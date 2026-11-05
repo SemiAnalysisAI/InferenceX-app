@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetServerLogAvailability, mockGetDb } = vi.hoisted(() => ({
-  mockGetServerLogAvailability: vi.fn(),
+const { mockGetBenchmarkPresence, mockGetDb } = vi.hoisted(() => ({
+  mockGetBenchmarkPresence: vi.fn(),
   mockGetDb: vi.fn(() => 'mock-sql'),
 }));
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({ getDb: mockGetDb }));
-vi.mock('@semianalysisai/inferencex-db/queries/server-logs', () => ({
-  getServerLogAvailability: mockGetServerLogAvailability,
+vi.mock('@semianalysisai/inferencex-db/queries/benchmark-presence', () => ({
+  getBenchmarkPresence: mockGetBenchmarkPresence,
 }));
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: any[]) => any) => fn,
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));
 
 import { NextRequest } from 'next/server';
@@ -23,16 +23,16 @@ beforeEach(() => vi.clearAllMocks());
 
 describe('GET /api/v1/log-availability', () => {
   it('returns a presence map for valid, deduplicated ids', async () => {
-    mockGetServerLogAvailability.mockResolvedValueOnce({ 4: true });
+    mockGetBenchmarkPresence.mockResolvedValueOnce({ trace: [9, 1], log: [4, 2] });
     const response = await GET(req('/api/v1/log-availability?ids=9,4,4'));
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ 4: true });
-    expect(mockGetServerLogAvailability).toHaveBeenCalledWith('mock-sql', [4, 9]);
+    expect(mockGetBenchmarkPresence).toHaveBeenCalledWith('mock-sql');
   });
 
   it('returns 400 when no valid ids are provided', async () => {
     const response = await GET(req('/api/v1/log-availability?ids=bad,0'));
     expect(response.status).toBe(400);
-    expect(mockGetServerLogAvailability).not.toHaveBeenCalled();
+    expect(mockGetBenchmarkPresence).not.toHaveBeenCalled();
   });
 });

@@ -1,0 +1,498 @@
+import type { OperatorXSource } from './source';
+import { normalizeBundle } from '@semianalysisai/inferencex-db/operatorx/normalize';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  planFromManifest,
+  type OperatorXRawBundle,
+} from '@semianalysisai/inferencex-db/operatorx/bundle';
+import { buildComparison, comparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
+
+import { caseRefs } from '@/components/operatorx/compare/model';
+
+const sourceMock = vi.hoisted(() => vi.fn());
+vi.mock('./sources', () => ({ getOperatorXSource: sourceMock }));
+const shared = vi.hoisted(() => ({
+  values: new Map<string, unknown>(),
+  get: vi.fn(),
+  set: vi.fn(),
+  purge: vi.fn(),
+}));
+vi.mock('@/lib/cache/blob-cache', () => ({
+  blobEnabled: () => true,
+  blobGet: shared.get,
+  blobSet: shared.set,
+  blobPurge: shared.purge,
+}));
+vi.mock('next/cache', () => ({
+  revalidateTag: vi.fn(),
+  unstable_cache: vi.fn(),
+}));
+
+const args = { m: 1, n: 64, k: 128, a: { dtype: 'bf16' }, b: { dtype: 'bf16' } };
+const shape = { type: 'gemm', args, sources: ['deepseek-ai/DeepSeek-R1-0528/q_a_proj'] };
+function bundle(
+  id: string,
+  backends: string[],
+  options: { noDocs?: boolean; status?: 'ok' | 'error'; revision?: string; kernel?: string } = {},
+): OperatorXRawBundle {
+  const kernel = options.kernel ?? 'gemm_kernel';
+  return {
+    run: {
+      run_id: id,
+      run_attempt: 1,
+      revision: options.revision ?? '1',
+      source_sha: 'a'.repeat(40),
+      source_branch: 'main',
+      generated_at: '2026-09-26T00:00:00Z',
+      conclusion: options.noDocs ? 'failure' : 'success',
+    },
+    manifest: {
+      include: [
+        {
+          id: 's1',
+          runner: 'cluster:h200-dgxc',
+          mode: 'timing',
+          backends,
+          cases: [{ testlist: 'gemm', shape }],
+        },
+      ],
+    },
+    shards: options.noDocs
+      ? []
+      : [
+          {
+            id: 's1',
+            attempt: 1,
+            docs: [
+              {
+                run: { cluster: 'h200' },
+                rows: backends.map((backend) => ({
+                  testlist: 'gemm',
+                  op: { ...shape, backend },
+                  status: options.status ?? 'ok',
+                  metrics: {
+                    latency_us: 10,
+                    profile: {
+                      timeline: [{ name: kernel, start_us: 0, dur_us: 10, stream: 0 }],
+                      kernels: [{ name: kernel, us_per_call: 10, count_per_call: 1 }],
+                    },
+                  },
+                })),
+              },
+            ],
+          },
+        ],
+  };
+}
+
+function projection(raw: OperatorXRawBundle) {
+  return buildComparison('gemm', [{ runner: 'h200-dgxc', dataset: normalizeBundle(raw) }]);
+}
+
+function source(bundles: OperatorXRawBundle[], failedIds = new Set<string>()) {
+  const byId = new Map(bundles.map((item) => [item.run.run_id, item]));
+  const getBundle = vi.fn((id: string) =>
+    failedIds.has(id)
+      ? Promise.reject(new Error('database unavailable'))
+      : Promise.resolve(byId.get(id)!),
+  );
+  const config: { -readonly [K in keyof OperatorXSource]: OperatorXSource[K] } = {
+    name: 'fixture',
+    listRuns: () =>
+      Promise.resolve(
+        bundles.map((item) => ({
+          ...item.run,
+          plan: planFromManifest(item.manifest)!,
+        })),
+      ),
+    getBundle,
+  };
+  sourceMock.mockReturnValue(config);
+  return { getBundle, config };
+}
+
+beforeEach(() => {
+  vi.resetModules();
+  sourceMock.mockReset();
+  vi.unstubAllEnvs();
+  shared.values.clear();
+  shared.get
+    .mockReset()
+    .mockImplementation((key: string) => Promise.resolve(shared.values.get(key) ?? null));
+  shared.set.mockReset().mockImplementation((key: string, value: unknown) => {
+    shared.values.set(key, structuredClone(value));
+    return Promise.resolve();
+  });
+  shared.purge.mockReset().mockImplementation((prefix: string) => {
+    for (const key of shared.values.keys()) if (key.startsWith(prefix)) shared.values.delete(key);
+    return Promise.resolve(0);
+  });
+});
+
+describe('OperatorX comparison coverage', () => {
+  it('keeps an older backend when the new run only measures vLLM', async () => {
+    const reads = source([bundle('2', ['vllm']), bundle('1', ['vllm', 'torch'])]);
+    const { getComparison } = await import('./service');
+
+    const comparison = await getComparison('gemm');
+
+    expect(comparison.rows.map((row) => [row.caseKey.split('|').at(-1), row.runId])).toEqual([
+      ['vllm', '2'],
+      ['torch', '1'],
+    ]);
+    expect(reads.getBundle).toHaveBeenCalledTimes(2);
+    await getComparison('gemm');
+    expect(reads.getBundle).toHaveBeenCalledTimes(2);
+  });
+
+  it('fills missing shard results from an older measurement', async () => {
+    source([bundle('2', ['vllm'], { noDocs: true }), bundle('1', ['vllm'])]);
+    const { getComparison } = await import('./service');
+
+    const comparison = await getComparison('gemm');
+    expect(comparison.rows).toMatchObject([{ runId: '1', status: 'ok', latencyUs: 10 }]);
+  });
+
+  it('loads an older run after the newest bundle read fails', async () => {
+    const reads = source([bundle('2', ['vllm']), bundle('1', ['vllm'])], new Set(['2']));
+    const { getComparison } = await import('./service');
+
+    const comparison = await getComparison('gemm');
+    expect(comparison.rows).toMatchObject([{ runId: '1', status: 'ok' }]);
+    expect(reads.getBundle).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports a source failure rather than an empty successful comparison', async () => {
+    source([bundle('2', ['vllm'])], new Set(['2']));
+    const { getComparison } = await import('./service');
+
+    await expect(getComparison('gemm')).rejects.toMatchObject({ status: 503 });
+  });
+
+  it('keeps a newer explicit error instead of resurrecting an old success', async () => {
+    source([bundle('2', ['vllm'], { status: 'error' }), bundle('1', ['vllm'])]);
+    const { getComparison } = await import('./service');
+
+    const comparison = await getComparison('gemm');
+    expect(comparison.rows).toMatchObject([{ runId: '2', status: 'error', latencyUs: null }]);
+  });
+});
+
+it('reads a stored timeline after a newer comparison replaces its row', async () => {
+  const old = bundle('1', ['vllm']);
+  const recent = bundle('2', ['vllm']);
+  source([old]);
+  const { getComparison, getTimelines } = await import('./service');
+  const comparison = await getComparison('gemm');
+  const view = comparisonView(comparison, null);
+  const ref = caseRefs(view, ['h200'], 0)[0].ref;
+  expect(ref).toBe('1:0:1');
+
+  source([recent, old]);
+  const result = await getTimelines('gemm', [ref]);
+
+  expect(result.known).toBe(true);
+  expect(result.timelines[ref]).toMatchObject({ names: ['gemm_kernel'], spanUs: 10 });
+});
+
+it('uses the new stored revision after re-ingest instead of a cached old bundle', async () => {
+  source([bundle('1', ['vllm'], { revision: '101', kernel: 'old_kernel' })]);
+  const { getDataset, getTimelines } = await import('./service');
+  await getDataset('1');
+
+  source([bundle('1', ['vllm'], { revision: '102', kernel: 'new_kernel' })]);
+  const current = await getTimelines('gemm', ['1:0:102']);
+  const replaced = await getTimelines('gemm', ['1:0:101']);
+
+  expect(current).toMatchObject({
+    known: true,
+    timelines: { '1:0:102': { names: ['new_kernel'] } },
+  });
+  expect(replaced).toEqual({ known: false, timelines: { '1:0:101': null } });
+});
+
+describe('compact OperatorX comparison reads', () => {
+  it('serves stored comparisons without reading artifacts, and reuses the revision cache', async () => {
+    const raw = bundle('9', ['vllm'], { revision: '900' });
+    const reads = source([raw]);
+    const compact = buildComparison('gemm', [
+      { runner: 'h200-dgxc', dataset: normalizeBundle(raw) },
+    ]);
+    const getRunComparison = vi.fn().mockResolvedValue(compact);
+    reads.config.getRunComparison = getRunComparison;
+    const { getComparison } = await import('./service');
+    expect(await getComparison('gemm')).toEqual(compact);
+    expect(await getComparison('gemm')).toEqual(compact);
+    expect(getRunComparison).toHaveBeenCalledTimes(1);
+    expect(reads.getBundle).not.toHaveBeenCalled();
+  });
+
+  it('mixes compact and legacy runs while filling only missing cases', async () => {
+    const newest = bundle('9', ['vllm', 'torch'], { noDocs: true });
+    const older = bundle('8', ['vllm', 'torch']);
+    const reads = source([newest, older]);
+    reads.config.getRunComparison = vi.fn((id: string) =>
+      Promise.resolve(
+        id === '9'
+          ? buildComparison('gemm', [{ runner: 'h200-dgxc', dataset: normalizeBundle(newest) }])
+          : null,
+      ),
+    );
+    const { getComparison } = await import('./service');
+    const result = await getComparison('gemm');
+    expect(result.rows.map((r) => [r.runId, r.status, r.revision])).toEqual([
+      ['8', 'ok', '1'],
+      ['8', 'ok', '1'],
+    ]);
+    expect(reads.getBundle).toHaveBeenCalledTimes(1);
+    expect(reads.getBundle).toHaveBeenCalledWith('8');
+  });
+
+  it('does not cache a partial compact read or hide a storage error with artifact fallback', async () => {
+    const rows = [bundle('9', ['vllm']), bundle('8', ['vllm'])];
+    const reads = source(rows);
+    const getRunComparison = vi.fn((id: string) => {
+      if (id === '9') return Promise.reject(new Error('storage unavailable'));
+      return Promise.resolve(
+        buildComparison('gemm', [{ runner: 'h200-dgxc', dataset: normalizeBundle(rows[1]) }]),
+      );
+    });
+    reads.config.getRunComparison = getRunComparison;
+    const { getComparison, isPartialComparison } = await import('./service');
+    const first = await getComparison('gemm');
+    expect(first.rows[0].runId).toBe('8');
+    expect(isPartialComparison(first)).toBe(true);
+    await getComparison('gemm');
+    expect(getRunComparison).toHaveBeenCalledTimes(4);
+    expect(reads.getBundle).not.toHaveBeenCalled();
+  });
+
+  it('refreshes compact results when the run revision changes', async () => {
+    const first = bundle('9', ['vllm'], { revision: '900' });
+    const firstReads = source([first]);
+    firstReads.config.getRunComparison = vi
+      .fn()
+      .mockResolvedValue(
+        buildComparison('gemm', [{ runner: 'h200-dgxc', dataset: normalizeBundle(first) }]),
+      );
+    const { getComparison } = await import('./service');
+    const originalComparison = await getComparison('gemm');
+    expect(originalComparison.rows[0].revision).toBe('900');
+    const replaced = bundle('9', ['vllm'], { revision: '901' });
+    const reads = source([replaced]);
+    const getRunComparison = vi
+      .fn()
+      .mockResolvedValue(
+        buildComparison('gemm', [{ runner: 'h200-dgxc', dataset: normalizeBundle(replaced) }]),
+      );
+    reads.config.getRunComparison = getRunComparison;
+    const updatedComparison = await getComparison('gemm');
+    expect(updatedComparison.rows[0].revision).toBe('901');
+    expect(getRunComparison).toHaveBeenCalledTimes(1);
+    expect(reads.getBundle).not.toHaveBeenCalled();
+  });
+});
+
+describe('bulk OperatorX comparison reads', () => {
+  it.each([true, false])(
+    'uses one query, preserving merge order and fallback (complete=%s)',
+    async (complete) => {
+      const newest = bundle('9', ['vllm'], { status: 'error' });
+      const older = bundle('8', ['vllm', 'torch']);
+      const reads = source([newest, older]);
+      const compact = new Map(
+        (complete ? [older, newest] : [newest]).map((raw) => [raw.run.run_id, projection(raw)]),
+      );
+      const read = vi.fn().mockResolvedValue(compact);
+      reads.config.getRunComparisons = read;
+      reads.config.getRunComparison = vi
+        .fn()
+        .mockRejectedValue(new Error('unexpected per-run read'));
+      const { getComparison } = await import('./service');
+      const result = await getComparison('gemm');
+      expect(result.rows.map((row) => [row.runId, row.status])).toEqual([
+        ['9', 'error'],
+        ['8', 'ok'],
+      ]);
+      await getComparison('gemm');
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(read.mock.calls[0][0]).toMatchObject([{ run_id: '9' }, { run_id: '8' }]);
+      expect(reads.config.getRunComparison).not.toHaveBeenCalled();
+      expect(reads.getBundle).toHaveBeenCalledTimes(complete ? 0 : 1);
+    },
+  );
+
+  it('retries a failed bulk query without silently loading raw artifacts', async () => {
+    const reads = source([bundle('9', ['vllm'])]);
+    reads.config.getRunComparisons = vi.fn().mockRejectedValue(new Error('bulk read unavailable'));
+    const { getComparison } = await import('./service');
+    await expect(getComparison('gemm')).rejects.toThrow('bulk read unavailable');
+    await expect(getComparison('gemm')).rejects.toThrow('bulk read unavailable');
+    expect(reads.config.getRunComparisons).toHaveBeenCalledTimes(2);
+    expect(reads.getBundle).not.toHaveBeenCalled();
+  });
+});
+
+it('reads timelines four runs at a time, reuses shared runs and preserves reference order', async () => {
+  const items = Array.from({ length: 6 }, (_, i) => bundle(String(i + 1), ['vllm', 'torch']));
+  const reads = source(items);
+  const pending = new Map(
+    items.map((item) => [item.run.run_id, Promise.withResolvers<OperatorXRawBundle>()]),
+  );
+  const secondBatch = Promise.withResolvers<void>();
+  reads.getBundle.mockImplementation((id: string) => {
+    if (id === '6') secondBatch.resolve();
+    return pending.get(id)!.promise;
+  });
+  const { getTimelines } = await import('./service');
+  expect(await getTimelines('gemm', [])).toEqual({ known: true, timelines: {} });
+  expect(reads.getBundle).not.toHaveBeenCalled();
+  const refs = ['1:0:1', '2:0:1', '1:1:1', '3:0:1', '4:0:1', '5:0:1', '6:0:1', '1:0:1'];
+  const resultPromise = getTimelines('gemm', refs);
+  expect(reads.getBundle.mock.calls.map(([id]) => id)).toEqual(['1', '2', '3', '4']);
+  // Complete each batch out of order; completion must not reorder the response.
+  for (const id of ['4', '3', '2', '1']) pending.get(id)!.resolve(items[Number(id) - 1]);
+  await secondBatch.promise;
+  expect(reads.getBundle).toHaveBeenCalledTimes(6);
+  pending.get('6')!.resolve(items[5]);
+  pending.get('5')!.resolve(items[4]);
+  const result = await resultPromise;
+  expect(result.known).toBe(true);
+  expect(Object.keys(result.timelines)).toEqual([...new Set(refs)]);
+  expect(Object.values(result.timelines)).toHaveLength(7);
+  for (const timeline of Object.values(result.timelines)) {
+    expect(timeline).toMatchObject({ names: ['gemm_kernel'], spanUs: 10 });
+  }
+  expect(reads.getBundle.mock.calls.filter(([id]) => id === '1')).toHaveLength(1);
+});
+
+it('marks missing, stale and invalid timeline references unknown without losing valid siblings', async () => {
+  const reads = source([bundle('1', ['vllm'])]);
+  const { OperatorXSourceError } = await import('./source');
+  reads.getBundle.mockImplementation((id: string) =>
+    id === 'missing'
+      ? Promise.reject(new OperatorXSourceError('Run not found', 404))
+      : Promise.resolve(bundle(id, ['vllm'])),
+  );
+  const { getTimelines } = await import('./service');
+  const invalid = ['missing:0:1', '1:0:stale', '1:99:1', '1:0', 'missing:1:1'];
+  const result = await getTimelines('gemm', [...invalid, '1:0:1']);
+  expect(result.known).toBe(false);
+  expect(result.timelines['1:0:1']).toMatchObject({ names: ['gemm_kernel'] });
+  for (const ref of invalid) {
+    expect(result.timelines[ref]).toBeNull();
+  }
+  expect(reads.getBundle).toHaveBeenCalledTimes(2);
+  expect(await getTimelines('moe', ['1:0:1'])).toEqual({
+    known: false,
+    timelines: { '1:0:1': null },
+  });
+});
+
+it('propagates non-404 timeline read failures', async () => {
+  const reads = source([bundle('1', ['vllm'])]);
+  const { OperatorXSourceError } = await import('./source');
+  const failure = new OperatorXSourceError('Database unavailable', 503);
+  reads.getBundle.mockRejectedValue(failure);
+  const { getTimelines } = await import('./service');
+  await expect(getTimelines('gemm', ['1:0:1', '1:1:1'])).rejects.toBe(failure);
+  expect(reads.getBundle).toHaveBeenCalledTimes(1);
+});
+
+describe('shared OperatorX comparisons', () => {
+  it('reuses a merged comparison on a fresh instance, including payloads over 2 MB', async () => {
+    const raw = bundle('new', ['vllm']);
+    const { config, getBundle } = source([raw]);
+    config.name = 'database';
+    const comparison = projection(raw);
+    comparison.rows[0].sources[0].roles.push('x'.repeat(2_100_000));
+    const read = vi.fn().mockResolvedValue(new Map([[raw.run.run_id, comparison]]));
+    config.getRunComparisons = read;
+    const firstService = await import('./service');
+    const first = await firstService.getComparison('gemm');
+    expect(JSON.stringify(first).length).toBeGreaterThan(2_000_000);
+    vi.resetModules();
+    const secondService = await import('./service');
+    const second = await secondService.getComparison('gemm');
+    expect(second).toEqual(first);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(getBundle).not.toHaveBeenCalled();
+    expect(shared.set).toHaveBeenCalledTimes(1);
+  });
+
+  it('keys re-ingestion by revision and scoped invalidation removes the shared entry', async () => {
+    const raw = bundle('new', ['vllm']);
+    const { config, getBundle } = source([raw]);
+    config.name = 'database';
+    const service = await import('./service');
+    await service.getComparison('gemm');
+    raw.run.revision = '2';
+    const updated = await service.getComparison('gemm');
+    expect(updated.rows[0].revision).toBe('2');
+    expect(getBundle).toHaveBeenCalledTimes(2);
+    expect(shared.values.size).toBe(2);
+    const { purgeOperatorX } = await import('@/lib/cache/api-cache');
+    shared.values.set('unrelated:entry', { untouched: true });
+    await purgeOperatorX();
+    expect(shared.values.size).toBe(1);
+    expect(shared.values.has('unrelated:entry')).toBe(true);
+    vi.resetModules();
+    const service1 = await import('./service');
+    await service1.getComparison('gemm');
+    expect(getBundle).toHaveBeenCalledTimes(3);
+  });
+
+  it('never shares partial reads and retries them after source recovery', async () => {
+    const failed = new Set(['old']);
+    const { config, getBundle } = source(
+      [bundle('new', ['vllm']), bundle('old', ['torch'])],
+      failed,
+    );
+    config.name = 'database';
+    const firstService = await import('./service');
+    const first = await firstService.getComparison('gemm');
+    expect(firstService.isPartialComparison(first)).toBe(true);
+    expect(shared.set).not.toHaveBeenCalled();
+    failed.clear();
+    vi.resetModules();
+    const recoveredService = await import('./service');
+    const recovered = await recoveredService.getComparison('gemm');
+    expect(recoveredService.isPartialComparison(recovered)).toBe(false);
+    expect(recovered.rows).toHaveLength(2);
+    expect(getBundle).toHaveBeenCalledTimes(4);
+    expect(shared.set).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not publish a concurrent re-ingest under the captured old revision', async () => {
+    const raw = bundle('new', ['vllm'], { revision: '2' });
+    const { config } = source([raw]);
+    config.name = 'database';
+    config.listRuns = () =>
+      Promise.resolve([{ ...raw.run, revision: '1', plan: planFromManifest(raw.manifest)! }]);
+    const service = await import('./service');
+    const result = await service.getComparison('gemm');
+    expect(result.rows[0].revision).toBe('2');
+    expect(service.isPartialComparison(result)).toBe(true);
+    expect(shared.set).not.toHaveBeenCalled();
+  });
+
+  it('isolates deployment namespaces and never persists local artifacts', async () => {
+    const { config, getBundle } = source([bundle('new', ['vllm'])]);
+    config.name = 'database';
+    vi.stubEnv('CACHE_NAMESPACE', 'production');
+    const service2 = await import('./service');
+    await service2.getComparison('gemm');
+    vi.resetModules();
+    vi.stubEnv('CACHE_NAMESPACE', 'staging');
+    const service3 = await import('./service');
+    await service3.getComparison('gemm');
+    expect(getBundle).toHaveBeenCalledTimes(2);
+    expect(shared.values.size).toBe(2);
+    vi.resetModules();
+    config.name = 'local';
+    const service4 = await import('./service');
+    await service4.getComparison('gemm');
+    expect(shared.set).toHaveBeenCalledTimes(2);
+  });
+});

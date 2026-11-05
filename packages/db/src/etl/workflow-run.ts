@@ -1,12 +1,10 @@
-/**
- * Workflow run cache + GitHub API enrichment.
- * `createWorkflowRunServices(sql, githubToken?)` returns `fetchGithubRun` and
- * `getOrCreateWorkflowRun`.
- */
-
 import type postgres from 'postgres';
 
-import { GITHUB_API_BASE, GITHUB_REPOS } from '@semianalysisai/inferencex-constants';
+import {
+  benchmarkSourceRepos,
+  GITHUB_API_BASE,
+  LEGACY_GITHUB_REPO,
+} from '@semianalysisai/inferencex-constants';
 
 import { CONCLUSION_OVERRIDES, isRunAttemptPurged } from './run-overrides.js';
 
@@ -31,34 +29,14 @@ export interface GithubRunInfo {
   pullRequests: GithubPullRequestRef[];
 }
 
-/**
- * Create workflow-run DB services with an in-memory cache.
- * Both `fetchGithubRun` and `getOrCreateWorkflowRun` are memoized so that
- * repeated calls for the same run ID within one ingest session hit the cache
- * rather than making extra network or DB round-trips.
- *
- * @param sql - Active `postgres` connection used for upserts.
- * @param githubToken - Optional GitHub PAT used to enrich runs via the API.
- *   When omitted, `fetchGithubRun` always returns `null`.
- * @returns An object with `fetchGithubRun` and `getOrCreateWorkflowRun`.
- */
 export function createWorkflowRunServices(
   sql: Sql,
   githubToken?: string,
-  repos: readonly string[] = GITHUB_REPOS,
+  repos: readonly string[] = [...benchmarkSourceRepos(), LEGACY_GITHUB_REPO],
 ) {
   const workflowRunCache = new Map<string, number>();
   const githubRunCache = new Map<number, GithubRunInfo | null>();
 
-  /**
-   * Fetch metadata for a GitHub Actions run from the API.
-   * Tries each repo in `GITHUB_REPOS` in order, stopping at the first 200 response.
-   * Results (including `null` for 404s or network failures) are cached in memory.
-   *
-   * @param runId - Numeric GitHub Actions run ID.
-   * @returns A `GithubRunInfo` object if the run was found, or `null` on 404,
-   *   network error, or when no `githubToken` was provided.
-   */
   async function fetchGithubRun(runId: number): Promise<GithubRunInfo | null> {
     if (githubRunCache.has(runId)) return githubRunCache.get(runId)!;
     if (!githubToken) {
@@ -119,27 +97,6 @@ export function createWorkflowRunServices(
     }
   }
 
-  /**
-   * Upsert a `workflow_runs` row and return its DB id.
-   * Fields from `ghInfo` (if provided) take precedence over the inline params,
-   * allowing the GCS backup script to enrich rows with live GitHub API data
-   * while the CI script supplies all fields directly from environment variables.
-   * The result is cached so subsequent calls for the same run skip the upsert.
-   *
-   * @param params.githubRunId - Numeric GitHub Actions run ID.
-   * @param params.name - Workflow run display name.
-   * @param params.date - ISO date string (`YYYY-MM-DD`) associated with this run.
-   * @param params.headBranch - Git branch name, if known.
-   * @param params.headSha - Git commit SHA, if known.
-   * @param params.createdAt - ISO timestamp when the run was created.
-   * @param params.status - Run status string (e.g. `'completed'`).
-   * @param params.conclusion - Run conclusion string (e.g. `'success'`), or `null`.
-   * @param params.htmlUrl - URL to the run on GitHub, if known.
-   * @param params.runStartedAt - ISO timestamp when the run actually started, if known.
-   * @param params.ghInfo - Optional pre-fetched GitHub API data; fields here
-   *   override the corresponding inline params when present.
-   * @returns The `workflow_runs.id` primary key for this run.
-   */
   async function getOrCreateWorkflowRun(params: {
     githubRunId: number;
     runAttempt?: number;

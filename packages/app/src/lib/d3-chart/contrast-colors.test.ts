@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { contrastColors } from './contrast-colors';
 
-// Mock canvas for color probing
 const mockImageData = { data: new Uint8ClampedArray([0, 0, 0, 255]) };
 const mockCtx = {
   clearRect: vi.fn(),
@@ -11,9 +10,7 @@ const mockCtx = {
   get fillStyle(): string {
     return '';
   },
-  set fillStyle(_: string) {
-    /* noop — the test controls output via mockImageData */
-  },
+  set fillStyle(_: string) {},
 };
 
 beforeEach(() => {

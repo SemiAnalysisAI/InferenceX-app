@@ -1,7 +1,7 @@
 ---
 title: 'AMD MI355X Qwen3.5 397B-A17B 推理：SGLang FP8 三个月内每 GPU 吞吐量提升最高 19 倍'
-subtitle: '从 v0.5.8（2 月）→ v0.5.10rc0（4 月）→ v0.5.12（5 月），三次 AITER 内核合入 MI355X 加上从 TP=8 到 TP=2/TP=4 的重新调优，将 Qwen3.5 8k/1k 峰值从 1.3k 推高至 6.4k tok/s/GPU，并将曲线延伸至 75 tok/s/user'
-seoDescription: 'AMD MI355X 在 SGLang FP8 上 3 个月内将 Qwen3.5 397B-A17B 每 GPU 吞吐量最高提升 19 倍——经 AITER 内核从 1.3k 提升至 6.4k tok/s/GPU。'
+subtitle: '从 v0.5.8（2 月）→ v0.5.10rc0（4 月）→ v0.5.12（5 月），三次 AITER kernel 合入 MI355X 加上从 TP=8 到 TP=2/TP=4 的重新调优，将 Qwen3.5 8k/1k 峰值从 1.3k 推高至 6.4k tok/s/GPU，并将曲线延伸至 75 tok/s/user'
+seoDescription: 'AMD MI355X 在 SGLang FP8 上 3 个月内将 Qwen3.5 397B-A17B 每 GPU 吞吐量最高提升 19 倍——经 AITER kernel 从 1.3k 提升至 6.4k tok/s/GPU。'
 date: '2026-05-25'
 publishDate: '2026-05-25'
 tags:
@@ -15,7 +15,7 @@ tags:
   - rocm
 ---
 
-阿里巴巴于 [2026-02-16 发布 Qwen3.5-397B-A17B](https://www.alibabacloud.com/blog/602894) 后 13 周，AMD MI355X 上 SGLang FP8 在 8k/1k 工作负载下的每 GPU 吞吐量在 40 tok/s/user 的等交互性下**最高提升至 19.0 倍**（在仪表板的单调三次 Hermite Pareto 插值上，从 2026-02-20 v0.5.8.post1 基线的 192 tok/s/GPU 提升至 2026-05-19 v0.5.12 运行的 3,660 tok/s/GPU）。这一增长叠加了三个 SGLang 版本以及三次 AITER MoE 内核合入带来的大部分提升，5 月的 v0.5.10rc0 → v0.5.12 镜像升级又在此基础上额外贡献了约 **1.5 倍**。
+阿里巴巴于 [2026-02-16 发布 Qwen3.5-397B-A17B](https://www.alibabacloud.com/blog/602894) 后 13 周，AMD MI355X 上 SGLang FP8 在 8k/1k 工作负载下的每 GPU 吞吐量在 40 tok/s/user 的等交互性下**最高提升至 19.0 倍**（在仪表板的单调三次 Hermite Pareto 插值上，从 2026-02-20 v0.5.8.post1 基线的 192 tok/s/GPU 提升至 2026-05-19 v0.5.12 运行的 3,660 tok/s/GPU）。这一增长叠加了三个 SGLang 版本以及三次 AITER MoE kernel 合入带来的大部分提升，5 月的 v0.5.10rc0 → v0.5.12 镜像升级又在此基础上额外贡献了约 **1.5 倍**。
 
 这完全是软件优化——全程使用相同的 MI355X CDNA4 硅片，TCO 始终为 $1.48/GPU/hr。相关记录：[sgl-project/sglang#20736](https://github.com/sgl-project/sglang/pull/20736)、[sgl-project/sglang#21188](https://github.com/sgl-project/sglang/pull/21188) 和 [sgl-project/sglang#21421](https://github.com/sgl-project/sglang/pull/21421)，均在 3–4 月合入，且均通过 `SGLANG_USE_AITER=1` 开关控制。上游到基准测试的闭环速度本身就是护城河。
 
@@ -36,9 +36,9 @@ Qwen3.5-397B-A17B 是阿里巴巴的 MoE 旗舰模型，于 2026-02-16 发布，
 
 带来这些巨大性能提升的部分优化包括：
 
-- **[sgl-project/sglang PR #20736](https://github.com/sgl-project/sglang/pull/20736)**，由 [zhentaocc](https://github.com/zhentaocc) 提交（合著者 [yichiche](https://github.com/yichiche)），2026-04-15 合入——**在 Qwen2 MoE 和 Qwen3.5 MoE 中将共享专家与路由专家融合**。当 `shared_expert_intermediate_size == moe_intermediate_size` 时，共享专家被视为额外的一个专家（top-K + 1），在单次 AITER MoE 分发中一并处理。每个 MoE 层减少一次内核启动，共享专家权重的 HBM 往返次数也减少。据报告在 Qwen3.5 并发 16 时总吞吐量提升 +4.6%，TPOT 降低 -4%；FP8 精度最初需要 AITER split-K 修复后才能启用。
-- **[sgl-project/sglang PR #21188](https://github.com/sgl-project/sglang/pull/21188)**，由 [yichiche](https://github.com/yichiche) 提交，2026-03-23 合入——**为 `GemmaRMSNorm` 添加 `forward_hip` 路径，使 AMD GPU 使用融合 RMSNorm 内核（AITER `fused_add_rms_norm` / `rms_norm`）而非原生回退路径**。原生路径在 MI355X 上受标量运算限制；融合路径将 Gemma 风格的 `weight + 1.0` 偏移吸收进内核中。据报告在 8x MI355X、并发 1、8k/1k 下：**中位端到端延迟降低 -23.1%，总吞吐量提升 +30.0%，中位首 token 延迟（TTFT）降低 -17.0%**，同时 GSM8K 精度从 0.943 提升至 0.955。
-- **[sgl-project/sglang PR #21421](https://github.com/sgl-project/sglang/pull/21421)**，由 [zhentaocc](https://github.com/zhentaocc) 提交，2026-03-26 合入——**将 AITER 的 `fused_topk` 内核集成到 SGLang 的 `fused_topk` 中，用于 softmax 评分的 MoE top-K 选择**。启用 AITER 时自动分发到 `aiter.fused_moe.fused_topk`。内核微基准测试显示：在 Qwen3.5 形态（E=512, top-K=10）上比 sgl-kernel 基线快约 1.31x 到 **6.29x**，在高 token 数下增益最大。端到端 bs=64 1k/1k 下：总吞吐量提升 +1.9%，GSM8K 精度与基线偏差在 ±0.001 以内。
+- **[sgl-project/sglang PR #20736](https://github.com/sgl-project/sglang/pull/20736)**，由 [zhentaocc](https://github.com/zhentaocc) 提交（合著者 [yichiche](https://github.com/yichiche)），2026-04-15 合入——**在 Qwen2 MoE 和 Qwen3.5 MoE 中将共享专家与路由专家融合**。当 `shared_expert_intermediate_size == moe_intermediate_size` 时，共享专家被视为额外的一个专家（top-K + 1），在单次 AITER MoE 分发中一并处理。每个 MoE 层减少一次 kernel 启动，共享专家权重的 HBM 往返次数也减少。据报告在 Qwen3.5 并发 16 时总吞吐量提升 4.6%，TPOT 降低 4%；FP8 精度最初需要 AITER split-K 修复后才能启用。
+- **[sgl-project/sglang PR #21188](https://github.com/sgl-project/sglang/pull/21188)**，由 [yichiche](https://github.com/yichiche) 提交，2026-03-23 合入——**为 `GemmaRMSNorm` 添加 `forward_hip` 路径，使 AMD GPU 使用融合 RMSNorm kernel（AITER `fused_add_rms_norm` / `rms_norm`）而非原生回退路径**。原生路径在 MI355X 上受标量运算限制；融合路径将 Gemma 风格的 `weight + 1.0` 偏移吸收进 kernel 中。据报告在 8x MI355X、并发 1、8k/1k 下：**中位端到端延迟降低 23.1%，总吞吐量提升 30.0%，中位首 token 延迟（TTFT）降低 17.0%**，同时 GSM8K 精度从 0.943 提升至 0.955。
+- **[sgl-project/sglang PR #21421](https://github.com/sgl-project/sglang/pull/21421)**，由 [zhentaocc](https://github.com/zhentaocc) 提交，2026-03-26 合入——**将 AITER 的 `fused_topk` kernel 集成到 SGLang 的 `fused_topk` 中，用于 softmax 评分的 MoE top-K 选择**。启用 AITER 时自动分发到 `aiter.fused_moe.fused_topk`。kernel 微基准测试显示：在 Qwen3.5 形态（E=512, top-K=10）上比 sgl-kernel 基线快约 1.31x 到 **6.29x**，在高 token 数下增益最大。端到端 bs=64 1k/1k 下：总吞吐量提升 1.9%，GSM8K 精度与基线偏差在 ±0.001 以内。
 
 ## 测试数据
 
@@ -149,7 +149,7 @@ Qwen3.5-397B-A17B 是阿里巴巴的 MoE 旗舰模型，于 2026-02-16 发布，
       "name": "哪些 SGLang PR 推动了 MI355X Qwen3.5 的加速？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "三个由 AMD 编写、通过 SGLANG_USE_AITER=1 开关控制的上游 PR 被纳入 v0.5.10rc0 镜像。PR #20736（zhentaocc 提交，2026-04-15 合入）在 Qwen2/Qwen3.5 MoE 中将共享专家与路由专家融合为单次 AITER 分发中的 topk+1。PR #21188（yichiche 提交，2026-03-23 合入）为 GemmaRMSNorm 添加 forward_hip 路径，使 AMD GPU 使用融合 RMSNorm 内核（AITER fused_add_rms_norm / rms_norm）而非原生回退路径，据报告在 8k/1k 并发 1 下端到端延迟降低 -23.1%，吞吐量提升 +30.0%。PR #21421（zhentaocc 提交，2026-03-26 合入）将 AITER 的 fused_topk 内核集成到 SGLang 的 fused_topk 中用于 softmax MoE top-K 选择，内核微基准测试在 Qwen3.5 形态上比 sgl-kernel 基线快 1.31x 到 6.29x。"
+        "text": "三个由 AMD 编写、通过 SGLANG_USE_AITER=1 开关控制的上游 PR 被纳入 v0.5.10rc0 镜像。PR #20736（zhentaocc 提交，2026-04-15 合入）在 Qwen2/Qwen3.5 MoE 中将共享专家与路由专家融合为单次 AITER 分发中的 topk+1。PR #21188（yichiche 提交，2026-03-23 合入）为 GemmaRMSNorm 添加 forward_hip 路径，使 AMD GPU 使用融合 RMSNorm kernel（AITER fused_add_rms_norm / rms_norm）而非原生回退路径，据报告在 8k/1k 并发 1 下端到端延迟降低 23.1%，吞吐量提升 30.0%。PR #21421（zhentaocc 提交，2026-03-26 合入）将 AITER 的 fused_topk kernel 集成到 SGLang 的 fused_topk 中用于 softmax MoE top-K 选择，kernel 微基准测试在 Qwen3.5 形态上比 sgl-kernel 基线快 1.31x 到 6.29x。"
       }
     },
     {
@@ -157,7 +157,7 @@ Qwen3.5-397B-A17B 是阿里巴巴的 MoE 旗舰模型，于 2026-02-16 发布，
       "name": "从 TP=8 切换到 TP=2/TP=4 带来了多少增益？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "2026 年 4 月的 InferenceX 配方更新将 TP 重新调优、v0.5.10rc0 镜像升级和 AITER PR 打包为一次变更，因此从公开的 InferenceX 数据集无法将它们完全分离。可以确定的是：TP=8 在 Qwen3.5 的 512 专家 MoE 分发路径上浪费了 MI355X 大部分的 tensor-core 算力，而 TP=2 / TP=4 将解码批次分配到更少的 rank 上以保持 AITER 融合 MoE 分发的高效运行。TP 重新调优是 AITER 内核优化在端到端层面得以体现的必要条件。"
+        "text": "2026 年 4 月的 InferenceX 配方更新将 TP 重新调优、v0.5.10rc0 镜像升级和 AITER PR 打包为一次变更，因此从公开的 InferenceX 数据集无法将它们完全分离。可以确定的是：TP=8 在 Qwen3.5 的 512 专家 MoE 分发路径上浪费了 MI355X 大部分的 tensor-core 算力，而 TP=2 / TP=4 将解码批次分配到更少的 rank 上以保持 AITER 融合 MoE 分发的高效运行。TP 重新调优是 AITER kernel 优化在端到端层面得以体现的必要条件。"
       }
     },
     {

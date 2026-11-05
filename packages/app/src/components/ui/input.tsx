@@ -1,6 +1,6 @@
 import * as React from 'react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/shared/utils';
 import { CONTROL_FOCUS, CONTROL_HEIGHT } from '@/components/ui/control-styles';
 
 function Input({ className, type, ...props }: React.ComponentProps<'input'>) {

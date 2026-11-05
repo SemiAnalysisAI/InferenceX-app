@@ -125,9 +125,6 @@ describe('Dataset conversation flamegraph timing', () => {
   it('shows subturn offsets when the subagent group is expanded', () => {
     cy.contains('button', 'Explore').click();
     cy.get('[data-testid="flamegraph-time-g-1-c-0"]').should('have.text', '+1:01:01–1:01:08');
-    // Parallel groups render as left-gutter brackets; each member row carries
-    // one bracket segment per group it belongs to (non-transitive chains keep
-    // their own segments/lanes).
     cy.get('[data-testid="flamegraph-overlap-g-1-c-0"]')
       .should('have.length', 1)
       .and('have.attr', 'data-overlap-group', 'subagent-1-1');
@@ -149,8 +146,6 @@ describe('Dataset conversation flamegraph timing', () => {
       onBeforeLoad: unlockAgenticGate,
     });
 
-    // Representative label only — exhaustive label coverage lives in
-    // trace-flamegraph.test.ts (buildVisibleRows).
     cy.get('[data-rowkey="t-0"]').should('contain.text', '第 1 轮');
     cy.get('[data-testid="flamegraph-bar-t-0"]')
       .should('have.attr', 'role', 'meter')
@@ -163,9 +158,7 @@ describe('Dataset conversation flamegraph timing', () => {
     cy.get('[data-testid="flamegraph-bar-t-0"]').blur();
     cy.contains('button', 'Explore').click();
     cy.get('[data-rowkey="g-1-c-0"]').should('exist');
-  });
 
-  it('publishes bidirectional hreflang metadata for noindex conversation pages', () => {
     cy.visit('/zh/agentx/test-dataset/conversations/conversation-1', {
       onBeforeLoad: unlockAgenticGate,
     });

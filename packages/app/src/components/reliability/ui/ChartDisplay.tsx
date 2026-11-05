@@ -9,9 +9,9 @@ import { ChartSection } from '@/components/ui/chart-section';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading } from '@/components/ui/heading';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
-import { exportToCsv } from '@/lib/csv-export';
-import { reliabilityChartToCsv } from '@/lib/csv-export-helpers';
-import { useLocale } from '@/lib/use-locale';
+import { exportToCsv } from '@/lib/export/csv-export';
+import { reliabilityChartToCsv } from '@/lib/export/csv-export-helpers';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import ReliabilityBarChartD3 from './BarChartD3';
 import ReliabilityChartControls from './ChartControls';
@@ -38,7 +38,7 @@ const STRINGS = {
 
 export default function ReliabilityChartDisplay() {
   const CHART_ID = 'reliability-chart';
-  const { setIsLegendExpanded, chartData } = useReliabilityContext();
+  const { setIsLegendExpanded, chartData, enabledModels } = useReliabilityContext();
   const t = STRINGS[useLocale()];
 
   const handleExportCsv = useCallback(() => {
@@ -70,6 +70,7 @@ export default function ReliabilityChartDisplay() {
       <ChartSection
         chartId={CHART_ID}
         analyticsPrefix="reliability"
+        analyticsContext={{ gpu_count: enabledModels.size }}
         zoomResetEvent={`d3chart_zoom_reset_${CHART_ID}`}
         setIsLegendExpanded={setIsLegendExpanded}
         onExportCsv={handleExportCsv}

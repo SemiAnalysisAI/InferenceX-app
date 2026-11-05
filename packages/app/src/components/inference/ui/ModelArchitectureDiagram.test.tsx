@@ -4,17 +4,19 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Model } from '@/lib/data-mappings';
-import { getModelArchitecture } from '@/lib/model-architectures';
+import { Model } from '@/lib/catalog/data-mappings';
+import { getModelArchitecture } from '@/lib/catalog/model-architectures';
 
 const mocks = vi.hoisted(() => ({
   renderDiagram: vi.fn(),
+  diagramHeight: vi.fn((_arch: unknown, _expanded: ReadonlySet<string>): number | null => 480),
   theme: { resolved: 'light' },
   pathname: { value: '/inference' },
 }));
 
 vi.mock('./model-architecture-diagram-renderer', () => ({
   renderDiagram: mocks.renderDiagram,
+  diagramHeight: mocks.diagramHeight,
 }));
 vi.mock('next-themes', () => ({
   useTheme: () => ({ resolvedTheme: mocks.theme.resolved }),
@@ -24,7 +26,7 @@ vi.mock('next/link', () => ({
     <a {...props}>{children}</a>
   ),
 }));
-vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
+vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 vi.mock('next/navigation', () => ({ usePathname: () => mocks.pathname.value }));
 
 import ModelArchitectureDiagram from './ModelArchitectureDiagram';
@@ -75,6 +77,14 @@ let container: HTMLDivElement;
 let root: Root;
 let observedWidth: number;
 let clientWidthSpy: { mockRestore: () => void };
+const resizeFrames = new Map<number, FrameRequestCallback>();
+let nextFrame = 0;
+
+function flushResizeFrames() {
+  const callbacks = [...resizeFrames.values()];
+  resizeFrames.clear();
+  act(() => callbacks.forEach((callback) => callback(0)));
+}
 
 function render(model: Model = Model.DeepSeek_R1) {
   act(() => root.render(<ModelArchitectureDiagram model={model} />));
@@ -95,6 +105,13 @@ beforeEach(() => {
   mocks.pathname.value = '/inference';
   ResizeObserverStub.instances = [];
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
+  resizeFrames.clear();
+  nextFrame = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    resizeFrames.set(++nextFrame, callback);
+    return nextFrame;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => resizeFrames.delete(id));
   clientWidthSpy = vi
     .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
     .mockImplementation(() => observedWidth);
@@ -144,6 +161,23 @@ describe('ModelArchitectureDiagram rendering', () => {
     expect(mocks.renderDiagram.mock.calls.at(-1)?.[5]).toBe('zh');
   });
 
+  it('reserves the diagram height on the svg before the renderer draws', () => {
+    mocks.diagramHeight.mockReturnValueOnce(512);
+    act(() => root.render(<ModelArchitectureDiagram model={Model.DeepSeek_R1} variant="inline" />));
+
+    const svg = container.querySelector('[data-testid="model-architecture-svg"]');
+    expect(svg?.getAttribute('height')).toBe('512');
+    expect(mocks.diagramHeight.mock.calls[0]?.[1]).toEqual(new Set());
+  });
+
+  it('leaves the svg height to the renderer when the layout height is unknown', () => {
+    mocks.diagramHeight.mockReturnValueOnce(null);
+    act(() => root.render(<ModelArchitectureDiagram model={Model.DeepSeek_R1} variant="inline" />));
+
+    const svg = container.querySelector('[data-testid="model-architecture-svg"]');
+    expect(svg?.hasAttribute('height')).toBe(false);
+  });
+
   it('renders once on initial expansion and ignores the observer callback for the same width', () => {
     render();
     expand();
@@ -152,13 +186,37 @@ describe('ModelArchitectureDiagram rendering', () => {
     expect(ResizeObserverStub.instances).toHaveLength(1);
 
     act(() => ResizeObserverStub.instances[0].trigger());
+    flushResizeFrames();
     expect(mocks.renderDiagram).toHaveBeenCalledTimes(1);
 
     observedWidth = 460;
     act(() => ResizeObserverStub.instances[0].trigger());
+    expect(mocks.renderDiagram).toHaveBeenCalledTimes(1);
+    flushResizeFrames();
     expect(mocks.renderDiagram).toHaveBeenCalledTimes(2);
 
     act(() => ResizeObserverStub.instances[0].trigger());
+    flushResizeFrames();
+    expect(mocks.renderDiagram).toHaveBeenCalledTimes(2);
+  });
+
+  it('coalesces resize bursts outside observer delivery and cancels frames on unmount', () => {
+    render();
+    expand();
+    for (const width of [460, 440, 420]) {
+      observedWidth = width;
+      act(() => ResizeObserverStub.instances[0].trigger());
+    }
+    expect(mocks.renderDiagram).toHaveBeenCalledTimes(1);
+    expect(resizeFrames.size).toBe(1);
+    flushResizeFrames();
+    expect(mocks.renderDiagram).toHaveBeenCalledTimes(2);
+
+    observedWidth = 400;
+    act(() => ResizeObserverStub.instances[0].trigger());
+    act(() => root.render(null));
+    expect(resizeFrames.size).toBe(0);
+    flushResizeFrames();
     expect(mocks.renderDiagram).toHaveBeenCalledTimes(2);
   });
 

@@ -22,11 +22,11 @@ NVIDIA GB200 NVL72 运行 Dynamo vLLM 在 Kimi K2.5 NVFP4 8k/1k 上峰值达到 
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 
-Kimi K2.5 是一个 1T 参数的 MoE 模型，拥有 384 个路由专家加 1 个共享专家，每 token 激活 8 个专家，共 60 层 MoE 层。每个 MoE 层执行一次路由式 all-to-all 分发加一次 all-to-all 汇聚，因此单次前向传播在 60 层中总共约有 120 次 all-to-all 操作。在 NVL72 上，这些流量始终运行在 NVLink 5 上，每 GPU 1.8 TB/s，聚合互联带宽达 130 TB/s。而在 B200 上，宽 EP 超过 8 GPU 后就离开了 NVLink 域，退回到 ConnectX 7 InfiniBand 的每 GPU 400 Gb/s，约为 NVL72 NVLink 带宽的 1/36。稀疏度为 48 的 MoE（如 K2.5）无法在规模化时容忍这种差距。
+Kimi K2.5 是一个 1T 参数的 MoE 模型，拥有 384 个路由专家加 1 个共享专家，每 token 激活 8 个专家，共 60 个 MoE 层。每个 MoE 层执行一次路由式 all-to-all 分发加一次 all-to-all 汇聚，因此单次前向传播在 60 层中总共约有 120 次 all-to-all 操作。在 NVL72 上，这些流量始终运行在 NVLink 5 上，每 GPU 1.8 TB/s，聚合互联带宽达 130 TB/s。而在 B200 上，宽 EP 超过 8 GPU 后就离开了 NVLink 域，退回到 ConnectX 7 InfiniBand 的每 GPU 400 Gb/s，约为 NVL72 NVLink 带宽的 1/36。稀疏度为 48 的 MoE（如 K2.5）在大规模部署时无法承受这种差距。
 
 ## 宽 EP 对 Kimi K2.5 为何重要
 
-在 EP 4 下，每个 GPU 持有 Kimi K2.5 384 个专家中的 96 个。解码受限于每步从 HBM 重新加载这些专家权重所需的显存带宽。将 EP 扩展到 16 会将每 GPU 的专家占用降至 24 个。每次专家权重读取被摊销到更大的有效批次上——更多对等 GPU 通过该 rank 分发 token。这使解码从权重带宽受限转向算力和通信受限。在这种模式下，Blackwell 的 FP4 tensor core 和 NVLink 带宽都能发挥优势。
+在 EP 4 下，每个 GPU 持有 Kimi K2.5 的 384 个专家中的 96 个。解码受限于每步从 HBM 重新加载这些专家权重所需的显存带宽。将 EP 扩展到 16 会将每 GPU 的专家占用降至 24 个。每次专家权重读取被摊销到更大的有效批次上——更多对等 GPU 通过该 rank 分发 token。这使解码从权重带宽受限转向算力和通信受限。在这种模式下，Blackwell 的 FP4 tensor core 和 NVLink 带宽都能发挥优势。
 
 扩宽 EP 的代价是每个 MoE 层增加一次 all-to-all 集合通信。如果该集合通信命中 scale-out 互联，交互性预算在吞吐量收益回本之前就会崩溃。NVL72 的 scale-up 域使得 EP 8 到 EP 16 的宽 EP 在 K2.5 解码池上可行。B200 的 8 GPU NVLink 域使得跨两个节点的 Decode EP 4 成为 scale-out 接管前的天花板。
 
@@ -82,7 +82,7 @@ GB200 NVL72 在 23 到 36 tok/s/user 区间内维持约 12,580 tok/s/GPU 的平�
 
 ## NVL72 上的 vLLM 宽 EP
 
-vLLM 在 v0.9 中推出了 PPLX all-to-all 后端，随后添加了 DeepEP。v0.11 完成了 V1 引擎迁移，并通过 PR [#24845](https://github.com/vllm-project/vllm/pull/24845) 扩展了双批重叠（DBO，Dual Batch Overlap）路径，添加了 DeepEP 高吞吐量内核以及 DBO 的预填充支持，使 all-to-all 通信可以隐藏在计算之后。上述基准测试运行的是 v0.18.0，未启用投机解码。
+vLLM 在 v0.9 中推出了 PPLX all-to-all 后端，随后添加了 DeepEP。v0.11 完成了 V1 引擎迁移，并通过 PR [#24845](https://github.com/vllm-project/vllm/pull/24845) 扩展了双批重叠（DBO，Dual Batch Overlap）路径，添加了 DeepEP 高吞吐量 kernel 以及 DBO 的预填充支持，使 all-to-all 通信可以隐藏在计算之后。上述基准测试运行的是 v0.18.0，未启用投机解码。
 
 GB200 NVL72 配置在 NVIDIA Dynamo 中以 vLLM 作为 worker 运行时，在 InferenceX 数据集中标记为 dynamo-vllm。Dynamo 将预填充（4 GPU、TP 4、EP 4）与解码（8 到 16 GPU，TP 和 EP 均扩展至 16）分离，并通过 NVL72 互联在两者之间路由请求。SGLang 和 TRT-LLM 在 NVL72 上也有类似的分离式 + 宽 EP 路径，其中 SGLang 公开的 GB200 结果目前最为成熟。
 
@@ -113,7 +113,7 @@ GB200 NVL72 在并发 2,048 到 4,096 范围内以 23 到 36 tok/s/user 的交�
       "name": "为什么 GB200 NVL72 在 MoE 模型上能扩展比 B200 更宽的专家并行？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "NVL72 是一个 72 GPU 的 NVLink scale-up 域。每个 GPU 可以 1.8 TB/s 的速率访问其他所有 GPU，聚合互联带宽达 130 TB/s。B200 每个 NVLink 域最多 8 GPU。更宽的专家并行必须跨越 InfiniBand，每 GPU 400 Gb/s，约为 NVL72 NVLink 带宽的 1/36。Kimi K2.5 有 384 个路由专家和 60 层 MoE 层，每层 MoE 执行一次 all-to-all 分发加汇聚，单次前向传播约 120 次 all-to-all。该集合通信仅在互联端到端均为 NVLink 时才能在 EP 16 或更高级别实际运行。在 NVL72 上流量保持在 scale-up 域内；B200 超过 8 GPU 后就不再如此。"
+        "text": "NVL72 是一个 72 GPU 的 NVLink scale-up 域。每个 GPU 可以以 1.8 TB/s 的速率访问其他所有 GPU，聚合互联带宽达 130 TB/s。B200 每个 NVLink 域最多 8 GPU。更宽的专家并行必须跨越 InfiniBand，每 GPU 400 Gb/s，约为 NVL72 NVLink 带宽的 1/36。Kimi K2.5 有 384 个路由专家和 60 个 MoE 层，每层执行一次 all-to-all 分发加汇聚，单次前向传播约 120 次 all-to-all。该集合通信仅在互联端到端均为 NVLink 时才能在 EP 16 或更高级别实际运行。在 NVL72 上流量保持在 scale-up 域内；B200 超过 8 GPU 后就不再如此。"
       }
     },
     {
@@ -121,7 +121,7 @@ GB200 NVL72 在并发 2,048 到 4,096 范围内以 23 到 36 tok/s/user 的交�
       "name": "在 GB200 NVL72 上运行 Kimi K2.5 宽 EP 需要什么版本的 vLLM 和配方？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Kimi K2.5 配方需要 vLLM 0.18 或更高版本，该版本依赖 Eagle3 投机解码支持。PPLX all-to-all 后端在 vLLM 0.9 中推出，随后是 DeepEP，v0.11 完成了 V1 引擎迁移并通过 PR #24845 扩展了双批重叠（DBO）路径（添加 DeepEP 高吞吐量内核和 DBO 预填充支持）。InferenceX GB200 基准测试在预填充池上使用 TP 4，在 NVL72 解码池上将 TP 和 EP 扩展至 16。上游 vLLM 配方使用 DP 4 / DP 16 形态，两侧均为 TP 1 加专家并行。"
+        "text": "Kimi K2.5 配方需要 vLLM 0.18 或更高版本，该版本依赖 Eagle3 投机解码支持。PPLX all-to-all 后端在 vLLM 0.9 中推出，随后是 DeepEP，v0.11 完成了 V1 引擎迁移并通过 PR #24845 扩展了双批重叠（DBO）路径（添加 DeepEP 高吞吐量 kernel 和 DBO 预填充支持）。InferenceX GB200 基准测试在预填充池上使用 TP 4，在 NVL72 解码池上将 TP 和 EP 扩展至 16。上游 vLLM 配方使用 DP 4 / DP 16 形态，两侧均为 TP 1 加专家并行。"
       }
     },
     {

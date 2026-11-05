@@ -5,12 +5,13 @@ import { join } from 'node:path';
 import { before, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-import { packedSkillSuite, succeeded as expectSuccess } from './packed-skill.mjs';
+import { packageInfo, packedSkillSuite, succeeded as expectSuccess } from './packed-skill.mjs';
 
 const suite = packedSkillSuite();
 const { temporaryRoot, environment } = suite;
 const base = 'https://inferencex.semianalysis.com';
 const installed = new Map();
+const skillRoots = new Map();
 const preload = join(temporaryRoot, 'http-response.mjs');
 const schema = {
   components: {
@@ -60,6 +61,7 @@ const schema = {
 before(() => {
   for (const target of ['codex', 'claude']) {
     const root = suite.install(target);
+    skillRoots.set(target, root);
     const cookbook = readFileSync(join(root, 'references/public-api-examples.md'), 'utf8');
     const snippets = [
       'Evaluation lookup',
@@ -74,15 +76,18 @@ before(() => {
       assert.ok(snippet, `execute the installed ${heading} recipe`);
       return snippet.groups.code;
     });
-    installed.set(target, snippets);
+    installed.set(target, { root, snippets });
   }
   writeFileSync(
     preload,
     `
 import { appendFileSync, readFileSync } from 'node:fs';
 const fixtures = JSON.parse(readFileSync(process.env.INFERENCEX_EXAMPLE_FIXTURES, 'utf8'));
-globalThis.fetch = async (input) => {
+globalThis.fetch = async (input, options) => {
   const url = String(input.url ?? input);
+  const headers = new Headers(options?.headers);
+  if ((headers.get('user-agent') ?? '') !== process.env.INFERENCEX_EXPECT_USER_AGENT) throw new Error('Unexpected attribution marker');
+  if (!process.env.INFERENCEX_EXPECT_USER_AGENT && headers.has('x-inferencex-traffic')) throw new Error('Opt-out retained traffic marker');
   appendFileSync(process.env.INFERENCEX_EXAMPLE_REQUESTS, JSON.stringify(url) + '\\n');
   const response = fixtures[url];
   if (!response) throw new Error('Unexpected request: ' + url);
@@ -96,7 +101,13 @@ globalThis.fetch = async (input) => {
 function run(
   index,
   responses,
-  { target = 'codex', replacement, openapi = schema, project = suite.project('request-') } = {},
+  {
+    target = 'codex',
+    replacement,
+    openapi = schema,
+    project = suite.project('request-'),
+    telemetry = true,
+  } = {},
 ) {
   const fixtures = { [`${base}/api/openapi.json`]: { body: JSON.stringify(openapi) } };
   for (const [path, value] of Object.entries(responses)) {
@@ -106,12 +117,20 @@ function run(
   const requestsPath = join(project, 'requests.jsonl');
   writeFileSync(fixturesPath, JSON.stringify(fixtures));
   writeFileSync(requestsPath, '');
-  let code = installed.get(target)[index];
+  const { root, snippets } = installed.get(target);
+  let code = snippets[index].replace(
+    './.agents/skills/inferencex-api/scripts/capture-response.mjs',
+    pathToFileURL(join(root, 'scripts/capture-response.mjs')).href,
+  );
   if (replacement) code = code.replace(...replacement);
   const result = suite.node(['--import', pathToFileURL(preload).href, '--input-type=module'], {
     cwd: project,
     env: {
       ...environment,
+      INFERENCEX_SKILL_DIR: skillRoots.get(target),
+      INFERENCEX_TELEMETRY: telemetry ? '1' : '0',
+      DO_NOT_TRACK: '0',
+      INFERENCEX_EXPECT_USER_AGENT: telemetry ? `inferencex-skill/${packageInfo.version}` : '',
       INFERENCEX_EXAMPLE_FIXTURES: fixturesPath,
       INFERENCEX_EXAMPLE_REQUESTS: requestsPath,
     },
@@ -229,6 +248,30 @@ test('raw recipes retain complete UTF-8 and failure bodies before parsing, and r
     assert.notEqual(result.status, 0);
     assert.equal(result.stdout, '');
     assert.equal(assertCaptures(result).records.length, 2);
+  }
+});
+
+test('every installed raw recipe uses the shared capture budget before interpreting OpenAPI', () => {
+  for (const index of [0, 1, 2, 3]) {
+    const result = run(
+      index,
+      {},
+      {
+        replacement: ['createResponseCapture()', 'createResponseCapture({ responseBytes: 1024 })'],
+        openapi: { ...schema, extra: 'x'.repeat(1024) },
+      },
+    );
+    assert.notEqual(result.status, 0);
+    assert.equal(result.stdout, '');
+    assert.match(result.stderr, /1024-byte budget/u);
+    assert.deepEqual(result.requests, [`${base}/api/openapi.json`]);
+    const directory = readdirSync(result.project).find((name) => name.startsWith('api-evidence-'));
+    assert.deepEqual(readdirSync(join(result.project, directory)), ['1.json']);
+    const failed = JSON.parse(readFileSync(join(result.project, directory, '1.json'), 'utf8'));
+    assert.equal(failed.status, 200);
+    assert.equal(failed.body_path, undefined);
+    assert.equal(failed.sha256, undefined);
+    assert.ok(Number.isFinite(Date.parse(failed.failed_at)));
   }
 });
 
@@ -574,5 +617,16 @@ test('installed history recipe keeps all scoped observations, dates, raw configu
     const result = run(2, { [path]: input });
     assert.notEqual(result.status, 0);
     assert.equal(result.stdout, '');
+  }
+});
+
+test('all four raw lookup recipes omit both attribution headers when opted out', () => {
+  for (let index = 0; index < 4; index++) {
+    const result = run(index, {}, { openapi: {}, telemetry: false });
+    assert.equal(result.requests.length, 1);
+    assert.doesNotMatch(
+      result.stderr,
+      /Unexpected attribution marker|Opt-out retained traffic marker/u,
+    );
   }
 });

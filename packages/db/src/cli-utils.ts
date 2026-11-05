@@ -1,6 +1,5 @@
 import readline from 'readline';
 
-/** Prompt the user for y/N confirmation. Returns true if 'y'. */
 export function confirm(prompt: string): Promise<boolean> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
@@ -11,12 +10,20 @@ export function confirm(prompt: string): Promise<boolean> {
   });
 }
 
-/** Returns true if --yes was passed as a CLI arg. */
 export function hasYesFlag(): boolean {
   return process.argv.includes('--yes') || process.argv.includes('-y');
 }
 
-/** Returns true if --no-ssl was passed as a CLI arg. */
 export function hasNoSslFlag(): boolean {
   return process.argv.includes('--no-ssl');
+}
+
+/** Repository for ingest scripts when no argument or run URL names one. Exits when unset. */
+export function requireIngestRepo(): string {
+  const repo = process.env.INGEST_REPO;
+  if (!repo) {
+    console.error('INGEST_REPO is not set');
+    process.exit(1);
+  }
+  return repo;
 }

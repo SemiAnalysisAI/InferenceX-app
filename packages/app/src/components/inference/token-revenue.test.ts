@@ -65,7 +65,6 @@ describe('token revenue', () => {
       output_tput_per_gpu: 200,
       server_gpu_cache_hit_rate: 0.8,
       server_external_cache_hit_rate: 0.1,
-      // External already contains this offload tier, so it must not be added.
       server_cpu_cache_hit_rate: 0.05,
     });
     const pricing: TokenRevenuePricing = {
@@ -75,7 +74,6 @@ describe('token revenue', () => {
       outputPerMillion: 10,
     };
 
-    // 80 fresh input tok/s at $2/M, 720 cached at $0.2/M, 200 output at $10/M.
     expect(tokenRevenuePerGpuHour(agentic, pricing)).toBeCloseTo(8.2944, 10);
   });
 
@@ -129,6 +127,29 @@ describe('token revenue', () => {
     });
     expect(inputTokenShareForRevenue(disaggregated)).toBeCloseTo(8 / 9, 10);
     expect(tokenRevenuePerGpuHour(disaggregated, openRouterPricing)).toBeCloseTo(10.4, 10);
+  });
+
+  it('reads the measured mix of a real prefill/decode split identically on both chip bases', () => {
+    const split = {
+      disagg: true,
+      prefill_num_workers: 1,
+      decode_num_workers: 1,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 12,
+      tput_per_gpu: 1_000,
+      isl: null,
+      osl: null,
+    };
+    // 900 input + 100 output per deployment chip, stored per pool.
+    const pool = point({ ...split, input_tput_per_gpu: 3_600, output_tput_per_gpu: 400 / 3 });
+    const total = point({
+      ...split,
+      chip_basis: 'total',
+      input_tput_per_gpu: 900,
+      output_tput_per_gpu: 100,
+    });
+    expect(inputTokenShareForRevenue(pool)).toBeCloseTo(0.9, 10);
+    expect(inputTokenShareForRevenue(total)).toBeCloseTo(0.9, 10);
   });
 
   it('uses measured prompt and generation totals for agentic disaggregated rows', () => {
@@ -203,11 +224,23 @@ describe('token revenue', () => {
 
     expect(tokenRevenuePerGpuHour(unknownMix, openRouterPricing)).toBeNull();
   });
+
+  it('returns priced copies, re-prices last and leaves the input points untouched', () => {
+    const priced = point({ tokenRevenuePerGpuHour: { y: 9, roof: false } });
+    const unpriced = point();
+    const inputs = [priced, unpriced];
+    const before = structuredClone(inputs);
+
+    const out = applyTokenRevenuePricing(inputs, openRouterPricing);
+
+    expect(out[0]).not.toBe(priced);
+    expect(out[1]).not.toBe(unpriced);
+    expect(inputs).toStrictEqual(before);
+    for (const result of out) expect(Object.keys(result).at(-1)).toBe('tokenRevenuePerGpuHour');
+  });
 });
 
 describe('GB300 cache hit-rate fallback', () => {
-  // A GB300 AgentX point shaped like production run 32146276534: ~97% of the
-  // 130k tok/s/GPU is cached input, but the server hit rate never got scraped.
   const unmeasuredGb300 = point({
     hw: 'gb300',
     hwKey: 'gb300_dynamo-vllm',

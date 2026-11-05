@@ -1,0 +1,1982 @@
+'use client';
+
+import * as d3 from 'd3';
+import { useQueries, type UseQueryResult } from '@tanstack/react-query';
+import { ChartNoAxesCombined, ChevronDown, Loader2, TriangleAlert } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+
+import {
+  bucketTimeMs,
+  meanPowerAt,
+  sumPowerAt,
+  type GpuPowerSeries,
+  type GpuPowerSeriesResponse,
+} from '@/components/gpu-power/power-series';
+import { useComparisonSeries } from '@/components/inference/hooks/useComparisonSeries';
+import { comparisonEntryLabel } from '@/components/inference/utils/comparisonEntry';
+import ChartLegend, { type LegendSwitchConfig } from '@/components/ui/chart-legend';
+import { CONTROL_HEIGHT, SELECT_TRIGGER_STYLE } from '@/components/ui/control-styles';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
+import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
+import { useThemeColors } from '@/hooks/useThemeColors';
+import { useUrlState } from '@/hooks/useUrlState';
+import { usePowerXSurface } from '@/components/inference/ui/powerx-surface';
+import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
+import { ApiRequestError } from '@/lib/api/api-request-error';
+import { computeToggle } from '@/lib/shared/toggle-set';
+import { getModelSortIndex } from '@/lib/catalog/constants';
+import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import type { LayerConfig, RenderContext, ZoomContext } from '@/lib/d3-chart/D3Chart/types';
+import { lttbDownsample } from '@/lib/d3-chart/downsample';
+import { CHART_FONT_SANS, CHART_TYPE, px } from '@/lib/d3-chart/typography';
+import { overlayRunColor, overlayRunIndex } from '@/lib/charts/overlay-run-style';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn, getDisplayLabel } from '@/lib/shared/utils';
+
+import {
+  useInferenceActions,
+  useInferenceData,
+  useInferenceDisplay,
+  useInferenceFilters,
+} from '../InferenceContext';
+import type { InferenceData, OverlayData } from '../types';
+import { powerVariantDash } from '../utils/power-compare';
+import { PowerLoadSwings, PowerLoadSwingsCaveat } from '../powerx/PowerLoadSwings';
+import PowerTimelineSummary from './PowerTimelineSummary';
+import {
+  allGpuPool,
+  consumePowerTraceFocus,
+  groupPoolsBySize,
+  hasPowerTimelineWindow,
+  parsePowerTimelineParams,
+  powerTimelineSampleX,
+  joinPowerTimeline,
+  planPowerTimelineRequests,
+  prioritizeRun,
+  prioritizeRuns,
+  POWER_TIMELINE_SMOOTH_SECONDS,
+  powerTimelineStatus,
+  rollingMean,
+  spreadLabelYs,
+  runIdFromUrl,
+  traceConfigLabel,
+  traceKeyRunId,
+  tracePools,
+  windowPhase,
+  type PoolSizeGroup,
+  type PowerPool,
+  type PowerPoolRole,
+  type PowerTimelineAxis,
+  type PowerTimelineLines,
+  type PowerTimelineRequest,
+  type PowerTimelineStatus,
+  type PowerTimelineTrace,
+  type WindowPhase,
+  mostCoveredConcurrency,
+} from '../utils/powerTimeline';
+
+export const POWER_TIMELINE_MAX_RUNS = 4;
+const HIT_POINTS_PER_TRACE = 200;
+const MAX_LABELED_TRACES = 40;
+const CHART_HEIGHT = 600;
+const MARGIN = { top: 24, right: 24, bottom: 60, left: 64 };
+const GUTTER_GAP = 10;
+const DENSE_TRACES = 8;
+const MAX_GUTTER = 168;
+// Room for half of the last x tick label, which the label gutter used to provide.
+const PHONE_MARGIN_RIGHT = 20;
+/** Minimum pixels per x tick, tighter on phones so a narrow plot still gets three or four. */
+const X_TICK_SPACING = { phone: 48, desktop: 80 };
+
+const STRINGS = {
+  en: {
+    timeAxis: 'Time axis',
+    concurrency: 'Concurrency',
+    allConcurrencies: 'All',
+    highlight: 'Highlight',
+    highlightNone: 'All lines',
+    wall: 'Wall clock (UTC)',
+    elapsed: 'Since telemetry start',
+    serving: 'Since serving start',
+    xServing: 'Time since serving-window start (s)',
+    windowOnly: 'Validated window only',
+    windowOnlyHelp:
+      'Show only retained samples inside each recorded validated serving window. Traces without valid window bounds are omitted.',
+    missingWindow: (count: number) =>
+      `${count} trace${count === 1 ? '' : 's'} omitted: no valid serving-window bounds.`,
+    missingFocus:
+      'The selected trace is unavailable for these filters or has no retained telemetry.',
+    xWall: 'Time (UTC)',
+    xElapsed: 'Time since telemetry start (m:ss)',
+    resetFilter: 'Reset filter',
+    perGpu: 'One line per GPU',
+    perGpuHelp: 'Draw every GPU of a config instead of the mean across its GPUs.',
+    raw: 'Raw 1-s samples',
+    rawHelp: `Draw the one-second buckets as recorded. Off by default: lines show a centered ${POWER_TIMELINE_SMOOTH_SECONDS}-second rolling mean so overlapping configs stay readable. Tooltips and the summary table always use recorded values.`,
+    pools: 'Prefill / decode pools',
+    poolsHelp:
+      'One line per worker-role pool: the summed board power of the prefill GPUs and of the decode GPUs of a config. Dashed references are pool size × rated TDP.',
+    utilityLines: 'All-in provisioned lines',
+    utilityHelp:
+      'Dashed reference at the all-in provisioned utility power per GPU from the hardware registry (SemiAnalysis Datacenter Industry Model). Off by default because it compresses the traces.',
+    loadingTitle: 'Loading GPU telemetry',
+    loadingDetail: (runs: number) =>
+      `${runs} run${runs === 1 ? '' : 's'} · this can take up to a minute`,
+    loadingMore: (runs: number) => `Loading ${runs} more run${runs === 1 ? '' : 's'}…`,
+    errorTitle: 'GPU telemetry failed to load',
+    errorDetail: 'The run errors are listed below the chart.',
+    emptyTitle: 'No telemetry to show',
+    loadError: (runId: string, message: string) => `Run ${runId}: ${message}`,
+    noTraces:
+      'No telemetry traces for the visible hardware. Enable a series in the legend or choose another date.',
+    noArtifacts:
+      'These points predate per-config telemetry artifacts, so no timeline is available for them.',
+    droppedRuns: (runs: number) =>
+      `Telemetry from ${runs} more run${runs === 1 ? '' : 's'} was not loaded (limit ${POWER_TIMELINE_MAX_RUNS} runs per chart).`,
+    telemetry: 'Telemetry',
+    instructions:
+      'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Click a point to pin tooltip',
+    dismiss: 'Click elsewhere to dismiss',
+    phase: {
+      before: 'Before window (startup / warmup)',
+      window: 'Measurement window',
+      after: 'After window',
+      unknown: 'Window not recorded',
+    } satisfies Record<WindowPhase, string>,
+    meanPerGpu: 'Mean per GPU',
+    gpus: (count: number) => `${count} GPU${count === 1 ? '' : 's'}`,
+    min: 'min',
+    max: 'max',
+    validated: 'Validated average',
+    sinceStart: 'since start',
+    tdp: 'TDP',
+    allIn: 'all-in',
+    poolShort: { prefill: 'prefill', decode: 'decode', all: 'all GPUs' } satisfies Record<
+      PowerPoolRole,
+      string
+    >,
+    traceKey: 'Trace colours',
+    yMean: 'Mean power per GPU (W)',
+    yGpu: 'Power per GPU (W)',
+    yPool: 'GPU pool power (W)',
+    pool: 'Pool',
+    poolPower: 'Pool power',
+    poolTdp: 'pool TDP',
+    focused: (label: string) => `Focused on ${label}`,
+    showAll: 'Show all',
+    unofficialRun: 'Unofficial run',
+    branch: 'Branch',
+    viewWorkflow: 'View workflow run',
+  },
+  zh: {
+    timeAxis: '时间轴',
+    concurrency: '并发数',
+    allConcurrencies: '全部',
+    highlight: '突出显示',
+    highlightNone: '全部曲线',
+    wall: '实际时刻（UTC）',
+    elapsed: '距遥测起点',
+    serving: '距服务窗口起点',
+    xServing: '距服务窗口开始的时间（秒）',
+    windowOnly: '仅显示有效测量窗口',
+    windowOnlyHelp: '仅显示已记录的有效服务窗口内保留的采样点；缺少有效窗口边界的曲线不绘制。',
+    missingWindow: (count: number) => `${count} 条曲线缺少有效服务窗口边界，未绘制。`,
+    missingFocus: '所选曲线不符合当前筛选条件，或没有保留的遥测数据。',
+    xWall: '时间（UTC）',
+    xElapsed: '距遥测开始的时间（分:秒）',
+    resetFilter: '重置筛选',
+    perGpu: '每个 GPU 一条线',
+    perGpuHelp: '绘制配置中每个 GPU 的曲线，而不是各 GPU 的平均值。',
+    raw: '原始 1 秒采样',
+    rawHelp: `按记录值绘制 1 秒采样桶。默认关闭：曲线显示以每点为中心的 ${POWER_TIMELINE_SMOOTH_SECONDS} 秒滚动平均，以便多条配置重叠时仍可辨认。提示框和汇总表始终使用记录值。`,
+    pools: '预填充 / 解码 GPU 池',
+    poolsHelp:
+      '按 worker 角色分池绘制：每条线是同一配置中预填充 GPU 或解码 GPU 的板卡功耗之和。虚线参考为池内 GPU 数量 × 额定 TDP。',
+    utilityLines: '整体预配功耗参考线',
+    utilityHelp:
+      '以虚线标出硬件注册表中每 GPU 的整体预配功耗，即市电侧的 all-in 功率（SemiAnalysis 数据中心行业模型）。默认关闭，因为它会压缩曲线的纵向分辨率。',
+    loadingTitle: '正在加载 GPU 遥测数据',
+    loadingDetail: (runs: number) => `${runs} 个运行 · 可能需要约一分钟`,
+    loadingMore: (runs: number) => `正在加载另外 ${runs} 个运行……`,
+    errorTitle: 'GPU 遥测数据加载失败',
+    errorDetail: '各运行的错误信息列在图表下方。',
+    emptyTitle: '暂无可显示的遥测数据',
+    loadError: (runId: string, message: string) => `运行 ${runId}：${message}`,
+    noTraces: '当前可见硬件没有遥测曲线。请在图例中启用一个系列或选择其他日期。',
+    noArtifacts: '这些数据点早于按配置上传的遥测产物，因此没有可用的时间线。',
+    droppedRuns: (runs: number) =>
+      `另有 ${runs} 个运行的遥测数据未加载（每张图表最多 ${POWER_TIMELINE_MAX_RUNS} 个运行）。`,
+    telemetry: '遥测来源',
+    instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
+    dismiss: '点击其他区域关闭',
+    phase: {
+      before: '测量窗口之前（启动 / warmup）',
+      window: '测量窗口内',
+      after: '测量窗口之后',
+      unknown: '未记录测量窗口',
+    } satisfies Record<WindowPhase, string>,
+    meanPerGpu: '每 GPU 平均',
+    gpus: (count: number) => `${count} 个 GPU`,
+    min: '最小',
+    max: '最大',
+    validated: '有效平均值',
+    sinceStart: '距起点',
+    tdp: 'TDP',
+    allIn: 'all-in',
+    poolShort: { prefill: '预填充', decode: '解码', all: '全部 GPU' } satisfies Record<
+      PowerPoolRole,
+      string
+    >,
+    traceKey: '曲线颜色',
+    yMean: '每 GPU 平均功耗（W）',
+    yGpu: '单 GPU 功耗（W）',
+    yPool: 'GPU 池功耗（W）',
+    pool: 'GPU 池',
+    poolPower: '池功耗',
+    poolTdp: '池 TDP',
+    focused: (label: string) => `聚焦：${label}`,
+    showAll: '显示全部',
+    unofficialRun: '非官方运行',
+    branch: '分支',
+    viewWorkflow: '查看工作流运行',
+  },
+} as const;
+
+type XMode = PowerTimelineAxis;
+type LineMode = PowerTimelineLines;
+
+interface TimelineSample {
+  trace: PowerTimelineTrace;
+  color: string;
+  overlayIndex: number | null;
+  column: number;
+  timeMs: number;
+  x: number;
+  y: number;
+  min: number;
+  max: number;
+  gpuCount: number;
+  phase: WindowPhase;
+  pool?: { role: PowerPoolRole; gpuCount: number };
+  /** Y of the drawn (smoothed) line at this sample, so the hover dot sits on the line. */
+  drawnY?: number;
+}
+
+interface TracePoint {
+  x: number;
+  y: number | null;
+}
+
+interface TracePath {
+  id: string;
+  traceKey: string;
+  hwKey: string;
+  series?: string;
+  overlayIndex: number | null;
+  color: string;
+  segment: 'full' | 'window';
+  width: number;
+  opacity: number;
+  points: TracePoint[];
+  pool?: PowerPoolRole;
+}
+
+interface ReferenceLine {
+  id: string;
+  watts: number;
+  label: string;
+  color: string;
+  kind: 'tdp' | 'utility';
+  pools?: PowerPoolRole[];
+}
+
+const REFERENCE_LABEL_ROW = 13;
+
+interface TraceLabel {
+  id: string;
+  traceKey: string;
+  hwKey: string;
+  series?: string;
+  pool?: PowerPoolRole;
+  color: string;
+  text: string;
+  x: number;
+  y: number;
+}
+
+interface DrawModel {
+  paths: TracePath[];
+  labels: TraceLabel[];
+}
+
+export interface PowerTimelineProps {
+  chartId: string;
+  data: InferenceData[];
+  overlayData?: OverlayData;
+  caption?: React.ReactNode;
+  footer?: React.ReactNode;
+  comparison?: boolean;
+  runNumbering?: Map<string, number>;
+}
+
+type TimelineStrings = (typeof STRINGS)[keyof typeof STRINGS];
+
+/** A labelled toolbar control: label beside the control on desktop, a label column on phones. */
+function ToolbarField({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor?: string;
+  children: React.ReactNode;
+}) {
+  const labelClass = 'text-xs text-muted-foreground';
+  return (
+    <div className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 md:flex md:gap-2">
+      {htmlFor ? (
+        <label htmlFor={htmlFor} className={labelClass}>
+          {label}
+        </label>
+      ) : (
+        <span className={labelClass}>{label}</span>
+      )}
+      {children}
+    </div>
+  );
+}
+
+/** Native select styled like the segmented toggle's phone variant, so all toolbar controls match. */
+function ToolbarSelect({
+  id,
+  testId,
+  value,
+  onChange,
+  className,
+  children,
+}: {
+  id: string;
+  testId: string;
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={cn('relative min-w-0', className)}>
+      <select
+        id={id}
+        data-testid={testId}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={cn(
+          SELECT_TRIGGER_STYLE,
+          CONTROL_HEIGHT.sm,
+          'w-full appearance-none truncate pr-9 text-foreground',
+        )}
+      >
+        {children}
+      </select>
+      <ChevronDown
+        aria-hidden="true"
+        className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground"
+      />
+    </div>
+  );
+}
+
+/**
+ * Loading, error and empty states. A blocking status is a centred panel over the hidden plot; a
+ * non-blocking one (more runs still loading) is a small notice that leaves drawn lines visible.
+ */
+function PowerTimelineStatusPanel({
+  status,
+  t,
+}: {
+  status: PowerTimelineStatus;
+  t: TimelineStrings;
+}) {
+  if (!status.blocking) {
+    return (
+      <div
+        className="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2"
+        data-testid="power-timeline-empty"
+        data-status={status.kind}
+        role="status"
+        aria-live="polite"
+      >
+        <p className="inline-flex items-center gap-2 rounded-full border bg-background/95 px-3 py-1 text-xs text-muted-foreground shadow-sm">
+          <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+          {t.loadingMore(status.runs)}
+        </p>
+      </div>
+    );
+  }
+  const { icon, title, detail } =
+    status.kind === 'loading'
+      ? {
+          icon: (
+            <Loader2 className="size-6 animate-spin text-muted-foreground" aria-hidden="true" />
+          ),
+          title: t.loadingTitle,
+          detail: t.loadingDetail(status.runs),
+        }
+      : status.kind === 'error'
+        ? {
+            icon: <TriangleAlert className="size-6 text-destructive" aria-hidden="true" />,
+            title: t.errorTitle,
+            detail: t.errorDetail,
+          }
+        : {
+            icon: (
+              <ChartNoAxesCombined className="size-6 text-muted-foreground" aria-hidden="true" />
+            ),
+            title: t.emptyTitle,
+            detail:
+              status.reason === 'missingWindow'
+                ? t.missingWindow(status.missing)
+                : t[status.reason],
+          };
+  return (
+    <div
+      className="absolute inset-0 z-10 flex items-center justify-center rounded-lg border border-dashed border-border/70 p-4 lg:right-3"
+      data-testid="power-timeline-empty"
+      data-status={status.kind}
+      role={status.kind === 'error' ? 'alert' : 'status'}
+      aria-live="polite"
+      aria-busy={status.kind === 'loading'}
+    >
+      <div className="flex max-w-xs flex-col items-center gap-2 text-center">
+        {icon}
+        <p className="text-sm font-semibold text-foreground">{title}</p>
+        <p className="text-sm text-muted-foreground">{detail}</p>
+      </div>
+    </div>
+  );
+}
+
+async function fetchPowerSeries(
+  request: PowerTimelineRequest,
+  signal: AbortSignal,
+): Promise<GpuPowerSeriesResponse> {
+  const params = new URLSearchParams({ runId: request.runId, series: 'power' });
+  if (request.prefix) params.set('prefix', request.prefix);
+  const url = `/api/gpu-metrics?${params.toString()}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sources: request.sources }),
+    cache: 'no-store',
+    signal,
+  });
+  const body = (await response.json()) as GpuPowerSeriesResponse | { error: string };
+  if (!response.ok) {
+    throw new ApiRequestError(
+      'error' in body ? body.error : `HTTP ${response.status}`,
+      response.status,
+      url,
+    );
+  }
+  return body as GpuPowerSeriesResponse;
+}
+
+function formatElapsed(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.round(totalSeconds));
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  const mm = h > 0 ? String(m).padStart(2, '0') : String(m);
+  return `${h > 0 ? `${h}:` : ''}${mm}:${String(s).padStart(2, '0')}`;
+}
+
+const formatUtcClock = d3.utcFormat('%H:%M:%S');
+const formatUtcDate = d3.utcFormat('%Y-%m-%d');
+const formatWatts = d3.format(',.0f');
+
+const LABEL_CHAR_WIDTH = 6.5;
+
+function baseHardware(hwKey: string): string {
+  return hwKey.split('_')[0];
+}
+
+function runIdsOf(points: readonly InferenceData[]): Set<string> {
+  return new Set(
+    points
+      .map((point) => runIdFromUrl(point.run_url))
+      .filter((runId): runId is string => runId !== null),
+  );
+}
+
+function drawnPools(series: GpuPowerSeries): PowerPool[] {
+  const pools = tracePools(series);
+  return pools.length > 0 ? pools : [allGpuPool(series)];
+}
+
+function poolDash(pool: PowerPoolRole): string | null {
+  const dash = powerVariantDash({ kind: 'role', id: pool });
+  return dash === '' ? null : dash;
+}
+
+interface TraceRow {
+  id: string;
+  pool?: PowerPoolRole;
+  values: (number | null)[];
+}
+
+function traceRows(series: GpuPowerSeries, lineMode: LineMode): TraceRow[] {
+  if (lineMode === 'gpu') {
+    return series.gpus.map((gpu, row) => ({ id: `gpu${gpu}`, values: series.power[row] }));
+  }
+  if (lineMode === 'pool') {
+    return drawnPools(series).map((pool) => ({
+      id: `pool:${pool.role}`,
+      pool: pool.role,
+      values: series.t.map((_, column) => sumPowerAt(series, pool.rows, column)),
+    }));
+  }
+  return [{ id: 'mean', values: series.t.map((_, column) => meanPowerAt(series, column)) }];
+}
+
+function tracePaths(
+  trace: PowerTimelineTrace,
+  color: string,
+  overlayIndex: number | null,
+  xMode: XMode,
+  lineMode: LineMode,
+  windowOnly: boolean,
+  raw = false,
+  dense = false,
+): TracePath[] {
+  const { series } = trace;
+  const span = raw ? 1 : smoothSpan(series);
+  const rows = traceRows(series, lineMode).map((row) => ({
+    ...row,
+    values: rollingMean(row.values, span),
+  }));
+  // Many overlaid configs: thinner, slightly translucent lines so crossings stay readable.
+  const faint = lineMode === 'gpu' ? 0.22 : dense ? 0.22 : 0.32;
+  const strong = lineMode === 'gpu' ? 0.85 : dense ? 0.8 : 1;
+  const widths = lineMode === 'gpu' ? [1, 1.5] : dense ? [1, 1.4] : [1.25, 2.25];
+  const paths: TracePath[] = [];
+  for (const row of rows) {
+    const full: TracePoint[] = [];
+    const window: TracePoint[] = [];
+    row.values.forEach((value, column) => {
+      const x = powerTimelineSampleX(trace, column, xMode, windowOnly);
+      if (x === null) return;
+      const point = { x, y: value };
+      full.push(point);
+      if (windowPhase(trace, bucketTimeMs(series, column)) === 'window') window.push(point);
+    });
+    if (!windowOnly && full.length > 1)
+      paths.push({
+        id: `${trace.key}:${row.id}:full`,
+        traceKey: trace.key,
+        hwKey: trace.point.hwKey,
+        overlayIndex,
+        color,
+        segment: 'full',
+        width: widths[0],
+        opacity: faint,
+        points: full,
+        pool: row.pool,
+      });
+    if (window.length > 1) {
+      paths.push({
+        id: `${trace.key}:${row.id}:window`,
+        traceKey: trace.key,
+        hwKey: trace.point.hwKey,
+        overlayIndex,
+        color,
+        segment: 'window',
+        width: widths[1],
+        opacity: strong,
+        points: window,
+        pool: row.pool,
+      });
+    }
+  }
+  return paths;
+}
+
+function smoothSpan(series: Pick<GpuPowerSeries, 'bucketSeconds'>): number {
+  const bucket = series.bucketSeconds > 0 ? series.bucketSeconds : 1;
+  return Math.max(1, Math.round(POWER_TIMELINE_SMOOTH_SECONDS / bucket));
+}
+
+function traceSamples(
+  trace: PowerTimelineTrace,
+  color: string,
+  overlayIndex: number | null,
+  xMode: XMode,
+  lineMode: LineMode,
+  windowOnly: boolean,
+  raw = false,
+): TimelineSample[] {
+  const { series } = trace;
+  if (lineMode !== 'pool') {
+    const rows = series.power.map((_, row) => row);
+    return sampleRows(trace, color, overlayIndex, xMode, windowOnly, rows, undefined, !raw);
+  }
+  return drawnPools(series).flatMap((pool) =>
+    sampleRows(
+      trace,
+      color,
+      overlayIndex,
+      xMode,
+      windowOnly,
+      pool.rows,
+      { role: pool.role, gpuCount: pool.rows.length },
+      !raw,
+    ),
+  );
+}
+
+function sampleRows(
+  trace: PowerTimelineTrace,
+  color: string,
+  overlayIndex: number | null,
+  xMode: XMode,
+  windowOnly: boolean,
+  rows: readonly number[],
+  pool: TimelineSample['pool'],
+  smoothY = false,
+): TimelineSample[] {
+  const { series } = trace;
+  const samples: TimelineSample[] = [];
+  for (let column = 0; column < series.t.length; column++) {
+    const x = powerTimelineSampleX(trace, column, xMode, windowOnly);
+    if (x === null) continue;
+    let sum = 0;
+    let count = 0;
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (const row of rows) {
+      const value = series.power[row]?.[column];
+      if (value === null || value === undefined) continue;
+      sum += value;
+      count += 1;
+      if (value < min) min = value;
+      if (value > max) max = value;
+    }
+    if (count === 0 || (pool && count < rows.length)) continue;
+    const timeMs = bucketTimeMs(series, column);
+    samples.push({
+      trace,
+      color,
+      overlayIndex,
+      column,
+      timeMs,
+      x,
+      y: pool ? sum : sum / count,
+      min,
+      max,
+      gpuCount: count,
+      phase: windowPhase(trace, timeMs),
+      pool,
+    });
+  }
+  if (smoothY) {
+    const smoothed = rollingMean(
+      samples.map((sample) => sample.y),
+      smoothSpan(series),
+    );
+    samples.forEach((sample, index) => {
+      sample.drawnY = smoothed[index] ?? sample.y;
+    });
+  }
+  return lttbDownsample(
+    samples,
+    HIT_POINTS_PER_TRACE,
+    (sample) => sample.x,
+    (sample) => sample.y,
+  );
+}
+
+type AnyContinuousScale = d3.ScaleLinear<number, number>;
+
+function drawTraces(
+  group: d3.Selection<SVGGElement, unknown, null, undefined>,
+  xScale: AnyContinuousScale,
+  yScale: AnyContinuousScale,
+  model: DrawModel,
+  highlight: string | null,
+): void {
+  const line = d3
+    .line<TracePoint>()
+    .defined((point) => point.y !== null)
+    .x((point) => xScale(point.x))
+    .y((point) => yScale(point.y ?? 0))
+    .curve(d3.curveLinear);
+  const selection = group
+    .selectAll<SVGPathElement, TracePath>('path.power-trace')
+    .data(model.paths, (path) => path.id);
+  selection.exit().remove();
+  selection
+    .enter()
+    .append('path')
+    .attr('class', 'power-trace')
+    .attr('fill', 'none')
+    .attr('stroke-linejoin', 'round')
+    .attr('stroke-linecap', 'round')
+    .merge(selection)
+    .attr('data-trace-key', (path) => path.traceKey)
+    .attr('data-hw', (path) => path.hwKey)
+    .attr('data-segment', (path) => path.segment)
+    .attr('data-run-index', (path) => path.overlayIndex)
+    .attr('data-pool', (path) => path.pool ?? null)
+    .attr('stroke-dasharray', (path) => (path.pool ? poolDash(path.pool) : null))
+    .attr('stroke', (path) => path.color)
+    .attr('stroke-width', (path) => path.width)
+    .attr('opacity', (path) => traceOpacity(path, highlight))
+    .attr('d', (path) => line(path.points));
+}
+
+function isHighlighted(mark: TracePath | TraceLabel, highlight: string): boolean {
+  return highlight === mark.hwKey || highlight === mark.traceKey || highlight === mark.series;
+}
+
+function traceOpacity(path: TracePath, highlight: string | null): number {
+  if (highlight === null) return path.opacity;
+  return isHighlighted(path, highlight) ? Math.min(1, path.opacity + 0.15) : path.opacity * 0.15;
+}
+
+function labelOpacity(label: TraceLabel, highlight: string | null): number {
+  return highlight === null || isHighlighted(label, highlight) ? 1 : 0.2;
+}
+
+function labelWidth(text: string): number {
+  return text.length * LABEL_CHAR_WIDTH;
+}
+
+/** Right-gutter width that fits the longest trace label, capped so the plot keeps its room. */
+function powerTimelineGutter(labels: readonly { text: string }[]): number {
+  if (labels.length === 0) return MARGIN.right;
+  const widest = Math.max(...labels.map((label) => labelWidth(label.text)));
+  return Math.min(MAX_GUTTER, Math.ceil(widest + GUTTER_GAP + 6));
+}
+
+/**
+ * Trace names sit in the right gutter, outside the clipped plot, spread so none overlap. A faint
+ * leader joins each name to the end of its line, so traces that stop early stay attributable.
+ */
+function drawLabels(
+  plotGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+  chartGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+  xScale: AnyContinuousScale,
+  yScale: AnyContinuousScale,
+  model: DrawModel,
+  plotWidth: number,
+  plotHeight: number,
+  highlight: string | null,
+  inGutter: boolean,
+): void {
+  plotGroup.selectAll('text.power-trace-label').remove();
+  if (!inGutter) {
+    // Phones name the traces in the HTML colour key above the plot instead.
+    chartGroup.select('g.power-trace-gutter').remove();
+    return;
+  }
+  let gutter = chartGroup.select<SVGGElement>('g.power-trace-gutter');
+  if (gutter.empty()) gutter = chartGroup.append('g').attr('class', 'power-trace-gutter');
+  const rowHeight = CHART_TYPE.dataLabel + 3;
+  const ys = spreadLabelYs(
+    model.labels.map((label) => yScale(label.y)),
+    rowHeight,
+    rowHeight / 2,
+    plotHeight - rowHeight / 2,
+  );
+  const labelX = plotWidth + GUTTER_GAP;
+  const items = gutter
+    .selectAll<SVGGElement, TraceLabel>('g.power-trace-label-item')
+    .data(model.labels, (label) => label.id);
+  items.exit().remove();
+  const entered = items.enter().append('g').attr('class', 'power-trace-label-item');
+  entered.append('path').attr('class', 'power-trace-leader').attr('fill', 'none');
+  entered
+    .append('text')
+    .attr('class', 'power-trace-label')
+    .attr('font-family', CHART_FONT_SANS)
+    .attr('font-size', px(CHART_TYPE.dataLabel))
+    .attr('font-weight', '600')
+    .attr('dominant-baseline', 'middle')
+    .attr('pointer-events', 'none');
+  const merged = entered.merge(items);
+  const byId = new Map(model.labels.map((label, index) => [label.id, index]));
+  merged.each(function (label) {
+    const y = ys[byId.get(label.id)!];
+    const endX = xScale(label.x);
+    const endY = yScale(label.y);
+    const item = d3.select(this);
+    const opacity = labelOpacity(label, highlight);
+    item
+      .select('path.power-trace-leader')
+      .attr('stroke', label.color)
+      .attr('stroke-width', 1)
+      .attr('opacity', 0.45 * opacity)
+      .attr(
+        'd',
+        endX >= 0 && endX <= plotWidth
+          ? `M${endX},${endY}L${plotWidth + 2},${endY}L${labelX - 3},${y}`
+          : `M${plotWidth + 2},${y}L${labelX - 3},${y}`,
+      );
+    item
+      .select('text.power-trace-label')
+      .attr('data-hw', label.hwKey)
+      .attr('data-pool', label.pool ?? null)
+      .attr('fill', label.color)
+      .attr('opacity', opacity)
+      .attr('text-anchor', 'start')
+      .attr('x', labelX)
+      .attr('y', y)
+      .text(label.text);
+  });
+}
+
+function drawReferenceLines(
+  group: d3.Selection<SVGGElement, unknown, null, undefined>,
+  yScale: AnyContinuousScale,
+  width: number,
+  lines: ReferenceLine[],
+): void {
+  group.selectAll('.power-reference').remove();
+  // Labels sit at the left end, above their line, and are spread so stacked TDPs stay legible;
+  // the right end belongs to the trace leaders.
+  const labelYs = spreadLabelYs(
+    lines.map((line) => yScale(line.watts) - 6),
+    REFERENCE_LABEL_ROW,
+    REFERENCE_LABEL_ROW / 2,
+    Number.POSITIVE_INFINITY,
+  );
+  lines.forEach((line, index) => {
+    const y = yScale(line.watts);
+    const g = group
+      .append('g')
+      .attr('class', 'power-reference')
+      .attr('data-reference', line.kind)
+      .attr('data-pool', line.pools?.join(' ') ?? null)
+      .attr('data-watts', line.watts);
+    g.append('line')
+      .attr('x1', 0)
+      .attr('x2', width)
+      .attr('y1', y)
+      .attr('y2', y)
+      .attr('stroke', line.color)
+      .attr('stroke-width', 1.25)
+      .attr('stroke-dasharray', line.kind === 'tdp' ? '6,4' : '2,4')
+      .attr('opacity', 0.8);
+    g.append('text')
+      .attr('x', 6)
+      .attr('y', labelYs[index])
+      .attr('text-anchor', 'start')
+      .attr('dominant-baseline', 'middle')
+      .attr('fill', line.color)
+      .attr('font-family', CHART_FONT_SANS)
+      .attr('font-size', px(CHART_TYPE.annotation))
+      .attr('font-weight', '600')
+      .attr('paint-order', 'stroke')
+      .attr('stroke', 'var(--background)')
+      .attr('stroke-width', 3)
+      .text(line.label);
+  });
+}
+
+export default function PowerTimeline({
+  chartId,
+  data,
+  overlayData,
+  caption,
+  footer,
+  comparison = false,
+  runNumbering: providedRunNumbering,
+}: PowerTimelineProps) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const { hardwareConfig, hwTypesWithData } = useInferenceData();
+  const { activeHwTypes, selectedPrecisions, quickFilters, activeDates } = useInferenceFilters();
+  const { isLegendExpanded, highContrast } = useInferenceDisplay();
+  const { setBestPerSku, toggleHwType, selectAllHwTypes, setIsLegendExpanded, toggleActiveDate } =
+    useInferenceActions();
+  const { allGraphs: comparisonSeries, runNumbering } = useComparisonSeries(providedRunNumbering);
+  const {
+    unofficialRunInfos,
+    runIndexByUrl,
+    activeOverlayHwTypes,
+    localOfficialOverride,
+    setUnifiedOverlaySelection,
+  } = useUnofficialRun();
+
+  const { getUrlParam, setUrlParams } = useUrlState();
+  const [initialView] = useState(() =>
+    parsePowerTimelineParams({
+      i_ptaxis: getUrlParam('i_ptaxis'),
+      i_ptlines: getUrlParam('i_ptlines'),
+      i_ptwindow: getUrlParam('i_ptwindow'),
+      i_ptfocus: getUrlParam('i_ptfocus'),
+      i_ptutility: getUrlParam('i_ptutility'),
+      i_ptconc: getUrlParam('i_ptconc'),
+      i_ptraw: getUrlParam('i_ptraw'),
+    }),
+  );
+  const powerXSurface = usePowerXSurface();
+  const isPhone = useIsMobileViewport();
+  // On the PowerX tab, align runs at serving start unless the URL picks an axis.
+  const [xModeChoice, setXModeChoice] = useState<XMode | null>(
+    initialView.axis ?? (powerXSurface ? 'serving' : null),
+  );
+  const [lineMode, setLineMode] = useState<LineMode>(initialView.lines);
+  const [windowOnly, setWindowOnly] = useState(initialView.windowOnly);
+  const [showUtility, setShowUtility] = useState(initialView.utility);
+  const [raw, setRaw] = useState(initialView.raw);
+  const [highlight, setHighlight] = useState<string | null>(null);
+  const [focusKey, setFocusKey] = useState<string | null>(initialView.focus);
+  const requestedFocusRef = useRef<string | null | undefined>(undefined);
+  if (requestedFocusRef.current === undefined) {
+    requestedFocusRef.current = consumePowerTraceFocus();
+  }
+  const [concurrency, setConcurrency] = useState<number | null>(() =>
+    requestedFocusRef.current ? null : initialView.concurrency,
+  );
+
+  const plotsHere = useCallback(
+    (point: InferenceData) =>
+      point.measuredPowerTimeline !== undefined &&
+      selectedPrecisions.includes(point.precision) &&
+      matchesQuickFilters(point, quickFilters),
+    [selectedPrecisions, quickFilters],
+  );
+  const measuredData = useMemo(() => data.filter(plotsHere), [data, plotsHere]);
+  const overlayPoints = useMemo(
+    () => (overlayData?.data ?? []).filter(plotsHere),
+    [overlayData, plotsHere],
+  );
+  const overlayPointSet = useMemo(() => new Set<InferenceData>(overlayPoints), [overlayPoints]);
+  const concurrencyOptions = useMemo(
+    () =>
+      [...new Set([...measuredData, ...overlayPoints].map((point) => point.conc))]
+        .filter((conc) => Number.isSafeInteger(conc) && conc > 0)
+        .toSorted((a, b) => a - b),
+    [measuredData, overlayPoints],
+  );
+  // PowerX tab: first view compares chips at one shared load rather than every concurrency.
+  // A shared or requested focus keeps every load so the focused trace stays drawn.
+  const autoConcurrencyRef = useRef(
+    !powerXSurface ||
+      initialView.concurrency !== null ||
+      Boolean(initialView.focus) ||
+      Boolean(requestedFocusRef.current),
+  );
+  useEffect(() => {
+    if (autoConcurrencyRef.current || measuredData.length === 0) return;
+    autoConcurrencyRef.current = true;
+    setConcurrency(mostCoveredConcurrency(measuredData));
+  }, [measuredData]);
+  const allPoints = useMemo(
+    () =>
+      [...measuredData, ...overlayPoints].filter(
+        (point) => concurrency === null || point.conc === concurrency,
+      ),
+    [measuredData, overlayPoints, concurrency],
+  );
+
+  const hwKeysInData = useMemo(
+    () =>
+      [...new Set(measuredData.map((point) => point.hwKey))].toSorted(
+        (a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
+      ),
+    [measuredData],
+  );
+  const stableHcKeys = useMemo(() => [...hwTypesWithData], [hwTypesWithData]);
+  const activeOfficialKeys = useMemo(() => [...activeHwTypes], [activeHwTypes]);
+  const { resolveColor, getCssColor } = useThemeColors({
+    highContrast,
+    identifiers: hwKeysInData,
+    activeKeys: activeOfficialKeys,
+    hcKeys: stableHcKeys,
+  });
+
+  const requests = useMemo(() => planPowerTimelineRequests(allPoints), [allPoints]);
+  const focusRun = traceKeyRunId(requestedFocusRef.current ?? focusKey);
+  const officialHwTypes = localOfficialOverride ?? activeHwTypes;
+  const comparisonSeriesOf = useCallback(
+    (point: InferenceData) =>
+      comparison && !overlayPointSet.has(point) ? `${point.date}_${point.hwKey}` : undefined,
+    [comparison, overlayPointSet],
+  );
+  const isShown = useCallback(
+    (point: InferenceData) => {
+      if (overlayPointSet.has(point)) return activeOverlayHwTypes.has(point.hwKey);
+      const series = comparisonSeriesOf(point);
+      return series ? activeDates.has(series) : officialHwTypes.has(point.hwKey);
+    },
+    [overlayPointSet, activeOverlayHwTypes, comparisonSeriesOf, activeDates, officialHwTypes],
+  );
+  const overlayRunIds = useMemo(() => runIdsOf(overlayPoints), [overlayPoints]);
+  const shownRunIds = useMemo(() => runIdsOf(allPoints.filter(isShown)), [allPoints, isShown]);
+  const fetchedRequests = useMemo(
+    () =>
+      prioritizeRun(
+        prioritizeRuns(prioritizeRuns(requests, overlayRunIds), shownRunIds),
+        focusRun,
+      ).slice(0, POWER_TIMELINE_MAX_RUNS),
+    [requests, overlayRunIds, shownRunIds, focusRun],
+  );
+  const droppedRuns = requests.length - fetchedRequests.length;
+  const combineQueries = useCallback(
+    (results: UseQueryResult<GpuPowerSeriesResponse, Error>[]) => ({
+      loadingRuns: results.filter((query) => query.isPending).length,
+      errors: fetchedRequests.flatMap((request, index) => {
+        const error = results[index]?.error;
+        return error instanceof Error ? [{ request, error }] : [];
+      }),
+      resolved: fetchedRequests.flatMap((request, index) => {
+        const response = results[index]?.data;
+        return response ? [[request.runId, response] as const] : [];
+      }),
+    }),
+    [fetchedRequests],
+  );
+  const { loadingRuns, errors, resolved } = useQueries({
+    queries: fetchedRequests.map((request) => ({
+      queryKey: ['power-timeline', request.runId, request.prefix, request.sources] as const,
+      queryFn: ({ signal }: { signal: AbortSignal }) => fetchPowerSeries(request, signal),
+      staleTime: 0,
+      refetchOnWindowFocus: true,
+      retry: 1,
+    })),
+    combine: combineQueries,
+  });
+  const responses = useMemo(() => new Map<string, GpuPowerSeriesResponse>(resolved), [resolved]);
+
+  const { traces, missing } = useMemo(
+    () => joinPowerTimeline(allPoints, responses),
+    [allPoints, responses],
+  );
+  const hasAnyArtifact = requests.length > 0;
+
+  useEffect(() => {
+    const requested = requestedFocusRef.current;
+    if (!requested) return;
+    const trace = traces.find((entry) => entry.key === requested);
+    if (!trace) return;
+    requestedFocusRef.current = null;
+    setFocusKey(trace.key);
+    if (tracePools(trace.series).length > 0) setLineMode('pool');
+  }, [traces]);
+
+  useEffect(() => {
+    if (loadingRuns > 0 || responses.size === 0) return;
+    trackOncePerPageview('inference_power_timeline_loaded', {
+      traces: traces.length,
+      missing: missing.length,
+      runs: responses.size,
+    });
+  }, [loadingRuns, responses.size, traces.length, missing.length]);
+
+  const comparisonColors = useMemo(
+    () => new Map(comparisonSeries.map((series) => [series.id, series.color])),
+    [comparisonSeries],
+  );
+  const colorForTrace = useCallback(
+    (trace: PowerTimelineTrace): { color: string; overlayIndex: number | null } => {
+      if (overlayPointSet.has(trace.point)) {
+        const index = overlayRunIndex(trace.point.run_url ?? null, runIndexByUrl);
+        return { color: overlayRunColor(index), overlayIndex: index };
+      }
+      const series = comparisonSeriesOf(trace.point);
+      const color =
+        (series && comparisonColors.get(series)) ?? getCssColor(resolveColor(trace.point.hwKey));
+      return { color, overlayIndex: null };
+    },
+    [
+      overlayPointSet,
+      runIndexByUrl,
+      comparisonSeriesOf,
+      comparisonColors,
+      getCssColor,
+      resolveColor,
+    ],
+  );
+  const handleToggleHwType = useCallback(
+    (key: string) => {
+      if (!overlayData) {
+        toggleHwType(key);
+        return;
+      }
+      setBestPerSku(false, { applySelection: false });
+      const official = new Set([...officialHwTypes].filter((hw) => hwTypesWithData.has(hw)));
+      setUnifiedOverlaySelection(
+        computeToggle(official, key, hwTypesWithData),
+        activeOverlayHwTypes,
+      );
+    },
+    [
+      overlayData,
+      toggleHwType,
+      setBestPerSku,
+      officialHwTypes,
+      hwTypesWithData,
+      setUnifiedOverlaySelection,
+      activeOverlayHwTypes,
+    ],
+  );
+  const visibleTraces = useMemo(
+    () => traces.filter((trace) => isShown(trace.point)),
+    [traces, isShown],
+  );
+  const focusedTrace = useMemo(
+    () => visibleTraces.find((trace) => trace.key === focusKey) ?? null,
+    [visibleTraces, focusKey],
+  );
+  const activeHighlight = highlight ?? focusedTrace?.key ?? null;
+  const visibleRunCount = useMemo(
+    () => new Set(visibleTraces.map((trace) => trace.runId)).size,
+    [visibleTraces],
+  );
+  const xMode: XMode = xModeChoice ?? (visibleRunCount <= 1 ? 'wall' : 'elapsed');
+
+  const hasPools = useMemo(
+    () => visibleTraces.some((trace) => tracePools(trace.series).length > 0),
+    [visibleTraces],
+  );
+  useEffect(() => {
+    setUrlParams({
+      i_ptaxis: xModeChoice ?? '',
+      i_ptlines: lineMode === 'mean' ? '' : lineMode,
+      i_ptwindow: windowOnly ? 'window' : '',
+      i_ptfocus: focusKey ?? '',
+      i_ptutility: showUtility ? '1' : '',
+      i_ptconc: concurrency === null ? '' : String(concurrency),
+      i_ptraw: raw ? '1' : '',
+    });
+  }, [xModeChoice, lineMode, windowOnly, focusKey, showUtility, concurrency, raw, setUrlParams]);
+
+  const missingWindows =
+    windowOnly || xMode === 'serving'
+      ? visibleTraces.filter((trace) => !hasPowerTimelineWindow(trace)).length
+      : 0;
+
+  const hardwareLabel = useCallback(
+    (point: InferenceData): string => {
+      const config = overlayPointSet.has(point)
+        ? overlayData?.hardwareConfig[point.hwKey]
+        : hardwareConfig[point.hwKey];
+      return config ? getDisplayLabel(config) : point.hwKey;
+    },
+    [overlayPointSet, overlayData, hardwareConfig],
+  );
+  const entryLabel = useCallback(
+    (point: InferenceData) => comparisonEntryLabel(String(point.date), runNumbering),
+    [runNumbering],
+  );
+  const seriesLabel = useCallback(
+    (point: InferenceData): string =>
+      comparisonSeriesOf(point)
+        ? `${hardwareLabel(point)} · ${entryLabel(point)}`
+        : hardwareLabel(point),
+    [comparisonSeriesOf, hardwareLabel, entryLabel],
+  );
+
+  const model = useMemo<DrawModel>(() => {
+    const paths: TracePath[] = [];
+    const labels: TraceLabel[] = [];
+    const bases = new Set(visibleTraces.map((trace) => baseHardware(trace.point.hwKey)));
+    const hardwarePrefix = (trace: PowerTimelineTrace) => {
+      if (bases.size < 2) return '';
+      const base = baseHardware(trace.point.hwKey);
+      return `${HW_REGISTRY[base]?.label ?? base.toUpperCase()} `;
+    };
+    const entries = new Set(
+      visibleTraces
+        .filter((trace) => comparisonSeriesOf(trace.point))
+        .map((trace) => trace.point.date),
+    );
+    const entryPrefix = (trace: PowerTimelineTrace) =>
+      entries.size > 1 && comparisonSeriesOf(trace.point) ? `${entryLabel(trace.point)} ` : '';
+    for (const trace of visibleTraces) {
+      const { color, overlayIndex } = colorForTrace(trace);
+      const series = comparisonSeriesOf(trace.point);
+      const tracePathSet = tracePaths(
+        trace,
+        color,
+        overlayIndex,
+        xMode,
+        lineMode,
+        windowOnly,
+        raw,
+        visibleTraces.length > DENSE_TRACES,
+      ).map((path) => ({ ...path, series }));
+      paths.push(...tracePathSet);
+      if (visibleTraces.length > MAX_LABELED_TRACES) continue;
+      const groups: { pool?: PowerPoolRole; paths: TracePath[] }[] =
+        lineMode === 'pool'
+          ? drawnPools(trace.series).map((pool) => ({
+              pool: pool.role,
+              paths: tracePathSet.filter((path) => path.pool === pool.role),
+            }))
+          : [{ paths: tracePathSet }];
+      for (const group of groups) {
+        const anchor =
+          group.paths.find((path) => path.segment === 'window') ??
+          group.paths.find((path) => path.segment === 'full');
+        const last = anchor?.points.filter((point) => point.y !== null).at(-1);
+        if (!last || last.y === null) continue;
+        labels.push({
+          id: group.pool ? `${trace.key}:${group.pool}` : trace.key,
+          traceKey: trace.key,
+          hwKey: trace.point.hwKey,
+          series,
+          pool: group.pool,
+          color,
+          text: `${entryPrefix(trace)}${hardwarePrefix(trace)}${
+            group.pool
+              ? `c${trace.point.conc} · ${t.poolShort[group.pool]}`
+              : `c${trace.point.conc}`
+          }`,
+          x: last.x,
+          y: last.y,
+        });
+      }
+    }
+    return { paths, labels };
+  }, [
+    visibleTraces,
+    colorForTrace,
+    comparisonSeriesOf,
+    entryLabel,
+    xMode,
+    lineMode,
+    windowOnly,
+    raw,
+    t,
+  ]);
+
+  const margin = useMemo(
+    () =>
+      // A phone cannot spare a label gutter: the plot takes the card width and the colour key
+      // above it names the traces.
+      isPhone
+        ? { ...MARGIN, right: PHONE_MARGIN_RIGHT }
+        : { ...MARGIN, right: powerTimelineGutter(model.labels) },
+    [model.labels, isPhone],
+  );
+
+  const samples = useMemo(
+    () =>
+      visibleTraces.flatMap((trace) => {
+        const { color, overlayIndex } = colorForTrace(trace);
+        return traceSamples(trace, color, overlayIndex, xMode, lineMode, windowOnly, raw);
+      }),
+    [visibleTraces, colorForTrace, xMode, lineMode, windowOnly, raw],
+  );
+
+  const referenceLines = useMemo<ReferenceLine[]>(() => {
+    const lines: ReferenceLine[] = [];
+    const pushLines = (base: string, color: string, pool?: PoolSizeGroup) => {
+      const specs = HW_REGISTRY[base];
+      if (!specs) return;
+      const label = specs.label ?? base.toUpperCase();
+      const size = pool?.size ?? 1;
+      const id = pool ? `${base}:${pool.roles.join('+')}:${pool.size}` : base;
+      const name = pool
+        ? `${label} ${pool.roles.map((role) => t.poolShort[role]).join(' / ')} ×${pool.size}`
+        : label;
+      if (specs.tdp > 0) {
+        lines.push({
+          id: `tdp:${id}`,
+          watts: specs.tdp * size,
+          label: `${name} ${t.tdp} ${specs.tdp * size} W`,
+          color,
+          kind: 'tdp',
+          pools: pool?.roles,
+        });
+      }
+      if (showUtility && specs.power > 0) {
+        const watts = pool ? Math.round(specs.power * 1000) * size : specs.power * 1000;
+        lines.push({
+          id: `utility:${id}`,
+          watts,
+          label: `${name} ${t.allIn} ${Math.round(watts)} W`,
+          color,
+          kind: 'utility',
+          pools: pool?.roles,
+        });
+      }
+    };
+    const perBase = new Map<string, { color: string; pools: PowerPool[] }>();
+    for (const trace of visibleTraces) {
+      const base = baseHardware(trace.point.hwKey);
+      if (!perBase.has(base)) perBase.set(base, { color: colorForTrace(trace).color, pools: [] });
+      if (lineMode === 'pool') perBase.get(base)!.pools.push(...drawnPools(trace.series));
+    }
+    for (const [base, { color, pools }] of perBase) {
+      if (lineMode !== 'pool') {
+        pushLines(base, color);
+        continue;
+      }
+      for (const group of groupPoolsBySize(pools)) pushLines(base, color, group);
+    }
+    return lines;
+  }, [visibleTraces, colorForTrace, showUtility, lineMode, t]);
+
+  const xDomain = useMemo<[number, number]>(() => {
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (const path of model.paths) {
+      for (const point of path.points) {
+        if (point.x < min) min = point.x;
+        if (point.x > max) max = point.x;
+      }
+    }
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      return xMode === 'wall' ? [Date.UTC(2026, 0, 1), Date.UTC(2026, 0, 1, 0, 10)] : [0, 600];
+    }
+    if (xMode === 'serving' && windowOnly) min = Math.min(0, min);
+    return min === max ? [min, max + (xMode === 'wall' ? 60_000 : 60)] : [min, max];
+  }, [model.paths, xMode, windowOnly]);
+  const yDomain = useMemo<[number, number]>(() => {
+    let max = 0;
+    for (const path of model.paths) {
+      for (const point of path.points) if (point.y !== null && point.y > max) max = point.y;
+    }
+    for (const line of referenceLines) if (line.watts > max) max = line.watts;
+    return [0, max > 0 ? max * 1.06 : 100];
+  }, [model.paths, referenceLines]);
+
+  const xTickFormat = useMemo(() => {
+    if (xMode === 'elapsed') return (value: d3.AxisDomain) => formatElapsed(Number(value));
+    if (xMode === 'serving') return (value: d3.AxisDomain) => d3.format('~g')(Number(value));
+    const span = xDomain[1] - xDomain[0];
+    const crossesDate = formatUtcDate(new Date(xDomain[0])) !== formatUtcDate(new Date(xDomain[1]));
+    const format = d3.utcFormat(
+      crossesDate ? '%m/%d %H:%M' : span < 3 * 60_000 ? '%H:%M:%S' : '%H:%M',
+    );
+    return (value: d3.AxisDomain) =>
+      format(value instanceof Date ? value : new Date(Number(value)));
+  }, [xMode, xDomain]);
+
+  const highlightRef = useRef(activeHighlight);
+  highlightRef.current = activeHighlight;
+  const layers = useMemo<LayerConfig<TimelineSample>[]>(
+    () => [
+      {
+        type: 'custom',
+        key: 'power-reference-lines',
+        render: (group, ctx) => {
+          drawReferenceLines(group, ctx.yScale as AnyContinuousScale, ctx.width, referenceLines);
+        },
+      },
+      {
+        type: 'custom',
+        key: 'power-traces',
+        render: (group, ctx: RenderContext) => {
+          drawTraces(
+            group,
+            ctx.xScale as AnyContinuousScale,
+            ctx.yScale as AnyContinuousScale,
+            model,
+            highlightRef.current,
+          );
+        },
+        onZoom: (group, ctx: ZoomContext) => {
+          drawTraces(
+            group,
+            ctx.newXScale as AnyContinuousScale,
+            ctx.newYScale as AnyContinuousScale,
+            model,
+            highlightRef.current,
+          );
+        },
+      },
+      {
+        type: 'point',
+        key: 'power-hit-points',
+        data: samples,
+        config: {
+          getCx: () => 0,
+          getCy: () => 0,
+          getX: (sample) => sample.x,
+          getY: (sample) => sample.drawnY ?? sample.y,
+          getColor: (sample) => sample.color,
+          getRadius: () => 2,
+          keyFn: (sample) =>
+            sample.pool
+              ? `${sample.trace.key}:${sample.pool.role}:${sample.column}`
+              : `${sample.trace.key}:${sample.column}`,
+          maxPoints: Number.POSITIVE_INFINITY,
+        },
+      },
+      {
+        type: 'custom',
+        key: 'power-trace-labels',
+        render: (group, ctx: RenderContext) => {
+          drawLabels(
+            group,
+            ctx.layout.g,
+            ctx.xScale as AnyContinuousScale,
+            ctx.yScale as AnyContinuousScale,
+            model,
+            ctx.width,
+            ctx.height,
+            highlightRef.current,
+            !isPhone,
+          );
+        },
+        onZoom: (group, ctx: ZoomContext) => {
+          drawLabels(
+            group,
+            ctx.layout.g,
+            ctx.newXScale as AnyContinuousScale,
+            ctx.newYScale as AnyContinuousScale,
+            model,
+            ctx.width,
+            ctx.height,
+            highlightRef.current,
+            !isPhone,
+          );
+        },
+      },
+    ],
+    [referenceLines, model, samples, isPhone],
+  );
+
+  const onDisplayUpdate = useCallback(
+    (ctx: RenderContext) => {
+      const root = d3.select(ctx.layout.svg.node() as SVGSVGElement);
+      root
+        .selectAll<SVGPathElement, TracePath>('path.power-trace')
+        .attr('opacity', (path) => traceOpacity(path, activeHighlight));
+      root
+        .selectAll<SVGTextElement, TraceLabel>('text.power-trace-label')
+        .attr('opacity', (label) => labelOpacity(label, activeHighlight));
+    },
+    [activeHighlight],
+  );
+
+  const tooltipContent = useCallback(
+    (sample: TimelineSample, isPinned: boolean) => {
+      const { trace } = sample;
+      const point = trace.point;
+      const overlayInfo =
+        sample.overlayIndex === null ? null : unofficialRunInfos[sample.overlayIndex];
+      const tdp = HW_REGISTRY[baseHardware(point.hwKey)]?.tdp ?? 0;
+      const elapsed = formatElapsed((sample.timeMs - trace.series.startMs) / 1000);
+      const clock = `${formatUtcClock(new Date(sample.timeMs))} UTC`;
+      const time =
+        xMode === 'serving'
+          ? `${sample.x.toFixed(1)} s · ${t.serving} · ${clock}`
+          : xMode === 'wall'
+            ? `${clock} · +${elapsed} ${t.sinceStart}`
+            : `+${elapsed} · ${clock}`;
+      const colon = locale === 'zh' ? '：' : ':';
+      const validated = point.measuredAvgPower?.y;
+      const { pool } = sample;
+      const readings = pool
+        ? `<div class="mt-1 text-muted-foreground">${t.pool}${colon} ${t.poolShort[pool.role]} · ${t.gpus(pool.gpuCount)}</div>
+        <div class="font-medium">${t.poolPower}${colon} ${formatWatts(sample.y)} W${
+          tdp > 0
+            ? ` <span class="text-muted-foreground">(${((sample.y / (tdp * pool.gpuCount)) * 100).toFixed(0)}% ${t.poolTdp})</span>`
+            : ''
+        }</div>
+        <div class="text-muted-foreground">${t.meanPerGpu}${colon} ${(sample.y / sample.gpuCount).toFixed(1)} W · ${t.min} ${sample.min.toFixed(1)} W · ${t.max} ${sample.max.toFixed(1)} W</div>`
+        : `<div class="mt-1 font-medium">${t.meanPerGpu}${colon} ${sample.y.toFixed(1)} W${
+            tdp > 0
+              ? ` <span class="text-muted-foreground">(${((sample.y / tdp) * 100).toFixed(0)}% ${t.tdp})</span>`
+              : ''
+          }</div>
+        <div class="text-muted-foreground">${t.gpus(sample.gpuCount)} · ${t.min} ${sample.min.toFixed(1)} W · ${t.max} ${sample.max.toFixed(1)} W</div>`;
+      return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 210px; user-select: ${isPinned ? 'text' : 'none'}">
+        ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
+        <div class="font-semibold mb-1" style="color: ${sample.color}">${seriesLabel(point)} · ${traceConfigLabel(point)}${
+          overlayInfo ? ` · ✕ ${overlayInfo.branch || `run ${overlayInfo.id}`}` : ''
+        }</div>
+        <div class="text-muted-foreground">${time}</div>
+        ${readings}
+        <div class="text-muted-foreground">${t.phase[sample.phase]}</div>
+        ${
+          typeof validated === 'number'
+            ? `<div class="text-muted-foreground">${t.validated}${colon} ${validated.toFixed(1)} W</div>`
+            : ''
+        }
+      </div>`;
+    },
+    [unofficialRunInfos, xMode, t, locale, seriesLabel],
+  );
+
+  const legendItems = useMemo(() => {
+    const overlayItems =
+      overlayData && unofficialRunInfos.length > 0
+        ? unofficialRunInfos
+            .map((info, index) => {
+              const hasPoints = overlayPoints.some(
+                (point) => overlayRunIndex(point.run_url ?? null, runIndexByUrl) === index,
+              );
+              if (!hasPoints) return null;
+              const branch = info.branch || `run ${info.id}`;
+              return {
+                name: `✕ unofficial-run-${info.id}`,
+                label: `✕ ${branch}`,
+                color: overlayRunColor(index),
+                title: comparison ? t.unofficialRun : `${t.unofficialRun}: ${branch}`,
+                isHighlighted: true,
+                hw: `overlay-run-${info.id}`,
+                isActive: true,
+                isRemovable: false,
+                onClick: () => {},
+                tooltip: (
+                  <div className="font-normal text-xs">
+                    <div className="text-red-500 font-semibold">{t.unofficialRun}</div>
+                    <div>
+                      {t.branch}: {branch}
+                    </div>
+                    {info.url && (
+                      <a
+                        href={info.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline"
+                      >
+                        {t.viewWorkflow}
+                      </a>
+                    )}
+                  </div>
+                ),
+              };
+            })
+            .filter((item): item is NonNullable<typeof item> => item !== null)
+        : [];
+    if (comparison) {
+      const seriesWithData = new Set(measuredData.map((point) => `${point.date}_${point.hwKey}`));
+      const comparisonItems = comparisonSeries
+        .filter(({ id }) => seriesWithData.has(id))
+        .map(({ date, hwKey, id, color }) => ({
+          name: `${hwKey} ${comparisonEntryLabel(date, runNumbering)}`,
+          label: comparisonEntryLabel(date, runNumbering),
+          color,
+          title: hardwareConfig[hwKey] ? getDisplayLabel(hardwareConfig[hwKey]) : hwKey,
+          hw: id,
+          isActive: activeDates.has(id),
+          onClick: () => {
+            toggleActiveDate(id);
+            track('interactivity_date_toggled', { date, gpu: hwKey, view: 'power_timeline' });
+          },
+          tooltip: null,
+        }));
+      return [...overlayItems, ...comparisonItems];
+    }
+    const officialItems = hwKeysInData
+      .filter((key) => hwTypesWithData.has(key) && hardwareConfig[key])
+      .map((key) => {
+        const config = hardwareConfig[key];
+        return {
+          name: config.name,
+          label: getDisplayLabel(config),
+          color: resolveColor(key),
+          title: config.gpu,
+          hw: key,
+          isActive: officialHwTypes.has(key),
+          onClick: () => {
+            handleToggleHwType(key);
+            track('latency_hw_type_toggled', { gpu: key });
+          },
+          tooltip: null,
+        };
+      });
+    return [...overlayItems, ...officialItems];
+  }, [
+    overlayData,
+    unofficialRunInfos,
+    overlayPoints,
+    runIndexByUrl,
+    hwKeysInData,
+    hwTypesWithData,
+    hardwareConfig,
+    resolveColor,
+    officialHwTypes,
+    handleToggleHwType,
+    t,
+    comparison,
+    comparisonSeries,
+    measuredData,
+    runNumbering,
+    activeDates,
+    toggleActiveDate,
+  ]);
+
+  const chooseLineMode = (next: LineMode) => {
+    setLineMode(next);
+    track('inference_power_timeline_lines_changed', { lines: next });
+  };
+  const switches: LegendSwitchConfig[] = [
+    {
+      id: 'power-timeline-per-gpu',
+      label: t.perGpu,
+      checked: lineMode === 'gpu',
+      onCheckedChange: (checked) => chooseLineMode(checked ? 'gpu' : 'mean'),
+      infoTooltip: t.perGpuHelp,
+    },
+  ];
+  if (hasPools || lineMode === 'pool') {
+    switches.push({
+      id: 'power-timeline-pools',
+      label: t.pools,
+      checked: lineMode === 'pool',
+      onCheckedChange: (checked) => chooseLineMode(checked ? 'pool' : 'mean'),
+      infoTooltip: t.poolsHelp,
+    });
+  }
+  switches.push(
+    {
+      id: 'power-timeline-raw',
+      label: t.raw,
+      checked: raw,
+      onCheckedChange: (checked) => {
+        setRaw(checked);
+        track('inference_power_timeline_raw_toggled', { enabled: checked });
+      },
+      infoTooltip: t.rawHelp,
+    },
+    {
+      id: 'power-timeline-window-only',
+      label: t.windowOnly,
+      checked: windowOnly,
+      onCheckedChange: (checked) => {
+        setWindowOnly(checked);
+        track('inference_power_timeline_window_changed', { window_only: checked });
+      },
+      infoTooltip: t.windowOnlyHelp,
+    },
+    {
+      id: 'power-timeline-utility',
+      label: t.utilityLines,
+      checked: showUtility,
+      onCheckedChange: (checked) => {
+        setShowUtility(checked);
+        track('inference_power_timeline_utility_toggled', { enabled: checked });
+      },
+      infoTooltip: t.utilityHelp,
+    },
+  );
+
+  const overlayHwInScope = new Set(overlayPoints.map((point) => String(point.hwKey)));
+  const hwFiltered =
+    !comparison &&
+    (hwKeysInData.some(
+      (key) => hwTypesWithData.has(key) && hardwareConfig[key] && !officialHwTypes.has(key),
+    ) ||
+      [...overlayHwInScope].some((key) => !activeOverlayHwTypes.has(key)));
+  const resetHwFilter = () => {
+    selectAllHwTypes();
+    if (overlayData) {
+      setUnifiedOverlaySelection(
+        new Set(hwTypesWithData),
+        new Set([...activeOverlayHwTypes, ...overlayHwInScope]),
+      );
+    }
+    track('inference_power_timeline_filter_reset');
+  };
+
+  const legendElement = (
+    <ChartLegend
+      variant="sidebar"
+      grouped={comparison}
+      disableActiveSort={comparison}
+      legendItems={legendItems}
+      isLegendExpanded={isLegendExpanded}
+      onExpandedChange={(expanded) => {
+        setIsLegendExpanded(expanded);
+        track('latency_legend_expanded', { enabled: expanded });
+      }}
+      onItemHover={(id) => setHighlight(id)}
+      onItemHoverEnd={() => setHighlight(null)}
+      hideAtomFootnote
+      switches={switches}
+      actions={
+        hwFiltered
+          ? [{ id: 'power-timeline-reset-filter', label: t.resetFilter, onClick: resetHwFilter }]
+          : undefined
+      }
+    />
+  );
+
+  const runInfos = useMemo(
+    () =>
+      fetchedRequests
+        .map((request) => responses.get(request.runId)?.runInfo)
+        .filter((info): info is NonNullable<typeof info> => Boolean(info)),
+    [fetchedRequests, responses],
+  );
+
+  const toolbar = (
+    <div
+      className="flex flex-col gap-2 pb-1 md:flex-row md:flex-wrap md:items-center md:justify-end md:gap-x-4"
+      data-testid="power-timeline-toolbar"
+    >
+      <ToolbarField label={t.concurrency} htmlFor={`${chartId}-power-timeline-concurrency`}>
+        <ToolbarSelect
+          id={`${chartId}-power-timeline-concurrency`}
+          testId="power-timeline-concurrency"
+          value={concurrency === null ? '' : String(concurrency)}
+          onChange={(selected) => {
+            const value = selected === '' ? null : Number(selected);
+            setConcurrency(value);
+            track('inference_power_timeline_concurrency_changed', { concurrency: value });
+          }}
+        >
+          <option value="">{t.allConcurrencies}</option>
+          {concurrency !== null && !concurrencyOptions.includes(concurrency) && (
+            <option value={concurrency}>{`c${concurrency}`}</option>
+          )}
+          {concurrencyOptions.map((conc) => (
+            <option key={conc} value={conc}>{`c${conc}`}</option>
+          ))}
+        </ToolbarSelect>
+      </ToolbarField>
+      {visibleTraces.length > 1 && (
+        <ToolbarField label={t.highlight} htmlFor={`${chartId}-power-timeline-highlight`}>
+          <ToolbarSelect
+            id={`${chartId}-power-timeline-highlight`}
+            testId="power-timeline-highlight"
+            className="md:max-w-56"
+            value={focusedTrace?.key ?? ''}
+            onChange={(selected) => {
+              const key = selected === '' ? null : selected;
+              setFocusKey(key);
+              track('inference_power_timeline_highlight_changed', { highlighted: key !== null });
+            }}
+          >
+            <option value="">{t.highlightNone}</option>
+            {visibleTraces.map((trace) => (
+              <option key={trace.key} value={trace.key}>
+                {`${seriesLabel(trace.point)} · ${traceConfigLabel(trace.point)}`}
+              </option>
+            ))}
+          </ToolbarSelect>
+        </ToolbarField>
+      )}
+      <ToolbarField label={t.timeAxis}>
+        <SegmentedToggle<XMode>
+          value={xMode}
+          ariaLabel={t.timeAxis}
+          role="group"
+          // Three long segments cannot share a phone row; a native select keeps one tidy control.
+          variant={isPhone ? 'select' : 'segments'}
+          testId="power-timeline-axis"
+          className={isPhone ? 'w-full' : 'flex-nowrap'}
+          buttonClassName="whitespace-nowrap"
+          options={[
+            { value: 'wall', label: t.wall, testId: 'power-timeline-axis-wall' },
+            { value: 'elapsed', label: t.elapsed, testId: 'power-timeline-axis-elapsed' },
+            { value: 'serving', label: t.serving, testId: 'power-timeline-axis-serving' },
+          ]}
+          onValueChange={(mode) => {
+            setXModeChoice(mode);
+            track('inference_power_timeline_axis_changed', { mode });
+          }}
+        />
+      </ToolbarField>
+    </div>
+  );
+
+  const loadSwings = powerXSurface && loadingRuns === 0 && visibleTraces.length > 0 && (
+    <PowerLoadSwings
+      traces={focusedTrace ? [focusedTrace] : visibleTraces}
+      colorOf={(trace) => colorForTrace(trace).color}
+      labelOf={seriesLabel}
+    />
+  );
+
+  const status = powerTimelineStatus({
+    loadingRuns,
+    fetchedRuns: fetchedRequests.length,
+    failedRuns: errors.length,
+    hasAnyArtifact,
+    visibleTraces: visibleTraces.length,
+    missingWindows,
+    drawable: model.paths.length > 0,
+  });
+  const blocked = status?.blocking === true;
+
+  return (
+    <div
+      className={cn(
+        'relative flex flex-col gap-2 [&_circle.point]:[fill-opacity:0]',
+        // Nothing to draw yet: hide the placeholder axes, grid and watermark so the status panel
+        // is the only thing in the plot area instead of text over a fake 0–100 W scale.
+        blocked && "[&_svg[data-testid='d3-chart-svg']]:invisible",
+      )}
+      data-testid="power-timeline"
+      data-status={status?.kind ?? 'ready'}
+    >
+      <D3Chart<TimelineSample>
+        key={`${chartId}-${xMode}-${lineMode}-${windowOnly}`}
+        chartId={chartId}
+        data={samples}
+        height={CHART_HEIGHT}
+        margin={margin}
+        watermark={overlayData && overlayPoints.length > 0 ? 'unofficial' : 'logo'}
+        testId="power-timeline-chart-svg"
+        grabCursor
+        instructions={powerXSurface || blocked ? '' : t.instructions}
+        xScale={
+          xMode === 'wall'
+            ? { type: 'time', domain: [new Date(xDomain[0]), new Date(xDomain[1])] }
+            : { type: 'linear', domain: xDomain }
+        }
+        yScale={{ type: 'linear', domain: yDomain, nice: true }}
+        xAxis={{
+          label: xMode === 'wall' ? t.xWall : xMode === 'serving' ? t.xServing : t.xElapsed,
+          tickValues: (scale) => {
+            const timeScale = scale as
+              | d3.ScaleTime<number, number>
+              | d3.ScaleLinear<number, number>;
+            const [left, right] = timeScale.range();
+            const spacing = isPhone ? X_TICK_SPACING.phone : X_TICK_SPACING.desktop;
+            return timeScale.ticks(Math.max(2, Math.min(10, Math.floor((right - left) / spacing))));
+          },
+          tickFormat: xTickFormat,
+        }}
+        yAxis={{
+          label: lineMode === 'pool' ? t.yPool : lineMode === 'gpu' ? t.yGpu : t.yMean,
+          tickCount: 8,
+        }}
+        layers={layers}
+        displayIdentity={activeHighlight ?? ''}
+        onDisplayUpdate={onDisplayUpdate}
+        zoom={{
+          enabled: true,
+          axes: 'x',
+          scaleExtent: [1, 60],
+          resetEventName: `power_timeline_zoom_reset_${chartId}`,
+        }}
+        tooltip={{
+          rulerType: 'crosshair',
+          content: tooltipContent,
+          getRulerX: (sample, xScale) => (xScale as AnyContinuousScale)(sample.x),
+          getRulerY: (sample, yScale) => yScale(sample.drawnY ?? sample.y),
+          onHoverStart: (selection) => {
+            selection
+              .attr('r', 5)
+              .attr('stroke', 'white')
+              .attr('stroke-width', 1)
+              .style('fill-opacity', 1);
+          },
+          onHoverEnd: (selection) => {
+            selection.attr('r', 2).attr('stroke', 'none').style('fill-opacity', null);
+          },
+          attachToLayer: 2,
+        }}
+        legendElement={legendElement}
+        footer={footer}
+        caption={
+          <>
+            {caption}
+            {toolbar}
+            {!isPhone && loadSwings}
+            {isPhone && model.labels.length > 0 && (
+              <ul
+                className="flex flex-wrap gap-x-3 gap-y-1 px-1 text-xs"
+                aria-label={t.traceKey}
+                data-testid="power-timeline-key"
+              >
+                {model.labels.map((label) => (
+                  <li
+                    key={label.id}
+                    className="flex items-center gap-1.5 font-medium whitespace-nowrap"
+                    style={{ opacity: labelOpacity(label, activeHighlight) }}
+                    data-hw={label.hwKey}
+                  >
+                    <svg aria-hidden="true" width="14" height="6" className="shrink-0">
+                      <line
+                        x1="0"
+                        x2="14"
+                        y1="3"
+                        y2="3"
+                        stroke={label.color}
+                        strokeWidth="3"
+                        strokeDasharray={(label.pool && poolDash(label.pool)) || undefined}
+                      />
+                    </svg>
+                    {label.text}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        }
+        noDataOverlay={status ? <PowerTimelineStatusPanel status={status} t={t} /> : undefined}
+      />
+      {powerXSurface && <PowerLoadSwingsCaveat />}
+      {/* On phones the per-trace stat cards follow the chart so the plot stays near the top. */}
+      {isPhone && loadSwings}
+      <div
+        className="flex flex-col gap-1 px-1 text-xs text-muted-foreground"
+        data-testid="power-timeline-status"
+      >
+        {focusedTrace && (
+          <p
+            className="inline-flex items-center gap-2 self-start rounded-full border px-2 py-0.5"
+            data-testid="power-timeline-focus"
+          >
+            <span>
+              {t.focused(
+                `${seriesLabel(focusedTrace.point)} · ${traceConfigLabel(focusedTrace.point)}`,
+              )}
+            </span>
+            <button
+              type="button"
+              className="underline decoration-dotted hover:text-foreground"
+              data-testid="power-timeline-focus-clear"
+              onClick={() => {
+                setFocusKey(null);
+                track('inference_power_timeline_focus_cleared');
+              }}
+            >
+              {t.showAll}
+            </button>
+          </p>
+        )}
+        {focusKey && !focusedTrace && loadingRuns === 0 && (
+          <p data-testid="power-timeline-focus-missing">{t.missingFocus}</p>
+        )}
+        {errors.map(({ request, error }) => (
+          <p key={request.runId} className="text-destructive" role="alert">
+            {t.loadError(request.runId, error.message)}
+          </p>
+        ))}
+        {droppedRuns > 0 && <p>{t.droppedRuns(droppedRuns)}</p>}
+        {runInfos.length > 0 && (
+          <p data-testid="power-timeline-source">
+            {t.telemetry}:{' '}
+            {runInfos.map((info, index) => (
+              <React.Fragment key={info.id}>
+                {index > 0 && ' · '}
+                <a
+                  href={info.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline decoration-dotted"
+                >
+                  {`run ${info.id}`}
+                </a>
+                {info.createdAt ? ` (${formatUtcDate(new Date(info.createdAt))})` : ''}
+              </React.Fragment>
+            ))}
+          </p>
+        )}
+      </div>
+      {loadingRuns === 0 && visibleTraces.length > 0 && (
+        <PowerTimelineSummary
+          traces={visibleTraces}
+          responses={responses}
+          colorOf={(trace) => colorForTrace(trace).color}
+          hardwareLabel={seriesLabel}
+          isOverlay={(point) => overlayPointSet.has(point)}
+        />
+      )}
+    </div>
+  );
+}

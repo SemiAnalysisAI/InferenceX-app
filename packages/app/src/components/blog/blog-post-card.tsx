@@ -5,40 +5,28 @@ import Link from 'next/link';
 import { BlogThumbnail } from '@/components/blog/blog-thumbnail';
 import { Badge } from '@/components/ui/badge';
 import { Heading } from '@/components/ui/heading';
-import { track } from '@/lib/analytics';
-import type { PostThumbnail } from '@/lib/blog';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import type { PostThumbnail } from '@/lib/blog/blog';
+import { cn } from '@/lib/shared/utils';
 
 export interface BlogPostCardProps {
   slug: string;
   title: string;
   subtitle: string;
-  /** Pre-formatted, locale-aware date label. */
   dateLabel: string;
-  /** ISO date for the `<time>` element. */
   date: string;
-  /** Pre-formatted reading-time label, e.g. "8 min read". */
   readingLabel: string;
   tags?: string[];
-  /** Accessible label for the tag list, localized by the caller. */
   tagsLabel?: string;
-  /** Per-theme figure paths for the thumbnail; null shows the text-free tile. */
   thumbnail: PostThumbnail | null;
-  /** Blog list base path, e.g. '/zh/blog' on Chinese pages. */
   basePath?: string;
-  /** Where the card is rendered; separates index clicks from related-strip clicks. */
   placement?: 'index' | 'related';
-  /** Eager-load the thumbnail (first row of the index). */
   priority?: boolean;
   className?: string;
 }
 
 const MAX_TAGS = 3;
 
-/**
- * Index/grid card. The whole card is one link; tags are plain badges so the
- * card never nests interactive elements.
- */
 export function BlogPostCard({
   slug,
   title,

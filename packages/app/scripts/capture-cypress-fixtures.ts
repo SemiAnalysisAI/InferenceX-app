@@ -1,16 +1,3 @@
-/**
- * Capture cypress fixtures from a running InferenceX deployment.
- *
- * Hits the public production API by default and writes one JSON file per
- * endpoint into cypress/fixtures/api/. The cypress e2e suite uses these
- * fixtures via cy.intercept so tests run with no database.
- *
- * Usage:
- *   bun run --cwd packages/app capture:fixtures                              (prod)
- *   bun run --cwd packages/app capture:fixtures http://localhost:3000        (local dev)
- *   bun run --cwd packages/app capture:fixtures -- --collectivex-only         (synthetic multi-run data)
- */
-
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
@@ -29,7 +16,7 @@ import {
   assertFixtureContent,
   fixtureSha256,
   fixtureTopLevel,
-} from '../src/lib/test-fixture-manifest';
+} from '../src/lib/testing/test-fixture-manifest';
 
 const cliArgs = process.argv.filter((argument) => argument !== '--').slice(2);
 const collectiveXOnly = cliArgs.includes('--collectivex-only');
@@ -39,13 +26,8 @@ const baseUrl = (
 
 const fixturesDir = resolve(import.meta.dirname, '..', 'cypress', 'fixtures', 'api');
 
-// Defaults chosen to land on common, well-populated rows. The cypress suite
-// doesn't assert on specific values, so any realistic snapshot suffices.
 const BENCHMARK_MODEL = 'DeepSeek-R1-0528';
 
-// History must cover every (isl, osl) combo that appears in the benchmarks
-// fixture, otherwise the drill-down trend modal shows "no historical data"
-// when the user double-clicks a scatter point with a non-default (isl, osl).
 const HISTORY_MODEL = 'DeepSeek-R1-0528';
 const HISTORY_PAIRS: [number, number][] = [
   [1024, 1024],
@@ -53,10 +35,6 @@ const HISTORY_PAIRS: [number, number][] = [
   [8192, 1024],
 ];
 
-// Top-N most-recent unique dates kept per partition. Partitioning by model
-// (or hardware) ensures infrequently-benchmarked entries — e.g. llama70b
-// last ran in late 2025 — still get N dates of data instead of being culled
-// by a global calendar window.
 const TOP_DATES_PER_PARTITION = 10;
 
 async function fetchLatestDate(): Promise<string> {
@@ -73,13 +51,6 @@ async function fetchJson<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-/**
- * Keep rows whose date is among the N most-recent unique dates *within their
- * partition*. Partitioning is the load-bearing piece: a global "top N dates"
- * window would silently drop infrequent entries (e.g. llama70b's last ran
- * months before the latest dsr1 run), but partitioning by model gives every
- * model its own N-date window.
- */
 function keepTopDatesPerPartition<T extends { date: string }>(
   rows: T[],
   partition: (r: T) => string,
@@ -100,13 +71,6 @@ function keepTopDatesPerPartition<T extends { date: string }>(
   return out;
 }
 
-/**
- * Within each partition, keep at most `n` rows by sampling evenly along
- * `axis` (typically `conc`). Used to shrink benchmark sweeps that have ~20
- * concurrency levels per config when the chart only needs a handful to
- * render. Preserves the lowest and highest values so chart axis ranges stay
- * representative.
- */
 function sampleAlongAxis<T>(
   rows: T[],
   partition: (r: T) => string,
@@ -141,9 +105,6 @@ function sampleAlongAxis<T>(
 }
 
 async function writeFixture(name: string, data: unknown): Promise<number> {
-  // Large, machine-shaped API payloads stay minified; every other fixture is
-  // pretty-printed to match oxfmt. This mirrors .prettierignore and makes
-  // repeated capture runs byte-for-byte stable.
   const minified = name.startsWith('collectivex-');
   const body = `${JSON.stringify(data, null, minified ? undefined : 2)}\n`;
   await writeFile(resolve(fixturesDir, `${name}.json`), body);
@@ -202,8 +163,6 @@ async function writeCollectiveXFixtures(): Promise<[string, number][]> {
   const sizes: [string, number][] = [
     ['collectivex-latest', await writeFixture('collectivex-latest', latest)],
   ];
-  // The newest dataset already has the stable `collectivex-latest` fixture;
-  // older runs get id-keyed files for multi-run selection.
   for (const dataset of datasets.slice(1)) {
     const name = `collectivex-run-${dataset.run.run_id}`;
     sizes.push([name, await writeFixture(name, dataset)]);
@@ -247,16 +206,10 @@ async function main() {
   const reliability = await fetchJson<{ date: string; hardware: string }[]>('/api/v1/reliability');
   const evaluations = await fetchJson<{ date: string; model: string }[]>('/api/v1/evaluations');
 
-  // Latest-snapshot: already deduped to one row per config, no date filter.
-  // ~20 conc levels per (hw, fw, prec, isl, osl) — sample down to keep the
-  // scatter visually populated without writing every concurrency point.
   const benchmarks = await fetchJson<BenchmarkRow[]>(
     `/api/v1/benchmarks?model=${encodeURIComponent(BENCHMARK_MODEL)}`,
   );
 
-  // History: merge the (isl, osl) pairs that the benchmarks fixture covers
-  // and partition by hardware/framework/precision/isl/osl so each scatter
-  // point has multi-date data when the user double-clicks it.
   interface HistoryRow {
     date: string;
     conc: number;
@@ -293,12 +246,6 @@ async function main() {
         keepTopDatesPerPartition(availability, (r) => r.model, N),
       ),
     ],
-    // Reliability is not truncated: the chart aggregates per hardware over
-    // user-selectable date windows ("Last 7 days" vs "Last 3 months"), and
-    // tests assert that switching windows changes the bar count. Truncating
-    // to a fixed top-N collapses every hardware onto the same recent dates,
-    // which makes the windows produce identical bar counts and that
-    // assertion fails. Full reliability is small (~270 KB) so we just keep it.
     ['reliability', await writeFixture('reliability', reliability)],
     [
       'evaluations',
@@ -321,9 +268,6 @@ async function main() {
     ],
     [
       'benchmarks-history',
-      // Two-pass: trim to top-N dates per config, then sample concurrencies
-      // within each (config, date) so trend lines have multi-date coverage
-      // but each (config, date) point doesn't carry every conc level.
       await writeFixture(
         'benchmarks-history',
         sampleAlongAxis(
@@ -346,8 +290,6 @@ async function main() {
       }),
     ],
     ['workflow-info', await writeFixture('workflow-info', workflowInfo)],
-    // Synthetic deterministic data: production may hold arbitrary sweeps,
-    // while e2e asserts on the builders' known multi-run shape.
     ...collectiveXSizes,
   ];
 

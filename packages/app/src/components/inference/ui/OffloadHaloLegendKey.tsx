@@ -1,6 +1,6 @@
-import { POINT_SIZE } from '@/lib/chart-rendering';
-import type { Locale } from '@/lib/i18n';
-import { useLocale } from '@/lib/use-locale';
+import { POINT_SIZE } from '@/lib/charts/chart-rendering';
+import type { Locale } from '@/lib/i18n/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 export const OFFLOAD_HALO_RADIUS = POINT_SIZE + 4;
 export const OFFLOAD_HALO_STROKE_WIDTH = 1.5;
@@ -10,11 +10,6 @@ export function offloadHaloLabel(locale: Locale): string {
   return locale === 'zh' ? 'KV offload 已开启' : 'KV offload ON';
 }
 
-/**
- * Key for the dashed ring drawn around agentic points that use KV-cache
- * offload. Rendered in the axis-metric info footer below the chart (the
- * footer is `no-export`, so downloaded PNGs carry only the halo itself).
- */
 export function OffloadHaloLegendKey() {
   const locale = useLocale();
   return (

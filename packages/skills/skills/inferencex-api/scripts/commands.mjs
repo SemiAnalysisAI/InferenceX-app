@@ -256,6 +256,36 @@ export const FORMAL_OPERATIONS = Object.freeze([
 
 const UTILITY_OPERATIONS = Object.freeze([
   operation({
+    route: ['charts'],
+    kind: 'charts',
+    description: 'List templates or present recorded AgentX sources as charts and tables.',
+    formats: ['json', 'svg', 'csv', 'markdown'],
+    policies: [],
+    outputSchema: null,
+    formal: false,
+    contractVersion: 1,
+    options: Object.freeze([
+      option(
+        'template',
+        'list|agentx-sources',
+        'List recommendations or render a source comparison.',
+        { required: true },
+      ),
+      option('--input', 'path', 'Saved selected-point JSON capture; required when rendering.'),
+      option('--output-dir', 'path', 'New chart directory; required when rendering.'),
+      option('--phase', 'all|profiling|warmup', 'Recorded phase to include.', { default: 'all' }),
+      option('--style', 'chart|table|both', 'Presentation outputs to write.', { default: 'both' }),
+      option(
+        '--metric',
+        'requests|input-tokens|output-tokens|e2e|ttft',
+        'One image metric; token/latency images show medians.',
+        { default: 'requests' },
+      ),
+      SHARED_OPTIONS.error,
+    ]),
+    network: null,
+  }),
+  operation({
     route: ['discover'],
     kind: 'discovery',
     description: 'Discover capabilities, models, dates, datasets, and observed configs.',
@@ -268,7 +298,11 @@ const UTILITY_OPERATIONS = Object.freeze([
       option('resource', 'capabilities|models|dates|datasets|configs', 'Discovery resource.', {
         required: true,
       }),
-      option('--model', 'string', 'Model selector required for dates and configs.'),
+      option(
+        '--model',
+        'string',
+        'Display model selector or DB model key; required for dates and configs.',
+      ),
       option('--date', 'YYYY-MM-DD', 'Optional configs as-of cutoff.'),
       option('--limit', 'integer', 'Local result limit, from 1 to 1000.', { default: 100 }),
       option('--offset', 'integer', 'Nonnegative local result offset.', { default: 0 }),
@@ -492,7 +526,7 @@ export function parseOperation(argv) {
   if (entry.formal && outputDir === null) {
     throw argumentError(`${entry.command} requires --output-dir <new-directory>.`);
   }
-  if (!entry.formal && outputDir !== null) {
+  if (!entry.formal && entry.command !== 'charts' && outputDir !== null) {
     throw argumentError(`--output-dir does not apply to ${entry.command}.`);
   }
   if (

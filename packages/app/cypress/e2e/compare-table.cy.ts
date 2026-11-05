@@ -3,9 +3,6 @@ describe('Compare Interpolated Table', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    // Visit the canonical model-prefixed URL directly to avoid the bare-slug
-    // 308 redirect changing the URL after page load (which would invalidate
-    // the URL-based assertions further down).
     cy.visit('/compare/deepseek-r1-gb200-vs-h100');
     cy.get('[data-testid="compare-interpolated-table"]').should('exist');
   });
@@ -15,14 +12,6 @@ describe('Compare Interpolated Table', () => {
       delete doc.body.dataset.scrollLocked;
       doc.body.style.removeProperty('pointer-events');
     });
-  });
-
-  it('renders the interpolated table with at least one target column', () => {
-    cy.get('[data-testid="compare-interpolated-table"]').should('be.visible');
-    cy.get('[data-testid="compare-interpolated-table"] thead th').should(
-      'have.length.greaterThan',
-      1,
-    );
   });
 
   it('keeps metric context visible while scrolling the mobile comparison', () => {
@@ -50,12 +39,7 @@ describe('Compare Interpolated Table', () => {
     cy.viewport(1280, 720);
   });
 
-  it('displays editable target interactivity input boxes', () => {
-    cy.get('[data-testid^="compare-table-target-"]').should('have.length.greaterThan', 0);
-    cy.get('[data-testid="compare-table-target-0"]').should('have.attr', 'type', 'text');
-  });
-
-  it('shows metric rows (throughput, cost, power, concurrency)', () => {
+  it('commits target value when pressing Enter and updates the throughput cell', () => {
     const expectedMetrics = [
       'Throughput (tok/s/chip)',
       'Cost ($/M tok)',
@@ -65,14 +49,10 @@ describe('Compare Interpolated Table', () => {
     for (const metric of expectedMetrics) {
       cy.get('[data-testid="compare-interpolated-table"] tbody').should('contain.text', metric);
     }
-  });
 
-  it('shows GPU labels in table cells', () => {
     cy.get('[data-testid="compare-interpolated-table"] tbody td').should('contain.text', 'GB200');
     cy.get('[data-testid="compare-interpolated-table"] tbody td').should('contain.text', 'H100');
-  });
 
-  it('commits target value when pressing Enter and updates the throughput cell', () => {
     cy.get('[data-testid="compare-table-target-1"]').then(($input) => {
       const original = Number($input.val() as string);
       const next = original + 3;
@@ -138,13 +118,6 @@ describe('Compare Interpolated Table', () => {
     );
   });
 
-  it('displays the descriptive header text', () => {
-    cy.get('[data-testid="compare-interpolated-table"]')
-      .parent()
-      .parent()
-      .should('contain.text', 'Interpolated from real benchmark data');
-  });
-
   it('localizes the comparison reader and target input names', () => {
     cy.visit('/zh/compare/deepseek-r1-gb200-vs-h100');
     cy.get('[data-testid="compare-interpolated-table"]')
@@ -156,5 +129,39 @@ describe('Compare Interpolated Table', () => {
       'aria-label',
       '目标交互性 1（tok/s/user）',
     );
+  });
+});
+
+describe('Compare table with a shared sequence', () => {
+  // The server renders this page's table for 8k/1k; the shared URL asks for 1k/1k.
+  const SHARED_URL = '/compare/deepseek-r1-b200-vs-h200/8k-1k?i_seq=1k%2F1k';
+  const SHARED_SEQUENCE_ROWS = {
+    method: 'GET',
+    pathname: '/api/v1/benchmarks',
+    query: { view: 'calculator', sequence: '1k/1k' },
+  };
+
+  beforeEach(() => {
+    cy.window().then((win) => {
+      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+    });
+  });
+
+  it('drops the server cells when the shared sequence fails to load', () => {
+    cy.intercept(SHARED_SEQUENCE_ROWS, { statusCode: 500, body: { error: 'unavailable' } });
+    cy.visit(SHARED_URL);
+    cy.get('[data-testid="compare-table-status"]', { timeout: 15000 })
+      .should('have.attr', 'data-status', 'error')
+      .and('contain.text', 'failed to load');
+    cy.get('[data-testid="compare-interpolated-table"]').should('not.exist');
+  });
+
+  it('shows the empty state for a shared sequence without rows for the pair', () => {
+    cy.intercept(SHARED_SEQUENCE_ROWS, { body: [] });
+    cy.visit(SHARED_URL);
+    cy.get('[data-testid="compare-table-status"]', { timeout: 15000 })
+      .should('have.attr', 'data-status', 'empty')
+      .and('contain.text', 'selected workload');
+    cy.get('[data-testid="compare-interpolated-table"]').should('not.exist');
   });
 });

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { execFileSync } from 'node:child_process';
 
-import { compareEnglishSurfaces } from '../src/lib/zh-objective-guard';
+import { compareEnglishSurfaces } from '../src/lib/i18n/zh-objective-guard';
 
 interface Options {
   readonly chineseOnly: boolean;

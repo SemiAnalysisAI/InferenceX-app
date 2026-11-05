@@ -1,11 +1,12 @@
-import { SUPPLEMENTAL_BENCHMARK_ROWS } from '../../src/lib/supplemental-benchmarks';
+import { SUPPLEMENTAL_BENCHMARK_ROWS } from '../../src/lib/benchmarks/supplemental-benchmarks';
 import { OVERLAY_RUN_ID, OVERLAY_RUN_URL } from '../support/overlay-fixtures';
-import { servingArtifact, videoRun } from '../support/video-artifacts';
+import { videoHistoryEntry } from '../../src/components/video-benchmark/history';
+import { servingArtifact } from '../support/video-artifacts';
+import { expectHwKeyPoints, type ScatterPoint } from '../support/scatter-points';
 
 const datum = (el: Element) => (el as Element & { __data__: { x: number; y: number } }).__data__;
-
-// Merged from tabs.cy.ts and first-load-navigation.cy.ts
-// to reduce per-file Cypress startup overhead (~500ms per file)
+const tpuDatum = (points: ScatterPoint[]) =>
+  points.find((point) => String(point.datum.hwKey).startsWith('tpuv7'))!.datum;
 
 describe('Chart Section Tabs — E2E', () => {
   before(() => {
@@ -53,6 +54,22 @@ describe('Chart Section Tabs — E2E', () => {
     cy.url().should('include', '/fleet');
   });
 
+  it('opens First-Token Limits from the footer link', () => {
+    cy.get('[data-testid="tab-trigger-first-token"]').should('not.exist');
+
+    cy.get('[data-testid="footer-link-first-token"]').scrollIntoView().click();
+    cy.url().should('include', '/first-token');
+    cy.get('[data-testid="first-token-controls"]').should('exist');
+  });
+
+  it('opens Prefix Cache Reuse from the footer link', () => {
+    cy.get('[data-testid="tab-trigger-cache-reuse"]').should('not.exist');
+
+    cy.get('[data-testid="footer-link-cache-reuse"]').scrollIntoView().click();
+    cy.url().should('include', '/cache-reuse');
+    cy.get('[data-testid="cache-reuse-controls"]').should('exist');
+  });
+
   it('opens GPU Reliability from the footer link', () => {
     cy.get('[data-testid="tab-trigger-reliability"]').should('not.exist');
 
@@ -69,28 +86,22 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="gpu-specs-content"]').should('exist');
   });
 
-  it('shows mobile chart select dropdown on small viewport', () => {
-    cy.viewport(375, 812);
-    cy.visit('/inference');
-    cy.get('[data-testid="mobile-chart-select"]').should('be.visible');
-  });
-
-  it('keeps the sliding indicator aligned after the ↑↑↓↓ unlock inserts the Hidden trigger', () => {
-    // Start locked: testIsolation is off, so an unlock persisted by an earlier
-    // test would make the konami sequence below a no-op (nothing would insert,
-    // nothing would shift, and the assertion would pass vacuously).
+  it('keeps the sliding indicator aligned after the Konami code unlock inserts the Hidden trigger', () => {
     cy.visit('/inference', {
       onBeforeLoad(win) {
-        win.localStorage.removeItem('inferencex-feature-gate');
+        win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+        win.localStorage.setItem('inferencex-feature-gate', '1');
       },
     });
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
     cy.get('[data-testid="chart-section-tabs"] .tab-indicator').should('exist');
-    // Unlock mid-session: inserting the Hidden trigger reflows the
-    // justify-evenly tabs WITHOUT resizing the nav box, so the nav's
-    // ResizeObserver never fires — only the gateUnlocked remeasure keeps
-    // the indicator under the active tab.
     cy.get('body').type('{upArrow}{upArrow}{downArrow}{downArrow}');
+    cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
+    cy.get('body').type('{leftArrow}{rightArrow}{leftArrow}{rightArrow}ba');
+    cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
+    cy.get('body').type(
+      '{upArrow}{upArrow}{downArrow}{downArrow}{leftArrow}{rightArrow}{leftArrow}{rightArrow}BA',
+    );
     cy.get('[data-testid="tab-trigger-hidden"]').should('be.visible');
     cy.get('[data-testid="chart-section-tabs"] .tab-indicator').should(($indicator) => {
       const active = $indicator
@@ -103,8 +114,49 @@ describe('Chart Section Tabs — E2E', () => {
       expect(Number(match!.groups!.left)).to.be.closeTo(active.offsetLeft, 1);
       expect(indicator.getBoundingClientRect().width).to.be.closeTo(active.offsetWidth, 1);
     });
-    // Re-lock so the unlock doesn't leak into later tests (testIsolation off).
-    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
+    cy.reload();
+    cy.get('[data-testid="tab-trigger-hidden"]').should('be.visible');
+    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate-konami-v1'));
+  });
+
+  for (const [path, landing] of [
+    ['/powerx', '/'],
+    ['/zh/powerx', '/zh'],
+    ['/powerx/tutorial', '/'],
+    ['/zh/powerx/tutorial', '/zh'],
+  ] as const) {
+    it(`sends a locked visitor from ${path} to the landing page`, () => {
+      cy.visit(path, {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+          win.localStorage.setItem('inferencex-feature-gate', '1');
+        },
+      });
+      cy.location('pathname').should('eq', landing);
+    });
+  }
+
+  it('keeps PowerX open once the feature gate is unlocked', () => {
+    cy.visit('/powerx', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
+      },
+    });
+    cy.get('[data-testid="inference-chart-display"]').should('exist');
+    cy.location('pathname').should('eq', '/powerx');
+  });
+
+  it('permanently redirects the retired PowerX page to the inference dashboard', () => {
+    cy.request({ url: '/gpu-metrics?gm_runId=12345', followRedirect: false }).then((response) => {
+      expect(response.status).to.eq(308);
+      expect(response.headers.location).to.eq('/inference?gm_runId=12345');
+    });
+    cy.request({ url: '/zh/gpu-metrics', followRedirect: false }).then((response) => {
+      expect(response.status).to.eq(308);
+      expect(response.headers.location).to.eq('/zh/inference');
+    });
   });
 });
 
@@ -113,11 +165,9 @@ describe('First-load navigation', () => {
     cy.visit('/', {
       onBeforeLoad(win) {
         win.localStorage.removeItem('inferencex-starred');
-        // Snoozed, not cleared: the star modal is the eligible landing nudge
-        // on first load, and its corner card would sit over the footer links
-        // these specs click.
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.removeItem('inferencex-rubin-banner-dismissed');
+        win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
+        win.localStorage.setItem('inferencex-landing-banner-variant', 'ubenchx');
       },
     });
 
@@ -136,11 +186,12 @@ describe('First-load navigation', () => {
 
   it('navigates to dashboard from the header with one click', () => {
     cy.get('[data-testid="nav-link-dashboard"]').click();
-    cy.location('pathname').should('eq', '/inference');
+    cy.location('pathname').should('eq', '/inference/deepseek-v41-flash');
+    cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4.1 Flash');
   });
 
-  it('navigates to comparisons from the header with one click', () => {
-    cy.get('[data-testid="nav-link-compare"]').click();
+  it('navigates to comparisons from the footer with one click', () => {
+    cy.get('[data-testid="footer-link-compare"]').click();
     cy.location('pathname').should('eq', '/compare');
   });
 
@@ -156,46 +207,28 @@ describe('First-load navigation', () => {
 
   it('leads the landing page with the AgentX hero and its two CTAs', () => {
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
-      // The hero owns /compare's h1; on the landing page it is a section heading.
-      cy.get('h2').should('have.text', 'Compare Realistic Agentic Inference Perf');
-      cy.get('h1').should('not.exist');
+      cy.get('h1').should('have.text', 'Compare Realistic Agentic Inference Perf');
+      cy.get('h2').should('not.exist');
       cy.get('[data-testid="compare-agentx-revenue-calculator-link"]')
         .should('contain.text', 'Token Revenue Calculator')
         .and('have.attr', 'href', '/profit-estimator-per-gigawatt');
       cy.get('[data-testid="compare-agentx-dashboard-link"]')
         .should('have.text', 'Dashboard')
-        .and('have.attr', 'href', '/inference/kimi-k3');
+        .and('have.attr', 'href', '/inference/deepseek-v41-flash');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 7);
-      // Editorial order, not alphabetical — see FEATURED_AGENTX_MODEL_SLUGS.
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 2);
+      for (const hidden of ['minimax-m3', 'kimi-k3', 'glm-5-3']) {
+        cy.get(`[data-testid="compare-agentx-model-${hidden}"]`).should('not.exist');
+      }
       cy.get('[data-testid^="compare-agentx-model-"]').then(($rows) => {
         const slugs = [...$rows].map((row) =>
           (row.dataset.testid ?? '').replace('compare-agentx-model-', ''),
         );
-        expect(slugs).to.deep.equal([
-          'kimi-k3',
-          'deepseek-v41-flash',
-          'deepseek-v4',
-          'glm-5-3',
-          'minimax-m3',
-          'qwen-3-5',
-          'qwen-3-8-flash-next',
-        ]);
+        expect(slugs).to.deep.equal(['deepseek-v41-flash', 'muse-spark-open']);
       });
-      // Only the still-new rows carry the NEW pill — see AGENTX_NEW_MODEL_SLUGS.
-      cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]')
-        .should('have.length', 4)
-        .each(($badge) => expect($badge.text()).to.equal('NEW'));
-      for (const slug of ['kimi-k3', 'deepseek-v41-flash', 'glm-5-3', 'qwen-3-8-flash-next']) {
-        cy.get(
-          `[data-testid="compare-agentx-model-${slug}"] [data-new-badge="agentx-ledger"]`,
-        ).should('exist');
-      }
-      for (const slug of ['deepseek-v4', 'minimax-m3', 'qwen-3-5']) {
-        cy.get(
-          `[data-testid="compare-agentx-model-${slug}"] [data-new-badge="agentx-ledger"]`,
-        ).should('not.exist');
-      }
+      cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]').should(
+        'not.exist',
+      );
       cy.get('[data-testid="compare-agentx-model-deepseek-v41-flash"]')
         .should('have.attr', 'href', '/inference/deepseek-v41-flash')
         .and('contain.text', 'DeepSeek V4.1 Flash 552B');
@@ -210,32 +243,104 @@ describe('First-load navigation', () => {
   });
 });
 
-describe('Rubin launch banner', { testIsolation: true }, () => {
+describe('Huawei UBenchX launch banner', { testIsolation: true }, () => {
   for (const locale of ['', '/zh']) {
-    it(`opens DeepSeek V4 results from ${locale || '/'} landing page`, () => {
+    it(`opens Huawei core-memory profiles from ${locale || '/'} landing page`, () => {
       cy.visit(locale || '/', {
         onBeforeLoad(win) {
-          // Dismissing the previous launch must not hide the Rubin banner.
-          win.localStorage.setItem('inferencex-tpuv7-banner-dismissed', '1');
-          win.localStorage.removeItem('inferencex-rubin-banner-dismissed');
+          win.localStorage.setItem('inferencex-rubin-minimax-m3-banner-dismissed', '1');
+          win.localStorage.setItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed', '1');
+          win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
+          win.localStorage.setItem('inferencex-landing-banner-variant', 'ubenchx');
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         },
       });
-      cy.get('[data-testid="launch-banner"]')
-        .should('have.attr', 'href', `${locale}/inference/deepseek-v4`)
+      cy.get('[data-testid="launch-banner"]:visible')
+        .should('have.attr', 'href', `${locale}/ubenchx/core-memory-profiles`)
         .and(
           'contain.text',
-          locale ? 'Rubin 智能体推理性能' : 'Rubin Agentic Inference Performance',
+          locale ? 'Huawei Ascend 950PR 微基准测试' : 'Huawei Ascend 950PR Microbenchmarks',
         )
         .and(
           'contain.text',
-          locale ? '速度达 Blackwell Ultra 的 67 倍' : '67x Faster than Blackwell Ultra',
+          locale
+            ? '周期级核心访存微基准测试（Beta）'
+            : 'Cycle Level Core memory-access MicroBenchmarks (Beta)',
         )
         .click();
-      cy.location('pathname').should('eq', `${locale}/inference/deepseek-v4`);
-      cy.get('[data-testid="inference-chart-display"]').should('be.visible');
+      cy.location('pathname').should('eq', `${locale}/ubenchx/core-memory-profiles`);
+      cy.get('[data-testid="ascend-core-profiles"]').should('be.visible');
     });
   }
+});
+
+describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
+  for (const locale of ['', '/zh']) {
+    it(`opens OperatorX from ${locale || '/'} landing page`, () => {
+      cy.visit(locale || '/', {
+        onBeforeLoad(win) {
+          win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
+          win.localStorage.setItem('inferencex-landing-banner-variant', 'operatorx');
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        },
+      });
+      cy.get('[data-testid="launch-banner"]:visible')
+        .should('have.length', 1)
+        .and('have.attr', 'href', `${locale}/operatorx`)
+        .and(
+          'contain.text',
+          locale ? 'Huawei Ascend 950PR 微基准测试' : 'Huawei Ascend 950PR Microbenchmarks',
+        )
+        .and(
+          'contain.text',
+          locale
+            ? '950PR GEMM FLOPs 与最大 FLOPS 利用率'
+            : '950PR GEMM FLOPs and Max FLOPS utilization',
+        )
+        .click();
+      cy.location('pathname').should('eq', `${locale}/operatorx`);
+      cy.get('[data-testid="operatorx-page"]').should('be.visible');
+    });
+  }
+
+  it('assigns a sticky arm on first visit and shows only that arm', () => {
+    cy.clearAllLocalStorage();
+    cy.visit('/', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('html')
+      .invoke('attr', 'data-landing-banner-variant')
+      .then((variant) => {
+        expect(variant).to.be.oneOf(['ubenchx', 'operatorx']);
+        cy.window()
+          .its('localStorage')
+          .invoke('getItem', 'inferencex-landing-banner-variant')
+          .should('eq', variant);
+        cy.get('[data-testid="launch-banner"]:visible')
+          .should('have.length', 1)
+          .and(
+            'have.attr',
+            'href',
+            variant === 'operatorx' ? '/operatorx' : '/ubenchx/core-memory-profiles',
+          );
+        cy.reload();
+        cy.get('html').should('have.attr', 'data-landing-banner-variant', variant);
+      });
+  });
+
+  it('shares dismissal across arms', () => {
+    cy.visit('/', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-landing-banner-variant', 'operatorx');
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="intro-section"]').should('be.visible');
+    cy.get('[data-testid="launch-banner"]').should('not.exist');
+  });
 });
 
 describe('TPUv7 results', { testIsolation: true }, () => {
@@ -244,8 +349,7 @@ describe('TPUv7 results', { testIsolation: true }, () => {
       cy.visit(`${locale}/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8`);
       cy.location('pathname').should('eq', `${locale}/inference`);
       cy.get('[data-testid="inference-chart-display"]').should('be.visible');
-      cy.get('.dot-group[data-hw-key^="tpuv7"]').should('have.length.at.least', 1);
-      // Verify the rendered values, then reload the share URL in each locale.
+      expectHwKeyPoints('tpuv7', true);
       cy.location('href').then((href) => {
         const url = new URL(href);
         url.searchParams.set('g_model', 'Qwen-3.5-397B-A17B');
@@ -254,45 +358,35 @@ describe('TPUv7 results', { testIsolation: true }, () => {
         url.searchParams.set('i_metric', 'y_costh');
         cy.visit(url.toString());
       });
-      const dots = '.dot-group[data-hw-key^="tpuv7"]';
-
-      // Internal owner cost is the default basis; External is the opt-in.
       cy.get('[data-testid="tco-basis-internal"]').should('have.attr', 'aria-pressed', 'true');
-      cy.get(dots)
-        .first()
-        .then(($point) => {
-          const internal = { ...datum($point[0]) };
-          cy.get('[data-testid="tco-basis-external"]').click();
-          cy.get(dots)
-            .first()
-            .should(($external) => {
-              expect(datum($external[0]).y).to.be.closeTo((internal.y * 1.21) / 1.03, 1e-8);
-              expect(datum($external[0]).x).to.equal(internal.x);
-            });
-          cy.get('[data-testid="share-button"]').first().click();
-          cy.get('[data-testid="share-url-input"]')
-            .invoke('val')
-            .should('include', 'g_tco=external')
-            .then((url) => cy.visit(String(url)));
-          cy.get('[data-testid="tco-basis-external"]').should('have.attr', 'aria-pressed', 'true');
-          cy.get(dots)
-            .first()
-            .should(($external) => {
-              expect(datum($external[0]).y).to.be.closeTo((internal.y * 1.21) / 1.03, 1e-8);
-            });
-          cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView();
-          cy.screenshot(`tco-basis-${locale ? 'zh' : 'en'}-desktop`, { capture: 'viewport' });
-          cy.viewport(390, 844);
-          cy.get('[data-testid="inference-secondary-controls"] > button').click();
-          cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView().should('be.visible');
-          cy.screenshot(`tco-basis-${locale ? 'zh' : 'en'}-mobile`, { capture: 'viewport' });
-          cy.get('[data-testid="tco-basis-internal"]').click();
-          cy.get(dots)
-            .first()
-            .should(($restored) => {
-              expect(datum($restored[0]).y).to.be.closeTo(internal.y, 1e-8);
-            });
+      expectHwKeyPoints('tpuv7', true);
+      cy.scatterPoints().then((initial) => {
+        const internal = { ...tpuDatum(initial) };
+        cy.get('[data-testid="tco-basis-external"]').click();
+        cy.scatterPoints().should((points) => {
+          expect(tpuDatum(points).y).to.be.closeTo((internal.y * 1.21) / 1.03, 1e-8);
+          expect(tpuDatum(points).x).to.equal(internal.x);
         });
+        cy.get('[data-testid="share-button"]').first().click();
+        cy.get('[data-testid="share-url-input"]')
+          .invoke('val')
+          .should('include', 'g_tco=external')
+          .then((url) => cy.visit(String(url)));
+        cy.get('[data-testid="tco-basis-external"]').should('have.attr', 'aria-pressed', 'true');
+        cy.scatterPoints().should((points) => {
+          expect(tpuDatum(points).y).to.be.closeTo((internal.y * 1.21) / 1.03, 1e-8);
+        });
+        cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView();
+        cy.screenshot(`tco-basis-${locale ? 'zh' : 'en'}-desktop`, { capture: 'viewport' });
+        cy.viewport(390, 844);
+        cy.get('[data-testid="inference-secondary-controls"] > button').click();
+        cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView().should('be.visible');
+        cy.screenshot(`tco-basis-${locale ? 'zh' : 'en'}-mobile`, { capture: 'viewport' });
+        cy.get('[data-testid="tco-basis-internal"]').click();
+        cy.scatterPoints().should((points) => {
+          expect(tpuDatum(points).y).to.be.closeTo(internal.y, 1e-8);
+        });
+      });
     });
   }
   it('reprices a TPU unofficial overlay without changing throughput', () => {
@@ -358,108 +452,59 @@ describe('TPUv7 results', { testIsolation: true }, () => {
   });
 });
 
-describe('H3 video artifact viewer', () => {
+describe('H3 video performance history', () => {
   beforeEach(() => {
-    cy.intercept('GET', '/api/video-runs?page=*', { runs: [], nextPage: null });
-  });
-  it('shares a comparison built by opening two CI runs through the page', () => {
-    for (const saved of [
-      servingArtifact(123, 40, 'NVIDIA H200'),
-      servingArtifact(456, 41, 'NVIDIA B200'),
-    ]) {
-      cy.intercept('GET', `/api/video-runs?run=${saved.runId}`, {
-        run: videoRun(Number(saved.runId), 'success'),
-        artifacts: [saved.artifact],
-      });
-      cy.intercept(
-        'GET',
-        `/api/video-runs?run=${saved.runId}&artifact=${saved.artifact.id}&format=media`,
-        saved,
-      );
-    }
-    cy.intercept('GET', 'https://media.test/**', { statusCode: 204 });
-    cy.visit('/video?view=tradeoff&run=123&artifact=40');
-    cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 3);
-    cy.contains('summary', 'Run details and artifact selection').click();
-    cy.get('[data-testid="video-ci-runs"] form input').type('456');
-    cy.get('[data-testid="video-ci-runs"] form').submit();
-    cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 6);
-    cy.location().should((location) => {
-      const params = new URLSearchParams(location.search);
-      expect(params.get('run')).to.equal('456');
-      expect(params.get('compare')).to.equal('123.40,456.41');
+    cy.intercept('GET', '/api/video-runs?format=history&page=*', {
+      schemaVersion: 1,
+      entries: [],
+      nextPage: null,
     });
-    cy.reload();
-    cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 6);
-    cy.get('[data-testid="video-tradeoff"]')
-      .should('contain', 'NVIDIA H200')
-      .and('contain', 'NVIDIA B200');
   });
-  it('restores a cross-hardware comparison on reload and retains good results when one artifact fails', () => {
-    const h200 = servingArtifact(123, 40, 'NVIDIA H200');
-    const b200 = servingArtifact(456, 41, 'NVIDIA B200');
-    for (const saved of [h200, b200]) {
-      cy.intercept('GET', `/api/video-runs?run=${saved.runId}`, {
-        run: videoRun(Number(saved.runId), 'success'),
-        artifacts: [saved.artifact],
-      });
-      cy.intercept(
-        'GET',
-        `/api/video-runs?run=${saved.runId}&artifact=${saved.artifact.id}&format=media`,
-        saved,
-      );
-    }
-    cy.intercept('GET', '/api/video-runs?run=789&artifact=42&format=media', {
-      statusCode: 503,
-      body: { error: 'Synthetic unavailable artifact' },
-    });
-    cy.intercept('GET', 'https://media.test/**', { statusCode: 204 });
-    cy.visit('/video?view=tradeoff&run=123&artifact=40&source=123&compare=123.40,456.41,789.42');
-    cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 6);
-    cy.get('[data-testid="tradeoff-detail"]').should('contain', 'NVIDIA H200');
-    cy.get('[data-testid="video-tradeoff"]')
-      .should('contain', 'NVIDIA H200')
-      .and('contain', 'NVIDIA B200');
-    cy.get('[role="alert"]').should('contain', 'Some comparison results could not be loaded');
+  it('opens published history behind the dashboard and restores its filters after reload', () => {
+    const entry = videoHistoryEntry(servingArtifact(), '2026-09-09T00:00:00Z');
+    cy.intercept('GET', '/api/video-runs?format=history&page=1*', {
+      schemaVersion: 1,
+      entries: [entry],
+      nextPage: null,
+    }).as('history');
+    cy.visit('/video');
+    cy.wait('@history');
+    cy.get('[data-testid="video-history"]').should('not.exist');
+    cy.get('[data-testid="video-history-section"] summary').click();
+    cy.get('[data-testid="video-history"] h1').should('contain', 'Performance history');
+    cy.get('[data-testid="video-history-observation"]').should('have.length', 3);
+    cy.get('[aria-label="Client concurrency"]').click();
+    cy.contains('[role="option"]', 'C2').click();
+    cy.get('[data-testid="video-history-observation"]')
+      .should('have.length', 1)
+      .and('contain', 'C2');
     cy.reload();
-    cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 6);
-    cy.get('[data-testid="tradeoff-detail"]').should('contain', 'NVIDIA H200');
-    cy.contains(
-      '[data-testid="video-tradeoff"] tbody button',
-      /NVIDIA B200.*Client concurrency 4/,
-    ).click();
-    cy.contains('button', 'Open videos and full result').click();
-    cy.get('[data-testid="serving-selected-metrics"]').should('contain', 'C4');
-    cy.location('search').should('include', 'run=456').and('include', 'compare=');
-    cy.get('[data-testid="serving-media"] video')
-      .should('have.attr', 'src')
-      .and('include', '/gpu/c4/');
+    cy.get('[data-testid="video-history-observation"]')
+      .should('have.length', 1)
+      .and('contain', 'C2')
+      .and('contain', '240 / —');
+    cy.location('search').should('contain', 'history-concurrency=2');
   });
-  it('uses the shared unlock for navigation and keeps an empty viewer free of sample results', () => {
+  it('keeps the hidden Video tab behind the shared unlock and noindex', () => {
     cy.viewport(1440, 1000);
     cy.visit('/video', {
       onBeforeLoad(win) {
-        win.localStorage.removeItem('inferencex-feature-gate');
+        win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
       },
     });
-    cy.get('[data-testid="video-ci-runs"]').should('contain', 'No H3 runs in this page');
     cy.get('video[data-role]').should('not.exist');
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
-    cy.get('body').type('{upArrow}{upArrow}{downArrow}{downArrow}');
+    cy.get('body').type(
+      '{upArrow}{upArrow}{downArrow}{downArrow}{leftArrow}{rightArrow}{leftArrow}{rightArrow}BA',
+    );
     cy.get('[data-testid="tab-trigger-hidden"]').click();
     cy.contains('a', 'Video').should('have.attr', 'href', '/video');
     cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
   });
-  it('shows a recoverable load error and the Chinese empty state', () => {
-    cy.visit('/video');
-    cy.contains('summary', 'Local artifact tools').click();
-    cy.get('[data-testid="video-benchmark"]').contains('summary', 'Manifest URL').click();
-    cy.get('input[aria-label="Manifest URL"]').type('https://example.com/wrong.json');
-    cy.contains('button', 'Load manifest').click();
-    cy.get('[role="alert"]').should('contain', 'Could not load this bundle');
-    cy.get('video[data-role]').should('not.exist');
-    cy.visit('/zh/video');
-    cy.get('[data-testid="video-ci-runs"]').should('contain', '本页 GitHub 历史中没有 H3 运行');
+  it('renders the Chinese history section for a history deep link', () => {
+    cy.visit('/zh/video?history-hardware=H200');
+    cy.get('[data-testid="video-history-section"]').should('have.attr', 'open');
+    cy.get('[data-testid="video-history"] h1').should('contain', '性能历史');
     cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
   });
 });

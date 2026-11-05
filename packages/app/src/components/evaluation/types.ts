@@ -1,41 +1,31 @@
-import type { Model } from '@/lib/data-mappings';
+import type { Model } from '@/lib/catalog/data-mappings';
 
-/**
- * Represents a single eval data point for the chart
- */
 export interface EvaluationChartData {
-  /**
-   * `eval_results.id` of the row that produced this data point. When rows are
-   * aggregated across retries (`aggregateEvaluationChartRows`), this is the id
-   * of the latest run in the group — the one most likely to have eval_samples
-   * persisted for the drawer.
-   */
   evalResultId: number;
   configId: number;
   hwKey: string;
-  /** Bare hardware key (e.g. `b300`, `mi355x`) before composition with framework/spec into `hwKey`. Needed by the live-fetch path to match GHA artifact names. */
   hardware: string;
-  configLabel: string; // Display label like "H100 (vLLM)" or "B200 (TRTLLM)"
-  score: number; // eval benchmark score (midpoint when aggregated)
-  scoreError?: number; // standard error of the score (or half range when aggregated)
-  minScore?: number; // minimum score across all runs (when aggregated)
-  maxScore?: number; // maximum score across all runs (when aggregated)
-  errorMin?: number; // min of (score - SE) for error bars
-  errorMax?: number; // max of (score + SE) for error bars
+  configLabel: string;
+  score: number;
+  scoreError?: number;
+  minScore?: number;
+  maxScore?: number;
+  errorMin?: number;
+  errorMax?: number;
   model: string;
   benchmark: string;
   specDecode: string;
   date: string;
   datetime: string;
   precision: string;
-  framework: string; // vllm, trt, etc.
+  framework: string;
   physicalChips?: number;
   dp?: number;
-  tp: number; // tensor parallelism (decode-side for disagg)
-  ep: number; // expert parallelism (decode-side for disagg)
-  dp_attention: boolean; // data parallel attention (decode-side for disagg)
-  conc: number; // concurrency
-  disagg: boolean; // disaggregated prefill/decode
+  tp: number;
+  ep: number;
+  dp_attention: boolean;
+  conc: number;
+  disagg: boolean;
   isMultinode: boolean;
   prefillTp: number;
   prefillEp: number;
@@ -44,7 +34,7 @@ export interface EvaluationChartData {
   decodeNumWorkers: number;
   numPrefillGpu: number;
   numDecodeGpu: number;
-  runUrl?: string; // GitHub Actions run URL
+  runUrl?: string;
 }
 
 export interface EvalChangelogEntry {
@@ -52,9 +42,6 @@ export interface EvalChangelogEntry {
   configs: string[];
 }
 
-/**
- * Context type for the Eval Chart
- */
 export interface EvaluationChartContextType {
   loading: boolean;
   isEvaluationDataSettled: boolean;
@@ -86,7 +73,7 @@ export interface EvaluationChartContextType {
   setIsLegendExpanded: (value: boolean) => void;
   hwTypesWithData: Set<string>;
   selectAllHwTypes: () => void;
-  highlightedConfigs: Set<string>; // Configurations that have new data from selected run date
+  highlightedConfigs: Set<string>;
   changelogEntries: EvalChangelogEntry[];
   modelHasEvalData: boolean;
   selectedPrecisions: string[];

@@ -4,10 +4,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const track = vi.fn();
-vi.mock('@/lib/analytics', () => ({ track: (...args: unknown[]) => track(...args) }));
+vi.mock('@/lib/analytics/analytics', () => ({ track: (...args: unknown[]) => track(...args) }));
 
 let locale: 'en' | 'zh' = 'en';
-vi.mock('@/lib/use-locale', () => ({ useLocale: () => locale }));
+vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => locale }));
 
 import { PromoVideo } from '@/components/about/promo-video';
 
@@ -28,7 +28,6 @@ function video(): HTMLVideoElement {
 beforeEach(() => {
   locale = 'en';
   track.mockClear();
-  // jsdom has no media stack, so HTMLMediaElement.play is undefined by default.
   play = vi.fn<() => Promise<void>>(() => Promise.resolve());
   HTMLMediaElement.prototype.play = play;
   container = document.createElement('div');
@@ -44,8 +43,6 @@ afterEach(() => {
 describe('PromoVideo', () => {
   it('defers the download until the visitor asks for it', () => {
     renderUi(<PromoVideo />);
-    // preload="none" is the whole point: a ~30 MB asset must not land on the
-    // critical path of /about for the majority who never press play.
     expect(video().getAttribute('preload')).toBe('none');
     expect(video().getAttribute('poster')).toBe('/promo-poster.webp');
   });
@@ -77,9 +74,6 @@ describe('PromoVideo', () => {
   });
 
   it('hides the overlay when playback starts without the overlay button', () => {
-    // Native controls, keyboard, or the OS media keys can start playback
-    // without routing through our overlay; the overlay must still get out of
-    // the way rather than covering the running video.
     renderUi(<PromoVideo />);
     act(() => {
       video().dispatchEvent(new Event('play'));

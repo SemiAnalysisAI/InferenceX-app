@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface UseResponsiveChartDimensionsOptions {
-  /**
-   * Fixed height value for the chart.
-   * @default 600
-   */
   height?: number;
 }
 
@@ -14,16 +10,8 @@ export interface UseResponsiveChartDimensionsResult {
   setContainerRef: (element: HTMLDivElement | null) => void;
 }
 
-/**
- * Hook for managing responsive chart dimensions with ResizeObserver.
- * Provides a containerRef and dimensions state that automatically updates
- * when the container width changes. Height is fixed.
- *
- * @example
- * const { dimensions, setContainerRef } = useResponsiveChartDimensions({
- *   height: 600,
- * });
- */
+export const RESIZE_COALESCE_MS = 100;
+
 export function useResponsiveChartDimensions(
   options: UseResponsiveChartDimensionsOptions = {},
 ): UseResponsiveChartDimensionsResult {
@@ -32,59 +20,82 @@ export function useResponsiveChartDimensions(
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height });
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const heightRef = useRef(height);
+  heightRef.current = height;
+  const appliedWidthRef = useRef(0);
+  const pendingWidthRef = useRef<number | null>(null);
+  const coalesceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Keep the dimensions object referentially stable when nothing changed.
-  // ResizeObserver fires once right after observe() with the same width the
-  // ref callback just measured — without this guard that initial callback
-  // produces a new object identity, which downstream chart effects treat as
-  // a resize and answer with a full (visually identical) D3 rebuild.
-  const updateDimensions = useCallback((width: number, h: number) => {
+  const updateDimensions = useCallback((width: number) => {
+    appliedWidthRef.current = width;
+    const h = heightRef.current;
     setDimensions((prev) =>
       prev.width === width && prev.height === h ? prev : { width, height: h },
     );
   }, []);
 
-  // ref callback for initial dimension calculation and ResizeObserver setup
+  const cancelCoalescing = useCallback(() => {
+    clearTimeout(coalesceTimerRef.current ?? undefined);
+    coalesceTimerRef.current = null;
+    pendingWidthRef.current = null;
+  }, []);
+
+  const observeWidth = useCallback(
+    (width: number) => {
+      if (coalesceTimerRef.current !== null) {
+        pendingWidthRef.current = width;
+        return;
+      }
+      if (width === appliedWidthRef.current) return;
+      updateDimensions(width);
+      const flush = () => {
+        const pending = pendingWidthRef.current;
+        pendingWidthRef.current = null;
+        if (pending === null || pending === appliedWidthRef.current) {
+          coalesceTimerRef.current = null;
+          return;
+        }
+        updateDimensions(pending);
+        coalesceTimerRef.current = setTimeout(flush, RESIZE_COALESCE_MS);
+      };
+      coalesceTimerRef.current = setTimeout(flush, RESIZE_COALESCE_MS);
+    },
+    [updateDimensions],
+  );
+
   const setContainerRef = useCallback(
     (element: HTMLDivElement | null) => {
-      // clean up previous observer if container changed
       if (resizeObserverRef.current) {
         resizeObserverRef.current.disconnect();
         resizeObserverRef.current = null;
       }
+      cancelCoalescing();
 
       containerRef.current = element;
 
       if (element) {
-        // set initial dimensions
-        const initialWidth = element.getBoundingClientRect().width;
-        updateDimensions(initialWidth, height);
+        updateDimensions(element.getBoundingClientRect().width);
 
-        // set up ResizeObserver
         resizeObserverRef.current = new ResizeObserver((entries) => {
-          if (entries[0]) {
-            const { width: observedWidth } = entries[0].contentRect;
-            updateDimensions(observedWidth, height);
-          }
+          if (entries[0]) observeWidth(entries[0].contentRect.width);
         });
 
         resizeObserverRef.current.observe(element);
       }
     },
-    [height, updateDimensions],
+    [cancelCoalescing, observeWidth, updateDimensions],
   );
 
-  // clean up on unmount or height change
   useEffect(
     () => () => {
       if (resizeObserverRef.current) {
         resizeObserverRef.current.disconnect();
       }
+      cancelCoalescing();
     },
-    [],
+    [cancelCoalescing],
   );
 
-  // update dimensions when height changes
   useEffect(() => {
     setDimensions((prev) => (prev.height === height ? prev : { ...prev, height }));
   }, [height]);

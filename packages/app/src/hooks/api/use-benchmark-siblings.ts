@@ -16,6 +16,7 @@ export interface BenchmarkSibling {
   prefill_pp: number | null;
   prefill_dcp_size: number | null;
   prefill_pcp_size: number | null;
+  prefill_dwdp_size?: number | null;
   prefill_dp_attention: boolean;
   prefill_num_workers: number;
   num_prefill_gpu: number;

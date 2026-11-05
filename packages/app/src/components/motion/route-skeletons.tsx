@@ -1,21 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
-/**
- * Loading fallbacks for the dynamic compare routes' in-page Suspense
- * boundaries (NOT `loading.tsx` — a route-level boundary streams a 200 shell
- * before the page runs, degrading its notFound()/permanentRedirect() to soft
- * client-side handling; each page validates first, then suspends only its
- * data-dependent body behind these). They give navigation immediate visual
- * feedback while the benchmark payload streams in — the header stays mounted
- * and interactive, so context is preserved instead of a frozen or blank page.
- *
- * Dimensions mirror the destination pages (heading block + 600px chart area /
- * catalog card grid) so the finished content replaces the skeleton without
- * layout shift.
- */
-
-/** Compare catalog: hero title block + catalog card grid. */
 export function CompareRouteSkeleton() {
   return (
     <div className="flex flex-col gap-8" aria-busy="true" data-testid="route-skeleton">
@@ -37,7 +22,6 @@ export function CompareRouteSkeleton() {
   );
 }
 
-/** Compare detail routes: heading block + chart card. */
 export function CompareDetailRouteSkeleton() {
   return (
     <div className="flex flex-col gap-4" aria-busy="true" data-testid="route-skeleton">

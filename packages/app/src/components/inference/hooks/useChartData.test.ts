@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import chartDefinitions from '@/components/inference/metric-registry';
-import { dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
+import { dedupeAgenticHistoryRuns } from '@/lib/benchmarks/benchmark-run-selection';
 
 import type { InferenceData } from '@/components/inference/types';
 import { EMPTY_QUICK_FILTERS } from '@/components/inference/utils/quickFilters';
@@ -16,6 +16,7 @@ import {
   derivedModeRoofline,
   flipRooflineDirection,
   supportsPointTokenMetric,
+  withUncachedQualifier,
 } from './useChartData';
 
 interface DedupeInput {
@@ -58,9 +59,6 @@ describe('dedupeRowsToLatestPerConfig', () => {
   });
 
   it('keeps BOTH offload variants even when they were ingested on different dates', () => {
-    // The regression: offload=on sweep landed LATER than offload=off. Without
-    // offload in the key, the on-variant's newer date would win the shared group
-    // and silently drop the (older) off-variant series entirely.
     const rows = [
       drow({ id: 1, offload_mode: 'off', date: '2026-06-01' }),
       drow({ id: 2, offload_mode: 'on', date: '2026-06-05' }),
@@ -86,8 +84,6 @@ describe('dedupeRowsToLatestPerConfig', () => {
   });
 
   it('normalizes a missing offload_mode to "off" (matches the SQL lineKey)', () => {
-    // A row with no offload_mode collides with an explicit offload=off row of the
-    // same config — both are the "off" series, so latest-date dedup applies.
     const rows = [
       drow({ id: 1, offload_mode: undefined, date: '2026-06-01' }),
       drow({ id: 2, offload_mode: 'off', date: '2026-06-03' }),
@@ -338,15 +334,14 @@ describe('buildComparisonDates', () => {
     expect(result).toEqual(['2026-02-01']);
   });
 
-  it('keeps other same-day runs but excludes the selected main run', () => {
+  it('keeps every exact-run series, including the currently selected main run', () => {
     const result = buildComparisonDates(
       ['h100'],
       ['2026-03-01~r301', '2026-03-01~r300', '2026-02-01~r200'],
       { startDate: '', endDate: '' },
       '2026-03-01',
-      '300',
     );
-    expect(result).toEqual(['2026-03-01~r301', '2026-02-01~r200']);
+    expect(result).toEqual(['2026-03-01~r301', '2026-03-01~r300', '2026-02-01~r200']);
   });
 
   it('deduplicates dates appearing in both range and explicit list', () => {
@@ -470,7 +465,6 @@ describe('applyAgenticPercentileToXLabel', () => {
   });
 
   it('does not touch mid-label statistic words', () => {
-    // Only a LEADING statistic word is a prefix; words later in the label are content.
     expect(applyAgenticPercentileToXLabel('Normalized E2E @ 400 output tokens (s)', 'P90')).toBe(
       'P90 Normalized E2E @ 400 output tokens (s)',
     );
@@ -491,10 +485,6 @@ describe('flipRooflineDirection', () => {
 });
 
 describe('derived higher-is-better x-axis rooflines', () => {
-  // The E2E Normalized Interactivity mode renders on the e2e chart definition (lower-x-is-better)
-  // but its x-axis is higher-is-better, like interactivity. ChartDisplay
-  // therefore mirrors each configured e2e corner horizontally rather than
-  // hardcoding one corner.
   it('mirroring the e2e corner reproduces the interactivity corner for every y-metric', () => {
     const defs = chartDefinitions as Record<string, unknown>[];
     const e2e = defs.find((d) => d.chartType === 'e2e')!;
@@ -592,13 +582,6 @@ const scopePoint = (hwKey: string, extra: Record<string, unknown> = {}): Inferen
   }) as unknown as InferenceData;
 
 describe('applyScopeFilters', () => {
-  // The legend's selection universe is built from this filter chain. It must
-  // depend on the GPU picker / quick filters / compare scope and on nothing
-  // else — in particular NOT on which y-axis metric is drawn. See the
-  // `selectionPoints` comment in useChartData: reconcileActiveSet intersects
-  // the user's legend selection with whatever set it is handed and never
-  // re-widens, so a universe that shrinks when a Measured Energy axis is
-  // picked deletes the telemetry-less configs for good.
   const withTelemetry = scopePoint('b200_sglang', {
     measuredAvgPower: { y: 900, roof: false },
   });
@@ -650,5 +633,40 @@ describe('supportsPointTokenMetric', () => {
     });
 
     expect(supportsPointTokenMetric(futureRubin, 'total')).toBe(true);
+  });
+});
+
+describe('withUncachedQualifier', () => {
+  it('renames total and unqualified token nouns to uncached suffix + output tokens', () => {
+    expect(withUncachedQualifier('Total Tokens per $1 TCO (tok/$)', 'en')).toBe(
+      'Uncached Suffix + Output Tokens per $1 TCO (tok/$)',
+    );
+    expect(withUncachedQualifier('Token Throughput per Chip', 'en')).toBe(
+      'Uncached Suffix + Output Token Throughput per Chip',
+    );
+    expect(withUncachedQualifier('Cost per Million Total Tokens ($)', 'en')).toBe(
+      'Cost per Million Uncached Suffix + Output Tokens ($)',
+    );
+    expect(withUncachedQualifier('Measured Joules per Token (incl. prompt)', 'en')).toBe(
+      'Measured Joules per Uncached Suffix + Output Token',
+    );
+  });
+
+  it('renames input-only token nouns to uncached suffix input tokens', () => {
+    expect(withUncachedQualifier('Input Token Throughput per Chip', 'en')).toBe(
+      'Uncached Suffix Input Token Throughput per Chip',
+    );
+  });
+
+  it('renames Chinese labels', () => {
+    expect(withUncachedQualifier('每 1 美元 TCO 对应的总 token 数（tok/$）', 'zh')).toBe(
+      '每 1 美元 TCO 对应的未缓存 suffix + 输出 token 数（tok/$）',
+    );
+    expect(withUncachedQualifier('每芯片 token 吞吐量（tok/s/chip）', 'zh')).toBe(
+      '每芯片 未缓存 suffix + 输出 token 吞吐量（tok/s/chip）',
+    );
+    expect(withUncachedQualifier('每芯片输入 token 吞吐量', 'zh')).toBe(
+      '每芯片未缓存 suffix 输入 token 吞吐量',
+    );
   });
 });

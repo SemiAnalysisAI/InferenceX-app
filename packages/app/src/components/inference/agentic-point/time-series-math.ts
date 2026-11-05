@@ -1,35 +1,16 @@
-/**
- * Pure data-shaping helpers behind the agentic point-detail time-series
- * charts: rolling/cumulative aggregations over `TimeSeriesPoint[]` server
- * scrapes and per-request timeline records. No React, no SVG — everything
- * here is unit-testable in isolation (see time-series-math.test.ts).
- */
-
 import type { RequestChartRecord } from '@/hooks/api/use-request-chart-data';
 import type { TimeSeriesPoint } from '@/hooks/api/use-trace-server-metrics';
 
-/** One drawable line in a TimeSeriesChart. */
 export interface ChartSeries {
   name: string;
-  /** The line to draw (caller pre-smooths if desired). */
   data: TimeSeriesPoint[];
-  /** Optional raw per-scrape values; rendered as low-opacity scatter behind the line. */
   rawData?: TimeSeriesPoint[];
   color: string;
-  /** Override default stroke width (1.8). Use higher values for emphasis lines. */
   strokeWidth?: number;
-  /** Stroke opacity (0..1). Use < 1 for background/underlay lines. */
   strokeOpacity?: number;
-  /** Hide from the hover legend (e.g. per-engine underlay lines that
-   *  would clutter the tooltip). The path still renders. */
   hideFromHover?: boolean;
 }
 
-/**
- * Find the largest plotted value without spreading the full dataset into a
- * variadic call. Agentic runs can contain tens of thousands of request samples,
- * which exceeds browser argument limits when passed to `Math.max(...values)`.
- */
 export function maxTimeSeriesValue(
   series: readonly ChartSeries[],
   initialValue = Number.NEGATIVE_INFINITY,
@@ -45,7 +26,6 @@ export type RequestMetric = 'interactivity' | 'ttft' | 'e2e';
 export type RequestPercentile = 'p75' | 'p90';
 export type ThroughputSeriesKey = 'input' | 'decode';
 
-/** Toggle one throughput series while preserving the at-least-one invariant. */
 export function toggleThroughputSeries(
   selected: ReadonlySet<ThroughputSeriesKey>,
   key: ThroughputSeriesKey,
@@ -57,7 +37,6 @@ export function toggleThroughputSeries(
   return next;
 }
 
-/** Linear-interpolated percentile (matches numpy's default method). */
 export function quantile(sortedAsc: number[], q: number): number {
   if (sortedAsc.length === 1) return sortedAsc[0]!;
   const pos = (sortedAsc.length - 1) * q;
@@ -67,12 +46,10 @@ export function quantile(sortedAsc: number[], q: number): number {
   return sortedAsc[lo]! + (sortedAsc[hi]! - sortedAsc[lo]!) * (pos - lo);
 }
 
-/** Linear-interpolated value at time `t` from a time-sorted series. */
 export function interpAt(data: TimeSeriesPoint[], t: number): number | null {
   if (data.length === 0) return null;
   if (t <= data[0]!.t) return data[0]!.value;
   if (t >= data.at(-1)!.t) return data.at(-1)!.value;
-  // Binary search
   let lo = 0;
   let hi = data.length - 1;
   while (hi - lo > 1) {
@@ -87,14 +64,6 @@ export function interpAt(data: TimeSeriesPoint[], t: number): number | null {
   return a.value + (b.value - a.value) * frac;
 }
 
-/**
- * Build raw request samples plus a trailing request-count percentile. E2E
- * latency is measured from HTTP request start through final response byte.
- *
- * The percentile is computed in latency space. Interactivity then inverts
- * the selected TPOT percentile, matching the aggregate chart convention:
- * P90 interactivity = 1 / P90 TPOT (a conservative tail-latency view).
- */
 export function rollingRequestMetric(
   requests: readonly RequestChartRecord[],
   metric: RequestMetric,
@@ -102,9 +71,6 @@ export function rollingRequestMetric(
   windowSize = 50,
 ): { raw: TimeSeriesPoint[]; trend: TimeSeriesPoint[]; cumulative: TimeSeriesPoint[] } {
   const q = percentile === 'p75' ? 0.75 : 0.9;
-  // Phase is the caller's concern — the agentic detail page passes a
-  // phase-scoped (warmup or profiling) timeline. Here we only drop cancelled
-  // requests and samples without a usable latency value.
   const samples = requests
     .filter((request) => !request.cancelled)
     .flatMap((request) => {
@@ -133,10 +99,6 @@ export function rollingRequestMetric(
     return { t, value: metric === 'interactivity' ? 1000 / latencyMs : latencyMs / 1000 };
   });
 
-  // Exact expanding percentiles without inserting into a growing sorted array
-  // (which is O(n²) from repeated `splice` shifts on six-figure request sets).
-  // Coordinate-compress all observed values, then track prefix counts in a
-  // Fenwick tree so insertion and kth-value lookup are both O(log n).
   const latencyValues = [...new Set(samples.map(({ latencyMs }) => latencyMs))].toSorted(
     (a, b) => a - b,
   );
@@ -179,19 +141,8 @@ export function rollingRequestMetric(
   return { raw, trend, cumulative };
 }
 
-/**
- * Time-weighted rolling average over a `windowS`-second trailing window.
- * Treats the input as a step function (value held constant between
- * samples) and integrates over the trailing window, dividing by the
- * window length. Good for smoothing irregularly-sampled event series
- * (e.g. request start/end events) where the regular sample-count
- * `rollingAverage` would over-weight bursts of close-together events.
- */
 export function timeRollingAverage(data: TimeSeriesPoint[], windowS: number): TimeSeriesPoint[] {
   if (data.length === 0 || windowS <= 0) return data;
-  // Prefix integral of the input step function. `areaAt[i]` is the integral
-  // from t=0 through data[i].t, with the first value extended back to zero.
-  // A moving left cursor then evaluates every trailing window in O(n) total.
   const areaAt = new Float64Array(data.length);
   areaAt[0] = data[0]!.value * data[0]!.t;
   for (let index = 1; index < data.length; index += 1) {
@@ -216,7 +167,6 @@ export function timeRollingAverage(data: TimeSeriesPoint[], windowS: number): Ti
   return out;
 }
 
-/** Centered rolling average over `windowSize` samples. */
 export function rollingAverage(data: TimeSeriesPoint[], windowSize: number): TimeSeriesPoint[] {
   if (data.length === 0 || windowSize <= 1) return data;
   const half = Math.floor(windowSize / 2);
@@ -235,19 +185,6 @@ export function rollingAverage(data: TimeSeriesPoint[], windowSize: number): Tim
   return out;
 }
 
-/**
- * Centered, volume-weighted ratio over matching rate series.
- *
- * Counter families that describe one logical fraction can publish their
- * deltas in adjacent scrape buckets. Averaging the pointwise ratios gives a
- * tiny-denominator bucket the same weight as a million-token bucket and can
- * therefore produce impossible percentages. Sum the rates over the window
- * first, then divide. The semantic upper bound is applied only after that
- * aggregation as a guard against residual counter timing skew.
- *
- * The denominator owns the timeline. Missing numerator samples contribute
- * zero, which is the correct interpretation for a no-hit interval.
- */
 export function rollingRatioOfSums(
   numerator: TimeSeriesPoint[],
   denominator: TimeSeriesPoint[],
@@ -262,8 +199,6 @@ export function rollingRatioOfSums(
     numeratorByT.set(point.t, (numeratorByT.get(point.t) ?? 0) + Math.max(0, point.value));
   }
 
-  // The ETL emits sorted canonical-grid series. Coalesce defensively so a
-  // duplicate denominator timestamp cannot receive the numerator twice.
   const rows: { t: number; numerator: number; denominator: number }[] = [];
   for (const point of denominator) {
     if (!Number.isFinite(point.t) || !Number.isFinite(point.value)) continue;
@@ -305,15 +240,6 @@ export function rollingRatioOfSums(
   return out;
 }
 
-/**
- * Volume-weight a stored ratio without substituting a different denominator.
- *
- * `ratio = numerator / denominator`, so a positive interval lets us recover
- * the original denominator exactly as `numerator / ratio`. This matters for
- * vLLM, where prefix-cache queries are not interchangeable with prompt-token
- * throughput. A zero-hit interval cannot be inverted; only there do we use
- * the supplied denominator proxy to retain its zero-valued weight.
- */
 export function rollingRatioFromComponents(
   ratio: TimeSeriesPoint[],
   numerator: TimeSeriesPoint[],
@@ -337,9 +263,6 @@ export function rollingRatioFromComponents(
   const recoveredNumerator: TimeSeriesPoint[] = [];
   const recoveredDenominator: TimeSeriesPoint[] = [];
 
-  // The stored ratio omits `queries=0` ticks, but a lagging hit counter can
-  // still publish a positive numerator there. Walk the sorted union so those
-  // hits participate in the same centered window as their adjacent queries.
   const timeline: number[] = [];
   let ratioIndex = 0;
   let numeratorIndex = 0;
@@ -360,8 +283,6 @@ export function rollingRatioFromComponents(
   for (const t of timeline) {
     const pointRatio = ratioByT.get(t);
     const observedNumerator = numeratorByT.get(t) ?? 0;
-    // No stored ratio means the ETL saw no positive query denominator. Keep
-    // a zero denominator entry so a hit-only tick is not silently dropped.
     if (pointRatio === undefined) {
       if (observedNumerator > 0) {
         recoveredNumerator.push({ t, value: observedNumerator });
@@ -387,14 +308,6 @@ export function rollingRatioFromComponents(
   return rollingRatioOfSums(recoveredNumerator, recoveredDenominator, windowSize, upperBound);
 }
 
-/**
- * Expanding-window cumulative mean from index 0..i.
- *
- * `burnInS` suppresses rendering during the unstable startup interval while
- * retaining those samples in every later average. This avoids visually
- * promoting a single bursty counter bucket without changing the run-to-date
- * meaning of the line once it appears.
- */
 export function cumulativeAverage(data: TimeSeriesPoint[], burnInS = 0): TimeSeriesPoint[] {
   if (data.length === 0) return data;
   const out: TimeSeriesPoint[] = [];
@@ -409,13 +322,6 @@ export function cumulativeAverage(data: TimeSeriesPoint[], burnInS = 0): TimeSer
   return out;
 }
 
-/**
- * Run-to-date time-weighted average of a step series.
- *
- * Duplicate timestamps are coalesced to their final value before integration;
- * this is important for request handoffs where several start/end events occur
- * at the same instant. Each value is held until the next timestamp.
- */
 export function cumulativeTimeAverage(data: TimeSeriesPoint[]): TimeSeriesPoint[] {
   if (data.length === 0) return [];
   const points: TimeSeriesPoint[] = [];
@@ -441,10 +347,6 @@ export function cumulativeTimeAverage(data: TimeSeriesPoint[]): TimeSeriesPoint[
   });
 }
 
-/**
- * Cumulative count of successfully completed (non-cancelled) requests by end
- * time. Phase is the caller's concern — pass a phase-scoped timeline.
- */
 export function cumulativeCompletedRequests(
   requests: readonly RequestChartRecord[],
 ): TimeSeriesPoint[] {
@@ -457,10 +359,6 @@ export function cumulativeCompletedRequests(
   return [{ t: 0, value: 0 }, ...completionTimes.map((t, index) => ({ t, value: index + 1 }))];
 }
 
-/**
- * Retrospective average sequence length among requests active at each event.
- * OSL uses the request's final observed length across its whole lifetime.
- */
 export function averageSequenceLengthInFlight(
   requests: readonly RequestChartRecord[],
   metric: 'isl' | 'osl',
@@ -473,7 +371,6 @@ export function averageSequenceLengthInFlight(
     events.set(t, current);
   };
 
-  // Phase is the caller's concern — pass a phase-scoped timeline.
   for (const request of requests) {
     const tokens = request[metric];
     if (
@@ -500,30 +397,8 @@ export function averageSequenceLengthInFlight(
     });
 }
 
-// A promptTokensBySource bucket label denotes tokens served from some cache
-// tier (local prefix cache, offloaded/host KV, remote KV transfer) rather than
-// freshly computed. Matches vllm labels (`local_cache_hit`,
-// `external_kv_transfer`) and the sglang labels the chart-series builder emits
-// (`cache hit (HBM)`, `cache hit (CPU offload)`, `cache hit`).
 const CACHE_SOURCE_RE = /cache|hit|transfer|reuse/iu;
 
-/**
- * Cumulative "unique" (freshly prefill-computed) input tokens from the
- * promptTokensBySource breakdown: total prompt tokens minus everything served
- * from a cache tier. The breakdown's buckets sum to the real prompt-token
- * total per scrape, so this is internally consistent and naturally monotonic.
- *
- * Preferred over `cumulativeDifferenceMonotonic(prefillTps, prefixCacheHitsTps)`
- * because `vllm:prefix_cache_hits` re-counts tokens across chunked-prefill /
- * preemption scheduler passes — its cumulative routinely exceeds the prompt
- * tokens ever received, which drove the difference deeply negative and froze
- * the monotonic-clamped curve at whatever it reached in the first few seconds.
- *
- * Any bucket whose label isn't recognizably a cache tier counts as computed
- * (the safe direction for "unique"): a new fresh-compute label over-reports
- * unique slightly rather than silently freezing the line. Returns [] when no
- * breakdown is available so the caller can fall back.
- */
 export function cumulativeUniqueInputTokens(
   promptTokensBySource: Record<string, TimeSeriesPoint[]> | undefined,
 ): TimeSeriesPoint[] {
@@ -545,27 +420,10 @@ export function cumulativeUniqueInputTokens(
   return out;
 }
 
-/**
- * Per-event step series: at each request start/end, sum the ISLs of
- * currently-active requests across distinct `cid`s. Within a single
- * `cid` aiperf dispatches turns sequentially (turn N+1 waits for N),
- * so each cid contributes at most one in-flight ISL at a time. Across
- * different cids we assume content is independent (parent ↔ subagent
- * and conv ↔ conv share negligible prefix in practice — cross-conv
- * dedup added ~0.25 pp to theoretical hit rate, so treating them as
- * independent is a tight approximation of the true in-flight unique
- * token count).
- *
- * Output is a step function: one point per event, value held constant
- * until the next event. Time axis is seconds relative to the earliest
- * event in `requests`.
- */
 export function inflightUniqueTokens(
   requests: readonly { cid: string; start: number; end: number; isl: number | null }[],
 ): TimeSeriesPoint[] {
   if (requests.length === 0) return [];
-  // The request_timeline timestamps are ns-relative to its own origin.
-  // Convert events to seconds and emit a step series.
   interface Event {
     tNs: number;
     kind: 'start' | 'end';
@@ -582,12 +440,8 @@ export function inflightUniqueTokens(
     );
   }
   if (events.length === 0) return [];
-  // Sort by time; on ties, process 'end' before 'start' so a same-instant
-  // turn handoff within one cid doesn't transiently double-count.
   events.sort((a, b) => a.tNs - b.tNs || (a.kind === 'end' ? -1 : 1));
 
-  // Active ISL per cid (max in case the same cid somehow has overlapping
-  // events; in practice it's always 0 or 1 request at a time per cid).
   const activeByCid = new Map<string, number>();
   let total = 0;
   const out: TimeSeriesPoint[] = [{ t: 0, value: 0 }];
@@ -610,21 +464,6 @@ export function inflightUniqueTokens(
   return out;
 }
 
-/**
- * Monotonic-non-decreasing cumulative difference of two rate series:
- * for each unique timestamp, compute Σa[0..t] − Σb[0..t], then enforce
- * a running max so the curve never dips below its prior value.
- *
- * Use this to plot things like "cumulative cache-missed tokens" where the
- * true value can only ever grow, but the underlying per-tick rates can
- * temporarily look negative due to counter timing skew between scrapes
- * (vllm's `prefix_cache_hits` and `prompt_tokens` counters can lag each
- * other by ~5-10 s in our data even though their lifetime totals agree).
- *
- * `a` and `b` may have different (or overlapping) timestamp sets — both
- * are unioned and walked in time order. Output has one point per unique
- * timestamp present in either input.
- */
 export function cumulativeDifferenceMonotonic(
   a: TimeSeriesPoint[],
   b: TimeSeriesPoint[],
@@ -647,7 +486,6 @@ export function cumulativeDifferenceMonotonic(
   return out;
 }
 
-/** Pointwise sum of two arrays sharing the same t index. */
 function sumSeries(a: TimeSeriesPoint[], b: TimeSeriesPoint[]): TimeSeriesPoint[] {
   const n = Math.min(a.length, b.length);
   const out: TimeSeriesPoint[] = Array.from({ length: n });
@@ -657,7 +495,6 @@ function sumSeries(a: TimeSeriesPoint[], b: TimeSeriesPoint[]): TimeSeriesPoint[
   return out;
 }
 
-/** Build throughput lines from the currently visible input/decode signals. */
 export function buildThroughputChartSeries(
   input: TimeSeriesPoint[],
   decode: TimeSeriesPoint[],

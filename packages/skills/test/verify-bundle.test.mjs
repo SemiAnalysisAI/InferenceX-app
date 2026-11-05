@@ -17,8 +17,12 @@ import { CliError } from '../skills/inferencex-api/scripts/cli-contract.mjs';
 import { verifyBundle } from '../skills/inferencex-api/scripts/verify-bundle.mjs';
 import { evaluatePolicy } from '../skills/inferencex-api/scripts/coverage-policy.mjs';
 import { bundleSuite } from './bundle-harness.mjs';
+import { AGENTX_BUNDLE_VARIANTS } from './agentx-bundle-fixtures.mjs';
 
-const bundles = bundleSuite();
+const sharedResponses = structuredClone(AGENTX_BUNDLE_VARIANTS.positive);
+sharedResponses.responses[1].body = {};
+sharedResponses.responses[2].body = {};
+const bundles = bundleSuite({ agentx: { 'shared-responses': sharedResponses } });
 
 test('valid evidence survives an unmet hardware policy and offline verification', () => {
   const saved = bundles.create('powerx', 'positive');
@@ -156,6 +160,57 @@ test('Markdown reports are deterministic after relocation and never edit the evi
   const second = bundles.verify(relocated, ['--report', secondReport]);
   assert.equal(second.status, 0, second.stderr);
   assert.equal(readFileSync(secondReport, 'utf8'), readFileSync(firstReport, 'utf8'));
+});
+
+test('verification reports hash actual artifacts and distinguish recorded from current policy', () => {
+  const saved = bundles.create('powerx', 'positive', {
+    policy: ['--require-hardware', 'absent-hardware'],
+  });
+  const manifestPath = join(saved.directory, 'manifest.json');
+  // Equivalent JSON with different bytes must retain its own file hash.
+  writeFileSync(manifestPath, ` \n${readFileSync(manifestPath, 'utf8')}\n`);
+  const reportPath = join(dirname(saved.directory), 'facts.md');
+  const verified = bundles.verify(saved.directory, ['--report', reportPath]);
+  assert.equal(verified.status, 0, verified.stderr);
+  const output = JSON.parse(verified.stdout);
+  const manifest = JSON.parse(readFileSync(join(saved.directory, 'manifest.json')));
+  assert.deepEqual(output.evidence.recorded_policy, manifest.summary.policy);
+  assert.equal(output.evidence.recorded_policy.status, 'failed');
+  assert.equal(output.policy.status, 'not_requested');
+  assert.equal(output.evidence.request_count, manifest.requests.length);
+  assert.deepEqual(output.evidence.result_context.units, bundles.readResult(saved.directory).units);
+  assert.deepEqual(
+    output.evidence.result_context.metadata,
+    bundles.readResult(saved.directory).metadata,
+  );
+  const report = readFileSync(reportPath, 'utf8');
+  for (const artifact of output.evidence.artifacts) {
+    const bytes = readFileSync(join(saved.directory, artifact.path));
+    assert.equal(artifact.size, bytes.length);
+    assert.equal(artifact.sha256, createHash('sha256').update(bytes).digest('hex'));
+    assert.ok(report.includes(artifact.sha256));
+  }
+  assert.equal(output.evidence.artifacts[0].path, 'manifest.json');
+  assert.match(report, /manifest\.summary\.policy/u);
+  assert.match(report, /Current verification policy/u);
+  assert.match(report, /result\.json.*units/u);
+  assert.match(report, /"status": "failed"/u);
+  assert.match(report, /"status": "not_requested"/u);
+});
+
+test('artifact inventories deduplicate identical response files and CSV context stays absent', () => {
+  const saved = bundles.create('agentx', 'shared-responses');
+  const verified = bundles.verify(saved.directory);
+  assert.equal(verified.status, 0, verified.stderr);
+  const { evidence } = JSON.parse(verified.stdout);
+  assert.equal(evidence.request_count, 4);
+  const paths = evidence.artifacts.map(({ path }) => path);
+  assert.equal(new Set(paths).size, paths.length);
+  assert.equal(paths.filter((path) => path.startsWith('responses/')).length, 3);
+  const csv = bundles.create('powerx', 'positive', { format: 'csv' });
+  const csvResult = bundles.verify(csv.directory);
+  assert.equal(csvResult.status, 0, csvResult.stderr);
+  assert.equal(Object.hasOwn(JSON.parse(csvResult.stdout).evidence, 'result_context'), false);
 });
 
 test('offline errors distinguish unsupported contracts from invalid evidence', () => {

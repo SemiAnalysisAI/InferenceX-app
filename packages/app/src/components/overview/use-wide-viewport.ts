@@ -23,11 +23,6 @@ function getServerSnapshot(): null {
   return null;
 }
 
-/**
- * Tri-state on purpose: the server snapshot is `null`, so server rendering and
- * hydration keep both responsive surfaces mounted. The client snapshot takes
- * over immediately after hydration and subscribes to viewport changes.
- */
 export function useWideViewport(): boolean | null {
   return useSyncExternalStore<boolean | null>(subscribe, getSnapshot, getServerSnapshot);
 }

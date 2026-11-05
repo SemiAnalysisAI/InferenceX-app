@@ -2,7 +2,7 @@
 import * as d3 from 'd3';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { KNOWN_CONFIG_ISSUES } from '@/lib/known-issues';
+import { KNOWN_CONFIG_ISSUES } from '@/lib/benchmarks/known-issues';
 
 import {
   type AnnotationRenderOptions,
@@ -145,7 +145,6 @@ describe('renderKnownIssueAnnotations', () => {
     expect(top1).toBeGreaterThan(bottom0);
     for (const rect of rects) {
       expect(Number(rect.getAttribute('x'))).toBeGreaterThanOrEqual(0);
-      // Right edges align at the plot's right edge minus the gap
       expect(Number(rect.getAttribute('x')) + Number(rect.getAttribute('width'))).toBe(800 - 10);
     }
   });
@@ -172,7 +171,6 @@ describe('renderKnownIssueAnnotations', () => {
   });
 
   it('omits the arrow when the series is zoomed/panned out of view', () => {
-    // Scales push every point far outside the 800x500 plot
     renderKnownIssueAnnotations(
       g,
       defs,
@@ -198,5 +196,26 @@ describe('renderKnownIssueAnnotations', () => {
     const box = g.select('[data-testid="known-issue-annotation"]').node() as SVGAElement;
     box.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(onLinkClick).toHaveBeenCalledWith(gb300Annotation);
+  });
+});
+
+describe('renderKnownIssueAnnotations on phone-width plots', () => {
+  it('keeps an official-preview box inside a narrow plot', () => {
+    const width = 240;
+    renderKnownIssueAnnotations(g, defs, baseOptions({ width, annotations: [veraRubinPreview] }));
+    const rect = g.select('.known-issue-annotation rect');
+    const x = Number(rect.attr('x'));
+    const w = Number(rect.attr('width'));
+    expect(x).toBeGreaterThanOrEqual(2);
+    expect(x + w).toBeLessThanOrEqual(width);
+    const detail = g.select('.known-issue-annotation text:nth-of-type(2)').text();
+    expect(detail).not.toContain('Results may change');
+  });
+
+  it('keeps the full preview sentence when the plot is wide enough', () => {
+    renderKnownIssueAnnotations(g, defs, baseOptions({ annotations: [veraRubinPreview] }));
+    expect(g.select('.known-issue-annotation').text()).toContain(
+      'InferenceX Official Preview: Results may change as validation and publication continue.',
+    );
   });
 });

@@ -4,7 +4,7 @@ import * as d3 from 'd3';
 import { useMemo } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import {
   type CollectiveXKvFrontierPoint,
@@ -15,7 +15,6 @@ import {
   collectiveXRunDasharray,
 } from './data';
 
-/** Line-key suffix marking a series' bulk wire-ceiling line (not an envelope). */
 const CEILING_SUFFIX = '__collectivex-kv-wire-ceiling';
 
 interface CollectiveXKvFrontierChartProps {
@@ -33,7 +32,7 @@ interface CollectiveXKvFrontierChartProps {
 
 const STRINGS = {
   en: {
-    noData: 'No measured KV rows match the selected page size and direction.',
+    noData: 'No measured KV rows match the selected direction.',
     instructions:
       'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
     xAxis: (logScale: boolean) => `Sequence length (ISL tokens${logScale ? ', log' : ''})`,
@@ -44,7 +43,7 @@ const STRINGS = {
     backendFrontier: 'backend best at this ISL',
     dominated: 'below the envelope',
     pointContext: (row: CollectiveXKvFrontierPoint['row'], tier: string) =>
-      `${row.op} · page ${row.page_tokens} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')} · <strong>${tier}</strong>`,
+      `${row.op} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')} · <strong>${tier}</strong>`,
     pointMetrics: (point: CollectiveXKvFrontierPoint) => {
       const aggregate = `Aggregate ${point.y.toFixed(point.y >= 100 ? 0 : 2)} GB/s`;
       const req = point.row.request_ms;
@@ -61,7 +60,7 @@ const STRINGS = {
     verify: (passed: boolean) => `verify: ${passed ? 'passed' : 'FAILED'}`,
   },
   zh: {
-    noData: '没有与所选页大小和传输方向匹配的 KV 实测数据。',
+    noData: '没有与所选传输方向匹配的 KV 实测数据。',
     instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
     xAxis: (logScale: boolean) => `序列长度（ISL token${logScale ? '，对数' : ''}）`,
     yAxis: (op: CollectiveXKvFrontierSelection['op'], logScale: boolean) =>
@@ -71,7 +70,7 @@ const STRINGS = {
     backendFrontier: '该 ISL 下后端最优',
     dominated: '低于包络线',
     pointContext: (row: CollectiveXKvFrontierPoint['row'], tier: string) =>
-      `${row.op} · 页大小 ${row.page_tokens} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')} · <strong>${tier}</strong>`,
+      `${row.op} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')} · <strong>${tier}</strong>`,
     pointMetrics: (point: CollectiveXKvFrontierPoint) => {
       const aggregate = `聚合带宽 ${point.y.toFixed(point.y >= 100 ? 0 : 2)} GB/s`;
       const req = point.row.request_ms;
@@ -131,9 +130,6 @@ export function CollectiveXKvFrontierChart({
     () => new Map(cases.map((kase) => [`${kase.run_id}:${kase.case_id}`, kase.run_index])),
     [cases],
   );
-  // Roofline per series in the /inference style, drawn through the best batch
-  // at every measured ISL: the full (ISL, batch) grid is plotted as points and
-  // the per-ISL envelope is the achievable bandwidth curve for that backend.
   const lines = useMemo(() => {
     const bySeries: Record<string, CollectiveXKvFrontierPoint[]> = {};
     for (const point of points) {
@@ -144,8 +140,6 @@ export function CollectiveXKvFrontierChart({
     for (const [seriesId, seriesPoints] of Object.entries(bySeries)) {
       result[seriesId] = seriesPoints
         .toSorted((a, b) => a.x - b.x)
-        // Ties (two batches at the same peak) stay on the frontier as points
-        // but the line only needs one vertex per ISL.
         .filter((point, index, sorted) => index === 0 || point.x !== sorted[index - 1].x)
         .map((point) => ({ x: point.x, y: point.y }));
     }
@@ -155,9 +149,6 @@ export function CollectiveXKvFrontierChart({
     () => new Map(points.map((point) => [point.seriesId, point.colorKey])),
     [points],
   );
-  // Each series' bulk single-descriptor rows, drawn as a dotted line above the
-  // envelope: what the fabric itself moves at that ISL. The gap from a paged
-  // rung up to this line is per-descriptor software overhead, not the wire.
   const ceilings = useMemo(
     () => collectiveXKvWireCeilings(cases, selection.op),
     [cases, selection.op],
@@ -166,7 +157,6 @@ export function CollectiveXKvFrontierChart({
     const merged: Record<string, { x: number; y: number }[]> = { ...lines };
     if (!showWireCeilings) return merged;
     for (const [seriesId, ceiling] of ceilings) {
-      // Only series that are actually plotted get a ceiling line.
       if (!(seriesId in lines) || ceiling.length < 2) continue;
       merged[`${seriesId}${CEILING_SUFFIX}`] = ceiling.map(({ x, y }) => ({ x, y }));
     }
@@ -224,8 +214,6 @@ export function CollectiveXKvFrontierChart({
                 : key;
               return colors[colorBySeries.get(seriesId) ?? ''] ?? '#888';
             },
-            // Ceiling lines are dotted ('1 4' is used by no run dasharray) so
-            // they read as reference lines, not another measured envelope.
             getStrokeDasharray: (key) =>
               key.endsWith(CEILING_SUFFIX)
                 ? '1 4'

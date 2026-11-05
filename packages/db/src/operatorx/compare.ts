@@ -1,0 +1,611 @@
+/**
+ * Cross-hardware comparison: the same cases measured on different GPU runners, aligned by
+ * case identity (op args + backend) and grouped into workload sources. Pure; the caller
+ * picks which run supplies each runner's results (newest first wins per case).
+ */
+import {
+  ATTENTION_TYPES,
+  attentionTokens,
+  type ComputePrecision,
+  mathPrecision,
+  opLabels,
+  type OpWork,
+  opWork,
+} from './describe';
+import { OPERATORX_HARDWARE_REFERENCES, type OperatorXHardwareReference } from './hardware';
+import {
+  type OperatorXDataset,
+  type OperatorXSource,
+  type OperatorXStatus,
+  stableJson,
+} from './normalize';
+import { compareSplits, parallelKey, parallelLabel } from './parallel';
+import { comparisonDefaults, type ComparisonDefaults } from './visualization';
+import { topLevelModel, type WorkloadSource, workloadSources } from './workloads';
+
+/** An op family: GEMM, MoE, or the attention modules (several op types). */
+export type ComparisonOp = 'gemm' | 'moe' | 'attention';
+
+/** The family an op type belongs to, or null for types no view compares. */
+export function opFamily(type: string): ComparisonOp | null {
+  if (type === 'gemm' || type === 'moe') return type;
+  return ATTENTION_TYPES.includes(type) ? 'attention' : null;
+}
+
+/** One GPU and the run(s) its results came from. */
+export interface ComparisonHardware {
+  /** Hardware key (h200, b200, mi355x, ...): the entity that is compared and colored. */
+  id: string;
+  runner: string;
+  runs: { runId: string; generatedAt: string }[];
+  /** Optional normalization basis for hardware absent from the general GPU catalog. */
+  reference?: OperatorXHardwareReference;
+}
+
+export type { ComputePrecision, OpWork, WorkPart, LinkTransfer } from './describe';
+
+export interface ComparisonRow {
+  /** Case identity shared by the same case on every runner. */
+  caseKey: string;
+  hardware: string;
+  testlist: string;
+  /** The op type: the family itself, or the attention module. */
+  opType: string;
+  /** Device split (`tp8`, `dp8·ep8`); empty for one device. */
+  parallel: string;
+  workloads: string[];
+  /** Models the case comes from, as InferenceX names them, with its roles in each. */
+  sources: CaseSource<string>[];
+  shape: string;
+  precision: string;
+  computePrecision: ComputePrecision;
+  /** Primary size axis: GEMM M, MoE tokens, attention new tokens. */
+  x: number | null;
+  dims: Record<string, number>;
+  status: OperatorXStatus;
+  latencyUs: number | null;
+  flops: number | null;
+  bytes: number | null;
+  /** Per device, stage by stage, for the roofline. */
+  work: OpWork | null;
+  kernel: string | null;
+  cudaGraph: boolean | null;
+  runId: string;
+  resultIndex: number;
+  revision: string;
+}
+
+/**
+ * A model a case comes from (a name, or an index into `ComparisonView.models`) and the
+ * layers that run the case in it (`attn.wq_b`, `mlp`).
+ */
+export interface CaseSource<M> {
+  model: M;
+  roles: string[];
+}
+
+/** Sources grouped by model: several checkpoints of one model merge. */
+function sourcesByModel(sources: OperatorXSource[]): CaseSource<string>[] {
+  const byModel = new Map<string, Set<string>>();
+  for (const s of sources) {
+    const model = topLevelModel(s.model);
+    byModel.set(model, (byModel.get(model) ?? new Set()).add(s.role));
+  }
+  return [...byModel].map(([model, roles]) => ({ model, roles: [...roles].sort() }));
+}
+
+export interface ComparisonWorkload extends WorkloadSource {
+  cases: number;
+  hardware: string[];
+}
+
+export interface Comparison {
+  op: ComparisonOp;
+  hardware: ComparisonHardware[];
+  workloads: ComparisonWorkload[];
+  rows: ComparisonRow[];
+}
+
+export interface ComparisonInput {
+  /** Runner label as the sweep planned it (h200-dgxc, mi300x-amd, ...). */
+  runner: string;
+  dataset: OperatorXDataset;
+}
+
+/** Hardware key of a runner label: `h200-dgxc` -> `h200`, `mi300x-amd` -> `mi300x`. */
+export function hardwareKey(runner: string): string {
+  return runner.split('-')[0];
+}
+
+type Args = Record<string, unknown>;
+const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+/** The operands the math runs on: GEMM A and B, the experts, attention's projections. */
+function quantOperands(op: ComparisonOp, a: Args): unknown[] {
+  if (op === 'gemm') return [a.a, a.b];
+  if (op === 'moe') {
+    const ex = (a.experts ?? {}) as Args;
+    return ex.w1 ? [ex.a1, ex.w1] : [];
+  }
+  const proj = (a.proj ?? {}) as Record<string, Args>;
+  const pairs = Object.values(proj).flatMap((p) => [p.a, p.b]);
+  return pairs.length > 0 ? pairs : [{ dtype: 'bf16' }];
+}
+
+function dims(op: ComparisonOp, a: Args): Record<string, number> {
+  const out: Record<string, number> = {};
+  const put = (k: string, v: unknown) => {
+    const n = num(v);
+    if (n !== null) out[k] = n;
+  };
+  if (op === 'gemm') {
+    put('m', a.m);
+    put('n', a.n);
+    put('k', a.k);
+  } else if (op === 'attention') {
+    put('tokens', attentionTokens(a));
+    put('hidden', a.hidden);
+    put('heads', a.heads ?? a.q_heads ?? a.v_heads);
+    put('compressRatio', a.compress_ratio);
+  } else {
+    const ex = (a.experts ?? {}) as Args;
+    put('tokens', a.tokens);
+    put('hidden', a.hidden);
+    put('experts', ex.num);
+    put('topK', ex.top_k);
+    put('inter', ex.inter);
+  }
+  return out;
+}
+
+const isObj = (v: unknown) => typeof v === 'object' && v !== null;
+
+/** GEMM operands are descriptors (`a`, `b`); MoE carries an `experts` block, attention a `batch`. */
+function isCurrentSchema(op: ComparisonOp, a: Args): boolean {
+  if (op === 'gemm') return isObj(a.a) && isObj(a.b);
+  return op === 'moe' ? isObj(a.experts) : isObj(a.batch);
+}
+
+function sizeOf(op: ComparisonOp, a: Args): number | null {
+  if (op === 'gemm') return num(a.m);
+  return op === 'moe' ? num(a.tokens) : attentionTokens(a);
+}
+
+/** The identity used to choose one result per GPU, case, and backend. */
+export function comparisonCaseKey(
+  op: ComparisonOp,
+  runner: string,
+  result: OperatorXDataset['results'][number],
+): string | null {
+  if (opFamily(result.opType) !== op || !isCurrentSchema(op, result.args)) return null;
+  return `${hardwareKey(runner)}|${stableJson(result.args)}|${result.backend}`;
+}
+
+function totals(work: OpWork | null): Pick<ComparisonRow, 'flops' | 'bytes' | 'work'> {
+  if (!work) return { flops: null, bytes: null, work: null };
+  const sum = (key: 'flops' | 'bytes') => work.parts.reduce((t, p) => t + p[key], 0);
+  return { flops: sum('flops'), bytes: sum('bytes'), work };
+}
+
+/** Inputs newest first: the first runner's result for a case wins. */
+export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Comparison {
+  const hardware = new Map<string, ComparisonHardware>();
+  const rows = new Map<string, ComparisonRow>();
+  const workloads = new Map<
+    string,
+    { source: WorkloadSource; cases: Set<string>; hardware: Set<string> }
+  >();
+  for (const { runner, dataset } of inputs) {
+    const hw = hardwareKey(runner);
+    let used = false;
+    for (const r of dataset.results) {
+      const key = comparisonCaseKey(op, runner, r);
+      if (key === null) continue;
+      const caseKey = `${stableJson(r.args)}|${r.backend}`;
+      if (rows.has(key)) continue;
+      used = true;
+      const sources = workloadSources(op, r.testlist, [...new Set(r.sources.map((s) => s.model))]);
+      for (const s of sources) {
+        const w = workloads.get(s.id) ?? { source: s, cases: new Set(), hardware: new Set() };
+        w.cases.add(stableJson(r.args));
+        w.hardware.add(hw);
+        workloads.set(s.id, w);
+      }
+      rows.set(key, {
+        caseKey,
+        hardware: hw,
+        testlist: r.testlist,
+        opType: r.opType,
+        parallel: parallelKey(r.args),
+        workloads: sources.map((s) => s.id),
+        sources: sourcesByModel(r.sources),
+        ...opLabels(r.opType, r.args),
+        computePrecision: mathPrecision(quantOperands(op, r.args)),
+        x: sizeOf(op, r.args),
+        dims: dims(op, r.args),
+        status: r.status,
+        latencyUs: r.latencyUs,
+        ...totals(opWork(r.opType, r.args)),
+        kernel: r.kernel,
+        cudaGraph: r.cudaGraph,
+        runId: dataset.run.runId,
+        resultIndex: r.index,
+        revision: dataset.run.revision,
+      });
+    }
+    if (used) {
+      const h = hardware.get(hw) ?? { id: hw, runner, runs: [] };
+      h.runs.push({ runId: dataset.run.runId, generatedAt: dataset.run.generatedAt });
+      hardware.set(hw, h);
+    }
+  }
+  return {
+    op,
+    hardware: [...hardware.values()],
+    workloads: [...workloads.values()]
+      .map((w) => ({ ...w.source, cases: w.cases.size, hardware: [...w.hardware].sort() }))
+      .sort((a, b) => b.hardware.length - a.hardware.length || a.label.localeCompare(b.label)),
+    rows: [...rows.values()],
+  };
+}
+
+interface Scope {
+  bySplit: Map<string, number[]>;
+  splits: ParallelOption[];
+}
+
+interface RowIndex {
+  keyId: Int32Array;
+  keyCase: Int32Array;
+  hardwareId: Int32Array;
+  caseIds: Map<string, number>;
+  caseKeys: string[];
+  backends: string[];
+  hardware: string[];
+  models: string[];
+  scopes: Map<string, Scope>;
+}
+
+const rowIndexes = new WeakMap<Pick<Comparison, 'rows'>, RowIndex>();
+
+function intern(ids: Map<string, number>, values: string[], value: string): number {
+  let id = ids.get(value);
+  if (id === undefined) {
+    id = values.length;
+    ids.set(value, id);
+    values.push(value);
+  }
+  return id;
+}
+
+function rowIndex(comparison: Pick<Comparison, 'rows'>): RowIndex {
+  const known = rowIndexes.get(comparison);
+  if (known) return known;
+  const { rows } = comparison;
+  const keyIds = new Map<string, number>();
+  const hardwareIds = new Map<string, number>();
+  const keyId = new Int32Array(rows.length);
+  const hardwareId = new Int32Array(rows.length);
+  const hardware: string[] = [];
+  let lastHardware: string | null = null;
+  let lastHardwareId = -1;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    let id = keyIds.get(r.caseKey);
+    if (id === undefined) {
+      id = keyIds.size;
+      keyIds.set(r.caseKey, id);
+    }
+    keyId[i] = id;
+    if (r.hardware !== lastHardware) {
+      lastHardware = r.hardware;
+      lastHardwareId = intern(hardwareIds, hardware, r.hardware);
+    }
+    hardwareId[i] = lastHardwareId;
+  }
+  const cases = new Map<string, { seen: Uint8Array; count: number }>();
+  let lastModel: string | null = null;
+  let last: { seen: Uint8Array; count: number } = { seen: new Uint8Array(0), count: 0 };
+  for (let i = 0; i < rows.length; i++)
+    for (const s of rows[i].sources) {
+      if (s.model !== lastModel) {
+        lastModel = s.model;
+        let m = cases.get(s.model);
+        if (!m) {
+          m = { seen: new Uint8Array(keyIds.size), count: 0 };
+          cases.set(s.model, m);
+        }
+        last = m;
+      }
+      if (last.seen[keyId[i]] === 0) {
+        last.seen[keyId[i]] = 1;
+        last.count++;
+      }
+    }
+  const index: RowIndex = {
+    keyId,
+    keyCase: new Int32Array(keyIds.size).fill(-1),
+    hardwareId,
+    caseIds: new Map(),
+    caseKeys: [],
+    backends: Array.from<string>({ length: keyIds.size }).fill(''),
+    hardware,
+    models: [...cases]
+      .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
+      .map(([m]) => m),
+    scopes: new Map(),
+  };
+  rowIndexes.set(comparison, index);
+  return index;
+}
+
+function caseOf(index: RowIndex, key: string, id: number): number {
+  let c = index.keyCase[id];
+  if (c === -1) {
+    const separator = key.lastIndexOf('|');
+    c = intern(index.caseIds, index.caseKeys, separator === -1 ? key : key.slice(0, separator));
+    index.keyCase[id] = c;
+    if (separator !== -1) index.backends[id] = key.slice(separator + 1);
+  }
+  return c;
+}
+
+/** Models any case comes from, most cases first. */
+export function comparisonModels(comparison: Pick<Comparison, 'rows'>): string[] {
+  return [...rowIndex(comparison).models];
+}
+
+/** A case as every runner measured it: described once. */
+export interface ComparisonCase {
+  key: string;
+  testlist: string;
+  opType: string;
+  sources: CaseSource<number>[];
+  shape: string;
+  precision: string;
+  computePrecision: ComputePrecision;
+  x: number | null;
+  dims: Record<string, number>;
+  /** Useful FLOPs and minimum memory bytes per device: `work`'s totals. */
+  flops: number | null;
+  bytes: number | null;
+  work: OpWork | null;
+}
+
+/** Per-GPU measurements, column arrays indexed like `ComparisonView.cases`. */
+export interface ComparisonColumns {
+  /** Backend selected for each operation; omitted only by older cached payloads. */
+  backend?: (string | null)[];
+  status: (OperatorXStatus | null)[];
+  latencyUs: (number | null)[];
+  /** Index into `ComparisonView.kernels`. */
+  kernel: (number | null)[];
+  cudaGraph: (boolean | null)[];
+  runId: (string | null)[];
+  resultIndex: (number | null)[];
+  revision: (string | null)[];
+}
+
+/** One workload's cases across hardware, compact for transfer. */
+export interface ComparisonView {
+  op: ComparisonOp;
+  hardware: ComparisonHardware[];
+  workloads: ComparisonWorkload[];
+  workload: string | null;
+  defaults: ComparisonDefaults;
+  /** Models with cases, for picking one; see `comparisonView`'s `model`. */
+  modelOptions: string[];
+  /** The model the cases were picked by, instead of a workload. */
+  model: string | null;
+  /** Device splits the workload (or model) has cases at, one device first. */
+  parallelOptions: ParallelOption[];
+  /** The split the cases are at. */
+  parallel: string;
+  cases: ComparisonCase[];
+  /** Models the cases come from. */
+  models: string[];
+  kernels: string[];
+  measurements: Record<string, ComparisonColumns>;
+}
+
+export interface ParallelOption {
+  /** `tp8`, `dp8·ep8`; empty for one device. */
+  key: string;
+  label: string;
+  cases: number;
+}
+
+function scopeOf(
+  comparison: Comparison,
+  index: RowIndex,
+  workload: string | null,
+  model: string | null,
+): Scope {
+  const name = model ? `model:${model}` : workload ? `workload:${workload}` : '';
+  const known = index.scopes.get(name);
+  if (known) return known;
+  const bySplit = new Map<string, number[]>();
+  const cases = new Map<string, { seen: Uint8Array; count: number }>();
+  comparison.rows.forEach((r, i) => {
+    if (
+      !(model
+        ? r.sources.some((s) => s.model === model)
+        : workload && r.workloads.includes(workload))
+    )
+      return;
+    let split = cases.get(r.parallel);
+    if (!split) {
+      split = { seen: new Uint8Array(index.keyCase.length), count: 0 };
+      cases.set(r.parallel, split);
+      bySplit.set(r.parallel, []);
+    }
+    bySplit.get(r.parallel)!.push(i);
+    if (split.seen[index.keyId[i]] === 0) {
+      split.seen[index.keyId[i]] = 1;
+      split.count++;
+    }
+  });
+  const scope = {
+    bySplit,
+    splits: [...cases]
+      .map(([key, split]) => ({ key, label: parallelLabel(key), cases: split.count }))
+      .sort((a, b) => compareSplits(a.key, b.key)),
+  };
+  if (!model || index.models.includes(model)) index.scopes.set(name, scope);
+  return scope;
+}
+
+const measured = (r: ComparisonRow) =>
+  r.status === 'ok' && r.latencyUs !== null && Number.isFinite(r.latencyUs) && r.latencyUs > 0;
+
+/** Workload shown when the request names none (or an unknown one), if the data has it. */
+export const DEFAULT_WORKLOADS: Partial<Record<ComparisonOp, string>> = {
+  moe: 'moe:DeepSeek-V4.1-Flash',
+};
+
+/**
+ * The cases of one workload (default: the op's default workload, else the best-covered),
+ * or, given `model`, every case that model's checkpoints contribute, at one device split
+ * (default: one device, else the smallest split there is).
+ */
+export function comparisonView(
+  comparison: Comparison,
+  workloadId: string | null,
+  model: string | null = null,
+  parallel: string | null = null,
+): ComparisonView {
+  const find = (id: string | null | undefined) =>
+    id ? comparison.workloads.find((w) => w.id === id)?.id : undefined;
+  const workload = model
+    ? null
+    : (find(workloadId) ??
+      find(DEFAULT_WORKLOADS[comparison.op]) ??
+      comparison.workloads[0]?.id ??
+      null);
+  const index = rowIndex(comparison);
+  const scope = scopeOf(comparison, index, workload, model);
+  const splits = scope.splits.map((o) => ({ ...o }));
+  const split = splits.find((o) => o.key === parallel)?.key ?? splits[0]?.key ?? '';
+  // Raw rows retain backend identity. Hardware comparisons align full operation
+  // arguments across vendor-specific backends, selecting the fastest valid result.
+  const all = comparison.rows;
+  const splitRows = scope.bySplit.get(split) ?? [];
+  const caseIds = Int32Array.from(splitRows, (i) => caseOf(index, all[i].caseKey, index.keyId[i]));
+  const caseCount = index.caseKeys.length;
+  const present = new Uint8Array(index.hardware.length);
+  const slot = new Int32Array(index.hardware.length * caseCount).fill(-1);
+  const selected: number[] = [];
+  for (let n = 0; n < splitRows.length; n++) {
+    const i = splitRows[n];
+    present[index.hardwareId[i]] = 1;
+    const key = index.hardwareId[i] * caseCount + caseIds[n];
+    const at = slot[key];
+    if (at === -1) {
+      slot[key] = selected.length;
+      selected.push(i);
+      continue;
+    }
+    const r = all[i];
+    const p = all[selected[at]];
+    if (
+      (p.status === 'missing' && r.status !== 'missing') ||
+      (measured(r) && (!measured(p) || r.latencyUs! < p.latencyUs!))
+    )
+      selected[at] = i;
+  }
+  const caseIndex = new Int32Array(caseCount).fill(-1);
+  const cases: ComparisonCase[] = [];
+  const models: string[] = [];
+  const modelIndex = new Map<string, number>();
+  const sortedRoles = new Set<string[]>();
+  for (const i of selected) {
+    const r = all[i];
+    const id = index.keyCase[index.keyId[i]];
+    const seen = caseIndex[id];
+    // Runners can list different layers for one case; the case names every one.
+    if (seen !== -1) {
+      const merged = cases[seen].sources;
+      for (const s of r.sources) {
+        const m = intern(modelIndex, models, s.model);
+        const into = merged.find((x) => x.model === m);
+        if (into) {
+          if (!sortedRoles.has(into.roles) || !s.roles.every((role) => into.roles.includes(role))) {
+            into.roles = [...new Set([...into.roles, ...s.roles])].sort();
+            sortedRoles.add(into.roles);
+          }
+        } else {
+          merged.push({ model: m, roles: [...s.roles] });
+        }
+      }
+      continue;
+    }
+    caseIndex[id] = cases.length;
+    cases.push({
+      key: index.caseKeys[id],
+      testlist: r.testlist,
+      opType: r.opType,
+      sources: r.sources.map((s) => ({
+        model: intern(modelIndex, models, s.model),
+        roles: [...s.roles],
+      })),
+      shape: r.shape,
+      precision: r.precision,
+      computePrecision: r.computePrecision,
+      x: r.x,
+      dims: r.dims,
+      flops: r.flops,
+      bytes: r.bytes,
+      work: r.work,
+    });
+  }
+  const kernels: string[] = [];
+  const kernelIndex = new Map<string, number>();
+  const measurements: Record<string, ComparisonColumns> = {};
+  const hardware = comparison.hardware
+    .filter((h) => present[index.hardware.indexOf(h.id)] === 1)
+    .map((h) => {
+      const reference = OPERATORX_HARDWARE_REFERENCES[h.id];
+      return reference ? { ...h, reference } : h;
+    });
+  const nulls = Array.from<null>({ length: cases.length }).fill(null);
+  const empty = () => [...nulls];
+  for (const h of hardware) {
+    measurements[h.id] = {
+      backend: empty(),
+      status: empty(),
+      latencyUs: empty(),
+      kernel: empty(),
+      cudaGraph: empty(),
+      runId: empty(),
+      resultIndex: empty(),
+      revision: empty(),
+    };
+  }
+  for (const i of selected) {
+    const r = all[i];
+    const c = caseIndex[index.keyCase[index.keyId[i]]];
+    const col = measurements[r.hardware];
+    col.backend![c] = index.backends[index.keyId[i]];
+    col.status[c] = r.status;
+    col.latencyUs[c] = r.latencyUs;
+    col.cudaGraph[c] = r.cudaGraph;
+    col.runId[c] = r.runId;
+    col.resultIndex[c] = r.resultIndex;
+    col.revision[c] = r.revision;
+    if (r.kernel) col.kernel[c] = intern(kernelIndex, kernels, r.kernel);
+  }
+  return {
+    op: comparison.op,
+    hardware,
+    workloads: comparison.workloads,
+    workload,
+    modelOptions: [...index.models],
+    model,
+    parallelOptions: splits,
+    parallel: split,
+    cases,
+    models,
+    kernels,
+    measurements,
+    defaults: comparisonDefaults({ op: comparison.op, cases, measurements }),
+  };
+}

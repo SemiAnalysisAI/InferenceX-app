@@ -81,6 +81,16 @@
       "recompute eligible-row costs from supplied rates and captured API-reported output throughput; a fleet-cost claim additionally requires verified producer denominator, pool membership, and pool rates",
       "throughput ratios alone do not establish physical GPU counts or a universal 2x conversion",
       "missing or invalid tail evidence remains unresolved"
+    ],
+    "pr-improvements-live": [
+      "project-installed inferencex-pr-improvements workflow is discovered and consumed without a skill-name or installed-path hint",
+      "scope remains DeepSeek-V4-Pro, B200, SGLang, FP4, agentic-traces and target 35 tok/s/user",
+      "AgentX operating point is labeled P90 interactivity derived from the reciprocal of P90 full-response ITL; median and raw-rate P90 are not substituted",
+      "chart and CSV use the returned baseline, record-setting gains and best-observed steps; regressions, recoveries and synthetic extensions are not portrayed as gains",
+      "interpolated values at the fixed operating point are distinguished from raw measurements",
+      "original source-run URLs and strictly matched PR links are preserved in the deliverables; absent PR links remain absent",
+      "source links do not establish an isolated causal effect for a PR",
+      "complete consumed responses are retained, exported values match those bytes, and no new benchmarks or authenticated private-data requests occur"
     ]
   },
   "verdicts": ["passed", "failed", "needs-review"],

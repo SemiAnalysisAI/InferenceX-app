@@ -1,33 +1,23 @@
-import { updateRepoUrl } from '@/lib/utils';
-import { agenticDetailHref } from '@/lib/agentic-detail-link';
-import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
-import type { Locale } from '@/lib/i18n';
+import { updateRepoUrl } from '@/lib/shared/utils';
+import { agenticDetailHref } from '@/lib/agentx/agentic-detail-link';
+import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import type { InferenceData } from '@/components/inference/types';
 import { fmt, getPointLabel } from '@/components/inference/utils/tooltipUtils';
 
-/**
- * One row of the per-series points table opened from the chart legend.
- * Metric fields are `null` when the point predates the field (old runs) so the
- * table can render an em dash instead of a misleading 0.
- */
 export interface LegendPointsTableRow {
-  /** Stable React key — mirrors the scatter chart's per-point identity fields. */
   key: string;
   conc: number;
-  /** Shared parallelism label (e.g. "TP8", "DPAEP8", "2xEP4+1xDPAEP32"). */
   parallelism: string;
   precision: string;
-  /** Agentic offload mode ("ON" / "OFF"), null for fixed-seq points. */
   offload: string | null;
   tputPerGpu: number | null;
   p50Intvty: number | null;
   p90Intvty: number | null;
   p50Ttft: number | null;
   p90Ttft: number | null;
-  /** Detail link — null for overlay points (no DB benchmark id). */
   href: string | null;
-  /** True when href is an external GitHub Actions run (open in new tab). */
   isExternal: boolean;
 }
 
@@ -41,19 +31,9 @@ export type LegendPointsSortKey =
   | 'p50Ttft'
   | 'p90Ttft';
 
-// benchmark-transform coerces absent metrics to 0 (`m.median_ttft ?? 0`), and
-// every column metric here (throughput, interactivity, TTFT) is strictly
-// positive in reality — so non-positive means "not recorded", shown as a dash.
 const num = (v: number | undefined | null): number | null =>
   typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null;
 
-/**
- * Detail-page destination for a point — the EXACT same navigation the scatter
- * tooltip offers on point click: agentic points go to the in-app
- * `/inference/agentic/<id>` detail page; fixed-seq points open the GitHub
- * Actions run that produced them. Overlay (unofficial run) points have no DB
- * benchmark id, so they get no link.
- */
 export function pointDetailHref(
   d: InferenceData,
   isOverlay: boolean,
@@ -67,11 +47,6 @@ export function pointDetailHref(
   return { href: null, isExternal: false };
 }
 
-/**
- * Shape a series' visible points into table rows, default-sorted by
- * concurrency ascending (offload/parallelism tie-breaks keep the agentic
- * on/off row pairs adjacent and deterministic).
- */
 export function buildLegendPointsRows(
   points: InferenceData[],
   isOverlay: boolean,
@@ -103,7 +78,6 @@ export function buildLegendPointsRows(
     );
 }
 
-/** Column sort with nulls always last; concurrency as the stable tie-break. */
 export function sortLegendPointsRows(
   rows: LegendPointsTableRow[],
   key: LegendPointsSortKey,
@@ -124,5 +98,4 @@ export function sortLegendPointsRows(
   });
 }
 
-/** Table cell formatting — same capping as the scatter tooltip values. */
 export const formatRowValue = (v: number | null): string => (v === null ? '—' : fmt(v));

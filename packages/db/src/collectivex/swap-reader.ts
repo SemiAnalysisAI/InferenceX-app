@@ -1,17 +1,9 @@
 import type { CollectiveXPercentiles, CollectiveXSwapPoint, CollectiveXSwapResult } from './types';
 
-/** The standalone harness writes an execution matrix without EP case metadata. */
-export function isSwapMatrix(value: unknown): boolean {
-  const matrix = value as {
-    version?: unknown;
-    include?: { backend?: unknown; sku?: unknown }[];
-  } | null;
-  return (
-    matrix?.version === undefined &&
-    Array.isArray(matrix?.include) &&
-    matrix.include.length > 0 &&
-    matrix.include.every((cell) => cell?.backend === 'swap-blocks' && typeof cell?.sku === 'string')
-  );
+/** The cases.json entries this reader needs: swap_blocks cases carry `suite: 'swap-blocks'`. */
+export interface SwapRequestedCase {
+  sku: string;
+  case: { suite?: string; case_id?: string };
 }
 
 function positive(value: unknown): value is number {
@@ -32,18 +24,24 @@ function percentiles(value: unknown): value is CollectiveXPercentiles {
   );
 }
 
-/** Validate measured values before any chart/summary can call a result successful. */
 export function readSwapResults(
-  matrix: unknown,
+  requestedCases: readonly SwapRequestedCase[],
   docs: unknown[],
-  sourceSha: string,
 ): CollectiveXSwapResult[] {
-  if (!isSwapMatrix(matrix)) return [];
-  const skus = (matrix as { include: { sku: string }[] }).include.map((cell) => cell.sku);
+  // Each result must answer one requested case of its own GPU pool, exactly once.
+  const requested = new Map<string, Set<string>>();
+  for (const entry of requestedCases) {
+    if (entry.case.suite !== 'swap-blocks' || !entry.case.case_id) continue;
+    const caseIds = requested.get(entry.sku) ?? new Set<string>();
+    caseIds.add(entry.case.case_id);
+    requested.set(entry.sku, caseIds);
+  }
+  const answered = new Set<string>();
   const seen = new Set<string>();
   return docs.flatMap((doc) => {
     const raw = doc as {
       schema?: string;
+      case_id?: string;
       operation?: string;
       timing?: string;
       warmup: number;
@@ -68,16 +66,20 @@ export function readSwapResults(
       !Number.isSafeInteger(raw.warmup) ||
       raw.warmup < 0 ||
       !raw.runtime ||
-      raw.runtime.source_sha !== sourceSha ||
-      !['device', 'torch', 'vllm', 'image'].every(
+      !['device', 'torch', 'vllm', 'image', 'source_sha'].every(
         (key) => typeof raw.runtime[key as keyof typeof raw.runtime] === 'string',
       )
     ) {
       throw new TypeError('invalid swap_blocks artifact or provenance');
     }
-    // Legacy single-pool artifacts did not record SKU; multi-pool runs must identify it.
-    const sku = raw.runtime.sku ?? (skus.length === 1 ? skus[0] : undefined);
-    if (!sku || !skus.includes(sku)) throw new TypeError('invalid swap_blocks GPU pool');
+    const { sku } = raw.runtime;
+    const caseIds = sku ? requested.get(sku) : undefined;
+    if (!sku || !caseIds) throw new TypeError('invalid swap_blocks GPU pool');
+    const caseKey = JSON.stringify([sku, raw.case_id]);
+    if (!raw.case_id || !caseIds.has(raw.case_id) || answered.has(caseKey)) {
+      throw new TypeError('swap_blocks result does not answer one requested case');
+    }
+    answered.add(caseKey);
     const points = raw.cases.map((row): CollectiveXSwapPoint => {
       const key = JSON.stringify([
         sku,
@@ -104,7 +106,6 @@ export function readSwapResults(
       }
       seen.add(key);
       const p = row.latency.percentiles_us;
-      // Count copied payload once, including d2d; this is host-observed goodput.
       const rate = (us: number) => row.payload_bytes / us / 1000;
       return {
         direction: row.direction,

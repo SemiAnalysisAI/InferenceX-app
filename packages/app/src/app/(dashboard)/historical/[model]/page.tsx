@@ -3,25 +3,12 @@ import { notFound, permanentRedirect } from 'next/navigation';
 
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import HistoricalTrendsDisplay from '@/components/trends/HistoricalTrendsDisplay';
-import {
-  MODEL_ROUTES,
-  modelRoutePath,
-  pathWithSearchParams,
-  resolveModelRouteSlug,
-} from '@/lib/model-routes';
-import { modelTabMetadata } from '@/lib/tab-meta';
-
-/**
- * `/historical/<model>` — the Historical Trends tab seeded to a specific
- * model, giving every model an indexable URL. `GlobalFilterProvider` (mounted
- * by the dashboard shell) reads the model straight from the pathname, so the
- * page body is identical to the bare tab; switching models in the UI rewrites
- * the pathname in place via `history.replaceState` (no reload, no remount).
- */
+import { MODEL_ROUTES, modelRoutePath, resolveModelRouteSlug } from '@/lib/routing/model-routes';
+import { MODEL_TAB_META, modelTabMetadata } from '@/lib/routing/tab-meta';
+import { TabIntro } from '@/components/dashboard/tab-intro';
 
 interface Props {
   params: Promise<{ model: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export function generateStaticParams() {
@@ -35,21 +22,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return modelTabMetadata('historical', resolved.route);
 }
 
-export default async function HistoricalModelPage({ params, searchParams }: Props) {
+export default async function HistoricalModelPage({ params }: Props) {
   const { model } = await params;
   const resolved = resolveModelRouteSlug(model);
   if (!resolved) notFound();
-  // Aliases and non-canonical casing 308 to the canonical slug, keeping any
-  // share-link params, mirroring /compare/[slug]. `searchParams` is awaited
-  // only on this branch so the canonical slugs stay statically generated.
-  if (resolved.isAlias) {
-    permanentRedirect(
-      pathWithSearchParams(modelRoutePath('historical', resolved.route.slug), await searchParams),
-    );
-  }
+  // Prerendered route: reading searchParams here throws DYNAMIC_SERVER_USAGE. next.config
+  // redirects known aliases with their query; this only catches other casings.
+  if (resolved.isAlias) permanentRedirect(modelRoutePath('historical', resolved.route.slug));
   return (
-    <InferenceProvider activeTab="historical">
-      <HistoricalTrendsDisplay />
-    </InferenceProvider>
+    <>
+      <InferenceProvider activeTab="historical">
+        <HistoricalTrendsDisplay />
+      </InferenceProvider>
+      <TabIntro
+        tab="historical"
+        title={MODEL_TAB_META.historical.title(resolved.route.seoName)}
+        intro={MODEL_TAB_META.historical.intro(resolved.route.seoName)}
+      />
+    </>
   );
 }

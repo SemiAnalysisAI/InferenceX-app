@@ -17,8 +17,6 @@ const baseTemplate = {
   precision: 'fp8',
   tp: 8,
   conc: 64,
-  // Deliberately NOT one of the timeline dates: templates carry each config's
-  // first-observation date, which buildFrameData must override per frame.
   date: '2025-08-15',
 } as unknown as InferenceData;
 
@@ -42,10 +40,6 @@ function makeTimeline(): ReplayTimeline {
         hwKey: 'h100',
         precision: 'fp8',
         template: { ...baseTemplate, hwKey: 'h100', date: '2025-08-20' } as InferenceData,
-        // Stays invisible across the first two steps so a true "omits invisible
-        // configs" assertion is meaningful — `interpolateAtStep` pops a config
-        // in for the *whole* invisible→visible segment, so we need both
-        // bracketing steps invisible for the config to actually be skipped.
         stepValues: [
           { visible: false, x: 0, y: 0 },
           { visible: false, x: 0, y: 0 },
@@ -73,7 +67,6 @@ describe('stepFloatAtFraction', () => {
   });
 
   it('lands on integer step at segment boundaries', () => {
-    // 4 dates → segments at fraction 0, 1/3, 2/3, 1
     expect(stepFloatAtFraction(0, 4)).toBe(0);
     expect(stepFloatAtFraction(1 / 3, 4)).toBeCloseTo(1, 6);
     expect(stepFloatAtFraction(2 / 3, 4)).toBeCloseTo(2, 6);
@@ -148,16 +141,10 @@ describe('shouldCommitFraction', () => {
   });
 
   it('commits across the rounding boundary', () => {
-    // 0.5004 → round*1000 = 500, 0.5006 → round*1000 = 501
     expect(shouldCommitFraction(0.5004, 0.5006)).toBe(true);
   });
 });
 
-// Mirrors ReplayPanel.commitFraction: snapshot fractionRef BEFORE mutating
-// it, then ask the pure predicate whether to call setFraction. The throttle
-// is load-bearing — if the predicate is given the React-committed value
-// instead of the ref's previous value, a backward scrub that crosses a
-// quantum boundary would silently no-op the commit.
 function makeCommitter() {
   const fractionRef = { current: 0 };
   const commits: number[] = [];
@@ -175,13 +162,10 @@ function makeCommitter() {
 describe('commitFraction throttle (rAF-loop invariant)', () => {
   it('advances fractionRef every tick but commits only when the quantum changes', () => {
     const { fractionRef, commits, commit } = makeCommitter();
-    // Sub-quantum increments. 0.0001 * 4 = 0.0004 — all round to 0, no commits.
     const subQuantum = 1 / (FRACTION_COMMIT_QUANTUM * 10);
     for (let i = 1; i <= 4; i++) commit(i * subQuantum);
     expect(fractionRef.current).toBeCloseTo(4 * subQuantum);
     expect(commits).toHaveLength(0);
-    // Fifth tick lands on 0.0005 — round(0.5) === 1, crossing the first
-    // quantum boundary → one commit.
     commit(5 * subQuantum);
     expect(commits).toHaveLength(1);
     expect(commits[0]).toBeCloseTo(5 * subQuantum);
@@ -196,9 +180,9 @@ describe('commitFraction throttle (rAF-loop invariant)', () => {
 
   it('commits a backward scrub that crosses a quantum boundary', () => {
     const { fractionRef, commits, commit } = makeCommitter();
-    commit(0.8); // forward, commits
-    fractionRef.current = 0.8; // simulate the ref already at the committed value
-    commit(0.6); // backward across many quanta — must commit
+    commit(0.8);
+    fractionRef.current = 0.8;
+    commit(0.6);
     expect(commits.at(-1)).toBe(0.6);
   });
 
@@ -215,7 +199,6 @@ describe('buildFrameData', () => {
   it('emits one InferenceData per visible config at the given fraction', () => {
     const t = makeTimeline();
     const out = buildFrameData(t, 0);
-    // At fraction 0 only config "a" is visible (config "b" pops in at step 1).
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({ hwKey: 'b200', x: 0, y: 100 });
   });
@@ -228,7 +211,6 @@ describe('buildFrameData', () => {
 
   it('lerps positions between step values', () => {
     const t = makeTimeline();
-    // fraction 0.25 → idxFloat ≈ 0.0625 after cubic ease, mostly at step 0
     const out = buildFrameData(t, 0.25);
     const a = out.find((d) => d.hwKey === 'b200');
     expect(a).toBeDefined();
@@ -246,9 +228,6 @@ describe('buildFrameData', () => {
     }
   });
 
-  // Regression: ScatterGraph scopes Pareto frontiers and line paths per
-  // point.date, so a frame mixing template (first-observation) dates renders
-  // one hardware series as several same-colored lines with duplicate labels.
   it('stamps every point with the playhead date, not the template first-observation date', () => {
     const t = makeTimeline();
     const atStart = buildFrameData(t, 0);
@@ -256,8 +235,6 @@ describe('buildFrameData', () => {
     for (const d of atStart) expect(d.date).toBe('2025-09-01');
 
     const atEnd = buildFrameData(t, 1);
-    // Both configs are visible at the last step and carry distinct template
-    // dates — the frame must still present a single uniform date.
     expect(atEnd).toHaveLength(2);
     for (const d of atEnd) expect(d.date).toBe('2025-09-03');
   });

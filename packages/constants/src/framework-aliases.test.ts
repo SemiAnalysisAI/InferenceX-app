@@ -30,6 +30,7 @@ describe('FRAMEWORK_LABELS', () => {
 describe('MODEL_SPEC_METHOD_LABELS', () => {
   it('maps MiniMax-M3 mtp to "M3 EAGLE"', () => {
     expect(MODEL_SPEC_METHOD_LABELS['MiniMax-M3']?.mtp).toBe('M3 EAGLE');
+    expect(MODEL_SPEC_METHOD_LABELS['MiniMax-M3.1-Flash']?.mtp).toBe('DSpark');
   });
 
   it('maps Kimi-K3 mtp to "DSpark"', () => {
@@ -38,6 +39,12 @@ describe('MODEL_SPEC_METHOD_LABELS', () => {
 });
 
 describe('resolveFrameworkPartLabel', () => {
+  it('labels disaggregated vLLM without renaming its data key', () => {
+    expect(resolveFrameworkPartLabel(undefined, 'vllm-disagg')).toBe('MoRI vLLM');
+    expect(resolveFrameworkAlias('vllm-disagg')).toBe('vllm-disagg');
+    expect(resolveFrameworkAliasesInString('mi355x_vllm-disagg')).toBe('mi355x_vllm-disagg');
+  });
+
   it('renders M3 mtp as "M3 EAGLE"', () => {
     expect(resolveFrameworkPartLabel('MiniMax-M3', 'mtp')).toBe('M3 EAGLE');
   });

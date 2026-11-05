@@ -8,9 +8,6 @@ import {
   sortLegendPointsRows,
 } from '@/components/inference/utils/legend-points-table';
 
-// ---------------------------------------------------------------------------
-// fixture factory (mirrors tooltip-utils.test.ts)
-// ---------------------------------------------------------------------------
 function pt(overrides: Partial<InferenceData> = {}): InferenceData {
   return {
     date: '2025-06-15',
@@ -35,9 +32,6 @@ function pt(overrides: Partial<InferenceData> = {}): InferenceData {
   } as InferenceData;
 }
 
-// ===========================================================================
-// pointDetailHref
-// ===========================================================================
 describe('pointDetailHref', () => {
   it('agentic point with numeric id links to the in-app detail page', () => {
     const d = pt({ benchmark_type: 'agentic_traces', id: 206863 });
@@ -48,8 +42,6 @@ describe('pointDetailHref', () => {
   });
 
   it('keeps a Chinese reader on /zh', () => {
-    // The bare path used to hand /zh readers to the English detail page, and
-    // every link out of that page kept them in English.
     const d = pt({ benchmark_type: 'agentic_traces', id: 206863 });
     expect(pointDetailHref(d, false, 'zh')).toEqual({
       href: '/zh/inference/agentic/206863',
@@ -84,8 +76,6 @@ describe('pointDetailHref', () => {
   });
 
   it('does not build an /agentic/<id> link for a non-persisted id (0 / NaN)', () => {
-    // `typeof id === 'number'` accepted these; isPersistedBenchmarkId rejects
-    // them so we never link to /inference/agentic/0 or /inference/agentic/NaN.
     for (const badId of [0, Number.NaN]) {
       const d = pt({ benchmark_type: 'agentic_traces', id: badId });
       expect(pointDetailHref(d, false)).toEqual({ href: null, isExternal: false });
@@ -102,9 +92,6 @@ describe('pointDetailHref', () => {
   });
 });
 
-// ===========================================================================
-// buildLegendPointsRows
-// ===========================================================================
 describe('buildLegendPointsRows', () => {
   it('maps official point fields onto table rows', () => {
     const rows = buildLegendPointsRows(
@@ -171,8 +158,6 @@ describe('buildLegendPointsRows', () => {
   });
 
   it('treats the transform\'s "?? 0" coercion of absent metrics as missing', () => {
-    // Agentic rows have no median_* keys in metrics JSONB; benchmark-transform
-    // fills them with 0. These metrics are strictly positive when measured.
     const rows = buildLegendPointsRows([pt({ median_intvty: 0, median_ttft: 0 })], false);
     expect(rows[0].p50Intvty).toBeNull();
     expect(rows[0].p50Ttft).toBeNull();
@@ -188,9 +173,6 @@ describe('buildLegendPointsRows', () => {
   });
 });
 
-// ===========================================================================
-// sortLegendPointsRows
-// ===========================================================================
 describe('sortLegendPointsRows', () => {
   const rows = buildLegendPointsRows(
     [
@@ -230,9 +212,6 @@ describe('sortLegendPointsRows', () => {
   });
 });
 
-// ===========================================================================
-// formatRowValue
-// ===========================================================================
 describe('formatRowValue', () => {
   it('renders em dash for missing values', () => {
     expect(formatRowValue(null)).toBe('—');

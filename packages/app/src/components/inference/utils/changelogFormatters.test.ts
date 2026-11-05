@@ -125,4 +125,10 @@ describe('configKeyMatchesHwKey', () => {
   it('rejects completely different framework', () => {
     expect(configKeyMatchesHwKey('dsr1-fp8-h200-sglang', 'h200_trt')).toBe(false);
   });
+
+  it('resolves runner-name aliases to the canonical GPU key', () => {
+    const key = 'minimaxm3-fp4-vrnvl72-dynamo-vllm-agentic-agg-mtp';
+    expect(configKeyMatchesHwKey(key, 'vr200_dynamo-vllm', 'agentic_traces')).toBe(true);
+    expect(configKeyMatchesHwKey(key, 'vrnvl72_dynamo-vllm', 'agentic_traces')).toBe(false);
+  });
 });

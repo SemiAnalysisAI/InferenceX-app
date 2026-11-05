@@ -15,9 +15,9 @@ tags:
 
 **面向 LLM 推理的 Agentic Benchmark** 衡量模型服务系统在 AI agent 流量下的表现。它不判断 agent 是否修复了 bug 或完成了工作流，而是测量承载每次模型调用的基础设施，包括延迟、吞吐量、cache 复用、并发能力与成本。
 
-这一目标会改变 workload。传统推理基准测试可以发送 input 和 output 长度固定的独立 prompt；Agent Benchmark 则必须表示完整会话，其中上下文随轮次增长，请求共享长 prefix，tool 执行带来停顿，subagent 产生并行分支。后续请求通常要等前序请求完成后才能开始。
+这一目标会改变 workload。传统推理基准测试可以发送 input 和 output 长度固定的独立 prompt；Agent Benchmark 则必须刻画完整会话，其中上下文随轮次增长，请求共享长 prefix，tool 执行带来停顿，subagent 产生并行分支。后续请求通常要等前序请求完成后才能开始。
 
-AgentX 是 InferenceX 面向这类 workload 的开放基准测试。它把自愿提供的编码 agent trace 转换为保护隐私的请求形状，再通过 AIPerf 进行确定性回放，用相同场景比较完整的软硬件推理配置。
+AgentX 是 InferenceX 面向这类 workload 的开放基准测试。它把自愿提供的编码 agent trace 转换为保护隐私的请求形状，再通过 AIPerf 进行确定性回放，并在多个并发 agent 客户端下比较完整的软硬件推理配置。
 
 <DashboardCTA href="/zh/inference?i_seq=agentic-traces">对比实时 AgentX 推理结果 →</DashboardCTA>
 
@@ -32,7 +32,7 @@ Agentic Inference Benchmark 是面向多轮 agent 流量的系统基准测试。
 - 每个活跃 agent 接收 output token 的速度是多少？
 - 在目标延迟下，每颗芯片能提供多少 output 吞吐量？
 - 重复 prefix 会命中 HBM、host memory，还是触发重新计算？
-- 在可用的响应速度下，每百万 token 的成本是多少？
+- 在可用的运行点上，每百万 token 的成本是多少？
 
 “Benchmark”也常用于 agent 任务评估，因此必须说明测试范围。这两类测试回答不同问题：
 

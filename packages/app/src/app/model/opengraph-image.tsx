@@ -1,5 +1,5 @@
 import { renderOgImage, size } from '@/app/blog/[slug]/og-image-render';
-import { getModelPageSlugs } from '@/lib/model-pages';
+import { getModelPageSlugs } from '@/lib/catalog/model-pages';
 
 export const alt = 'InferenceX Model Architectures';
 export { size };

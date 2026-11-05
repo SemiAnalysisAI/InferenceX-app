@@ -1,24 +1,23 @@
 import type { ComponentType, ReactNode } from 'react';
 
+import type { LandingBannerVariant } from './landing-banner';
+
 export type NudgeTrigger =
   | { type: 'immediate' }
+  /** After the page has loaded and the main thread is idle, so it never delays first paint. */
+  | { type: 'idle' }
   | { type: 'timer'; delayMs: number }
   | {
       type: 'event';
       event: string;
-      /** Show after the event fires this many times (default 1). */
       threshold?: number;
-      /** Delay (ms) between threshold being met and the nudge appearing. */
       delayMs?: number;
     }
   | {
       type: 'dom-event';
-      /** Native DOM event name (e.g. 'copy'). */
       event: string;
-      /** CSS selector — only count events whose target matches. */
       selector?: string;
       threshold?: number;
-      /** Delay (ms) between threshold being met and the nudge appearing. */
       delayMs?: number;
     };
 
@@ -28,18 +27,11 @@ export type NudgeDismissal =
   | {
       type: 'timed';
       durationMs: number;
-      /**
-       * When true the cooldown timer starts at first show, giving a
-       * "remind every N" cadence (the nudge re-appears after `durationMs`
-       * regardless of whether the user dismissed it). When false (the default)
-       * the timer starts on user dismissal — the nudge is "snoozed for N".
-       */
       cooldownStartsOnShow?: boolean;
     };
 
 export interface NudgeCondition {
   check: () => boolean;
-  /** Re-evaluate when this window event fires. */
   listenEvent?: string;
 }
 
@@ -47,47 +39,20 @@ export interface NudgeAction {
   label: string;
   labelZh?: string;
   icon?: ReactNode;
-  /**
-   * Called when the user clicks the action button.
-   * For event-triggered nudges the trigger's CustomEvent detail is forwarded
-   * so the handler can access runtime data without a special case in the engine.
-   */
   onClick: (eventDetail?: unknown) => void;
 }
 
 export interface NudgeRenderContext {
   dismiss: () => void;
-  /** IDs owned by the engine's dialog accessibility contract. */
   titleId: string;
   descriptionId: string;
 }
 
 export interface NudgeAnchor {
-  /**
-   * Resolve the element the coach mark should point at, in the live DOM.
-   * Return `null` when nothing suitable is on screen (chart still loading,
-   * every candidate filtered out, scrolled out of view) — the engine hides
-   * the callout rather than stranding an arrow.
-   */
   resolve: () => Element | null;
-  /**
-   * Measure and validate a previously resolved anchor. Returning `null` tells
-   * the coach mark to discard it and run the full resolver again. Supplying
-   * this enables anchor reuse during high-frequency geometry updates.
-   */
   getRect?: (element: Element) => DOMRect | null;
-  /**
-   * Narrow mutation observation to the live surface that owns the anchor.
-   * Defaults to `document.body` for anchors without a stable local root.
-   */
   getMutationRoot?: (element: Element | null) => Node | null;
-  /**
-   * Clicking an element matching this selector counts as taking the nudge's
-   * action: the user found the affordance, so record engagement and stop
-   * showing it.
-   */
   actionSelector?: string;
-  /** Extra window events that should trigger a reposition (beyond scroll/resize). */
   repositionEvents?: readonly string[];
 }
 
@@ -99,71 +64,38 @@ export interface NudgeContent {
   description: string;
   descriptionZh?: string;
   action?: NudgeAction;
-  /** data-testid on the nudge container (preserves existing selectors). */
   testId?: string;
 
-  /** Escape hatch (modals): replaces the default body. Engine still renders chrome + X. */
   renderContent?: (ctx: NudgeRenderContext) => ReactNode;
 
-  // -- Modal-specific (ignored by toasts/banners) --
-
-  /** Label for the dismiss button (default "Maybe Later"). */
   dismissLabel?: string;
   dismissLabelZh?: string;
-  /** Label + handler for the primary CTA (modals only). */
+  hideDismissButton?: boolean;
   primaryAction?: NudgeAction;
-  /** Extra CSS class on the modal container (e.g. branded border). */
+  secondaryAction?: NudgeAction;
   containerClassName?: string;
-  /** Render as a true center-of-page modal with a backdrop instead of a bottom-right card. */
   centered?: boolean;
-  /** Extra CSS class on the primary action button (e.g. glow effect). */
   actionClassName?: string;
-  /** Badge text rendered next to the title (e.g. "New"). */
   badge?: string;
   badgeZh?: string;
 
-  // -- Coach-mark-specific (ignored by toasts/modals/banners) --
-
-  /**
-   * Which on-screen element the callout points at. Required for `coach-mark`;
-   * without it the engine has nothing to anchor to and skips the nudge.
-   */
   anchor?: NudgeAnchor;
 
-  // -- Banner-specific (ignored by toasts/modals) --
-
-  /** href for the banner link (the whole banner is clickable). */
   href?: string;
-  /** Called when the banner link is clicked (for analytics). */
   onLinkClick?: () => void;
-  /** Short action label shown at the end of the banner link. */
   linkLabel?: string;
   linkLabelZh?: string;
 }
-
-// ---------------------------------------------------------------------------
-// Analytics overrides
-// ---------------------------------------------------------------------------
 
 export interface NudgeAnalyticsOverrides {
   shown?: string;
   dismissed?: string;
   action?: string;
-  /** Extra properties attached to every analytics event for this nudge. */
   properties?: Record<string, string>;
 }
 
-// ---------------------------------------------------------------------------
-// NudgeDefinition — a single registry entry
-// ---------------------------------------------------------------------------
-
 export type NudgeType = 'toast' | 'modal' | 'banner' | 'coach-mark';
 
-/**
- * Which NudgeEngine instance owns a nudge. One engine mounts per scope, so a
- * new scope needs a matching `<NudgeEngine scope="…" />` on the surface it
- * names — `agentic-detail` mounts on /inference/agentic/[id].
- */
 export type NudgeScope = 'dashboard' | 'landing' | 'evaluation' | 'agentic-detail';
 
 export interface NudgeDefinition {
@@ -171,46 +103,25 @@ export interface NudgeDefinition {
   type: NudgeType;
   trigger: NudgeTrigger | NudgeTrigger[];
   dismissal: NudgeDismissal;
-  /** localStorage / sessionStorage key for dismissal state. */
   storageKey: string;
   conditions?: NudgeCondition[];
-  /** Higher priority wins when multiple nudges are eligible simultaneously. */
   priority: number;
-  /** Which NudgeEngine instance manages this nudge. */
   scope: NudgeScope;
-  /**
-   * Render an immediate banner in the server response so hydration cannot
-   * insert it above existing content and cause a layout shift.
-   */
   renderOnInitialLoad?: boolean;
+  /** A/B arm of the landing banner; only the arm assigned to the visitor is shown. */
+  variant?: LandingBannerVariant;
 
-  // Scheduling (time-bound campaigns)
   schedule?: {
     showAfter?: string;
     hideAfter?: string;
   };
 
-  /**
-   * A secondary localStorage key that permanently suppresses the nudge.
-   * Example: `inferencex-starred` suppresses the star-nudge toast.
-   */
   permanentSuppressKey?: string;
-  /**
-   * Window event that triggers a permanent-suppress write + immediate hide.
-   * Example: `inferencex:starred`, `inferencex:eval-samples-opened`.
-   */
   permanentSuppressEvent?: string;
 
   content: NudgeContent;
 
-  /**
-   * When the action button is clicked, should the nudge be persisted as
-   * dismissed and visually cleared? Defaults to `true` for `toast`/`modal`
-   * (action = engagement) and `false` for `banner` (banner action navigates;
-   * leaving it visible avoids a flash before the page transition completes).
-   */
   dismissOnAction?: boolean;
 
-  /** Override default `{id}_shown` / `{id}_dismissed` / `{id}_action` event names. */
   analytics?: NudgeAnalyticsOverrides;
 }

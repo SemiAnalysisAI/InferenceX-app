@@ -1,17 +1,7 @@
 'use client';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/shared/utils';
 
-/**
- * A percentage typed straight into the chart caption, e.g. the utilization
- * or model license fee the profit estimator assumes. Styled like the
- * caption's Cost Tier trigger (same height and outline) so the three read as
- * one row of controls. The `%` sign is a pseudo-element so the caption's
- * textContent stays the export twin's plain value.
- *
- * The owner keeps the raw string and clamps on blur; this component only
- * draws the box and sizes it to the digits typed.
- */
 export function CaptionPercentInput({
   id,
   testId,

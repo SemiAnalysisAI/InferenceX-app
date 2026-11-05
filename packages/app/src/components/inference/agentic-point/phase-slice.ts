@@ -1,20 +1,3 @@
-/**
- * Warmup vs profiling phase slicing for the agentic per-point detail page.
- *
- * Agentic trace-replay runs have two phases: a warmup (cache-warming) pass, then
- * the measured profiling window. The server-metric time-series (`chart_series`)
- * spans the whole run with no per-point phase label, but the per-request
- * `request_timeline` IS phase-tagged. We derive the warmup→profiling boundary
- * from the timeline and slice the server series at it.
- *
- * ⚠️ ORIGIN-GAP INVARIANT: the two payloads share the aiperf clock but have
- * DIFFERENT zero origins — `serverMetrics.startNs` is the first server scrape,
- * `timeline.startNs` is the first request's credit (observed ~124 s apart in
- * real runs). The boundary must therefore be rebased through absolute ns by
- * subtracting `serverMetrics.startNs`; a same-axis offset comparison would be
- * off by the origin gap. This rebasing lives in `phaseBoundarySec` only.
- */
-
 import type { RequestChartData, RequestChartRecord } from '@/hooks/api/use-request-chart-data';
 import type { RequestRecord, RequestTimeline } from '@/hooks/api/use-request-timeline';
 import type {
@@ -25,11 +8,6 @@ import type {
 
 export type StagePhase = 'warmup' | 'profiling';
 
-/**
- * The subset of server-metric series the per-point charts render. Both the
- * top-level `TraceServerMetrics` and a per-source object (after the detail page
- * remaps `promptTps`→`prefillTps`, `generationTps`→`decodeTps`) are assignable.
- */
 export interface ServerSeriesLike {
   kvCacheUsage: TimeSeriesPoint[];
   prefixCacheHitRate: TimeSeriesPoint[];
@@ -42,19 +20,12 @@ export interface ServerSeriesLike {
   kvCacheUsageByEngine: { engineLabel: string; points: TimeSeriesPoint[] }[];
 }
 
-/** True when the timeline contains at least one non-profiling (warmup) request. */
 type RequestPhaseData = Pick<RequestChartData, 'startNs' | 'durationS' | 'requests'>;
 
 export function timelineHasWarmup(timeline: RequestPhaseData | null | undefined): boolean {
   return Boolean(timeline?.requests.some((r) => r.phase !== 'profiling'));
 }
 
-/**
- * Absolute-ns wall-clock instant where the profiling phase begins
- * = `timeline.startNs + earliest profiling request's start offset`.
- * Returns null unless BOTH a warmup and a profiling request exist (nothing to
- * split otherwise).
- */
 export function phaseBoundaryNs(timeline: RequestPhaseData | null | undefined): number | null {
   if (!timeline) return null;
   let hasWarmup = false;
@@ -70,14 +41,6 @@ export function phaseBoundaryNs(timeline: RequestPhaseData | null | undefined): 
   return timeline.startNs + minProfilingStart;
 }
 
-/**
- * The profiling-start boundary expressed on the SERVER-METRIC chart's own t-axis
- * (seconds from `serverMetrics.startNs`). See the origin-gap invariant at the top
- * of the file — the `- serverMetrics.startNs` subtraction is mandatory.
- *
- * Returns null when there's no warmup/profiling split, or `serverMetrics` is
- * absent (→ callers fall back to the full-run series).
- */
 export function phaseBoundarySec(
   serverMetrics: Pick<TraceServerMetrics, 'startNs'> | null | undefined,
   timeline: RequestPhaseData | null | undefined,
@@ -93,20 +56,6 @@ export interface PhaseSlicedSeries<S> {
   durationS: number;
 }
 
-/**
- * Slice every server-metric series to one phase:
- *  - warmup:    keep points with `t < boundary`, no rebase, `durationS = boundary`
- *  - profiling: keep points with `t >= boundary`, rebased so `t` starts at 0,
- *               `durationS = full - boundary`
- *
- * A point exactly at `t === boundary` belongs to profiling. Null boundary
- * (single-phase point, or no server metrics) → identity passthrough with the
- * full `durationS`. Pure — returns new objects, never mutates the input.
- *
- * NOTE: rebasing the profiling slice to start at 0 makes the cumulative charts
- * (prompt-token source, unique-input-tokens) read as "since profiling start"
- * rather than "since run start" — intended.
- */
 export function sliceServerSeriesByPhase<S extends ServerSeriesLike>(
   series: S,
   phase: StagePhase,
@@ -149,32 +98,19 @@ export function sliceServerSeriesByPhase<S extends ServerSeriesLike>(
   return { series: { ...series, ...slicedFields } as S, durationS };
 }
 
-/** Filter request-timeline records to one phase (warmup = anything not profiling). */
 export function requestsForPhase(requests: RequestRecord[], phase: StagePhase): RequestRecord[] {
   return phase === 'warmup'
     ? requests.filter((r) => r.phase !== 'profiling')
     : requests.filter((r) => r.phase === 'profiling');
 }
 
-/**
- * Scope a whole request timeline to one phase: keep only that phase's requests
- * and, for profiling, rebase every ns offset (and `startNs`) so the phase starts
- * at t=0 — mirroring `sliceServerSeriesByPhase` so the request-derived charts and
- * the server charts share a 0-based axis for the same phase. `durationS` becomes
- * the phase window. Returns the input unchanged when there's no warmup/profiling
- * split (single-phase point). Pure — new object, original untouched.
- *
- * The boundary here is on the REQUEST clock (offset from `timeline.startNs`), so
- * we use `phaseBoundaryNs` minus `timeline.startNs` rather than the server-axis
- * `phaseBoundarySec` (different origin — see the file header).
- */
 export function sliceTimelineByPhase(
   timeline: RequestTimeline,
   phase: StagePhase,
 ): RequestTimeline {
   const boundaryNs = phaseBoundaryNs(timeline);
   if (boundaryNs === null) return timeline;
-  const boundaryOff = boundaryNs - timeline.startNs; // ns offset on the request clock
+  const boundaryOff = boundaryNs - timeline.startNs;
   const inPhase = (r: RequestRecord) =>
     phase === 'warmup' ? r.start < boundaryOff : r.start >= boundaryOff;
   const shift = phase === 'profiling' ? boundaryOff : 0;
@@ -190,7 +126,6 @@ export function sliceTimelineByPhase(
   return { ...timeline, startNs: timeline.startNs + shift, requests, durationS };
 }
 
-/** Compact-data counterpart to `sliceTimelineByPhase` for summary charts. */
 export function sliceRequestChartDataByPhase(
   data: RequestChartData,
   phase: StagePhase,

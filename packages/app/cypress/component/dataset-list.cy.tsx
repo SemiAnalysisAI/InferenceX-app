@@ -101,8 +101,8 @@ describe('DatasetList', () => {
     cy.wait('@list');
     cy.contains('cc-traces-weka (full)').should('be.visible');
     cy.contains('cc-traces-weka (256k)').should('be.visible');
-    cy.contains('1,234').should('be.visible'); // conversation_count, localized
-    cy.contains('82%').should('be.visible'); // cachedPct
+    cy.contains('1,234').should('be.visible');
+    cy.contains('82%').should('be.visible');
     cy.contains('Request shape').should('be.visible');
     cy.contains('Token volume').should('be.visible');
     cy.get('a[href="/agentx/cc-traces-weka-full"]')

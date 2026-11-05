@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { buildOpenApiDocument } from '@/lib/api-documentation';
+import { buildOpenApiDocument } from '@/lib/api/api-documentation';
 
 export const dynamic = 'force-static';
 

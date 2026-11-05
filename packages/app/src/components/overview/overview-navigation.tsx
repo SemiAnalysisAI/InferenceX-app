@@ -1,5 +1,8 @@
 'use client';
 
+import { overviewDataForModelVisibility } from '@/lib/overview/overview-model-visibility';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
+
 import {
   createContext,
   type MutableRefObject,
@@ -12,8 +15,8 @@ import {
   useState,
 } from 'react';
 
-import { track } from '@/lib/analytics';
-import { notifyClientSearchChange } from '@/lib/client-navigation';
+import { trackVirtualPageview } from '@/lib/analytics/analytics';
+import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
 import {
   OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   type OverviewComparisonMode,
@@ -26,7 +29,7 @@ import {
   resolveOverviewReferenceHardware,
   resolveOverviewRowScope,
   resolveOverviewTier,
-} from '@/lib/overview-data';
+} from '@/lib/overview/overview-data';
 import {
   mergeOverviewControlHref,
   OVERVIEW_CLIENT_ONLY_KEYS,
@@ -34,24 +37,13 @@ import {
   type OverviewClientOnlySearchKey,
   overviewHref,
   type OverviewSearchKey,
-} from '@/lib/overview-links';
+} from '@/lib/overview/overview-links';
 
 const OVERVIEW_SERVER_SEARCH_KEYS = OVERVIEW_SEARCH_ORDER.filter(
   (key): key is Exclude<OverviewSearchKey, OverviewClientOnlySearchKey> =>
     !OVERVIEW_CLIENT_ONLY_KEYS.includes(key as OverviewClientOnlySearchKey),
 );
 
-/**
- * Cache and request identity. The payload depends only on the server-resolved
- * params, minus `ref` and `present`, which the client derives. Equivalent URLs — explicit
- * defaults, reordered params, campaign tags, a fragment — collapse to one key,
- * so a `ref` change is a guaranteed hit and the CDN sees one entry per data
- * state instead of one per link anyone has ever shared.
- *
- * Every param the server reads has to appear here. Both row scopes do: each
- * narrows the rows the response carries, and the dormant one still reaches the
- * payload so a tab switch can restore the other mode's answer.
- */
 function overviewDataKey(href: string): string {
   const url = new URL(href, 'https://inferencex.local');
   const params = url.searchParams;
@@ -71,8 +63,6 @@ export type OverviewNavControl = 'comparison' | 'engine' | 'hwrows' | 'models' |
 
 interface OverviewNavigationValue {
   isPending: boolean;
-  /** Which switcher the user just activated with the keyboard, so the option
-   *  that replaces it can take the focus its predecessor lost on unmount. */
   focusIntent: MutableRefObject<OverviewNavControl | null>;
   prefetch: (targetHref: string, keys: readonly OverviewSearchKey[]) => void;
   replaceClientState: (targetHref: string, keys: readonly OverviewClientOnlySearchKey[]) => void;
@@ -80,13 +70,6 @@ interface OverviewNavigationValue {
   push: (targetHref: string, keys: readonly OverviewSearchKey[]) => void;
 }
 
-/**
- * Split contexts, not one. A selector click moves the pending href immediately
- * and the payload only when the request settles, so a single value would push
- * two full matrix renders per uncached selection. Splitting them means the
- * controls and failure notice can re-render on their own while the matrix waits
- * for real data.
- */
 const OverviewDataContext = createContext<OverviewPageData | null>(null);
 const OverviewReferenceContext = createContext<OverviewReferenceHardware | null>(null);
 const OverviewComparisonContext = createContext<OverviewComparisonMode | null>(null);
@@ -124,12 +107,22 @@ export function OverviewNavigationProvider({
     if (pending !== undefined) return pending;
 
     const url = new URL(key, window.location.origin);
+    const rowScope = resolveOverviewRowScope(url.searchParams.get('rows') ?? undefined);
+    const hardwareRowScope = resolveOverviewHardwareRowScope(
+      url.searchParams.get('hwrows') ?? undefined,
+    );
+    // Keep full rows in this UI cache. Visibility must precede scope/count
+    // derivation, including when relocking while a row filter is active.
+    // The API still supports its existing scoped requests for other clients.
+    url.searchParams.delete('rows');
+    url.searchParams.delete('hwrows');
     const request = fetch(`/api/v1/overview${url.search}`, {
       headers: { Accept: 'application/json' },
     })
       .then(async (response) => {
         if (!response.ok) throw new Error(`Overview request failed (${response.status})`);
-        const nextData = (await response.json()) as OverviewPageData;
+        const fullData = (await response.json()) as OverviewPageData;
+        const nextData = { ...fullData, rowScope, hardwareRowScope };
         dataCacheRef.current.set(key, nextData);
         return nextData;
       })
@@ -146,16 +139,6 @@ export function OverviewNavigationProvider({
       setPendingHref(href);
       setNavigationError(false);
       if (updateHistory) {
-        // Deliberately the pristine prototype method: `window.history.pushState`
-        // is patched by Next to dispatch a router action, and that per-click
-        // reducer run is exactly the work this route exists to avoid. The cost
-        // is that `useSearchParams()`/`usePathname()` stay at the load-time URL
-        // here — `notifyClientSearchChange` and the explicit `$pageview` in the
-        // success branch are the substitutes. Do not add a `useSearchParams()`
-        // consumer to the overview tree.
-        //
-        // Re-activating a still-pending option resolves to a byte-identical
-        // href; pushing it again would stack a Back press that goes nowhere.
         const currentHref = `${window.location.pathname}${window.location.search}${window.location.hash}`;
         if (href !== currentHref) {
           History.prototype.pushState.call(window.history, window.history.state, '', href);
@@ -166,9 +149,6 @@ export function OverviewNavigationProvider({
       void load(href)
         .then((nextData) => {
           if (navigationId !== navigationIdRef.current) return;
-          // A client-only control can change while this data request is in
-          // flight. Commit the loaded server state without rolling that newer
-          // local state back out of the address bar or navigation context.
           const settledHref = mergeOverviewControlHref(
             href,
             pendingHrefRef.current,
@@ -188,21 +168,11 @@ export function OverviewNavigationProvider({
           }
           setData(nextData);
           setNavigationError(false);
-          // The pushState above is invisible to Next's router, so the app-wide
-          // pageview tracker never fires here. Emit once per committed state —
-          // in the success branch so Back/Forward is covered too, and so the
-          // recoverable failure path never records a pageview.
-          track('$pageview', {
-            $current_url: new URL(settledHref, window.location.origin).href,
-          });
+          trackVirtualPageview(settledHref, 'overview_control');
         })
         .catch(() => {
           if (navigationId !== navigationIdRef.current) return;
           focusIntentRef.current = null;
-          // Roll back only what failed to load. A reference chosen while this
-          // request was in flight needs no payload of its own, and the address
-          // bar keeps it either way, so dropping it here would repaint against
-          // a column the URL still claims.
           const clientState = pendingHrefRef.current;
           const rolledBack = mergeOverviewControlHref(
             committedHrefRef.current,
@@ -219,9 +189,6 @@ export function OverviewNavigationProvider({
 
   useEffect(() => {
     ++navigationIdRef.current;
-    // Known params always come from the server-resolved props; only the extras
-    // (utm_*, gclid, a fragment) are adopted from the address bar, so a stale
-    // location can never key the cache to the wrong payload.
     const actual = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     const href = mergeOverviewControlHref(actual, initialHref, OVERVIEW_SERVER_SEARCH_KEYS);
     dataCacheRef.current.set(overviewDataKey(href), initialData);
@@ -231,7 +198,10 @@ export function OverviewNavigationProvider({
     setPendingHref(href);
     setData(initialData);
     setNavigationError(false);
-  }, [initialData, initialHref]);
+    // The page is prerendered with the default controls, so a shared URL's controls load here.
+    // trackVirtualPageview dedupes by pathname, so this load does not repeat the landing pageview.
+    if (overviewDataKey(actual) !== overviewDataKey(href)) commit(actual, false);
+  }, [commit, initialData, initialHref]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -246,11 +216,6 @@ export function OverviewNavigationProvider({
     return () => window.removeEventListener('popstate', handlePopState);
   }, [commit]);
 
-  // A commit still in flight when the provider leaves the tree must not write
-  // history or route from a component that is gone: invalidate its generation
-  // so both settled handlers bail. Kept as its own effect — folding it into the
-  // popstate effect above would tie it to that effect's `commit` dependency and
-  // silently start cancelling live navigations.
   useEffect(
     () => () => {
       ++navigationIdRef.current;
@@ -266,10 +231,6 @@ export function OverviewNavigationProvider({
 
   const replaceClientState = useCallback(
     (targetHref: string, keys: readonly OverviewClientOnlySearchKey[]) => {
-      // A child effect can request client-only cleanup before this provider's
-      // mount effect adopts the loaded URL. Rebase both snapshots on the live
-      // address first so campaign params and the fragment survive that race,
-      // while server-owned keys still come from their pending/committed state.
       const actualHref = `${window.location.pathname}${window.location.search}${window.location.hash}`;
       const pendingBase = mergeOverviewControlHref(
         actualHref,
@@ -297,23 +258,11 @@ export function OverviewNavigationProvider({
     [],
   );
 
-  /** The URL already shows the new selection while the matrix still shows the
-   *  old numbers. Consumers use this to say so. Compared on the data key rather
-   *  than the href: a `ref` change repaints from the payload already in hand, so
-   *  reading it as a load would dim the card and have the live region announce a
-   *  request that never runs. */
   const isPending = useMemo(
     () => overviewDataKey(pendingHref) !== overviewDataKey(committedHref),
     [committedHref, pendingHref],
   );
 
-  /**
-   * `ref` picks which column the percentages are measured against; every cost
-   * it needs is already in the payload. Deriving it from the pending URL rather
-   * than the response makes a reference change instant and request-free. The
-   * synthetic origin keeps this renderable on the server, where `window` is not
-   * defined.
-   */
   const referenceHardware = useMemo(
     () =>
       resolveOverviewReferenceHardware(
@@ -322,9 +271,6 @@ export function OverviewNavigationProvider({
     [pendingHref],
   );
 
-  // Derived from the pending URL, not the settled payload, so the window
-  // selector reflects a choice whose request is still in flight — including
-  // re-selecting the previous window to undo it.
   const comparisonMode = useMemo(
     () =>
       resolveOverviewComparisonMode(
@@ -378,8 +324,13 @@ export function useOverviewNavigationError(): boolean {
 
 export function useOverviewData(): OverviewPageData {
   const value = useContext(OverviewDataContext);
+  const unlocked = useFeatureGate();
+  const visible = useMemo(
+    () => (value === null ? null : overviewDataForModelVisibility(value, unlocked)),
+    [value, unlocked],
+  );
   if (value === null) throw new Error('Overview controls require OverviewNavigationProvider');
-  return value;
+  return visible!;
 }
 
 export function useOverviewReference(): OverviewReferenceHardware {

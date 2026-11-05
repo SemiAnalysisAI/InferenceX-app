@@ -8,10 +8,6 @@ interface ResolveScatterXAxisScaleOptions {
   scaleType: ScatterXAxisScalePreference;
 }
 
-/**
- * Resolve the scatter plot's x scale from stable metric identities.
- * Display labels are deliberately excluded because they vary by locale.
- */
 export function resolveScatterXAxisScale({
   extent,
   selectedYAxisMetric,

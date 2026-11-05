@@ -1,20 +1,19 @@
 import { isDeepStrictEqual } from 'node:util';
 
 import type { BenchmarkPointBackfill } from '../etl/run-overrides.js';
+import { isRecord } from './records.js';
 
 interface BackfillRow {
   offload_mode: unknown;
   recipe_fingerprint?: unknown;
+  spec_method?: unknown;
   metrics: unknown;
 }
 
 function asMetricsRecord(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
+  return isRecord(value) ? value : null;
 }
 
-/** Reject a replayed correction when its audited source telemetry changed. */
 export function matchesExpectedBackfillMetrics(
   value: unknown,
   backfill: BenchmarkPointBackfill,
@@ -42,6 +41,8 @@ function isApplied(row: BackfillRow, backfill: BenchmarkPointBackfill): boolean 
     (row.recipe_fingerprint ?? null) !== backfill.set.recipeFingerprint
   )
     return false;
+  if (backfill.set.specMethod !== undefined && row.spec_method !== backfill.set.specMethod)
+    return false;
   const metrics = asMetricsRecord(row.metrics);
   if (!metrics) return false;
   return (
@@ -51,7 +52,6 @@ function isApplied(row: BackfillRow, backfill: BenchmarkPointBackfill): boolean 
   );
 }
 
-/** Recover only the exact JSONB array written by the original broken backfill. */
 function recoverMalformedMetrics(
   value: unknown,
   backfill: BenchmarkPointBackfill,
@@ -67,7 +67,6 @@ function recoverMalformedMetrics(
   return originalMetrics;
 }
 
-/** The caller must first resolve exactly one source-or-destination identity. */
 export function planBenchmarkPointBackfill(
   row: BackfillRow,
   backfill: BenchmarkPointBackfill,

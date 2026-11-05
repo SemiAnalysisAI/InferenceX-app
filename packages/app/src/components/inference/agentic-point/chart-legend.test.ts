@@ -8,11 +8,8 @@ import {
   layoutChartLegend,
 } from './chart-legend';
 
-// Inline render of the point-detail charts: 720 viewBox units wide with the
-// shared 60/16 left/right axis padding.
 const INLINE_INNER_WIDTH = 720 - 60 - 16;
 
-/** Right edge of the item at `index`, i.e. where its text stops. */
 const itemRight = (labels: readonly string[], index: number, width: number): number => {
   const { items } = layoutChartLegend(labels, width);
   return items[index]!.x + LEGEND_TEXT_OFFSET + estimateTextWidth(labels[index]!);
@@ -24,7 +21,6 @@ describe('estimateTextWidth', () => {
   });
 
   it('counts CJK characters as roughly one em each', () => {
-    // Four fullwidth characters at font size 11.
     expect(estimateTextWidth('芯片缓存')).toBeCloseTo(44, 5);
   });
 
@@ -58,8 +54,6 @@ describe('layoutChartLegend', () => {
   });
 
   it('wraps the eleven-series KV-cache legend instead of overprinting it', () => {
-    // The regression from the inline KV-cache chart: eleven per-engine labels
-    // in ~644 units used to get 58 units each and collide.
     const labels = [
       'prefill (500e)',
       'prefill (501a)',
@@ -81,9 +75,7 @@ describe('layoutChartLegend', () => {
     for (const [i, label] of labels.entries()) {
       const item = layout.items[i]!;
       const right = item.x + LEGEND_TEXT_OFFSET + estimateTextWidth(label);
-      // Every item fits inside the plot width...
       expect(right).toBeLessThanOrEqual(INLINE_INNER_WIDTH);
-      // ...and starts clear of its predecessor on the same row.
       const prev = layout.items[i - 1];
       if (prev && prev.row === item.row) {
         expect(item.x).toBeGreaterThanOrEqual(

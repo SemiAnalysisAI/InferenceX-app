@@ -4,7 +4,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { getAllChipPages, getChipPage, getChipSpec } from '@/lib/chip-pages';
+import { getAllChipPages, getChipPage, getChipSpec } from '@/lib/catalog/chip-pages';
 
 import { SpecTable } from './chip-page-sections';
 
@@ -54,6 +54,7 @@ describe('chip specification table', () => {
     expect(container.textContent).toContain('左右滑动可查看全部规格参数');
     expect(container.textContent).toContain(topologyZh);
     expect(container.textContent).not.toContain(topologyEn);
+    if (slug === 'b300') expect(container.textContent).toContain('1,100 W');
 
     act(() => {
       root.render(<SpecTable entry={entry} locale="en" />);
@@ -61,5 +62,6 @@ describe('chip specification table', () => {
 
     expect(container.textContent).toContain(topologyEn);
     expect(container.textContent).not.toContain(topologyZh);
+    if (slug === 'b300') expect(container.textContent).toContain('1,100 W');
   });
 });

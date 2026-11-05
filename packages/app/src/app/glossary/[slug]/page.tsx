@@ -2,22 +2,21 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
-import { getPostBySlug } from '@/lib/blog';
+import { getPostBySlug } from '@/lib/blog/blog';
 import {
   getAdjacentGlossaryEntries,
   getAllGlossaryEntries,
   getGlossaryEntry,
   getRelatedGlossaryEntries,
-} from '@/lib/glossary';
-import { enAlternates } from '@/lib/i18n';
-import {
-  AUTHOR_HANDLE,
-  AUTHOR_NAME,
-  SITE_NAME,
-  SITE_URL,
-} from '@semianalysisai/inferencex-constants';
+} from '@/lib/content/glossary';
+import { glossaryMetaTitle } from '@/lib/content/glossary-title';
+import { enAlternates } from '@/lib/i18n/i18n';
+import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import { clampMetaDescription } from '@/lib/seo/meta-text';
+import { socialMetadata } from '@/lib/seo/social-metadata';
+import { analyticsPlacement } from '@/lib/analytics/placement';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -34,7 +33,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const entry = getGlossaryEntry(slug);
   if (!entry) return {};
 
-  const title = `${entry.term}: AI Inference Definition`;
+  const title = glossaryMetaTitle(entry, 'en');
+  const description = clampMetaDescription(entry.definition, 'en');
   const url = `${SITE_URL}/glossary/${entry.slug}`;
   const keywords = [
     entry.term,
@@ -46,23 +46,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title,
-    description: entry.definition,
+    description,
     keywords,
     authors: [{ name: AUTHOR_NAME }],
     alternates: enAlternates(`/glossary/${entry.slug}`),
-    openGraph: {
+    ...socialMetadata({
       title: `${title} | ${SITE_NAME}`,
-      description: entry.definition,
+      description,
       url,
+      locale: 'en',
       type: 'article',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title,
-      description: entry.definition,
-      site: AUTHOR_HANDLE,
-      creator: AUTHOR_HANDLE,
-    },
+    }),
   };
 }
 
@@ -119,7 +113,7 @@ export default async function GlossaryTermPage({ params }: Props) {
   };
 
   return (
-    <main className="relative">
+    <main className="relative" {...analyticsPlacement('glossary')}>
       <JsonLd data={jsonLd} />
       <div className="container mx-auto px-4 lg:px-8">
         <article className="mx-auto max-w-5xl">

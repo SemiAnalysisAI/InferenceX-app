@@ -4,8 +4,8 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import * as React from 'react';
 
-import { cn } from '@/lib/utils';
-import { useLocale } from '@/lib/use-locale';
+import { cn } from '@/lib/shared/utils';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const Dialog = DialogPrimitive.Root;
 
@@ -32,12 +32,12 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => {
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { overlayClassName?: string }
+>(({ className, children, overlayClassName, ...props }, ref) => {
   const closeLabel = useLocale() === 'zh' ? '关闭' : 'Close';
   return (
     <DialogPortal>
-      <DialogOverlay />
+      <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Content
         ref={ref}
         className={cn(

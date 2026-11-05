@@ -2,9 +2,10 @@ import type { Metadata } from 'next';
 
 import { AgentXMethodology } from '@/components/datasets/agentx-methodology';
 import { DatasetList } from '@/components/datasets/dataset-list';
-import { JsonLd } from '@/components/json-ld';
-import { enAlternates } from '@/lib/i18n';
+import { JsonLd } from '@/components/seo/json-ld';
+import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 const DESCRIPTION =
   'AgentX replays workload shapes derived from opt-in Claude Code sessions. Explore its methodology, distributions, and per-conversation flamegraphs.';
@@ -13,12 +14,12 @@ export const metadata: Metadata = {
   title: 'AgentX Methodology and Datasets',
   description: DESCRIPTION,
   alternates: enAlternates('/agentx'),
-  openGraph: {
+  ...socialMetadata({
     title: 'AgentX Methodology and Datasets | InferenceX',
     description: DESCRIPTION,
     url: `${SITE_URL}/agentx`,
-  },
-  twitter: { title: 'AgentX Methodology and Datasets | InferenceX', description: DESCRIPTION },
+    locale: 'en',
+  }),
 };
 
 const jsonLd = {

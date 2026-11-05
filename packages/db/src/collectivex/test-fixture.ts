@@ -14,7 +14,6 @@ export interface RowOverrides {
   globalTokens?: number;
   stageUnavailable?: boolean;
   stageZeroBytes?: boolean;
-  /** Adds wire_byte_provenance at this multiple of byte_provenance (a token-expert LL row). */
   wireBytesFactor?: number;
 }
 
@@ -24,11 +23,10 @@ export interface ShardOverrides {
   sku?: string;
   backend?: string;
   implName?: string;
+  libraryVersion?: string;
   ep?: number;
   phase?: string;
-  /** null models a pre-LL artifact: no mode field (the case_id keeps `normal`). */
   mode?: string | null;
-  /** null models a pre-FP8 artifact: no precision field and no case_id suffix. */
   precision?: string | null;
   scaleUpTransport?: string;
   scaleOutTransport?: string | null;
@@ -52,10 +50,6 @@ function component(base: number): Json {
   return { availability: 'measured', percentiles_us: percentiles(base) };
 }
 
-// `total` defaults to the activation count (the bf16 case, where there are no
-// scale bytes). Dispatch under FP8 carries extra scale bytes, so its total
-// exceeds activation — the fixture models that so tests can prove the payload
-// rate reads total_logical_bytes rather than activation_data_bytes.
 function bytes(activation: number, total: number = activation): Json {
   return { activation_data_bytes: activation, total_logical_bytes: total };
 }
@@ -70,8 +64,6 @@ function makeRawRow(index: number, row: RowOverrides, worldSize: number): Json {
       ? { availability: 'unavailable', percentiles_us: null }
       : component(120 + index),
   };
-  // Dispatch total exceeds activation (models FP8 scale bytes); combine is
-  // always bf16 (total == activation); roundtrip total is their sum.
   const byteProvenance: Json = {
     dispatch: bytes(384763904, 400000000),
     combine: bytes(384763904),
@@ -109,6 +101,7 @@ function makeRawCase(options: ShardOverrides, caseId: string): Json {
   const phase = options.phase === 'prefill' ? 'prefill' : 'decode';
   return {
     case_id: caseId,
+    suite: 'ep-core',
     backend: options.backend ?? 'deepep-v2',
     ep: options.ep ?? 8,
     gpus_per_node: options.gpusPerNode ?? 8,
@@ -127,7 +120,6 @@ function makeRawCase(options: ShardOverrides, caseId: string): Json {
 function caseIdOf(options: ShardOverrides = {}): string {
   if (options.caseId) return options.caseId;
   const tail = options.variant ? `-${options.variant}` : '';
-  // Pre-LL artifacts (mode: null) still carried `normal` in their case_ids.
   const mode = options.mode === null ? 'normal' : (options.mode ?? 'normal');
   const precision = options.precision === null ? '' : `-${options.precision ?? 'bf16'}`;
   return `${options.sku ?? 'h200-dgxc'}-${options.backend ?? 'deepep-v2'}-${options.workload ?? 'deepseek-v3'}-${mode}-${options.phase ?? 'decode'}-ep${options.ep ?? 8}-uniform${precision}${tail}`;
@@ -149,7 +141,10 @@ export function makeRawShard(options: ShardOverrides = {}): Json {
       case_id: caseId,
       case_factors: { sku, case: makeRawCase({ ...options, backend }, caseId) },
     },
-    implementation: { name: options.implName ?? backend },
+    implementation: {
+      name: options.implName ?? backend,
+      ...(options.libraryVersion ? { library_version: options.libraryVersion } : {}),
+    },
     runtime: { vendor: options.vendor ?? 'nvidia' },
     measurement: { rows: rows.map((row, index) => makeRawRow(index, row, worldSize)) },
     outcome: {
@@ -181,10 +176,10 @@ function requestedFromShard(shard: Json): RequestedCaseSpec {
   };
 }
 
+/** The shape of a CollectiveX results directory's `cases.json`. */
 export function makeRawMatrix(requested: RequestedCaseSpec[], version = 1): Json {
   return {
     version,
-    include: [],
     requested_cases: requested.map((entry) => ({
       case: entry.case,
       sku: entry.sku,
@@ -206,10 +201,12 @@ export interface KvOverrides {
   reasons?: string[];
   disposition?: 'runnable' | 'unsupported';
   reason?: string;
-  /** String on purpose by default: the kv entrypoint emitted `version: '1'`. */
   version?: number | string;
   rows?: Partial<KvRowSpec>[];
   omitShard?: boolean;
+  /** Extra `implementation` fields (library_version, maturity, transport, library_config). */
+  implementation?: Json;
+  network?: string;
 }
 
 interface KvRowSpec {
@@ -221,6 +218,9 @@ interface KvRowSpec {
   gbps_p50: number;
   latency_p50: number;
   verify_passed: boolean;
+  posted_bytes: number;
+  /** The row's first burst failed: no samples. */
+  failed: boolean;
 }
 
 function makeRawKvRow(spec: Partial<KvRowSpec>): Json {
@@ -229,23 +229,28 @@ function makeRawKvRow(spec: Partial<KvRowSpec>): Json {
     kind: spec.kind ?? 'paged',
     preset: 'dsv4',
     isl: spec.isl ?? 32768,
-    page_tokens: spec.page_tokens === undefined ? 64 : spec.page_tokens,
+    page_tokens: spec.page_tokens === undefined ? 256 : spec.page_tokens,
     layers: 61,
     page_bytes: spec.kind === 'bulk' ? null : 9216,
     descs: spec.kind === 'bulk' ? 1 : 20302,
     req_bytes: 183000000,
     batch: spec.batch ?? 1,
     op: spec.op ?? 'pull',
+    ...(spec.posted_bytes === undefined ? {} : { posted_bytes: spec.posted_bytes }),
     prep_ms: 1.2,
-    latency_ms: {
-      p50: latency,
-      p95: latency * 1.05,
-      min: latency * 0.98,
-      max: latency * 1.1,
-      n: 24,
-    },
-    gbps_p50: spec.gbps_p50 ?? 7.39,
-    verify: { passed: spec.verify_passed ?? true, detail: '' },
+    latency_ms: spec.failed
+      ? null
+      : {
+          p50: latency,
+          p95: latency * 1.05,
+          min: latency * 0.98,
+          max: latency * 1.1,
+          n: 24,
+        },
+    gbps_p50: spec.failed ? null : (spec.gbps_p50 ?? 7.39),
+    verify: spec.failed
+      ? { passed: false, detail: "transfer raised RuntimeError('boom')" }
+      : { passed: spec.verify_passed ?? true, detail: '' },
   };
 }
 
@@ -253,11 +258,6 @@ function kvCaseIdOf(options: KvOverrides): string {
   return `${options.sku ?? 'gb200'}-${options.backend ?? 'nixl'}-${options.workload ?? 'kv-dsv4'}-${options.fabric ?? 'rdma'}-xfer-ep2-paged-${options.precision ?? 'fp8'}`;
 }
 
-/**
- * A kv-transfer shard + its matrix requested-case entry. Mirrors the real
- * artifacts: the shard's case carries only the identity factors while the
- * matrix entry carries the full case (isl_ladder, batch_sizes, topology).
- */
 export function makeKvFixture(options: KvOverrides = {}): {
   shard: Json | null;
   requested: RequestedCaseSpec;
@@ -275,10 +275,11 @@ export function makeKvFixture(options: KvOverrides = {}): {
     suite: 'kv-transfer',
   };
   const rows = options.rows ?? [
-    { kind: 'paged', page_tokens: 64, batch: 1 },
-    { kind: 'paged', page_tokens: 64, batch: 16, gbps_p50: 15.12, latency_p50: 193.7 },
-    { kind: 'paged', page_tokens: 16, batch: 1, gbps_p50: 2.72, latency_p50: 67.3 },
+    { kind: 'paged', batch: 1 },
+    { kind: 'paged', batch: 4, gbps_p50: 15.12, latency_p50: 193.7 },
+    { kind: 'paged', batch: 1, op: 'push', gbps_p50: 8.02, latency_p50: 22.82 },
     { kind: 'bulk', page_tokens: null, batch: 1, gbps_p50: 89.41, latency_p50: 2.05 },
+    { kind: 'bulk', page_tokens: null, batch: 1, op: 'push', gbps_p50: 92.1, latency_p50: 1.99 },
   ];
   const shard: Json | null = options.omitShard
     ? null
@@ -286,7 +287,8 @@ export function makeKvFixture(options: KvOverrides = {}): {
         version: options.version ?? '1',
         record_type: 'case-attempt',
         identity: { case_id: caseId, case_factors: { sku, case: identityCase } },
-        implementation: { name: options.backend ?? 'nixl' },
+        implementation: { name: options.backend ?? 'nixl', ...options.implementation },
+        ...(options.network ? { topology: { network: options.network } } : {}),
         runtime: { vendor: options.vendor ?? 'nvidia' },
         measurement: { rows: rows.map(makeRawKvRow) },
         outcome: {
@@ -368,8 +370,6 @@ export function makeCollectiveXDataset(): CollectiveXDataset {
     topologyClass: 'mi355x-xgmi-rdma',
     nodes: 2,
   });
-  // The same cell as shardA measured with FP8 dispatch, so consumers exercise
-  // the bf16/fp8 split of an otherwise identical configuration.
   const shardC = makeRawShard({ precision: 'fp8' });
   const unsupportedId = 'b300-deepep-v2-deepseek-v3-normal-decode-ep16-uniform-bf16';
   const pendingId = 'b200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform-bf16';

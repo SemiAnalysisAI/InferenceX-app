@@ -11,7 +11,6 @@ import {
   type ParetoPointLabel,
 } from './paretoLabels';
 
-// Helper to create a minimal InferenceData for testing
 const makePoint = (overrides: Partial<InferenceData> = {}): InferenceData =>
   ({
     x: 100,
@@ -25,7 +24,6 @@ const makePoint = (overrides: Partial<InferenceData> = {}): InferenceData =>
 describe('getParetoLabel', () => {
   it('prefixes simple numeric tp with "TP"', () => {
     const point = makePoint({ tp: 4 });
-    // Without ep/dp_attention, getPointLabel returns String(tp) = "4"
     expect(getParetoLabel(point)).toBe('TP4');
   });
 
@@ -37,7 +35,6 @@ describe('getParetoLabel', () => {
   it('uses full parallelism label when ep is present', () => {
     const point = makePoint({ tp: 4, ep: 8 });
     const label = getParetoLabel(point);
-    // Should contain EP (expert parallelism) rather than just "TP4"
     expect(label).not.toBe('TP4');
     expect(label).toContain('EP');
   });
@@ -100,7 +97,6 @@ describe('getParetoLabel', () => {
   });
 
   it('kv_offloading="none" wins over legacy offload_mode="on"', () => {
-    // Current metadata must not be overridden by the legacy fallback
     const point = makePoint({ tp: 4, kv_offloading: 'none', offload_mode: 'on' });
     expect(getParetoLabel(point)).toBe('TP4');
   });
@@ -121,7 +117,6 @@ describe('getParetoLabel', () => {
       decode_num_workers: 1,
     });
     const label = getParetoLabel(point);
-    // Should be something like "2xTEP4+1xDEP8"
     expect(label).toContain('2x');
     expect(label).toContain('+');
     expect(label).toContain('1x');
@@ -171,22 +166,17 @@ describe('labelSimilarity', () => {
   });
 
   it('returns fractional value for partial overlap', () => {
-    // "1xDPAEP4+1xDPAEP32" → ["DPAEP4", "DPAEP32"]
-    // "1xDPAEP4+1xDPAEP16" → ["DPAEP4", "DPAEP16"]
-    // Shared: DPAEP4 (1), All unique: DPAEP4, DPAEP32, DPAEP16 (3)
     const sim = labelSimilarity('1xDPAEP4+1xDPAEP32', '1xDPAEP4+1xDPAEP16');
     expect(sim).toBeCloseTo(1 / 3);
   });
 
   it('returns partial similarity between offload-on and offload-off of the same parallelism', () => {
-    // "TP8" → ["TP8"], "TP8 + CPU KV Offloading" → ["TP8", "CPU KV Offloading"];
-    // shared TP8 → 1/2
     expect(labelSimilarity('TP8', 'TP8 + CPU KV Offloading')).toBeCloseTo(0.5);
   });
 
   it('returns higher similarity for more shared components', () => {
-    const sim1 = labelSimilarity('TP8', 'TEP4'); // 0 shared
-    const sim2 = labelSimilarity('1xDPAEP4+1xDPAEP32', '1xDPAEP4+1xDPAEP16'); // 1/3
+    const sim1 = labelSimilarity('TP8', 'TEP4');
+    const sim2 = labelSimilarity('1xDPAEP4+1xDPAEP32', '1xDPAEP4+1xDPAEP16');
     expect(sim2).toBeGreaterThan(sim1);
   });
 });
@@ -216,7 +206,7 @@ describe('computeParetoPointLabels', () => {
   });
 });
 
-const linearScale = (x: number) => x; // identity scale for simplicity
+const linearScale = (x: number) => x;
 
 describe('computeGradientStops', () => {
   const makeParetoLabel = (x: number, label: string, color: string): ParetoPointLabel => ({
@@ -245,11 +235,8 @@ describe('computeGradientStops', () => {
     );
     expect(stops).not.toBeNull();
     expect(stops!.length).toBeGreaterThanOrEqual(3);
-    // First stop should be color of first label
     expect(stops![0].color).toBe('#aaa');
-    // Last stop should be color of second label
     expect(stops![stops!.length - 1].color).toBe('#bbb');
-    // All offsets should be between 0 and 1
     for (const stop of stops!) {
       expect(stop.offset).toBeGreaterThanOrEqual(0);
       expect(stop.offset).toBeLessThanOrEqual(1);
@@ -274,7 +261,6 @@ describe('computeGradientStops', () => {
       linearScale,
     );
     expect(stops).not.toBeNull();
-    // Should transition from #aaa to #bbb
     expect(stops![0].color).toBe('#aaa');
     expect(stops![stops!.length - 1].color).toBe('#bbb');
   });
@@ -289,10 +275,8 @@ describe('computeGradientStops', () => {
       linearScale,
     );
     expect(stops).not.toBeNull();
-    // Starts at 0, ends at 1
     expect(stops![0].offset).toBe(0);
     expect(stops![stops!.length - 1].offset).toBe(1);
-    // Contains all three colors
     const colors = new Set(stops!.map((s) => s.color));
     expect(colors.has('#aaa')).toBe(true);
     expect(colors.has('#bbb')).toBe(true);
@@ -300,38 +284,28 @@ describe('computeGradientStops', () => {
   });
 
   it('returns null for descending-x points (paretoFrontLowerRight order)', () => {
-    // paretoFrontLowerRight returns points in descending x order.
-    // Without sorting to ascending x first, totalRange becomes negative
-    // and computeGradientStops returns null — the bug that broke gradient
-    // lines for cost/energy metrics.
     const descendingPoints = [
       makeParetoLabel(30, 'TP16', '#ccc'),
       makeParetoLabel(20, 'TP8', '#bbb'),
       makeParetoLabel(10, 'TP4', '#aaa'),
     ];
     const result = computeGradientStops(descendingPoints, linearScale);
-    // Descending x ⇒ totalRange ≤ 0 ⇒ null
     expect(result).toBeNull();
   });
 
   it('works correctly when descending-x points are sorted to ascending before calling', () => {
-    // This mirrors the fix in ScatterGraph.tsx: sort roofline points
-    // by ascending x before passing to computeGradientStops.
     const points = [
       makeParetoLabel(30, 'TP16', '#ccc'),
       makeParetoLabel(20, 'TP8', '#bbb'),
       makeParetoLabel(10, 'TP4', '#aaa'),
     ];
-    // Sort ascending by x (the fix)
     points.sort((a, b) => a.point.x - b.point.x);
 
     const stops = computeGradientStops(points, linearScale);
     expect(stops).not.toBeNull();
     expect(stops![0].offset).toBe(0);
     expect(stops![stops!.length - 1].offset).toBe(1);
-    // First color should be TP4's color (smallest x)
     expect(stops![0].color).toBe('#aaa');
-    // Last color should be TP16's color (largest x)
     expect(stops![stops!.length - 1].color).toBe('#ccc');
   });
 });
@@ -349,9 +323,6 @@ describe('PARETO_LABEL_COLORS', () => {
   });
 });
 
-// ===========================================================================
-// buildGradientColorMap
-// ===========================================================================
 describe('buildGradientColorMap', () => {
   const ptA = { tp: 4 } as InferenceData;
   const ptB = { tp: 8 } as InferenceData;

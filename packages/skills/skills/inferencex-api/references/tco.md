@@ -1,5 +1,13 @@
 # Compare modeled GPU-rate costs
 
+For the profit-estimator views (`profit-estimator` and
+`profit-estimator-per-gigawatt`), `cacheHitMode` defaults to `theoretical`, labeled
+“Theroticial Roofline” in the dashboards. It uses trace-derived infinite-cache
+reuse, falling back to the measured cache hit rate when no theoretical rate is
+available. Pass `cacheHitMode=actual` to price measured cache behavior explicitly.
+Report the selected mode with the economics assumptions; a roofline estimate is
+not measured cache performance.
+
 Use explicit user-supplied USD/GPU-hour rates to estimate cost per million output
 tokens **on the API's reported throughput basis**. A supplied `/GPU-hour` rate
 establishes its billing unit; keep its source with the assumptions. Normalize a
@@ -83,9 +91,12 @@ USD per million output tokens =
   USD/GPU-hour × 1,000,000 / (output tokens/second/GPU × 3,600)
 ```
 
-The feed preserves the producer's output-throughput denominator. Fixed-sequence
-results can divide output throughput by decode GPUs and total throughput by
-prefill plus decode GPUs; AgentX uses a different path. Ratios between fields
+The feed contains fixed-sequence rows only and preserves the stored
+output-throughput denominator: disaggregated rows divide output throughput by
+decode GPUs, input throughput by prefill GPUs, and total throughput by prefill
+plus decode GPUs. Dashboard views accept `chipBasis=total` to divide input and
+output by every GPU instead; see
+[dashboard views](dashboard-views.md#disaggregated-chip-basis). Ratios between fields
 alone establish neither physical GPU membership nor a universal `2×` correction.
 Keep the rate estimate on the reported basis. A whole-deployment conversion or
 fleet winner requires the exact producer semantics, verified pool membership,
@@ -98,8 +109,11 @@ It is not a measured GPU-utilization assertion. Costs outside the supplied hourl
 rate—such as idle time, storage, networking, staffing, or ownership expenses—are
 outside this calculation. The denominator is output tokens; there is no token
 revenue, input-token value weighting, or measured power/energy calculation.
+Power may still be recorded in the captured observations. Describe it as unused
+by this formula; an availability claim requires checking the selected rows' metric
+fields and their validation verdicts.
 
-If reporting sensitivity with supplied prices, equal modeled cost occurs at
+When the user requests price sensitivity, equal modeled cost occurs at
 `price_A / price_B = throughput_A / throughput_B` for comparable points. Equality
 is a tie; crossing that boundary changes the cheaper estimate. Preserve that
 distinction when rounding the saved boundary for prose.
@@ -125,8 +139,9 @@ or workloads to obtain a complete comparison.
 
 Retain `point.evidence_date` for the knot(s) backing the target, plus
 `oldest_frontier_date` and `latest_date` for the whole frontier. Report differing
-dates across GPUs. If reporting a gap, compute elapsed days from those endpoints
-in the saved calculation. The metadata records the requested model and returned
+dates across GPUs. Equal backing-date endpoints identify one date, not one
+observation; retain `is_interpolated` when describing the point. If reporting a gap,
+compute elapsed days from those endpoints in the saved calculation. The metadata records the requested model and returned
 `db_model_keys`. Even a single returned raw key establishes only the API's model
 bucket, not identical checkpoint weights or an exact model revision across the
 frontier's observations. Do not turn a one-key response into a matched-release claim.
@@ -143,13 +158,46 @@ or quality, stop this comparison and gather the necessary benchmark evidence.
 
 Use this branch only for missing rates or unspecified billing units. Keep those
 inputs symbolic and request what is missing. For a median-target task, use the
-[bounded raw-API capture recipe](public-api-examples.md) to retain the complete
+[installed response capture helper](public-api-examples.md) to retain the complete
 `tco-feed?view=points&format=json` response for the requested model, workloads,
 median target (`tiers`), and optional date. For a P99 task, use the eligible,
 comparable raw observations from the [P99 recipe](#check-a-p99-itl-constraint).
 Keep each hardware/workload's positive throughput and evidence dates separate;
 median-feed points must also be in range. Missing, clamped, and unreachable points
 have no cost boundary.
+
+Capture the current OpenAPI operation and then the exact requested points feed.
+The example paths below use the Codex installation; Claude Code uses `.claude`.
+Set the model, workloads, target and optional date from the user's request.
+
+```bash
+node --input-type=module <<'JS'
+import { createResponseCapture } from './.agents/skills/inferencex-api/scripts/capture-response.mjs';
+const { read, requests } = createResponseCapture();
+const spec = await read('/api/openapi.json');
+if (!spec.paths?.['/api/v1/tco-feed']?.get) throw new Error('TCO feed GET is not documented');
+const query = new URLSearchParams({ model: 'DeepSeek-V4-Pro', workloads: '8192x1024',
+  tiers: '50', view: 'points', format: 'json' });
+await read(`/api/v1/tco-feed?${query}`);
+console.log(JSON.stringify({ requests, points_body: requests.at(-1).body_path }, null, 2));
+JS
+```
+
+Run the installed offline summary helper on `points_body`, retaining the same
+selectors (including `--date` if the captured query used one). Use a new report path:
+
+```bash
+node .agents/skills/inferencex-api/scripts/tco-summary.mjs \
+  --input api-evidence-EXAMPLE/2.body --model DeepSeek-V4-Pro \
+  --workloads 8192x1024 --target 50 --hardware-a b200 --hardware-b mi355x \
+  --report tco-conditional.md
+```
+
+Its JSON contains `comparisons`, `source`, `price_status`, `cost_winner`,
+`conclusion` and `report_markdown`. It uses the formal TCO feed validator and
+computes each workload separately. Keep its generated conditional conclusion in
+the final reply. This is an offline analysis of a raw capture, not a formal bundle
+accepted by `inferencex verify`; retain the capture sidecars beside its source body.
 
 For two such points with throughputs `t_A` and `t_B`, equal modeled cost occurs at
 `price_A / price_B = t_A / t_B` on the API-reported throughput basis. A's estimate
@@ -170,12 +218,21 @@ Convert it to milliseconds with `p99_itl * 1000`. `p99_tpot` measures a differen
 statistic (per-request time per output token). The reciprocal `1000 / p99_intvty`
 is not P99 ITL. A median frontier target cannot certify a tail SLA.
 Use only the user's requested predicate for classification and costing. Retain a
-finite `p99_itl < 0.020` pass and its cost on the API-reported basis. If another
-statistic helps explain a limitation, report its recorded value separately.
+finite `p99_itl < 0.020` pass and its cost on the API-reported basis. Build the priced
+table from those passing rows. Derive best-cost points, price boundaries, their
+dates, and throughput/concurrency extrema from that same named population; reuse
+those values in the report and final answer. Count known, null, and missing
+`recipe_fingerprint` values in that population before describing availability.
+A narrower comparison names its additional selectors or exclusions wherever its
+results appear, and retains the full passing population's counts and extrema.
+Report passing concurrency values as observed coverage. A necessary concurrency
+limit requires evidence beyond a selected subset or an observed range; keep every
+eligible observation, including flagged outliers, in that population.
+If another statistic helps explain a limitation, report its recorded value separately.
 Different percentiles can differ greatly without internal inconsistency; TPOT and
 ITL also measure different statistics. Aggregate ratios alone establish neither
 invalid data nor a delivery pattern. Additional screening thresholds require the
-user's criterion; do not invent a preferred planning subset from those ratios.
+user's criterion.
 
 Capture the complete benchmark/history response using the bounded raw-API recipe,
 then set the workload scope to the user's request. Obtain `scope.model` from
@@ -185,7 +242,10 @@ example keeps every selected observation and checks **strictly below 20 ms**
 (`p99_itl < 0.020` seconds). Missing, nonnumeric, nonfinite, and negative values
 remain `unknown`; preserve the source capture alongside this derived report.
 Raw request concurrency is `conc`. The recipe maps it to `concurrency`, retaining
-the raw field and using `null` for missing or invalid values.
+the raw field and using `null` for missing or invalid values. `passing_summary`
+counts all passing rows per hardware, including recorded power fields separately
+from `power_valid` verdicts. Finite-field counts describe availability; measured
+power comparisons still use the [PowerX eligibility rules](powerx.md#selection-and-coverage).
 
 ```bash
 node --input-type=module - evidence/benchmark-history.body <<'JS'
@@ -206,7 +266,27 @@ const checked = selected.map((row) => {
     p99_itl_under_20ms: known ? (seconds < 0.020 ? 'pass' : 'fail') : 'unknown',
   };
 });
-console.log(JSON.stringify({ source_path, scope, matching_rows: checked.length, rows: checked }, null, 2));
+const passing = checked.filter((row) => row.p99_itl_under_20ms === 'pass');
+const passing_summary = [...new Set(passing.map((row) => row.hardware))].sort().map((hardware) => {
+  const population = passing.filter((row) => row.hardware === hardware);
+  const concurrency = population.map((row) => row.concurrency).filter((value) => value !== null);
+  const passed = population.filter((row) => row.metrics.power_valid === 1).length;
+  const failed = population.filter((row) => row.metrics.power_valid === 0).length;
+  return {
+    hardware,
+    rows: population.length,
+    concurrency: {
+      values: [...new Set(concurrency)].sort((a, b) => a - b),
+      unknown_rows: population.length - concurrency.length,
+    },
+    power: {
+      avg_power_w_finite_rows: population.filter((row) => Number.isFinite(row.metrics.avg_power_w)).length,
+      joules_per_output_token_finite_rows: population.filter((row) => Number.isFinite(row.metrics.joules_per_output_token)).length,
+      validation: { passed, failed, unavailable: population.length - passed - failed },
+    },
+  };
+});
+console.log(JSON.stringify({ source_path, scope, matching_rows: checked.length, passing_summary, rows: checked }, null, 2));
 JS
 ```
 

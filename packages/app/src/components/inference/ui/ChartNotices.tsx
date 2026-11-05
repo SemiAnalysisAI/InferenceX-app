@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 
-/** Keep operational notes for the visible official and overlay series below the chart. */
 export default function ChartNotices({
   chartId,
   notices,

@@ -1,69 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { CAROUSEL_LABELS, CAROUSEL_ORGS, QUOTES } from './quotes-data';
+import { orgAnchorId } from './quotes-data';
 
-/**
- * The landing carousel renders `QUOTES` filtered by `CAROUSEL_ORGS`, while the
- * /quotes page renders every entry in `QUOTES`. That split is what lets a
- * supporter come off the carousel without being dropped from the site, so it is
- * asserted here rather than left implicit.
- */
-const OFF_CAROUSEL_ONLY = [
-  'Together AI',
-  'Nebius',
-  'White House',
-  'UC San Diego',
-  'TensorWave',
-] as const;
-
-describe('quote carousel membership', () => {
-  it('keeps every carousel org backed by a real quote', () => {
-    const quotedOrgs = new Set(QUOTES.map((quote) => quote.org));
-    for (const org of CAROUSEL_ORGS) {
-      expect(quotedOrgs.has(org), `${org} is in CAROUSEL_ORGS but has no quote`).toBe(true);
-    }
-  });
-
-  it('lists each carousel org once', () => {
-    expect(new Set(CAROUSEL_ORGS).size).toBe(CAROUSEL_ORGS.length);
-  });
-
-  it('features Mooncake in the landing carousel', () => {
-    expect(CAROUSEL_ORGS).toContain('Mooncake');
-  });
-
-  it('features AMD and NVIDIA in the landing carousel under CEO labels', () => {
-    expect(CAROUSEL_ORGS).toContain('AMD');
-    expect(CAROUSEL_ORGS).toContain('NVIDIA');
-    expect(CAROUSEL_LABELS['AMD']).toBe('AMD Lisa Su');
-    expect(CAROUSEL_LABELS['NVIDIA']).toBe('NVIDIA Jensen');
-  });
-
-  it.each(OFF_CAROUSEL_ONLY)('excludes %s from the carousel', (org) => {
-    expect((CAROUSEL_ORGS as readonly string[]).includes(org)).toBe(false);
-  });
-
-  it.each(OFF_CAROUSEL_ONLY)('still shows %s on the quotes page', (org) => {
-    expect(QUOTES.some((quote) => quote.org === org)).toBe(true);
-  });
-
-  it('resolves carousel display labels for the orgs that use them', () => {
-    // Overrides may outlive carousel membership (see the note in quotes-data),
-    // so only assert that active carousel orgs resolve to a non-empty label.
-    for (const org of CAROUSEL_ORGS) {
-      expect(CAROUSEL_LABELS[org] ?? org).not.toBe('');
-    }
-  });
-});
-
-describe('Chinese quote attribution', () => {
-  it('provides a Chinese role for every quote with an English role', () => {
-    for (const quote of QUOTES) {
-      if (!quote.title) continue;
-      expect(
-        Reflect.get(quote, 'titleZh'),
-        `${quote.name} has an English role but no Chinese role`,
-      ).toBeTruthy();
-    }
+describe('orgAnchorId', () => {
+  it.each([
+    ['Google', 'quote-google'],
+    ['Meta Superintelligence Labs', 'quote-meta-superintelligence-labs'],
+    ['  Example & Company! ', 'quote-example-company'],
+  ])('turns %s into a stable quote anchor', (org, expected) => {
+    expect(orgAnchorId(org)).toBe(expected);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MODEL_PREFIX_MAPPING } from '@/lib/data-mappings';
+import { MODEL_PREFIX_MAPPING } from '@/lib/catalog/data-mappings';
 import type { RunInfo } from '../types';
 import { legendChangelogsByHardware } from './legend-changelog';
 

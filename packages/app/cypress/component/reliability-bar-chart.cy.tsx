@@ -1,8 +1,8 @@
 import ReliabilityBarChartD3 from '@/components/reliability/ui/BarChartD3';
 import { mountWithProviders } from '../support/test-utils';
 import { createMockReliabilityData } from '../support/mock-data';
-import { Model } from '@/lib/data-mappings';
-import { registerAnalyticsClient } from '@/lib/analytics';
+import { Model } from '@/lib/catalog/data-mappings';
+import { registerAnalyticsClient } from '@/lib/analytics/analytics';
 
 describe('ReliabilityBarChartD3', () => {
   it('tracks retry and requests reliability data again', () => {
@@ -68,13 +68,10 @@ describe('ReliabilityBarChartD3', () => {
       },
     );
 
-    // SVG should render
     cy.get('#reliability-chart svg').should('exist');
 
-    // Horizontal bars should be present (rect elements inside the chart)
     cy.get('#reliability-chart svg rect').should('have.length.greaterThan', 0);
 
-    // Legend should render with sidebar class
     cy.get('.sidebar-legend').should('exist');
     cy.get('.sidebar-legend li').should('have.length.greaterThan', 0);
   });

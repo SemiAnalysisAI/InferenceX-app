@@ -3,11 +3,12 @@
 import type { ReactNode } from 'react';
 
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { ModelLogo } from '@/components/ui/model-logo';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { NewBadge } from '@/components/ui/new-badge';
+import { CaptionField, captionControlTriggerClassName } from '@/components/ui/result-context';
 import {
   Select,
   SelectContent,
@@ -30,8 +31,8 @@ import {
   getSequenceLabel,
   groupByCategory,
   sequenceKind,
-} from '@/lib/data-mappings';
-import { useLocale } from '@/lib/use-locale';
+} from '@/lib/catalog/data-mappings';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {
@@ -115,9 +116,6 @@ function CategorySectionTitle({
   );
 }
 
-// Full-color creator logo beside each model name, in the dropdown rows and
-// the closed trigger alike. `ModelLogo` renders nothing for models without
-// a configured logo, so rows degrade to plain text instead of breaking.
 const toOption = (model: string, badge?: ReactNode) => ({
   value: model,
   label: getModelLabel(model as Model),
@@ -133,17 +131,7 @@ interface ModelSelectorProps {
   onOpenChange?: (open: boolean) => void;
   availableModels: string[];
   'data-testid'?: string;
-  /**
-   * Optional affordance rendered beside the closed trigger (outside the
-   * dropdown) — e.g. the
-   * model-architecture deep-dive link on the inference dashboard.
-   */
   trailing?: ReactNode;
-  /**
-   * Models whose dropdown rows carry a NEW pill (localized). The inference
-   * dashboard passes the featured AgentX set; surfaces that don't highlight
-   * new models simply omit the prop.
-   */
   newModels?: ReadonlySet<string>;
 }
 
@@ -253,7 +241,6 @@ interface SequenceSelectorProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   availableSequences: string[];
-  /** Selected model, so per-model scenario retirements group as Deprecated. */
   model?: Model | null;
   'data-testid'?: string;
 }
@@ -332,26 +319,19 @@ export function SequenceSelector({
 }
 
 interface ScenarioSelectorProps {
+  variant?: 'field' | 'caption';
   id?: string;
   value: string;
   onChange: (value: Sequence) => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   availableSequences: string[];
-  /** Selected model, so retired scenarios carry the correct status in their labels. */
   model?: Model | null;
   'data-testid'?: string;
 }
 
-/**
- * Scenario selector — fixed-seq-len rows grouped under "Fixed Sequence Length",
- * agentic-trace rows rendered flat first. Label is "Scenario" (the ISL/OSL
- * framing only applies to the fixed-seq subset).
- *
- * A single selected scenario stays visible in the same control, disabled when
- * there is no alternative workload to choose.
- */
 export function ScenarioSelector({
+  variant = 'field',
   id = 'scenario-select',
   value,
   onChange,
@@ -368,8 +348,7 @@ export function ScenarioSelector({
   const fixedGroups = groupByCategory(fixedSeq, (s) =>
     getSequenceCategoryForModel(s as Sequence, model),
   );
-  if (availableSequences.length === 0) return null;
-  const isOnlySelectedScenario = availableSequences.length === 1 && availableSequences[0] === value;
+  if (availableSequences.length <= 1) return null;
   const scenarioLabel = (seq: string) => {
     const label = getSequenceLabel(seq as Sequence, locale);
     return getSequenceCategoryForModel(seq as Sequence, model) === 'deprecated'
@@ -402,34 +381,61 @@ export function ScenarioSelector({
       ),
   });
 
+  const select = (
+    <SearchableSelect
+      showSelectedHelp={variant !== 'caption'}
+      className={variant === 'caption' ? captionControlTriggerClassName : undefined}
+      value={value}
+      initialLabel={scenarioLabel(value)}
+      contentClassName="min-w-[min(16rem,var(--radix-popover-content-available-width))]"
+      placeholder={t.scenario}
+      triggerId={id}
+      triggerTestId={testId}
+      searchable={false}
+      onValueChange={(v) => {
+        track('selector_scenario_changed', { scenario: v });
+        onChange(v as Sequence);
+      }}
+      open={open}
+      onOpenChange={onOpenChange}
+      groups={[
+        { label: '', options: agentic.map(toScenarioOption) },
+        {
+          label: t.fixedSequenceLength,
+          options: [...fixedGroups.default, ...fixedGroups.deprecated].map(toScenarioOption),
+        },
+      ].filter((group) => group.options.length > 0)}
+    />
+  );
+
+  if (variant === 'caption') {
+    return (
+      <CaptionField
+        label={t.scenario}
+        value={scenarioLabel(value)}
+        control={
+          <div className="flex items-center gap-1">
+            {select}
+            <InfoHelp
+              label={scenarioLabel(value)}
+              value={value}
+              triggerTestId={`selected-option-help-${value}`}
+              contentTestId={`selected-option-help-content-${value}`}
+            >
+              {toScenarioOption(value).help}
+            </InfoHelp>
+          </div>
+        }
+        controlId={id}
+        testId="result-context-scenario"
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-1">
       <LabelWithTooltip htmlFor={id} label={t.scenario} tooltip={t.scenarioTooltip} />
-      <SearchableSelect
-        key={isOnlySelectedScenario ? 'fixed' : 'selectable'}
-        disabled={isOnlySelectedScenario}
-        value={value}
-        initialLabel={scenarioLabel(value)}
-        contentClassName="min-w-[min(16rem,var(--radix-popover-content-available-width))]"
-        placeholder={t.scenario}
-        triggerId={id}
-        triggerTestId={testId}
-        searchable={false}
-        onValueChange={(v) => {
-          track('selector_scenario_changed', { scenario: v });
-          onChange(v as Sequence);
-        }}
-        open={isOnlySelectedScenario ? false : open}
-        onOpenChange={onOpenChange}
-        groups={[
-          // Agentic is already named in its row, so it needs no repeated heading.
-          { label: '', options: agentic.map(toScenarioOption) },
-          {
-            label: t.fixedSequenceLength,
-            options: [...fixedGroups.default, ...fixedGroups.deprecated].map(toScenarioOption),
-          },
-        ].filter((group) => group.options.length > 0)}
-      />
+      {select}
     </div>
   );
 }
@@ -441,11 +447,6 @@ interface PercentileSelectorProps {
   'data-testid'?: string;
 }
 
-/**
- * Latency percentile selector for agentic-trace charts. The selected value
- * rewrites the chart x-axis metric from `median_*` to `{percentile}_*`, so
- * picking p99 plots p99 e2e latency / interactivity instead of the median.
- */
 export function PercentileSelector({
   id = 'percentile-select',
   value,
@@ -492,10 +493,6 @@ interface PrecisionSelectorProps {
   'data-testid'?: string;
 }
 
-/**
- * Precision multi-select. Keep a single selected precision visible in the same
- * disabled control so benchmark context and geometry remain consistent.
- */
 export function PrecisionSelector({
   id = 'precision-select',
   value,

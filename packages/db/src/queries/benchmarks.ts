@@ -1,5 +1,6 @@
 import type { DbClient } from '../connection.js';
 import type { PowerAudit, WorkerPower } from '../etl/benchmark-mapper.js';
+import { withStoredPerPoolBasis } from '../etl/disagg-throughput';
 export type { PowerAudit, WorkerPower } from '../etl/benchmark-mapper.js';
 
 /**
@@ -134,20 +135,22 @@ interface RecursiveBenchmarkPlan {
   resultOrder: SqlPiece;
 }
 
+// An AgentX curve spans AGG/disagg and offload lines that may run different images, so
+// append-only runs inherit only while every shared line keeps its image, as InferenceX's
+// append-only check requires. `line_images` is NULL when a line has a missing or second
 function curveRunBase(modelKeys: string[], runLineFilter: SqlPiece): SqlPiece {
   return sqlPiece`
-    run_lines AS (
-      SELECT *
-      FROM benchmark_curve_runs
-      WHERE model = ANY(${modelKeys})
-        ${runLineFilter}
-    ), ranked_runs AS (
-      SELECT run_lines.*,
+    ranked_runs AS (
+      SELECT l.curve_scope, l.workflow_run_id, l.date, l.line_images, l.point_ids,
+        wr.run_started_at, wr.github_run_id, wr.append_only,
         row_number() OVER (
-          PARTITION BY curve_scope
-          ORDER BY date DESC, run_started_at DESC NULLS LAST, workflow_run_id DESC
+          PARTITION BY l.curve_scope
+          ORDER BY l.date DESC, wr.run_started_at DESC NULLS LAST, l.workflow_run_id DESC
         ) AS run_rank
-      FROM run_lines
+      FROM benchmark_curve_run_lines l
+      JOIN latest_workflow_runs wr ON wr.id = l.workflow_run_id
+      WHERE l.model = ANY(${modelKeys})
+        ${runLineFilter}
     )`;
 }
 
@@ -156,7 +159,7 @@ const CURVE_RECURSION = sqlPiece`
 
   SELECT
     older.*,
-    current.root_image,
+    current.chain_images || older.line_images,
     current.snapshot_date,
     current.snapshot_workflow_run_id
   FROM curve_runs current
@@ -164,22 +167,17 @@ const CURVE_RECURSION = sqlPiece`
     ON older.curve_scope = current.curve_scope
     AND older.run_rank = current.run_rank + 1
   WHERE current.append_only
-    AND current.image_count = 1
-    AND current.images_complete
-    AND older.image_count = 1
-    AND older.images_complete
-    AND older.image = current.root_image`;
+    AND current.chain_images IS NOT NULL
+    AND older.line_images IS NOT NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM jsonb_each_text(older.line_images) older_line
+      WHERE current.chain_images ->> older_line.key <> older_line.value
+    )`;
 
 const CURVE_POINT_SOURCE = sqlPiece`
   FROM curve_runs cr
-  JOIN benchmark_results br ON br.workflow_run_id = cr.workflow_run_id
-  JOIN configs point_c
-    ON point_c.id = br.config_id
-    AND benchmark_curve_scope(
-      point_c.model, point_c.hardware, point_c.framework, point_c.precision,
-      br.benchmark_type, br.isl, br.osl, point_c.spec_method, point_c.disagg, br.offload_mode
-    ) = cr.curve_scope
-  WHERE br.error IS NULL`;
+  CROSS JOIN LATERAL unnest(cr.point_ids) AS point(id)
+  JOIN benchmark_results br ON br.id = point.id`;
 
 function executeRecursiveBenchmarkQuery(
   sql: DbClient,
@@ -194,7 +192,7 @@ function executeRecursiveBenchmarkQuery(
     ), selected_points AS (
       SELECT DISTINCT ON (
         ${plan.pointIdentity}
-      ) br.*, cr.snapshot_date, cr.snapshot_workflow_run_id
+      ) br.id, cr.snapshot_date, cr.snapshot_workflow_run_id
       ${CURVE_POINT_SOURCE}
       ORDER BY
         ${plan.pointOrder}
@@ -227,22 +225,20 @@ function executeRecursiveBenchmarkQuery(
       br.recipe_fingerprint,
       ${plan.metricsExpression},
       br.workers,
-      -- A bare br.power_* reference fails during query planning until the next
-      -- ingest applies migration 015. The jsonb lookup returns NULL before the
-      -- migration and the stored value afterward, making deploy order safe.
-      to_jsonb(br) -> 'power_invalid_reasons' AS power_invalid_reasons,
-      to_jsonb(br) -> 'power_audit' AS power_audit,
+      br.power_invalid_reasons,
+      br.power_audit,
       br.date::text,
       br.workflow_run_id,
       wr.run_started_at::text,
       CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url,
-      br.snapshot_date::text AS curve_date,
-      br.snapshot_workflow_run_id AS curve_workflow_run_id,
+      sp.snapshot_date::text AS curve_date,
+      sp.snapshot_workflow_run_id AS curve_workflow_run_id,
       snapshot_wr.run_started_at::text AS curve_run_started_at
-    FROM selected_points br
+    FROM selected_points sp
+    JOIN benchmark_results br ON br.id = sp.id
     JOIN configs c ON c.id = br.config_id
     JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
-    JOIN latest_workflow_runs snapshot_wr ON snapshot_wr.id = br.snapshot_workflow_run_id
+    JOIN latest_workflow_runs snapshot_wr ON snapshot_wr.id = sp.snapshot_workflow_run_id
     ORDER BY ${plan.resultOrder}
   `;
   return executeSqlPiece(sql, query);
@@ -289,7 +285,7 @@ function queryRecursiveBenchmarks(
         ), curve_runs AS (
           SELECT
             seed_runs.*,
-            seed_runs.image AS root_image,
+            seed_runs.line_images AS chain_images,
             seed_runs.date AS snapshot_date,
             seed_runs.workflow_run_id AS snapshot_workflow_run_id
           FROM seed_runs`;
@@ -299,7 +295,8 @@ function queryRecursiveBenchmarks(
         pointIdentity,
         pointOrder,
         metricsExpression: rawMetrics,
-        resultOrder: sqlPiece`br.config_id, br.conc, br.isl, br.osl`,
+        resultOrder: sqlPiece`br.config_id, br.conc, br.isl, br.osl,
+          br.benchmark_type, br.offload_mode, br.recipe_fingerprint`,
       });
     }
     case 'run': {
@@ -307,7 +304,7 @@ function queryRecursiveBenchmarks(
         curve_runs AS (
           SELECT
             ranked_runs.*,
-            ranked_runs.image AS root_image,
+            ranked_runs.line_images AS chain_images,
             ranked_runs.date AS snapshot_date,
             ranked_runs.workflow_run_id AS snapshot_workflow_run_id
           FROM ranked_runs
@@ -318,19 +315,20 @@ function queryRecursiveBenchmarks(
         pointIdentity,
         pointOrder,
         metricsExpression: rawMetrics,
-        resultOrder: sqlPiece`br.config_id, br.conc, br.isl, br.osl, br.offload_mode`,
+        resultOrder: sqlPiece`br.config_id, br.conc, br.isl, br.osl, br.offload_mode,
+          br.benchmark_type, br.recipe_fingerprint`,
       });
     }
     case 'history': {
       const runLineFilter =
         variant.benchmarkType === 'agentic_traces'
-          ? sqlPiece`AND benchmark_type = 'agentic_traces'`
-          : sqlPiece`AND isl = ${variant.isl} AND osl = ${variant.osl}`;
+          ? sqlPiece`AND l.benchmark_type = 'agentic_traces'`
+          : sqlPiece`AND l.isl = ${variant.isl} AND l.osl = ${variant.osl}`;
       const seed = sqlPiece`
         curve_runs AS (
           SELECT
             ranked_runs.*,
-            ranked_runs.image AS root_image,
+            ranked_runs.line_images AS chain_images,
             ranked_runs.date AS snapshot_date,
             ranked_runs.workflow_run_id AS snapshot_workflow_run_id
           FROM ranked_runs`;
@@ -346,7 +344,8 @@ function queryRecursiveBenchmarks(
           br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode,
           br.recipe_fingerprint, br.conc, cr.run_rank`,
         metricsExpression: sqlPiece`br.metrics - '{std_ttft,std_tpot,std_e2el,std_intvty,std_itl,mean_ttft,mean_tpot,mean_e2el,mean_intvty,mean_itl}'::text[] AS metrics`,
-        resultOrder: sqlPiece`br.snapshot_date, c.id, br.conc`,
+        resultOrder: sqlPiece`sp.snapshot_date, c.id, br.conc, sp.snapshot_workflow_run_id,
+          br.benchmark_type, br.isl, br.osl, br.offload_mode, br.recipe_fingerprint`,
       });
     }
   }
@@ -359,8 +358,9 @@ function queryRecursiveBenchmarks(
  *
  * Selection unit is the LINE, not the point. Normally each line comes entirely from
  * its newest workflow run. Runs explicitly marked append-only are the sole exception:
- * their new points extend the immediately preceding same-image curve, including a
- * consecutive chain of append-only runs back to the nearest full snapshot.
+ * their new points extend the immediately preceding curve while every shared line keeps
+ * its image, including a consecutive chain of append-only runs back to the nearest full
+ * snapshot.
  *
  * The frontend filters by sequence client-side. This eliminates API round-trips when
  * switching sequences — the data is already cached by React Query.
@@ -383,17 +383,16 @@ export async function getLatestBenchmarks(
   if (date) {
     // The latest variant chooses one seed per line under the requested cutoff.
     // Its recursive history remains unrestricted so an append-only seed can
-    // still reach the nearest earlier full same-image snapshot.
+    // still reach the nearest earlier full snapshot.
     const rows = await queryRecursiveBenchmarks(sql, modelKeys, {
       kind: 'latest',
       date,
       exact: exact ?? false,
       asOfRunId: !exact && asOfRunId ? Number(asOfRunId) : undefined,
     });
-    return rows as unknown as BenchmarkRow[];
+    return withStoredPerPoolBasis(rows as unknown as BenchmarkRow[]);
   }
 
-  // No date filter: use materialized view for instant lookups
   const rows = await sql`
     SELECT
       lb.id,
@@ -423,31 +422,32 @@ export async function getLatestBenchmarks(
       lb.recipe_fingerprint,
       lb.metrics,
       lb.workers,
-      -- latest_benchmarks lacks these fields until migration 015 recreates it;
-      -- the jsonb lookup keeps reads safe during that deploy window.
-      to_jsonb(lb) -> 'power_invalid_reasons' AS power_invalid_reasons,
-      to_jsonb(lb) -> 'power_audit' AS power_audit,
+      lb.power_invalid_reasons,
+      lb.power_audit,
       lb.date::text,
       lb.workflow_run_id,
       wr.run_started_at::text,
       CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url,
-      lb.snapshot_date::text AS curve_date,
-      lb.snapshot_workflow_run_id AS curve_workflow_run_id,
+      p.snapshot_date::text AS curve_date,
+      p.snapshot_workflow_run_id AS curve_workflow_run_id,
       snapshot_wr.run_started_at::text AS curve_run_started_at
-    FROM latest_benchmarks lb
+    FROM latest_benchmark_points p
+    JOIN benchmark_results lb ON lb.id = p.id
     JOIN configs c ON c.id = lb.config_id
-    JOIN latest_workflow_runs wr ON wr.id = lb.workflow_run_id
-    JOIN latest_workflow_runs snapshot_wr ON snapshot_wr.id = lb.snapshot_workflow_run_id
-    WHERE c.model = ANY(${modelKeys})
-    ORDER BY lb.config_id, lb.conc, lb.isl, lb.osl, lb.date DESC
+    JOIN workflow_runs wr ON wr.id = lb.workflow_run_id
+    JOIN workflow_runs snapshot_wr ON snapshot_wr.id = p.snapshot_workflow_run_id
+    WHERE p.model = ANY(${modelKeys}) AND c.model = ANY(${modelKeys})
+    ORDER BY lb.config_id, lb.conc, lb.isl, lb.osl, lb.date DESC,
+      lb.benchmark_type, lb.offload_mode, lb.recipe_fingerprint
   `;
-  return rows as unknown as BenchmarkRow[];
+  return withStoredPerPoolBasis(rows as unknown as BenchmarkRow[]);
 }
 
 /**
  * Fetch the curve snapshot represented by one workflow run. Ordinary runs return
  * exactly their own points; append-only runs also include the immediately preceding
- * same-image curve chain. Used by GPU comparison for same-day run snapshots.
+ * curve chain whose shared lines keep their images. Used by GPU comparison for
+ * same-day run snapshots.
  */
 export async function getBenchmarksForRun(
   sql: DbClient,
@@ -459,7 +459,7 @@ export async function getBenchmarksForRun(
     kind: 'run',
     githubRunId: Number(githubRunId),
   });
-  return rows as unknown as BenchmarkRow[];
+  return withStoredPerPoolBasis(rows as unknown as BenchmarkRow[]);
 }
 
 /** Fetch every logical curve snapshot across time for historical views. */
@@ -477,5 +477,5 @@ export async function getAllBenchmarksForHistory(
     osl,
     benchmarkType,
   });
-  return rows as unknown as BenchmarkRow[];
+  return withStoredPerPoolBasis(rows as unknown as BenchmarkRow[]);
 }

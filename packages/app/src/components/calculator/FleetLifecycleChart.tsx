@@ -3,8 +3,8 @@
 import * as d3 from 'd3';
 import React, { useCallback, useMemo, useRef } from 'react';
 
-import { formatLargeNumber } from '@/lib/chart-rendering';
-import { getChartWatermark } from '@/lib/data-mappings';
+import { formatLargeNumber } from '@/lib/charts/chart-rendering';
+import { getChartWatermark } from '@/lib/catalog/data-mappings';
 import type { AnyScale } from '@/lib/d3-chart/chart-update';
 import {
   D3Chart,
@@ -14,8 +14,8 @@ import {
   type RenderContext,
   type ScaleConfig,
 } from '@/lib/d3-chart/D3Chart';
-import { escapeHtml } from '@/lib/utils';
-import { useLocale } from '@/lib/use-locale';
+import { escapeHtml } from '@/lib/shared/utils';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import {
   isBreakEvenAnchored,
@@ -27,17 +27,10 @@ import {
   type LifecycleSeries,
 } from './lifecycle';
 
-// Right margin holds the end-of-line chip labels, which sit outside the plot.
 const CHART_MARGIN = { top: 20, right: 104, bottom: 50, left: 70 };
 
-/** Minimum vertical gap between end-of-line labels, px. */
 const LABEL_MIN_GAP = 13;
 
-/**
- * Half the label's cap height, near enough. Labels are centred on their line's
- * end value, so a series plateauing at the very top of the domain would have
- * half its glyphs above the SVG edge without this inset.
- */
 const LABEL_HALF_HEIGHT = 6;
 
 const DATE_FORMATS = {
@@ -45,17 +38,14 @@ const DATE_FORMATS = {
   zh: { axis: '%Y年%-m月', tooltip: '%Y年%-m月%-d日' },
 } as const;
 
-/** One plotted series: an hwKey's margin staircase since the model shipped. */
 export interface LifecycleChartSeries {
   key: string;
   label: string;
   color: string;
   series: LifecycleSeries;
-  /** Run date, config label and run links for each step riser, keyed by month. */
   stepInfo: Map<number, { date: string; config: string; factor: number; runUrls: string[] }>;
 }
 
-/** A hovered step riser — one measured config improvement. */
 interface StepMarker {
   x: number;
   y: number;
@@ -64,46 +54,21 @@ interface StepMarker {
   month: number;
 }
 
-/**
- * Hover positions the readout can snap to: a uniform grid across the window.
- *
- * The alternative — snapping to the sample points themselves — reads badly here,
- * because sample density varies by two orders of magnitude along a line. Each
- * rollout carries 24 samples over its ramp (a day or two apart) while a plateau
- * carries a single sample spanning months, so the cursor would crawl through a
- * riser and then jump a year. A uniform grid moves at a constant speed, and at
- * this count each slice is well under a pixel wide unzoomed.
- */
 const HOVER_SLICE_COUNT = 1200;
 
-/**
- * How near a slice must be to a step for the readout to include that step's
- * config and run links, in slices.
- *
- * A step's own instant almost never coincides with a grid slice, and at this
- * density a slice is a fraction of a pixel — so matching by equality would make
- * the run links unreachable by pointing at the dot, which is the only place a
- * reader would think to look for them. Four slices is about three pixels
- * unzoomed: near enough to mean "that dot", far enough to be hittable.
- */
 const STEP_MATCH_SLICES = 4;
 
-/** One position on the time axis the readout can rest at. */
 interface HoverSlice {
-  /** Timestamp, ms. */
   x: number;
-  /** Present only on measured-step scatter markers. */
   seriesKey?: string;
 }
 
-/** A measured config change, placed on the time axis. */
 interface StepAt {
   x: number;
   seriesKey: string;
   month: number;
 }
 
-/** One series' state at a hovered slice. */
 interface SliceReading {
   label: string;
   color: string;
@@ -111,13 +76,11 @@ interface SliceReading {
   cumulative: number;
 }
 
-/** Which lifecycle quantity the y axis plots. Defined in `lifecycle.ts`, which selects on it. */
 export type { LifecycleMetric } from './lifecycle';
 
 interface FleetLifecycleChartProps {
   data: LifecycleChartSeries[];
   metric: LifecycleMetric;
-  /** Anchor for the x axis — the model's release date, as a timestamp. */
   anchorMs: number;
   yLabel: string;
   labels: {
@@ -129,22 +92,18 @@ interface FleetLifecycleChartProps {
     revenuePerMw: string;
     cumulativeRevenue: string;
     costPerDay: string;
-    /** Names the running total column, which is cumulative *margin* whatever the y axis plots. */
     cumulative: string;
     sinceFirst: string;
     runLink: string;
   };
   breakEvenLabel: string;
-  /** Localised hint under the chart. */
   instructions: string;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
 }
 
-/** CSS class names derive from series keys, so strip separators as TrendChart does. */
 const safeKey = (key: string) => key.replaceAll(/[|_\s]/gu, '-');
 
-/** Signed money, negative rendered as -$X rather than $-X. */
 const money = (value: number) => `${value < 0 ? '-$' : '$'}${formatLargeNumber(Math.abs(value))}`;
 
 const FleetLifecycleChart = React.memo(
@@ -174,8 +133,6 @@ const FleetLifecycleChart = React.memo(
         const key = safeKey(entry.key);
         lookup.set(key, entry);
         record[key] = entry.series.points.map((p) => ({ x: toMs(p.month), y: valueOf(p) }));
-        // Markers mark measured config changes and nothing else — no rug of
-        // synthetic samples, and every dot is a sweep the user can look up.
         for (const p of entry.series.points) {
           if (!p.isStep) continue;
           flat.push({
@@ -190,7 +147,6 @@ const FleetLifecycleChart = React.memo(
       return { lineDataRecord: record, markers: flat, bySafeKey: lookup };
     }, [data, toMs, valueOf]);
 
-    /** The grid the hover readout snaps to, plus where the steps sit on it. */
     const { hoverSlices, stepsOnAxis, sliceSpacing } = useMemo(() => {
       let min = Infinity;
       let max = -Infinity;
@@ -216,17 +172,6 @@ const FleetLifecycleChart = React.memo(
       return { hoverSlices: slices, stepsOnAxis: steps, sliceSpacing: spacing };
     }, [data, toMs]);
 
-    /**
-     * What the custom layers should draw *now*.
-     *
-     * The zoom behaviour installed by a render captures that render's layer
-     * callbacks, and `d3.zoom`'s double-click reset is a transition — so its
-     * trailing events can fire after a later render has already redrawn. A stale
-     * callback then re-appends what the new render just removed: switch the axis to
-     * revenue mid-reset and the break-even rule comes back and stays, because
-     * nothing renders again afterwards. Reading through a ref keeps every draw,
-     * stale closure or not, consistent with the current props.
-     */
     const latest = useRef({ metric, lineDataRecord, bySafeKey });
     latest.current = { metric, lineDataRecord, bySafeKey };
 
@@ -238,9 +183,6 @@ const FleetLifecycleChart = React.memo(
         max = Math.max(max, toMs(entry.series.endMonth));
       }
       if (!Number.isFinite(min)) return { type: 'time', domain: [new Date(), new Date()] };
-      // nice defaults to true in scale-builders, which rounds a multi-year span
-      // out to whole years and leaves dead space before the release date and
-      // after the horizon. The domain here is meaningful on both ends.
       return { type: 'time', domain: [new Date(min), new Date(max)], nice: false };
     }, [data, toMs]);
 
@@ -254,18 +196,10 @@ const FleetLifecycleChart = React.memo(
           if (value > max) max = value;
         }
       }
-      // Always include zero. For margin that is the whole question — which side of
-      // break-even a fleet is on; for revenue it is the floor a rollout starts from.
       const span = max - min || Math.max(Math.abs(max), 1);
       return { type: 'linear', domain: [min - span * 0.05, max + span * 0.05], nice: true };
     }, [data, valueOf]);
 
-    /**
-     * The break-even rule. No reference-line layer exists to reuse, and a custom
-     * layer must be idempotent: the chart re-renders into the same zoom group, so
-     * appending unconditionally leaves a stale rule behind at the previous
-     * y-scale on every data change.
-     */
     const drawZeroRule = useCallback(
       (
         zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -274,15 +208,9 @@ const FleetLifecycleChart = React.memo(
       ) => {
         const y = yScale(0);
         zoomGroup.selectAll('.lifecycle-zero-rule').remove();
-        // Zero is break-even only for margin. On a revenue axis it is just the
-        // bottom of the scale, and labelling it "break-even" would be a lie: each
-        // chip breaks even at its own cost line, not at zero revenue.
         if (!isBreakEvenAnchored(latest.current.metric)) return;
         if (!Number.isFinite(y)) return;
 
-        // Lowered explicitly: `renderLines` keeps its paths in place across
-        // re-renders via a data join, while this layer removes and re-appends, so
-        // without this the rule climbs above the lines after the first repaint.
         const group = zoomGroup.append('g').attr('class', 'lifecycle-zero-rule').lower();
         group
           .append('line')
@@ -313,8 +241,6 @@ const FleetLifecycleChart = React.memo(
       [drawZeroRule],
     );
 
-    // Without this the rule stays pinned to the base scale while the lines move,
-    // so a zoomed chart shows break-even in the wrong place.
     const zoomZeroRule = useCallback(
       (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>, ctx: RenderContext) =>
         drawZeroRule(
@@ -328,14 +254,6 @@ const FleetLifecycleChart = React.memo(
       [drawZeroRule],
     );
 
-    /**
-     * Chip names at the right end of each line, so a series can be identified
-     * without crossing back to the legend.
-     *
-     * Drawn into `ctx.layout.g` rather than the zoom group: layers render into a
-     * clipped group (`clipContent` defaults to true), and these sit past the plot
-     * width, so they would be clipped away entirely.
-     */
     const drawSeriesLabels = useCallback(
       (
         ctx: RenderContext,
@@ -345,8 +263,6 @@ const FleetLifecycleChart = React.memo(
         const group = ctx.layout.g;
         group.selectAll('.lifecycle-series-label').remove();
 
-        // Where the plot is cut off, in data units. Panning moves it, so the label
-        // must follow the line's *visible* end, not its last data point.
         const edge = Number(xScale.invert(ctx.width));
 
         const { lineDataRecord: lines, bySafeKey: lookup } = latest.current;
@@ -356,14 +272,11 @@ const FleetLifecycleChart = React.memo(
             const last = points.at(-1);
             const first = points[0];
             if (!entry || !last || !first) return [];
-            // Panned entirely past the right edge: there is no line to name.
             if (first.x > edge) return [];
 
             let value = last.y;
             let x = xScale(last.x);
             if (last.x > edge) {
-              // The line runs off the edge. Interpolate the segment that straddles
-              // it, so the label sits level with where the line actually leaves.
               x = ctx.width;
               for (let i = 1; i < points.length; i += 1) {
                 const before = points[i - 1]!;
@@ -378,8 +291,6 @@ const FleetLifecycleChart = React.memo(
 
             const y = yScale(value);
             if (!Number.isFinite(y) || !Number.isFinite(x)) return [];
-            // Zooming the y axis can push the end value outside the visible range;
-            // pin the label to the nearest edge rather than let it escape.
             const top = LABEL_HALF_HEIGHT;
             const bottom = ctx.height - LABEL_HALF_HEIGHT;
             return [
@@ -393,15 +304,12 @@ const FleetLifecycleChart = React.memo(
           })
           .toSorted((a, b) => a.y - b.y);
 
-        // Nudge downwards so near-identical end values stay legible.
         for (let i = 1; i < placed.length; i += 1) {
           const previous = placed[i - 1]!;
           const current = placed[i]!;
           if (current.y - previous.y < LABEL_MIN_GAP) current.y = previous.y + LABEL_MIN_GAP;
         }
 
-        // Nudging only ever pushes down, so the stack can run off the bottom.
-        // Slide the whole block back up by the overflow, keeping the gaps.
         const overflow = (placed.at(-1)?.y ?? 0) - (ctx.height - LABEL_HALF_HEIGHT);
         if (overflow > 0) {
           for (const entry of placed) entry.y = Math.max(entry.y - overflow, LABEL_HALF_HEIGHT);
@@ -460,10 +368,6 @@ const FleetLifecycleChart = React.memo(
           config: {
             getColor: (key: string) => bySafeKey.get(key)?.color ?? '#888',
             strokeWidth: 2,
-            // Every riser is a rollout curve and every plateau is flat, and the
-            // samples already carry that shape — so interpolate linearly and draw
-            // exactly what was computed. A step curve would flatten the rollouts
-            // into stairs; a spline would overshoot on the near-vertical ones.
             curve: d3.curveLinear,
           },
         },
@@ -494,14 +398,6 @@ const FleetLifecycleChart = React.memo(
       ],
     );
 
-    /**
-     * A series' plotted rate and cumulative margin at an arbitrary instant.
-     *
-     * Interpolates linearly between samples, which is exactly what the line does
-     * (`curveLinear`), so the readout always agrees with the pixel under the rule.
-     * Returns null outside the series' own window — a chip first measured a year
-     * after release has no line, and so no number, before then.
-     */
     const readingAt = useCallback(
       (entry: LifecycleChartSeries, month: number): SliceReading | null => {
         const points = entry.series.points;
@@ -515,18 +411,9 @@ const FleetLifecycleChart = React.memo(
 
     const sliceDate = useMemo(() => d3.timeFormat(dateFormats.tooltip), [dateFormats]);
 
-    /**
-     * Was the readout frozen when the current click started?
-     *
-     * Written by a capture-phase listener on the SVG, so it is settled before the
-     * plot overlay's own bubble-phase handler pins the new slice. Reading the
-     * pinned state afterwards would always say "frozen" and the toggle below could
-     * never tell a freeze from a release.
-     */
     const wasFrozen = useRef(false);
 
     const handleRender = useCallback((ctx: RenderContext) => {
-      // Named listener, so re-renders replace it rather than stacking copies.
       ctx.layout.svg.on(
         'click.lifecycle-freeze',
         () => {
@@ -536,17 +423,6 @@ const FleetLifecycleChart = React.memo(
       );
     }, []);
 
-    /**
-     * The hover readout: every visible chip's number at the instant under the
-     * rule, in one popup.
-     *
-     * Per-point tooltips answered "what is this dot?", which is the wrong question
-     * for this chart — the lines are only interesting against each other, and a
-     * reader comparing two chips at one date had to hover twice and hold the first
-     * number in their head. This reads every line at once. Steps keep their
-     * detail: any step nearest this slice contributes its config and, once frozen,
-     * its run links, so the per-rung audit trail survives.
-     */
     const tooltipConfig = useMemo(
       () => ({
         rulerType: 'vertical' as const,
@@ -580,11 +456,6 @@ const FleetLifecycleChart = React.memo(
             )
             .join('');
 
-          // Config detail is frozen-only. On hover the popup is a scanning tool —
-          // one line per chip, the same shape wherever the cursor is — and a step
-          // block appearing under it as the cursor crosses a dot both reflows the
-          // rows and buries the comparison the reader came for. A click says "tell
-          // me about this instant", and that is when the detail belongs.
           const tolerance = sliceSpacing * STEP_MATCH_SLICES;
           const steps = isPinned
             ? stepsOnAxis
@@ -594,11 +465,6 @@ const FleetLifecycleChart = React.memo(
                   const info = entry?.stepInfo.get(step.month);
                   if (!entry || !info) return [];
                   const factor = info.factor > 1.005 ? ` (${info.factor.toFixed(2)}x)` : '';
-                  // Every rung links its run, not just the first and last. The
-                  // table only links the opening and closing sweeps, so without
-                  // this the intermediate rungs — exactly where an anomalous run
-                  // that was never purged would sit — have no audit trail
-                  // anywhere in the UI.
                   const links = info.runUrls
                     .map(
                       (url, i) =>
@@ -633,9 +499,6 @@ const FleetLifecycleChart = React.memo(
         },
         getRulerX: (d: HoverSlice, xScale: any) => xScale(d.x),
         onPointClick: () => {
-          // The overlay pins on every click, so a second click would just re-pin.
-          // `wasFrozen` is read in the capture phase, before that pin lands, which
-          // makes the same gesture a toggle: click to freeze, click to release.
           if (!wasFrozen.current) return;
           chartRef.current?.dismissTooltip();
           chartRef.current?.hideTooltip();
@@ -652,9 +515,6 @@ const FleetLifecycleChart = React.memo(
           ? {
               tickValues: (scale: AnyScale) => {
                 const timeScale = scale as d3.ScaleTime<number, number>;
-                // Chinese year/month labels need more room on narrow plots.
-                // Keep the same calendar candidates as English, then thin them
-                // by their positions on the current (possibly zoomed) scale.
                 const ticks = timeScale.ticks(8);
                 let previousX = -Infinity;
                 return ticks.filter((tick) => {
@@ -679,8 +539,6 @@ const FleetLifecycleChart = React.memo(
       [yLabel],
     );
 
-    // x only: the y axis is a money scale whose zero line is the whole point, and
-    // rescaling it would move break-even under the reader. Matches TrendChart.
     const zoomConfig = useMemo(
       () => ({ enabled: true, axes: 'x' as const, scaleExtent: [1, 10] as [number, number] }),
       [],

@@ -1,13 +1,8 @@
 'use client';
 
-import { useLocale } from '@/lib/use-locale';
-import { cn } from '@/lib/utils';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 
-/**
- * Superscript marker appended to ATOM-family framework labels (e.g. "ATOM¹",
- * "Mooncake ATOMesh¹"). Consumers detect it in a display label to decide
- * whether the footnote below applies to the chart.
- */
 export const ATOM_FOOTNOTE_MARKER = '¹';
 
 const STRINGS = {
@@ -20,11 +15,6 @@ const STRINGS = {
   },
 } as const;
 
-/**
- * Footnote explaining the ¹ marker on ATOM-family series labels. Rendered in
- * the evaluation chart legend and in the inference chart's axis-metric info
- * footer, so the copy lives in one place.
- */
 export function AtomEngineFootnote({ className }: { className?: string }) {
   const locale = useLocale();
   return (

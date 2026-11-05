@@ -27,7 +27,6 @@ function stubRect(element: Element, left: number, top: number, size = 12): void 
     }) as DOMRect;
 }
 
-/** A point the resolver can find, mid-viewport so it passes the on-screen check. */
 function addPoint(parent: ParentNode = document.body): HTMLElement {
   const point = document.createElement('div');
   point.className = 'dot-group';
@@ -65,11 +64,6 @@ function pressEscape() {
 
 const isVisible = () => container.querySelector('[data-testid="coach-mark-target"]') !== null;
 
-/**
- * Let the component notice a DOM change on its own: the MutationObserver
- * callback is a microtask, and the reposition it schedules runs on the next
- * animation frame.
- */
 async function flushReposition() {
   await act(async () => {
     await Promise.resolve();
@@ -125,8 +119,6 @@ describe('CoachMark input handling', () => {
 
   describe('when no anchor resolves (scrolled away, or every point filtered out)', () => {
     beforeEach(() => {
-      // The card stays mounted so it can be measured and can re-appear, but
-      // nothing is drawn — the user has never seen this tip.
       renderCoachMark({ resolve: () => null, actionSelector: ACTION_SELECTOR });
     });
 
@@ -138,9 +130,6 @@ describe('CoachMark input handling', () => {
     });
 
     it('ignores Escape rather than burning the permanent dismissal', () => {
-      // Escape is a global key: the user is closing some other UI entirely.
-      // Acting on it here would permanently dismiss a tip never shown, and it
-      // would not come back on scroll.
       pressEscape();
       expect(onDismiss).not.toHaveBeenCalled();
     });
@@ -162,8 +151,6 @@ describe('CoachMark input handling', () => {
     pressEscape();
     expect(onDismiss).not.toHaveBeenCalled();
 
-    // The point appears — as it does when the chart is scrolled into view.
-    // No re-render: the component's own MutationObserver has to notice.
     point = addPoint();
     await flushReposition();
     expect(isVisible()).toBe(true);

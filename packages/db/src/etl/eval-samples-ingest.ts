@@ -1,26 +1,10 @@
-/**
- * Bulk DB insert for `eval_samples`.
- * Idempotent on (eval_result_id, doc_id) — re-running the same artifact is a no-op.
- */
-
 import type postgres from 'postgres';
 import type { EvalSampleParams } from './eval-samples-mapper';
 
 type Sql = ReturnType<typeof postgres>;
 
-/** Conservative chunk size — each row carries ~5 jsonb/text params, well under PG's 65k param ceiling. */
 const CHUNK_SIZE = 500;
 
-/**
- * Bulk-insert sample rows for a single eval_results row.
- *
- * Uses `unnest` over parallel arrays (same pattern as `bulkIngestBenchmarkRows`)
- * with `ON CONFLICT (eval_result_id, doc_id) DO NOTHING` so that re-runs are
- * cheap and metric/text drift doesn't silently overwrite the originally
- * ingested sample (we don't have a "winner" rule for duplicates).
- *
- * @returns Number of rows actually inserted (excludes conflicts).
- */
 export async function bulkIngestEvalSamples(
   sql: Sql,
   evalResultId: number,
@@ -28,7 +12,6 @@ export async function bulkIngestEvalSamples(
 ): Promise<{ newCount: number }> {
   if (samples.length === 0) return { newCount: 0 };
 
-  // Dedupe within the batch on doc_id to avoid ON CONFLICT collisions in one statement.
   const seen = new Map<number, EvalSampleParams>();
   for (const s of samples) seen.set(s.docId, s);
   const deduped = [...seen.values()];

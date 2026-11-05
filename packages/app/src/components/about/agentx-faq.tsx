@@ -2,6 +2,8 @@ import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
 import { CopyableCodeBlock } from '@/components/ui/copyable-code-block';
+import { AgentXQuickstartCallout } from '@/components/datasets/agentx-quickstart';
+import { AGENTX_QUICKSTART, AGENTX_ROUTING } from '@/lib/agentx/quickstart';
 
 type Locale = 'en' | 'zh';
 
@@ -70,19 +72,6 @@ const CONTENT: Record<
         code: undefined,
       },
       {
-        title: 'What is the minimal command?',
-        paragraphs: [
-          'Replace the URL, model, corpus, and concurrency with values for your deployment. AIPerf fills in the scenario defaults and writes results under ./artifacts/. Pin --random-seed for exact replay sampling and reconstructed-dataset cache reuse. Add --tokenizer when the served model name is not a resolvable Hugging Face tokenizer.',
-        ],
-        code: `aiperf profile \\
-  --scenario inferencex-agentx-mvp \\
-  --url http://localhost:8000 \\
-  --model YOUR_MODEL \\
-  --endpoint-type chat \\
-  --public-dataset semianalysis_cc_traces_weka_062126 \\
-  --concurrency 256`,
-      },
-      {
         title: 'Why does AgentX use streaming chat completions?',
         paragraphs: [
           'The recorded workload is represented as multi-turn message arrays, which map naturally to an OpenAI-compatible chat-completions endpoint. Streaming exposes first-token and token-to-token timing; a non-streaming response cannot provide those core latency measurements.',
@@ -128,7 +117,9 @@ export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
       },
       {
         title: 'How should multi-replica routing work?',
+        code: AGENTX_ROUTING,
         paragraphs: [
+          AGENTX_QUICKSTART.en.routingHelp,
           "Conversation-aware routing is essential when a router fronts several replicas. If turns from one conversation land on different workers, prefix-cache reuse collapses and the benchmark measures routing scatter rather than the serving stack's cache capability.",
           'AIPerf assigns a stable correlation ID to each conversation; subagents receive their own stable IDs. These controls are not scenario-locked because they change request placement rather than request content.',
         ],
@@ -197,25 +188,12 @@ export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
         bullets: [
           '开启 streaming，以便测量首 token 延迟（TTFT）和 token 间延迟（ITL）。',
           'ignore_eos:true 要求服务器生成指定长度的输出，而不是提前停止。',
-          '保留原始轮次间延迟；仅将整个系统的全局空闲时间限制在 10 秒以内。',
+          '保留原始轮次间延迟；仅将全局空闲时间限制在 10 秒以内。',
           'first_turn_prefix cache busting 为每次回放的会话加入唯一首轮标记，避免虚假的跨会话 cache hit，同时保留会话内部的 cache 复用。',
           '有效测试至少运行 900 秒，默认运行 1,800 秒。',
           '正式测量前通过 warmup 建立深层 prefix。',
           '每次运行都会使用 seed，并将其记录在产物中。',
         ],
-      },
-      {
-        title: '最简运行命令是什么？',
-        paragraphs: [
-          '请根据部署情况替换 URL、模型、语料和 --concurrency 的值。AIPerf 会补齐场景默认值，并将结果写入 ./artifacts/。固定 --random-seed 可精确复现采样并复用重建后的数据集 cache；当模型名称无法解析为 Hugging Face tokenizer 时，请额外传入 --tokenizer。',
-        ],
-        code: `aiperf profile \\
-  --scenario inferencex-agentx-mvp \\
-  --url http://localhost:8000 \\
-  --model YOUR_MODEL \\
-  --endpoint-type chat \\
-  --public-dataset semianalysis_cc_traces_weka_062126 \\
-  --concurrency 256`,
       },
       {
         title: '为什么 AgentX 使用 streaming chat completions？',
@@ -250,7 +228,7 @@ export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
       {
         title: '如何确认负载生成器（load generator）不是瓶颈？',
         paragraphs: [
-          'AIPerf 会将工作分配到多个 worker 进程，并每两秒上报 worker 健康状态。应将高 CPU 警告视为客户端饱和信号；在信任结果前，需要增加客户端 CPU 核心数或负载生成器主机。',
+          'AIPerf 会将工作分配到多个 worker 进程，并每两秒上报 worker 健康状态。应将高 CPU 警告视为客户端饱和信号；在信任结果前，需要增加客户端 CPU 核心数，或再加一台负载生成器主机。',
           '--show-trace-timing 可以区分等待连接池中空闲连接的时间与等待服务器返回首字节的时间。worker 的 CPU 使用率正常且连接池阻塞很少，才有充分依据认为瓶颈位于服务器端。',
         ],
       },
@@ -263,7 +241,9 @@ export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
       },
       {
         title: '多副本应如何路由？',
+        code: AGENTX_ROUTING,
         paragraphs: [
+          AGENTX_QUICKSTART.zh.routingHelp,
           '当路由器连接多个副本时，必须使用会话感知路由。如果同一会话的各轮落在不同 worker 上，prefix cache 复用会大幅下降，基准测试最终衡量的是路由分散程度，而不是服务栈的 cache 能力。',
           'AIPerf 会为每个会话分配稳定的 correlation ID；子智能体则拥有各自的稳定 ID。这些配置改变请求落点而非请求内容，因此不会被场景锁定。',
         ],
@@ -316,6 +296,10 @@ export function AgentXFaq({ locale }: { locale: Locale }) {
             {paragraph}
           </p>
         ))}
+
+        <div className="mt-6">
+          <AgentXQuickstartCallout locale={locale} />
+        </div>
 
         <div className="mt-6 divide-y divide-border/60">
           {content.sections.map((section) => (

@@ -5,21 +5,19 @@ import { useEffect, useMemo } from 'react';
 
 import type { GPUDataPoint } from '@/components/calculator/types';
 import { useThroughputData } from '@/components/calculator/useThroughputData';
-import {
-  CompareTableRenderer,
-  type CompareTableData,
-} from '@/components/compare/compare-table-renderer';
+import { CompareTableRenderer } from '@/components/compare/compare-table-renderer';
+import { LazyCompareInferenceChart } from '@/components/compare/lazy-compare-inference-chart';
 import {
   GlobalFilterProvider,
+  useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
-} from '@/components/GlobalFilterContext';
-import { InferenceProvider } from '@/components/inference/InferenceContext';
-import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
+} from '@/providers/GlobalFilterContext';
 import { Card } from '@/components/ui/card';
-import { track } from '@/lib/analytics';
-import { toModel, toSequence } from '@/lib/compare-enum-coerce';
-import type { AgenticScenarioIntro } from '@/lib/compare-ssr';
+import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
+import { toModel, toSequence } from '@/lib/compare/compare-enum-coerce';
+import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
+import type { CompareTableData } from '@/lib/compare/compare-table-view';
 
 const STRINGS = {
   en: {
@@ -54,8 +52,6 @@ interface ComparePrecisionPageClientProps {
   precB: string;
   ssrTableData: CompareTableData;
   narrative: string[];
-  /** Set only when the page is rendering the agentic workload. Explains
-   *  what AgentX measures before the head-to-head numbers. */
   agenticIntro?: AgenticScenarioIntro | null;
   gpuLabel: string;
   gpuVendor: string;
@@ -86,18 +82,15 @@ export default function ComparePrecisionPageClient({
   locale = 'en',
 }: ComparePrecisionPageClientProps) {
   useEffect(() => {
-    track('compare_precision_page_view', {
+    trackOncePerPageview(
+      'compare_precision_page_view',
+      { slug, gpu, model: defaultModel, precisions: [precA, precB] },
       slug,
-      gpu,
-      prec_a: precA,
-      prec_b: precB,
-    });
-  }, [slug, gpu, precA, precB]);
+    );
+  }, [slug, gpu, defaultModel, precA, precB]);
 
   const initialModel = toModel(defaultModel);
   const initialSequence = toSequence(defaultSequence);
-  // Seed GlobalFilterProvider with both precisions so the chart renders data
-  // for both quantization levels on load.
   const initialPrecisions = useMemo(() => [precA, precB], [precA, precB]);
   const t = STRINGS[locale];
   const isZh = locale === 'zh';
@@ -108,131 +101,132 @@ export default function ComparePrecisionPageClient({
       initialSequence={initialSequence}
       initialPrecisions={initialPrecisions}
     >
-      <InferenceProvider activeTab="compare" initialActiveHwTypes={[gpu]}>
-        <div className="flex flex-col gap-4">
-          <Card className="flex w-full min-w-0 flex-col gap-3">
-            <header>
-              <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                {modelLabel} · {gpuLabel} · {t.eyebrowSuffix}
-              </div>
-              <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">
-                {isZh
-                  ? `${gpuLabel}：${aLabel} 与 ${bLabel} ${t.h1Prefix}`
-                  : `${gpuLabel}: ${aLabel} vs ${bLabel} ${t.h1Prefix}`}
-              </h1>
-              {isZh ? (
-                <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
-                  在 <strong>{gpuLabel}</strong>（{gpuVendor} {gpuArch}）上，比较{' '}
-                  <strong>{aLabel}</strong> 与 <strong>{bLabel}</strong> 两种量化精度对{' '}
-                  <strong>{modelLabel}</strong> 推理的影响，涵盖不同 LLM
-                  工作负载下的吞吐量、延迟和成本。可通过下方图表控件切换序列长度和指标，操作方式与
-                  <Link href="/zh" className="underline hover:text-primary">
-                    {t.mainChartLinkText}
-                  </Link>
-                  相同。
-                </p>
-              ) : (
-                <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
-                  How <strong>{aLabel}</strong> and <strong>{bLabel}</strong> precision affect{' '}
-                  <strong>{modelLabel}</strong> inference on <strong>{gpuLabel}</strong> (
-                  {gpuVendor} {gpuArch}). Throughput, latency, and cost across LLM workloads. Use
-                  the chart controls below to switch sequences and metrics — same interactions as{' '}
-                  <Link href="/" className="underline hover:text-primary">
-                    {t.mainChartLinkText}
-                  </Link>
-                  .
-                </p>
-              )}
-              {agenticIntro && (
-                <p
-                  className="mt-3 max-w-3xl text-sm text-foreground/80"
-                  data-testid="compare-agentic-intro"
-                >
-                  {agenticIntro.paragraph}{' '}
-                  <Link
-                    href={agenticIntro.href}
-                    data-testid="compare-agentic-intro-link"
-                    className="font-medium text-brand underline underline-offset-4 hover:no-underline"
-                  >
-                    {agenticIntro.linkLabel} →
-                  </Link>
-                </p>
-              )}
-              {narrative.length > 0 && (
-                <div
-                  className="mt-3 flex flex-col gap-2 max-w-3xl"
-                  data-testid="compare-precision-narrative"
-                >
-                  {narrative.map((para, i) => (
-                    <p key={i} className="text-sm text-foreground/80">
-                      {para}
-                      {i === narrative.length - 1 && (
-                        <>
-                          {' '}
-                          <span className="text-muted-foreground italic">
-                            {isZh
-                              ? `（以上数据基于此 URL 对应的默认 ${defaultSequence ?? t.caveatSeqFallback} 配置；在控件中切换序列长度或模型后，下方表格和图表会同步更新。两侧均采用各自精度下可用的最优推理配置；只有存在相应测试配置时，才可能纳入 MTP 等投机解码方法。该口径与其他对比页面一致。）`
-                              : `(Numbers reflect the default ${defaultSequence ?? t.caveatSeqFallback} selection for this URL — table and chart below update if you change sequence or model in the controls. Each side uses the best available serving configuration for that precision, which may include speculative decoding such as MTP where recipes exist — the same convention as the other comparison pages.)`}
-                          </span>
-                        </>
-                      )}
-                    </p>
-                  ))}
-                </div>
-              )}
-              <div className="mt-2 flex flex-wrap gap-4 text-sm">
-                <Link
-                  href={isZh ? '/zh/compare-precision' : '/compare-precision'}
-                  className="underline hover:text-primary text-muted-foreground"
-                  onClick={() => track('compare_precision_cross_link_index', { slug })}
-                >
-                  {t.allComparisonsLinkText}
+      <div className="flex flex-col gap-4">
+        <Card className="flex w-full min-w-0 flex-col gap-3">
+          <header>
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">
+              {modelLabel} · {gpuLabel} · {t.eyebrowSuffix}
+            </div>
+            <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">
+              {isZh
+                ? `${gpuLabel}：${aLabel} 与 ${bLabel} ${t.h1Prefix}`
+                : `${gpuLabel}: ${aLabel} vs ${bLabel} ${t.h1Prefix}`}
+            </h1>
+            {isZh ? (
+              <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
+                在 <strong>{gpuLabel}</strong>（{gpuVendor} {gpuArch}）上，比较{' '}
+                <strong>{aLabel}</strong> 与 <strong>{bLabel}</strong> 两种量化精度对{' '}
+                <strong>{modelLabel}</strong> 推理的影响，涵盖不同 LLM
+                工作负载下的吞吐量、延迟和成本。可通过下方图表控件切换序列长度和指标，操作方式与
+                <Link href="/zh" className="underline hover:text-primary">
+                  {t.mainChartLinkText}
                 </Link>
-                <Link
-                  href={isZh ? '/zh' : '/'}
-                  className="underline hover:text-primary text-muted-foreground"
-                  onClick={() => track('compare_precision_cross_link_dashboard', { slug })}
-                >
-                  {t.dashboardLinkText}
+                相同。
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
+                How <strong>{aLabel}</strong> and <strong>{bLabel}</strong> precision affect{' '}
+                <strong>{modelLabel}</strong> inference on <strong>{gpuLabel}</strong> ({gpuVendor}{' '}
+                {gpuArch}). Throughput, latency, and cost across LLM workloads. Use the chart
+                controls below to switch sequences and metrics — same interactions as{' '}
+                <Link href="/" className="underline hover:text-primary">
+                  {t.mainChartLinkText}
                 </Link>
+                .
+              </p>
+            )}
+            {agenticIntro && (
+              <p
+                className="mt-3 max-w-3xl text-sm text-foreground/80"
+                data-testid="compare-agentic-intro"
+              >
+                {agenticIntro.paragraph}{' '}
+                <Link
+                  href={agenticIntro.href}
+                  data-testid="compare-agentic-intro-link"
+                  className="font-medium text-brand underline underline-offset-4 hover:no-underline"
+                >
+                  {agenticIntro.linkLabel} →
+                </Link>
+              </p>
+            )}
+            {narrative.length > 0 && (
+              <div
+                className="mt-3 flex flex-col gap-2 max-w-3xl"
+                data-testid="compare-precision-narrative"
+              >
+                {narrative.map((para, i) => (
+                  <p key={i} className="text-sm text-foreground/80">
+                    {para}
+                    {i === narrative.length - 1 && (
+                      <>
+                        {' '}
+                        <span className="text-muted-foreground italic">
+                          {isZh
+                            ? `（以上数据基于此 URL 对应的默认 ${defaultSequence ?? t.caveatSeqFallback} 配置；在控件中切换序列长度或模型后，下方表格和图表会同步更新。两侧均采用各自精度下可用的最优推理配置；只有存在相应测试配置时，才可能纳入 MTP 等投机解码方法。该口径与其他对比页面一致。）`
+                            : `(Numbers reflect the default ${defaultSequence ?? t.caveatSeqFallback} selection for this URL — table and chart below update if you change sequence or model in the controls. Each side uses the best available serving configuration for that precision, which may include speculative decoding such as MTP where recipes exist — the same convention as the other comparison pages.)`}
+                        </span>
+                      </>
+                    )}
+                  </p>
+                ))}
               </div>
-            </header>
-            <figure
-              className="mt-2 flex flex-col gap-2"
-              data-testid="compare-precision-indexed-image"
-            >
-              <img
-                src={heroImageSrc}
-                alt={
-                  isZh
-                    ? `${modelLabel}：${gpuLabel} 上 ${aLabel} 与 ${bLabel} 在相同交互性水平下的吞吐量与成本`
-                    : `${modelLabel}: ${aLabel} versus ${bLabel} throughput and cost at matched interactivity levels on ${gpuLabel}`
-                }
-                width={1200}
-                height={675}
-                loading="eager"
-                fetchPriority="high"
-                className="w-full rounded-lg border border-border/50"
-              />
-              <figcaption className="text-xs text-muted-foreground">
-                {isZh
-                  ? `${gpuLabel} 上 ${aLabel} 与 ${bLabel} 在此对比默认工作负载下的吞吐量与每百万 token 成本。`
-                  : `${aLabel} versus ${bLabel} throughput and cost per million tokens on ${gpuLabel} for this comparison's canonical default workload.`}
-              </figcaption>
-            </figure>
-            <CompareTableSection
-              gpu={gpu}
-              precA={precA}
-              precB={precB}
-              aLabel={aLabel}
-              bLabel={bLabel}
-              ssrTableData={ssrTableData}
-              emptyStateText={t.emptyState}
+            )}
+            <div className="mt-2 flex flex-wrap gap-4 text-sm">
+              <Link
+                href={isZh ? '/zh/compare-precision' : '/compare-precision'}
+                className="underline hover:text-primary text-muted-foreground"
+                onClick={() => track('compare_precision_cross_link_index', { slug })}
+              >
+                {t.allComparisonsLinkText}
+              </Link>
+              <Link
+                href={isZh ? '/zh' : '/'}
+                className="underline hover:text-primary text-muted-foreground"
+                onClick={() => track('compare_precision_cross_link_dashboard', { slug })}
+              >
+                {t.dashboardLinkText}
+              </Link>
+            </div>
+          </header>
+          <figure
+            className="mt-2 flex flex-col gap-2"
+            data-testid="compare-precision-indexed-image"
+          >
+            <img
+              src={heroImageSrc}
+              alt={
+                isZh
+                  ? `${modelLabel}：${gpuLabel} 上 ${aLabel} 与 ${bLabel} 在相同交互性水平下的吞吐量与成本`
+                  : `${modelLabel}: ${aLabel} versus ${bLabel} throughput and cost at matched interactivity levels on ${gpuLabel}`
+              }
+              width={1200}
+              height={675}
+              loading="eager"
+              fetchPriority="high"
+              className="w-full rounded-lg border border-border/50"
             />
-          </Card>
-          <InferenceChartDisplay />
-        </div>
-      </InferenceProvider>
+            <figcaption className="text-xs text-muted-foreground">
+              {isZh
+                ? `${gpuLabel} 上 ${aLabel} 与 ${bLabel} 在此对比默认工作负载下的吞吐量与每百万 token 成本。`
+                : `${aLabel} versus ${bLabel} throughput and cost per million tokens on ${gpuLabel} for this comparison's canonical default workload.`}
+            </figcaption>
+          </figure>
+          <CompareTableSection
+            gpu={gpu}
+            precA={precA}
+            precB={precB}
+            aLabel={aLabel}
+            bLabel={bLabel}
+            ssrTableData={ssrTableData}
+            ssrSequence={defaultSequence}
+            ssrModel={initialModel}
+            ssrPrecisions={initialPrecisions}
+            emptyStateText={t.emptyState}
+          />
+        </Card>
+        <LazyCompareInferenceChart activeTab="compare" initialActiveHwTypes={[gpu]} />
+      </div>
     </GlobalFilterProvider>
   );
 }
@@ -244,6 +238,9 @@ function CompareTableSection({
   aLabel,
   bLabel,
   ssrTableData,
+  ssrSequence,
+  ssrModel,
+  ssrPrecisions,
   emptyStateText,
 }: {
   gpu: string;
@@ -252,25 +249,33 @@ function CompareTableSection({
   aLabel: string;
   bLabel: string;
   ssrTableData: CompareTableData;
+  ssrSequence: string | null;
+  ssrModel: ReturnType<typeof toModel>;
+  ssrPrecisions: string[];
   emptyStateText: string;
 }) {
-  const { effectiveSequence, effectivePrecisions, selectedModel } = useGlobalFilterSelection();
+  const {
+    selectedSequence,
+    effectiveSequence,
+    effectivePrecisions,
+    selectedModel,
+    selectedPrecisions,
+    sequenceResolved,
+  } = useGlobalFilterSelection();
   const { selectedRunDate } = useGlobalFilterRun();
+  const { availableDates } = useGlobalFilterAvailability();
 
-  const { gpuDataByGroupKey, ranges, hasData } = useThroughputData(
+  const { gpuDataByGroupKey, ranges, hasData, loading, error } = useThroughputData(
     selectedModel,
     effectiveSequence,
     effectivePrecisions,
     selectedRunDate,
   );
 
-  // Partition client-side points by precision. Both sides share the same GPU,
-  // so we match on the GPUDataPoint.precision field rather than hw key prefix.
   const { pointsA, pointsB } = useMemo(() => {
     const pA: GPUDataPoint[] = [];
     const pB: GPUDataPoint[] = [];
     for (const [groupKey, points] of Object.entries(gpuDataByGroupKey)) {
-      // Only consider groups matching this GPU.
       const hwKey = groupKey.split('__')[0];
       if (hwKey !== gpu && !hwKey.startsWith(`${gpu}_`)) continue;
       for (const point of points) {
@@ -281,16 +286,26 @@ function CompareTableSection({
     return { pointsA: pA, pointsB: pB };
   }, [gpuDataByGroupKey, gpu, precA, precB]);
 
-  const clientRange = hasData ? ranges.interactivity : ssrTableData.interactivityRange;
-
   return (
     <CompareTableRenderer
       aLabel={aLabel}
       bLabel={bLabel}
       ssrTableData={ssrTableData}
-      interactivityRange={clientRange}
-      gpuDataPointsA={pointsA}
-      gpuDataPointsB={pointsB}
+      ssrSequence={ssrSequence}
+      ssrModel={ssrModel}
+      ssrPrecisions={ssrPrecisions}
+      selectedSequence={selectedSequence}
+      effectiveSequence={effectiveSequence}
+      sequenceResolved={sequenceResolved}
+      selectedModel={selectedModel}
+      selectedPrecisions={selectedPrecisions}
+      effectivePrecisions={effectivePrecisions}
+      latestRun={!selectedRunDate || selectedRunDate === availableDates.at(-1)}
+      pointsA={pointsA}
+      pointsB={pointsB}
+      clientInteractivityRange={hasData ? ranges.interactivity : null}
+      loading={loading}
+      error={error}
       emptyStateText={emptyStateText}
     />
   );

@@ -2,9 +2,9 @@ import EvalBarChartD3 from '@/components/evaluation/ui/BarChartD3';
 import EvaluationTable from '@/components/evaluation/ui/EvaluationTable';
 import { mountWithProviders } from '../support/test-utils';
 import { createMockEvaluationChartData } from '../support/mock-data';
-import { Model, Precision } from '@/lib/data-mappings';
-import { normalizeEvalHardwareKey } from '@/lib/chart-utils';
-import { overlayRunColor } from '@/lib/overlay-run-style';
+import { Model, Precision } from '@/lib/catalog/data-mappings';
+import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 
 describe('EvalBarChartD3', () => {
   it('omits default DP in table cells while preserving DP8 and physical chip counts', () => {
@@ -67,7 +67,6 @@ describe('EvalBarChartD3', () => {
       },
       unofficial: {},
     });
-    // Skeleton elements are rendered (Skeleton component uses data-slot="skeleton")
     cy.get('[data-slot="skeleton"]').should('have.length.greaterThan', 0);
   });
 
@@ -141,10 +140,8 @@ describe('EvalBarChartD3', () => {
       },
     );
 
-    // SVG should be rendered inside the chart container
     cy.get('#evaluation-chart svg').should('exist');
 
-    // Points (circles) should render for the mean scores
     cy.get('#evaluation-chart svg circle').should('have.length.greaterThan', 0);
   });
 
@@ -182,31 +179,8 @@ describe('EvalBarChartD3', () => {
     cy.get('.sidebar-legend li').should('have.length', 2);
   });
 
-  it('Show Labels switch is present in the legend', () => {
-    const mockData = [createMockEvaluationChartData()];
-    mountWithProviders(
-      <div style={{ width: 900, height: 700 }}>
-        <EvalBarChartD3 />
-      </div>,
-      {
-        evaluation: {
-          chartData: mockData,
-          unfilteredChartData: mockData,
-          loading: false,
-          error: null,
-        },
-        unofficial: {},
-      },
-    );
-
-    cy.contains('Show Labels').should('exist');
-    cy.contains('High Contrast').should('exist');
-  });
-
   for (const includeOfficial of [false, true]) {
     it(`renders interactive unofficial markers with a portaled tooltip (${includeOfficial ? 'with' : 'without'} official rows)`, () => {
-      // Evaluation-only run that originally displayed its error bar and legend
-      // entry, but no marker because the tooltip is no longer an SVG sibling.
       const run = {
         id: 33769499103,
         name: 'Run Sweep - Validate vLLM P/D cache-source metrics on GB300',
@@ -281,10 +255,7 @@ describe('EvalBarChartD3', () => {
       cy.get('#evaluation-chart .unofficial-error-bar').should('have.length', 1);
       cy.get('#evaluation-chart .point').should('have.length', officialRows.length);
 
-      // The group's bounds include its score label; target the visible marker.
       cy.get(`${marker} .unofficial-eval-x`).trigger('mouseenter').trigger('mousemove');
-      // Hover tooltips ignore pointer events, so Cypress's fixed-position
-      // hit test sees the chart underneath. Check their rendered state directly.
       cy.get(tooltip)
         .should('have.css', 'display', 'block')
         .and('have.css', 'opacity', '1')

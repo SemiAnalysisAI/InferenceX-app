@@ -11,10 +11,6 @@ interface Executed {
   params?: unknown[];
 }
 
-/**
- * Minimal stand-in for the postgres.js client surface runMigrations uses:
- * tagged-template select on schema_migrations + begin(tx.unsafe).
- */
 function fakeSql(applied: string[]) {
   const executed: Executed[] = [];
   const sql = (strings: TemplateStringsArray) => {

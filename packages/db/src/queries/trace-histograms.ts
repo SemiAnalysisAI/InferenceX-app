@@ -1,10 +1,15 @@
 /**
- * Fetch per-request ISL/OSL arrays from stored aiperf `profile_export.jsonl`
- * blobs (gzipped in `agentic_trace_replay.profile_export_jsonl_gz`). Caller
- * passes the set of `benchmark_results.id`s it wants and receives one entry
- * per id that actually has a trace_replay blob (others are silently skipped).
+ * Per-request ISL/OSL arrays for a set of agentic benchmark points. Caller
+ * passes the `benchmark_results.id`s it wants and receives one entry per id
+ * whose stored request timeline or raw aiperf `profile_export.jsonl` blob
+ * could be read (others are silently skipped).
  *
- * The JSONL has one JSON object per request with the shape:
+ * Precomputed request-chart columns (`request_chart_data_gz`) supply the
+ * arrays when current; only their ISL and OSL columns are decoded. Otherwise
+ * current request timelines do: gzip timelines (`request_timeline_gz`) are
+ * decoded in Node, and legacy JSONB timelines are unnested in SQL. Points
+ * without a current timeline fall back to the gzipped profile blob, whose
+ * JSONL has one JSON object per request with the shape:
  *   { metrics: { input_sequence_length: { value, unit }, output_sequence_length: {...}, ... } }
  *
  * Returns raw arrays rather than pre-binned histograms — payload stays tiny
@@ -12,11 +17,19 @@
  * however it wants.
  */
 
-import { gunzipSync } from 'node:zlib';
+import { readTraceProfileLines } from '../lib/trace-profile-storage';
 
 import { REQUEST_TIMELINE_VERSION } from '../etl/compute-request-timeline';
+import { decodeRequestChartSequenceLengths } from '../etl/request-chart-columns';
+import { scanRequestTimelineGz } from '../etl/request-timeline-codec';
 
 import type { DbClient } from '../connection.js';
+import {
+  REQUEST_CHART_DATA_VERSION,
+  logRequestChartColumnsReadFailure,
+  readRequestChartColumns,
+} from './request-chart-data';
+import { logRequestTimelineReadFailure, readRequestTimelineGz } from './request-timeline';
 
 export interface TraceHistogramPoint {
   /** benchmark_results.id this entry belongs to. */
@@ -30,21 +43,27 @@ export interface TraceHistogramPoint {
 export type TraceHistogramMap = Record<number, TraceHistogramPoint>;
 
 const QUERY_CHUNK_SIZE = 12;
-// Bytea values expand in Neon's JSON-over-HTTP response. Keep raw fallback
-// reads comfortably below its 64 MiB response cap; current ingests should use
-// request_timeline instead and never need this path.
-const MAX_FALLBACK_BLOB_BYTES = 24 * 1024 * 1024;
+const INLINE_COLUMNS_BYTES = 1024 * 1024;
+const POINTS_IN_FLIGHT = 4;
+/** The only request fields a histogram needs from a scanned gzip timeline. */
+const SEQUENCE_LENGTH_FIELDS: ReadonlySet<string> = new Set(['isl', 'osl']);
 
 interface TimelineRow {
   benchmark_result_id: number;
   trace_replay_id: number;
+  columns_bytes: number | null;
+  columns_inline: string | null;
+  /** octet_length(request_timeline_gz); null when the row has no gzip timeline. */
+  gz_bytes: number | null;
   /** Version of the stored timeline, read WITHOUT shipping the document. */
   timeline_version: number | null;
-  /** ISL per completed request, unnested server-side (see the query below). */
+  /** Legacy JSONB only: ISL per completed request, unnested server-side. */
   isl: (number | null)[] | null;
   osl: (number | null)[] | null;
   has_blob: boolean;
 }
+
+type SequenceLengths = Omit<TraceHistogramPoint, 'id'>;
 
 /** Postgres hands back `number[]`; drop anything non-finite defensively. */
 function finiteNumbers(values: (number | null)[] | null): number[] {
@@ -56,14 +75,85 @@ function finiteNumbers(values: (number | null)[] | null): number[] {
   return out;
 }
 
+async function scanTimelineSequenceLengths(
+  sql: DbClient,
+  row: TimelineRow,
+): Promise<SequenceLengths | null> {
+  const isl: number[] = [];
+  const osl: number[] = [];
+  try {
+    const gz = await readRequestTimelineGz(sql, row.trace_replay_id, Number(row.gz_bytes));
+    await scanRequestTimelineGz(gz, SEQUENCE_LENGTH_FIELDS, (request) => {
+      if (typeof request.isl === 'number' && Number.isFinite(request.isl)) isl.push(request.isl);
+      if (typeof request.osl === 'number' && Number.isFinite(request.osl)) osl.push(request.osl);
+    });
+  } catch (error) {
+    logRequestTimelineReadFailure(row.trace_replay_id, error);
+    return null;
+  }
+  return { isl, osl };
+}
+
+async function profileSequenceLengths(
+  sql: DbClient,
+  traceReplayId: number,
+): Promise<SequenceLengths | null> {
+  try {
+    const isl: number[] = [];
+    const osl: number[] = [];
+    for await (const line of readTraceProfileLines(sql, traceReplayId)) {
+      if (!line) continue;
+      let rec: { metrics?: Record<string, { value?: number } | number> };
+      try {
+        rec = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      const m = rec.metrics ?? {};
+      const islVal = readMetric(m['input_sequence_length']);
+      const oslVal = readMetric(m['output_sequence_length']);
+      if (typeof islVal === 'number' && Number.isFinite(islVal)) isl.push(islVal);
+      if (typeof oslVal === 'number' && Number.isFinite(oslVal)) osl.push(oslVal);
+    }
+    return { isl, osl };
+  } catch {
+    return null;
+  }
+}
+
+async function pointSequenceLengths(
+  sql: DbClient,
+  row: TimelineRow,
+): Promise<SequenceLengths | null> {
+  if (row.columns_bytes !== null) {
+    try {
+      return decodeRequestChartSequenceLengths(
+        await readRequestChartColumns(
+          sql,
+          row.trace_replay_id,
+          Number(row.columns_bytes),
+          row.columns_inline,
+        ),
+      );
+    } catch (error) {
+      logRequestChartColumnsReadFailure(row.trace_replay_id, error);
+    }
+  }
+  if (row.timeline_version !== null && Number(row.timeline_version) === REQUEST_TIMELINE_VERSION) {
+    return row.gz_bytes === null
+      ? { isl: finiteNumbers(row.isl), osl: finiteNumbers(row.osl) }
+      : scanTimelineSequenceLengths(sql, row);
+  }
+  return row.has_blob ? profileSequenceLengths(sql, row.trace_replay_id) : null;
+}
+
 export async function getTraceHistograms(
   sql: DbClient,
   benchmarkResultIds: number[],
 ): Promise<TraceHistogramMap> {
   if (benchmarkResultIds.length === 0) return {};
 
-  const result: TraceHistogramMap = {};
-  const fallbackRows: TimelineRow[] = [];
+  const rows: TimelineRow[] = [];
   for (let i = 0; i < benchmarkResultIds.length; i += QUERY_CHUNK_SIZE) {
     const chunk = benchmarkResultIds.slice(i, i + QUERY_CHUNK_SIZE);
     // Project the two arrays out in SQL instead of selecting
@@ -73,78 +163,54 @@ export async function getTraceHistograms(
     // driver's 64 MiB response cap, which failed the whole request with
     // `507 response is too large` and left the distribution charts empty on
     // exactly the biggest runs. Unnesting server-side sends ~600 KB instead.
+    // Rows with a gzip timeline never touch the legacy JSONB here.
     const chunkRows = (await sql`
       select
         br.id as benchmark_result_id,
         atr.id as trace_replay_id,
-        (atr.request_timeline->>'version')::int as timeline_version,
-        (
+        case
+          when atr.request_chart_data_version = ${REQUEST_CHART_DATA_VERSION}
+            then octet_length(atr.request_chart_data_gz)
+        end as columns_bytes,
+        case
+          when atr.request_chart_data_version = ${REQUEST_CHART_DATA_VERSION}
+            and octet_length(atr.request_chart_data_gz) <= ${INLINE_COLUMNS_BYTES}
+            then encode(atr.request_chart_data_gz, 'base64')
+        end as columns_inline,
+        octet_length(atr.request_timeline_gz) as gz_bytes,
+        case
+          when atr.request_timeline_gz is not null then atr.request_timeline_version::int
+          else (atr.request_timeline->>'version')::int
+        end as timeline_version,
+        case when atr.request_timeline_gz is null then (
           select array_agg((r->>'isl')::numeric order by ord)
           from jsonb_array_elements(atr.request_timeline->'requests') with ordinality x(r, ord)
           where jsonb_typeof(r->'isl') = 'number'
-        ) as isl,
-        (
+        ) end as isl,
+        case when atr.request_timeline_gz is null then (
           select array_agg((r->>'osl')::numeric order by ord)
           from jsonb_array_elements(atr.request_timeline->'requests') with ordinality x(r, ord)
           where jsonb_typeof(r->'osl') = 'number'
-        ) as osl,
-        (atr.profile_export_jsonl_gz is not null) as has_blob
+        ) end as osl,
+        (atr.profile_export_jsonl_gz is not null or atr.profile_export_chunk_count > 0) as has_blob
       from benchmark_results br
       join agentic_trace_replay atr on atr.id = br.trace_replay_id
       where br.id = any(${chunk}::bigint[])
     `) as unknown as TimelineRow[];
-    for (const row of chunkRows) {
-      const id = Number(row.benchmark_result_id);
-      if (
-        row.timeline_version !== null &&
-        Number(row.timeline_version) === REQUEST_TIMELINE_VERSION
-      ) {
-        result[id] = { id, isl: finiteNumbers(row.isl), osl: finiteNumbers(row.osl) };
-      } else if (row.has_blob) {
-        fallbackRows.push(row);
-      }
-    }
+    rows.push(...chunkRows);
   }
 
-  // Compatibility fallback for pre-timeline rows. Fetch one small blob at a
-  // time; oversized legacy rows are omitted instead of turning the whole API
-  // response into a 507.
-  for (const row of fallbackRows) {
-    const blobRows = (await sql`
-      select profile_export_jsonl_gz as blob
-      from agentic_trace_replay
-      where id = ${row.trace_replay_id}
-        and octet_length(profile_export_jsonl_gz) <= ${MAX_FALLBACK_BLOB_BYTES}
-    `) as unknown as { blob: Buffer }[];
-    const blob = blobRows[0]?.blob;
-    if (!blob) continue;
-    try {
-      const jsonl = gunzipSync(blob).toString('utf8');
-      const isl: number[] = [];
-      const osl: number[] = [];
-      for (const line of jsonl.split('\n')) {
-        if (!line) continue;
-        let rec: { metrics?: Record<string, { value?: number } | number> };
-        try {
-          rec = JSON.parse(line);
-        } catch {
-          continue;
-        }
-        const m = rec.metrics ?? {};
-        const islVal = readMetric(m['input_sequence_length']);
-        const oslVal = readMetric(m['output_sequence_length']);
-        if (typeof islVal === 'number' && Number.isFinite(islVal)) isl.push(islVal);
-        if (typeof oslVal === 'number' && Number.isFinite(oslVal)) osl.push(oslVal);
-      }
-      result[Number(row.benchmark_result_id)] = {
-        id: Number(row.benchmark_result_id),
-        isl,
-        osl,
-      };
-    } catch {
-      // Drop malformed blobs silently — caller treats missing ids as "no data".
+  const result: TraceHistogramMap = {};
+  let next = 0;
+  const readPoints = async (): Promise<void> => {
+    while (next < rows.length) {
+      const row = rows[next++];
+      const lengths = await pointSequenceLengths(sql, row);
+      const id = Number(row.benchmark_result_id);
+      if (lengths) result[id] = { id, ...lengths };
     }
-  }
+  };
+  await Promise.all(Array.from({ length: POINTS_IN_FLIGHT }, readPoints));
   return result;
 }
 

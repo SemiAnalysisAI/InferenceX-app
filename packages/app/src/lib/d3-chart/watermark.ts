@@ -3,9 +3,8 @@ import type * as d3 from 'd3';
 import type { ChartMargin } from './types';
 import { CHART_TYPE, px } from './typography';
 
-const UNOFFICIAL_WATERMARK_IMAGE_PATH = '/decorative/kanye-west.png';
+const UNOFFICIAL_WATERMARK_IMAGE_PATH = '/decorative/pointing-muse.webp';
 
-/** Insert the watermark backing rect, masked to the inner chart area. */
 function insertWatermarkRect(
   svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
   innerWidth: number,
@@ -23,7 +22,6 @@ function insertWatermarkRect(
     .attr('fill', `url(#${patternId})`);
 }
 
-/** Keep the single unofficial-run background image aligned to the plot area. */
 export function positionUnofficialWatermarkImage(
   svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
   innerWidth: number,
@@ -38,7 +36,6 @@ export function positionUnofficialWatermarkImage(
     .attr('height', innerHeight);
 }
 
-/** Create a centered logo watermark pattern. */
 export function createLogoWatermark(
   svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
   defs: d3.Selection<SVGDefsElement, unknown, null, undefined>,
@@ -68,7 +65,6 @@ export function createLogoWatermark(
   insertWatermarkRect(svg, innerWidth, innerHeight, margin, patternId);
 }
 
-/** Create a diagonal repeating warning watermark for unofficial runs. */
 export function createUnofficialWatermark(
   svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
   defs: d3.Selection<SVGDefsElement, unknown, null, undefined>,
@@ -78,7 +74,6 @@ export function createUnofficialWatermark(
   chartId: string,
 ): void {
   const patternId = `unofficial-pattern-${chartId}`;
-  // Brick pattern: two rows per tile, second row shifted by half-width.
   const patternWidth = 460;
   const rowHeight = 130;
   const patternHeight = rowHeight * 2;
@@ -114,17 +109,13 @@ export function createUnofficialWatermark(
       .text('May contain hacks, or not fully passing evals');
   };
 
-  // Row 1: centered.
   addLabel(patternWidth / 2, rowHeight / 2);
-  // Row 2: staggered by half-width — drawn at both seams so the brick wraps
-  // across adjacent tiles into a single label centered on each seam.
   addLabel(0, rowHeight + rowHeight / 2);
   addLabel(patternWidth, rowHeight + rowHeight / 2);
 
   insertWatermarkRect(svg, innerWidth, innerHeight, margin, patternId);
 
-  // Insert after the warning rect so :first-child places the image behind it.
-  // Source: https://freepngimg.com/png/16388-kanye-west-png-image (CC BY-NC 4.0).
+  // Asset provenance: public/decorative/pointing-muse.md.
   svg
     .insert('image', ':first-child')
     .attr('class', 'unofficial-watermark-image')

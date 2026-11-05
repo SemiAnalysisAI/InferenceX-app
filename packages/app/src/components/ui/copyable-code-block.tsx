@@ -3,8 +3,8 @@
 import { Check, Copy } from 'lucide-react';
 import { useState } from 'react';
 
-import { track } from '@/lib/analytics';
-import type { Locale } from '@/lib/i18n';
+import { track } from '@/lib/analytics/analytics';
+import type { Locale } from '@/lib/i18n/i18n';
 
 const STRINGS = {
   en: {
@@ -23,7 +23,6 @@ const STRINGS = {
   },
 } as const;
 
-/** A bounded reader, not a truncated preview: copy always includes every byte. */
 export function CopyableCodeBlock({
   children,
   locale,

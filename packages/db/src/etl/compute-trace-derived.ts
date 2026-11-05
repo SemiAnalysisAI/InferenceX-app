@@ -1,10 +1,3 @@
-/**
- * Compute every derived trace-replay payload while parsing server metrics only
- * once. The standalone aggregate/chart helpers remain the compatibility path
- * for backfills; ingest uses this coordinator to avoid repeated GiB-scale
- * decompression and JSON tokenization.
- */
-
 import {
   AGGREGATE_SERVER_METRIC_KEYS,
   computeAggregateStats,
@@ -31,7 +24,6 @@ export interface TraceDerivedPayloads {
 }
 
 export interface TraceDerivedComputeOptions {
-  /** Override the bounded fast-path threshold, primarily for streaming tests. */
   maxInMemoryBytes?: number;
 }
 
@@ -49,12 +41,6 @@ function selectMetrics(metrics: MetricsMap, wanted: ReadonlySet<string>): Metric
   return selected;
 }
 
-/**
- * Produce the same three JSON values previously computed independently in
- * `insertTraceReplay()`. Malformed inputs retain the old failure isolation:
- * profile stats/timeline can succeed without server metrics, and a chart
- * projection failure does not discard aggregate stats.
- */
 export async function computeTraceDerivedPayloads(
   profileBlob: Buffer | null,
   serverBlob: Buffer | null,
@@ -84,10 +70,6 @@ export async function computeTraceDerivedPayloads(
       : selectMetrics(phases.metrics, AGGREGATE_SERVER_METRIC_KEYS);
     aggregateStats = withServerMetricAggregateStats(aggregateStats, aggregateMetrics);
 
-    // The historical in-memory path builds chart timing metadata from every
-    // metric, while its oversized streaming fallback retains only chart keys.
-    // Preserve that distinction exactly even though the shared streaming pass
-    // also collects the aggregate-only GPU prefix-cache aliases.
     const profiling = phases.complete
       ? phases.metrics
       : selectMetrics(phases.metrics, CHART_METRIC_KEYS);

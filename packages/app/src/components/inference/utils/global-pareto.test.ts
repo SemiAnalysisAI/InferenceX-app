@@ -78,26 +78,26 @@ describe('globalParetoFrontier', () => {
     [true, false],
     [false, true],
     [false, false],
-  ])('connects the worst boundary by reversing X=%s and Y=%s', (maximizeX, maximizeY) => {
+  ])('keeps only non-dominated observations for X=%s and Y=%s', (maximizeX, maximizeY) => {
     const input = [
       { x: 1, y: 2 },
       { x: 2, y: 1 },
       { x: 3, y: 4 },
       { x: 4, y: 3 },
     ];
-    const hinterland = globalParetoFrontier(input, !maximizeX, !maximizeY);
-    for (const point of hinterland) {
+    const frontier = globalParetoFrontier(input, maximizeX, maximizeY);
+    for (const point of frontier) {
       expect(
         input.some(
           (other) =>
-            (maximizeX ? other.x <= point.x : other.x >= point.x) &&
-            (maximizeY ? other.y <= point.y : other.y >= point.y) &&
+            (maximizeX ? other.x >= point.x : other.x <= point.x) &&
+            (maximizeY ? other.y >= point.y : other.y <= point.y) &&
             (other.x !== point.x || other.y !== point.y),
         ),
       ).toBe(false);
     }
-    if (maximizeX && maximizeY) expect(hinterland).toEqual(input.slice(0, 2));
-    if (!maximizeX && !maximizeY) expect(hinterland).toEqual(input.slice(2));
+    if (maximizeX && maximizeY) expect(frontier).toEqual(input.slice(2));
+    if (!maximizeX && !maximizeY) expect(frontier).toEqual(input.slice(0, 2));
   });
 });
 

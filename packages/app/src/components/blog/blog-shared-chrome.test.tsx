@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import type { TocHeading } from '@/lib/blog';
+import type { TocHeading } from '@/lib/blog/blog';
 import { BlogToc } from './blog-toc';
 
 const headings = [{ id: 'results', text: 'Results', level: 2 }] satisfies TocHeading[];

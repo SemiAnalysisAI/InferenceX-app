@@ -1,14 +1,12 @@
 import type { Metadata } from 'next';
-import { notFound, redirect } from 'next/navigation';
-
-import 'katex/dist/katex.min.css';
+import { notFound, permanentRedirect } from 'next/navigation';
 
 import ModelDetailContent from '@/components/model/ModelDetailContent';
 import { modelAliasDestination } from '@/components/model/model-page-copy';
-import { COMPARE_MODEL_ALIASES } from '@/lib/compare-slug';
-import { modelDetailMetadata } from '@/lib/model-page-metadata';
-import { getModelPageSlugs } from '@/lib/model-pages';
-import { getLocalizedModelPage } from '@/lib/model-pages-zh';
+import { COMPARE_MODEL_ALIASES } from '@/lib/compare/compare-slug';
+import { modelDetailMetadata } from '@/lib/catalog/model-page-metadata';
+import { getModelPageSlugs } from '@/lib/catalog/model-pages';
+import { getLocalizedModelPage } from '@/lib/catalog/model-pages-zh';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -26,7 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ModelPage({ params }: Props) {
   const { slug } = await params;
   const canonical = COMPARE_MODEL_ALIASES[slug];
-  if (canonical) redirect(modelAliasDestination(canonical, 'en'));
+  if (canonical) permanentRedirect(modelAliasDestination(canonical, 'en'));
 
   const page = getLocalizedModelPage(slug, 'en');
   if (!page) notFound();

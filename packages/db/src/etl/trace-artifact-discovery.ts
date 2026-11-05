@@ -48,17 +48,6 @@ function extractMultinodeArchive(artifactDir: string): string | null {
   return fs.existsSync(extractedDir) ? extractedDir : null;
 }
 
-/**
- * Discover trace-replay siblings in both artifact layouts:
- *
- * - Single-node: `agentic_<suffix>/aiperf_artifacts/*`
- * - Direct multinode upload: `agentic_<suffix>/conc_<N>/aiperf_artifacts/*`
- * - Multinode: `multinode_server_logs_<suffix>/multinode_server_logs.tar.gz`,
- *   containing `agentic/conc_<N>/aiperf_artifacts/*`
- *
- * Multinode keys include concurrency (`<suffix>|<N>`) because one artifact
- * contains several points, each with a distinct trace payload.
- */
 export function discoverTraceReplayArtifacts(
   artifactsDir: string,
 ): Map<string, TraceReplayArtifactPaths> {
@@ -67,10 +56,6 @@ export function discoverTraceReplayArtifacts(
 
   const entries = fs.readdirSync(artifactsDir);
 
-  // Current multinode jobs upload the same completed aiperf directory twice:
-  // directly as `agentic_*`, and inside the server-log tarball. Index complete
-  // direct copies first so matching archives do not expand a second GiB-scale
-  // copy. Incomplete/legacy direct artifacts still fall through to the archive.
   for (const entry of entries) {
     if (!entry.startsWith('agentic_')) continue;
     const artifactDir = path.join(artifactsDir, entry);

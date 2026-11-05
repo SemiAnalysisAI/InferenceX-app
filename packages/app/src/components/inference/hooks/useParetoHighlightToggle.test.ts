@@ -39,16 +39,15 @@ describe('useParetoHighlightToggle', () => {
     act(() => result.current.setVisible(true));
     expect(result.current).toMatchObject({ visible: true, playful: false });
   });
-  it('restores playful share links and keeps separate toggles independent', () => {
-    const { result } = renderHook(() => ({
-      frontier: useParetoHighlightToggle('2'),
-      hinterland: useParetoHighlightToggle('1'),
-    }));
-    expect(result.current.frontier).toMatchObject({ visible: true, playful: true });
-    expect(result.current.hinterland).toMatchObject({ visible: true, playful: false });
-    act(() => result.current.frontier.setVisible(false));
-    expect(result.current.hinterland).toMatchObject({ visible: true, playful: false });
-    act(() => result.current.frontier.setVisible(true));
-    expect(result.current.frontier).toMatchObject({ visible: true, playful: false });
+  it.each([
+    ['1', false],
+    ['2', true],
+  ] as const)('restores frontier mode %s from share links', (mode, playful) => {
+    const { result } = renderHook(() => useParetoHighlightToggle(mode));
+    expect(result.current).toMatchObject({ visible: true, playful });
+    act(() => result.current.setVisible(false));
+    expect(result.current.visible).toBe(false);
+    act(() => result.current.setVisible(true));
+    expect(result.current).toMatchObject({ visible: true, playful: !playful });
   });
 });

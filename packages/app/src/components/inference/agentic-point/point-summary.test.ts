@@ -21,6 +21,17 @@ function meta(overrides: Partial<PointMeta> = {}): PointMeta {
     spec_method: 'none',
     disagg: true,
     is_multinode: true,
+    prefill_tp: 4,
+    prefill_ep: 1,
+    prefill_dp_attention: false,
+    prefill_num_workers: 2,
+    decode_tp: 16,
+    decode_ep: 16,
+    decode_dp_attention: true,
+    decode_num_workers: 4,
+    num_prefill_gpu: 8,
+    num_decode_gpu: 64,
+    recipe_fingerprint: null,
     conc: 128,
     offload_mode: 'off',
     kv_offloading: null,
@@ -108,6 +119,25 @@ describe('PointSummary', () => {
     expect(html).toContain('Mooncake');
     expect(html).toContain('Router');
     expect(html).toContain('vLLM Router 0.1.14');
+  });
+
+  it('links an agentic point to its configuration on the Prefix Cache Reuse tab', () => {
+    const html = renderToStaticMarkup(
+      createElement(PointSummary, { meta: meta({ model: 'dsr1', disagg: false }) }),
+    );
+
+    expect(html).toContain('Prefix cache reuse for this config');
+    expect(html).toContain(
+      'href="/cache-reuse?g_model=DeepSeek-R1-0528&amp;i_seq=agentic-traces&amp;i_prec=fp8&amp;c_cfg=gb200_dynamo-vllm&amp;c_recipe=agg%7Cmn%7Cp2x4%2F1%2F-%7Cd4x16%2F16%2Fdpa%7Cg8%2B64%7Cspec-none%7Coffload-off%7C&amp;g_rundate=2026-06-23"',
+    );
+  });
+
+  it('offers no cache-reuse link for a fixed-sequence point', () => {
+    const html = renderToStaticMarkup(
+      createElement(PointSummary, { meta: meta({ benchmark_type: 'single_turn' }) }),
+    );
+
+    expect(html).not.toContain('cache-reuse-link');
   });
 
   it('renders runtime metadata labels in Simplified Chinese on /zh', () => {

@@ -1,5 +1,13 @@
 # PowerX measured-data export
 
+For version-attributed Node recipes, set `INFERENCEX_SKILL_DIR` to the absolute installed
+`inferencex-api` directory containing this skill's `SKILL.md` (not the
+`inferencex` shortcut directory). This locates the shared request header helper. Standalone recipes still work
+without this optional helper and send no attribution.
+Set `INFERENCEX_TELEMETRY=0` to omit attribution; use
+`INFERENCEX_TRAFFIC=validation` for demos and acceptance checks. See
+[request usage](cli.md#request-usage) for the captured fields.
+
 Use the bundled exporter through the versioned CLI on Node 24 or 26 for measured
 GPU power and energy in an exact single-turn workload. Consult the current
 [OpenAPI benchmark operation](https://inferencex.semianalysis.com/api/openapi.json)
@@ -48,6 +56,34 @@ Existing output directories are refused.
 
 Use `inferencex verify <directory>` to reconstruct the result from the saved
 responses. A later API request is separate evidence and may return different data.
+
+## NVL72 CPU measurements
+
+Raw benchmark responses may include `cpu_power_valid`, `avg_cpu_socket_power_w`,
+`avg_total_cpu_power_w`, `total_cpu_energy_j`, optional module power/energy, and
+optional CPU core and SysIO rail breakdowns (`avg_total_cpu_rail_power_w`,
+`avg_total_cpu_sysio_power_w` and their energies). The rails are inside the Grace
+socket total; never add them to it.
+CPU measurements require `cpu_power_valid === 1`, independently of GPU validity.
+`powerValid=strictV2` filters GPU measurements only. Read `power_audit.cpu` for
+sensor type, collector, socket coverage, and validation reasons. Grace socket
+readings combine CPU and LPDDR5X power; a module reading already includes GPU
+power. Missing measurements stay unavailable. These fields add no CPU samples to
+the `gpu-metrics` view and do not change the CLI export format.
+
+## GPU temperature telemetry
+
+The PowerX run explorer can display per-GPU Celsius readings from native SRT
+samples v3, preserving host-local GPU identities. Missing temperature stays
+unavailable; older v1/v2 power files do not gain inferred temperatures. Chart lines
+break at missing readings, including rolling averages and chip means with no
+contributing readings. Rolling windows ignore missing values and keep missing
+centers unavailable; zero Celsius remains a measured value. The public view's
+`chart` contains measured points only; use its `rows` to retain missing timestamps. These
+samples are exposed by the UI-owned `/api/gpu-metrics` raw-artifact reader and
+its stored digest, not the stable measured-energy export above. Do not infer
+temperature coverage from `power_valid`, or compare prefill/decode temperatures
+without matching role and time-window evidence.
 
 ## Selection and coverage
 
@@ -133,6 +169,12 @@ this recipe's eligibility label, not evidence that a row predates validation.
 
 ```bash
 node --input-type=module - evidence/powerx <<'JS'
+import { pathToFileURL } from 'node:url';
+let requestHeaders = () => ({});
+if (process.env.INFERENCEX_SKILL_DIR) {
+  try { ({ requestHeaders } = await import(pathToFileURL(`${process.env.INFERENCEX_SKILL_DIR}/scripts/request-headers.mjs`).href)); }
+  catch { /* Optional attribution must not prevent a standalone query. */ }
+}
 import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -199,7 +241,7 @@ async function diagnose() {
   const captureDir = await mkdtemp('api-evidence-');
   let response, bytes;
   try {
-    response = await fetch(url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
+    response = await fetch(url, { headers: requestHeaders(url, { source: 'skill' }), signal: AbortSignal.timeout(30_000), redirect: 'error' });
     bytes = Buffer.from(await response.arrayBuffer());
   } catch (error) {
     await writeFile(join(captureDir, 'response.json'), JSON.stringify({ query_url: url.href,
@@ -364,7 +406,9 @@ IDs can arrive as strings, including values beyond JavaScript's safe integer ran
 preserve them exactly. Retain the complete run URL, including any `/attempts/` path.
 Single-turn rows commonly omit producer workflow IDs/start times, while snapshot
 fields remain present. Keep those producer fields absent; a snapshot ID does not
-identify the producer of every observation. Preserve source timestamps as supplied.
+identify the producer of every observation. Check `run_url` independently: it can
+still identify the producing GitHub run and attempt when those optional fields
+are absent. Preserve source timestamps as supplied.
 
 Apply the [shared GPU topology rule](../SKILL.md#evidence-and-interpretation) to
 CSV additions and prose. For example, raw role counts `64/64`, `disagg=false` and

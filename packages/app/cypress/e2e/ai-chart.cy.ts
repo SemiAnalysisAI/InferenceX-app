@@ -367,6 +367,18 @@ describe('AI chart Chinese workflow', () => {
   });
 
   it('does not expose a provider error body or API key on the Chinese route', () => {
+    cy.viewport(375, 844);
+    cy.visit('/zh/ai-chart');
+    cy.get('input[placeholder="OpenAI API Key"]').should('be.visible');
+    cy.get('textarea[placeholder="描述想查看的图表……"]').should('be.visible');
+    cy.contains('提示词示例').should('be.visible');
+    cy.contains(`${Cypress.platform === 'darwin' ? '⌘' : 'Ctrl'}+Enter 生成图表`).should(
+      'be.visible',
+    );
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
+    });
+
     cy.intercept('POST', 'https://api.openai.com/v1/chat/completions', {
       statusCode: 401,
       body: { error: { message: 'provider-internal-error sk-sensitive-example-key' } },
@@ -384,19 +396,5 @@ describe('AI chart Chinese workflow', () => {
     cy.get('[data-testid="ai-chart-error"]').should('not.exist');
     cy.get('input[placeholder="OpenAI API Key"]').should('have.value', 'sk-sensitive-example-key');
     cy.get('textarea').should('have.value', '对比吞吐量');
-  });
-
-  it('keeps Chinese provider controls and examples within 375px', () => {
-    cy.viewport(375, 844);
-    cy.visit('/zh/ai-chart');
-    cy.get('input[placeholder="OpenAI API Key"]').should('be.visible');
-    cy.get('textarea[placeholder="描述想查看的图表……"]').should('be.visible');
-    cy.contains('提示词示例').should('be.visible');
-    cy.contains(`${Cypress.platform === 'darwin' ? '⌘' : 'Ctrl'}+Enter 生成图表`).should(
-      'be.visible',
-    );
-    cy.document().then((doc) => {
-      expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
-    });
   });
 });

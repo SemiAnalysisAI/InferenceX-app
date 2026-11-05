@@ -1,0 +1,111 @@
+'use client';
+
+import { Button } from '@/components/ui/button';
+import { track } from '@/lib/analytics/analytics';
+import { placementFor } from '@/lib/analytics/placement';
+import { routeTemplateForPathname } from '@/lib/analytics/route-template';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { dashboardRouteForPathname } from '@/lib/routing/dashboard-routes';
+
+const SITE_URL = 'https://inferencex.semianalysis.com';
+
+const STRINGS = {
+  en: {
+    shareText:
+      'Explore InferenceX: open-source agentic and fixed-sequence AI inference benchmarks, including AgentX results from public chip runs.',
+    twitter: 'Share on X (Twitter)',
+    linkedin: 'Share on LinkedIn',
+  },
+  zh: {
+    shareText:
+      '探索 InferenceX：开源智能体推理与固定序列 AI 推理基准测试，并提供来自公开芯片运行的 AgentX 结果。',
+    twitter: '分享到 X（推特）',
+    linkedin: '分享到 LinkedIn',
+  },
+} as const;
+
+function getShareUrl(): string {
+  if (typeof window === 'undefined') return SITE_URL;
+  return window.location.href;
+}
+
+/**
+ * The page being shared, for share events. `view` is the dashboard tab (absent off the dashboards)
+ * and `route_template` the page's route. Read at event time so it follows client-side navigation.
+ */
+export function shareAnalyticsProperties(): Record<string, unknown> {
+  if (typeof window === 'undefined') return {};
+  const { pathname } = window.location;
+  return {
+    view: dashboardRouteForPathname(pathname)?.key,
+    route_template: routeTemplateForPathname(pathname),
+  };
+}
+
+interface SocialShareButtonProps {
+  /** Extra event properties, such as the selected `model` or a `placement` the DOM can't supply. */
+  analyticsProperties?: Record<string, unknown>;
+}
+
+export function ShareTwitterButton({
+  text,
+  analyticsProperties,
+}: SocialShareButtonProps & { text?: string }) {
+  const t = STRINGS[useLocale()];
+  return (
+    <Button
+      variant="outline"
+      size="icon"
+      className="size-7"
+      title={t.twitter}
+      data-testid="share-twitter"
+      onClick={(event) => {
+        const url = getShareUrl();
+        window.open(
+          `https://twitter.com/intent/tweet?text=${encodeURIComponent(text ?? t.shareText)}&url=${encodeURIComponent(url)}`,
+          '_blank',
+          'noopener,noreferrer,width=600,height=400',
+        );
+        track('social_share_twitter', {
+          ...shareAnalyticsProperties(),
+          placement: placementFor(event.currentTarget),
+          ...analyticsProperties,
+        });
+      }}
+    >
+      <svg viewBox="0 0 24 24" fill="currentColor" className="size-3.5">
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+      </svg>
+    </Button>
+  );
+}
+
+export function ShareLinkedInButton({ analyticsProperties }: SocialShareButtonProps = {}) {
+  const t = STRINGS[useLocale()];
+  return (
+    <Button
+      variant="outline"
+      size="icon"
+      className="size-7"
+      title={t.linkedin}
+      data-testid="share-linkedin"
+      onClick={(event) => {
+        const url = getShareUrl();
+        window.open(
+          `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
+          '_blank',
+          'noopener,noreferrer,width=600,height=600',
+        );
+        track('social_share_linkedin', {
+          ...shareAnalyticsProperties(),
+          placement: placementFor(event.currentTarget),
+          ...analyticsProperties,
+        });
+      }}
+    >
+      <svg viewBox="0 0 24 24" fill="currentColor" className="size-3.5">
+        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+      </svg>
+    </Button>
+  );
+}

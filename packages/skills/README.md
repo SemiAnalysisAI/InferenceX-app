@@ -1,194 +1,209 @@
-# @semianalysisai/inferencex-skills
+# InferenceX Skills
 
-Installs the `inferencex-api` Agent Skill for Codex or Claude Code. The skill
-queries existing public InferenceX observations and creates replayable evidence
-bundles for PowerX, AgentX, result provenance, TCO, framework releases, and
-CollectiveX. It never launches benchmarks.
+> InferenceX benchmark data for coding agents and the command line.
 
-## Requirements and installation
+Install InferenceX skills for Codex or Claude Code. Query existing public benchmarks,
+create AgentX charts and tables, explore PR-linked performance improvements,
+export source data, and verify saved evidence offline.
 
-Use Node 24 or later. Public installation requires npm registry access; live
-queries require public HTTPS but no repository checkout, database credentials, or
-runtime dependencies.
+## Install
 
-```bash
+Requires Node.js 24 or later. Run from your project directory.
+
+The commands below target 1.2.0. Until it is published, use the supplied candidate
+archive as described below.
+
+```sh
 # Codex
-npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- \
+npm exec --yes --package @semianalysisai/inferencex-skills@1.2.0 -- \
   inferencex-skills install --target codex
 
 # Claude Code
-npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- \
+npm exec --yes --package @semianalysisai/inferencex-skills@1.2.0 -- \
   inferencex-skills install --target claude
 ```
 
-These commands apply after 0.12.0 is published and publicly verified. For a candidate
-archive, run from the target project:
+The default installation is project-scoped. Add
+`--scope user` to make the skill available in every project on this machine:
+Codex uses `~/.agents/skills/`; Claude Code uses `~/.claude/skills/`. Use
+`--scope project` (the default) for `.agents/skills/` or `.claude/skills/` in the
+current directory. `--dir <skills-root>` is an explicit alternative to `--scope`.
 
-```bash
-INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-0.12.0.tgz'
-npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- \
-  inferencex-skills install --target codex
-npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- \
-  inferencex-skills status --target codex --json
-npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- \
-  inferencex-skills install --target codex --force --dry-run --json
-```
+Each installation includes `inferencex/` (the general entry), `inferencex-to-chart/`
+and `inferencex-to-table/` (AgentX output shortcuts),
+`inferencex-pr-improvements/` (historical performance gains), and `inferencex-api/`
+(the shared CLI and cookbooks). Existing script paths and the old skill name
+continue to work. Upgrade an existing installation with `install --force` using
+the same target and scope; save local edits first. `status --json` reports all five
+paths, including missing or damaged entries.
 
-Use that same candidate archive for every installer operation before publication.
-An unpublished version returning `ETARGET` does not justify substituting `latest`.
+<details>
+<summary>Installing an unpublished build</summary>
 
-| Target              | Installed skill                  |
-| ------------------- | -------------------------------- |
-| `codex` or `agents` | `.agents/skills/inferencex-api/` |
-| `claude`            | `.claude/skills/inferencex-api/` |
+Replace the package name and version with the absolute path to the supplied `.tgz`
+and add `--offline`. Use that same archive for installation, status checks and upgrades.
 
-`--dir <skills-root>` selects a custom parent directory. `list`, `status`,
-`--dry-run`, and `--help` do not modify the installed skill.
+If you need to build the archive, run `npm pack` in `packages/skills`.
 
-## Unified CLI
+</details>
 
-The npm package exposes `inferencex` during `npm exec`. Copying the skill does not
-add a persistent binary to `PATH`; invoke the copied entry with Node.
+## Usage
 
-```bash
+For AgentX interactivity comparisons and historical or efficiency-gain charts, use
+P90 slow-tail interactivity: `1 / P90(full-response ITL in seconds)`. Do not use
+the median or P90 of token rates. The bundled
+[P90 recipe](skills/inferencex-api/references/agentic-interactivity.md) includes
+a tested raw-data helper and instructions for checking deployed API metadata.
+Single-turn median calculations and the formal TCO workflow are unchanged.
+
+Profit-estimator dashboard links encode share state in named route segments,
+for example `/profit-estimator/deepseek-v4/target/24`.
+The per-gigawatt page and `/zh` pages use the same format. These dashboards
+are P90-only and remove legacy percentile parameters. Other legacy query links
+remain readable; the separate read-only API and CLI contracts have not changed.
+To reproduce that example through `/api/v1/views/profit-estimator`, continue
+using `?model=DeepSeek-V4-Pro&target=24` (P90 is the default). Dashboard segments
+`cache-hit-mode`, `tco-basis`, `date`, `run`, `precision`, `chips`, and
+`unofficial-runs` map to API parameters `cacheHitMode`, `tcoBasis`, `date`,
+`runId`, `precisions`, `gpus`, and `unofficialrun`; `power` maps to `powerBasis`,
+and `dates`, `start`, and `end` keep their names.
+
+The `inference`, `historical`, `calculator`, and `first-token` views accept
+`chipBasis=pool` (default) or `chipBasis=total`, matching the dashboard's
+disaggregated throughput toggle (`g_chips`). See
+[dashboard views](skills/inferencex-api/references/dashboard-views.md#disaggregated-chip-basis).
+
+Both profit estimators and their read-only APIs default to `theoretical`, displayed
+as “Theroticial Roofline”. This uses trace-derived infinite-cache reuse, with the
+measured rate as a fallback when unavailable. Choose `cacheHitMode=actual` in the
+API or `/cache-hit-mode/actual` in a dashboard link for measured cache hit rates.
+
+Open a new Claude Code session and type `/inferencex <your task>`. In Codex,
+select **inferencex** from `/skills` or mention `$inferencex`. If the entry does
+not appear after installation, restart the agent in the project where you installed
+it. Personal installations also work when you start from another project.
+
+For example:
+
+> /inferencex Check the TCO assumptions in this spreadsheet against InferenceX.
+> Keep my workload, latency target, prices and units; flag anything that does not match.
+
+For AgentX source comparisons, use the output-specific entries:
+
+> /inferencex-to-chart Show request counts by recorded source category
+> for AgentX result `<result-id>`.
+
+> /inferencex-to-table Compare the recorded source categories in this saved AgentX
+> capture. Give me a simple table image, with CSV for my spreadsheet.
+
+In Codex, use `$inferencex-to-chart` or `$inferencex-to-table`, or select the entry
+from `/skills`. Replace `<result-id>` with your selected result; a saved
+selected-point capture works too. The ready template compares one result's recorded
+source categories. The chart entry shows one metric per image: request counts by
+default, or median input tokens, output tokens, E2E or TTFT. The table entry puts
+request counts, share and all four medians in one image, with detailed Markdown and
+a CSV for spreadsheets. Both layouts adapt from one source to forty. Each output
+retains the saved source and sample counts.
+You can still ask `/inferencex` for either output, or request a chart and table together.
+
+For historical throughput gains or modeled cost reductions:
+
+> /inferencex-pr-improvements Show DeepSeek-R1-0528 on H200 SGLang FP8,
+> 8K/1K, output throughput at 35 tok/s/user, with source PR and run links.
+
+Codex uses `$inferencex-pr-improvements`. The skill renders a waterfall, summary
+and CSV from the public API or a saved waterfall response. It compares the
+baseline with successive records and the best observation at the same
+interactivity target. Source links establish provenance, not an isolated causal
+effect of each PR. These raw-view outputs are separate from formal CLI evidence
+bundles. Fresh queries check that the deployment supports the waterfall API.
+
+You can also use the CLI directly from the installed skill:
+
+```sh
 inferencex_cli=.agents/skills/inferencex-api/scripts/inferencex.mjs
 node "$inferencex_cli" discover models
 mkdir -p evidence
-node "$inferencex_cli" powerx export --model GLM-5 --isl 8192 --osl 1024 \
-  --output-dir evidence/powerx --require-hardware h200_sxm
-node "$inferencex_cli" verify evidence/powerx --require-hardware h200_sxm
+node "$inferencex_cli" powerx export --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \
+  --output-dir evidence/powerx
+node "$inferencex_cli" verify evidence/powerx
 ```
 
-For Claude Code, set `inferencex_cli=.claude/skills/inferencex-api/scripts/inferencex.mjs`.
+For Claude Code, use `.claude/skills/inferencex-api/scripts/inferencex.mjs` instead.
+Each export needs a new output directory. Public queries require no API key.
 
-Formal commands create one new directory containing the result, complete decoded
-responses, request ledger, hashes, coverage, policy, and a manifest written last.
-Exit 0 means the bundle completed and any requested policy passed. Exit 3 means the
-bundle is valid but an explicit coverage predicate failed. Completed bundles are
-immutable; write reports to sibling paths and verify last.
+| Workflow             | Use it to                                                             |
+| -------------------- | --------------------------------------------------------------------- |
+| PowerX               | Export measured power and energy observations.                        |
+| AgentX               | Export agentic workload summaries and check trace availability.       |
+| AgentX charts/tables | Compare request counts, token lengths and latency by recorded source. |
+| PR improvements      | Show historical gains with associated source PR and run links.        |
+| Result provenance    | Investigate a result's producer, configuration and logs.              |
+| TCO                  | Compare costs using your price assumptions.                           |
+| Framework releases   | Compare matched observations across versions.                         |
+| CollectiveX          | Compare communication benchmark runs.                                 |
 
-The six formal routes are:
+The package queries existing observations; it does not launch benchmarks.
 
-- `inferencex powerx export`
-- `inferencex agentx export`
-- `inferencex result inspect`
-- `inferencex tco compare`
-- `inferencex releases compare`
-- `inferencex collectivex compare`
+Online requests carry package attribution for aggregate request counts. Set
+`INFERENCEX_TELEMETRY=0` to opt out. [Fields and controls](https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/packages/skills/skills/inferencex-api/references/cli.md#request-usage).
 
-`inferencex discover`, `describe`, `schema`, `verify`, and `doctor` provide
-discovery, offline contract metadata, replay, and installation diagnostics. See the
-[CLI contract](skills/inferencex-api/references/cli.md) and the domain cookbooks for
-options, units, dates, provenance, and interpretation.
+## Documentation
 
-PowerX and AgentX support contract 1 JSON and fixed-column CSV. Missing values stay
-missing and real zeroes remain zero. TCO prices are explicit user assumptions.
-Release and CollectiveX comparisons preserve unmatched coverage and do not establish
-causality.
+- [CLI reference](https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/packages/skills/skills/inferencex-api/references/cli.md) — commands, exports and offline verification.
+- [Chart and table templates](https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/packages/skills/skills/inferencex-api/references/chart-templates.md) — output styles and offline AgentX source comparisons.
+- [Dashboard views](https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/packages/skills/skills/inferencex-api/references/dashboard-views.md) — dashboard filters and calculated chart data.
+- [Upgrading and compatibility](https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/docs/inferencex-cli-compatibility.md) — migration from 0.11 and earlier.
+- [Public API](https://inferencex.semianalysis.com/api) — endpoints and response formats.
 
-## Upgrade from 0.11 and earlier
+<details>
+<summary>简体中文</summary>
 
-```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- \
-  inferencex-skills status --target codex --json
-npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- \
-  inferencex-skills install --target codex --force --dry-run --json
-npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- \
-  inferencex-skills install --target codex --force
-```
+为 Codex 或 Claude Code 安装 InferenceX skills，查询已有的公开基准测试数据，
+生成 AgentX 图表与表格、查看 PR 关联的性能提升、导出源数据，并离线核验已保存的证据。
 
-Receipts from 0.12.0 onward use package integrity checks. A receipt from 0.11 or earlier identifies its
-version and can be upgraded with `--force`. Matching packaged files are replaced;
-local edits should be reviewed first. Unmanaged and obsolete files are preserved,
-so a removed helper may remain on disk after upgrade without being a supported 0.12.0
-command.
+需要 Node.js 24 或更高版本。上方命令指定 1.2.0；发布前请将包名和版本替换为候选 `.tgz` 的绝对路径，并加上 `--offline`。
+安装、状态检查和升级使用同一份产物。没有候选包时，在 `packages/skills` 目录执行 `npm pack` 生成。
 
-The 0.12.0 query interface is `inferencex` only. Direct domain scripts and
-`verify-export.mjs` are not supported query commands. Exports from 0.11 and earlier need
-the pinned package that created them. See the [migration guide](../../docs/inferencex-cli-compatibility.md).
+默认只安装到当前项目；加上 `--scope user` 后，本机所有项目均可使用：
+Codex 安装到 `~/.agents/skills/`，Claude Code 安装到 `~/.claude/skills/`。
+`--scope project` 使用当前项目的对应目录；自定义目录可用 `--dir`，不与 `--scope` 混用。
+每处安装均包含 `inferencex/` 通用入口、`inferencex-to-chart/` 与 `inferencex-to-table/`
+两个 AgentX 输出入口、`inferencex-pr-improvements/` 历史性能提升入口，
+以及 `inferencex-api/` 共用 CLI 与 cookbook。
+旧脚本路径与技能名称继续可用。升级时使用相同 target 和 scope 并加上 `--force`，
+先保存本地修改；`status --json` 会分别报告五个目录的状态，入口缺失或损坏时也会报告。
 
-The installer stages a merged destination and receipt before activation. A later
-real install recovers supported interrupted transactions. `status` and
-`--dry-run` inspect recovery without mutation; unsafe or foreign transaction state
-remains blocked for review. These checks do not promise power-loss durability or
-repair arbitrary external edits.
+安装后，新开一个 Claude Code 会话并输入 `/inferencex 核对这份表格里的 TCO 假设`；
+Codex 可在 `/skills` 中选择 inferencex，或使用 `$inferencex`。
+若安装后没有显示入口，重启 agent；
+项目级安装须从对应项目启动。也可按上方示例直接运行 CLI。
+每次导出都需要新的输出目录；公开查询不需要 API key。
 
-## Published history
+PowerX 可导出实测功耗与能耗；AgentX 可导出智能体工作负载汇总并检查 trace 可用性。
+在 Claude Code 中，输入 `/inferencex-to-chart 按 AgentX 结果 <result-id> 中记录的来源类别，画一张请求数对比图`；
+输入 `/inferencex-to-table 将这份已保存的 AgentX capture 按记录的来源类别整理为简明表格图片，并附上 CSV` 可生成表格图片和电子表格所需的数据。
+Codex 对应使用 `$inferencex-to-chart` 或 `$inferencex-to-table`，也可从 `/skills` 选择。
+将 `<result-id>` 替换为选定结果的 ID，也可提供已保存的 selected-point capture。
+现成模板用于比较单条结果中记录的来源类别。图表入口每张图只呈现一个指标：默认为请求数，
+也可改为输入 token 数、输出 token 数、E2E 或 TTFT 的中位数。表格入口把请求数、占比和四项中位数
+汇总在一张图片中，另附详细的 Markdown 表格和可导入电子表格的 CSV。两种版式都会根据来源数量（1 到 40 个）自动调整。
+两种输出共用统计结果与数据范围，保留已保存的源数据和样本数。也可以通过通用 `/inferencex` 入口生成其中任一输出，或同时生成图表和表格。
 
-Versions 0.1.0 through 0.11.0 are immutable published releases. The website remains
-pinned to the anonymously verified 0.11.0 package until 0.12.0 publication and public
-verification complete. Their historical interfaces remain available only by pinning
-those versions; this README documents the 0.12.0 candidate. The package remains pre-1.0: later
-minor releases may change the CLI. Evidence format `schema_version: 1` is separate
-from the package version; a stable 1.0 release is deferred.
+输入 `/inferencex-pr-improvements 查看 DeepSeek-R1-0528 在 H200 SGLang FP8、8K/1K、35 tok/s/user 下的历史输出吞吐量提升，附来源 PR 和运行链接`，可生成瀑布图、汇总和 CSV。
+Codex 对应使用 `$inferencex-pr-improvements`。该入口支持公开 API 或已保存的 waterfall 响应，
+在相同交互速度目标下比较基线、历次刷新纪录的结果和最佳观测；成本下降按成本模型估算。
+来源链接用于追溯数据，不代表已单独验证每个 PR 的因果贡献。这些视图产物与正式 CLI 证据包分开；
+查询新数据前会检查所连接的部署是否支持 waterfall API。
 
-## 中文说明
+还可追溯结果的来源、配置和日志，按自定义价格假设比较 TCO，在框架版本间比较匹配的观测，
+以及比较两次 CollectiveX 通信基准测试。该包查询已有观测，不启动基准测试。
+详细命令、仪表板视图、旧版迁移和接口格式见上方文档链接。
+在线请求会携带包来源标识，用于统计请求总量；设置 `INFERENCEX_TELEMETRY=0` 可关闭，
+采集字段及控制方式见上方链接。
 
-`@semianalysisai/inferencex-skills` 为 Codex 或 Claude Code 安装
-`inferencex-api` Agent Skill。它读取 InferenceX 已有的公开观测数据，为 PowerX、
-AgentX、结果溯源、TCO、框架版本比较和 CollectiveX 生成可离线复核的证据目录，
-不会启动新的基准测试。
+</details>
 
-### 安装
+## License
 
-需要 Node 24 或更高版本。0.12.0 发布并完成公开验证后，可执行：
-
-```bash
-# Codex
-npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- \
-  inferencex-skills install --target codex
-
-# Claude Code
-npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- \
-  inferencex-skills install --target claude
-```
-
-发布前审阅本地 `.tgz` 时，将 `--package` 的值换成产物绝对路径，并加上
-`--offline`。安装、`status`、`--dry-run` 和重新安装均须使用同一份候选产物。
-未发布版本返回 `ETARGET` 时，不能改用 `latest` 代替。Codex 安装到 `.agents/skills/inferencex-api/`，Claude Code
-安装到 `.claude/skills/inferencex-api/`。`--dir` 可指定自定义 skills 根目录。
-
-### 统一命令
-
-0.12.0 只提供一个查询入口：`inferencex`。复制 skill 不会把命令长期加入 `PATH`，
-因此应通过已安装脚本调用：
-
-```bash
-inferencex_cli=.agents/skills/inferencex-api/scripts/inferencex.mjs
-node "$inferencex_cli" discover models
-mkdir -p evidence
-node "$inferencex_cli" powerx export --model GLM-5 --isl 8192 --osl 1024 \
-  --output-dir evidence/powerx --require-hardware h200_sxm
-node "$inferencex_cli" verify evidence/powerx --require-hardware h200_sxm
-```
-
-Claude Code 将变量设为 `.claude/skills/inferencex-api/scripts/inferencex.mjs`。
-
-正式命令会创建一个新目录，保存结果、完整解码响应、请求记录、哈希、覆盖范围、
-policy 和最后写入的 manifest。退出码 0 表示目录完整且显式 policy 通过或未指定；
-退出码 3 表示证据有效，但显式覆盖要求未满足。完成后的证据目录不可修改，报告应写到
-同级路径，并在所有其他写入完成后执行离线校验。
-
-六个正式命令族分别是 `powerx export`、`agentx export`、`result inspect`、
-`tco compare`、`releases compare` 和 `collectivex compare`。完整参数、单位、
-日期和溯源规则见 [CLI 约定](skills/inferencex-api/references/cli.md)及各领域指南。
-
-### 从 0.11 及更早版本升级
-
-`status --json` 可查看当前安装，`install --force --dry-run --json` 可预览，
-`install --force` 执行升级。0.12.0 起会校验 package 完整性；0.11 及更早版本的 receipt 只用于识别
-旧版本，但仍可强制升级。安装器会保留不归当前 package 管理的文件，因此旧 helper
-可能继续留在磁盘上，但不属于 0.12.0 支持的命令。
-
-0.12.0 不支持直接执行领域脚本或 `verify-export.mjs`。需要处理旧版导出时，应固定使用
-生成该导出的历史 package。0.1.0 至 0.11.0 均为不可变的已发布版本；网站在 0.12.0
-发布并完成公开验证前继续固定到已验证的 0.11.0。
-
-0.12.0 仍处于 1.0 之前的开发阶段，后续次版本可能调整 CLI。证据格式的
-`schema_version: 1` 与包版本分别管理；1.0 稳定版留待后续发布。
-
-## License / 许可证
-
-GPL-3.0-or-later, matching the InferenceX-app repository.
-
-采用 GPL-3.0-or-later，与 InferenceX-app 仓库一致。
+[GPL-3.0-or-later](https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/packages/skills/LICENSE).

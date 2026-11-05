@@ -1,7 +1,10 @@
 'use client';
 
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { CHIP_BASIS_METRICS, chipBasisCsvNote } from '@/lib/benchmarks/chip-basis';
+import { track } from '@/lib/analytics/analytics';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
+import { useLocale } from '@/lib/i18n/use-locale';
+import dynamic from 'next/dynamic';
 import React, { useCallback, useMemo, useState } from 'react';
 
 import {
@@ -10,11 +13,12 @@ import {
   useInferenceDisplay,
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
-import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
+import { useGlobalFilterActions, useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 import { useInterpolatedTrendData } from '@/components/inference/hooks/useInterpolatedTrendData';
 import type { TrendLineConfig } from '@/components/inference/types';
 import ChartControls from '@/components/inference/ui/ChartControls';
 import { CostTierSelector } from '@/components/inference/ui/CostTierSelector';
+import { TcoBasisCaption } from '@/components/inference/ui/TcoBasisCaption';
 import TrendChart from '@/components/inference/ui/TrendChart';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
@@ -23,23 +27,23 @@ import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header
 import { Heading } from '@/components/ui/heading';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { ResultContext } from '@/components/ui/result-context';
-import { exportToCsv } from '@/lib/csv-export';
-import { historicalTrendToCsv } from '@/lib/csv-export-helpers';
+import { exportToCsv } from '@/lib/export/csv-export';
+import { historicalTrendToCsv } from '@/lib/export/csv-export-helpers';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getModelSortIndex } from '@/lib/constants';
+import { getModelSortIndex } from '@/lib/catalog/constants';
 import {
   type Model,
   type Precision,
-  type Sequence,
+  Sequence,
   getModelLabel,
   getPrecisionLabel,
   getSequenceLabel,
-} from '@/lib/data-mappings';
-import { getDisplayLabel } from '@/lib/utils';
+} from '@/lib/catalog/data-mappings';
+import { getDisplayLabel } from '@/lib/shared/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import {
   includesJalapenoResult,
@@ -48,25 +52,37 @@ import {
   JalapenoOfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
   Tpuv7OfficialPreviewNotice,
-} from '@/components/official-preview-notice';
-import { metricChartTitle, metricLabel } from '@/lib/chart-utils';
+} from '@/components/ui/official-preview-notice';
+import { metricChartTitle, metricLabel } from '@/lib/charts/chart-utils';
 import {
   costTierOptionLabel,
   metricCostTier,
+  METRIC_REGISTRY,
   type MetricKey,
 } from '@/components/inference/metric-registry';
 import { Button } from '@/components/ui/button';
 
+const ImprovementWaterfallChart = dynamic(
+  () => import('@/components/inference/ui/ImprovementWaterfallChart'),
+  { loading: () => <Skeleton className="h-[430px] w-full" /> },
+);
+
 const STRINGS = {
   en: {
+    chartView: 'Chart view',
+    line: 'Trend line',
+    waterfall: 'Improvement waterfall',
     heading: 'Historical Trends',
     description:
       'Interpolated performance metrics over time at a fixed interactivity operating point.',
     targetLabel: 'Target Interactivity (tok/s/user)',
+    agenticTargetLabel: 'Target P90 Interactivity (tok/s/user)',
+    agenticTargetTooltip:
+      'AgentX uses 1 / P90 full-response ITL in seconds, not P90 of token rates. Legacy ITL is used only when full-response mean/percentile ITL fields are absent. Missing or invalid P90 latency is omitted.',
     targetTooltip:
       "The interactivity operating point used for interpolation. Move the slider to see how each chip's performance changes at different interactivity levels.",
-    captionTitle: (yTitle: string, target: number) =>
-      `${yTitle} Over Time at ${target} tok/s/user Interactivity`,
+    captionTitle: (yTitle: string, target: number, isAgentic: boolean) =>
+      `${yTitle} Over Time at ${target} tok/s/user ${isAgentic ? 'P90 ' : ''}Interactivity`,
     source: 'Source: SemiAnalysis InferenceX™',
     updated: 'Updated:',
     logScale: 'Log Scale',
@@ -80,12 +96,18 @@ const STRINGS = {
     targetHint: 'Adjust the operating point used by the trend interpolation.',
   },
   zh: {
+    chartView: '图表视图',
+    line: '趋势线',
+    waterfall: '性能提升瀑布图',
     heading: '历史趋势',
     description: '将交互性固定在指定水平后，展示各项性能指标随时间的变化；数据经插值计算。',
     targetLabel: '目标交互性（tok/s/user）',
+    agenticTargetLabel: '目标 P90 交互性（tok/s/user）',
+    agenticTargetTooltip:
+      'AgentX 交互性为 P90 全响应 ITL（秒）的倒数，不是 token 速率的 P90。仅当全响应 ITL 的均值和分位数字段均缺失时才使用旧版 ITL。P90 延迟缺失或无效的数据点不参与计算。',
     targetTooltip: '设置插值计算采用的交互性水平。移动滑块可比较不同交互性水平下的芯片性能。',
-    captionTitle: (yTitle: string, target: number) =>
-      `${yTitle} 随时间变化（交互性 ${target} tok/s/user）`,
+    captionTitle: (yTitle: string, target: number, isAgentic: boolean) =>
+      `${yTitle} 随时间变化（${isAgentic ? 'P90 ' : ''}交互性 ${target} tok/s/user）`,
     source: '来源：SemiAnalysis InferenceX™',
     updated: '更新时间：',
     logScale: '对数缩放',
@@ -109,13 +131,22 @@ function historicalRunDate(date: string, locale: 'en' | 'zh'): string {
 }
 
 export default function HistoricalTrendsDisplay() {
-  const { tcoBasis } = useGlobalFilterSelection();
+  const [chartView, setChartView] = useState<'line' | 'waterfall'>('line');
+  const PerformanceChart = chartView === 'waterfall' ? ImprovementWaterfallChart : TrendChart;
+  const { tcoBasis, chipBasis } = useGlobalFilterSelection();
+  const { setChipBasis } = useGlobalFilterActions();
+  const chipBasisControl = useMemo(
+    () => ({ value: chipBasis, onChange: setChipBasis, source: 'historical' }),
+    [chipBasis, setChipBasis],
+  );
   const locale = useLocale();
   const t = STRINGS[locale];
   const { graphs, loading, error, hardwareConfig, hwTypesWithData, availableDates } =
     useInferenceData();
   const { selectedModel, selectedSequence, selectedPrecisions, activeHwTypes, selectedRunDate } =
     useInferenceFilters();
+  const isAgentic = selectedSequence === Sequence.AgenticTraces;
+  const targetLabel = isAgentic ? t.agenticTargetLabel : t.targetLabel;
   const { selectedYAxisMetric, tokenRevenuePricing, logScale, isLegendExpanded, highContrast } =
     useInferenceDisplay();
   const {
@@ -127,13 +158,10 @@ export default function HistoricalTrendsDisplay() {
     setHighContrast,
   } = useInferenceActions();
 
-  // Graph definitions can outlive empty results; hardware metadata is built
-  // from source rows before selected-metric coverage and clipping filters.
   const hasInteractivityChart =
     Object.keys(hardwareConfig).length > 0 &&
     graphs.some((g) => g.chartDefinition.chartType === 'interactivity');
 
-  // Get Y-axis label and title from chart definition
   const currentYLabel = useMemo(() => {
     if (graphs.length === 0) return '';
     return metricLabel(graphs[0].chartDefinition, selectedYAxisMetric, locale);
@@ -144,7 +172,6 @@ export default function HistoricalTrendsDisplay() {
     return metricChartTitle(graphs[0].chartDefinition, selectedYAxisMetric, locale);
   }, [graphs, locale, selectedYAxisMetric]);
 
-  // Interactivity range from current chart data
   const interactivityRange = useMemo(() => {
     const g = graphs.find((graph) => graph.chartDefinition.chartType === 'interactivity');
     if (!g || g.data.length === 0) return { min: 0, max: 200 };
@@ -152,7 +179,6 @@ export default function HistoricalTrendsDisplay() {
     return { min: Math.ceil(Math.min(...xs)), max: Math.floor(Math.max(...xs)) };
   }, [graphs]);
 
-  // Slider state (dual: numeric value + string for input display)
   const [targetInteractivity, setTargetInteractivity] = useState(35);
   const [interactivityInput, setInteractivityInput] = useState('35');
 
@@ -183,7 +209,6 @@ export default function HistoricalTrendsDisplay() {
     track('historical_trend_target_input', { value: targetInteractivity });
   }, [interactivityInput, targetInteractivity, interactivityRange]);
 
-  // Interpolated trend data
   const {
     trendLines,
     loading: trendLoading,
@@ -199,9 +224,9 @@ export default function HistoricalTrendsDisplay() {
     tokenRevenuePricing,
     enabled: hasInteractivityChart,
     tcoBasis,
+    chipBasis,
   });
 
-  // High contrast color support
   const activeHwKeys = useMemo(() => [...activeHwTypes], [activeHwTypes]);
   const { resolveColor } = useThemeColors({
     highContrast,
@@ -209,7 +234,6 @@ export default function HistoricalTrendsDisplay() {
     activeKeys: activeHwKeys,
   });
 
-  // Line configs for TrendChart — one per visible GPU+precision combo
   const lineConfigs = useMemo(
     (): TrendLineConfig[] =>
       [...trendLines.keys()]
@@ -239,9 +263,6 @@ export default function HistoricalTrendsDisplay() {
   const showsVeraRubinPreview = includesVeraRubinResult(lineConfigs.map((config) => config.hwKey));
   const showsTpuv7Preview = includesTpuv7Result(lineConfigs.map((config) => config.hwKey));
 
-  // Check `error` before the loading skeleton: a failed benchmark query never
-  // produces rows, so `loading` (which includes "no rows yet") would otherwise
-  // pin the page on the skeleton forever instead of surfacing the error card.
   if (error) {
     return (
       <section data-testid="historical-trends-display">
@@ -274,11 +295,7 @@ export default function HistoricalTrendsDisplay() {
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader title={t.heading} description={t.description} />
-            <ChartControls
-              tcoSource="historical"
-              hideGpuComparison
-              showTcoBasis={[...activeHwTypes].some((key) => key.split('_')[0] === 'tpuv7')}
-            />
+            <ChartControls tcoSource="historical" hideGpuComparison />
             <div className="space-y-2">
               <Skeleton className="h-5 w-56" />
               <Skeleton className="h-9 w-full" />
@@ -322,7 +339,6 @@ export default function HistoricalTrendsDisplay() {
 
   return (
     <section data-testid="historical-trends-display" className="flex flex-col gap-4">
-      {/* Controls card — same selectors as Inference Performance tab */}
       <Card className="relative z-30">
         <div className="flex flex-col gap-4">
           <DashboardSectionHeader
@@ -330,20 +346,15 @@ export default function HistoricalTrendsDisplay() {
             description={t.description}
             actions={<ChartShareActions />}
           />
-          <ChartControls
-            tcoSource="historical"
-            hideGpuComparison
-            showTcoBasis={[...activeHwTypes].some((key) => key.split('_')[0] === 'tpuv7')}
-          />
+          <ChartControls tcoSource="historical" hideGpuComparison />
 
-          {/* Target interactivity slider */}
           {!loading && hasInteractivityChart && (
             <TooltipProvider delayDuration={0}>
               <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-2">
                 <LabelWithTooltip
                   htmlFor="historical-target"
-                  label={t.targetLabel}
-                  tooltip={t.targetTooltip}
+                  label={targetLabel}
+                  tooltip={isAgentic ? t.agenticTargetTooltip : t.targetTooltip}
                 />
                 <p className="text-xs text-muted-foreground">{t.targetHint}</p>
                 <div className="flex flex-wrap items-center gap-3 sm:gap-4">
@@ -354,7 +365,7 @@ export default function HistoricalTrendsDisplay() {
                       max={interactivityRange.max}
                       step={1}
                       value={targetInteractivity}
-                      aria-label={t.targetLabel}
+                      aria-label={targetLabel}
                       data-testid="historical-target-slider"
                       onChange={handleSliderChange}
                       onPointerUp={() =>
@@ -393,7 +404,7 @@ export default function HistoricalTrendsDisplay() {
                     onBlur={handleInputBlur}
                     className="w-24 shrink-0"
                     min={0}
-                    aria-label={t.targetLabel}
+                    aria-label={targetLabel}
                     data-testid="historical-target-input"
                   />
                 </div>
@@ -403,13 +414,38 @@ export default function HistoricalTrendsDisplay() {
         </div>
       </Card>
 
-      {/* Chart card */}
       {hasInteractivityChart ? (
         <section>
           <figure data-testid="historical-trend-figure" className="relative rounded-lg">
             <ChartButtons
               chartId="historical-trend"
+              hideZoomReset={chartView === 'waterfall'}
+              leadingControls={
+                <div role="group" aria-label={t.chartView} className="flex gap-1">
+                  {(['line', 'waterfall'] as const).map((view) => (
+                    <Button
+                      key={view}
+                      size="sm"
+                      variant={chartView === view ? 'secondary' : 'ghost'}
+                      aria-pressed={chartView === view}
+                      data-testid={`historical-view-${view}`}
+                      onClick={() => {
+                        setChartView(view);
+                        track('historical_chart_view_changed', { view });
+                      }}
+                    >
+                      {t[view]}
+                    </Button>
+                  ))}
+                </div>
+              }
               analyticsPrefix="historical"
+              analyticsContext={selectionAnalyticsContext({
+                model: selectedModel,
+                sequence: selectedSequence,
+                precisions: selectedPrecisions,
+                gpuCount: activeHwTypes.size,
+              })}
               zoomResetEvent="d3chart_zoom_reset_historical-trend"
               setIsLegendExpanded={setIsLegendExpanded}
               exportFileName={`InferenceX_historical_${selectedModel}`}
@@ -419,17 +455,29 @@ export default function HistoricalTrendsDisplay() {
                   lineConfigs,
                   currentYLabel,
                   targetInteractivity,
+                  isAgentic ? 'p90' : 'median',
                 );
-                exportToCsv(`InferenceX_historical_${selectedModel}`, headers, rows);
+                exportToCsv(
+                  `InferenceX_historical_${selectedModel}`,
+                  headers,
+                  rows,
+                  CHIP_BASIS_METRICS.has(selectedYAxisMetric)
+                    ? [chipBasisCsvNote(chipBasis, locale)]
+                    : [],
+                );
               }}
             />
             <Card>
-              <TrendChart
+              <PerformanceChart
                 chartId="historical-trend"
+                lowerIsBetter={
+                  METRIC_REGISTRY[selectedYAxisMetric.replace(/^y_/u, '') as MetricKey]
+                    ?.polarity === 'lower'
+                }
                 caption={
                   <>
                     <Heading as="h2" level="card">
-                      {t.captionTitle(currentYTitle, targetInteractivity)}
+                      {t.captionTitle(currentYTitle, targetInteractivity, isAgentic)}
                     </Heading>
                     <ResultContext
                       locale={locale}
@@ -443,13 +491,13 @@ export default function HistoricalTrendsDisplay() {
                         const tier = metricCostTier(
                           selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,
                         );
-                        // Same copy as the selector so a PNG export matches it.
                         return tier ? costTierOptionLabel(tier, locale) : undefined;
                       })()}
-                      // The trend chart prices every point from the published
-                      // tiers, so Custom User Values is not offered here.
                       costTierControl={<CostTierSelector allowCustom={false} />}
-                      target={`${targetInteractivity} tok/s/user`}
+                      tcoBasis={
+                        <TcoBasisCaption hardwareKeys={activeHwTypes} source="historical" />
+                      }
+                      target={`${isAgentic ? 'P90 ' : ''}${targetInteractivity} tok/s/user`}
                       date={
                         selectedRunDate ? historicalRunDate(selectedRunDate, locale) : undefined
                       }
@@ -464,6 +512,7 @@ export default function HistoricalTrendsDisplay() {
                       includeAllPowerThroughputMetrics={false}
                       includePowerThroughputCaveat={false}
                       tcoBasis={tcoBasis}
+                      chipBasis={chipBasisControl}
                     />
                     <UnofficialDomainNotice />
                   </>
@@ -476,6 +525,7 @@ export default function HistoricalTrendsDisplay() {
                 legendElement={
                   <ChartLegend
                     variant="sidebar"
+                    collapsible={chartView === 'line'}
                     onItemRemove={removeHwType}
                     legendItems={Object.entries(hardwareConfig)
                       .filter(([key]) => hwTypesWithData.has(key))
@@ -492,24 +542,28 @@ export default function HistoricalTrendsDisplay() {
                         isActive: activeHwTypes.has(key),
                         onClick: () => {
                           toggleHwType(key);
-                          track('historical_hw_type_toggled', { hw: key });
+                          track('historical_hw_type_toggled', { gpu: key });
                         },
                       }))}
                     isLegendExpanded={isLegendExpanded}
                     onExpandedChange={(expanded) => {
                       setIsLegendExpanded(expanded);
-                      track('historical_legend_expanded', { expanded });
+                      track('historical_legend_expanded', { enabled: expanded });
                     }}
                     switches={[
-                      {
-                        id: 'historical-log-scale',
-                        label: t.logScale,
-                        checked: logScale,
-                        onCheckedChange: (checked: boolean) => {
-                          setLogScale(checked);
-                          track('historical_log_scale_toggled', { enabled: checked });
-                        },
-                      },
+                      ...(chartView === 'line'
+                        ? [
+                            {
+                              id: 'historical-log-scale',
+                              label: t.logScale,
+                              checked: logScale,
+                              onCheckedChange: (checked: boolean) => {
+                                setLogScale(checked);
+                                track('historical_log_scale_toggled', { enabled: checked });
+                              },
+                            },
+                          ]
+                        : []),
                       {
                         id: 'historical-high-contrast',
                         label: t.highContrast,

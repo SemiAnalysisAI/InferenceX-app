@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { fetchReliability } from '@/lib/api';
+import { fetchReliabilityDaily } from '@/lib/api/api';
 
 export function useReliability() {
   return useQuery({
     queryKey: ['reliability'],
-    queryFn: ({ signal }) => fetchReliability(signal),
+    queryFn: ({ signal }) => fetchReliabilityDaily(signal),
   });
 }

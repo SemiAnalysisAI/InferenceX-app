@@ -1,4 +1,3 @@
-/** Label/value pair for the summary <dl> grids on dataset and conversation pages. */
 export function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>

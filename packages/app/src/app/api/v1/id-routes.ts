@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { cachedJson } from '@/lib/api-cache';
-import { PUBLIC_API_ERRORS, publicApiError, tooManyIdsError } from '@/lib/public-api-errors';
+import { cachedJson } from '@/lib/cache/api-cache';
+import { PUBLIC_API_ERRORS, publicApiError, tooManyIdsError } from '@/lib/api/public-api-errors';
 
 /**
  * Shared GET-handler factories for the agentic benchmark routes, which all
@@ -12,7 +12,7 @@ import { PUBLIC_API_ERRORS, publicApiError, tooManyIdsError } from '@/lib/public
  * Both preserve the v1 error contract: 400 with `{error}` for bad params,
  * 404 `{error: 'Not found'}` when a single-id lookup misses, and 500
  * `{error: 'Internal server error'}` (with a console.error) on query failure.
- * Success payloads go through `cachedJson` for CDN caching + gzip.
+ * Success payloads go through `cachedJson` for CDN caching + compression.
  */
 
 /**
@@ -55,7 +55,7 @@ export function idsQueryRoute<T>(options: {
     const ids = parseIdsParam(request, maxIds);
     if (ids instanceof NextResponse) return ids;
     try {
-      return cachedJson(await fetch(ids));
+      return cachedJson(request, await fetch(ids));
     } catch (error) {
       console.error(`Error fetching ${logLabel}:`, error);
       return publicApiError(PUBLIC_API_ERRORS.internal, 500);
@@ -71,13 +71,13 @@ export function idQueryRoute<T>(options: {
   const { logLabel, fetch } = options;
   return async (request: NextRequest) => {
     const id = Number(request.nextUrl.searchParams.get('id'));
-    if (!id || !Number.isFinite(id)) {
+    if (!Number.isSafeInteger(id) || id <= 0) {
       return publicApiError(PUBLIC_API_ERRORS.idRequired, 400);
     }
     try {
       const data = await fetch(id);
       if (!data) return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
-      return cachedJson(data);
+      return cachedJson(request, data);
     } catch (error) {
       console.error(`Error fetching ${logLabel}:`, error);
       return publicApiError(PUBLIC_API_ERRORS.internal, 500);

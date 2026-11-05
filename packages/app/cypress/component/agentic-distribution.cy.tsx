@@ -2,14 +2,11 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 
 import { Distribution } from '@/components/inference/agentic-point/distribution';
 
-// Mounted outside the Next app shell; next-style-loader inserts the global
-// stylesheet before this anchor, so it must exist before the import below.
 const cssAnchor = document.createElement('noscript');
 cssAnchor.id = '__next_css__DO_NOT_USE__';
 document.head.append(cssAnchor);
 require('@/app/globals.css');
 
-/** Deterministic lognormal sample so bar counts and the fit are reproducible. */
 function lognormalSample(count: number, mu: number, sigma: number): number[] {
   let seed = 987_654;
   const uniform = () => {
@@ -41,21 +38,17 @@ describe('Agentic ISL/OSL distribution', () => {
 
     cy.contains('1,500 requests').should('be.visible');
     cy.contains('log scale').should('be.visible');
-    // Bars only — no fitted overlay or stats readout.
     cy.contains('lognormal fit').should('not.exist');
     cy.contains('μ=').should('not.exist');
     cy.get(`path[stroke="${FIT_STROKE}"]`).should('not.exist');
     cy.get('rect[opacity="0.55"]').should('have.length.greaterThan', 10);
 
-    // Percentile guides remain, one per percentile.
     cy.get(
       'line[stroke="#3b82f6"], line[stroke="#22c55e"], line[stroke="#f59e0b"], line[stroke="#ef4444"]',
     ).should('have.length', 8);
   });
 
   it('spreads mass across the axis instead of piling it into the first bins', () => {
-    // The point of the log axis: on a linear one this sample puts almost
-    // everything in the leftmost bins. Assert the tallest bar is not the first.
     mountDistribution(lognormalSample(1500, 7.3, 0.9));
     cy.get('rect[opacity="0.55"]').then(($bars) => {
       const heights = [...$bars].map((bar) => Number(bar.getAttribute('height')));

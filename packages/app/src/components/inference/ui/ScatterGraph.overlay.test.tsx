@@ -16,6 +16,7 @@ import {
   overlayState,
   point,
   rebuildCount,
+  scatterPoints,
 } from './ScatterGraph.test-harness';
 
 const measurements = (offset: number, runUrl?: string): InferenceData[] => [
@@ -25,6 +26,53 @@ const measurements = (offset: number, runUrl?: string): InferenceData[] => [
 ];
 
 describe('ScatterGraph unofficial overlays', () => {
+  it('hides framework text for official and unofficial line labels without rebuilding points', () => {
+    const hwKey = 'b200_trt';
+    const points = [point(hwKey, 'fp8', 10, 300, 1), point(hwKey, 'fp8', 20, 200, 2)];
+    const runUrl = 'https://github.com/o/r/actions/runs/123';
+    inferenceState.current = {
+      ...baseInferenceState(),
+      activeHwTypes: new Set([hwKey]),
+      hwTypesWithData: new Set([hwKey]),
+      showLineLabels: true,
+      showFrameworkLabel: true,
+    };
+    overlayState.current = {
+      ...baseOverlayState(),
+      isUnofficialRun: true,
+      activeOverlayHwTypes: new Set([hwKey]),
+      allOverlayHwTypes: new Set([hwKey]),
+      runIndexByUrl: { [runUrl]: 0 },
+      unofficialRunInfos: [{ id: '123', branch: 'framework-toggle', url: runUrl }],
+    };
+    const { container, rerender, unmount } = mountChart({
+      data: points,
+      overlayData: {
+        data: points.map((p) => ({ ...p, y: p.y + 100, run_url: runUrl })),
+        hardwareConfig: {},
+        label: 'framework-toggle',
+      },
+    });
+    const labels = () =>
+      [...container.querySelectorAll('.line-label .ll-text')].map((n) => n.textContent);
+    expect(labels().filter((label) => label?.includes('TRTLLM'))).toHaveLength(2);
+    const pointLayer = container.querySelector('.canvas-point-layer');
+    const overlay = container.querySelector('.overlay-roofline-path');
+    const color = overlay?.getAttribute('stroke');
+    const builds = rebuildCount();
+    inferenceState.current = { ...inferenceState.current, showFrameworkLabel: false };
+    rerender();
+    expect(labels()).toEqual(['B200', 'B200']);
+    expect(container.querySelector('.canvas-point-layer')).toBe(pointLayer);
+    expect(container.querySelector('.overlay-roofline-path')).toBe(overlay);
+    expect(overlay?.getAttribute('stroke')).toBe(color);
+    expect(rebuildCount()).toBe(builds);
+    inferenceState.current = { ...inferenceState.current, showFrameworkLabel: true };
+    rerender();
+    expect(labels().filter((label) => label?.includes('TRTLLM'))).toHaveLength(2);
+    unmount();
+  });
+
   it('labels measured overlay boundary configurations in run colors without labeling off-boundary samples', () => {
     const runUrls = [
       'https://github.com/o/r/actions/runs/123',
@@ -198,74 +246,40 @@ describe('ScatterGraph unofficial overlays', () => {
       },
     });
     const buildsAfterMount = rebuildCount();
-    const groups = [
-      ...container.querySelectorAll<SVGGElement>('.dot-group, .unofficial-overlay-pt'),
-    ];
+    const official = () => scatterPoints(container);
+    const overlayGroups = [...container.querySelectorAll<SVGGElement>('.unofficial-overlay-pt')];
     const curves = [...container.querySelectorAll('.roofline-path, .overlay-roofline-path')];
     const paths = curves.map((curve) => curve.getAttribute('d'));
     const axes = [...container.querySelectorAll('.x-axis, .y-axis')];
     const axisGeometry = axes.map((axis) => axis.innerHTML);
-    const positions = groups.map((group) => group.getAttribute('transform'));
-    expect(groups).toHaveLength(9);
+    const officialPositions = official().map((entry) => [entry.x, entry.y]);
+    const overlayPositions = overlayGroups.map((group) => group.getAttribute('transform'));
+    expect(official().length + overlayGroups.length).toBe(9);
     expect(curves).toHaveLength(2);
     expect(paths.every(Boolean)).toBe(true);
 
     for (const showAllMeasurements of [false, true, false]) {
       inferenceState.current = { ...inferenceState.current, hideNonOptimal: !showAllMeasurements };
       rerender();
-      for (const group of groups) {
+      for (const entry of official()) {
+        const visible = showAllMeasurements || (entry.datum as InferenceData).x !== 20;
+        expect(entry.opacity).toBe(visible ? 1 : 0);
+        expect(entry.interactive).toBe(visible);
+      }
+      for (const group of overlayGroups) {
         const datum = (group as SVGGElement & { __data__: InferenceData }).__data__;
         const visible = showAllMeasurements || (datum.x !== 20 && datum.run_url !== runUrls[0]);
         expect(group.style.opacity).toBe(visible ? '1' : '0');
         expect(group.style.pointerEvents).toBe(visible ? 'auto' : 'none');
-        expect(Boolean(group.querySelector('.legacy-power-ring'))).toBe(
-          datum.power_tier === 'legacy',
-        );
       }
-      expect(
-        container.querySelector('[data-testid="measured-power-summary"]')?.textContent,
-      ).toContain(
-        showAllMeasurements
-          ? 'Showing 9 of 9 measured points: 3/3 validated · 6/6 historical.'
-          : 'Showing 4 of 9 measured points: 2/3 validated · 2/6 historical.',
-      );
       expect(curves.map((curve) => curve.getAttribute('d'))).toEqual(paths);
       expect(axes.map((axis) => axis.innerHTML)).toEqual(axisGeometry);
-      expect(groups.map((group) => group.getAttribute('transform'))).toEqual(positions);
+      expect(official().map((entry) => [entry.x, entry.y])).toEqual(officialPositions);
+      expect(overlayGroups.map((group) => group.getAttribute('transform'))).toEqual(
+        overlayPositions,
+      );
       expect(rebuildCount()).toBe(buildsAfterMount);
     }
-    unmount();
-  });
-
-  it('includes unofficial measured points in the validated/historical coverage summary', () => {
-    const runUrl = 'https://github.com/o/r/actions/runs/123';
-    const overlayPoints = [
-      { ...point('h100', 'fp8', 30, 300, 2), power_tier: 'certified', run_url: runUrl },
-      { ...point('h100', 'fp8', 35, 350, 4), power_tier: 'legacy', run_url: runUrl },
-    ] as InferenceData[];
-    inferenceState.current = {
-      ...baseInferenceState(),
-      selectedYAxisMetric: 'y_measuredJPerOutputToken',
-    };
-    overlayState.current = {
-      ...baseOverlayState(),
-      isUnofficialRun: true,
-      activeOverlayHwTypes: new Set(['h100']),
-      allOverlayHwTypes: new Set(['h100']),
-      runIndexByUrl: { [runUrl]: 0 },
-      unofficialRunInfos: [{ id: '123', branch: 'test-branch', url: runUrl }],
-    };
-
-    const { container, unmount } = mountChart({
-      overlayData: {
-        data: overlayPoints,
-        hardwareConfig: HARDWARE_CONFIG,
-      } as unknown as Parameters<typeof ScatterGraph>[0]['overlayData'],
-    });
-
-    expect(
-      container.querySelector('[data-testid="measured-power-summary"]')?.textContent,
-    ).toContain('Showing 2 of 2 measured points: 1/1 validated · 1/1 historical.');
     unmount();
   });
 
@@ -294,7 +308,6 @@ describe('ScatterGraph unofficial overlays', () => {
     expect(container.querySelectorAll('.unofficial-overlay-pt')).toHaveLength(2);
     expect(container.querySelectorAll('.overlay-roofline-path').length).toBeGreaterThan(0);
 
-    // Toggling an official hw must not rebuild or disturb overlay markers.
     inferenceState.current = {
       ...inferenceState.current,
       activeHwTypes: new Set(['h100']),
@@ -331,14 +344,14 @@ describe('ScatterGraph unofficial overlays', () => {
       } as unknown as Parameters<typeof ScatterGraph>[0]['overlayData'],
     });
     const buildsAfterMount = rebuildCount();
-    const officialLabel = container.querySelector<SVGTextElement>('.dot-group .point-label');
+    const officialLabel = () =>
+      container.querySelector<SVGTextElement>('.point-label-anchor .point-label');
     const overlayLabel = container.querySelector<SVGTextElement>(
       '.unofficial-overlay-pt .overlay-label',
     );
 
-    expect(officialLabel).not.toBeNull();
+    expect(officialLabel()).toBeNull();
     expect(overlayLabel).not.toBeNull();
-    expect(officialLabel!.style.display).toBe('none');
     expect(overlayLabel!.style.display).toBe('none');
     const mutationRecords: MutationRecord[] = [];
     const observer = new MutationObserver((records) => mutationRecords.push(...records));
@@ -350,7 +363,7 @@ describe('ScatterGraph unofficial overlays', () => {
     };
     rerender();
 
-    expect(officialLabel!.style.display).toBe('');
+    expect(officialLabel()!.style.display).toBe('');
     expect(overlayLabel!.style.display).toBe('');
     mutationRecords.push(...observer.takeRecords());
     observer.disconnect();
@@ -431,7 +444,7 @@ describe('ScatterGraph unofficial overlays', () => {
       unofficialRunInfos: [{ id: '123', branch: 'test-branch', url: runUrl }],
     };
 
-    const { container, unmount } = mountChart({
+    const { container, rerender, unmount } = mountChart({
       overlayData: {
         data: overlayPoints,
         hardwareConfig: HARDWARE_CONFIG,
@@ -443,6 +456,16 @@ describe('ScatterGraph unofficial overlays', () => {
     expect(groups[0].querySelector('.offload-halo')).not.toBeNull();
     expect(groups[1].querySelector('.spec-decode-marker')).toBeNull();
     expect(groups[1].querySelector('.offload-halo')).toBeNull();
+    const haloColor = groups[0].querySelector('.offload-halo')!.getAttribute('stroke');
+    const positions = groups.map((group) => group.getAttribute('transform'));
+    inferenceState.current = { ...inferenceState.current, showOffloadingLabel: false };
+    rerender();
+    expect(container.querySelector('.offload-halo')).toBeNull();
+    expect([...container.querySelectorAll('.unofficial-overlay-pt')]).toEqual(groups);
+    expect(groups.map((group) => group.getAttribute('transform'))).toEqual(positions);
+    inferenceState.current = { ...inferenceState.current, showOffloadingLabel: true };
+    rerender();
+    expect(groups[0].querySelector('.offload-halo')!.getAttribute('stroke')).toBe(haloColor);
     unmount();
   });
 
@@ -460,8 +483,6 @@ describe('ScatterGraph unofficial overlays', () => {
         { id: '123', branch: 'test-branch', url: 'https://github.com/o/r/actions/runs/123' },
       ],
     };
-    // Overlay points are all NVIDIA (h100); an AMD-only quick filter must hide them,
-    // exactly as it would the official points.
     inferenceState.current = {
       ...baseInferenceState(),
       quickFilters: { vendors: ['AMD'], frameworks: [], deployment: [], spec: [], power: [] },

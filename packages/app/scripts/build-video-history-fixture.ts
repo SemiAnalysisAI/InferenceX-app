@@ -1,0 +1,84 @@
+/**
+ * Rebuild cypress/fixtures/api/video-history.json from retained StoredArtifact
+ * exports (frontend exports of the original CI artifacts; no new benchmark and
+ * no new publication). Entries whose run has no local export are kept verbatim,
+ * so fidelity-only entries survive a rebuild untouched.
+ *
+ * Usage:
+ *   bun scripts/build-video-history-fixture.ts <dir-with-<runId>.json>
+ *
+ * Exports for runs the fixture does not list yet are added as new entries.
+ */
+
+import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+
+import {
+  videoHistoryEntry,
+  type VideoHistoryEntry,
+  type VideoHistoryPage,
+} from '../src/components/video-benchmark/history';
+import type { StoredArtifact } from '../src/components/video-benchmark/stored';
+import {
+  FIXTURE_MANIFEST_FILENAME,
+  type FixtureManifest,
+  assertFixtureContent,
+  fixtureSha256,
+  fixtureTopLevel,
+} from '../src/lib/testing/test-fixture-manifest';
+
+const FIXTURE_NAME = 'video-history';
+const fixturesDir = resolve(import.meta.dirname, '..', 'cypress', 'fixtures', 'api');
+const source = process.argv[2];
+if (!source) throw new Error('Pass the directory holding retained <runId>.json exports');
+
+const current = JSON.parse(
+  await readFile(resolve(fixturesDir, `${FIXTURE_NAME}.json`), 'utf8'),
+) as VideoHistoryPage;
+const exports = new Map<string, StoredArtifact>();
+const files = await readdir(source);
+for (const file of files.filter((name) => /^\d+\.json$/u.test(name))) {
+  const saved = JSON.parse(await readFile(resolve(source, file), 'utf8')) as StoredArtifact;
+  if (saved.storageVersion !== 1) throw new Error(`${file} is not a storageVersion 1 export`);
+  exports.set(`${saved.runId}.${saved.artifact.id}`, saved);
+}
+
+let rebuilt = 0;
+const known = new Set(current.entries.map((entry) => entry.id));
+const entries: VideoHistoryEntry[] = current.entries.map((entry) => {
+  const saved = exports.get(entry.id);
+  if (!saved) return entry;
+  rebuilt += 1;
+  const next = videoHistoryEntry(saved, entry.publishedAt);
+  // The existing fixture already carries the artifact identity (size, digest); keep it.
+  // Preserve fixture-only chart approval when rebuilding a retained observation.
+  // A newly added export remains unapproved: an export is not a publication.
+  return { ...next, approved: entry.approved, artifact: { ...next.artifact, ...entry.artifact } };
+});
+// An export the fixture has not seen becomes a new entry after the existing ones: an export
+// is not a publication, so its publication time stays unknown and it sorts after dated entries.
+const added = [...exports.values()].filter(
+  (saved) => !known.has(`${saved.runId}.${saved.artifact.id}`),
+);
+entries.push(...added.map((saved) => videoHistoryEntry(saved, null)));
+const page: VideoHistoryPage = { schemaVersion: 1, entries, nextPage: current.nextPage };
+assertFixtureContent(FIXTURE_NAME, page);
+const body = `${JSON.stringify(page, null, 2)}\n`;
+await writeFile(resolve(fixturesDir, `${FIXTURE_NAME}.json`), body);
+
+const manifestPath = resolve(fixturesDir, FIXTURE_MANIFEST_FILENAME);
+const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as FixtureManifest;
+const capturedAt = new Date().toISOString();
+manifest.fixtures[FIXTURE_NAME] = {
+  bytes: Buffer.byteLength(body),
+  capturedAt,
+  sha256: fixtureSha256(body),
+  source:
+    'Retained public H3 metadata replay; fixture-only synthetic approval flags exercise chart layout and do not record an actual publication. No new benchmark or production publication.',
+  topLevel: fixtureTopLevel(page),
+};
+manifest.generatedAt = capturedAt;
+await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+console.log(
+  `Wrote ${entries.length} entries; ${rebuilt} rebuilt and ${added.length} added from ${exports.size} exports`,
+);

@@ -6,7 +6,7 @@ import {
   type TraceServerMetrics,
 } from '@semianalysisai/inferencex-db/queries/trace-server-metrics';
 
-import { cachedQuery } from '@/lib/api-cache';
+import { cachedQuery } from '@/lib/cache/api-cache';
 
 import { idQueryRoute } from '../id-routes';
 

@@ -129,12 +129,10 @@ describe('Dataset distribution percentiles', () => {
     }
   });
 
-  it('shows median and mean model requests per conversation', () => {
+  it('summarizes subagents per trace instead of charting group counts', () => {
     cy.contains('dt', 'Median requests / convo').next('dd').should('have.text', '12');
     cy.contains('dt', 'Mean requests / convo').next('dd').should('have.text', '14.6');
-  });
 
-  it('summarizes subagents per trace instead of charting group counts', () => {
     cy.contains('dt', 'Median subagents / trace').next('dd').should('have.text', '3');
     cy.contains('dt', 'Mean subagents / trace').next('dd').should('have.text', '4.8');
     cy.contains('Subagent groups per conversation').should('not.exist');
@@ -157,11 +155,9 @@ describe('Dataset distribution percentiles', () => {
   it('localizes the distribution cards and conversation controls', () => {
     cy.visit('/zh/agentx/test-dataset', { onBeforeLoad: unlockAgenticGate });
 
-    // Representative labels only; exhaustive copy lives with the translations.
     cy.get('input[aria-label="搜索对话"]').should('exist');
     cy.contains('[data-slot="card"]', '每对话轮次数').within(() => {
       cy.get('[data-testid="distribution-unit"]').should('have.text', '轮次');
-      // Keyboard access keeps working on the localized route.
       cy.get('rect[role="slider"]')
         .focus()
         .should('have.attr', 'aria-valuetext')

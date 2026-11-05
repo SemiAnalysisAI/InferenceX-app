@@ -1,5 +1,70 @@
 # D3 Chart Design Rationale
 
+## Router-aware framework labels
+
+Inference line labels and legends use `router_name` from each point's runtime
+metadata. Plain `sglang` or `vllm` with router `smg` displays as `SMG SGLang`
+or `SMG vLLM`. If any point uses SMG, the entire curve's line label and legend
+use the SMG framework name without a mixed-name suffix. Curves with no SMG
+points keep the standard name, and point tooltips use only that point's
+metadata. This applies to official results and unofficial overlays.
+Hardware keys, framework filters and measurements do not change.
+The inference Views API uses the same helper for series and table labels.
+
+## Desktop legend alignment
+
+The shared chart wrapper places the desktop legend 8px below the plot's top
+guideline, using the same top margin as the SVG renderer. Below the `lg`
+breakpoint, the legend stays below the chart with its existing 12px gap.
+Official and unofficial series share this layout. This is presentation-only;
+API responses, filters, and `inferencex-skills` contracts are unchanged.
+
+## PNG export aspect ratio
+
+Inference charts keep the title above the plot and place cost controls, pricing
+assumptions, attribution, and the deployment notice below the plot and legend.
+The shared `D3Chart` / `D3ChartWrapper` `footer` slot keeps this context inside
+the chart's export root. PowerX retains its existing header layout.
+
+The inference footer omits the optimization note and prefix-cache navigation
+link. The complete ATOM disclaimer lives in the exportable chart footer whenever
+a selected official or unofficial series uses ATOM, including history comparisons.
+It appears below the plot in Auto, 16:9, and 1:1 PNG exports. Hidden ATOM series
+do not add the disclaimer.
+
+The download popover offers Auto, 16:9, and 1:1 for PNG export only. Auto retains
+the existing image dimensions. Fixed ratios lay out an offscreen clone at a
+1280×720 or 1000×1000 CSS-pixel frame (captured at 2× resolution). The exporter
+measures caption and source-footer space, then gives the remaining height and
+width to the plot. Long captions can grow the complete frame proportionally.
+The chart rebuilds axes, grids, points and curves using copied visible scales,
+without stretching a bitmap or adding letterbox bars. Text and mark sizes stay
+constant; official points and unofficial overlays use the new coordinates.
+
+Each D3 SVG registers a clone renderer. Export copies D3 bindings before keyed
+joins and namespaces SVG IDs to keep clipping/gradients independent of the live
+chart. Export decorations use `onExportRender`, never a callback that updates
+live-chart refs. Auto keeps the previous capture path.
+
+The choice stays local to each download menu. It does not resize the live chart,
+change benchmark data or share links, or affect CSV and MP4 export. The
+presentation-only choice has no read-only API parameter.
+
+PNG and replay MP4 link footers resolve background, foreground, and font from
+the active export context rather than choosing a separate light/dark palette.
+The footer retains the originating hostname and route and fits long links to
+the output width. This is presentation-only; API responses, skills, and benchmark
+data are unchanged.
+
+## Cost controls in the caption
+
+Inference and historical charts place TCO Basis immediately after Cost Tier
+below the graph. The model/scenario, cost-metric and visible-TPUv7 gates apply
+to official data and unofficial overlays. The shared caption field exports the
+selected basis as text; embedded charts do not expose interactive controls.
+This placement is presentation-only: `tcoBasis`, API responses, defaults and
+calculations are unchanged.
+
 ## Four Invalidation Phases
 
 One effect for every D3 operation takes roughly 500ms (React reconciliation ~200ms plus a full SVG update ~300ms). `D3Chart` separates structure, stable-identity data joins, metric coordinates, and display decoration. The most common interaction, switching the Y-axis metric, then takes roughly 100ms:
@@ -17,15 +82,9 @@ Custom layers that own scale-neutral decorations declare a `displayIdentity` and
 
 `ScatterGraph` further partitions Effect 4 because its controls have disjoint mutation scopes. Mark visibility, palette/shape, trace metadata, point-label visibility/collision, line-label placement, and known-issue annotations each have a dedicated layout effect. It deliberately omits the generic scatter `displayIdentity`: point-label toggles update only `.point-label` nodes, while the unofficial overlay layer's own display callback updates only `.overlay-label` nodes. Recombining these passes causes label toggles to restamp thousands of unchanged shape, visibility, and trace attributes.
 
-## In-Place Y-Value Mutation
+## In-Place Datum Mutation
 
-Effect 3 mutates `datum.y` directly on D3-bound data:
-
-```js
-dotGroups.each(function (d) {
-  d.y = resolveY(d);
-});
-```
+Effect 3 copies each point's new values onto its D3-bound datum by join key (`Object.assign(bound, next)` in `updateLayerForMetric`), then re-applies transforms.
 
 This is an intentional React anti-pattern. D3's data binding means each DOM element holds a reference to its datum. Mutating the datum and re-applying transforms is 10x faster than D3's full enter/update/exit cycle because there's no DOM creation or destruction.
 
@@ -38,18 +97,9 @@ The zoom handler runs on every mouse/touch event during drag. It reads scales, r
 
 ## requestAnimationFrame Throttling in Zoom
 
-During zoom/pan, point repositioning (cheap: transform attr update) runs every frame. Grid and roofline updates (expensive: full path recalculation) are batched via rAF:
+During zoom/pan, point repositioning (cheap: transform attr update) runs on every zoom event. Axis, grid, and roofline updates (expensive: full path recalculation) go through `createZoomFrameBatcher`, which keeps at most one frame queued and runs only the latest transform's work.
 
-```js
-if (!rafId) {
-  rafId = requestAnimationFrame(() => {
-    updateGridAndRooflines(lastTransform);
-    rafId = null;
-  });
-}
-```
-
-This keeps zoom at 60fps while deferring expensive work. The `rafId` guard prevents queuing multiple frames. Pending rAF is cancelled on unmount to prevent updates on removed DOM.
+This keeps zoom at 60fps while deferring expensive work. Effect cleanup cancels a pending frame so it never updates removed DOM.
 
 ## HTML Strings for Tooltips
 
@@ -58,18 +108,9 @@ Tooltips are built as HTML template literal strings, injected via D3's `.html()`
 1. `ReactDOM.render()` inside a D3 event handler (breaks React's lifecycle)
 2. Or lifting tooltip state to React (causes re-render cascade on every mousemove)
 
-HTML strings bypass React entirely. The tooltip div is a plain DOM element appended to `document.body`, positioned absolutely. This keeps tooltip updates at <1ms per frame.
+HTML strings bypass React entirely. D3 writes them into a tooltip div that is portaled to `document.body` and positioned with `position: fixed`. This keeps tooltip updates at <1ms per frame.
 
-## Pareto Front: 4 Directions
-
-Different metrics need different "optimal" directions:
-
-| Direction   | "Best" means   | Example metric                                                        |
-| ----------- | -------------- | --------------------------------------------------------------------- |
-| upper_right | High x, high y | (not currently used)                                                  |
-| upper_left  | Low x, high y  | Interactivity chart: low latency (x), high throughput (y)             |
-| lower_right | High x, low y  | Cost/energy chart: high interactivity (x), low $/M tok or J/token (y) |
-| lower_left  | Low x, low y   | (not currently used)                                                  |
+## Pareto Front Direction
 
 The metric registry declares whether higher or lower values are preferable. Chart definitions derive the concrete corner from that polarity and the chart's x-axis direction, which keeps the choice in data rather than rendering code.
 
@@ -77,63 +118,58 @@ The metric registry declares whether higher or lower values are preferable. Char
 
 ### Global Pareto highlights
 
-Every inference scatter chart exposes independent **Pareto Frontier** and
-**Pareto Hinterland** switches under **Advanced**, off by default.
+For machine-readable frontier and hinterland observations, see the
+[Pareto frontier and hinterland reference](../packages/skills/skills/inferencex-api/references/pareto.md).
+The server and chart share `src/lib/charts/pareto-frontier.ts`; their input-selection pipelines differ.
+
+Inference scatter charts with a performance-preference X axis expose a **Pareto Frontier** switch under
+**Advanced**, off by default.
 Collapsing Advanced does not turn off an enabled highlight.
-`i_frontier=1` and `i_hinterland=1`
-preserve plain shading in share links; value `2` restores the scenic background.
+`i_frontier=1` preserves plain shading in share links; value `2` restores the scenic background.
 The frontier pools the currently visible official
 and unofficial observations across the selected series and dates, after hardware,
 precision, quick filters and Optimal Only. It does not replace per-series curves.
+While enabled, hardware series with no observation on the global frontier render
+at 20% alpha, including their curves, points, labels and clipped continuations.
+All observations of a frontier hardware series retain their normal styling, and
+ties at a frontier coordinate keep every tied hardware series prominent.
+The alpha filter composes with visibility and hover opacity; switching the
+frontier off removes it. Official and unofficial marks use the same treatment.
 
 The global dotted line connects non-dominated observations with straight segments
 in rendered coordinates. Rings mark the observed vertices, including singleton
-frontiers. The orange dashed hinterland connects the worst boundary observations,
-computed by reversing both axis preferences. Green shading extends beyond the
-best boundary toward the best corner; red shading extends beyond the worst
-boundary toward the worst corner. The area between the boundaries stays clear.
-Neither line claims measured performance between observations.
+frontiers. Green shading extends beyond the frontier toward the best corner.
+The line does not claim measured performance between observations.
 The resolved axis directions determine the preferred corner,
 including custom metrics, latency, cost and energy. Power uses lower power as the
 preferred Y direction, separately from the existing upper load-sweep boundaries.
 
-Each toggle cycles independently: off → plain fill → off → scenic background → off →
+The toggle cycles: off → plain fill → off → scenic background → off →
 plain fill. The frontier uses a sunny castle landscape with butterflies. The
-hinterland uses a dark purple swamp landscape. These are original AI-generated
-decorative scenes, not benchmark data or imagery from a game franchise.
+scene is an original AI-generated decoration, not benchmark data or imagery from a game franchise.
 Switching metrics retains the mode. Switching off hides the line and background.
-Each scene covers the full plot once (`xMidYMid slice`) at 30% opacity and is cut
+The scene covers the full plot once (`xMidYMid slice`) at 30% opacity and is cut
 off by the boundary path. It is not tiled or fitted to the shaded region. The
 background stays fixed in screen coordinates while the boundary follows zoom.
-Optimized WebP assets live under `public/decorative/pareto/` and load only when the
+The optimized WebP asset lives under `public/decorative/pareto/` and loads only when the
 scenic mode is enabled.
 
 These are SVG decorations, so exports include them. Their custom display layer
 updates with visibility, log scales and zoom without taking point pointer events.
 One-dimensional GPU, history and evaluation charts have no two-objective Pareto
-region and do not expose these switches.
+region and do not expose this switch.
 
-The six measured-power metrics (average, prefill, decode, P75, P90 and percentage of TDP) draw a fixed upper power boundary across tested configurations. **Optimal Only** shows boundary points when on and all measurements when off, preserving curve geometry, axis domains and zoom. These views use no separate **Show all measurements** switch. The boundary describes power demand across the load sweep; energy-per-token metrics retain their lower-energy Pareto frontiers.
+The six measured-power metrics (average, prefill, decode, P75, P90 and percentage of TDP) draw a fixed upper power boundary across tested configurations. **Optimal Only** shows boundary points when on and all measurements when off, preserving curve geometry, axis domains and zoom. The boundary describes power demand across the load sweep; energy-per-token metrics retain their lower-energy Pareto frontiers.
 
-Modeled chassis power retains its existing behavior: **Optimal Only** on shows the minimum-power Pareto frontier, which can legitimately contain one point. Turning it off draws the upper power boundary. In that mode, the separate **Show all measurements** switch (`i_allpoints=1`) reveals off-boundary points without changing the curve.
-
-Dividing watts by one hardware's positive, constant TDP preserves its boundary membership. A lower percentage across different chips is not, by itself, an energy-efficiency comparison. Historical rings remain attached to visible historical points.
+Dividing watts by one hardware's positive, constant TDP preserves its boundary membership. A lower percentage across different chips is not, by itself, an energy-efficiency comparison.
 
 Upper boundaries use monotone interpolation between unique-X vertices, including after zoom. Curves are grouped by hardware, precision and date, and additionally by run for unofficial overlays; unrelated dates and runs never share a curve.
 
-**Perf Ruler** is available on all six measured-power axes in both chart views. It measures the ratio of the drawn upper-boundary values at the same X coordinate, using the rendered paths after zoom; clicking an off-boundary dot selects its series' boundary, clamped to the curves' shared X range. The ratio compares power or percentage of TDP, not energy efficiency. Optimal Only changes point visibility without moving the ruler. Hidden or removed curves cannot be measured, and changing either axis clears existing rulers. Modeled chassis power keeps its existing ruler restriction while showing an upper boundary; energy and other Pareto views retain their ruler behavior.
+**Perf Ruler** is available on all six measured-power axes in both chart views. It measures the ratio of the drawn upper-boundary values at the same X coordinate, using the rendered paths after zoom; clicking an off-boundary dot selects its series' boundary, clamped to the curves' shared X range. The ratio compares power or percentage of TDP, not energy efficiency. Optimal Only changes point visibility without moving the ruler. Hidden or removed curves cannot be measured, and changing either axis clears existing rulers. Energy and other Pareto views retain their ruler behavior.
 
-## Gradient Roofline Labels
+### Concurrency is not an x-axis
 
-Parallelism strategies (TP4, TEP8, DPAEP4) color roofline paths with gradient stops and use one label per contiguous strategy segment. The reasoning:
-
-- A roofline may have 8+ points with different strategies. Individual labels would overlap.
-- Gradient coloring shows strategy territories: "this segment of the curve uses TP8, that segment uses EP4"
-- Blend zones (5-20% of gap between label changes) create smooth transitions between strategies
-
-The territory rule: each point "owns" the region ±50% to its neighbors. When adjacent points share a label, they merge into a single color band.
-
-Measured-power gradient labels use the displayed upper-boundary points, with the same single-date restriction as other gradient curves. They describe configuration changes, not numeric slope or efficiency. A boundary with one configuration keeps a solid line and its configuration label. Unofficial overlays also use one label per contiguous configuration segment, while their strokes and labels retain the run color shown in the legend.
+There is no concurrency x-axis mode. GPU count varies across configurations, so the same concurrency is not a comparable load between them; `conc` stays a point attribute in tooltips, tables, CSV and the API. Exact topology quick filters (`pointTopologyKey`) select allocation and parallelism without filtering concurrency.
 
 ## Axis Domains from Visible Data Only
 
@@ -152,20 +188,6 @@ When Effect 2 rebuilds the SVG (data shape change), the current zoom transform i
 
 The rAF deferral on zoom-dismiss is critical — calling `setState` synchronously inside a D3 zoom handler causes React to re-render mid-zoom, creating visible jank.
 
-## Tooltip & Chart Wrapper Abstractions
-
-Three higher-level abstractions sit above the raw D3 tooltip logic:
-
-- **`useStickyTooltip`** (`src/hooks/useStickyTooltip.ts`) — Manages pin/dismiss state, position, and content for a single tooltip instance. Encapsulates the ref+state pattern from the Pin/Dismiss lifecycle above so individual chart components don't reimplement it.
-- **`useChartTooltipHandlers`** (`src/hooks/useChartTooltipHandlers.ts`) — Wires mouse/touch events to a `useStickyTooltip` instance. Handles hover-follow, click-to-pin, and click-away-to-dismiss as a composable hook.
-- **`D3ChartWrapper`** (`src/components/ui/d3-chart-wrapper.tsx`) — Shared container for D3 charts. Handles the SVG ref, resize observer, tooltip portal div, and cleanup. Charts pass a render callback instead of managing their own container lifecycle.
-
-These exist because multiple chart types (scatter, GPU, bar) all need the same tooltip and container behavior. The abstractions prevent each chart from reimplementing the Pin/Dismiss lifecycle and resize handling.
-
-## Dynamic Left Margin Measurement
-
-D3 bar charts measure actual Y-axis label widths using a temporary SVG `<text>` element before rendering. Hardcoded margins truncate labels when GPU names get long (e.g., "GB200 NVL72 (Dynamo TRT, MTP) (FP4)"). The formula `max(80, ceil(measuredWidth * 0.6) + 12)` ensures labels always fit while maintaining a minimum margin for short labels.
-
 ## One Animation System per Property
 
 Opacity animates via inline CSS `transition: opacity 150ms ease` (set on dots, rooflines, and labels in the render path); d3 `.transition()` is reserved for attributes CSS can't animate — the `data-update` entrance transitions on dot `transform` and roofline `d`. Never point both systems at the same property: a d3 transition re-writes the style every animation frame, and each write restarts the CSS transition, emitting `transitionrun`/`transitioncancel` per node per frame (a legend hover across a full chart used to produce tens of thousands of events per session, all of it also observed by PostHog's session-replay MutationObserver). Handlers like legend hover therefore write opacity **once** and let CSS do the animation.
@@ -178,3 +200,43 @@ existing snap behavior. Replay passes a zero duration and remains frame-driven.
 ## Batched Label Measurement
 
 Label loops that size a background rect to its text (`.ll-bg`/`.pl-bg`, point-label collision avoidance) must not interleave `getBBox()` with DOM writes — each read after a write forces a synchronous layout, turning N labels into N reflows. The pattern is two passes over the selection: write every label's text first, then measure every bbox (one forced layout for the whole batch), then write the rects. Same rule for `measureLegendRightInset`: it reads `getBoundingClientRect`, so it's skipped entirely when there are no known-issue annotations to place — it would otherwise run on every zoom frame.
+
+## Write Only What Changed
+
+Every `setAttribute`, inline-style write, `textContent` assignment, and node move produces a `MutationObserver` record, **even when the value is unchanged**. PostHog session replay (rrweb) serializes each record — a moved node is re-serialized with its whole subtree — and the agentic-point coach mark rescans on them. A throttled Chrome profile of a legend toggle attributed ~40% of the main-thread work to rrweb processing these records; most came from blind re-syncs of hundreds of point labels, decoration rings, gradient stops, and `.raise()` calls that were already in order.
+
+Hot re-sync paths (data, metric, and display phases; zoom frames; point-label placement) therefore use the write-if-changed helpers in `src/lib/d3-chart/chart-update.ts`: `setAttrIfChanged`, `setStyleIfChanged`, `setTextIfChanged`, and `raiseInOrder` (sequential `.raise()` semantics, skipped when each parent's tail is already in that order). They compare against the live DOM, not a cache, so a label the placement pass moved is still restored correctly. Reads of attributes and inline styles never force layout. Initial enter-path construction can keep plain `.attr()` chains — new nodes produce one add record regardless. Tests for these paths assert a repeated pass emits zero mutation records.
+
+The shared layers (`bars`, `horizontal-bars`, `points`, `error-bars`, `bar-labels`, `lines`, `rooflines`, `radar`) and the grid write through `writeAttrs`/`writeText`, which apply the same comparison to a whole attribute map per node. Axes are drawn by `renderAxes`'s own copy of the d3-axis algorithm (same join, keys, ordering, enter attributes and `__axis` bookkeeping), with every update write going through the comparison; transitions still use the d3 generator. A test pins its output to d3-axis byte for byte, including after a `customize` callback has replaced tick text with `tspan`s. Line and roofline `d` strings are cached per path on the projected coordinates, curve and defined mask (`layers/line-path-cache.ts`), so a pass whose geometry did not move skips building the path string.
+
+When the data phase runs while zoomed, the zoom transform is re-applied right after the rebuild. The grid, axes and the layers whose zoom handler rewrites every scale-dependent attribute (bar, horizontal bar, point, error bar, line, bar label) are drawn with the zoomed scales up front, so the re-applied transform finds nothing to change. Rooflines, scatter, radar and custom layers still render with the base scales, since their zoom handlers either skip some nodes or receive scale-sensitive context. The proximity overlay is removed before `raiseInOrder`, so the raised marks are already at the tail and do not move.
+
+## Build Only What Is Visible
+
+Point labels default to off, so the scatter layer builds a `.point-label` only while labels are shown and removes it when they are hidden (`syncPointLabel`). Previously every point carried a hidden `text` and `tspan`, which is half of each point's subtree. A label built late takes the stacking slot it would have had if it had been built with its point. That slot is after the hit circle, the original shape and any theme marker, and before offload halos or shapes re-created for a new precision (`lib/d3-chart/layers/point-label-order.ts`). The orange-chicken marker uses the same slot when a point has no label. A new label is filled in while detached, so it lands as one DOM insertion.
+
+Turning labels on builds one label per point, so that path avoids selector engines and live collections. `syncPointLabel` and the collision placement find a point's label by walking its element children (`childPointLabel`) and walk a label's tspans the same way, instead of `querySelector`, a d3 join or `children`. In jsdom those cost several microseconds per point, which made building every label slower than the old style flip on hidden labels.
+
+Other passes skip work that cannot change anything. A point without an offload halo skips the halo join. The Pareto fade does not walk the chart's marks while the frontier is off and no fade was applied to that zoom group. Point-label collision placement runs only while labels are visible. The dot `transition` style is written once per dot.
+
+A width change re-runs the data phase. `useResponsiveChartDimensions` applies the first change of a resize at once and collapses later changes into one per `RESIZE_COALESCE_MS` (100 ms), ending on the final width. A window or panel drag therefore renders about ten times a second instead of once per frame.
+
+## Canvas Point Layer
+
+`ScatterGraph` draws its official points on one canvas instead of one SVG group per point (`canvas: ensureCanvasPointLayer` on the scatter layer, `lib/d3-chart/layers/canvas-points.ts`). Thousands of `.dot-group` subtrees were most of the chart's DOM, and every data, zoom and legend pass walked them. The layer keeps per-point state in typed arrays (positions, target and shown opacity, fade, shape, palette slot, halo slot) and repaints in one `requestAnimationFrame` after any change. Other charts, unofficial overlays, rooflines and line labels stay SVG. The scatter layer passes the factory in, and shared code (`layer-renderer.ts`, the tooltip hooks, export) finds a live layer through `canvas-point-registry.ts`, so charts that never draw canvas points do not ship the layer.
+
+Everything a user sees matches the SVG it replaced. Points are drawn in the order a keyed d3 join would have left the DOM (`canvas-point-order.ts`, duplicates included), so overlapping points stack the same way. Opacity changes animate with the CSS `ease` curve over the same 150 ms, and coordinate transitions use the shared 300 ms cubic tween. The Pareto fade multiplies opacity by 0.2 like the `opacity(0.2)` filter. Offload halos are dashed strokes with the halo legend's radius and dash. Theme colours given as `var(--name)` resolve against the canvas's computed style, and a theme class change repaints every live layer.
+
+Pointer input goes through one transparent `.dot-hit-area` path, the union of the interactive points' hit circles, so the cursor and event targets still follow the points. A uniform grid (`canvas-point-hit.ts`) answers which point is under the pointer. The last drawn interactive point within the hit radius wins, as the topmost SVG circle did, and hidden points never match. Point labels remain SVG text in `.point-label-anchor` groups, built only for visible points, so collision placement and label CSS are unchanged.
+
+PNG and SVG export still render real `.dot-group` elements through the SVG scatter path, in the live draw order. The old export cloned the live groups, so their child order and style order carried the chart's history. `restoreExportOrder` reproduces that history from what the layer tracked. A point whose shape type changed while it lived has its shape after its label, and a point that was faded before its first transition write keeps `filter` ahead of `transition`. A repeated key stays the fresh group the SVG join would have re-created.
+
+Tests and Cypress read points from the layer element rather than the DOM. `.canvas-point-layer` exposes `scatterPoints()`, one snapshot per point with its datum, key, plot and client coordinates, opacity, interactivity, shape, colour, halo, fade, hover state, label and `data-*` attributes. `data-points-joined` counts joins that added points, so `.canvas-point-layer:not([data-points-joined="0"])` means points have rendered. Clicks and hovers are dispatched on `.dot-hit-area` at a point's `clientX`/`clientY` (`cypress/support/scatter-points.ts`).
+
+## Huawei series identity
+
+Huawei uses a shared amber/gold identity, separate from NVIDIA green, AMD red, Google blue and OpenAI purple. `HUAWEI_CHART_PALETTE` (including the `HUAWEI_CHART_COLORS` tokens) in `packages/constants/src/gpu-keys.ts` defines a darker amber for light canvases and a brighter gold for dark canvases. Both base colors exceed 4.5:1 contrast against the tested white and `#111214` reference backgrounds.
+
+`getVendor` recognizes canonical Ascend keys, framework-suffixed keys and Huawei/Ascend display names. The shared normal, date and high-contrast generators retain this identity; multiple Huawei chips/configurations use related amber shades. High-contrast palettes reserve the amber band from other vendors when Huawei is present. OperatorX delegates to the shared generator instead of maintaining a local crimson override. ubenchX uses the same generator for Huawei marks, legend swatches and tooltips while retaining its existing GPU palette. Theme changes update display decoration without changing measurement coordinates.
+
+These colors encode vendor identity, not a measurement. Sequential heatmap scales encode values and are independent of categorical vendor colors; official logo artwork is also separate. This is presentation-only: no API values, filters, hardware specifications or normalization references change.

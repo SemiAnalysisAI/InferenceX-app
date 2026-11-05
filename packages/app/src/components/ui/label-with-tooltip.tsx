@@ -6,11 +6,6 @@ import { Label } from '@/components/ui/label';
 import { InfoHelp } from '@/components/ui/option-info';
 
 interface LabelWithTooltipProps {
-  /**
-   * Omit for controls that are not labelable elements — a segmented toggle is a
-   * `role="tablist"`, so `for` would dangle and its `ariaLabel` is the accessible
-   * name instead.
-   */
   htmlFor?: string;
   label: string;
   tooltip: ReactNode;

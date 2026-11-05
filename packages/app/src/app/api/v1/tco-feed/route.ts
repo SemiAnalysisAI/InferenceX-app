@@ -5,8 +5,8 @@ import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
 
 import { getLatestBenchmarks } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
-import { cachedJson, cachedQuery, cachedText } from '@/lib/api-cache';
-import { loadFixture } from '@/lib/test-fixtures';
+import { cachedJson, cachedQuery, cachedText } from '@/lib/cache/api-cache';
+import { loadFixture } from '@/lib/testing/test-fixtures';
 
 import {
   computeTcoFeed,
@@ -21,7 +21,7 @@ import {
   type TcoFeedRow,
   type TcoFeedSourceRow,
   type TcoFeedWorkload,
-} from '@/lib/tco-feed';
+} from '@/lib/calculator/tco-feed';
 
 export const dynamic = 'force-dynamic';
 
@@ -185,7 +185,7 @@ export async function GET(request: NextRequest) {
       if (format === 'csv') {
         return cachedText(tcoScoresToCsv(scores, workloads), 'text/csv; charset=utf-8');
       }
-      return cachedJson({
+      return cachedJson(request, {
         model,
         db_model_keys: dbModelKeys,
         date: date ?? null,
@@ -201,7 +201,7 @@ export async function GET(request: NextRequest) {
     if (format === 'csv') {
       return cachedText(tcoFeedToCsv(rows), 'text/csv; charset=utf-8');
     }
-    return cachedJson({
+    return cachedJson(request, {
       model,
       db_model_keys: dbModelKeys,
       date: date ?? null,

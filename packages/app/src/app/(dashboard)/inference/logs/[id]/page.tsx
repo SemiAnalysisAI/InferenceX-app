@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { BenchmarkLogDetail } from '@/components/inference/log-viewer/benchmark-log-detail';
-import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
-import { enAlternates } from '@/lib/i18n';
+import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
+import { enAlternates } from '@/lib/i18n/i18n';
 
 export async function generateMetadata({
   params,

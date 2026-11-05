@@ -31,18 +31,18 @@ describe('append-only benchmark snapshots', () => {
     expect(captured.calls()).toBe(1);
 
     const { text, values } = captured.query();
-    expect(text).toContain('WITH RECURSIVE run_lines AS');
+    expect(text).toContain('WITH RECURSIVE ranked_runs AS');
     expect(text).toContain('FROM ranked_runs WHERE github_run_id = ? UNION ALL');
     expect(text).not.toContain('seed_runs AS');
     expect(text).not.toContain('r.date <=');
     expect(text).toContain('WHERE current.append_only');
-    expect(text).toContain('older.image = current.root_image');
+    expect(text).toContain('current.chain_images ->> older_line.key <> older_line.value');
     expect(text).toContain('older.curve_scope = current.curve_scope');
-    expect(text).toContain('point_c.id = br.config_id');
+    expect(text).toContain('unnest(cr.point_ids) AS point(id)');
     expect(text).toContain('br.recipe_fingerprint, br.conc, cr.run_rank');
     expect(text).toContain('br.workflow_run_id, wr.run_started_at::text');
-    expect(text).toContain('br.snapshot_date::text AS curve_date');
-    expect(text).toContain('snapshot_wr.id = br.snapshot_workflow_run_id');
+    expect(text).toContain('sp.snapshot_date::text AS curve_date');
+    expect(text).toContain('snapshot_wr.id = sp.snapshot_workflow_run_id');
     expect(values).toEqual([['dsv4'], 123456]);
   });
 
@@ -71,17 +71,17 @@ describe('append-only benchmark snapshots', () => {
     expect(values).toEqual([['dsv4'], '2026-08-01']);
   });
 
-  it('stamps latest materialized-view rows with a separate logical identity', async () => {
+  it('stamps maintained latest rows with a separate logical identity', async () => {
     const captured = captureSql();
 
     await getLatestBenchmarks(captured.sql, 'dsv4');
 
     const { text } = captured.query();
-    expect(text).toContain('FROM latest_benchmarks lb');
+    expect(text).toContain('FROM latest_benchmark_points p');
     expect(text).toContain('lb.date::text, lb.workflow_run_id');
-    expect(text).toContain('lb.snapshot_date::text AS curve_date');
+    expect(text).toContain('p.snapshot_date::text AS curve_date');
     expect(text).toContain('lb.recipe_fingerprint,');
-    expect(text).toContain('snapshot_wr.id = lb.snapshot_workflow_run_id');
+    expect(text).toContain('snapshot_wr.id = p.snapshot_workflow_run_id');
   });
 
   it('seeds every filtered sequence run as a distinct historical snapshot', async () => {
@@ -90,14 +90,14 @@ describe('append-only benchmark snapshots', () => {
     await getAllBenchmarksForHistory(captured.sql, 'dsv4', 8192, 1024);
 
     const { text, values } = captured.query();
-    expect(text).toContain('AND isl = ? AND osl = ?');
+    expect(text).toContain('AND l.isl = ? AND l.osl = ?');
     expect(text).toContain('FROM ranked_runs UNION ALL');
     expect(text).not.toContain('WHERE github_run_id = ?');
     expect(text).not.toContain('seed_runs AS');
     expect(text).toContain('cr.snapshot_workflow_run_id, br.config_id');
     expect(text).toContain('br.recipe_fingerprint, br.conc, cr.run_rank');
     expect(text).toContain("br.metrics - '{std_ttft,std_tpot");
-    expect(text).toContain('ORDER BY br.snapshot_date, c.id, br.conc');
+    expect(text).toContain('ORDER BY sp.snapshot_date, c.id, br.conc');
     expect(values).toEqual([['dsv4'], 8192, 1024]);
   });
 
@@ -107,49 +107,53 @@ describe('append-only benchmark snapshots', () => {
     await getAllBenchmarksForHistory(captured.sql, 'dsv4', null, null, 'agentic_traces');
 
     const { text, values } = captured.query();
-    expect(text).toContain("AND benchmark_type = 'agentic_traces'");
+    expect(text).toContain("AND l.benchmark_type = 'agentic_traces'");
     expect(text).not.toContain('AND br.isl = ?');
     expect(text).toContain('FROM ranked_runs UNION ALL');
     expect(values).toEqual([['dsv4']]);
   });
 });
 
-describe('power audit provenance reads (tolerant to a not-yet-applied migration 015)', () => {
-  const TOLERANT_BR = [
-    "to_jsonb(br) -> 'power_invalid_reasons' AS power_invalid_reasons",
-    "to_jsonb(br) -> 'power_audit' AS power_audit",
-  ];
+describe('stored per-pool basis on read', () => {
+  // An agentic disaggregated row the backfill has not reached yet: the producer
+  // divided input and output by all 16 chips.
+  const unbackfilled = {
+    benchmark_type: 'agentic_traces',
+    disagg: true,
+    num_prefill_gpu: 4,
+    num_decode_gpu: 12,
+    prefill_num_workers: 1,
+    decode_num_workers: 3,
+    metrics: { tput_per_gpu: 1000, input_tput_per_gpu: 900, output_tput_per_gpu: 100 },
+  };
+  const sqlReturning = () =>
+    vi.fn(() => Promise.resolve([structuredClone(unbackfilled)])) as unknown as Parameters<
+      typeof getBenchmarksForRun
+    >[0];
 
-  it('selects both columns via to_jsonb on the exact-run path', async () => {
-    const captured = captureSql();
-    await getBenchmarksForRun(captured.sql, 'dsv4', 123456);
-    const { text } = captured.query();
-    for (const piece of TOLERANT_BR) expect(text).toContain(piece);
-    expect(text).not.toMatch(/\b(?:br|lb)\.power_(?:invalid_reasons|audit)\b/u);
-  });
-
-  it('selects both columns via to_jsonb on the dated latest path', async () => {
-    const captured = captureSql();
-    await getLatestBenchmarks(captured.sql, 'dsv4', '2026-08-01');
-    const { text } = captured.query();
-    for (const piece of TOLERANT_BR) expect(text).toContain(piece);
-    expect(text).not.toMatch(/\b(?:br|lb)\.power_(?:invalid_reasons|audit)\b/u);
-  });
-
-  it('selects both columns via to_jsonb on the history path', async () => {
-    const captured = captureSql();
-    await getAllBenchmarksForHistory(captured.sql, 'dsv4', 8192, 1024);
-    const { text } = captured.query();
-    for (const piece of TOLERANT_BR) expect(text).toContain(piece);
-    expect(text).not.toMatch(/\b(?:br|lb)\.power_(?:invalid_reasons|audit)\b/u);
-  });
-
-  it('selects both columns via to_jsonb on the no-date matview path', async () => {
-    const captured = captureSql();
-    await getLatestBenchmarks(captured.sql, 'dsv4');
-    const { text } = captured.query();
-    expect(text).toContain("to_jsonb(lb) -> 'power_invalid_reasons' AS power_invalid_reasons");
-    expect(text).toContain("to_jsonb(lb) -> 'power_audit' AS power_audit");
-    expect(text).not.toMatch(/\b(?:br|lb)\.power_(?:invalid_reasons|audit)\b/u);
+  it.each([
+    [
+      'latest (materialized view)',
+      (sql: Parameters<typeof getLatestBenchmarks>[0]) => getLatestBenchmarks(sql, 'dsv4'),
+    ],
+    [
+      'latest (dated)',
+      (sql: Parameters<typeof getLatestBenchmarks>[0]) =>
+        getLatestBenchmarks(sql, 'dsv4', '2026-08-01'),
+    ],
+    [
+      'exact run',
+      (sql: Parameters<typeof getLatestBenchmarks>[0]) => getBenchmarksForRun(sql, 'dsv4', 123),
+    ],
+    [
+      'history',
+      (sql: Parameters<typeof getLatestBenchmarks>[0]) =>
+        getAllBenchmarksForHistory(sql, 'dsv4', null, null, 'agentic_traces'),
+    ],
+  ])('rescales unbackfilled agentic rows on the %s path', async (_label, read) => {
+    const [row] = await read(sqlReturning());
+    expect(row!.metrics.input_tput_per_gpu).toBeCloseTo(3600, 9);
+    expect(row!.metrics.output_tput_per_gpu).toBeCloseTo((100 * 16) / 12, 9);
+    expect(row!.metrics.input_tput_per_total_gpu).toBe(900);
   });
 });

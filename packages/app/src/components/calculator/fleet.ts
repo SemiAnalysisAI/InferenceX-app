@@ -1,50 +1,28 @@
-/**
- * Pure fleet-scale projection math — no React, no 'use client'.
- *
- * Scales the calculator's per-GPU interpolated operating point to a fleet
- * sized by a facility power budget. "Facility power" means all-in critical IT
- * power per GPU (host, networking, cooling overhead) from the SemiAnalysis
- * Datacenter Industry Model — the same `power` field behind the tok/s/MW
- * metric. Projections assume 100% utilization at the benchmark operating
- * point and owned-datacenter economics for the selected TCO tier.
- */
+import type { GpuSpecs } from '@/lib/catalog/constants';
 
-/** 24h × 365d ÷ 12 — the convention used for $/GPU/hr → $/mo conversions. */
+import { MS_PER_MONTH, outputTokPerChip, splitTokenStreams } from './lifecycle';
+import { getThroughputForType } from './power-ranking';
+import type { CostProvider, CostType, InterpolatedResult } from './types';
+
 export const HOURS_PER_MONTH = 730;
 
 export interface FleetStats {
-  /** Whole GPUs deployable within the facility power budget */
   gpus: number;
-  /** Fleet-wide throughput for the selected token type (tok/s) */
   fleetTokPerSec: number;
-  /** Simultaneous user streams: fleet output tok/s ÷ interactivity (tok/s/user) */
   concurrentUsers: number;
-  /** Fleet TCO for the selected tier ($/hr) */
   costPerHour: number;
-  /** Fleet TCO for the selected tier ($/mo, 730 hr/mo) */
   costPerMonth: number;
 }
 
 export interface FleetInputs {
-  /** Facility power budget in megawatts */
   mw: number;
-  /** All-in facility power per GPU in kilowatts (HW_REGISTRY.power) */
   powerKwPerGpu: number;
-  /** TCO rate for the selected cost tier ($/GPU/hr) */
   costPerGpuHour: number;
-  /** Interpolated per-GPU throughput for the selected token type (tok/s/gpu) */
   tputPerGpu: number;
-  /** Interpolated per-GPU output throughput (tok/s/gpu) — users stream output tokens */
   outputTputPerGpu: number;
-  /** Operating-point interactivity (output tok/s/user) */
   interactivity: number;
 }
 
-/**
- * Returns null when the fleet cannot be sized: no power budget, unknown
- * per-GPU power (e.g. hardware missing from HW_REGISTRY), or a budget too
- * small to power a single GPU.
- */
 export function computeFleetStats(inputs: FleetInputs): FleetStats | null {
   const { mw, powerKwPerGpu, costPerGpuHour, tputPerGpu, outputTputPerGpu, interactivity } = inputs;
   if (!(mw > 0) || !(powerKwPerGpu > 0)) return null;
@@ -66,7 +44,62 @@ export function computeFleetStats(inputs: FleetInputs): FleetStats | null {
   };
 }
 
-/** Compact display formatting for fleet-scale magnitudes (1.24M, 48.3k, 950). */
+export interface FleetSizingOptions {
+  mw: number;
+  specs: Pick<GpuSpecs, 'power' | 'costh' | 'costr'>;
+  costProvider: CostProvider;
+  costType: CostType;
+  interactivity: number;
+  totalThroughput?: number;
+}
+
+export function sizeFleetForResult(
+  result: InterpolatedResult,
+  options: FleetSizingOptions,
+): FleetStats | null {
+  const total = options.totalThroughput ?? result.value;
+  return computeFleetStats({
+    mw: options.mw,
+    powerKwPerGpu: options.specs.power,
+    costPerGpuHour: options.specs[options.costProvider],
+    tputPerGpu:
+      options.costType === 'total' ? total : getThroughputForType(result, options.costType),
+    outputTputPerGpu: outputTokPerChip(total, result.inputTokenShare, result.outputTputValue),
+    interactivity: options.interactivity,
+  });
+}
+
+export function buildFleetSchedule(
+  progression: readonly { date: string; result: InterpolatedResult }[],
+  options: Omit<FleetSizingOptions, 'totalThroughput'> & {
+    anchorMs: number;
+    cacheReadRatio: number;
+  },
+) {
+  const first = progression[0];
+  const last = progression.at(-1);
+  if (!first || !last || !Number.isFinite(options.anchorMs)) return null;
+  const opening = sizeFleetForResult(first.result, options);
+  const latest = sizeFleetForResult(last.result, options);
+  if (!opening || !latest) return null;
+
+  return {
+    gpus: opening.gpus,
+    costPerHour: opening.costPerHour,
+    provisionedMw: (opening.gpus * options.specs.power) / 1000,
+    concurrentUsersNow: latest.concurrentUsers,
+    steps: progression.map(({ date, result }) => ({
+      month: (Date.parse(`${date}T00:00:00Z`) - options.anchorMs) / MS_PER_MONTH,
+      ...splitTokenStreams(
+        opening.gpus * getThroughputForType(result, 'total'),
+        result.inputTokenShare,
+        result.cacheHitRate,
+        options.cacheReadRatio,
+      ),
+    })),
+  };
+}
+
 export function formatCompact(value: number, digits = 1): string {
   if (!Number.isFinite(value)) return '—';
   const abs = Math.abs(value);

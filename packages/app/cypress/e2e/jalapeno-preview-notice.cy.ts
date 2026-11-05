@@ -1,3 +1,7 @@
+import { compactTrendHistory } from '@/components/inference/hooks/trend-history-rows';
+
+import { availabilityBody } from '../support/e2e';
+
 const JALAPENO_QUERY =
   'g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerGpu';
 const JALAPENO_NOTICE = '[data-testid="jalapeno-official-preview-notice"]';
@@ -8,11 +12,9 @@ const TPUV7_NOTICE = '[data-testid="tpuv7-official-preview-notice"]';
 
 describe('official preview notices', () => {
   beforeEach(() => {
-    // Keep this spec independent of Neon response time. The client appends the
-    // supplemental Jalapeño and July Rubin snapshots to these successful empty
-    // responses, which is exactly the path under test here.
-    cy.intercept('GET', '**/api/v1/availability*', { body: [] });
+    cy.intercept('GET', '**/api/v1/availability/compact', { body: availabilityBody([]) });
     cy.intercept('GET', '**/api/v1/benchmarks/history*', { body: [] });
+    cy.intercept('GET', '**/api/v1/benchmarks/history/trends*', { body: compactTrendHistory([]) });
     cy.intercept('GET', '**/api/v1/benchmarks?*', { body: [] });
   });
 
@@ -69,9 +71,6 @@ describe('official preview notices', () => {
   it('appears with Jalapeño historical trend lines', () => {
     cy.visit(`/historical?${JALAPENO_QUERY}`);
 
-    // The historical view defaults to 35 tok/s/user, below Jalapeño's measured
-    // range, and correctly does not extrapolate. Move into its measured range
-    // so a Jalapeño trend line, and therefore the preview notice, appears.
     cy.get('[data-testid="historical-trends-display"] input[type="number"]', {
       timeout: 20000,
     })
@@ -102,7 +101,8 @@ describe('official preview notices', () => {
   it('shows the Vera Rubin preview when its output-token fleet curve is visible', () => {
     cy.visit('/fleet?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4');
 
-    cy.get('[data-testid="fleet-cost-type-selector"]').click();
+    cy.get('[data-testid="fleet-legend"]', { timeout: 20000 }).should('be.visible');
+    cy.get('#fleet-cost-type').click();
     cy.get('[role="option"]').contains('Output Tokens').click();
     cy.get('[data-testid="fleet-legend"]', { timeout: 20000 }).should('contain.text', 'Vera Rubin');
     cy.get('[data-testid="fleet-controls"] input[type="number"]').clear().type('100').blur();
@@ -141,8 +141,6 @@ describe('official preview notices', () => {
       .and('contain.text', 'Results may change as validation and publication continue.')
       .and('not.contain.text', '\u2014');
     cy.get(JALAPENO_NOTICE).should('not.exist');
-    // With the API mocked empty, TPU7x is the only series here, so the legend
-    // offers no "Hide" toggle; the Jalapeño case above covers toggle tracking.
 
     cy.visit(`/inference?${JALAPENO_QUERY}`);
     cy.get(JALAPENO_NOTICE, { timeout: 20000 }).should('be.visible');

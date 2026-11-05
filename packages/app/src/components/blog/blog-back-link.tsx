@@ -3,7 +3,7 @@
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
 export function BlogBackLink({
   href = '/blog',

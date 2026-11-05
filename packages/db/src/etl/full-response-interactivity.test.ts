@@ -19,7 +19,6 @@ function profileRecord(overrides: Record<string, unknown> = {}): string {
     metrics: {
       output_sequence_length: { value: 26_571, unit: 'tokens' },
       time_to_first_token: { value: 529.058811, unit: 'ms' },
-      // This is the legacy mixed-domain value that must not be reused.
       inter_token_latency: { value: 0.003067398, unit: 'ms' },
     },
     ...overrides,

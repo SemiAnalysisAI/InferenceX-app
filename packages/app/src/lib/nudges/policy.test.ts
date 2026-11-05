@@ -32,8 +32,6 @@ describe('dismissesOnAction', () => {
   });
 
   it('returns true for coach-mark by default', () => {
-    // Performing the interaction the coach mark teaches is the whole point —
-    // it must not keep pointing at the chart afterwards.
     expect(dismissesOnAction(makeNudge('coach-mark'))).toBe(true);
   });
 

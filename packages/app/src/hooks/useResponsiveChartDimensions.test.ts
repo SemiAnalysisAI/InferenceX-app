@@ -4,12 +4,11 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  RESIZE_COALESCE_MS,
   useResponsiveChartDimensions,
   type UseResponsiveChartDimensionsResult,
 } from './useResponsiveChartDimensions';
 
-// Minimal ResizeObserver stand-in — jsdom doesn't implement it. Tests fire
-// observations manually via `trigger`.
 class MockResizeObserver {
   static instances: MockResizeObserver[] = [];
   callback: ResizeObserverCallback;
@@ -72,7 +71,6 @@ function renderHook<T>(hook: () => T): {
   };
 }
 
-/** Create a container div whose getBoundingClientRect reports `width`. */
 function makeContainer(width: number): HTMLDivElement {
   const el = document.createElement('div');
   vi.spyOn(el, 'getBoundingClientRect').mockReturnValue({ width } as DOMRect);
@@ -113,9 +111,6 @@ describe('useResponsiveChartDimensions', () => {
     });
     const initial = result.current.dimensions;
 
-    // ResizeObserver fires once right after observe() with the width the ref
-    // callback already measured. The object identity must not change — a new
-    // identity makes every chart treat it as a resize and fully rebuild.
     MockResizeObserver.instances.at(-1)!.trigger(800);
 
     expect(result.current.dimensions).toBe(initial);
@@ -173,8 +168,37 @@ describe('useResponsiveChartDimensions', () => {
     });
 
     expect(observer.disconnected).toBe(true);
-    // Last measured dimensions are retained (no reset to 0 on detach).
     expect(result.current.dimensions).toEqual({ width: 800, height: 600 });
     unmount();
+  });
+
+  it('applies the first width change at once and coalesces a burst into its final width', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { result, unmount } = renderHook<UseResponsiveChartDimensionsResult>(() =>
+        useResponsiveChartDimensions({ height: 600 }),
+      );
+      act(() => {
+        result.current.setContainerRef(makeContainer(800));
+      });
+      const observer = MockResizeObserver.instances.at(-1)!;
+
+      observer.trigger(1024);
+      expect(result.current.dimensions.width).toBe(1024);
+
+      observer.trigger(1000);
+      observer.trigger(990);
+      expect(result.current.dimensions.width).toBe(1024);
+
+      act(() => vi.advanceTimersByTime(RESIZE_COALESCE_MS));
+      expect(result.current.dimensions).toEqual({ width: 990, height: 600 });
+
+      act(() => vi.advanceTimersByTime(RESIZE_COALESCE_MS));
+      observer.trigger(700);
+      expect(result.current.dimensions.width).toBe(700);
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

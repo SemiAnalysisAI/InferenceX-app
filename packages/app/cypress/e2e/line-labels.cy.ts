@@ -1,49 +1,29 @@
+import { CANVAS_POINT_LAYER_SELECTOR } from '@/lib/d3-chart/layers/canvas-point-registry';
+
 import { expandLegendAdvanced } from '../support/legend-advanced';
+import { POINT_LABELS } from '../support/scatter-points';
 
 describe('Line Labels Toggle', () => {
   before(() => {
-    cy.visit('/inference', {
+    cy.visit('/inference?g_model=DeepSeek-V4-Pro', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
     });
-    // Wait for chart to load
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
     cy.get('.sidebar-legend').first().should('be.visible');
-    // Label switches live in the collapsed-by-default Advanced drawer.
+    // Line and GPU-count switches remain in the Advanced drawer.
     expandLegendAdvanced();
   });
 
-  it('Line Labels toggle exists in the legend', () => {
-    cy.get('#scatter-line-labels').should('exist');
-    cy.get('label[for="scatter-line-labels"]').should('contain.text', 'Line Labels');
-  });
-
-  it('Line Labels toggle is on by default', () => {
+  it('line labels stay in the foreground after zooming', () => {
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
 
-    // Line labels render on load without interaction
-    cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length.greaterThan', 0);
-  });
-
-  it('toggling Line Labels on then back off adds and removes label elements', () => {
-    // Off by default — turn it on first.
-    cy.get('#scatter-line-labels').click();
-    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
     cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length.greaterThan', 0);
 
-    // Turn it back off — labels disappear.
-    cy.get('#scatter-line-labels').click();
-    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
-    cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length', 0);
-  });
-
-  it('line labels have colored background rects and text', () => {
-    // Off by default — ensure on (idempotent; prior test left them off).
     cy.get('#scatter-line-labels').then(($el) => {
       if ($el.attr('data-state') !== 'checked') cy.wrap($el).click();
     });
-    // Each line label group should contain a background rect and text
     cy.get('[data-testid="scatter-graph"] svg g.line-label .ll-bg').should(
       'have.length.greaterThan',
       0,
@@ -52,10 +32,7 @@ describe('Line Labels Toggle', () => {
       'have.length.greaterThan',
       0,
     );
-  });
 
-  it('line labels render in the foreground, after the scatter points', () => {
-    // Off by default — ensure on (idempotent; previous test leaves them on).
     cy.get('#scatter-line-labels').then(($el) => {
       if ($el.attr('data-state') !== 'checked') cy.wrap($el).click();
     });
@@ -63,35 +40,23 @@ describe('Line Labels Toggle', () => {
 
     cy.get('[data-testid="scatter-graph"] [data-testid="d3-chart-svg"]').then(($svg) => {
       const svg = $svg[0];
-      const dots = svg.querySelectorAll('.dot-group');
-      const labels = svg.querySelectorAll('g.line-label');
-      expect(dots.length, 'scatter dot groups exist').to.be.greaterThan(0);
-      expect(labels.length, 'line labels exist').to.be.greaterThan(0);
+      const points = svg.querySelector(CANVAS_POINT_LAYER_SELECTOR);
+      const firstLabel = svg.querySelector('g.line-label');
+      expect(points, 'scatter point layer exists').to.not.equal(null);
+      expect(firstLabel, 'line labels exist').to.not.equal(null);
 
-      // Every label must paint after every dot group. Comparing the *last* dot
-      // group against the *first* label is sufficient: if the earliest label
-      // follows the latest dot in document order, all labels are in front.
-      const lastDot = dots.item(dots.length - 1)!;
-      const firstLabel = labels.item(0)!;
-      const relation = lastDot.compareDocumentPosition(firstLabel);
+      const relation = points!.compareDocumentPosition(firstLabel!);
       expect(
         relation & Node.DOCUMENT_POSITION_FOLLOWING,
         'line label follows the scatter points in DOM order (foreground)',
       ).to.be.greaterThan(0);
     });
-  });
 
-  it('line labels stay in the foreground after zooming', () => {
-    // Regression guard: the foreground raise must run on every render (in the
-    // shared renderer), not rely on a zoom-transform replay re-firing onZoom.
-    // Ensure labels are on (a previous test may have left them on).
     cy.get('#scatter-line-labels').then(($el) => {
       if ($el.attr('data-state') !== 'checked') cy.wrap($el).click();
     });
     cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length.greaterThan', 0);
 
-    // The chart requires Shift for wheel zoom (so bare scroll doesn't hijack
-    // the page). Dispatch a few shift+wheel events over the plot to zoom in.
     cy.get('[data-testid="scatter-graph"] [data-testid="d3-chart-svg"]').then(($svg) => {
       const svg = $svg[0];
       const r = svg.getBoundingClientRect();
@@ -112,63 +77,40 @@ describe('Line Labels Toggle', () => {
 
     cy.get('[data-testid="scatter-graph"] [data-testid="d3-chart-svg"]').then(($svg) => {
       const svg = $svg[0];
-      const dots = svg.querySelectorAll('.dot-group');
+      const points = svg.querySelector(CANVAS_POINT_LAYER_SELECTOR)!;
       const labels = svg.querySelectorAll('g.line-label');
       expect(labels.length, 'line labels still exist after zoom').to.be.greaterThan(0);
-      const lastDot = dots.item(dots.length - 1)!;
       const firstLabel = labels.item(0)!;
       expect(
-        lastDot.compareDocumentPosition(firstLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
+        points.compareDocumentPosition(firstLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
         'line label still follows the scatter points after zoom (foreground)',
       ).to.be.greaterThan(0);
     });
-    // No zoom reset needed: the next test toggles labels off (zoom-agnostic) and
-    // the later tests re-visit the page fresh.
-  });
-
-  it('toggling Line Labels off removes label elements', () => {
-    cy.get('#scatter-line-labels').click();
-    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
-
-    // Line label groups should no longer exist
-    cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length', 0);
   });
 
   it('Line Labels can be enabled alongside Gradient Labels', () => {
     cy.get('#scatter-line-labels').click();
+    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
+
+    cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length', 0);
+
+    cy.get('#scatter-line-labels').click();
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
 
     cy.get('#scatter-gradient-labels').click();
     cy.get('#scatter-gradient-labels').should('have.attr', 'data-state', 'checked');
 
-    // Both should be checked
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-gradient-labels').should('have.attr', 'data-state', 'checked');
 
-    // Line labels should still render
     cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length.greaterThan', 0);
 
-    // Reset
     cy.get('#scatter-line-labels').click();
     cy.get('#scatter-gradient-labels').click();
   });
 
-  it('URL param i_linelabel=1 enables line labels on load', () => {
-    cy.visit('/inference?i_linelabel=1', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      },
-    });
-    cy.get('[data-testid="scatter-graph"]').should('be.visible');
-    expandLegendAdvanced();
-    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
-
-    // Labels should be rendered
-    cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length.greaterThan', 0);
-  });
-
   it('URL param i_linelabel=0 disables line labels on load', () => {
-    cy.visit('/inference?i_linelabel=0', {
+    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_linelabel=0', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -177,12 +119,22 @@ describe('Line Labels Toggle', () => {
     expandLegendAdvanced();
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
 
-    // Labels should not be rendered
     cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length', 0);
+
+    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_linelabel=1', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="scatter-graph"]').should('be.visible');
+    expandLegendAdvanced();
+    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
+
+    cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length.greaterThan', 0);
   });
 
-  it('legacy URL param i_nolabel=1 keeps point labels hidden on load', () => {
-    cy.visit('/inference?i_nolabel=1', {
+  it('legacy URL param i_nolabel=1 keeps GPU-count labels off on load', () => {
+    cy.visit('/inference?g_model=deepseek-v4-pro&i_nolabel=1', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -192,22 +144,8 @@ describe('Line Labels Toggle', () => {
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
   });
 
-  it('legacy URL param i_advlabel=1 auto-enables Labels so advanced labels render', () => {
-    cy.visit('/inference?i_advlabel=1', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      },
-    });
-    cy.get('[data-testid="scatter-graph"]').should('be.visible');
-    expandLegendAdvanced();
-    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
-    // Labels toggle is auto-enabled by the URL hydration so the advanced
-    // (parallelism) point labels actually render.
-    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
-  });
-
-  it('legacy URL combo i_advlabel=1&i_nolabel=1 keeps point labels hidden (i_nolabel wins)', () => {
-    cy.visit('/inference?i_advlabel=1&i_nolabel=1', {
+  it('URL param i_advlabel=1 renders parallelism without enabling GPU-count labels', () => {
+    cy.visit('/inference?g_model=deepseek-v4-pro&i_advlabel=1', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -216,13 +154,27 @@ describe('Line Labels Toggle', () => {
     expandLegendAdvanced();
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get(`[data-testid="scatter-graph"] ${POINT_LABELS}`)
+      .filter(':visible')
+      .should('have.length.greaterThan', 0);
+  });
+
+  it('legacy i_nolabel=1 suppresses GPU counts without suppressing explicit parallelism', () => {
+    cy.visit('/inference?g_model=deepseek-v4-pro&i_advlabel=1&i_nolabel=1', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="scatter-graph"]').should('be.visible');
+    expandLegendAdvanced();
+    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
+    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get(`[data-testid="scatter-graph"] ${POINT_LABELS}`)
+      .filter(':visible')
+      .should('have.length.greaterThan', 0);
   });
 
   it('places the precision between the GPU and engine when multiple precisions are selected', () => {
-    // Pair the FP4+FP8 selection with a model that has both precisions in the
-    // fixtures. The default model (DeepSeek-V4-Pro) only has FP4, so
-    // `effectivePrecisions` would drop FP8 and the test couldn't observe the
-    // dual-precision labeling behavior.
     cy.visit('/inference?g_model=DeepSeek-R1-0528&i_linelabel=1&i_prec=fp4,fp8', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -230,15 +182,10 @@ describe('Line Labels Toggle', () => {
     });
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
 
-    // With both FP4 and FP8 shown, each curve is its own line and the label
-    // must carry the precision between the GPU and engine so the two curves of
-    // the same hardware are distinguishable (e.g. "B200 FP8 (vLLM)" vs
-    // "B200 FP4 (vLLM)").
     cy.get('[data-testid="scatter-graph"] svg g.line-label .ll-text')
       .should('have.length.greaterThan', 0)
       .then(($texts) => {
         const labels = $texts.toArray().map((el) => el.textContent ?? '');
-        // At least one label for each selected precision.
         expect(
           labels.some((t) => /\bFP8\b/u.test(t)),
           'an FP8 line label exists',

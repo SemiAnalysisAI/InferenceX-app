@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { ChartHover, type HoverItem } from '@/components/inference/agentic-point/chart-hover';
 import type { Distribution } from '@/hooks/api/use-datasets';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { compact, localeNumber } from './format';
 
 const STRINGS = {
@@ -149,7 +149,6 @@ export function DistributionCard({
               : undefined
           }
         >
-          {/* bars */}
           {bins.map((b, i) => {
             const h = (b.count / maxCount) * innerH;
             const x = PAD.left + i * barW;
@@ -166,7 +165,6 @@ export function DistributionCard({
             );
           })}
 
-          {/* guide lines */}
           {guides.map((g) => {
             const x = valueToX(g.value);
             return (
@@ -184,7 +182,6 @@ export function DistributionCard({
             );
           })}
 
-          {/* x axis */}
           <line
             x1={PAD.left}
             x2={PAD.left + innerW}
@@ -222,7 +219,6 @@ export function DistributionCard({
             {localizedUnit}
           </text>
 
-          {/* guide legend */}
           {guides.map((g, i) => (
             <g key={g.label} transform={`translate(${PAD.left + i * 110}, ${PAD.top})`}>
               <line

@@ -1,5 +1,5 @@
 import ModelIndexContent from '@/components/model/ModelIndexContent';
-import { modelIndexMetadata } from '@/lib/model-page-metadata';
+import { modelIndexMetadata } from '@/lib/catalog/model-page-metadata';
 
 export const metadata = modelIndexMetadata('zh');
 

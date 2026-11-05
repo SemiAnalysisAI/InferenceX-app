@@ -34,7 +34,6 @@ describe('DistributionCard', () => {
     cy.get(
       'line[stroke="#3b82f6"], line[stroke="#22c55e"], line[stroke="#f59e0b"], line[stroke="#ef4444"]',
     ).should('have.length', 8);
-    // One filled bar rect per bin (ChartHover may add a transparent overlay rect).
     cy.get('rect[class*="fill-primary"]').should('have.length', distribution.bins.length);
   });
 

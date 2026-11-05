@@ -39,7 +39,6 @@ describe('configCacheKey', () => {
   it('differs when any single field changes', () => {
     const base = configCacheKey(makeConfig());
 
-    // Change each field and verify the key is different
     expect(configCacheKey(makeConfig({ hardware: 'mi355x' }))).not.toBe(base);
     expect(configCacheKey(makeConfig({ framework: 'sglang' }))).not.toBe(base);
     expect(configCacheKey(makeConfig({ model: 'llama70b' }))).not.toBe(base);
@@ -61,7 +60,6 @@ describe('configCacheKey', () => {
 
   it('includes all 17 fields in the key', () => {
     const key = configCacheKey(makeConfig());
-    // 17 fields = 16 colons
     expect(key.split(':').length).toBe(17);
   });
 

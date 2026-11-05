@@ -15,9 +15,26 @@ inferencex powerx export --model GLM-5 --isl 8192 --osl 1024 \
 inferencex verify evidence/powerx --require-hardware h200_sxm
 ```
 
-`discover` reads capabilities or current public data. A formal command creates one
-new evidence directory containing `result.json` or `result.csv`, decoded response
-bodies, and `manifest.json`. `verify` replays that directory without network access.
+`discover` reads capabilities or current public data. `discover models` lists the
+DB model keys carried by availability rows (for example `dsv4`); `discover configs`
+and `discover dates` accept either that key or the display selector from the
+OpenAPI `model` enum (for example `DeepSeek-V4-Pro`). When the two forms differ,
+the key is resolved through the public `/api/v1/views/options` registry and the
+output `scope` records both `requested_model` and the resolved `model_selector`.
+An exact DB key restricts the returned observations to that key; a display
+selector includes every DB key in its family. Discovery slices each fetched
+snapshot locally. Check `coverage.complete_for_scope` before treating counts or
+hardware coverage as exhaustive; use `--limit` up to 1000 at offset 0 to include
+more rows in one response. Separate offset requests can observe different snapshots.
+Discovery stdout is a normalized projection; even a complete scope and recorded
+response hash do not retain the original API body. Use discovery to select a
+scope. For a report's coverage or exclusion counts, calculate from retained
+bundle bodies or the [raw capture recipes](public-api-examples.md), including
+supplemental diagnostics. Redirecting discovery stdout alone is insufficient
+source evidence.
+A formal command creates one new evidence directory containing `result.json` or
+`result.csv`, decoded response bodies, and `manifest.json`. `verify` replays that
+directory without network access.
 Use `inferencex describe [command ...]` for fixed input, format, limit, policy, and
 schema metadata. Use `inferencex schema <name>` for a published JSON Schema.
 
@@ -105,7 +122,9 @@ Formal commands require `--output-dir <new-directory>`. Its parent must already
 exist; the examples create `evidence` first, and the CLI creates the new leaf. They
 never reuse, merge, or overwrite a directory. The manifest is written last and
 records normalized arguments, every request attempt, response hashes, the result
-hash, coverage, policy, and relative paths.
+hash, coverage, export policy at `manifest.summary.policy`, and relative paths.
+The `policy` in `verify` stdout evaluates that verification invocation's requirements;
+it can differ from the recorded export policy.
 
 Once completed, the entire bundle tree is immutable: never add, edit, or delete a
 file or directory inside it. Put a README, explanation, or verification report in a
@@ -113,8 +132,25 @@ sibling path outside the bundle. Finish those surrounding writes first, then run
 `inferencex verify` as the final step. `verify --report` also requires a new path
 outside the bundle.
 
+Use `verify <bundle> --report <new-sibling-path>` for a generated evidence appendix.
+Its JSON `evidence` and Markdown report contain unique artifact paths, decoded byte
+sizes and SHA-256 hashes, including the hash computed from the actual manifest bytes.
+The manifest does not contain its own hash. Logical requests can share a response
+file, so request count and unique file count are separate. `evidence.recorded_policy`
+copies `manifest.summary.policy`; `evidence.result_context` copies the JSON result's
+existing metadata, units, limitations and comparison context. CSV has no extracted
+JSON context. These copied fields do not summarize raw-row availability, and replay
+does not verify claims in a separately written analysis report.
+
 ## Compatibility
 
+- From 1.0.0, supported commands and arguments, documented required output fields
+  and their meanings, and exit-code semantics remain compatible across 1.x. Minor
+  releases may add commands, optional arguments, and optional fields. Breaking
+  these guarantees requires a new major package version; human summary wording
+  and diagnostic message text are outside this promise.
+- Evidence `schema_version: 1` is versioned independently from the npm package.
+  Check the recorded schema and contract versions when consuming a bundle.
 - Contract 1 JSON allows additive optional fields. Consumers should read known
   fields and ignore unknown fields. Fields marked required, nullability, units, and
   closed status enums are stable within contract 1.
@@ -122,7 +158,7 @@ outside the bundle.
   metrics stay in evidence or JSON extensions instead of creating dynamic columns.
 - IDs are strings even when they contain only digits. Dates are `YYYY-MM-DD`;
   evidence timestamps are UTC ISO strings.
-- The 0.12.0 entry rejects removed `--output` and `--evidence-dir` options with a
+- The 1.0.0 entry rejects removed `--output` and `--evidence-dir` options with a
   migration hint. Contract 1 bundles preserve the producer package version.
 
 ## Legacy migration
@@ -137,7 +173,26 @@ outside the bundle.
 | `compare-collectivex.mjs --output x --evidence-dir e` | `inferencex collectivex compare --output-dir e` | Add `--min-comparable-pairs` for a CI gate                |
 | `verify-export.mjs --evidence-dir e --export x`       | `inferencex verify e`                           | Contract 1 finds the result from the manifest             |
 
-The direct helpers and `verify-export.mjs` are not query interfaces in 0.12.0.
+The direct helpers and `verify-export.mjs` are not query interfaces in 1.0.0.
 Exports from 0.11 and earlier require their pinned older package; they are not contract 1
 bundles. Installer upgrades from those versions remain supported and do not make old query
-commands part of the 0.12.0 interface.
+commands part of the 1.0.0 interface.
+
+## Request usage
+
+Online CLI requests identify themselves as `inferencex-cli/<package-version>`;
+the packaged raw API recipes use `inferencex-skill/<package-version>`. A skill
+calling the CLI therefore counts as CLI traffic. The shared helper sends these
+headers only to the first-party HTTPS origin. It never contacts PostHog directly.
+
+The API records aggregate received request counts, including retries, with only
+the transport, version, route template, server environment and traffic class.
+This does not measure people, installs, completed analyses or offline commands.
+No prompts, spreadsheet contents, query strings, concrete IDs or persistent
+user/install identifiers are included in the analytics event.
+
+Set `INFERENCEX_TELEMETRY=0` or `DO_NOT_TRACK=1` to omit both attribution headers,
+including retries and raw recipes. Ordinary API access logs are unaffected.
+Use `INFERENCEX_TRAFFIC=validation` for demos and acceptance checks. CI runs are
+classified as `ci` automatically when `CI` is nonempty (except `0` or `false`).
+The production usage report excludes CI, validation and preview traffic.

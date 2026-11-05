@@ -1,10 +1,112 @@
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
-// The website advertises the verified public release, which can lag the source candidate.
-import PUBLISHED_SKILL from '../../src/lib/published-inferencex-skills.json';
+import PUBLISHED_SKILL from '../../src/lib/api/published-inferencex-skills.json';
 
 const SITE_URL = 'https://inferencex.semianalysis.com';
 
 describe('API documentation', () => {
+  it('publishes exact model architecture facts and rejects unsupported selection controls', () => {
+    const endpoint = '/api/v1/views/model-architectures';
+    cy.request(`${endpoint}?model=kimi-k3`).then(({ body, status }) => {
+      expect(status).to.equal(200);
+      expect(body.params).to.deep.equal({ model: 'Kimi-K3' });
+      expect(body.models).to.have.length(1);
+      expect(body.models[0].slug).to.equal('kimi-k3');
+      expect(body.models[0].architecture).to.include({
+        numLayers: 93,
+        hiddenSize: 7168,
+        numExperts: 898,
+        activeExperts: 16,
+        routedExpertHiddenSize: 3584,
+      });
+      cy.request(`${endpoint}?model=Kimi-K3`).its('body').should('deep.equal', body);
+    });
+    cy.request(endpoint).then(({ body }) => {
+      expect(body.params.model).to.equal(null);
+      expect(
+        body.models.find((entry: { slug: string }) => entry.slug === 'muse-spark-open'),
+      ).to.have.nested.property('architecture.totalParams', 816);
+    });
+    for (const suffix of [
+      '?model=missing',
+      '?model=',
+      '?model=kimi-k3&model=Kimi-K3',
+      '?runId=123',
+    ]) {
+      cy.request({ url: `${endpoint}${suffix}`, failOnStatusCode: false })
+        .its('status')
+        .should('eq', 400);
+    }
+    cy.request('/api/openapi.json').then(({ body }) => {
+      const operation = body.paths[endpoint].get;
+      expect(operation.parameters.map((item: { name: string }) => item.name)).to.deep.equal([
+        'model',
+      ]);
+      expect(
+        body.components.schemas.ModelArchitecturesView.properties.models.items.properties,
+      ).to.have.keys('slug', 'architecture');
+    });
+    for (const locale of ['/api', '/zh/api']) {
+      cy.visit(locale);
+      cy.get('[data-testid="api-endpoint-get-model-architectures-view"] summary').click();
+      cy.get('[data-testid="api-endpoint-get-model-architectures-view"]').should(
+        'contain.text',
+        endpoint,
+      );
+    }
+  });
+
+  it('exposes Pareto boundaries without promoting legacy fixtures or chart share params', () => {
+    const query =
+      '/api/v1/pareto?model=DeepSeek-R1-0528&rawModel=dsr1&sequence=1k%2F1k&xMetric=median_intvty&yMetric=output_tput_per_gpu&xDirection=max&yDirection=max';
+    cy.request<BenchmarkRow[]>('/api/v1/benchmarks?model=DeepSeek-R1-0528').then(
+      ({ body: rows }) => {
+        expect(rows.length).to.be.greaterThan(0);
+        expect(
+          rows.some((row) => row.benchmark_type !== undefined && row.benchmark_type !== null),
+        ).to.equal(false);
+        cy.request(query).then(({ body, status }) => {
+          expect(status).to.equal(200);
+          expect(body.counts).to.deep.equal({
+            returned: rows.length,
+            selected: 0,
+            eligible: 0,
+            missing_or_nonfinite: 0,
+          });
+          expect(body.frontier).to.deep.equal([]);
+          expect(body.hinterland).to.deep.equal([]);
+        });
+      },
+    );
+    for (const suffix of ['&i_frontier=1', '&i_hinterland=2']) {
+      cy.request({ url: `${query}${suffix}`, failOnStatusCode: false })
+        .its('status')
+        .should('eq', 400);
+    }
+    cy.request(`${query}&hardware=not-a-hardware`).then(({ body }) => {
+      expect(body.frontier).to.deep.equal([]);
+      expect(body.hinterland).to.deep.equal([]);
+      expect(body.counts.selected).to.equal(0);
+    });
+    for (const locale of ['/api', '/zh/api']) {
+      cy.visit(locale);
+      cy.get('[data-testid="api-endpoint-get-pareto"] summary').click();
+      cy.get('[data-testid="api-endpoint-get-pareto"]').should('contain.text', '/api/v1/pareto');
+    }
+    cy.request('/api/openapi.json').then(({ body }) => {
+      const operation = body.paths['/api/v1/pareto'].get;
+      expect(operation.operationId).to.equal('get-pareto');
+      expect(operation.parameters.map((item: { name: string }) => item.name)).to.not.include(
+        'i_hinterland',
+      );
+      expect(body.components.schemas.ParetoBoundaries.properties).to.have.keys(
+        'source_url',
+        'selection',
+        'counts',
+        'frontier',
+        'hinterland',
+      );
+    });
+  });
   for (const locale of [
     {
       path: '/api',
@@ -43,7 +145,6 @@ describe('API documentation', () => {
           cy.stub(win.navigator.clipboard, 'writeText').as('copyAgentExample').resolves();
         },
       });
-      // The reference is server-rendered; wait for the shell's client mount before copying.
       cy.get('[data-testid="theme-toggle"]')
         .should('have.attr', 'aria-label')
         .and('contain', 'currently');
@@ -97,8 +198,10 @@ describe('API documentation', () => {
           .and('contain.text', '8192')
           .and('contain.text', '1024')
           .and('contain.text', 'strictV2')
-          .and('contain.text', 'powerx.csv')
-          .and('contain.text', 'powerx.json')
+          .and('contain.text', 'powerx export')
+          .and('contain.text', 'result.csv')
+          .and('contain.text', 'result.json')
+          .and('contain.text', 'manifest.json')
           .and('contain.text', locale.missing)
           .and('contain.text', locale.context)
           .and('contain.text', locale.excluded)
@@ -116,12 +219,24 @@ describe('API documentation', () => {
         .and('contain.text', '.agents/skills/inferencex-api/references/powerx.md')
         .and('contain.text', '.claude/skills/inferencex-api/references/powerx.md')
         .and('contain.text', 'avg_power_w')
-        .and('contain.text', '--format json --output powerx.json')
+        .and('contain.text', '--format json --output-dir evidence/powerx-json')
+        .and('contain.text', 'result.csv')
+        .and('contain.text', 'result.json')
+        .and('contain.text', 'manifest.json')
+        .and('contain.text', 'responses/')
         .within(() => {
           cy.get('pre code')
-            .should('contain.text', 'node .agents/skills/inferencex-api/scripts/export-powerx.mjs')
+            .should('contain.text', 'mkdir -p evidence')
+            .and(
+              'contain.text',
+              'node .agents/skills/inferencex-api/scripts/inferencex.mjs powerx export',
+            )
             .and('contain.text', '--model DeepSeek-V4-Pro --isl 8192 --osl 1024')
-            .and('contain.text', '--format csv --output powerx.csv 2> powerx-report.log')
+            .and('contain.text', '--format csv --output-dir evidence/powerx-csv')
+            .and(
+              'contain.text',
+              'node .agents/skills/inferencex-api/scripts/inferencex.mjs verify evidence/powerx-csv',
+            )
             .invoke('text')
             .then((command) => {
               cy.contains('button', locale.copy).click();
@@ -157,6 +272,17 @@ describe('API documentation', () => {
           });
       });
     }
+    cy.get('#api-powerx-cookbook summary').click();
+    cy.get('#api-powerx-cookbook pre')
+      .should('have.attr', 'tabindex', '0')
+      .and('have.css', 'overflow-x', 'auto')
+      .and('contain.text', 'inferencex.mjs powerx export')
+      .and('contain.text', '--output-dir evidence/powerx-csv')
+      .should(($pre) => {
+        const bounds = $pre[0].getBoundingClientRect();
+        expect(bounds.left).to.be.at.least(0);
+        expect(bounds.right).to.be.at.most(390);
+      });
     cy.get('[data-testid="api-endpoint-list-benchmarks"] summary').click();
     cy.get('[data-testid="api-endpoint-list-benchmarks"]').within(() => {
       cy.get('[role="region"][aria-labelledby="list-benchmarks-parameters"]')
@@ -257,9 +383,7 @@ describe('API documentation', () => {
     cy.get('[data-testid="footer-link-api"]')
       .should('have.attr', 'href', '/zh/api')
       .and('have.text', 'API 文档');
-  });
 
-  it('keeps wide schemas locally scrollable without overflowing the Chinese mobile page', () => {
     cy.viewport(375, 844);
     cy.visit('/zh/api');
 

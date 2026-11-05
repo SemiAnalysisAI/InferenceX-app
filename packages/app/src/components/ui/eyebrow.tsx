@@ -1,13 +1,8 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/shared/utils';
 
-/**
- * Uppercase mono eyebrow label — the small kicker above headings. Wraps the
- * single most repeated typography recipe in the app so its size, weight, and
- * letter-spacing stay uniform. See docs/typography.md.
- */
 const eyebrowVariants = cva('font-mono text-xs font-semibold uppercase', {
   variants: {
     tone: {

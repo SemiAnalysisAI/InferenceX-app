@@ -9,6 +9,7 @@ const FRAMEWORK_SLUGS = [
   'dynamo',
   'lmcache',
   'mooncake',
+  'mori-umbp',
 ] as const;
 
 const FRAMEWORK_NAMES: Record<(typeof FRAMEWORK_SLUGS)[number], string> = {
@@ -20,6 +21,7 @@ const FRAMEWORK_NAMES: Record<(typeof FRAMEWORK_SLUGS)[number], string> = {
   dynamo: 'NVIDIA Dynamo',
   lmcache: 'LMCache',
   mooncake: 'Mooncake',
+  'mori-umbp': 'MoRI UMBP',
 };
 
 const ROUTE_VIEWPORTS = [
@@ -42,12 +44,14 @@ describe('AgentX optimizations', () => {
         'have.length',
         FRAMEWORK_SLUGS.length,
       );
-      // Direct route into one project, for a reader who knows which engine they run.
       cy.get('[data-testid="agentx-optimizations-framework-link"][data-framework="sglang"]').should(
         'have.attr',
         'href',
         '/agentx/optimizations/sglang',
       );
+      cy.get(
+        '[data-testid="agentx-optimizations-framework-link"][data-framework="mori-umbp"]',
+      ).should('have.attr', 'href', '/agentx/optimizations/mori-umbp');
       cy.get('[data-testid="agentx-optimizations-cta"]')
         .should('contain.text', 'Read the optimizations')
         .click();
@@ -70,7 +74,6 @@ describe('AgentX optimizations', () => {
         'A brief introduction to the distributed inference ecosystem',
       );
       cy.get('[data-testid="agentx-optimizations-figure-servingStack"] img').should('be.visible');
-      // The day-zero section keeps its own upstream references.
       cy.get('[data-testid="agentx-optimizations-section-other"]')
         .find('[data-testid="agentx-optimizations-pr"]')
         .first()
@@ -94,23 +97,28 @@ describe('AgentX optimizations', () => {
         cy.get('[data-testid="agentx-optimizations-figure-vllmSelectiveRetention"] img').should(
           'be.visible',
         );
+        cy.get('[data-testid="agentx-optimizations-figure-vllmSelectiveRetention"]').should(
+          'contain.text',
+          'View full-resolution image',
+        );
         cy.get('[data-testid="agentx-optimizations-pr"]')
           .should('have.length.greaterThan', 20)
           .first()
           .should('have.attr', 'href', 'https://github.com/vllm-project/vllm/pull/43447')
           .and('contain.text', 'vLLM #43447');
-        // Sibling projects stay one click away.
         cy.get('[data-testid="agentx-optimizations-card"]').should(
           'have.length',
           FRAMEWORK_SLUGS.length - 1,
         );
       });
+
+    cy.visit('/agentx/optimizations/mori-umbp', { onBeforeLoad: unlockAgenticGate });
+    cy.get('[data-testid="agentx-optimizations-figure-umbpStoreLinker"]')
+      .should('be.visible')
+      .and('not.contain.text', 'View full-resolution image');
   });
 
   it('renders the index and representative projects at 1440px and 390px in both locales', () => {
-    // Project pages share one template and differ only in typechecked data, so
-    // the route matrix visits two representatives (one with a hyphenated slug)
-    // instead of all eight; the tests above deep-cover vllm (en) and sglang (zh).
     const matrixSlugs = ['tensorrt-llm', 'mooncake'] as const;
     for (const viewport of ROUTE_VIEWPORTS) {
       for (const locale of ['', '/zh']) {
@@ -189,7 +197,6 @@ describe('AgentX optimizations', () => {
 
     cy.visit('/zh/agentx/optimizations/sglang', { onBeforeLoad: unlockAgenticGate });
     cy.get('[data-testid="agentx-optimizations-article"]').within(() => {
-      // Product names stay English; the prose around them is translated.
       cy.get('h1').should('have.text', 'SGLang');
       cy.contains('HiCache offload').should('be.visible');
       cy.contains('并发 384 下输出吞吐量提升 26.75%').should('be.visible');

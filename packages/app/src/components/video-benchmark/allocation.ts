@@ -7,8 +7,6 @@ export function allocatedGpus(bundle: Partial<Pick<Bundle, 'ci' | 'documents'>>)
     const count = Number(match.groups?.count);
     return Number.isSafeInteger(count) && count > 0 ? count : null;
   }
-  // AMD's granted full-node job omits GPU AllocTRES. Require the retained step
-  // binding and physical UUID inventory; requested GPU counts alone are insufficient.
   if (
     text(at(bundle.ci, 'site', 'cluster')) !== 'mi355x-amds' ||
     text(at(job, 'OverSubscribe')) !== 'NO' ||

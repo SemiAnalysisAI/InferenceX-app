@@ -1,0 +1,351 @@
+import { GET as videoRuns } from '@/app/api/video-runs/route';
+import { compareSide, pairCases } from '@/components/video-benchmark/compare';
+import {
+  VIDEO_HISTORY_MAX_PAGES,
+  VIDEO_HISTORY_PAGE_SIZE,
+  type VideoHistoryPage,
+} from '@/components/video-benchmark/history';
+import { servingCells } from '@/components/video-benchmark/serving';
+import { storedBundle, type StoredArtifact } from '@/components/video-benchmark/stored';
+import {
+  efficiencyValue,
+  latencyValue,
+  tradeoffCurves,
+  tradeoffPoints,
+  type DeploymentCost,
+} from '@/components/video-benchmark/tradeoff';
+import { selectVideoEvidence } from '@/components/video-benchmark/view-selection';
+import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
+import {
+  parseEnumParam,
+  parseNumberParam,
+  parseRunIdParam,
+  validateParams as validateViewParams,
+} from '@/lib/views-api/params';
+import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
+import { readResponse, sourceRequest } from '@/lib/views-api/source';
+import { videoDashboardProjection } from '@/lib/views-api/video-dashboard';
+import { type NextRequest, NextResponse } from 'next/server';
+
+export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
+const headers = { 'Cache-Control': 'private, no-store' };
+
+async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'compare') {
+  const history = await readResponse<VideoHistoryPage>(
+    await videoRuns(
+      sourceRequest(request, '/api/video-runs', {
+        format: 'history',
+        page: '1',
+        pages: String(VIDEO_HISTORY_MAX_PAGES),
+      }),
+    ),
+  );
+  if (history.schemaVersion !== 1 || !Array.isArray(history.entries))
+    throw new Error('Unsupported published history projection');
+  const { nextPage } = history;
+  const pagesRead =
+    nextPage === null
+      ? Math.max(1, Math.ceil(history.entries.length / VIDEO_HISTORY_PAGE_SIZE))
+      : nextPage - 1;
+  const projection = videoDashboardProjection([history], request.nextUrl.search);
+  const { baseline, candidate } = projection.comparison;
+  let cases: {
+    status: 'not-requested' | 'no-pair' | 'not-published' | 'ready' | 'unavailable';
+    resolvedCaseIndex: number;
+    count: number;
+    selected: ReturnType<typeof pairCases>['pairs'][number] | null;
+    unmatched: ReturnType<typeof pairCases>['unmatched'] | null;
+  } = { status: 'not-requested', resolvedCaseIndex: 0, count: 0, selected: null, unmatched: null };
+  if (view === 'compare') {
+    cases.status = 'no-pair';
+    if (baseline && candidate) {
+      // Same artifact can contain both points. Read it once, through the published-only media path.
+      const artifacts = new Map<string, StoredArtifact | null>();
+      try {
+        for (const point of [baseline, candidate]) {
+          const key = `${point.runId}:${point.artifactId}`;
+          if (artifacts.has(key)) continue;
+          const response = await videoRuns(
+            sourceRequest(request, '/api/video-runs', {
+              run: point.runId,
+              artifact: String(point.artifactId),
+              format: 'published',
+            }),
+          );
+          artifacts.set(
+            key,
+            response.status === 204 ? null : await readResponse<StoredArtifact>(response),
+          );
+        }
+        const b = artifacts.get(`${baseline.runId}:${baseline.artifactId}`);
+        const c = artifacts.get(`${candidate.runId}:${candidate.artifactId}`);
+        cases.status = 'not-published';
+        if (b && c) {
+          const matched = pairCases(
+            compareSide(b, baseline).records,
+            compareSide(c, candidate).records,
+          );
+          const index = Math.min(
+            projection.params.caseIndex,
+            Math.max(matched.pairs.length - 1, 0),
+          );
+          cases = {
+            status: 'ready',
+            resolvedCaseIndex: index,
+            count: matched.pairs.length,
+            selected: matched.pairs[index] ?? null,
+            unmatched: matched.unmatched,
+          };
+        }
+      } catch {
+        // Like the collapsed UI panel, a media error does not erase published chart metrics.
+        cases.status = 'unavailable';
+      }
+    }
+  }
+  return NextResponse.json(
+    {
+      view: 'video',
+      apiVersion: 'v1',
+      ...projection,
+      params: { ...projection.params, view, displayView: projection.params.view },
+      coverage: {
+        pagesRead,
+        maxPages: VIDEO_HISTORY_MAX_PAGES,
+        nextPage,
+        truncated: nextPage !== null,
+      },
+      comparison: { ...projection.comparison, cases },
+    },
+    { headers },
+  );
+}
+
+function serializePoint({
+  run: evidenceRun,
+  ...point
+}: ReturnType<typeof tradeoffPoints>[number] & { x: number | null; y: number | null }) {
+  return {
+    ...point,
+    run: {
+      exportRun: evidenceRun.exportRun,
+      artifact: evidenceRun.artifact,
+      manifestSha256: evidenceRun.bundle.manifestSha256,
+    },
+  };
+}
+
+/** Published CI evidence only. Never accepts URLs, local bundles, or credentials. */
+export function GET(request: NextRequest) {
+  return runViewsRoute('video', async () => {
+    validateViewParams(request.nextUrl.searchParams, VIEW_QUERY_PARAMS['video']);
+    const s = request.nextUrl.searchParams;
+    const mode = parseEnumParam(
+      s.get('view'),
+      'view',
+      ['dashboard', 'compare', 'discovery', 'results', 'tradeoff'],
+      s.has('run') || s.has('artifact') ? 'results' : 'dashboard',
+    );
+    if (mode === 'dashboard' || mode === 'compare') {
+      for (const key of s.keys())
+        if (key !== 'view' && !key.startsWith('v_'))
+          throw new ViewsApiParamError(key, 'Use a legacy view for run/artifact selectors');
+      return dashboardResponse(request, mode);
+    }
+    for (const key of s.keys())
+      if (key.startsWith('v_'))
+        throw new ViewsApiParamError(
+          key,
+          'Dashboard selectors require view=dashboard or view=compare',
+        );
+    // GitHub run id and artifact id share the positive-digits rule.
+    const run = parseRunIdParam(s.get('run'), 'run');
+    const artifact = parseRunIdParam(s.get('artifact'), 'artifact');
+    const page = String(parseNumberParam(s.get('page'), 'page', 1, { min: 1, integer: true }));
+    if (artifact && !run) throw new ViewsApiParamError('run', 'run is required with artifact');
+    const response = await videoRuns(
+      sourceRequest(request, '/api/video-runs', {
+        run,
+        artifact,
+        page,
+        format: artifact ? 'published' : undefined,
+      }),
+    );
+    if (response.status === 204) return new NextResponse(null, { status: 204, headers });
+    const payload = await readResponse<StoredArtifact>(response);
+    if (!artifact)
+      return NextResponse.json(
+        { view: 'video', apiVersion: 'v1', params: { run, page }, discovery: payload },
+        { headers },
+      );
+    const refs = s.get('compare')?.split(',').filter(Boolean) ?? [];
+    if (
+      refs.length > 8 ||
+      refs.some(
+        (ref) =>
+          !/^[1-9]\d*:[1-9]\d*$/.test(ref) ||
+          ref.split(':').some((n) => !Number.isSafeInteger(Number(n))),
+      )
+    )
+      throw new ViewsApiParamError('compare', 'Expected up to eight run:artifact pairs');
+    const saved = [payload];
+    const unpublishedCompare: string[] = [];
+    for (const ref of new Set(refs)) {
+      const [r, a] = ref.split(':');
+      if (r === run && a === artifact) continue;
+      const compared = await videoRuns(
+        sourceRequest(request, '/api/video-runs', { run: r, artifact: a, format: 'published' }),
+      );
+      // An unstored ref is missing evidence, not a failed read of the primary artifact.
+      if (compared.status === 204) unpublishedCompare.push(ref);
+      else saved.push(await readResponse<StoredArtifact>(compared));
+    }
+    const runs = saved.flatMap((item) =>
+      item.sources
+        .filter((source) => !source.kind)
+        .map((source) => ({
+          bundle: storedBundle(source),
+          exportRun: item.runId,
+          artifact: String(item.artifact.id),
+        })),
+    );
+    const all = runs.flatMap(tradeoffPoints);
+    const source = s.get('source') ?? payload.sources[0]?.id ?? null;
+    const selectedSource = payload.sources.find((item) => item.id === source);
+    if (source && !selectedSource)
+      throw new ViewsApiParamError(
+        'source',
+        'Unknown published source',
+        payload.sources.map((item) => item.id),
+      );
+    const workloads = [...new Map(all.map((p) => [p.group, p.workloadLabel])).entries()];
+    const workload =
+      s.get('workload') ??
+      all.find((p) => p.sourceId === source)?.group ??
+      workloads[0]?.[0] ??
+      null;
+    if (workload && !workloads.some(([key]) => key === workload))
+      throw new ViewsApiParamError('workload', 'Unknown workload');
+    const points = all.filter((p) => p.group === workload);
+    const xAxis = parseEnumParam(
+      s.get('xAxis'),
+      'xAxis',
+      ['p90', 'median'],
+      points.some((p) => p.role === 'serving') &&
+        !points.some((p) => latencyValue(p, 'p90') !== null)
+        ? 'median'
+        : 'p90',
+    );
+    const yAxis = parseEnumParam(
+      s.get('yAxis'),
+      'yAxis',
+      ['dollar', 'clipsGpu', 'secondsGpu', 'clipsAllocatedGpu', 'secondsAllocatedGpu', 'energy'],
+      'clipsGpu',
+    );
+    let costs: Record<string, DeploymentCost> = {};
+    if (s.has('costs')) {
+      try {
+        const input: unknown = JSON.parse(s.get('costs')!);
+        if (
+          !input ||
+          Array.isArray(input) ||
+          typeof input !== 'object' ||
+          Object.keys(input).length > 100
+        )
+          throw new Error('Invalid deployment cost');
+        for (const value of Object.values(input)) {
+          if (
+            !value ||
+            typeof value !== 'object' ||
+            typeof value.hourly !== 'string' ||
+            !Number.isFinite(Number(value.hourly)) ||
+            Number(value.hourly) < 0 ||
+            typeof value.source !== 'string' ||
+            typeof value.date !== 'string'
+          )
+            throw new Error('Invalid deployment cost');
+        }
+        costs = input as Record<string, DeploymentCost>;
+      } catch {
+        throw new ViewsApiParamError(
+          'costs',
+          'Expected a JSON object of point IDs to {hourly,source,date} strings',
+        );
+      }
+    }
+    const plotted = points.flatMap((p) => {
+      const x = latencyValue(p, xAxis),
+        y = efficiencyValue(p, yAxis, costs[p.id]);
+      return p.completeWorkload && x !== null && y !== null ? [{ ...p, x, y }] : [];
+    });
+    const selected =
+      s.get('selected') ?? points.find((p) => p.sourceId === source)?.id ?? points[0]?.id ?? null;
+    const phase = parseEnumParam(
+      s.get('phase'),
+      'phase',
+      ['measurement', 'startup', 'warmup'],
+      'measurement',
+    );
+    const gpuBasis = parseEnumParam(
+      s.get('gpuBasis'),
+      'gpuBasis',
+      ['participating', 'allocated'],
+      'participating',
+    );
+    const view = mode;
+    const cell = s.get('cell'),
+      slot = s.get('slot');
+    const evidence = selectedSource
+      ? selectVideoEvidence(selectedSource, { cell, slot, phase, gpuBasis })
+      : null;
+    const selectedPoint = points.find((point) => point.id === selected);
+    return NextResponse.json(
+      {
+        view: 'video',
+        apiVersion: 'v1',
+        params: {
+          run,
+          artifact,
+          page,
+          compare: refs,
+          source,
+          cell,
+          slot,
+          view,
+          workload,
+          xAxis,
+          yAxis,
+          selected,
+          costs,
+          phase,
+          gpuBasis,
+        },
+        unpublishedCompare,
+        sources: payload.sources,
+        workloads,
+        evidence,
+        serving: runs.map((r) => ({
+          run: r.exportRun,
+          artifact: r.artifact,
+          cells: servingCells(r.bundle),
+        })),
+        points: plotted.map(serializePoint),
+        selectedPoint: selectedPoint
+          ? serializePoint({
+              ...selectedPoint,
+              x: latencyValue(selectedPoint, xAxis),
+              y: efficiencyValue(selectedPoint, yAxis, costs[selectedPoint.id]),
+            })
+          : null,
+        curves: Object.fromEntries(
+          Object.entries(tradeoffCurves(plotted)).map(([key, curve]) => [
+            key,
+            curve.map(serializePoint),
+          ]),
+        ),
+      },
+      { headers },
+    );
+  });
+}

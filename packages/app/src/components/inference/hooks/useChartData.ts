@@ -1,223 +1,110 @@
 import { useMemo, useRef } from 'react';
+import {
+  FLIP_MAP,
+  applyAgenticPercentileToXLabel,
+  applyScopeFilters,
+  buildComparisonDates,
+  dedupeRowsToLatestPerConfig,
+  filterOverviewHistoryRows,
+  flipRooflineDirection,
+  supportsPointTokenMetric,
+  type RooflineDirection,
+  type XAxisMode,
+} from './chart-data-core';
 
-import { useQueries, useQuery } from '@tanstack/react-query';
 import { rowToSequence } from '@semianalysisai/inferencex-constants';
+import { useQueries, useQuery } from '@tanstack/react-query';
 
 import chartDefinitions, {
+  countsInputTokens,
+  isAllInMeasuredConfigKey,
   tokenMetricTypeForConfigKey,
 } from '@/components/inference/metric-registry';
+import { allInMeasuredTableData } from '@/components/inference/utils/inference-table-data';
+import {
+  applyTokenRevenuePricing,
+  usesTokenSalePricing,
+} from '@/components/inference/token-revenue';
 import type {
   AggDataEntry,
   ChartDefinition,
   HardwareConfig,
   InferenceData,
+  PowerCompare,
   RenderableGraph,
-  TokenRevenuePricing,
   TokenRevenuePriceSource,
+  TokenRevenuePricing,
   YAxisMetricKey,
 } from '@/components/inference/types';
-import {
-  applyTokenRevenuePricing,
-  usesTokenSalePricing,
-} from '@/components/inference/token-revenue';
 import { partitionChartDataByLimits } from '@/components/inference/utils';
+import { expandPowerCompareSeries } from '@/components/inference/utils/power-compare';
+import { parseComparisonEntry } from '@/components/inference/utils/comparisonEntry';
 import {
-  parseComparisonEntry,
-  resolveComparisonEntries,
-} from '@/components/inference/utils/comparisonEntry';
-import { useBenchmarks, benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
-import type { BenchmarkRow } from '@/lib/api';
-import {
-  DEFAULT_TCO_BASIS,
-  GPU_ALIAS_TO_CANONICAL,
-  getModelSortIndex,
-  hardwareKeyMatchesAnyBase,
-  type TcoBasis,
-} from '@/lib/constants';
-import { mergeRunScopedRows, transformBenchmarkRows } from '@/lib/benchmark-transform';
-import {
-  benchmarkCurveDate,
-  dedupeAgenticHistoryRuns,
-  dedupeRowsToLatestPerConfig as dedupeLatestBenchmarkSeries,
-} from '@/lib/benchmark-run-selection';
-import { Sequence, type Model } from '@/lib/data-mappings';
-import { isPreferredVrLine, preferVrDefaultRun, VR_DEFAULT_RUN } from '../default-run-preference';
-import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
-import { remapInferencePoint } from '@/lib/chart-utils';
-import { overviewServingSeriesKey, type OverviewServingSeriesRow } from '@/lib/overview-data';
-import { supportsChartTokenMetric, type TokenMetricType } from '@/lib/supplemental-benchmarks';
-import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
-import {
-  applyQuickFilters,
   computeAvailableQuickFilters,
   EMPTY_QUICK_FILTERS,
   type QuickFilters,
 } from '@/components/inference/utils/quickFilters';
+import {
+  resolveXAxisField,
+  type FixedSequenceStatistic,
+} from '@/components/inference/utils/resolveXAxisField';
+import { benchmarkQueryOptions, useBenchmarks } from '@/hooks/api/use-benchmarks';
+import type { BenchmarkRow } from '@/lib/api/api';
+import {
+  benchmarkCurveDate,
+  dedupeAgenticHistoryRuns,
+} from '@/lib/benchmarks/benchmark-run-selection';
+import {
+  mergeRunScopedRows,
+  transformBenchmarkRows,
+  type TokenBasis,
+} from '@/lib/benchmarks/benchmark-transform';
+import { remapInferencePoint } from '@/lib/charts/chart-utils';
+import {
+  CHIP_BASIS_METRICS,
+  DEFAULT_CHIP_BASIS,
+  withTotalChipQualifier,
+  type ChipBasis,
+} from '@/lib/benchmarks/chip-basis';
+import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/catalog/constants';
+import { Sequence, type Model } from '@/lib/catalog/data-mappings';
+import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/shared/utils';
+import { isPreferredVrLine, preferVrDefaultRun, VR_DEFAULT_RUN } from '../default-run-preference';
+
+export {
+  applyAgenticPercentileToXLabel,
+  applyScopeFilters,
+  buildComparisonDates,
+  dedupeRowsToLatestPerConfig,
+  derivedModeRoofline,
+  filterByGPU,
+  filterOverviewHistoryRows,
+  flipRooflineDirection,
+  isAgenticOnlyXAxisMode,
+  supportsPointTokenMetric,
+  X_AXIS_MODES,
+  type RooflineDirection,
+  type XAxisMode,
+} from './chart-data-core';
 
 /**
- * Chart x-axis variant selected by the dropdown in the Chart panel. The
- * inference provider and ChartDisplay import this single definition.
+ * Rename the token noun of a metric label for the uncached basis (the Horace He Metric), e.g.
+ * "Total Tokens per $1 TCO" -> "Uncached Suffix + Output Tokens per $1 TCO" and
+ * "Input Token Throughput per Chip" -> "Uncached Suffix Input Token Throughput per Chip".
  */
-export type XAxisMode = 'ttft' | 'e2e' | 'interactivity' | 'e2e-normalized-interactivity';
-
-export const X_AXIS_MODES: readonly XAxisMode[] = [
-  'ttft',
-  'e2e',
-  'interactivity',
-  'e2e-normalized-interactivity',
-];
-
-/**
- * Modes whose x metric is derived from persisted per-request traces —
- * these only exist for agentic scenarios (fixed-seq rows have no
- * trace_replay blob to derive them from).
- */
-export function isAgenticOnlyXAxisMode(mode: XAxisMode): boolean {
-  return mode === 'e2e-normalized-interactivity';
-}
-
-/** Build deduplicated comparison dates, excluding the main run date. */
-export function buildComparisonDates(
-  selectedGPUs: string[],
-  selectedDates: string[],
-  selectedDateRange: { startDate: string; endDate: string },
-  selectedRunDate: string | undefined,
-  selectedRunId?: string,
-): string[] {
-  if (selectedGPUs.length === 0) return [];
-  // Range endpoints + individually-added dates/runs (redundant same-day range
-  // endpoints dropped), minus the main date/run which the primary query covers.
-  // Other run-qualified entries on the same day are distinct overlays and stay.
-  return resolveComparisonEntries(selectedDates, selectedDateRange).filter((entry) => {
-    if (entry === selectedRunDate) return false;
-    const { runId } = parseComparisonEntry(entry);
-    return runId === undefined || runId !== selectedRunId;
-  });
-}
-
-/** Filter data by GPU key, resolving aliases to canonical keys. */
-export function filterByGPU<T extends { hwKey: unknown }>(
-  data: T[],
-  selectedGPUs: string[],
-  aliasMap: Record<string, string>,
-): T[] {
-  if (selectedGPUs.length === 0) return data;
-  return data.filter((dp) => {
-    const hwKey = String(dp.hwKey);
-    const canonical = aliasMap[hwKey];
-    return (
-      selectedGPUs.includes(hwKey) || (canonical !== undefined && selectedGPUs.includes(canonical))
-    );
-  });
-}
-
-/** Restrict one snapshot to the exact serving envelope selected by Overview. */
-export function filterOverviewHistoryRows<T extends OverviewServingSeriesRow>(
-  rows: T[],
-  configKey: string | undefined,
-): T[] {
-  return configKey === undefined
-    ? rows
-    : rows.filter((row) => overviewServingSeriesKey(row) === configKey);
-}
-
-export type RooflineDirection = 'upper_left' | 'upper_right' | 'lower_left' | 'lower_right';
-const FLIP_MAP: Record<RooflineDirection, RooflineDirection> = {
-  upper_left: 'upper_right',
-  upper_right: 'upper_left',
-  lower_left: 'lower_right',
-  lower_right: 'lower_left',
-};
-
-/** Flip roofline direction when the x-axis is swapped. */
-export function flipRooflineDirection(dir: RooflineDirection): RooflineDirection {
-  return FLIP_MAP[dir];
-}
-
-/**
- * Roofline corner for a trace-derived x-axis mode. Derived modes render on the
- * e2e chart definition, whose corners assume lower-x-is-better; when the
- * derived metric is higher-is-better (E2E Normalized Interactivity) the corner mirrors
- * horizontally. This keeps the y-metric's own good direction — throughput and
- * tokens-per-dollar purchasing power land on an upper corner, while cost and
- * joules land on a lower one.
- */
-export function derivedModeRoofline(
-  configuredE2eCorner: RooflineDirection | undefined,
-  higherXIsBetter: boolean,
-): RooflineDirection | undefined {
-  if (!configuredE2eCorner || !higherXIsBetter) return configuredE2eCorner;
-  return flipRooflineDirection(configuredE2eCorner);
-}
-
-// Statistic words that may already prefix an x-axis label (from chart config
-// or the TTFT override label). Trailing whitespace is consumed so a replace
-// never doubles the separator space.
-const X_LABEL_STAT_PREFIX_RE = /^(?:Median|Mean|P75|P90|P95|P99(?:\.9)?)\b\s*/iu;
-
-/**
- * Agentic sequences plot percentile fields (e.g. `p90_intvty`, `p75_e2el`),
- * so the x-axis label must carry the selected percentile. Replaces an
- * existing leading statistic word (e.g. the TTFT override's "P90 Time To
- * First Token (s)") or prefixes the percentile when the configured label has
- * none (e.g. "Interactivity (tok/s/user)" → "P90 Interactivity (tok/s/user)").
- * Only call for agentic sequences — fixed-seq labels must stay untouched.
- */
-export function applyAgenticPercentileToXLabel(label: string, pctlWord: string): string {
-  return X_LABEL_STAT_PREFIX_RE.test(label)
-    ? label.replace(X_LABEL_STAT_PREFIX_RE, `${pctlWord} `)
-    : `${pctlWord} ${label}`;
-}
-
-/** The dedup key fields a chart series is identified by. */
-interface DedupeRow {
-  hardware: string;
-  framework: string;
-  spec_method: string;
-  disagg: boolean;
-  precision: string;
-  offload_mode?: string | null;
-  benchmark_type?: string;
-  date: string;
-  workflow_run_id?: number;
-  run_started_at?: string | null;
-}
-
-// AgentX replacement scope matches benchmark_curve_scope in the SQL layer.
-/**
- * Keep only the newest workflow run for each chart series. AgentX treats topology,
- * speculative decoding and offload as point properties within a complete curve.
- */
-export function dedupeRowsToLatestPerConfig<T extends DedupeRow>(rows: T[]): T[] {
-  return dedupeLatestBenchmarkSeries(rows);
-}
-
-/**
- * Coarse filters that apply to every y-axis metric: the explicit GPU picks, the
- * vendor / deployment / spec quick-filter pills, and the two-GPU compare scope.
- * Deliberately excludes the y-metric coverage filter, so the result is the set
- * of configs the user could have selected regardless of which axis is drawn.
- */
-export function applyScopeFilters(
-  points: InferenceData[],
-  selectedGPUs: string[],
-  quickFilters: QuickFilters,
-  compareGpuPair?: readonly [string, string] | null,
-): InferenceData[] {
-  let scoped = filterByGPU(points, selectedGPUs, GPU_ALIAS_TO_CANONICAL);
-  scoped = applyQuickFilters(scoped, quickFilters);
-  if (compareGpuPair) {
-    scoped = scoped.filter((d) => hardwareKeyMatchesAnyBase(String(d.hwKey), compareGpuPair));
+export function withUncachedQualifier(text: unknown, locale: 'en' | 'zh'): string | undefined {
+  if (typeof text !== 'string') return undefined;
+  if (locale === 'zh') {
+    const zh = text.replace('（含提示词）', '');
+    if (zh.includes('总 token')) return zh.replace('总 token', '未缓存 suffix + 输出 token');
+    if (zh.includes('输入 token')) return zh.replace('输入 token', '未缓存 suffix 输入 token');
+    return zh.replace('token', '未缓存 suffix + 输出 token');
   }
-  return scoped;
-}
-
-/** Apply snapshot-scoped metric support using the source date, not its display date. */
-export function supportsPointTokenMetric(
-  point: Pick<InferenceData, 'hwKey' | 'date' | 'actualDate'>,
-  tokenType: TokenMetricType,
-): boolean {
-  return supportsChartTokenMetric(String(point.hwKey), point.actualDate ?? point.date, tokenType);
+  const en = text.replace(' (incl. prompt)', '');
+  if (/\bTotal Token/u.test(en))
+    return en.replace(/\bTotal Token/u, 'Uncached Suffix + Output Token');
+  if (/\bInput Token/u.test(en)) return en.replace(/\bInput Token/u, 'Uncached Suffix Input Token');
+  return en.replace(/\bToken/u, 'Uncached Suffix + Output Token');
 }
 
 export function useChartData(
@@ -238,28 +125,10 @@ export function useChartData(
   enabled = true,
   latestAvailableDate?: string,
   selectedPercentile = 'p90',
-  /** When set, only series for these two registry GPU keys are shown (compare pages). */
   compareGpuPair?: readonly [string, string] | null,
-  /**
-   * Exact GitHub run id used to pin contested configs while carrying forward
-   * configs that the selected run did not produce.
-   */
   selectedRunId?: string,
-  /** Selected main run id, including non-contested runs, used only to avoid
-   * fetching the primary run again as a same-day comparison overlay. */
-  comparisonMainRunId?: string,
-  /** Current x-axis mode. Canonical agentic-frontier stamping happens later,
-   * after ChartDisplay has fetched the trace-derived normalized metric. */
   selectedXAxisMode?: XAxisMode,
-  /**
-   * GitHub run id for the "as of run" base view. Set only when an
-   * earlier-than-latest run is selected.
-   */
   asOfRunId?: string,
-  /**
-   * Coarse vendor / aggregation / spec-decoding filters applied to every point
-   * (also applied to overlay points in ScatterGraph so both paths stay in sync).
-   */
   quickFilters: QuickFilters = EMPTY_QUICK_FILTERS,
   overviewHistoryPair?: {
     currentConfigKey: string;
@@ -268,31 +137,21 @@ export function useChartData(
   benchmarkQueryScope?: string,
   initialBenchmarkRows?: BenchmarkRow[],
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
-  /** Opt-in from the inference page only; explicit date/run/history views opt out. */
   allowDefaultRunPreference = false,
+  powerCompare: PowerCompare = 'none',
+  fixedSequenceStatistic: FixedSequenceStatistic = 'median',
+  tokenBasis: TokenBasis = 'total',
+  prefetchLatestRows = false,
+  chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
 ) {
-  // When the selected date is the latest available, use '' (empty string) to match
-  // the initial no-date query key, reusing the eagerly-fetched benchmarks from the
-  // materialized view instead of firing a redundant second fetch with identical data.
-  //
-  // The '' shortcut hits the materialized view, which has no run-level filter, so it
-  // is only valid for the latest run. When an earlier run is selected (asOfRunId set)
-  // we must query the date-filtered path so the run cutoff applies.
   const queryDate = asOfRunId
     ? (selectedRunDate ?? '')
     : selectedRunDate && latestAvailableDate && selectedRunDate === latestAvailableDate
       ? ''
       : selectedRunDate;
 
-  // Two queries: the normal latest-per-config view (always), plus the
-  // run-scoped rows when a specific workflow run is selected. The merged
-  // result pins ONLY the configs the selected run produced to that run, and
-  // carries every other config forward from the base rows — selecting one of
-  // two same-day vLLM runs must not hide the day's SGLang curve just because
-  // it lives in a different workflow run. The base query is the default view
-  // query, so it's almost always already in the React Query cache.
   const {
-    data: baseRows,
+    data: queriedBaseRows,
     isLoading: baseLoading,
     isFetching: baseFetching,
     isPlaceholderData: basePlaceholder,
@@ -306,10 +165,26 @@ export function useChartData(
     undefined,
     !asOfRunId && queryDate === '' ? initialBenchmarkRows : undefined,
     benchmarkQueryScope,
-    // Same-model key changes (date/run/scope) keep the previous rows rendered
-    // while the new result fetches; `refreshing` below surfaces that window.
     true,
   );
+  // Latest rows depend only on the model, so start them while availability resolves the sequence.
+  // The prefetch fills the key the disabled observer above reads, and a disabled observer still
+  // returns cached data. Until the sequence resolves those rows would be filtered by the
+  // provisional default sequence, so the chart keeps loading instead of painting them.
+  useQuery(
+    benchmarkQueryOptions(
+      selectedModel,
+      '',
+      prefetchLatestRows,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      benchmarkQueryScope,
+    ),
+  );
+  const baseRows = prefetchLatestRows ? undefined : queriedBaseRows;
   const {
     data: runRows,
     isLoading: runLoading,
@@ -334,15 +209,11 @@ export function useChartData(
   );
 
   const allRows = useMemo(() => {
-    // Wait for the run rows before rendering a scoped view — rendering base
-    // rows first would flash the un-scoped chart, then swap contested points.
     let scopedRows = baseRows;
     if (selectedRunId) {
       if (!runRows) return undefined;
       scopedRows = baseRows ? mergeRunScopedRows(runRows, baseRows) : runRows;
     }
-    // A missing preferred run falls back to the existing chart. Keep source ids,
-    // dates, metrics and links intact; this is only a presentation preference.
     return preferVr && scopedRows && preferredRows
       ? preferVrDefaultRun(scopedRows, preferredRows)
       : scopedRows;
@@ -352,22 +223,11 @@ export function useChartData(
     baseLoading || (Boolean(selectedRunId) && runLoading) || (preferVr && preferredLoading);
   const queryError = baseError ?? (selectedRunId ? runError : null);
 
-  // GPU comparison: fetch data for each additional comparison date
   const comparisonDates = useMemo(
-    () =>
-      buildComparisonDates(
-        selectedGPUs,
-        selectedDates,
-        selectedDateRange,
-        selectedRunDate,
-        comparisonMainRunId,
-      ),
-    [selectedGPUs, selectedDates, selectedDateRange, selectedRunDate, comparisonMainRunId],
+    () => buildComparisonDates(selectedGPUs, selectedDates, selectedDateRange, selectedRunDate),
+    [selectedGPUs, selectedDates, selectedDateRange, selectedRunDate],
   );
 
-  // Each comparison entry is either a plain date (latest run that day, exact-date
-  // query) or a specific run encoded as `date~r<id>~<i>of<n>` (exact-run query) so
-  // multiple same-day runs can be compared as distinct series.
   const comparisonQueries = useQueries({
     queries: comparisonDates.map((entry) => {
       const parsed = parseComparisonEntry(entry);
@@ -379,24 +239,12 @@ export function useChartData(
 
   const comparisonLoading = comparisonQueries.some((q) => q.isLoading);
 
-  // Loading = query is fetching OR we haven't received any data yet (waiting for date/filters)
   const loading = queryLoading || !allRows || (comparisonDates.length > 0 && comparisonLoading);
-  // Refreshing = data is on screen but a fresh result is on the way: either the
-  // base query is showing previous-key placeholder rows, or a same-key refetch
-  // is in flight. Distinct from `loading`, which means nothing renderable yet.
   const refreshing = !loading && (basePlaceholder || baseFetching);
   const error = queryError ? queryError.message : null;
 
-  // Stable identity for comparison query data — useQueries returns a new array ref every render,
-  // so we derive a stable key from dataUpdatedAt timestamps to avoid cascading memo invalidation.
   const comparisonDataKey = comparisonQueries.map((q) => q.dataUpdatedAt).join(',');
 
-  // Merge main rows with comparison date rows.
-  // Stamp each row with the *requested* date (not the actual DB date) so that
-  // GPUGraph's activeDates filter (keyed by user-selected date) matches the points.
-  //
-  // rowToSequence handles both fixed-seq (via isl/osl) and agentic (via
-  // benchmark_type), so one filter covers every scenario.
   const rows = useMemo(() => {
     if (!allRows) return [];
     const seqFilter = (r: { isl: number | null; osl: number | null; benchmark_type: string }) =>
@@ -406,9 +254,6 @@ export function useChartData(
       overviewHistoryPair?.currentConfigKey,
     );
 
-    // Keep only each series' latest-date rows (drops stale config_ids left behind
-    // when parallelism settings change between runs). AgentX replaces the complete
-    // curve; fixed-sequence workloads keep separate offload variants.
     const deduped = dedupeRowsToLatestPerConfig(seqFiltered);
 
     const mainRows = deduped.map((r) => ({
@@ -441,19 +286,15 @@ export function useChartData(
     overviewHistoryPair?.baselineConfigKey,
   ]);
 
-  // Transform filtered rows into chart data
   const { chartData, hardwareConfig: rawHardwareConfig } = useMemo(() => {
     if (rows.length === 0)
       return {
         chartData: [] as InferenceData[][],
         hardwareConfig: {} as HardwareConfig,
       };
-    return transformBenchmarkRows(rows, selectedPercentile, tcoBasis);
-  }, [rows, selectedPercentile, tcoBasis]);
+    return transformBenchmarkRows(rows, selectedPercentile, tcoBasis, tokenBasis, chipBasis);
+  }, [rows, selectedPercentile, tcoBasis, tokenBasis, chipBasis]);
 
-  // Sort hardware config — stabilize reference when keys and labels haven't changed.
-  // Different sequences for the same model often have the same GPU configs,
-  // so avoid creating a new object (which cascades to Effect 2 deps).
   const prevHardwareConfigRef = useRef<{ key: string; config: HardwareConfig }>({
     key: '',
     config: {} as HardwareConfig,
@@ -476,11 +317,6 @@ export function useChartData(
     return config;
   }, [rawHardwareConfig]);
 
-  // Quick-filter values that have data for the current model / sequence /
-  // precision. Derived from the full transformed point set (BEFORE quick
-  // filters) so the pills reflect what exists and don't churn as the user
-  // selects — drives which framework pills show and which vendor/agg/spec
-  // options are disabled.
   const availableQuickFilters = useMemo(
     () =>
       computeAvailableQuickFilters(
@@ -489,18 +325,11 @@ export function useChartData(
     [chartData, selectedPrecisions],
   );
 
-  // Stable chart definitions — only depends on metric/axis selections, not data.
-  // Separated so that sequence/data changes don't create new chartDefinition refs,
-  // which would cause Effect 3 (metric reposition) to fire redundantly after Effect 2.
   const stableChartDefinitions = useMemo(
     () =>
       (chartDefinitions as ChartDefinition[]).map((chartDef) => {
         const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;
 
-        // Resolve which data field the x-axis plots — shared with the overlay
-        // path (processOverlayChartData) via resolveXAxisField so the two
-        // can't drift. Labels/headings stay here (display-only) and follow the
-        // resolver's branch discriminant.
         const isAgentic = selectedSequence === Sequence.AgenticTraces;
         const effectiveXMetric =
           chartDef.chartType === 'e2e' ? selectedE2eXAxisMetric : selectedXAxisMetric;
@@ -508,13 +337,15 @@ export function useChartData(
           isAgentic,
           percentile: selectedPercentile,
           xAxisMode: selectedXAxisMode,
+          fixedSequenceStatistic,
         });
         const naturalX = resolved.naturalX as keyof AggDataEntry;
         const xAxisField = resolved.xAxisField as keyof AggDataEntry;
         const { isTtftOverride } = resolved;
 
         const ttftPctl = isTtftOverride ? xAxisField.replace(/_ttft$/u, '') : 'p90';
-        const ttftPctlWord = ttftPctl === 'median' ? 'Median' : ttftPctl.toUpperCase();
+        const ttftPctlWord =
+          ttftPctl === 'median' ? 'Median' : ttftPctl === 'mean' ? 'Mean' : ttftPctl.toUpperCase();
         const ttftLabel = `${ttftPctlWord} Time To First Token (s)`;
         const ttftLabelZh = `${ttftPctlWord} 首 token 延迟 (s)`;
 
@@ -540,12 +371,6 @@ export function useChartData(
           xAxisLabelZh = ttftLabelZh;
         }
 
-        // Agentic: relabel to the chosen percentile (the resolver already
-        // rewrote the field) — xAxisLabel still carries the raw chartDef
-        // prefix (or none: the base Interactivity / E2E Latency config labels
-        // have no statistic word, so the percentile is prefixed). The chart
-        // heading ("vs. <latency>") is also rewritten so the title above the
-        // plot reflects what's drawn.
         const headingKey = `${selectedYAxisMetric}_heading` as keyof ChartDefinition;
         let chartHeading = isTtftOverride
           ? `vs. ${ttftPctlWord} Time To First Token`
@@ -560,14 +385,24 @@ export function useChartData(
             /^(?<vsPrefix>vs\.\s+)(?:(?:Median|Mean|P75|P90|P95|P99(?:\.9)?)\s+)?/iu,
             `$1${pctlWord} `,
           );
+        } else {
+          const word = xAxisField.startsWith('mean_')
+            ? 'Mean'
+            : xAxisField.startsWith('median_')
+              ? 'Median'
+              : xAxisField.split('_')[0].toUpperCase();
+          const wordZh = word === 'Mean' ? '平均' : '中位';
+          xAxisLabel = applyAgenticPercentileToXLabel(xAxisLabel, word);
+          xAxisLabelZh = applyAgenticPercentileToXLabel(xAxisLabelZh, word).replace(
+            /^(?:Mean|Median)\s+/u,
+            wordZh,
+          );
+          chartHeading = chartHeading.replace(
+            /^(?<vsPrefix>vs\.\s+)(?:(?:Median|Mean|P75|P90|P95|P99(?:\.9)?)\s+)?/iu,
+            `$1${word} `,
+          );
         }
 
-        // The x-axis is "flipped" only when the good-direction reverses
-        // (e.g. interactivity → TTFT: "higher is better" → "lower is better").
-        // E2EL → TTFT keeps the same direction ("lower is better" for both),
-        // so no roofline flip is needed for the e2e chart.
-        // Compare against `naturalX` (percentile-adjusted) — switching the
-        // percentile of the same logical metric is NOT a flip.
         const xAxisFlipped =
           xAxisField !== naturalX && !(chartDef.chartType === 'e2e' && isTtftOverride);
 
@@ -596,7 +431,6 @@ export function useChartData(
                     'Token Revenue per GPU Hour at OpenRouter Pricing',
                   y_tokenRevenuePerGpuHour_titleZh:
                     '按 OpenRouter 价格计算的每 GPU 小时 token 收入',
-                  // The heading reads `_chartTitle`; keep the priced source there too.
                   y_tokenRevenuePerGpuHour_chartTitle:
                     'Token Revenue per GPU Hour at OpenRouter Pricing',
                   y_tokenRevenuePerGpuHour_chartTitleZh:
@@ -615,14 +449,58 @@ export function useChartData(
                   y_tokenRevenuePerGpuHour_chartTitleZh: '按标准化价格计算的每 GPU 小时 token 收入',
                 }
             : {};
+        const tokenBasisLabels: Partial<ChartDefinition> =
+          tokenBasis === 'uncached' && countsInputTokens(selectedYAxisMetric)
+            ? Object.fromEntries(
+                (['label', 'title', 'chartTitle'] as const).flatMap((field) => [
+                  [
+                    `${selectedYAxisMetric}_${field}`,
+                    withUncachedQualifier(
+                      chartDef[`${selectedYAxisMetric}_${field}` as keyof ChartDefinition],
+                      'en',
+                    ),
+                  ],
+                  [
+                    `${selectedYAxisMetric}_${field}Zh`,
+                    withUncachedQualifier(
+                      chartDef[`${selectedYAxisMetric}_${field}Zh` as keyof ChartDefinition],
+                      'zh',
+                    ),
+                  ],
+                ]),
+              )
+            : {};
+        const labelled = { ...chartDef, ...revenueLabels, ...tokenBasisLabels } as Record<
+          string,
+          unknown
+        >;
+        // Disaggregated rows change with the chip basis; name the denominator so a
+        // chart, its PNG export and a share-link viewer can't mistake one for the other.
+        const chipBasisLabels: Partial<ChartDefinition> =
+          chipBasis === 'total' && CHIP_BASIS_METRICS.has(selectedYAxisMetric)
+            ? Object.fromEntries(
+                (['label', 'title', 'chartTitle'] as const).flatMap((field) => [
+                  [
+                    `${selectedYAxisMetric}_${field}`,
+                    withTotalChipQualifier(labelled[`${selectedYAxisMetric}_${field}`], 'en'),
+                  ],
+                  [
+                    `${selectedYAxisMetric}_${field}Zh`,
+                    withTotalChipQualifier(labelled[`${selectedYAxisMetric}_${field}Zh`], 'zh'),
+                  ],
+                ]),
+              )
+            : {};
         const yLabelKey = `${selectedYAxisMetric}_label` as keyof ChartDefinition;
-        const dynamicYLabel = { ...chartDef, ...revenueLabels }[yLabelKey];
+        const dynamicYLabel = { ...labelled, ...chipBasisLabels }[yLabelKey];
 
         return {
           chartDefinition: {
             ...chartDef,
             ...rooflineOverrides,
             ...revenueLabels,
+            ...tokenBasisLabels,
+            ...chipBasisLabels,
             heading: chartHeading,
             x_scale_field: xAxisField,
             x_label: xAxisLabel,
@@ -639,15 +517,15 @@ export function useChartData(
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
       selectedPercentile,
+      fixedSequenceStatistic,
       selectedSequence,
       tokenRevenuePriceSource,
+      tokenBasis,
+      chipBasis,
     ],
   );
 
-  // Build renderable graphs (data processing + stable chart definitions)
   const graphs: RenderableGraph[] = useMemo(() => {
-    // Once loading finishes, retain resolved axes even without official rows
-    // so unofficial-only charts use the same definitions. Keep initial skeletons.
     if (chartData.length === 0 && loading) return [];
     if (
       usesTokenSalePricing(selectedYAxisMetric) &&
@@ -673,9 +551,6 @@ export function useChartData(
 
     const result = stableChartDefinitions.map(
       ({ chartDefinition, metricKey, xAxisField }, index) => {
-        // Quick filters (vendor / deployment / mtp-stp) are part of this coarse
-        // pre-filter, which also prunes the legend and rooflines since they
-        // derive from this set.
         const filteredData = applyScopeFilters(
           dataSource[index] || [],
           selectedGPUs,
@@ -683,9 +558,6 @@ export function useChartData(
           compareGpuPair,
         );
 
-        // Filter to points that have the selected metric, then remap x/y.
-        // Intentional cost/TTFT outliers are partitioned only after this step
-        // so ScatterGraph can retain them for dashed boundary continuations.
         const tokenType = tokenMetricTypeForConfigKey(selectedYAxisMetric);
         const metricData = filteredData.filter(
           (d) => metricKey in d && supportsPointTokenMetric(d, tokenType),
@@ -693,7 +565,11 @@ export function useChartData(
         const hasMetric = metricData.length > 0;
         const isTtftX = typeof xAxisField === 'string' && xAxisField.endsWith('_ttft');
         const mappedData = hasMetric
-          ? metricData.map((d) => remapInferencePoint(d, metricKey, xAxisField))
+          ? expandPowerCompareSeries(
+              metricData.map((d) => remapInferencePoint(d, metricKey, xAxisField)),
+              selectedYAxisMetric,
+              powerCompare,
+            )
           : [];
 
         const isAgentic = selectedSequence === Sequence.AgenticTraces;
@@ -711,6 +587,15 @@ export function useChartData(
           chartDefinition,
           data: processedData,
           clippedData,
+          ...(isAllInMeasuredConfigKey(selectedYAxisMetric)
+            ? {
+                tableData: expandPowerCompareSeries(
+                  allInMeasuredTableData(filteredData, metricKey, xAxisField),
+                  selectedYAxisMetric,
+                  powerCompare,
+                ),
+              }
+            : {}),
         };
       },
     );
@@ -730,15 +615,9 @@ export function useChartData(
     compareGpuPair,
     selectedPercentile,
     quickFilters,
+    powerCompare,
   ]);
 
-  // Points that pass every scope filter but NOT the y-metric coverage filter.
-  // The legend's active set must be reconciled against these, never against
-  // `graphs`: reconcileActiveSet intersects the user's selection with the set
-  // it is handed and never re-widens, so reconciling against metric-filtered
-  // data permanently deletes every config without telemetry for the selected
-  // axis (the Measured Energy axes) the moment that axis is picked. Both chart
-  // definitions are built from the same rows, so index 0 carries every hw key.
   const selectionPoints = useMemo(
     () => applyScopeFilters(chartData[0] ?? [], selectedGPUs, quickFilters, compareGpuPair),
     [chartData, selectedGPUs, quickFilters, compareGpuPair],

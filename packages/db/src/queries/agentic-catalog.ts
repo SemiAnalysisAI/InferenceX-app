@@ -1,34 +1,14 @@
-/**
- * Catalog of AgentX points that have a stored telemetry blob.
- *
- * `/inference/agentic/<id>` only renders something useful when the row has an
- * `agentic_trace_replay` blob behind it, so this is the authoritative list of
- * detail pages that exist. There are hundreds of such rows — far too many to
- * list one card each — so the catalog collapses them to one entry per
- * (model, hardware, framework, precision) config and links to a representative
- * point. The detail page ships a sibling navigator, so landing on one point of
- * a config is enough to reach the rest of that config's concurrencies.
- *
- * Representative point = latest date, then highest throughput per GPU (the
- * headline point on that config's curve), with the id as a final tiebreak so
- * the choice is deterministic across requests.
- */
-
 import type { DbClient } from '../connection.js';
 
 export interface AgenticCatalogEntry {
-  /** `benchmark_results.id` of the representative point for this config. */
   id: number;
   model: string;
   hardware: string;
   framework: string;
   precision: string;
-  /** Trace-backed points in this config, i.e. detail pages reachable from it. */
   points: number;
-  /** Lowest and highest client concurrency measured with a stored trace. */
   minConc: number;
   maxConc: number;
-  /** Most recent benchmark date in this config (YYYY-MM-DD). */
   latestDate: string;
 }
 
@@ -44,7 +24,7 @@ export async function getAgenticCatalog(sql: DbClient): Promise<AgenticCatalogEn
       from benchmark_results br
       join configs c on c.id = br.config_id
       join agentic_trace_replay atr on atr.id = br.trace_replay_id
-      where atr.profile_export_jsonl_gz is not null
+      where (atr.profile_export_jsonl_gz is not null or atr.profile_export_chunk_count > 0)
     ),
     ranked as (
       select

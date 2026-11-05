@@ -1,30 +1,114 @@
-import { useQuery } from '@tanstack/react-query';
+import { type QueryClient, queryOptions, useQuery } from '@tanstack/react-query';
+
+import type { OperatorXRunRef } from '@semianalysisai/inferencex-db/operatorx/bundle';
+import type { ComparisonOp, ComparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
 import type {
   OperatorXDataset,
-  OperatorXRunSummary,
-} from '@semianalysisai/inferencex-db/operatorx/reader';
+  OperatorXResultDetail,
+} from '@semianalysisai/inferencex-db/operatorx/normalize';
+import {
+  type OperatorXTimeline,
+  TIMELINE_VERSION,
+} from '@semianalysisai/inferencex-db/operatorx/timeline';
+
+import { ApiRequestError } from '@/lib/api/api-request-error';
+
 async function get<T>(url: string, signal: AbortSignal): Promise<T> {
   const response = await fetch(url, { signal });
-  if (!response.ok) throw new Error(`OperatorX request failed (${response.status})`);
-  return response.json();
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new ApiRequestError(
+      body?.error ?? `OperatorX request failed (${response.status})`,
+      response.status,
+      url,
+    );
+  }
+  return body as T;
 }
+
 export function useOperatorXRuns() {
   return useQuery({
-    queryKey: ['operatorx-runs'],
+    queryKey: ['operatorx', 'runs'],
     queryFn: ({ signal }) =>
-      get<{ runs: OperatorXRunSummary[]; discovery_complete: boolean }>(
-        '/api/v1/operatorx/runs',
-        signal,
-      ),
+      get<{ source: string; runs: OperatorXRunRef[] }>('/api/v1/operatorx/runs', signal),
     staleTime: 60_000,
-    refetchInterval: (q) => (q.state.data?.discovery_complete === false ? 2000 : false),
   });
 }
-export function useOperatorXRun(runId: string) {
+
+export function useOperatorXDataset(runId: string | null) {
   return useQuery({
-    queryKey: ['operatorx-run', runId],
+    queryKey: ['operatorx', 'run', runId],
     queryFn: ({ signal }) => get<OperatorXDataset>(`/api/v1/operatorx/runs/${runId}`, signal),
     enabled: Boolean(runId),
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
   });
+}
+
+export function useOperatorXResult(runId: string | null, index: number | null) {
+  return useQuery({
+    queryKey: ['operatorx', 'result', runId, index],
+    queryFn: ({ signal }) =>
+      get<OperatorXResultDetail>(`/api/v1/operatorx/runs/${runId}/results/${index}`, signal),
+    enabled: Boolean(runId) && index !== null,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function operatorXComparisonQuery(
+  op: ComparisonOp | null,
+  workload: string | null,
+  parallel: string | null,
+) {
+  const params = new URLSearchParams({ op: op ?? '' });
+  if (workload) params.set('workload', workload);
+  if (parallel !== null) params.set('parallel', parallel);
+  return queryOptions({
+    queryKey: ['operatorx', 'compare', op, workload, parallel],
+    queryFn: ({ signal }) => get<ComparisonView>(`/api/v1/operatorx/compare?${params}`, signal),
+    enabled: op !== null,
+    staleTime: 5 * 60_000,
+    placeholderData: (previous) => (previous?.op === op ? previous : undefined),
+  });
+}
+
+export function useOperatorXComparison(
+  op: ComparisonOp | null,
+  workload: string | null,
+  parallel: string | null,
+) {
+  return useQuery(operatorXComparisonQuery(op, workload, parallel));
+}
+
+/** Every case one model contributes to an op family at one device split, across hardware. */
+export function useOperatorXModel(op: ComparisonOp, model: string | null, parallel: string | null) {
+  const params = new URLSearchParams({ op });
+  if (model) params.set('model', model);
+  if (parallel !== null) params.set('parallel', parallel);
+  return useQuery({
+    queryKey: ['operatorx', 'model', op, model, parallel],
+    queryFn: ({ signal }) => get<ComparisonView>(`/api/v1/operatorx/compare?${params}`, signal),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export type OperatorXTimelines = Record<string, OperatorXTimeline | null>;
+
+function timelinesQuery(op: ComparisonOp, refs: string[]) {
+  return {
+    queryKey: ['operatorx', 'timelines', TIMELINE_VERSION, op, refs.join(',')],
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      get<OperatorXTimelines>(
+        `/api/v1/operatorx/timelines?${new URLSearchParams({ op, r: refs.join(','), v: String(TIMELINE_VERSION) })}`,
+        signal,
+      ),
+    staleTime: 5 * 60_000,
+  };
+}
+
+export function useOperatorXTimelines(op: ComparisonOp, refs: string[]) {
+  return useQuery({ ...timelinesQuery(op, refs), enabled: refs.length > 0 });
+}
+
+export function prefetchOperatorXTimelines(client: QueryClient, op: ComparisonOp, refs: string[]) {
+  if (refs.length > 0) void client.prefetchQuery(timelinesQuery(op, refs));
 }

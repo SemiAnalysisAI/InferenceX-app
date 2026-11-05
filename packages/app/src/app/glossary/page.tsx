@@ -2,16 +2,18 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { GlossaryBrowser, type GlossaryBrowserEntry } from '@/components/glossary/glossary-browser';
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
-import { getAllPosts } from '@/lib/blog';
-import { GLOSSARY_CATEGORIES, getAllGlossaryEntries } from '@/lib/glossary';
-import { enAlternates } from '@/lib/i18n';
+import { getAllPosts } from '@/lib/blog/blog';
+import { GLOSSARY_CATEGORIES, getAllGlossaryEntries } from '@/lib/content/glossary';
+import { enAlternates } from '@/lib/i18n/i18n';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import { socialMetadata } from '@/lib/seo/social-metadata';
+import { analyticsPlacement } from '@/lib/analytics/placement';
 
 const title = 'AI Inference Glossary';
 const description =
-  'Clear, technically grounded definitions for agentic inference, LLM benchmarks, serving metrics, distributed parallelism, numerical precision, chip hardware, and inference software.';
+  'Clear definitions of agentic inference, LLM benchmark, serving metric, parallelism, precision, chip hardware and inference software terms.';
 
 export const metadata: Metadata = {
   title,
@@ -27,17 +29,12 @@ export const metadata: Metadata = {
     'distributed inference',
   ],
   alternates: enAlternates('/glossary'),
-  openGraph: {
+  ...socialMetadata({
     title: `${title} | ${SITE_NAME}`,
     description,
     url: `${SITE_URL}/glossary`,
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title,
-    description,
-  },
+    locale: 'en',
+  }),
 };
 
 export default function GlossaryPage() {
@@ -84,7 +81,7 @@ export default function GlossaryPage() {
   };
 
   return (
-    <main className="relative">
+    <main className="relative" {...analyticsPlacement('glossary')}>
       <JsonLd data={jsonLd} />
       <div className="container mx-auto px-4 lg:px-8">
         <Card className="overflow-hidden p-0">

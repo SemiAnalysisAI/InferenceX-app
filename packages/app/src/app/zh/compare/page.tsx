@@ -6,19 +6,24 @@ import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 
 import { AgentXCompareHero } from '@/components/compare/agentx-compare-hero';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
 import { ModelLogo } from '@/components/ui/model-logo';
 import { CompareRouteSkeleton } from '@/components/motion/route-skeletons';
-import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare-agentx';
-import { getComparablePairsByModelSlug } from '@/lib/compare-availability';
-import { type ComparePair, COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
-import { bucketComparePairsByVendor } from '@/lib/compare-ssr';
-import { formatModelListZh } from '@/lib/compare-ssr-zh';
-import { type Model } from '@/lib/data-mappings';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
+import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
+import { getComparablePairsByModelSlug } from '@/lib/compare/compare-availability';
+import {
+  type ComparePair,
+  PUBLIC_COMPARE_MODEL_SLUGS,
+  type CompareModelSlug,
+} from '@/lib/compare/compare-slug';
+import { bucketComparePairsByVendor } from '@/lib/compare/compare-ssr';
+import { formatModelListZh } from '@/lib/compare/compare-ssr-zh';
+import { type Model } from '@/lib/catalog/data-mappings';
+import { zhAlternates } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 86400;
 
 const DESCRIPTION =
   '对比 Kimi K3、DeepSeek V4 Pro、MiniMax M3、Qwen 3.5 与 GLM 5.3 的 AgentX 智能体推理结果，并浏览定长序列芯片对比。';
@@ -27,18 +32,12 @@ export const metadata: Metadata = {
   title: 'AgentX 智能体推理对比',
   description: DESCRIPTION,
   alternates: zhAlternates('/compare'),
-  openGraph: {
+  ...socialMetadata({
     title: `AgentX 智能体推理对比 | ${SITE_NAME}`,
     description: DESCRIPTION,
     url: `${SITE_URL}/zh/compare`,
-    type: 'website',
-    locale: ZH_OG_LOCALE,
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: `AgentX 智能体推理对比 | ${SITE_NAME}`,
-    description: DESCRIPTION,
-  },
+    locale: 'zh',
+  }),
 };
 
 interface VendorGroup {
@@ -91,7 +90,6 @@ export default function CompareIndexPageZh() {
     <>
       <JsonLd data={jsonLd} />
       <AgentXCompareHero locale="zh" />
-      {/* In-page Suspense, not loading.tsx — see the English page for why. */}
       <Suspense fallback={<CompareRouteSkeleton />}>
         <CompareCatalogZh />
       </Suspense>
@@ -102,7 +100,7 @@ export default function CompareIndexPageZh() {
 async function CompareCatalogZh() {
   const comparablePairsByModel = await getComparablePairsByModelSlug();
   const totalUrls = [...comparablePairsByModel.values()].reduce((s, p) => s + p.length, 0);
-  const modelsWithPairs = COMPARE_MODEL_SLUGS.filter(
+  const modelsWithPairs = PUBLIC_COMPARE_MODEL_SLUGS.filter(
     (m) => (comparablePairsByModel.get(m.slug)?.length ?? 0) > 0,
   );
 
@@ -165,10 +163,6 @@ async function CompareCatalogZh() {
           <section key={model.slug} id={model.slug}>
             <Card className="flex flex-col gap-4">
               <div>
-                {/* `displayName` 按约定即 Model 枚举值（见 compare-slug.ts 中的
-                    CompareModelSlug），因此共享的 ModelLogo 可从 MODEL_CONFIG
-                    解析各区块的品牌标识（DeepSeek、MiniMax、Kimi 等）；没有
-                    配置 logo 的模型则不渲染任何内容。 */}
                 <h2 className="flex items-center gap-2.5 text-xl lg:text-2xl font-bold tracking-tight">
                   <ModelLogo model={model.displayName as Model} className="size-6 lg:size-7" />
                   {model.label}
@@ -191,7 +185,7 @@ async function CompareCatalogZh() {
                       return (
                         <ComparePairCardLink
                           key={slug}
-                          href={comparisonPairHref('zh', slug, model)}
+                          href={comparisonPairHref('zh', slug)}
                           slug={slug}
                           label={label}
                           archLine={archLine}

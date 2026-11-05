@@ -1,28 +1,22 @@
 import type { Metadata } from 'next';
-import { notFound, permanentRedirect } from 'next/navigation';
 
 import ProfitEstimatorDisplay from '@/components/calculator/ProfitEstimatorDisplay';
-import { resolveCalculatorUrlSeed } from '@/components/calculator/url-seed';
+import {
+  profitRouteInput,
+  type ProfitRouteProps,
+} from '@/components/calculator/profit-route-input';
 import {
   modelRouteAvailableForTab,
-  modelRoutePath,
-  pathWithSearchParams,
+  modelRoutesForTab,
   resolveModelRouteSlug,
-} from '@/lib/model-routes';
-import { modelTabMetadata } from '@/lib/tab-meta';
+} from '@/lib/routing/model-routes';
+import { MODEL_TAB_META, modelTabMetadata } from '@/lib/routing/tab-meta';
+import { TabIntro } from '@/components/dashboard/tab-intro';
 
-/**
- * `/profit-estimator/<model>` — the GW-year profit estimator seeded to a
- * specific model, so every model has an indexable URL. Switching models in
- * the UI rewrites the pathname in place via `history.replaceState` (no reload,
- * no remount), the same mechanism `/calculator/<model>` uses. No
- * `generateStaticParams`: the page reads searchParams, so it renders
- * dynamically anyway.
- */
+type Props = ProfitRouteProps;
 
-interface Props {
-  params: Promise<{ model: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+export function generateStaticParams() {
+  return modelRoutesForTab('profit-estimator-per-gigawatt').map((route) => ({ model: route.slug }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -36,32 +30,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return modelTabMetadata('profit-estimator-per-gigawatt', resolved.route);
 }
 
-export default async function ProfitEstimatorModelPage({ params, searchParams }: Props) {
-  const [{ model }, sp] = await Promise.all([params, searchParams]);
-  const resolved = resolveModelRouteSlug(model);
-  // Only the models this tab serves (see MODEL_ROUTE_TAB_MODELS) get a page.
-  if (
-    !resolved ||
-    !modelRouteAvailableForTab('profit-estimator-per-gigawatt', resolved.route.model)
-  ) {
-    notFound();
-  }
-  // Aliases and non-canonical casing 308 to the canonical slug, keeping any
-  // share-link params.
-  if (resolved.isAlias) {
-    permanentRedirect(
-      pathWithSearchParams(
-        modelRoutePath('profit-estimator-per-gigawatt', resolved.route.slug),
-        sp,
-      ),
-    );
-  }
-  const seed = resolveCalculatorUrlSeed(sp);
-  // A legacy explicit ?g_model= wins over the path, as on /calculator/<model>.
+export default async function ProfitEstimatorModelPage({ params }: Props) {
+  const resolved = await profitRouteInput('profit-estimator-per-gigawatt', false, params);
   return (
-    <ProfitEstimatorDisplay
-      basis="gw-year"
-      urlSeed={{ ...seed, model: seed.model ?? resolved.route.model }}
-    />
+    <>
+      <ProfitEstimatorDisplay basis="gw-year" routeModel={resolved.route.model} />
+      <TabIntro
+        tab="profit-estimator-per-gigawatt"
+        title={MODEL_TAB_META['profit-estimator-per-gigawatt'].title(resolved.route.seoName)}
+        intro={MODEL_TAB_META['profit-estimator-per-gigawatt'].intro(resolved.route.seoName)}
+      />
+    </>
   );
 }

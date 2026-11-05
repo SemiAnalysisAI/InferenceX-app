@@ -19,21 +19,25 @@ import {
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useFrameworkReleases } from '@/hooks/api/use-framework-releases';
 import { useLatestImages } from '@/hooks/api/use-latest-images';
-import type { LatestImageRow } from '@/lib/api';
-import { track } from '@/lib/analytics';
-import { Sequence, getSequenceLabel } from '@/lib/data-mappings';
-import { useLocale } from '@/lib/use-locale';
-import { getFrameworkLabel } from '@/lib/utils';
+import type { LatestImageRow } from '@/lib/api/api';
+import { track } from '@/lib/analytics/analytics';
+import { Sequence, getSequenceLabel, isModelVisible } from '@/lib/catalog/data-mappings';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { getFrameworkLabel } from '@/lib/shared/utils';
+import { ImageAgeChart } from './image-age-chart';
+import { imageAgeSummary, matchesImageFilters, type ImageFilters } from './image-age';
 import {
   AGE_MAX_RED_DAYS,
   ageColorStyle,
   ageRowStyle,
   baseFramework,
   daysSince,
-  getActualLatestTag,
+  earliestSubmission,
+  firstSubmissionDates,
+  getActualLatestRelease,
   getCurrentImageNodeTypeTooltip,
   imageRowDisplayModel,
-  imageRowSequence,
   isActiveImageRow,
   isOutdated,
   isStaleAgentx,
@@ -56,7 +60,7 @@ const STRINGS = {
       'Current tags are the images used by InferenceX. Latest tags are upstream framework releases.',
     scrollHint: 'Scroll horizontally to see all image and version details.',
     reviewImage: 'Review image',
-    reviewHint: 'The image differs from the latest release or uses an unstable tag.',
+    reviewHint: 'The image predates the latest framework release.',
     staleAgentx: 'AgentX submission over 14 days old',
     unknownRelease: 'Not available',
     loading: 'Loading...',
@@ -108,7 +112,7 @@ const STRINGS = {
     versionHint: '当前标签指 InferenceX 使用的镜像，最新标签指上游框架的发布版本。',
     scrollHint: '横向滚动可查看完整的镜像与版本信息。',
     reviewImage: '镜像需核查',
-    reviewHint: '镜像与最新发布版本不同，或使用了不稳定标签。',
+    reviewHint: '该镜像早于框架的最新发布版本。',
     staleAgentx: 'AgentX 提交已超过 14 天',
     unknownRelease: '暂无信息',
     loading: '加载中……',
@@ -151,16 +155,10 @@ const STRINGS = {
 
 type NodeType = 'single' | 'disagg' | 'all';
 
-/** Human label for a scenario key — AgentX rows read "Agentic"/"智能体", never "null/null". */
 function sequenceOptionLabel(seq: string, locale: 'en' | 'zh'): string {
   return seq === Sequence.AgenticTraces ? getSequenceLabel(Sequence.AgenticTraces, locale) : seq;
 }
 
-/**
- * Filter options from the active catalog. Scenarios are derived separately per
- * selected model (`sequenceOptionsForModel`) so a retired model × scenario
- * pair never appears in the ISL/OSL dropdown.
- */
 function deriveOptions(data: LatestImageRow[]) {
   const models = new Set<string>();
   const precisions = new Set<string>();
@@ -190,6 +188,7 @@ function formatSpecMethod(method: string, offLabel: string) {
 }
 
 export function CurrentImageContent() {
+  const featureGateUnlocked = useFeatureGate();
   const { data, isLoading, error, refetch: refetchImages } = useLatestImages();
   const {
     data: releases,
@@ -200,71 +199,63 @@ export function CurrentImageContent() {
   const locale = useLocale();
   const t = STRINGS[locale];
 
-  const [selectedModel, setSelectedModel] = useState<string>('all');
+  const [requestedModel, setSelectedModel] = useState<string>('all');
+  const selectedModel = isModelVisible(requestedModel, featureGateUnlocked)
+    ? requestedModel
+    : 'all';
   const [selectedPrecision, setSelectedPrecision] = useState<string>('all');
-  // 8K/1K is the fixed-sequence scenario still swept across models; 1K/1K and
-  // 1K/8K are retired, so they never reach the dropdown.
-  const [selectedSequence, setSelectedSequence] = useState<string>(Sequence.EightK_OneK);
+  const [selectedSequence, setSelectedSequence] = useState<string>(Sequence.AgenticTraces);
   const [selectedSpecMethod, setSelectedSpecMethod] = useState<string>('all');
   const [selectedHardware, setSelectedHardware] = useState<string>('all');
-  const [selectedNodeType, setSelectedNodeType] = useState<NodeType>('single');
-  // Empty array = no framework filter (matches every row); any non-empty array
-  // limits the table to rows whose base framework is in the set.
+  const [selectedNodeType, setSelectedNodeType] = useState<NodeType>('all');
   const [selectedFrameworks, setSelectedFrameworks] = useState<string[]>([]);
 
-  // Only model × scenario pairs InferenceX still benchmarks. Retired pairs keep
-  // their newest image in the DB, but that image is not a refresh candidate.
-  const activeRows = useMemo(() => data?.filter(isActiveImageRow), [data]);
+  const activeRows = useMemo(
+    () =>
+      data?.filter(
+        (row) =>
+          isActiveImageRow(row) && isModelVisible(imageRowDisplayModel(row), featureGateUnlocked),
+      ),
+    [data, featureGateUnlocked],
+  );
+  const firstSubmitted = useMemo(() => firstSubmissionDates(data ?? []), [data]);
 
   const options = useMemo(() => (activeRows ? deriveOptions(activeRows) : null), [activeRows]);
 
-  // Scenario choices follow the selected model: picking MiniMax M3 offers
-  // Agentic only, because its 8K/1K sweep is retired.
   const sequenceOptions = useMemo(
     () => (activeRows ? sequenceOptionsForModel(activeRows, selectedModel) : []),
     [activeRows, selectedModel],
   );
-  // When the model does not run the chosen scenario, filter on the first one
-  // it does run instead of showing an empty table for a phantom selection.
   const effectiveSequence = resolveSelectedSequence(sequenceOptions, selectedSequence);
 
-  // Stable "today" per render — recomputed on each mount, which is fine for the
-  // page's read-only display (no need to tick every minute).
   const today = useMemo(() => new Date(), []);
+
+  const imageFilters = useMemo<ImageFilters>(
+    () => ({
+      model: selectedModel,
+      precision: selectedPrecision,
+      sequence: effectiveSequence,
+      spec: selectedSpecMethod,
+      hardware: selectedHardware,
+      nodeType: selectedNodeType,
+      frameworks: selectedFrameworks,
+    }),
+    [
+      selectedModel,
+      selectedPrecision,
+      effectiveSequence,
+      selectedSpecMethod,
+      selectedHardware,
+      selectedNodeType,
+      selectedFrameworks,
+    ],
+  );
 
   const filtered = useMemo(() => {
     if (!activeRows) return [];
-    const rows = activeRows.filter((row) => {
-      if (selectedModel !== 'all' && imageRowDisplayModel(row) !== selectedModel) return false;
-      if (selectedPrecision !== 'all' && row.precision !== selectedPrecision) return false;
-      if (imageRowSequence(row) !== effectiveSequence) return false;
-      if (selectedSpecMethod !== 'all' && row.spec_method !== selectedSpecMethod) return false;
-      if (selectedHardware !== 'all' && row.hardware !== selectedHardware) return false;
-      if (selectedNodeType !== 'all') {
-        const disagg = row.disagg;
-        if (selectedNodeType === 'single' && disagg) return false;
-        if (selectedNodeType === 'disagg' && !disagg) return false;
-      }
-      if (
-        selectedFrameworks.length > 0 &&
-        !selectedFrameworks.includes(baseFramework(row.framework))
-      )
-        return false;
-      return true;
-    });
-    // Sort oldest-image first so the most stale entries surface at the top —
-    // users primarily care about "what hasn't been refreshed in a while".
+    const rows = activeRows.filter((row) => matchesImageFilters(row, imageFilters));
     return rows.toSorted((a, b) => a.date.localeCompare(b.date));
-  }, [
-    activeRows,
-    selectedModel,
-    selectedPrecision,
-    effectiveSequence,
-    selectedSpecMethod,
-    selectedHardware,
-    selectedNodeType,
-    selectedFrameworks,
-  ]);
+  }, [activeRows, imageFilters]);
 
   return (
     <div className="w-full min-w-0">
@@ -332,8 +323,6 @@ export function CurrentImageContent() {
                     onValueChange={(v) => {
                       track('current_image_model_changed', { model: v });
                       setSelectedModel(v);
-                      // Commit the scenario fallback so it sticks when the user
-                      // later widens the model filter again.
                       const next = sequenceOptionsForModel(activeRows ?? [], v);
                       if (next.length > 0 && !next.includes(selectedSequence)) {
                         setSelectedSequence(next[0]);
@@ -446,7 +435,7 @@ export function CurrentImageContent() {
                   <Select
                     value={selectedHardware}
                     onValueChange={(v) => {
-                      track('current_image_hardware_changed', { hardware: v });
+                      track('current_image_hardware_changed', { gpu: v });
                       setSelectedHardware(v);
                     }}
                   >
@@ -518,6 +507,14 @@ export function CurrentImageContent() {
         </TooltipProvider>
       )}
 
+      {data && (
+        <ImageAgeChart
+          filters={imageFilters}
+          summary={imageAgeSummary(filtered, today.toISOString().slice(0, 10))}
+          locale={locale}
+        />
+      )}
+
       {activeRows && filtered.length === 0 && (
         <div className="py-12 text-center text-muted-foreground">{t.noMatch}</div>
       )}
@@ -573,10 +570,13 @@ export function CurrentImageContent() {
                 {filtered.map((row, i) => {
                   const displayModel = imageRowDisplayModel(row);
                   const gpuLabel = row.hardware.toUpperCase();
-                  const actualLatest = getActualLatestTag(row.framework, releases);
-                  const outdated = isOutdated(row.image, actualLatest);
+                  const release = getActualLatestRelease(row.framework, releases);
+                  const outdated = isOutdated(
+                    row.image,
+                    release,
+                    earliestSubmission(firstSubmitted, row),
+                  );
                   const ageDays = daysSince(row.date, today);
-                  // Preserve the existing age and image-status rules; only the presentation changes.
                   const staleAgentx = isStaleAgentx(row.benchmark_type, ageDays);
                   const stale = outdated || staleAgentx;
                   const ageStyle = stale ? ageColorStyle(ageDays) : undefined;
@@ -626,9 +626,9 @@ export function CurrentImageContent() {
                         )}
                       </td>
                       <td className="px-4 py-4 align-top text-sm">
-                        {actualLatest ? (
+                        {release ? (
                           <code className="inline-block break-all rounded bg-muted px-1.5 py-0.5 font-mono text-xs select-all">
-                            {actualLatest}
+                            {release.tag}
                           </code>
                         ) : (
                           <span className="text-xs text-muted-foreground">{t.unknownRelease}</span>

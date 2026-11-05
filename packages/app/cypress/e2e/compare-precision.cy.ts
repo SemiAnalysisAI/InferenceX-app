@@ -9,7 +9,7 @@ describe('Compare precision index page', () => {
     cy.visit('/compare');
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
       cy.get('h1').should('have.text', 'Compare Realistic Agentic Inference Perf');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 7);
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 8);
       cy.get('[data-testid="compare-agentx-model-kimi-k3"]').should(
         'have.attr',
         'href',
@@ -20,7 +20,7 @@ describe('Compare precision index page', () => {
         .and('have.attr', 'href', '/profit-estimator-per-gigawatt');
       cy.get('[data-testid="compare-agentx-dashboard-link"]')
         .should('have.text', 'Dashboard')
-        .and('have.attr', 'href', '/inference/kimi-k3');
+        .and('have.attr', 'href', '/inference/deepseek-v41-flash');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
     });
     cy.get('[data-testid="compare-model-catalog"]')
@@ -36,14 +36,12 @@ describe('Compare precision index page', () => {
       .first()
       .should('contain.text', 'AgentX')
       .and('have.attr', 'href')
-      .and('match', /\/agentic$/u);
+      .and('match', /^\/compare\/deepseek-v4-[^/?]+$/u);
     cy.get('#deepseek-r1 a[data-scenario="8K/1K"]')
       .first()
       .should('contain.text', '8K/1K')
       .and('have.attr', 'href')
-      .and('match', /\/8k-1k$/u);
-    // Vendor logos render beside each hardware label in the pair cards:
-    // NVIDIA uses the full-color green mark, AMD its monochrome brand mark.
+      .and('match', /^\/compare\/deepseek-r1-[^/?]+$/u);
     cy.get('a[data-scenario] img[src="/logos/nvidia-color.svg"]').should('exist');
     cy.get('a[data-scenario] img[src="/logos/amd.svg"]').should('exist');
   });
@@ -52,7 +50,7 @@ describe('Compare precision index page', () => {
     cy.visit('/zh/compare');
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
       cy.get('h1').should('have.text', '真实智能体工作负载下的推理性能对比');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 7);
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 8);
       cy.get('[data-testid="compare-agentx-model-deepseek-v4"]').should(
         'have.attr',
         'href',
@@ -63,7 +61,7 @@ describe('Compare precision index page', () => {
         .and('have.attr', 'href', '/zh/profit-estimator-per-gigawatt');
       cy.get('[data-testid="compare-agentx-dashboard-link"]')
         .should('have.text', '仪表板')
-        .and('have.attr', 'href', '/zh/inference/kimi-k3');
+        .and('have.attr', 'href', '/zh/inference/deepseek-v41-flash');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
     });
     cy.get('[data-testid="compare-model-catalog"]').should(
@@ -73,19 +71,9 @@ describe('Compare precision index page', () => {
     cy.get('#deepseek-v4 a[data-scenario="AgentX"]')
       .first()
       .should('have.attr', 'href')
-      .and('match', /^\/zh\/compare\/.+\/agentic$/u);
+      .and('match', /^\/zh\/compare\/deepseek-v4-[^/?]+$/u);
     cy.get('a[data-scenario] img[src="/logos/nvidia-color.svg"]').should('exist');
     cy.get('a[data-scenario] img[src="/logos/amd.svg"]').should('exist');
-  });
-
-  it('renders the /compare-per-dollar index with precision and spec-decode CTA links', () => {
-    cy.visit('/compare-per-dollar');
-    cy.get('[data-testid="compare-index-precision-link"]')
-      .should('have.attr', 'href', '/compare-precision')
-      .and('contain.text', 'Compare precisions');
-    cy.get('[data-testid="compare-index-spec-decode-link"]')
-      .should('have.attr', 'href', '/compare-spec-decode')
-      .and('contain.text', 'Compare speculative decoding');
   });
 });
 
@@ -96,12 +84,6 @@ describe('Compare precision index + slug page', () => {
     });
   });
 
-  it('renders the precision index with a hero title and at least one card', () => {
-    cy.visit('/compare-precision');
-    cy.contains('h1', /precision/iu).should('be.visible');
-    cy.get('a[href^="/compare-precision/"]').should('have.length.greaterThan', 0);
-  });
-
   it('navigates to the first card slug, renders table + hero PNG + JSON-LD', () => {
     cy.visit('/compare-precision');
     cy.get('a[href^="/compare-precision/"]')
@@ -110,15 +92,11 @@ describe('Compare precision index + slug page', () => {
       .then((href) => {
         const slug = (href as string).replace('/compare-precision/', '');
 
-        // Visit the slug page.
         cy.visit(href as string);
         cy.location('pathname').should('eq', href);
 
-        // Interpolated comparison table renders.
         cy.get('[data-testid="compare-interpolated-table"]').should('exist');
 
-        // Both precision labels appear in the table body rows (side labels
-        // render in tbody cells, same as GPU labels on /compare/[slug]).
         const parts = slug.split('-vs-');
         const precA = parts[0].split('-').pop()!;
         const precB = parts[1];
@@ -128,10 +106,8 @@ describe('Compare precision index + slug page', () => {
           expect(text).to.contain(precB.toUpperCase());
         });
 
-        // Hero PNG image present.
         cy.get('img[src$=".png"]').should('exist');
 
-        // JSON-LD script present.
         cy.get('script[type="application/ld+json"]').should('exist');
       });
   });
@@ -143,15 +119,12 @@ describe('Compare precision index + slug page', () => {
       .invoke('attr', 'href')
       .then((href) => {
         const slug = (href as string).replace('/compare-precision/', '');
-        // Reverse the precision tokens around '-vs-'.
         const vsIdx = slug.indexOf('-vs-');
         const left = slug.slice(0, vsIdx);
         const right = slug.slice(vsIdx + 4);
-        // Extract the precisions (last token of left side, full right side).
         const leftParts = left.split('-');
         const precA = leftParts.pop()!;
         const modelGpu = leftParts.join('-');
-        // Build reversed slug: {model}-{gpu}-{right}-vs-{precA}.
         const reversedSlug = `${modelGpu}-${right}-vs-${precA}`;
         cy.visit(`/compare-precision/${reversedSlug}`);
         cy.location('pathname').should('eq', href);

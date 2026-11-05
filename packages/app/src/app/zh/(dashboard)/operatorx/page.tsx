@@ -1,16 +1,16 @@
 import type { Metadata } from 'next';
 
-import OperatorXDisplay from '@/components/operatorx/OperatorXDisplay';
+import OperatorXView from '@/components/operatorx/OperatorXView';
 import { ZhTabIntro } from '@/components/zh/zh-tab-intro';
-import { tabMetadataZh } from '@/lib/tab-meta-zh';
+import { tabMetadataZh } from '@/lib/routing/tab-meta-zh';
 
 export const metadata: Metadata = tabMetadataZh('operatorx');
 
 export default function ZhOperatorXPage() {
   return (
     <>
+      <OperatorXView />
       <ZhTabIntro tab="operatorx" />
-      <OperatorXDisplay />
     </>
   );
 }

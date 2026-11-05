@@ -1,0 +1,784 @@
+import { NextRequest } from 'next/server';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  buildEqualServiceComparison,
+  getEqualServiceSources,
+} from '@/components/inference/utils/equal-service-comparison';
+import { buildInferenceSeries } from '@/lib/views-api/series';
+import { Sequence } from '@/lib/catalog/data-mappings';
+import type { BenchmarkRow } from '@/lib/api/api';
+
+const { mockGetLatestBenchmarks, mockGetBenchmarksForRun, mockUnofficialRun, mockGetDb } =
+  vi.hoisted(() => ({
+    mockGetLatestBenchmarks: vi.fn(),
+    mockGetBenchmarksForRun: vi.fn(),
+    mockUnofficialRun: vi.fn(),
+    mockGetDb: vi.fn(() => 'mock-sql'),
+  }));
+
+vi.mock('@/app/api/unofficial-run/route', () => ({ GET: mockUnofficialRun }));
+
+vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+  getDb: mockGetDb,
+  FIXTURES_MODE: false,
+}));
+
+vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
+  getLatestBenchmarks: mockGetLatestBenchmarks,
+  getBenchmarksForRun: mockGetBenchmarksForRun,
+}));
+
+vi.mock('@/lib/cache/api-cache', () => ({
+  cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
+  cachedDerivedData: (fn: (...args: unknown[]) => unknown) => fn,
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
+  cachedText: (data: string, contentType: string) =>
+    new Response(data, { headers: { 'Content-Type': contentType } }),
+}));
+
+import { GET } from './route';
+
+function request(path: string): NextRequest {
+  return new NextRequest(new URL(path, 'http://localhost'));
+}
+
+let nextId = 1;
+
+function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
+  return {
+    id: nextId++,
+    hardware: 'h200',
+    framework: 'trt',
+    model: 'dsr1',
+    precision: 'fp8',
+    spec_method: 'none',
+    disagg: false,
+    is_multinode: false,
+    prefill_tp: 8,
+    prefill_ep: 1,
+    prefill_dp_attention: false,
+    prefill_num_workers: 0,
+    decode_tp: 8,
+    decode_ep: 1,
+    decode_dp_attention: false,
+    decode_num_workers: 0,
+    num_prefill_gpu: 8,
+    num_decode_gpu: 8,
+    benchmark_type: 'single_turn',
+    offload_mode: 'off',
+    isl: 8192,
+    osl: 1024,
+    conc: 64,
+    image: 'img:1',
+    metrics: {
+      tput_per_gpu: 450.5,
+      output_tput_per_gpu: 400.2,
+      input_tput_per_gpu: 50.3,
+      median_ttft: 0.15,
+      p90_ttft: 0.3,
+      median_tpot: 0.012,
+      median_intvty: 12.5,
+      median_itl: 0.011,
+      median_e2el: 2.3,
+    },
+    date: '2026-03-01',
+    run_url: 'https://github.com/org/repo/actions/runs/777',
+    ...overrides,
+  } as BenchmarkRow;
+}
+
+const ROWS = [
+  makeRow({ conc: 16, metrics: { ...makeRow().metrics, median_intvty: 40, tput_per_gpu: 200 } }),
+  makeRow(),
+  makeRow({ hardware: 'mi300x', framework: 'vllm', conc: 32 }),
+];
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockGetLatestBenchmarks.mockResolvedValue(ROWS);
+  mockGetBenchmarksForRun.mockResolvedValue(ROWS);
+  mockUnofficialRun.mockImplementation(() => Response.json({ benchmarks: [], evaluations: [] }));
+});
+
+describe('GET /api/v1/views/inference', () => {
+  it('keeps unavailable all-in table rows in official, compared and unofficial scopes and CSV', async () => {
+    const untiled = makeRow({
+      hardware: 'gb200',
+      metrics: {
+        ...makeRow().metrics,
+        avg_power_w: 500,
+        avg_total_gpu_power_w: 4000,
+        power_valid: 1,
+        power_metric_schema_version: 2,
+      },
+    });
+    const historical = { ...untiled, id: 998, date: '2026-02-28' };
+    const unofficial = {
+      ...untiled,
+      id: 999,
+      run_url: 'https://github.com/org/repo/actions/runs/999',
+    };
+    mockGetLatestBenchmarks.mockImplementation((_db, _models, date) =>
+      Promise.resolve(date === historical.date ? [historical] : [untiled]),
+    );
+    mockUnofficialRun.mockImplementation(() =>
+      Response.json({ benchmarks: [unofficial], evaluations: [] }),
+    );
+    const query =
+      '/api/v1/views/inference?model=DeepSeek-R1-0528&metric=utilityModeledWatts&best=false&optimal=true&dates=2026-02-28&unofficialrun=999';
+    const response = await GET(request(query));
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    for (const [scope, id] of [
+      [body, untiled.id],
+      [body.comparisons[0], historical.id],
+      [body.overlays[0], unofficial.id],
+    ]) {
+      expect(scope.series).toEqual([]);
+      expect(scope.count).toBe(0);
+      expect(scope.tableRows).toMatchObject([
+        {
+          id,
+          y: null,
+          measuredGpuWatts: 500,
+          status: 'unavailable',
+          unavailableReason: 'topology',
+        },
+      ]);
+      expect(scope).not.toHaveProperty('observedPoints');
+    }
+    expect(body.comparisons[0].tableRows[0].date).toBe(historical.date);
+    expect(body.overlays[0].tableRows[0].runId).toBe(999);
+
+    const csvResponse = await GET(request(`${query}&format=csv`));
+    const csv = await csvResponse.text();
+    const [header, ...lines] = csv.trim().split('\r\n');
+    const columns = header.split(',');
+    expect(lines).toHaveLength(3);
+    for (const line of lines) {
+      const values = line.split(',');
+      expect(values[columns.indexOf('y')]).toBe('');
+      expect(values[columns.indexOf('measuredGpuWatts')]).toBe('500');
+      expect(values[columns.indexOf('unavailableReason')]).toBe('topology');
+    }
+  });
+
+  it('compares stitched observations before frontier pruning and preserves each producer endpoint', async () => {
+    const rows = ['h200', 'mi300x'].flatMap((hardware, index) =>
+      [20, 60].map((x, position) =>
+        makeRow({
+          hardware,
+          conc: position + 1,
+          curve_workflow_run_id: 900,
+          curve_date: '2026-03-02',
+          date: position === 0 ? '2026-03-01' : '2026-03-02',
+          run_url: `https://github.com/org/repo/actions/runs/${777 + position}`,
+          power_audit: {
+            producer_sha: `producer-${position}`,
+            exporter_image_sha256: `exporter-${position}`,
+          },
+          metrics: {
+            ...makeRow().metrics,
+            median_intvty: x,
+            avg_power_w: 200 + 200 * position + 50 * index,
+            output_tput_per_gpu: 100 + 100 * position + 50 * index,
+            joules_per_output_token: 4 - 2 * position - index,
+            power_valid: 1,
+            power_metric_schema_version: 2,
+          },
+        }),
+      ),
+    );
+    mockGetLatestBenchmarks.mockResolvedValue(rows);
+    const projected = buildInferenceSeries(rows, {
+      sequence: Sequence.EightK_OneK,
+      percentile: 'p90',
+      precisions: ['fp8'],
+      metricConfigKey: 'y_measuredAvgPower',
+      xmode: 'interactivity',
+      xmetric: 'p90_ttft',
+      gpus: [],
+      quickFilters: { vendors: [], frameworks: [], deployment: [], spec: [], power: [] },
+      optimal: true,
+      best: true,
+    });
+    const sources = getEqualServiceSources(projected.observedPoints);
+    const expected = buildEqualServiceComparison(projected.observedPoints, {
+      baseline: sources[0].key,
+      comparator: sources[1].key,
+      target: 40,
+      xField: 'median_intvty',
+    });
+    const response = await GET(
+      request(
+        '/api/v1/views/inference?model=DeepSeek-R1-0528&metric=measuredAvgPower&serviceCompare=true&serviceTarget=40',
+      ),
+    );
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.serviceSources).toHaveLength(2);
+    expect(body.serviceSources).toEqual(sources);
+    expect(body.equalServiceComparison.metrics.meanWattsPerGpu.changePercent).toBeCloseTo(100 / 6);
+    expect(body.equalServiceComparison.metrics.outputTokensPerSecond.changePercent).toBeCloseTo(
+      100 / 3,
+    );
+    expect(body.equalServiceComparison.metrics.joulesPerOutputToken.changePercent).toBeCloseTo(
+      -100 / 3,
+    );
+    for (const [metric, values] of Object.entries(expected.metrics)) {
+      expect(body.equalServiceComparison.metrics[metric].changePercent).toBe(values.changePercent);
+      expect(body.equalServiceComparison.metrics[metric].baseline.value).toBe(
+        values.baseline?.value,
+      );
+    }
+    expect(
+      body.equalServiceComparison.metrics.meanWattsPerGpu.baseline.endpoints.map(
+        (endpoint: { point: { id: number } }) => endpoint.point.id,
+      ),
+    ).toEqual(rows.slice(0, 2).map((row) => row.id));
+    expect(
+      body.equalServiceComparison.metrics.meanWattsPerGpu.baseline.endpoints.map(
+        (endpoint: { point: { runUrl: string } }) => endpoint.point.runUrl,
+      ),
+    ).toEqual(rows.slice(0, 2).map((row) => row.run_url));
+    expect(body.matchedConcurrency.rows).toMatchObject([
+      { concurrency: 1, baseline: { status: 'observed' }, comparator: { status: 'observed' } },
+      { concurrency: 2, baseline: { status: 'observed' }, comparator: { status: 'observed' } },
+    ]);
+    expect(body).not.toHaveProperty('observedPoints');
+    expect(body.equalServiceCurve).toHaveLength(2);
+  });
+
+  it('includes unofficial sources and validated role shares using one output-token denominator', async () => {
+    const row = makeRow({
+      hardware: 'gb200',
+      framework: 'trt',
+      disagg: true,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 4,
+      prefill_num_workers: 1,
+      decode_num_workers: 1,
+      metrics: {
+        ...makeRow().metrics,
+        avg_power_w: 400,
+        power_valid: 1,
+        power_metric_schema_version: 2,
+        joules_per_input_token: 1,
+        joules_per_output_token: 8,
+        prefill_joules_per_input_token: 0.4,
+        decode_joules_per_output_token: 4.8,
+      },
+    });
+    mockGetLatestBenchmarks.mockResolvedValue([row]);
+    mockUnofficialRun.mockImplementation(() =>
+      Response.json({
+        benchmarks: [{ ...row, id: 999, run_url: 'https://github.com/org/repo/actions/runs/999' }],
+        evaluations: [],
+      }),
+    );
+    const response = await GET(
+      request(
+        '/api/v1/views/inference?model=DeepSeek-R1-0528&metric=measuredAvgPower&serviceCompare=true&roleShare=true&unofficialrun=999',
+      ),
+    );
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.serviceSources).toHaveLength(2);
+    expect(body.roleEnergyShares).toHaveLength(2);
+    expect(
+      body.roleEnergyShares
+        .map((item: { point: { id: number } }) => item.point.id)
+        .sort((a: number, b: number) => a - b),
+    ).toEqual([row.id, 999].sort((a, b) => a - b));
+    for (const share of body.roleEnergyShares) {
+      expect(share).toMatchObject({
+        prefill: 3.2,
+        decode: 4.8,
+        total: 8,
+        prefillShare: 40,
+        decodeShare: 60,
+      });
+    }
+    expect(body.overlays[0]).not.toHaveProperty('observedPoints');
+  });
+
+  it('applies chipBasis to official and unofficial disaggregated rows and rejects unknown values', async () => {
+    const row = makeRow({
+      hardware: 'gb200',
+      framework: 'trt',
+      disagg: true,
+      is_multinode: true,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 12,
+      prefill_num_workers: 1,
+      decode_num_workers: 1,
+      metrics: { ...makeRow().metrics, output_tput_per_gpu: 160, input_tput_per_gpu: 1200 },
+    });
+    mockGetLatestBenchmarks.mockResolvedValue([row]);
+    mockUnofficialRun.mockImplementation(() =>
+      Response.json({
+        benchmarks: [{ ...row, id: 999, run_url: 'https://github.com/org/repo/actions/runs/999' }],
+        evaluations: [],
+      }),
+    );
+    const outputY = async (chipBasis?: string) => {
+      const query = chipBasis ? `&chipBasis=${chipBasis}` : '';
+      const response = await GET(
+        request(
+          `/api/v1/views/inference?model=DeepSeek-R1-0528&metric=outputTputPerGpu&unofficialrun=999${query}`,
+        ),
+      );
+      const body = await response.json();
+      return {
+        params: body.params,
+        official: body.series[0].points[0].y as number,
+        overlay: body.overlays[0].series[0].points[0].y as number,
+      };
+    };
+    const pool = await outputY();
+    expect(pool.params.chipBasis).toBe('pool');
+    expect(pool.official).toBe(160);
+    expect(pool.overlay).toBe(160);
+    const total = await outputY('total');
+    expect(total.params.chipBasis).toBe('total');
+    expect(total.official).toBeCloseTo((160 * 12) / 16, 9);
+    expect(total.overlay).toBeCloseTo((160 * 12) / 16, 9);
+
+    const invalid = await GET(
+      request('/api/v1/views/inference?model=DeepSeek-R1-0528&chipBasis=decode'),
+    );
+    expect(invalid.status).toBe(400);
+    const invalidBody = await invalid.json();
+    expect(invalidBody.param).toBe('chipBasis');
+  });
+
+  it('resolves the fixed-sequence statistic and rejects unknown values', async () => {
+    mockGetLatestBenchmarks.mockResolvedValue([
+      makeRow({ metrics: { ...makeRow().metrics, mean_tpot: 0.025, mean_intvty: 99 } }),
+    ]);
+    const response = await GET(
+      request('/api/v1/views/inference?model=DeepSeek-R1-0528&metric=tpPerGpu&xstat=mean'),
+    );
+    const body = await response.json();
+    expect(body.params.xstat).toBe('mean');
+    expect(body.xAxis).toMatchObject({ field: 'mean_tpot_intvty', statistic: 'mean' });
+    expect(body.series[0].points[0].x).toBe(40);
+    const invalid = await GET(
+      request('/api/v1/views/inference?model=DeepSeek-R1-0528&xstat=average'),
+    );
+    expect(invalid.status).toBe(400);
+    const invalidBody = await invalid.json();
+    expect(invalidBody.param).toBe('xstat');
+  });
+
+  it('defaults Qwen to E2EL and newer GPUs, with explicit axis and hardware overrides', async () => {
+    const hardware = ['mi300x', 'mi325x', 'h100', 'h200', 'mi355x', 'b200'];
+    mockGetLatestBenchmarks.mockResolvedValue(
+      hardware.map((gpu) => makeRow({ model: 'qwen3.5', hardware: gpu, framework: 'sglang' })),
+    );
+    const url = '/api/v1/views/inference?model=Qwen-3.5-397B-A17B&metric=tpPerGpu';
+    const defaultResponse = await GET(request(url));
+    const defaults = await defaultResponse.json();
+    expect(defaults.params.xmode).toBe('e2e');
+    expect(defaults.xAxis.field).toBe('median_e2el');
+    expect(defaults.series.map((series: { gpu: string }) => series.gpu).sort()).toEqual([
+      'b200',
+      'mi355x',
+    ]);
+
+    const overriddenResponse = await GET(request(`${url}&xmode=interactivity&gpus=h100,h200`));
+    const overridden = await overriddenResponse.json();
+    expect(overridden.params.xmode).toBe('interactivity');
+    expect(overridden.series.map((series: { gpu: string }) => series.gpu).sort()).toEqual([
+      'h100',
+      'h200',
+    ]);
+
+    const allResponse = await GET(request(`${url}&gpus=`));
+    const all = await allResponse.json();
+    expect(all.series.map((series: { gpu: string }) => series.gpu).sort()).toEqual(
+      hardware.toSorted(),
+    );
+  });
+
+  it('defaults Qwen to the cross-framework winner while best=false keeps both engines', async () => {
+    const rows = ['vllm', 'sglang'].flatMap((framework) =>
+      [16, 64].map((conc) =>
+        makeRow({
+          model: 'qwen3.5',
+          framework,
+          hardware: 'b200',
+          conc,
+          metrics: {
+            ...makeRow().metrics,
+            median_intvty: conc === 16 ? 40 : 20,
+            tput_per_gpu: (framework === 'sglang' ? 400 : 200) + conc,
+          },
+        }),
+      ),
+    );
+    mockGetLatestBenchmarks.mockResolvedValue(rows);
+    const url = '/api/v1/views/inference?model=Qwen-3.5-397B-A17B&metric=tpPerGpu';
+    const bestResponse = await GET(request(url));
+    expect(bestResponse.status).toBe(200);
+    const best = await bestResponse.json();
+    expect(best.params.best).toBe(true);
+    expect(best.series.map((series: { framework: string }) => series.framework)).toEqual([
+      'sglang',
+    ]);
+    const allResponse = await GET(request(`${url}&best=false`));
+    expect(allResponse.status).toBe(200);
+    const all = await allResponse.json();
+    expect(all.series.map((series: { framework: string }) => series.framework).sort()).toEqual([
+      'sglang',
+      'vllm',
+    ]);
+    expect(
+      all.series.find((series: { framework: string }) => series.framework === 'sglang'),
+    ).toEqual(best.series[0]);
+  });
+  it('returns chart-ready series with resolved params for the default selection', async () => {
+    const res = await GET(
+      request('/api/v1/views/inference?model=DeepSeek-R1-0528&metric=tpPerGpu'),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(mockGetLatestBenchmarks).toHaveBeenCalledWith(
+      'mock-sql',
+      ['dsr1'],
+      undefined,
+      undefined,
+      undefined,
+    );
+    expect(body.view).toBe('inference');
+    expect(body.apiVersion).toBe('v1');
+    expect(body.params).toMatchObject({
+      model: 'DeepSeek-R1-0528',
+      sequence: '8k/1k',
+      metric: 'y_tpPerGpu',
+      xmode: 'interactivity',
+      xmetric: 'p90_ttft',
+      percentile: 'p90',
+      precisions: ['fp8'],
+      optimal: true,
+      best: true,
+      format: 'json',
+    });
+
+    expect(body.series).toHaveLength(2);
+    expect(body.count).toBe(3);
+    expect(body.metric.configKey).toBe('y_tpPerGpu');
+    expect(body.xAxis.field).toBe('median_intvty');
+    const h200 = body.series.find((s: { gpu: string }) => s.gpu === 'h200');
+    expect(h200.points).toHaveLength(2);
+    expect(h200.points[0].runId).toBe(777);
+  });
+
+  it.each([
+    ['Muse-Spark-Open', 'musespark'],
+    ['GLM-5.3-Flash', 'glm5.3flash'],
+  ])('accepts %s without fabricating published results', async (model, dbKey) => {
+    mockGetLatestBenchmarks.mockResolvedValue([]);
+    const res = await GET(
+      request(`/api/v1/views/inference?model=${model}&sequence=agentic-traces`),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.params.model).toBe(model);
+    expect(body.params.sequence).toBe('agentic-traces');
+    expect(body.series).toEqual([]);
+    expect(body.count).toBe(0);
+    expect(mockGetLatestBenchmarks.mock.calls[0][1]).toEqual([dbKey]);
+  });
+
+  it('rejects unknown models and bad enums with a 400 and allowed values', async () => {
+    const badModel = await GET(request('/api/v1/views/inference?model=NotAModel'));
+    expect(badModel.status).toBe(400);
+    const badModelBody = await badModel.json();
+    expect(badModelBody.param).toBe('model');
+
+    const badMode = await GET(
+      request('/api/v1/views/inference?model=DeepSeek-R1-0528&xmode=bogus'),
+    );
+    expect(badMode.status).toBe(400);
+    const body = await badMode.json();
+    expect(body.param).toBe('xmode');
+    expect(body.allowed).toContain('interactivity');
+  });
+
+  it('resolves e2e-normalized-interactivity to the interactivity chart', async () => {
+    const res = await GET(
+      request(
+        '/api/v1/views/inference?model=DeepSeek-R1-0528&metric=tpPerGpu&xmode=e2e-normalized-interactivity',
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.params.xmode).toBe('interactivity');
+    expect(body.xAxis.mode).toBe('interactivity');
+  });
+
+  it('fetches an exact run snapshot when runId is given', async () => {
+    const res = await GET(
+      request('/api/v1/views/inference?model=DeepSeek-R1-0528&metric=tpPerGpu&runId=99'),
+    );
+    expect(res.status).toBe(200);
+    expect(mockGetBenchmarksForRun).toHaveBeenCalledWith('mock-sql', ['dsr1'], '99');
+    expect(mockGetLatestBenchmarks).not.toHaveBeenCalled();
+    const resBody = await res.json();
+    expect(resBody.params.runId).toBe('99');
+  });
+
+  it('keeps measured-power boundaries separate for official and unofficial runs', async () => {
+    const sweep = [
+      { conc: 1, interactivity: 100, watts: 250 },
+      { conc: 8, interactivity: 50, watts: 500 },
+      { conc: 32, interactivity: 25, watts: 450 },
+    ];
+    const official = sweep.map(({ conc, interactivity, watts }, index) =>
+      makeRow({
+        id: 100 + index,
+        conc,
+        metrics: { ...makeRow().metrics, median_intvty: interactivity, avg_power_w: watts },
+      }),
+    );
+    const runUrl = 'https://github.com/org/repo/actions/runs/888/attempts/1';
+    const overlay = official.map((row, index) => ({
+      ...row,
+      id: 200 + index,
+      run_url: runUrl,
+      metrics: { ...row.metrics, avg_power_w: row.metrics.avg_power_w * 2 },
+    }));
+    mockGetLatestBenchmarks.mockResolvedValue(official);
+    mockUnofficialRun.mockImplementation(() =>
+      Response.json({ benchmarks: overlay, evaluations: [] }),
+    );
+
+    const res = await GET(
+      request(
+        '/api/v1/views/inference?model=DeepSeek-R1-0528&metric=measuredAvgPower&optimal=true&unofficialrun=888',
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.params.optimal).toBe(true);
+    expect(body.count).toBe(2);
+    expect(body.frontier).toEqual({ direction: 'upper_right', points: 2 });
+    expect(body.series).toHaveLength(1);
+    expect(body.series[0].points).toMatchObject([
+      { id: 101, concurrency: 8, x: 50, y: 500, runId: 777, frontier: true },
+      { id: 100, concurrency: 1, x: 100, y: 250, runId: 777, frontier: true },
+    ]);
+    expect(body.overlays).toHaveLength(1);
+    expect(body.overlays[0]).toMatchObject({
+      runUrl,
+      count: 2,
+      frontier: { direction: 'upper_right', points: 2 },
+      series: [
+        {
+          points: [
+            { id: 201, concurrency: 8, x: 50, y: 1000, runId: 888, frontier: true },
+            { id: 200, concurrency: 1, x: 100, y: 500, runId: 888, frontier: true },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('splits each measured point into power parts that sum to All in Measured W/GPU', async () => {
+    const sweep = [
+      { conc: 32, interactivity: 25, watts: 600 },
+      { conc: 1, interactivity: 100, watts: 250 },
+    ];
+    mockGetLatestBenchmarks.mockResolvedValue(
+      sweep.map(({ conc, interactivity, watts }, index) =>
+        makeRow({
+          id: 300 + index,
+          conc,
+          metrics: {
+            ...makeRow().metrics,
+            median_intvty: interactivity,
+            avg_power_w: watts,
+            avg_total_gpu_power_w: watts * 8,
+            power_valid: 1,
+            power_metric_schema_version: 2,
+          },
+        }),
+      ),
+    );
+
+    const res = await GET(
+      request(
+        '/api/v1/views/inference?model=DeepSeek-R1-0528&metric=measuredAvgPower&powerBreakdown=true',
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.params.powerBreakdown).toBe(true);
+    expect(body.powerBreakdowns).toHaveLength(1);
+    const [series] = body.powerBreakdowns;
+    expect(series).toMatchObject({
+      precision: 'fp8',
+      categories: [
+        'gpu',
+        'cpu',
+        'memory',
+        'nic',
+        'nvswitch',
+        'storage',
+        'other',
+        'fans',
+        'psuLoss',
+        'network',
+        'facility',
+      ],
+      tdpWattsPerGpu: 700,
+      interactivityField: 'median_intvty',
+    });
+    expect(series.modelRevision).toMatch(/^[0-9a-f]{40}$/u);
+    // Points follow the interactivity axis, so the busier concurrency comes first.
+    expect(
+      series.points.map((point: { concurrency: number; interactivity: number }) => [
+        point.concurrency,
+        point.interactivity,
+      ]),
+    ).toEqual([
+      [32, 25],
+      [1, 100],
+    ]);
+    for (const [index, point] of series.points.entries()) {
+      const parts = Object.values(point.wattsPerGpu as Record<string, number>);
+      expect(parts.reduce((sum, value) => sum + value, 0)).toBeCloseTo(point.totalWattsPerGpu, 6);
+      expect(point.wattsPerGpu.gpu).toBeCloseTo([600, 250][index], 6);
+      expect(point).not.toHaveProperty('configKey');
+      expect(point.point).toMatchObject({ id: [300, 301][index] });
+    }
+    // Load moves the measured GPU part, the fans and the PSU loss; fixed parts stay put.
+    const [high, low] = series.points;
+    for (const key of ['cpu', 'memory', 'nic', 'nvswitch', 'storage', 'other', 'network']) {
+      expect(high.wattsPerGpu[key]).toBeCloseTo(low.wattsPerGpu[key], 6);
+    }
+    expect(high.wattsPerGpu.fans).toBeGreaterThan(low.wattsPerGpu.fans);
+    expect(high.wattsPerGpu.psuLoss).toBeGreaterThan(low.wattsPerGpu.psuLoss);
+
+    const offResponse = await GET(
+      request('/api/v1/views/inference?model=DeepSeek-R1-0528&metric=measuredAvgPower'),
+    );
+    const off = await offResponse.json();
+    expect(off).not.toHaveProperty('powerBreakdowns');
+    const csv = await GET(
+      request('/api/v1/views/inference?model=DeepSeek-R1-0528&powerBreakdown=true&format=csv'),
+    );
+    expect(csv.status).toBe(400);
+  });
+
+  it('reads the headroom table along each chip frontier and blanks cells outside the range', async () => {
+    // B200 from 20 to 320 tok/s/user, H200 only between 40 and 120.
+    const sweep = [
+      { hardware: 'b200', conc: 256, interactivity: 20, tput: 4000, avg: 900, p90: 960 },
+      { hardware: 'b200', conc: 64, interactivity: 60, tput: 2400, avg: 800, p90: 880 },
+      { hardware: 'b200', conc: 16, interactivity: 150, tput: 1200, avg: 650, p90: 720 },
+      { hardware: 'b200', conc: 4, interactivity: 320, tput: 500, avg: 500, p90: 560 },
+      { hardware: 'h200', conc: 32, interactivity: 40, tput: 1500, avg: 600, p90: 650 },
+      { hardware: 'h200', conc: 8, interactivity: 120, tput: 700, avg: 450, p90: 520 },
+    ];
+    mockGetLatestBenchmarks.mockResolvedValue(
+      sweep.map(({ hardware, conc, interactivity, tput, avg, p90 }, index) =>
+        makeRow({
+          id: 400 + index,
+          hardware,
+          conc,
+          metrics: {
+            ...makeRow().metrics,
+            median_intvty: interactivity,
+            tput_per_gpu: tput,
+            avg_power_w: avg,
+            p90_power_w: p90,
+            avg_total_gpu_power_w: avg * 8,
+            power_valid: 1,
+            power_metric_schema_version: 2,
+          },
+        }),
+      ),
+    );
+    const res = await GET(
+      request(
+        '/api/v1/views/inference?model=DeepSeek-R1-0528&metric=measuredPowerPercentTdp&headroom=true',
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.params.headroom).toBe(true);
+    expect(body.headroom.interactivities).toEqual([25, 50, 100, 300]);
+    expect(body.headroom.interactivityField).toBe('median_intvty');
+    expect(body.headroom.rows).toHaveLength(2);
+    const [b200, h200] = body.headroom.rows;
+    expect(b200).toMatchObject({ hwKey: 'b200_trt', precision: 'fp8', tdpWatts: 1000 });
+    expect(b200.cells.map((cell: unknown) => cell !== null)).toEqual([true, true, true, true]);
+    expect(h200).toMatchObject({ tdpWatts: 700, interactivityMin: 40, interactivityMax: 120 });
+    expect(h200.cells.map((cell: unknown) => cell !== null)).toEqual([false, true, true, false]);
+    for (const cell of b200.cells) {
+      expect(cell.percentTdpP90).toBeCloseTo((cell.p90Watts / 1000) * 100, 6);
+      expect(cell.headroomPercent).toBeCloseTo(100 - cell.percentTdpP90, 6);
+      expect(cell.avgWatts).toBeLessThan(cell.p90Watts);
+    }
+    // The spline is monotone: faster per-user serving draws less per chip in this sweep.
+    const p90s = b200.cells.map((cell: { p90Watts: number }) => cell.p90Watts);
+    expect(p90s).toEqual([...p90s].toSorted((a: number, c: number) => c - a));
+    const offResponse = await GET(
+      request('/api/v1/views/inference?model=DeepSeek-R1-0528&metric=tpPerGpu'),
+    );
+    const off = await offResponse.json();
+    expect(off).not.toHaveProperty('headroom');
+    expect(off.params.headroom).toBe(false);
+    const csv = await GET(
+      request('/api/v1/views/inference?model=DeepSeek-R1-0528&headroom=true&format=csv'),
+    );
+    expect(csv.status).toBe(400);
+  });
+
+  it('canonicalizes list params and applies quick filters', async () => {
+    const res = await GET(
+      request(
+        '/api/v1/views/inference?model=DeepSeek-R1-0528&metric=tpPerGpu&vendors=amd&deployment=agg',
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.params.vendors).toEqual(['AMD']);
+    expect(body.params.deployment).toEqual(['multi-node', 'single-node']);
+    expect(body.series).toHaveLength(1);
+    expect(body.series[0].gpu).toBe('mi300x');
+  });
+
+  it('case-folds the gpus filter: uppercase base keys select the same series', async () => {
+    const upperRes = await GET(
+      request('/api/v1/views/inference?model=DeepSeek-R1-0528&metric=tpPerGpu&gpus=MI300X'),
+    );
+    expect(upperRes.status).toBe(200);
+    const upper = await upperRes.json();
+    const lowerRes = await GET(
+      request('/api/v1/views/inference?model=DeepSeek-R1-0528&metric=tpPerGpu&gpus=mi300x'),
+    );
+    const lower = await lowerRes.json();
+    expect(upper.params.gpus).toEqual(['mi300x']);
+    expect(upper.series).toEqual(lower.series);
+    expect(upper.series.length).toBeGreaterThan(0);
+  });
+
+  it('returns flat CSV rows when format=csv', async () => {
+    const res = await GET(
+      request('/api/v1/views/inference?model=DeepSeek-R1-0528&metric=tpPerGpu&format=csv'),
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Type')).toContain('text/csv');
+    const text = await res.text();
+    const [header, ...lines] = text.trim().split(/\r?\n/);
+    expect(header).toContain('hwKey');
+    expect(header).toContain('x');
+    expect(header).toContain('y');
+    expect(lines).toHaveLength(3);
+  });
+});

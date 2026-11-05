@@ -1,15 +1,18 @@
 import { useReducer, useState } from 'react';
-import { GlobalFilterSelectionContext } from '@/components/GlobalFilterContext';
-import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
 import {
-  overlaySelectionReducer,
-  UnofficialRunContext,
-} from '@/components/unofficial-run-provider';
+  GlobalFilterActionsContext,
+  GlobalFilterSelectionContext,
+} from '@/providers/GlobalFilterContext';
+import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
+import { overlaySelectionReducer, UnofficialRunContext } from '@/providers/unofficial-run-provider';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import { useParetoHighlightToggle } from '@/components/inference/hooks/useParetoHighlightToggle';
 import ChartDisplay from '@/components/inference/ui/ChartDisplay';
+import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface';
+import chartDefinitions from '@/components/inference/metric-registry';
 import { mountWithProviders } from '../support/test-utils';
 import { expandLegendAdvanced } from '../support/legend-advanced';
+import { clickScatterPoint, visiblePoints } from '../support/scatter-points';
 import {
   createMockInferenceData,
   createMockChartDefinition,
@@ -18,21 +21,33 @@ import {
   createMockInferenceContextValues,
   createMockUnofficialRunContext,
 } from '../support/mock-data';
-import { Model, Precision, Sequence } from '@/lib/data-mappings';
-import { buildExclusion, resolveExclusionGroups } from '@/lib/exclusion';
+import { Model, Precision, Sequence } from '@/lib/catalog/data-mappings';
+import { buildExclusion, resolveExclusionGroups } from '@/lib/benchmarks/exclusion';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 const defaultChartDef = createMockChartDefinition();
 const hwConfig = createMockHardwareConfig();
 
+const expectPointsFaded = (faded: boolean) =>
+  cy.scatterPoints('#global-pareto-test').should((points) => {
+    expect(points).to.have.length(2);
+    for (const point of points) expect(point.faded, point.key).to.equal(faded);
+  });
+
+const expectVisiblePointCount = (scope: string, count: number) =>
+  cy.scatterPoints(scope).should((points) => expect(visiblePoints(points)).to.have.length(count));
+
 describe('ScatterGraph', () => {
-  it('toggles global Pareto highlights independently and removes dismissed overlay winners', () => {
+  it('keeps the frontier modes and overlay winners without exposing the retired hinterland', () => {
     const official = [
       createMockInferenceData({ hwKey: 'h100', precision: Precision.FP8, x: 20, y: 80 }),
       createMockInferenceData({ hwKey: 'h100', precision: Precision.FP8, x: 80, y: 20 }),
     ];
     const overlay = [
-      createMockInferenceData({ hwKey: 'h100', precision: Precision.FP8, x: 90, y: 90 }),
+      createMockInferenceData({ hwKey: 'b200', precision: Precision.FP8, x: 90, y: 90 }),
+      createMockInferenceData({ hwKey: 'b200', precision: Precision.FP8, x: 80, y: 95 }),
+      createMockInferenceData({ hwKey: 'h200', precision: Precision.FP8, x: 10, y: 15 }),
+      createMockInferenceData({ hwKey: 'h200', precision: Precision.FP8, x: 15, y: 10 }),
     ];
     const base = createMockInferenceContextValues();
     function ParetoHarness() {
@@ -41,12 +56,9 @@ describe('ScatterGraph', () => {
         playful: paretoFrontierPlayful,
         setVisible: setShowParetoFrontier,
       } = useParetoHighlightToggle();
-      const {
-        visible: showParetoHinterland,
-        playful: paretoHinterlandPlayful,
-        setVisible: setShowParetoHinterland,
-      } = useParetoHighlightToggle();
       const [showOverlay, setShowOverlay] = useState(true);
+      const [showLineLabels, setShowLineLabels] = useState(false);
+      const [showGradientLabels, setShowGradientLabels] = useState(false);
       const inference = {
         ...base,
         hardwareConfig: hwConfig,
@@ -56,10 +68,11 @@ describe('ScatterGraph', () => {
         hideNonOptimal: false,
         showParetoFrontier,
         setShowParetoFrontier,
-        showParetoHinterland,
         paretoFrontierPlayful,
-        paretoHinterlandPlayful,
-        setShowParetoHinterland,
+        showLineLabels,
+        setShowLineLabels,
+        showGradientLabels,
+        setShowGradientLabels,
       };
       return (
         <InferenceContextsProvider
@@ -88,70 +101,118 @@ describe('ScatterGraph', () => {
     }
     mountWithProviders(<ParetoHarness />, {
       unofficial: {
-        activeOverlayHwTypes: new Set(['h100']),
-        allOverlayHwTypes: new Set(['h100']),
+        activeOverlayHwTypes: new Set(['b200', 'h200']),
+        allOverlayHwTypes: new Set(['b200', 'h200']),
       },
     });
     cy.get('.global-pareto-frontier, .pareto-hinterland').should('not.exist');
     cy.get('#global-pareto-test-pareto-frontier').should('not.exist');
     cy.get('#global-pareto-test-pareto-hinterland').should('not.exist');
     expandLegendAdvanced();
+    cy.get('#global-pareto-test-pareto-hinterland').should('not.exist');
+    cy.contains('Pareto Hinterland').should('not.exist');
     cy.get('#global-pareto-test-pareto-frontier').click();
     cy.get('.global-pareto-frontier').should('have.attr', 'stroke-dasharray', '1,6');
-    cy.get('.global-pareto-highlight circle').should('have.length', 1);
-    cy.get('.pareto-hinterland').should('not.exist');
-    cy.get('#global-pareto-test-pareto-hinterland').click();
-    cy.get('.pareto-hinterland').should('have.attr', 'pointer-events', 'none');
-    cy.get('.pareto-hinterland')
-      .should('have.attr', 'fill', 'none')
-      .and('have.attr', 'stroke-dasharray', '8,5');
-    cy.get('.global-pareto-hinterland-highlight circle').should('have.length', 2);
-    cy.get('.pareto-hinterland')
-      .invoke('attr', 'd')
-      .then((hinterlandPath) => {
-        cy.get('.global-pareto-frontier').invoke('attr', 'd').should('not.equal', hinterlandPath);
+    cy.get('.global-pareto-frontier')
+      .should('have.attr', 'pointer-events', 'none')
+      .and('have.attr', 'fill', 'none');
+    cy.get('.global-pareto-frontier-area')
+      .should('have.attr', 'fill', '#22c55e')
+      .and('have.attr', 'data-style', 'plain');
+    cy.get('.global-pareto-highlight circle').should('have.length', 2);
+    expectPointsFaded(true);
+    cy.get('.roofline-path').should(($marks) => {
+      $marks.each((_, mark) => {
+        expect(mark.style.filter).to.equal('opacity(0.2)');
       });
+    });
+    cy.get('.unofficial-overlay-pt').should(($marks) => {
+      expect($marks).to.have.length(4);
+      $marks.each((_, mark) => {
+        const hw = (mark as unknown as { __data__: { hwKey: string } }).__data__.hwKey;
+        expect(mark.style.filter).to.equal(hw === 'b200' ? '' : 'opacity(0.2)');
+      });
+    });
+    cy.get('.overlay-roofline-path').should(($curves) => {
+      expect($curves).to.have.length(2);
+      $curves.each((_, curve) => {
+        const hw = (curve as unknown as { __data__: { points: { hwKey: string }[] } }).__data__
+          .points[0].hwKey;
+        expect(curve.style.filter).to.equal(hw === 'b200' ? '' : 'opacity(0.2)');
+      });
+    });
+    cy.get('#scatter-line-labels').click();
+    cy.get('.line-label[data-hw-key="h100"]').should(($labels) => {
+      $labels.each((_, label) => {
+        expect(label.style.filter).to.equal('opacity(0.2)');
+      });
+    });
+    cy.get('#scatter-line-labels').click();
+    cy.get('#scatter-line-labels').click();
+    cy.get('.line-label[data-hw-key="h100"]').should(($labels) => {
+      $labels.each((_, label) => {
+        expect(label.style.filter).to.equal('opacity(0.2)');
+      });
+    });
+    cy.get('#global-pareto-test-pareto-frontier').click();
+    expectPointsFaded(false);
+    cy.get('.roofline-path, .unofficial-overlay-pt, .overlay-roofline-path').should(($marks) => {
+      $marks.each((_, mark) => {
+        expect(mark.style.filter).to.equal('');
+      });
+    });
+    cy.get('#global-pareto-test-pareto-frontier').click();
+    expectPointsFaded(true);
+    cy.get('.pareto-hinterland').should('not.exist');
     cy.contains('button', 'Dismiss test overlay').click();
     cy.get('.global-pareto-highlight circle').should('have.length', 2);
+    expectPointsFaded(false);
+    cy.get('.roofline-path').should(($marks) => {
+      $marks.each((_, mark) => {
+        expect(mark.style.filter).to.equal('');
+      });
+    });
     cy.get('#global-pareto-test-pareto-frontier').click();
     cy.get('.global-pareto-frontier').should('not.exist');
-    cy.get('.pareto-hinterland').should('exist');
-    cy.get('#global-pareto-test-pareto-hinterland').click();
-    cy.get('.pareto-hinterland').should('not.exist');
+    cy.get('.global-pareto-frontier-area').should('not.exist');
     cy.get('#global-pareto-test-pareto-frontier').click();
-    cy.get('#global-pareto-test-pareto-hinterland').click();
-    cy.get('.global-pareto-frontier-area, .pareto-hinterland-area')
-      .should('have.length', 2)
+    cy.get('.global-pareto-frontier-area')
+      .should('have.length', 1)
+      .each(($area) => {
+        expect($area.attr('data-style')).to.equal('plain');
+      });
+    cy.get('#global-pareto-test-pareto-frontier').click();
+    cy.get('#global-pareto-test-pareto-frontier').click();
+    cy.get('.global-pareto-frontier-area')
+      .should('have.length', 1)
       .each(($area) => {
         expect($area.attr('data-style')).to.equal('playful');
         expect($area.attr('fill')).to.match(/^url\(#/);
       });
-    cy.get('pattern[id$="-scene"]').should('have.length', 2);
+    cy.get('pattern[id$="-scene"]').should('have.length', 1);
     cy.get('pattern[id$="-scene"] text').should('not.exist');
     cy.get('pattern[id$="-scene"] image')
-      .should('have.length', 2)
+      .should('have.length', 1)
       .each(($image) => {
         expect($image.attr('preserveAspectRatio')).to.equal('xMidYMid slice');
         expect(Number($image.attr('width'))).to.be.greaterThan(160);
         expect($image.attr('width')).to.equal($image.parent().attr('width'));
         expect($image.attr('height')).to.equal($image.parent().attr('height'));
-        expect($image.attr('href')).to.match(/\/decorative\/pareto\/.+\.webp$/);
+        expect($image.attr('href')).to.equal('/decorative/pareto/sunny-castle.webp');
       });
-    cy.get('.global-pareto-frontier-area,.pareto-hinterland-area').each(($area) => {
+    cy.get('.global-pareto-frontier-area').each(($area) => {
       expect($area.attr('fill-opacity')).to.equal('0.3');
     });
     cy.get('#global-pareto-test-pareto-frontier').click();
     cy.get('.global-pareto-frontier-area').should('not.exist');
-    cy.get('.pareto-hinterland-area').should('exist');
+    cy.get('pattern[id$="-scene"]').should('not.exist');
     cy.get('#global-pareto-test-pareto-frontier').click();
     cy.get('.global-pareto-frontier-area').should('have.attr', 'data-style', 'plain');
     cy.get('.global-pareto-frontier-area').should('have.attr', 'fill', '#22c55e');
-    cy.get('#global-pareto-test-pareto-hinterland').click();
-    cy.get('#global-pareto-test-pareto-hinterland').click();
-    cy.get('.pareto-hinterland-area').should('have.attr', 'fill', '#ef4444');
     cy.get('[data-testid="legend-advanced-toggle"]').click();
     cy.get('#global-pareto-test-pareto-frontier').should('not.exist');
-    cy.get('.global-pareto-frontier-area,.pareto-hinterland-area').should('have.length', 2);
+    cy.get('.global-pareto-frontier-area').should('have.length', 1);
+    cy.get('.pareto-hinterland, .pareto-hinterland-area').should('not.exist');
   });
 
   for (const mixedRuns of [false, true]) {
@@ -410,6 +471,72 @@ describe('ScatterGraph', () => {
     );
   });
 
+  it('explains why All in Measured has no points', () => {
+    cy.viewport(1280, 720);
+    mountWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <ScatterGraph
+          chartId="test-scatter-all-in-measured-empty"
+          modelLabel="Kimi K3"
+          data={[]}
+          xLabel="Interactivity"
+          yLabel="All in Measured Power per Chip"
+          chartDefinition={defaultChartDef}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_trt']),
+          hwTypesWithData: new Set(),
+          selectedYAxisMetric: 'y_utilityModeledWatts',
+        },
+        unofficial: {},
+      },
+    );
+
+    cy.contains('No values are available for All in Measured in this selection.').should(
+      'be.visible',
+    );
+    cy.contains('No measurements to plot for this selection.').should('not.exist');
+    cy.contains('eight-GPU HGX/OAM systems, or whole GB200/GB300 NVL72 compute trays').should(
+      'be.visible',
+    );
+    cy.screenshot('nvl72-empty-en-desktop', { overwrite: true });
+  });
+
+  it('localizes the All in Measured explanation', () => {
+    cy.viewport(390, 720);
+    mountWithProviders(
+      <PathnameContext.Provider value="/zh/inference">
+        <div style={{ width: 375, height: 600 }}>
+          <ScatterGraph
+            chartId="test-scatter-all-in-measured-empty-zh"
+            modelLabel="Kimi K3"
+            data={[]}
+            xLabel="交互性"
+            yLabel="每芯片整体实测功耗"
+            chartDefinition={defaultChartDef}
+          />
+        </div>
+      </PathnameContext.Provider>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_trt']),
+          hwTypesWithData: new Set(),
+          selectedYAxisMetric: 'y_utilityModeledJPerOutputToken',
+        },
+        unofficial: {},
+      },
+    );
+
+    cy.contains('当前选择没有可用的整体实测功耗数值。').should('be.visible');
+    cy.contains('当前选择没有可绘制的测量数据。').should('not.exist');
+    cy.contains('八卡 HGX/OAM 系统，或完整的 GB200/GB300 NVL72 计算 tray').should('be.visible');
+    cy.screenshot('nvl72-empty-zh-mobile', { overwrite: true });
+  });
+
   for (const selectedYAxisMetric of ['y_tpPerGpu', 'y_measuredPrefillJPerInputToken'] as const) {
     it(`offers targeted quick-filter recovery on ${selectedYAxisMetric} without changing model, precision or date`, () => {
       mountWithProviders(
@@ -537,10 +664,9 @@ describe('ScatterGraph', () => {
       },
     );
 
-    // The scatter layer renders point groups with class 'dot-group'
-    cy.get('#test-scatter-points svg .dot-group').should('exist');
-    // Each point gets a <g> with a visible shape inside
-    cy.get('#test-scatter-points svg .visible-shape').should('have.length.greaterThan', 0);
+    cy.scatterPoints('#test-scatter-points').should((points) => {
+      expect(visiblePoints(points)).to.have.length.greaterThan(0);
+    });
   });
 
   it('keeps official-only legend toggles active after a scope change', () => {
@@ -741,7 +867,9 @@ describe('ScatterGraph', () => {
     ).should('have.css', 'opacity', '1');
   });
 
-  it('renders legend with hardware items', () => {
+  it('keeps the desktop legend below the top guideline without changing the mobile gap', () => {
+    cy.viewport(1440, 900);
+    const chartId = 'test-scatter-legend';
     const data = [
       createMockInferenceData({ hwKey: 'b200_trt', x: 64, y: 320, precision: Precision.FP4 }),
       createMockInferenceData({ hwKey: 'h100', x: 32, y: 210, precision: Precision.FP4 }),
@@ -750,7 +878,7 @@ describe('ScatterGraph', () => {
     mountWithProviders(
       <div style={{ width: 800, height: 600 }}>
         <ScatterGraph
-          chartId="test-scatter-legend"
+          chartId={chartId}
           modelLabel="DeepSeek R1"
           data={data}
           xLabel="Concurrency"
@@ -771,6 +899,26 @@ describe('ScatterGraph', () => {
 
     cy.get('.sidebar-legend').should('exist');
     cy.get('.sidebar-legend label').should('have.length.greaterThan', 0);
+
+    const assertDesktopAlignment = () => {
+      cy.get(`#${chartId}`).should(($chart) => {
+        const legend = $chart[0].querySelector('.sidebar-legend')!.getBoundingClientRect();
+        const guideline = $chart[0].querySelector('.border-top')!.getBoundingClientRect();
+        expect(legend.top - guideline.top, 'legend below top guideline').to.be.closeTo(8, 0.1);
+      });
+    };
+    assertDesktopAlignment();
+
+    cy.viewport(375, 812);
+    cy.get('[data-slot="chart-legend-wrapper"]').should(($legend) => {
+      expect(getComputedStyle($legend[0]).marginTop, 'unchanged mobile gap').to.equal('12px');
+      const svg = $legend[0].parentElement!.querySelector('svg')!;
+      expect($legend[0].getBoundingClientRect().top).to.be.at.least(
+        svg.getBoundingClientRect().bottom,
+      );
+    });
+    cy.viewport(1440, 900);
+    assertDesktopAlignment();
   });
 
   it('combines matching hardware across unofficial runs and recomputes after dismissal', () => {
@@ -960,13 +1108,11 @@ describe('ScatterGraph', () => {
       },
     );
 
-    // Both the official roofline and the overlay (unofficial) roofline render.
     cy.get('#test-scatter-overlay-labels svg .roofline-path').should('have.length.greaterThan', 0);
     cy.get('#test-scatter-overlay-labels svg .overlay-roofline-path').should(
       'have.length.greaterThan',
       0,
     );
-    // Both an official-keyed and an overlay-keyed line label should render.
     cy.get('#test-scatter-overlay-labels svg .line-label').should('have.length.greaterThan', 0);
     cy.get('#test-scatter-overlay-labels svg .line-label')
       .filter('[data-line-key^="overlay-"]')
@@ -974,14 +1120,15 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-overlay-labels svg .line-label')
       .filter('[data-line-key]:not([data-line-key^="overlay-"])')
       .should('have.length.greaterThan', 0);
-    // The exact branch that crashed the production page remains visible in the
-    // overlay line label and legend after ScatterGraph's render-time updates.
-    cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"]')
-      .find('text')
-      .should('contain.text', runBranch);
+    cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"] .ll-text')
+      .should('have.text', 'B200 (TRTLLM)')
+      .and('not.contain.text', runBranch);
     cy.get(
       '#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"] .ll-gpu',
-    ).should('not.exist');
+    ).should('have.text', 'B200');
+    cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"]')
+      .should('have.attr', 'data-visible', '1')
+      .and('have.css', 'opacity', '1');
     cy.get('#test-scatter-overlay-labels [data-testid="chart-legend"]').should(
       'contain.text',
       runBranch,
@@ -1045,7 +1192,6 @@ describe('ScatterGraph', () => {
           activeOverlayHwTypes: new Set(['h100_vllm']),
           allOverlayHwTypes: new Set(['h100_vllm']),
           runIndexByUrl: { [runUrl]: 0, 'precision-order': 0 },
-          // No run metadata: exercise the hardware-label fallback path.
           unofficialRunInfos: [],
         },
       },
@@ -1143,7 +1289,7 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-singleton-overlay-label svg .line-label[data-line-key^="overlay-"]')
       .should('have.length', 1)
       .find('text')
-      .should('contain.text', 'tileRT');
+      .should('have.text', 'B200 (TRTLLM)');
 
     cy.get('#test-scatter-singleton-overlay-label svg').then(($svg) => {
       const svg = $svg[0];
@@ -1252,8 +1398,6 @@ describe('ScatterGraph', () => {
       createMockInferenceData({ hwKey: 'h100_vllm_mtp', x: 16, y: 200, precision: Precision.FP4 }),
       createMockInferenceData({ hwKey: 'h100_vllm_mtp', x: 32, y: 150, precision: Precision.FP4 }),
     ];
-    // Overlay roofline with no run metadata, so its line label falls back to the
-    // hw label — exercising the overlay path's model-aware suffix resolution.
     const runUrl = 'https://github.com/x/y/actions/runs/999';
     const overlayData = {
       data: [
@@ -1308,18 +1452,15 @@ describe('ScatterGraph', () => {
           activeOverlayHwTypes: new Set(['b200_vllm_mtp']),
           allOverlayHwTypes: new Set(['b200_vllm_mtp']),
           runIndexByUrl: { [runUrl]: 0, '999': 0 },
-          // Intentionally empty so the overlay label falls back to the hw label.
           unofficialRunInfos: [],
         },
       },
     );
 
-    // Official roofline label reads "EAGLE", not the generic "MTP".
     cy.get('#test-scatter-m3-eagle svg .line-label')
       .filter('[data-line-key]:not([data-line-key^="overlay-"])')
       .find('text')
       .should('contain.text', 'EAGLE');
-    // Overlay roofline (no run metadata → hw-label fallback) also reads "EAGLE".
     cy.get('#test-scatter-m3-eagle svg .line-label[data-line-key^="overlay-"]')
       .find('text')
       .should('contain.text', 'EAGLE');
@@ -1329,7 +1470,6 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-m3-eagle svg .line-label[data-line-key^="overlay-"] .ll-engine')
       .should('contain.text', 'EAGLE')
       .and('have.attr', 'fill', '#d1d5db');
-    // No label should show the generic MTP token for M3.
     cy.get('#test-scatter-m3-eagle svg .line-label text').should('not.contain.text', 'MTP');
   });
 
@@ -1412,18 +1552,12 @@ describe('ScatterGraph', () => {
       },
     );
 
-    // Preview mode is diagnostic, so cross-engine official and unofficial
-    // results remain visible together instead of choosing one engine family.
     cy.get('#test-scatter-agentx-engine-guard svg .overlay-roofline-path').should('exist');
     cy.get(
       '#test-scatter-agentx-engine-guard svg .roofline-path[data-hw-key="b200_sglang"]',
     ).should('have.css', 'opacity', '1');
-    // The exclusion resolver must be bypassed rather than resolving in favor of
-    // either the official or overlay engine family.
     cy.get('@setUnifiedOverlaySelection').should('not.have.been.called');
 
-    // An additional official engine can also be selected while the preview is
-    // loaded; the production-only conflict toggle must not be consulted.
     cy.get('label[for="checkbox-h100_vllm"]').click();
     cy.get('@blockedComparisonToggle').should('not.have.been.called');
     cy.get('@setUnifiedOverlaySelection').should((setSelection) => {
@@ -1576,7 +1710,6 @@ describe('ScatterGraph', () => {
       },
     );
 
-    // Same engine family: no exclusion applies, both series render.
     cy.get('#test-scatter-agentx-same-family svg .overlay-roofline-path').should('exist');
     cy.get('#test-scatter-agentx-same-family svg .roofline-path').should(
       'have.css',
@@ -1660,8 +1793,6 @@ describe('ScatterGraph', () => {
 
   it('clears perf rulers when the y-axis or x-axis metric changes', () => {
     const chartId = 'test-scatter-perf-ruler-axis-reset';
-    // Distinct `conc` per point keeps the D3 join keys unique, as they are
-    // for real runs; the metric-change update matches marks by that key.
     const officialData = ['b200_sglang', 'h100_vllm'].flatMap((hwKey, hwIndex) =>
       [8, 16, 32].map((x, index) =>
         createMockInferenceData({
@@ -1727,8 +1858,6 @@ describe('ScatterGraph', () => {
 
     mountWithProviders(<AxisMetricHarness />, { unofficial: {} });
 
-    // Ruler mode exposes one widened hit stroke per visible roofline; clicking
-    // two of them completes a measurement.
     const placeRuler = () => {
       cy.get(`#${chartId} svg .perf-ruler-hit`).should('have.length', 2);
       cy.get(`#${chartId} svg .perf-ruler-hit`).eq(0).click({ force: true });
@@ -1736,11 +1865,6 @@ describe('ScatterGraph', () => {
       cy.get(`#${chartId} svg .perf-ruler`).should('have.length', 1);
     };
 
-    // Clearing the rulers also drops the "clear rulers" legend entry, which
-    // narrows the sidebar and rebuilds the chart while the metric-change
-    // tween is still running. Both three-point curves must still be drawn
-    // as real curves afterwards (a stale tween used to collapse them onto a
-    // single coordinate).
     const expectCurvesIntact = () => {
       cy.get(`#${chartId} svg .roofline-path`)
         .should('have.length', 2)
@@ -1754,16 +1878,12 @@ describe('ScatterGraph', () => {
     cy.get('#scatter-perf-ruler').click({ force: true });
     placeRuler();
 
-    // Switching the y-axis metric redraws the curves in new units: the ruler
-    // must not survive. Ruler mode itself stays on so the user can measure
-    // again without re-enabling it.
     cy.get('[data-testid="change-y-metric"]').click();
     cy.get(`#${chartId} svg .perf-ruler`).should('not.exist');
     cy.get('#scatter-perf-ruler').should('have.attr', 'aria-checked', 'true');
     expectCurvesIntact();
     placeRuler();
 
-    // Same for the x-axis metric (the resolved `x_scale_field`).
     cy.get('[data-testid="change-x-metric"]').click();
     cy.get(`#${chartId} svg .perf-ruler`).should('not.exist');
     cy.get('#scatter-perf-ruler').should('have.attr', 'aria-checked', 'true');
@@ -1772,7 +1892,130 @@ describe('ScatterGraph', () => {
   });
 });
 
+describe('ChartDisplay modeled power disclosures', () => {
+  for (const locale of ['en', 'zh'] as const) {
+    it(`states the chassis and NVL72 PUEs and the NVL72 Grace input without overflow (${locale})`, () => {
+      const point = createMockInferenceData({
+        hwKey: 'gb200',
+        hw: 'NVIDIA GB200',
+        model: Model.Qwen3_5,
+        y: 1000,
+        utilityModeledWatts: { y: 1000, roof: false },
+      });
+      mountWithProviders(
+        <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+          <div className="p-4">
+            <ChartDisplay />
+          </div>
+        </PathnameContext.Provider>,
+        {
+          inference: {
+            selectedModel: Model.Qwen3_5,
+            selectedYAxisMetric: 'y_utilityModeledWatts',
+            activeHwTypes: new Set(['gb200']),
+            hwTypesWithData: new Set(['gb200']),
+            hardwareConfig: { gb200: { name: 'gb200', label: 'GB200', suffix: '', gpu: 'GB200' } },
+            graphs: [
+              {
+                model: Model.Qwen3_5,
+                sequence: Sequence.EightK_OneK,
+                chartDefinition: chartDefinitions[0],
+                data: [point],
+              },
+            ],
+          },
+          globalFilters: { selectedModel: Model.Qwen3_5 },
+          unofficial: {},
+        },
+      );
+      for (const width of [1280, 390]) {
+        cy.viewport(width, 900);
+        cy.get('[data-testid="power-basis-assumptions"]')
+          .should('be.visible')
+          .and('contain.text', 'PUE 1.3')
+          .and('contain.text', 'PUE 1.1')
+          .and(
+            'contain.text',
+            locale === 'en'
+              ? 'measured Grace-socket power replaces the modeled CPU and memory when the run has validated socket telemetry'
+              : '以实测功耗代替 CPU 和内存的估算值（否则二者均按模型估算）',
+          )
+          .should(($note) => {
+            expect($note[0].scrollWidth).to.be.at.most($note[0].clientWidth);
+          });
+        cy.scatterPoints().should((points) => expect(visiblePoints(points)).to.not.be.empty);
+        cy.screenshot(`all-in-measured-boundary-${locale}-${width}`, { overwrite: true });
+      }
+    });
+  }
+});
+
 describe('ChartDisplay responsive status notes', () => {
+  const atomDisclaimer =
+    '1 The ATOM engine is promising, however it has yet to serve production tokens. It is still in its infant stage.';
+
+  function assertAtomPngExport(ratio: 'auto' | '16:9' | '1:1') {
+    let exportedPng = '';
+    let exportedNote:
+      | {
+          text: string | null;
+          excluded: boolean;
+          bounds: DOMRect;
+          plotBottom: number;
+          rootBottom: number;
+          removedNotes: number;
+        }
+      | undefined;
+    cy.window().then((win) => {
+      cy.stub(win.HTMLAnchorElement.prototype, 'click').callsFake(
+        function (this: HTMLAnchorElement) {
+          if (!this.download.endsWith('.png')) return;
+          exportedPng = this.href;
+          const root = win.document.querySelector('#chart-0-export')!;
+          const note = root.querySelector<HTMLElement>('[data-testid="atom-engine-footnote"]');
+          if (!note) return;
+          exportedNote = {
+            text: note.textContent,
+            excluded: Boolean(note.closest('.no-export')),
+            bounds: note.getBoundingClientRect(),
+            plotBottom: root
+              .querySelector('svg[data-testid="d3-chart-svg"]')!
+              .getBoundingClientRect().bottom,
+            rootBottom: root.getBoundingClientRect().bottom,
+            removedNotes: root.querySelectorAll(
+              '[data-testid="agentic-optimization-note"], [data-testid="cache-reuse-link"]',
+            ).length,
+          };
+        },
+      );
+    });
+    cy.get('[data-testid="export-button"]').first().click();
+    cy.get('[data-testid="png-aspect-ratio"]').select(ratio);
+    cy.get('[data-testid="export-png-button"]').click();
+    cy.window().should(() => {
+      expect(exportedPng).to.match(/^data:image\/png;base64,/u);
+      expect(exportedNote, 'ATOM disclaimer captured with the PNG').not.to.equal(undefined);
+      expect(exportedNote!.text).to.equal(atomDisclaimer);
+      expect(exportedNote!.excluded).to.equal(false);
+      expect(exportedNote!.bounds.top).to.be.at.least(exportedNote!.plotBottom);
+      expect(exportedNote!.bounds.bottom).to.be.at.most(exportedNote!.rootBottom);
+      expect(exportedNote!.bounds.height).to.be.greaterThan(0);
+      expect(exportedNote!.removedNotes).to.equal(0);
+    });
+    cy.window().then(async (win) => {
+      const image = new win.Image();
+      image.src = exportedPng;
+      await image.decode();
+      expect(image.naturalWidth).to.be.greaterThan(0);
+      if (ratio !== 'auto') {
+        expect(image.naturalWidth / image.naturalHeight).to.be.closeTo(
+          ratio === '16:9' ? 16 / 9 : 1,
+          0.001,
+        );
+      }
+    });
+  }
+
   for (const locale of ['en', 'zh'] as const) {
     for (const width of [390, 1440]) {
       it(`uses available width and preserves complete notices (${locale}, ${width}px)`, () => {
@@ -1809,49 +2052,25 @@ describe('ChartDisplay responsive status notes', () => {
           const offload = notes
             .querySelector('[data-testid="offload-halo-key"]')!
             .getBoundingClientRect();
-          const optimization = notes
-            .querySelector('[data-testid="agentic-optimization-note"]')!
-            .getBoundingClientRect();
-          const footnote = notes
-            .querySelector('[data-testid="atom-engine-footnote"]')!
-            .getBoundingClientRect();
-          for (const item of [offload, optimization, footnote]) {
-            expect(item.left).to.be.at.least(bounds.left);
-            expect(item.right).to.be.at.most(bounds.right + 1);
-          }
-          if (width === 1440) {
-            expect(optimization.left).to.be.greaterThan(offload.right);
-            expect(footnote.left).to.be.greaterThan(optimization.right);
-            expect(optimization.top + optimization.height / 2).to.be.closeTo(
-              offload.top + offload.height / 2,
-              1,
-            );
-          } else {
-            expect(footnote.top, 'long caveat wraps below short status notes').to.be.at.least(
-              optimization.bottom,
-            );
-            expect(notes.scrollWidth, 'notes never overflow horizontally').to.be.at.most(
-              notes.clientWidth,
-            );
-          }
+          expect(offload.left).to.be.at.least(bounds.left);
+          expect(offload.right).to.be.at.most(bounds.right + 1);
+          expect(notes.scrollWidth).to.be.at.most(notes.clientWidth);
         });
         cy.get('[data-testid="offload-halo-key"]').should(
           'contain.text',
           locale === 'zh' ? 'KV offload 已开启' : 'KV offload ON',
         );
-        cy.get('[data-testid="atom-engine-footnote"]').should(
+        cy.get('#chart-0 [data-slot="chart-footer"] [data-testid="atom-engine-footnote"]').should(
           'have.text',
           locale === 'zh'
             ? '1 ATOM 引擎前景可期，但尚未用于生产环境 token 服务，仍处于早期阶段。'
             : '1 The ATOM engine is promising, however it has yet to serve production tokens. It is still in its infant stage.',
         );
-        cy.get('[data-testid="agentic-optimization-note"] button').click();
-        cy.get('[data-testid="option-help-content-agentic-optimizations"]').should(
-          'contain.text',
-          locale === 'zh'
-            ? '每项配置可能使用推测解码等推理优化。将鼠标悬停在数据点上可查看其具体设置。'
-            : 'Each configuration may use inference optimizations such as speculative decoding. Hover over a point to see its exact settings.',
-        );
+        cy.get('[data-testid="atom-engine-footnote"]').should(($note) => {
+          expect($note[0].scrollWidth).to.be.at.most($note[0].clientWidth);
+        });
+        cy.get('[data-testid="agentic-optimization-note"]').should('not.exist');
+        cy.get('[data-testid="chart-figure"] [data-testid="cache-reuse-link"]').should('not.exist');
       });
     }
   }
@@ -1891,11 +2110,105 @@ describe('ChartDisplay responsive status notes', () => {
       'contain.text',
       'KV offload ON',
     );
-    cy.get('[data-testid="chart-status-notes"] [data-testid="atom-engine-footnote"]').should(
+    cy.get('#chart-0 [data-testid="atom-engine-footnote"]').should(
       'contain.text',
       'has yet to serve production tokens',
     );
+    assertAtomPngExport('16:9');
   });
+
+  for (const ratio of ['auto', '16:9', '1:1'] as const) {
+    it(`includes the complete selected ATOM disclaimer in ${ratio} PNG exports`, () => {
+      mountWithProviders(<ChartDisplay />, {
+        inference: {
+          graphs: [
+            {
+              model: Model.DeepSeek_R1,
+              sequence: Sequence.AgenticTraces,
+              chartDefinition: defaultChartDef,
+              data: [createMockInferenceData({ framework: 'atom' })],
+            },
+          ],
+        },
+        globalFilters: {},
+        unofficial: {},
+      });
+      cy.get('#chart-0 [data-testid="atom-engine-footnote"]').should('have.text', atomDisclaimer);
+      assertAtomPngExport(ratio);
+    });
+  }
+
+  it('omits the ATOM disclaimer when its series is not selected', () => {
+    mountWithProviders(<ChartDisplay />, {
+      inference: {
+        graphs: [
+          {
+            model: Model.DeepSeek_R1,
+            sequence: Sequence.AgenticTraces,
+            chartDefinition: defaultChartDef,
+            data: [
+              createMockInferenceData(),
+              createMockInferenceData({ hwKey: 'mi355x_atom', framework: 'atom' }),
+            ],
+          },
+        ],
+        activeHwTypes: new Set(['b200_trt']),
+      },
+      globalFilters: {},
+      unofficial: {},
+    });
+    cy.scatterPoints('#chart-0').should((points) => expect(points).to.not.be.empty);
+    cy.get('[data-testid="atom-engine-footnote"]').should('not.exist');
+  });
+
+  for (const history of [false, true]) {
+    it(`shows one ATOM disclaimer in PowerX Where ${history ? 'history' : 'chip'} comparison`, () => {
+      mountWithProviders(
+        <PowerXSurfaceProvider>
+          <ChartDisplay />
+        </PowerXSurfaceProvider>,
+        {
+          inference: {
+            selectedYAxisMetric: 'y_measuredAvgPower',
+            powerCompare: 'breakdown',
+            selectedGPUs: history ? ['b200_trt'] : [],
+            selectedDates: history ? ['2025-03-01'] : [],
+            activeDates: new Set(['2025-03-01_b200_trt']),
+            graphs: [
+              {
+                model: Model.DeepSeek_R1,
+                sequence: Sequence.AgenticTraces,
+                chartDefinition: defaultChartDef,
+                data: [createMockInferenceData({ framework: 'atom' })],
+              },
+            ],
+          },
+          globalFilters: {},
+          unofficial: {},
+        },
+      );
+      cy.get('[data-testid="powerx-where-controls"]').should('be.visible');
+      cy.get('[data-testid="atom-engine-footnote"]')
+        .should('have.length', 1)
+        .and('have.text', atomDisclaimer)
+        .and('be.visible');
+      if (history) {
+        cy.get('#chart-0 [data-slot="chart-footer"] [data-testid="atom-engine-footnote"]').should(
+          'have.length',
+          1,
+        );
+        assertAtomPngExport('16:9');
+      } else {
+        cy.get('[data-testid="chart-figure"]').should(($figure) => {
+          const panels = $figure[0].querySelector('[data-testid="power-analysis-panels"]')!;
+          const note = $figure[0].querySelector('[data-testid="atom-engine-footnote"]')!;
+          expect(note.getBoundingClientRect().top).to.be.at.least(
+            panels.getBoundingClientRect().bottom,
+          );
+        });
+      }
+    });
+  }
 });
 
 describe('ChartDisplay engine comparison guard', () => {
@@ -2007,7 +2320,8 @@ describe('ChartDisplay engine comparison guard', () => {
   it('keeps official table rows synchronized with legend state after a scope change', () => {
     const chartDefinition = createMockChartDefinition({ chartType: 'interactivity' });
     const baseInference = createMockInferenceContextValues();
-    const baseGlobalFilters = createMockGlobalFilterContexts().selection;
+    const { selection: baseGlobalFilters, actions: globalFilterActions } =
+      createMockGlobalFilterContexts();
 
     function OfficialRowsScopeHarness() {
       const [secondScope, setSecondScope] = useState(false);
@@ -2045,23 +2359,28 @@ describe('ChartDisplay engine comparison guard', () => {
 
       return (
         <GlobalFilterSelectionContext.Provider value={globalFilters}>
-          <InferenceContextsProvider
-            data={inference}
-            filters={inference}
-            display={inference}
-            actions={inference}
-          >
-            <button data-testid="change-official-table-scope" onClick={() => setSecondScope(true)}>
-              Change scope
-            </button>
-            <button
-              data-testid="select-official-vllm"
-              onClick={() => setActiveKeys(new Set(['h100_vllm']))}
+          <GlobalFilterActionsContext.Provider value={globalFilterActions}>
+            <InferenceContextsProvider
+              data={inference}
+              filters={inference}
+              display={inference}
+              actions={inference}
             >
-              Select vLLM
-            </button>
-            <ChartDisplay />
-          </InferenceContextsProvider>
+              <button
+                data-testid="change-official-table-scope"
+                onClick={() => setSecondScope(true)}
+              >
+                Change scope
+              </button>
+              <button
+                data-testid="select-official-vllm"
+                onClick={() => setActiveKeys(new Set(['h100_vllm']))}
+              >
+                Select vLLM
+              </button>
+              <ChartDisplay />
+            </InferenceContextsProvider>
+          </GlobalFilterActionsContext.Provider>
         </GlobalFilterSelectionContext.Provider>
       );
     }
@@ -2082,8 +2401,6 @@ describe('ChartDisplay engine comparison guard', () => {
   });
 
   it('renders the table columns without the median interactivity or TTFT columns', () => {
-    // Mirror the real interactivity chart: x IS interactivity, which is what
-    // made the separate median column a duplicate.
     const chartDefinition = createMockChartDefinition({
       chartType: 'interactivity',
       x: 'median_intvty',
@@ -2123,14 +2440,8 @@ describe('ChartDisplay engine comparison guard', () => {
     cy.get('[data-testid="inference-table-view-btn"]').click();
     cy.get('[data-testid="inference-results-table"] thead th').then(($headers) => {
       const headers = [...$headers].map((th) => (th.textContent ?? '').trim());
-      // Interactivity is already the x-axis column on the interactivity chart,
-      // so the median column duplicated it. Assert both that the column is gone
-      // and that exactly one interactivity column remains, so a rename cannot
-      // quietly reintroduce the duplicate.
       expect(headers).to.not.include('Median Interactivity (tok/s)');
       expect(headers.filter((h) => h.toLowerCase().includes('interactivity'))).to.have.length(1);
-      // Median TTFT was dropped too; unlike interactivity it is not duplicated
-      // by the x-axis column, so nothing else in the table should carry it.
       expect(headers).to.not.include('Median TTFT (ms)');
       expect(headers.filter((h) => h.toLowerCase().includes('ttft'))).to.have.length(0);
     });
@@ -2345,7 +2656,8 @@ describe('ChartDisplay engine comparison guard', () => {
       isNonMainBranch: true,
     };
     const baseInference = createMockInferenceContextValues();
-    const baseGlobalFilters = createMockGlobalFilterContexts().selection;
+    const { selection: baseGlobalFilters, actions: globalFilterActions } =
+      createMockGlobalFilterContexts();
     const baseUnofficial = createMockUnofficialRunContext();
 
     function OverlayScopeHarness() {
@@ -2432,40 +2744,45 @@ describe('ChartDisplay engine comparison guard', () => {
 
       return (
         <GlobalFilterSelectionContext.Provider value={globalFilters}>
-          <UnofficialRunContext.Provider value={unofficial}>
-            <InferenceContextsProvider
-              data={inference}
-              filters={inference}
-              display={inference}
-              actions={inference}
-            >
-              <button data-testid="change-overlay-scope" onClick={() => setSecondScope(true)}>
-                Change scope
-              </button>
-              <button data-testid="load-official-scope" onClick={() => setSecondScopeLoaded(true)}>
-                Load official scope
-              </button>
-              <button
-                data-testid="clear-overlay-scope"
-                onClick={() =>
-                  dispatchSelection({
-                    type: 'selection',
-                    official: selection.localOfficialOverride ?? new Set(officialKeys),
-                    overlay: new Set(),
-                  })
-                }
+          <GlobalFilterActionsContext.Provider value={globalFilterActions}>
+            <UnofficialRunContext.Provider value={unofficial}>
+              <InferenceContextsProvider
+                data={inference}
+                filters={inference}
+                display={inference}
+                actions={inference}
               >
-                Clear overlays
-              </button>
-              <button
-                data-testid="rerender-overlay-scope"
-                onClick={() => setRenderVersion((version) => version + 1)}
-              >
-                Rerender
-              </button>
-              <ChartDisplay />
-            </InferenceContextsProvider>
-          </UnofficialRunContext.Provider>
+                <button data-testid="change-overlay-scope" onClick={() => setSecondScope(true)}>
+                  Change scope
+                </button>
+                <button
+                  data-testid="load-official-scope"
+                  onClick={() => setSecondScopeLoaded(true)}
+                >
+                  Load official scope
+                </button>
+                <button
+                  data-testid="clear-overlay-scope"
+                  onClick={() =>
+                    dispatchSelection({
+                      type: 'selection',
+                      official: selection.localOfficialOverride ?? new Set(officialKeys),
+                      overlay: new Set(),
+                    })
+                  }
+                >
+                  Clear overlays
+                </button>
+                <button
+                  data-testid="rerender-overlay-scope"
+                  onClick={() => setRenderVersion((version) => version + 1)}
+                >
+                  Rerender
+                </button>
+                <ChartDisplay />
+              </InferenceContextsProvider>
+            </UnofficialRunContext.Provider>
+          </GlobalFilterActionsContext.Provider>
         </GlobalFilterSelectionContext.Provider>
       );
     }
@@ -2475,8 +2792,6 @@ describe('ChartDisplay engine comparison guard', () => {
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 2);
 
     cy.get('[data-testid="change-overlay-scope"]').click();
-    // The new overlay scope can arrive before the official query. Its empty
-    // graph must not be persisted as an intentional empty official selection.
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 2);
     cy.get('[data-testid="load-official-scope"]').click();
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 4);
@@ -2492,8 +2807,6 @@ describe('ChartDisplay engine comparison guard', () => {
   });
 });
 
-// Reproduces Qwen3.5 power sweeps: fastest is also lowest watts, while the
-// upper power boundary shows measured power across operating configurations.
 describe('Power envelopes', () => {
   const powerMetrics = [
     ['y_measuredAvgPower', 'Watts'],
@@ -2555,12 +2868,18 @@ describe('Power envelopes', () => {
           },
         },
       );
-      cy.get('#power-clipped .dot-group').should('have.length', 1);
+      cy.scatterPoints('#power-clipped').should('have.length', 1);
       cy.get('#power-clipped .overflow-continuation').should('not.exist');
     });
   }
 
-  function PowerHarness({ singleConfiguration = false }: { singleConfiguration?: boolean }) {
+  function PowerHarness({
+    singleConfiguration = false,
+    normalized = false,
+  }: {
+    singleConfiguration?: boolean;
+    normalized?: boolean;
+  }) {
     const [optimal, setOptimal] = useState(true);
     const [gradientLabels, setGradientLabels] = useState(false);
     const [metric, setMetric] = useState('y_measuredAvgPower');
@@ -2605,7 +2924,7 @@ describe('Power envelopes', () => {
       hwTypesWithData: new Set(['b200_trt']),
     });
     const definition = createMockChartDefinition({
-      chartType: 'interactivity',
+      chartType: normalized ? 'e2e' : 'interactivity',
       [`${metric}_roofline`]: 'lower_right',
     });
     return (
@@ -2639,7 +2958,7 @@ describe('Power envelopes', () => {
       [100, 400],
       [70, 600],
       [40, 800],
-      [60, 100], // An off-boundary measurement must select its curve, not its raw y.
+      [60, 100],
     ];
     const official = samples.map(([x, y], index) =>
       createMockInferenceData({ hwKey: 'h100', x, y, conc: index + 1 }),
@@ -2707,7 +3026,9 @@ describe('Power envelopes', () => {
     expandLegendAdvanced();
     cy.get('#scatter-perf-ruler').click({ force: true });
     cy.get('#power-ruler .perf-ruler-hit').should('have.length', 3);
-    cy.get('#power-ruler .dot-group').last().click({ force: true });
+    cy.scatterPoints('#power-ruler')
+      .should((points) => expect(points).to.not.be.empty)
+      .then((points) => clickScatterPoint(points.at(-1)!));
     cy.get('#power-ruler .unofficial-overlay-pt').eq(3).click({ force: true });
 
     const chartId = 'power-ruler';
@@ -2722,7 +3043,6 @@ describe('Power envelopes', () => {
           svg.querySelector<SVGPathElement>('.roofline-path')!,
           svg.querySelector<SVGPathElement>('.overlay-roofline-path')!,
         ];
-        // Sample native SVG geometry independently of the ruler's interpolation helper.
         for (const [index, path] of paths.entries()) {
           const length = path.getTotalLength();
           const distance = Math.min(
@@ -2796,9 +3116,7 @@ describe('Power envelopes', () => {
           .should('have.attr', 'd', boundary)
           .and('have.attr', 'stroke')
           .and('match', /^url\(#roofline-gradient-/u);
-        cy.get('#power-sweep .dot-group')
-          .filter((_, element) => element.style.opacity !== '0')
-          .should('have.length', 3);
+        expectVisiblePointCount('#power-sweep', 3);
         cy.get('#power-sweep .parallelism-label .pl-text').should(($labels) => {
           expect([...$labels].map((label) => label.textContent)).to.have.members(['TP2', 'TP4']);
         });
@@ -2808,15 +3126,11 @@ describe('Power envelopes', () => {
           );
         });
         cy.get('#scatter-hide-non-optimal').click({ force: true });
-        cy.get('#power-sweep .dot-group')
-          .filter((_, element) => element.style.opacity !== '0')
-          .should('have.length', 4);
+        expectVisiblePointCount('#power-sweep', 4);
         cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
         cy.get('#power-sweep .parallelism-label').should('not.contain.text', 'TP8');
         cy.get('#scatter-hide-non-optimal').click({ force: true });
-        cy.get('#power-sweep .dot-group')
-          .filter((_, element) => element.style.opacity !== '0')
-          .should('have.length', 3);
+        expectVisiblePointCount('#power-sweep', 3);
         cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
         cy.get('#scatter-gradient-labels').click({ force: true });
         cy.get('#power-sweep .roofline-path')
@@ -2824,9 +3138,7 @@ describe('Power envelopes', () => {
           .and('have.attr', 'stroke')
           .and('not.match', /^url\(/u);
         cy.get('#power-sweep .parallelism-label').should('not.exist');
-        cy.get('#power-sweep .dot-group')
-          .filter((_, element) => element.style.opacity !== '0')
-          .should('have.length', 3);
+        expectVisiblePointCount('#power-sweep', 3);
       });
     cy.get('#scatter-gradient-labels').click({ force: true });
     for (const [, label] of powerMetrics) {
@@ -2906,52 +3218,41 @@ describe('Power envelopes', () => {
       .and('have.text', 'TP2');
   });
 
+  it('starts the power boundary at the high E2E Normalized Interactivity end', () => {
+    mountWithProviders(<PowerHarness normalized />, { unofficial: {} });
+    expectVisiblePointCount('#power-sweep', 3);
+  });
+
   it('keeps a fixed measured-power boundary while Optimal Only changes measurement visibility', () => {
     mountWithProviders(<PowerHarness />, { unofficial: {} });
     cy.get('#power-sweep .roofline-path[data-curve-kind="power-envelope"]').should(
       'have.length',
       1,
     );
-    cy.get('#power-sweep .dot-group')
-      .filter((_, element) => element.style.opacity !== '0')
-      .should('have.length', 3);
+    expectVisiblePointCount('#power-sweep', 3);
     cy.get('#power-sweep .roofline-path[data-curve-kind="power-envelope"]')
       .should('have.length', 1)
       .invoke('attr', 'd')
       .should('match', /^M[^C]+C/u);
-    cy.get('#power-sweep .dot-group')
-      .filter((_, element) => element.style.opacity !== '0')
-      .should('have.length', 3)
-      .each(($point) => cy.wrap($point).should('have.css', 'opacity', '1'));
-    cy.get('#scatter-show-all-measurements').should('not.exist');
-    cy.get('[data-testid="measured-power-summary"]')
-      .should('contain.text', 'Showing 3 of 4 measured points')
-      .and('contain.text', '1/2 historical');
-    cy.get('#power-sweep .dot-group')
-      .filter((_, element) => element.style.opacity !== '0')
-      .find('.legacy-power-ring')
-      .should('have.length', 1);
-    cy.get('#power-sweep .dot-group')
-      .filter((_, element) => element.style.opacity === '0')
-      .should('have.css', 'pointer-events', 'none');
+    cy.scatterPoints('#power-sweep').should((points) => {
+      const shown = visiblePoints(points);
+      expect(shown).to.have.length(3);
+      for (const point of shown) expect(point.opacity, point.key).to.equal(1);
+      const hidden = points.filter((point) => point.opacity === 0);
+      expect(hidden).to.have.length.greaterThan(0);
+      for (const point of hidden) expect(point.interactive, point.key).to.equal(false);
+    });
     cy.get('#power-sweep .roofline-path')
       .invoke('attr', 'd')
       .then((boundary) => {
         cy.get('#scatter-hide-non-optimal').click({ force: true });
-        cy.get('#power-sweep .dot-group')
-          .should('have.length', 4)
-          .each(($point) => cy.wrap($point).should('have.css', 'opacity', '1'));
+        cy.scatterPoints('#power-sweep').should((points) => {
+          expect(points).to.have.length(4);
+          for (const point of points) expect(point.opacity, point.key).to.equal(1);
+        });
         cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
-        cy.get('[data-testid="measured-power-summary"]').should(
-          'contain.text',
-          'Showing 4 of 4 measured points',
-        );
-        cy.get('#power-sweep .legacy-power-ring').should('have.length', 2);
-        cy.get('#scatter-show-all-measurements').should('not.exist');
         cy.get('#scatter-hide-non-optimal').click({ force: true });
-        cy.get('#power-sweep .dot-group')
-          .filter((_, element) => element.style.opacity !== '0')
-          .should('have.length', 3);
+        expectVisiblePointCount('#power-sweep', 3);
         cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
       });
     for (const [, label] of powerMetrics) {
@@ -2961,24 +3262,17 @@ describe('Power envelopes', () => {
         .should('have.length', 1)
         .invoke('attr', 'd')
         .should('match', /^M[^C]+C/u);
-      cy.get('#power-sweep .dot-group')
-        .filter((_, element) => element.style.opacity !== '0')
-        .should('have.length', 3);
-      cy.get('#scatter-show-all-measurements').should('not.exist');
+      expectVisiblePointCount('#power-sweep', 3);
     }
     cy.contains('button', 'Energy').click();
     cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
     cy.get('#power-sweep .roofline-path[data-curve-kind="pareto"]').should('have.length', 1);
-    cy.get('[data-testid="power-curve-description"]').should('not.exist');
-    cy.get('#scatter-show-all-measurements').should('not.exist');
   });
 
   for (const metric of ['measuredAvgPower', 'measuredP75Power'] as const) {
     it(`smooths ${metric} across configurations and preserves overlay runs through zoom`, () => {
       const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/101';
       const secondRunUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/102';
-      // The H100 Qwen3.5 8k/1k measurements that produced loops when joined
-      // in concurrency order. EP1 and EP8 contribute to the same upper boundary.
       const rows = [
         [16, 62.737, 399.728, 8],
         [32, 55.742, 448.775, 8],
@@ -3085,11 +3379,9 @@ describe('Power envelopes', () => {
       }
       cy.get(officialSelector).should('have.length', 1);
       cy.get(overlaySelector).should('have.length', 1);
-      cy.get('#power-overlay .dot-group').should('have.length', 9);
+      cy.scatterPoints('#power-overlay').should('have.length', 9);
       cy.get('#power-overlay .unofficial-overlay-pt').should('have.length', 12);
-      cy.get('#power-overlay .dot-group')
-        .filter((_, element) => element.style.opacity !== '0')
-        .should('have.length', 6);
+      expectVisiblePointCount('#power-overlay', 6);
       cy.get('#power-overlay .unofficial-overlay-pt')
         .filter((_, element) => element.style.opacity !== '0')
         .should('have.length', 6);
@@ -3097,10 +3389,7 @@ describe('Power envelopes', () => {
       cy.get(`${officialSelector}, ${overlaySelector}`).then(($paths) => {
         const geometry = [...$paths].map((path) => path.getAttribute('d'));
         cy.get('#scatter-hide-non-optimal').click({ force: true });
-        cy.get('#scatter-show-all-measurements').should('not.exist');
-        cy.get('#power-overlay .dot-group')
-          .filter((_, element) => element.style.opacity !== '0')
-          .should('have.length', 9);
+        expectVisiblePointCount('#power-overlay', 9);
         cy.get('#power-overlay .unofficial-overlay-pt')
           .filter((_, element) => element.style.opacity !== '0')
           .should('have.length', 12);
@@ -3108,9 +3397,7 @@ describe('Power envelopes', () => {
           expect([...$current].map((path) => path.getAttribute('d'))).to.deep.equal(geometry);
         });
         cy.get('#scatter-hide-non-optimal').click({ force: true });
-        cy.get('#power-overlay .dot-group')
-          .filter((_, element) => element.style.opacity !== '0')
-          .should('have.length', 6);
+        expectVisiblePointCount('#power-overlay', 6);
         cy.get('#power-overlay .unofficial-overlay-pt')
           .filter((_, element) => element.style.opacity !== '0')
           .should('have.length', 6);

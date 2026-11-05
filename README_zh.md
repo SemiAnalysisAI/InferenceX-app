@@ -12,7 +12,7 @@
 
 ## 概览
 
-LLM 推理性能是提供 AI 服务时的核心关注点，但准确的性能分析始终难以获得。软件开发与模型发布的快节奏使得不同配置之间的性能比较十分困难。现有的性能基准测试由于是静态的而迅速过时，参与者还会用不切实际、高度特化的配置来"刷榜"。InferenceX 通过每晚使用最新软件在主流硬件平台上对热门模型进行基准测试来解决这些问题。对于每个模型与硬件组合，InferenceX 会扫描不同的张量并行大小与最大并发请求数，以吞吐量-延迟曲线呈现完整图景。在软件配置方面，我们确保其在不同服务场景下具有普遍适用性，并开源整个仓库以欢迎社区贡献。我们希望 InferenceX 能为社区提供最新、真实的 LLM 推理性能信息。
+LLM 推理性能是提供 AI 服务时的核心关注点，但准确的性能分析始终难以获得。软件开发与模型发布的快节奏使得不同配置之间的性能比较十分困难。现有的性能基准测试由于是静态的而迅速过时，参与者还会用不切实际、高度特化的配置来“刷榜”。InferenceX 通过每晚使用最新软件在主流硬件平台上对热门模型进行基准测试来解决这些问题。对于每个模型与硬件组合，InferenceX 会扫描不同的张量并行大小与最大并发请求数，以吞吐量-延迟曲线呈现完整图景。在软件配置方面，我们确保其在不同服务场景下具有普遍适用性，并开源整个仓库以欢迎社区贡献。我们希望 InferenceX 能为社区提供最新、真实的 LLM 推理性能信息。
 
 ## 架构
 
@@ -64,7 +64,7 @@ bun install
 
 ### 2. 配置数据库
 
-仪表板需要实时 PostgreSQL 数据库。在 `.env` 中设置 `DATABASE_READONLY_URL`；应用同时支持标准 PostgreSQL 服务器和 Neon。
+仪表板需要一个运行中的 PostgreSQL 数据库。在 `.env` 中设置 `DATABASE_READONLY_URL`；应用同时支持标准 PostgreSQL 服务器和 Neon。
 
 #### 方式 A：标准 PostgreSQL
 
@@ -140,19 +140,19 @@ bun run dev
 
 合并到 `main` 或 `master` 的 `packages/db/src/etl/run-overrides.ts` 变更会由 CI 自动应用到生产数据库，随后执行数据库校验、缓存失效和缓存预热。覆盖命令仍可用于本地预览和手动恢复。
 
-| 脚本                                   | 说明                           |
-| -------------------------------------- | ------------------------------ |
-| `bun run admin:db:migrate`             | 运行数据库迁移                 |
-| `bun run admin:db:ingest:run`          | 从 GitHub 运行摄取基准测试数据 |
-| `bun run admin:db:ingest:ci`           | 摄取基准测试数据（CI 模式）    |
-| `bun run admin:db:ingest:gcs`          | 从 GCS 摄取基准测试数据        |
-| `bun run admin:db:ingest:supplemental` | 摄取补充数据                   |
-| `bun run admin:db:apply-overrides`     | 手动预览或应用数据覆盖         |
-| `bun run admin:db:reset`               | 重置数据库                     |
-| `bun run admin:db:verify`              | 校验数据库完整性               |
-| `bun run admin:cache:invalidate`       | 失效 API 缓存                  |
-| `bun run admin:cache:warmup`           | 预热 API 缓存                  |
+| 脚本                                   | 说明                                     |
+| -------------------------------------- | ---------------------------------------- |
+| `bun run admin:db:migrate`             | 运行数据库迁移                           |
+| `bun run admin:db:ingest:run`          | 从 GitHub Actions 运行中摄取基准测试数据 |
+| `bun run admin:db:ingest:ci`           | 摄取基准测试数据（CI 模式）              |
+| `bun run admin:db:ingest:gcs`          | 从 GCS 摄取基准测试数据                  |
+| `bun run admin:db:ingest:supplemental` | 摄取补充数据                             |
+| `bun run admin:db:apply-overrides`     | 手动预览或应用数据覆盖                   |
+| `bun run admin:db:reset`               | 重置数据库                               |
+| `bun run admin:db:verify`              | 校验数据库完整性                         |
+| `bun run admin:cache:invalidate`       | 失效 API 缓存                            |
+| `bun run admin:cache:warmup`           | 预热 API 缓存                            |
 
 ## 部署
 
-部署于 Vercel。所有必需的环境变量见 [`.env.example`](.env.example)。
+部署于 Vercel。核心环境变量见 [`.env.example`](.env.example)；各运行时变量的作用及是否必填、Vercel 项目设置、GitHub Actions 变量与 secret、预发布环境前提条件见 [`docs/deployment-configuration.md`](docs/deployment-configuration.md)。

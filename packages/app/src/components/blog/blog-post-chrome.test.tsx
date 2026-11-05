@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import type { BlogPostMeta, TocHeading } from '@/lib/blog';
+import type { BlogPostMeta, TocHeading } from '@/lib/blog/blog';
 
 import { BlogPostContent } from './blog-post-content';
 import { BlogPostNav } from './blog-post-nav';

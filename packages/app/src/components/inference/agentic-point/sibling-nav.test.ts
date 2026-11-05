@@ -36,6 +36,18 @@ function sibling(overrides: Partial<BenchmarkSibling> = {}): BenchmarkSibling {
 }
 
 describe('chipLabel', () => {
+  it('shows DWDP group width and count on prefill-only runs', () => {
+    expect(
+      chipLabel(
+        sibling({
+          prefill_tp: 1,
+          prefill_pp: 1,
+          prefill_dwdp_size: 8,
+          prefill_num_workers: 2,
+        }),
+      ),
+    ).toBe('2xDWDP8 • c=2');
+  });
   it('labels a non-disaggregated multinode point with its one aggregate topology', () => {
     expect(chipLabel(sibling())).toBe('TP8PP2 • c=2');
   });

@@ -4,7 +4,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { OverviewEngineScope, OverviewPageData } from '@/lib/overview-data';
+import type { OverviewEngineScope, OverviewPageData } from '@/lib/overview/overview-data';
 
 const routerStub = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
 
@@ -41,8 +41,6 @@ function pageData(engineScope: OverviewEngineScope): OverviewPageData {
   };
 }
 
-/** Mirrors the real page: the scope comes from the payload in context, so the
- *  active option moves when the response lands. */
 function Body() {
   const data = useOverviewData();
   return (
@@ -107,8 +105,6 @@ describe('overview switcher focus', () => {
       await Promise.resolve();
     });
 
-    // The activated anchor is gone — React swapped in the active <span> — and
-    // without the focus handoff the browser drops focus to <body>.
     const active = scopeOption('all');
     expect(active.tagName).toBe('SPAN');
     expect(active.getAttribute('aria-current')).toBe('true');
@@ -121,8 +117,6 @@ describe('overview switcher focus', () => {
 
     renderSwitcher('community', '/overview');
 
-    // A pointer click never focuses the anchor first in jsdom, so there is no
-    // focus to restore and the active option must not steal it.
     await act(async () => {
       scopeOption('all').dispatchEvent(
         new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }),

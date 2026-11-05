@@ -7,30 +7,25 @@ import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-con
 
 import type { GPUDataPoint } from '@/components/calculator/types';
 import { useThroughputData } from '@/components/calculator/useThroughputData';
-import {
-  CompareTableRenderer,
-  type CompareTableData,
-} from '@/components/compare/compare-table-renderer';
+import { CompareTableRenderer } from '@/components/compare/compare-table-renderer';
+import { LazyCompareInferenceChart } from '@/components/compare/lazy-compare-inference-chart';
 import {
   GlobalFilterProvider,
   useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
-} from '@/components/GlobalFilterContext';
-import { InferenceProvider } from '@/components/inference/InferenceContext';
-import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
+} from '@/providers/GlobalFilterContext';
 import { Card } from '@/components/ui/card';
-import { track } from '@/lib/analytics';
-import type { BenchmarkRow } from '@/lib/api';
-import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
-import { toModel, toPrecisions, toSequence } from '@/lib/compare-enum-coerce';
-import type { AgenticScenarioIntro } from '@/lib/compare-ssr';
+import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
+import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
+import type { CompareChipPageLink } from '@/lib/compare/compare-chip-link';
+import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
+import type { CompareTableData } from '@/lib/compare/compare-table-view';
 
-/** Only show Cost + Concurrency in the interpolated table — the rest of the
- *  metric rows (Throughput, tok/s/MW) live on the sibling /compare page. */
 const PER_DOLLAR_TABLE_METRICS = ['Cost ($/M tok)', 'Concurrency'];
 
-/** Localized display labels keyed by the table's stable English metric key. */
 const PER_DOLLAR_LABEL_OVERRIDES = {
   en: {
     'Cost ($/M tok)': 'Dollar per Million Tokens',
@@ -40,8 +35,6 @@ const PER_DOLLAR_LABEL_OVERRIDES = {
   },
 } as const;
 
-/** y_costh = Cost per Million Total Tokens (Owning at Large Hyperscaler Volume). Defined in
- *  packages/app/src/components/inference/metric-registry.ts. */
 const PER_DOLLAR_DEFAULT_Y_AXIS = 'y_costh';
 
 const STRINGS = {
@@ -74,8 +67,6 @@ const STRINGS = {
 interface ComparePerDollarPageClientProps {
   a: string;
   b: string;
-  /** Canonical compare slug (e.g. `deepseek-r1-h100-vs-h200`). Used for the
-   *  cross-link to the sibling `/compare/<same-slug>` route. */
   slug: string;
   label: string;
   modelLabel: string;
@@ -84,14 +75,7 @@ interface ComparePerDollarPageClientProps {
   defaultPrecision: string | null;
   ssrTableData: CompareTableData;
   initialBenchmarkRows?: BenchmarkRow[];
-  /** One SSR-rendered prose paragraph per interpolated-table row (default
-   *  interactivity target). Each paragraph picks a template variant
-   *  deterministically from the slug so prose stays stable across renders
-   *  but varies across pages in the catalog. Empty array when there's no
-   *  comparable data. */
   narrative: string[];
-  /** Set only when the page is rendering the agentic workload. Explains
-   *  what AgentX measures before the head-to-head numbers. */
   agenticIntro?: AgenticScenarioIntro | null;
   aLabel: string;
   bLabel: string;
@@ -99,13 +83,10 @@ interface ComparePerDollarPageClientProps {
   bVendor: string;
   aArch: string;
   bArch: string;
-  /** Large-hyperscaler-volume ownership $/GPU/hr for each GPU — sourced from HW_REGISTRY.costh
-   *  (the same input the per-dollar cost-per-token math uses). Rendered in the
-   *  header so readers can audit the pricing assumptions. */
   aCostPerGpuHr: number;
   bCostPerGpuHr: number;
-  /** Crawlable data graphic generated for the canonical default comparison. */
   heroImageSrc: string;
+  chipPageLink?: CompareChipPageLink | null;
   locale?: 'en' | 'zh';
 }
 
@@ -131,11 +112,16 @@ export default function ComparePerDollarPageClient({
   aCostPerGpuHr,
   bCostPerGpuHr,
   heroImageSrc,
+  chipPageLink = null,
   locale = 'en',
 }: ComparePerDollarPageClientProps) {
   useEffect(() => {
-    track('compare_per_dollar_page_view', { gpu_a: a, gpu_b: b, default_model: defaultModel });
-  }, [a, b, defaultModel]);
+    trackOncePerPageview(
+      'compare_per_dollar_page_view',
+      { slug, gpus: [a, b], model: defaultModel },
+      slug,
+    );
+  }, [slug, a, b, defaultModel]);
 
   const compareGpuPair = useMemo(() => [a, b] as const, [a, b]);
   const initialModel = toModel(defaultModel);
@@ -158,159 +144,172 @@ export default function ComparePerDollarPageClient({
       initialSequence={initialSequence}
       initialPrecisions={initialPrecisions}
     >
-      <InferenceProvider
-        activeTab="compare"
-        initialActiveHwTypes={[a, b]}
-        compareGpuPair={compareGpuPair}
-        initialYAxisMetric={PER_DOLLAR_DEFAULT_Y_AXIS}
-        benchmarkQueryScope={benchmarkQueryScope}
-        initialBenchmarkModel={initialModel}
-        initialBenchmarkRows={initialBenchmarkRows}
-      >
-        <div className="flex flex-col gap-4">
-          <Card className="flex w-full min-w-0 flex-col gap-3">
-            <header>
-              <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                {modelLabel} · {t.eyebrowSuffix}
-              </div>
-              <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">
-                {label} {t.h1Suffix}
-              </h1>
-              {isZh ? (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  对比 <strong>{aLabel}</strong>（{aVendor} {aArch}）与 <strong>{bLabel}</strong>（
-                  {bVendor} {bArch}）在 <strong>{modelLabel}</strong> 上的每百万 token
-                  成本。该指标采用 Hyperscaler 自有设备 TCO 口径，并按总 token
-                  数归一化，用于比较不同 LLM
-                  工作负载下的每美元性能。可在任一目标交互性下找出成本更低的
-                  SKU，并通过下方图表控件切换序列长度、精度和指标；操作方式与
-                  <Link href="/zh" className="underline hover:text-primary">
-                    {t.mainChartLinkText}
-                  </Link>
-                  相同。
-                </p>
-              ) : (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Cost per million tokens of <strong>{aLabel}</strong> ({aVendor} {aArch}) versus{' '}
-                  <strong>{bLabel}</strong> ({bVendor} {bArch}) on <strong>{modelLabel}</strong>.
-                  Large-hyperscaler-volume ownership TCO normalized by total tokens — performance
-                  per dollar across LLM workloads. Pick the more cost-efficient SKU at every target
-                  interactivity level. Use the chart controls below to switch sequences, precisions,
-                  and metrics — same interactions as{' '}
-                  <Link href="/" className="underline hover:text-primary">
-                    {t.mainChartLinkText}
-                  </Link>
-                  .
-                </p>
-              )}
-              {agenticIntro && (
-                <p
-                  className="mt-3 max-w-3xl text-sm text-foreground/80"
-                  data-testid="compare-agentic-intro"
-                >
-                  {agenticIntro.paragraph}{' '}
-                  <Link
-                    href={agenticIntro.href}
-                    data-testid="compare-agentic-intro-link"
-                    className="font-medium text-brand underline underline-offset-4 hover:no-underline"
-                  >
-                    {agenticIntro.linkLabel} →
-                  </Link>
-                </p>
-              )}
-              {narrative.length > 0 && (
-                <div
-                  className="mt-3 flex flex-col gap-2"
-                  data-testid="compare-per-dollar-narrative"
-                >
-                  {narrative.map((para, i) => (
-                    <p key={i} className="text-sm text-foreground/80">
-                      {para}
-                      {i === narrative.length - 1 && (
-                        <>
-                          {' '}
-                          <span className="text-muted-foreground italic">
-                            {isZh
-                              ? `（以上数据基于此 URL 对应的默认 ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} 配置；在控件中切换序列长度、精度或模型后，下方表格和图表会同步更新。）`
-                              : `(Numbers reflect the default ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} selection for this URL — table and chart below update if you change sequence, precision, or model in the controls.)`}
-                          </span>
-                        </>
-                      )}
-                    </p>
-                  ))}
-                </div>
-              )}
-              {(aCostPerGpuHr > 0 || bCostPerGpuHr > 0) && (
-                <p
-                  className="mt-2 text-xs text-muted-foreground"
-                  data-testid="compare-per-dollar-pricing"
-                >
-                  {t.pricingLabel} <strong>{aLabel}</strong>{' '}
-                  {aCostPerGpuHr > 0 ? `$${aCostPerGpuHr.toFixed(2)}/chip/hr` : '—'} ·{' '}
-                  <strong>{bLabel}</strong>{' '}
-                  {bCostPerGpuHr > 0 ? `$${bCostPerGpuHr.toFixed(2)}/chip/hr` : '—'}.{' '}
-                  {t.pricingSource}{' '}
-                  <a
-                    href={TCO_SOURCE_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline hover:text-primary"
-                    onClick={() => track('compare_per_dollar_tco_source_clicked', { slug })}
-                  >
-                    {TCO_SOURCE_TITLE}
-                  </a>
-                  .
-                </p>
-              )}
-              <p className="mt-2 text-sm">
+      <div className="flex flex-col gap-4">
+        <Card className="flex w-full min-w-0 flex-col gap-3">
+          <header>
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">
+              {modelLabel} · {t.eyebrowSuffix}
+            </div>
+            <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">
+              {label} {t.h1Suffix}
+            </h1>
+            {isZh ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                对比 <strong>{aLabel}</strong>（{aVendor} {aArch}）与 <strong>{bLabel}</strong>（
+                {bVendor} {bArch}）在 <strong>{modelLabel}</strong> 上的每百万 token
+                成本。该指标采用 Hyperscaler 自有设备 TCO 口径，并按总 token 数归一化，用于比较不同
+                LLM 工作负载下的每美元性能。可在任一目标交互性下找出成本更低的
+                SKU，并通过下方图表控件切换序列长度、精度和指标；操作方式与
+                <Link href="/zh" className="underline hover:text-primary">
+                  {t.mainChartLinkText}
+                </Link>
+                相同。
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Cost per million tokens of <strong>{aLabel}</strong> ({aVendor} {aArch}) versus{' '}
+                <strong>{bLabel}</strong> ({bVendor} {bArch}) on <strong>{modelLabel}</strong>.
+                Large-hyperscaler-volume ownership TCO normalized by total tokens — performance per
+                dollar across LLM workloads. Pick the more cost-efficient SKU at every target
+                interactivity level. Use the chart controls below to switch sequences, precisions,
+                and metrics — same interactions as{' '}
+                <Link href="/" className="underline hover:text-primary">
+                  {t.mainChartLinkText}
+                </Link>
+                .
+              </p>
+            )}
+            {agenticIntro && (
+              <p
+                className="mt-3 max-w-3xl text-sm text-foreground/80"
+                data-testid="compare-agentic-intro"
+              >
+                {agenticIntro.paragraph}{' '}
                 <Link
-                  href={isZh ? `/zh/compare/${slug}` : `/compare/${slug}`}
-                  className="underline hover:text-primary text-muted-foreground"
-                  onClick={() => track('compare_per_dollar_cross_link_to_full', { slug })}
+                  href={agenticIntro.href}
+                  data-testid="compare-agentic-intro-link"
+                  className="font-medium text-brand underline underline-offset-4 hover:no-underline"
                 >
-                  {t.fullComparisonLinkText}
+                  {agenticIntro.linkLabel} →
                 </Link>
               </p>
-            </header>
-            <figure
-              className="mt-2 flex flex-col gap-2"
-              data-testid="compare-per-dollar-indexed-image"
-            >
-              <img
-                src={heroImageSrc}
-                alt={
-                  isZh
-                    ? `${modelLabel}：${aLabel} 与 ${bLabel} 在相同交互性水平下的每百万 token 成本`
-                    : `${modelLabel}: ${aLabel} versus ${bLabel} cost per million tokens at matched interactivity levels`
-                }
-                width={1200}
-                height={675}
-                loading="eager"
-                fetchPriority="high"
-                className="w-full rounded-lg border border-border/50"
-              />
-              <figcaption className="text-xs text-muted-foreground">
-                {isZh
-                  ? `${aLabel} 与 ${bLabel} 在此对比默认工作负载下的每百万 token 成本。成本越低表示每美元性能越高。`
-                  : `${aLabel} versus ${bLabel} cost per million tokens for this comparison's canonical default workload. Lower cost indicates better performance per dollar.`}
-              </figcaption>
-            </figure>
-            <CompareTableSection
-              a={a}
-              b={b}
-              aLabel={aLabel}
-              bLabel={bLabel}
-              ssrTableData={ssrTableData}
-              initialModel={initialModel}
-              initialSequence={initialSequence}
-              initialCalculatorRows={initialCalculatorRows}
-              emptyStateText={t.emptyState}
-              isZh={isZh}
+            )}
+            {narrative.length > 0 && (
+              <div className="mt-3 flex flex-col gap-2" data-testid="compare-per-dollar-narrative">
+                {narrative.map((para, i) => (
+                  <p key={i} className="text-sm text-foreground/80">
+                    {para}
+                    {i === narrative.length - 1 && (
+                      <>
+                        {' '}
+                        <span className="text-muted-foreground italic">
+                          {isZh
+                            ? `（以上数据基于此 URL 对应的默认 ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} 配置；在控件中切换序列长度、精度或模型后，下方表格和图表会同步更新。）`
+                            : `(Numbers reflect the default ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} selection for this URL — table and chart below update if you change sequence, precision, or model in the controls.)`}
+                        </span>
+                      </>
+                    )}
+                  </p>
+                ))}
+              </div>
+            )}
+            {(aCostPerGpuHr > 0 || bCostPerGpuHr > 0) && (
+              <p
+                className="mt-2 text-xs text-muted-foreground"
+                data-testid="compare-per-dollar-pricing"
+              >
+                {t.pricingLabel} <strong>{aLabel}</strong>{' '}
+                {aCostPerGpuHr > 0 ? `$${aCostPerGpuHr.toFixed(2)}/chip/hr` : '—'} ·{' '}
+                <strong>{bLabel}</strong>{' '}
+                {bCostPerGpuHr > 0 ? `$${bCostPerGpuHr.toFixed(2)}/chip/hr` : '—'}.{' '}
+                {t.pricingSource}{' '}
+                <a
+                  href={TCO_SOURCE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-primary"
+                  onClick={() => track('compare_per_dollar_tco_source_clicked', { slug })}
+                >
+                  {TCO_SOURCE_TITLE}
+                </a>
+                .
+              </p>
+            )}
+            <p className="mt-2 text-sm">
+              <Link
+                href={isZh ? `/zh/compare/${slug}` : `/compare/${slug}`}
+                className="underline hover:text-primary text-muted-foreground"
+                onClick={() => track('compare_per_dollar_cross_link_to_full', { slug })}
+              >
+                {t.fullComparisonLinkText}
+              </Link>
+            </p>
+            {chipPageLink && (
+              <p className="mt-2 text-sm" data-testid="compare-chip-page-link">
+                <Link
+                  href={chipPageLink.href}
+                  className="underline hover:text-primary text-muted-foreground"
+                  onClick={() =>
+                    track('compare_per_dollar_cross_link_to_chip_page', {
+                      slug,
+                      chip_slug: chipPageLink.slug,
+                    })
+                  }
+                >
+                  {chipPageLink.label} →
+                </Link>
+              </p>
+            )}
+          </header>
+          <figure
+            className="mt-2 flex flex-col gap-2"
+            data-testid="compare-per-dollar-indexed-image"
+          >
+            <img
+              src={heroImageSrc}
+              alt={
+                isZh
+                  ? `${modelLabel}：${aLabel} 与 ${bLabel} 在相同交互性水平下的每百万 token 成本`
+                  : `${modelLabel}: ${aLabel} versus ${bLabel} cost per million tokens at matched interactivity levels`
+              }
+              width={1200}
+              height={675}
+              loading="eager"
+              fetchPriority="high"
+              className="w-full rounded-lg border border-border/50"
             />
-          </Card>
-          <InferenceChartDisplay />
-        </div>
-      </InferenceProvider>
+            <figcaption className="text-xs text-muted-foreground">
+              {isZh
+                ? `${aLabel} 与 ${bLabel} 在此对比默认工作负载下的每百万 token 成本。成本越低表示每美元性能越高。`
+                : `${aLabel} versus ${bLabel} cost per million tokens for this comparison's canonical default workload. Lower cost indicates better performance per dollar.`}
+            </figcaption>
+          </figure>
+          <CompareTableSection
+            a={a}
+            b={b}
+            aLabel={aLabel}
+            bLabel={bLabel}
+            ssrTableData={ssrTableData}
+            ssrSequence={defaultSequence}
+            ssrPrecisions={initialPrecisions}
+            initialModel={initialModel}
+            initialSequence={initialSequence}
+            initialCalculatorRows={initialCalculatorRows}
+            emptyStateText={t.emptyState}
+            isZh={isZh}
+          />
+        </Card>
+        <LazyCompareInferenceChart
+          activeTab="compare"
+          initialActiveHwTypes={[a, b]}
+          compareGpuPair={compareGpuPair}
+          initialYAxisMetric={PER_DOLLAR_DEFAULT_Y_AXIS}
+          benchmarkQueryScope={benchmarkQueryScope}
+          initialBenchmarkModel={initialModel}
+          initialBenchmarkRows={initialBenchmarkRows}
+          initialBenchmarkSequence={defaultSequence ?? undefined}
+        />
+      </div>
     </GlobalFilterProvider>
   );
 }
@@ -321,9 +320,11 @@ function CompareTableSection({
   aLabel,
   bLabel,
   ssrTableData,
+  ssrSequence,
   initialModel,
   initialSequence,
   initialCalculatorRows,
+  ssrPrecisions,
   emptyStateText,
   isZh,
 }: {
@@ -332,14 +333,22 @@ function CompareTableSection({
   aLabel: string;
   bLabel: string;
   ssrTableData: CompareTableData;
+  ssrSequence: string | null;
+  ssrPrecisions: string[] | undefined;
   initialModel: ReturnType<typeof toModel>;
   initialSequence: ReturnType<typeof toSequence>;
   initialCalculatorRows?: BenchmarkRow[];
   emptyStateText: string;
   isZh: boolean;
 }) {
-  const { effectiveSequence, effectivePrecisions, selectedModel, sequenceResolved } =
-    useGlobalFilterSelection();
+  const {
+    selectedSequence,
+    effectiveSequence,
+    effectivePrecisions,
+    selectedModel,
+    selectedPrecisions,
+    sequenceResolved,
+  } = useGlobalFilterSelection();
   const { availableDates } = useGlobalFilterAvailability();
   const { selectedRunDate } = useGlobalFilterRun();
   const latestAvailableDate = availableDates.at(-1) ?? '';
@@ -354,7 +363,7 @@ function CompareTableSection({
       ? initialCalculatorRows
       : undefined;
 
-  const { gpuDataByGroupKey, ranges, hasData } = useThroughputData(
+  const { gpuDataByGroupKey, ranges, hasData, loading, error } = useThroughputData(
     selectedModel,
     effectiveSequence,
     effectivePrecisions,
@@ -376,16 +385,26 @@ function CompareTableSection({
     return { pointsA: pA, pointsB: pB };
   }, [gpuDataByGroupKey, a, b]);
 
-  const clientRange = hasData ? ranges.interactivity : ssrTableData.interactivityRange;
-
   return (
     <CompareTableRenderer
       aLabel={aLabel}
       bLabel={bLabel}
       ssrTableData={ssrTableData}
-      interactivityRange={clientRange}
-      gpuDataPointsA={pointsA}
-      gpuDataPointsB={pointsB}
+      ssrSequence={ssrSequence}
+      ssrModel={initialModel}
+      ssrPrecisions={ssrPrecisions ?? []}
+      selectedSequence={selectedSequence}
+      effectiveSequence={effectiveSequence}
+      sequenceResolved={sequenceResolved}
+      selectedModel={selectedModel}
+      selectedPrecisions={selectedPrecisions}
+      effectivePrecisions={effectivePrecisions}
+      latestRun={calculatorRunDate === ''}
+      pointsA={pointsA}
+      pointsB={pointsB}
+      clientInteractivityRange={hasData ? ranges.interactivity : null}
+      loading={loading}
+      error={error}
       emptyStateText={emptyStateText}
       metricLabelOverrides={PER_DOLLAR_LABEL_OVERRIDES[isZh ? 'zh' : 'en']}
       visibleMetricLabels={PER_DOLLAR_TABLE_METRICS}

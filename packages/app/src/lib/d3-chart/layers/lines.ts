@@ -1,16 +1,18 @@
 import * as d3 from 'd3';
 
+import { setAttrIfChanged, writeAttrs } from '../chart-update';
 import type { ContinuousScale } from '../types';
+
+import { projectedLinePath } from './line-path-cache';
 
 type AnyXScale = ContinuousScale | d3.ScaleTime<number, number>;
 
 export interface LineConfig {
   getColor: (key: string) => string;
-  /** Optional per-series SVG dash pattern; return `none` for a solid line. */
   getStrokeDasharray?: (key: string) => string;
   strokeWidth?: number;
+  getStrokeWidth?: (key: string) => number;
   curve?: d3.CurveFactory;
-  /** Return false to create gaps in the line (e.g., missing data points). */
   isDefined?: (d: { x: number; y: number }) => boolean;
 }
 
@@ -19,7 +21,6 @@ interface LineEntry {
   points: { x: number; y: number }[];
 }
 
-/** Render multiple keyed line paths using enter/update/exit. */
 export function renderLines(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   lines: Record<string, { x: number; y: number }[]>,
@@ -27,15 +28,8 @@ export function renderLines(
   yScale: ContinuousScale,
   config: LineConfig,
 ): void {
-  const lineGenerator = d3
-    .line<{ x: number; y: number }>()
-    .x((d) => (xScale as d3.ScaleLinear<number, number>)(d.x))
-    .y((d) => yScale(d.y))
-    .curve(config.curve ?? d3.curveMonotoneX);
-
-  if (config.isDefined) {
-    lineGenerator.defined(config.isDefined);
-  }
+  const project = xScale as d3.ScaleLinear<number, number>;
+  const curve = config.curve ?? d3.curveMonotoneX;
 
   const entries: LineEntry[] = Object.entries(lines)
     .filter(([, points]) => points.length > 0)
@@ -45,27 +39,24 @@ export function renderLines(
     .selectAll<SVGPathElement, LineEntry>('.line-path')
     .data(entries, (d) => d.key);
 
-  // Enter
-  const entered = selection
-    .enter()
-    .append('path')
-    .attr('class', (d) => `line-path line-${d.key}`)
-    .attr('fill', 'none');
+  const entered = selection.enter().append('path').attr('fill', 'none');
 
-  // Exit
   selection.exit().remove();
 
-  // Update all
-  entered
-    .merge(selection)
-    .attr('class', (d) => `line-path line-${d.key}`)
-    .attr('stroke', (d) => config.getColor(d.key))
-    .attr('stroke-dasharray', (d) => config.getStrokeDasharray?.(d.key) ?? null)
-    .attr('stroke-width', config.strokeWidth ?? 2)
-    .attr('d', (d) => lineGenerator(d.points));
+  writeAttrs(entered.merge(selection), {
+    class: (d) => `line-path line-${d.key}`,
+    'data-line-key': (d) => d.key,
+    stroke: (d) => config.getColor(d.key),
+    'stroke-dasharray': (d) => config.getStrokeDasharray?.(d.key) ?? null,
+    'stroke-width': (d) => config.getStrokeWidth?.(d.key) ?? config.strokeWidth ?? 2,
+  }).each(function (d) {
+    writeLinePath(
+      this,
+      projectedLinePath(this, d.points, project, yScale, curve, config.isDefined),
+    );
+  });
 }
 
-/** Update line paths on zoom (recompute d attribute). */
 export function updateLinesOnZoom(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   lines: Record<string, { x: number; y: number }[]>,
@@ -73,17 +64,19 @@ export function updateLinesOnZoom(
   yScale: ContinuousScale,
   config?: Pick<LineConfig, 'curve' | 'isDefined'>,
 ): void {
-  const lineGenerator = d3
-    .line<{ x: number; y: number }>()
-    .x((d) => (xScale as d3.ScaleLinear<number, number>)(d.x))
-    .y((d) => yScale(d.y))
-    .curve(config?.curve ?? d3.curveMonotoneX);
+  const project = xScale as d3.ScaleLinear<number, number>;
+  const curve = config?.curve ?? d3.curveMonotoneX;
 
-  if (config?.isDefined) {
-    lineGenerator.defined(config.isDefined);
-  }
+  group.selectAll<SVGPathElement, unknown>('.line-path').each(function () {
+    const key = this.dataset.lineKey ?? '';
+    if (!Object.hasOwn(lines, key)) return;
+    const points = lines[key];
+    d3.select(this).datum(points);
+    writeLinePath(this, projectedLinePath(this, points, project, yScale, curve, config?.isDefined));
+  });
+}
 
-  for (const [key, points] of Object.entries(lines)) {
-    group.select(`.line-${key}`).datum(points).attr('d', lineGenerator);
-  }
+function writeLinePath(element: SVGPathElement, path: string | null): void {
+  if (path === null) element.removeAttribute('d');
+  else setAttrIfChanged(element, 'd', path);
 }

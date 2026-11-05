@@ -1,5 +1,5 @@
-import { getTelemetryGuide } from '@/lib/agentx-telemetry-zh';
-import type { Locale } from '@/lib/i18n';
+import { getTelemetryGuide } from '@/lib/agentx/agentx-telemetry-zh';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import { AgentXTelemetryLink } from './agentx-telemetry-link';
 
@@ -14,11 +14,6 @@ const STRINGS = {
   },
 } as const;
 
-/**
- * Entry point from /agentx into the telemetry tutorial. Rendered inside the
- * AgentX methodology card next to the optimizations callout, so it is a
- * section rather than its own card.
- */
 export function AgentXTelemetryCallout({ locale }: { locale: Locale }) {
   const guide = getTelemetryGuide(locale);
   const t = STRINGS[locale];

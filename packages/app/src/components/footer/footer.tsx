@@ -1,20 +1,21 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
-import { track } from '@/lib/analytics';
-import { isEmbedPathname } from '@/lib/embed-route';
-import { useLocale } from '@/lib/use-locale';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
+import { ShareTwitterButton, ShareLinkedInButton } from '@/components/ui/share-buttons';
+import { track } from '@/lib/analytics/analytics';
+import { analyticsPlacement } from '@/lib/analytics/placement';
+import { isEmbedPathname } from '@/lib/embed/embed-route';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { StarButton } from './footer-star-cta';
 
 const STRINGS = {
   en: {
     description:
-      'Continuous open-source agentic inference benchmarking. Real-world, reproducible, auditable performance data trusted by trillion dollar AI infrastructure operators like OpenAI, Meta, Oracle, Microsoft, etc.',
+      'Continuous open-source AI accelerator system benchmarking. Real-world, reproducible, auditable performance data trusted by trillion dollar AI infrastructure operators like OpenAI, Meta, Oracle, Microsoft, etc.',
     semianalysis: 'SemiAnalysis',
     mainSite: 'Main Site',
     newsletter: 'Newsletter',
@@ -31,12 +32,16 @@ const STRINGS = {
     supporters: 'Supporters',
     agentx: 'AgentX',
     telemetry: 'Telemetry',
+    comparisons: 'Comparisons',
     articles: 'Articles',
+    hardwareResults: 'Hardware Results',
     whitepapers: 'Whitepapers',
     apiReference: 'API Reference',
     historicalTrends: 'Historical Trends',
     tcoCalculator: 'TCO Calculator',
     fleetLifecycle: 'Fleet Lifecycle',
+    firstTokenLimits: 'First-Token Limits',
+    cacheReuse: 'Prefix Cache Reuse',
     gpuReliability: 'Chip Reliability',
     gpuSpecsDashboard: 'Chip Specs Dashboard',
     perfPerDollar: 'Performance per Dollar',
@@ -50,7 +55,7 @@ const STRINGS = {
   },
   zh: {
     description:
-      'InferenceX 持续开展开源的 agentic 推理基准测试，发布来自真实环境、可复现、可审计的性能数据，并获得 OpenAI、Meta、Oracle、Microsoft 等万亿美元级 AI 基础设施运营方的信赖。',
+      'InferenceX 持续开展开源的 AI 加速器系统基准测试，发布来自真实环境、可复现、可审计的性能数据，并获得 OpenAI、Meta、Oracle、Microsoft 等万亿美元级 AI 基础设施运营方的信赖。',
     semianalysis: 'SemiAnalysis',
     mainSite: 'SemiAnalysis 官网',
     newsletter: '订阅通讯',
@@ -67,11 +72,15 @@ const STRINGS = {
     supporters: '业界评价',
     agentx: 'AgentX',
     telemetry: '遥测数据',
+    comparisons: '性能对比',
     articles: '技术文章',
+    hardwareResults: '硬件结果',
     whitepapers: '白皮书',
     historicalTrends: '历史趋势',
     tcoCalculator: 'TCO 计算器',
     fleetLifecycle: '集群生命周期',
+    firstTokenLimits: '首 token 延迟约束',
+    cacheReuse: '前缀缓存复用',
     gpuReliability: '芯片可靠性',
     gpuSpecsDashboard: '芯片规格仪表板',
     apiReference: 'API 文档',
@@ -86,25 +95,87 @@ const STRINGS = {
   },
 } as const;
 
-export const Footer = ({ starCount }: { starCount?: number | null }) => {
+const FOOTER_EVENT_PROPERTIES = { placement: 'footer' } as const;
+
+const LINK_CLASS =
+  'inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8';
+
+type FooterStringKey = keyof (typeof STRINGS)['en'];
+
+const SEMIANALYSIS_LINKS: readonly (readonly [string, string, FooterStringKey])[] = [
+  ['main-site', 'https://semianalysis.com', 'mainSite'],
+  ['newsletter', 'https://newsletter.semianalysis.com', 'newsletter'],
+  ['about', 'https://semianalysis.com/about/', 'about'],
+];
+
+const LEGAL_LINKS: readonly (readonly [string, string, FooterStringKey])[] = [
+  ['privacy', 'https://semianalysis.com/privacy-policy/', 'privacyPolicy'],
+  ['cookies', 'https://semianalysis.com/cookie-policy/', 'cookiePolicy'],
+];
+
+const CONTRIBUTE_LINKS: readonly (readonly [string, string, FooterStringKey])[] = [
+  ['benchmarks', 'https://github.com/SemiAnalysisAI/InferenceX', 'benchmarks'],
+  ['agentx-harness', 'https://github.com/SemiAnalysisAI/agentx-harness', 'agentxHarness'],
+  ['visualization', 'https://github.com/SemiAnalysisAI/InferenceX-app', 'visualization'],
+];
+
+const MORE_LINKS: readonly (readonly [string, string, FooterStringKey, string?])[] = [
+  ['supporters', '/quotes', 'supporters', 'footer_supporters_clicked'],
+  ['agentx', '/agentx', 'agentx', 'footer_agentx_clicked'],
+  ['telemetry', '/inference/agentic', 'telemetry', 'footer_telemetry_clicked'],
+  ['compare', '/compare', 'comparisons', 'footer_compare_clicked'],
+  ['articles', '/blog', 'articles', 'footer_articles_clicked'],
+  ['hardware', '/hardware', 'hardwareResults', 'footer_hardware_clicked'],
+  ['whitepapers', '/whitepaper', 'whitepapers', 'footer_whitepapers_clicked'],
+  ['api', '/api', 'apiReference', 'footer_api_clicked'],
+  ['historical', '/historical', 'historicalTrends', 'footer_historical_clicked'],
+  ['calculator', '/calculator', 'tcoCalculator', 'footer_calculator_clicked'],
+  ['fleet', '/fleet', 'fleetLifecycle', 'footer_fleet_clicked'],
+  ['first-token', '/first-token', 'firstTokenLimits', 'footer_first_token_clicked'],
+  ['cache-reuse', '/cache-reuse', 'cacheReuse', 'footer_cache_reuse_clicked'],
+  ['reliability', '/reliability', 'gpuReliability'],
+  ['gpu-specs', '/gpu-specs', 'gpuSpecsDashboard'],
+  ['compare-per-dollar', '/compare-per-dollar', 'perfPerDollar'],
+  ['model-architectures', '/model', 'modelArchitectures'],
+  ['glossary', '/glossary', 'glossary'],
+  ['chips', '/chips', 'chipSpecs'],
+  ['rankings', '/rankings', 'rankings'],
+  ['run', '/run', 'runPages'],
+];
+
+const externalLinks = (
+  links: readonly (readonly [string, string, FooterStringKey])[],
+  t: (typeof STRINGS)[keyof typeof STRINGS],
+) =>
+  links.map(([id, href, label]) => (
+    <a
+      key={id}
+      data-testid={`footer-link-${id}`}
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={LINK_CLASS}
+    >
+      {t[label]}
+    </a>
+  ));
+
+export const Footer = () => {
   const locale = useLocale();
   const pathname = usePathname();
   const t = STRINGS[locale];
-  // Internal links stay within the current language tree.
   const prefix = locale === 'zh' ? '/zh' : '';
-  // Embeds render one chart inside a third-party iframe; no site chrome.
   if (isEmbedPathname(pathname)) return null;
   return (
     <footer
       data-testid="footer"
+      {...analyticsPlacement('footer')}
       className="relative mt-auto w-full overflow-visible pt-16 md:pt-20"
     >
       <div className="container mx-auto border-t border-border/50 px-4 py-10 lg:px-8">
-        {/* Main grid */}
         <div className="mb-8 grid gap-8 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-x-10">
-          {/* Left — Brand */}
           <div data-testid="footer-brand" className="flex min-w-0 flex-col items-start gap-3">
-            <Link
+            <IntentPrefetchLink
               data-testid="footer-brand-link"
               target="_blank"
               href="https://semianalysis.com/"
@@ -117,7 +188,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 alt="SemiAnalysis logo"
                 className="h-auto"
               />
-            </Link>
+            </IntentPrefetchLink>
             <p
               data-testid="footer-brand-description"
               className="max-w-prose text-sm leading-relaxed text-muted-foreground lg:max-w-xs"
@@ -126,248 +197,57 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
             </p>
           </div>
 
-          {/* Center — Links */}
           <div
             data-testid="footer-links"
             className="grid min-w-0 grid-cols-2 gap-x-6 gap-y-6 break-words sm:grid-cols-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,2fr)]"
           >
             <div data-testid="footer-links-semianalysis" className="flex min-w-0 flex-col gap-1">
               <h2 className="mb-1 text-sm font-semibold text-foreground">{t.semianalysis}</h2>
-              <a
-                data-testid="footer-link-main-site"
-                href="https://semianalysis.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-              >
-                {t.mainSite}
-              </a>
-              <a
-                data-testid="footer-link-newsletter"
-                href="https://newsletter.semianalysis.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-              >
-                {t.newsletter}
-              </a>
-              <a
-                data-testid="footer-link-about"
-                href="https://semianalysis.com/about/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-              >
-                {t.about}
-              </a>
+              {externalLinks(SEMIANALYSIS_LINKS, t)}
             </div>
             <div data-testid="footer-links-legal" className="flex min-w-0 flex-col gap-1">
               <h2 className="mb-1 text-sm font-semibold text-foreground">{t.legal}</h2>
-              <Link
+              <IntentPrefetchLink
                 data-testid="footer-link-land-acknowledgement"
                 href={`${prefix}/land-acknowledgement`}
-                className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
+                className={LINK_CLASS}
               >
                 {t.landAcknowledgement}
-              </Link>
-              <a
-                data-testid="footer-link-privacy"
-                href="https://semianalysis.com/privacy-policy/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-              >
-                {t.privacyPolicy}
-              </a>
-              <a
-                data-testid="footer-link-cookies"
-                href="https://semianalysis.com/cookie-policy/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-              >
-                {t.cookiePolicy}
-              </a>
+              </IntentPrefetchLink>
+              {externalLinks(LEGAL_LINKS, t)}
             </div>
             <div data-testid="footer-links-contribute" className="flex min-w-0 flex-col gap-1">
               <h2 className="mb-1 text-sm font-semibold text-foreground">{t.contribute}</h2>
-              <a
-                data-testid="footer-link-benchmarks"
-                href="https://github.com/SemiAnalysisAI/InferenceX"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-              >
-                {t.benchmarks}
-              </a>
-              <a
-                data-testid="footer-link-agentx-harness"
-                href="https://github.com/SemiAnalysisAI/agentx-harness"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-              >
-                {t.agentxHarness}
-              </a>
-              <a
-                data-testid="footer-link-visualization"
-                href="https://github.com/SemiAnalysisAI/InferenceX-app"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-              >
-                {t.visualization}
-              </a>
+              {externalLinks(CONTRIBUTE_LINKS, t)}
             </div>
-            {/* "More" holds many links, so it gets a double-width column with
-                the links flowing in two sub-columns. This keeps every group on
-                one balanced row instead of wrapping below the others. */}
             <div
               data-testid="footer-links-more"
               className="col-span-full xl:col-span-1 flex min-w-0 flex-col gap-1"
             >
               <h2 className="mb-1 text-sm font-semibold text-foreground">{t.more}</h2>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-                <Link
-                  data-testid="footer-link-supporters"
-                  href={`${prefix}/quotes`}
-                  onClick={() => track('footer_supporters_clicked')}
-                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-                >
-                  {t.supporters}
-                </Link>
-                <Link
-                  data-testid="footer-link-agentx"
-                  href={`${prefix}/agentx`}
-                  onClick={() => track('footer_agentx_clicked')}
-                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-                >
-                  {t.agentx}
-                </Link>
-                <Link
-                  data-testid="footer-link-telemetry"
-                  href={`${prefix}/inference/agentic`}
-                  onClick={() => track('footer_telemetry_clicked')}
-                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-                >
-                  {t.telemetry}
-                </Link>
-                <Link
-                  data-testid="footer-link-articles"
-                  href={`${prefix}/blog`}
-                  onClick={() => track('footer_articles_clicked')}
-                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-                >
-                  {t.articles}
-                </Link>
-                <Link
-                  data-testid="footer-link-whitepapers"
-                  href={`${prefix}/whitepaper`}
-                  onClick={() => track('footer_whitepapers_clicked')}
-                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-                >
-                  {t.whitepapers}
-                </Link>
-                <Link
-                  data-testid="footer-link-api"
-                  href={`${prefix}/api`}
-                  onClick={() => track('footer_api_clicked')}
-                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-                >
-                  {t.apiReference}
-                </Link>
-                <Link
-                  data-testid="footer-link-historical"
-                  href={`${prefix}/historical`}
-                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-                  onClick={() => track('footer_historical_clicked')}
-                >
-                  {t.historicalTrends}
-                </Link>
-                <Link
-                  data-testid="footer-link-calculator"
-                  href={`${prefix}/calculator`}
-                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-                  onClick={() => track('footer_calculator_clicked')}
-                >
-                  {t.tcoCalculator}
-                </Link>
-                <Link
-                  data-testid="footer-link-fleet"
-                  href={`${prefix}/fleet`}
-                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-                  onClick={() => track('footer_fleet_clicked')}
-                >
-                  {t.fleetLifecycle}
-                </Link>
-                <Link
-                  data-testid="footer-link-reliability"
-                  href={`${prefix}/reliability`}
-                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-                >
-                  {t.gpuReliability}
-                </Link>
-                <Link
-                  data-testid="footer-link-gpu-specs"
-                  href={`${prefix}/gpu-specs`}
-                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-                >
-                  {t.gpuSpecsDashboard}
-                </Link>
-                <Link
-                  data-testid="footer-link-compare-per-dollar"
-                  href={`${prefix}/compare-per-dollar`}
-                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-                >
-                  {t.perfPerDollar}
-                </Link>
-                <Link
-                  data-testid="footer-link-model-architectures"
-                  href={`${prefix}/model`}
-                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-                >
-                  {t.modelArchitectures}
-                </Link>
-                <Link
-                  data-testid="footer-link-glossary"
-                  href={`${prefix}/glossary`}
-                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-                >
-                  {t.glossary}
-                </Link>
-                <Link
-                  data-testid="footer-link-chips"
-                  href={`${prefix}/chips`}
-                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-                >
-                  {t.chipSpecs}
-                </Link>
-                <Link
-                  data-testid="footer-link-rankings"
-                  href={`${prefix}/rankings`}
-                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-                >
-                  {t.rankings}
-                </Link>
-                <Link
-                  data-testid="footer-link-run"
-                  href={`${prefix}/run`}
-                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
-                >
-                  {t.runPages}
-                </Link>
+                {MORE_LINKS.map(([id, path, label, event]) => (
+                  <IntentPrefetchLink
+                    key={id}
+                    data-testid={`footer-link-${id}`}
+                    href={`${prefix}${path}`}
+                    onClick={event ? () => track(event, FOOTER_EVENT_PROPERTIES) : undefined}
+                    className={LINK_CLASS}
+                  >
+                    {t[label]}
+                  </IntentPrefetchLink>
+                ))}
               </div>
             </div>
           </div>
 
-          {/* Right — CTA + Social */}
           <div
             data-testid="footer-cta"
             className="flex min-w-0 flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between lg:col-span-2"
           >
             <div data-testid="footer-social-buttons" className="flex items-center gap-1.5">
               <div className="rounded-md bg-background/80 w-fit">
-                <StarButton starCount={starCount} />
+                <StarButton />
               </div>
               <div className="rounded-md bg-background/80 w-fit">
                 <ShareTwitterButton />
@@ -382,7 +262,6 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
           </div>
         </div>
 
-        {/* Bottom bar */}
         <div
           data-testid="footer-bottom-bar"
           className="border-t border-border/40 pt-6 flex flex-col md:flex-row items-center justify-between gap-4"

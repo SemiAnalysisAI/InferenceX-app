@@ -11,26 +11,26 @@ import {
   useState,
 } from 'react';
 
+import { track } from '@/lib/analytics/analytics';
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
-import { track } from '@/lib/analytics';
 
 import {
   useGlobalFilterActions,
   useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
-} from '@/components/GlobalFilterContext';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
+} from '@/providers/GlobalFilterContext';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
+import { useEvaluations } from '@/hooks/api/use-evaluations';
 import {
   resolveAvailableSelection,
-  useChartUIState,
   useChartToggleSet,
+  useChartUIState,
   useUrlStateSync,
 } from '@/hooks/useChartContext';
-import { useEvaluations } from '@/hooks/api/use-evaluations';
 import { useUrlState } from '@/hooks/useUrlState';
-import type { Model } from '@/lib/data-mappings';
-import type { EvalRow } from '@/lib/api';
+import type { EvalRow } from '@/lib/api/api';
+import type { Model } from '@/lib/catalog/data-mappings';
 
 import {
   aggregateEvaluationChartRows,
@@ -39,24 +39,10 @@ import {
 } from './chart-data';
 import type { EvalChangelogEntry, EvaluationChartContextType, EvaluationChartData } from './types';
 
-/** @internal Exported for test provider wrapping only. */
 export const EvaluationContext = createContext<EvaluationChartContextType | undefined>(undefined);
 
-export function resolveEvaluationDate(
-  requestedDate: string,
-  availableDates: readonly string[],
-): string {
-  if (availableDates.length === 0) return requestedDate;
-  if (!requestedDate) return availableDates.at(-1)!;
-  if (availableDates.includes(requestedDate)) return requestedDate;
-
-  const target = new Date(requestedDate).getTime();
-  return availableDates.reduce((closest, date) => {
-    const closestDifference = Math.abs(new Date(closest).getTime() - target);
-    const difference = Math.abs(new Date(date).getTime() - target);
-    return difference < closestDifference ? date : closest;
-  }, availableDates[0]);
-}
+import { resolveEvaluationDate } from './date-resolution';
+export { resolveEvaluationDate } from './date-resolution';
 
 export function retryFailedEvaluationQueries({
   availabilityFailed,
@@ -138,8 +124,6 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     remove: removeHwRaw,
   } = useChartToggleSet();
 
-  // Pending legend-active selection restored from `e_active` URL param.
-  // Consumed once when hardware availability settles.
   const [pendingActiveHardware, setPendingActiveHardware] = useState<Set<string> | null>(() => {
     const value = getUrlParam('e_active');
     if (!value) return null;
@@ -309,7 +293,6 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     [setSelectedModel],
   );
 
-  // ── Debounced hardware selection tracking ────────────────────────────────
   const evalTrackMounted = useRef(false);
   useEffect(() => {
     if (!evalTrackMounted.current) {
@@ -329,7 +312,6 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [enabledHardware]);
 
-  // Serialize the legend-active set, omitting when it equals all hwTypesWithData.
   const eActiveStr = useMemo(() => {
     if (enabledHardware.size === 0) return '';
     if (enabledHardware.size === hwTypesWithData.size) {

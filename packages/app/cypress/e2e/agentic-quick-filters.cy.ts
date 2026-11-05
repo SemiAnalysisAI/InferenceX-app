@@ -1,4 +1,5 @@
-import { unlockAgenticGate } from '../support/e2e';
+import { availabilityBody, unlockAgenticGate } from '../support/e2e';
+import { expectHwKeyPoints } from '../support/scatter-points';
 
 const MODEL = 'dsv4';
 const DATE = '2026-06-12';
@@ -91,7 +92,9 @@ const benchmarks = configs.flatMap((config) =>
 );
 
 function visitAgenticQuickFilters() {
-  cy.intercept('GET', '/api/v1/availability', { body: availability }).as('availability');
+  cy.intercept('GET', '/api/v1/availability/compact', { body: availabilityBody(availability) }).as(
+    'availability',
+  );
   cy.intercept('GET', '/api/v1/benchmarks*', { body: benchmarks }).as('benchmarks');
   cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&i_spec=mtp', {
     onBeforeLoad(win) {
@@ -107,9 +110,8 @@ describe('Agentic Quick Filters', () => {
   it('opens from the legend, omits spec decoding, and filters the rendered agentic points', () => {
     visitAgenticQuickFilters();
 
-    // A stale speculative-decoding URL selection is ignored for agentic data.
-    cy.get('.dot-group[data-hw-key^="b200"]').should('exist');
-    cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
+    expectHwKeyPoints('b200', true);
+    expectHwKeyPoints('mi300x', true);
     cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
     cy.get('[data-testid="scatter-quick-filters"]').should('contain.text', 'Quick Filters').click();
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
@@ -119,33 +121,26 @@ describe('Agentic Quick Filters', () => {
     cy.contains('Spec Decoding').should('not.exist');
 
     cy.get('[data-testid="quick-filter-vendor-AMD"]').click();
-    cy.get('.dot-group[data-hw-key^="b200"]').should('not.exist');
-    cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
+    expectHwKeyPoints('b200', false);
+    expectHwKeyPoints('mi300x', true);
     cy.get('[data-testid="quick-filters-selected-count"]').should('contain.text', '1 selected');
 
-    // An incompatible cross-group selection produces zero points. The dialog
-    // must stay mounted so the reader can recover without reloading the page.
     cy.get('[data-testid="quick-filter-framework-vllm"]').click();
     cy.get('[data-testid="scatter-empty-quick-filters"]').should('exist');
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
 
     cy.contains('button', 'Clear filters').click();
-    cy.get('.dot-group[data-hw-key^="b200"]').should('exist');
-    cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
+    expectHwKeyPoints('b200', true);
+    expectHwKeyPoints('mi300x', true);
     cy.get('[data-testid="quick-filters-selected-count"]').should('not.exist');
-  });
 
-  it('clears Quick Filters from the legend reset action', () => {
-    visitAgenticQuickFilters();
-
-    cy.get('[data-testid="scatter-quick-filters"]').click();
     cy.get('[data-testid="quick-filter-vendor-AMD"]').click();
     cy.get('[data-testid="quick-filters-dialog"]').contains('button', 'Done').click();
 
-    cy.get('.dot-group[data-hw-key^="b200"]').should('not.exist');
+    expectHwKeyPoints('b200', false);
     cy.get('[data-testid="scatter-reset-filter"]').click();
-    cy.get('.dot-group[data-hw-key^="b200"]').should('exist');
-    cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
+    expectHwKeyPoints('b200', true);
+    expectHwKeyPoints('mi300x', true);
 
     cy.get('[data-testid="scatter-quick-filters"]').click();
     cy.get('[data-testid="quick-filter-vendor-AMD"]').should('have.attr', 'aria-pressed', 'false');

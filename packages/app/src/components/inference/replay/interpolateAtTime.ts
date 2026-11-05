@@ -4,8 +4,6 @@ export interface PerStepValue {
   y: number;
 }
 
-// invisible→visible pops in at destination so new dots land on the frontier
-// instead of dragging across from (0,0).
 export function interpolateAtStep(
   stepValues: readonly PerStepValue[],
   idxFloat: number,

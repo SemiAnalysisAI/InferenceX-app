@@ -1,11 +1,15 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { getDb } from '@semianalysisai/inferencex-db/connection';
-import { searchServerLogs } from '@semianalysisai/inferencex-db/queries/server-logs';
+import {
+  searchServerLogs,
+  ServerLogSearchTimeoutError,
+} from '@semianalysisai/inferencex-db/queries/server-logs';
 
-import { cachedJson } from '@/lib/api-cache';
+import { cachedJson } from '@/lib/cache/api-cache';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 const DEFAULT_RESULT_LIMIT = 50;
 const MAX_RESULT_LIMIT = 100;
@@ -38,8 +42,18 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    return cachedJson({ id, query, ...(await searchServerLogs(getDb(), id, query, limit)) });
+    return cachedJson(request, {
+      id,
+      query,
+      ...(await searchServerLogs(getDb(), id, query, limit)),
+    });
   } catch (error) {
+    if (error instanceof ServerLogSearchTimeoutError) {
+      return NextResponse.json(
+        { error: 'Search timed out. Try a more specific term.' },
+        { status: 504, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
     console.error('Error searching server logs:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

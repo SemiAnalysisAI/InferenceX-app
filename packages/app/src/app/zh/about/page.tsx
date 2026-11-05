@@ -6,8 +6,9 @@ import { FAQ_ITEMS_ZH } from '@/components/about/faq-data-zh';
 import { AgentXFaq } from '@/components/about/agentx-faq';
 import { buildFaqJsonLd, FaqList } from '@/components/about/faq';
 import { PromoVideo } from '@/components/about/promo-video';
-import { JsonLd } from '@/components/json-ld';
-import { zhAlternates, ZH_OG_LOCALE, ZH_LANG_TAG } from '@/lib/i18n';
+import { JsonLd } from '@/components/seo/json-ld';
+import { zhAlternates, ZH_LANG_TAG } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 import { GITHUB_OWNER, GITHUB_REPO, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const faqJsonLd = buildFaqJsonLd(FAQ_ITEMS_ZH, ZH_LANG_TAG);
@@ -19,16 +20,12 @@ export const metadata: Metadata = {
   title: '关于',
   description: ABOUT_DESCRIPTION,
   alternates: zhAlternates('/about'),
-  openGraph: {
+  ...socialMetadata({
     title: '关于 | InferenceX',
     description: ABOUT_DESCRIPTION,
     url: `${SITE_URL}/zh/about`,
-    locale: ZH_OG_LOCALE,
-  },
-  twitter: {
-    title: '关于 | InferenceX',
-    description: ABOUT_DESCRIPTION,
-  },
+    locale: 'zh',
+  }),
 };
 
 export default function AboutPageZh() {
@@ -42,9 +39,9 @@ export default function AboutPageZh() {
 
         <section>
           <Card>
-            <h2 className="text-lg font-semibold mb-2">
+            <h1 className="text-lg font-semibold mb-2">
               持续运行的开源智能体推理基准测试，受到万亿美元级、吉瓦规模 Token 工厂运营方的信赖
-            </h2>
+            </h1>
             <p className="text-muted-foreground mb-2">
               全球迈向 AGI
               的进程呈指数级加速，软件开发和模型发布也日新月异。静态基准测试很快就会过时；参与者提交的软件镜像往往是为基准测试专门构建的，无法反映真实应用场景中的性能。
@@ -113,9 +110,7 @@ export default function AboutPageZh() {
                 </span>
                 <div>
                   <strong className="text-foreground">上传产物。</strong> 请求延迟、token 计数、芯片
-                  功耗遥测数据和评估样本均附加到运行页面。GitHub Actions 保留这些产物 90
-                  天，同时每周发布完整基准测试数据库的快照作为公开的 GitHub
-                  Release，以实现更长期的可审计性。
+                  功耗遥测数据和评估样本均附加到运行页面。GitHub Actions 保留这些产物 90 天。
                 </div>
               </li>
               <li className="flex gap-3">
@@ -145,14 +140,6 @@ export default function AboutPageZh() {
                 className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
               >
                 查看测试配置
-              </Link>
-              <Link
-                href="https://github.com/SemiAnalysisAI/InferenceX-app/releases?q=db-dump"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
-              >
-                每周数据库快照
               </Link>
               <Link
                 href={`https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`}

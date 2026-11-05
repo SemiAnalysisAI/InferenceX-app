@@ -24,17 +24,12 @@ function stubBox(element: Element, left: number, top: number, width: number, hei
     }) as DOMRect;
 }
 
-/**
- * The skeleton `setupChart` builds: a root group translated by the margins,
- * and a clip rect sized to the plot area inside them.
- */
 const CLIP_ID = 'clip-scatter-graph';
 
 function renderChartSvg({
   box = { left: 100, top: 200, width: 800, height: 600 },
   transform = 'translate(60,24)' as string | null,
   clip = { width: 730, height: 516 } as { width: number; height: number } | null,
-  /** A same-SVG clipPath belonging to something else (overflow continuations). */
   decoyClip = false,
 } = {}): Element {
   const svg = svgEl('svg');
@@ -114,7 +109,6 @@ describe('plotClipSize', () => {
 
 describe('plotBounds', () => {
   it('insets the SVG box by the chart margins', () => {
-    // 60px left / 24px top margins are the inference scatter's axis gutters.
     const svg = renderChartSvg();
 
     expect(plotBounds(svg)).toEqual({
@@ -142,15 +136,11 @@ describe('plotBounds', () => {
   });
 
   it("resolves the chart's own clipPath, not whichever one comes first", () => {
-    // The overflow-continuation layer defines a clipPath per group, so
-    // "the first clipPath in the SVG" is not a safe assumption.
     const svg = renderChartSvg({ decoyClip: true });
     expect(plotBounds(svg)).toEqual({ left: 160, top: 224, right: 890, bottom: 740 });
   });
 
   it('returns null when the chart clips nothing', () => {
-    // clipContent: false — no clip-path on the zoom group, so nothing is
-    // painted away and the caller should fall back to the SVG box.
     expect(plotBounds(renderChartSvg({ clip: null }))).toBeNull();
   });
 

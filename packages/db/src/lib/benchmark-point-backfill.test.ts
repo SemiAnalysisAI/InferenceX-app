@@ -9,7 +9,6 @@ const backfills = BENCHMARK_POINT_BACKFILLS.filter(
 
 describe('benchmark point backfill recovery', () => {
   it.each(backfills)('extends the previously applied c$conc offload patch', (backfill) => {
-    // State written before #975 added the cache-hit fields to this ledger entry.
     const row = {
       offload_mode: 'on',
       metrics: {
@@ -22,7 +21,6 @@ describe('benchmark point backfill recovery', () => {
       },
     };
     const original = structuredClone(row);
-    // Reproduces the failure without the explicitly registered previous version.
     expect(() => planBenchmarkPointBackfill(row, { ...backfill, previousSet: undefined })).toThrow(
       'desired identity has unexpected data',
     );
@@ -124,5 +122,17 @@ describe('benchmark point backfill recovery', () => {
         recipeBackfill,
       ),
     ).toBeNull();
+  });
+
+  it('moves a point still on the mtp config and treats the none config as applied', () => {
+    const relabel = BENCHMARK_POINT_BACKFILLS.find((b) => b.set.specMethod === 'none')!;
+    const metrics = { output_tput_per_gpu: 42 };
+    const row = {
+      offload_mode: relabel.offloadMode,
+      recipe_fingerprint: relabel.recipeFingerprint,
+      metrics,
+    };
+    expect(planBenchmarkPointBackfill({ ...row, spec_method: 'mtp' }, relabel)).toEqual(metrics);
+    expect(planBenchmarkPointBackfill({ ...row, spec_method: 'none' }, relabel)).toBeNull();
   });
 });

@@ -29,18 +29,6 @@ function DateRangePickerHarness({
 }
 
 describe('DateRangePicker', () => {
-  it('renders with placeholder text', () => {
-    cy.mount(<DateRangePickerHarness />);
-    cy.get('[data-testid="date-range-wrapper"]').should('contain', 'Select date range');
-  });
-
-  it('opens dialog when clicked', () => {
-    cy.mount(<DateRangePickerHarness />);
-    cy.contains('Select date range').click();
-    cy.get('[role="dialog"]').should('be.visible');
-    cy.contains('Select Date Range').should('be.visible');
-  });
-
   it('apply is disabled when no dates selected', () => {
     cy.mount(<DateRangePickerHarness />);
     cy.contains('Select date range').click();

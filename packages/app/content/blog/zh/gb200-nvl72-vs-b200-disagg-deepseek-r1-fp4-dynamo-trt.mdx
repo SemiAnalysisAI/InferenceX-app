@@ -104,7 +104,7 @@ DeepSeek R1 0528 是 DeepSeek 于 2025 年 5 月发布的 671B 参数 MoE 模型
 | 275                 | 103                   | 126            | 0.82x              |
 | 300                 | _不可达_              | 67             | _∞_（B200 胜出）   |
 
-以及同一对比按每百万 token 成本归一化的结果，GB200 NVL72 每 GPU 小时 TCO 高 13%（$2.21 vs $1.95）削弱了其吞吐量优势：
+下面将同一对比按每百万 token 成本归一化：GB200 NVL72 每 GPU 小时 TCO 高 13%（$2.21 vs $1.95），这在一定程度上抵消了其吞吐量优势：
 
 | 交互性 (tok/s/user) | GB200 NVL72 $/M tok | B200 $/M tok | B200 / GB200 NVL72 |
 | ------------------- | ------------------- | ------------ | ------------------ |
@@ -170,7 +170,7 @@ NVIDIA 的 [SGLang GB200 NVL72 结果](https://lmsys.org/blog/2025-09-25-gb200-p
       "name": "GB200 NVL72 在此对比中每百万 token 成本也低于 B200 吗？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "在 75–175 tok/s/user 区间内是的，在两端基本持平。GB200 NVL72 每 GPU 小时 TCO 高约 13%（$2.21 vs $1.95，数据来源 SemiAnalysis AI Cloud TCO 模型），这在成本维度上削弱了吞吐量优势。在峰值吞吐量端（25 至 60 tok/s/user）成本基本持平：GB200 NVL72 便宜 1.01 至 1.06 倍。在 125 tok/s/user 时成本差距为 3.87 倍（B200 每百万 token $0.58，GB200 NVL72 $0.15）。在 225 tok/s/user 以上成本差距反转：B200 在 225 tok/s/user 时便宜 5%，在 250 tok/s/user 时便宜 15%，在 275 tok/s/user 时便宜 27%。"
+        "text": "在 75–175 tok/s/user 区间内是的，在两端基本持平。GB200 NVL72 每 GPU 小时 TCO 高约 13%（$2.21 vs $1.95，数据来源 SemiAnalysis AI Cloud TCO 模型），这在成本维度上削弱了吞吐量优势。在峰值吞吐量端（25 至 60 tok/s/user）成本基本持平：B200 的成本是 GB200 NVL72 的 1.01 至 1.06 倍。在 125 tok/s/user 时成本差距为 3.87 倍（B200 每百万 token $0.58，GB200 NVL72 $0.15）。在 225 tok/s/user 以上成本差距反转：B200 在 225 tok/s/user 时便宜 5%，在 250 tok/s/user 时便宜 15%，在 275 tok/s/user 时便宜 27%。"
       }
     },
     {

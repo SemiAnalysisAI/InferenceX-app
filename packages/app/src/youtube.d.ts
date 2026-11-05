@@ -1,5 +1,3 @@
-/** Minimal YouTube IFrame API types for the minecraft music player. */
-
 interface Window {
   onYouTubeIframeAPIReady?: (() => void) | undefined;
 }

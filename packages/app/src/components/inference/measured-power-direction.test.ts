@@ -7,22 +7,7 @@ import {
   isFrontierEligible,
   paretoFrontForDirection,
   type ParetoDirection,
-} from '@/lib/chart-utils';
-
-/**
- * Regression coverage for the Pareto direction of the measured-power axes.
- *
- * These three axes shipped without a `_roofline` entry. Consequences of the
- * missing value, all reproduced below:
- *   - InferenceTable fell through to the descending branch, so the table led
- *     with the *most* power-hungry configuration (the reported bug);
- *   - ScatterGraph's `dir ?? 'lower_right'` fallback drew the e2e-latency
- *     chart's frontier from the wrong corner, since that block plots
- *     lower-x-is-better and needs `lower_left`.
- *
- * The assertions therefore run the real chart config through the production
- * frontier and sort helpers rather than restating the JSON.
- */
+} from '@/lib/charts/chart-utils';
 
 const MEASURED_POWER_METRICS = [
   'y_measuredAvgPower',
@@ -49,16 +34,6 @@ function declaredDirection(chartDef: ChartDefinition, metric: string): ParetoDir
   return chartDef[`${metric}_roofline` as keyof ChartDefinition] as ParetoDirection | undefined;
 }
 
-/**
- * One B200 config swept at five concurrencies. `x` is interactivity on the
- * interactivity block and e2e latency on the e2e block; `y` is chip watts.
- * Power dips at conc 32, so the two corners select disjoint pairs apart from
- * that shared minimum:
- *   lower_right (max x, min watts) → conc 1 and conc 32
- *   lower_left  (min x, min watts) → conc 256 and conc 32
- * Both corners exclude conc 8 and conc 64, which are dominated — those are the
- * rows "Optimal Only" must hide.
- */
 const SWEEP: { conc: number; x: number; watts: number }[] = [
   { conc: 1, x: 50, watts: 800 },
   { conc: 8, x: 40, watts: 1400 },
@@ -84,7 +59,6 @@ function sweepPoints(metricField: string): InferenceData[] {
   );
 }
 
-/** Concurrencies on the frontier, in the order the production pareto fn emits. */
 function frontierConcs(chartDef: ChartDefinition, metric: string): number[] {
   const direction = declaredDirection(chartDef, metric);
   expect(
@@ -100,21 +74,14 @@ function frontierConcs(chartDef: ChartDefinition, metric: string): number[] {
 describe('measured-power Pareto direction', () => {
   describe.each(MEASURED_POWER_METRICS)('%s', (metric) => {
     it('picks the lower-RIGHT frontier on the interactivity chart', () => {
-      // Interactivity is higher-is-better, watts lower-is-better: the optimal
-      // configs are the fast ones that also draw the least power.
       expect(frontierConcs(interactivityDef, metric)).toEqual([1, 32]);
     });
 
     it('picks the lower-LEFT frontier on the e2e-latency chart', () => {
-      // The e2e block plots latency, where lower is also better, so the corner
-      // mirrors. The `?? 'lower_right'` fallback in ScatterGraph would pick
-      // [1, 32] here — the exact inversion this direction exists to prevent.
       expect(frontierConcs(e2eDef, metric)).toEqual([256, 32]);
     });
 
     it('excludes dominated configs from the Optimal Only set', () => {
-      // "Optimal Only" renders exactly the frontier members, so the dominated
-      // conc 8 / conc 64 points must not appear on either chart.
       for (const chartDef of [interactivityDef, e2eDef]) {
         const concs = frontierConcs(chartDef, metric);
         expect(concs).toHaveLength(2);
@@ -124,8 +91,6 @@ describe('measured-power Pareto direction', () => {
     });
 
     it('sorts the table ascending — lowest watts first', () => {
-      // The reported bug: with no declared direction the table sorted
-      // descending and led with the 1400 W row.
       const metricField = (interactivityDef[metric as keyof ChartDefinition] as string).replace(
         /\.y$/u,
         '',
@@ -136,8 +101,6 @@ describe('measured-power Pareto direction', () => {
   });
 
   it('keeps the measured-power axes pointing at a lower-is-better corner', () => {
-    // A direction that is not a `lower_*` corner would flip the table back to
-    // descending even though the frontier assertions above still passed.
     for (const chartDef of [interactivityDef, e2eDef]) {
       for (const metric of MEASURED_POWER_METRICS) {
         expect(declaredDirection(chartDef, metric)).toMatch(/^lower_/u);
@@ -166,8 +129,6 @@ describe('measured-power Pareto direction', () => {
   });
 
   it('keeps %TDP bilingual while using the same per-hardware frontier as watts', () => {
-    // A fixed hardware TDP rescales watts without changing dominance within
-    // that hardware series. The shared sweep tests above exercise both axes.
     for (const chartDef of [interactivityDef, e2eDef]) {
       expect(chartDef.y_measuredPowerPercentTdp).toMatch(/\.y$/u);
       expect(chartDef['y_measuredPowerPercentTdp_label']).toBeTruthy();

@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { cachedJson } from '@/lib/api-cache';
+import { cachedJson } from '@/lib/cache/api-cache';
 import {
   resolveOverviewComparisonMode,
   resolveOverviewEngineScope,
@@ -9,8 +9,8 @@ import {
   resolveOverviewReferenceHardware,
   resolveOverviewRowScope,
   resolveOverviewTier,
-} from '@/lib/overview-data';
-import { getOverviewPageData } from '@/lib/overview-data.server';
+} from '@/lib/overview/overview-data';
+import { getOverviewPageData } from '@/lib/overview/overview-data.server';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       resolveOverviewRowScope(params.get('rows') ?? undefined),
       resolveOverviewHardwareRowScope(params.get('hwrows') ?? undefined),
     );
-    return cachedJson(data);
+    return cachedJson(request, data);
   } catch (error) {
     console.error('Error fetching overview:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

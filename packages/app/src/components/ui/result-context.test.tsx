@@ -27,6 +27,37 @@ function renderContext(locale: 'en' | 'zh') {
 }
 
 describe('ResultContext', () => {
+  it.each([
+    ['en', 'SemiAnalysis InferenceX™', 'Source: SemiAnalysis InferenceX™ (Deprecated)'],
+    ['zh', 'SemiAnalysis InferenceX™', '来源: SemiAnalysis InferenceX™ (已弃用)'],
+    [
+      'en',
+      'SemiAnalysis InferenceX™ + UNOFFICIAL overlays',
+      'Source: SemiAnalysis InferenceX™ + UNOFFICIAL overlays (Deprecated)',
+    ],
+    [
+      'zh',
+      'SemiAnalysis InferenceX™ + 非官方 overlays',
+      '来源: SemiAnalysis InferenceX™ + 非官方 overlays (已弃用)',
+    ],
+  ] as const)('appends the deprecated status to the %s source %s', (locale, source, expected) => {
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    act(() => root.render(<ResultContext locale={locale} source={source} deprecated />));
+    expect(container.textContent).toBe(expected);
+    act(() => root.render(<ResultContext locale={locale} source={source} deprecated={false} />));
+    expect(container.textContent).toBe(`${locale === 'zh' ? '来源' : 'Source'}: ${source}`);
+    act(() => root.unmount());
+  });
+
+  it('does not render an orphan deprecated label without a source', () => {
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    act(() => root.render(<ResultContext locale="en" deprecated />));
+    expect(container.textContent).toBe('');
+    act(() => root.unmount());
+  });
+
   it('renders all effective result inputs in English', () => {
     const context = renderContext('en');
     expect(context.querySelector('[data-testid="result-context"]')?.textContent).toContain(
@@ -122,7 +153,6 @@ describe('ResultContext', () => {
         />,
       );
     });
-    // The caption term becomes the label for the editor's input.
     expect(container.querySelector('label[for="util"]')?.textContent).toBe('Utilization:');
     expect(container.querySelector('label[for="fee"]')?.textContent).toBe(
       'Model License Fee Assumption:',
@@ -130,7 +160,6 @@ describe('ResultContext', () => {
     const util = container.querySelector('[data-testid="result-context-utilization"]');
     expect(util?.querySelector('.no-export [data-testid="util-control"]')).not.toBeNull();
     expect(util?.querySelector('.export-only')?.textContent).toBe('60%');
-    // textContent reads as the plain caption, so exports and text assertions match.
     expect(util?.textContent).toBe('60%');
     const fee = container.querySelector('[data-testid="result-context-license-fee"]');
     expect(fee?.querySelector('.no-export [data-testid="fee-control"]')).not.toBeNull();
@@ -142,10 +171,10 @@ describe('ResultContext', () => {
     const container = document.createElement('div');
     act(() => {
       createRoot(container).render(
-        <ResultContext locale="zh" costTier="自有（超大规模云大批量）" date="2026-09-01" />,
+        <ResultContext locale="zh" costTier="自有 · 超大规模云厂商批量采购" date="2026-09-01" />,
       );
     });
-    expect(container.textContent).toContain('成本层级: 自有（超大规模云大批量）');
+    expect(container.textContent).toContain('成本层级: 自有 · 超大规模云厂商批量采购');
     expect(container.textContent).not.toContain('模型:');
   });
 

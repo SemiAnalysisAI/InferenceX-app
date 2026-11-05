@@ -30,7 +30,7 @@ tags:
 
 ## 没有人在使用上下文并行
 
-尽管 p90 输入序列长度达到 317k token，目前仍没有任何提交使用[上下文并行](/zh/glossary/context-parallelism)。这恰恰是该技术存在的意义所在，因此这种缺席需要解释。
+尽管 p90 输入序列长度达到 317k token，目前仍没有任何提交使用[上下文并行](/zh/glossary/context-parallelism)。这恰恰是该技术所针对的场景，因此这种缺席需要解释。
 
 M3 只有 4 个 KV head，即使在 TP8 下 DCP 也最多只能到 2；而且 MSA indexer 还需要单独的上下文并行处理，相关 vLLM PR 已经提交。因此这个上限是架构层面的，而不是调优疏忽，它也限定了长上下文并行策略在这个模型上能带来多少收益。
 
@@ -38,7 +38,7 @@ M3 只有 4 个 KV head，即使在 TP8 下 DCP 也最多只能到 2；而且 MS
 
 NVIDIA 所有 Pareto 最优点在并发 20 以上都启用了 [KV offload](/zh/glossary/kv-cache-offload)。而 AMD 的 Pareto 最优点没有一个使用 DRAM KV offload；在其他模型上，AMD 使用 offload 的比例也低于 NVIDIA。
 
-原因很机械：AMD vLLM 上 CPU KV cache offload 所需的 GPU 到 CPU 传输效率极低，因为 hipMemcpyBatchAsync API 直到 ROCm 7.14 才提供。没有它，vLLM 原生的 simple CPU offloading 只能做串行 memcpy，而无法把多次拷贝合并成更大的消息。
+原因在于实现机制：AMD vLLM 上 CPU KV cache offload 所需的 GPU 到 CPU 传输效率极低，因为 hipMemcpyBatchAsync API 直到 ROCm 7.14 才提供。没有它，vLLM 原生的 simple CPU offloading 只能做串行 memcpy，而无法把多次拷贝合并成更大的消息。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/2b40624a-223c-44db-a403-0be563b2af82_2048x1298.png"

@@ -13,7 +13,7 @@ tags:
 
 LLM 推理性能取决于两大支柱：硬件和软件。硬件创新通过每年发布新型 GPU/XPU 和新系统来驱动性能的阶跃式提升，而软件则每天都在演进，在这些硬件跃升之上持续带来性能增益。
 
-SGLang、vLLM、TensorRT-LLM、CUDA 和 ROCm 等 AI 软件通过内核级优化、分布式推理策略和调度创新实现持续的性能改进，以仅相隔数天的增量更新不断推高性能的帕累托前沿。
+SGLang、vLLM、TensorRT-LLM、CUDA 和 ROCm 等 AI 软件通过 kernel 级优化、分布式推理策略和调度创新实现持续的性能改进，以仅相隔数天的增量更新不断推高性能的帕累托前沿。
 
 这种软件进步的速度带来了一个挑战：在某个固定时间点进行的基准测试很快就会过时，无法反映使用最新软件包所能达到的真实性能。
 
@@ -104,7 +104,7 @@ InferenceMAX 项目得到了许多大型计算资源买家和 ML 社区知名成
 >
 > -- Saurabh Dighe，Azure 战略规划与架构公司副总裁
 
-> _"理论峰值与真实推理吞吐量之间的差距往往取决于系统软件：推理引擎、分布式策略和底层内核。InferenceMAX 的价值在于它对最新软件进行基准测试，展示了 FP4、MTP、投机解码和 wide-EP 等优化在不同硬件上的实际表现。这样的开放、可复现结果有助于整个社区更快前进。"_
+> _"理论峰值与真实推理吞吐量之间的差距往往取决于系统软件：推理引擎、分布式策略和底层 kernel。InferenceMAX 的价值在于它对最新软件进行基准测试，展示了 FP4、MTP、投机解码和 wide-EP 等优化在不同硬件上的实际表现。这样的开放、可复现结果有助于整个社区更快前进。"_
 >
 > -- Tri Dao，Together AI 首席科学家、Flash Attention 发明者
 
@@ -120,7 +120,7 @@ InferenceMAX 项目得到了许多大型计算资源买家和 ML 社区知名成
 >
 > -- Kaichao You，vLLM 项目联合负责人
 
-> _"InferenceMAX 展示了开放生态系统在实践中的运作方式。vLLM、SGLang 和 TensorRT-LLM 等许多领先的推理栈都构建在 PyTorch 之上，而这样的基准测试展示了内核、运行时和框架层面的创新如何转化为在包括 NVIDIA 和 AMD GPU 在内的各种硬件平台上的可量化性能。通过开源和每夜运行，InferenceMAX 为追踪进展和为 PyTorch 用户提供数据驱动的洞察提供了一种透明的、社区驱动的方法。"_
+> _"InferenceMAX 展示了开放生态系统在实践中的运作方式。vLLM、SGLang 和 TensorRT-LLM 等许多领先的推理栈都构建在 PyTorch 之上，而这样的基准测试展示了 kernel、运行时和框架层面的创新如何转化为在包括 NVIDIA 和 AMD GPU 在内的各种硬件平台上的可量化性能。通过开源和每夜运行，InferenceMAX 为追踪进展和为 PyTorch 用户提供数据驱动的洞察提供了一种透明的、社区驱动的方法。"_
 >
 > -- Matt White，PyTorch Foundation 执行总监
 
@@ -136,7 +136,7 @@ InferenceMAX 项目得到了许多大型计算资源买家和 ML 社区知名成
 >
 > -- Roman Chernin，Nebius 联合创始人兼首席商务官
 
-> _"在 Crusoe，我们相信成为一个出色的合作伙伴意味着赋予客户选择权和清晰度。这就是我们自豪地支持 InferenceMAX 的原因——它为整个 AI 社区提供了针对最新硬件的开源、可复现的基准测试。通过提供关于吞吐量、效率和成本的透明、真实的数据，InferenceMAX 穿透了炒作，帮助客户自信地为其独特工作负载选择最佳平台。"_
+> _"在 Crusoe，我们相信成为一个出色的合作伙伴意味着赋予客户选择权和清晰度。这就是我们自豪地支持 InferenceMAX 的原因——它为整个 AI 社区提供了针对最新硬件的开源、可复现的基准测试。通过提供关于吞吐量、效率和成本的透明、真实的数据，InferenceMAX 拨开了炒作迷雾，帮助客户自信地为其独特工作负载选择最佳平台。"_
 >
 > -- Chase Lochmiller，Crusoe 联合创始人兼 CEO
 
@@ -144,7 +144,7 @@ InferenceMAX 项目得到了许多大型计算资源买家和 ML 社区知名成
 >
 > -- Charles Liang，Supermicro 创始人兼 CEO
 
-> _"在 TensorWave，我们正在 AMD GPU 上构建下一代云，因为我们相信当客户拥有强有力的替代选择时，创新才会蓬勃发展。InferenceMAX 通过提供开源、可复现的基准测试来支持这一愿景，这些测试追踪最新硬件和软件上的吞吐量、效率和成本。通过穿透合成数字并凸显真实推理性能，它帮助客户看到 AMD 平台在大规模 AI 方面的全部潜力。"_
+> _"在 TensorWave，我们正在 AMD GPU 上构建下一代云，因为我们相信当客户拥有强有力的替代选择时，创新才会蓬勃发展。InferenceMAX 通过提供开源、可复现的基准测试来支持这一愿景，这些测试追踪最新硬件和软件上的吞吐量、效率和成本。通过剔除合成数字的干扰并凸显真实推理性能，它帮助客户看到 AMD 平台在大规模 AI 方面的全部潜力。"_
 >
 > -- Darrick Horton，TensorWave CEO
 
@@ -176,7 +176,7 @@ InferenceMAX 项目得到了许多大型计算资源买家和 ML 社区知名成
   caption="来源：SemiAnalysis"
 />
 
-## InferenceMAX v1 基准测试方法论
+## InferenceMAX v1 基准测试方法
 
 提供反映不同 GPU、推理引擎和工作负载在多种交互性水平下全部可能性的基准测试，是 InferenceMAX 的核心目标。本节将介绍基准测试方法论如何被设计来实现这一目标。
 
@@ -205,13 +205,13 @@ InferenceMAX 项目得到了许多大型计算资源买家和 ML 社区知名成
 
 为了防止 [SGLang 与 vLLM 基准测试大战的重演](https://x.com/dylan522p/status/1920638653677596836)并节省计算时间，我们决定首先为每个模型只选择 vLLM 或 SGLang 中的一个作为默认引擎。早在 7 月份，我们就告知 AMD 和 Nvidia，我们将使用 SGLang 作为 DeepSeek 670B 的引擎，使用 vLLM 作为 Llama3 70B 和 Llama4 的引擎。后来我们用 GPT-OSS 120B 替换了 Llama4，因为没有人使用 Llama4，而 GPT-OSS 120B 更接近较小的 "mini" 前沿模型。
 
-我们希望服务器配置尽可能反映真实部署情况，因此要求 AMD 和 Nvidia 提交与其文档指南中讨论如何在其硬件上部署这些模型时相当接近的配置：
+我们希望服务器配置尽可能反映真实部署情况，因此要求 AMD 和 Nvidia 提交尽量贴近其官方文档中模型部署指南的配置：
 
 - [https://docs.nvidia.com/llm-inference-quick-start-recipes/index.html](https://docs.nvidia.com/llm-inference-quick-start-recipes/index.html)
 - [recipes.vllm.ai](https://docs.vllm.ai/projects/recipes/en/latest/)
 - [https://rocm.docs.amd.com/en/docs-7.0-docker/benchmark-docker/inference-vllm-gpt-oss-120b.html](https://rocm.docs.amd.com/en/docs-7.0-docker/benchmark-docker/inference-vllm-gpt-oss-120b.html)
 
-我们之前没有明确说明 InferenceMAX 是否允许预热（warmup），所以 Nvidia 在其 SGLang DeepSeek 提交中包含了一个预热阶段来处理某些 JIT 编译的内核。在基准测试开发接近尾声时，AMD 注意到了上述关于 Nvidia 提交的情况，并询问是否允许预热，因为他们没有意识到自己也可以这样做。经过 AMD、Nvidia 和 SemiAnalysis AI 工程团队之间的讨论，各方同意目前禁止预热，并将 DeepSeek 基准测试的时长延长最多 5 倍以确保公平。这次沟通混乱是我们的失误，因为从一开始就没有明确预热规则。我们计划在发布后重新审视这一议题，因为在真实生产推理中，预热通常在 Kubernetes 控制平面将 Pod 报告为健康之前发生。
+我们之前没有明确说明 InferenceMAX 是否允许预热（warmup），所以 Nvidia 在其 SGLang DeepSeek 提交中包含了一个预热阶段来处理某些 JIT 编译的 kernel。在基准测试开发接近尾声时，AMD 注意到了上述关于 Nvidia 提交的情况，并询问是否允许预热，因为他们没有意识到自己也可以这样做。经过 AMD、Nvidia 和 SemiAnalysis AI 工程团队之间的讨论，各方同意目前禁止预热，并将 DeepSeek 基准测试的时长延长最多 5 倍以确保公平。这次沟通混乱是我们的失误，因为从一开始就没有明确预热规则。我们计划在发布后重新审视这一议题，因为在真实生产推理中，预热通常在 Kubernetes 控制平面将 Pod 报告为健康之前发生。
 
 ## 讨论：DeepSeek R1 服务策略
 
@@ -266,7 +266,7 @@ InferenceMAX 使用 GitHub Actions 来编排基准测试运行。一个 GitHub A
 
 在解读吞吐量 vs 延迟/交互性图表时，请记住大多数实际应用运行在两个极端之间的某个位置。仅测量单一或有限吞吐量或交互性水平的基准测试结果有时可能具有误导性。
 
-例如，如果 GPU A 在给定交互性水平下——以面向人类的 AI 聊天机器人应用为例取 5 tokens/s/user——提供了 GPU B 4 倍的吞吐量，但这个交互性水平实际上太慢而不实用的事实意味着这种性能差异几乎没有真实的实际意义。相反——应该为给定应用选择一个现实的交互性水平。
+例如，如果 GPU A 在给定交互性水平下——以面向人类的 AI 聊天机器人应用为例，取 5 tokens/s/user——提供了 GPU B 4 倍的吞吐量，但这个交互性水平实际上太慢而不实用的事实意味着这种性能差异几乎没有真实的实际意义。相反——应该为给定应用选择一个现实的交互性水平。
 
 在本报告的后续部分，我们还将按 GPU 的总拥有成本（TCO）对吞吐量进行归一化。
 
@@ -274,7 +274,7 @@ InferenceMAX 使用 GitHub Actions 来编排基准测试运行。一个 GitHub A
 
 让我们逐步分析几个基准测试示例来解释如何分析结果。
 
-在我们的第一个结果中，H100 vLLM 与 MI300X ROCm 7.0 vLLM 在 Llama 3.3 70B FP8 推理场景（1k in/ 8k out）的对比显示了 MI300X 的强劲性能，尤其在低交互性水平（20 到 30 tok/s/user）下，这得益于 MI300X 在 TP1 运行时更好的内存带宽和内存容量优势。
+在我们的第一个结果中，H100 vLLM 与 MI300X ROCm 7.0 vLLM 在 Llama 3.3 70B FP8 推理（reasoning）场景（1k in/ 8k out）的对比显示了 MI300X 的强劲性能，尤其在低交互性水平（20 到 30 tok/s/user）下，这得益于 MI300X 在 TP1 运行时更好的内存带宽和内存容量优势。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/471369b0-e290-4560-a348-b3079c8b6e88_2329x1393.png"
@@ -303,7 +303,7 @@ InferenceMAX 使用 GitHub Actions 来编排基准测试运行。一个 GitHub A
   caption="来源：SemiAnalysis"
 />
 
-在 LLaMA 70B FP4 方面，B200 在所有三种工作负载类型上的吞吐量性能都大幅超越 MI355X。这表明 AMD 的 FP4 内核仍有改进空间。
+在 LLaMA 70B FP4 方面，B200 在所有三种工作负载类型上的吞吐量性能都大幅超越 MI355X。这表明 AMD 的 FP4 kernel 仍有改进空间。
 
 转到 B200（vLLM 和 TRT-LLM）vs. MI355X vLLM 运行 GPT-OSS 120B 的对比，我们可以看到 MI355X 在按 TCO 归一化后与 B200 vLLM 具有竞争力。在下一节中，我们将看到 MI355X 在某些交互性范围内的 TCO 性价比优于 Nvidia。吞吐量-延迟图表显示竞争更为激烈，MI355X 在给定 tok/s/gpu 吞吐量下比 B200 慢不超过约 15 秒。我们在现实中看到的 GPT-OSS 120B 最实用的交互性范围约为 150-200 tok/s/user。
 
@@ -454,23 +454,23 @@ SemiAnalysis GPU 云市场租赁价格报告基于对 70 多家 GPU 云和 100 �
   caption="来源：SemiAnalysis"
 />
 
-## 每全额配置公用事业兆瓦估计 Token 吞吐量 vs 交互性（tok/s/user）
+## 每兆瓦全额配置市电的估计 Token 吞吐量 vs 交互性（tok/s/user）
 
 电力是 AI 基础设施的终极约束。每个数据中心都在有限的功率范围内运行，通常以兆瓦（MW）为单位衡量。这直接决定了给定数据中心可以产生多少有用计算——以及最终可以产生多少 token。
 
-推理经济不仅可以通过 GPU 性能（吞吐量/GPU vs TCO）的视角来分析，还可以通过每功率吞吐量来分析——以每全额配置公用事业 MW 的 token/s 来衡量。全额公用事业功率涵盖 GPU、CPU、网络设备、其他相关集群 IT 设备以及设施开销的功率需求。设施开销包括电力分配损耗以及用于冷却设备（如冷水机组、CDU 和冷却塔等）的功率消耗。每 MW 处理的 token 数越多，每单位能源的潜在收入和利润就越大。请注意，对于 InferenceMAX，我们使用的是全额配置公用事业 MW，它考虑了上述设施开销，而不是每全额关键 IT MW 的 token 数（后者不考虑设施开销）。这些指标在不同站点之间有所不同，但我们根据我们的 [AI TCO 模型](https://semianalysis.com/ai-cloud-tco-model/)和[数据中心模型](https://semianalysis.com/datacenter-industry-model/)选择了行业代表性数值。
+推理经济不仅可以通过 GPU 性能（吞吐量/GPU vs TCO）的视角来分析，还可以通过每功率吞吐量来分析——以每全额配置市电 MW 的 token/s 来衡量。全额市电功率涵盖 GPU、CPU、网络设备、其他相关集群 IT 设备以及设施开销的功率需求。设施开销包括电力分配损耗以及用于冷却设备（如冷水机组、CDU 和冷却塔等）的功率消耗。每 MW 处理的 token 数越多，每单位能源的潜在收入和利润就越大。请注意，对于 InferenceMAX，我们使用的是全额配置市电 MW，它考虑了上述设施开销，而不是每全额关键 IT MW 的 token 数（后者不考虑设施开销）。这些指标在不同站点之间有所不同，但我们根据我们的 [AI TCO 模型](https://semianalysis.com/ai-cloud-tco-model/)和[数据中心模型](https://semianalysis.com/datacenter-industry-model/)选择了行业代表性数值。
 
-请注意，托管租金和电力成本通常占总拥有成本的不到 20%。这意味着如果给定 GPU 与另一块 GPU 相比每 MW token 数低 20%，这仅会转化为不到 4% 的总拥有成本差异（即 20% \* 20% = 4%）。TCO 贡献的大头来自各 GPU 硬件供应商收取的毛利率。一些厂商收取高达 75% 的毛利率（即售出成本的 4 倍加价），而其他厂商低于 50% 的毛利率（即不到售出成本的 2 倍）。
+请注意，托管租金和电力成本通常占总拥有成本的不到 20%。这意味着如果给定 GPU 与另一块 GPU 相比每 MW token 数低 20%，这仅会转化为不到 4% 的总拥有成本差异（即 20% \* 20% = 4%）。TCO 贡献的大头来自各 GPU 硬件供应商收取的毛利率。一些厂商收取高达 75% 的毛利率（即销货成本的 4 倍加价），而其他厂商低于 50% 的毛利率（即不到销货成本的 2 倍）。
 
 我们使用速率单位——即 token/s per MW——而非累积的每 token 能量单位（如焦耳每 token）。这是因为数据中心容量以兆瓦（MW）为单位来规划，这是一个速率单位，等同于每秒 1 兆焦耳（MJ）。如果我们将速率单位在给定时间段内积分，就得到该时间段内消耗的绝对能量值。
 
 目前，我们通过加总数据中心中各组件的热设计功耗（TDP）来估算给定集群所需的 MW。TDP 与预期平均功率不同。举例说明：对于内存带宽受限的解码工作负载，系统功耗永远不会达到 TDP，而是会在较低的功率水平——即预期平均功率附近波动。未来，我们将通过 ipmitool 对每个系统（和网络设备）的实际功耗进行基准测试。届时我们将转向每 token 的累积能量单位。
 
-我们基于 InferenceMAX 原始结果结合来自我们 [AI 数据中心行业模型](https://semianalysis.com/datacenter-industry-model/)的 AI 集群全额公用事业功率数据来估算每配置功率的吞吐量。该模型通过跨供应商、架构和推理栈的功率归一化估算来量化全额公用事业功率。完整的估算和持续的每夜基准测试可在 [InferenceMAX.ai](https://inferencemax.semianalysis.com/) 上获取。
+我们基于 InferenceMAX 原始结果结合来自我们 [AI 数据中心行业模型](https://semianalysis.com/datacenter-industry-model/)的 AI 集群全额市电功率数据来估算每配置功率的吞吐量。该模型通过跨供应商、架构和推理栈的功率归一化估算来量化全额市电功率。完整的估算和持续的每夜基准测试可在 [InferenceMAX.ai](https://inferencemax.semianalysis.com/) 上获取。
 
 ## 每 MW 性能结果
 
-我们看到，对于 gpt-oss 120B 使用 MX4 weights 的推理场景（1K 输入 token / 8K 输出 token），在 90 tok/s/user 交互性水平下，MI300X 每全额配置公用事业 MW 可处理 750,000 token/s（再次强调，这是按公用事业 MW 衡量的，而非按关键 IT 功率 MW），而 MI355X 每全额配置公用事业 MW 可处理 2,550,000 token/s。这代表了从 CDNA3 代到 CDNA4 代约 3 倍的能效提升。
+我们看到，对于 gpt-oss 120B 使用 MX4 weights 的推理（reasoning）场景（1K 输入 token / 8K 输出 token），在 90 tok/s/user 交互性水平下，MI300X 每全额配置市电 MW 可处理 750,000 token/s（再次强调，这是按公用事业 MW 衡量的，而非按关键 IT 功率 MW），而 MI355X 每全额配置市电 MW 可处理 2,550,000 token/s。这代表了从 CDNA3 代到 CDNA4 代约 3 倍的能效提升。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/0aa98f63-d0f8-4666-85fd-47a1bbf78c7a_1645x1121.png"
@@ -491,14 +491,14 @@ SemiAnalysis GPU 云市场租赁价格报告基于对 70 多家 GPU 云和 100 �
   caption="来源：SemiAnalysis"
 />
 
-在下一个基准测试中，我们以 30 tok/s/user 交互性水平来看 DeepSeek R1 的每功率 token 数。比较单节点 H200 FP8 与 GB200 NVL72 FP4（不含多 token 预测），GB200 NVL72 在每全额配置公用事业 MW 处理的 token/s 方面提供了约 8 倍的提升。请注意，H200 和 B200 的结果都来自单节点。我们将探索 B200 和 H200 通过在 SpectrumX 以及 InfiniBand 上实现分离式预填充和 wide 专家并行所能释放的更大每 MW token 吞吐量潜力。SGLang 的 [GB200 NVL72 分析](https://lmsys.org/blog/2025-09-25-gb200-part-2/)显示，8-GPU 系统确实可以通过实现 wide 专家并行获得强劲的性能提升。然而，SGLang 的博客也表明，即使 Hopper 同样实现了分离式预填充和 wide EP，GB200 NVL72 仍然胜出。
+在下一个基准测试中，我们以 30 tok/s/user 交互性水平来看 DeepSeek R1 的每功率 token 数。比较单节点 H200 FP8 与 GB200 NVL72 FP4（不含多 token 预测），GB200 NVL72 在每全额配置市电 MW 处理的 token/s 方面提供了约 8 倍的提升。请注意，H200 和 B200 的结果都来自单节点。我们将探索 B200 和 H200 通过在 SpectrumX 以及 InfiniBand 上实现分离式预填充和 wide 专家并行所能释放的更大每 MW token 吞吐量潜力。SGLang 的 [GB200 NVL72 分析](https://lmsys.org/blog/2025-09-25-gb200-part-2/)显示，8-GPU 系统确实可以通过实现 wide 专家并行获得强劲的性能提升。然而，SGLang 的博客也表明，即使 Hopper 同样实现了分离式预填充和 wide EP，GB200 NVL72 仍然胜出。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/e17e8c63-bc2a-4ce2-a9c9-0d00a586de3a_1566x1121.png"
   caption="来源：SemiAnalysis"
 />
 
-继续 DeepSeek 但转到 FP8，我们看到 GB200 在 tok/s/gpu vs tok/s/user 上也主导了所有单节点系统。我们注意到这里有一些细微差别——B200 和 MI355X 都在运行单节点 SGLang，尽管对于 DeepSeek 而言，vLLM 可能在 MI355X 上比 SGLang 能提供更好的结果。我们将探索为 MI355X 添加 DeepSeek vLLM 支持和/或为所有 8-GPU 服务器添加 SGLang 多节点 wideEP。此外，如前所述，Dynamo 团队目前只有时间实现足以在约 30 tok/s/user 附近实现并行帕累托前沿下移的优化。进一步的优化可以将帕累托前沿进一步推低，从而在更高交互性水平下提升 GB200 NVL72 FP8 的每功率吞吐量。
+继续 DeepSeek 但转到 FP8，我们看到 GB200 在 tok/s/gpu vs tok/s/user 上也主导了所有单节点系统。我们注意到这里有一些细微差别——B200 和 MI355X 都在运行单节点 SGLang，尽管对于 DeepSeek 而言，vLLM 可能在 MI355X 上比 SGLang 能提供更好的结果。我们将探索为 MI355X 添加 DeepSeek vLLM 支持和/或为所有 8-GPU 服务器添加 SGLang 多节点 wideEP。此外，如前所述，Dynamo 团队目前只来得及实现部分优化，使并行帕累托前沿下移到约 30 tok/s/user 附近。进一步的优化可以将帕累托前沿进一步推低，从而在更高交互性水平下提升 GB200 NVL72 FP8 的每功率吞吐量。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/129e616b-82d6-413b-ae0c-e28f07b27d84_1661x1121.png"
@@ -516,9 +516,9 @@ SemiAnalysis GPU 云市场租赁价格报告基于对 70 多家 GPU 云和 100 �
   caption="来源：SemiAnalysis"
 />
 
-在阅读了 vLLM 的 NCCL 绑定代码后，我们并不认为 FFI 绑定是问题的根本原因。运行 nvidia-smi 时，我们看到 GPU_UTIL 不是 100% 而是 0%——表明没有内核在 GPU 上运行，由此我们得出结论这不是设备端的 NCCL 死锁。
+在阅读了 vLLM 的 NCCL 绑定代码后，我们并不认为 FFI 绑定是问题的根本原因。运行 nvidia-smi 时，我们看到 GPU_UTIL 不是 100% 而是 0%——表明没有 kernel 在 GPU 上运行，由此我们得出结论这不是设备端的 NCCL 死锁。
 
-接下来，我们使用 Linux [perf](https://perfwiki.github.io/main/) top 分析器查看 Python 层之下，试图更深入地了解具体是哪个共享库触发了这个问题。我们注意到该进程（及子进程）的大部分 CPU 周期都花在 "libnvidia-ptxjitcompiler.so" 上。查阅 "libnvidia-ptxjitcompiler" 文档后，我们找到了这样的描述：_"PTX JIT Compiler 库（/usr/lib/libnvidia-ptxjitcompiler.so.575.57.08）是一个 JIT 编译器，将 PTX 编译为 GPU 机器码，由 CUDA 驱动使用"_。这非常奇怪，因为我们不确定为什么初始化时要调用 PTX 编译器——通常所有 NCCL 内核都是在构建时预编译好的，不应该有需要即时编译的内核。
+接下来，我们使用 Linux [perf](https://perfwiki.github.io/main/) top 分析器查看 Python 层之下，试图更深入地了解具体是哪个共享库触发了这个问题。我们注意到该进程（及子进程）的大部分 CPU 周期都花在 "libnvidia-ptxjitcompiler.so" 上。查阅 "libnvidia-ptxjitcompiler" 文档后，我们找到了这样的描述：_"PTX JIT Compiler 库（/usr/lib/libnvidia-ptxjitcompiler.so.575.57.08）是一个 JIT 编译器，将 PTX 编译为 GPU 机器码，由 CUDA 驱动使用"_。这非常奇怪，因为我们不确定为什么初始化时要调用 PTX 编译器——通常所有 NCCL kernel 都是在构建时预编译好的，不应该有需要即时编译的 kernel。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/a8a1c7d6-51e3-4b5f-85ea-41568792ac21_1937x1121.png"
@@ -541,7 +541,7 @@ SemiAnalysis GPU 云市场租赁价格报告基于对 70 多家 GPU 云和 100 �
   caption="来源：SemiAnalysis"
 />
 
-我们遇到的另一个 Blackwell 问题是 vLLM/SGLang 的子依赖 Flashinfer 存在文件锁竞态条件（race condition）。出于某种原因，Nvidia 决定不将编译好的内核打包到容器镜像中，而是在服务器启动时下载它们。由于我们每个节点最多有 8 个进程（每个 GPU 1 个进程），如果代码不是进程安全的，我们在下载这些编译内核时就会遇到竞态条件。
+我们遇到的另一个 Blackwell 问题是 vLLM/SGLang 的子依赖 Flashinfer 存在文件锁竞态条件（race condition）。出于某种原因，Nvidia 决定不将编译好的 kernel 打包到容器镜像中，而是在服务器启动时下载它们。由于我们每个节点最多有 8 个进程（每个 GPU 1 个进程），如果代码不是进程安全的，我们在下载这些编译 kernel 时就会遇到竞态条件。
 
 实际上，这个竞态条件是由于[一次旨在防止竞态条件的尝试](https://github.com/flashinfer-ai/flashinfer/pull/1779)而引入的！Flashinfer 没有依赖内置 FileLock Python 包的锁清理，而是手动清理锁，这反而导致了竞态条件。[这已在 Flashinfer 中修补](https://github.com/flashinfer-ai/flashinfer/pull/1779)，但尚未上游到 vLLM/SGLang Blackwell 发布容器镜像。非常感谢 Flashinfer 团队和 Kedar Potar 迅速介入，在与团队对接后仅 4 小时内就完成了调试和修补。
 
@@ -571,7 +571,7 @@ GitHub Actions 的[自托管 runner](https://docs.github.com/en/actions/how-tos/
 
 每个基准测试变体作为一个单独的 job 运行。对于每个模型，我们对以下不同组合进行基准测试：不同的 GPU、输入/输出序列长度、精度、张量并行度和并发数。这在添加更多配置时导致每个 workflow 的 job 数量产生[组合爆炸](https://en.wikipedia.org/wiki/Combinatorial_explosion)。
 
-具体来说：InferenceMAX 目前在最多 7 种 GPU 类型上对 3 个模型进行基准测试，涵盖 3 种不同的 ISL/OSL 对、2 种精度设置，以及大约 4 种并发数和张量并行选项。并非每个模型都使用所有可能的配置，但这个最坏情况估算给出 3 _ 7 _ 3 _ 2 _ 4 \* 4 = 2016 个不同的 job。在这种规模下，GitHub Actions 工作流可视化遇到了限制：服务器在尝试渲染 DAG 时在十秒后超时，导致[错误消息](https://github.com/503.html)。这使得调试运行变得极其困难。我们的解决方法是将单个每夜 workflow 拆分为三个，按 ISL/OSL 对分拆。这将每个 workflow 的 job 数从大约 1500 减少到 500，服务器似乎可以可靠地处理。
+具体来说：InferenceMAX 目前在最多 7 种 GPU 类型上对 3 个模型进行基准测试，涵盖 3 种不同的 ISL/OSL 对、2 种精度设置，以及大约 4 种并发数和张量并行选项。并非每个模型都使用所有可能的配置，但这个最坏情况估算给出 3 \* 7 \* 3 \* 2 \* 4 \* 4 = 2016 个不同的 job。在这种规模下，GitHub Actions 工作流可视化遇到了限制：服务器在尝试渲染 DAG 时在十秒后超时，导致[错误消息](https://github.com/503.html)。这使得调试运行变得极其困难。我们的解决方法是将单个每夜 workflow 拆分为三个，按 ISL/OSL 对分拆。这将每个 workflow 的 job 数从大约 1500 减少到 500，服务器似乎可以可靠地处理。
 
 另一个 Bug 涉及使用 [download-artifacts@v5](https://github.com/actions/download-artifact) action 时的硬限制。在每次完整扫描 workflow 结束时，会运行一个 job 来收集和汇总所有 job 的性能结果，这些结果作为 workflow 的 artifact 存储。作为收集过程的一部分，会调用 download-artifacts@v5 action。它初始化一个 [artifact client](https://github.com/actions/toolkit/blob/main/packages/artifact/src/internal/client.ts)，该 client 反过来调用一个 [list artifacts 函数](https://github.com/actions/toolkit/blob/main/packages/artifact/src/internal/find/list-artifacts.ts)（需要列出所有 artifact 然后通过模式匹配找到请求的那个），该函数出于"性能原因"强制执行了 1000 的硬限制。据称当 client 尝试列出超过 1000 个 artifact 时应该会打印一个警告，但我们从未观察到这种行为。
 

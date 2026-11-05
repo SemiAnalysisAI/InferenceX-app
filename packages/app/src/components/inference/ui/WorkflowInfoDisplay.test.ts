@@ -1,11 +1,21 @@
 import { describe, expect, it } from 'vitest';
 
-import { getAdjacentRunId, getLatestRunId, workflowRunCountLabel } from './WorkflowInfoDisplay';
+import {
+  getAdjacentRunId,
+  getLatestRunId,
+  workflowRunCountLabel,
+  workflowRunCountShortLabel,
+} from './WorkflowInfoDisplay';
 
 describe('workflow run count label', () => {
   it('preserves the English label and uses natural Chinese counting syntax', () => {
     expect(workflowRunCountLabel(2, 5, 'en')).toBe('Run 2/5');
     expect(workflowRunCountLabel(2, 5, 'zh')).toBe('第 2 次运行（共 5 次）');
+  });
+
+  it('uses a compact label for the selected run so it fits the phone stepper', () => {
+    expect(workflowRunCountShortLabel(2, 5, 'en')).toBe('Run 2/5');
+    expect(workflowRunCountShortLabel(2, 5, 'zh')).toBe('第 2/5 次运行');
   });
 });
 

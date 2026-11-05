@@ -1,5 +1,7 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 
+import { ApiRequestError } from '@/lib/api/api-request-error';
+
 import type {
   ConversationDetail,
   ConversationList,
@@ -34,10 +36,8 @@ export interface DistributionStats {
   max: number;
   mean: number;
   median: number;
-  /** Added in chart_data v2. */
   p75?: number;
   p90: number;
-  /** Added in chart_data v2. */
   p95?: number;
 }
 
@@ -65,11 +65,9 @@ export type DatasetDetail = RawDatasetDetail & {
 
 export type ConversationSort = NonNullable<ListConversationsOpts['sort']>;
 
-// Dataset contents only change on (rare) re-ingest, so cache aggressively.
 const DAY = 24 * 60 * 60 * 1000;
 const CONVERSATION_QUERY_GC_TIME = 5 * 60 * 1000;
 
-/** Shared fetch for the per-dataset endpoints: 404 → null, other errors throw. */
 async function fetchJsonOr404<T>(
   url: string,
   label: string,
@@ -77,31 +75,31 @@ async function fetchJsonOr404<T>(
 ): Promise<T | null> {
   const res = await fetch(url, { signal });
   if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`${label} ${res.status}`);
+  if (!res.ok) throw new ApiRequestError(`${label} ${res.status}`, res.status, url);
   return (await res.json()) as T;
 }
 
-/** All ingested datasets (registry cards). */
 export function useDatasets() {
   return useQuery({
     queryKey: ['datasets'] as const,
     queryFn: async ({ signal }) => {
-      const res = await fetch('/api/v1/datasets', { signal });
-      if (!res.ok) throw new Error(`datasets ${res.status}`);
+      const url = '/api/v1/datasets';
+      const res = await fetch(url, { signal });
+      if (!res.ok) throw new ApiRequestError(`datasets ${res.status}`, res.status, url);
       return (await res.json()) as DatasetRecord[];
     },
     staleTime: DAY,
   });
 }
 
-/** One dataset incl. chart_data. */
-export function useDataset(slug: string | null) {
+export function useDataset(slug: string | null, initialData?: DatasetDetail) {
   return useQuery({
     queryKey: ['dataset', slug] as const,
     queryFn: ({ signal }) =>
       fetchJsonOr404<DatasetDetail>(`/api/v1/datasets/${slug}`, 'dataset', signal),
     enabled: Boolean(slug),
     staleTime: DAY,
+    initialData,
   });
 }
 
@@ -113,7 +111,6 @@ export interface UseConversationsArgs {
   sort?: ConversationSort;
 }
 
-/** Paginated conversation list for a dataset (counts only). */
 export function useDatasetConversations({
   slug,
   search = '',
@@ -143,7 +140,6 @@ export function useDatasetConversations({
   });
 }
 
-/** One conversation's flamegraph structure. */
 export function useDatasetConversation(slug: string | null, convId: string | null) {
   return useQuery({
     queryKey: ['dataset-conversation', slug, convId] as const,

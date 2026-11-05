@@ -2,14 +2,15 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { AgentXOptimizationsArticle } from '@/components/datasets/agentx-optimizations-article';
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import {
   AGENTX_OPTIMIZATION_FRAMEWORKS,
   getOptimizationFramework,
-} from '@/lib/agentx-optimizations';
-import { getLocalizedFramework } from '@/lib/agentx-optimizations-zh';
-import { zhAlternates, ZH_LANG_TAG, ZH_OG_LOCALE } from '@/lib/i18n';
+} from '@/lib/agentx/agentx-optimizations';
+import { getLocalizedFramework } from '@/lib/agentx/agentx-optimizations-zh';
+import { zhAlternates, ZH_LANG_TAG } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 interface Props {
   params: Promise<{ framework: string }>;
@@ -31,13 +32,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description: localized.summary,
     alternates: zhAlternates(`/agentx/optimizations/${slug}`),
-    openGraph: {
+    ...socialMetadata({
       title: `${title} | InferenceX`,
       description: localized.summary,
       url: `${SITE_URL}/zh/agentx/optimizations/${slug}`,
-      locale: ZH_OG_LOCALE,
-    },
-    twitter: { title: `${title} | InferenceX`, description: localized.summary },
+      locale: 'zh',
+    }),
   };
 }
 

@@ -1,4 +1,3 @@
-/** Stable anchor id for an org's quote on the quotes page (first occurrence wins). */
 export function orgAnchorId(org: string): string {
   const slug = org
     .toLowerCase()
@@ -9,11 +8,9 @@ export function orgAnchorId(org: string): string {
 
 export interface Quote {
   text: string;
-  /** Simplified Chinese translation of `text`, shown on /zh pages. */
   textZh?: string;
   name: string;
   title: string;
-  /** Simplified Chinese translation of `title`, shown on /zh pages. */
   titleZh?: string;
   org: string;
   logo?: string;
@@ -21,6 +18,26 @@ export interface Quote {
 }
 
 export const QUOTES: Quote[] = [
+  {
+    text: 'Making AI infrastructure accessible to more developers starts with measuring how real-world, multi-turn agentic workloads—including context growth and prefix-cache reuse—perform in production. We welcome open-source, reproducible benchmarks like InferenceX that highlight the cost efficiency and interactivity of Google TPUs running open software. That kind of transparent data gives developers the confidence to deploy at scale.',
+    textZh:
+      '要让更多开发者用上 AI 基础设施，首先需要测量真实的多轮智能体工作负载在生产环境中的表现，包括上下文增长和前缀缓存复用。我们欢迎 InferenceX 这样的开源、可复现基准测试，展示 Google TPU 运行开放软件时的成本效率和交互性能。这样的透明数据让开发者有信心进行大规模部署。',
+    name: 'Bill Jia',
+    title: 'VP of Engineering at Google',
+    titleZh: 'Google 工程副总裁',
+    org: 'Google',
+    logo: 'google-color.svg',
+  },
+  {
+    text: "Ray Serve LLM's mission is to be best way to scale Ray-native LLM inference, including ergonomic Python APIs for low-latency serving across heterogeneous clusters and inference engines. Having transparent benchmark runs with engine configurations available gives us trusted reference datapoints to compare against. This makes InferenceX particularly helpful for understanding serving performance and ensuring Ray Serve LLM stays lightweight and performant.",
+    textZh:
+      'Ray Serve LLM 的使命是成为扩展 Ray 原生 LLM 推理的最佳方式，其中包括提供易用的 Python API，支持跨异构集群和推理引擎的低延迟服务。公开透明的基准测试运行记录及其引擎配置，为我们提供了可信赖的参考数据，便于对比。这让 InferenceX 对理解推理服务性能、确保 Ray Serve LLM 保持轻量且高性能尤其有帮助。',
+    name: 'Seiji Eicher',
+    title: 'Anyscale',
+    titleZh: 'Anyscale',
+    org: 'Anyscale',
+    logo: 'anyscale.svg',
+  },
   {
     text: "Vendor-neutral, continuously updated benchmarking is essential as models and inference stacks co-evolve. MiniMax M3 was built with both frontier capability and real-world deployment efficiency in mind, and the day-one vLLM support from the community reflects the collaborative spirit we're proud to be part of. InferenceX provides the kind of transparent, reproducible data the ecosystem needs.",
     textZh:
@@ -76,7 +93,7 @@ export const QUOTES: Quote[] = [
   {
     text: "Our mission at Azure is to give customers the most performant, efficient, and cost-effective cloud for AI. SemiAnalysis InferenceMAX™ supports that mission by providing transparent, reproducible benchmarks that track inference performance across GPUs and software stacks under realistic workloads. This continuous data on throughput, efficiency, and cost per watt strengthens our ability to tune Azure's inference platform for scale, helping customers build with confidence on Microsoft Cloud.",
     textZh:
-      'Azure 的使命是为客户提供性能最强、效率最高且最具成本效益的 AI 云。SemiAnalysis InferenceMAX™ 通过提供透明、可复现的基准测试来追踪各类 GPU 和软件栈在真实工作负载下的推理性能，有力地支持了这一使命。关于吞吐量、效率和每瓦成本的持续数据增强了我们优化 Azure 推理平台规模化的能力，帮助客户在 Microsoft Cloud 上自信构建。',
+      'Azure 的使命是为客户提供性能最强、效率最高且最具成本效益的 AI 云。SemiAnalysis InferenceMAX™ 通过提供透明、可复现的基准测试来追踪各类 GPU 和软件栈在真实工作负载下的推理性能，有力地支持了这一使命。关于吞吐量、效率和每瓦成本的持续数据增强了我们面向大规模部署调优 Azure 推理平台的能力，帮助客户在 Microsoft Cloud 上自信构建。',
     name: 'Scott Guthrie',
     title: 'Executive Vice President, Microsoft Cloud & AI',
     titleZh: 'Microsoft Cloud & AI 执行副总裁',
@@ -90,7 +107,7 @@ export const QUOTES: Quote[] = [
       '在 Microsoft，为客户大规模交付最佳推理性能和经济性，需要深入理解 AI 模型如何与真实硬件和软件交互。像 InferenceMAX™ 这样的开源、可复现基准测试对于产出关于吞吐量、效率和成本的透明洞察至关重要。这些持续信号帮助指导我们的平台战略，使我们能够从芯片到系统再到软件对整个技术栈进行优化，让每一层协同工作，充分释放基础设施的潜力。',
     name: 'Saurabh Dighe',
     title: 'Corporate Vice President, Azure Strategic Planning & Architecture',
-    titleZh: 'Microsoft 公司副总裁、Azure 战略规划与架构负责人',
+    titleZh: 'Microsoft 公司副总裁（Azure 战略规划与架构）',
     org: 'Microsoft',
     logo: 'microsoft.svg',
     link: 'https://www.linkedin.com/in/saurabhdighe/',
@@ -120,7 +137,7 @@ export const QUOTES: Quote[] = [
   {
     text: 'The gap between theoretical peak and real-world inference throughput is often determined by systems software: inference engine, distributed strategies, and low-level kernels. InferenceMAX™ is valuable because it benchmarks the latest software showing how optimizations like FP4, MTP, speculative decode, and wide-EP actually play out across various hardware. Open, reproducible results like these help the whole community move faster.',
     textZh:
-      '理论峰值与实际推理吞吐量之间的差距往往取决于系统软件：推理引擎、分布式策略和底层内核。InferenceMAX™ 的价值在于它对最新软件进行基准测试，展示了 FP4、MTP、投机解码和 wide-EP 等优化在不同硬件上的实际效果。这种开放、可复现的结果帮助整个社区更快地前进。',
+      '理论峰值与实际推理吞吐量之间的差距往往取决于系统软件：推理引擎、分布式策略和底层 kernel。InferenceMAX™ 的价值在于它对最新软件进行基准测试，展示了 FP4、MTP、投机解码和 wide-EP 等优化在不同硬件上的实际效果。这种开放、可复现的结果帮助整个社区更快地前进。',
     name: 'Tri Dao',
     title: 'Chief Scientist of Together AI & Inventor of Flash Attention',
     titleZh: 'Together AI 首席科学家、FlashAttention 发明者',
@@ -162,7 +179,7 @@ export const QUOTES: Quote[] = [
   {
     text: 'InferenceMAX™ demonstrates how an open ecosystem can operate in practice. Many leading inference stacks such as vLLM, SGLang, and TensorRT-LLM are built on PyTorch, and benchmarks like this show how innovations across kernels, runtimes, and frameworks translate into measurable performance on a range of hardware platforms, including NVIDIA and AMD GPUs. By being open source and running nightly, InferenceMAX™ offers a transparent, community-driven approach to tracking progress and providing PyTorch users with data-driven insights.',
     textZh:
-      'InferenceMAX™ 展示了开放生态如何在实践中运作。vLLM、SGLang 和 TensorRT-LLM 等众多领先推理栈均构建于 PyTorch 之上，而这样的基准测试展示了内核、运行时和框架层面的创新如何转化为 NVIDIA 和 AMD GPU 等多种硬件平台上可衡量的性能。凭借开源属性和每夜运行，InferenceMAX™ 提供了一种透明的、社区驱动的方式来追踪进展，并为 PyTorch 用户提供数据驱动的洞察。',
+      'InferenceMAX™ 展示了开放生态如何在实践中运作。vLLM、SGLang 和 TensorRT-LLM 等众多领先推理栈均构建于 PyTorch 之上，而这样的基准测试展示了 kernel、运行时和框架层面的创新如何转化为 NVIDIA 和 AMD GPU 等多种硬件平台上可衡量的性能。凭借开源属性和每晚运行，InferenceMAX™ 提供了一种透明的、社区驱动的方式来追踪进展，并为 PyTorch 用户提供数据驱动的洞察。',
     name: 'Matt White',
     title: 'Executive Director, PyTorch Foundation',
     titleZh: 'PyTorch Foundation 执行董事',
@@ -206,7 +223,7 @@ export const QUOTES: Quote[] = [
   {
     text: "SGLang is the inference engine behind many production inference factories such as xAI's Grok, earning its recognition as THE Inference King. At scale, we see firsthand how much performance varies across hardware, models, and configurations. InferenceX™ benchmarks SGLang across every major GPU platform nightly, capturing that variance in a way no other benchmark does, continuously, & reproducibly.",
     textZh:
-      'SGLang 是 xAI Grok 等众多生产级推理工厂背后的推理引擎，被誉为推理之王。在大规模场景中，我们深刻体会到性能在不同硬件、模型和配置间的巨大差异。InferenceX™ 每夜在所有主流 GPU 平台上对 SGLang 进行基准测试，以其他基准测试无法做到的方式——持续且可复现地——捕捉这种差异。',
+      'SGLang 是 xAI Grok 等众多生产级推理工厂背后的推理引擎，被誉为推理之王。在大规模场景中，我们深刻体会到性能在不同硬件、模型和配置间的巨大差异。InferenceX™ 每晚在所有主流 GPU 平台上对 SGLang 进行基准测试，以其他基准测试无法做到的方式——持续且可复现地——捕捉这种差异。',
     name: 'Mingyi Lu',
     title: 'SGLang Product Lead',
     titleZh: 'SGLang 产品负责人',
@@ -217,7 +234,7 @@ export const QUOTES: Quote[] = [
   {
     text: "InferenceX™ ensembles precisely that — open, reproducible benchmarks that are continuously updated as xPU accelerators (GPUs/TPUs/LPUs), memory, storage, and software stacks evolve. I'm excited to see the InferenceX benchmarking roadmap include agentic coding workloads that stress CPU KV Cache offloading & soon NVMe KV Cache offloading from xPUs. As WEKA helps scale the Memory Wall by building the KV Cache infrastructure that feeds these xPUs, having this level of visibility into inference performance helps the entire ecosystem make smarter decisions about where to invest.",
     textZh:
-      'InferenceX™ 恰好体现了这一点——开放、可复现的基准测试，随着 xPU 加速器（GPU/TPU/LPU）、内存、存储和软件栈的演进而持续更新。我很高兴看到 InferenceX 基准测试路线图纳入了对 CPU KV Cache 卸载乃至即将到来的 NVMe KV Cache 卸载施压的智能体编程工作负载。WEKA 通过构建为这些 xPU 供给的 KV Cache 基础设施来帮助突破内存墙，拥有这种对推理性能的深度可见性有助于整个生态做出更明智的投资决策。',
+      'InferenceX™ 恰好体现了这一点——开放、可复现的基准测试，随着 xPU 加速器（GPU/TPU/LPU）、内存、存储和软件栈的演进而持续更新。我很高兴看到 InferenceX 基准测试路线图纳入了会给 CPU KV Cache 卸载带来压力、并很快也会给 NVMe KV Cache 卸载带来压力的智能体编程工作负载。WEKA 通过构建为这些 xPU 供给的 KV Cache 基础设施来帮助突破内存墙，拥有这种对推理性能的深度可见性有助于整个生态做出更明智的投资决策。',
     name: 'Val Bercovici',
     title: 'Chief AI Officer, WEKA',
     titleZh: 'WEKA 首席 AI 官',
@@ -261,7 +278,7 @@ export const QUOTES: Quote[] = [
   {
     text: 'When we introduced DistServe, the thesis was simple: split prefill and decode and optimize each on its own terms. Eighteen months later, disaggregation is the default architecture across the industry. InferenceX™ is the benchmark that comparing disaggregated and aggregated serving across the whole pareto curve. InferenceX shows exactly when and where P/D separation pays off in TTFT, TPOT, throughput, and cost.',
     textZh:
-      '当我们推出 DistServe 时，核心论点很简单：将预填充和解码分离，分别优化。十八个月后，解聚已成为行业默认架构。InferenceX™ 是在整条帕累托曲线上对比解聚与聚合服务的基准测试。InferenceX 精确展示了 P/D 分离在 TTFT、TPOT、吞吐量和成本方面何时何地带来收益。',
+      '当我们推出 DistServe 时，核心论点很简单：将预填充和解码分离，分别优化。十八个月后，分离式部署已成为行业默认架构。InferenceX™ 是在整条帕累托曲线上对比分离式与聚合式推理的基准测试。InferenceX 精确展示了 P/D 分离在 TTFT、TPOT、吞吐量和成本方面何时何地带来收益。',
     name: 'Hao Zhang',
     title: 'Assistant Professor, UC San Diego & Co-Creator of DistServe, vLLM, and FastVideo',
     titleZh: 'UC San Diego 助理教授、DistServe、vLLM 和 FastVideo 联合创建者',
@@ -278,16 +295,6 @@ export const QUOTES: Quote[] = [
     org: 'Red Hat',
     logo: 'redhat.svg',
     link: 'https://www.linkedin.com/in/michael-goin/',
-  },
-  {
-    text: 'Now commonly hearing "We want the Semianalysis for X". Testament to what @dylan522p has built.',
-    textZh: '现在经常听到"我们想要X领域的 SemiAnalysis"。这是对 @dylan522p 所构建之物的最好证明。',
-    name: 'Sriram Krishnan',
-    title: 'White House Senior AI Advisor',
-    titleZh: '白宫高级 AI 顾问',
-    org: 'White House',
-    logo: 'white-house.svg',
-    link: 'https://x.com/sriramk/status/2048824255702262135',
   },
   {
     text: 'Premium Inference is a new category, driven by agents that need fast, interactive tokens with the best per-chip throughput on intelligent frontier models. InferenceX™ is one of the few benchmarks measuring this chip performance in the open, across every major accelerator. We look forward to participating in the official InferenceX with SN50 and showing our premium decode performance on frontier open models tracked transparently.',
@@ -313,7 +320,7 @@ export const QUOTES: Quote[] = [
   {
     text: 'Open collaboration is driving the next era of AI innovation. The open-source InferenceMAX benchmark gives the community transparent, nightly results that inspire trust and accelerate progress. It highlights the competitive TCO performance of our AMD Instinct MI300, MI325X, and MI355X GPUs across diverse workloads, underscoring the strength of our platform and our commitment to giving developers real-time visibility into our software progress.',
     textZh:
-      '开放协作正在推动 AI 创新的下一个时代。开源的 InferenceMAX 基准测试为社区提供透明的每夜结果，激发信任并加速进步。它突出了我们 AMD Instinct MI300、MI325X 和 MI355X GPU 在多样化工作负载中极具竞争力的 TCO 表现，彰显了我们平台的实力以及我们致力于让开发者实时了解软件进展的承诺。',
+      '开放协作正在推动 AI 创新的下一个时代。开源的 InferenceMAX 基准测试为社区提供透明的每晚结果，激发信任并加速进步。它突出了我们 AMD Instinct MI300、MI325X 和 MI355X GPU 在多样化工作负载中极具竞争力的 TCO 表现，彰显了我们平台的实力以及我们致力于让开发者实时了解软件进展的承诺。',
     name: 'Dr. Lisa Su',
     title: 'Chair and CEO, AMD',
     titleZh: 'AMD 董事长兼首席执行官',
@@ -324,7 +331,7 @@ export const QUOTES: Quote[] = [
   {
     text: "Inference demand is growing exponentially, driven by long-context reasoning. NVIDIA Grace Blackwell NVL72 was invented for this new era of thinking AI. NVIDIA is meeting that demand through constant hardware and software innovation to enable what's next in AI. By benchmarking frequently, InferenceMAX™ gives the industry a transparent view of LLM inference performance on real-world workloads. The results are clear: Grace Blackwell NVL72 with TRT-LLM and Dynamo delivers unmatched performance per dollar and per megawatt—powering the most productive and cost-effective AI factories in the world.",
     textZh:
-      '推理需求在长上下文推理的驱动下呈指数级增长。NVIDIA Grace Blackwell NVL72 正是为这个思考型 AI 的新时代而生。NVIDIA 通过持续的硬件和软件创新来满足这一需求，推动 AI 的下一步发展。通过高频基准测试，InferenceMAX™ 为行业提供了 LLM 推理在真实工作负载上性能的透明视角。结果一目了然：Grace Blackwell NVL72 搭配 TRT-LLM 和 Dynamo 提供了无与伦比的每美元性能和每兆瓦性能——驱动着全球最高效、最具成本效益的 AI 工厂。',
+      '推理需求在长上下文推理的驱动下呈指数级增长。NVIDIA Grace Blackwell NVL72 正是为这个思考型 AI 的新时代而生。NVIDIA 通过持续的硬件和软件创新来满足这一需求，推动 AI 的下一步发展。通过高频基准测试，InferenceMAX™ 为行业提供了 LLM 推理在真实工作负载上性能的透明视角。结果一目了然：Grace Blackwell NVL72 搭配 TRT-LLM 和 Dynamo 提供了无与伦比的每美元性能和每兆瓦性能——驱动着全球生产力最高、最具成本效益的 AI 工厂。',
     name: 'Jensen Huang',
     title: 'Founder & CEO, NVIDIA',
     titleZh: 'NVIDIA 创始人兼首席执行官',
@@ -335,7 +342,7 @@ export const QUOTES: Quote[] = [
   {
     text: "Speed is the moat. InferenceMAX™'s nightly benchmarks match the speed of improvement of the AMD software stack. It's fantastic to see AMD's MI300, MI325, and MI355 GPUs performing so well across diverse workloads and interactivity levels.",
     textZh:
-      '速度就是护城河。InferenceMAX™ 的每夜基准测试与 AMD 软件栈的改进速度同步。看到 AMD MI300、MI325 和 MI355 GPU 在多样化工作负载和交互级别上表现如此出色，令人振奋。',
+      '速度就是护城河。InferenceMAX™ 的每晚基准测试与 AMD 软件栈的改进速度同步。看到 AMD MI300、MI325 和 MI355 GPU 在多样化工作负载和交互级别上表现如此出色，令人振奋。',
     name: 'Anush Elangovan',
     title: 'VP GPU Software, AMD',
     titleZh: 'AMD GPU 软件副总裁',
@@ -346,7 +353,7 @@ export const QUOTES: Quote[] = [
   {
     text: 'InferenceMAX™ highlights workloads that the ML community cares about. At NVIDIA, we welcome these comparisons because they underscore the advantage of our full-stack approach—from GPUs hardware to NVLink networking to NVL72 Rack Scale to Dynamo disaggregated serving that consistently delivers industry-leading inference performance and ROI at scale.',
     textZh:
-      'InferenceMAX™ 聚焦机器学习社区关注的工作负载。在 NVIDIA，我们欢迎这些对比，因为它们凸显了我们全栈方案的优势——从 GPU 硬件到 NVLink 网络，到 NVL72 机架级系统，再到 Dynamo 解聚服务，持续提供业界领先的推理性能和大规模投资回报率。',
+      'InferenceMAX™ 聚焦机器学习社区关注的工作负载。在 NVIDIA，我们欢迎这些对比，因为它们凸显了我们全栈方案的优势——从 GPU 硬件到 NVLink 网络，到 NVL72 机架级系统，再到 Dynamo 分离式推理，持续提供业界领先的推理性能和大规模投资回报率。',
     name: 'Ian Buck',
     title: 'VP & GM, Hyperscale, NVIDIA & Inventor of CUDA',
     titleZh: 'NVIDIA 超大规模计算业务副总裁兼总经理、CUDA 发明者',
@@ -357,7 +364,7 @@ export const QUOTES: Quote[] = [
   {
     text: "InferenceMAX™'s nightly results highlight the rapid pace of progress in the AMD software stack. It's exciting to witness the birth of an open project that provides a tied feedback loop between what the software team works on here at AMD and how it affects specific ML use cases across our MI300, MI325, and MI355 GPUs. I'm looking forward to see what's next for InferenceMAX and to showcase what the AMD platform can do. AMD GPUs will continue to get faster every week.",
     textZh:
-      'InferenceMAX™ 的每夜结果突出展示了 AMD 软件栈的快速进步。能够见证一个开源项目的诞生令人兴奋——它在 AMD 软件团队的工作与其对我们 MI300、MI325 和 MI355 GPU 上特定机器学习用例的影响之间建立了紧密的反馈闭环。我期待看到 InferenceMAX 的下一步发展，并展示 AMD 平台的能力。AMD GPU 将持续每周变得更快。',
+      'InferenceMAX™ 的每晚结果突出展示了 AMD 软件栈的快速进步。能够见证一个开源项目的诞生令人兴奋——它在 AMD 软件团队的工作与其对我们 MI300、MI325 和 MI355 GPU 上特定机器学习用例的影响之间建立了紧密的反馈闭环。我期待看到 InferenceMAX 的下一步发展，并展示 AMD 平台的能力。AMD GPU 将持续每周变得更快。',
     name: 'Quentin Colombet',
     title: 'Senior Director, AMD, Ex-Brium CEO',
     titleZh: 'AMD 高级总监、Brium 前首席执行官',
@@ -433,7 +440,7 @@ export const QUOTES: Quote[] = [
   {
     text: "InferenceX™ provides the open source measurements the community needs — nightly results across real workloads, real hardware, and real software stacks. As someone who has written extensively about the gap between theoretical and actual system performance, I'm glad to see a project that makes that gap visible and trackable for everyone.",
     textZh:
-      'InferenceX™ 提供了社区所需的开源测量——真实工作负载、真实硬件和真实软件栈上的每夜结果。作为一位大量撰写过理论性能与实际系统性能差距的人，我很高兴看到一个让这种差距对每个人都清晰可见、可追踪的项目。',
+      'InferenceX™ 提供了社区所需的开源测量——真实工作负载、真实硬件和真实软件栈上的每晚结果。作为一位大量撰写过理论性能与实际系统性能差距的人，我很高兴看到一个让这种差距对每个人都清晰可见、可追踪的项目。',
     name: 'Stas Bekman',
     title: 'Developer & Author of Machine Learning Engineering Open Book (17.5K+ ⭐)',
     titleZh: '开发者、《Machine Learning Engineering Open Book》作者（17.5K+ ⭐）',
@@ -529,7 +536,7 @@ export const QUOTES: Quote[] = [
   {
     text: 'At EmbeddedLLM, our team works deep in the production inference stack, including major maintainer and contributor work in vLLM, so we see every day how much real-world AI performance depends on the full system: model, runtime, kernels, scheduling, and hardware. InferenceX™ matters because it benchmarks that full system continuously and openly. It turns inference from a marketing conversation into an engineering discipline, giving AI labs, neoclouds, and enterprises the data they need to make decisions on throughput, cost, and efficiency at production scale.',
     textZh:
-      '在 EmbeddedLLM，我们的团队深耕于生产推理栈，包括 vLLM 的核心维护和贡献工作，因此我们每天都能看到真实 AI 性能在多大程度上取决于完整系统：模型、运行时、内核、调度和硬件。InferenceX™ 之所以重要，是因为它持续且公开地对完整系统进行基准测试。它将推理从营销话题转变为工程学科，为 AI 实验室、新型云服务商和企业提供在生产规模上做出吞吐量、成本和效率决策所需的数据。',
+      '在 EmbeddedLLM，我们的团队深耕于生产推理栈，包括 vLLM 的核心维护和贡献工作，因此我们每天都能看到真实 AI 性能在多大程度上取决于完整系统：模型、运行时、kernel、调度和硬件。InferenceX™ 之所以重要，是因为它持续且公开地对完整系统进行基准测试。它将推理从营销话题转变为工程学科，为 AI 实验室、新型云服务商和企业提供在生产规模上做出吞吐量、成本和效率决策所需的数据。',
     name: 'Pin Siang Tan',
     title: 'Co-founder & CTO, EmbeddedLLM',
     titleZh: 'EmbeddedLLM 联合创始人兼首席技术官',
@@ -569,14 +576,31 @@ export const QUOTES: Quote[] = [
     logo: 'kvcache-ai.svg',
     link: 'https://kvcache.ai/',
   },
+  {
+    text: "When you own your hardware, every serving decision shows up directly in your margins. InferenceX's open, reproducible benchmarks show how different accelerators and inference engines actually perform on real workloads, so smaller providers like us can make infra decisions with the same data as the biggest players. Nobody else shows acceptance length like these guys.",
+    textZh:
+      '硬件是自己买的，每一项推理服务决策都会直接影响利润率。InferenceX 的开放、可复现基准测试展示了不同加速器和推理引擎在真实工作负载下的实际表现，让我们这样规模较小的服务商也能用和行业巨头一样的数据来做基础设施决策。还没有谁能像他们这样展示 acceptance length。',
+    name: 'Nicholas Khami',
+    title: 'Morph',
+    titleZh: 'Morph',
+    org: 'Morph',
+    logo: 'morph.svg',
+  },
+  {
+    text: "Delivering cheap, reliable inference for long horizon agents depends on understanding exactly how hardware and serving software perform at different points on the throughput-latency curve. InferenceX's excellent open, continuously updated benchmarks support the work that our research team do to ensure that we are always driving the most cost efficient way to serve each model across our heterogeneous fleet.",
+    textZh:
+      '要为长周期智能体（long-horizon agents）提供低成本、可靠的推理服务，就必须准确理解硬件和推理服务软件在吞吐量-延迟曲线各个位置上的实际表现。InferenceX 出色的开放、持续更新的基准测试，为我们研究团队的工作提供了有力支撑，帮助我们始终在异构集群上以最具成本效益的方式部署每一个模型。',
+    name: 'Meryem Arik',
+    title: 'Co-Founder & CEO, Doubleword',
+    titleZh: 'Doubleword 联合创始人兼首席执行官',
+    org: 'Doubleword',
+    logo: 'doubleword.png',
+    link: 'https://www.doubleword.ai/',
+  },
 ];
 
-/**
- * Orgs featured in the landing page carousel. Display order comes from the
- * QUOTES array above (carousel orgs are listed first there); this list only
- * controls membership.
- */
 export const CAROUSEL_ORGS = [
+  'Google',
   'MiniMax',
   'Moonshot AI',
   'Alibaba Qwen',
@@ -602,13 +626,6 @@ export const CAROUSEL_ORGS = [
   'Mooncake',
 ] as const;
 
-/**
- * Display label overrides for carousel orgs.
- *
- * `Together AI` is not currently in CAROUSEL_ORGS, so its override is inert —
- * it is kept so the card reads "Tri Dao" rather than "Together AI" if the org
- * is added back to the carousel.
- */
 export const CAROUSEL_LABELS: Record<string, string> = {
   'Together AI': 'Tri Dao',
   'PyTorch Foundation': 'PyTorch',

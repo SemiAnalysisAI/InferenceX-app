@@ -65,7 +65,6 @@ function decodeRequestChartData(wire: RequestChartDataWire): RequestChartData {
   };
 }
 
-/** Fetches the compact request dataset used by the default point charts. */
 export function useRequestChartData(id: number | null, enabled = false) {
   return useByIdQuery<RequestChartDataWire, RequestChartData>(
     'request-chart-data',

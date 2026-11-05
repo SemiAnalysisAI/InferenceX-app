@@ -36,9 +36,9 @@ DeepSeek V4 Pro 0813 是一款来自中国、极受欢迎的前沿开放权重�
 
 8 月 21 日之后，来自 Inferact 和 NVIDIA 的 vLLM 优化让 B200 的每美元性能超过了 MI355X。这仍是一场胶着的竞赛，而不是已成定局；[AMD 也公布了自己的 DeepSeek V4 vLLM 优化清单](https://github.com/vllm-project/vllm/issues/52911)，上面还有不少待办事项。
 
-## ATOM 这个前提
+## 关于 ATOM 的附加说明
 
-在端到端延迟上，MI355X 上的 ATOM 胜过 B200 vLLM，但没有胜过 B300 或 B200 SGLang。更重要的前提在于部署：中国和西方的多数 AI 实验室都不愿在生产中使用 ATOM，因此只在厂商引擎下成立的优势，并不能代表使用上游软件栈的客户实际拿到的性能。在单节点上，MI355X 的开源方案（vLLM）依然落后于 ATOM。
+在端到端延迟上，MI355X 上的 ATOM 胜过 B200 vLLM，但没有胜过 B300 或 B200 SGLang。更重要的限定条件在于部署：中国和西方的多数 AI 实验室都不愿在生产中使用 ATOM，因此只在厂商引擎下成立的优势，并不能代表使用上游软件栈的客户实际拿到的性能。在单节点上，MI355X 的开源方案（vLLM）依然落后于 ATOM。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/e8d915c0-c962-4277-b62c-a1b08b8e7179_1924x1262.png"

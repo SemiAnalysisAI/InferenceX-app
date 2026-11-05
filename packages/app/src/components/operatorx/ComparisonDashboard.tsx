@@ -1,0 +1,383 @@
+'use client';
+
+import { useQueryClient } from '@tanstack/react-query';
+import { useTheme } from 'next-themes';
+import { isDarkTheme } from '@/lib/themes/themes';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+
+import type { ComparisonOp } from '@semianalysisai/inferencex-db/operatorx/compare';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Card } from '@/components/ui/card';
+import { CONTROL_HEIGHT } from '@/components/ui/control-styles';
+import { Heading } from '@/components/ui/heading';
+import { Label } from '@/components/ui/label';
+import { Pending } from '@/components/ui/pending';
+import { RetryableQueryError } from '@/components/ui/retryable-query-error';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { prefetchOperatorXTimelines, useOperatorXComparison } from '@/hooks/api/use-operatorx';
+import { useClientSearch } from '@/hooks/useClientSearch';
+import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
+import { replaceClientSearch } from '@/lib/routing/client-navigation';
+
+import { CaseDetail } from './CaseDetail';
+import { CoverageStrip } from './CoverageStrip';
+import {
+  hardwareLabel,
+  operatorXColors,
+  measuredHardware,
+  toggleHardwareSelection,
+} from './compare/hardware';
+import { METRICS, metricById } from './compare/metrics';
+import { buildModel, caseRefs, type ComparisonModel } from './compare/model';
+import { VISUALIZATIONS } from './viz';
+import type { VizDefinition } from './viz/types';
+
+const NO_BASELINE = 'none';
+
+// Literal class names so Tailwind generates them.
+const SPAN_CLASS = {
+  5: 'lg:col-span-5',
+  6: 'lg:col-span-6',
+  7: 'lg:col-span-7',
+  12: 'lg:col-span-12',
+} as const;
+
+type Span = keyof typeof SPAN_CLASS;
+
+function layout(visible: VizDefinition[]): { viz: VizDefinition; span: Span }[] {
+  const out = visible.map((viz) => ({ viz, span: (viz.wide ? 12 : 6) as Span }));
+  let run: typeof out = [];
+  for (const card of [...out, null]) {
+    if (card && card.span !== 12) {
+      run.push(card);
+      continue;
+    }
+    if (run.length % 2 === 1) run.at(-1)!.span = 12;
+    for (let i = 0; i + 1 < run.length; i += 2) {
+      const [first, second] = [run[i], run[i + 1]];
+      first.span = first.viz.span ?? (second.viz.span ? ((12 - second.viz.span) as Span) : 6);
+      second.span = (12 - first.span) as Span;
+    }
+    run = [];
+  }
+  return out;
+}
+
+function setParam(key: string, value: string) {
+  const params = new URLSearchParams(window.location.search);
+  params.set(key, value);
+  replaceClientSearch(params);
+}
+
+/** The one-device option's select value (its split key is empty). */
+const ONE_DEVICE = '1';
+
+function setParallel(value: string) {
+  const params = new URLSearchParams(window.location.search);
+  if (value === ONE_DEVICE) params.delete('parallel');
+  else params.set('parallel', value);
+  replaceClientSearch(params);
+}
+
+function ControlGroup({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0 space-y-1.5">
+      <Label htmlFor={htmlFor}>{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+const VizCard = memo(
+  ({
+    model,
+    viz,
+    span,
+    eager,
+  }: {
+    model: ComparisonModel;
+    viz: VizDefinition;
+    span: Span;
+    eager: boolean;
+  }) => {
+    const [mounted, setMounted] = useState(eager);
+    const card = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+      if (mounted) return;
+      if (eager || typeof IntersectionObserver === 'undefined') {
+        setMounted(true);
+        return;
+      }
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) {
+            setMounted(true);
+          }
+        },
+        { rootMargin: '300px' },
+      );
+      if (card.current) observer.observe(card.current);
+      return () => observer.disconnect();
+    }, [eager, mounted]);
+    return (
+      <Card
+        ref={card}
+        data-testid={`operatorx-viz-${viz.id}`}
+        aria-busy={!mounted}
+        aria-labelledby={`operatorx-title-${viz.id}`}
+        tabIndex={mounted ? undefined : 0}
+        onFocus={() => setMounted(true)}
+        className={`min-w-0 ${SPAN_CLASS[span]}`}
+      >
+        <Heading id={`operatorx-title-${viz.id}`} as="h2" level="card" className="mb-4">
+          {viz.title}
+        </Heading>
+        {mounted ? (
+          <viz.Component model={model} />
+        ) : (
+          <Skeleton aria-hidden="true" className={vizSkeletonClass(viz)} />
+        )}
+      </Card>
+    );
+  },
+);
+
+function vizSkeletonClass(viz: VizDefinition): string {
+  return viz.id === 'roofline' ? 'h-[460px]' : 'h-[420px]';
+}
+
+function visibleVisualizations(op: ComparisonOp, baseline: string | null): VizDefinition[] {
+  return VISUALIZATIONS.filter((v) => v.ops.includes(op) && (baseline || !v.needsBaseline));
+}
+
+const CONTROL_LABELS = ['Workload', 'Devices', 'Metric', 'Baseline'] as const;
+
+/**
+ * Loading state laid out like the loaded dashboard (controls card, then the card grid with
+ * each chart's placeholder height), so the content that replaces it does not move the cards
+ * or the footer under a reader who has already scrolled.
+ */
+function ComparisonSkeleton({ op }: { op: ComparisonOp }) {
+  return (
+    <div
+      className="flex flex-col gap-4"
+      data-testid="operatorx-loading"
+      aria-busy="true"
+      aria-label="Loading results…"
+    >
+      <Card className="relative z-10 py-4 md:py-5">
+        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+          {CONTROL_LABELS.map((label) => (
+            <div key={label} className="min-w-0 space-y-1.5">
+              <Label>{label}</Label>
+              <Skeleton aria-hidden="true" className={CONTROL_HEIGHT.default} />
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 border-t border-border/60 pt-3">
+          <Skeleton aria-hidden="true" className="h-[106px] lg:h-[62px]" />
+        </div>
+      </Card>
+      <div className="grid gap-4 lg:grid-cols-12">
+        {layout(visibleVisualizations(op, null)).map(({ viz, span }) => (
+          <Card
+            key={viz.id}
+            data-testid={`operatorx-viz-skeleton-${viz.id}`}
+            className={`min-w-0 ${SPAN_CLASS[span]}`}
+          >
+            <Heading as="h2" level="card" className="mb-4">
+              {viz.title}
+            </Heading>
+            <Skeleton aria-hidden="true" className={vizSkeletonClass(viz)} />
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
+  const search = new URLSearchParams(useClientSearch());
+  const metric = metricById(search.get('metric'));
+  const {
+    data: view,
+    error,
+    isLoading,
+    isPlaceholderData: switching,
+    refetch,
+  } = useOperatorXComparison(op, search.get('workload'), search.get('parallel'));
+  const theme = isDarkTheme(useTheme().resolvedTheme) ? 'dark' : 'light';
+  const [picked, setPicked] = useState<string[] | null>(null);
+  const [pickedBaseline, setBaseline] = useState<string | null>(null);
+  const [inspected, setInspected] = useState<number | null>(null);
+  const queryClient = useQueryClient();
+  useDialogCloseTracking(inspected !== null, 'operatorx_case_closed', { op });
+
+  // GPUs with measured results at the selected device split
+  const available = useMemo(() => (view ? measuredHardware([view]) : []), [view]);
+  const colors = useMemo(
+    () => operatorXColors(view?.hardware.map((h) => h.id) ?? [], theme),
+    [view, theme],
+  );
+  const hardware = useMemo(
+    () => (picked ? available.filter((h) => picked.includes(h)) : available),
+    [picked, available],
+  );
+  const baseline = pickedBaseline && hardware.includes(pickedBaseline) ? pickedBaseline : null;
+  // Charts, legend, GPU control and case detail all read this same live state.
+  const model = useMemo(() => {
+    if (!view) return null;
+    const toggle = (hw: string) => {
+      track('operatorx_gpu_toggled', { op, gpu: hw, placement: 'chart' });
+      const next = toggleHardwareSelection(hardware, hw);
+      if (next !== hardware) setPicked(next);
+    };
+    const inspect = (index: number) => {
+      track('operatorx_case_opened', { op, metric: metric.id });
+      setInspected(index);
+    };
+    const preview = (i: number) =>
+      prefetchOperatorXTimelines(
+        queryClient,
+        op,
+        caseRefs(view, hardware, i).map((r) => r.ref),
+      );
+    return buildModel(view, metric, { hardware, available, toggle }, colors, baseline, {
+      inspect,
+      preview,
+    });
+  }, [view, metric, hardware, available, colors, baseline, queryClient, op]);
+
+  if (error)
+    return (
+      <RetryableQueryError
+        message={error.message}
+        analyticsEvent="operatorx_comparison_retry"
+        onRetry={refetch}
+        testId="operatorx-comparison-error"
+      />
+    );
+  if (isLoading || !view || !model) return <ComparisonSkeleton op={op} />;
+  const pending = switching
+    ? view.workloads.find((w) => w.id === search.get('workload'))
+    : undefined;
+  if (view.workloads.length === 0)
+    return (
+      <Card className="py-6 text-center">
+        <p className="text-sm text-muted-foreground">No results yet</p>
+      </Card>
+    );
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Card className="relative z-10 py-4 md:py-5" data-testid="operatorx-controls">
+        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+          <ControlGroup label="Workload" htmlFor="operatorx-workload">
+            <SearchableSelect
+              triggerId="operatorx-workload"
+              value={pending?.id ?? view.workload ?? ''}
+              onValueChange={(v) => {
+                track('operatorx_workload_selected', { op, workload: v });
+                setParam('workload', v);
+              }}
+              groups={[
+                {
+                  label: '',
+                  options: view.workloads.map((w) => ({
+                    value: w.id,
+                    label: w.label,
+                  })),
+                },
+              ]}
+            />
+          </ControlGroup>
+          <ControlGroup label="Devices" htmlFor="operatorx-parallel">
+            <SearchableSelect
+              triggerId="operatorx-parallel"
+              value={view.parallel || ONE_DEVICE}
+              onValueChange={(v) => {
+                track('operatorx_parallel_selected', { op, parallel: v });
+                setParallel(v);
+              }}
+              searchable={false}
+              groups={[
+                {
+                  label: '',
+                  options: view.parallelOptions.map((o) => ({
+                    value: o.key || ONE_DEVICE,
+                    label: `${o.label} (${o.cases})`,
+                  })),
+                },
+              ]}
+            />
+          </ControlGroup>
+          <ControlGroup label="Metric" htmlFor="operatorx-metric">
+            <SearchableSelect
+              triggerId="operatorx-metric"
+              value={metric.id}
+              onValueChange={(v) => {
+                track('operatorx_metric_selected', { op, metric: v });
+                setParam('metric', v);
+              }}
+              searchable={false}
+              groups={[
+                {
+                  label: '',
+                  options: METRICS.map((m) => ({ value: m.id, label: `${m.label} (${m.unit})` })),
+                },
+              ]}
+            />
+          </ControlGroup>
+
+          <ControlGroup label="Baseline" htmlFor="operatorx-baseline">
+            <SearchableSelect
+              triggerId="operatorx-baseline"
+              value={baseline ?? NO_BASELINE}
+              onValueChange={(v) => {
+                track('operatorx_baseline_selected', { op, gpu: v });
+                setBaseline(v);
+              }}
+              searchable={false}
+              groups={[
+                {
+                  label: '',
+                  options: [
+                    { value: NO_BASELINE, label: 'None' },
+                    ...hardware.map((h) => ({ value: h, label: hardwareLabel(h) })),
+                  ],
+                },
+              ]}
+            />
+          </ControlGroup>
+        </div>
+        <div className="mt-4 border-t border-border/60 pt-3">
+          <CoverageStrip model={model} />
+        </div>
+      </Card>
+      <Pending active={switching} label={`Loading ${pending?.label ?? 'workload'}…`}>
+        <div className="grid gap-4 lg:grid-cols-12">
+          {layout(visibleVisualizations(op, baseline)).map(({ viz, span }, index) => (
+            <VizCard key={viz.id} model={model} viz={viz} span={span} eager={index === 0} />
+          ))}
+        </div>
+      </Pending>
+      <CaseDetail
+        op={op}
+        view={view}
+        hardware={hardware}
+        colors={colors}
+        caseIndex={inspected}
+        onClose={() => setInspected(null)}
+      />
+    </div>
+  );
+}

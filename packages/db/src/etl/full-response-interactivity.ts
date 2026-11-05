@@ -1,16 +1,3 @@
-/**
- * Canonical AgentX interactivity over the complete client-observed response.
- *
- * New aggregate artifacts expose `full_response_itl` directly. Older runs can
- * reconstruct the same per-request value from the retained AIPerf profile:
- *
- *   (request_end - first_content) / (OSL - 1)
- *   = (request_end - request_start - TTFT) / (OSL - 1)
- *
- * All returned latency values are seconds/token. Interactivity is the inverse
- * of each matching latency statistic, preserving slow-tail percentile meaning.
- */
-
 import { gunzipSync } from 'node:zlib';
 
 import { meanOf, quantile, readNum } from '../queries/agentic-shared';
@@ -74,7 +61,6 @@ function percentileStats(values: readonly number[]): Record<FullResponseStat, nu
   };
 }
 
-/** Return one full-response ITL sample in seconds/token, or undefined. */
 export function fullResponseItlSample(record: ProfileRecord): number | undefined {
   if (record.error) return undefined;
   if (record.metadata?.benchmark_phase && record.metadata.benchmark_phase !== 'profiling') {
@@ -115,10 +101,6 @@ export function fullResponseItlSample(record: ProfileRecord): number | undefined
   return decodeDuration / (osl - 1);
 }
 
-/**
- * Compute namespaced and canonical ITL/interactivity fields from a profile.
- * Empty/malformed profiles return an empty patch and never erase stored data.
- */
 export function fullResponseMetricsFromProfile(jsonl: string): Record<string, number> {
   const samples: number[] = [];
   for (const line of jsonl.split('\n')) {
@@ -126,10 +108,12 @@ export function fullResponseMetricsFromProfile(jsonl: string): Record<string, nu
     try {
       const sample = fullResponseItlSample(JSON.parse(line) as ProfileRecord);
       if (sample !== undefined && Number.isFinite(sample) && sample > 0) samples.push(sample);
-    } catch {
-      // A malformed record does not invalidate the remaining profile.
-    }
+    } catch {}
   }
+  return fullResponseMetricsFromSamples(samples);
+}
+
+function fullResponseMetricsFromSamples(samples: number[]): Record<string, number> {
   if (samples.length === 0) return {};
 
   const stats = percentileStats(samples);
@@ -144,6 +128,20 @@ export function fullResponseMetricsFromProfile(jsonl: string): Record<string, nu
   return preferFullResponseMetrics(patch);
 }
 
+export async function fullResponseMetricsFromLines(
+  lines: AsyncIterable<string>,
+): Promise<Record<string, number>> {
+  const samples: number[] = [];
+  for await (const line of lines) {
+    if (!line.trim()) continue;
+    try {
+      const sample = fullResponseItlSample(JSON.parse(line) as ProfileRecord);
+      if (sample !== undefined && Number.isFinite(sample) && sample > 0) samples.push(sample);
+    } catch {}
+  }
+  return fullResponseMetricsFromSamples(samples);
+}
+
 export function fullResponseMetricsFromGzip(blob: Buffer | null): Record<string, number> {
   if (!blob) return {};
   try {
@@ -153,11 +151,6 @@ export function fullResponseMetricsFromGzip(blob: Buffer | null): Record<string,
   }
 }
 
-/**
- * Replace canonical AgentX ITL/interactivity with namespaced full-response
- * values when present. Missing full-response percentiles delete their legacy
- * canonical counterparts so one row never mixes the two timing domains.
- */
 export function preferFullResponseMetrics(metrics: Record<string, number>): Record<string, number> {
   const out = { ...metrics };
   const hasFullResponse = FULL_RESPONSE_STAT_KEYS.some(

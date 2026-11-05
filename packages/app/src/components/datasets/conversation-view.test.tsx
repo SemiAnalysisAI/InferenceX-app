@@ -26,14 +26,14 @@ vi.mock('@/components/ui/card', () => ({
   Card: ({ children }: PropsWithChildren) => createElement('div', null, children),
 }));
 vi.mock('@/components/datasets/trace-flamegraph', () => ({ TraceFlamegraph: () => null }));
-vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
+vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 vi.mock('@/hooks/api/use-datasets', () => ({
   useDatasetConversation: () => testState.conversation,
 }));
-vi.mock('@/lib/use-locale', () => ({ useLocale: () => testState.locale }));
+vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => testState.locale }));
 
 import { ConversationView } from './conversation-view';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
 afterEach(() => {
   testState.locale = 'en';

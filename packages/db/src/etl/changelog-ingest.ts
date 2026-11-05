@@ -1,7 +1,3 @@
-/**
- * Changelog entry parsing and insertion.
- */
-
 import { resolveFrameworkAliasesInString } from '@semianalysisai/inferencex-constants';
 import type postgres from 'postgres';
 
@@ -15,15 +11,6 @@ export interface ChangelogEntry {
   appendOnly: boolean;
 }
 
-/**
- * Parse a raw changelog JSON array (from `changelog_metadata.json`) into typed entries.
- * Each item is expected to have `config-keys` (array of strings) and `description` (string).
- * PR links are extracted from the description when present as `PR: https://...`.
- * Malformed or non-object items in the array are silently skipped.
- *
- * @param raw - The parsed JSON value from the changelog metadata file (expected to be an array).
- * @returns An array of `ChangelogEntry` objects; empty if `raw` is not an array.
- */
 export function parseChangelogEntries(raw: unknown): ChangelogEntry[] {
   if (!Array.isArray(raw)) return [];
   const out: ChangelogEntry[] = [];
@@ -34,7 +21,6 @@ export function parseChangelogEntries(raw: unknown): ChangelogEntry[] {
       : [];
     const rawDesc = item['description'];
     const description = Array.isArray(rawDesc) ? rawDesc.join('\n') : String(rawDesc ?? '');
-    // PR link: prefer explicit pr-link field, fall back to inline "PR: https://..."
     const prLink =
       (item['pr-link'] ? String(item['pr-link']) : null) ??
       description.match(/\bPR:\s*(?<url>https?:\/\/\S+)/u)?.[1] ??
@@ -46,18 +32,10 @@ export function parseChangelogEntries(raw: unknown): ChangelogEntry[] {
   return out;
 }
 
-/**
- * Returns true if any changelog entry in the given arrays is marked `evals-only: true`.
- * When a run is evals-only, its benchmark/perf data should be skipped during ingest.
- */
 export function hasEvalsOnlyFlag(changelogs: { entries: ChangelogEntry[] }[]): boolean {
   return changelogs.some((c) => c.entries.some((e) => e.evalsOnly));
 }
 
-/**
- * Return whether this run extends existing curves. Mixed metadata is rejected because
- * append-only is stored and resolved at workflow-run scope.
- */
 export function hasAppendOnlyFlag(changelogs: { entries: ChangelogEntry[] }[]): boolean {
   const entries = changelogs.flatMap((changelog) => changelog.entries);
   const appendOnlyEntries = entries.filter((entry) => entry.appendOnly);
@@ -67,19 +45,6 @@ export function hasAppendOnlyFlag(changelogs: { entries: ChangelogEntry[] }[]): 
   return appendOnlyEntries.length > 0;
 }
 
-/**
- * Insert changelog entries for a workflow run into the `changelog_entries` table.
- * Uses `ON CONFLICT DO UPDATE` on `(workflow_run_id, base_ref, head_ref)`, so
- * re-running the ingest for the same workflow replaces its previous changelog metadata.
- *
- * @param sql - Active `postgres` connection.
- * @param workflowRunId - DB id of the parent `workflow_runs` row.
- * @param date - ISO date string (`YYYY-MM-DD`) for the `date` column.
- * @param baseRef - The base git ref for this changelog (e.g. `"main"`).
- * @param headRef - The head git ref for this changelog (e.g. a branch or SHA).
- * @param entries - Parsed changelog entries to insert.
- * @returns The number of rows inserted or updated.
- */
 export async function ingestChangelogEntries(
   sql: Sql,
   workflowRunId: number,

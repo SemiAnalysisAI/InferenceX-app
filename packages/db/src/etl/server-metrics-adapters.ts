@@ -1,9 +1,3 @@
-/**
- * Normalize orchestrator-specific server-metric labels into a stable source
- * identity consumed by the API and frontend. AIPerf owns the export envelope;
- * the serving orchestrator owns the meaning of labels inside each series.
- */
-
 export type MetricSourceRole = 'router' | 'prefill' | 'decode' | 'combined' | 'unknown';
 
 export interface RawMetricSourceSeries {
@@ -12,14 +6,11 @@ export interface RawMetricSourceSeries {
 }
 
 export interface ServerMetricsContext {
-  /** Canonical framework stored in configs, for example `dynamo-vllm`. */
   framework?: string | null;
-  /** Per-worker role series are only meaningful for disaggregated configs. */
   disagg?: boolean;
 }
 
 export interface MetricSource {
-  /** Stable key used to join this source across different metric names. */
   id: string;
   adapter: string;
   role: MetricSourceRole;
@@ -57,21 +48,12 @@ const dynamoAdapter: ServerMetricsAdapter = {
     const endpointUrl = series.endpoint_url ?? labels['dynamo_endpoint'] ?? null;
     const workerId = labels['worker_id'] ?? null;
     return {
-      // A source is one WORKER, not one engine inside it. `dp_rank` (sglang)
-      // and `engine` (vllm) both name engines *within* a worker, so keying on
-      // them split every worker into 4-5 identical-looking entries: a 6p1d run
-      // listed 35 endpoints for 7 workers. The endpoint is only identity when
-      // the worker is anonymous — otherwise one worker reachable on two URLs
-      // would split again.
       id: stableId('dynamo', [role, workerId ?? endpointUrl]),
       adapter: 'dynamo',
       role,
       endpointUrl,
       nativeRole,
       workerId,
-      // Null at worker granularity: this source spans every rank/engine the
-      // worker owns, so naming one of them would be arbitrary. The per-engine
-      // breakdown lives in the source's own `kvCacheUsageByEngine`.
       dpRank: null,
       engine: null,
     };
@@ -95,7 +77,6 @@ const trtllmAdapter: ServerMetricsAdapter = {
     const endpointUrl = series.endpoint_url ?? null;
     const workerId = labels['worker_id'] ?? null;
     return {
-      // Native TRT metrics and Dynamo's rank-labelled gauges share one endpoint.
       id: stableId('trtllm', [role, endpointUrl ?? workerId]),
       adapter: 'trtllm',
       role,

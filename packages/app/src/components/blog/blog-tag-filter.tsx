@@ -4,19 +4,13 @@ import { TAG_CHIP_CLASS } from './blog-tag-chip';
 import { BlogTagLink } from './blog-tag-link';
 
 interface BlogTagFilterProps {
-  /** Tags shown inline, most frequent first. */
   primary: string[];
-  /** Everything else, alphabetical, behind the disclosure. */
   more: string[];
   activeTag?: string;
   basePath: string;
   labels: { all: string; more: string; filter: string };
 }
 
-/**
- * One-row tag filter: "All", the most frequent tags, and a disclosure for the
- * long tail. The active tag is always visible even when it lives in the tail.
- */
 export function BlogTagFilter({ primary, more, activeTag, basePath, labels }: BlogTagFilterProps) {
   const inline = activeTag && more.includes(activeTag) ? [...primary, activeTag] : primary;
   const tail = more.filter((tag) => tag !== activeTag);

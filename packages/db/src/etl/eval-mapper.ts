@@ -1,13 +1,7 @@
-/**
- * Eval row mappers: raw JSON → `EvalParams`.
- * Two formats supported:
- *   `mapEvalRow()`    — individual eval ZIP (`meta_env.json` + `results_*.json`)
- *   `mapAggEvalRow()` — compiled aggregate (flat row from `agg_eval_all.json`)
- */
-
-import { normalizeLegacyTpuRow, physicalChipCount, roleChipCount } from './tpu-normalization';
+import { normalizeLegacyTpuRow, physicalChipCount } from './tpu-normalization';
 import { PRECISION_KEYS } from '@semianalysisai/inferencex-constants';
 import type { ConfigParams } from './config-cache';
+import { resolveConfigTopology } from './topology';
 import type { SkipTracker } from './skip-tracker';
 import {
   resolveModelKey,
@@ -15,17 +9,11 @@ import {
   normalizeFramework,
   normalizePrecision,
   normalizeSpecMethod,
-  parseBool,
-  parseOptionalBool,
   parseNum,
   parseInt2,
   parseIslOsl,
 } from './normalizers';
 
-/**
- * Rename raw lm-eval metric keys to the standardized names used in the agg format.
- * Keys not in this map are stored verbatim.
- */
 const EVAL_METRIC_RENAMES: Record<string, string> = {
   'exact_match,strict-match': 'em_strict',
   'exact_match_stderr,strict-match': 'em_strict_se',
@@ -43,22 +31,6 @@ export interface EvalParams {
   metrics: Record<string, number>;
 }
 
-/**
- * Map an individual eval ZIP's `meta_env.json` + results JSON to typed `EvalParams`.
- *
- * `meta_env.json` supplies the config (hardware, model, framework, precision, tp, ep, etc.).
- * The results file supplies task names, accuracy metrics, and `lm_eval_version`.
- * One `EvalParams` is returned per task in the results dict — lm-harness can report
- * multiple tasks in a single file and all are captured.
- *
- * Returns an empty array and increments the appropriate skip counter when the model
- * or hardware cannot be resolved, or when the results dict is empty/invalid.
- *
- * @param meta - Parsed contents of the artifact's `meta_env.json`.
- * @param results - Parsed contents of the artifact's `results_*.json`.
- * @param tracker - Shared skip tracker; counters are mutated in place on failure.
- * @returns An array of `EvalParams` (one per task), or an empty array on failure.
- */
 export function mapEvalRow(
   meta: Record<string, any>,
   results: Record<string, any>,
@@ -97,23 +69,20 @@ export function mapEvalRow(
   }
   const specMethod = normalizeSpecMethod(meta.spec_decoding);
   const lmEvalVersion = results.lm_eval_version ? String(results.lm_eval_version) : null;
-  const config = buildEvalConfig(
-    meta,
-    gpuKey,
+  const config: ConfigParams = {
+    hardware: gpuKey,
     framework,
-    modelKey,
+    model: modelKey,
     precision,
     specMethod,
-    disaggFromFw,
-  );
+    ...resolveConfigTopology(meta, framework, disaggFromFw),
+  };
 
   const nSamples = results['n-samples'] as Record<string, any> | undefined;
-  // AgentX uses zero for variable sequence lengths; eval rows represent these as NULL.
   const isl = parseInt2(meta.isl) ?? null;
   const osl = parseInt2(meta.osl) ?? null;
 
   return taskEntries.map(([taskName, rawMetrics]) => {
-    // Collect numeric metrics; rename lm-eval keys to standardized names.
     const metrics: Record<string, number> = {};
     if (rawMetrics && typeof rawMetrics === 'object') {
       for (const [k, v] of Object.entries(rawMetrics as Record<string, any>)) {
@@ -124,7 +93,6 @@ export function mapEvalRow(
     }
     const dp = physicalChipCount(meta.dp);
     if (dp !== undefined) metrics.dp = dp;
-    // Extract n_eff from top-level n-samples (not present in per-task rawMetrics).
     const nEff = parseNum(nSamples?.[taskName]?.effective);
     if (nEff !== undefined) metrics['n_eff'] = nEff;
 
@@ -140,21 +108,6 @@ export function mapEvalRow(
   });
 }
 
-/**
- * Map a flat row from `agg_eval_all.json` (produced by `eval_results_all_*.zip` or
- * the CI aggregate artifact) to typed `EvalParams`.
- *
- * Unlike `mapEvalRow`, all config fields are inline in the row rather than split
- * across two files. ISL/OSL are not present as explicit fields; they are parsed
- * from the `source` path using the `{n}k{m}k` filename convention.
- *
- * Returns `null` and increments the appropriate skip counter when the model,
- * hardware, or task cannot be resolved.
- *
- * @param row - A single flat row from the aggregate eval JSON array.
- * @param tracker - Shared skip tracker; counters are mutated in place on failure.
- * @returns A typed `EvalParams` object, or `null` if the row cannot be mapped.
- */
 export function mapAggEvalRow(
   row: Record<string, any>,
   tracker: SkipTracker,
@@ -190,7 +143,6 @@ export function mapAggEvalRow(
   }
   const specMethod = normalizeSpecMethod(row.spec_decoding);
 
-  // ISL/OSL is encoded in the source path (e.g. "eval_dsr1_1k8k_.../results_...").
   const islOsl = row.source ? parseIslOsl(String(row.source)) : null;
 
   const metrics: Record<string, number> = {};
@@ -209,138 +161,19 @@ export function mapAggEvalRow(
   if (dp !== undefined) metrics.dp = dp;
 
   return {
-    config: buildEvalConfig(row, gpuKey, framework, modelKey, precision, specMethod, disaggFromFw),
+    config: {
+      hardware: gpuKey,
+      framework,
+      model: modelKey,
+      precision,
+      specMethod,
+      ...resolveConfigTopology(row, framework, disaggFromFw),
+    },
     task,
     isl: islOsl?.isl ?? null,
     osl: islOsl?.osl ?? null,
     conc: parseInt2(row.conc) ?? null,
     lmEvalVersion: null,
     metrics,
-  };
-}
-
-/**
- * Build a `ConfigParams` from an eval source row (either an agg row or a meta_env dict).
- *
- * Handles both schemas that appear in the artifacts:
- * - **v1** (legacy single-node): only `tp`/`ep`/`dp_attention` — prefill = decode,
- *   `num_workers` defaults to 0, `is_multinode` is false.
- * - **v2** (disagg / multinode, 2025-12-19+): separate `prefill_tp`/`decode_tp` etc.
- *   with `prefill_num_workers`/`decode_num_workers` and `is_multinode`. Presence of
- *   `prefill_tp` on the source selects the v2 branch.
- *
- * An explicit `disagg: false` on a Dynamo row is authoritative for a direct
- * deployment unless a non-zero decode worker pool proves disaggregation.
- * When the field is absent, the framework, multi-node marker, and worker
- * topology retain the legacy inference behavior.
- */
-function buildEvalConfig(
-  src: Record<string, any>,
-  hardware: string,
-  framework: string,
-  model: string,
-  precision: string,
-  specMethod: string,
-  disaggFromFw: boolean,
-): ConfigParams {
-  const isMultinode = parseBool(src.is_multinode);
-
-  let prefillTp: number, prefillEp: number, prefillDpAttn: boolean, prefillNumWorkers: number;
-  let decodeTp: number, decodeEp: number, decodeDpAttn: boolean, decodeNumWorkers: number;
-  let numPrefillGpu: number, numDecodeGpu: number;
-
-  if ('prefill_tp' in src) {
-    prefillTp = parseInt2(src.prefill_tp) ?? 1;
-    prefillEp = parseInt2(src.prefill_ep) ?? 1;
-    prefillDpAttn = parseBool(src.prefill_dp_attention);
-    prefillNumWorkers = parseInt2(src.prefill_num_workers) ?? 0;
-    decodeTp = parseInt2(src.decode_tp) ?? 1;
-    decodeEp = parseInt2(src.decode_ep) ?? 1;
-    decodeDpAttn = parseBool(src.decode_dp_attention);
-    decodeNumWorkers = parseInt2(src.decode_num_workers) ?? 0;
-    numPrefillGpu =
-      roleChipCount(src.num_prefill_gpu) ??
-      (disaggFromFw || (parseInt2(src.decode_num_workers) ?? 0) > 0
-        ? undefined
-        : physicalChipCount(src.num_gpus)) ??
-      prefillTp * prefillEp * Math.max(prefillNumWorkers, 1);
-    numDecodeGpu =
-      roleChipCount(src.num_decode_gpu) ??
-      (disaggFromFw || (parseInt2(src.decode_num_workers) ?? 0) > 0
-        ? undefined
-        : physicalChipCount(src.num_gpus)) ??
-      decodeTp * decodeEp * Math.max(decodeNumWorkers, 1);
-  } else {
-    const tp = parseInt2(src.tp) ?? 1;
-    const ep = parseInt2(src.ep) ?? 1;
-    const dpAttn = parseBool(src.dp_attention);
-    prefillTp = tp;
-    decodeTp = tp;
-    prefillEp = ep;
-    decodeEp = ep;
-    prefillDpAttn = dpAttn;
-    decodeDpAttn = dpAttn;
-    prefillNumWorkers = 0;
-    decodeNumWorkers = 0;
-    numPrefillGpu = physicalChipCount(src.num_gpus) ?? tp * ep;
-    numDecodeGpu = physicalChipCount(src.num_gpus) ?? tp * ep;
-  }
-
-  const explicitDisagg = parseOptionalBool(src.disagg);
-  const disagg =
-    disaggFromFw ||
-    decodeNumWorkers > 0 ||
-    (explicitDisagg === undefined && (isMultinode || prefillNumWorkers > 0));
-
-  if (!disagg) {
-    const usePrefill =
-      decodeTp <= 0 ||
-      decodeEp <= 0 ||
-      (decodeNumWorkers <= 0 && numDecodeGpu <= 0 && (prefillNumWorkers > 0 || numPrefillGpu > 0));
-    const aggregate = usePrefill
-      ? {
-          tp: prefillTp,
-          ep: prefillEp,
-          dpAttn: prefillDpAttn,
-          numWorkers: prefillNumWorkers,
-          numGpu: numPrefillGpu,
-        }
-      : {
-          tp: decodeTp,
-          ep: decodeEp,
-          dpAttn: decodeDpAttn,
-          numWorkers: decodeNumWorkers,
-          numGpu: numDecodeGpu,
-        };
-    prefillTp = aggregate.tp;
-    decodeTp = aggregate.tp;
-    prefillEp = aggregate.ep;
-    decodeEp = aggregate.ep;
-    prefillDpAttn = aggregate.dpAttn;
-    decodeDpAttn = aggregate.dpAttn;
-    prefillNumWorkers = aggregate.numWorkers;
-    decodeNumWorkers = aggregate.numWorkers;
-    numPrefillGpu = aggregate.numGpu;
-    numDecodeGpu = aggregate.numGpu;
-  }
-
-  return {
-    hardware,
-    framework,
-    model,
-    precision,
-    specMethod,
-    disagg,
-    isMultinode,
-    prefillTp,
-    prefillEp,
-    prefillDpAttn,
-    prefillNumWorkers,
-    decodeTp,
-    decodeEp,
-    decodeDpAttn,
-    decodeNumWorkers,
-    numPrefillGpu,
-    numDecodeGpu,
   };
 }

@@ -28,7 +28,7 @@ _相关阅读：[Vera Rubin – 极致协同设计：从 Grace Blackwell Oberon 
 
 目前 VR NVL72 的早期指标均来自 CoreWeave，我们尚未独立验证。Nvidia 已承诺在 2026 自然年第三季度前向 InferenceX 提交可验证的数据。Google 预计将在未来几个月内提交 TPUv7 结果，AMD 也已承诺提交 MI455X UALoE72。等这些数据落地后，整个生态系统将获得一份跨系统的客观对比。
 
-在本文中，我们将对照多条基线来拆解 Nvidia 的 Rubin 性能宣称，展示 Rubin 明显领先 Blackwell 的地方，以及领先幅度较薄弱的地方。我们还将基于已有的 Rubin 总拥有成本（TCO）估算来分析其每 TCO 性能。Rubin 及众多其他系统的 TCO 数据来自我们的 [AI TCO 模型，该模型追踪各类 AI 芯片的总拥有成本，涵盖资本开支（capex）、运营开支（opex）及其他各项费用。](https://semianalysis.com/ai-cloud-tco-model/)我们还使用[数据中心模型中的全口径公用电力配置估算（All-in Utility Provisioned Power Estimates）](https://semianalysis.com/datacenter-industry-model/)来考察每瓦性能。
+在本文中，我们将对照多条基线来拆解 Nvidia 的 Rubin 性能宣称，展示 Rubin 明显领先 Blackwell 的地方，以及领先幅度较薄弱的地方。我们还将基于已有的 Rubin 总拥有成本（TCO）估算来分析其每美元 TCO 性能。Rubin 及众多其他系统的 TCO 数据来自我们的 [AI TCO 模型，该模型追踪各类 AI 芯片的总拥有成本，涵盖资本开支（capex）、运营开支（opex）及其他各项费用。](https://semianalysis.com/ai-cloud-tco-model/)我们还使用[数据中心模型中的全口径公用电力配置估算（All-in Utility Provisioned Power Estimates）](https://semianalysis.com/datacenter-industry-model/)来考察每瓦性能。
 
 最后，我们将呈现 [VR NVL72 逐组件构建的物料清单（BoM）。这部分内容收录于即将发布的 SemiAnalysis 物料清单（BoM）模型。](https://semianalysis.com/vr-nvl72-model/)
 
@@ -199,7 +199,7 @@ CoreWeave-Nvidia 图表上第一个值得注意的宣称是：在约 150 tok/s/u
 
 - NVFP4 精度
 - 投机解码（使用 MTP）
-- 分离式服务（使用 Dynamo）
+- 分离式推理（使用 Dynamo）
 - 宽专家并行（Wide Expert Parallelism）
 - 基于 TensorRT-LLM
 

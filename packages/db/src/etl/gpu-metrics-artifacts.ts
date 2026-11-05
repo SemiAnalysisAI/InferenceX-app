@@ -1,0 +1,211 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+import { isRecord } from '../lib/records.js';
+
+import { sha256Hex } from './benchmark-artifacts.js';
+import {
+  isPowerAuditValidationEntry,
+  normalizePowerAuditValidations,
+} from './power-audit-validations.js';
+
+export const GPU_METRICS_ARTIFACT_PREFIX = 'gpu_metrics_';
+export const POWER_AUDIT_ARTIFACT_PREFIX = 'power_audit_';
+
+export interface GpuMetricsArtifact {
+  artifactName: string;
+  artifactDir: string;
+}
+
+export interface GpuMetricsCsvFile {
+  fileName: string;
+  path: string;
+}
+
+export interface GpuMetricsSidecars {
+  context: Record<string, unknown> | null;
+  validations?: Record<string, Record<string, unknown>>;
+  seriesInventory?: { fileName: string; sampleCount: number }[];
+  runArtifactInventory?: string[];
+  powerManifest?: Record<string, unknown> | null;
+  identity: unknown | null;
+  energyStart: Record<string, number> | null;
+  energyEnd: Record<string, number> | null;
+}
+
+export function gpuMetricsArtifactSuffix(artifactName: string): string | null {
+  for (const prefix of [GPU_METRICS_ARTIFACT_PREFIX, POWER_AUDIT_ARTIFACT_PREFIX]) {
+    if (artifactName.startsWith(prefix)) return artifactName.slice(prefix.length);
+  }
+  return null;
+}
+
+export function isPowerAuditArtifact(artifactName: string): boolean {
+  return artifactName.startsWith(POWER_AUDIT_ARTIFACT_PREFIX);
+}
+
+export function expectedTelemetryArtifactNames(suffix: string): string[] {
+  return [`${GPU_METRICS_ARTIFACT_PREFIX}${suffix}`, `${POWER_AUDIT_ARTIFACT_PREFIX}${suffix}`];
+}
+
+export function isGpuMetricsCsvPath(relativePath: string): boolean {
+  const lower = path.posix.basename(relativePath).toLowerCase();
+  if (!lower.startsWith('gpu_metrics') || !lower.endsWith('.csv')) return false;
+  return !lower.includes('_identity') && !lower.includes('_energy_');
+}
+
+export function walkFiles(
+  root: string,
+  matches: (relativePath: string) => boolean,
+): GpuMetricsCsvFile[] {
+  if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) return [];
+  const files: GpuMetricsCsvFile[] = [];
+  const visit = (directory: string): void => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const pathname = path.join(directory, entry.name);
+      if (entry.isDirectory()) visit(pathname);
+      else if (entry.isFile()) {
+        const fileName = path.relative(root, pathname).split(path.sep).join('/');
+        if (matches(fileName)) files.push({ fileName, path: pathname });
+      }
+    }
+  };
+  visit(root);
+  return files.toSorted((a, b) => a.fileName.localeCompare(b.fileName));
+}
+
+export function readMultinodePowerManifest(samplesPath: string): Record<string, unknown> | null {
+  const parsed = readJsonIfPresent(path.join(path.dirname(samplesPath), 'manifest.json'));
+  return isRecord(parsed) ? parsed : null;
+}
+
+export function readPowerAuditValidations(
+  root: string,
+  artifactName = path.basename(root),
+): Record<string, Record<string, unknown>> {
+  if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) return {};
+  const files = new Map<string, string>();
+  const read = (name: string) => {
+    const file = path.join(root, name);
+    if (isPowerAuditValidationEntry(name) && fs.existsSync(file) && fs.statSync(file).isFile()) {
+      files.set(name, fs.readFileSync(file, 'utf8'));
+    }
+  };
+  for (const name of fs.readdirSync(root).sort()) {
+    read(name);
+  }
+  const agentic = path.join(root, 'LOGS', 'agentic');
+  if (fs.existsSync(agentic) && fs.statSync(agentic).isDirectory()) {
+    for (const entry of fs.readdirSync(agentic, { withFileTypes: true })) {
+      const match = /^conc_(?<concurrency>[1-9]\d*)$/u.exec(entry.name);
+      if (!entry.isDirectory() || !match) continue;
+      read(`LOGS/agentic/${entry.name}/power_validation.json`);
+      read(`LOGS/power/windows/agentic_power_concurrency_${match.groups!.concurrency}.json`);
+    }
+  }
+  const validations = normalizePowerAuditValidations(artifactName, files);
+  for (const validation of validations.values()) {
+    if (typeof validation.validation_path !== 'string') continue;
+    const original = files.get(validation.validation_path);
+    if (original !== undefined) validation.validation_sha256 = sha256Hex(original);
+  }
+  return Object.fromEntries(validations);
+}
+
+function readJsonIfPresent(pathname: string): unknown | null {
+  if (!fs.existsSync(pathname)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(pathname, 'utf8')) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+export function parseEnergyCsv(text: string): Record<string, number> | null {
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  if (lines.length <= 1) return null;
+  const out: Record<string, number> = {};
+  for (const line of lines.slice(1)) {
+    const [gpu, value] = line.split(',');
+    const parsed = Number.parseFloat(value ?? '');
+    if (gpu !== undefined && gpu !== '' && Number.isFinite(parsed)) out[gpu.trim()] = parsed;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+function readIdentity(csvDir: string): unknown | null {
+  const json = readJsonIfPresent(path.join(csvDir, 'gpu_metrics_identity.json'));
+  if (json !== null) return json;
+  const csvPath = path.join(csvDir, 'gpu_metrics_identity.csv');
+  if (!fs.existsSync(csvPath)) return null;
+  const lines = fs
+    .readFileSync(csvPath, 'utf8')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  if (lines.length <= 1) return null;
+  const header = lines[0]!.split(',').map((h) => h.trim());
+  return lines.slice(1).map((line) => {
+    const cells = line.split(',').map((c) => c.trim());
+    return Object.fromEntries(header.map((key, i) => [key, cells[i] ?? '']));
+  });
+}
+
+export function readGpuMetricsSidecars(csvPath: string): GpuMetricsSidecars {
+  const dir = path.dirname(csvPath);
+  let context: Record<string, unknown> | null = null;
+  const contextFiles = fs
+    .readdirSync(dir)
+    .filter(
+      (entry) => entry.toLowerCase().endsWith('_context.json') && entry.includes('gpu_metrics'),
+    )
+    .sort();
+  for (const entry of contextFiles) {
+    const parsed = readJsonIfPresent(path.join(dir, entry));
+    if (isRecord(parsed)) {
+      context = parsed;
+      break;
+    }
+  }
+  const energyStartPath = path.join(dir, 'gpu_metrics_energy_start.csv');
+  const energyEndPath = path.join(dir, 'gpu_metrics_energy_end.csv');
+  return {
+    context,
+    identity: readIdentity(dir),
+    energyStart: fs.existsSync(energyStartPath)
+      ? parseEnergyCsv(fs.readFileSync(energyStartPath, 'utf8'))
+      : null,
+    energyEnd: fs.existsSync(energyEndPath)
+      ? parseEnergyCsv(fs.readFileSync(energyEndPath, 'utf8'))
+      : null,
+  };
+}
+
+export function contextUtcOffsetMinutes(context: Record<string, unknown> | null): number {
+  const zone = context?.timestamp_timezone;
+  if (typeof zone !== 'string') return 0;
+  const match = /^(?<sign>[+-])(?<h>\d{2}):?(?<m>\d{2})$/u.exec(zone.trim());
+  if (!match?.groups) return 0;
+  const minutes = Number(match.groups.h) * 60 + Number(match.groups.m);
+  return match.groups.sign === '-' ? -minutes : minutes;
+}
+
+export function discoverGpuMetricsArtifacts(artifactsDir: string): Map<string, GpuMetricsArtifact> {
+  const discovered = new Map<string, GpuMetricsArtifact>();
+  if (!fs.existsSync(artifactsDir)) return discovered;
+  const names = fs
+    .readdirSync(artifactsDir)
+    .filter((artifactName) => fs.statSync(path.join(artifactsDir, artifactName)).isDirectory());
+  for (const preferred of [false, true]) {
+    for (const artifactName of names) {
+      if (isPowerAuditArtifact(artifactName) !== preferred) continue;
+      const suffix = gpuMetricsArtifactSuffix(artifactName);
+      if (!suffix || discovered.has(suffix)) continue;
+      discovered.set(suffix, { artifactName, artifactDir: path.join(artifactsDir, artifactName) });
+    }
+  }
+  return discovered;
+}

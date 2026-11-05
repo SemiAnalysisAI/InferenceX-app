@@ -54,6 +54,23 @@ it('selects direction, layout and percentile and separates comparison runs', () 
   ).toEqual([]);
 });
 
+it('skips rows whose selected percentile was not measured instead of plotting null', () => {
+  const dataset = buildDatasetFromNeutral(swapMatrix, [makeSwapDoc()], swapMeta);
+  const selection = {
+    direction: 'h2d',
+    layout: 'contiguous',
+    metric: 'latency',
+    percentile: 'p99',
+  } as const;
+  const before = swapChartPoints([dataset], selection);
+  const target = before[0].row;
+  (target.latency_us as Record<string, number | null>).p99 = null;
+  const after = swapChartPoints([dataset], selection);
+  expect(after).toHaveLength(before.length - 1);
+  expect(after.every((point) => Number.isFinite(point.y))).toBe(true);
+  expect(after.some((point) => point.row === target)).toBe(false);
+});
+
 it('selects one-way host or read-plus-write HBM ceilings and deduplicates visible GPUs', () => {
   const points = [{ sku: 'h200-dgxc' }, { sku: 'h200-dgxc' }, { sku: 'gb200' }];
   expect(swapRooflines(points, 'h2d').map((r) => [r.path, r.gbps, r.devices])).toEqual([

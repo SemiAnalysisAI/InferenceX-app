@@ -1,17 +1,9 @@
-/**
- * Shared SQL-file migration loop used by `migrate.ts` (main DB) and
- * `migrate-collectivex.ts` (CollectiveX DB). Applies pending `*.sql` files
- * from a directory in filename order, tracking them in a `schema_migrations`
- * table on the target database.
- */
-
 import fs from 'fs';
 import path from 'path';
 
 import type { Sql } from '../etl/db-utils';
 
 export async function runMigrations(sql: Sql, migrationsDir: string): Promise<number> {
-  // Create migrations tracking table if it doesn't exist
   await sql`
     create table if not exists schema_migrations (
       filename   text        primary key,

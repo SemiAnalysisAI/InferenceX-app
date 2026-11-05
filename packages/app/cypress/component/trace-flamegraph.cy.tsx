@@ -1,8 +1,6 @@
 import { TraceFlamegraph } from '@/components/datasets/trace-flamegraph';
 import type { ConversationStructure } from '@/hooks/api/use-datasets';
 
-// Two main turns followed by one subagent group with two child turns.
-// Node indices: 0 = turn, 1 = turn, 2 = subagent (so its rows key off `g-2`).
 const structure: ConversationStructure = {
   blockSize: 64,
   nodes: [

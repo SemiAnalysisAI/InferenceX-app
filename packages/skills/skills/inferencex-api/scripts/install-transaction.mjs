@@ -115,7 +115,13 @@ async function readTransaction(
     return blocked('installer transaction path is not an owned directory');
   }
 
-  const names = readdirSync(transaction);
+  let names;
+  try {
+    names = readdirSync(transaction);
+  } catch (error) {
+    if (error.code === 'ENOENT') return { state: 'missing' };
+    throw error;
+  }
   const markerNames = names.filter((name) => name.startsWith('owner-'));
   if (markerNames.length === 0 && names.length === 0 && recoveryTransactionId !== null) {
     return {
@@ -198,6 +204,10 @@ async function readTransaction(
     return blocked('installer transaction marker is foreign or malformed');
   }
   if (record.phase === 'cleanup' && names.length !== 1) {
+    // The owner can finish cleanup between the directory listing and marker read.
+    if (remainingRescans > 0) {
+      return readTransaction(destination, transaction, recoveryTransactionId, remainingRescans - 1);
+    }
     return blocked('terminal installer cleanup contains unexpected data');
   }
   return { state: 'valid', identity, paths, record };
@@ -349,7 +359,12 @@ function removeOwnedContents(paths) {
 function finishTerminalCleanup(destination, paths, record) {
   const recoveryPaths = moveToRecovery(destination, paths, record);
   rmSync(recoveryPaths.marker);
-  rmdirSync(recoveryPaths.transaction);
+  try {
+    rmdirSync(recoveryPaths.transaction);
+  } catch (error) {
+    // A contender can finish the empty tombstone after its owner marker is removed.
+    if (error.code !== 'ENOENT') throw error;
+  }
 }
 
 function finishCleanup(destination, paths, record) {

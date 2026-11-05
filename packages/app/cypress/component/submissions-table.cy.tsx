@@ -1,5 +1,5 @@
 import SubmissionsTable from '@/components/submissions/SubmissionsTable';
-import type { SubmissionSummaryRow } from '@/lib/submissions-types';
+import type { SubmissionSummaryRow } from '@/lib/submissions/submissions-types';
 
 const baseRow: Omit<SubmissionSummaryRow, 'spec_method' | 'hardware' | 'date'> = {
   model: 'dsr1',
@@ -34,11 +34,8 @@ describe('SubmissionsTable — Spec Method column', () => {
 
   it('renders canonical spec_method labels and shows an em-dash for "none"', () => {
     cy.mount(<SubmissionsTable data={rows} />);
-    // The cell renders the canonical spec-method label (MTP/EAGLE) for the model.
     cy.contains('td', 'MTP').should('be.visible').and('have.class', 'uppercase');
     cy.contains('td', 'EAGLE').should('be.visible').and('have.class', 'uppercase');
-    // The "none" row renders an em-dash placeholder instead of literal "none".
-    // Hardware text is rendered uppercase via .toUpperCase().
     cy.contains('tbody tr', 'MI355X').within(() => {
       cy.contains('—').should('be.visible');
     });
@@ -64,11 +61,9 @@ describe('SubmissionsTable — Spec Method column', () => {
 
   it('sorts by spec_method when the header is clicked', () => {
     cy.mount(<SubmissionsTable data={rows} />);
-    // Desc alphabetical: 'none' (mi355x) → 'mtp' (h200) → 'eagle' (b300).
     cy.contains('th', 'Spec Method').click();
     cy.get('tbody tr').first().should('contain.text', 'MI355X');
     cy.get('tbody tr').last().should('contain.text', 'B300');
-    // Asc alphabetical: 'eagle' (b300) → 'mtp' (h200) → 'none' (mi355x).
     cy.contains('th', 'Spec Method').click();
     cy.get('tbody tr').first().should('contain.text', 'B300');
     cy.get('tbody tr').last().should('contain.text', 'MI355X');
@@ -99,7 +94,6 @@ describe('SubmissionsTable — Image diff in expanded row', () => {
       date: '2026-05-13',
       image: NEW,
     },
-    // Different config — no diff should be computed against the h200 rows.
     {
       ...baseRow,
       hardware: 'b300',
@@ -111,8 +105,7 @@ describe('SubmissionsTable — Image diff in expanded row', () => {
 
   it('shows previous → current image on the bump-day row', () => {
     cy.mount(<SubmissionsTable data={diffRows} />);
-    // Sort defaults to date desc, so the newest h200 row (image=NEW) is first.
-    cy.get('tbody tr').first().click(); // expand
+    cy.get('tbody tr').first().click();
     cy.get('[data-testid="submissions-image-diff"]')
       .should('be.visible')
       .within(() => {
@@ -124,7 +117,6 @@ describe('SubmissionsTable — Image diff in expanded row', () => {
 
   it('renders just the current image when there is no preceding run', () => {
     cy.mount(<SubmissionsTable data={diffRows} />);
-    // Expand the b300 row (single-row config, no diff).
     cy.contains('tbody tr', 'B300').click();
     cy.contains('tbody tr', 'B300')
       .next()

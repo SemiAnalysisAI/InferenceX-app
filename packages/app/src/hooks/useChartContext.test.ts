@@ -34,10 +34,6 @@ describe('reconcileActiveSet', () => {
   });
 
   it('never re-widens, so a shrink-then-grow round trip loses the pruned keys', () => {
-    // Why InferenceContext must not hand this function a metric-filtered set:
-    // selecting a Measured Energy axis drops the configs without telemetry,
-    // and switching back cannot bring them back — with every survivor still
-    // available, reconcile returns the shrunken set unchanged.
     const full = new Set(['b200_sglang', 'b200_vllm', 'h200_sglang']);
     const withTelemetry = new Set(['b200_sglang']);
 

@@ -1,9 +1,13 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-import { normalizeArtifactRows, normalizeEvalArtifactRows } from './route';
+import {
+  githubRateLimitRetryAfter,
+  normalizeArtifactRows,
+  normalizeEvalArtifactRows,
+  unofficialRunCacheControl,
+} from './route';
 
-// ── Mock AdmZip ──────────────────────────────────────────────────────
 const mockGetEntries = vi.fn();
 vi.mock('adm-zip', () => ({
   default: class MockAdmZip {
@@ -13,15 +17,18 @@ vi.mock('adm-zip', () => ({
   },
 }));
 
-// ── Mock fetch ───────────────────────────────────────────────────────
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
+
+const mockGetCachedBenchmarks = vi.fn();
+vi.mock('@/lib/benchmarks/benchmark-query-cache.server', () => ({
+  getCachedBenchmarks: (...args: unknown[]) => mockGetCachedBenchmarks(...args),
+}));
 
 function makeRequest(params: string) {
   return new NextRequest(`http://localhost/api/unofficial-run?${params}`);
 }
 
-/** Minimal raw artifact row matching the shape produced by CI benchmarks. */
 function rawRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     hw: 'h200-nv',
@@ -65,7 +72,6 @@ function rawRow(overrides: Record<string, unknown> = {}): Record<string, unknown
   };
 }
 
-/** Minimal valid agentic row: scenario_type triggers the agentic path; `users` → conc. */
 function rawAgenticRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     infmax_model_prefix: 'dsv4',
@@ -130,7 +136,12 @@ describe('normalizeArtifactRows', () => {
 
   it('falls back to model path when prefix is absent', () => {
     const rows = normalizeArtifactRows(
-      [rawRow({ infmax_model_prefix: undefined, model: 'deepseek-ai/DeepSeek-R1-0528' })],
+      [
+        rawRow({
+          infmax_model_prefix: undefined,
+          model: 'deepseek-ai/DeepSeek-R1-0528',
+        }),
+      ],
       '2026-03-01',
     );
     expect(rows[0].model).toBe('dsr1');
@@ -243,9 +254,6 @@ describe('normalizeArtifactRows', () => {
   });
 
   it('surfaces pipeline-parallelism fields in metrics (auto-capture)', () => {
-    // pp has no configs-table column: the frontend reads it from the metrics
-    // JSONB (rowToAggDataEntry), so the overlay route must keep passing it
-    // through. Field shape matches run 30314948116 (Kimi-K3 TP8 PP2).
     const rows = normalizeArtifactRows(
       [
         rawRow({
@@ -423,7 +431,6 @@ describe('normalizeEvalArtifactRows', () => {
     );
 
     expect(rows).toHaveLength(2);
-    // Two distinct configs (different hw) → local ids 1 and 2, plus offset = 11 and 12
     expect(rows.map((r) => r.config_id).toSorted()).toEqual([11, 12]);
     expect(maxConfigId).toBe(12);
   });
@@ -444,16 +451,79 @@ describe('normalizeEvalArtifactRows', () => {
   });
 });
 
-// ── GET handler tests ────────────────────────────────────────────────
+describe('unofficialRunCacheControl', () => {
+  it('caches long only when every run has completed', () => {
+    expect(unofficialRunCacheControl([{ status: 'completed' }, { status: 'completed' }])).toContain(
+      's-maxage=3600',
+    );
+    expect(unofficialRunCacheControl([{ status: 'completed' }, { status: 'in_progress' }])).toBe(
+      'public, max-age=0, s-maxage=30',
+    );
+    expect(unofficialRunCacheControl([])).toBe('public, max-age=0, s-maxage=30');
+  });
+});
+
+function response(status: number, headers: Record<string, string>) {
+  return new Response(null, { status, headers });
+}
+
+function mockRunWithBenchmarks(status: string | null) {
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () =>
+      Promise.resolve({
+        id: 123,
+        head_branch: 'feature',
+        created_at: '2026-01-01T00:00:00Z',
+        html_url: 'http://github.com/run/123',
+        status,
+      }),
+  });
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () =>
+      Promise.resolve({
+        artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: 'http://dl' }],
+      }),
+  });
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+  });
+  mockGetEntries.mockReturnValue([
+    { entryName: 'results.json', getData: () => Buffer.from(JSON.stringify([rawRow()])) },
+  ]);
+}
+
+describe('githubRateLimitRetryAfter', () => {
+  it('ignores failures that are not rate limits', () => {
+    expect(githubRateLimitRetryAfter(response(404, {}))).toBeNull();
+    expect(githubRateLimitRetryAfter(response(403, { 'x-ratelimit-remaining': '10' }))).toBeNull();
+  });
+
+  it('derives the wait from the primary rate-limit reset time', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000_000);
+    expect(
+      githubRateLimitRetryAfter(
+        response(403, { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1000090' }),
+      ),
+    ).toBe('90');
+    vi.restoreAllMocks();
+  });
+
+  it('falls back to a minute for a secondary limit without timing headers', () => {
+    expect(githubRateLimitRetryAfter(response(429, {}))).toBe('60');
+  });
+});
 
 describe('GET /api/unofficial-run', () => {
-  // Dynamic import to avoid hoisting issues with mocks
   let GET: (req: Request) => Promise<Response>;
 
   beforeEach(async () => {
     vi.resetModules();
     mockFetch.mockReset();
     mockGetEntries.mockReset();
+    mockGetCachedBenchmarks.mockReset();
     process.env.GITHUB_TOKEN = 'test-token';
     const mod = await import('./route');
     GET = mod.GET as any;
@@ -489,18 +559,20 @@ describe('GET /api/unofficial-run', () => {
   });
 
   it('returns GitHub error status when run fetch fails', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found' });
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+    });
     const res = await GET(makeRequest('runId=999'));
     expect(res.status).toBe(404);
   });
 
   it('returns 404 when neither benchmark nor eval artifact exists', async () => {
-    // Run metadata fetch
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ id: 123, created_at: '2026-01-01T00:00:00Z' }),
     });
-    // Artifacts fetch (no results_bmk)
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ artifacts: [{ name: 'other_artifact', id: 1 }] }),
@@ -513,12 +585,10 @@ describe('GET /api/unofficial-run', () => {
   });
 
   it('returns error when artifact download fails', async () => {
-    // Run metadata
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ id: 123, created_at: '2026-01-01T00:00:00Z' }),
     });
-    // Artifacts
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () =>
@@ -526,8 +596,11 @@ describe('GET /api/unofficial-run', () => {
           artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: 'http://dl' }],
         }),
     });
-    // Download fails
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 410, statusText: 'Gone' });
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 410,
+      statusText: 'Gone',
+    });
     const res = await GET(makeRequest('runId=123'));
     expect(res.status).toBe(410);
   });
@@ -535,7 +608,6 @@ describe('GET /api/unofficial-run', () => {
   it('returns benchmarks on success', async () => {
     const bmkData = [rawRow()];
 
-    // Run metadata
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () =>
@@ -550,7 +622,6 @@ describe('GET /api/unofficial-run', () => {
           status: 'completed',
         }),
     });
-    // Artifacts
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () =>
@@ -558,15 +629,12 @@ describe('GET /api/unofficial-run', () => {
           artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: 'http://dl' }],
         }),
     });
-    // Download — return a buffer-like object
     const fakeBuffer = new ArrayBuffer(8);
     mockFetch.mockResolvedValueOnce({
       ok: true,
       arrayBuffer: () => Promise.resolve(fakeBuffer),
     });
 
-    // Mock zip extraction — the AdmZip constructor receives the buffer,
-    // and our mock returns these entries
     const bmkJson = JSON.stringify(bmkData);
     mockGetEntries.mockReturnValue([
       { entryName: 'results.json', getData: () => Buffer.from(bmkJson) },
@@ -584,8 +652,97 @@ describe('GET /api/unofficial-run', () => {
     expect(body.evaluations).toEqual([]);
   });
 
+  it.each([
+    [true, 2],
+    [false, 1],
+  ])(
+    'stitches the published curve only when the changelog is append-only (%s)',
+    async (appendOnly, expectedRows) => {
+      const image = 'lmsysorg/sglang:v0.5.0';
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            id: 123,
+            head_branch: 'feature',
+            created_at: '2026-01-02T00:00:00Z',
+            html_url: 'http://github.com/run/123',
+          }),
+      });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            artifacts: [
+              {
+                name: 'results_bmk',
+                id: 10,
+                archive_download_url: 'http://dl/bmk',
+              },
+              {
+                name: 'changelog-metadata',
+                id: 11,
+                archive_download_url: 'http://dl/cl',
+              },
+            ],
+          }),
+      });
+      mockFetch.mockResolvedValue({
+        ok: true,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+      });
+      const changelog = {
+        base_ref: 'origin/main',
+        head_ref: 'abc',
+        entries: [
+          {
+            'config-keys': ['dsr1-fp8-h200-sglang'],
+            'append-only': appendOnly,
+          },
+        ],
+      };
+      mockGetEntries
+        .mockReturnValueOnce([
+          {
+            entryName: 'results.json',
+            getData: () => Buffer.from(JSON.stringify([rawRow({ image })])),
+          },
+        ])
+        .mockReturnValueOnce([
+          {
+            entryName: 'changelog_metadata.json',
+            getData: () => Buffer.from(JSON.stringify(changelog)),
+          },
+        ]);
+      const run = normalizeArtifactRows([rawRow({ image })], '2026-01-01')[0];
+      mockGetCachedBenchmarks.mockResolvedValue([
+        {
+          ...run,
+          id: 55,
+          conc: 64,
+          date: '2026-01-01',
+          run_url: 'http://github.com/run/100',
+        },
+      ]);
+
+      const res = await GET(makeRequest('runId=123'));
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.benchmarks).toHaveLength(expectedRows);
+      expect(mockGetCachedBenchmarks).toHaveBeenCalledTimes(appendOnly ? 1 : 0);
+      if (appendOnly) {
+        expect(body.benchmarks[1]).toMatchObject({
+          id: 55,
+          date: '2026-01-01',
+          run_url: 'http://github.com/run/123',
+          curve_date: '2026-01-02',
+        });
+      }
+    },
+  );
+
   it('falls back to per-config bmk_* artifacts when results_bmk is missing (agentic-only sweeps)', async () => {
-    // Run metadata
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () =>
@@ -600,21 +757,34 @@ describe('GET /api/unofficial-run', () => {
           status: 'completed',
         }),
     });
-    // Artifacts: no results_bmk — only per-config agentic artifacts (plus the
-    // big sibling `agentic_*` trace blobs the route must NOT download).
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () =>
         Promise.resolve({
           artifacts: [
-            { name: 'bmk_agentic_dsv4_conc72', id: 30, archive_download_url: 'http://dl-a' },
-            { name: 'bmk_agentic_dsv4_conc56', id: 31, archive_download_url: 'http://dl-b' },
-            { name: 'agentic_dsv4_conc72', id: 32, archive_download_url: 'http://dl-blob' },
-            { name: 'server_logs_dsv4_conc72', id: 33, archive_download_url: 'http://dl-log' },
+            {
+              name: 'bmk_agentic_dsv4_conc72',
+              id: 30,
+              archive_download_url: 'http://dl-a',
+            },
+            {
+              name: 'bmk_agentic_dsv4_conc56',
+              id: 31,
+              archive_download_url: 'http://dl-b',
+            },
+            {
+              name: 'agentic_dsv4_conc72',
+              id: 32,
+              archive_download_url: 'http://dl-blob',
+            },
+            {
+              name: 'server_logs_dsv4_conc72',
+              id: 33,
+              archive_download_url: 'http://dl-log',
+            },
           ],
         }),
     });
-    // Two per-config downloads (Promise.all order matches artifact order)
     mockFetch.mockResolvedValueOnce({
       ok: true,
       arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
@@ -649,7 +819,6 @@ describe('GET /api/unofficial-run', () => {
     expect(body.benchmarks[0].benchmark_type).toBe('agentic_traces');
     expect(body.benchmarks[0].hardware).toBe('mi355x');
     expect(body.benchmarks[0].run_url).toBe('http://github.com/run/777');
-    // Only the two bmk_* artifacts were downloaded: run + artifacts + 2 downloads.
     expect(mockFetch).toHaveBeenCalledTimes(4);
   });
 
@@ -664,15 +833,21 @@ describe('GET /api/unofficial-run', () => {
           created_at: '2026-07-07T00:00:00Z',
         }),
     });
-    // Merged artifact alongside per-config ones (mixed fixed-seq + agentic
-    // sweep) — the merged artifact already contains the per-config rows.
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () =>
         Promise.resolve({
           artifacts: [
-            { name: 'results_bmk', id: 40, archive_download_url: 'http://dl-merged' },
-            { name: 'bmk_agentic_dsv4_conc72', id: 41, archive_download_url: 'http://dl-a' },
+            {
+              name: 'results_bmk',
+              id: 40,
+              archive_download_url: 'http://dl-merged',
+            },
+            {
+              name: 'bmk_agentic_dsv4_conc72',
+              id: 41,
+              archive_download_url: 'http://dl-a',
+            },
           ],
         }),
     });
@@ -691,7 +866,6 @@ describe('GET /api/unofficial-run', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.benchmarks).toHaveLength(2);
-    // Exactly one download (the merged artifact) — per-config was skipped.
     expect(mockFetch).toHaveBeenCalledTimes(3);
   });
 
@@ -711,8 +885,16 @@ describe('GET /api/unofficial-run', () => {
       json: () =>
         Promise.resolve({
           artifacts: [
-            { name: 'bmk_agentic_dsv4_conc72', id: 50, archive_download_url: 'http://dl-old' },
-            { name: 'bmk_agentic_dsv4_conc72', id: 51, archive_download_url: 'http://dl-new' },
+            {
+              name: 'bmk_agentic_dsv4_conc72',
+              id: 50,
+              archive_download_url: 'http://dl-old',
+            },
+            {
+              name: 'bmk_agentic_dsv4_conc72',
+              id: 51,
+              archive_download_url: 'http://dl-new',
+            },
           ],
         }),
     });
@@ -731,7 +913,6 @@ describe('GET /api/unofficial-run', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.benchmarks).toHaveLength(1);
-    // Three fetches total; the single download hit the newest artifact URL.
     expect(mockFetch).toHaveBeenCalledTimes(3);
     expect(mockFetch.mock.calls[2][0]).toBe('http://dl-new');
   });
@@ -757,7 +938,13 @@ describe('GET /api/unofficial-run', () => {
       ok: true,
       json: () =>
         Promise.resolve({
-          artifacts: [{ name: 'eval_results_all', id: 20, archive_download_url: 'http://dl-eval' }],
+          artifacts: [
+            {
+              name: 'eval_results_all',
+              id: 20,
+              archive_download_url: 'http://dl-eval',
+            },
+          ],
         }),
     });
     mockFetch.mockResolvedValueOnce({
@@ -785,6 +972,94 @@ describe('GET /api/unofficial-run', () => {
     expect(body.evaluations[0].run_url).toBe('http://github.com/run/321');
   });
 
+  it('caches a completed run at the CDN for an hour under the dashboard tag', async () => {
+    mockRunWithBenchmarks('completed');
+    const res = await GET(makeRequest('runId=123'));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Cache-Control')).toBe(
+      'public, max-age=60, s-maxage=3600, stale-while-revalidate=86400',
+    );
+    expect(res.headers.get('Vercel-Cache-Tag')).toBe('db-cdn');
+    const body = await res.json();
+    expect(body.benchmarks).toHaveLength(1);
+  });
+
+  it('sends plain JSON without Vary so the CDN keeps one entry per run', async () => {
+    mockRunWithBenchmarks('completed');
+    const res = await GET(
+      new NextRequest('http://localhost/api/unofficial-run?runId=123', {
+        headers: { 'Accept-Encoding': 'gzip, deflate, br, zstd' },
+      }),
+    );
+    expect(res.headers.get('Content-Encoding')).toBeNull();
+    expect(res.headers.get('Vary')).toBeNull();
+    const body = await res.json();
+    expect(body.benchmarks).toHaveLength(1);
+  });
+
+  it.each(['in_progress', 'queued', null])(
+    'caches a %s run for 30 seconds only',
+    async (status) => {
+      mockRunWithBenchmarks(status);
+      const res = await GET(makeRequest('runId=123'));
+      expect(res.status).toBe(200);
+      expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=30');
+    },
+  );
+
+  it('caches a missing run briefly so repeated polling stays off GitHub', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      headers: new Headers(),
+    });
+    const res = await GET(makeRequest('runId=999'));
+    expect(res.status).toBe(404);
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=300');
+  });
+
+  it('keeps a no-artifact 404 short-lived because the listing may have failed', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ id: 123, status: 'completed' }),
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ artifacts: [] }),
+    });
+    const res = await GET(makeRequest('runId=123'));
+    expect(res.status).toBe(404);
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=30');
+  });
+
+  it('turns a GitHub rate limit into an uncached 503 with Retry-After', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      statusText: 'Forbidden',
+      headers: new Headers({ 'x-ratelimit-remaining': '0', 'retry-after': '120' }),
+    });
+    const res = await GET(makeRequest('runId=123'));
+    expect(res.status).toBe(503);
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+    expect(res.headers.get('Retry-After')).toBe('120');
+    const body = await res.json();
+    expect(body.error).toContain('rate limit');
+  });
+
+  it('passes a non-rate-limit GitHub 403 through uncached', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      statusText: 'Forbidden',
+      headers: new Headers({ 'x-ratelimit-remaining': '4000' }),
+    });
+    const res = await GET(makeRequest('runId=123'));
+    expect(res.status).toBe(403);
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+  });
+
   it('returns 500 on unexpected error', async () => {
     mockFetch.mockRejectedValueOnce(new Error('Network failure'));
     const res = await GET(makeRequest('runId=123'));
@@ -794,12 +1069,10 @@ describe('GET /api/unofficial-run', () => {
   });
 
   it('uses today date when created_at is missing', async () => {
-    // Run metadata without created_at
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ id: 456, head_branch: 'feature' }),
     });
-    // Artifacts
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () =>
@@ -807,14 +1080,12 @@ describe('GET /api/unofficial-run', () => {
           artifacts: [{ name: 'results_bmk', id: 20, archive_download_url: 'http://dl' }],
         }),
     });
-    // Download
     const fakeBuffer = new ArrayBuffer(8);
     mockFetch.mockResolvedValueOnce({
       ok: true,
       arrayBuffer: () => Promise.resolve(fakeBuffer),
     });
 
-    // No JSON entries in zip
     mockGetEntries.mockReturnValue([]);
 
     const res = await GET(makeRequest('runId=456'));
@@ -826,7 +1097,6 @@ describe('GET /api/unofficial-run', () => {
   });
 
   it('merges data from multiple comma-separated runIds', async () => {
-    // Run 1 metadata
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () =>
@@ -841,24 +1111,30 @@ describe('GET /api/unofficial-run', () => {
           status: 'completed',
         }),
     });
-    // Run 1 artifacts
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () =>
         Promise.resolve({
-          artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: 'http://dl-1' }],
+          artifacts: [
+            {
+              name: 'results_bmk',
+              id: 10,
+              archive_download_url: 'http://dl-1',
+            },
+          ],
         }),
     });
-    // Run 1 download
     mockFetch.mockResolvedValueOnce({
       ok: true,
       arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
     });
     mockGetEntries.mockReturnValueOnce([
-      { entryName: 'r1.json', getData: () => Buffer.from(JSON.stringify([rawRow()])) },
+      {
+        entryName: 'r1.json',
+        getData: () => Buffer.from(JSON.stringify([rawRow()])),
+      },
     ]);
 
-    // Run 2 metadata
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () =>
@@ -873,15 +1149,19 @@ describe('GET /api/unofficial-run', () => {
           status: 'completed',
         }),
     });
-    // Run 2 artifacts
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () =>
         Promise.resolve({
-          artifacts: [{ name: 'results_bmk', id: 20, archive_download_url: 'http://dl-2' }],
+          artifacts: [
+            {
+              name: 'results_bmk',
+              id: 20,
+              archive_download_url: 'http://dl-2',
+            },
+          ],
         }),
     });
-    // Run 2 download
     mockFetch.mockResolvedValueOnce({
       ok: true,
       arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
@@ -899,13 +1179,11 @@ describe('GET /api/unofficial-run', () => {
     expect(body.runInfos).toHaveLength(2);
     expect(body.runInfos.map((r: { id: number }) => r.id)).toEqual([111, 222]);
     expect(body.benchmarks).toHaveLength(2);
-    // Each benchmark row is tagged with its originating run_url
     expect(body.benchmarks[0].run_url).toBe('http://github.com/run/111');
     expect(body.benchmarks[1].run_url).toBe('http://github.com/run/222');
   });
 
   it('dedupes repeated runIds in the comma-separated list', async () => {
-    // Only one set of fetches expected since 123 is deduped
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () =>
@@ -933,12 +1211,10 @@ describe('GET /api/unofficial-run', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.runInfos).toHaveLength(1);
-    // Only three fetches were made (run, artifacts, download) — not six
     expect(mockFetch).toHaveBeenCalledTimes(3);
   });
 
   it('fails with the upstream status when any runId in the list errors', async () => {
-    // First run succeeds
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () =>
@@ -962,8 +1238,11 @@ describe('GET /api/unofficial-run', () => {
     });
     mockGetEntries.mockReturnValueOnce([]);
 
-    // Second run 404s on metadata fetch
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found' });
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+    });
 
     const res = await GET(makeRequest('runId=111,999'));
     expect(res.status).toBe(404);
@@ -972,10 +1251,9 @@ describe('GET /api/unofficial-run', () => {
   });
 });
 
-// Retained outputs of the real producer CLI, with synthetic input traces.
 import validProcessorPower from '../../../../../db/src/etl/fixtures/power-processor/valid-power.json';
 import missingProcessorPower from '../../../../../db/src/etl/fixtures/power-processor/missing-power.json';
-import { transformBenchmarkRows } from '@/lib/benchmark-transform';
+import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
 
 it('carries the actual processor audit and power through API mapping into measured chart fields', () => {
   const rows = normalizeArtifactRows([validProcessorPower, missingProcessorPower], '2026-09-11');

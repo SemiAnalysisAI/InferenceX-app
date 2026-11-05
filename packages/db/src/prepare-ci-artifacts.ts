@@ -3,11 +3,14 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 
+import { requireIngestRepo } from './cli-utils.js';
 import { buildArtifactPlan } from './lib/ci-artifact-preparation.js';
 import { downloadArtifact, listRunArtifacts, type ArtifactMeta } from './lib/github-artifacts.js';
-
-const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
+import { verifyRequiredPowerArtifacts } from './etl/required-power-publication.js';
+import { describeRetryCopySelection, dropSupersededJobCopies } from './etl/retry-copies.js';
+import { isRunAttemptPurged } from './etl/run-overrides.js';
 
 interface GithubRunMetadata {
   head_sha?: string;
@@ -32,24 +35,52 @@ function fetchRunMetadata(repo: string, runId: string): GithubRunMetadata {
   ) as GithubRunMetadata;
 }
 
-function downloadWithRetries(artifact: ArtifactMeta, artifactsPath: string, attempt = 1): void {
-  const zipPath = path.join(artifactsPath, 'artifact.zip');
+const DOWNLOAD_CONCURRENCY = 8;
+
+async function downloadWithRetries(
+  artifact: ArtifactMeta,
+  artifactsPath: string,
+  attempt = 1,
+): Promise<void> {
   const artifactPath = path.join(artifactsPath, artifact.name);
   try {
-    fs.rmSync(zipPath, { force: true });
     fs.rmSync(artifactPath, { recursive: true, force: true });
-    downloadArtifact(artifact, artifactsPath);
+    await downloadArtifact(artifact, artifactsPath);
   } catch (error) {
-    fs.rmSync(zipPath, { force: true });
     fs.rmSync(artifactPath, { recursive: true, force: true });
     if (attempt >= 3) {
       throw new Error(`Failed to download artifact ${artifact.name} after 3 attempts`, {
         cause: error,
       });
     }
-    console.warn(`  attempt ${attempt}/3 failed; retrying in ${attempt}s`);
-    execFileSync('sleep', [String(attempt)]);
-    downloadWithRetries(artifact, artifactsPath, attempt + 1);
+    console.warn(`  ${artifact.name}: attempt ${attempt}/3 failed; retrying in ${attempt}s`);
+    await sleep(attempt * 1000);
+    await downloadWithRetries(artifact, artifactsPath, attempt + 1);
+  }
+}
+
+async function downloadAll(
+  artifacts: readonly ArtifactMeta[],
+  artifactsPath: string,
+): Promise<void> {
+  let next = 0;
+  let failed = false;
+  async function worker(): Promise<void> {
+    while (!failed && next < artifacts.length) {
+      const artifact = artifacts[next++];
+      console.log(`Downloading artifact: ${artifact.name}`);
+      try {
+        await downloadWithRetries(artifact, artifactsPath);
+      } catch (error) {
+        failed = true;
+        throw error;
+      }
+    }
+  }
+  const workers = Math.min(DOWNLOAD_CONCURRENCY, artifacts.length);
+  const results = await Promise.allSettled(Array.from({ length: workers }, worker));
+  for (const result of results) {
+    if (result.status === 'rejected') throw result.reason;
   }
 }
 
@@ -66,6 +97,7 @@ function writeOutputs(values: Record<string, string | number | boolean>): void {
 
 function writeReuseMetadata(
   artifactsPath: string,
+  repo: string,
   sourceRunId: string,
   mergeRunId: string,
   source: GithubRunMetadata,
@@ -79,16 +111,12 @@ function writeReuseMetadata(
       {
         source_run_id: sourceRunId,
         source_run_attempt: source.run_attempt ?? 1,
-        source_run_url:
-          source.html_url ??
-          `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${sourceRunId}`,
+        source_run_url: source.html_url ?? `https://github.com/${repo}/actions/runs/${sourceRunId}`,
         source_pr_number: source.pull_requests?.[0]?.number ?? null,
         source_head_sha: source.head_sha ?? null,
         ingest_run_id: mergeRunId,
         ingest_run_attempt: merge.run_attempt ?? 1,
-        ingest_run_url:
-          merge.html_url ??
-          `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${mergeRunId}`,
+        ingest_run_url: merge.html_url ?? `https://github.com/${repo}/actions/runs/${mergeRunId}`,
       },
       null,
       2,
@@ -96,7 +124,7 @@ function writeReuseMetadata(
   );
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const args = process.argv.slice(2).filter((arg) => arg !== '--');
   const dryRun = args.includes('--dry-run');
   const positional = args.filter((arg) => arg !== '--dry-run');
@@ -105,7 +133,7 @@ function main(): void {
     process.env.MERGE_RUN_ID ?? positional[1] ?? sourceRunId,
     'MERGE_RUN_ID',
   );
-  const repo = process.env.INGEST_REPO ?? DEFAULT_REPO;
+  const repo = requireIngestRepo();
   const artifactsPath = process.env.ARTIFACTS_PATH ?? path.resolve('artifacts');
 
   const sourceMetadata = fetchRunMetadata(repo, sourceRunId);
@@ -144,17 +172,32 @@ function main(): void {
   if (fs.readdirSync(artifactsPath).length > 0) {
     throw new Error(`ARTIFACTS_PATH must be empty before preparation: ${artifactsPath}`);
   }
-  for (const artifact of plan.artifacts) {
-    console.log(`Downloading artifact: ${artifact.name}`);
-    downloadWithRetries(artifact, artifactsPath);
+  await downloadAll(plan.artifacts, artifactsPath);
+  for (const line of describeRetryCopySelection(
+    dropSupersededJobCopies(artifactsPath, plan.artifacts, sourceRunId),
+  )) {
+    console.log(line);
+  }
+  if (isRunAttemptPurged(Number(sourceRunId), sourceMetadata.run_attempt ?? 1)) {
+    console.log(`Source run ${sourceRunId} is purged; skipping required-power verification.`);
+  } else {
+    verifyRequiredPowerArtifacts(
+      artifactsPath,
+      {
+        runId: Number(sourceRunId),
+        runAttempt: sourceMetadata.run_attempt ?? 1,
+        headSha: sourceMetadata.head_sha ?? null,
+      },
+      process.env.INGEST_REQUIRE_POWER === 'true',
+    );
   }
   if (plan.reused) {
-    writeReuseMetadata(artifactsPath, sourceRunId, mergeRunId, sourceMetadata, mergeMetadata);
+    writeReuseMetadata(artifactsPath, repo, sourceRunId, mergeRunId, sourceMetadata, mergeMetadata);
   }
 }
 
 try {
-  main();
+  await main();
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;

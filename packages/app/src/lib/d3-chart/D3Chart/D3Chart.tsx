@@ -1,16 +1,15 @@
 'use client';
 
 import React, { useImperativeHandle, useRef } from 'react';
-import * as d3 from 'd3';
 
 import { D3ChartWrapper } from '@/components/ui/d3-chart-wrapper';
 import { useChartTooltipHandlers } from '@/hooks/useChartTooltipHandlers';
 import { useChartZoom } from '@/hooks/useChartZoom';
 import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
 
-import type { ContinuousScale } from '../types';
+import { DEFAULT_CHART_MARGIN } from '../chart-setup';
 
-import { isBandScale, type BuiltScale } from './scale-builders';
+import type { BuiltScale } from './scale-builders';
 import type { D3ChartHandle, D3ChartProps } from './types';
 import { useD3ChartRenderer } from './useD3ChartRenderer';
 
@@ -19,7 +18,7 @@ function D3ChartInner<T>(
     chartId,
     data,
     height = 600,
-    margin,
+    margin = DEFAULT_CHART_MARGIN,
     watermark,
     testId,
     grabCursor = true,
@@ -39,7 +38,10 @@ function D3ChartInner<T>(
     legendElement,
     noDataOverlay,
     caption,
+    footer,
+    scrollablePlot,
     onRender,
+    onExportRender,
     onDisplayUpdate,
   }: D3ChartProps<T>,
   ref: React.ForwardedRef<D3ChartHandle>,
@@ -83,18 +85,6 @@ function D3ChartInner<T>(
       getSvgElement: () => svgRef.current,
       getTooltipElement: () => tooltipRef.current,
       getScales: () => scalesRef.current,
-      refreshDataPositions: () => {
-        const svg = svgRef.current;
-        const scales = scalesRef.current;
-        if (!svg || !scales) return;
-        if (isBandScale(scales.xScale) || isBandScale(scales.yScale)) return;
-        const transform = d3.zoomTransform(svg);
-        const curX = transform.rescaleX(scales.xScale as ContinuousScale);
-        const curY = transform.rescaleY(scales.yScale as ContinuousScale);
-        d3.select(svg)
-          .selectAll<SVGGElement, { x: number; y: number }>('.dot-group')
-          .attr('transform', (d) => `translate(${curX(d.x)},${curY(d.y)})`);
-      },
     }),
     [dismissTooltip, hideTooltipElements, pinnedPoint, pinnedPointIsOverlay, isPinned, pinTooltip],
   );
@@ -124,6 +114,7 @@ function D3ChartInner<T>(
       legendElement,
       noDataOverlay,
       onRender,
+      onExportRender,
       onDisplayUpdate,
     },
     {
@@ -149,16 +140,20 @@ function D3ChartInner<T>(
       tooltipRef={tooltipRef}
       setContainerRef={setContainerRef}
       dimensions={dimensions}
+      plotTop={margin.top}
       pinnedPoint={pinnedPoint}
       isPinned={isPinned}
       dismissTooltip={dismissTooltip}
       hideTooltipElements={hideTooltipElements}
       instructions={instructions}
+      zoomEnabled={zoomConfig?.enabled ?? false}
       testId={testId}
       grabCursor={grabCursor}
       legendElement={legendElement}
       noDataOverlay={noDataOverlay}
       caption={caption}
+      footer={footer}
+      scrollablePlot={scrollablePlot}
     />
   );
 }

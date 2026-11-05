@@ -22,8 +22,9 @@
 
 import { tokenRevenueFromRatesPerGpuHour } from '@/components/inference/token-revenue';
 import type { TokenRevenuePricing } from '@/components/inference/types';
-import { Model } from '@/lib/data-mappings';
+import { Model } from '@/lib/catalog/data-mappings';
 
+import type { ProfitPowerSource } from './profit-power';
 import type { InterpolatedResult } from './types';
 
 /** Calendar hours in a year (365 x 24). */
@@ -60,38 +61,22 @@ export interface ProfitModelDefaults {
 }
 
 /**
- * Per-model defaults. Kimi K3 opens on 45 tok/s/user and Moonshot's list
- * price ($3.00 / $0.30 cached / $15.00 per M tok, flat at any context length)
- * because third-party hosts undercut it on OpenRouter, where the catalog
- * aggregate sits near $1.80 / $9.00. GLM 5.2/5.3 opens on Z.ai's list price
- * ($1.40 / $0.26 cached / $4.40 per M tok) because third-party hosts undercut
- * it on OpenRouter, and on 100 tok/s/user: Z.ai serves at 48 tok/s/user, but
- * no priced SKU has a measured point that low yet, so the nearest round
- * operating point every curve covers is used until one does. MiniMax M3 opens
- * on MiniMax's standard list price for <=512K-token calls ($0.30 / $0.06
- * cached / $1.20 per M tok, the permanent 50%-off rate) because the OpenRouter
- * aggregate also sits below it, and on 83 tok/s/user, the speed MiniMax's own
- * API serves at; the B200/B300/GB200/MI355X agentic curves all cover that
- * point, and the Hopper and MI300-series curves top out below it and list as
- * not priced. GLM 5.2/5.3 opens on a 10% model license fee and MiniMax M3 on
- * 20%, instead of the 30% the other models assume. DeepSeek V4 Pro opens on
- * DeepSeek's peak-hour list price ($1.32 / $0.044 cached / $3.96 per M tok;
- * off-peak is half that) because third-party hosts undercut it on OpenRouter,
- * on 24 tok/s/user, the speed DeepSeek's own API serves at, and on a 0% model
- * license fee: the weights ship under the MIT license, so there is no lab cut
- * to model. The B200, B300, and MI355X agentic curves reach that point; the
- * GB200, GB300, and H200 curves bottom out above it and list as not priced
- * until a lower-interactivity run lands. DeepSeek V4.1 Flash opens on the
- * `deepseek-flash` peak-hour list price ($0.30 / $0.006 cached / $1.20 per M
- * tok; off-peak is half that) from the same pricing page, on 125 tok/s/user,
- * the speed DeepSeek's own API serves the Flash tier at, and on the same 0%
- * MIT license fee. It entered the fleet on AgentX only, so the
- * estimator serves it from day zero; SKUs whose curves stop short of 125
- * tok/s/user list as not priced rather than extrapolated.
+ * Per-model defaults. On 2026-10-25, the first 5-tok/s/user step that
+ * maximized priced AgentX SKU coverage in a 5–300 sweep selected Kimi K3 60, GLM 5.2/5.3
+ * 135, MiniMax M3 115, DeepSeek V4 Pro 170, and DeepSeek V4.1 Flash 150.
+ * These editable P90 targets show measured configurations; they are not claims
+ * about hosted API speeds. Curves outside the target range stay unpriced.
+ *
+ * Kimi K3 uses Moonshot's list price ($3.00 / $0.30 cached / $15.00 per M tok),
+ * GLM 5.2/5.3 uses Z.ai's list price ($1.40 / $0.26 / $4.40), and MiniMax M3
+ * uses MiniMax's <=512K list price ($0.30 / $0.06 / $1.20). Third-party
+ * OpenRouter hosts can undercut those labs. GLM and MiniMax M3 assume a 20%
+ * model license fee. DeepSeek V4 Pro and V4.1 Flash use DeepSeek's peak-hour
+ * list prices and a 0% fee because their weights ship under the MIT license.
  */
 const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
   [Model.DeepSeek_V4_Pro]: {
-    interactivity: 24,
+    interactivity: 170,
     labCutPct: 0,
     listPricing: {
       vendor: 'DeepSeek',
@@ -102,7 +87,7 @@ const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
     },
   },
   [Model.DeepSeek_V4_1_Flash]: {
-    interactivity: 125,
+    interactivity: 150,
     labCutPct: 0,
     listPricing: {
       vendor: 'DeepSeek',
@@ -113,7 +98,7 @@ const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
     },
   },
   [Model.Kimi_K3]: {
-    interactivity: DEFAULT_PROFIT_INTERACTIVITY,
+    interactivity: 60,
     labCutPct: DEFAULT_LAB_CUT_PCT,
     listPricing: {
       vendor: 'Moonshot',
@@ -124,8 +109,8 @@ const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
     },
   },
   [Model.GLM_5_2]: {
-    interactivity: 100,
-    labCutPct: 10,
+    interactivity: 135,
+    labCutPct: 20,
     listPricing: {
       vendor: 'Z.ai',
       inputPerMillion: 1.4,
@@ -135,7 +120,7 @@ const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
     },
   },
   [Model.MiniMax_M3]: {
-    interactivity: 83,
+    interactivity: 115,
     labCutPct: 20,
     listPricing: {
       vendor: 'MiniMax',
@@ -168,6 +153,19 @@ export function listPricingToTokenRevenuePricing(list: ProfitListPricing): Token
   };
 }
 
+/**
+ * Whether the profit estimator uses the observed (server-measured) cache hit
+ * rate or the infinite-cache theoretical rate from the trace.
+ *
+ * - **actual**: the cache hit rate measured by the serving runtime during the
+ *   benchmark, reflecting real cache capacity and eviction behaviour.
+ * - **theoretical**: the infinite-cache theoretical rate computed from the
+ *   trace, representing the maximum reuse potential if cache capacity were
+ *   unbounded. Useful as an upper-bound revenue estimate.
+ */
+export type CacheHitMode = 'actual' | 'theoretical';
+export const DEFAULT_CACHE_HIT_MODE: CacheHitMode = 'theoretical';
+
 /** Fraction of benchmarked throughput that is actually sold. */
 export const DEFAULT_UTILIZATION_PCT = 60;
 
@@ -187,8 +185,10 @@ export interface ProfitEstimatorAssumptions {
 }
 
 export interface ProfitEstimatorRow {
-  /** Distinguish identical hardware bars when both power budgets are shown. */
+  /** Identify the power budget and any full-chassis extrapolation in charts and CSV. */
   powerLabel?: string;
+  /** What the measured + modeled power budget was measured on; unset for provisioned rows. */
+  powerSource?: ProfitPowerSource;
   hwKey: string;
   resultKey: string;
   precision?: string;
@@ -227,6 +227,10 @@ export interface ProfitEstimatorRow {
  */
 export type ProfitEstimatorSkipReason =
   | 'no-measured-power'
+  | 'incompatible-power-basis'
+  | 'unsupported-power-hardware'
+  | 'unsupported-power-topology'
+  | 'outside-power-model'
   | 'outside-measured-range'
   | 'no-power'
   | 'no-cost'
@@ -400,6 +404,22 @@ export function modelsWithAgenticData<M extends string>(
     rows.filter((row) => row.benchmark_type === 'agentic_traces').map((row) => row.model),
   );
   return models.filter((model) => dbKeysFor(model).some((key) => agenticDbModels.has(key)));
+}
+
+/**
+ * Remap interpolated results to use the theoretical cache hit rate in place of
+ * the measured one. When the theoretical rate is unavailable, the measured rate
+ * is kept — the intent is an upper-bound estimate, not a dropout.
+ */
+export function applyCacheHitMode<
+  T extends { cacheHitRate?: number; theoreticalCacheHitRate?: number },
+>(results: readonly T[], mode: CacheHitMode): T[] {
+  if (mode === 'actual') return results as T[];
+  return results.map((r) =>
+    typeof r.theoreticalCacheHitRate === 'number'
+      ? { ...r, cacheHitRate: r.theoreticalCacheHitRate }
+      : r,
+  );
 }
 
 /**

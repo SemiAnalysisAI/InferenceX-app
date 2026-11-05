@@ -2,44 +2,24 @@
 
 import { useId, useState, type ReactNode } from 'react';
 
-/** Vertical crosshair + floating value tooltip overlay shared by every chart. */
 export interface HoverItem {
-  /** Color swatch to render next to the label. */
   color: string;
   label: string;
   value: string;
-  /** Optional faint secondary line (e.g. timestamp under main values). */
   hint?: string;
 }
 
 interface ChartHoverProps {
-  /** Padding inside the SVG; matches the chart's CHART_PAD. */
   pad: { top: number; right: number; bottom: number; left: number };
-  /** SVG viewBox dimensions used to render the chart. */
   width: number;
   height: number;
-  /**
-   * Called with the cursor's normalized x in [0..1] across the plot area.
-   * Returns `null` to hide the tooltip (e.g. cursor outside data range).
-   */
   resolve: (xFraction: number) => { items: HoverItem[]; title?: string } | null;
-  /** Optional accessible name that enables keyboard exploration of discrete values. */
   ariaLabel?: string;
-  /** Number of discrete x-axis values available to keyboard users. */
   keyboardSteps?: number;
-  /** Optional locale-aware formatter for the screen-reader value summary. */
   formatAriaValueText?: (items: HoverItem[]) => string;
   children: ReactNode;
 }
 
-/**
- * Wrap a chart's <svg> render to add mouse-driven crosshair + tooltip.
- *
- * The chart owner renders its bars / lines / axes via `children`; this wrapper
- * adds an invisible <rect> across the plot area to capture pointer events, a
- * vertical line that follows the cursor, and a floating tooltip on the right
- * of the cursor (auto-flipping to the left when it would overflow).
- */
 export function ChartHover({
   pad,
   width,
@@ -94,7 +74,6 @@ export function ChartHover({
     const svg = e.currentTarget.ownerSVGElement;
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
-    // Convert client coords → SVG viewBox coords.
     const sx = ((e.clientX - rect.left) * width) / rect.width;
     const sy = ((e.clientY - rect.top) * height) / rect.height;
     const fraction = Math.max(0, Math.min(1, (sx - pad.left) / innerW));
@@ -204,8 +183,6 @@ function HoverTooltip({
   items: HoverItem[];
   id: string;
 }) {
-  // Position tooltip near the crosshair as a % of the container.
-  // We flip to the cursor's left side when it would overflow the right edge.
   const xPx = padLeft + xFraction * innerW;
   const onRight = xPx < containerWidth * 0.55;
   const left = onRight ? `${(xPx / containerWidth) * 100}%` : 'auto';

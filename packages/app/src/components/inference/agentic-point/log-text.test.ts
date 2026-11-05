@@ -78,8 +78,6 @@ describe('buildLogLines', () => {
       { text: ' after\nnext line', highlighted: false },
     ]);
     expect(lines).toHaveLength(2);
-    // `text` rejoins the pieces, so the memoized plain-row path and the
-    // per-piece highlight path always render the same characters.
     expect(lines[0]?.text).toBe('INFO before router ready after');
     expect(lines[0]?.pieces).toEqual([
       { text: 'INFO before ', highlighted: false },

@@ -1,18 +1,9 @@
 import { Card } from '@/components/ui/card';
 import { Eyebrow } from '@/components/ui/eyebrow';
-import { getTelemetryGuide } from '@/lib/agentx-telemetry-zh';
-import type { Locale } from '@/lib/i18n';
+import { getTelemetryGuide } from '@/lib/agentx/agentx-telemetry-zh';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import { AgenticCatalogLink } from './agentic-catalog-link';
-
-/**
- * Short hero for `/inference/agentic`, drawn from the same
- * `AGENTX_TELEMETRY_GUIDE` that renders the full tutorial at
- * `/agentx/telemetry`. Reusing the guide's eyebrow, title, lead, and
- * highlights keeps the catalog's framing in lockstep with the tutorial —
- * including the highlight counts, which `agentx-telemetry.test.ts` pins to
- * what the detail page actually ships.
- */
 
 const STRINGS = {
   en: {

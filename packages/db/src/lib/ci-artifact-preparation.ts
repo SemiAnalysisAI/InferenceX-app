@@ -8,10 +8,6 @@ export interface ArtifactPlan {
   reused: boolean;
 }
 
-/**
- * Match normal ingestion: keep the newest upload for each exact artifact name.
- * Reused sweeps only differ by taking changelog metadata from the merge run.
- */
 export function buildArtifactPlan(
   sourceRunId: string,
   mergeRunId: string,

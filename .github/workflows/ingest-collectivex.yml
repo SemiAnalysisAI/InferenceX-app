@@ -1,0 +1,107 @@
+name: Ingest CollectiveX Results
+
+# CollectiveX results are uploaded from a cluster with
+# `bun run admin:db:ingest:collectivex --dir <results>`; nothing reads them from git. This
+# workflow applies pending migrations and purges the dashboard's CollectiveX cache, and with
+# delete_run first deletes that stored run. Run it with no input after an upload made without
+# APP_URL / VERCEL_INVALIDATE_SECRET to show the new run at once.
+on:
+  workflow_dispatch:
+    inputs:
+      delete_run:
+        description: Delete this stored run_id before purging the cache (leave empty to only migrate and purge)
+        required: false
+
+permissions: {}
+
+# One group for every run: they queue behind each other instead of writing at once (the
+# database also serializes writers with an advisory lock).
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    name: Maintain CollectiveX results
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check inputs and secrets
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          VERCEL_INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
+          DATABASE_COLLECTIVEX_WRITE_URL: ${{ secrets.DATABASE_COLLECTIVEX_WRITE_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          DELETE_RUN: ${{ inputs.delete_run }}
+        run: |
+          : "${SLACK_WEBHOOK_URL:?SLACK_WEBHOOK_URL secret is not set}"
+          : "${APP_URL:?APP_URL repository variable is not set}"
+          : "${VERCEL_INVALIDATE_SECRET:?VERCEL_INVALIDATE_SECRET secret is not set}"
+          : "${DATABASE_COLLECTIVEX_WRITE_URL:?DATABASE_COLLECTIVEX_WRITE_URL secret is not set}"
+          if [ -n "$DELETE_RUN" ] && ! [[ "$DELETE_RUN" =~ ^[1-9][0-9]{0,9}$ ]]; then
+            echo "delete_run must be a stored run_id" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Bun
+        id: setup-bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Cache Bun packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ runner.arch }}-${{
+            steps.setup-bun.outputs.bun-version }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-${{ runner.arch }}-${{ steps.setup-bun.outputs.bun-version }}-
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+
+      - name: Run migrations
+        env:
+          DATABASE_COLLECTIVEX_WRITE_URL: ${{ secrets.DATABASE_COLLECTIVEX_WRITE_URL }}
+        run: bun run --cwd packages/db src/migrate-collectivex.ts --yes
+
+      - name: Delete run
+        if: inputs.delete_run != ''
+        env:
+          DATABASE_COLLECTIVEX_WRITE_URL: ${{ secrets.DATABASE_COLLECTIVEX_WRITE_URL }}
+          DELETE_RUN: ${{ inputs.delete_run }}
+        # APP_URL is not passed here, so the CLI leaves the purge to the next step.
+        run: bun run --cwd packages/db src/ingest-collectivex.ts --delete-run "$DELETE_RUN" --yes
+
+      # A deleted run must never be served again, so deletion drops the cached responses
+      # outright instead of serving them once more while the CDN refreshes.
+      - name: Invalidate CollectiveX cache
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          VERCEL_INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
+          VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
+          IMMEDIATE: ${{ inputs.delete_run != '' }}
+        run: |
+          : "${APP_URL:?APP_URL repository variable is not set}"
+          headers=(-H "Authorization: Bearer $VERCEL_INVALIDATE_SECRET")
+          if [ -n "$VERCEL_PROTECTION_BYPASS_SECRET" ]; then
+            headers+=(-H "x-vercel-protection-bypass: $VERCEL_PROTECTION_BYPASS_SECRET")
+          fi
+          curl -sSf -X POST "${APP_URL%/}/api/v1/invalidate?scope=collectivex&immediate=${IMMEDIATE}" "${headers[@]}"
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d # v4.0.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": ":rotating_light: *Ingest CollectiveX workflow failed*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+            }

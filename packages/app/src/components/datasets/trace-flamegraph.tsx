@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { ConversationStructure } from '@/hooks/api/use-datasets';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { compact, formatShare } from './format';
 import {
   buildRowOverlaps,
@@ -30,7 +30,7 @@ export type {
   TimedRequest,
 } from './trace-flamegraph-model';
 
-const SEG = {
+export const SEG = {
   cached: '#10b981',
   uncached: '#f59e0b',
   output: '#8b5cf6',
@@ -331,7 +331,7 @@ export function TraceFlamegraph({
                         type="button"
                         onClick={() => {
                           track('datasets_flamegraph_group_toggled', {
-                            expanded: !row.isExpanded,
+                            enabled: !row.isExpanded,
                           });
                           if (row.groupIndex !== undefined) toggle(row.groupIndex);
                         }}

@@ -1,5 +1,96 @@
 # AgentX cookbook
 
+## Benchmark your own hardware
+
+Share [the AgentX quickstart](https://inferencex.semianalysis.com/agentx/quickstart)
+([简体中文](https://inferencex.semianalysis.com/zh/agentx/quickstart)).
+Use Python 3.11–3.13. Start an OpenAI-compatible streaming
+chat-completions server, then set `HUGGINGFACE_MODEL_NAME` and `CONC_SESSIONS`
+for your deployment:
+
+```bash
+pip install 'agentx-harness==1.0.7'
+
+export HUGGINGFACE_MODEL_NAME="org/model"
+export CONC_SESSIONS=16
+
+agentx profile \
+  --url "http://127.0.0.1:8000" --endpoint /v1/chat/completions \
+  --model "$HUGGINGFACE_MODEL_NAME" --tokenizer "$HUGGINGFACE_MODEL_NAME" \
+  --tokenizer-trust-remote-code \
+  --concurrency "$CONC_SESSIONS" \
+  --public-dataset "semianalysis_cc_traces_weka_062126" \
+  --output-artifact-dir "output_dir_results"
+```
+
+Replace the URL as needed. `agentx profile` selects the AgentX scenario
+automatically. If the server uses an alias, change `--model` but retain the
+matching Hugging Face tokenizer. Only trust remote tokenizer code from a
+repository you trust; omit that flag when custom code is unnecessary.
+Concurrency counts session trees, not individual in-flight requests.
+
+Optionally export these in the same shell before running the benchmark:
+
+```bash
+# Adds X-Dynamo-Session-ID; subagents also get X-Dynamo-Parent-Session-ID.
+# Only this option sends the parent ID, preserving forked-agent lineage.
+export AIPERF_HTTP_X_DYNAMO_SESSION_ID_FROM_CORRELATION_ID=true
+# Also sends X-Session-ID, if a front-end router needs it.
+export AIPERF_HTTP_X_SESSION_ID_FROM_CORRELATION_ID=true
+```
+
+`X-Session-ID` alone does not send the parent ID. Inspect errors and
+`submission_valid` in the output artifacts, retain the server configuration,
+and follow the methodology before comparing hardware. This CLI runs against
+your server; it does not publish results to InferenceX or add a read-only API
+operation.
+
+## Read published benchmark results
+
+GLM-5.3-Flash uses display model `GLM-5.3-Flash`, raw DB key `glm5.3flash`,
+and dashboard route `/inference/glm-5-3-flash` (also under `/zh`). Use
+`model=GLM-5.3-Flash&sequence=agentic-traces` for the inference view. Native
+`zai-org/GLM-5.3-Flash` and `nvidia/GLM-5.3-Flash-NVFP4` observations share
+this model bucket; precision remains a separate field. Registration does not
+publish experimental runs or establish hardware qualification. Preserve empty
+responses, and never substitute the older GLM-5.2/5.3 bucket. The future
+`OneNexus/GLM-5.3-Flash-MXFP4` checkpoint is not registered as a qualified
+benchmark target; `OneNexus/GLM-5.3-MXFP4` is a different, non-Flash checkpoint.
+Parameter counts, weights-publication date, OpenRouter ID and API list pricing
+remain unverified and are not inherited from GLM-5.3.
+
+The dashboard exposes this model only after its existing UI feature gate is
+enabled. This is a presentation flag, not authorization: read-only API model
+parameters, raw identities and returned data are unaffected. An unofficial
+run does not unlock the UI. Public model discovery omits Flash by default.
+
+For interactivity comparisons and performance-over-time charts, first read
+[AgentX P90 interactivity](agentic-interactivity.md). The dashboard operating point
+uses reciprocal P90 full-response ITL, not the median or P90 of token rates.
+
+Muse Spark Open uses display model `Muse-Spark-Open`, raw DB key
+`musespark`, and dashboard route `/inference/muse-spark-open` (also under `/zh`).
+Use `model=Muse-Spark-Open` for benchmark reads and the inference view API,
+with `sequence=agentic-traces` for the latter. Landing-page and comparison results
+links open the canonical dashboard without an `unofficialRun` parameter.
+Unofficial runs remain available through explicitly supplied overlay links; they
+do not populate the published benchmark API. Preserve empty API responses as no
+published data; do not substitute another model.
+
+MiniMax M3.1 Flash uses display model `MiniMax-M3.1-Flash`, raw DB key
+`minimaxm31flash`, and dashboard route `/inference/minimax-m31-flash` (also under
+`/zh`). It is benchmarked on AgentX only, with the checkpoint's built-in DSpark
+drafter, which the API reports as spec method `mtp`. Use
+`model=MiniMax-M3.1-Flash` for benchmark reads and the inference view API, with
+`sequence=agentic-traces` for the latter. Its rows never fall back to `MiniMax-M3`.
+
+Installed raw recipes use `scripts/capture-response.mjs`, which applies the shared
+request-header helper for version attribution. Set `INFERENCEX_TELEMETRY=0` or
+`DO_NOT_TRACK=1` to omit attribution; use `INFERENCEX_TRAFFIC=validation` for demos
+and acceptance checks. See [request usage](cli.md#request-usage) for the captured
+fields. Standalone copies of older inline recipes without that helper send no
+attribution.
+
 AgentX observations measure serving-system performance under concurrent,
 closed-loop agent clients. `conc` is the number of clients that issue their next
 request after the previous response; it is not a fixed request batch. Report
@@ -137,6 +228,25 @@ validate the bundle with `inferencex verify`, then inspect the saved benchmark
 response. Neither outcome says whether other benchmark jobs, failed runs, source
 artifacts, or data outside that response exist.
 
+### Read the enrichment and coverage states
+
+The status fields describe different objects:
+
+| Source field                                                    | Meaning                                                                                                                       |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `row.agentx.status = complete`                                  | Both the aggregate entry and derived-metric entry were returned for this result ID; individual values can be null.            |
+| `row.agentx.aggregates.status = available`                      | The aggregate response contains this ID, including entries whose groups are all null.                                         |
+| `metadata.enrichment_coverage.aggregates[group].available_rows` | Number of selected rows with a non-null distribution for this group; its `n` can be zero.                                     |
+| `manifest.coverage.hardware[].valid_records`                    | Number of rows with at least one recognized aggregate group whose `n > 0`. This is the hardware policy's usable-record count. |
+
+Trace availability is recorded separately. Keep each distribution's `n` with its
+statistics. A row can have both enrichment entries while only some metric groups
+contain samples.
+
+For `agentx.status = complete`, report “rows with both aggregate and derived-metric
+entries.” Use the existing per-group counts in `metadata.enrichment_coverage` to
+describe which optional groups have values, are null, or have missing entries.
+
 An unsupported raw ID remains in the export but is not sent to numeric enrichment
 endpoints. Do not use this summary workflow to bulk-read timelines, histograms, or
 server metrics.
@@ -163,21 +273,28 @@ main-agent requests. Timeline-level `startNs` and `endNs` are wall-clock nanosec
 anchors. Per-request `credit`, `start`, `ack`, and `end` are nanosecond offsets from
 `timeline.startNs`. Keep those two timestamp roles separate. Retain the original
 response text before parsing: JavaScript `Number` can round large integer anchors.
-For anchor differences, parse the original JSON with Python's integer-preserving
-`json.load`, subtract the integer anchors, then convert the difference to seconds.
+For anchor differences, parse the original JSON with an integer-preserving parser
+(Python's `json.load` or the raw-number reviver below), subtract the integer anchors,
+then convert the difference to seconds.
 Reserialized JavaScript numbers cannot recover the original digits.
 
-For each server-metric series used in the requested analysis, inspect its returned
+Inventory every returned scalar and nested server-metric series, including
+`promptTokensBySource`, using the recipe's sample summary. Inspect each series'
 fields before calculating statistics. `queueDepth` carries `running`, `waiting`,
 and `total`, while scalar series use `value`. Report that series' own sample,
 finite, nonzero, and missing counts; array lengths can differ. A nonzero fraction
 uses that field's finite count as its denominator, with missing samples reported
 separately. An empty series has no samples; zero-valued samples remain recorded
-observations. When relating a request group to metric windows, align timestamp
-origins, state the inclusion rule, and report inside/outside counts for that exact
-group. Retain exceptions; overlapping overall ranges do not establish that every
-member falls inside the same windows.
+observations. When relating a request group to metric windows, use the optional
+calculation below with that group's explicit identities. It counts each sample once
+across the union of the selected windows; summing per-request counts instead measures
+sample/request memberships. Retain exceptions and each series' own denominator.
 
+Compute phase totals per request before taking percentiles; separate phase
+percentiles are distributions, not additive components of the E2E percentile.
+For the slowest request in a phase, select the record with the largest `end - start`
+first, then read its IDs, ISL, OSL, and cancellation state from that record. Maxima
+of separate fields can belong to different requests.
 For timeline accounting, `sum(end - start)` is cumulative request latency and can
 exceed elapsed time when requests overlap. The union of `[start, end]` intervals
 is time with at least one request in flight. Neither measures GPU utilization or
@@ -188,7 +305,10 @@ was never limiting or that a cold cache caused the latency.
 
 ```bash
 node --input-type=module <<'JS'
-const base = 'https://inferencex.semianalysis.com';
+import { summarizeTrace, renderTraceSummary, validateTimeline } from './.agents/skills/inferencex-api/scripts/trace-summary.mjs';
+import { createResponseCapture } from './.agents/skills/inferencex-api/scripts/capture-response.mjs';
+import { readFileSync } from 'node:fs';
+
 const selectedResultId = '421';
 const diagnosticId = /^(?:[1-9]\d*)$/u.test(selectedResultId) ? Number(selectedResultId) : null;
 if (!Number.isSafeInteger(diagnosticId) || diagnosticId <= 0 || String(diagnosticId) !== selectedResultId) {
@@ -197,20 +317,12 @@ if (!Number.isSafeInteger(diagnosticId) || diagnosticId <= 0 || String(diagnosti
 
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const finite = (value) => typeof value === 'number' && Number.isFinite(value);
-const integer = (value) => finite(value) && Number.isInteger(value);
-const finiteOrNull = (value) => value === null || finite(value);
-const requests = [];
+const { read: capture, requests } = createResponseCapture();
 
 async function read(path) {
-  const query_url = new URL(path, base).href;
-  const response = await fetch(query_url, {
-    redirect: 'error',
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!response.ok) throw new Error(`HTTP ${response.status}: ${query_url}`);
-  const body_utf8 = await response.text();
-  const data = JSON.parse(body_utf8);
-  requests.push({ query_url, retrieved_at: new Date().toISOString(), body_utf8 });
+  const data = await capture(path);
+  const record = requests.at(-1);
+  record.body_utf8 = readFileSync(record.body_path, 'utf8');
   return data;
 }
 
@@ -264,36 +376,27 @@ const common = () => ({
   },
 });
 
-if (!traceAvailable) {
+function writeDiagnostics(diagnostics) {
+  const trace_summary = summarizeTrace(diagnostics);
   console.log(JSON.stringify({
+    ...diagnostics,
+    trace_summary,
+    trace_report_markdown: renderTraceSummary(trace_summary),
+  }, null, 2));
+}
+
+if (!traceAvailable) {
+  writeDiagnostics({
     ...common(),
     outcome: 'trace_unavailable',
     timeline: null,
     histograms: null,
     server_metrics: null,
-  }, null, 2));
+  });
 } else {
   try {
     const timeline = await read(`/api/v1/request-timeline?id=${id}`);
-    if (!object(timeline) || !integer(timeline.version) || !integer(timeline.startNs) ||
-        !integer(timeline.endNs) || !finite(timeline.durationS) ||
-        !Array.isArray(timeline.requests) || timeline.requests.some((request) =>
-          !object(request) || typeof request.cid !== 'string' || !integer(request.ti) ||
-          typeof request.wid !== 'string' || !integer(request.ad) ||
-          typeof request.phase !== 'string' || !integer(request.credit) ||
-          !Number.isSafeInteger(request.start) || request.start < 0 ||
-          !finiteOrNull(request.ack) || !Number.isSafeInteger(request.end) ||
-          request.end < request.start ||
-          !finiteOrNull(request.ttftMs) || !finiteOrNull(request.tpotMs) ||
-          !finiteOrNull(request.isl) || !finiteOrNull(request.osl) ||
-          typeof request.cancelled !== 'boolean' ||
-          Object.hasOwn(request, 'ri') && !integer(request.ri) ||
-          Object.hasOwn(request, 'srcTrace') && typeof request.srcTrace !== 'string' ||
-          Object.hasOwn(request, 'srcOuter') && !integer(request.srcOuter) ||
-          Object.hasOwn(request, 'srcInner') && !integer(request.srcInner) ||
-          Object.hasOwn(request, 'srcKind') && typeof request.srcKind !== 'string')) {
-      throw new Error('Unexpected request timeline response');
-    }
+    validateTimeline(timeline);
 
     const histograms = await read(`/api/v1/trace-histograms?ids=${id}`);
     const histogram = object(histograms) ? histograms[id] : null;
@@ -305,69 +408,14 @@ if (!traceAvailable) {
     }
 
     const serverMetrics = await read(`/api/v1/trace-server-metrics?id=${id}`);
-    const series = ['kvCacheUsage', 'prefixCacheHitRate', 'queueDepth', 'prefillTps',
-      'decodeTps', 'prefixCacheHitsTps', 'hostKvCacheUsage', 'kvCacheUsageByEngine'];
-    if (!object(serverMetrics) || !object(serverMetrics.meta) ||
-        !integer(serverMetrics.startNs) || !integer(serverMetrics.endNs) ||
-        !finite(serverMetrics.durationS) || !integer(serverMetrics.timeslicesCount) ||
-        serverMetrics.timeslicesCount < 0 ||
-        series.some((key) => !Array.isArray(serverMetrics[key]) ||
-          serverMetrics[key].some((entry) => !object(entry))) ||
-        !object(serverMetrics.promptTokensBySource) ||
-        Object.values(serverMetrics.promptTokensBySource).some((entries) =>
-          !Array.isArray(entries) || entries.some((entry) => !object(entry))) ||
-        !finiteOrNull(serverMetrics.kvCachePoolTokens) ||
-        !Array.isArray(serverMetrics.metricSources) ||
-        serverMetrics.metricSources.some((entry) => !object(entry)) ||
-        Object.hasOwn(serverMetrics.meta, 'id') && serverMetrics.meta.id !== diagnosticId) {
-      throw new Error('Unexpected aggregate server metrics response');
-    }
 
-    // Summarize returned samples separately; series are not aligned by array index.
-    const sampleCounts = (points, fields = ['value']) => ({
-      sample_count: points.length,
-      fields: Object.fromEntries(fields.map((field) => {
-        const values = points.map((point) => point[field]).filter(finite);
-        return [field, {
-          finite_count: values.length,
-          nonzero_count: values.filter((value) => value !== 0).length,
-          missing_or_nonfinite_count: points.length - values.length,
-        }];
-      })),
-    });
-    const scalarSeries = series.filter((key) => key !== 'queueDepth' && key !== 'kvCacheUsageByEngine');
-    const serverMetricSamples = {
-      ...Object.fromEntries(scalarSeries.map((key) => [key, sampleCounts(serverMetrics[key])])),
-      queueDepth: sampleCounts(serverMetrics.queueDepth, ['running', 'waiting', 'total']),
-      promptTokensBySource: Object.fromEntries(Object.entries(serverMetrics.promptTokensBySource)
-        .map(([source, points]) => [source, sampleCounts(points)])),
-      kvCacheUsageByEngine: serverMetrics.kvCacheUsageByEngine.map(({ engineLabel, points }) => ({
-        engineLabel, ...sampleCounts(points),
-      })),
-    };
-    let cumulativeRequestLatencyS = 0;
-    let requestInflightUnionS = 0;
-    let coveredEnd = 0;
-    for (const { start, end } of [...timeline.requests].sort((a, b) => a.start - b.start)) {
-      cumulativeRequestLatencyS += (end - start) / 1e9;
-      requestInflightUnionS += Math.max(0, end - Math.max(start, coveredEnd)) / 1e9;
-      coveredEnd = Math.max(coveredEnd, end);
-    }
-
-    console.log(JSON.stringify({
+    writeDiagnostics({
       ...common(),
       outcome: 'trace_diagnostics',
       timeline,
       histograms,
       server_metrics: serverMetrics,
-      trace_summary: {
-        request_count: timeline.requests.length,
-        cancelled_request_count: timeline.requests.filter((request) => request.cancelled).length,
-        cumulative_request_latency_s: cumulativeRequestLatencyS,
-        request_inflight_union_s: requestInflightUnionS,
-        server_metric_samples: serverMetricSamples,
-      },
-    }, null, 2));
+    });
   } catch (error) {
     throw new Error(
       `Trace availability inconsistency for result ${id}: ${error.message}`,
@@ -378,7 +426,28 @@ if (!traceAvailable) {
 JS
 ```
 
-Save the JSON output with the analysis. `benchmark_siblings.sku` and
+The recipe calls the installed offline helper and emits `trace_summary` plus
+`trace_report_markdown`. Save the JSON output with the analysis. Reuse the generated
+Markdown conclusion in the final answer, including its exact global/per-phase scope,
+request identity, phase, units, and value; do not relabel a phase maximum as the
+longest request in the entire trace. The summary includes cancelled requests and
+uses the first request in original timeline order to break equal-duration ties.
+For Claude Code, replace `.agents/skills` with `.claude/skills` in the import.
+
+To recompute the same report offline from saved recipe output:
+
+```bash
+node .agents/skills/inferencex-api/scripts/trace-summary.mjs evidence/selected-point.json > evidence/selected-point-summary.json
+```
+
+This helper reads only the supplied regular file (up to 64 MiB) and ignores any
+previously saved summary. It uses the package's JSON error diagnostics on stderr.
+It preserves unavailable traces separately from valid empty timelines; malformed
+scope, timeline events, or required server-metric structures fail instead of
+producing a no-trace result. It uses safe relative request offsets for duration
+calculations and does not subtract the rounded JavaScript wall-clock anchors.
+
+`benchmark_siblings.sku` and
 `selected_point` retain every identity field the API supplied; absence remains
 absence. `metadata.requests[].body_utf8` retains response text before numeric
 parsing; use it when exact large-integer values matter. Preserve the distinction
@@ -390,3 +459,50 @@ never existed. Do not call the page-owned
 `/api/v1/request-chart-data` or `/api/v1/trace-server-metric-source` operations.
 Do not repeat this recipe across a result set; ask the user to choose another single
 ID first.
+
+### Requested queue-window analysis
+
+Use this only when the question requires queue samples during particular requests.
+Save the recipe output as `selected-point.json` and the chosen raw request identities
+(`cid`, `ri` when present, `ti`, `wid`) as an array in `selected-requests.json`.
+Select those identities from the requested conversation, phase, or slow-request
+group first. The output retains the matched rows and zero-based sample indices so
+subsequent queue statistics can use precisely that population. Equal timestamps
+remain separate observations.
+
+```bash
+node --input-type=module - selected-point.json selected-requests.json <<'JS'
+import { readFileSync } from 'node:fs';
+const capture = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const identities = JSON.parse(readFileSync(process.argv[3], 'utf8'));
+const raw = (path) => JSON.parse(capture.metadata.requests.find(({ query_url }) =>
+  new URL(query_url).pathname === path).body_utf8,
+  (key, value, context) => key === 'startNs' ? BigInt(context.source) : value);
+const timeline = raw('/api/v1/request-timeline');
+const metrics = raw('/api/v1/trace-server-metrics');
+const selected = identities.map((identity) => {
+  const matches = timeline.requests.filter((row) =>
+    ['cid', 'ri', 'ti', 'wid'].every((key) => row[key] === identity[key]));
+  if (matches.length !== 1) throw new Error('Each identity must match exactly one captured request');
+  return matches[0];
+});
+const offsetS = Number(metrics.startNs - timeline.startNs) / 1e9;
+const inside = [];
+let invalid = 0;
+for (const [index, sample] of metrics.queueDepth.entries()) {
+  if (!Number.isFinite(sample.t)) { invalid++; continue; }
+  const t = offsetS + sample.t;
+  if (selected.some(({ start, end }) => start / 1e9 <= t && t <= end / 1e9)) inside.push(index);
+}
+console.log(JSON.stringify({
+  selected_requests: selected,
+  inclusion_rule: 'start <= (metrics.startNs - timeline.startNs) / 1e9 + t <= end; start/end in seconds',
+  series: 'queueDepth',
+  sample_count: metrics.queueDepth.length,
+  inside_sample_indices: inside,
+  inside_sample_count: inside.length,
+  outside_sample_count: metrics.queueDepth.length - inside.length - invalid,
+  invalid_timestamp_sample_count: invalid,
+}, null, 2));
+JS
+```

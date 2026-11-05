@@ -1,0 +1,219 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+import {
+  fetchBenchmarks,
+  fetchWorkflowInfo,
+  fetchDashboardAvailability,
+  fetchCollectiveXRun,
+  fetchCollectiveXRunList,
+  fetchReliability,
+  fetchEvaluations,
+  fetchFrameworkReleases,
+  fetchLatestImages,
+} from './api';
+import { buildRunSummary } from '@semianalysisai/inferencex-db/collectivex/reader';
+import { makeCollectiveXDataset } from '@/components/collectivex/test-fixture';
+
+const mockFetch = vi.fn();
+vi.stubGlobal('fetch', mockFetch);
+
+beforeEach(() => {
+  mockFetch.mockReset();
+});
+
+function mockOk(data: unknown) {
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve(data),
+  });
+}
+
+function mockError(status: number, statusText: string) {
+  mockFetch.mockResolvedValueOnce({
+    ok: false,
+    status,
+    statusText,
+  });
+}
+
+describe('abort signal', () => {
+  it('passes signal to fetch and rejects with AbortError when aborted', async () => {
+    const controller = new AbortController();
+    mockFetch.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          controller.signal.addEventListener('abort', () =>
+            reject(new DOMException('The operation was aborted.', 'AbortError')),
+          );
+        }),
+    );
+    const promise = fetchBenchmarks('dsr1', undefined, undefined, controller.signal);
+    controller.abort();
+    await expect(promise).rejects.toThrow('The operation was aborted.');
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ signal: controller.signal }),
+    );
+  });
+});
+
+describe('fetchBenchmarks', () => {
+  it('fetches with correct URL and params', async () => {
+    mockOk([]);
+    await fetchBenchmarks('DeepSeek-R1-0528');
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/benchmarks?model=DeepSeek-R1-0528',
+      expect.objectContaining({}),
+    );
+  });
+
+  it('includes date param when provided', async () => {
+    mockOk([]);
+    await fetchBenchmarks('DeepSeek-R1-0528', '2026-02-27');
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/benchmarks?model=DeepSeek-R1-0528&date=2026-02-27',
+      expect.objectContaining({}),
+    );
+  });
+
+  it('requests the compact calculator view for one sequence', async () => {
+    mockOk([]);
+    await fetchBenchmarks(
+      'DeepSeek-R1-0528',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        type: 'calculator',
+        sequence: 'agentic-traces',
+      },
+    );
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/benchmarks?model=DeepSeek-R1-0528&view=calculator&sequence=agentic-traces',
+      expect.objectContaining({}),
+    );
+  });
+
+  it('returns parsed JSON on success', async () => {
+    const data = [{ hardware: 'h200', metrics: {} }];
+    mockOk(data);
+    const result = await fetchBenchmarks('dsr1');
+    expect(result).toEqual(data);
+  });
+
+  it('throws on API error', async () => {
+    mockError(500, 'Internal Server Error');
+    await expect(fetchBenchmarks('dsr1')).rejects.toThrow('API error: 500 Internal Server Error');
+  });
+});
+
+describe('fetchWorkflowInfo', () => {
+  it('fetches with correct URL', async () => {
+    mockOk({ runs: [], changelogs: [], configs: [] });
+    await fetchWorkflowInfo('2026-03-01');
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/workflow-info?date=2026-03-01',
+      expect.objectContaining({}),
+    );
+  });
+
+  it('serializes the Agentic Traces workflow cache dimension', async () => {
+    mockOk({ runs: [], changelogs: [], configs: [], runConfigs: [] });
+    await fetchWorkflowInfo('2026-03-01', undefined, 'agentic_traces');
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/workflow-info?date=2026-03-01&benchmarkType=agentic_traces',
+      expect.objectContaining({}),
+    );
+  });
+});
+
+describe('simple read abort signals', () => {
+  it('forwards AbortSignal for latest images and framework releases', async () => {
+    const controller = new AbortController();
+    mockOk([]);
+    await fetchLatestImages(controller.signal);
+    mockOk({});
+    await fetchFrameworkReleases(controller.signal);
+
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/latest-images',
+      expect.objectContaining({ signal: controller.signal }),
+    );
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/framework-releases',
+      expect.objectContaining({ signal: controller.signal }),
+    );
+  });
+});
+
+describe('fetchDashboardAvailability', () => {
+  it('fetches from /api/v1/availability/compact', async () => {
+    mockOk({ dates: ['2026-03-01'], models: ['dsr1'], lines: [] });
+    const result = await fetchDashboardAvailability();
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/availability/compact',
+      expect.objectContaining({}),
+    );
+    expect(result.models).toEqual(['dsr1']);
+  });
+});
+
+describe('fetchReliability', () => {
+  it('fetches from /api/v1/reliability', async () => {
+    mockOk([{ hardware: 'h100', date: '2026-03-01', n_success: 10, total: 10 }]);
+    const result = await fetchReliability();
+    expect(mockFetch).toHaveBeenCalledWith('/api/v1/reliability', expect.objectContaining({}));
+    expect(result).toHaveLength(1);
+    expect(result[0].hardware).toBe('h100');
+  });
+});
+
+describe('fetchEvaluations', () => {
+  it('fetches from /api/v1/evaluations', async () => {
+    mockOk([{ task: 'gsm8k', model: 'dsr1' }]);
+    const result = await fetchEvaluations();
+    expect(mockFetch).toHaveBeenCalledWith('/api/v1/evaluations', expect.objectContaining({}));
+    expect(result[0].task).toBe('gsm8k');
+  });
+});
+
+describe('CollectiveX API', () => {
+  const dataset = makeCollectiveXDataset();
+
+  function mockJson(payload: unknown) {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(payload),
+    });
+  }
+
+  it('fetches a specific run by id', async () => {
+    mockJson(dataset);
+
+    const result = await fetchCollectiveXRun(1, dataset.run.run_id);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      `/api/v1/collectivex/runs/${dataset.run.run_id}?version=1`,
+      expect.objectContaining({}),
+    );
+    expect(result.run.run_id).toBe(dataset.run.run_id);
+  });
+
+  it('fetches the run list', async () => {
+    mockJson({ version: 1, runs: [buildRunSummary(dataset)], discovery_complete: true });
+
+    const response = await fetchCollectiveXRunList(1);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/collectivex/runs?version=1',
+      expect.objectContaining({}),
+    );
+    expect(response.discovery_complete).toBe(true);
+    expect(response.runs).toHaveLength(1);
+    expect(response.runs[0].run_id).toBe(dataset.run.run_id);
+  });
+});

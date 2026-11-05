@@ -24,7 +24,6 @@ describe('buildScale', () => {
     const scale = buildScale({ type: 'linear', domain: [0, 97] }, [500, 0]);
     expect(isContinuousScale(scale)).toBe(true);
     if (isContinuousScale(scale)) {
-      // nice() rounds domain to [0, 100]
       expect(scale.domain()[1]).toBeGreaterThanOrEqual(97);
       expect(scale.range()).toEqual([500, 0]);
     }
@@ -50,7 +49,6 @@ describe('buildScale', () => {
     const d1 = new Date('2025-01-01');
     const d2 = new Date('2025-12-31');
     const scale = buildScale({ type: 'time', domain: [d1, d2] }, [0, 800]);
-    // Time scale has invert but no bandwidth
     expect('invert' in scale).toBe(true);
     expect('bandwidth' in scale).toBe(false);
   });

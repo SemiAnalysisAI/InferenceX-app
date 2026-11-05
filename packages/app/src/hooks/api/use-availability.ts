@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { fetchAvailability } from '@/lib/api';
-import { withSupplementalAvailability } from '@/lib/supplemental-benchmarks';
+import { fetchDashboardAvailability } from '@/lib/api/api';
+import { indexAvailability } from '@/lib/benchmarks/availability-index';
 
 export function useAvailability() {
   return useQuery({
     queryKey: ['availability'],
-    queryFn: async ({ signal }) => withSupplementalAvailability(await fetchAvailability(signal)),
+    queryFn: async ({ signal }) => indexAvailability(await fetchDashboardAvailability(signal)),
   });
 }

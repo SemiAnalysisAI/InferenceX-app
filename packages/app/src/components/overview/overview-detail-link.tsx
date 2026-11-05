@@ -3,12 +3,9 @@
 import { ArrowRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { track } from '@/lib/analytics';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { cn } from '@/lib/shared/utils';
 
-/** A plain anchor, not `<Link>`: the dashboard reads filters from a snapshot
- *  `url-state.ts` takes at module evaluation, so client-side navigation would
- *  land unfiltered. */
 export function OverviewDetailLink({
   href,
   model,

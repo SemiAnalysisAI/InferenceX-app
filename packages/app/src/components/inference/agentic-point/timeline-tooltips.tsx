@@ -5,7 +5,7 @@ import type { RequestRecord } from '@/hooks/api/use-request-timeline';
 import { formatDuration, formatTickLabel } from './timeline-format';
 import { cursorStatsAt, type SortedRequestTimes } from './timeline-cursor-stats';
 import { requestSourceLabel, shortenWid, type RequestTimelineRow } from './timeline-rows';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const TOOLTIP_STRINGS = {
   en: {
@@ -47,7 +47,6 @@ export interface TooltipData {
   req: RequestRecord;
 }
 
-/** Per-request hover tooltip (fixed-position, follows the mouse). */
 export function TimelineTooltip({ data, linkable }: { data: TooltipData; linkable?: boolean }) {
   const locale = useLocale();
   const t = TOOLTIP_STRINGS[locale];
@@ -117,15 +116,12 @@ export function TimelineTooltip({ data, linkable }: { data: TooltipData; linkabl
 }
 
 export interface CursorState {
-  /** Cursor x in svg-local px (drives the crosshair line). */
   xPx: number;
-  /** ns offset from dataStart the cursor points at. */
   tNs: number;
   clientX: number;
   clientY: number;
 }
 
-/** Cursor stats popover: requests in flight / waiting / completed at time t. */
 export function CursorPopover({
   cursor,
   dataStart,
@@ -139,10 +135,7 @@ export function CursorPopover({
   const copy = TOOLTIP_STRINGS[locale];
   const t = cursor.tNs;
   const { running, waiting, completed, inflight } = cursorStatsAt(times, t);
-  // Absolute wall-clock seconds since the timeline origin (dataStart).
   const tSec = t / 1e9;
-  // Position the popover near the cursor without overflowing the viewport.
-  // 200 px wide; flip to the left of the cursor if it would clip the right.
   const wantLeft = cursor.clientX + 14;
   const left =
     typeof window === 'undefined' || wantLeft + 220 < window.innerWidth
@@ -169,7 +162,6 @@ export function CursorPopover({
         <span>{copy.completed}</span>
         <span className="text-foreground text-right tabular-nums">{completed}</span>
       </div>
-      {/* dataStart is informational — the displayed t is relative to it. */}
       <div className="mt-1 pt-1 border-t border-border/40 text-[9px] text-muted-foreground">
         {copy.relative((dataStart / 1e9).toFixed(0))}
       </div>

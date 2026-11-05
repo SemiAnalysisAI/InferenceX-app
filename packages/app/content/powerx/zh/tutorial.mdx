@@ -1,0 +1,125 @@
+---
+title: '每一块 GPU，每一秒，每一瓦'
+description: 'PowerX 公开实测 AI 推理背后的功耗。'
+updated: '2026-10-27'
+---
+
+<Widget name="ladder" alt="功耗阶梯：一个实测点经建模部件延伸到 IT 和数据中心功率" />
+
+PowerX 测量每颗加速器在运行基准测试时的功耗，并对它周围的系统其余部分建模。实心标记是实测遥测，空心标记是开源功耗模型的建模值，虚线标记是标称或假设值。这套视觉语法在每张图表上都成立。
+
+## 从实测到建模功耗
+
+<Widget name="flow" alt="从 exporter 采样到实测 GPU 功耗、功耗模型、IT 功率和数据中心功率的流程" />
+
+- **采样。** NVIDIA 节点上的 `dcgm-exporter` 和 AMD 节点上的 `device-metrics-exporter` 每秒上报一次每颗 GPU 的功耗，头节点按同一时钟抓取所有节点。
+- **开窗。** 每个并发点只有一个服务窗口，从 warmup 结束到最后一个请求完成。只有窗口内的样本才计入统计。
+- **积分。** 每颗 GPU 的能量是其样本在窗口内的梯形积分；每 token 能量 = 整个部署的 GPU 能量 ÷ 客户端统计的全部 token 数（输入 + 输出）。
+- **建模。** `power_model` 包接收实测瓦特数和一个工作状态（固定序列、智能体、带 KV offload 的智能体），加上 CPU、内存、NIC、交换芯片、存储、风扇和 PSU 损耗得到 IT 功率，再乘以 PUE（风冷机箱 1.3，液冷 NVL72 机柜 1.1）得到数据中心功率。
+
+<Callout kind="note">
+
+实测瓦特数只覆盖加速器本身：HGX 系统上是 GPU 板卡，NVL72 上是 GPU 模组，AMD 上是 GPU 封装。NVL72 上窗口通过 Grace 校验时，Grace socket 也是实测值。建模值一概不存储，而是按固定的模型版本从存储的 GPU 样本即时重算，因此模型一旦更新，所有数据点同时变化。
+
+</Callout>
+
+## 动手探索 PowerX
+
+数据中心曲线位于 GPU 曲线之上且形状相同，因为模型补上的部件几乎不随负载变化。数据中心功耗是实测 IT 功耗乘以假定 PUE：风冷机箱取 1.3，液冷 NVL72 机柜取 1.1。
+
+<Widget
+  name="measured-vs-modeled"
+  alt="同一批数据点的实测 GPU 每 token 能耗与实测数据中心每 token 能耗对比"
+/>
+
+越低越好，两条线都是对交互性的 Pareto 前沿，与仪表板其他图表一致。
+
+把 GPU 从空闲拉到 TDP，看哪些建模部件会跟着变。
+
+<Widget name="load" alt="负载条：各建模部件随 GPU 负载的变化" />
+
+风扇和 PSU 损耗跟随 GPU；CPU、内存、NIC 和交换芯片保持不变，所以 GPU 负载越轻，额外开销的相对占比越大。
+
+## 测试方法
+
+平均、P75 和 P90 功耗在窗口内按时间加权，覆盖部署中的全部 GPU；prefill 和 decode 角色在同一窗口内分别求平均。做规划看 **P90**，因为动态功率调度对峰值敏感；比较芯片看**每 token 能量**。
+
+能量按全部 token（输入 + 输出）分摊。聚合式部署中 prefill 和 decode 共用同一批 GPU，焦耳数无法按阶段拆分，若按每输出 token 计量，提示词的能耗也会算到输出上。分离式部署的 prefill 和 decode 各用一组 GPU，**功耗去向**视图会按角色拆分它们的能耗。
+
+只有离线验证器从原始样本重新执行并通过全部五项检查，数据点才标记为 **Validated**。其余都是 **Historical**：吞吐量保留，能量和建模功耗去掉，审计记录会写明未通过的检查。
+
+<Widget name="validity" alt="五项有效性检查" />
+
+功耗采集是每次官方 sweep 的一部分，提交的测试配置会自动被测量。要自行运行，在多节点 matrix 条目中加上 `power: true`；单节点和 AgentX 任务直接使用集群自带的 exporter。`require-power`（或 `REQUIRE_POWER=1`）会让窗口无效的任务直接失败，而不是记录 `power_valid: 0`。
+
+<Widget name="run-config" alt="运行配置生成器" />
+
+汇总 JSON 包含 `power_valid`、`avg_power_w`、`p90_power_w` 和各 `joules_per_*` 指标；`power_audit_<result>` 产物包含 `samples.csv`、窗口文件和 `power_validation_<result>.json`。
+
+<Callout kind="important">
+
+AMD 的 exporter 上报的是封装功耗，NVIDIA 上报的是板卡或模组功耗，跨厂商比较时应当说明这一点。AgentX 数据点使用模型的智能体状态，该状态尚未用实测的系统功耗校准。
+
+</Callout>
+
+## 应用结果
+
+按容量规划的读法读一个通过校验的数据点：实测瓦特数、模型补上的 IT 瓦特数、每兆瓦可部署的 GPU 数，以及它与标称值之间的差距。
+
+<Widget
+  name="worked-example"
+  alt="实例：一个数据点读作 GPU 功耗、IT 功率、每 MW GPU 数、TDP 占比和全系统 provisioned 功率"
+/>
+
+打开 [PowerX](/zh/inference?i_metric=y_measuredAvgPower)，通过 [API](/zh/api) 获取同样的数字，或用 [skills 包](https://github.com/SemiAnalysisAI/InferenceX-app/tree/main/packages/skills)中的 `inferencex powerx export` 命令导出。
+
+## 常见问题
+
+<details>
+<summary>为什么实测功耗远低于 TDP？</summary>
+
+以 decode 为主的推理受限于内存和延迟目标，而不是计算，所以 GPU 很少触及功率上限。Prefill、视频生成和训练则接近 TDP。
+
+</details>
+
+<details>
+<summary>DCGM 和 nvidia-smi 的读数有差异吗？</summary>
+
+没有。两者读取的是同一个 NVML 传感器，固件本身已经按约 1 秒做了平均，因此采样快于 1 Hz 收益很小。DCGM 额外提供一个守护进程和一个能量计数器。
+
+</details>
+
+<details>
+<summary>为什么用 P90 而不是平均值？</summary>
+
+容量是按峰值配置的。P90 是窗口内 10 % 时间会超过的功率，安全余量应在它之上叠加。
+
+</details>
+
+<details>
+<summary>为什么提供不含 PUE 的 IT 口径？</summary>
+
+数据中心容量团队按每 GPU 的关键 IT kW 做规划。PUE 取决于站点，所以 Facility 口径单独应用它。
+
+</details>
+
+<details>
+<summary>功耗模型变化时会发生什么？</summary>
+
+不存储任何建模值。每个建模数字都由存储的 GPU 实测值按固定的模型版本重新计算，所以更新会同时改变所有数据点，模型版本会显示在提示框中。
+
+</details>
+
+<details>
+<summary>为什么同一次运行中其他点都是 Validated，只有一个点是 Historical？</summary>
+
+有效性按窗口判定。丢失一个样本或时钟不一致只会使该窗口失效；该点保留吞吐量，但失去能量指标。
+
+</details>
+
+<details>
+<summary>Facility 数值更高是否意味着站点效率更低？</summary>
+
+不是。PUE 是按散热类型固定的模型输入，不是对基准测试站点的测量。
+
+</details>

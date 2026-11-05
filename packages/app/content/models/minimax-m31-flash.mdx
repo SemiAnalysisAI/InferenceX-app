@@ -1,0 +1,27 @@
+---
+title: 'MiniMax M3.1 Flash'
+developer: 'MiniMax'
+releaseDate: 'October 23, 2026'
+description: "MiniMax's 428B-total / 23B-active multimodal MoE with sparse attention in all 60 layers, three dense FFNs, and built-in DSpark speculation."
+---
+
+## Overview
+
+MiniMax-M3.1-Flash builds on MiniMax M3 for coding, agentic workflows and multimodal tasks. MiniMax reports approximately 428B total parameters and 23B active per token, with image, video and text input and text output ([model card](https://huggingface.co/MiniMaxAI/MiniMax-M3.1-Flash)).
+
+## Architecture
+
+- **Backbone:** 60 layers, hidden size 6144 and vocabulary 200064.
+- **FFN split:** the first 3 layers use dense FFNs with intermediate width 12288; the remaining 57 use MoE. Dense FFN does not imply dense attention.
+- **Attention:** MiniMax Sparse Attention (MSA) in all 60 layers. This differs from M3, whose first 3 attention layers are full GQA. There are 64 query heads and 4 KV heads, head dimension 128, with per-head QK normalization.
+- **Position encoding:** partial RoPE over 64 dimensions of each 128-dimensional head; RoPE theta 10,000,000.
+- **Experts:** 128 routed experts, top-4 selected per token, plus 1 shared expert; routed and shared intermediate width 3072.
+- **Activation:** `swigluoai`, with alpha 1.702 and limit 7.0, rather than an unmodified SiLU gate.
+- **Context:** config position limit 1,048,576; vendor headline up to 1M tokens.
+- **Speculation and quantization:** DSpark draft included; the config specifies NVFP4 experts and MXFP8 weights, while the model card describes quantization-aware training for experts and attention paths. The published config does not establish a specific KV-cache precision. Inspect the actual checkpoint configuration when comparing serving results.
+
+The dimensions, FFN split and all-sparse attention schedule come from the [published config](https://huggingface.co/MiniMaxAI/MiniMax-M3.1-Flash/raw/main/config.json); the [model card](https://huggingface.co/MiniMaxAI/MiniMax-M3.1-Flash) describes the released inference features.
+
+## Version boundary
+
+M3.1 Flash has its own InferenceX model bucket. Its shared backbone dimensions do not make its attention schedule, RoPE settings, quantization or speculative-decoding configuration interchangeable with M3. Weights use the MiniMax Community license identified in the model card ([model card](https://huggingface.co/MiniMaxAI/MiniMax-M3.1-Flash)).

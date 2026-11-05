@@ -30,19 +30,47 @@ test('installed tail-latency recipe evaluates actual P99 ITL and keeps unresolve
   );
   assert.ok(snippet, 'the installed cookbook contains an executable P99 ITL recipe');
   const rows = [
-    row('438804', { p99_itl: 0.05700164780020714, p99_intvty: 50.79342177879253 }, { conc: 1024 }),
+    row(
+      '438804',
+      {
+        p99_itl: 0.05700164780020714,
+        p99_intvty: 50.79342177879253,
+        avg_power_w: 999,
+        power_valid: 1,
+      },
+      { conc: 1024 },
+    ),
     row(
       '434362',
       { p99_itl: 0.05607323992240702, p99_intvty: 53.10656552068859 },
       { hardware: 'mi355x', conc: 32 },
     ),
-    row('below', { p99_itl: 0.019999 }, { conc: 1.5 }),
+    row(
+      'below',
+      { p99_itl: 0.019999, avg_power_w: 500, joules_per_output_token: 2 },
+      { conc: 1.5 },
+    ),
     row('boundary', { p99_itl: 0.02 }, { conc: 1 }),
     row('missing', {}, { conc: undefined }),
     row('null', { p99_itl: null }, { conc: null }),
     row('string', { p99_itl: '0.001' }, { conc: '8' }),
     row('negative', { p99_itl: -0.001 }, { conc: -1 }),
     row('overflow', { p99_itl: 'NONFINITE_FIXTURE' }, { conc: 0 }),
+    row(
+      'low-concurrency',
+      { p99_itl: 0.01, avg_power_w: 400, joules_per_output_token: 2, power_valid: 1 },
+      { conc: 1, spec_method: 'mtp' },
+    ),
+    row(
+      'high-concurrency',
+      { p99_itl: 0.001, avg_power_w: 600, joules_per_output_token: 1, power_valid: 0 },
+      { conc: 2048, spec_method: 'none' },
+    ),
+    row(
+      'missing-power',
+      { p99_itl: 0.015, avg_power_w: null, joules_per_output_token: '2', power_valid: null },
+      { hardware: 'mi355x', conc: 128 },
+    ),
     row('other-workload', { p99_itl: 0.001 }, { isl: 1024 }),
   ];
   const input = join(project, 'history.body');
@@ -55,7 +83,7 @@ test('installed tail-latency recipe evaluates actual P99 ITL and keeps unresolve
     }),
   );
   const output = JSON.parse(result.stdout);
-  assert.equal(output.matching_rows, 9);
+  assert.equal(output.matching_rows, 12);
   assert.deepEqual(
     output.rows.map(({ id, p99_itl_under_20ms }) => [id, p99_itl_under_20ms]),
     [
@@ -68,6 +96,9 @@ test('installed tail-latency recipe evaluates actual P99 ITL and keeps unresolve
       ['string', 'unknown'],
       ['negative', 'unknown'],
       ['overflow', 'unknown'],
+      ['low-concurrency', 'pass'],
+      ['high-concurrency', 'pass'],
+      ['missing-power', 'pass'],
     ],
   );
   assert.equal(output.rows[0].p99_itl_ms, 57.00164780020714);
@@ -75,8 +106,34 @@ test('installed tail-latency recipe evaluates actual P99 ITL and keeps unresolve
   assert.equal(output.rows[4].p99_itl_ms, null);
   assert.deepEqual(
     output.rows.map(({ concurrency }) => concurrency),
-    [1024, 32, null, 1, null, null, null, null, null],
+    [1024, 32, null, 1, null, null, null, null, null, 1, 2048, 128],
   );
+  assert.deepEqual(output.passing_summary, [
+    {
+      hardware: 'b200',
+      rows: 3,
+      concurrency: { values: [1, 2048], unknown_rows: 1 },
+      power: {
+        avg_power_w_finite_rows: 3,
+        joules_per_output_token_finite_rows: 3,
+        validation: { passed: 1, failed: 1, unavailable: 1 },
+      },
+    },
+    {
+      hardware: 'mi355x',
+      rows: 1,
+      concurrency: { values: [128], unknown_rows: 0 },
+      power: {
+        avg_power_w_finite_rows: 0,
+        joules_per_output_token_finite_rows: 0,
+        validation: { passed: 0, failed: 0, unavailable: 1 },
+      },
+    },
+  ]);
+  for (const original of rows.slice(9, 12)) {
+    const retained = output.rows.find(({ id }) => id === original.id);
+    for (const [key, value] of Object.entries(original)) assert.deepEqual(retained[key], value);
+  }
   assert.equal(output.rows[6].conc, '8', 'invalid raw concurrency is retained for diagnosis');
   assert.equal(output.rows[0].run_url, rows[0].run_url);
   assert.equal(readFileSync(input, 'utf8'), bytes, 'the complete capture remains unchanged');

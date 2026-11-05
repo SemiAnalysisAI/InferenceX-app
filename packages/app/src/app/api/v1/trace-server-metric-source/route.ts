@@ -7,7 +7,7 @@ import {
   type MetricSourceSeries,
 } from '@semianalysisai/inferencex-db/queries/trace-server-metrics';
 
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { cachedJson, cachedQuery } from '@/lib/cache/api-cache';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   try {
     const data = await getCachedMetricSource(id, source);
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    return cachedJson(data);
+    return cachedJson(request, data);
   } catch (error) {
     console.error('Error fetching trace server metric source:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

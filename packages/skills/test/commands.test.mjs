@@ -24,7 +24,7 @@ test('registry fixes all six formal routes and public utility commands', () => {
   );
   assert.deepEqual(
     COMMANDS.filter(({ formal }) => !formal).map(({ command }) => command),
-    ['discover', 'verify', 'describe', 'schema', 'doctor'],
+    ['charts', 'discover', 'verify', 'describe', 'schema', 'doctor'],
   );
 });
 

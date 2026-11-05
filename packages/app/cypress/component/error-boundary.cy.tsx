@@ -1,8 +1,8 @@
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 import AppError from '@/app/error';
-import { NotFoundContent } from '@/components/not-found-content';
-import { registerAnalyticsClient } from '@/lib/analytics';
+import { NotFoundContent } from '@/components/errors/not-found-content';
+import { registerAnalyticsClient } from '@/lib/analytics/analytics';
 
 describe('App error boundary localization', () => {
   it('preserves the accessible English recovery UI and tracks its lifecycle', () => {

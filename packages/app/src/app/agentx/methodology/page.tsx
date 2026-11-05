@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 
 import { AgentXMethodologyArticle } from '@/components/datasets/agentx-methodology-article';
-import { JsonLd } from '@/components/json-ld';
-import { enAlternates } from '@/lib/i18n';
+import { JsonLd } from '@/components/seo/json-ld';
+import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 const DESCRIPTION =
   'How AgentX transforms opt-in coding-agent traces into replay graphs with controlled KV-cache warmup and benchmark settings.';
@@ -12,12 +13,12 @@ export const metadata: Metadata = {
   title: 'AgentX Methodology',
   description: DESCRIPTION,
   alternates: enAlternates('/agentx/methodology'),
-  openGraph: {
+  ...socialMetadata({
     title: 'AgentX Methodology | InferenceX',
     description: DESCRIPTION,
     url: `${SITE_URL}/agentx/methodology`,
-  },
-  twitter: { title: 'AgentX Methodology | InferenceX', description: DESCRIPTION },
+    locale: 'en',
+  }),
 };
 
 const jsonLd = {

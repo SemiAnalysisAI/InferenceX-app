@@ -1,0 +1,347 @@
+import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
+
+import {
+  DEFAULT_CHIP_BASIS,
+  measuredInputShare,
+  withChipBasis,
+  type ChipBasis,
+  type ChipBasisRow,
+} from '@/lib/benchmarks/chip-basis';
+import type { HardwareConfig } from '@/components/inference/types';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { rowLatencyMetric } from '@/lib/benchmarks/benchmark-transform';
+import { pricingCacheHitRate } from '@/lib/calculator/cache-pricing';
+import { getHardwareKey } from '@/lib/charts/chart-utils';
+import {
+  DEFAULT_TCO_BASIS,
+  getGpuSpecs,
+  getHardwareConfig,
+  type TcoBasis,
+} from '@/lib/catalog/constants';
+import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
+import { supportsTokenMetric } from '@/lib/benchmarks/supplemental-benchmarks';
+
+import {
+  getCostField,
+  hermiteInterpolate,
+  interpolateForGPU,
+  maxInteractivityAtCost,
+  monotoneSlopes,
+  paretoFrontUpperLeft,
+  reciprocalMetricAt,
+  recoverReciprocalNumerator,
+  sign,
+} from './interpolation';
+import type { CostType, GPUDataPoint } from './types';
+
+// Re-export pure functions so existing imports from this module keep working.
+export {
+  getCostField,
+  hermiteInterpolate,
+  interpolateForGPU,
+  maxInteractivityAtCost,
+  monotoneSlopes,
+  paretoFrontUpperLeft,
+  reciprocalMetricAt,
+  recoverReciprocalNumerator,
+  sign,
+};
+
+import {
+  countCurvesByPrecision,
+  resolveEffectivePrecisions,
+} from '@/lib/benchmarks/default-precisions';
+/** Cost per million tokens: costPerHour / (tokPerSec * 3600 / 1_000_000) */
+const computeGpuCost = (costPerHour: number, tps: number) =>
+  costPerHour && tps > 0 ? costPerHour / ((tps * 3600) / 1_000_000) : 0;
+
+/** Metadata describing what a group key stands for. */
+export interface GroupMeta {
+  hwKey: string;
+  /** Set only when multiple precisions are selected, matching the group key. */
+  precision?: string;
+}
+
+/** Group metadata for an unofficial-run overlay group. */
+export interface OverlayGroupMeta extends GroupMeta {
+  /** Index of the run in the loaded set — drives the overlay palette color. */
+  runIndex: number;
+}
+
+function getAgenticMetric(
+  row: BenchmarkRow,
+  percentile: Percentile,
+  suffix: 'intvty' | 'e2el' | 'ttft',
+): number {
+  const value = rowLatencyMetric(row, percentile, suffix);
+  return typeof value === 'number' ? value : 0;
+}
+
+/**
+ * Time to first token for a row, at the percentile `interactivity` uses for
+ * agentic rows and the median for fixed sequences — the same split the
+ * inference chart's TTFT axis makes. Undefined rather than zero when the row
+ * has no usable measurement: the first-token page filters on this value, and
+ * a zero would clear every cap.
+ */
+function firstTokenSeconds(
+  row: BenchmarkRow,
+  sequence: Sequence,
+  percentile: Percentile,
+): number | undefined {
+  const value =
+    sequence === Sequence.AgenticTraces
+      ? getAgenticMetric(row, percentile, 'ttft')
+      : rowLatencyMetric(row, 'median', 'ttft');
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+/**
+ * Fraction of a row's input tokens served from cache, or null when the row
+ * carries no cache metric at all — which is every fixed-sequence row.
+ *
+ * Three tiers are reported and they do not all stack. Measured across 326
+ * production agentic rows, checked against each row's own
+ * `theoretical_cache_hit_rate` ceiling:
+ *
+ * - **GPU + external are disjoint.** Their sum never exceeds 1 nor the ceiling
+ *   on any row carrying both, so they add.
+ * - **The CPU-offload tier double-counts external where both are reported.**
+ *   `gpu + external + cpu` breaches the ceiling on 56 of the 132 rows with a
+ *   non-zero CPU rate, and *every* breach is a row that also reports an
+ *   external rate — the router-side external figure already contains the
+ *   offload tier there.
+ * - **Where no external rate is reported, the CPU tier is real and disjoint.**
+ *   On the 26 offload-on rows with no external figure, `gpu + cpu` breaches the
+ *   ceiling 0 times, median CPU rate 0.055.
+ *
+ * Hence the conditional: external when present, CPU only in its absence. Adding
+ * CPU unconditionally would overstate the cached share; dropping it entirely —
+ * which this did before — understated it by a median 5.54pp on those 26 rows,
+ * and an understated cached share bills more input at the fresh-token price and
+ * so *overstates* revenue (by a median 27% on the input leg there). That is the
+ * direction worth spending a branch to avoid.
+ *
+ * A reported external `0` suppresses CPU rather than counting as an absence: a
+ * router reporting no external hits has still accounted for the offload tier. No
+ * production row currently has that shape, so that arm is a deliberate choice
+ * about unobserved data, pinned by a test rather than measured.
+ *
+ * The clamp is not decorative — the GPU figure alone reaches 1.185 on some rows.
+ */
+/**
+ * Fraction of a config's tokens that are input tokens.
+ *
+ * Disaggregated rows report `input_tput_per_gpu` per *prefill* chip and
+ * `output_tput_per_gpu` per *decode* chip, while `tput_per_gpu` is per chip
+ * overall, so `input / (input + output)` off the stored rates is wrong for them.
+ * `measuredInputShare` first puts the rates on one denominator (every
+ * deployment chip), which also keeps the mix independent of the chip-basis
+ * toggle, and accepts rows still carrying raw per-total producer rates.
+ *
+ * Then: trust the measured rates when they are self-consistent, and fall back to
+ * the structural mix when they are not (a legacy row without a real prefill/decode
+ * split, or missing rates). For a fixed sequence the structural mix is ISL:OSL.
+ * For agentic traces it is the run's own prompt:generation token counts.
+ *
+ * Returns null when nothing in the row pins the mix down.
+ */
+function inputTokenShare(row: ChipBasisRow): number | null {
+  // Self-consistent: the rates share the denominator `tput_per_gpu` uses, so the
+  // split they imply is the measured one. 1% covers float noise.
+  const m = row.metrics;
+  const measured = measuredInputShare(
+    {
+      disagg: row.disagg,
+      chip_basis: row.chip_basis,
+      num_prefill_gpu: row.num_prefill_gpu,
+      num_decode_gpu: row.num_decode_gpu,
+      prefill_num_workers: row.prefill_num_workers,
+      decode_num_workers: row.decode_num_workers,
+      isl: row.isl,
+      osl: row.osl,
+      tput_per_gpu: m.tput_per_gpu,
+      input_tput_per_gpu: m.input_tput_per_gpu,
+      output_tput_per_gpu: m.output_tput_per_gpu,
+    },
+    0.01,
+  );
+  if (measured !== null) return measured;
+
+  const { isl, osl } = row;
+  if (typeof isl === 'number' && typeof osl === 'number' && isl + osl > 0) {
+    return isl / (isl + osl);
+  }
+  const prompt = row.metrics.total_prompt_tokens;
+  const generated = row.metrics.total_generation_tokens;
+  if (typeof prompt === 'number' && typeof generated === 'number' && prompt + generated > 0) {
+    return prompt / (prompt + generated);
+  }
+  // The remaining rates are known to be on incompatible denominators. Treat
+  // the mix as unknown rather than turning a per-prefill/per-decode ratio into
+  // a fleet-wide token share and billing input volume the fleet did not serve.
+  return null;
+}
+
+/**
+ * Build `GPUDataPoint` groups from raw benchmark rows.
+ *
+ * Shared by the official and the unofficial-run overlay paths so both are
+ * derived by identical logic — the only difference is how rows are keyed into
+ * groups, which the caller controls via `classify`.
+ */
+export function buildGpuGroups<M extends GroupMeta>(
+  rows: BenchmarkRow[],
+  options: {
+    sequence: Sequence;
+    precisions: string[];
+    /** Agentic x/e2e latency percentile. Fixed-sequence rows keep the median. */
+    percentile?: Percentile;
+    /** Token basis selected by the consumer; applies to official and overlay rows. */
+    tokenType?: CostType;
+    tcoBasis?: TcoBasis;
+    /** Which chips divide disaggregated input/output throughput. Defaults to per pool. */
+    chipBasis?: ChipBasis;
+    /** Derive a row's group key + metadata. Return null to drop the row. */
+    classify: (hwKey: string, row: BenchmarkRow) => { key: string; meta: M } | null;
+  },
+): {
+  grouped: Record<string, GPUDataPoint[]>;
+  groupMeta: Record<string, M>;
+  hwConfigMap: HardwareConfig;
+} {
+  const {
+    sequence,
+    precisions,
+    percentile = Percentile.P90,
+    tokenType = 'total',
+    tcoBasis = DEFAULT_TCO_BASIS,
+    chipBasis = DEFAULT_CHIP_BASIS,
+    classify,
+  } = options;
+  const grouped: Record<string, GPUDataPoint[]> = {};
+  const groupMeta: Record<string, M> = {};
+  const hwConfigMap: HardwareConfig = {};
+
+  for (const row of rows) {
+    if (rowToSequence(row) !== sequence) continue;
+    if (!precisions.includes(row.precision)) continue;
+    if (!supportsTokenMetric(row, tokenType)) continue;
+
+    const hwKey = getHardwareKey({
+      hw: row.hardware,
+      framework: row.framework,
+      disagg: row.disagg,
+      benchmark_type: row.benchmark_type,
+      spec_decoding: row.spec_method,
+    });
+    const hwConfig = getHardwareConfig(hwKey, DB_MODEL_TO_DISPLAY[row.model] ?? row.model);
+    if (!hwConfig) continue;
+
+    const classified = classify(hwKey, row);
+    if (!classified) continue;
+    const { key: groupKey, meta } = classified;
+
+    if (!hwConfigMap[hwKey]) hwConfigMap[hwKey] = { ...hwConfig, name: hwKey };
+
+    // Callers match `row` by identity (classify, sourceRow), so only the rates
+    // read the rescaled copy.
+    const ratedRow = withChipBasis(row, chipBasis);
+    const m = ratedRow.metrics;
+    const tput = m.tput_per_gpu ?? 0;
+    const outputTput = m.output_tput_per_gpu ?? tput;
+    const inputTput = m.input_tput_per_gpu ?? 0;
+    const cacheHitRate = pricingCacheHitRate({
+      server_gpu_cache_hit_rate: m.server_gpu_cache_hit_rate,
+      server_external_cache_hit_rate: m.server_external_cache_hit_rate,
+      server_cpu_cache_hit_rate: m.server_cpu_cache_hit_rate,
+      theoretical_cache_hit_rate: m.theoretical_cache_hit_rate,
+      hw: row.hardware,
+    });
+    const theoreticalRate =
+      typeof m.theoretical_cache_hit_rate === 'number' &&
+      Number.isFinite(m.theoretical_cache_hit_rate)
+        ? Math.max(0, Math.min(1, m.theoretical_cache_hit_rate))
+        : null;
+    const tokenShare = inputTokenShare(ratedRow);
+    const specs = getGpuSpecs(hwKey, tcoBasis);
+    const power = specs.power;
+
+    if (!grouped[groupKey]) grouped[groupKey] = [];
+    groupMeta[groupKey] = meta;
+
+    const ttft = firstTokenSeconds(row, sequence, percentile);
+
+    grouped[groupKey].push({
+      sourceRow: row,
+      hwKey,
+      interactivity:
+        sequence === Sequence.AgenticTraces
+          ? getAgenticMetric(row, percentile, 'intvty')
+          : rowLatencyMetric(row, 'median', 'intvty'),
+      ...(ttft === undefined ? {} : { ttft }),
+      ...(sequence === Sequence.AgenticTraces
+        ? {
+            e2eLatency: getAgenticMetric(row, percentile, 'e2el'),
+            date: row.date,
+          }
+        : {}),
+      throughput: tput,
+      outputThroughput: outputTput,
+      inputThroughput: inputTput,
+      ...(cacheHitRate === null ? {} : { cacheHitRate }),
+      ...(theoreticalRate === null ? {} : { theoreticalCacheHitRate: theoreticalRate }),
+      ...(tokenShare === null ? {} : { inputTokenShare: tokenShare }),
+      concurrency: row.conc,
+      tp: row.decode_tp,
+      dp: row.metrics.dp,
+      precision: row.precision,
+      ep: row.decode_ep,
+      dp_attention: row.decode_dp_attention,
+      disagg: row.disagg,
+      costh: computeGpuCost(specs.costh, tput),
+      costr: computeGpuCost(specs.costr, tput),
+      costhi: computeGpuCost(specs.costh, inputTput),
+      costri: computeGpuCost(specs.costr, inputTput),
+      costhOutput: computeGpuCost(specs.costh, outputTput),
+      costrOutput: computeGpuCost(specs.costr, outputTput),
+      tpPerMw: power && power > 0 ? (tput * 1000) / power : 0,
+      inputTpPerMw: power && power > 0 ? (inputTput * 1000) / power : 0,
+      outputTpPerMw: power && power > 0 ? (outputTput * 1000) / power : 0,
+    });
+  }
+
+  return { grouped, groupMeta, hwConfigMap };
+}
+
+/**
+ * Server-side mirror of the dashboard's precision resolution
+ * (`GlobalFilterContext`): explicit selections are honoured intersected with
+ * what official and overlay rows carry; otherwise the official default is
+ * auto-picked and overlay precisions are included via `resolveEffectivePrecisions`.
+ * Composes the same pure functions the
+ * dashboard uses — `countCurvesByPrecision` + `resolveEffectivePrecisions` —
+ * over the fetched rows, with the same `['fp4']` fallback when the model has no
+ * rows for the sequence.
+ */
+export function resolveRowPrecisions(
+  rows: BenchmarkRow[],
+  sequence: Sequence,
+  requested: readonly string[],
+  overlayRows: BenchmarkRow[] = [],
+): string[] {
+  const forSequence = rows.filter((row) => rowToSequence(row) === sequence);
+  const unofficialPrecisions = overlayRows
+    .filter((row) => rowToSequence(row) === sequence)
+    .map((row) => row.precision);
+  const available = [
+    ...new Set([...forSequence.map((row) => row.precision), ...unofficialPrecisions]),
+  ].toSorted();
+  return resolveEffectivePrecisions({
+    selectedPrecisions: [...requested],
+    availablePrecisions: available.length > 0 ? available : ['fp4'],
+    curveCounts: countCurvesByPrecision(forSequence),
+    unofficialPrecisions,
+    explicit: requested.length > 0,
+  });
+}

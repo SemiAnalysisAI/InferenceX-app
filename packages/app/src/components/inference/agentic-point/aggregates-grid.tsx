@@ -7,9 +7,8 @@ import { AggregateChart, type AggregatePoint, type PercentileKey } from './aggre
 import { CHART_SIZES } from './chart-shared';
 import { ExpandableChart } from './expandable-chart';
 import { chipLabel } from './sibling-nav';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
-/** Bundle per-percentile values for one sibling into the shape AggregateChart wants. */
 function toAggPoint(
   sibling: { id: number; label: string },
   pct: MetricPercentiles | null | undefined,
@@ -26,7 +25,6 @@ function toAggPoint(
   return { id: sibling.id, label: sibling.label, values };
 }
 
-/** "Aggregates across configs" view: ISL/OSL/KV/prefix stats per SKU sibling. */
 export function AggregatesGrid({
   siblings,
   aggregates,

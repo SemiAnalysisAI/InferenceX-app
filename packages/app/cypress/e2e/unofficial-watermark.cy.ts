@@ -1,3 +1,4 @@
+import { availabilityBody } from '../support/e2e';
 import { expandLegendAdvanced } from '../support/legend-advanced';
 
 describe('Unofficial-run watermark', () => {
@@ -42,7 +43,7 @@ describe('Unofficial-run watermark', () => {
           evaluations: [],
         },
       });
-      cy.intercept('GET', '/api/v1/availability*', { body: [] });
+      cy.intercept('GET', '/api/v1/availability/compact', { body: availabilityBody([]) });
       cy.intercept('GET', '/api/v1/benchmarks*', { body: [] });
 
       cy.visit(
@@ -72,7 +73,7 @@ describe('Unofficial-run watermark', () => {
     cy.get('[data-testid="inference-chart-display"] .unofficial-watermark-image')
       .should('have.length.greaterThan', 0)
       .each(($image) => {
-        cy.wrap($image).should('have.attr', 'href', '/decorative/kanye-west.png');
+        cy.wrap($image).should('have.attr', 'href', '/decorative/pointing-muse.webp');
         cy.wrap($image).parent('svg').find('.unofficial-watermark-image').should('have.length', 1);
       });
 

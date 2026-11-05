@@ -28,9 +28,9 @@ tags:
 
 Kimi K2.5 是一个 1T 参数的 MoE 模型，使用多头潜在注意力（MLA，Multi-head Latent Attention），这是 DeepSeek 在 V2 中引入的注意力变体。MLA 通过将 key 和 value 投影到共享潜空间来减少 KV 缓存占用。由此产生的每 rank 注意力头数取决于 tensor-parallel rank 数：TP=4 时 Kimi K2.5 为 16 头/rank，TP=8 时为 8 头/rank。
 
-AITER（AMD 面向 ROCm 的手动调优 AI Tensor Engine）在 CDNA4 上有优化的 MLA 内核路径，但 vLLM 的集成代码在 TP=8 时未能正确分发到该路径。AITER 的 MLA 解码内核围绕 `gqa_ratio=16` 的 ASM 路径构建，原生接受 16 头/rank（TP=4）和 128 头/rank，并拒绝中间值。在 Kimi K2.5 TP=8 的 8 头/rank 下，分发因头数断言失败而回退到 vLLM 的参考 TritonMLA 路径，该路径在 MXFP4 下比 AITER 慢很多。
+AITER（AMD 面向 ROCm 的手动调优 AI Tensor Engine）在 CDNA4 上有优化的 MLA kernel 路径，但 vLLM 的集成代码在 TP=8 时未能正确分发到该路径。AITER 的 MLA 解码 kernel 围绕 `gqa_ratio=16` 的 ASM 路径构建，原生接受 16 头/rank（TP=4）和 128 头/rank，并拒绝中间值。在 Kimi K2.5 TP=8 的 8 头/rank 下，分发因头数断言失败而回退到 vLLM 的参考 TritonMLA 路径，该路径在 MXFP4 下比 AITER 慢很多。
 
-PR #35850 在单次提交中完成了三项修改：通过头重复技巧（将 8 头填充到 16 头以使用现有的 `gqa_ratio=16` ASM 内核）支持 `num_heads < 16` 的 AITER MLA——这为 Kimi K2.5 TP=8 和 Kimi-Linear TP=16 解锁了性能；放宽了头数断言以接受 4、8 或 [16, 128] 内任意 16 的倍数；以及当使用 FP8 KV 缓存时自动从 TritonMLA 回退到 AITER MLA（TritonMLA 对 FP8 KV 抛出 `NotImplementedError`）。三项修改均随 vLLM 0.18 发布。此外，AMD 对 MoE 专家形态的 MXFP4 GEMM 自动调优也与该 PR 一起贡献了观测到的吞吐量提升。
+PR #35850 在单次提交中完成了三项修改：通过头重复技巧（将 8 头填充到 16 头以使用现有的 `gqa_ratio=16` ASM kernel）支持 `num_heads < 16` 的 AITER MLA——这为 Kimi K2.5 TP=8 和 Kimi-Linear TP=16 解锁了性能；放宽了头数断言以接受 4、8 或 [16, 128] 内任意 16 的倍数；以及当使用 FP8 KV 缓存时自动从 TritonMLA 回退到 AITER MLA（TritonMLA 对 FP8 KV 抛出 `NotImplementedError`）。三项修改均随 vLLM 0.18 发布。此外，AMD 对 MoE 专家矩阵形状（shape）的 MXFP4 GEMM 自动调优也与该 PR 一起贡献了观测到的吞吐量提升。
 
 ## 解读曲线
 
@@ -49,7 +49,7 @@ InferenceX 的基准测试结果在变化一落地就捕获到了：
 | 3 月 26 日     | 32    | 8         | 1,255     | 27 ms     | 36.4       | 6.5x       |
 | 3 月 26 日     | 64    | 8         | 1,647     | 43 ms     | 23.3       | 4.7x       |
 
-两个日期均使用 TP=8 以进行等条件对比。延迟下限从 152–199 ms 崩塌至 13–43 ms，覆盖整个批次曲线。
+两个日期均使用 TP=8 以进行等条件对比。延迟下限从 152–199 ms 骤降至 13–43 ms，覆盖整个批次曲线。
 
 对于峰值吞吐量，修复后的最优配方切换到 TP=4，以少量低批次交互性为代价换取更高的每 GPU token 数：
 
@@ -67,7 +67,7 @@ InferenceX 的基准测试结果在变化一落地就捕获到了：
 | 337                  | 5.1（插值，约并发 62）    | **78.9**（实测，并发 4）  | **15.6x**  |
 | 380                  | 4.9（外推）               | 74.7（插值，约并发 5）    | 15.2x      |
 
-"最高 15 倍"的标题出现在 337 tok/s/GPU 处，v0.16 破损的延迟下限（152–199 ms TPOT，与批大小无关）与 v0.18 在并发 4 下 13 ms 的正常下限在此交汇。在该工作点上，vLLM v0.18 已能在 Kimi K2.5 推理上实现接近实时语音的延迟。
+"最高 15 倍"的标题出现在 337 tok/s/GPU 处，v0.16 异常的延迟下限（152–199 ms TPOT，与批大小无关）与 v0.18 在并发 4 下 13 ms 的正常下限在此交汇。在该工作点上，vLLM v0.18 已能在 Kimi K2.5 推理上实现接近实时语音的延迟。
 
 <Figure
   srcLight="/images/mi355x-kimi-k2-5-vllm-aiter-7x-speedup/benchmark-light.png"
@@ -84,7 +84,7 @@ InferenceX 的基准测试结果在变化一落地就捕获到了：
 
 AMD 已经展示了其能够在自有技术栈上交付生产级分离式推理的能力。MI355X DeepSeek R1 结果使用了 `mori-sglang` 配合分离式预填充/解码、MXFP4 和 MXFP8，含和不含 MTP 投机解码两种模式。我们期待尽快在 Kimi K2.5 上看到同样的方案。
 
-而这正是我们基准测试所展示的更新节奏为何如此重要。如果在 3 月 1 日做一次时间点 MI355X vs B200 对比，结论会是 MI355X 落后 10 倍且几乎不可用。然而，仅仅 25 天后的数据证明 MI355X 已进入 B200 单节点的射程之内。
+这也正是我们基准测试所体现的更新节奏如此重要的原因。如果在 3 月 1 日做一次时间点 MI355X vs B200 对比，结论会是 MI355X 落后 10 倍且几乎不可用。然而，仅仅 25 天后的数据证明 MI355X 已进入 B200 单节点的射程之内。
 
 <DashboardCTA href="https://inferencex.semianalysis.com/inference">
   点击查看完整 InferenceX 仪表板 →
@@ -99,7 +99,7 @@ AMD 已经展示了其能够在自有技术栈上交付生产级分离式推理�
       "name": "vLLM PR #35850 为 MI355X 上的 Kimi K2.5 修复了什么？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "vLLM PR #35850（2026 年 3 月 6 日合入）通过头重复技巧为 MI355X CDNA4 添加了 num_heads < 16 的 AITER MLA 支持，将 8 个头填充到 16 个后调用优化的 gqa_ratio=16 ASM 内核。这为 Kimi K2.5 TP=8（8 头/rank）和 Kimi-Linear TP=16（4 头/rank）解锁了性能。该 PR 还放宽了头数断言以接受 4、8 或 [16, 128] 内任意 16 的倍数，并在使用 FP8 KV 缓存时添加了从 TritonMLA 到 AITER MLA 的自动回退。修复前，TP=8 的 Kimi K2.5 回退到参考 Triton MLA 路径，在 MXFP4 下比 AITER 慢很多。该修复随 vLLM 0.18 发布。"
+        "text": "vLLM PR #35850（2026 年 3 月 6 日合入）通过头重复技巧为 MI355X CDNA4 添加了 num_heads < 16 的 AITER MLA 支持，将 8 个头填充到 16 个后调用优化的 gqa_ratio=16 ASM kernel。这为 Kimi K2.5 TP=8（8 头/rank）和 Kimi-Linear TP=16（4 头/rank）解锁了性能。该 PR 还放宽了头数断言以接受 4、8 或 [16, 128] 内任意 16 的倍数，并在使用 FP8 KV 缓存时添加了从 TritonMLA 到 AITER MLA 的自动回退。修复前，TP=8 的 Kimi K2.5 回退到参考 Triton MLA 路径，在 MXFP4 下比 AITER 慢很多。该修复随 vLLM 0.18 发布。"
       }
     },
     {

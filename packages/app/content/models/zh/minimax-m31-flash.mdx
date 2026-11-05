@@ -1,0 +1,27 @@
+---
+title: 'MiniMax M3.1 Flash'
+developer: 'MiniMax'
+releaseDate: '2026 年 10 月 23 日'
+description: 'MiniMax 的多模态 MoE 模型，总参数量 428B、每个 token 激活 23B，60 层均采用稀疏注意力，前 3 层使用稠密 FFN，并内置 DSpark 投机解码。'
+---
+
+## 概述
+
+MiniMax-M3.1-Flash 基于 MiniMax M3，面向代码、智能体与多模态任务。MiniMax 公布的总参数量约为 428B，每个 token 激活 23B，支持图像、视频和文本输入，输出文本（[模型卡](https://huggingface.co/MiniMaxAI/MiniMax-M3.1-Flash)）。
+
+## 架构
+
+- **主干：**60 层，隐藏维度 6144，词表大小 200064。
+- **FFN 分布：**前 3 层使用中间维度 12288 的稠密 FFN，后 57 层使用 MoE。稠密 FFN 不代表该层采用稠密注意力。
+- **注意力：**60 层均采用 MiniMax 稀疏注意力（MSA），与前 3 层使用完整 GQA 的 M3 不同。共有 64 个 query head、4 个 KV head，head 维度 128，并对每个 head 进行 QK 归一化。
+- **位置编码：**在每个 128 维 head 的 64 个维度上应用部分 RoPE，theta 为 10,000,000。
+- **Expert：**128 个路由 expert，每个 token 选取 top-4，另有 1 个共享 expert；路由和共享 expert 的中间维度均为 3072。
+- **激活函数：**采用 `swigluoai`（alpha 为 1.702、limit 为 7.0），而非未经修改的普通 SiLU 门控。
+- **上下文：**配置的位置上限为 1,048,576；厂商标称支持最长 1M token。
+- **投机解码与量化：**内置 DSpark draft；配置指定了 NVFP4 expert 与 MXFP8 权重，模型卡则介绍了 expert 和注意力路径的量化感知训练。公开配置不足以确定 KV cache 的具体精度。比较推理结果时，应核对实际 checkpoint 配置。
+
+上述维度、FFN 分布以及全层稀疏注意力分布均来自[公开配置](https://huggingface.co/MiniMaxAI/MiniMax-M3.1-Flash/raw/main/config.json)；已发布的推理特性见[模型卡](https://huggingface.co/MiniMaxAI/MiniMax-M3.1-Flash)。
+
+## 版本边界
+
+M3.1 Flash 在 InferenceX 中使用独立的模型数据桶。虽然部分主干维度与 M3 相同，但注意力分布、RoPE、量化和投机解码配置并不相同，不能直接混用。模型卡将权重许可证标为 MiniMax Community（[模型卡](https://huggingface.co/MiniMaxAI/MiniMax-M3.1-Flash)）。

@@ -1,5 +1,6 @@
 import type * as d3 from 'd3';
 
+import { writeAttrs } from '../chart-update';
 import type { ContinuousScale } from '../types';
 
 export interface HorizontalBarConfig<T> {
@@ -13,7 +14,6 @@ export interface HorizontalBarConfig<T> {
   keyFn?: (d: T) => string;
 }
 
-/** Render horizontal bars (y=band, x=linear) using enter/update/exit. */
 export function renderHorizontalBars<T>(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   data: T[],
@@ -21,40 +21,39 @@ export function renderHorizontalBars<T>(
   xScale: ContinuousScale,
   config: HorizontalBarConfig<T>,
 ): d3.Selection<SVGRectElement, T, SVGGElement, unknown> {
-  return group
-    .selectAll<SVGRectElement, T>('.bar')
-    .data(data, config.keyFn)
-    .join('rect')
-    .attr('class', 'bar')
-    .attr('x', 0)
-    .attr('y', (d) => yScale(config.getY(d)) || 0)
-    .attr('width', (d) => Math.max(0, xScale(config.getX(d))))
-    .attr('height', yScale.bandwidth())
-    .attr('fill', (d) => config.getColor(d))
-    .attr('stroke', config.stroke ?? 'none')
-    .attr('stroke-width', config.strokeWidth ?? 0)
-    .attr('rx', config.rx ?? 2)
-    .attr('opacity', config.opacity ?? 0.85)
-    .attr('cursor', 'pointer');
+  const bars = group.selectAll<SVGRectElement, T>('.bar').data(data, config.keyFn).join('rect');
+  return writeAttrs(bars, {
+    class: 'bar',
+    x: 0,
+    y: (d) => yScale(config.getY(d)) || 0,
+    width: (d) => Math.max(0, xScale(config.getX(d))),
+    height: yScale.bandwidth(),
+    fill: (d) => config.getColor(d),
+    stroke: config.stroke ?? 'none',
+    'stroke-width': config.strokeWidth ?? 0,
+    rx: config.rx ?? 2,
+    opacity: config.opacity ?? 0.85,
+    cursor: 'pointer',
+  });
 }
 
-/** Update horizontal bar widths on zoom (X-only rescale). */
 export function updateHorizontalBarsOnZoom<T>(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   xScale: ContinuousScale,
   getX: (d: T) => number,
 ): void {
-  group.selectAll<SVGRectElement, T>('.bar').attr('width', (d) => Math.max(0, xScale(getX(d))));
+  writeAttrs(group.selectAll<SVGRectElement, T>('.bar'), {
+    width: (d) => Math.max(0, xScale(getX(d))),
+  });
 }
 
-/** Restyle existing bars without repeating their data join or geometry writes. */
 export function updateHorizontalBarsForDisplay<T>(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   config: HorizontalBarConfig<T>,
 ): void {
-  group
-    .selectAll<SVGRectElement, T>('.bar')
-    .attr('fill', (d) => config.getColor(d))
-    .attr('stroke', config.stroke ?? 'none')
-    .attr('stroke-width', config.strokeWidth ?? 0);
+  writeAttrs(group.selectAll<SVGRectElement, T>('.bar'), {
+    fill: (d) => config.getColor(d),
+    stroke: config.stroke ?? 'none',
+    'stroke-width': config.strokeWidth ?? 0,
+  });
 }

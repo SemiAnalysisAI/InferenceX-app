@@ -1,50 +1,449 @@
 import { readFile } from 'node:fs/promises';
-import { PGlite } from '@electric-sql/pglite';
-import { it, expect } from 'vitest';
-import type { DbClient } from '../connection';
-import { makeOperatorXBundle, makeOperatorXMoeBundle } from '../operatorx/test-fixture';
-import { getOperatorXBundle, listOperatorXRuns, saveOperatorXBundle } from './operatorx';
 
-it('persists raw documents atomically and cannot replace a newer attempt with stale results', async () => {
-  const db = new PGlite();
-  try {
-    await db.exec(
-      await readFile(
-        new URL('../../migrations-operatorx/001_initial_schema.sql', import.meta.url),
-        'utf8',
-      ),
-    );
-    const sql: DbClient = async (strings, ...values) => {
-      const query = strings.reduce((s, part, index) => s + (index ? `$${index}` : '') + part, '');
-      const result = await db.query<Record<string, unknown>>(query, values);
+import { PGlite } from '@electric-sql/pglite';
+import { expect, it } from 'vitest';
+
+import type { DbClient } from '../connection';
+import type { Sql } from '../etl/db-utils';
+import type { OperatorXRawBundle } from '../operatorx/bundle';
+import { OPERATORX_COMPARISON_OPS } from '../operatorx/comparison-cache';
+import { buildComparison } from '../operatorx/compare';
+import { normalizeBundle } from '../operatorx/normalize';
+import {
+  backfillOperatorXRunComparisons,
+  getOperatorXBundle,
+  getOperatorXRunComparison,
+  getOperatorXRunComparisons,
+  listOperatorXRuns,
+  saveOperatorXBundle,
+} from './operatorx';
+
+function bundle(): OperatorXRawBundle {
+  const shape = {
+    type: 'gemm',
+    args: { m: 1, n: 64, k: 128, a: { dtype: 'bf16' }, b: { dtype: 'bf16' } },
+    sources: ['openai/gpt-oss-120b/k_proj'],
+  };
+  return {
+    run: {
+      run_id: '123',
+      run_attempt: 1,
+      source_sha: 'a'.repeat(40),
+      source_branch: 'main',
+      generated_at: '2026-09-26T00:00:00Z',
+      conclusion: 'success',
+    },
+    manifest: {
+      include: [
+        {
+          id: 's1',
+          runner: 'cluster:h200-dgxc',
+          mode: 'timing',
+          backends: ['vllm'],
+          cases: [{ testlist: 'gemm', shape }],
+        },
+      ],
+    },
+    shards: [
+      {
+        id: 's1',
+        attempt: 1,
+        docs: [
+          {
+            run: { cluster: 'h200' },
+            rows: [
+              {
+                testlist: 'gemm',
+                op: { ...shape, backend: 'vllm' },
+                status: 'ok',
+                metrics: { latency_us: 10 },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function bind(value: unknown): string | number | boolean | null {
+  if (Array.isArray(value))
+    return `{${value.map((item) => JSON.stringify(String(item))).join(',')}}`;
+  return value !== null && typeof value === 'object'
+    ? JSON.stringify(value)
+    : (value as string | number | boolean | null);
+}
+
+function sqlFor(db: PGlite): Sql & DbClient {
+  const makeTag = (client: Pick<PGlite, 'query'>): Sql => {
+    const tag = async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      const query = strings.reduce((text, part, i) => text + (i ? `$${i}` : '') + part, '');
+      // postgres.js serializes any parameter bound to a scalar jsonb slot with JSON.stringify,
+      // strings included, so a pre-serialized string is stored as a jsonb string.
+      const params = values.map((value, i) =>
+        /^::jsonb(?!\[)/u.test(strings[i + 1] ?? '') ? JSON.stringify(value) : bind(value),
+      );
+      const result = await client.query<Record<string, unknown>>(query, params);
       return result.rows;
     };
-    const old = makeOperatorXBundle();
-    const newer = structuredClone(old);
-    newer.run.run_attempt = 2;
-    newer.run.conclusion = 'failure';
-    await saveOperatorXBundle(sql, old);
-    await saveOperatorXBundle(sql, newer);
-    await saveOperatorXBundle(sql, old);
-    const stored = await getOperatorXBundle(sql, '123');
-    expect(stored?.run).toMatchObject({
-      run_attempt: 2,
-      conclusion: 'failure',
-    });
-    expect(await listOperatorXRuns(sql)).toMatchObject([
-      { run_id: '123', run_attempt: 2, measured: 1 },
-    ]);
-    expect(await getOperatorXBundle(sql, '999')).toBeNull();
-    const legacy = makeOperatorXMoeBundle();
-    await sql`UPDATE opx_runs SET bundle = ${legacy}::jsonb, run_attempt = 1,
-      summary = ${{ ...legacy.run, _reader_version: 2, requested: 3, measured: 3 }}::jsonb WHERE run_id = '123'`;
-    expect(await listOperatorXRuns(sql)).toMatchObject([{ requested: 4, measured: 4 }]);
-    const refreshed = await db.query<{ summary: Record<string, unknown> }>(
-      'SELECT summary FROM opx_runs',
+    return Object.assign(tag, {
+      array: (items: unknown[]) => items,
+      begin: <T>(fn: (tx: Sql) => Promise<T>) => db.transaction((tx) => fn(makeTag(tx))),
+    }) as unknown as Sql & DbClient;
+  };
+  return makeTag(db) as Sql & DbClient;
+}
+
+async function migrate(db: PGlite, compact = true): Promise<void> {
+  for (const name of [
+    '001_initial_schema.sql',
+    ...(compact ? ['002_comparison_cache.sql', '003_comparison_attention.sql'] : []),
+  ]) {
+    await db.exec(
+      await readFile(new URL(`../../migrations-operatorx/${name}`, import.meta.url), 'utf8'),
     );
-    expect(refreshed.rows[0].summary).toMatchObject({ _reader_version: 3, measured: 4 });
-    const summaries = await listOperatorXRuns(sql);
-    expect(summaries[0]).not.toHaveProperty('_reader_version');
+  }
+}
+
+function expectedComparison(raw: OperatorXRawBundle) {
+  const dataset = normalizeBundle(raw);
+  return buildComparison('gemm', [{ runner: dataset.run.plan!.runner, dataset }]);
+}
+
+// The first PGlite test also pays the database start-up.
+it('persists raw OperatorX documents and replaces a re-ingested run atomically', async () => {
+  const db = new PGlite();
+  try {
+    await migrate(db);
+    const sql = sqlFor(db);
+    const first = bundle();
+    first.run.generated_at = '2026-09-26T08:00:00.123+08:00';
+
+    expect(await saveOperatorXBundle(sql, first)).toEqual({ docs: 1, results: 1 });
+    expect(await listOperatorXRuns(sql)).toMatchObject([
+      {
+        run_id: '123',
+        plan: { runner: 'h200-dgxc', requested: 1 },
+      },
+    ]);
+    const storedOriginal = await getOperatorXBundle(sql, '123');
+    expect(storedOriginal).toMatchObject({
+      run: { run_id: '123', conclusion: 'success' },
+      shards: first.shards,
+    });
+    const originalRevision = storedOriginal!.run.revision;
+    const originalRuns = await listOperatorXRuns(sql);
+    expect(originalRuns[0].revision).toBe(originalRevision);
+    const compactOriginal = await getOperatorXRunComparison(sql, '123', 'gemm');
+    expect(compactOriginal).toEqual(expectedComparison(storedOriginal!));
+    expect(compactOriginal!.rows[0]).toMatchObject({
+      latencyUs: 10,
+      status: 'ok',
+      runId: '123',
+      resultIndex: 0,
+      revision: originalRevision,
+    });
+    expect(await getOperatorXRunComparison(sql, '123', 'moe')).toEqual({
+      op: 'moe',
+      hardware: [],
+      workloads: [],
+      rows: [],
+    });
+
+    const retry = structuredClone(first);
+    retry.run.run_attempt = 2;
+    retry.run.conclusion = 'failure';
+    retry.shards = [];
+    expect(await saveOperatorXBundle(sql, retry)).toEqual({ docs: 0, results: 1 });
+    const storedReplacement = await getOperatorXBundle(sql, '123');
+    expect(storedReplacement).toMatchObject({
+      run: { run_attempt: 2, conclusion: 'failure' },
+      shards: [],
+    });
+    const replacementRevision = storedReplacement!.run.revision;
+    expect(replacementRevision).not.toBe(originalRevision);
+    const replacementRuns = await listOperatorXRuns(sql);
+    expect(replacementRuns[0].revision).toBe(replacementRevision);
+    const compactReplacement = await getOperatorXRunComparison(sql, '123', 'gemm');
+    expect(compactReplacement).toEqual(expectedComparison(storedReplacement!));
+    expect(compactReplacement!.rows[0]).toMatchObject({
+      status: 'missing',
+      latencyUs: null,
+      revision: replacementRevision,
+    });
+    const persisted = await db.query<{ run_id: number }>('SELECT run_id FROM opx_run_comparisons');
+    expect(persisted.rows).toHaveLength(OPERATORX_COMPARISON_OPS.length);
+    expect(persisted.rows.every((row) => String(row.run_id) === replacementRevision)).toBe(true);
+    expect(await getOperatorXRunComparison(sql, '999', 'gemm')).toBeNull();
+    expect(await getOperatorXBundle(sql, '999')).toBeNull();
+  } finally {
+    await db.close();
+  }
+}, 20_000);
+
+it('keeps raw documents and compact comparisons intact when a re-ingest fails', async () => {
+  const db = new PGlite();
+  try {
+    await migrate(db);
+    const sql = sqlFor(db);
+    await saveOperatorXBundle(sql, bundle());
+    const before = await getOperatorXBundle(sql, '123');
+    const comparison = await getOperatorXRunComparison(sql, '123', 'gemm');
+    // A raw-document write failure must preserve the previous revision.
+    await db.exec(`ALTER TABLE opx_run_docs ADD CONSTRAINT reject_retry CHECK (run_attempt = 1)`);
+    const retry = bundle();
+    retry.run.run_attempt = 2;
+    retry.shards[0].attempt = 2;
+    await expect(saveOperatorXBundle(sql, retry)).rejects.toThrow();
+    expect(await getOperatorXBundle(sql, '123')).toEqual(before);
+    expect(await getOperatorXRunComparison(sql, '123', 'gemm')).toEqual(comparison);
+    // A projection failure after all raw writes must roll those writes back too.
+    await db.exec('ALTER TABLE opx_run_docs DROP CONSTRAINT reject_retry');
+    await db.exec(
+      `ALTER TABLE opx_run_comparisons ADD CONSTRAINT reject_gemm CHECK (op <> 'gemm') NOT VALID`,
+    );
+    await expect(saveOperatorXBundle(sql, retry)).rejects.toThrow();
+    expect(await getOperatorXBundle(sql, '123')).toEqual(before);
+    expect(await getOperatorXRunComparison(sql, '123', 'gemm')).toEqual(comparison);
+  } finally {
+    await db.close();
+  }
+});
+
+it('replaces an older Ascend run atomically while preserving other hardware', async () => {
+  const db = new PGlite();
+  try {
+    await migrate(db);
+    const sql = sqlFor(db);
+    const old = bundle();
+    old.run.run_id = 'old-ascend';
+    (old.manifest as { include: { runner: string }[] }).include[0].runner = 'ascend950pr-external';
+    await saveOperatorXBundle(sql, old);
+    await saveOperatorXBundle(sql, bundle());
+
+    const replacement = structuredClone(old);
+    replacement.run.run_id = 'new-ascend';
+    replacement.shards[0].docs[0] = {
+      run: { cluster: 'ascend950pr' },
+      rows: [{ ...row(1, 7), op: { ...row(1, 7).op, backend: 'vllm' } }],
+    };
+    await expect(saveOperatorXBundle(sql, replacement, '123')).rejects.toThrow(
+      'Replacement target is not an Ascend 950PR run',
+    );
+    expect(await getOperatorXBundle(sql, 'old-ascend')).not.toBeNull();
+    expect(await getOperatorXBundle(sql, 'new-ascend')).toBeNull();
+
+    await saveOperatorXBundle(sql, replacement, 'old-ascend');
+    expect(await getOperatorXBundle(sql, 'old-ascend')).toBeNull();
+    expect(await getOperatorXBundle(sql, '123')).not.toBeNull();
+    expect(await getOperatorXBundle(sql, 'new-ascend')).not.toBeNull();
+    const comparison = await getOperatorXRunComparison(sql, 'new-ascend', 'gemm');
+    expect(comparison?.rows[0]).toMatchObject({
+      latencyUs: 7,
+      runId: 'new-ascend',
+    });
+  } finally {
+    await db.close();
+  }
+});
+
+it('reads large runs in bounded document batches without changing shard order', async () => {
+  const db = new PGlite();
+  try {
+    await migrate(db);
+    const sql = sqlFor(db);
+    const input = bundle();
+    input.shards = [
+      { id: 'a', attempt: 1, docs: Array.from({ length: 11 }, (_, n) => ({ n })) },
+      { id: 'b', attempt: 2, docs: Array.from({ length: 9 }, (_, n) => ({ n })) },
+    ];
+    await saveOperatorXBundle(sql, input);
+    const stored = await getOperatorXBundle(sql, '123');
+    expect(stored?.shards).toEqual(input.shards);
+    expect(stored?.run.revision).toMatch(/^\d+$/u);
+  } finally {
+    await db.close();
+  }
+});
+
+const row = (m: number, latency: number) => ({
+  testlist: 'gemm',
+  op: {
+    type: 'gemm',
+    backend: 'vllm',
+    args: { m, n: 64, k: 128, a: { dtype: 'bf16' }, b: { dtype: 'bf16' } },
+    sources: ['openai/gpt-oss-120b/k_proj'],
+  },
+  status: 'ok',
+  metrics: { latency_us: latency, profile: { kernels: [{ name: `kernel_${latency}` }] } },
+});
+
+it('projects persisted shard order so duplicate selection and timeline indices match raw reads', async () => {
+  const db = new PGlite();
+  try {
+    await migrate(db);
+    const sql = sqlFor(db);
+    const input = bundle();
+    input.shards[0].id = 'z';
+    input.shards.push({
+      id: 'a',
+      attempt: 1,
+      docs: [{ run: { cluster: 'h200' }, rows: [row(2, 30), row(1, 20)] }],
+    });
+    await saveOperatorXBundle(sql, input);
+    const stored = (await getOperatorXBundle(sql, '123'))!;
+    expect(stored.shards.map((s) => s.id)).toEqual(['a', 'z']);
+    const comparison = (await getOperatorXRunComparison(sql, '123', 'gemm'))!;
+    expect(comparison).toEqual(expectedComparison(stored));
+    const selected = comparison.rows.find((r) => r.dims.m === 1)!;
+    expect(selected).toMatchObject({ latencyUs: 20, resultIndex: 1, kernel: 'kernel_20' });
+    const normalized = normalizeBundle(stored);
+    expect(normalized.results[selected.resultIndex].latencyUs).toBe(selected.latencyUs);
+    expect(normalized.metrics[selected.resultIndex]).toMatchObject({
+      profile: { kernels: [{ name: 'kernel_20' }] },
+    });
+  } finally {
+    await db.close();
+  }
+});
+
+it('backfills idempotently and refuses a revision replaced after the raw read', async () => {
+  const db = new PGlite();
+  try {
+    await migrate(db);
+    const sql = sqlFor(db);
+    await saveOperatorXBundle(sql, bundle());
+    const captured = (await getOperatorXBundle(sql, '123'))!;
+    await db.exec('DELETE FROM opx_run_comparisons');
+    expect(await getOperatorXRunComparison(sql, '123', 'gemm')).toBeNull();
+    expect(await backfillOperatorXRunComparisons(sql, captured)).toBe(true);
+    expect(await backfillOperatorXRunComparisons(sql, captured)).toBe(true);
+    expect(await getOperatorXBundle(sql, '123')).toEqual(captured);
+    expect(await getOperatorXRunComparison(sql, '123', 'gemm')).toEqual(
+      expectedComparison(captured),
+    );
+    const persisted = await db.query('SELECT * FROM opx_run_comparisons');
+    expect(persisted.rows).toHaveLength(OPERATORX_COMPARISON_OPS.length);
+
+    await db.exec('UPDATE opx_run_comparisons SET format_version = 999');
+    expect(await getOperatorXRunComparison(sql, '123', 'gemm')).toBeNull();
+    expect(await backfillOperatorXRunComparisons(sql, captured)).toBe(true);
+    expect(await getOperatorXRunComparison(sql, '123', 'gemm')).toEqual(
+      expectedComparison(captured),
+    );
+
+    const retry = bundle();
+    retry.shards = [];
+    await saveOperatorXBundle(sql, retry);
+    const replacement = await getOperatorXRunComparison(sql, '123', 'gemm');
+    expect(await backfillOperatorXRunComparisons(sql, captured)).toBe(false);
+    expect(await getOperatorXRunComparison(sql, '123', 'gemm')).toEqual(replacement);
+    await expect(backfillOperatorXRunComparisons(sql, bundle())).rejects.toThrow('stored revision');
+  } finally {
+    await db.close();
+  }
+});
+
+it('falls back before the projection migration is applied', async () => {
+  const db = new PGlite();
+  try {
+    await migrate(db, false);
+    expect(await getOperatorXRunComparison(sqlFor(db), '123', 'gemm')).toBeNull();
+    expect(await getOperatorXRunComparisons(sqlFor(db), [bundle().run], 'gemm')).toEqual(new Map());
+  } finally {
+    await db.close();
+  }
+});
+
+it.each(['42501', '08006', '57014'])(
+  'propagates database errors with SQLSTATE %s',
+  async (code) => {
+    const failure = Object.assign(new Error('database failure'), { code });
+    const sql = (() => Promise.reject(failure)) as unknown as DbClient;
+    await expect(getOperatorXRunComparison(sql, '123', 'gemm')).rejects.toBe(failure);
+    await expect(getOperatorXRunComparisons(sql, [bundle().run], 'gemm')).rejects.toBe(failure);
+  },
+);
+
+it('reads requested compact run revisions in one query with full single-read parity', async () => {
+  const db = new PGlite();
+  try {
+    await migrate(db);
+    const sql = sqlFor(db);
+    const first = bundle();
+    const second = bundle();
+    second.run.run_id = '124';
+    await saveOperatorXBundle(sql, first);
+    await saveOperatorXBundle(sql, second);
+    const runs = await listOperatorXRuns(sql);
+    let calls = 0;
+    const counted: DbClient = (strings, ...values) => {
+      calls++;
+      return sql(strings, ...values);
+    };
+    const result = await getOperatorXRunComparisons(counted, runs, 'gemm');
+    expect(calls).toBe(1);
+    expect(result.size).toBe(2);
+    for (const run of runs) {
+      const raw = await getOperatorXBundle(sql, run.run_id);
+      expect(result.get(run.run_id)).toEqual(expectedComparison(raw!));
+    }
+    expect(await getOperatorXRunComparisons(counted, [], 'gemm')).toEqual(new Map());
+    expect(calls).toBe(1);
+
+    const captured = runs.find((run) => run.run_id === '123')!;
+    await saveOperatorXBundle(sql, first);
+    expect(await getOperatorXRunComparisons(sql, [captured], 'gemm')).toEqual(new Map());
+    const current = await listOperatorXRuns(sql);
+    await db.exec("UPDATE opx_run_comparisons SET format_version = 999 WHERE op = 'gemm'");
+    expect(await getOperatorXRunComparisons(sql, current, 'gemm')).toEqual(new Map());
+    const missing = { ...captured, run_id: 'not-stored' };
+    expect(await getOperatorXRunComparisons(sql, [missing], 'gemm')).toEqual(new Map());
+  } finally {
+    await db.close();
+  }
+});
+
+it('stores comparisons as JSON objects and still reads double-encoded legacy rows', async () => {
+  const db = new PGlite();
+  try {
+    await migrate(db);
+    const sql = sqlFor(db);
+    await saveOperatorXBundle(sql, bundle());
+    const stored = await db.query<{ t: string }>(
+      'SELECT DISTINCT jsonb_typeof(comparison) AS t FROM opx_run_comparisons',
+    );
+    expect(stored.rows).toEqual([{ t: 'object' }]);
+
+    const expected = await getOperatorXRunComparison(sql, '123', 'gemm');
+    // Rows written before the fix hold the comparison as a jsonb string.
+    await db.exec(
+      `UPDATE opx_run_comparisons SET comparison = to_jsonb(comparison::text) WHERE op = 'gemm'`,
+    );
+    expect(await getOperatorXRunComparison(sql, '123', 'gemm')).toEqual(expected);
+  } finally {
+    await db.close();
+  }
+});
+
+it('reads comparisons for more runs than one batch holds', async () => {
+  const db = new PGlite();
+  try {
+    await migrate(db);
+    const sql = sqlFor(db);
+    const keys = Array.from({ length: 19 }, (_, i) => String(1000 + i));
+    for (const key of keys) {
+      const run = bundle();
+      run.run.run_id = key;
+      await saveOperatorXBundle(sql, run);
+    }
+    const comparisons = await getOperatorXRunComparisons(
+      sql,
+      keys.map((run_id) => ({ run_id })),
+      'gemm',
+    );
+    expect([...comparisons.keys()].toSorted()).toEqual(keys);
+    expect([...comparisons.values()].every((c) => c.op === 'gemm')).toBe(true);
   } finally {
     await db.close();
   }

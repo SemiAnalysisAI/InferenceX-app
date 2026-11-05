@@ -1,13 +1,13 @@
 import * as React from 'react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/shared/utils';
 
 function Card({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="card"
       className={cn(
-        'bg-background/20 backdrop-blur-[2px] text-card-foreground flex min-w-0 flex-col rounded-xl border border-border/40 p-4 md:p-6',
+        'bg-background/20 backdrop-blur-[2px] text-card-foreground flex min-w-0 flex-col rounded-xl border border-border/40 p-3 sm:p-4 md:p-6',
         className,
       )}
       {...props}

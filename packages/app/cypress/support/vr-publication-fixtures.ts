@@ -1,7 +1,6 @@
+import { availabilityBody, interceptBenchmarkPresence } from './e2e';
 import { metricsFor } from './overlay-fixtures';
 
-// Synthetic API rows, not published benchmark measurements. Keep real run data
-// and private source links out of the public test fixtures.
 export const VR_FIXTURE_DATE = '2026-09-09';
 export const VR_LATEST_FIXTURE_DATE = '2026-09-10';
 export const VR_LATEST_FIXTURE_RUN = 9_100_001;
@@ -38,7 +37,6 @@ export const vrPublicationRows = ['vr200', 'gb300'].flatMap((hardware, chipIndex
     offload_mode: 'off',
     benchmark_type: 'agentic_traces',
     image: null,
-    // VR remains visible even when the model's newest date belongs to GB300.
     date: chipIndex === 0 ? VR_FIXTURE_DATE : '2026-09-10',
     run_url: null,
     metrics: {
@@ -75,8 +73,8 @@ export function interceptVrPublicationData(includeNewerVr = false): void {
   const latest = includeNewerVr
     ? [...vrLatestPublicationRows, ...vrPublicationRows.filter((row) => row.hardware !== 'vr200')]
     : vrPublicationRows;
-  cy.intercept('GET', '/api/v1/availability*', {
-    body: [...preferred, ...latest].map(({ metrics: _metrics, ...row }) => row),
+  cy.intercept('GET', '/api/v1/availability/compact', {
+    body: availabilityBody([...preferred, ...latest].map(({ metrics: _metrics, ...row }) => row)),
   });
   cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
     request.reply({ body: request.query['date'] === VR_FIXTURE_DATE ? preferred : latest });
@@ -99,5 +97,6 @@ export function interceptVrPublicationData(includeNewerVr = false): void {
       runConfigs: [],
     },
   });
-  cy.intercept('GET', '/api/v1/trace-availability*', { body: {} });
+  cy.intercept('GET', '/api/v1/workflow-changelogs*', { body: { dates: [] } });
+  interceptBenchmarkPresence();
 }

@@ -7,8 +7,15 @@ export default defineConfig({
     include: ['src/**/*.test.ts'],
   },
   resolve: {
-    alias: {
-      '@semianalysisai/inferencex-constants': path.resolve(__dirname, '../constants/src/index.ts'),
-    },
+    alias: [
+      {
+        find: /^@semianalysisai\/inferencex-constants$/,
+        replacement: path.resolve(__dirname, '../constants/src/index.ts'),
+      },
+      {
+        find: /^@semianalysisai\/inferencex-constants\//,
+        replacement: `${path.resolve(__dirname, '../constants/src')}/`,
+      },
+    ],
   },
 });

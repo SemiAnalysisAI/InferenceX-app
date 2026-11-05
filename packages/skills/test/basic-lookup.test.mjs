@@ -88,10 +88,14 @@ globalThis.fetch = async (input) => {
     cwd: project,
     env: {
       ...environment,
+      INFERENCEX_SKILL_DIR: skillRoot,
       INFERENCEX_TEST_ROWS: fixturePath,
       INFERENCEX_TEST_REQUESTS: requestsPath,
     },
-    input: snippet.groups.code,
+    input: snippet.groups.code.replaceAll(
+      './.agents/skills/inferencex-api/scripts/capture-response.mjs',
+      pathToFileURL(join(skillRoot, 'scripts/capture-response.mjs')).href,
+    ),
   });
   succeeded(result);
   const output = JSON.parse(result.stdout);

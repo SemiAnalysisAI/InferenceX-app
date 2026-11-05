@@ -24,10 +24,6 @@ afterEach(() => {
 });
 
 describe('RouteTransition', () => {
-  // npm react (used by this test runner) does not ship the ViewTransition
-  // API, so this exercises exactly the documented fallback: children render
-  // unwrapped and navigation output is unchanged. The Next.js app router
-  // uses its vendored React build, where the wrapper is active.
   it('renders children when the React ViewTransition API is unavailable', () => {
     act(() => {
       root.render(
@@ -51,8 +47,6 @@ describe('route skeletons', () => {
     const skeleton = container.querySelector('[data-testid="route-skeleton"]');
     expect(skeleton).not.toBeNull();
     expect(skeleton?.getAttribute('aria-busy')).toBe('true');
-    // The 600px block mirrors the chart card so content replaces the
-    // fallback without layout shift.
     expect(container.querySelector(String.raw`[class*="h-\[600px\]"]`)).not.toBeNull();
   });
 

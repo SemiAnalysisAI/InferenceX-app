@@ -4,14 +4,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { asMock, createMockGroup } from './test-helpers';
 import { renderPoints, updatePointsOnZoom, type PointConfig } from './points';
 
-// Mock the downsample module so we can control when LTTB triggers
 vi.mock('../downsample', () => ({
   lttbDownsample: vi.fn((data: any[], target: number) => data.slice(0, target)),
 }));
 
 import { lttbDownsample } from '../downsample';
-
-// ── Fixtures ─────────────────────────────────────────────────────────
 
 interface TestPoint {
   id: string;
@@ -43,8 +40,6 @@ function makeScales() {
   const yScale = d3.scaleLinear().domain([0, 100]).range([300, 0]);
   return { xScale, yScale };
 }
-
-// ── renderPoints ─────────────────────────────────────────────────────
 
 describe('renderPoints', () => {
   it('creates one circle per data item', () => {
@@ -93,7 +88,6 @@ describe('renderPoints', () => {
     const config = makeConfig({ getX: (d) => d.dataX });
     const result = asMock(renderPoints(group as any, SAMPLE_DATA, config));
 
-    // Without xScale, should use getCx
     expect(result.elements[0].attrs['cx']).toBe(50);
   });
 
@@ -173,7 +167,6 @@ describe('renderPoints', () => {
     const group = createMockGroup();
     const { xScale, yScale } = makeScales();
 
-    // Generate data that exceeds the default 2000 threshold
     const bigData: TestPoint[] = Array.from({ length: 3000 }, (_, i) => ({
       id: `p${i}`,
       px: i,
@@ -191,7 +184,6 @@ describe('renderPoints', () => {
 
     renderPoints(group as any, bigData, config, xScale, yScale);
 
-    // lttbDownsample should have been called
     expect(lttbDownsample).toHaveBeenCalled();
   });
 
@@ -250,14 +242,11 @@ describe('renderPoints', () => {
       radius: 4,
     }));
 
-    // No getX/getY → no downsampling
     renderPoints(group as any, bigData, makeConfig());
 
     expect(lttbDownsample).not.toHaveBeenCalled();
   });
 });
-
-// ── updatePointsOnZoom ───────────────────────────────────────────────
 
 const newGetCx = (d: TestPoint) => d.px * 2;
 const newGetCy = (d: TestPoint) => d.py * 0.5;
@@ -283,6 +272,5 @@ describe('updatePointsOnZoom', () => {
       () => 0,
       () => 0,
     );
-    // Should not throw
   });
 });

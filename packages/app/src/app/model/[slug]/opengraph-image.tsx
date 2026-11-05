@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 
 import { renderOgImage, size } from '@/app/blog/[slug]/og-image-render';
-import { getModelPage, getModelPageSlugs } from '@/lib/model-pages';
+import { getModelPage, getModelPageSlugs } from '@/lib/catalog/model-pages';
 
 export const alt = 'InferenceX Model Architecture Deep-Dive';
 export { size };
@@ -41,8 +41,6 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
       subtitle: page.meta.description,
       date: '',
     },
-    // releaseDate is free-form text (may hold multiple versions), so it is
-    // passed through verbatim instead of being date-formatted.
     { dateLabel: `${page.meta.developer} · ${page.meta.releaseDate}` },
   );
 }

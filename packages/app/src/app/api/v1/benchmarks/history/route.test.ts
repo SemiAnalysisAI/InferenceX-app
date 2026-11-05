@@ -14,9 +14,9 @@ vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
   getAllBenchmarksForHistory: mockGetAllBenchmarksForHistory,
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: any[]) => any) => fn,
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));
 
 import { GET } from './route';

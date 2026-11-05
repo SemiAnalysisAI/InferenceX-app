@@ -123,7 +123,7 @@ describe('rollingRequestMetric', () => {
     const result = rollingRequestMetric(
       [
         request(1, 100, 10),
-        request(2, 200, 20, { phase: 'warmup' }), // kept — caller passes a phase-scoped timeline
+        request(2, 200, 20, { phase: 'warmup' }),
         request(3, 300, 30, { cancelled: true }),
         request(4, null, null),
         request(5, 0, 0),
@@ -159,8 +159,6 @@ describe('timeRollingAverage', () => {
       4,
     );
 
-    // t=0: zero-length window → raw value. t=2: 10 held on [0,2) → 10.
-    // t=4: 10 on [0,2) + 20 on [2,4) = 60 area / 4 s = 15.
     expect(result).toEqual([
       { t: 0, value: 10 },
       { t: 2, value: 10 },
@@ -178,8 +176,6 @@ describe('timeRollingAverage', () => {
       2,
     );
 
-    // Window [2,4): value 20 held throughout (the t=0 sample sets the step
-    // value at the window start via carry-forward of data[j-1]).
     expect(result.at(-1)).toEqual({ t: 4, value: 20 });
   });
 
@@ -228,8 +224,6 @@ describe('rollingRatioOfSums', () => {
       3,
     );
 
-    // The middle interval has a zero denominator and would yield an infinite
-    // pointwise ratio. Across the shared window it is 100 / 200 = 50%.
     expect(result[1]).toEqual({ t: 1, value: 0.5 });
     expect(result.every((point) => point.value <= 1)).toBe(true);
   });
@@ -285,8 +279,6 @@ describe('rollingRatioFromComponents', () => {
       2,
     );
 
-    // The original query rate is 200 / 0.5 = 400. Using prompt throughput
-    // as the denominator would incorrectly clamp both intervals to 100%.
     expect(result.map((point) => point.value)).toEqual([0.5, 0.5]);
   });
 
@@ -324,8 +316,6 @@ describe('rollingRatioFromComponents', () => {
       3,
     );
 
-    // t=0 has hits but no queries, while the matching query delta lands at
-    // t=1. The centered window must retain both halves: 100 / 100 = 100%.
     expect(result).toEqual([
       { t: 0, value: 1 },
       { t: 1, value: 1 },
@@ -401,7 +391,7 @@ describe('cumulativeCompletedRequests', () => {
       cumulativeCompletedRequests([
         request(4, 100, 10),
         request(2, 100, 10),
-        request(1, 100, 10, { phase: 'warmup' }), // kept — caller passes a phase-scoped timeline
+        request(1, 100, 10, { phase: 'warmup' }),
         request(3, 100, 10, { cancelled: true }),
       ]),
     ).toEqual([
@@ -436,8 +426,6 @@ describe('averageSequenceLengthInFlight', () => {
   });
 
   it('excludes cancelled and missing sequence lengths (phase is the caller’s concern)', () => {
-    // Only the null-osl and cancelled rows are dropped; the warmup row is kept
-    // (the caller passes a phase-scoped timeline), so it produces a step series.
     expect(
       averageSequenceLengthInFlight(
         [
@@ -562,14 +550,14 @@ describe('inflightUniqueTokens', () => {
   it('sums active ISLs across cids as a step series (ends before starts on ties)', () => {
     const out = inflightUniqueTokens([
       { cid: 'a', start: 0, end: 2e9, isl: 100 },
-      { cid: 'a', start: 2e9, end: 4e9, isl: 150 }, // turn handoff at t=2
+      { cid: 'a', start: 2e9, end: 4e9, isl: 150 },
       { cid: 'b', start: 1e9, end: 3e9, isl: 200 },
     ]);
     expect(out).toEqual([
       { t: 0, value: 0 },
       { t: 0, value: 100 },
       { t: 1, value: 300 },
-      { t: 2, value: 200 }, // end of a's turn 1 processed first — no double count
+      { t: 2, value: 200 },
       { t: 2, value: 350 },
       { t: 3, value: 150 },
       { t: 4, value: 0 },
@@ -584,7 +572,7 @@ describe('inflightUniqueTokens', () => {
     expect(out).toEqual([
       { t: 0, value: 0 },
       { t: 0, value: 100 },
-      { t: 1, value: 100 }, // nested request folded into the cid's max ISL
+      { t: 1, value: 100 },
       { t: 2, value: 0 },
       { t: 3, value: 0 },
     ]);
@@ -607,7 +595,7 @@ describe('cumulativeDifferenceMonotonic', () => {
         ],
         [
           { t: 0, value: 5 },
-          { t: 2, value: 20 }, // drives the raw diff negative — clamp holds
+          { t: 2, value: 20 },
         ],
       ),
     ).toEqual([

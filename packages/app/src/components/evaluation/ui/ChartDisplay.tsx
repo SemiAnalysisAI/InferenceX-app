@@ -3,8 +3,9 @@
 import { useCallback, useMemo, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
 
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
 import EvaluationTable from '@/components/evaluation/ui/EvaluationTable';
 import { Card } from '@/components/ui/card';
@@ -17,11 +18,11 @@ import { ResultContext } from '@/components/ui/result-context';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
-import { exportToCsv } from '@/lib/csv-export';
-import { evaluationChartToCsv } from '@/lib/csv-export-helpers';
-import type { Locale } from '@/lib/i18n';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
+import { type Precision, getPrecisionLabel } from '@/lib/catalog/data-mappings';
+import { exportToCsv } from '@/lib/export/csv-export';
+import { evaluationChartToCsv } from '@/lib/export/csv-export-helpers';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import EvaluationChartControls from './ChartControls';
 import EvalBarChartD3, { formatEvaluationDate } from './BarChartD3';
@@ -100,6 +101,7 @@ export default function EvaluationChartDisplay() {
     chartData,
     unofficialChartData,
     selectedPrecisions,
+    enabledHardware,
     isError,
     isAvailabilityError,
     isEvaluationDataError,
@@ -107,9 +109,6 @@ export default function EvaluationChartDisplay() {
     retry,
   } = useEvaluation();
   const { isUnofficialRun } = useUnofficialRun();
-  // In unofficial-run mode the bar chart already shows both, but the table only
-  // takes one input. Merge the unofficial rows in so users can drill into samples
-  // for unofficial configs via the live-fetch path.
   const tableData = useMemo(
     () => (isUnofficialRun ? [...chartData, ...unofficialChartData] : chartData),
     [isUnofficialRun, chartData, unofficialChartData],
@@ -192,6 +191,11 @@ export default function EvaluationChartDisplay() {
         chartId={CHART_ID}
         mobileActions
         analyticsPrefix="evaluation"
+        analyticsContext={selectionAnalyticsContext({
+          model: selectedModel,
+          precisions: selectedPrecisions,
+          gpuCount: enabledHardware.size,
+        })}
         setIsLegendExpanded={setIsLegendExpanded}
         onExportCsv={handleExportCsv}
         exportFileName={`InferenceX_evaluation_${selectedModel}_${selectedBenchmark}`}
@@ -203,6 +207,8 @@ export default function EvaluationChartDisplay() {
             onValueChange={handleViewModeChange}
             ariaLabel={t.viewModeAria}
             testId="evaluation-view-toggle"
+            className="max-md:flex-1"
+            buttonClassName="max-md:flex-1 max-md:justify-center"
           />
         }
       >
@@ -232,7 +238,7 @@ export default function EvaluationChartDisplay() {
                 >
                   <p className="text-sm text-muted-foreground">{t.tableLoading}</p>
                   <Skeleton className="h-8 w-1/3" />
-                  <Skeleton className="h-64 w-full" />
+                  <Skeleton className="h-154 w-full" />
                 </div>
               ) : (
                 <>

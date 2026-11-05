@@ -1,23 +1,3 @@
-/**
- * Ingest a HuggingFace cc-traces-weka dataset into the `datasets` +
- * `dataset_conversations` tables that back the /datasets area.
- *
- * Public dataset, no token needed — fetched via the HF datasets-server rows API
- * (rows are large, ~3.5 MB each, so we page in small chunks with adaptive
- * backoff). Per conversation we build a flamegraph-ready `structure` (turns +
- * subagent groups, input split into cached-prefix vs uncached) and accumulate
- * dataset-level distributions for the detail cards. Raw hash_ids are discarded
- * after the cached/uncached split is computed.
- *
- * Usage (DATABASE_WRITE_URL must be provided — never hardcoded):
- *   DATABASE_WRITE_URL='postgres://…' bun src/ingest-weka-dataset.ts \
- *     semianalysisai/cc-traces-weka-062126 [--label "…"] [--variant full|256k] \
- *     [--description "…"] [--limit N]
- *
- * Upsert: re-running replaces the dataset's rows (delete + re-insert).
- * Remember to purge the API cache afterwards (POST /api/v1/invalidate).
- */
-
 import { createAdminSql } from './etl/db-utils';
 import { hasNoSslFlag } from './cli-utils';
 import {
@@ -73,10 +53,6 @@ const sleep = (ms: number) =>
     setTimeout(resolve, ms);
   });
 
-/**
- * Fetch JSON, transparently retrying on HF rate-limiting (429) and transient
- * 5xx with exponential backoff. Honors a Retry-After header when present.
- */
 async function fetchJson(url: string, attempt = 0): Promise<unknown> {
   const res = await fetch(url);
   if (res.status === 429 || res.status >= 500) {
@@ -107,7 +83,6 @@ async function getRowCount(dataset: string): Promise<number> {
   return typeof num === 'number' ? num : 0;
 }
 
-/** Page through rows with adaptive length (halve on "too big"/error). */
 async function* iterRows(
   dataset: string,
   total: number,
@@ -115,7 +90,7 @@ async function* iterRows(
 ): AsyncGenerator<RawWekaConversation> {
   const cap = limit ? Math.min(limit, total) : total;
   let offset = 0;
-  let length = 5; // ~18 MB/page at ~3.5 MB/row; backs off on failure
+  let length = 5;
   while (offset < cap) {
     const want = Math.min(length, cap - offset);
     const url = `${ROWS_API}?dataset=${encodeURIComponent(dataset)}&config=default&split=train&offset=${offset}&length=${want}`;
@@ -137,18 +112,18 @@ async function* iterRows(
     for (const r of rows) yield r.row;
     offset += rows.length;
     process.stdout.write(`\r  fetched ${Math.min(offset, cap)}/${cap} conversations`);
-    if (offset < cap) await sleep(400); // be polite to the HF datasets-server
+    if (offset < cap) await sleep(400);
   }
   process.stdout.write('\n');
 }
 
 interface Accumulator {
-  inputPerTurn: number[]; // effective input tokens, every turn (incl. subagent children)
+  inputPerTurn: number[];
   uncachedInputPerTurn: number[];
   outputPerTurn: number[];
-  cachedFractionPerTurn: number[]; // cached/in, for turns with in>0
-  turnsPerConv: number[]; // main (top-level) turns
-  requestsPerConv: number[]; // main turns + subagent child turns
+  cachedFractionPerTurn: number[];
+  turnsPerConv: number[];
+  requestsPerConv: number[];
   subagentInputPerRequest: number[];
   subagentOutputPerRequest: number[];
   subagentGroupsPerConv: number[];
@@ -288,7 +263,6 @@ function inferVariant(slug: string): string {
 }
 
 function defaultLabel(slug: string): string {
-  // cc-traces-weka-062126 → "CC Traces Weka 062126"
   return slug
     .split('-')
     .map((p) => (/^\d+$/u.test(p) ? p : p.toUpperCase()))
@@ -315,7 +289,6 @@ async function main(): Promise<void> {
   let blockSize = 64;
   let hashIdScope: string | null = null;
 
-  // Buffer the per-conversation rows; flush in batches to keep memory bounded.
   interface ConvRow {
     dataset_id: string;
     conv_id: string;
@@ -330,7 +303,6 @@ async function main(): Promise<void> {
   const pending: ConvRow[] = [];
 
   try {
-    // Upsert the dataset shell first (FK target). Counts/summary filled at the end.
     await sql`
       insert into datasets (id, slug, label, variant, description, hf_url, license)
       values (${args.dataset}, ${slug}, ${label}, ${variant}, ${args.description ?? null}, ${hfUrl}, 'apache-2.0')
@@ -339,14 +311,10 @@ async function main(): Promise<void> {
         description = coalesce(excluded.description, datasets.description),
         hf_url = excluded.hf_url, license = excluded.license, ingested_at = now()
     `;
-    // Clear prior conversations for a clean re-ingest.
     await sql`delete from dataset_conversations where dataset_id = ${args.dataset}`;
 
     const flush = async () => {
       if (pending.length === 0) return;
-      // postgres.js row-helper insert: serializes `structure` to jsonb and
-      // `models` to text[] per row (unnest can't carry a text[] column — a 2D
-      // array would flatten into scalar rows).
       const rows = pending.map((p) => ({
         dataset_id: args.dataset,
         conv_id: p.conv_id,

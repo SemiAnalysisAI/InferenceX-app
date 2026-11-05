@@ -1,7 +1,6 @@
 import { servingFixture } from '../../src/components/video-benchmark/serving.fixture';
 import type { StoredArtifact } from '../../src/components/video-benchmark/stored';
 
-// Synthetic CI artifacts; never benchmark evidence.
 export function servingArtifact(
   id = 123,
   artifactId = 40,

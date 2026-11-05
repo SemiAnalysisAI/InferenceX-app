@@ -1,28 +1,21 @@
-import { getDb } from '@semianalysisai/inferencex-db/connection';
-import {
-  getServerLogAvailability,
-  type ServerLogAvailabilityMap,
-} from '@semianalysisai/inferencex-db/queries/server-logs';
-
-import { cachedQuery } from '@/lib/api-cache';
+import { getCachedBenchmarkPresence } from '@/lib/benchmarks/benchmark-presence.server';
+import { presentIds } from '@/lib/benchmarks/benchmark-presence';
 
 import { idsQueryRoute } from '../id-routes';
 
 export const dynamic = 'force-dynamic';
 
-const getCachedServerLogAvailability = cachedQuery(
-  (ids: number[]): Promise<ServerLogAvailabilityMap> => getServerLogAvailability(getDb(), ids),
-  'server-log-availability',
-);
-
 /**
  * GET /api/v1/log-availability?ids=1,2,3
  *
- * Returns `{[id]: true}` for benchmark points with a linked server log. The
- * chart uses this lightweight check before offering its "View logs" action.
+ * Returns `{[id]: true}` for benchmark points with a linked server log, read
+ * from the cached presence set of every point (queries/benchmark-presence.ts).
  */
 export const GET = idsQueryRoute({
   maxIds: 500,
   logLabel: 'server log availability',
-  fetch: getCachedServerLogAvailability,
+  fetch: async (ids) => {
+    const { log } = await getCachedBenchmarkPresence();
+    return presentIds(log, ids);
+  },
 });

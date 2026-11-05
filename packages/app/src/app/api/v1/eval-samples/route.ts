@@ -6,16 +6,38 @@ import {
   getEvalSamples,
 } from '@semianalysisai/inferencex-db/queries/eval-samples';
 
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
-import { extractDemonstrations } from '@/lib/eval-sample-utils';
-import { parseEvalSampleWindow } from '@/lib/eval-sample-params';
+import { cachedJson, cachedQuery } from '@/lib/cache/api-cache';
+import { parseDemonstrations } from '@/lib/evaluation/eval-sample-utils';
+import { parseEvalSampleWindow } from '@/lib/evaluation/eval-sample-params';
 
 export const dynamic = 'force-dynamic';
 
 const getCachedEvalSamples = cachedQuery(
-  (evalResultId: number, filter: 'all' | 'passed' | 'failed', offset: number, limit: number) =>
-    getEvalSamples(getDb(), evalResultId, filter, offset, limit),
-  'eval-samples',
+  async (
+    evalResultId: number,
+    filter: 'all' | 'passed' | 'failed',
+    offset: number,
+    limit: number,
+  ) => {
+    const result = await getEvalSamples(getDb(), evalResultId, filter, offset, limit);
+    return {
+      samples: result.samples.map((s) => ({
+        docId: s.doc_id,
+        prompt: s.prompt,
+        target: s.target,
+        response: s.response,
+        rawResponse: s.raw_response,
+        demonstrations: parseDemonstrations(s.fewshot_source),
+        passed: s.passed,
+        score: s.score === null ? null : Number(s.score),
+        metrics: s.metrics ?? {},
+      })),
+      total: result.total,
+      passedTotal: result.passedTotal,
+      failedTotal: result.failedTotal,
+    };
+  },
+  'eval-samples-page',
 );
 const getCachedEvalSampleOffset = cachedQuery(
   (evalResultId: number, docId: number) => getEvalSampleOffset(getDb(), evalResultId, docId),
@@ -62,22 +84,9 @@ export async function GET(request: NextRequest) {
     const resolvedOffset =
       sampleOffset === null ? offset : Math.floor(sampleOffset / limit) * limit;
     const resolvedFilter = docId === null ? filter : 'all';
-    const result = await getCachedEvalSamples(evalResultId, resolvedFilter, resolvedOffset, limit);
-    return cachedJson({
-      samples: result.samples.map((s) => ({
-        docId: s.doc_id,
-        prompt: s.prompt,
-        target: s.target,
-        response: s.response,
-        rawResponse: s.raw_response,
-        demonstrations: extractDemonstrations(s.arguments_data),
-        passed: s.passed,
-        score: s.score === null ? null : Number(s.score),
-        metrics: s.metrics ?? {},
-      })),
-      total: result.total,
-      passedTotal: result.passedTotal,
-      failedTotal: result.failedTotal,
+    const page = await getCachedEvalSamples(evalResultId, resolvedFilter, resolvedOffset, limit);
+    return cachedJson(request, {
+      ...page,
       source: 'db' as const,
       offset: resolvedOffset,
     });

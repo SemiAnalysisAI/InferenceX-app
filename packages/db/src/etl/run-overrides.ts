@@ -1,38 +1,6 @@
-/**
- * Per-run overrides and special cases for the ingest pipeline.
- *
- * Entries are enforced at ingest time. Changes merged to main or master are also applied
- * automatically to production by CI, followed by database verification, cache invalidation,
- * and cache warmup. Use `bun run db:apply-overrides` only for local preview or manual recovery.
- *
- * CONCLUSION_OVERRIDES — force the conclusion for a run (e.g. 'success' when
- *   the benchmark ran fine but CI failed on a non-benchmark step).
- *
- * PURGED_RUNS — runs to skip on ingest and delete from the DB,
- *   e.g. typically due to experimental runs or features which generate lots of broken data.
- *
- * PURGED_RUN_ATTEMPTS — purge only specific attempts of a run, leaving the others intact.
- *   Use this when a single attempt produced bad data but a later attempt is expected to succeed
- *   (or has already succeeded), so we can't nuke the entire run.
- *
- * PURGED_BENCHMARK_POINTS, purge individual benchmark rows from an otherwise valid
- * run attempt and skip them on every future ingest. Each entry uses the row's durable
- * database natural key, which can be queried from the linked dashboard point.
- *
- * CHANGELOG_BACKFILLS — correct stored changelog metadata for one exact run attempt
- * and base/head ref pair.
- *
- * BENCHMARK_POINT_BACKFILLS — correct metrics, offload identity, and/or recipe
- * identity for one exact benchmark point. These are applied both during ingest
- * and against existing DB rows.
- *
- * Note: GitHub deletes old workflow runs over time so these overrides may not be applicable forever,
- *       but we should keep them around for historical reference. You can find these on github (if available) by filling
- *       in the run id into the following link: https://github.com/SemiAnalysisAI/InferenceX/actions/runs/{run_id_here}
- */
-
 import { type ConfigParams, configCacheKey } from './config-cache';
 import { QWEN35_P90_POWER_BACKFILLS } from './power-p90-backfills';
+import { SPEC_METHOD_BACKFILLS } from './spec-method-backfills';
 import { matchesExpectedBackfillMetrics } from '../lib/benchmark-point-backfill';
 
 export const CONCLUSION_OVERRIDES: ReadonlyMap<number, string> = new Map([
@@ -41,6 +9,28 @@ export const CONCLUSION_OVERRIDES: ReadonlyMap<number, string> = new Map([
 ]);
 
 export const PURGED_RUNS: ReadonlySet<number> = new Set([
+  39112710364, // 2026-10-20 | DeepSeek-V4.1-Flash B300 Dynamo + vLLM AgentX | Reason: Accidentally merged despite containing an EFA patch
+  38878624849, // 2026-10-19 | Muse Spark H100 | Reason: 256k corpus used for 1M context length model
+  38925660934, // 2026-10-19 | Muse Spark H100 HiCache | Reason: 256k corpus used for 1M context length model
+  38819015342, // 2026-10-19 | Muse Spark GB300 TP4 | Reason: 256k corpus used for 1M context length model
+  38835086328, // 2026-10-19 | Muse Spark GB300 TP4 | Reason: 256k corpus used for 1M context length model
+  38826180170, // 2026-10-19 | Muse Spark H200 TP8 | Reason: 256k corpus used for 1M context length model
+  38825818513, // 2026-10-19 | Muse Spark B300 TP4 | Reason: 256k corpus used for 1M context length model
+  38824954621, // 2026-10-19 | Muse Spark GB200 TP4 | Reason: 256k corpus used for 1M context length model
+  38834513220, // 2026-10-19 | Muse Spark GB200 TP4 | Reason: 256k corpus used for 1M context length model
+  38825822770, // 2026-10-19 | Muse Spark B200 TP4 | Reason: 256k corpus used for 1M context length model
+  38851010434, // 2026-10-19 | Muse Spark B200 TP8 | Reason: 256k corpus used for 1M context length model
+  32403083041, // 2026-09-30 | Reason: dsv4 trtllm gb300-fp4 AgentX: NVIDIA accidentally set publish_events_and_metrics to false
+  33219708211, // 2026-09-30 | Reason: qwen3.5 trtllm gb300-fp4 AgentX: NVIDIA accidentally set publish_events_and_metrics to false
+  31927376673, // 2026-09-30 | Reason: qwen3.5 trtllm gb300-fp4 AgentX: NVIDIA accidentally set publish_events_and_metrics to false
+  34413290524, // 2026-09-30 | Reason: glm5.2 trtllm gb300-fp4 AgentX: NVIDIA accidentally set publish_events_and_metrics to false
+  33716849615, // 2026-09-30 | Reason: glm5.2 trtllm gb300-fp4 AgentX: NVIDIA accidentally set publish_events_and_metrics to false
+  33219706372, // 2026-09-30 | Reason: glm5.2 trtllm gb300-fp4 AgentX: NVIDIA accidentally set publish_events_and_metrics to false
+  32346724519, // 2026-09-30 | Reason: glm5.2 trtllm gb300-fp4 AgentX: NVIDIA accidentally set publish_events_and_metrics to false
+  35806602041, // 2026-09-30 | Reason: MiniMax M3 GB200 TensorRT-LLM accidentally set publish_events_and_metrics: false; missing server metrics make the published P&L estimates unreliable
+  34511705667, // 2026-09-30 | Reason: MiniMax M3 GB200 TensorRT-LLM accidentally set publish_events_and_metrics: false; missing server metrics make the published P&L estimates unreliable
+  36734492117, // 2026-10-08 | Reason: MI355X DSV4 ATOM disagg LMCache AgentX did not report CPU KV cache hit rates; missing cache-hit metrics make the published P&L estimates unreliable
+  35855544139, // 2026-10-13 | Reason: user-reported missing CPU KV cache hit rate metric in MI355X DSV4 ATOM PD-disagg HiCache MTP AgentX run
   20286769842, // very long ago | Reason: broken run
   20789830797, // very long ago | Reason: broken run
   21427451958, // 2026-01-28 | Reason: for initial gsm8k evals baseline data collection, performance data ignored for this run
@@ -100,6 +90,19 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   34488664680, // 2026-09-13 | Reason: wrong configs ran
   34729188311, // 2026-09-13 | Reason: partial GLM-5.2 GB200 aggregate power refresh replaced the complete curve; restore the prior aggregate + disaggregated snapshot until a full same-image power curve is published
   34926284365, // 2026-09-16 | Reason: wrong data as mtp weights were uninitalized
+  35165441471, // 2026-09-19 | Reason: user-requested purge after reported Kimi K3 chart regression; suspected incomplete sweep remains unconfirmed
+  34819578354, // 2026-09-19 | Reason: narrower than the curve it supersedes — this kimik3-fp4-h200-vllm-agentic-balanced sweep carries only the TP8/EP32/DPA offload=off arm (c1-c16), so ingesting it made 2026-09-19 the latest H200 date and hid the three-curve 2026-09-13 set (TP16/EP32 c1-c12, TP8/EP32 offload=off c1-c16, TP8/EP32 offload=on c8-c32). Its values match the superseded arm within +/-6%, so nothing is lost by dropping it; re-ingest once the full H200 curve set is collected (source run of the PR #3053 sweep-reuse ingest)
+  34819564154, // 2026-09-19 | Reason: user-reported Kimi K3 GB300 chart regression and missing points compared with the pre-PowerX curve
+  34819961093, // 2026-09-19 | Reason: sibling of 34819578354 — this kimik3-fp4-h200-vllm-agentic-simple sweep (PR #3054, feat/kimik3-h200-simple-power) carries only the TP8/EP32/DPA offload=on arm (c8-c32, 13 points). Once 34819578354 was purged it became the latest H200 Kimi-K3 curve and kept hiding the three-arm 2026-09-13 set (35 points: TP16/EP32 c1-c12, TP8/EP32 offload=off c1-c16, TP8/EP32 offload=on c8-c32). Same vllm/vllm-openai:kimi-k3 image and recipe as the arm it duplicates, so no coverage is lost; re-ingest once the full H200 curve set is collected with measured power
+  40065869885, // 2026-10-25 | Reason: Uses skip indexer
+  40316025285, // 2026-10-27 | DeepSeek-V4.1-Flash FP4 GB300 Dynamo-SGLang AgentX disagg | Reason: Klaud Cold image-update partial re-sweep (PR #4515) ingested without append-only, replacing the full curve with three disagg points
+  40054839636, // 2026-10-27 | GLM-5.2 FP4 GB300 Dynamo-SGLang AgentX agg | Reason: Klaud Cold image-update partial re-sweep (PR #4449) ingested without append-only, replacing the full curve with two agg points
+  40279236382, // 2026-10-27 | DeepSeek-V4-Pro FP4 GB200 Dynamo-SGLang AgentX agg | Reason: Klaud Cold image-update partial re-sweep (PR #4529) ingested without append-only, replacing the full curve
+  40185235651, // 2026-10-27 | DeepSeek-V4.1-Flash FP4 GB300 Dynamo-SGLang AgentX agg | Reason: Klaud Cold image-update partial re-sweep (PR #4497) ingested without append-only, replacing the full curve
+  38953283564, // 2026-10-27 | DeepSeek-V4-Pro FP4 GB200 Dynamo-SGLang AgentX agg | Reason: Klaud Cold image-update partial re-sweep (PR #4196) ingested without append-only. Once 40279236382 was purged it became the latest curve and kept hiding the 8-point agg+disagg 2026-10-12 set (PR #3701)
+  38960572895, // 2026-10-27 | DeepSeek-V4-Pro FP4 B200 Dynamo-SGLang AgentX agg | Reason: Klaud Cold image-update partial re-sweep (PR #4203) ingested without append-only, hiding the 6-point agg+disagg 2026-09-22 set (PR #3257)
+  38925477096, // 2026-10-27 | DeepSeek-V4-Pro FP4 B200 Dynamo-SGLang AgentX disagg | Reason: Klaud Cold image-update partial re-sweep (PR #4176) ingested without append-only; would become the latest curve once 38960572895 is purged and keep hiding the 2026-09-22 set (PR #3257)
+  39339355047, // 2026-10-27 | DeepSeek-V4.1-Flash FP4 H100 SGLang AgentX | Reason: Klaud Cold image-update partial re-sweep (PR #4324) ingested without append-only, replacing the 10-point 2026-09-24 curve (PR #3345) with four points
 ]);
 
 export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([
@@ -126,6 +129,7 @@ export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new
   [30231719317, new Set([1])], // 2026-07-27 | DeepSeek-V4 FP4 GB300 Dynamo-vLLM MTP agentic | Reason: Outdated AgentX harness
   [30391410523, new Set([1])], // 2026-07-30 | Qwen3.5 FP4 GB300 Dynamo-SGLang MTP agentic | Reason: Outdated AgentX harness; corrected by v1+ run 31042542308
   [30425131777, new Set([3])], // 2026-07-30 | Kimi K3 FP4 B300 vLLM MTP agentic | Reason: Outdated AgentX harness
+  [41296675142, new Set([1])], // 2026-11-01 | PowerX NVL72 CPU and per-host GPU power (PR #3296) | Reason: 1 run overwriting curve
 ]);
 
 export interface BenchmarkPointKey {
@@ -135,7 +139,6 @@ export interface BenchmarkPointKey {
   osl: number | null;
   conc: number;
   offloadMode: string;
-  /** Producer recipe identity. Omit or set null only for legacy rows. */
   recipeFingerprint?: string | null;
 }
 
@@ -144,12 +147,6 @@ export interface PurgedBenchmarkPoint extends BenchmarkPointKey {
   runAttempt: number;
 }
 
-/**
- * Individual benchmark rows to skip on ingest and delete from the DB.
- * Keep a dated reason comment beside every entry for auditability:
- * `{ githubRunId, runAttempt, configId, benchmarkType, isl, osl, conc, offloadMode,
- * recipeFingerprint }`. Omitted fingerprints target only legacy NULL rows.
- */
 export const PURGED_BENCHMARK_POINTS: readonly PurgedBenchmarkPoint[] = [
   // 2026-08-03 | Point 438205 | Qwen3.5 FP4 B300 SGLang MTP, TP2/EP2, conc 32.
   // Reason: the one-hour AgentX profile stopped after 3,102s, then emitted no requests for 538s.
@@ -245,9 +242,7 @@ export const PURGED_BENCHMARK_POINTS: readonly PurgedBenchmarkPoint[] = [
 ];
 
 interface AuditedBackfill {
-  /** Stable, descriptive identifier used in logs and review history. */
   id: string;
-  /** Why artifact data is being corrected instead of re-running the benchmark. */
   reason: string;
 }
 
@@ -264,10 +259,6 @@ export interface ChangelogBackfill extends AuditedBackfill {
   };
 }
 
-/**
- * Audited corrections to changelog rows already produced by workflow artifacts.
- * Selectors use the table's complete durable identity. `set` is a partial patch.
- */
 export const CHANGELOG_BACKFILLS: readonly ChangelogBackfill[] = [
   {
     id: 'run-34744300699-restore-append-only',
@@ -305,6 +296,29 @@ export const CHANGELOG_BACKFILLS: readonly ChangelogBackfill[] = [
       appendOnly: true,
     },
   },
+  {
+    id: 'run-40211526054-pr-link',
+    reason: 'PR #4511 merged its changelog entry with the pull/XXX placeholder link.',
+    githubRunId: 40211526054,
+    runAttempt: 1,
+    baseRef: '88588aaf353a025a86190d41a5af737e1685d4a6',
+    headRef: '1c3e892a8493ae4bc6b25bc688ccd6d6916742c3',
+    set: {
+      prLink: 'https://github.com/SemiAnalysisAI/InferenceX/pull/4511',
+    },
+  },
+  {
+    id: 'run-41085412898-restore-append-only',
+    reason:
+      'PR #4675 produced an append-only delta sweep, but conflict resolution with #4676 removed the marker before its artifacts were reused for merge ingestion.',
+    githubRunId: 41085412898,
+    runAttempt: 3,
+    baseRef: 'fcb4a75b563c5c14e4922f47c3d53ed14500acf2',
+    headRef: 'bd626adbc0fc2a61f0165a455a1242e87008c74b',
+    set: {
+      appendOnly: true,
+    },
+  },
 ];
 
 export type JsonValue =
@@ -318,65 +332,26 @@ export type JsonValue =
 export interface BenchmarkPointBackfill extends AuditedBackfill {
   githubRunId: number;
   runAttempt: number;
-  /** Production ID retained for audit logs only. Never use it to match another DB branch. */
   productionConfigId?: number;
-  /** Public benchmark row ID when its production config ID is not exposed. Audit only. */
   productionBenchmarkId?: number;
-  /** Stable configuration dimensions shared by production, staging, and rebuilt databases. */
   config: ConfigParams;
   benchmarkType: string;
   isl: number | null;
   osl: number | null;
   conc: number;
   offloadMode: string;
-  /** Producer recipe identity. Omit or set null only for legacy rows. */
   recipeFingerprint?: string | null;
-  /** Source-bound corrections require an exact run attempt and these unchanged metrics. */
   expectedMetrics?: Readonly<Record<string, number>>;
-  /** Previously applied patch accepted when extending an identity-changing backfill. */
   previousSet?: BenchmarkPointBackfill['set'];
   set: {
-    /** Updates both the first-class column and metrics.offload_mode. */
     offloadMode?: 'on' | 'off';
-    /** Audited producer recipe identity for a legacy row that predates fingerprints. */
     recipeFingerprint?: string;
-    /** Shallow JSONB merge; existing unrelated metrics are preserved. */
+    specMethod?: string;
     metricsMerge?: Readonly<Record<string, JsonValue>>;
-    /** Top-level metric keys to remove before metricsMerge is applied. */
     metricsRemove?: readonly string[];
   };
 }
 
-/**
- * Audited corrections to individual benchmark points. The selector is the row's
- * complete pre-backfill natural identity; `set` contains only the desired changes.
- *
- * Example:
- * {
- *   id: 'run-123-attempt-1-conc-64-enable-offload',
- *   reason: 'The artifact omitted offload metadata for this point.',
- *   githubRunId: 123,
- *   runAttempt: 1,
- *   productionConfigId: 456,
- *   config: {
- *     hardware: 'gb300', framework: 'dynamo-vllm', model: 'dsv4',
- *     precision: 'fp4', specMethod: 'mtp', disagg: true, isMultinode: true,
- *     prefillTp: 8, prefillEp: 8, prefillDpAttn: true, prefillNumWorkers: 1,
- *     decodeTp: 8, decodeEp: 8, decodeDpAttn: true, decodeNumWorkers: 1,
- *     numPrefillGpu: 8, numDecodeGpu: 8,
- *   },
- *   benchmarkType: 'agentic_traces',
- *   isl: null,
- *   osl: null,
- *   conc: 64,
- *   offloadMode: 'off',
- *   recipeFingerprint: null,
- *   set: {
- *     offloadMode: 'on',
- *     metricsMerge: { kv_offloading: 'dram', kv_offload_backend: 'lmcache' },
- *   },
- * }
- */
 function disaggregatedConfig(
   base: Pick<ConfigParams, 'hardware' | 'framework' | 'model' | 'precision' | 'specMethod'>,
   prefill: { tp: number; ep: number; dpAttn: boolean; numWorkers: number },
@@ -398,30 +373,6 @@ function disaggregatedConfig(
     numDecodeGpu: decode.tp * decode.numWorkers,
   };
 }
-
-const QWEN35_GB300_DYNAMO_TRT = {
-  hardware: 'gb300',
-  framework: 'dynamo-trt',
-  model: 'qwen3.5',
-  precision: 'fp4',
-  specMethod: 'mtp',
-} as const;
-
-const DSV4_GB300_DYNAMO_TRT = {
-  hardware: 'gb300',
-  framework: 'dynamo-trt',
-  model: 'dsv4',
-  precision: 'fp4',
-  specMethod: 'mtp',
-} as const;
-
-const GLM52_GB300_DYNAMO_TRT = {
-  hardware: 'gb300',
-  framework: 'dynamo-trt',
-  model: 'glm5.2',
-  precision: 'fp4',
-  specMethod: 'mtp',
-} as const;
 
 const DSV4_GB200_DYNAMO_VLLM = {
   hardware: 'gb200',
@@ -462,7 +413,6 @@ const KIMI3_H200_VLLM_TP16: ConfigParams = {
 const KIMI3_H200_VLLM_TP16_RECIPE =
   'a6aa413ff9af529330e547e9fe13ef32c3d5e83a18887c3ee795df596ce3ecb5';
 
-/** Aggregated multi-node config where prefill and decode share one TP-only worker. */
 function aggregatedMultinodeConfig(
   base: Pick<ConfigParams, 'hardware' | 'framework' | 'model' | 'precision' | 'specMethod'>,
   tp: number,
@@ -484,20 +434,6 @@ function aggregatedMultinodeConfig(
   };
 }
 
-/**
- * Measured Dynamo + vLLM prefix-cache hit rates from the GB200 DeepSeek-V4 AgentX
- * sweep in run 31965016666 (attempt 2), keyed by concurrency.
- *
- * The GB300 launcher has no dedicated dsv4 dynamo-vllm AgentX branch, so those
- * sweeps fall through to the generic srt-slurm v1.0.36 pin, which predates the
- * logical-worker metrics discovery that GB200 gets from v1.0.45. Without
- * `AIPERF_SERVER_METRICS_URLS`, AIPerf scraped only the Dynamo frontend, which
- * exposes no `vllm:prefix_cache_*` counters, so every
- * `server_metrics.cache.*_cache_hit_rate` landed as null. Cache-aware pricing
- * treats a missing hit rate as 0 and bills ~97% cache hits at the full input
- * price. Until the GB300 sweeps are re-run with worker scraping, each point
- * borrows the nearest-concurrency GB200 measurement.
- */
 const GB200_DYNAMO_VLLM_CACHE_HIT_RATES = {
   1: { gpu: 0.9631118724591531, external: 0, cpu: 0 },
   4: { gpu: 0.9564614718743584, external: 0, cpu: 0 },
@@ -524,6 +460,7 @@ const GB300_CACHE_HIT_RATE_REASON =
 
 export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
   ...QWEN35_P90_POWER_BACKFILLS,
+  ...SPEC_METHOD_BACKFILLS,
   // Run 34744300699 remeasured these exact same-image TP16 points with valid
   // power. The earlier run predates recipe fingerprints, so backfill its ten
   // audited identities; the existing snapshot DISTINCT then selects the newer
@@ -786,371 +723,6 @@ export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
     },
   ),
 
-  // Every TensorRT-LLM recipe in run 31927376673 configures a 128 GiB native
-  // host KV cache on both prefill and decode workers. The master matrix only
-  // declared NIXL transfer, so all six artifacts lost the offload identity.
-  ...(
-    [
-      [
-        2360,
-        7,
-        '5c282408e21b662cf5afbef0d26a63ad2fb19bb66ca3b431763a1c40628f3036',
-        disaggregatedConfig(
-          QWEN35_GB300_DYNAMO_TRT,
-          { tp: 4, ep: 4, dpAttn: true, numWorkers: 1 },
-          { tp: 8, ep: 8, dpAttn: false, numWorkers: 7 },
-        ),
-      ],
-      [
-        2361,
-        96,
-        'da36b834945785abfa06c44f742684db7a96af49542d9012019063d552dc7393',
-        disaggregatedConfig(
-          QWEN35_GB300_DYNAMO_TRT,
-          { tp: 2, ep: 2, dpAttn: false, numWorkers: 2 },
-          { tp: 8, ep: 8, dpAttn: false, numWorkers: 3 },
-        ),
-      ],
-      [
-        2362,
-        704,
-        '60e4361ec00fd8a94a700b7ae9dbb4d8b6cf4095b1553f098af45551669fcf1f',
-        disaggregatedConfig(
-          QWEN35_GB300_DYNAMO_TRT,
-          { tp: 4, ep: 4, dpAttn: true, numWorkers: 3 },
-          { tp: 4, ep: 4, dpAttn: true, numWorkers: 2 },
-        ),
-      ],
-      [
-        2363,
-        52,
-        'd7fccb3572037431f39757640d090ab1204bb27ac57ff0f9f9a635e9cefb5867',
-        disaggregatedConfig(
-          QWEN35_GB300_DYNAMO_TRT,
-          { tp: 1, ep: 1, dpAttn: true, numWorkers: 2 },
-          { tp: 2, ep: 2, dpAttn: false, numWorkers: 2 },
-        ),
-      ],
-      [
-        2364,
-        565,
-        'a6017a5c8a675fb4f1f74e49bb0091f172e6ea357a1bb1b2d6577eb661c9f1c5',
-        disaggregatedConfig(
-          QWEN35_GB300_DYNAMO_TRT,
-          { tp: 4, ep: 4, dpAttn: true, numWorkers: 3 },
-          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
-        ),
-      ],
-      [
-        2365,
-        44,
-        'ac8406a4d46f3711732aa352c801bbd1eb7c3545b2982c5d2c56520fa8288342',
-        disaggregatedConfig(
-          QWEN35_GB300_DYNAMO_TRT,
-          { tp: 1, ep: 1, dpAttn: true, numWorkers: 1 },
-          { tp: 2, ep: 2, dpAttn: false, numWorkers: 1 },
-        ),
-      ],
-    ] as const
-  ).map(([productionConfigId, conc, recipeFingerprint, config]) => ({
-    id: `run-31927376673-config-${productionConfigId}-conc-${conc}-native-offload`,
-    reason:
-      'The TensorRT-LLM runtime recipe configured a native host KV cache, but the artifact reported this AgentX point as non-offloaded.',
-    githubRunId: 31927376673,
-    runAttempt: 1,
-    productionConfigId,
-    config,
-    benchmarkType: 'agentic_traces',
-    isl: null,
-    osl: null,
-    conc,
-    offloadMode: 'off',
-    recipeFingerprint,
-    set: {
-      offloadMode: 'on' as const,
-      metricsRemove: ['allocated_cpu_dram_gb'],
-      metricsMerge: {
-        kv_offloading: 'dram',
-        kv_offload_backend: 'native',
-        kv_offload_backend_version: '1.3.0rc24',
-      },
-    },
-  })),
-
-  // The Qwen metrics refresh retained the same 128 GiB host KV cache on
-  // prefill and decode, but its artifacts again reported offloading as disabled.
-  ...(
-    [
-      [
-        2360,
-        7,
-        '18f2c2292689243d0b87de83c376830284db0d86fb04a729376a8e310e01856d',
-        disaggregatedConfig(
-          QWEN35_GB300_DYNAMO_TRT,
-          { tp: 4, ep: 4, dpAttn: true, numWorkers: 1 },
-          { tp: 8, ep: 8, dpAttn: false, numWorkers: 7 },
-        ),
-      ],
-      [
-        2361,
-        96,
-        '097590578e9c8f65a51537c359a0bc0d0b4fcc5dbb557ee77a0939dbe0baeb3f',
-        disaggregatedConfig(
-          QWEN35_GB300_DYNAMO_TRT,
-          { tp: 2, ep: 2, dpAttn: false, numWorkers: 2 },
-          { tp: 8, ep: 8, dpAttn: false, numWorkers: 3 },
-        ),
-      ],
-      [
-        2362,
-        704,
-        'c798a4b016d861f821f34fbc9cffdfdcd74e1b608304f01f4fa944388ddd5ed0',
-        disaggregatedConfig(
-          QWEN35_GB300_DYNAMO_TRT,
-          { tp: 4, ep: 4, dpAttn: true, numWorkers: 3 },
-          { tp: 4, ep: 4, dpAttn: true, numWorkers: 2 },
-        ),
-      ],
-      [
-        2363,
-        52,
-        '8b163e70d15e09358a90ea0e109a7d60bb822b71155285479822854747fa51bc',
-        disaggregatedConfig(
-          QWEN35_GB300_DYNAMO_TRT,
-          { tp: 1, ep: 1, dpAttn: true, numWorkers: 2 },
-          { tp: 2, ep: 2, dpAttn: false, numWorkers: 2 },
-        ),
-      ],
-      [
-        2364,
-        565,
-        '3f73af0d7e9b46406415309565b5c912a78e3a7f0661e497a028af7323845fc4',
-        disaggregatedConfig(
-          QWEN35_GB300_DYNAMO_TRT,
-          { tp: 4, ep: 4, dpAttn: true, numWorkers: 3 },
-          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
-        ),
-      ],
-      [
-        2365,
-        44,
-        '22c7807daf12e816829cdb3d8c8fe08f28d5a8e20b3eb7d33f0090e92dafe866',
-        disaggregatedConfig(
-          QWEN35_GB300_DYNAMO_TRT,
-          { tp: 1, ep: 1, dpAttn: true, numWorkers: 1 },
-          { tp: 2, ep: 2, dpAttn: false, numWorkers: 1 },
-        ),
-      ],
-    ] as const
-  ).map(([productionConfigId, conc, recipeFingerprint, config]) => ({
-    id: `run-33219708211-config-${productionConfigId}-conc-${conc}-native-offload`,
-    reason:
-      'The Qwen TRT-LLM metrics refresh retained native host KV caching, but its offload metadata incorrectly placed it on a separate frontier from the original run.',
-    githubRunId: 33219708211,
-    runAttempt: 1,
-    productionConfigId,
-    config,
-    benchmarkType: 'agentic_traces',
-    isl: null,
-    osl: null,
-    conc,
-    offloadMode: 'off',
-    recipeFingerprint,
-    set: {
-      offloadMode: 'on' as const,
-      metricsRemove: ['allocated_cpu_dram_gb'],
-      metricsMerge: {
-        kv_offloading: 'dram',
-        kv_offload_backend: 'native',
-        kv_offload_backend_version: '1.3.0rc24',
-      },
-    },
-  })),
-
-  // The six disaggregated DeepSeek-V4-Pro recipes in run 32403083041
-  // configure a 180 GiB native host KV cache on each prefill worker. The
-  // master matrix omitted the offload annotation, so the artifacts reported
-  // these points as non-offloaded.
-  ...(
-    [
-      [
-        1523,
-        4,
-        '38be5ef96c0cd06d88da9fc176812f805d5a142f618c6c4a98d0e5dd9db6e9b7',
-        disaggregatedConfig(
-          DSV4_GB300_DYNAMO_TRT,
-          { tp: 4, ep: 4, dpAttn: true, numWorkers: 1 },
-          { tp: 8, ep: 8, dpAttn: false, numWorkers: 4 },
-        ),
-      ],
-      [
-        2415,
-        24,
-        'fb3f411ba6d72aa06658b108212333afde9ea2cb499e377fdfc65de5412592cb',
-        disaggregatedConfig(
-          DSV4_GB300_DYNAMO_TRT,
-          { tp: 4, ep: 4, dpAttn: true, numWorkers: 1 },
-          { tp: 4, ep: 4, dpAttn: false, numWorkers: 6 },
-        ),
-      ],
-      [
-        2417,
-        388,
-        '5d290a80ed5a6d5acf4b19a425017929cc9fe416161c59a76369d14e14694bac',
-        disaggregatedConfig(
-          DSV4_GB300_DYNAMO_TRT,
-          { tp: 8, ep: 8, dpAttn: true, numWorkers: 1 },
-          { tp: 32, ep: 32, dpAttn: true, numWorkers: 1 },
-        ),
-      ],
-      [
-        2419,
-        736,
-        '3c4563cbcbd0145b101f16672e8c8072b55c0dffc0014876cc52b58556d1997b',
-        disaggregatedConfig(
-          DSV4_GB300_DYNAMO_TRT,
-          { tp: 8, ep: 8, dpAttn: true, numWorkers: 2 },
-          { tp: 32, ep: 32, dpAttn: true, numWorkers: 1 },
-        ),
-      ],
-      [
-        2416,
-        1152,
-        '885edc2b1a2521989da184ecc0520dbbdc962b8813fd5a8a26115c343a54745d',
-        disaggregatedConfig(
-          DSV4_GB300_DYNAMO_TRT,
-          { tp: 8, ep: 8, dpAttn: true, numWorkers: 3 },
-          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
-        ),
-      ],
-      [
-        2418,
-        2626,
-        '6e47ac1cc8896a21dcff448d39454300783009dcd1216009b3466a6fc1d1b730',
-        disaggregatedConfig(
-          DSV4_GB300_DYNAMO_TRT,
-          { tp: 8, ep: 8, dpAttn: true, numWorkers: 5 },
-          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
-        ),
-      ],
-    ] as const
-  ).map(([productionConfigId, conc, recipeFingerprint, config]) => ({
-    id: `run-32403083041-config-${productionConfigId}-conc-${conc}-native-offload`,
-    reason:
-      'The TensorRT-LLM runtime recipe configured a native host KV cache, but the artifact reported this AgentX point as non-offloaded.',
-    githubRunId: 32403083041,
-    runAttempt: 3,
-    productionConfigId,
-    config,
-    benchmarkType: 'agentic_traces',
-    isl: null,
-    osl: null,
-    conc,
-    offloadMode: 'off',
-    recipeFingerprint,
-    set: {
-      offloadMode: 'on' as const,
-      metricsRemove: ['allocated_cpu_dram_gb'],
-      metricsMerge: {
-        kv_offloading: 'dram',
-        kv_offload_backend: 'native',
-        kv_offload_backend_version: '1.3.0rc24',
-      },
-    },
-  })),
-
-  // The six disaggregated GLM-5.2 recipes in run 32346724519 configure a
-  // 128 GiB native host KV cache on each prefill worker. The aggregate point
-  // has no host cache and is intentionally excluded. The master matrix omitted
-  // the offload annotation for the disaggregated points.
-  ...(
-    [
-      [
-        2426,
-        20,
-        '16c12cc3717783b1029c8e65865043f7d518de4af8d8477572eb594099844263',
-        disaggregatedConfig(
-          GLM52_GB300_DYNAMO_TRT,
-          { tp: 4, ep: 4, dpAttn: true, numWorkers: 1 },
-          { tp: 8, ep: 8, dpAttn: false, numWorkers: 1 },
-        ),
-      ],
-      [
-        2427,
-        30,
-        'daf6d60e1a5c68f3c00719a50d60d1b77ba603e851eb00f6149ef5989ba42e12',
-        disaggregatedConfig(
-          GLM52_GB300_DYNAMO_TRT,
-          { tp: 4, ep: 4, dpAttn: true, numWorkers: 1 },
-          { tp: 4, ep: 4, dpAttn: false, numWorkers: 4 },
-        ),
-      ],
-      [
-        2428,
-        60,
-        '454122157cfc71a5252e5ec33d7709cc4f4061c52a7ca5b28f4aea1fa3cc9011',
-        disaggregatedConfig(
-          GLM52_GB300_DYNAMO_TRT,
-          { tp: 4, ep: 4, dpAttn: true, numWorkers: 3 },
-          { tp: 4, ep: 4, dpAttn: false, numWorkers: 4 },
-        ),
-      ],
-      [
-        2429,
-        152,
-        '02abb316847471b7e7bc68e41b3013dafdaddfa6c464274bdfb11d5f3b386e61',
-        disaggregatedConfig(
-          GLM52_GB300_DYNAMO_TRT,
-          { tp: 4, ep: 4, dpAttn: true, numWorkers: 5 },
-          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
-        ),
-      ],
-      [
-        2431,
-        227,
-        'ac551c93599bd44d074294d3de65ca5aaa6b240c12187bb5aacbef788446c65f',
-        disaggregatedConfig(
-          GLM52_GB300_DYNAMO_TRT,
-          { tp: 4, ep: 4, dpAttn: true, numWorkers: 6 },
-          { tp: 8, ep: 8, dpAttn: true, numWorkers: 1 },
-        ),
-      ],
-      [
-        2430,
-        259,
-        '86114ba7b339cc49098f489d2621c81c119b7fd156f4f100cde228ff3c8326d2',
-        disaggregatedConfig(
-          GLM52_GB300_DYNAMO_TRT,
-          { tp: 4, ep: 4, dpAttn: true, numWorkers: 8 },
-          { tp: 16, ep: 16, dpAttn: true, numWorkers: 1 },
-        ),
-      ],
-    ] as const
-  ).map(([productionConfigId, conc, recipeFingerprint, config]) => ({
-    id: `run-32346724519-config-${productionConfigId}-conc-${conc}-native-offload`,
-    reason:
-      'The TensorRT-LLM runtime recipe configured a native host KV cache, but the artifact reported this AgentX point as non-offloaded.',
-    githubRunId: 32346724519,
-    runAttempt: 4,
-    productionConfigId,
-    config,
-    benchmarkType: 'agentic_traces',
-    isl: null,
-    osl: null,
-    conc,
-    offloadMode: 'off',
-    recipeFingerprint,
-    set: {
-      offloadMode: 'on' as const,
-      metricsRemove: ['allocated_cpu_dram_gb'],
-      metricsMerge: {
-        kv_offloading: 'dram',
-        kv_offload_backend: 'native',
-        kv_offload_backend_version: '1.3.0rc22.post1',
-      },
-    },
-  })),
-
   // The four disaggregated recipes in run 31965016666 attach
   // MooncakeStoreConnector to NIXL through MultiConnector and allocate a
   // 140 GB Mooncake segment per node. The three aggregate points in the same
@@ -1244,11 +816,12 @@ function backfillPointIdentity(
   backfill: BenchmarkPointBackfill,
   offloadMode: string = backfill.offloadMode,
   recipeFingerprint: string | null = backfill.recipeFingerprint ?? null,
+  config: ConfigParams = backfill.config,
 ): string {
   return JSON.stringify([
     backfill.githubRunId,
     backfill.runAttempt,
-    configCacheKey(backfill.config),
+    configCacheKey(config),
     backfill.benchmarkType,
     backfill.isl,
     backfill.osl,
@@ -1256,6 +829,12 @@ function backfillPointIdentity(
     offloadMode,
     recipeFingerprint,
   ]);
+}
+
+export function backfillDesiredConfig(backfill: BenchmarkPointBackfill): ConfigParams {
+  return backfill.set.specMethod === undefined
+    ? backfill.config
+    : { ...backfill.config, specMethod: backfill.set.specMethod };
 }
 
 function backfillProductionPointIdentity(
@@ -1267,7 +846,6 @@ function backfillProductionPointIdentity(
   return pointIdentity({
     githubRunId: backfill.githubRunId,
     runAttempt: backfill.runAttempt,
-    // Without a config ID, conservatively reject a possible purge overlap.
     configId: backfill.productionConfigId ?? purgedConfigId,
     benchmarkType: backfill.benchmarkType,
     isl: backfill.isl,
@@ -1316,7 +894,6 @@ function validateBackfillConfig(config: ConfigParams, id: string): void {
   }
 }
 
-/** Validate the backfill ledger before an ingest or database write starts. */
 export function validateRunBackfills(
   changelogs: readonly ChangelogBackfill[] = CHANGELOG_BACKFILLS,
   points: readonly BenchmarkPointBackfill[] = BENCHMARK_POINT_BACKFILLS,
@@ -1404,6 +981,12 @@ export function validateRunBackfills(
     if (backfill.set.recipeFingerprint === '') {
       throw new Error(`${backfill.id}: set.recipeFingerprint must be non-empty`);
     }
+    if (
+      backfill.set.specMethod !== undefined &&
+      (backfill.set.specMethod === '' || backfill.set.specMethod === backfill.config.specMethod)
+    ) {
+      throw new Error(`${backfill.id}: set.specMethod must be non-empty and change the config`);
+    }
     const mergeKeys = Object.keys(backfill.set.metricsMerge ?? {});
     if (backfill.previousSet) {
       const previous = backfill.previousSet;
@@ -1421,6 +1004,7 @@ export function validateRunBackfills(
     if (
       backfill.set.offloadMode === undefined &&
       backfill.set.recipeFingerprint === undefined &&
+      backfill.set.specMethod === undefined &&
       mergeKeys.length === 0 &&
       removeKeys.length === 0
     ) {
@@ -1448,6 +1032,7 @@ export function validateRunBackfills(
       backfill,
       desiredOffloadMode,
       desiredRecipeFingerprint,
+      backfillDesiredConfig(backfill),
     );
     if (pointDesiredIdentities.has(desiredIdentity)) {
       throw new Error(`${backfill.id}: desired point identity collides with another backfill`);
@@ -1489,7 +1074,7 @@ export function validateRunBackfills(
   }
 }
 
-interface BackfillablePoint extends BenchmarkPointKey {
+export interface BackfillablePoint extends BenchmarkPointKey {
   config: ConfigParams;
   metrics: Record<string, unknown>;
 }
@@ -1514,7 +1099,6 @@ interface BackfillableChangelog<T extends BackfillableChangelogEntry> {
   entries: T[];
 }
 
-/** Apply changelog corrections before artifact metadata is written to PostgreSQL. */
 export function applyChangelogBackfills<T extends BackfillableChangelogEntry>(
   githubRunId: number,
   runAttempt: number | null | undefined,
@@ -1551,8 +1135,6 @@ export function applyChangelogBackfills<T extends BackfillableChangelogEntry>(
         appendOnly,
       }));
     }
-    // ingestChangelogEntries upserts every entry onto the same (run, base, head)
-    // identity, so the final artifact entry is the row that persists.
     const entryIndex = changelog.entries.length - 1;
     const entry = changelog.entries[entryIndex];
     changelog.entries[entryIndex] = {
@@ -1584,14 +1166,13 @@ function matchesBenchmarkPoint(
   );
 }
 
-/** Apply one point patch to an ingest row before it reaches PostgreSQL. */
 export function applyBenchmarkPointBackfill<T extends BackfillablePoint>(
   githubRunId: number,
   runAttempt: number | null | undefined,
   point: T,
 ): AppliedBenchmarkPointBackfill<T> {
   const sourceIdentity = JSON.stringify([
-    point.configId,
+    configCacheKey(point.config),
     point.benchmarkType,
     point.isl,
     point.osl,
@@ -1624,12 +1205,16 @@ export function applyBenchmarkPointBackfill<T extends BackfillablePoint>(
   if (backfill.set.offloadMode !== undefined) metrics.offload_mode = offloadMode;
   const patched = {
     ...point,
+    config:
+      backfill.set.specMethod === undefined
+        ? point.config
+        : { ...point.config, specMethod: backfill.set.specMethod },
     offloadMode,
     recipeFingerprint: backfill.set.recipeFingerprint ?? point.recipeFingerprint ?? null,
     metrics,
   };
   const desiredIdentity = JSON.stringify([
-    patched.configId,
+    configCacheKey(patched.config),
     patched.benchmarkType,
     patched.isl,
     patched.osl,
@@ -1645,7 +1230,6 @@ export function applyBenchmarkPointBackfill<T extends BackfillablePoint>(
   };
 }
 
-/** Fail if two distinct artifact points collapse onto one identity after correction. */
 export function recordBackfilledPointIdentity(
   seen: Map<string, string>,
   sourceIdentity: string,
@@ -1660,10 +1244,6 @@ export function recordBackfilledPointIdentity(
   seen.set(desiredIdentity, sourceIdentity);
 }
 
-/**
- * True when this exact benchmark result is suppressed. When an ingest source
- * cannot determine the attempt, match the point across every attempt of its run.
- */
 export function isBenchmarkPointPurged(
   githubRunId: number,
   runAttempt: number | null | undefined,
@@ -1683,10 +1263,32 @@ export function isBenchmarkPointPurged(
   );
 }
 
-/**
- * True when the (run, attempt) pair should be skipped on ingest. Pass `runAttempt`
- * to honor PURGED_RUN_ATTEMPTS; omit it to check whole-run purges only.
- */
+export type BenchmarkPointPlan<T extends BackfillablePoint> =
+  | { kind: 'purged' }
+  | { kind: 'planned'; point: T; backfillId: string | null };
+
+export function planBenchmarkPoint<T extends BackfillablePoint>(
+  run: { githubRunId: number; runAttempt: number | null | undefined },
+  point: T,
+  seen: Map<string, string>,
+): BenchmarkPointPlan<T> {
+  if (isBenchmarkPointPurged(run.githubRunId, run.runAttempt, point)) return { kind: 'purged' };
+  const applied = applyBenchmarkPointBackfill(run.githubRunId, run.runAttempt, point);
+  recordBackfilledPointIdentity(seen, applied.sourceIdentity, applied.desiredIdentity);
+  return { kind: 'planned', point: applied.point, backfillId: applied.backfillId };
+}
+
+export function backfilledPoints<T extends Omit<BackfillablePoint, 'configId'>>(
+  run: { githubRunId: number; runAttempt: number | null | undefined },
+  points: readonly T[],
+): T[] {
+  return points.map(
+    (point) =>
+      applyBenchmarkPointBackfill(run.githubRunId, run.runAttempt, { ...point, configId: -1 })
+        .point,
+  );
+}
+
 export function isRunAttemptPurged(githubRunId: number, runAttempt?: number): boolean {
   if (PURGED_RUNS.has(githubRunId)) return true;
   if (runAttempt === undefined) return false;

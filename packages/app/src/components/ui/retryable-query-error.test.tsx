@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('next/navigation', () => ({ usePathname: () => mocks.pathname.value }));
-vi.mock('@/lib/analytics', () => ({ track: mocks.track }));
+vi.mock('@/lib/analytics/analytics', () => ({ track: mocks.track }));
 
 import { RetryableQueryError } from './retryable-query-error';
 

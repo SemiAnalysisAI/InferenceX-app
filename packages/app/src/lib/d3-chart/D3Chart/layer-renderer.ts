@@ -1,7 +1,6 @@
 import * as d3 from 'd3';
 
 import type { ChartLayout, ContinuousScale } from '../types';
-import { CHART_TYPE, px } from '../typography';
 import { renderBars, updateBarsOnZoom } from '../layers/bars';
 import {
   renderHorizontalBars,
@@ -19,18 +18,37 @@ import {
 import { renderBarLabels, updateBarLabelsOnZoom } from '../layers/bar-labels';
 import {
   renderScatterPoints,
+  syncPointLabel,
   updateScatterPointsForDisplay,
   updateScatterPointsOnZoom,
+  type ScatterPointConfig,
 } from '../layers/scatter-points';
 import { renderRadar } from '../layers/radar';
+import { canvasPointLayerOf } from '../layers/canvas-point-registry';
+import type { CanvasPointLayer, ScatterDatum } from '../layers/canvas-points';
 
 import type { BuiltScale } from './scale-builders';
-import type { LayerConfig, RenderContext, ZoomContext } from './types';
+import type { LayerConfig, RenderContext, ScatterLayerConfig, ZoomContext } from './types';
 
-/**
- * Render a single layer into the chart's zoomGroup (or g for non-clipped charts).
- * Returns the D3 selection if the layer produces one (for tooltip attachment).
- */
+export type LayerSurface = 'screen' | 'export';
+
+function syncCanvasLabels<T extends ScatterDatum>(
+  points: CanvasPointLayer<T>,
+  { getLabelText, foreground, hideLabels }: ScatterPointConfig<T>,
+): void {
+  points.setLabels(
+    getLabelText && foreground && !hideLabels ? getLabelText : null,
+    foreground ?? '',
+  );
+}
+
+function canvasPointsFor<T extends ScatterDatum>(
+  layer: ScatterLayerConfig<T>,
+  group: d3.Selection<SVGGElement, unknown, null, undefined>,
+): CanvasPointLayer<T> | null {
+  return layer.canvas ? canvasPointLayerOf<T>(group.node()) : null;
+}
+
 export function renderLayer<T>(
   layer: LayerConfig<T>,
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -38,6 +56,7 @@ export function renderLayer<T>(
   yScale: BuiltScale,
   layout: ChartLayout,
   ctx: RenderContext,
+  surface: LayerSurface = 'screen',
 ): d3.Selection<any, any, any, any> | null {
   const { width, height } = layout;
 
@@ -112,6 +131,14 @@ export function renderLayer<T>(
     }
 
     case 'scatter': {
+      if (layer.canvas && surface === 'screen') {
+        const points = layer.canvas(group.node()!);
+        points.join(layer.data, layer.keyFn, width, height);
+        points.restyle(layer.config);
+        points.place(xScale as ContinuousScale, yScale as ContinuousScale);
+        syncCanvasLabels(points, layer.config);
+        return d3.select(points.element);
+      }
       return renderScatterPoints(
         group,
         layer.data,
@@ -136,9 +163,6 @@ export function renderLayer<T>(
   }
 }
 
-/**
- * Cheap geometry updates that should follow every zoom event.
- */
 export function updateLayerPositionOnZoom<T>(
   layer: LayerConfig<T>,
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -171,7 +195,14 @@ export function updateLayerPositionOnZoom<T>(
       break;
     }
     case 'scatter': {
-      updateScatterPointsOnZoom(group, newXScale as ContinuousScale, newYScale as ContinuousScale);
+      const points = canvasPointsFor(layer, group);
+      if (points) points.place(newXScale as ContinuousScale, newYScale as ContinuousScale);
+      else
+        updateScatterPointsOnZoom(
+          group,
+          newXScale as ContinuousScale,
+          newYScale as ContinuousScale,
+        );
       break;
     }
     default: {
@@ -180,10 +211,6 @@ export function updateLayerPositionOnZoom<T>(
   }
 }
 
-/**
- * Expensive path, label, and annotation work. The renderer coalesces this
- * phase through one animation frame.
- */
 export function updateLayerDecorationOnZoom<T>(
   layer: LayerConfig<T>,
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -236,9 +263,6 @@ export function updateLayerDecorationOnZoom<T>(
   }
 }
 
-/**
- * Update metric coordinates without re-running the scatter data join.
- */
 export function updateLayerForMetric<T>(
   layer: LayerConfig<T>,
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -251,6 +275,13 @@ export function updateLayerForMetric<T>(
     return renderLayer(layer, group, xScale, yScale, layout, ctx);
   }
 
+  const points = canvasPointsFor(layer, group);
+  if (points) {
+    points.replaceData(layer.data, layer.keyFn);
+    syncCanvasLabels(points, layer.config);
+    points.place(xScale as ContinuousScale, yScale as ContinuousScale);
+    return d3.select(points.element);
+  }
   const keyFor = (datum: (typeof layer.data)[number], index: number): string =>
     layer.keyFn ? layer.keyFn(datum) : String(index);
   const nextByKey = new Map<string, (typeof layer.data)[number]>();
@@ -263,44 +294,30 @@ export function updateLayerForMetric<T>(
     });
   const getLabelText = layer.config.getLabelText;
   const foreground = layer.config.foreground;
-  if (getLabelText && foreground) {
+  if (getLabelText && foreground && !layer.config.hideLabels) {
     selection.each(function (datum) {
-      const lines = getLabelText(datum).split('\n');
-      const firstDy = -(0.8 + (lines.length - 1) * 1.1);
-      d3.select(this)
-        .selectAll<SVGTextElement, boolean>('.point-label')
-        .data([true])
-        .join('text')
-        .attr('class', 'point-label')
-        .attr('text-anchor', 'middle')
-        .attr('fill', foreground)
-        .attr('font-size', px(CHART_TYPE.dataLabel))
-        .attr('font-weight', '700')
-        .attr('pointer-events', 'none')
-        .style('display', layer.config.hideLabels ? 'none' : '')
-        .style('opacity', layer.config.hideLabels ? 0 : 1)
-        .selectAll<SVGTSpanElement, string>('tspan')
-        .data(lines)
-        .join('tspan')
-        .attr('x', 0)
-        .attr('dy', (_line, index) => (index === 0 ? `${firstDy}em` : '1.1em'))
-        .text((line) => line);
+      syncPointLabel(this, getLabelText(datum), foreground, false);
     });
   } else {
-    selection.selectAll('.point-label').remove();
+    group.selectAll('.dot-group > .point-label').remove();
   }
   updateScatterPointsOnZoom(group, xScale as ContinuousScale, yScale as ContinuousScale);
   return selection;
 }
 
-/** Update scale-neutral decoration without rebuilding joins, scales, or paths. */
 export function updateLayerForDisplay<T>(
   layer: LayerConfig<T>,
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   ctx: RenderContext,
 ): void {
   if (layer.type === 'scatter') {
-    updateScatterPointsForDisplay(group, layer.config);
+    const points = canvasPointsFor(layer, group);
+    if (points) {
+      points.restyle(layer.config);
+      syncCanvasLabels(points, layer.config);
+    } else {
+      updateScatterPointsForDisplay(group, layer.config);
+    }
     return;
   }
   if (layer.type === 'horizontalBar') {

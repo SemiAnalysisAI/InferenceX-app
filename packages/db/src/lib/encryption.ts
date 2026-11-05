@@ -1,6 +1,3 @@
-// AES-256-GCM with managed (per-message random) nonce. AAD is bound at cipher
-// construction; encrypt + decrypt must use the same bytes.
-
 import { gcm } from '@noble/ciphers/aes.js';
 import { bytesToUtf8, managedNonce, utf8ToBytes } from '@noble/ciphers/utils.js';
 
@@ -39,7 +36,6 @@ export function createCipher(key: CipherKey): Cipher {
         const cipher = aad === undefined ? wrapped(key) : wrapped(key, aad);
         return bytesToUtf8(cipher.decrypt(base64ToBytes(ciphertextB64)));
       } catch {
-        // Opaque error so the failure mode (tag vs base64 vs utf8) isn't an oracle.
         throw new Error('decrypt failed');
       }
     },
@@ -49,7 +45,6 @@ export function createCipher(key: CipherKey): Cipher {
 export function parseKey(raw: string): CipherKey {
   const trimmed = raw.trim();
   if (!trimmed) throw new Error('key is empty');
-  // Reject base64url explicitly — atob silently drops `-` and `_`.
   if (!BASE64_RE.test(trimmed)) {
     throw new Error('key contains non-base64 characters (expected A-Z a-z 0-9 + / =)');
   }

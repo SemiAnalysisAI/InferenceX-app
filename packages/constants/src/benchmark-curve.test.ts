@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { benchmarkCurveScope, type BenchmarkCurveInput } from './benchmark-curve';
+import { benchmarkCurveScope, curveLineImages, type BenchmarkCurveInput } from './benchmark-curve';
 
 const agg: BenchmarkCurveInput = {
   model: 'glm5.2',
@@ -41,4 +41,28 @@ describe('benchmarkCurveScope', () => {
       expect(benchmarkCurveScope(fixed)).not.toBe(benchmarkCurveScope({ ...fixed, ...change }));
     },
   );
+});
+
+describe('curveLineImages', () => {
+  it('splits AgentX lines by AGG/disagg and offload, as InferenceX does', () => {
+    expect(
+      curveLineImages([
+        { ...agg, image: 'a' },
+        { ...agg, disagg: true, image: 'b' },
+        { ...agg, offload_mode: 'on', image: 'c' },
+      ]),
+    ).not.toBeNull();
+    expect(
+      curveLineImages([
+        { ...agg, image: 'a' },
+        { ...agg, spec_method: 'none', image: 'b' },
+      ]),
+    ).toBeNull();
+    expect(
+      curveLineImages([
+        { ...agg, offload_mode: null, image: 'a' },
+        { ...agg, image: 'b' },
+      ]),
+    ).toBeNull();
+  });
 });

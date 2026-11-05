@@ -3,7 +3,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/lib/analytics', () => ({
+vi.mock('@/lib/analytics/analytics', () => ({
   track: vi.fn(),
 }));
 
@@ -22,7 +22,6 @@ function clickCard(anchor: Element) {
   });
 }
 
-/** Simulate the browser restoring this page from the back-forward cache. */
 function restoreFromBfcache() {
   const event = new Event('pageshow');
   Object.defineProperty(event, 'persisted', { value: true });
@@ -35,8 +34,6 @@ beforeEach(() => {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
-  // jsdom has neither view transitions nor matchMedia; the click handler
-  // gates the shared-element tag on both.
   (document as unknown as { startViewTransition: () => void }).startViewTransition = () => {};
   vi.stubGlobal(
     'matchMedia',
@@ -53,8 +50,6 @@ afterEach(() => {
 });
 
 const cardProps = {
-  // Hash hrefs keep jsdom from logging "navigation not implemented" when the
-  // click handler assigns location.href.
   href: '#a-vs-b',
   slug: 'a-vs-b',
   label: 'A vs B',
@@ -96,9 +91,6 @@ describe('ComparePairCardLink bfcache restore', () => {
     clickCard(firstCard);
     expect(firstCard.querySelector('h3')!.style.viewTransitionName).toBe('compare-title');
 
-    // Back → bfcache restore keeps the first card's inline name; the next
-    // click must not leave two `compare-title` elements in one document
-    // (duplicate names make the browser skip the transition entirely).
     restoreFromBfcache();
     clickCard(secondCard);
 

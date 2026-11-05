@@ -25,9 +25,9 @@ import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { useServerLogFiles } from '@/hooks/api/use-server-log-files';
 import { useServerLogSearch } from '@/hooks/api/use-server-log-search';
 import { SERVER_LOG_CHUNK_SIZE, useServerLog } from '@/hooks/api/use-server-log';
-import { track } from '@/lib/analytics';
-import { cn } from '@/lib/utils';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { cn } from '@/lib/shared/utils';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import {
   buildLogLines,
@@ -50,6 +50,8 @@ const STRINGS = {
     searching: 'Searching…',
     searchError: 'The logs could not be searched. Try again in a moment.',
     noMatches: 'No matches found.',
+    searchIncomplete:
+      'Search stopped after the first 64 million characters; later content was not searched.',
     match: 'match',
     matches: 'matches',
     firstMatches: 'Showing the first',
@@ -79,6 +81,7 @@ const STRINGS = {
     searching: '正在搜索……',
     searchError: '无法搜索日志，请稍后重试。',
     noMatches: '未找到匹配内容。',
+    searchIncomplete: '搜索已在前 6,400 万个字符处停止，之后的内容未被搜索。',
     match: '处匹配',
     matches: '处匹配',
     firstMatches: '显示前',
@@ -129,10 +132,8 @@ export function retryInitialServerLogQuery(
   else void refetchContent();
 }
 
-/** Console surface. Kept dark in every theme — these are raw terminal artifacts. */
 const LOG_SURFACE = 'bg-[#0b0e13]';
 
-/** Per-severity line tint. Error and warning rows also carry a left accent bar. */
 const LINE_TONE: Record<LogSeverity, string> = {
   error: 'border-l-rose-400/80 bg-rose-500/8 text-rose-200',
   warn: 'border-l-amber-300/70 bg-amber-300/6 text-amber-100',
@@ -140,19 +141,12 @@ const LINE_TONE: Record<LogSeverity, string> = {
   info: 'text-zinc-300',
 };
 
-/** Gutter cell. Empty on purpose — the number comes from a CSS counter, so it
-    stays out of `textContent` and out of anything the reader copies. */
 const GUTTER_CLASS = cn(
   'log-gutter sticky left-0 z-10 border-r border-white/8 px-3 text-right text-zinc-600 tabular-nums select-none',
   LOG_SURFACE,
 );
 const LINE_CLASS = 'border-l-2 border-transparent pr-4 pl-2.5';
 
-/**
- * One plain log line, memoized on primitives. Loading a chunk rebuilds the whole
- * line array, so without this every already-rendered line would reconcile again;
- * a megabyte-scale log is ~10k lines and that dominates the load-more click.
- */
 const LogRow = memo(({ text, severity }: { text: string; severity: LogSeverity }) => (
   <>
     <span aria-hidden="true" className={GUTTER_CLASS} />
@@ -161,7 +155,6 @@ const LogRow = memo(({ text, severity }: { text: string; severity: LogSeverity }
 ));
 LogRow.displayName = 'LogRow';
 
-/** Split a path so the directory reads as context and the filename as the value. */
 function FilePath({ path, className }: { path: string; className?: string }) {
   const separator = path.lastIndexOf('/');
   if (separator === -1) return <span className={className}>{path}</span>;
@@ -173,7 +166,6 @@ function FilePath({ path, className }: { path: string; className?: string }) {
   );
 }
 
-/** Full-width bordered notice used by the loading, error, and empty states. */
 function LogViewerNotice({
   icon,
   tone = 'muted',
@@ -259,8 +251,6 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
     };
   }, [jumpTarget, loadedOffset, rawLog, selectedFile]);
 
-  // Rendered lines carry the search highlight as a piece so a mid-line match
-  // stays one `<mark>` on the line it starts on.
   const logLines = useMemo(
     () =>
       buildLogLines(
@@ -274,8 +264,6 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
       ),
     [highlightedLog, log],
   );
-  // The jump target is the first highlighted run: it carries the scroll ref and
-  // the test id, while any continuation runs on later lines render unmarked.
   const jumpPiece = useMemo(() => {
     for (const [lineIndex, line] of logLines.entries()) {
       const pieceIndex = line.pieces.findIndex((piece) => piece.highlighted);
@@ -300,7 +288,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
 
   useEffect(() => {
     if (!searchTerm) return;
-    track(`${analyticsPrefix}_logs_searched`, { id, queryLength: searchTerm.length });
+    track(`${analyticsPrefix}_logs_searched`, { id, query_length: searchTerm.length });
   }, [analyticsPrefix, id, searchTerm]);
 
   useEffect(() => {
@@ -323,8 +311,8 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
     setCopied(true);
     track(`${analyticsPrefix}_logs_copied`, {
       id,
-      fileName: selectedFile,
-      loadedCharacters: log.length,
+      file_name: selectedFile,
+      loaded_characters: log.length,
     });
     window.setTimeout(() => setCopied(false), 1500);
   };
@@ -333,7 +321,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
     suppressScrollLoadUntilRef.current = 0;
     setSelection({ pointId: id, fileName, initialOffset: 0, jumpTarget: null });
     setCopied(false);
-    track(`${analyticsPrefix}_log_file_selected`, { id, fileName });
+    track(`${analyticsPrefix}_log_file_selected`, { id, file_name: fileName });
   };
 
   const goToSearchMatch = (result: Omit<LogJumpTarget, 'requestId'>) => {
@@ -348,9 +336,9 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
     setCopied(false);
     track(`${analyticsPrefix}_log_search_match_opened`, {
       id,
-      fileName: result.fileName,
+      file_name: result.fileName,
       offset: result.offset,
-      queryLength: searchTerm.length,
+      query_length: searchTerm.length,
     });
   };
 
@@ -358,9 +346,9 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
     (trigger: 'button' | 'scroll') => {
       track(`${analyticsPrefix}_log_chunk_loaded`, {
         id,
-        fileName: selectedFile,
+        file_name: selectedFile,
         offset: nextOffset,
-        chunkSize: SERVER_LOG_CHUNK_SIZE,
+        chunk_size: SERVER_LOG_CHUNK_SIZE,
         trigger,
       });
       void query.fetchNextPage();
@@ -486,15 +474,13 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
             ) : null}
           </div>
 
-          {/* Wraps rather than clipping: the pair does not fit beside the search field
-              on a phone, so the group breaks onto its own line(s). */}
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Button asChild variant="outline" size="sm" className="text-xs">
               <a
                 href={downloadUrl}
                 download
                 onClick={() =>
-                  track(`${analyticsPrefix}_log_downloaded`, { id, fileName: selectedFile })
+                  track(`${analyticsPrefix}_log_downloaded`, { id, file_name: selectedFile })
                 }
                 data-testid="download-selected-server-log"
               >
@@ -541,6 +527,14 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
               {formatter.format(searchQuery.data.matches.length)}{' '}
               {searchQuery.data.matches.length === 1 ? t.match : t.matches}
             </p>
+            {searchQuery.data.incomplete ? (
+              <p
+                className="text-2xs text-muted-foreground"
+                data-testid="server-log-search-incomplete"
+              >
+                {t.searchIncomplete}
+              </p>
+            ) : null}
             {searchQuery.data.matches.length === 0 ? (
               <p className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
                 {t.noMatches}
@@ -600,8 +594,6 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
       >
         <code className="log-lines grid w-max min-w-full grid-cols-[auto_1fr] py-3">
           {logLines.map((line, lineIndex) =>
-            // Only the few lines a search match spans need per-piece markup; the
-            // rest go through the memoized row so appends stay cheap.
             line.pieces.some((piece) => piece.highlighted) ? (
               <Fragment key={lineIndex}>
                 <span aria-hidden="true" className={GUTTER_CLASS} />
