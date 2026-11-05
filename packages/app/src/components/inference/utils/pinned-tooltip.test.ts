@@ -218,4 +218,23 @@ describe.each([
     expect(html).toContain('&lt;img src=x&gt;');
     expect(html).not.toContain('<img src=x>');
   });
+
+  it('does not invent tensor parallelism for legacy chip-count-only rows', () => {
+    const html = render(
+      config({
+        data: point({
+          disagg: false,
+          tp: 8,
+          physicalChips: 8,
+          ep: undefined,
+          prefill_ep: undefined,
+          decode_ep: undefined,
+          prefill_dcp_size: 4,
+        }),
+      }),
+    );
+    expect(text(html)).toContain('Parallelism Strategy: 8 Chips');
+    expect(text(html)).toContain('Decode Context Parallelism (DCP): 4');
+    expect(html).not.toContain('>TP8<');
+  });
 });

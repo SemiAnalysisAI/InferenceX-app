@@ -868,6 +868,15 @@ const powerWithheldHTML = (d: InferenceData, locale: Locale): string => {
 };
 
 const pinnedTopologyHTML = (d: InferenceData, locale: Locale): string => {
+  // Legacy rows use tp as a chip count without identifying the parallelism strategy.
+  if (
+    !d.disagg &&
+    (d.ep === null || d.ep === undefined) &&
+    (d.prefill_ep === null || d.prefill_ep === undefined) &&
+    !(d.prefill_dwdp_size && d.prefill_dwdp_size > 1)
+  ) {
+    return `<div data-pinned-parallelism class="pinned-section">${generateParallelismHTML(d, locale)}</div>`;
+  }
   const t = PARALLELISM_STRINGS[locale];
   const bool = (v: boolean | string | undefined) =>
     v === undefined ? '?' : asBool(v) ? t.yes : t.no;
