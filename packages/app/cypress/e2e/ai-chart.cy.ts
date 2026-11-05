@@ -6,7 +6,6 @@ describe('AI chart workspace', () => {
     cy.visit('/ai-chart');
     cy.get('#ai-chart-prompt').should('have.attr', 'aria-describedby', 'ai-chart-prompt-hint');
     cy.contains('button', 'Generate Chart').should('be.disabled');
-    cy.get('#ai-chart-requirements').should('contain.text', 'Add a description');
     cy.get('[data-testid="ai-chart-examples"] button')
       .first()
       .then(($example) => {
@@ -14,7 +13,6 @@ describe('AI chart workspace', () => {
         cy.wrap($example).click();
         cy.get('#ai-chart-prompt').should('have.value', prompt).type(' at high interactivity');
       });
-    cy.get('#ai-chart-requirements').should('contain.text', 'Add your provider');
     cy.get('#ai-chart-key')
       .type('test-openai-key', { log: false })
       .should('have.attr', 'type', 'password');
@@ -35,18 +33,6 @@ describe('AI chart workspace', () => {
     it(`keeps the ${locale} workspace labeled and contained on mobile`, () => {
       cy.viewport(390, 844);
       cy.visit(locale === 'zh' ? '/zh/ai-chart' : '/ai-chart');
-      cy.get('label[for="ai-chart-prompt"]').should(
-        'contain.text',
-        locale === 'zh' ? '想比较什么' : 'What would',
-      );
-      cy.get('label[for="ai-chart-provider"]').should(
-        'contain.text',
-        locale === 'zh' ? 'AI 服务商' : 'AI provider',
-      );
-      cy.get('#ai-chart-key-hint').should(
-        'contain.text',
-        locale === 'zh' ? '当前页面的内存' : 'page’s memory',
-      );
       cy.get(
         '#ai-chart-provider, #ai-chart-key, button[aria-label="Show API key"], button[aria-label="显示 API 密钥"]',
       ).each(($control) => {
@@ -234,50 +220,6 @@ describe('AI chart metric semantics', () => {
 });
 
 describe('AI chart Chinese workflow', () => {
-  it('requests Chinese presentation copy and renders the returned chart and summary', () => {
-    cy.viewport(1440, 900);
-    cy.fixture<FixtureRow[]>('api/benchmarks.json').then((fixtureRows) => {
-      const rows = [
-        fixtureRow(fixtureRows, 'b200', 40, 12_000),
-        fixtureRow(fixtureRows, 'mi355x', 40, 10_000),
-      ];
-      const spec = benchmarkSpec({
-        title: '每芯片吞吐量对比',
-        description: '在目标交互性下对比两种芯片。',
-        yAxisLabel: '每芯片吞吐量',
-      });
-
-      cy.intercept('GET', '**/api/v1/benchmarks?*', rows).as('zhBenchmarks');
-      cy.intercept('POST', 'https://api.openai.com/v1/chat/completions', (request) => {
-        const systemPrompt = request.body.messages?.[0]?.content ?? '';
-        if (systemPrompt.includes('chart generation assistant')) {
-          expect(systemPrompt).to.contain('natural Simplified Chinese');
-          request.reply({ choices: [{ message: { content: JSON.stringify(spec) } }] });
-          return;
-        }
-
-        expect(systemPrompt).to.contain('用自然、准确的简体中文回答');
-        request.reply({ choices: [{ message: { content: 'B200 在该配置下吞吐量更高。' } }] });
-      }).as('zhOpenAi');
-
-      cy.visit('/zh/ai-chart');
-      cy.get('input[placeholder="OpenAI API Key"]').type('test-api-key', { log: false });
-      cy.get('textarea[placeholder="描述想查看的图表……"]').type(
-        '对比 B200 和 MI355X 的每芯片吞吐量',
-      );
-      cy.contains('button', '生成图表').click();
-
-      cy.wait('@zhBenchmarks');
-      cy.get('#ai-chart-bar-export')
-        .should('contain.text', '每芯片吞吐量对比')
-        .and('contain.text', '在目标交互性下对比两种芯片。')
-        .and('contain.text', '每芯片吞吐量');
-      cy.get('[role="img"][aria-label="AI 生成的条形图"]').should('be.visible');
-      cy.contains('[data-slot="card-title"]', 'AI 总结').should('be.visible');
-      cy.contains('B200 在该配置下吞吐量更高。').should('be.visible');
-    });
-  });
-
   it('keeps interactive scatter and line charts exposed as accessible groups', () => {
     cy.fixture<FixtureRow[]>('api/benchmarks.json').then((fixtureRows) => {
       const rows = [

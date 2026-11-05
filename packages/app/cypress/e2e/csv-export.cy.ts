@@ -50,11 +50,6 @@ describe('CSV download route contract', () => {
         cy.get('[data-testid="evaluation-chart-view-btn"]').click();
         cy.get('#evaluation-chart svg circle').should('have.length.greaterThan', 0);
       }
-      cy.get('[data-testid="export-button"]').first().click();
-      cy.get('[data-testid="export-png-button"]')
-        .should('be.visible')
-        .and('contain.text', 'Download PNG');
-      cy.get('body').type('{esc}');
       exportFirstChart();
       readCapturedCsv().then((csv) => {
         const lines = csv

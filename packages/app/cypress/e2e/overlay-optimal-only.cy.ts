@@ -113,7 +113,7 @@ describe('Overlay points follow Optimal Only on the selected axes', () => {
       cy.get('[data-testid="chart-figure"] [data-testid="export-button"]').first().click();
       cy.get('[data-testid="png-aspect-ratio"]').select(ratio);
       cy.get('[data-testid="export-png-button"]').click();
-      cy.wrap(null, { timeout: 30000 })
+      cy.wrap(null)
         .should(() => {
           expect(png).to.match(/^data:image\/png;base64,/u);
         })

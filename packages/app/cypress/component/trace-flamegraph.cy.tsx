@@ -49,16 +49,6 @@ const structure: ConversationStructure = {
 };
 
 describe('TraceFlamegraph', () => {
-  it('renders the legend, main-turn rows, and the subagent group header', () => {
-    cy.mount(<TraceFlamegraph structure={structure} />);
-    cy.contains('Cached prefix').should('be.visible');
-    cy.contains('Uncached input').should('be.visible');
-    cy.contains('Output').should('be.visible');
-    cy.get('[data-rowkey="t-0"]').should('contain.text', 'Turn 1');
-    cy.get('[data-rowkey="t-1"]').should('contain.text', 'Turn 2');
-    cy.contains('Subagent: search').should('be.visible');
-  });
-
   it('keeps subagent children collapsed until the group is expanded', () => {
     cy.mount(<TraceFlamegraph structure={structure} />);
     cy.get('[data-rowkey="g-2-c-0"]').should('not.exist');

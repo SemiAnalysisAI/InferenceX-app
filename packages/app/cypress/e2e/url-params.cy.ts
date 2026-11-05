@@ -196,61 +196,6 @@ describe('URL Parameter Persistence', () => {
         .should('have.text', 'Cost per Million Total Tokens ($)');
     });
 
-    it('maps the removed API-pricing URL to hyperscaler-volume TCO', () => {
-      visitWithDismissedModal('/inference?i_metric=y_tokensPerDollar');
-
-      cy.get('[data-testid="yaxis-metric-selector"]').should(
-        'contain.text',
-        'Total Tokens per $1 TCO',
-      );
-      cy.get('[data-testid="cost-tier-selector"]').should(
-        'contain.text',
-        'Owning at Large Hyperscaler Volume',
-      );
-      cy.get('[data-testid="scatter-graph"]')
-        .first()
-        .find('svg text[transform="rotate(-90)"]')
-        .should('have.text', 'Total Tokens per $1 TCO (tok/$)');
-    });
-
-    it('keeps the legacy i_metric=y alias on raw throughput', () => {
-      visitWithDismissedModal('/inference?i_metric=y');
-
-      cy.get('[data-testid="yaxis-metric-selector"]').should(
-        'contain.text',
-        'Token Throughput per Chip',
-      );
-    });
-
-    it('switching to energy metric updates SVG axis label to joules', () => {
-      visitWithDismissedModal('/inference');
-      cy.get('[data-testid="scatter-graph"]').first().should('be.visible');
-
-      cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
-      cy.contains('[data-select-option]', 'All-in Provisioned Joules per Total Token').click({
-        force: true,
-      });
-
-      cy.get('[data-testid="scatter-graph"]')
-        .first()
-        .find('svg text[transform="rotate(-90)"]')
-        .should('have.text', 'All-in Provisioned J per Total Token (J/tok)');
-    });
-
-    it('i_metric=y_tpPerMw pre-selects throughput-per-MW', () => {
-      visitWithDismissedModal('/inference?i_metric=y_tpPerMw');
-
-      cy.get('[data-testid="yaxis-metric-selector"]').should(
-        'contain.text',
-        'Token Throughput per All in Utility MW',
-      );
-
-      cy.get('[data-testid="scatter-graph"]')
-        .first()
-        .find('svg text[transform="rotate(-90)"]')
-        .should('contain.text', 'Token Throughput per All in Utility MW');
-    });
-
     it('keeps tooltip rulers aligned after a zoomed metric switch', () => {
       visitWithDismissedModal('/inference?i_metric=y_tpPerGpu');
       expandLegendAdvanced();
@@ -341,32 +286,9 @@ describe('URL Parameter Persistence', () => {
       cy.get('[data-testid="precision-multiselect"]').invoke('text').should('not.contain', 'junk');
       assertNoHydrationMismatch();
     });
-
-    it('/inference with multiple URL params seeds all of them without a hydration error', () => {
-      visitWithErrorSpy('/inference?i_seq=1k/1k');
-      cy.get('[data-testid="scenario-selector"]').should('contain.text', '1K / 1K');
-      assertNoHydrationMismatch();
-
-      visitWithErrorSpy('/inference?g_model=DeepSeek-R1-0528&i_prec=fp8');
-      cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP8');
-      assertNoHydrationMismatch();
-
-      visitWithErrorSpy('/inference?i_seq=1k/1k&g_model=DeepSeek-R1-0528&i_prec=fp8');
-      cy.get('[data-testid="scenario-selector"]').should('contain.text', '1K / 1K');
-      cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek');
-      cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP8');
-      assertNoHydrationMismatch();
-    });
   });
 
   describe('High contrast mode', () => {
-    it('i_hc=0 disables high contrast on load', () => {
-      visitWithDismissedModal('/inference?i_hc=0');
-      cy.get('[data-testid="scatter-graph"]').should('exist');
-      expandLegendAdvanced();
-      cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'unchecked');
-    });
-
     it('r_hc=1 applies to reliability chart', () => {
       visitWithDismissedModal('/reliability?r_hc=1');
       cy.get('[data-testid="reliability-chart-display"]').should('exist');

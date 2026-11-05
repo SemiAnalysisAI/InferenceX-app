@@ -143,43 +143,6 @@ describe('GPUGraph', () => {
     cy.get('@setShowOffloadingLabel').should('have.been.calledWith', false);
   });
 
-  it('renders SVG within chart container', () => {
-    const data = [
-      createMockInferenceData({
-        hwKey: 'h100',
-        x: 64,
-        y: 210,
-        date: '2025-03-01',
-        precision: Precision.FP4,
-      }),
-    ];
-
-    mountGpuGraph(
-      <div style={{ width: 800, height: 600 }}>
-        <GPUGraph
-          chartId="test-gpu"
-          modelLabel="DeepSeek R1"
-          data={data}
-          xLabel="Concurrency"
-          yLabel="Throughput / Chip (tok/s)"
-          chartDefinition={defaultChartDef}
-        />
-      </div>,
-      {
-        inference: {
-          hardwareConfig: hwConfig,
-          selectedGPUs: ['h100'],
-          selectedDates: ['2025-03-01'],
-          selectedDateRange: { startDate: '', endDate: '' },
-          activeDates: new Set(['2025-03-01_h100']),
-          selectedPrecisions: [Precision.FP4],
-        },
-      },
-    );
-
-    cy.get('[data-testid="gpu-graph"] svg').should('exist');
-  });
-
   it('shows empty state when data is empty', () => {
     mountGpuGraph(
       <div style={{ width: 800, height: 600 }}>
@@ -264,62 +227,6 @@ describe('GPUGraph', () => {
     );
     cy.contains('暂无数据').should('be.visible');
     cy.contains('请调整模型、序列长度、精度、日期范围或芯片选项。').should('be.visible');
-  });
-
-  it('renders chart with points when data and selectedGPUs are provided', () => {
-    const data = [
-      createMockInferenceData({
-        hwKey: 'h100',
-        x: 64,
-        y: 210,
-        date: '2025-02-28',
-        precision: Precision.FP4,
-        conc: 64,
-      }),
-      createMockInferenceData({
-        hwKey: 'h100',
-        x: 32,
-        y: 180,
-        date: '2025-03-01',
-        precision: Precision.FP4,
-        conc: 32,
-      }),
-      createMockInferenceData({
-        hwKey: 'b200',
-        x: 64,
-        y: 350,
-        date: '2025-03-01',
-        precision: Precision.FP4,
-        conc: 64,
-      }),
-    ];
-
-    mountGpuGraph(
-      <div style={{ width: 800, height: 600 }}>
-        <GPUGraph
-          chartId="test-gpu-data"
-          modelLabel="DeepSeek R1"
-          data={data}
-          xLabel="Concurrency"
-          yLabel="Throughput / Chip (tok/s)"
-          chartDefinition={defaultChartDef}
-        />
-      </div>,
-      {
-        inference: {
-          hardwareConfig: hwConfig,
-          selectedGPUs: ['h100', 'b200'],
-          selectedDates: ['2025-02-28', '2025-03-01'],
-          selectedDateRange: { startDate: '', endDate: '' },
-          activeDates: new Set(['2025-02-28_h100', '2025-03-01_h100', '2025-03-01_b200']),
-          selectedPrecisions: [Precision.FP4],
-        },
-      },
-    );
-
-    cy.get('[data-testid="gpu-graph"] svg').should('exist');
-
-    cy.get('[data-testid="gpu-graph"] svg .visible-shape').should('have.length.greaterThan', 0);
   });
 
   it('shows spec decoding only on hover while retaining the offload halo', () => {

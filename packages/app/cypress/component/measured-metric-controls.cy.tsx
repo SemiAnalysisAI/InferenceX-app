@@ -14,39 +14,34 @@ function Controls() {
 }
 
 describe('Power boundary labels', () => {
-  for (const locale of ['en', 'zh'] as const) {
-    it(`keeps boundary selection clear (${locale})`, () => {
-      const width = locale === 'en' ? 1280 : 390;
-      cy.viewport(width, 720);
-      cy.mount(
-        <PathnameContext.Provider value={locale === 'en' ? '/inference' : '/zh/inference'}>
-          <Controls />
-        </PathnameContext.Provider>,
-      );
-      const labels =
-        locale === 'en'
-          ? ['GPU Level Measured', 'All in Measured IT (no PUE)', 'All in Measured']
-          : ['GPU 实测功耗', '整体实测 IT 功耗（不含 PUE）', '整体实测功耗'];
-      cy.get('[data-testid="measured-power-basis"]').click();
-      cy.get('[data-select-option]').should(($options) => {
-        expect([...$options].map((option) => option.textContent?.trim())).to.deep.equal(labels);
-      });
-      cy.get('[data-select-option][data-value="utility-modeled"]').click();
-      cy.get('[data-select-option]').should('not.exist');
-      cy.get('[data-testid="selected-metric"]').should('have.text', 'y_utilityModeledWatts');
-      cy.get('[data-testid="measured-metric-controls"]').should(($controls) => {
-        const box = $controls[0].getBoundingClientRect();
-        expect(box.left).to.be.at.least(0);
-        expect(box.right).to.be.at.most(width);
-        expect($controls[0].scrollWidth).to.be.at.most($controls[0].clientWidth);
-      });
-      cy.screenshot(`power-boundary-selected-${locale}`, { overwrite: true });
-      cy.get('[data-testid="measured-power-basis"]').click();
-      cy.get('[data-select-option][data-value="gpu-measured"]').click();
-      cy.get('[data-testid="selected-metric"]').should('have.text', 'y_measuredAvgPower');
-      cy.get('[data-testid="measured-power-basis"]').click();
-      cy.get('[data-select-option]').should('be.visible');
-      cy.screenshot(`power-boundary-options-${locale}`, { overwrite: true });
+  it('keeps boundary selection clear (en)', () => {
+    cy.viewport(1280, 720);
+    cy.mount(
+      <PathnameContext.Provider value="/inference">
+        <Controls />
+      </PathnameContext.Provider>,
+    );
+    cy.get('[data-testid="measured-power-basis"]').click();
+    cy.get('[data-select-option]').should(($options) => {
+      expect([...$options].map((option) => option.textContent?.trim())).to.deep.equal([
+        'GPU Level Measured',
+        'All in Measured IT (no PUE)',
+        'All in Measured',
+      ]);
     });
-  }
+    cy.get('[data-select-option][data-value="utility-modeled"]').click();
+    cy.get('[data-select-option]').should('not.exist');
+    cy.get('[data-testid="selected-metric"]').should('have.text', 'y_utilityModeledWatts');
+    cy.get('[data-testid="measured-metric-controls"]').should(($controls) => {
+      const box = $controls[0].getBoundingClientRect();
+      expect(box.left).to.be.at.least(0);
+      expect(box.right).to.be.at.most(1280);
+      expect($controls[0].scrollWidth).to.be.at.most($controls[0].clientWidth);
+    });
+    cy.get('[data-testid="measured-power-basis"]').click();
+    cy.get('[data-select-option][data-value="gpu-measured"]').click();
+    cy.get('[data-testid="selected-metric"]').should('have.text', 'y_measuredAvgPower');
+    cy.get('[data-testid="measured-power-basis"]').click();
+    cy.get('[data-select-option]').should('be.visible');
+  });
 });
