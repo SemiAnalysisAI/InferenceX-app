@@ -141,8 +141,8 @@ describe('Header', () => {
     cy.get('[data-testid="mobile-menu-toggle"]').should('have.attr', 'aria-label', '导航菜单');
   });
 
-  it('orders the nav with Home first and AgentX second', () => {
-    const expected = ['Home', 'AgentX', 'Overview', 'Dashboard', 'ubenchX', 'About'];
+  it('orders the nav as Home, Overview, Dashboard, AgentX, ubenchX, About', () => {
+    const expected = ['Home', 'Overview', 'Dashboard', 'AgentX', 'ubenchX', 'About'];
     cy.get('[data-testid^="nav-link-"]').then(($links) => {
       const labels = [...$links].map((link) => (link.textContent ?? '').replace('New', '').trim());
       expect(labels).to.deep.equal(expected);

@@ -38,12 +38,6 @@ interface NavLink {
 const NAV_LINKS: readonly NavLink[] = [
   { href: '/', label: 'Home', testId: 'nav-link-home', event: 'header_home_clicked' },
   {
-    href: '/agentx',
-    label: 'AgentX',
-    testId: 'nav-link-agentx',
-    event: 'header_agentx_clicked',
-  },
-  {
     href: '/overview',
     label: 'Overview',
     testId: 'nav-link-overview',
@@ -54,6 +48,12 @@ const NAV_LINKS: readonly NavLink[] = [
     label: 'Dashboard',
     testId: 'nav-link-dashboard',
     event: 'header_dashboard_clicked',
+  },
+  {
+    href: '/agentx',
+    label: 'AgentX',
+    testId: 'nav-link-agentx',
+    event: 'header_agentx_clicked',
   },
   {
     href: '/ubenchx',
