@@ -12,18 +12,11 @@ import {
   normalizeSpecMethod,
   parseBool,
 } from './etl/normalizers';
-import {
-  bulkIngestBenchmarkRows,
-  bulkUpsertAvailability,
-  type BenchmarkPersistenceInput,
-} from './etl/benchmark-ingest';
-import {
-  extractPowerAudit,
-  extractPowerInvalidReasons,
-  normalizePowerContractMetrics,
-  scrubWithheldPowerMetrics,
-} from './etl/benchmark-mapper';
 import { ingestEvalRow } from './etl/eval-ingest';
+import {
+  ingestSupplementalSnapshots,
+  type SupplementalSnapshot,
+} from './etl/supplemental-benchmarks';
 
 const sql = createAdminSql({
   noSsl: hasNoSslFlag(),
@@ -156,180 +149,6 @@ async function ingestSupplementalEvals(
   console.log(`  Evals: ${ingested} new, ${skipped} duplicate (ON CONFLICT updates)`);
 }
 
-interface SupplementalBmk {
-  model: string;
-  hw: string;
-  framework: string;
-  precision: string;
-  spec_decoding: string;
-  tp: number;
-  ep: number;
-  conc: number;
-  dp_attention: string;
-  isl: number;
-  osl: number;
-  image: string | null;
-  metrics: Record<string, number>;
-  date: string;
-  disagg?: boolean;
-  is_multinode?: boolean;
-  prefill_num_workers?: number;
-  decode_num_workers?: number;
-  power_invalid_reasons?: unknown;
-  power_audit?: unknown;
-}
-
-async function ingestSupplementalBmk(
-  configCache: ReturnType<typeof createConfigCache>,
-  getOrCreateWorkflowRun: ReturnType<typeof createWorkflowRunServices>['getOrCreateWorkflowRun'],
-): Promise<void> {
-  const filePath = path.join(DATA_DIR, 'supplemental-bmk.json');
-  if (!fs.existsSync(filePath)) {
-    console.log('  No supplemental-bmk.json found, skipping.');
-    return;
-  }
-
-  const data: SupplementalBmk[] = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  if (data.length === 0) {
-    console.log('  supplemental-bmk.json is empty, skipping.');
-    return;
-  }
-  console.log(`  Loaded ${data.length} supplemental benchmark entries`);
-
-  const { getOrCreateConfig } = configCache;
-
-  const byDate = new Map<string, SupplementalBmk[]>();
-  for (const entry of data) {
-    if (!byDate.has(entry.date)) byDate.set(entry.date, []);
-    byDate.get(entry.date)!.push(entry);
-  }
-
-  let totalNew = 0;
-  let totalDup = 0;
-
-  for (const [date, entries] of byDate) {
-    const workflowRunId = (await getOrCreateWorkflowRun({
-      githubRunId: 0,
-      name: 'Supplemental Benchmark Data',
-      date,
-      createdAt: `${date}T00:00:00Z`,
-      status: 'completed',
-      conclusion: 'success',
-    }))!;
-
-    const rows: BenchmarkPersistenceInput[] = [];
-
-    for (const entry of entries) {
-      const modelKey = resolveModelKey({ model: entry.model, infmax_model_prefix: undefined });
-      if (!modelKey) {
-        console.warn(`  Skipped: unknown model ${entry.model}`);
-        totalDup++; // oxlint-disable-line no-useless-assignment -- used after loop
-        continue;
-      }
-
-      const hw = hwToGpuKey(entry.hw);
-      if (!hw) {
-        console.warn(`  Skipped: unknown hardware ${entry.hw}`);
-        totalDup++; // oxlint-disable-line no-useless-assignment -- used after loop
-        continue;
-      }
-
-      const { framework, disagg: frameworkDisagg } = normalizeFramework(
-        entry.framework,
-        entry.disagg,
-      );
-      const specMethod = normalizeSpecMethod(entry.spec_decoding);
-      const dpAttn = parseBool(entry.dp_attention);
-      const disagg = frameworkDisagg || (entry.decode_num_workers ?? 0) > 0;
-
-      const configId = await getOrCreateConfig({
-        hardware: hw,
-        framework,
-        model: modelKey,
-        precision: entry.precision,
-        specMethod,
-        disagg,
-        isMultinode: entry.is_multinode ?? false,
-        prefillTp: entry.tp,
-        prefillEp: entry.ep,
-        prefillDpAttn: dpAttn,
-        prefillNumWorkers: entry.prefill_num_workers ?? 0,
-        decodeTp: entry.tp,
-        decodeEp: entry.ep,
-        decodeDpAttn: dpAttn,
-        decodeNumWorkers: entry.decode_num_workers ?? 0,
-        numPrefillGpu: entry.tp * entry.ep,
-        numDecodeGpu: entry.tp * entry.ep,
-      });
-
-      normalizePowerContractMetrics(entry.metrics, entry.metrics);
-      scrubWithheldPowerMetrics(entry.metrics);
-      const powerInvalidReasons = extractPowerInvalidReasons(
-        entry.power_invalid_reasons ?? entry.metrics.power_invalid_reasons,
-      );
-      const powerAudit = extractPowerAudit(entry.power_audit ?? entry.metrics.power_audit);
-      delete entry.metrics.power_invalid_reasons;
-      delete entry.metrics.power_audit;
-
-      rows.push({
-        configId,
-        benchmarkType: 'single_turn',
-        offloadMode: 'off',
-        isl: entry.isl,
-        osl: entry.osl,
-        conc: entry.conc,
-        image: entry.image,
-        recipeFingerprint: null,
-        metrics: entry.metrics,
-        powerInvalidReasons,
-        powerAudit,
-      });
-    }
-
-    const { newCount, dupCount } = await bulkIngestBenchmarkRows(sql, rows, workflowRunId, date);
-    totalNew += newCount;
-    totalDup += dupCount;
-
-    const availRows: {
-      model: string;
-      isl: number | null;
-      osl: number | null;
-      precision: string;
-      hardware: string;
-      framework: string;
-      specMethod: string;
-      disagg: boolean;
-      benchmarkType: string;
-    }[] = [];
-    for (const entry of entries) {
-      const modelKey = resolveModelKey({ model: entry.model, infmax_model_prefix: undefined });
-      const hw = hwToGpuKey(entry.hw);
-      if (!modelKey || !hw) continue;
-      const { framework, disagg: frameworkDisagg } = normalizeFramework(
-        entry.framework,
-        entry.disagg,
-      );
-      const specMethod = normalizeSpecMethod(entry.spec_decoding);
-      availRows.push({
-        model: modelKey,
-        isl: entry.isl,
-        osl: entry.osl,
-        precision: entry.precision,
-        hardware: hw,
-        framework,
-        specMethod,
-        disagg: frameworkDisagg || (entry.decode_num_workers ?? 0) > 0,
-        benchmarkType: 'single_turn',
-      });
-    }
-    if (availRows.length > 0) {
-      await bulkUpsertAvailability(sql, availRows, date);
-    }
-  }
-
-  console.log(`  Benchmarks: ${totalNew} new, ${totalDup} duplicate (ON CONFLICT updates)`);
-}
-
 async function main(): Promise<void> {
   console.log('=== db:ingest:supplemental ===');
   console.log(`Data directory: ${DATA_DIR}\n`);
@@ -349,7 +168,13 @@ async function main(): Promise<void> {
   console.log(`  ${configCache.size} configs preloaded\n`);
 
   await ingestSupplementalEvals(configCache, getOrCreateWorkflowRun);
-  await ingestSupplementalBmk(configCache, getOrCreateWorkflowRun);
+  const snapshots: SupplementalSnapshot[] = JSON.parse(
+    fs.readFileSync(path.join(DATA_DIR, 'supplemental-bmk.json'), 'utf8'),
+  );
+  const { newCount, dupCount } = await ingestSupplementalSnapshots(sql, snapshots);
+  console.log(
+    `  Benchmarks: ${snapshots.length} snapshots, ${newCount} new, ${dupCount} duplicate (ON CONFLICT updates)`,
+  );
 
   console.log('\n=== db:ingest:supplemental complete ===');
   console.log('  Invalidate API cache: bun run admin:cache:invalidate');
