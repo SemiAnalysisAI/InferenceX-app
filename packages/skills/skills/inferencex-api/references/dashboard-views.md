@@ -64,10 +64,11 @@ PNG 宽高比（自动 / 16:9 / 1:1）是下载菜单中仅用于图片导出的
 
 Use `tcoBasis=internal` (the default) or `tcoBasis=external` in cost-aware
 read-only views. Qwen3.5 and Kimi K3 expose the corresponding dashboard toggle
-on 8K/1K and Agentic Traces; inference charts show it for cost metrics when
-TPUv7 data is visible. The API accepts the pricing basis independently of
-control visibility. It changes configured ownership costs, not measured
-throughput; explicit custom costs remain user-controlled.
+on 8K/1K and Agentic Traces, and Muse Spark Open exposes it on Agentic Traces;
+inference charts show it for cost metrics when TPUv7 data is visible. The API
+accepts the pricing basis independently of control visibility. It changes
+configured ownership costs, not measured throughput; explicit custom costs
+remain user-controlled.
 
 Inference and historical charts place TCO Basis beside Cost Tier in the caption
 below the graph, including eligible unofficial overlays. PNG captions retain the
