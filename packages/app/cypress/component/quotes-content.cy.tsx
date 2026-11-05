@@ -135,6 +135,7 @@ describe('QuotesContent supporter logo wall', () => {
   it('links the managed providers to their quotes in both locales', () => {
     const providers = [
       'Together AI',
+      'Fireworks AI',
       'GMI Cloud',
       'Nebius',
       'Baseten',

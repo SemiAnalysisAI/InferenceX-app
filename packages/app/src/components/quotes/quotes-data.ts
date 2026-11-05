@@ -597,6 +597,17 @@ export const QUOTES: Quote[] = [
     logo: 'doubleword.png',
     link: 'https://www.doubleword.ai/',
   },
+  {
+    text: "Serving inference at scale across heterogeneous clouds and hardware means constantly trading off throughput, latency, and cost. InferenceX's open, reproducible benchmarks make those trade-offs visible across accelerators and serving stacks. Benchmarks often fixate on a synthetic workload that doesn't match real-world scenarios. AgentX uses real traces that capture realistic agentic workload patterns and thus provides representative results for the community.",
+    textZh:
+      '在异构云和硬件上大规模提供推理服务，意味着要不断在吞吐量、延迟和成本之间权衡。InferenceX 的开放、可复现基准测试让这些权衡在不同加速器和推理服务栈之间清晰可见。基准测试往往局限于与真实场景不符的合成工作负载，而 AgentX 使用真实轨迹，捕捉了真实的智能体工作负载模式，因此能为社区提供具有代表性的结果。',
+    name: 'Dmytro Dzhulgakov',
+    title: 'Co-Founder & CTO, Fireworks AI',
+    titleZh: 'Fireworks AI 联合创始人兼首席技术官',
+    org: 'Fireworks AI',
+    logo: 'fireworks.svg',
+    link: 'https://fireworks.ai/',
+  },
 ];
 
 export const CAROUSEL_ORGS = [
