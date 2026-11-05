@@ -359,13 +359,14 @@ describe('showsTcoBasisSelector', () => {
     },
   );
 
-  it('shows the selector for Muse Spark Open only on AgentX', () => {
-    for (const sequence of Object.values(Sequence)) {
-      expect(showsTcoBasisSelector(Model.Muse_Spark_Open, sequence)).toBe(
-        sequence === Sequence.AgenticTraces,
-      );
-    }
-  });
+  it.each([Model.Muse_Spark_Open, Model.GLM_5_2, Model.GLM_5_3_Flash])(
+    'shows the selector for %s only on AgentX',
+    (model) => {
+      for (const sequence of Object.values(Sequence)) {
+        expect(showsTcoBasisSelector(model, sequence)).toBe(sequence === Sequence.AgenticTraces);
+      }
+    },
+  );
 
   it('keeps unrelated models hidden', () => {
     expect(showsTcoBasisSelector(Model.Kimi_K2_5, Sequence.AgenticTraces)).toBe(false);
