@@ -874,11 +874,9 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
 @keyframes new-badge-flash {
   0%,
   100% {
-    opacity: 1;
     box-shadow: 0 0 0 0 color-mix(in oklab, var(--brand) 70%, transparent);
   }
   50% {
-    opacity: 0.45;
     box-shadow: 0 0 0 4px color-mix(in oklab, var(--brand) 0%, transparent);
   }
 }
