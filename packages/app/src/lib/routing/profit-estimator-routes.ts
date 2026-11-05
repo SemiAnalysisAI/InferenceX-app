@@ -90,6 +90,13 @@ export function profitRoutePathname(pathname: string, params: URLSearchParams): 
   return `${base}/${slug}${filters.length > 0 ? `/${filters.join('/')}` : ''}`;
 }
 
+export function profitRouteForTab(pathname: string, tab: ProfitRouteTab): string | null {
+  const parsed = parseModelRoutePathname(pathname);
+  if (!parsed || !isProfitRouteTab(parsed.tab)) return null;
+  const locale = parsed.zh ? '/zh' : '';
+  return `${locale}/${tab}${pathname.slice(`${locale}/${parsed.tab}`.length)}`;
+}
+
 export function setProfitRouteUnofficialRuns(url: URL, runIds: readonly string[]): void {
   const params = profitRouteSearch(url.pathname, url.search);
   const oldKeys = [...params.keys()].filter((key) => /^unofficialruns?$/iu.test(key));

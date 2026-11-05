@@ -6,6 +6,7 @@ import {
   PROFIT_ROUTE_PARAMS,
   parseProfitRouteFilters,
   profitRouteParams,
+  profitRouteForTab,
   profitRoutePathname,
   profitRouteSearch,
   setProfitRouteUnofficialRuns,
@@ -63,6 +64,22 @@ describe('profit estimator route state', () => {
         Model.Kimi_K3,
       ),
     ).toBe('/zh/profit-estimator/kimi-k3/target/24/cache-hit-mode/theoretical');
+  });
+
+  it('swaps the profit basis page and keeps locale, model and route values', () => {
+    expect(profitRouteForTab('/profit-estimator', 'profit-estimator-per-gigawatt')).toBe(
+      '/profit-estimator-per-gigawatt',
+    );
+    expect(
+      profitRouteForTab(
+        '/zh/profit-estimator-per-gigawatt/glm-5-3/target/120/power/modeled',
+        'profit-estimator',
+      ),
+    ).toBe('/zh/profit-estimator/glm-5-3/target/120/power/modeled');
+    expect(profitRouteForTab('/profit-estimator/kimi-k3', 'profit-estimator')).toBe(
+      '/profit-estimator/kimi-k3',
+    );
+    expect(profitRouteForTab('/calculator/kimi-k3', 'profit-estimator')).toBeNull();
   });
 
   it('gives route state priority over conflicting legacy queries', () => {

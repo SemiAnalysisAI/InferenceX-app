@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DASHBOARD_ROUTES,
+  dashboardNavTabForPathname,
   dashboardRouteForPathname,
   dashboardShellCapabilitiesForPathname,
   getDashboardRoute,
@@ -49,16 +50,12 @@ describe('dashboard route registry', () => {
     expect(dashboardRouteForPathname('/historical/kimi-k3')?.key).toBe('historical');
   });
 
-  it('puts both profit estimators between Inference Performance and Accuracy Evals', () => {
+  it('puts one profit estimator tab between Inference Performance and Accuracy Evals', () => {
     const primary = DASHBOARD_ROUTES.filter((route) => route.navGroup === 'primary').map(
       (route) => route.key,
     );
-    expect(primary.slice(0, 4)).toEqual([
-      'inference',
-      'profit-estimator-per-gigawatt',
-      'profit-estimator',
-      'evaluation',
-    ]);
+    expect(primary.slice(0, 3)).toEqual(['inference', 'profit-estimator', 'evaluation']);
+    expect(primary).not.toContain('profit-estimator-per-gigawatt');
     expect(primary).not.toContain('calculator');
     expect(primary).not.toContain('fleet');
     expect(primary).not.toContain('historical');
@@ -66,6 +63,22 @@ describe('dashboard route registry', () => {
       'profit-estimator-per-gigawatt',
     );
     expect(dashboardRouteForPathname('/profit-estimator/kimi-k3')?.key).toBe('profit-estimator');
+  });
+
+  it('keeps the per-gigawatt page indexed and marks the profit estimator tab active on it', () => {
+    const perGw = getDashboardRoute('profit-estimator-per-gigawatt');
+    expect(perGw.navGroup).toBe('merged');
+    expect(perGw.indexable).toBe(true);
+    expect(perGw.localeMirrored).toBe(true);
+    for (const pathname of [
+      '/profit-estimator',
+      '/profit-estimator-per-gigawatt',
+      '/zh/profit-estimator-per-gigawatt/kimi-k3/target/45',
+    ]) {
+      expect(dashboardNavTabForPathname(pathname)).toBe('profit-estimator');
+    }
+    expect(dashboardNavTabForPathname('/zh/evaluation')).toBe('evaluation');
+    expect(dashboardNavTabForPathname('/compare/foo-vs-bar')).toBeUndefined();
   });
 
   it('keeps PowerX behind the feature gate while its routes still resolve', () => {

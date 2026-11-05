@@ -1,4 +1,4 @@
-export type DashboardNavGroup = 'primary' | 'feature-gated' | 'footer-only';
+export type DashboardNavGroup = 'primary' | 'merged' | 'feature-gated' | 'footer-only';
 export type DashboardShareParamScope = 'g_' | 'i_' | 'e_' | 'r_' | 'c_' | 'v_';
 
 export interface DashboardProviderCapabilities {
@@ -109,7 +109,7 @@ export const DASHBOARD_ROUTES = [
     key: 'profit-estimator-per-gigawatt',
     path: '/profit-estimator-per-gigawatt',
     canonicalPath: '/profit-estimator-per-gigawatt',
-    navGroup: 'primary',
+    navGroup: 'merged',
     indexable: true,
     localeMirrored: true,
     providers: UNOFFICIAL_ONLY_DASHBOARD_PROVIDERS,
@@ -302,6 +302,15 @@ export function dashboardRouteForPathname(pathname: string): DashboardRoute | un
       enPath.startsWith(`${route.path}/`) ||
       enPath === route.canonicalPath,
   );
+}
+
+const MERGED_DASHBOARD_TABS: Partial<Record<DashboardRouteKey, DashboardRouteKey>> = {
+  'profit-estimator-per-gigawatt': 'profit-estimator',
+};
+
+export function dashboardNavTabForPathname(pathname: string): DashboardRouteKey | undefined {
+  const key = dashboardRouteForPathname(pathname)?.key;
+  return key && (MERGED_DASHBOARD_TABS[key] ?? key);
 }
 
 const DEFAULT_DASHBOARD_SHELL_CAPABILITIES: DashboardShellCapabilities = {

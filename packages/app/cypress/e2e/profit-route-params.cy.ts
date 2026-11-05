@@ -81,10 +81,49 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
     cy.location('pathname').should('eq', '/profit-estimator/deepseek-v4/target/24');
     cy.get('label[for="profit-target"]').should('contain.text', 'P90');
     cy.location('search').should('eq', '');
-    cy.get('a[href="/profit-estimator-per-gigawatt"]').filter(':visible').first().click();
+    cy.get('a[href="/profit-estimator"]').filter(':visible').first().click();
     cy.get('[data-testid="profit-target-input"]').should('have.value', '60');
     cy.location('pathname').should('not.include', '/target/24');
   });
+
+  for (const prefix of ['', '/zh']) {
+    it(`switches basis in ${prefix || '/'} between both URLs, keeping the model and route state`, () => {
+      const route = 'deepseek-v4/target/24/cache-hit-mode/actual';
+      const gpuHour = `${prefix}/profit-estimator/${route}`;
+      const perGw = `${prefix}/profit-estimator-per-gigawatt/${route}`;
+      const perGwTitle = prefix ? '每吉瓦' : 'per gigawatt';
+      cy.visit(`${gpuHour}?utm_source=test`, { onBeforeLoad: suppressNudges });
+      cy.get('[data-testid="profit-estimator-chart"]').should('exist');
+      cy.get('[data-testid="profit-basis-chip-hour"]').should('have.attr', 'aria-pressed', 'true');
+      cy.get('[data-testid="profit-controls"] h2').should('not.contain.text', perGwTitle);
+      cy.get('[data-testid="profit-controls"]').should(
+        'contain.text',
+        prefix ? '按每 GPU 小时或每吉瓦年估算' : 'per GPU-hour or per gigawatt-year',
+      );
+      cy.get('[data-testid="profit-basis-gw-year"]').click();
+      cy.location('pathname').should('eq', perGw);
+      cy.location('search').should('eq', '?utm_source=test');
+      cy.get('[data-testid="profit-basis-gw-year"]').should('have.attr', 'aria-pressed', 'true');
+      cy.get('[data-testid="profit-controls"] h2').should('contain.text', perGwTitle);
+      cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+      cy.get('[data-testid="profit-cache-hit-selector"]').should(
+        'contain.text',
+        prefix ? '实测' : 'Actual',
+      );
+      cy.get('[data-testid="tab-trigger-profit-estimator"]').should(
+        'have.attr',
+        'data-tab-active',
+        'true',
+      );
+      cy.go('back');
+      cy.location('pathname').should('eq', gpuHour);
+      cy.get('[data-testid="profit-basis-chip-hour"]').should('have.attr', 'aria-pressed', 'true');
+      cy.get('[data-testid="profit-controls"] h2').should('not.contain.text', perGwTitle);
+      cy.go('forward');
+      cy.location('pathname').should('eq', perGw);
+      cy.get('[data-testid="profit-basis-gw-year"]').should('have.attr', 'aria-pressed', 'true');
+    });
+  }
 
   it('keeps P90 pinned even with the feature gate unlocked and a bare-page percentile query', () => {
     cy.visit('/profit-estimator?i_pctl=p75&percentile=p50&c_ivtarget=24', {

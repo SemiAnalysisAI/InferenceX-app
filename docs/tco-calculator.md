@@ -455,13 +455,17 @@ page is deliberately on a different basis.
 
 ## Profit Estimator (`/profit-estimator`, `/profit-estimator-per-gigawatt`)
 
-Fleet Lifecycle answers "what did a fixed fleet earn over its life". These two tabs
-answer a narrower, present-tense question: at one interactivity operating point, what
-does each chip earn today, and who keeps it? The two tabs differ only in the denominator
+Fleet Lifecycle answers "what did a fixed fleet earn over its life". This tab
+answers a narrower, present-tense question: at one interactivity operating point, what
+does each chip earn today, and who keeps it? The two pages differ only in the denominator
 (`ProfitBasis`), either one GPU-hour (`chip-hour`) or the GPU-hours one all-in utility
-gigawatt-year buys for that SKU (`gw-year`).
+gigawatt-year buys for that SKU (`gw-year`). They share one dashboard tab. The
+"Estimate basis" switch in the Chart config panel moves between the two URLs with a
+client-side push that keeps the model slug, path filters, query and hash, and both URLs
+mark the Profit estimator tab active (`navGroup: 'merged'` in `dashboard-routes.ts`).
+Each page keeps its own title, metadata and canonical URL.
 
-Both tabs offer the same model list. A model needs AgentX (`agentic_traces`)
+Both pages offer the same model list. A model needs AgentX (`agentic_traces`)
 measurements with an interpolable operating point and a token price source.
 The page intersects its supported routes with live AgentX availability, so a
 model without current trace data disappears from the selector.

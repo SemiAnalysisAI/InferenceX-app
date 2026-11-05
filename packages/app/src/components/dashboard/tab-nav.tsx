@@ -16,7 +16,7 @@ import {
 import { track } from '@/lib/analytics/analytics';
 import {
   DASHBOARD_ROUTES,
-  dashboardRouteForPathname,
+  dashboardNavTabForPathname,
   getDashboardRoute,
   type DashboardRoute,
   type DashboardRouteKey,
@@ -133,7 +133,7 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
   const pathname = usePathname();
   const featureGateUnlocked = useFeatureGate();
   const locale = pathname === '/zh' || pathname.startsWith('/zh/') ? 'zh' : 'en';
-  const current = dashboardRouteForPathname(pathname)?.key ?? 'inference';
+  const current = dashboardNavTabForPathname(pathname) ?? 'inference';
   const currentRoute = getDashboardRoute(current);
   const lockedCurrentGatedTab =
     !featureGateUnlocked && currentRoute.navGroup === 'feature-gated' ? currentRoute : null;

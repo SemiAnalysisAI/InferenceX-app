@@ -183,11 +183,7 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
       'href',
       '/profit-estimator/kimi-k3/unofficial-runs/12345',
     );
-    cy.get('[data-testid="tab-trigger-profit-estimator-per-gigawatt"]').should(
-      'have.attr',
-      'href',
-      '/profit-estimator-per-gigawatt/kimi-k3/unofficial-runs/12345',
-    );
+    cy.get('[data-testid="tab-trigger-profit-estimator-per-gigawatt"]').should('not.exist');
   });
 
   it('carries route-owned runs from /zh/profit-estimator to desktop and mobile tabs', () => {
@@ -204,13 +200,12 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
         'href',
         '/zh/evaluation?unofficialruns=111,222',
       );
-      for (const destination of ['profit-estimator', 'profit-estimator-per-gigawatt']) {
-        cy.get(`[data-testid="${selector}-${destination}"]`).should(
-          'have.attr',
-          'href',
-          `/zh/${destination}/kimi-k3/unofficial-runs/111%2C222`,
-        );
-      }
+      cy.get(`[data-testid="${selector}-profit-estimator"]`).should(
+        'have.attr',
+        'href',
+        '/zh/profit-estimator/kimi-k3/unofficial-runs/111%2C222',
+      );
+      cy.get(`[data-testid="${selector}-profit-estimator-per-gigawatt"]`).should('not.exist');
     }
     cy.window().then((win) => {
       win.history.replaceState(null, '', base);
@@ -222,6 +217,20 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
       'href',
       '/zh/profit-estimator',
     );
+  });
+
+  it('marks the one profit estimator tab active on the per-gigawatt page', () => {
+    mountTabNav({ pathname: '/zh/profit-estimator-per-gigawatt/kimi-k3/target/45' });
+    cy.get('[data-testid="tab-trigger-profit-estimator"]')
+      .should('have.attr', 'data-tab-active', 'true')
+      .and('have.attr', 'href', '/zh/profit-estimator');
+    cy.get('[data-testid="mobile-tab-profit-estimator"]').should(
+      'have.attr',
+      'aria-current',
+      'page',
+    );
+    cy.get('[data-testid^="tab-trigger-profit-estimator-"]').should('not.exist');
+    cy.get('[data-testid^="mobile-tab-profit-estimator-"]').should('not.exist');
   });
 
   it('preserves a comma-separated list of run ids verbatim', () => {
@@ -269,13 +278,7 @@ describe('TabNav — Hidden popover for gated tabs', () => {
     cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate-konami-v1'));
     mountTabNav({ pathname: '/evaluation' });
     cy.get('[data-testid="mobile-chart-select"]').should('be.visible');
-    for (const key of [
-      'inference',
-      'profit-estimator-per-gigawatt',
-      'profit-estimator',
-      'evaluation',
-      'submissions',
-    ]) {
+    for (const key of ['inference', 'profit-estimator', 'evaluation', 'submissions']) {
       cy.get(`[data-testid="mobile-tab-${key}"]`).should('exist');
     }
     cy.get('[data-testid="mobile-tab-evaluation"]')
@@ -283,6 +286,7 @@ describe('TabNav — Hidden popover for gated tabs', () => {
       .and('have.attr', 'href', '/evaluation');
     cy.get('[data-testid="mobile-tab-inference"]').should('not.have.attr', 'aria-current');
     cy.get('[data-testid="mobile-tab-powerx"]').should('not.exist');
+    cy.get('[data-testid="mobile-tab-profit-estimator-per-gigawatt"]').should('not.exist');
     cy.get('[data-testid="mobile-tab-evaluation"]').should(($pill) => {
       const bounds = $pill[0]!.getBoundingClientRect();
       expect(bounds.height, 'mobile touch target').to.be.at.least(40);

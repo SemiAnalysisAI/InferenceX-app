@@ -17,12 +17,17 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="tab-trigger-evaluation"]').click();
     cy.url().should('include', '/evaluation');
 
-    cy.get('[data-testid="tab-trigger-profit-estimator-per-gigawatt"]').click();
-    cy.url().should('include', '/profit-estimator-per-gigawatt');
-
+    cy.get('[data-testid="tab-trigger-profit-estimator-per-gigawatt"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-profit-estimator"]').click();
-    cy.url().should('include', '/profit-estimator');
-    cy.url().should('not.include', '/profit-estimator-per-gigawatt');
+    cy.location('pathname').should('match', /^\/profit-estimator(?:\/|$)/u);
+
+    cy.get('[data-testid="profit-basis-gw-year"]').click();
+    cy.location('pathname').should('match', /^\/profit-estimator-per-gigawatt(?:\/|$)/u);
+    cy.get('[data-testid="tab-trigger-profit-estimator"]').should(
+      'have.attr',
+      'data-tab-active',
+      'true',
+    );
 
     cy.get('[data-testid="tab-trigger-submissions"]').click();
     cy.url().should('include', '/submissions');

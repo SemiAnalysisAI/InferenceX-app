@@ -124,7 +124,7 @@ export class SiteSearchEngine {
   seed(): Promise<void> {
     this.seeding ??= (async () => {
       for (const route of DASHBOARD_ROUTES) {
-        if (route.indexable && route.navGroup === 'primary') {
+        if (route.indexable && (route.navGroup === 'primary' || route.navGroup === 'merged')) {
           this.enqueue(route.path);
         }
       }

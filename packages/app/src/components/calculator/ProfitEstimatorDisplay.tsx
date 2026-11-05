@@ -9,6 +9,7 @@ import { Info, Plus, X } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { isDarkTheme } from '@/lib/themes/themes';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 import ProfitEstimatorChart from '@/components/calculator/ProfitEstimatorChart';
 import {
@@ -56,6 +57,7 @@ import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/
 import { CaptionPercentInput } from '@/components/ui/caption-percent-input';
 import { captionControlTriggerClassName, ResultContext } from '@/components/ui/result-context';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ALL_IN_MEASURED_NOTE, POWER_BASIS_LABELS } from '@/lib/power/power-basis';
@@ -78,7 +80,9 @@ import {
   Sequence,
   type Model,
 } from '@/lib/catalog/data-mappings';
-import { modelRoutesForTab, type ModelRouteTab } from '@/lib/routing/model-routes';
+import { modelRoutesForTab } from '@/lib/routing/model-routes';
+import { profitRouteForTab, type ProfitRouteTab } from '@/lib/routing/profit-estimator-routes';
+import { rememberChartStateInUrl } from '@/lib/routing/url-state';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn, getDisplayLabel } from '@/lib/shared/utils';
@@ -186,6 +190,16 @@ const STRINGS = {
       'gw-year': 'Revenue & profit estimator per gigawatt (Beta)',
       'chip-hour': 'Revenue & profit estimator (Beta)',
     },
+    description:
+      'Estimated revenue, compute cost, model license fee and operator profit for each chip from measured throughput at a target interactivity, per GPU-hour or per gigawatt-year',
+    chartGroup: 'Chart config',
+    basisLabel: 'Estimate basis',
+    basisTooltip:
+      'Per GPU-hour shows what one chip earns and costs in an hour. Per gigawatt counts how many of each chip one gigawatt of all-in utility power runs for a year, so chips with different power draw share one budget.',
+    basisOptions: {
+      'chip-hour': 'Per GPU-hour',
+      'gw-year': 'Per gigawatt (Beta)',
+    } satisfies Record<ProfitBasis, string>,
     benchmarkGroup: 'Benchmark config',
     powerLabel: 'Power estimation',
     powerTooltip:
@@ -303,6 +317,16 @@ const STRINGS = {
       'gw-year': '每吉瓦收入与利润估算器（Beta）',
       'chip-hour': '收入与利润估算器（Beta）',
     },
+    description:
+      '基于目标交互性下的实测吞吐量，按每 GPU 小时或每吉瓦年估算各芯片的收入、算力支出、模型许可费与运营方利润',
+    chartGroup: '图表配置',
+    basisLabel: '估算口径',
+    basisTooltip:
+      '每 GPU 小时口径展示单颗芯片一小时的收入与成本。每吉瓦口径按一吉瓦全电源配置功率一年可运行的芯片数量折算，让功耗不同的芯片在同一功率预算下比较。',
+    basisOptions: {
+      'chip-hour': '每 GPU 小时',
+      'gw-year': '每吉瓦（Beta）',
+    } satisfies Record<ProfitBasis, string>,
     benchmarkGroup: '基准测试配置',
     powerLabel: '功耗估算方式',
     powerTooltip:
@@ -458,7 +482,7 @@ function blurOnWheel(event: React.WheelEvent<HTMLInputElement>): void {
   event.currentTarget.blur();
 }
 
-export const PROFIT_BASIS_TAB: Record<ProfitBasis, ModelRouteTab> = {
+export const PROFIT_BASIS_TAB: Record<ProfitBasis, ProfitRouteTab> = {
   'chip-hour': 'profit-estimator',
   'gw-year': 'profit-estimator-per-gigawatt',
 };
@@ -522,6 +546,7 @@ function ProfitEstimatorInner({
   const t = STRINGS[locale];
   const chartStrings = profitEstimatorChartStrings(locale);
   const { setUrlParam, getUrlParam } = useUrlState();
+  const router = useRouter();
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown();
   const { resolvedTheme } = useTheme();
   const { interceptLocked: interceptLockedTier, dialog: tcoModelDialog } =
@@ -1060,6 +1085,18 @@ function ProfitEstimatorInner({
     [setSelectedModel],
   );
 
+  const handleBasisChange = useCallback(
+    (next: ProfitBasis) => {
+      if (next === basis) return;
+      rememberChartStateInUrl();
+      const pathname = profitRouteForTab(window.location.pathname, PROFIT_BASIS_TAB[next]);
+      if (pathname === null) return;
+      track('profit_basis_changed', { basis: next });
+      router.push(`${pathname}${window.location.search}${window.location.hash}`, { scroll: false });
+    },
+    [basis, router],
+  );
+
   const toggleGpuVisibility = useCallback(
     (hwKey: string) => {
       const visibleLegendKeys = legendHwKeys.filter((key) => visibleHwKeys.has(key));
@@ -1446,7 +1483,11 @@ function ProfitEstimatorInner({
       <section ref={controlsRef} data-testid="profit-controls">
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
-            <DashboardSectionHeader title={t.title[basis]} actions={<ChartShareActions />} />
+            <DashboardSectionHeader
+              title={t.title[basis]}
+              description={t.description}
+              actions={<ChartShareActions />}
+            />
 
             <TooltipProvider delayDuration={0}>
               <div className="grid min-w-0 items-start gap-x-6 gap-y-4 xl:grid-cols-12">
@@ -1692,54 +1733,85 @@ function ProfitEstimatorInner({
                 </ControlPanel>
               </div>
 
-              <ControlPanel legend={t.compareHistory} data-testid="profit-history-panel">
-                <div
-                  className={cn('grid min-w-0 gap-3', selectedGPUs.length > 0 && 'md:grid-cols-2')}
+              <div className="grid min-w-0 items-start gap-x-6 gap-y-4 xl:grid-cols-12">
+                <ControlPanel
+                  legend={t.chartGroup}
+                  data-testid="profit-chart-panel"
+                  className="xl:col-span-4"
                 >
                   <div className="flex min-w-0 flex-col space-y-1.5">
-                    <LabelWithTooltip
-                      htmlFor="profit-history-gpu"
-                      label={t.gpuConfig}
-                      tooltip={t.gpuConfigTooltip}
+                    <LabelWithTooltip label={t.basisLabel} tooltip={t.basisTooltip} />
+                    <SegmentedToggle<ProfitBasis>
+                      role="group"
+                      value={basis}
+                      options={(['chip-hour', 'gw-year'] as const).map((value) => ({
+                        value,
+                        label: t.basisOptions[value],
+                        testId: `profit-basis-${value}`,
+                      }))}
+                      onValueChange={handleBasisChange}
+                      ariaLabel={t.basisLabel}
+                      testId="profit-basis-toggle"
+                      className="w-fit self-start md:h-9"
                     />
-                    <div data-testid="profit-history-gpu-multiselect" className="min-w-0">
-                      <MultiSelect
-                        triggerId="profit-history-gpu"
-                        options={historyChipOptions}
-                        value={selectedGPUs}
-                        onChange={handleHistoryGpuChange}
-                        open={openDropdown === 'history-gpu'}
-                        onOpenChange={handleDropdownOpenChange('history-gpu')}
-                        placeholder={t.gpuConfigPlaceholder}
-                        maxSelections={PROFIT_HISTORY_MAX_GPUS}
-                        searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
-                        noResultsLabel={locale === 'zh' ? '无结果' : undefined}
-                        clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
-                        selectedSuffix={locale === 'zh' ? ' 已选' : undefined}
-                      />
-                    </div>
                   </div>
-
-                  {selectedGPUs.length > 0 && (
-                    <div
-                      className="flex min-w-0 flex-col space-y-1.5"
-                      data-testid="profit-history-date-range"
-                    >
+                </ControlPanel>
+                <ControlPanel
+                  legend={t.compareHistory}
+                  data-testid="profit-history-panel"
+                  className="xl:col-span-8"
+                >
+                  <div
+                    className={cn(
+                      'grid min-w-0 gap-3',
+                      selectedGPUs.length > 0 && 'md:grid-cols-2',
+                    )}
+                  >
+                    <div className="flex min-w-0 flex-col space-y-1.5">
                       <LabelWithTooltip
-                        htmlFor="profit-history-dates"
-                        label={t.comparisonDateRange}
-                        tooltip={t.comparisonDateRangeTooltip}
+                        htmlFor="profit-history-gpu"
+                        label={t.gpuConfig}
+                        tooltip={t.gpuConfigTooltip}
                       />
-                      <DateRangePicker
-                        dateRange={selectedDateRange}
-                        onChange={handleHistoryDateRangeChange}
-                        placeholder={t.dateRangePlaceholder}
-                        availableDates={historyAvailableDates}
-                      />
+                      <div data-testid="profit-history-gpu-multiselect" className="min-w-0">
+                        <MultiSelect
+                          triggerId="profit-history-gpu"
+                          options={historyChipOptions}
+                          value={selectedGPUs}
+                          onChange={handleHistoryGpuChange}
+                          open={openDropdown === 'history-gpu'}
+                          onOpenChange={handleDropdownOpenChange('history-gpu')}
+                          placeholder={t.gpuConfigPlaceholder}
+                          maxSelections={PROFIT_HISTORY_MAX_GPUS}
+                          searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
+                          noResultsLabel={locale === 'zh' ? '无结果' : undefined}
+                          clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
+                          selectedSuffix={locale === 'zh' ? ' 已选' : undefined}
+                        />
+                      </div>
                     </div>
-                  )}
-                </div>
-              </ControlPanel>
+
+                    {selectedGPUs.length > 0 && (
+                      <div
+                        className="flex min-w-0 flex-col space-y-1.5"
+                        data-testid="profit-history-date-range"
+                      >
+                        <LabelWithTooltip
+                          htmlFor="profit-history-dates"
+                          label={t.comparisonDateRange}
+                          tooltip={t.comparisonDateRangeTooltip}
+                        />
+                        <DateRangePicker
+                          dateRange={selectedDateRange}
+                          onChange={handleHistoryDateRangeChange}
+                          placeholder={t.dateRangePlaceholder}
+                          availableDates={historyAvailableDates}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </ControlPanel>
+              </div>
             </TooltipProvider>
 
             {selectedGPUs.length > 0 && (
