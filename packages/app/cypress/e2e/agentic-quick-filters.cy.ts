@@ -113,7 +113,7 @@ describe('Agentic Quick Filters', () => {
     expectHwKeyPoints('b200', true);
     expectHwKeyPoints('mi300x', true);
     cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
-    cy.get('[data-testid="scatter-quick-filters"]').should('contain.text', 'Quick Filters').click();
+    cy.get('[data-testid="scatter-quick-filters"]').should('contain.text', 'Quick filters').click();
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
     cy.get('[data-testid="quick-filters-selected-count"]').should('not.exist');
 
