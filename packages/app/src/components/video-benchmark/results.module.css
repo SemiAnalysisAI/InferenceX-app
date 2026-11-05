@@ -55,6 +55,9 @@
   .chartConfig {
     grid-column: 1 / -1;
   }
+  .runContext {
+    grid-column: 1 / -1;
+  }
 }
 @media (min-width: 1024px) {
   .controls {

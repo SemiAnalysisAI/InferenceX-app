@@ -427,7 +427,7 @@ describe('VideoGenX results', () => {
     cy.location('search').should('not.contain', 'r_hidden=');
   });
 
-  it('views results as of an earlier run from the Run context and returns to the latest', () => {
+  it('views results as of an earlier run and compares a chip config over time', () => {
     mount({ search: '?r_y=videosPerGpuHour' });
     cy.get('#run-select').should('contain', 'Run 3/3');
     points().should('have.length', 3);
@@ -439,6 +439,12 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="results-run-context"] button[aria-label="Next run"]').click();
     cy.get('#run-select').should('contain', 'Run 3/3');
     points().should('have.length', 3);
+    cy.get('[data-testid="results-chip-config"]').click();
+    cy.contains('[role="option"]', 'B200 · 4 GPU · TP2 × Ulysses 2').click();
+    searchParam('r_configs').should('equal', 'b200:4g:tp2:u2');
+    points().should('have.length', 1);
+    points('[data-hardware="b200"]').should('contain', '2026-09-09');
+    cy.get('[data-testid="results-compare-history"]').should('contain', 'Comparison Date Range');
   });
 
   it('applies explicit scenario prices and utilisation to profit', () => {

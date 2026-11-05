@@ -65,7 +65,10 @@ The page follows the inference and AgentX two-level layout. The overview has fou
 
 1. The header card holds the cohort help, Share, one line naming the fixed model,
    workload and engine, and three control panels: Chart config (X and Y metric),
-   Deployment (GPU count) and Run context. Run context reuses the inference run date
+   Deployment (GPU count), Compare history and Run context. Compare history's Chip Config
+   picks up to four deployments and an optional date range; the chart then plots each one's
+   runs in time order, labelled by run date, while the table, clips and cost caption keep
+   the selected run. Run context reuses the inference run date
    picker and Run select: each official deployment shows its latest run on or before the
    selected run, and the run link opens its GitHub Actions run. Model, workload and engine
    have no selectors while one cohort is published; a shared `r_workload` link still
@@ -284,7 +287,7 @@ browser playback and difference failure, bilingual layout and 390px overflow.
 历史记录保留尚无发布批准的存储结果；默认图表仅接纳发布回执与原始来源及 checkout 匹配的记录。
 发布批准与 full-sweep 或发布资格验收分开。
 页面沿用推理与 AgentX 的两级布局。概览页首将筛选分为基准测试配置（模型、工作负载、引擎）、图表配置（X/Y 指标）、
-部署（GPU 数量）和运行信息四组。运行信息沿用推理页的运行日期和运行选择器：每个正式部署显示其在所选运行或之前的最新运行，运行链接打开对应的 GitHub Actions 运行。图表绘制所选工作负载的全部实测部署：X 轴为单条视频中位延迟（默认）或 P90 延迟，所有部署生成的视频时长和帧率相同时，轴标题会注明这两项；
+部署（GPU 数量）、对比历史趋势和运行信息。对比历史趋势中的芯片配置最多可选 4 个部署，并可限定日期范围；图表随即按时间顺序绘制各部署的每次运行并标注运行日期，表格、视频和成本说明仍按所选运行显示。运行信息沿用推理页的运行日期和运行选择器：每个正式部署显示其在所选运行或之前的最新运行，运行链接打开对应的 GitHub Actions 运行。图表绘制所选工作负载的全部实测部署：X 轴为单条视频中位延迟（默认）或 P90 延迟，所有部署生成的视频时长和帧率相同时，轴标题会注明这两项；
 Y 轴为每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时生成视频数或每条有效视频的 GPU 能耗；每种硬件及每个叠加运行
 各自绘制 Pareto 前沿。右侧图例可隐藏硬件，没有匹配运行的硬件显示为灰色，图表下方的说明行与推理页一致，可切换成本层级和 GPU 口径，并列出更新时间、来源、各硬件的 TCO $/chip/hr 价格及其来源链接。
 图表下方的“代表性部署”表格每种硬件及每个叠加运行一行，展示按参与计算的 GPU 折算后每 GPU 小时生成视频数最多的部署，窄屏可横向滚动。

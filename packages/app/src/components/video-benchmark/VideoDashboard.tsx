@@ -27,13 +27,17 @@ import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { DatePicker } from '@/components/ui/date-picker';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { RUN_CONTEXT_GRID, RunField } from '@/components/inference/ui/WorkflowInfoDisplay';
 import { hardwareLabel } from './hardware';
-import { leadCell } from './deployment';
+import { layoutLabel, leadCell } from './deployment';
 import { useVideoPoints } from './use-video-points';
 import type { VideoInitialData } from './initial-data';
 import {
   DEFAULT_RESULTS_STATE,
+  MAX_CHIP_CONFIGS,
   parseResultsState,
   resultProjection,
   resultsSearch,
@@ -68,6 +72,15 @@ const STRINGS = {
     chartConfig: 'Chart config',
     deployment: 'Deployment',
     runContext: 'Run context',
+    compareHistory: 'Compare history',
+    chipConfig: 'Chip Config',
+    chipConfigHelp:
+      'Select up to 4 chip configurations to compare their runs over time. This shows how software updates affect a specific deployment.',
+    chipConfigPlaceholder: 'Select Chip Config',
+    compareRange: 'Comparison Date Range',
+    compareRangeHelp:
+      'The start and end execution dates of the runs plotted for the selected chip configs.',
+    compareRangePlaceholder: 'Select date range',
     secondaryControls: 'Chart, GPU count and run date',
     changed: 'changed',
     gpus: 'GPU count',
@@ -121,6 +134,14 @@ const STRINGS = {
     chartConfig: '图表配置',
     deployment: '部署',
     runContext: '运行信息',
+    compareHistory: '对比历史趋势',
+    chipConfig: '芯片配置',
+    chipConfigHelp:
+      '最多选择 4 个芯片配置以对比其各次运行的趋势。可用于追踪软件更新对特定部署的影响。',
+    chipConfigPlaceholder: '选择芯片配置',
+    compareRange: '对比日期范围',
+    compareRangeHelp: '图表绘制的所选芯片配置各次运行的起止执行日期。',
+    compareRangePlaceholder: '选择日期范围',
     secondaryControls: '图表、GPU 数量与运行日期',
     changed: '项已更改',
     gpus: 'GPU 数量',
@@ -390,6 +411,7 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
     state.yMetric !== DEFAULT_RESULTS_STATE.yMetric,
     state.gpuCount !== null,
     state.date !== null || state.run !== null,
+    state.configs.length > 0,
   ].filter(Boolean).length;
   const model = deploymentCells[0]?.metadata.model ?? state.model ?? s.title;
   const details = (id: string, title: string, open: boolean | undefined, children: ReactNode) => (
@@ -508,7 +530,75 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
                       />
                     </div>
                   </ControlPanel>
-                  <ControlPanel legend={s.runContext} data-testid="results-run-context">
+                  <ControlPanel legend={s.compareHistory} data-testid="results-compare-history">
+                    <div className="grid min-w-0 gap-3">
+                      <div className="flex min-w-0 flex-col space-y-1.5">
+                        <LabelWithTooltip
+                          htmlFor="results-chip-config"
+                          label={s.chipConfig}
+                          tooltip={s.chipConfigHelp}
+                        />
+                        <MultiSelect
+                          triggerId="results-chip-config"
+                          triggerTestId="results-chip-config"
+                          options={projection.chipConfigs.map(({ key, point }) => ({
+                            value: key,
+                            label: `${hardwareLabel(point.hardwareKey ?? '')} · ${layoutLabel(point, locale)}`,
+                          }))}
+                          value={state.configs}
+                          onChange={(configs) => {
+                            track('video_results_chip_config_selected', {
+                              configs: configs.join(','),
+                            });
+                            update(
+                              configs.length === 0
+                                ? { configs, compareFrom: null, compareTo: null }
+                                : { configs },
+                            );
+                          }}
+                          placeholder={s.chipConfigPlaceholder}
+                          maxSelections={MAX_CHIP_CONFIGS}
+                          searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
+                          noResultsLabel={locale === 'zh' ? '无结果' : undefined}
+                          clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
+                          selectedSuffix={locale === 'zh' ? ' 已选' : undefined}
+                        />
+                      </div>
+                      {state.configs.length > 0 && (
+                        <div className="flex min-w-0 flex-col space-y-1.5">
+                          <LabelWithTooltip
+                            htmlFor="date-picker"
+                            label={s.compareRange}
+                            tooltip={s.compareRangeHelp}
+                          />
+                          <DateRangePicker
+                            dateRange={{
+                              startDate: state.compareFrom ?? '',
+                              endDate: state.compareTo ?? '',
+                            }}
+                            onChange={({ startDate, endDate }) => {
+                              track('video_results_compare_range_changed', {
+                                start_date: startDate,
+                                end_date: endDate,
+                              });
+                              update({
+                                compareFrom: startDate || null,
+                                compareTo: endDate || null,
+                              });
+                            }}
+                            placeholder={s.compareRangePlaceholder}
+                            availableDates={options.dates}
+                            isCheckingAvailableDates={loading}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </ControlPanel>
+                  <ControlPanel
+                    legend={s.runContext}
+                    className={styles.runContext}
+                    data-testid="results-run-context"
+                  >
                     <div className={RUN_CONTEXT_GRID}>
                       <DatePicker
                         label={s.date}
@@ -611,6 +701,7 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
               </Heading>
               <VideoResultsChart
                 cells={deploymentCells}
+                history={state.configs.length > 0 ? projection.history : null}
                 roster={roster}
                 state={state}
                 colorFor={colorFor}

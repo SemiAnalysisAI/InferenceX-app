@@ -12,6 +12,10 @@ export function deploymentKey(p: Pick<VideoPoint, 'participating' | 'server'>): 
   return `${p.participating ?? 'na'}g:tp${p.server?.tp ?? 'na'}:u${p.server?.ulysses ?? 'na'}`;
 }
 
+/** One hardware deployment: the unit Chip Config compares across runs. */
+export const chipConfigKey = (p: Pick<VideoPoint, 'hardwareKey' | 'participating' | 'server'>) =>
+  `${p.hardwareKey}:${deploymentKey(p)}`;
+
 /**
  * On a batch-one server every request beyond one per replica waits in a queue:
  * latency grows with concurrency while throughput stays flat. Such a cell is

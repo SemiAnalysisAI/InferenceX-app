@@ -281,6 +281,15 @@ describe('VideoGenX results contract', () => {
     expect(shown({ date: '2026-11-03', run: '200' })).toEqual(['200', ['b200', 'h200:old']]);
     expect(shown({ date: '2026-11-01' })).toEqual(['100', ['h200:old']]);
     expect(shown({ date: '2026-11-02', run: '300' })).toEqual(['100', ['h200:old']]);
+    const h200 = latest.chipConfigs.find(({ point }) => point.hardwareKey === 'h200')!.key;
+    expect(latest.chipConfigs.map(({ point }) => point.hardwareKey)).toEqual(['b200', 'h200']);
+    const history = (selection: Partial<ResultsState>) =>
+      resultProjection([rerun, b200, first], { ...state(), configs: [h200], ...selection })
+        .history.map((c) => c.point.id)
+        .sort();
+    expect(history({})).toEqual(['h200:new', 'h200:old']);
+    expect(history({ compareFrom: '2026-11-02' })).toEqual(['h200:new']);
+    expect(history({ compareTo: '2026-11-02' })).toEqual(['h200:old']);
   });
 
   it('parses public control keys and preserves explicit zero prices', () => {
@@ -296,6 +305,9 @@ describe('VideoGenX results contract', () => {
       engine: 'sglang',
       date: '2026-10-18',
       run: '456',
+      configs: ['b200:4g:tp2:u2'],
+      compareFrom: '2026-09-01',
+      compareTo: '2026-10-18',
       hidden: ['mi355x'],
       deadlineSeconds: 60,
       costTier: 'r',
@@ -311,7 +323,7 @@ describe('VideoGenX results contract', () => {
     };
     expect(
       parseResultsState(
-        'r_model=MiniMaxAI%2FMiniMax-H3&r_workload=selected-source%3Ac1&r_resolution=1344%C3%97768&r_duration=8&r_mode=t2v&r_steps=50&r_gpus=4&r_engine=sglang&r_date=2026-10-18&r_run=456&r_hidden=mi355x&r_deadline=60&r_tier=r&r_api=0.02&r_price_t2v=0&r_price_i2v=0.1&r_utilization=0.5&unofficialrun=123&r_x=p90&r_y=kjPerClip&r_basis=allocated&r_optimal=0&r_point=123%3Aselected-source%3Ac1',
+        'r_model=MiniMaxAI%2FMiniMax-H3&r_workload=selected-source%3Ac1&r_resolution=1344%C3%97768&r_duration=8&r_mode=t2v&r_steps=50&r_gpus=4&r_engine=sglang&r_date=2026-10-18&r_run=456&r_configs=b200%3A4g%3Atp2%3Au2&r_from=2026-09-01&r_to=2026-10-18&r_hidden=mi355x&r_deadline=60&r_tier=r&r_api=0.02&r_price_t2v=0&r_price_i2v=0.1&r_utilization=0.5&unofficialrun=123&r_x=p90&r_y=kjPerClip&r_basis=allocated&r_optimal=0&r_point=123%3Aselected-source%3Ac1',
       ),
     ).toEqual(selection);
     expect(parseResultsState(resultsSearch(selection))).toEqual(selection);

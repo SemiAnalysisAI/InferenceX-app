@@ -1,6 +1,7 @@
 import { at, number, rows, text, type Json } from './bundle';
-import { costPerGpuHour, type CostTier } from './hardware';
+import { costPerGpuHour, hardwareSort, type CostTier } from './hardware';
 import { metricValue, type VideoPoint } from './metrics';
+import { chipConfigKey } from './deployment';
 import { DASHBOARD_SAMPLE_FLOOR, latestVideoCells } from './points';
 import type { ResultsEvidence } from './results-evidence';
 import {
@@ -22,6 +23,8 @@ export function resultsHardwareRoster(points: readonly Pick<VideoPoint, 'hardwar
   );
 }
 export type VideoMode = 't2v' | 'i2v' | 'r2v';
+
+export const MAX_CHIP_CONFIGS = 4;
 export interface ResultsState {
   model: string | null;
   workload: string | null;
@@ -35,6 +38,10 @@ export interface ResultsState {
   date: string | null;
   /** Run on the selected date to view as of; null is that date's last run. */
   run: string | null;
+  /** Chip configs whose runs the chart compares over time; empty shows the selected run. */
+  configs: string[];
+  compareFrom: string | null;
+  compareTo: string | null;
   hidden: string[];
   deadlineSeconds: number;
   costTier: CostTier;
@@ -60,6 +67,9 @@ export const DEFAULT_RESULTS_STATE: ResultsState = {
   engine: null,
   date: null,
   run: null,
+  configs: [],
+  compareFrom: null,
+  compareTo: null,
   hidden: [],
   deadlineSeconds: 120,
   costTier: 'h',
@@ -86,6 +96,9 @@ export const RESULTS_QUERY_PARAMS = [
   'r_engine',
   'r_date',
   'r_run',
+  'r_configs',
+  'r_from',
+  'r_to',
   'r_hidden',
   'r_deadline',
   'r_tier',
@@ -124,6 +137,12 @@ export function parseResultsState(search: string | URLSearchParams): ResultsStat
     engine: s.get('r_engine') || null,
     date: s.get('r_date') || null,
     run: /^[1-9]\d*$/u.test(s.get('r_run') ?? '') ? s.get('r_run') : null,
+    configs: [...new Set((s.get('r_configs') ?? '').split(',').filter(Boolean))].slice(
+      0,
+      MAX_CHIP_CONFIGS,
+    ),
+    compareFrom: s.get('r_from') || null,
+    compareTo: s.get('r_to') || null,
     hidden: [...new Set((s.get('r_hidden') ?? '').split(',').filter(Boolean))],
     deadlineSeconds: numeric('r_deadline', 120)!,
     costTier: s.get('r_tier') === 'r' ? 'r' : 'h',
@@ -156,6 +175,9 @@ export function resultsSearch(state: ResultsState): string {
     r_engine: state.engine,
     r_date: state.date,
     r_run: state.run,
+    r_configs: state.configs.join(',') || null,
+    r_from: state.compareFrom,
+    r_to: state.compareTo,
     r_hidden: state.hidden.join(',') || null,
     r_deadline: state.deadlineSeconds,
     r_tier: state.costTier,
@@ -428,9 +450,32 @@ export function resultProjection(
     state.workload === null
       ? preferred
       : ([...workloads].find(([, item]) => item.key === state.workload)?.[0] ?? null);
-  const runs = workloadRuns(
-    matches.filter((p) => p.workloadKey === workloadKey && p.runId !== state.unofficialRun),
+  const official = matches.filter(
+    (p) => p.workloadKey === workloadKey && p.runId !== state.unofficialRun,
   );
+  const runs = workloadRuns(official);
+  const chipConfigs = [...new Map(official.map((p) => [chipConfigKey(p), p]))]
+    .map(([key, point]) => ({ key, point }))
+    .toSorted(
+      (a, b) =>
+        hardwareSort(a.point.hardwareKey ?? '') - hardwareSort(b.point.hardwareKey ?? '') ||
+        (a.point.participating ?? 0) - (b.point.participating ?? 0) ||
+        a.key.localeCompare(b.key),
+    );
+  const history = [
+    ...new Map(
+      official
+        .filter((p) => {
+          const date = p.observedAt?.slice(0, 10) ?? '';
+          return (
+            state.configs.includes(chipConfigKey(p)) &&
+            (state.compareFrom === null || date >= state.compareFrom) &&
+            (state.compareTo === null || date <= state.compareTo)
+          );
+        })
+        .map((p) => [`${chipConfigKey(p)}:${p.runId}`, p]),
+    ).values(),
+  ].map((p) => resultCell(p, state));
   const asOf = state.date === null ? runs : runs.filter((r) => r.date <= state.date!);
   const day = asOf.at(-1)?.date ?? runs[0]?.date ?? null;
   const dayRuns = runs.filter((r) => r.date === day);
@@ -490,6 +535,8 @@ export function resultProjection(
     workloadKey,
     runs,
     run,
+    chipConfigs,
+    history,
     options: {
       models: values(metadata.map((m) => m.model)),
       resolutions: values(metadata.map((m) => m.resolution)),

@@ -499,6 +499,18 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'GitHub Actions run ID on the r_date day to view as of; default is that day’s last run.',
     'r_date 当天要查看截至哪一次运行的 GitHub Actions 运行 ID；默认为当天最后一次运行。',
   ],
+  r_configs: [
+    'Comma-separated chip configs (hardware:GPUs:tp:ulysses keys from chipConfigs, at most 4) whose official runs history returns for the Compare history chart.',
+    '以逗号分隔的芯片配置（chipConfigs 中的 hardware:GPU 数:tp:ulysses 键，最多 4 个）；history 返回这些配置的正式运行，用于对比历史趋势图。',
+  ],
+  r_from: [
+    'Earliest execution date, YYYY-MM-DD, of the runs history returns; default unbounded.',
+    'history 返回的运行的最早执行日期，格式 YYYY-MM-DD；默认不限。',
+  ],
+  r_to: [
+    'Latest execution date, YYYY-MM-DD, of the runs history returns; default unbounded.',
+    'history 返回的运行的最晚执行日期，格式 YYYY-MM-DD；默认不限。',
+  ],
   r_hidden: [
     'Comma-separated hardware keys hidden from the overview chart, table, deployment detail and clips.',
     '以逗号分隔的隐藏硬件键，作用于概览图表、表格、部署详情和视频。',
@@ -756,6 +768,20 @@ const NEW_VIEWS = {
           'The run the official cells are shown as of (r_date and r_run); null when no official run matches.',
         'x-description-zh':
           '正式结果所截至的运行（由 r_date 和 r_run 决定）；没有匹配的正式运行时为 null。',
+      },
+      chipConfigs: {
+        ...objects,
+        description:
+          'Every official deployment of the selected workload as { key, point }, the r_configs choices.',
+        'x-description-zh':
+          '所选工作负载的全部正式部署，每项为 { key, point }，即 r_configs 的可选项。',
+      },
+      history: {
+        ...objects,
+        description:
+          'Cells for every official run of the r_configs chip configs within r_from and r_to; empty when r_configs is empty.',
+        'x-description-zh':
+          'r_configs 所选芯片配置在 r_from 至 r_to 期间每次正式运行的结果；r_configs 为空时为空数组。',
       },
       excludedCount: { type: 'integer', minimum: 0 },
       sampleFloor: { type: 'integer', const: 10 },

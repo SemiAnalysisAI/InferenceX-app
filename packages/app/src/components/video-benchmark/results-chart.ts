@@ -1,3 +1,4 @@
+import { chipConfigKey } from './deployment';
 import { paretoFrontier } from './frontier';
 import { hardwareSort, type CostTier } from './hardware';
 import type { ResultCell } from './results';
@@ -152,6 +153,47 @@ export interface ResultsChartSelection extends ResultsMetricContext {
 }
 
 /** One series per hardware and per named run, each with its own deployment frontier. */
+/**
+ * Chip Config history: one series per selected deployment, its runs in measurement
+ * order and joined by a line. Every run is plotted; nothing is dominated.
+ */
+export function resultsHistorySeries(
+  cells: readonly ResultCell[],
+  selection: ResultsChartSelection,
+): ResultsChartSeries[] {
+  const x = RESULTS_X_METRICS[selection.x],
+    y = RESULTS_Y_METRICS[selection.y];
+  const groups = new Map<string, ResultsChartPoint[]>();
+  for (const cell of cells) {
+    const hardwareKey = cell.point.hardwareKey;
+    if (hardwareKey === null || selection.hidden.includes(hardwareKey)) continue;
+    const xValue = x.value(cell, selection),
+      yValue = y.value(cell, selection);
+    if (xValue === null || yValue === null || !Number.isFinite(xValue) || !Number.isFinite(yValue))
+      continue;
+    const key = chipConfigKey(cell.point);
+    groups.set(key, [
+      ...(groups.get(key) ?? []),
+      { key: resultsPointKey(cell), cell, x: xValue, y: yValue, optimal: true },
+    ]);
+  }
+  return [...groups]
+    .map(([key, points]) => {
+      const ordered = points.toSorted((a, b) =>
+        (a.cell.point.observedAt ?? '').localeCompare(b.cell.point.observedAt ?? ''),
+      );
+      return {
+        key,
+        hardwareKey: ordered[0].cell.point.hardwareKey!,
+        overlay: false,
+        points: ordered,
+        frontier: ordered,
+        measured: ordered.length,
+      };
+    })
+    .toSorted((a, b) => hardwareSort(a.hardwareKey) - hardwareSort(b.hardwareKey));
+}
+
 export function resultsChartSeries(
   cells: readonly ResultCell[],
   selection: ResultsChartSelection,

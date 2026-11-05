@@ -24,6 +24,7 @@ import {
   RESULTS_Y_METRICS,
   resultsChartSeries,
   resultsClip,
+  resultsHistorySeries,
   resultsMetricLabel,
   type ResultsChartPoint,
 } from './results-chart';
@@ -100,6 +101,7 @@ interface PlotPoint extends ResultsChartPoint {
 
 export default function VideoResultsChart({
   cells,
+  history,
   roster,
   state,
   colorFor,
@@ -110,6 +112,8 @@ export default function VideoResultsChart({
 }: {
   /** Official and named-run deployment cells across every GPU count, hidden hardware included. */
   cells: ResultCell[];
+  /** Chip Config runs to compare over time; null plots the selected run's deployments. */
+  history: ResultCell[] | null;
   roster: readonly string[];
   state: ResultsState;
   colorFor: (hardwareKey: string) => string;
@@ -124,12 +128,12 @@ export default function VideoResultsChart({
   const [legendExpanded, setLegendExpanded] = useState(true);
   const x = RESULTS_X_METRICS[state.xMetric],
     y = RESULTS_Y_METRICS[state.yMetric];
-  const clip = useMemo(() => resultsClip(cells), [cells]);
+  const clip = useMemo(() => resultsClip(history ?? cells), [history, cells]);
   const xLabel = resultsMetricLabel(x, locale, clip),
     yLabel = resultsMetricLabel(y, locale);
   const series = useMemo(
     () =>
-      resultsChartSeries(cells, {
+      (history ? resultsHistorySeries : resultsChartSeries)(history ?? cells, {
         x: state.xMetric,
         y: state.yMetric,
         basis: state.costBasis,
@@ -138,6 +142,7 @@ export default function VideoResultsChart({
         hidden: state.hidden,
       }),
     [
+      history,
       cells,
       state.xMetric,
       state.yMetric,
@@ -199,7 +204,8 @@ export default function VideoResultsChart({
         config: {
           getColor: (point) => point.color,
           getOpacity: (point) => (point.optimal ? 1 : 0.35),
-          getLabelText: (point) => s.gpus(point.cell.point.participating),
+          getLabelText: (point) =>
+            history ? (point.cell.metadata.date ?? '') : s.gpus(point.cell.point.participating),
           foreground: 'var(--foreground)',
           hideLabels: !labels,
           dataAttrs: {
@@ -211,7 +217,7 @@ export default function VideoResultsChart({
         },
       },
     ],
-    [lines, lineColors, plotted, labels, s],
+    [lines, lineColors, plotted, labels, s, history],
   );
   const tooltip = useMemo<TooltipConfig<PlotPoint>>(() => {
     const line = (label: string, value: string) => tooltipLine(escapeHtml(label), value);
@@ -306,7 +312,7 @@ export default function VideoResultsChart({
             onClick: () => {},
           },
     );
-  const single = series.length > 0 && series.every((item) => item.measured <= 1);
+  const single = !history && series.length > 0 && series.every((item) => item.measured <= 1);
 
   return (
     <D3Chart<PlotPoint>
