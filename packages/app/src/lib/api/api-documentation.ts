@@ -493,6 +493,16 @@ const evaluationsSchema = arraySchema(
     model: stringSchema,
     precision: stringSchema,
     spec_method: stringSchema,
+    spec_algorithm: {
+      ...nullableStringSchema,
+      description:
+        'Speculative algorithm recorded by a benchmark result for the same config and workflow run, or null when none was recorded.',
+    },
+    spec_draft_model: {
+      ...nullableStringSchema,
+      description:
+        'Draft model recorded alongside spec_algorithm ("native" for built-in heads), or null when none was recorded.',
+    },
     disagg: booleanSchema,
     is_multinode: booleanSchema,
     prefill_tp: integerSchema,
@@ -1335,6 +1345,8 @@ export const apiOperations: readonly ApiOperation[] = [
           model: 'dsr1',
           precision: 'fp8',
           spec_method: 'none',
+          spec_algorithm: null,
+          spec_draft_model: null,
           disagg: false,
           is_multinode: false,
           prefill_tp: 8,

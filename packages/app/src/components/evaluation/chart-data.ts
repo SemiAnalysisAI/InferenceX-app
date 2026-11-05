@@ -1,13 +1,12 @@
-import {
-  DISPLAY_MODEL_TO_DB,
-  resolveFrameworkPartLabel,
-} from '@semianalysisai/inferencex-constants';
+import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 
 import { hasPoolSplit } from '@/lib/benchmarks/chip-basis';
+import { speculativeDecodingLabel } from '@/lib/benchmarks/speculative-decoding';
 import type { EvalChangelogEntry, EvaluationChartData } from '@/components/evaluation/types';
 import type { EvalRow } from '@/lib/api/api';
 import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
+import type { Locale } from '@/lib/i18n/i18n';
 import { getFrameworkLabel } from '@/lib/shared/utils';
 
 interface EvalLabelParams {
@@ -33,21 +32,45 @@ function fmtSide(
   return `${side}(${tp}/${ep}/${dpa ? 'T' : 'F'}/${nw ?? 1})`;
 }
 
+function engineParts(item: EvalRow, model: string, locale: Locale): string[] {
+  const spec = speculativeDecodingLabel(
+    { method: item.spec_method, algorithm: item.spec_algorithm, draftModel: item.spec_draft_model },
+    model,
+    locale,
+  );
+  return [
+    item.framework && item.framework !== '1k8k' ? getFrameworkLabel(item.framework) : null,
+    spec,
+  ].filter((part): part is string => Boolean(part));
+}
+
+export interface ParallelismPill {
+  label: string;
+  value?: number;
+}
+
+export function parallelismPills(
+  tp: number,
+  ep: number,
+  dpa: boolean,
+  dp?: number,
+): ParallelismPill[] {
+  return [
+    { label: 'TP', value: tp },
+    ...(ep > 1 ? [{ label: 'EP', value: ep }] : []),
+    ...(dpa ? [{ label: 'DPA' }] : []),
+    ...(dp && dp > 1 ? [{ label: 'DP', value: dp }] : []),
+  ];
+}
+
 function buildConfigLabel(
   hwLabel: string,
-  framework: string,
-  specMethod: string,
+  engine: string[],
   precision: string,
   conc: number | null,
   params: EvalLabelParams,
   showPrecision: boolean,
-  model?: string,
 ): string {
-  const headerSuffixes: string[] = [];
-  if (framework && framework !== '1k8k') headerSuffixes.push(getFrameworkLabel(framework));
-  if (specMethod && specMethod !== 'none')
-    headerSuffixes.push(resolveFrameworkPartLabel(model, specMethod));
-
   const detailSuffixes: string[] = [];
   if (precision && showPrecision) detailSuffixes.push(precision.toUpperCase());
   if (conc) detailSuffixes.push(`C${conc}`);
@@ -70,7 +93,7 @@ function buildConfigLabel(
     if (params.decodeDpa) detailSuffixes.push('DPA');
   }
 
-  const line1 = headerSuffixes.length > 0 ? `${hwLabel} (${headerSuffixes.join(', ')})` : hwLabel;
+  const line1 = engine.length > 0 ? `${hwLabel} (${engine.join(', ')})` : hwLabel;
   return detailSuffixes.length > 0 ? `${line1}\n${detailSuffixes.join(' ')}` : line1;
 }
 
@@ -80,6 +103,7 @@ export function buildEvaluationChartRows(
   selectedModel: string | undefined,
   selectedPrecisions: string[],
   selectedRunDate?: string,
+  locale: Locale = 'en',
 ): EvaluationChartData[] {
   if (!selectedBenchmark || !selectedModel) return [];
 
@@ -114,16 +138,18 @@ export function buildEvaluationChartRows(
 
       const hwConfig = getHardwareConfig(hwKey, selectedModel);
       const hwLabel = hwConfig.label;
+      const engine = engineParts(item, selectedModel, locale);
 
       return {
         evalResultId: item.id,
         configId: item.config_id,
         hwKey,
         hardware: item.hardware,
+        hwLabel,
+        engineLabel: engine.join(' · '),
         configLabel: buildConfigLabel(
           hwLabel,
-          item.framework,
-          item.spec_method,
+          engine,
           item.precision,
           item.conc,
           {
@@ -139,7 +165,6 @@ export function buildEvaluationChartRows(
             prefillNw: item.prefill_num_workers,
           },
           showPrecision,
-          selectedModel,
         ),
         score,
         scoreError: item.metrics.em_strict_se ?? item.metrics.score_se ?? 0,
@@ -245,6 +270,7 @@ export function buildEvalChangelogEntries(
   selectedRunDate: string,
   selectedModel: string | undefined,
   selectedPrecisions: string[],
+  locale: Locale = 'en',
 ): EvalChangelogEntry[] {
   if (!selectedRunDate || !selectedModel) return [];
 
@@ -270,8 +296,7 @@ export function buildEvalChangelogEntries(
         benchmark: item.task,
         configLabel: buildConfigLabel(
           hwLabel,
-          item.framework,
-          item.spec_method,
+          engineParts(item, selectedModel, locale),
           item.precision,
           item.conc,
           {
@@ -281,7 +306,6 @@ export function buildEvalChangelogEntries(
             decodeDpa: item.decode_dp_attention,
           },
           showPrecision,
-          selectedModel,
         ),
       };
     });

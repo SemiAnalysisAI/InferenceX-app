@@ -19,6 +19,8 @@ function makeDatum(configLabel: string, score: number): EvaluationChartData {
     configId: score,
     hwKey: configLabel,
     hardware: configLabel,
+    hwLabel: configLabel,
+    engineLabel: '',
     configLabel,
     score,
     model: 'model',

@@ -31,6 +31,7 @@ import {
 import { useUrlState } from '@/hooks/useUrlState';
 import type { EvalRow } from '@/lib/api/api';
 import type { Model } from '@/lib/catalog/data-mappings';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import {
   aggregateEvaluationChartRows,
@@ -100,6 +101,7 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   );
   const rawData: EvalRow[] = rawRows ?? [];
   const unofficialRawData: EvalRow[] = unofficialEvalRows ?? [];
+  const locale = useLocale();
 
   const [dateIntent, setDateIntent] = useState(() => ({
     date: getUrlParam('e_rundate') || '',
@@ -195,8 +197,9 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
         selectedModel,
         effectivePrecisions,
         selectedRunDate,
+        locale,
       ),
-    [rawData, selectedBenchmark, selectedModel, selectedRunDate, effectivePrecisions],
+    [rawData, selectedBenchmark, selectedModel, selectedRunDate, effectivePrecisions, locale],
   );
 
   const unfilteredUnofficialChartData: EvaluationChartData[] = useMemo(
@@ -206,8 +209,10 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
         selectedBenchmark,
         selectedModel,
         effectivePrecisions,
+        undefined,
+        locale,
       ),
-    [unofficialRawData, selectedBenchmark, selectedModel, effectivePrecisions],
+    [unofficialRawData, selectedBenchmark, selectedModel, effectivePrecisions, locale],
   );
 
   const effectiveEnabledHardware = localOfficialOverride ?? enabledHardware;
@@ -236,8 +241,15 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
   }, [unfilteredChartData, selectedRunDate]);
 
   const changelogEntries: EvalChangelogEntry[] = useMemo(
-    () => buildEvalChangelogEntries(rawData, selectedRunDate, selectedModel, effectivePrecisions),
-    [rawData, selectedRunDate, selectedModel, effectivePrecisions],
+    () =>
+      buildEvalChangelogEntries(
+        rawData,
+        selectedRunDate,
+        selectedModel,
+        effectivePrecisions,
+        locale,
+      ),
+    [rawData, selectedRunDate, selectedModel, effectivePrecisions, locale],
   );
 
   const modelHasEvalData = useMemo(() => {

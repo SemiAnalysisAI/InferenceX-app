@@ -1,5 +1,8 @@
 import { getPointHardwareConfig } from '@/lib/benchmarks/inference-labels';
-import { specMethodDisplayLabel } from '@/lib/compare/compare-variant-slug';
+import {
+  specAlgorithmLabel,
+  speculativeDecodingLabel,
+} from '@/lib/benchmarks/speculative-decoding';
 import { agenticDetailHref } from '@/lib/agentx/agentic-detail-link';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { frameworkFamily } from '@/lib/catalog/framework-family';
@@ -563,7 +566,6 @@ const AGENTIC_STRINGS = {
   en: {
     speculativeDecoding: 'Speculative decoding',
     off: 'Off',
-    native: 'native',
     requests: 'Requests',
     promptTokens: 'Prompt tokens',
     generatedTokens: 'Generated tokens',
@@ -571,7 +573,6 @@ const AGENTIC_STRINGS = {
   zh: {
     speculativeDecoding: '投机解码',
     off: '关闭',
-    native: '原生',
     requests: '请求',
     promptTokens: '提示 token',
     generatedTokens: '生成 token',
@@ -584,34 +585,15 @@ const compactNumber = (value: number, locale: Locale): string =>
     maximumFractionDigits: 1,
   }).format(value);
 
-const SPEC_ALGORITHM_LABELS: Record<string, string> = {
-  mtp: 'MTP',
-  dspark: 'DSpark',
-  dflash: 'DFlash',
-  eagle: 'EAGLE',
-  eagle3: 'EAGLE3',
-  nextn: 'NextN',
-};
-
-const specAlgorithmLabel = (algorithm: string): string =>
-  SPEC_ALGORITHM_LABELS[algorithm] ?? algorithm.toUpperCase();
-
-const speculativeDecodingLabel = (
-  d: InferenceData,
-  t: (typeof AGENTIC_STRINGS)[Locale],
-): string => {
-  const specMethod = d.spec_decoding ?? 'none';
-  if (specMethod === 'none' || specMethod === '') return t.off;
-  if (!d.spec_algorithm) return specMethodDisplayLabel(d.model, specMethod);
-  const draft = d.spec_draft_model;
-  return `${specAlgorithmLabel(d.spec_algorithm)} (${!draft || draft === 'native' ? t.native : draft})`;
-};
-
 const speculativeRows = (d: InferenceData, locale: Locale): PointDetailRow[] => {
   const t = AGENTIC_STRINGS[locale];
-  const label = speculativeDecodingLabel(d, t);
-  return d.benchmark_type === 'agentic_traces' || label !== t.off
-    ? [row(t.speculativeDecoding, label)]
+  const label = speculativeDecodingLabel(
+    { method: d.spec_decoding, algorithm: d.spec_algorithm, draftModel: d.spec_draft_model },
+    d.model,
+    locale,
+  );
+  return label || d.benchmark_type === 'agentic_traces'
+    ? [row(t.speculativeDecoding, label ?? t.off)]
     : [];
 };
 

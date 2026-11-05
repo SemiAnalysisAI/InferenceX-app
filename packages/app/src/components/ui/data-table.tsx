@@ -30,6 +30,7 @@ export interface DataTableColumn<T> {
   align?: 'left' | 'right' | 'center';
   cell: (row: T, index: number) => React.ReactNode;
   sortValue?: (row: T) => number | string;
+  colSpan?: (row: T) => number;
   className?: string;
   importance?: 'key' | 'secondary';
   pinned?: boolean;
@@ -329,24 +330,36 @@ export function DataTable<T>({
                 </td>
               </tr>
             ) : (
-              pageData.map((row, rowIndex) => (
-                <tr key={rowIndex} className="border-b border-border/50 hover:bg-muted/30">
-                  {visibleColumns.map((col) => (
-                    <td
-                      key={columns.indexOf(col)}
-                      className={`px-3 py-2 ${ALIGN_CLASSES[col.align ?? 'left']} ${col.align === 'right' || col.align === 'center' ? 'tabular-nums' : ''} ${col.className ?? ''} ${col.pinned ? 'sticky left-0 z-1 border-r border-border/50 bg-card' : ''}`}
-                    >
-                      {col.pinned ? (
-                        <div className="w-40 max-w-40 whitespace-normal [overflow-wrap:anywhere] sm:w-auto sm:max-w-none">
-                          {col.cell(row, safePage * pageSize + rowIndex)}
-                        </div>
-                      ) : (
-                        col.cell(row, safePage * pageSize + rowIndex)
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))
+              pageData.map((row, rowIndex) => {
+                let covered = 0;
+                return (
+                  <tr key={rowIndex} className="border-b border-border/50 hover:bg-muted/30">
+                    {visibleColumns.map((col) => {
+                      if (covered > 0) {
+                        covered -= 1;
+                        return null;
+                      }
+                      const span = col.colSpan?.(row) ?? 1;
+                      covered = span - 1;
+                      return (
+                        <td
+                          key={columns.indexOf(col)}
+                          colSpan={span > 1 ? span : undefined}
+                          className={`px-3 py-2 ${ALIGN_CLASSES[col.align ?? 'left']} ${col.align === 'right' || col.align === 'center' ? 'tabular-nums' : ''} ${col.className ?? ''} ${col.pinned ? 'sticky left-0 z-1 border-r border-border/50 bg-card' : ''}`}
+                        >
+                          {col.pinned ? (
+                            <div className="w-40 max-w-40 whitespace-normal [overflow-wrap:anywhere] sm:w-auto sm:max-w-none">
+                              {col.cell(row, safePage * pageSize + rowIndex)}
+                            </div>
+                          ) : (
+                            col.cell(row, safePage * pageSize + rowIndex)
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

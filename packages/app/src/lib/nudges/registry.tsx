@@ -244,8 +244,8 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       title: "See the model's actual answers",
       titleZh: '查看模型的实际回答',
       description:
-        'Click Prompts on any row to compare each prompt, the expected answer, and what the model actually responded.',
-      descriptionZh: '点击任意行的"提示词"按钮，对比每条提示、预期答案和模型的实际回复。',
+        'Click the prompts icon at the end of any row to compare each prompt, the expected answer, and what the model actually responded.',
+      descriptionZh: '点击任意行末尾的提示词图标，对比每条提示、预期答案和模型的实际回复。',
       testId: 'eval-samples-nudge',
     },
     analytics: {

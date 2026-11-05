@@ -656,7 +656,7 @@ export const apiRouteCatalog = [
       en: 'UI-only overlay for unofficial workflow artifacts. Append-only runs also include the published curve points they extend when each shared topology keeps its image. Development on loopback hosts may explicitly opt into local artifact files via INFERENCEX_LOCAL_ARTIFACT_DIR; production only reads the public GitHub source. Artifact availability and shape are not stable. The CDN caches completed runs for an hour, queued or in-progress runs for 30 seconds, and missing runs for five minutes; a GitHub rate limit returns an uncached 503 with Retry-After.',
       zh: '仅供界面叠加非官方工作流产物。append-only 运行还会包含其所扩展的已发布曲线数据点，前提是两者共有的每种拓扑都使用同一镜像。开发环境通过本机地址访问时，可用 INFERENCEX_LOCAL_ARTIFACT_DIR 显式启用本地文件；生产环境仅从公开 GitHub 来源读取。产物的可用性和结构并不稳定。CDN 对已完成的运行缓存 1 小时，对排队中或进行中的运行缓存 30 秒，对不存在的运行缓存 5 分钟；触发 GitHub 速率限制时返回不缓存的 503，并附带 Retry-After。',
     },
-    sourceSha256: '6ebfddfb38dc18e92e22039c68eb7609f3677193b8f2d4f0867e48f67ab41682',
+    sourceSha256: 'c5178f61e3b47290019285247aeec0f429d41feafe73e58e6e89cfb0d89327d9',
   },
   {
     source: 'src/app/api/v1/agentic-aggregates/route.ts',
@@ -1998,7 +1998,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/evaluations.ts',
-    sourceSha256: '937f1329a40edda00012b8058b7f802629ba972de88585c29fedd1447c4d1929',
+    sourceSha256: '38abc2279f364bedfd3f6c077490851c3b2e518896006bed3b027329f77316c2',
     reviewArea: {
       en: 'Evaluation aggregate result fields, provenance, metrics, and latest-attempt selection.',
       zh: '评测汇总结果字段、来源、指标和最新尝试选择。',

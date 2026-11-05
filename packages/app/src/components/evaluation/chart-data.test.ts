@@ -7,6 +7,7 @@ import {
   aggregateEvaluationChartRows,
   buildEvalChangelogEntries,
   buildEvaluationChartRows,
+  parallelismPills,
 } from './chart-data';
 
 function evalRow(overrides: Partial<EvalRow> = {}): EvalRow {
@@ -18,6 +19,8 @@ function evalRow(overrides: Partial<EvalRow> = {}): EvalRow {
     model: 'dsr1',
     precision: 'fp8',
     spec_method: 'none',
+    spec_algorithm: null,
+    spec_draft_model: null,
     disagg: false,
     is_multinode: false,
     prefill_tp: 8,
@@ -136,6 +139,30 @@ describe('buildEvaluationChartRows', () => {
     expect(result[0].configLabel).toBe('H200 (Dynamo TRTLLM, MTP)\nFP4 C128 T8 E1');
   });
 
+  it('names the recorded speculative algorithm and draft model in the chip and config labels', () => {
+    const row = evalRow({
+      framework: 'sglang',
+      spec_method: 'draft_model',
+      spec_algorithm: 'dflash',
+      spec_draft_model: 'RadixArk/Kimi-K3.1-Dflash2-Preview',
+    });
+    const [en] = buildEvaluationChartRows([row], 'gsm8k', Model.DeepSeek_R1, [Precision.FP8]);
+    expect(en).toMatchObject({
+      hwLabel: 'H200',
+      engineLabel: 'SGLang · DFlash (RadixArk/Kimi-K3.1-Dflash2-Preview)',
+      configLabel: 'H200 (SGLang, DFlash (RadixArk/Kimi-K3.1-Dflash2-Preview))\nC128 T8 E1',
+    });
+    const [zh] = buildEvaluationChartRows(
+      [{ ...row, spec_method: 'mtp', spec_algorithm: 'mtp', spec_draft_model: 'native' }],
+      'gsm8k',
+      Model.DeepSeek_R1,
+      [Precision.FP8],
+      undefined,
+      'zh',
+    );
+    expect(zh.engineLabel).toBe('SGLang · MTP (原生)');
+  });
+
   it('renders DPA flags distinguishing prefill/decode sides', () => {
     const rows = buildEvaluationChartRows(
       [
@@ -194,6 +221,18 @@ describe('buildEvaluationChartRows', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({ configId: 3, score: 0 });
+  });
+});
+
+describe('parallelismPills', () => {
+  it('always shows TP and adds EP, DPA and DP only when they apply', () => {
+    expect(parallelismPills(8, 1, false)).toEqual([{ label: 'TP', value: 8 }]);
+    expect(parallelismPills(16, 16, true, 2)).toEqual([
+      { label: 'TP', value: 16 },
+      { label: 'EP', value: 16 },
+      { label: 'DPA' },
+      { label: 'DP', value: 2 },
+    ]);
   });
 });
 
