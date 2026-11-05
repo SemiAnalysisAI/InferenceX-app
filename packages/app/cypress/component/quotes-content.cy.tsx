@@ -256,7 +256,10 @@ describe('SupporterLogoWall rows', () => {
       ['eleven', [6, 5]],
     ] as const) {
       rowsOf(id).then(({ list, rows }) => {
-        expect(rows.map((r) => r.length), id).to.deep.equal(sizes);
+        expect(
+          rows.map((r) => r.length),
+          id,
+        ).to.deep.equal(sizes);
         const listCenter = (list.left + list.right) / 2;
         for (const row of rows) {
           const center = (row[0].left + row.at(-1)!.right) / 2;
