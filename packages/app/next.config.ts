@@ -60,6 +60,7 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || '.next',
   allowedDevOrigins: allowedDevOriginsFromEnv(),
   transpilePackages: ['@semianalysisai/inferencex-constants'],
+  typescript: { ignoreBuildErrors: process.env.E2E_FIXTURES === '1' },
   serverExternalPackages: ['shiki'],
   // PostHog endpoints end in a slash (`/ingest/e/`); the redirects below keep stripping it elsewhere.
   skipTrailingSlashRedirect: true,
