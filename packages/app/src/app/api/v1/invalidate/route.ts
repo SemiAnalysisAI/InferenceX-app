@@ -55,6 +55,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ invalidated: true, scope, immediate });
   }
 
-  const blobsDeleted = await purgeAll({ immediate });
-  return NextResponse.json({ invalidated: true, blobsDeleted, immediate });
+  purgeAll({ immediate });
+  return NextResponse.json({ invalidated: true, blobPurge: 'scheduled', immediate });
 }

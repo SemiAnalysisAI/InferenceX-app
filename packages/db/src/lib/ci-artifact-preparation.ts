@@ -1,7 +1,22 @@
+import { serverLogArtifactSuffix } from '../etl/server-log-artifacts.js';
 import type { ArtifactMeta } from './github-artifacts.js';
 
 export const CHANGELOG_ARTIFACT_NAME = 'changelog-metadata';
 export const REQUIRED_POWER_MANIFEST = 'required-power-sweep-manifest';
+const REUSED_INGEST_BUNDLE = 'reused-ingest-artifacts';
+const UNREAD_ARTIFACT_PREFIXES = ['job_event', 'al_gate'] as const;
+
+// Ingest reads server logs only beside the bmk_ artifact with the same suffix.
+function isReadByIngest(artifact: ArtifactMeta, names: ReadonlySet<string>): boolean {
+  if (UNREAD_ARTIFACT_PREFIXES.some((prefix) => artifact.name.startsWith(prefix))) return false;
+  const suffix = serverLogArtifactSuffix(artifact.name);
+  return (
+    suffix === null ||
+    names.has(REUSED_INGEST_BUNDLE) ||
+    names.has(`bmk_agentic_${suffix}`) ||
+    names.has(`bmk_${suffix}`)
+  );
+}
 
 export interface ArtifactPlan {
   artifacts: ArtifactMeta[];
@@ -38,10 +53,15 @@ export function buildArtifactPlan(
     selected.set(CHANGELOG_ARTIFACT_NAME, changelog);
   }
 
+  const names = new Set(selected.keys());
   return {
-    artifacts: [...selected.values()].toSorted((left, right) =>
-      left.name.localeCompare(right.name),
-    ),
+    artifacts: [...selected.values()]
+      .filter((artifact) => isReadByIngest(artifact, names))
+      .toSorted(
+        (left, right) =>
+          (right.size_in_bytes ?? 0) - (left.size_in_bytes ?? 0) ||
+          left.name.localeCompare(right.name),
+      ),
     reused,
   };
 }

@@ -166,6 +166,53 @@ describe('telemetry API verification', () => {
     expect(result.points[1]!.api.status).toBe('unknown');
     expect(result.counts.apiCompletePoints).toBe(0);
   });
+
+  it('checks at most four points at once and keeps receipt order and per-point failures', async () => {
+    const receipt = receiptFixture();
+    const template = receipt.points[0]!;
+    receipt.points = Array.from({ length: 10 }, (_, i) => ({
+      ...structuredClone(template),
+      benchmarkResultId: 100 + i,
+      api: { status: 'unknown' as const },
+    }));
+    let inFlight = 0;
+    let peak = 0;
+    let pending: (() => void)[] = [];
+    const fetcher = vi.fn<typeof fetch>(async (input) => {
+      const id = Number(new URL(String(input)).searchParams.get('id'));
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      const gate = Promise.withResolvers<void>();
+      pending.push(gate.resolve);
+      if (pending.length === 4 || fetcher.mock.calls.length === 10) {
+        // Release newest first so completion order differs from receipt order.
+        for (const release of pending.toReversed()) release();
+        pending = [];
+      }
+      await gate.promise;
+      inFlight--;
+      if (id === 103) return new Response('boom', { status: 500 });
+      return Response.json({
+        benchmarkResultId: id,
+        series: template.series.map((s) => ({
+          id: s.id,
+          sampleCount: s.sampleCount,
+          data: Array.from({ length: s.sampleCount }, () => ({ power: 100 })),
+        })),
+      });
+    });
+    const result = await verifyTelemetryApi(receipt, 'https://example.test', { fetch: fetcher });
+    expect(fetcher).toHaveBeenCalledTimes(10);
+    expect(peak).toBe(4);
+    expect(result.points.map((p) => p.benchmarkResultId)).toEqual(
+      Array.from({ length: 10 }, (_, i) => 100 + i),
+    );
+    expect(result.points.map((p) => p.api.status)).toEqual(
+      Array.from({ length: 10 }, (_, i) => (i === 3 ? 'failed' : 'readable')),
+    );
+    expect(result.points[3]!.api.error).toBe('HTTP 500');
+    expect(result.points[4]!.api.url).toBe('https://example.test/api/v1/gpu-metrics-point?id=104');
+  });
 });
 
 describe('telemetry API verification of not-collected points', () => {

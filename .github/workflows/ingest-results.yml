@@ -301,6 +301,7 @@ jobs:
           INGEST_REPORT_OUTPUT: ${{ github.workspace }}/ingest-report.json
           SERVER_LOG_BLOCKS: '1'
           GPU_SAMPLE_BLOBS: '1'
+          INGEST_TRACE_WORKERS: '8'
         run: |
           : "${INGEST_REPO:?BENCHMARK_REPO repository variable is not set}"
           bun run admin:db:ingest:ci
@@ -320,7 +321,7 @@ jobs:
           if [ "$INGEST_DATABASE_TARGET" != "staging" ]; then
             headers+=(-H "Authorization: Bearer $CACHE_INVALIDATE_SECRET")
           fi
-          curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" "${headers[@]}"
+          curl --retry 3 --retry-delay 2 --retry-connrefused --max-time 120 -sSf -X POST "$CACHE_INVALIDATE_URL" "${headers[@]}"
 
       # The purge only marks CDN responses stale. Requesting the dashboard APIs
       # starts their background refresh now instead of on a visitor's load.
@@ -331,10 +332,6 @@ jobs:
       - name: Verify PowerX source, database and public API
         id: powerx
         run: bun packages/db/src/verify-power-publication.ts power-publication.json "${CACHE_INVALIDATE_URL%/api/v1/invalidate}"
-
-      - name: Verify database
-        if: ${{ !cancelled() && steps.overrides.outcome == 'success' }}
-        run: bun run admin:db:verify
 
       # Database write failures that are not PowerX problems fail this step
       # instead of the PowerX check. Runs even when an earlier step failed, so

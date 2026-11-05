@@ -10,6 +10,7 @@ import {
 } from 'node:zlib';
 
 import { revalidateTag, unstable_cache } from 'next/cache';
+import { after } from 'next/server';
 import { workAsyncStorage } from 'next/dist/server/app-render/work-async-storage.external';
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 import {
@@ -344,16 +345,12 @@ export function cachedDerivedData<T, Args extends unknown[]>(
  * and ISR page data are only marked stale, so visitors get the previous
  * payload once while it refreshes in the background. `immediate` drops every
  * layer at once, for corrections and retractions that must never be served again.
+ *
+ * Reads use generation-scoped Blob paths keyed by the `db` tag, so expiring the
+ * tags is enough. Deleting the old blobs is garbage collection that runs after
+ * the response and only logs failures.
  */
-export async function purgeAll({
-  immediate = false,
-}: { immediate?: boolean } = {}): Promise<number> {
-  const deleted = await blobPurge(
-    '',
-    immediate
-      ? [`${OPERATORX_CACHE_SCOPE}/`]
-      : [`${OPERATORX_CACHE_SCOPE}/`, CONTENT_BLOB_KEY_PREFIX],
-  );
+export function purgeAll({ immediate = false }: { immediate?: boolean } = {}): void {
   const stale = immediate ? { expire: 0 } : 'max';
   revalidateTag(cacheTag(), { expire: 0 });
   revalidateTag(pageCacheTag(), stale);
@@ -362,7 +359,18 @@ export async function purgeAll({
   // CollectiveX responses are cached only under their own tag (no blobs), so
   // a full purge must drop that tag explicitly.
   purgeCollectiveX({ immediate });
-  return deleted;
+  after(async () => {
+    try {
+      await blobPurge(
+        '',
+        immediate
+          ? [`${OPERATORX_CACHE_SCOPE}/`]
+          : [`${OPERATORX_CACHE_SCOPE}/`, CONTENT_BLOB_KEY_PREFIX],
+      );
+    } catch (error) {
+      console.error('[api-cache] blob purge failed', error);
+    }
+  });
 }
 
 /**

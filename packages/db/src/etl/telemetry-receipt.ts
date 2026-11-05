@@ -428,8 +428,12 @@ export async function verifyTelemetryApi(
   origin: string,
   options: { fetch?: typeof fetch; headers?: HeadersInit } = {},
 ): Promise<TelemetryReceipt> {
-  for (const point of receipt.points) {
-    if (point.benchmarkResultId === null || point.notCollected) continue;
+  const points = receipt.points.filter((p) => p.benchmarkResultId !== null && !p.notCollected);
+  let next = 0;
+  const check = async (): Promise<void> => {
+    while (next < points.length) await checkPoint(points[next++]!);
+  };
+  const checkPoint = async (point: (typeof points)[number]): Promise<void> => {
     const url = new URL('/api/v1/gpu-metrics-point', origin);
     url.searchParams.set('id', String(point.benchmarkResultId));
     const checkedAt = new Date().toISOString();
@@ -464,6 +468,7 @@ export async function verifyTelemetryApi(
         error: error instanceof Error ? error.message : String(error),
       };
     }
-  }
+  };
+  await Promise.all(Array.from({ length: 4 }, check));
   return summarizeTelemetryReceipt(receipt);
 }

@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   download: vi.fn(),
   sleep: vi.fn((_ms: number) => Promise.resolve()),
 }));
-vi.mock('node:child_process', () => ({ execFileSync: mocks.metadata }));
+vi.mock('node:child_process', () => ({ execFile: vi.fn(), execFileSync: mocks.metadata }));
 vi.mock('./lib/github-artifacts.js', () => ({
   listRunArtifacts: mocks.artifacts,
   downloadArtifact: mocks.download,

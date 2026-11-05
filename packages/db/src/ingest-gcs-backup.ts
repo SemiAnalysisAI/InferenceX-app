@@ -608,7 +608,7 @@ async function main(): Promise<void> {
           allInserted.push(...toInsert);
 
           if (serverLogArtifact && insertedIds.length > 0) {
-            const logFiles = readServerLogArtifactZip(
+            const logFiles = await readServerLogArtifactZip(
               serverLogArtifact.zipPath,
               serverLogArtifact.artifactName,
             );
