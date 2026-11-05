@@ -66,6 +66,7 @@ export const MODEL_TO_KEY: Record<string, string> = {
   'moonshotai/Kimi-K2.7-Code': 'kimik2.7-code',
   'amd/Kimi-K2.7-Code-MXFP4': 'kimik2.7-code',
   'moonshotai/Kimi-K3': 'kimik3',
+  'moonshotai/Kimi-K3.1-Pro': 'kimik3.1',
   'MiniMaxAI/MiniMax-M2.5': 'minimaxm2.5',
   'MiniMaxAI/MiniMax-M3': 'minimaxm3',
   'MiniMaxAI/MiniMax-M3.1-Flash': 'minimaxm31flash',

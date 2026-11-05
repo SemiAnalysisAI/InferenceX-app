@@ -96,6 +96,18 @@ describe('getModelAndSequence', () => {
     expect(result).toEqual({ model: Model.Kimi_K2_5, sequence: Sequence.OneK_OneK });
   });
 
+  it('keeps kimik3.1 artifacts out of the kimik3 bucket', () => {
+    expect(
+      getModelAndSequence(
+        'bmk_agentic_kimik3.1_tp8_conc16_kvdram-hicache_spec-draft_model_fp4_sglang',
+      ),
+    ).toEqual({ model: Model.Kimi_K3_1_Pro, sequence: Sequence.AgenticTraces });
+    expect(getModelAndSequence('bmk_agentic_kimik3_tp8_conc16_fp4_vllm')).toEqual({
+      model: Model.Kimi_K3,
+      sequence: Sequence.AgenticTraces,
+    });
+  });
+
   it('prefers the specific glm5.2 prefix over the glm5 family prefix', () => {
     const result = getModelAndSequence('results_glm5.2_1k1k');
     expect(result).toEqual({ model: Model.GLM_5_2, sequence: Sequence.OneK_OneK });

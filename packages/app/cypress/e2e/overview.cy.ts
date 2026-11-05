@@ -3,6 +3,7 @@ import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-con
 const MODEL_LABELS = [
   'Muse Spark Open 816B',
   'DeepSeek V4.1 Flash 552B',
+  'Kimi K3.1 Pro',
   'MiniMax M3.1 Flash 428B',
   'GLM5.2/GLM5.3',
   'Qwen3.5 397B',
@@ -18,7 +19,7 @@ const PLATFORM_HEADERS = [
 ];
 
 const SINGLE_TURN = 'single_turn_8k1k';
-const MATRIX_ROWS = 7;
+const MATRIX_ROWS = 8;
 const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_LABEL_ZH = '长上下文、多轮交互的真实智能体场景（AgentX）';

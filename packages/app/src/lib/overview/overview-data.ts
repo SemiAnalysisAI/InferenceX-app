@@ -380,6 +380,9 @@ const OVERVIEW_MODEL_SCENARIOS: Partial<Record<Model, readonly OverviewScenario[
   [Model.MiniMax_M3_1_Flash]: ['agentx'],
   [Model.Qwen3_5]: ['single_turn_8k1k', 'agentx'],
   [Model.Kimi_K3]: ['agentx'],
+  // K3.1 Pro entered the fleet on AgentX only (first sweep 2026-11-04,
+  // InferenceX#4803, B300 agentic traces); no 8K/1K sweep exists.
+  [Model.Kimi_K3_1_Pro]: ['agentx'],
   [Model.GLM_5_2]: ['agentx'],
   [Model.Qwen3_8_Flash_Next]: ['agentx'],
   // V4.1 Flash entered the fleet on AgentX only (first sweep 2026-09-10,
