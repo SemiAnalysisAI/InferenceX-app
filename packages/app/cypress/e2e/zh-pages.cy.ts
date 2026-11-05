@@ -285,11 +285,6 @@ describe('Chinese (/zh) pages', () => {
           cy.contains('button, li', label).should('be.visible');
         }
       });
-      cy.get('[data-testid="jalapeno-official-preview-notice"]').should(
-        'contain.text',
-        'Jalapeño 结果为官方预览',
-      );
-      cy.get('[data-testid="tpuv7-official-preview-notice"]').should('be.visible');
       for (const vendor of ['NVIDIA', 'AMD', 'OpenAI', 'Google']) {
         cy.get(`tbody span[role="img"][aria-label="${vendor}"]`).should('be.visible');
       }

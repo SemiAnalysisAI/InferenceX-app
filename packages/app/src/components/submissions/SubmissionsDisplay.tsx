@@ -9,14 +9,6 @@ import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Heading } from '@/components/ui/heading';
-import {
-  includesJalapenoResult,
-  includesTpuv7Result,
-  includesVeraRubinResult,
-  JalapenoOfficialPreviewNotice,
-  Tpuv7OfficialPreviewNotice,
-  VeraRubinOfficialPreviewNotice,
-} from '@/components/ui/official-preview-notice';
 import { ResultContext } from '@/components/ui/result-context';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
@@ -128,11 +120,6 @@ export default function SubmissionsDisplay() {
     [data?.volume],
   );
 
-  const chartHardware = useMemo(
-    () => new Set(data?.volume.map((row) => row.hardware)),
-    [data?.volume],
-  );
-
   if (error) {
     return (
       <RetryableQueryError
@@ -210,15 +197,6 @@ export default function SubmissionsDisplay() {
                 <Heading as="h3" level="card">
                   {t.chartCaption}
                 </Heading>
-                {includesJalapenoResult(chartHardware) && (
-                  <JalapenoOfficialPreviewNotice variant="inline" />
-                )}
-                {includesVeraRubinResult(chartHardware) && (
-                  <VeraRubinOfficialPreviewNotice variant="inline" />
-                )}
-                {includesTpuv7Result(chartHardware) && (
-                  <Tpuv7OfficialPreviewNotice variant="inline" />
-                )}
               </div>
             }
             footer={
