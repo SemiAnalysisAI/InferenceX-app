@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 
 import type { HardwareConfig, InferenceData } from '@/components/inference/types';
+import { powerBasisPillHtml } from '@/components/inference/powerx/PowerBasisPill';
 import { modelSystemPower, type SystemPowerEstimate } from '@/lib/power/modeled-system-power';
 import { gb300DisaggRow } from '@/lib/power/nvl72-power.fixture';
 import {
@@ -287,16 +288,15 @@ describe('modeled system-power tooltip', () => {
 
   it('keeps each power reading and its basis pill in the same grid cell', () => {
     const html = generateTooltipContent(config({ isPinned: true }));
-    const readings = [
-      ...html.matchAll(
-        /<div class="tooltip-line"[^>]*><strong>[^<]*<\/strong> <span data-power-reading>(?<reading>.*?)<\/span><\/div>/gu,
-      ),
-    ];
-    expect(readings).toHaveLength(3);
-    for (const match of readings) {
-      const reading = match.groups!.reading;
-      expect(reading).toContain('W/GPU');
-      expect(reading).toContain('data-testid="power-basis-pill"');
+    expect(html.split('<span data-power-reading>')).toHaveLength(4);
+    for (const [watts, basis] of [
+      [500, 'gpu'],
+      [750, 'it'],
+      [900, 'facility'],
+    ] as const) {
+      const pill = powerBasisPillHtml(basis, 'en');
+      expect(html).toContain(`<span data-power-reading>${watts} W/GPU${pill}</span>`);
+      expect(html).not.toContain(`<span data-power-reading>${watts} W/GPU</span>${pill}`);
     }
   });
 
