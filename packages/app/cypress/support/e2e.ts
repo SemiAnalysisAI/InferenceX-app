@@ -116,7 +116,9 @@ export function openXAxisMenu(): void {
       cy.wrap($toggle).click();
     }
   });
-  cy.get('[data-testid="x-axis-mode-selector"]').click();
+  // The selected option's help icon follows the label inside the trigger, so the trigger's
+  // centre can land on it. The chevron edge always opens the menu.
+  cy.get('[data-testid="x-axis-mode-selector"]').click('right');
 }
 
 export function selectXAxisMode(

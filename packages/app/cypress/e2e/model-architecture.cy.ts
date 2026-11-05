@@ -412,7 +412,7 @@ describe('Model Architecture Diagram', () => {
         .and('contain.text', 'Formula')
         .type('{esc}');
       cy.get('[data-testid^="axis-metric-row-"]').should('not.exist');
-      cy.get('[data-testid="x-axis-mode-selector"]').scrollIntoView().click();
+      cy.get('[data-testid="x-axis-mode-selector"]').scrollIntoView().click('right');
       cy.get('[data-testid="x-axis-mode-ttft"]').click();
       cy.get('[data-testid="x-axis-mode-selector"]')
         .should('contain.text', 'TTFT')
