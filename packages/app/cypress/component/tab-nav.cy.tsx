@@ -113,7 +113,7 @@ describe('TabNav — attached unofficial-run banner', () => {
           if (width < 640) expect(actionBounds.height, 'phone touch target').to.be.at.least(44);
         }
         const label = [...banner.querySelectorAll('span')].find(
-          (span) => span.textContent?.trim() === (zh ? '非官方' : 'Non-official'),
+          (span) => span.textContent?.trim() === (zh ? '非官方运行' : 'Unofficial runs'),
         )!;
         const labelStyle = getComputedStyle(label);
         expect(

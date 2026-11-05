@@ -204,11 +204,11 @@ export const Footer = () => {
             className="grid min-w-0 grid-cols-2 gap-x-6 gap-y-6 break-words sm:grid-cols-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,2fr)]"
           >
             <div data-testid="footer-links-semianalysis" className="flex min-w-0 flex-col gap-1">
-              <h2 className="mb-1 text-sm font-medium text-foreground">{t.semianalysis}</h2>
+              <h2 className="mb-1 text-sm font-semibold text-foreground">{t.semianalysis}</h2>
               {externalLinks(SEMIANALYSIS_LINKS, t)}
             </div>
             <div data-testid="footer-links-legal" className="flex min-w-0 flex-col gap-1">
-              <h2 className="mb-1 text-sm font-medium text-foreground">{t.legal}</h2>
+              <h2 className="mb-1 text-sm font-semibold text-foreground">{t.legal}</h2>
               <IntentPrefetchLink
                 data-testid="footer-link-land-acknowledgement"
                 href={`${prefix}/land-acknowledgement`}
@@ -219,14 +219,14 @@ export const Footer = () => {
               {externalLinks(LEGAL_LINKS, t)}
             </div>
             <div data-testid="footer-links-contribute" className="flex min-w-0 flex-col gap-1">
-              <h2 className="mb-1 text-sm font-medium text-foreground">{t.contribute}</h2>
+              <h2 className="mb-1 text-sm font-semibold text-foreground">{t.contribute}</h2>
               {externalLinks(CONTRIBUTE_LINKS, t)}
             </div>
             <div
               data-testid="footer-links-more"
               className="col-span-full xl:col-span-1 flex min-w-0 flex-col gap-1"
             >
-              <h2 className="mb-1 text-sm font-medium text-foreground">{t.more}</h2>
+              <h2 className="mb-1 text-sm font-semibold text-foreground">{t.more}</h2>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1">
                 {MORE_LINKS.map(([id, path, label, event]) => (
                   <IntentPrefetchLink

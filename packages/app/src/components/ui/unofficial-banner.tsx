@@ -9,7 +9,7 @@ import { cn } from '@/lib/shared/utils';
 
 const STRINGS = {
   en: {
-    label: 'Non-official',
+    label: 'Unofficial runs',
     viewingBranch: 'Viewing data from branch',
     viewingRuns: (count: number) => `Viewing ${count} runs`,
     dismissAll: 'Dismiss all',
@@ -18,7 +18,7 @@ const STRINGS = {
     dismissRunAria: (branch: string) => `Dismiss ${branch}`,
   },
   zh: {
-    label: '非官方',
+    label: '非官方运行',
     viewingBranch: '正在查看分支数据',
     viewingRuns: (count: number) => `正在查看 ${count} 个运行`,
     dismissAll: '全部关闭',
