@@ -111,11 +111,10 @@ describe('ScatterGraph', () => {
       .should('have.length', 2)
       .first()
       .should('contain.text', 'DEP2');
-    cy.get('.pinned-raw-topology summary').click();
-    cy.get('.pinned-raw-topology tbody tr')
-      .first()
-      .should('be.visible')
-      .and('contain.text', '32 2 2 True 16');
+    cy.get('.pinned-raw-topology').should('not.exist');
+    cy.get('[data-pinned-parallelism]')
+      .should('not.contain.text', 'Configuration details')
+      .and('not.contain.text', '配置详情');
     cy.get('[data-pinned-cache]')
       .should('contain.text', 'Chip 70.7%')
       .and('contain.text', 'CPU 24.2%')
