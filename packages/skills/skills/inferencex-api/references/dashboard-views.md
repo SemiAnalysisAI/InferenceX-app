@@ -31,6 +31,16 @@ presentation-only: scenario/precision/run/date parameters, defaults, returned
 measurements and unofficial overlays are unchanged; no API parameter represents
 the collapsed state.
 
+## Router-aware labels
+
+Inference series and table `label` values include `SMG SGLang` or `SMG vLLM`
+when runtime `router_name` is `smg`. If any point in a series uses SMG, the
+entire series label uses that SMG framework name, with no mixed-name suffix.
+Table labels use each point's own metadata. These labels match
+the chart legends and line labels, including unofficial overlays. Continue
+using canonical `framework` and `hwKey` values for filtering and identity;
+router labels do not change measurements or add filter parameters.
+
 ## PNG export aspect ratio
 
 PNG aspect ratio (Auto / 16:9 / 1:1) is an export-only setting in the download

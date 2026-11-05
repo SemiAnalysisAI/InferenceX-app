@@ -378,6 +378,18 @@ describe('CanvasPointLayer position animation', () => {
     expect(frames.pending()).toBe(false);
   });
 
+  it('requests an unaccelerated 2D context so WebKit keeps the canvas inside the plot transform', () => {
+    const frames = installFrames();
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+    const { layer } = mountLayer();
+    layer.join([point('a', 10, 10)], key, 100, 100);
+    layer.restyle(config);
+    layer.place(identity, identity);
+    layer.invalidate();
+    frames.run(0);
+    expect(getContext).toHaveBeenCalledWith('2d', { willReadFrequently: true });
+  });
+
   it('gives up animating when the canvas has no 2D context', () => {
     const frames = installFrames();
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
