@@ -779,9 +779,9 @@ const NEW_VIEWS = {
       history: {
         ...objects,
         description:
-          "Cells for every official run of the r_configs chip configs within r_from and r_to, plus the named overlay run's cells for those configs; empty when r_configs is empty.",
+          "Cells for every official run of the r_configs chip configs within r_from and r_to, each run contributing its newest publication of each deployment, plus the named overlay run's cells for those configs; empty when r_configs is empty.",
         'x-description-zh':
-          'r_configs 所选芯片配置在 r_from 至 r_to 期间每次正式运行的结果，以及指定叠加运行中这些配置的结果；r_configs 为空时为空数组。',
+          'r_configs 所选芯片配置在 r_from 至 r_to 期间每次正式运行的结果（每次运行中的每个部署取最新发布的结果），以及指定叠加运行中这些配置的结果；r_configs 为空时为空数组。',
       },
       excludedCount: { type: 'integer', minimum: 0 },
       sampleFloor: { type: 'integer', const: 10 },

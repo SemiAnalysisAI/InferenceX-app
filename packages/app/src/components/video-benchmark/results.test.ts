@@ -8,6 +8,7 @@ import {
   parseResultsState,
   resultProjection,
   resultsSearch,
+  type ResultCell,
   type ResultsState,
 } from './results';
 import type { ResultsEvidence } from './results-evidence';
@@ -35,6 +36,8 @@ const evidence = (overrides: Partial<ResultsEvidence> = {}): ResultsEvidence => 
   failures: null,
   ...overrides,
 });
+
+const ids = (cells: ResultCell[]) => cells.map((c) => c.point.id).sort();
 
 describe('VideoGenX results contract', () => {
   it('uses one complete 20-clip C1 workload, the same ten-sample floor and the requested hardware roster', () => {
@@ -267,31 +270,35 @@ describe('VideoGenX results contract', () => {
     });
     // Newest publication first, as the history pages deliver them.
     const rerun = run('h200:new', '300', '2026-11-03T05:00:00Z');
+    const republished = run('h200:stale', '300', '2026-11-03T05:00:00Z');
     const b200 = run('b200', '200', '2026-11-03T01:00:00Z', 'b200');
     const first = run('h200:old', '100', '2026-11-01T06:00:00Z');
+    const input = [rerun, republished, b200, first];
     const shown = (selection: Partial<ResultsState>) => {
-      const result = resultProjection([rerun, b200, first], { ...state(), ...selection });
-      return [result.run?.id, result.cells.map((c) => c.point.id).sort()];
+      const result = resultProjection(input, { ...state(), ...selection });
+      return [result.run?.id, ids(result.cells), ids(result.workloadMix)];
     };
-    const latest = resultProjection([rerun, b200, first], state());
+    const latest = resultProjection(input, state());
     expect(latest.runs.map((r) => r.id)).toEqual(['100', '200', '300']);
     expect(latest.options.dates).toEqual(['2026-11-01', '2026-11-03']);
-    expect(shown({})).toEqual(['300', ['b200', 'h200:new']]);
-    expect(shown({ date: '2026-11-03', run: '200' })).toEqual(['200', ['b200', 'h200:old']]);
-    expect(shown({ date: '2026-11-01' })).toEqual(['100', ['h200:old']]);
-    expect(shown({ date: '2026-11-02', run: '300' })).toEqual(['100', ['h200:old']]);
+    expect(shown({})).toEqual(['300', ['b200', 'h200:new'], ['b200', 'h200:new']]);
+    expect(shown({ date: '2026-11-03', run: '200' })).toEqual([
+      '200',
+      ['b200', 'h200:old'],
+      ['b200', 'h200:old'],
+    ]);
+    expect(shown({ date: '2026-11-01' })).toEqual(['100', ['h200:old'], ['h200:old']]);
+    expect(shown({ date: '2026-11-02', run: '300' })).toEqual(['100', ['h200:old'], ['h200:old']]);
     const h200 = latest.chipConfigs.find(({ point }) => point.hardwareKey === 'h200')!.key;
     expect(latest.chipConfigs.map(({ point }) => point.hardwareKey)).toEqual(['b200', 'h200']);
     const history = (selection: Partial<ResultsState>) =>
-      resultProjection([rerun, b200, first], { ...state(), configs: [h200], ...selection })
-        .history.map((c) => c.point.id)
-        .sort();
+      ids(resultProjection(input, { ...state(), configs: [h200], ...selection }).history);
     expect(history({})).toEqual(['h200:new', 'h200:old']);
     expect(history({ compareFrom: '2026-11-02' })).toEqual(['h200:new']);
     expect(history({ compareTo: '2026-11-02' })).toEqual(['h200:old']);
     const named = run('h200:named', '400', '2026-11-04T00:00:00Z');
     const overlaid = resultProjection(
-      [rerun, b200, first],
+      input,
       { ...state(), configs: [h200], unofficialRun: '400' },
       [named],
     ).history;

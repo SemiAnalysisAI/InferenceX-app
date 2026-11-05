@@ -462,19 +462,19 @@ export function resultProjection(
         (a.point.participating ?? 0) - (b.point.participating ?? 0) ||
         a.key.localeCompare(b.key),
     );
+  const comparedRuns = Map.groupBy(
+    official.filter((p) => {
+      const date = p.observedAt?.slice(0, 10) ?? '';
+      return (
+        state.configs.includes(chipConfigKey(p)) &&
+        (state.compareFrom === null || date >= state.compareFrom) &&
+        (state.compareTo === null || date <= state.compareTo)
+      );
+    }),
+    (p) => p.runId,
+  );
   const history = [
-    ...new Map(
-      official
-        .filter((p) => {
-          const date = p.observedAt?.slice(0, 10) ?? '';
-          return (
-            state.configs.includes(chipConfigKey(p)) &&
-            (state.compareFrom === null || date >= state.compareFrom) &&
-            (state.compareTo === null || date <= state.compareTo)
-          );
-        })
-        .map((p) => [`${chipConfigKey(p)}:${p.runId}`, p]),
-    ).values(),
+    ...[...comparedRuns.values()].flatMap(latest),
     ...latest(
       namedMatches.filter(
         (p) => p.workloadKey === workloadKey && state.configs.includes(chipConfigKey(p)),
@@ -514,7 +514,9 @@ export function resultProjection(
       return (
         (!state.model || m.model === state.model) &&
         (!state.engine || m.engine === state.engine) &&
-        (state.date === null || day === null || (m.date !== null && m.date <= day)) &&
+        (point.workloadKey === workloadKey
+          ? shownRuns.has(point.runId)
+          : state.date === null || day === null || (m.date !== null && m.date <= day)) &&
         (state.gpuCount === null || point.participating === state.gpuCount) &&
         !state.hidden.includes(point.hardwareKey ?? '') &&
         point.runId !== state.unofficialRun
