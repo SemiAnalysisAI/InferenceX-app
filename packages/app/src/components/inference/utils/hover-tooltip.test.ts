@@ -68,8 +68,20 @@ const config = (
   ...overrides,
 });
 
-// DOMParser builds an inert document, so test markup never executes.
-const render = (html: string) => new DOMParser().parseFromString(html, 'text/html').body;
+// Read the generated markup as plain text without handing it to an HTML parser.
+const ENTITIES: Record<string, string> = {
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#39;': "'",
+};
+const render = (html: string) => ({
+  textContent: html
+    .replaceAll(/<[^>]*>/g, '')
+    .replaceAll(/&(?:amp|lt|gt|quot|#39);/g, (entity) => ENTITIES[entity] ?? entity),
+  hasCacheBar: html.includes('data-hover-cache-bar'),
+});
 
 describe('formatHoverValue', () => {
   it('abbreviates large values and trims small ones', () => {
@@ -91,6 +103,8 @@ describe('shortAxisLabel', () => {
     expect(shortAxisLabel('P90 Interactivity (tok/s/user)')).toBe('P90 tok/s/user');
     expect(shortAxisLabel('Total Tokens per $1 TCO (tok/$)')).toBe('tok/$');
     expect(shortAxisLabel('Median TTFT (s)')).toBe('Median s');
+    expect(shortAxisLabel('P99.9 TTFT (s)')).toBe('P99.9 s');
+    expect(shortAxisLabel('p99.9 E2E Latency (s)')).toBe('p99.9 s');
   });
 
   it('handles full-width parentheses and labels without a unit', () => {
@@ -102,7 +116,7 @@ describe('shortAxisLabel', () => {
 describe('generateHoverTooltipContent', () => {
   it('shows the headline values, compact config and cache bar', () => {
     const el = render(generateHoverTooltipContent(config(agenticPoint())));
-    const text = el.textContent!.replaceAll(/\s+/g, ' ');
+    const text = el.textContent.replaceAll(/\s+/g, ' ');
     expect(text).toContain('B300 (SGLang)');
     expect(text).toContain('FP4 · conc 40');
     expect(text).toContain('31.26M tok/$');
@@ -115,11 +129,11 @@ describe('generateHoverTooltipContent', () => {
     expect(text).toContain('CPU 24.2%');
     expect(text).toContain('theoretical 97.3%');
     expect(text).toContain('Click for full details');
-    expect(el.querySelector('[data-hover-cache-bar]')).not.toBeNull();
+    expect(el.hasCacheBar).toBe(true);
   });
 
   it('leaves pinned-only details out of the hover card', () => {
-    const text = render(generateHoverTooltipContent(config(agenticPoint()))).textContent!;
+    const text = render(generateHoverTooltipContent(config(agenticPoint()))).textContent;
     expect(text).not.toContain('sha256');
     expect(text).not.toContain('566,443,844');
     expect(text).not.toContain('RadixArk');
@@ -136,7 +150,7 @@ describe('generateHoverTooltipContent', () => {
         selectedYAxisMetric: 'y_costh',
         hardwareConfig,
       }),
-    ).textContent!;
+    ).textContent;
     expect(text).toContain('Prompt Tokens');
     expect(text).toContain('Theoretical Cache Hit Rate');
     expect(text).toContain('RadixArk/Kimi-K3.1-Dflash2-Preview');
@@ -160,7 +174,7 @@ describe('generateHoverTooltipContent', () => {
         ),
       ),
     );
-    expect(el.querySelector('[data-hover-cache-bar]')).toBeNull();
+    expect(el.hasCacheBar).toBe(false);
     expect(el.textContent).not.toContain('KV cache hit');
   });
 
@@ -175,7 +189,7 @@ describe('generateHoverTooltipContent', () => {
           }),
         ),
       ),
-    ).textContent!.replaceAll(/\s+/g, ' ');
+    ).textContent.replaceAll(/\s+/g, ' ');
     expect(text).toContain('Chip 70.7%');
     expect(text).not.toContain('CPU 24.2%');
     expect(text).toContain('70.7%');
@@ -184,7 +198,7 @@ describe('generateHoverTooltipContent', () => {
   it('labels the TRT-LLM combined chip + CPU rate as one segment', () => {
     const text = render(
       generateHoverTooltipContent(config(agenticPoint({ framework: 'trt' }))),
-    ).textContent!.replaceAll(/\s+/g, ' ');
+    ).textContent.replaceAll(/\s+/g, ' ');
     expect(text).toContain('Chip + CPU 70.7%');
     expect(text).not.toContain('CPU 24.2%');
   });
@@ -198,7 +212,7 @@ describe('generateHoverTooltipContent', () => {
           yLabel: '每 $1 TCO 总 token 数（tok/$）',
         }),
       ),
-    ).textContent!.replaceAll(/\s+/g, ' ');
+    ).textContent.replaceAll(/\s+/g, ' ');
     expect(text).toContain('并发 40');
     expect(text).toContain('8 芯片');
     expect(text).toContain('KV cache 命中率');

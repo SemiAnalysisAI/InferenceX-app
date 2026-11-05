@@ -1031,7 +1031,7 @@ export const formatHoverValue = (value: number, metric?: string): string => {
 export const shortAxisLabel = (label: string): string => {
   const unit = /[(（](?<unit>[^()（）]+)[)）]\s*$/u.exec(label.trim())?.groups?.unit;
   if (!unit) return label;
-  const qualifier = /^(?<q>P\d{2,3}|p\d{2,3}|Median|Mean|中位数|平均)(?![A-Za-z0-9])/u.exec(
+  const qualifier = /^(?<q>[Pp]\d{1,3}(?:\.\d+)?|Median|Mean|中位数|平均)(?![A-Za-z0-9.])/u.exec(
     label.trim(),
   )?.groups?.q;
   return qualifier ? `${qualifier} ${unit}` : unit;
