@@ -34,7 +34,7 @@
       "tests": [
         {
           "title": [
-            "Agentic point detail \u2014 returning to the chart",
+            "Agentic point detail — returning to the chart",
             "restores the model and legend when the reader clicks Back"
           ],
           "duration": 924,
@@ -42,7 +42,7 @@
         },
         {
           "title": [
-            "Agentic point detail \u2014 returning to the chart",
+            "Agentic point detail — returning to the chart",
             "restores the model and legend through the \"Inference chart\" link"
           ],
           "duration": 647,
@@ -50,7 +50,7 @@
         },
         {
           "title": [
-            "Agentic point detail \u2014 returning to the chart",
+            "Agentic point detail — returning to the chart",
             "keeps a Chinese reader on /zh for the whole round trip"
           ],
           "duration": 649,
@@ -58,7 +58,7 @@
         },
         {
           "title": [
-            "Agentic point detail \u2014 returning to the chart",
+            "Agentic point detail — returning to the chart",
             "does not drop the unofficialruns overlay param on the round trip"
           ],
           "duration": 491,
@@ -374,7 +374,7 @@
       "tests": [
         {
           "title": [
-            "AgentX telemetry tutorial \u2014 English page",
+            "AgentX telemetry tutorial — English page",
             "renders the article, every section, and every figure"
           ],
           "duration": 444,
@@ -382,7 +382,7 @@
         },
         {
           "title": [
-            "AgentX telemetry tutorial \u2014 English page",
+            "AgentX telemetry tutorial — English page",
             "links back to /agentx and out to the agentic results"
           ],
           "duration": 153,
@@ -406,7 +406,7 @@
         },
         {
           "title": [
-            "AgentX telemetry tutorial \u2014 entry point on /agentx",
+            "AgentX telemetry tutorial — entry point on /agentx",
             "shows the Chinese callout on /zh/agentx"
           ],
           "duration": 169,
@@ -414,7 +414,7 @@
         },
         {
           "title": [
-            "AgentX telemetry tutorial \u2014 responsive locale routes",
+            "AgentX telemetry tutorial — responsive locale routes",
             "renders the full telemetry surface at 1440px and 375px in both locales"
           ],
           "duration": 313,
@@ -422,15 +422,15 @@
         },
         {
           "title": [
-            "AgentX telemetry tutorial \u2014 popup on the agentic point-detail page",
-            "is the only card in the corner \u2014 dashboard nudges stay off this route"
+            "AgentX telemetry tutorial — popup on the agentic point-detail page",
+            "is the only card in the corner — dashboard nudges stay off this route"
           ],
           "duration": 2694,
           "attempts": 1
         },
         {
           "title": [
-            "AgentX telemetry tutorial \u2014 popup on the agentic point-detail page",
+            "AgentX telemetry tutorial — popup on the agentic point-detail page",
             "opens the tutorial from its primary action"
           ],
           "duration": 2678,
@@ -438,7 +438,7 @@
         },
         {
           "title": [
-            "AgentX telemetry tutorial \u2014 popup on the agentic point-detail page",
+            "AgentX telemetry tutorial — popup on the agentic point-detail page",
             "stays dismissed across a reload"
           ],
           "duration": 6198,
@@ -855,7 +855,7 @@
       "tests": [
         {
           "title": [
-            "TCO calculator \u2014 unofficial run overlay",
+            "TCO calculator — unofficial run overlay",
             "agentic trace overlay",
             "renders official and unofficial DeepSeek V4 agentic calculations separately"
           ],
@@ -864,7 +864,7 @@
         },
         {
           "title": [
-            "TCO calculator \u2014 unofficial run overlay",
+            "TCO calculator — unofficial run overlay",
             "rendering",
             "renders overlay bars alongside the official bar"
           ],
@@ -873,7 +873,7 @@
         },
         {
           "title": [
-            "TCO calculator \u2014 unofficial run overlay",
+            "TCO calculator — unofficial run overlay",
             "rendering",
             "paints the overlay bar with the run palette color, not the hardware color"
           ],
@@ -882,7 +882,7 @@
         },
         {
           "title": [
-            "TCO calculator \u2014 unofficial run overlay",
+            "TCO calculator — unofficial run overlay",
             "hardware visibility",
             "brings hidden overlay bars back when the available hardware changes"
           ],
@@ -891,7 +891,7 @@
         },
         {
           "title": [
-            "TCO calculator \u2014 unofficial run overlay",
+            "TCO calculator — unofficial run overlay",
             "hardware visibility",
             "does not offer a hide control on the run legend entry"
           ],
@@ -900,7 +900,7 @@
         },
         {
           "title": [
-            "TCO calculator \u2014 unofficial run overlay",
+            "TCO calculator — unofficial run overlay",
             "hardware visibility",
             "restores every bar via reset filter"
           ],
@@ -909,7 +909,7 @@
         },
         {
           "title": [
-            "TCO calculator \u2014 unofficial run overlay",
+            "TCO calculator — unofficial run overlay",
             "late overlay arrival",
             "keeps a GPU filter the user set before the run landed"
           ],
@@ -918,7 +918,7 @@
         },
         {
           "title": [
-            "TCO calculator \u2014 unofficial run overlay",
+            "TCO calculator — unofficial run overlay",
             "sequence covered only by the run",
             "drops stale official hardware from the legend selection"
           ],
@@ -927,7 +927,7 @@
         },
         {
           "title": [
-            "TCO calculator \u2014 unofficial run overlay",
+            "TCO calculator — unofficial run overlay",
             "dismissing one of several runs on an overlay-only sequence",
             "keeps the surviving run visible instead of blanking the chart"
           ],
@@ -936,7 +936,7 @@
         },
         {
           "title": [
-            "TCO calculator \u2014 unofficial run overlay",
+            "TCO calculator — unofficial run overlay",
             "official-only surfaces",
             "excludes overlay rows from the table view"
           ],
@@ -945,7 +945,7 @@
         },
         {
           "title": [
-            "TCO calculator \u2014 unofficial run overlay",
+            "TCO calculator — unofficial run overlay",
             "Chinese page",
             "renders the overlay legend strings in Chinese"
           ],
@@ -954,7 +954,7 @@
         },
         {
           "title": [
-            "TCO calculator \u2014 unofficial run overlay",
+            "TCO calculator — unofficial run overlay",
             "dismissal",
             "removes the overlay bar when the run is dismissed from the banner"
           ],
@@ -1215,11 +1215,8 @@
           "attempts": 1
         },
         {
-          "title": [
-            "CollectiveX availability states",
-            "reports a missing run list"
-          ],
-          "duration": 1289,
+          "title": ["CollectiveX availability states", "reports a missing run list"],
+          "duration": 1135,
           "attempts": 1
         },
         {
@@ -1369,7 +1366,7 @@
       "tests": [
         {
           "title": [
-            "Compare-per-dollar slug page \u2014 slimmed table + cross-link",
+            "Compare-per-dollar slug page — slimmed table + cross-link",
             "shows only the Dollar-per-Million-Tokens and Concurrency metric rows"
           ],
           "duration": 479,
@@ -1377,7 +1374,7 @@
         },
         {
           "title": [
-            "Compare-per-dollar slug page \u2014 slimmed table + cross-link",
+            "Compare-per-dollar slug page — slimmed table + cross-link",
             "exposes a \"View full latency + throughput comparison\" cross-link to /compare/"
           ],
           "duration": 75,
@@ -1385,7 +1382,7 @@
         },
         {
           "title": [
-            "Compare-per-dollar slug page \u2014 slimmed table + cross-link",
+            "Compare-per-dollar slug page — slimmed table + cross-link",
             "attributes pricing to the shared TCO source"
           ],
           "duration": 8,
@@ -1393,7 +1390,7 @@
         },
         {
           "title": [
-            "Compare-per-dollar slug page \u2014 slimmed table + cross-link",
+            "Compare-per-dollar slug page — slimmed table + cross-link",
             "renders an indexable comparison PNG with descriptive alt text"
           ],
           "duration": 8,
@@ -1406,7 +1403,7 @@
         },
         {
           "title": [
-            "Compare slug page \u2014 cross-link to per-dollar view",
+            "Compare slug page — cross-link to per-dollar view",
             "renders a cross-link to /compare-per-dollar/<same-slug>"
           ],
           "duration": 130,
@@ -1739,7 +1736,7 @@
             "Current InferenceX Image localized routes",
             "shows a natural empty-filter message"
           ],
-          "duration": 611,
+          "duration": 479,
           "attempts": 1
         },
         {
@@ -2099,7 +2096,7 @@
       "tests": [
         {
           "title": [
-            "Evaluation Chart \u2014 Content & Interactions",
+            "Evaluation Chart — Content & Interactions",
             "changing the benchmark selector updates the chart subtitle to reflect the new benchmark"
           ],
           "duration": 440,
@@ -2107,7 +2104,7 @@
         },
         {
           "title": [
-            "Evaluation Chart \u2014 Content & Interactions",
+            "Evaluation Chart — Content & Interactions",
             "Show Labels switch exists in the legend and toggling it adds score labels to the chart"
           ],
           "duration": 325,
@@ -2168,7 +2165,7 @@
         },
         {
           "title": [
-            "Evaluation Chart \u2014 Simplified Chinese mobile path",
+            "Evaluation Chart — Simplified Chinese mobile path",
             "keeps table/chart actions reachable and localizes table labels and dates"
           ],
           "duration": 336,
@@ -2176,7 +2173,7 @@
         },
         {
           "title": [
-            "Evaluation Chart \u2014 Simplified Chinese mobile path",
+            "Evaluation Chart — Simplified Chinese mobile path",
             "distinguishes a fetch error from empty data and retries the failed query"
           ],
           "duration": 1249,
@@ -2184,7 +2181,7 @@
         },
         {
           "title": [
-            "Evaluation Chart \u2014 Simplified Chinese mobile path",
+            "Evaluation Chart — Simplified Chinese mobile path",
             "keeps evaluation results visible while retrying failed availability metadata"
           ],
           "duration": 1398,
@@ -2192,7 +2189,7 @@
         },
         {
           "title": [
-            "Evaluation Chart \u2014 Simplified Chinese mobile path",
+            "Evaluation Chart — Simplified Chinese mobile path",
             "renders a successful empty response without offering an error retry"
           ],
           "duration": 280,
@@ -2316,7 +2313,7 @@
       "tests": [
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle",
+            "Fleet — Fleet Lifecycle",
             "keeps benchmark and chart controls inside their panels on phones and desktops"
           ],
           "duration": 1204,
@@ -2329,15 +2326,7 @@
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle",
-            "the default MW budget drives the lifecycle table"
-          ],
-          "duration": 695,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Fleet \u2014 Fleet Lifecycle",
+            "Fleet — Fleet Lifecycle",
             "quotes both token prices in the caption, and tracks the fields"
           ],
           "duration": 1777,
@@ -2345,7 +2334,7 @@
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle",
+            "Fleet — Fleet Lifecycle",
             "raising the price above break-even turns margin positive and produces a payback"
           ],
           "duration": 562,
@@ -2353,15 +2342,15 @@
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle",
-            "bills the two streams apart \u2014 the output price alone moves margin"
+            "Fleet — Fleet Lifecycle",
+            "bills the two streams apart — the output price alone moves margin"
           ],
           "duration": 951,
           "attempts": 1
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle",
+            "Fleet — Fleet Lifecycle",
             "resets both prices together, keeping the ratio the user set"
           ],
           "duration": 626,
@@ -2374,15 +2363,7 @@
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle",
-            "names each line with its chip at the right edge"
-          ],
-          "duration": 189,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Fleet \u2014 Fleet Lifecycle",
+            "Fleet — Fleet Lifecycle",
             "reads every plotted chip at the hovered date, not just one point"
           ],
           "duration": 147,
@@ -2390,7 +2371,7 @@
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle",
+            "Fleet — Fleet Lifecycle",
             "freezes the readout on click, and releases it on the next click"
           ],
           "duration": 285,
@@ -2398,7 +2379,7 @@
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle",
+            "Fleet — Fleet Lifecycle",
             "keeps config detail out of the hover readout, showing it only once frozen"
           ],
           "duration": 268,
@@ -2406,7 +2387,7 @@
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle",
+            "Fleet — Fleet Lifecycle",
             "links the run behind any step, not just the first and last"
           ],
           "duration": 154,
@@ -2414,7 +2395,7 @@
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle",
+            "Fleet — Fleet Lifecycle",
             "zooms the time axis, as its own instructions promise"
           ],
           "duration": 1543,
@@ -2427,15 +2408,7 @@
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle",
-            "switches the y axis between margin and revenue"
-          ],
-          "duration": 535,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Fleet \u2014 Fleet Lifecycle",
+            "Fleet — Fleet Lifecycle",
             "a longer horizon accumulates more of whatever the daily margin is"
           ],
           "duration": 769,
@@ -2443,7 +2416,7 @@
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle",
+            "Fleet — Fleet Lifecycle",
             "tracks measured config improvements as steps, not one flat plateau"
           ],
           "duration": 391,
@@ -2451,7 +2424,7 @@
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle",
+            "Fleet — Fleet Lifecycle",
             "rolls each config out over the ramp instead of stepping instantly"
           ],
           "duration": 753,
@@ -2464,15 +2437,7 @@
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle",
-            "a shorter MTBI lowers availability"
-          ],
-          "duration": 742,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Fleet \u2014 Fleet Lifecycle",
+            "Fleet — Fleet Lifecycle",
             "draws one row per chip, pooling its software configs"
           ],
           "duration": 234,
@@ -2485,15 +2450,7 @@
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle",
-            "follows legend visibility"
-          ],
-          "duration": 395,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Fleet \u2014 Fleet Lifecycle",
+            "Fleet — Fleet Lifecycle",
             "explains chips that were never measured at an extreme target instead of dropping them"
           ],
           "duration": 345,
@@ -2501,23 +2458,23 @@
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle",
+            "Fleet — Fleet Lifecycle",
             "names the budget, not the slider, when a budget is too small to size a fleet"
           ],
-          "duration": 527,
+          "duration": 455,
           "attempts": 1
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle",
+            "Fleet — Fleet Lifecycle",
             "clearing the MW budget restores the empty state, and the input survives it"
           ],
-          "duration": 89,
+          "duration": 82,
           "attempts": 1
         },
         {
           "title": [
-            "Fleet \u2014 self-contained lifecycle regressions",
+            "Fleet — self-contained lifecycle regressions",
             "preserves c_price and derives a non-zero output price"
           ],
           "duration": 215,
@@ -2525,7 +2482,7 @@
         },
         {
           "title": [
-            "Fleet \u2014 self-contained lifecycle regressions",
+            "Fleet — self-contained lifecycle regressions",
             "plots revenue per MW as a real normalized y-axis metric"
           ],
           "duration": 237,
@@ -2533,7 +2490,7 @@
         },
         {
           "title": [
-            "Fleet \u2014 self-contained lifecycle regressions",
+            "Fleet — self-contained lifecycle regressions",
             "exports the physical fleet sizing alongside its economics"
           ],
           "duration": 238,
@@ -2541,7 +2498,7 @@
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle with agentic traces",
+            "Fleet — Fleet Lifecycle with agentic traces",
             "names the cached tier in the caption, since most input bills at it"
           ],
           "duration": 633,
@@ -2549,7 +2506,7 @@
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle with agentic traces",
+            "Fleet — Fleet Lifecycle with agentic traces",
             "raises the break-even price it seeds, because fewer tokens are billable"
           ],
           "duration": 544,
@@ -2557,7 +2514,7 @@
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle with agentic traces",
+            "Fleet — Fleet Lifecycle with agentic traces",
             "lowers margin at a fixed price, where the discount has nowhere to hide"
           ],
           "duration": 795,
@@ -2565,7 +2522,7 @@
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle in Chinese",
+            "Fleet — Fleet Lifecycle in Chinese",
             "keeps token-type headers and exported assumptions in Chinese as selections change"
           ],
           "duration": 3099,
@@ -2573,15 +2530,15 @@
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle in Chinese",
-            "uses the selected cost tier\u2019s Chinese label in the assumptions footer"
+            "Fleet — Fleet Lifecycle in Chinese",
+            "uses the selected cost tier’s Chinese label in the assumptions footer"
           ],
           "duration": 339,
           "attempts": 1
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle in Chinese",
+            "Fleet — Fleet Lifecycle in Chinese",
             "keeps Chinese axis and pinned dates when zooming at 1280px"
           ],
           "duration": 2276,
@@ -2589,7 +2546,7 @@
         },
         {
           "title": [
-            "Fleet \u2014 Fleet Lifecycle in Chinese",
+            "Fleet — Fleet Lifecycle in Chinese",
             "keeps Chinese axis and pinned dates when zooming at 390px"
           ],
           "duration": 2078,
@@ -2961,7 +2918,7 @@
         },
         {
           "title": [
-            "Historical Trends \u2014 Content & Interactions",
+            "Historical Trends — Content & Interactions",
             "Log Scale switch exists in the legend and can be toggled"
           ],
           "duration": 379,
@@ -2969,7 +2926,7 @@
         },
         {
           "title": [
-            "Historical Trends \u2014 Content & Interactions",
+            "Historical Trends — Content & Interactions",
             "Y-axis metric selector is present and can be changed"
           ],
           "duration": 259,
@@ -2977,7 +2934,7 @@
         },
         {
           "title": [
-            "Historical Trends \u2014 Content & Interactions",
+            "Historical Trends — Content & Interactions",
             "offers the published tiers in the caption Cost Tier selector but no Custom User Values"
           ],
           "duration": 340,
@@ -2985,7 +2942,7 @@
         },
         {
           "title": [
-            "Historical Trends \u2014 Content & Interactions",
+            "Historical Trends — Content & Interactions",
             "changing model updates the chart title to reflect the new model"
           ],
           "duration": 446,
@@ -2993,7 +2950,7 @@
         },
         {
           "title": [
-            "Historical Trends \u2014 Chinese route",
+            "Historical Trends — Chinese route",
             "localizes the metric title, chart instructions, and point tooltip"
           ],
           "duration": 481,
@@ -3001,7 +2958,7 @@
         },
         {
           "title": [
-            "Historical Trends \u2014 Chinese route",
+            "Historical Trends — Chinese route",
             "localizes the Agentic sequence and run date in the chart caption"
           ],
           "duration": 447,
@@ -3009,7 +2966,7 @@
         },
         {
           "title": [
-            "Historical Trends \u2014 Chinese route",
+            "Historical Trends — Chinese route",
             "shows a settled Chinese empty state instead of leaving the skeleton mounted"
           ],
           "duration": 251,
@@ -3017,7 +2974,7 @@
         },
         {
           "title": [
-            "Historical Trends \u2014 Chinese route",
+            "Historical Trends — Chinese route",
             "shows a safe Chinese primary error and recovers through the reload control"
           ],
           "duration": 1532,
@@ -3025,7 +2982,7 @@
         },
         {
           "title": [
-            "Historical Trends \u2014 Chinese route",
+            "Historical Trends — Chinese route",
             "shows a distinct secondary-history error and recovers through the tracked retry"
           ],
           "duration": 1493,
@@ -3033,7 +2990,7 @@
         },
         {
           "title": [
-            "Historical Trends \u2014 Chinese route",
+            "Historical Trends — Chinese route",
             "keeps the target controls and chart reachable at 375px"
           ],
           "duration": 237,
@@ -3147,7 +3104,7 @@
         },
         {
           "title": [
-            "Inference Chart \u2014 Simplified Chinese mobile path",
+            "Inference Chart — Simplified Chinese mobile path",
             "keeps chart controls reachable and localizes the complete table click path"
           ],
           "duration": 963,
@@ -3155,7 +3112,7 @@
         },
         {
           "title": [
-            "Inference Chart \u2014 Simplified Chinese mobile path",
+            "Inference Chart — Simplified Chinese mobile path",
             "localizes architecture and changelog overlays without changing technical model data"
           ],
           "duration": 302,
@@ -3292,7 +3249,7 @@
             "Qwen3.5 chart defaults",
             "switches to E2EL when entering Qwen after a manual axis selection"
           ],
-          "duration": 940,
+          "duration": 457,
           "attempts": 1
         },
         {
@@ -3324,7 +3281,7 @@
             "Qwen3.5 chart defaults",
             "does not count the default E2EL axis as a changed control on mobile"
           ],
-          "duration": 529,
+          "duration": 189,
           "attempts": 1
         },
         {
@@ -3377,7 +3334,7 @@
         },
         {
           "title": [
-            "Inference Replay \u2014 Simplified Chinese",
+            "Inference Replay — Simplified Chinese",
             "waits for fixture history and exercises every localized replay control"
           ],
           "duration": 2667,
@@ -3385,7 +3342,7 @@
         },
         {
           "title": [
-            "Inference Replay \u2014 Simplified Chinese",
+            "Inference Replay — Simplified Chinese",
             "shows an error, retries after analytics, and then renders controls"
           ],
           "duration": 2085,
@@ -3393,7 +3350,7 @@
         },
         {
           "title": [
-            "Inference Replay \u2014 Simplified Chinese",
+            "Inference Replay — Simplified Chinese",
             "renders the insufficient-history state only after a successful response"
           ],
           "duration": 724,
@@ -3408,7 +3365,7 @@
         {
           "title": [
             "official preview notices",
-            "renders both graph notices and tracks Jalape\u00f1o legend visibility"
+            "renders both graph notices and tracks Jalapeño legend visibility"
           ],
           "duration": 477,
           "attempts": 1
@@ -3450,7 +3407,7 @@
         {
           "title": [
             "official preview notices",
-            "uses the Chinese disclaimer on /zh and stays absent without Jalape\u00f1o results"
+            "uses the Chinese disclaimer on /zh and stays absent without Jalapeño results"
           ],
           "duration": 279,
           "attempts": 1
@@ -3619,7 +3576,7 @@
         },
         {
           "title": [
-            "landing \u2192 full dashboard navigation",
+            "landing → full dashboard navigation",
             "commits exactly one navigation and one history entry on a cold dashboard load"
           ],
           "duration": 3622,
@@ -3876,7 +3833,7 @@
           "title": [
             "Model Architecture Diagram",
             "Hybrid Attention Blocks (MoE model - Kimi K3)",
-            "keeps attention static \u2014 no CSA/HCA drill-down or union-softmax caption"
+            "keeps attention static — no CSA/HCA drill-down or union-softmax caption"
           ],
           "duration": 148,
           "attempts": 1
@@ -4490,8 +4447,8 @@
         },
         {
           "title": [
-            "Chart Section Tabs \u2014 E2E",
-            "opens Historical Trends from the footer link"
+            "Chart Section Tabs — E2E",
+            "opens the TCO Calculator and Fleet Lifecycle from the footer links"
           ],
           "duration": 195,
           "attempts": 1
@@ -4518,8 +4475,8 @@
         },
         {
           "title": [
-            "First-load navigation",
-            "navigates to articles from the footer"
+            "Chart Section Tabs — E2E",
+            "keeps the sliding indicator aligned after the Konami code unlock inserts the Hidden trigger"
           ],
           "duration": 717,
           "attempts": 1
@@ -4723,15 +4680,7 @@
         },
         {
           "title": [
-            "Landing nudges \u2014 modals",
-            "localizes the launch banner title in Chinese"
-          ],
-          "duration": 336,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Landing nudges \u2014 TPUv7 launch modal",
+            "Landing nudges — TPUv7 launch modal",
             "shows the new announcement despite a permanent dismissal of the old one"
           ],
           "duration": 163,
@@ -4739,7 +4688,7 @@
         },
         {
           "title": [
-            "Landing nudges \u2014 TPUv7 launch modal",
+            "Landing nudges — TPUv7 launch modal",
             "checks the three-day cooldown at -1ms from expiry"
           ],
           "duration": 64,
@@ -4747,7 +4696,7 @@
         },
         {
           "title": [
-            "Landing nudges \u2014 TPUv7 launch modal",
+            "Landing nudges — TPUv7 launch modal",
             "checks the three-day cooldown at 0ms from expiry"
           ],
           "duration": 101,
@@ -4755,7 +4704,7 @@
         },
         {
           "title": [
-            "Landing nudges \u2014 TPUv7 launch modal",
+            "Landing nudges — TPUv7 launch modal",
             "checks the three-day cooldown at 1ms from expiry"
           ],
           "duration": 92,
@@ -4763,7 +4712,7 @@
         },
         {
           "title": [
-            "Landing nudges \u2014 TPUv7 launch modal",
+            "Landing nudges — TPUv7 launch modal",
             "centers each button row and loads model logos at 1280px on /"
           ],
           "duration": 109,
@@ -4771,7 +4720,7 @@
         },
         {
           "title": [
-            "Landing nudges \u2014 TPUv7 launch modal",
+            "Landing nudges — TPUv7 launch modal",
             "centers each button row and loads model logos at 375px on /"
           ],
           "duration": 127,
@@ -4779,7 +4728,7 @@
         },
         {
           "title": [
-            "Landing nudges \u2014 TPUv7 launch modal",
+            "Landing nudges — TPUv7 launch modal",
             "centers each button row and loads model logos at 1280px on /zh"
           ],
           "duration": 114,
@@ -4787,7 +4736,7 @@
         },
         {
           "title": [
-            "Landing nudges \u2014 TPUv7 launch modal",
+            "Landing nudges — TPUv7 launch modal",
             "centers each button row and loads model logos at 375px on /zh"
           ],
           "duration": 191,
@@ -4795,7 +4744,7 @@
         },
         {
           "title": [
-            "Landing nudges \u2014 TPUv7 launch modal",
+            "Landing nudges — TPUv7 launch modal",
             "centers the modal over a backdrop and opens Qwen3.5 AgentX results"
           ],
           "duration": 762,
@@ -4803,7 +4752,7 @@
         },
         {
           "title": [
-            "Landing nudges \u2014 TPUv7 launch modal",
+            "Landing nudges — TPUv7 launch modal",
             "keeps Shift+Tab inside the dialog after clicking the panel"
           ],
           "duration": 209,
@@ -4821,23 +4770,7 @@
         },
         {
           "title": [
-            "Landing nudges \u2014 TPUv7 launch modal",
-            "dismisses on Escape"
-          ],
-          "duration": 262,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Landing nudges \u2014 TPUv7 launch modal",
-            "persists close-button dismissal"
-          ],
-          "duration": 327,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Landing nudges \u2014 TPUv7 launch modal",
+            "Landing nudges — TPUv7 launch modal",
             "localizes the modal and keeps the Chinese route tree"
           ],
           "duration": 477,
@@ -4845,7 +4778,7 @@
         },
         {
           "title": [
-            "Landing nudges \u2014 TPUv7 launch modal",
+            "Landing nudges — TPUv7 launch modal",
             "opens Kimi K3 and persists dismissal from / on mobile"
           ],
           "duration": 268,
@@ -4853,7 +4786,7 @@
         },
         {
           "title": [
-            "Landing nudges \u2014 TPUv7 launch modal",
+            "Landing nudges — TPUv7 launch modal",
             "opens Kimi K3 and persists dismissal from /zh on mobile"
           ],
           "duration": 281,
@@ -4861,7 +4794,7 @@
         },
         {
           "title": [
-            "Landing nudges \u2014 banner",
+            "Landing nudges — banner",
             "wraps the launch banner title and subtitle on mobile without clipping"
           ],
           "duration": 95,
@@ -4874,15 +4807,7 @@
         },
         {
           "title": [
-            "Landing nudges \u2014 banner",
-            "dismissing the banner persists across reloads"
-          ],
-          "duration": 557,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Landing nudges \u2014 banner",
+            "Landing nudges — banner",
             "clicking the banner body navigates without persisting dismissal"
           ],
           "duration": 1058,
@@ -4890,15 +4815,15 @@
         },
         {
           "title": [
-            "Dashboard nudges \u2014 reproducibility toast",
-            "reproducibility nudge is session-only \u2014 gone after reload"
+            "Dashboard nudges — reproducibility toast",
+            "reproducibility nudge is session-only — gone after reload"
           ],
           "duration": 3688,
           "attempts": 1
         },
         {
           "title": [
-            "Dashboard nudges \u2014 filter-hint toast",
+            "Dashboard nudges — filter-hint toast",
             "does not show the filter-hint nudge outside the inference tab"
           ],
           "duration": 3560,
@@ -4906,7 +4831,7 @@
         },
         {
           "title": [
-            "Dashboard nudges \u2014 filter-hint toast",
+            "Dashboard nudges — filter-hint toast",
             "arms the filter hint before a client transition into inference"
           ],
           "duration": 938,
@@ -4914,7 +4839,7 @@
         },
         {
           "title": [
-            "Dashboard nudges \u2014 filter-hint toast",
+            "Dashboard nudges — filter-hint toast",
             "re-evaluates the localized filter hint after a Chinese tab transition"
           ],
           "duration": 956,
@@ -4922,7 +4847,7 @@
         },
         {
           "title": [
-            "Dashboard nudges \u2014 filter-hint toast",
+            "Dashboard nudges — filter-hint toast",
             "dismissal persists to localStorage and the nudge stays gone after reload"
           ],
           "duration": 6641,
@@ -4930,7 +4855,7 @@
         },
         {
           "title": [
-            "Evaluation nudges \u2014 eval-samples toast",
+            "Evaluation nudges — eval-samples toast",
             "eval-samples open event refreshes the cooldown timestamp"
           ],
           "duration": 1671,
@@ -5547,7 +5472,7 @@
         {
           "title": [
             "Overview page",
-            "switches the history window through the embedded selector"
+            "compares each platform with its own validated result from 30–60 days earlier"
           ],
           "duration": 167,
           "attempts": 1
@@ -5605,7 +5530,7 @@
         {
           "title": [
             "Overview page",
-            "color-grades the whole cell against B200 and badges a missing baseline with a neutral \u221e"
+            "color-grades the whole cell against B200 and badges a missing baseline with a neutral ∞"
           ],
           "duration": 148,
           "attempts": 1
@@ -5824,7 +5749,7 @@
         },
         {
           "title": [
-            "Profit Estimator per GW \u2014 per-model route",
+            "Profit Estimator per GW — per-model route",
             "keeps the Kimi K3 whitepaper's historical target at 45 (English)"
           ],
           "duration": 354,
@@ -5832,7 +5757,7 @@
         },
         {
           "title": [
-            "Profit Estimator per GW \u2014 per-model route",
+            "Profit Estimator per GW — per-model route",
             "keeps the Kimi K3 whitepaper's historical target at 45 (/zh)"
           ],
           "duration": 214,
@@ -5840,7 +5765,7 @@
         },
         {
           "title": [
-            "Profit Estimator per GW \u2014 per-model route",
+            "Profit Estimator per GW — per-model route",
             "serves /profit-estimator-per-gigawatt/kimi-k3 and 308s aliases to the canonical slug"
           ],
           "duration": 143,
@@ -5848,7 +5773,7 @@
         },
         {
           "title": [
-            "Profit Estimator per GW \u2014 per-model route",
+            "Profit Estimator per GW — per-model route",
             "404s models the estimator does not serve yet"
           ],
           "duration": 41,
@@ -5856,7 +5781,7 @@
         },
         {
           "title": [
-            "Profit Estimator per GW \u2014 per-model route",
+            "Profit Estimator per GW — per-model route",
             "keeps AgentX estimates when an old 8k/1k query opens English profit"
           ],
           "duration": 443,
@@ -5864,7 +5789,7 @@
         },
         {
           "title": [
-            "Profit Estimator per GW \u2014 per-model route",
+            "Profit Estimator per GW — per-model route",
             "keeps AgentX estimates when an old 8k/1k query opens /zh profit"
           ],
           "duration": 511,
@@ -5872,7 +5797,7 @@
         },
         {
           "title": [
-            "Profit Estimator \u2014 GLM 5.2/5.3",
+            "Profit Estimator — GLM 5.2/5.3",
             "opens /profit-estimator/glm-5-3 on 135 tok/s/user and the Z.ai list price"
           ],
           "duration": 642,
@@ -5885,15 +5810,7 @@
         },
         {
           "title": [
-            "Profit Estimator \u2014 GLM 5.2/5.3",
-            "308s the older glm-5-2 slug to glm-5-3"
-          ],
-          "duration": 110,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit Estimator \u2014 GLM 5.2/5.3",
+            "Profit Estimator — GLM 5.2/5.3",
             "re-seeds the operating point and price source on a model switch"
           ],
           "duration": 483,
@@ -5901,7 +5818,7 @@
         },
         {
           "title": [
-            "Profit Estimator \u2014 GLM 5.2/5.3",
+            "Profit Estimator — GLM 5.2/5.3",
             "serves the Chinese mirror with the list price named in Chinese"
           ],
           "duration": 125,
@@ -5909,7 +5826,7 @@
         },
         {
           "title": [
-            "Profit Estimator \u2014 MiniMax M3",
+            "Profit Estimator — MiniMax M3",
             "opens /profit-estimator/minimax-m3 on 115 tok/s/user and the MiniMax list price"
           ],
           "duration": 602,
@@ -5917,7 +5834,7 @@
         },
         {
           "title": [
-            "Profit Estimator \u2014 MiniMax M3",
+            "Profit Estimator — MiniMax M3",
             "re-seeds the operating point and price source when switching from GLM"
           ],
           "duration": 499,
@@ -5925,7 +5842,7 @@
         },
         {
           "title": [
-            "Profit Estimator \u2014 MiniMax M3",
+            "Profit Estimator — MiniMax M3",
             "serves the Chinese mirror with the list price named in Chinese"
           ],
           "duration": 132,
@@ -5933,7 +5850,7 @@
         },
         {
           "title": [
-            "Profit Estimator \u2014 DeepSeek V4 Pro",
+            "Profit Estimator — DeepSeek V4 Pro",
             "shares an explicit P90 interactivity target and reopens on it"
           ],
           "duration": 879,
@@ -5941,7 +5858,7 @@
         },
         {
           "title": [
-            "Profit Estimator \u2014 DeepSeek V4 Pro",
+            "Profit Estimator — DeepSeek V4 Pro",
             "opens /profit-estimator/deepseek-v4 on 170 tok/s/user and the DeepSeek list price"
           ],
           "duration": 628,
@@ -5949,7 +5866,7 @@
         },
         {
           "title": [
-            "Profit Estimator \u2014 DeepSeek V4 Pro",
+            "Profit Estimator — DeepSeek V4 Pro",
             "re-seeds the operating point and price source when switching from Kimi K3"
           ],
           "duration": 533,
@@ -5957,7 +5874,7 @@
         },
         {
           "title": [
-            "Profit Estimator \u2014 DeepSeek V4 Pro",
+            "Profit Estimator — DeepSeek V4 Pro",
             "serves the Chinese mirror with the list price named in Chinese"
           ],
           "duration": 193,
@@ -5965,7 +5882,7 @@
         },
         {
           "title": [
-            "Profit Estimator \u2014 DeepSeek V4.1 Flash",
+            "Profit Estimator — DeepSeek V4.1 Flash",
             "opens /profit-estimator/deepseek-v41-flash on 150 tok/s/user and the DeepSeek Flash list price"
           ],
           "duration": 650,
@@ -5973,7 +5890,7 @@
         },
         {
           "title": [
-            "Profit Estimator \u2014 DeepSeek V4.1 Flash",
+            "Profit Estimator — DeepSeek V4.1 Flash",
             "re-seeds the operating point and price source when switching from DeepSeek V4 Pro"
           ],
           "duration": 510,
@@ -5981,7 +5898,7 @@
         },
         {
           "title": [
-            "Profit Estimator \u2014 DeepSeek V4.1 Flash",
+            "Profit Estimator — DeepSeek V4.1 Flash",
             "serves the Chinese mirror with the list price named in Chinese"
           ],
           "duration": 138,
@@ -6115,7 +6032,7 @@
         },
         {
           "title": [
-            "Profit Estimator \u2014 responsive control panels",
+            "Profit Estimator — responsive control panels",
             "keeps benchmark and pricing controls grouped on /profit-estimator at 768px"
           ],
           "duration": 958,
@@ -6123,7 +6040,7 @@
         },
         {
           "title": [
-            "Profit Estimator \u2014 responsive control panels",
+            "Profit Estimator — responsive control panels",
             "keeps benchmark and pricing controls grouped on /profit-estimator at 1280px"
           ],
           "duration": 1003,
@@ -6131,7 +6048,7 @@
         },
         {
           "title": [
-            "Profit Estimator \u2014 responsive control panels",
+            "Profit Estimator — responsive control panels",
             "keeps benchmark and pricing controls grouped on /profit-estimator at 1440px"
           ],
           "duration": 976,
@@ -6139,7 +6056,7 @@
         },
         {
           "title": [
-            "Profit Estimator \u2014 responsive control panels",
+            "Profit Estimator — responsive control panels",
             "keeps benchmark and pricing controls grouped on /profit-estimator-per-gigawatt at 375px"
           ],
           "duration": 942,
@@ -6147,7 +6064,7 @@
         },
         {
           "title": [
-            "Profit Estimator \u2014 responsive control panels",
+            "Profit Estimator — responsive control panels",
             "keeps benchmark and pricing controls grouped on /profit-estimator-per-gigawatt at 768px"
           ],
           "duration": 936,
@@ -6155,7 +6072,7 @@
         },
         {
           "title": [
-            "Profit Estimator \u2014 responsive control panels",
+            "Profit Estimator — responsive control panels",
             "keeps benchmark and pricing controls grouped on /profit-estimator-per-gigawatt at 1280px"
           ],
           "duration": 990,
@@ -6163,7 +6080,7 @@
         },
         {
           "title": [
-            "Profit Estimator \u2014 responsive control panels",
+            "Profit Estimator — responsive control panels",
             "keeps benchmark and pricing controls grouped on /profit-estimator-per-gigawatt at 1440px"
           ],
           "duration": 970,
@@ -6320,7 +6237,7 @@
             "VR publication economics",
             "prices cached-input TRTLLM data per chip-hour under /en"
           ],
-          "duration": 635,
+          "duration": 468,
           "attempts": 1
         },
         {
@@ -6471,7 +6388,7 @@
       "tests": [
         {
           "title": [
-            "Reliability Chart \u2014 Content & Interactions",
+            "Reliability Chart — Content & Interactions",
             "switching date range from default to \"Last 7 days\" changes the chart display"
           ],
           "duration": 835,
@@ -6479,7 +6396,7 @@
         },
         {
           "title": [
-            "Reliability Chart \u2014 Content & Interactions",
+            "Reliability Chart — Content & Interactions",
             "\"Reset filter\" link appears after deactivating a legend item and restores all items"
           ],
           "duration": 284,
@@ -6487,7 +6404,7 @@
         },
         {
           "title": [
-            "Reliability Chart \u2014 Chinese route and settled states",
+            "Reliability Chart — Chinese route and settled states",
             "localizes chart chrome, SVG labels, and accessibility text"
           ],
           "duration": 287,
@@ -6495,7 +6412,7 @@
         },
         {
           "title": [
-            "Reliability Chart \u2014 Chinese route and settled states",
+            "Reliability Chart — Chinese route and settled states",
             "shows a Chinese empty state only after an empty response settles"
           ],
           "duration": 120,
@@ -6503,7 +6420,7 @@
         },
         {
           "title": [
-            "Reliability Chart \u2014 Chinese route and settled states",
+            "Reliability Chart — Chinese route and settled states",
             "shows a safe Chinese error and recovers through the tracked retry control"
           ],
           "duration": 1257,
@@ -6511,7 +6428,7 @@
         },
         {
           "title": [
-            "Reliability Chart \u2014 Chinese route and settled states",
+            "Reliability Chart — Chinese route and settled states",
             "keeps controls reachable without body overflow at 375px"
           ],
           "duration": 168,
@@ -7215,7 +7132,7 @@
         },
         {
           "title": [
-            "X-Axis Mode Toggle \u2014 overlay path (finding #8 regression guard)",
+            "X-Axis Mode Toggle — overlay path (finding #8 regression guard)",
             "shows overlay (unofficial-run) watermark SVG when an overlay is loaded"
           ],
           "duration": 622,
@@ -7223,7 +7140,7 @@
         },
         {
           "title": [
-            "X-Axis Mode Toggle \u2014 overlay path (finding #8 regression guard)",
+            "X-Axis Mode Toggle — overlay path (finding #8 regression guard)",
             "e2e-normalized-interactivity mode shows suppression banner for unofficial-run overlays"
           ],
           "duration": 182,
@@ -7458,7 +7375,7 @@
             "Inference Y-axis metric",
             "changing Y-axis metric via dropdown updates SVG axis label"
           ],
-          "duration": 490,
+          "duration": 339,
           "attempts": 1
         },
         {
@@ -7651,7 +7568,7 @@
             "Video hardware dashboard (E2E fixtures)",
             "leads with the cross-hardware chart and restores v_ params from the URL"
           ],
-          "duration": 222,
+          "duration": 141,
           "attempts": 1
         },
         {
