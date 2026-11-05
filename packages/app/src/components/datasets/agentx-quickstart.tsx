@@ -20,7 +20,7 @@ export function AgentXQuickstartCallout({ locale }: { locale: Locale }) {
       <h2 id="benchmark-your-chips-title" className="text-lg font-semibold">
         {t.title}
       </h2>
-      <p className="max-w-prose text-sm leading-6 text-muted-foreground">{t.summary}</p>
+      <p className="text-sm leading-6 text-muted-foreground">{t.summary}</p>
       <CopyableCodeBlock locale={locale} label={t.run}>
         {AGENTX_COMMANDS}
       </CopyableCodeBlock>
