@@ -22,7 +22,6 @@ import {
 import { resolveShapeKey, syncPointLabel, type ScatterPointConfig } from './scatter-points';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const XHTML_NS = 'http://www.w3.org/1999/xhtml';
 const CSS_EASE_X1 = 0.25;
 const CSS_EASE_Y1 = 0.1;
 const CSS_EASE_X2 = 0.25;
@@ -33,6 +32,7 @@ const MARKER_HOVER_SCALE = 1.15;
 const NO_SLOT = 0;
 const NO_SHAPE = 255;
 const CANVAS_CONTEXT_OPTIONS: CanvasRenderingContext2DSettings = { willReadFrequently: true };
+export const CANVAS_POINT_SURFACE_CLASS = 'canvas-point-surface';
 
 export interface ScatterDatum {
   precision: string;
@@ -142,8 +142,8 @@ export function ensureCanvasPointLayer<T extends ScatterDatum>(
 
 export class CanvasPointLayer<T extends ScatterDatum> {
   readonly element: CanvasPointLayerElement;
-  private readonly foreignObject: SVGForeignObjectElement;
   private readonly canvas: HTMLCanvasElement;
+  private surfaceObserver: MutationObserver | null = null;
   private readonly hitPath: SVGPathElement;
   private readonly labelLayer: SVGGElement;
   private context: CanvasRenderingContext2D | null | undefined;
@@ -209,19 +209,22 @@ export class CanvasPointLayer<T extends ScatterDatum> {
     this.element.setAttribute('class', CANVAS_POINT_LAYER_CLASS);
     this.element.setAttribute(POINTS_JOINED_ATTRIBUTE, '0');
     this.element.scatterPoints = () => this.snapshot();
-    this.foreignObject = document.createElementNS(SVG_NS, 'foreignObject');
-    this.foreignObject.setAttribute('pointer-events', 'none');
-    this.canvas = document.createElementNS(XHTML_NS, 'canvas') as HTMLCanvasElement;
+    // The canvas is an HTML sibling placed under the SVG, not a <foreignObject> child. WebKit
+    // composites large canvases and paints composited foreignObject content without its SVG
+    // ancestors' transforms and clip, so Safari drew every point offset from the plot.
+    this.canvas = document.createElement('canvas');
+    this.canvas.className = CANVAS_POINT_SURFACE_CLASS;
+    this.canvas.setAttribute('aria-hidden', 'true');
     this.canvas.style.display = 'block';
+    this.canvas.style.position = 'absolute';
     this.canvas.style.pointerEvents = 'none';
-    this.foreignObject.append(this.canvas);
     this.hitPath = document.createElementNS(SVG_NS, 'path');
     this.hitPath.setAttribute('class', POINT_HIT_AREA_CLASS);
     this.hitPath.setAttribute('fill', 'transparent');
     this.hitPath.setAttribute('cursor', 'pointer');
     this.labelLayer = document.createElementNS(SVG_NS, 'g');
     this.labelLayer.setAttribute('class', 'point-label-layer');
-    this.element.append(this.foreignObject, this.hitPath, this.labelLayer);
+    this.element.append(this.hitPath, this.labelLayer);
   }
 
   join(
@@ -329,14 +332,59 @@ export class CanvasPointLayer<T extends ScatterDatum> {
     const ratio = globalThis.devicePixelRatio || 1;
     this.width = width;
     this.height = height;
-    this.foreignObject.setAttribute('width', String(width));
-    this.foreignObject.setAttribute('height', String(height));
     this.canvas.style.width = `${width}px`;
     this.canvas.style.height = `${height}px`;
     const pixelWidth = Math.max(1, Math.round(width * ratio));
     const pixelHeight = Math.max(1, Math.round(height * ratio));
     if (this.canvas.width !== pixelWidth) this.canvas.width = pixelWidth;
     if (this.canvas.height !== pixelHeight) this.canvas.height = pixelHeight;
+  }
+
+  /**
+   * Keeps the canvas directly under the SVG, aligned with this layer's plot origin. The SVG is
+   * made a positioned box so it paints above the canvas, which keeps lines, labels and
+   * annotations over the points as before. The canvas is removed once this layer leaves the SVG.
+   */
+  private mountSurface(): boolean {
+    const svg = this.element.isConnected ? this.element.ownerSVGElement : null;
+    const host = svg?.parentElement;
+    if (!svg || !host) {
+      this.unmountSurface();
+      return false;
+    }
+    if (this.canvas.parentNode !== host || this.canvas.nextSibling !== svg) {
+      host.insertBefore(this.canvas, svg);
+      if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+      if (getComputedStyle(svg).position === 'static') svg.style.position = 'relative';
+    }
+    if (!this.surfaceObserver && typeof MutationObserver !== 'undefined') {
+      this.surfaceObserver = new MutationObserver(() => {
+        if (!this.element.isConnected) this.unmountSurface();
+      });
+      this.surfaceObserver.observe(svg, { childList: true, subtree: true });
+    }
+    const ctm = this.element.getCTM?.();
+    const svgBox = svg.getBoundingClientRect();
+    const hostBox = host.getBoundingClientRect();
+    const left = svgBox.left - hostBox.left - host.clientLeft + (ctm?.e ?? 0);
+    const top = svgBox.top - hostBox.top - host.clientTop + (ctm?.f ?? 0);
+    setStyleIfChanged(this.canvas, 'left', `${left}px`);
+    setStyleIfChanged(this.canvas, 'top', `${top}px`);
+    return true;
+  }
+
+  private unmountSurface(): void {
+    this.surfaceObserver?.disconnect();
+    this.surfaceObserver = null;
+    this.canvas.remove();
+  }
+
+  /** Viewport position of the plot origin, which the hit grid and snapshots are relative to. */
+  private plotOrigin(): PointPosition {
+    const ctm = this.element.getScreenCTM?.();
+    if (ctm) return { x: ctm.e, y: ctm.f };
+    const bounds = this.canvas.getBoundingClientRect();
+    return { x: bounds.left, y: bounds.top };
   }
 
   private paletteSlots(palette: string[]): (color: string) => number {
@@ -488,6 +536,7 @@ export class CanvasPointLayer<T extends ScatterDatum> {
   }
 
   place(xScale: ContinuousScale, yScale: ContinuousScale): void {
+    this.mountSurface();
     for (let index = 0; index < this.count; index++) {
       const datum = this.data[index];
       const x = xScale(datum.x);
@@ -632,8 +681,8 @@ export class CanvasPointLayer<T extends ScatterDatum> {
   }
 
   private pointAt(event: MouseEvent): number {
-    const bounds = this.canvas.getBoundingClientRect();
-    return this.hitTest(event.clientX - bounds.left, event.clientY - bounds.top);
+    const origin = this.plotOrigin();
+    return this.hitTest(event.clientX - origin.x, event.clientY - origin.y);
   }
 
   private leavePointer(event: MouseEvent, handlers: PointPointerHandlers<T>): void {
@@ -672,7 +721,7 @@ export class CanvasPointLayer<T extends ScatterDatum> {
   }
 
   snapshot(): ScatterPointSnapshot<T>[] {
-    const bounds = this.canvas.getBoundingClientRect();
+    const origin = this.plotOrigin();
     const dataAttrs = Object.entries(this.config?.dataAttrs ?? {});
     return this.data.map((datum, index) => {
       const attrs: Record<string, string> = {};
@@ -686,8 +735,8 @@ export class CanvasPointLayer<T extends ScatterDatum> {
         datum,
         x: this.xs[index],
         y: this.ys[index],
-        clientX: bounds.left + this.xs[index],
-        clientY: bounds.top + this.ys[index],
+        clientX: origin.x + this.xs[index],
+        clientY: origin.y + this.ys[index],
         opacity: this.alpha[index],
         interactive: this.interactive[index] === 1,
         shape: SHAPE_ORDER[this.shape[index]],
@@ -788,6 +837,7 @@ export class CanvasPointLayer<T extends ScatterDatum> {
   }
 
   private draw(): void {
+    if (!this.mountSurface()) return;
     this.context ??= this.canvas.getContext('2d', CANVAS_CONTEXT_OPTIONS);
     const context = this.context;
     if (!context) return;

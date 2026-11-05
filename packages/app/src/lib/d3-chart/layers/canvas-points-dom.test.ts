@@ -42,32 +42,67 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
+function stubScreenOrigin(element: SVGGElement, x: number, y: number): void {
+  Object.defineProperty(element, 'getScreenCTM', {
+    configurable: true,
+    value: () => ({ a: 1, b: 0, c: 0, d: 1, e: x, f: y }),
+  });
+}
+
 describe('CanvasPointLayer DOM', () => {
-  it('builds a pointer-transparent canvas under a transparent hit path and a label layer', () => {
+  it('builds a pointer-transparent canvas under the SVG, beside a transparent hit path and a label layer', () => {
     const { svg, layer } = mountLayer();
     const element = svg.querySelector<CanvasPointLayerElement>(CANVAS_POINT_LAYER_SELECTOR)!;
     expect(element.dataset.pointsJoined).toBe('0');
-    expect([...element.children].map((child) => child.tagName)).toEqual([
-      'foreignObject',
-      'path',
-      'g',
-    ]);
-    const [foreignObject, hitPath, labelLayer] = element.children;
-    expect(foreignObject.getAttribute('pointer-events')).toBe('none');
-    const canvas = foreignObject.firstElementChild as HTMLCanvasElement;
+    expect([...element.children].map((child) => child.tagName)).toEqual(['path', 'g']);
+    const [hitPath, labelLayer] = element.children;
+    layer.join([point('a', 1, 2)], key, 100, 100);
+    layer.place(identity, identity);
+    expect(svg.querySelector('foreignObject, canvas')).toBeNull();
+    const canvas = svg.previousElementSibling as HTMLCanvasElement;
     expect(canvas.tagName.toLowerCase()).toBe('canvas');
-    expect([canvas.style.display, canvas.style.pointerEvents]).toEqual(['block', 'none']);
+    expect(canvas.getAttribute('aria-hidden')).toBe('true');
+    expect([canvas.style.display, canvas.style.position, canvas.style.pointerEvents]).toEqual([
+      'block',
+      'absolute',
+      'none',
+    ]);
+    expect((svg as SVGSVGElement).style.position).toBe('relative');
     expect([hitPath.getAttribute('fill'), hitPath.getAttribute('cursor')]).toEqual([
       'transparent',
       'pointer',
     ]);
     expect(labelLayer.getAttribute('class')).toBe('point-label-layer');
-    layer.join([point('a', 1, 2)], key, 100, 100);
     layer.restyle(config);
-    layer.place(identity, identity);
     expect(element.scatterPoints?.().map((entry) => [entry.key, entry.x, entry.y])).toEqual([
       ['a', 1, 2],
     ]);
+  });
+
+  it('aligns the canvas with the plot origin instead of relying on SVG transforms', () => {
+    const { svg, layer } = mountLayer();
+    const host = svg.parentElement!;
+    vi.spyOn(host, 'getBoundingClientRect').mockReturnValue(new DOMRect(10, 20, 500, 400));
+    vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue(new DOMRect(10, 28, 500, 392));
+    Object.defineProperty(layer.element, 'getCTM', {
+      configurable: true,
+      value: () => ({ a: 1, b: 0, c: 0, d: 1, e: 60, f: 24 }),
+    });
+    layer.join([point('a', 1, 2)], key, 100, 100);
+    layer.place(identity, identity);
+    const canvas = svg.previousElementSibling as HTMLCanvasElement;
+    expect([canvas.style.left, canvas.style.top]).toEqual(['60px', '32px']);
+  });
+
+  it('removes the canvas when the chart clears its SVG and keeps one canvas per layer', async () => {
+    const first = mountLayer();
+    first.layer.join([point('a', 1, 2)], key, 100, 100);
+    first.layer.place(identity, identity);
+    first.layer.place(identity, identity);
+    expect(document.querySelectorAll('canvas')).toHaveLength(1);
+    first.svg.replaceChildren();
+    await Promise.resolve();
+    expect(document.querySelectorAll('canvas')).toHaveLength(0);
   });
 
   it('redraws only connected layers when the document theme changes, from one observer', async () => {
@@ -161,9 +196,7 @@ describe('CanvasPointLayer labels', () => {
 describe('CanvasPointLayer pointer', () => {
   function pointerLayer() {
     const mounted = placedLayer([point('a', 10, 10), point('b', 60, 10)]);
-    vi.spyOn(mounted.svg.querySelector('canvas')!, 'getBoundingClientRect').mockReturnValue(
-      new DOMRect(100, 50, 100, 100),
-    );
+    stubScreenOrigin(mounted.layer.element, 100, 50);
     const events: string[] = [];
     const handlers: PointPointerHandlers<Datum> = {
       enter: (_event, datum) => {
@@ -195,7 +228,7 @@ describe('CanvasPointLayer pointer', () => {
     expect(events).toEqual(['enter:a', 'move', 'leave:a', 'enter:a', 'move']);
   });
 
-  it('clicks the first point and reports its position relative to the canvas', () => {
+  it('clicks the first point and reports its position relative to the plot origin', () => {
     const { events, fire } = pointerLayer();
     fire('click', 12, 10);
     fire('click', 35, 10);
@@ -210,9 +243,7 @@ describe('CanvasPointLayer state', () => {
       point('b', 30, 40),
       point('c', 50, 60, false),
     ]);
-    vi.spyOn(svg.querySelector('canvas')!, 'getBoundingClientRect').mockReturnValue(
-      new DOMRect(100, 50, 100, 100),
-    );
+    stubScreenOrigin(layer.element, 100, 50);
     layer.restyle({
       getColor: (d) => (d.id === 'a' ? 'red' : 'blue'),
       getPointerEvents: (d) => (d.id === 'c' ? 'none' : 'auto'),
