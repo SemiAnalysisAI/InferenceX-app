@@ -29,6 +29,8 @@ describe('H3 serving matrix', () => {
     expect(at(cells[2].power, 'phases', 'measurement', 'aggregate', 'joules_per_valid_clip')).toBe(
       168000,
     );
+    const amd = fixture('123', 'AMD Instinct MI355X', 4, ['692526018597', '692526014242']);
+    expect(servingCells(amd)).toHaveLength(3);
   });
   it('leaves old artifacts alone and retains unstarted cells without invented results', () => {
     const b = fixture();

@@ -85,7 +85,7 @@ export function servingCells(
       canonical(plan) === canonical(at(manifest, 'workload_plan')) &&
       devices.length > 0 &&
       new Set(devices).size === devices.length &&
-      devices.every((device) => typeof device === 'string' && device.startsWith('GPU-')),
+      devices.every((device) => typeof device === 'string' && device !== ''),
     'workload or GPU identity is missing or inconsistent',
   );
   const seen = new Set<number>();

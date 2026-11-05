@@ -6,6 +6,7 @@ export function servingFixture(
   runId = '123',
   hardware = 'NVIDIA H200',
   requests = 4,
+  devices = ['GPU-first', 'GPU-second'],
 ): Pick<Bundle, 'documents' | 'checksums' | 'manifest' | 'ci'> {
   const plan = {
     model_id: 'MiniMaxAI/MiniMax-H3',
@@ -32,7 +33,6 @@ export function servingFixture(
     source: '/runtime/sglang',
     python: '/usr/bin/python3',
   };
-  const devices = ['GPU-first', 'GPU-second'];
   const documents = new Map<string, Json>();
   const checksums = new Map<string, string>();
   const save = (path: string, value: Json, digest: string) => {
