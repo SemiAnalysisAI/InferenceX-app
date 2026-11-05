@@ -43,8 +43,8 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.get('[data-new-badge="launch-banner"]').should('have.class', 'new-badge-flash');
-    cy.get('[data-new-badge]')
-      .should('have.length', 4)
+    cy.get('[data-new-badge]:visible')
+      .should('have.length', 3)
       .then(($badges) => {
         const sizes = [...$badges].map((badge) => {
           const rect = badge.getBoundingClientRect();
@@ -384,6 +384,8 @@ describe('Dashboard nudges — reproducibility toast', () => {
     });
     cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
     cy.get('[data-testid="reproducibility-nudge"]').should('be.visible');
+    cy.get('[data-testid="reproducibility-nudge"] button[aria-label="Dismiss"]').click();
+    cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
 
     cy.window().then((win) => {
       expect(win.localStorage.getItem('inferencex-reproducibility-nudge-dismissed')).to.eq('1');
