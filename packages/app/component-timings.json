@@ -822,28 +822,6 @@
       ]
     },
     {
-      "spec": "cypress/component/comparison-series-theme.cy.tsx",
-      "duration": 587,
-      "tests": [
-        {
-          "title": [
-            "comparison chart themes",
-            "keeps decorative themes on the dark comparison palette (standard)"
-          ],
-          "duration": 302,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "comparison chart themes",
-            "keeps decorative themes on the dark comparison palette (high contrast)"
-          ],
-          "duration": 277,
-          "attempts": 1
-        }
-      ]
-    },
-    {
       "spec": "cypress/component/component-css.cy.tsx",
       "duration": 4061,
       "tests": [
@@ -2725,28 +2703,6 @@
       ]
     },
     {
-      "spec": "cypress/component/normalized-interactivity-help-link.cy.tsx",
-      "duration": 87,
-      "tests": [
-        {
-          "title": [
-            "NormalizedInteractivityHelpLink",
-            "renders a descriptive link to the English FAQ"
-          ],
-          "duration": 53,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "NormalizedInteractivityHelpLink",
-            "links the Chinese control to the Chinese FAQ"
-          ],
-          "duration": 29,
-          "attempts": 1
-        }
-      ]
-    },
-    {
       "spec": "cypress/component/power-analysis-panels.cy.tsx",
       "duration": 121,
       "tests": [
@@ -4339,44 +4295,6 @@
             "exposes bar values on keyboard focus without regressing pointer tooltips"
           ],
           "duration": 109,
-          "attempts": 1
-        }
-      ]
-    },
-    {
-      "spec": "cypress/component/umbp-run-label.cy.tsx",
-      "duration": 755,
-      "tests": [
-        {
-          "title": [
-            "UMBP run recognition legend",
-            "renders the official and overlay legends as UMBP MoRI SGLang at 2026-10-09T23:59:59-04:00"
-          ],
-          "duration": 252,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "UMBP run recognition legend",
-            "renders the official and overlay legends as MoRI SGLang at 2026-10-10T00:00:00-04:00"
-          ],
-          "duration": 154,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "router-aware framework labels",
-            "labels the entire official and unofficial curve SMG SGLang if any point uses SMG"
-          ],
-          "duration": 191,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "router-aware framework labels",
-            "labels the entire official and unofficial curve SMG vLLM if any point uses SMG"
-          ],
-          "duration": 151,
           "attempts": 1
         }
       ]

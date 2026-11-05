@@ -36,7 +36,7 @@ export const metricsFor = (intvty: number, tput: number, e2el: number): Record<s
 
 export const DOMINATED_CONFIG: [number, number, number, number] = [6, 60, 5000, 40];
 
-export const AGENTIC_FIXTURE_FIRST_ID = 900000;
+const AGENTIC_FIXTURE_FIRST_ID = 900000;
 let idCursor = AGENTIC_FIXTURE_FIRST_ID;
 export const b300Rows = (
   runUrl: string | null,

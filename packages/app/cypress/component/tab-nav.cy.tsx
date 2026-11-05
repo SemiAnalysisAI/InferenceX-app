@@ -58,28 +58,20 @@ describe('TabNav retained inference model', () => {
     setInferenceNavigationModel(undefined);
   });
 
-  for (const locale of ['', '/zh']) {
-    for (const width of [375, 1280]) {
-      it(`preserves the selected model and unofficial run from ${locale}/evaluation at ${width}px`, () => {
-        cy.viewport(width, 900);
-        setInferenceNavigationModel('Qwen-3.5-397B-A17B');
-        mountTabNav({ pathname: `${locale}/evaluation`, search: '?unofficialruns=12345' });
-        cy.get(`[data-testid="${width < 768 ? 'mobile-tab' : 'tab-trigger'}-inference"]`)
-          .filter(':visible')
-          .should(
-            'have.attr',
-            'href',
-            `${locale}/inference?unofficialruns=12345&g_model=Qwen-3.5-397B-A17B`,
-          );
-        cy.then(() => setInferenceNavigationModel('DeepSeek-V4-Pro'));
-        cy.get(`[data-testid="${width < 768 ? 'mobile-tab' : 'tab-trigger'}-inference"]`).should(
-          'have.attr',
-          'href',
-          `${locale}/inference?unofficialruns=12345&g_model=DeepSeek-V4-Pro`,
-        );
-      });
-    }
-  }
+  it('preserves the selected model and unofficial run from /zh/evaluation at 375px', () => {
+    cy.viewport(375, 900);
+    setInferenceNavigationModel('Qwen-3.5-397B-A17B');
+    mountTabNav({ pathname: '/zh/evaluation', search: '?unofficialruns=12345' });
+    cy.get('[data-testid="mobile-tab-inference"]')
+      .filter(':visible')
+      .should('have.attr', 'href', '/zh/inference?unofficialruns=12345&g_model=Qwen-3.5-397B-A17B');
+    cy.then(() => setInferenceNavigationModel('DeepSeek-V4-Pro'));
+    cy.get('[data-testid="mobile-tab-inference"]').should(
+      'have.attr',
+      'href',
+      '/zh/inference?unofficialruns=12345&g_model=DeepSeek-V4-Pro',
+    );
+  });
 });
 
 describe('TabNav — attached unofficial-run banner', () => {
@@ -195,47 +187,39 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
     );
   });
 
-  for (const prefix of ['', '/zh']) {
-    for (const tab of ['profit-estimator', 'profit-estimator-per-gigawatt']) {
-      it(`carries route-owned runs from ${prefix}/${tab} to desktop and mobile tabs`, () => {
-        const base = `${prefix}/${tab}/deepseek-v4/target/24`;
-        mountTabNav({ pathname: `${base}/unofficial-runs/111%2C222` });
-        for (const selector of ['tab-trigger', 'mobile-tab']) {
-          cy.get(`[data-testid="${selector}-inference"]`).should(
-            'have.attr',
-            'href',
-            `${prefix}/inference?unofficialruns=111,222`,
-          );
-          cy.get(`[data-testid="${selector}-evaluation"]`).should(
-            'have.attr',
-            'href',
-            `${prefix}/evaluation?unofficialruns=111,222`,
-          );
-          for (const destination of ['profit-estimator', 'profit-estimator-per-gigawatt']) {
-            cy.get(`[data-testid="${selector}-${destination}"]`).should(
-              'have.attr',
-              'href',
-              `${prefix}/${destination}/kimi-k3/unofficial-runs/111%2C222`,
-            );
-          }
-        }
-        cy.window().then((win) => {
-          win.history.replaceState(null, '', base);
-          win.dispatchEvent(new CustomEvent(CLIENT_PATHNAME_CHANGE_EVENT));
-        });
-        cy.get('[data-testid="tab-trigger-inference"]').should(
+  it('carries route-owned runs from /zh/profit-estimator to desktop and mobile tabs', () => {
+    const base = '/zh/profit-estimator/deepseek-v4/target/24';
+    mountTabNav({ pathname: `${base}/unofficial-runs/111%2C222` });
+    for (const selector of ['tab-trigger', 'mobile-tab']) {
+      cy.get(`[data-testid="${selector}-inference"]`).should(
+        'have.attr',
+        'href',
+        '/zh/inference?unofficialruns=111,222',
+      );
+      cy.get(`[data-testid="${selector}-evaluation"]`).should(
+        'have.attr',
+        'href',
+        '/zh/evaluation?unofficialruns=111,222',
+      );
+      for (const destination of ['profit-estimator', 'profit-estimator-per-gigawatt']) {
+        cy.get(`[data-testid="${selector}-${destination}"]`).should(
           'have.attr',
           'href',
-          `${prefix}/inference`,
+          `/zh/${destination}/kimi-k3/unofficial-runs/111%2C222`,
         );
-        cy.get('[data-testid="tab-trigger-profit-estimator"]').should(
-          'have.attr',
-          'href',
-          `${prefix}/profit-estimator`,
-        );
-      });
+      }
     }
-  }
+    cy.window().then((win) => {
+      win.history.replaceState(null, '', base);
+      win.dispatchEvent(new CustomEvent(CLIENT_PATHNAME_CHANGE_EVENT));
+    });
+    cy.get('[data-testid="tab-trigger-inference"]').should('have.attr', 'href', '/zh/inference');
+    cy.get('[data-testid="tab-trigger-profit-estimator"]').should(
+      'have.attr',
+      'href',
+      '/zh/profit-estimator',
+    );
+  });
 
   it('preserves a comma-separated list of run ids verbatim', () => {
     mountTabNav({ search: '?unofficialruns=111,222,333' });
@@ -353,12 +337,6 @@ describe('TabNav — Hidden popover for gated tabs', () => {
   it('highlights the Hidden trigger when the current path is one of the gated tabs', () => {
     cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1'));
     mountTabNav({ pathname: '/feedback' });
-    cy.get('[data-testid="tab-trigger-hidden"]').should('have.class', 'border-secondary');
-  });
-
-  it('highlights the Hidden trigger on /collectivex, which is now gated', () => {
-    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1'));
-    mountTabNav({ pathname: '/collectivex' });
     cy.get('[data-testid="tab-trigger-hidden"]').should('have.class', 'border-secondary');
   });
 

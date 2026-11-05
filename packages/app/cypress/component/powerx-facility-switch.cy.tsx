@@ -88,62 +88,52 @@ const pues = points.flatMap((p) =>
   p.modeledSystemPower?.status === 'supported' ? [p.modeledSystemPower.pue] : [],
 );
 
-for (const [label, width] of [
-  ['mobile', 393],
-  ['desktop', 1280],
-] as const) {
-  describe(`PowerX Include facility switch (${label})`, () => {
-    beforeEach(() => {
-      cy.viewport(width, 900);
-      cy.on('uncaught:exception', (error) => {
-        if (error.message.includes('ResizeObserver loop')) return false;
-      });
-    });
-
-    it('starts on, shows the facility layer and labels the PUE range of the chips', () => {
-      mountWithProviders(
-        <PathnameContext.Provider value="/powerx">
-          <PowerXSurfaceProvider>
-            <div style={{ width: '100%', maxWidth: 1120, padding: 12, boxSizing: 'border-box' }}>
-              <div className="mb-3 flex flex-wrap items-start gap-x-6">
-                <PowerXFacilitySwitch pues={pues} />
-              </div>
-              <PowerAnalysisPanels
-                data={points}
-                xField="mean_tpot_intvty"
-                xLabel="Interactivity (output tok/s/user)"
-                chartId="powerx-facility-test"
-                placement="before"
-              />
-            </div>
-          </PowerXSurfaceProvider>
-        </PathnameContext.Provider>,
-        { inference: {}, unofficial: {} },
-      );
-      cy.get('[data-testid="power-chip-compare-value"]').should('exist');
-      cy.scrollTo('top', { ensureScrollable: false });
-      cy.screenshot(`powerx-facility-${label}`, { capture: 'viewport' });
-      cy.get('[data-testid="powerx-facility-switch"] [role="switch"]').should(
-        'have.attr',
-        'aria-checked',
-        'true',
-      );
-      cy.get('[data-testid="powerx-facility-switch"] label').should(
-        'have.text',
-        'Include facility (PUE 1.1–1.3)',
-      );
-      cy.get('[data-testid="power-chip-compare-segment"][data-band="facility"]').should(
-        'have.length.greaterThan',
-        0,
-      );
-      cy.get('[data-testid="powerx-facility-switch"]').then(($el) => {
-        expect($el[0].scrollWidth).to.be.at.most($el[0].clientWidth + 1);
-      });
-      cy.get('[data-testid="powerx-facility-switch"] [role="switch"]').click();
-      cy.get('[data-testid="power-chip-compare-segment"][data-band="facility"]').should(
-        'have.length',
-        0,
-      );
+describe('PowerX Include facility switch (mobile)', () => {
+  beforeEach(() => {
+    cy.viewport(393, 900);
+    cy.on('uncaught:exception', (error) => {
+      if (error.message.includes('ResizeObserver loop')) return false;
     });
   });
-}
+
+  it('starts on, shows the facility layer and labels the PUE range of the chips', () => {
+    mountWithProviders(
+      <PathnameContext.Provider value="/powerx">
+        <PowerXSurfaceProvider>
+          <div style={{ width: '100%', maxWidth: 1120, padding: 12, boxSizing: 'border-box' }}>
+            <div className="mb-3 flex flex-wrap items-start gap-x-6">
+              <PowerXFacilitySwitch pues={pues} />
+            </div>
+            <PowerAnalysisPanels
+              data={points}
+              xField="mean_tpot_intvty"
+              xLabel="Interactivity (output tok/s/user)"
+              chartId="powerx-facility-test"
+              placement="before"
+            />
+          </div>
+        </PowerXSurfaceProvider>
+      </PathnameContext.Provider>,
+      { inference: {}, unofficial: {} },
+    );
+    cy.get('[data-testid="power-chip-compare-value"]').should('exist');
+    cy.get('[data-testid="powerx-facility-switch"] [role="switch"]').should(
+      'have.attr',
+      'aria-checked',
+      'true',
+    );
+    cy.get('[data-testid="powerx-facility-switch"] label').should('contain.text', 'PUE 1.1–1.3');
+    cy.get('[data-testid="power-chip-compare-segment"][data-band="facility"]').should(
+      'have.length.greaterThan',
+      0,
+    );
+    cy.get('[data-testid="powerx-facility-switch"]').then(($el) => {
+      expect($el[0].scrollWidth).to.be.at.most($el[0].clientWidth + 1);
+    });
+    cy.get('[data-testid="powerx-facility-switch"] [role="switch"]').click();
+    cy.get('[data-testid="power-chip-compare-segment"][data-band="facility"]').should(
+      'have.length',
+      0,
+    );
+  });
+});

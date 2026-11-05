@@ -21,11 +21,7 @@
       {
         "shard": 4,
         "duration": 27800,
-        "specs": [
-          "cypress/e2e/nudge-system.cy.ts",
-          "cypress/e2e/gradient-labels.cy.ts",
-          "cypress/e2e/tokens-per-currency.cy.ts"
-        ]
+        "specs": ["cypress/e2e/nudge-system.cy.ts", "cypress/e2e/gradient-labels.cy.ts"]
       },
       {
         "shard": 5,
@@ -93,7 +89,6 @@
         "duration": 27810,
         "specs": [
           "cypress/e2e/landing-dashboard-navigation.cy.ts",
-          "cypress/e2e/agentic-point-coach-mark.cy.ts",
           "cypress/e2e/jalapeno-preview-notice.cy.ts",
           "cypress/e2e/datasets-flamegraph-time.cy.ts",
           "cypress/e2e/fixed-sequence-logs.cy.ts"
@@ -106,8 +101,7 @@
           "cypress/e2e/inference-replay.cy.ts",
           "cypress/e2e/custom-user-values.cy.ts",
           "cypress/e2e/first-token-limits.cy.ts",
-          "cypress/e2e/framework-line-label.cy.ts",
-          "cypress/e2e/unofficial-watermark.cy.ts"
+          "cypress/e2e/framework-line-label.cy.ts"
         ]
       },
       {
@@ -213,11 +207,7 @@
       {
         "shard": 2,
         "duration": 30752,
-        "specs": [
-          "cypress/e2e/nudge-system.cy.ts",
-          "cypress/e2e/agentic-workload-explorer.cy.ts",
-          "cypress/e2e/unofficial-watermark.cy.ts"
-        ]
+        "specs": ["cypress/e2e/nudge-system.cy.ts", "cypress/e2e/agentic-workload-explorer.cy.ts"]
       },
       {
         "shard": 3,
@@ -273,8 +263,7 @@
         "specs": [
           "cypress/e2e/inference-chart.cy.ts",
           "cypress/e2e/powerx-compare.cy.ts",
-          "cypress/e2e/overlay-legend-remove.cy.ts",
-          "cypress/e2e/tokens-per-currency.cy.ts"
+          "cypress/e2e/overlay-legend-remove.cy.ts"
         ]
       },
       {
@@ -314,7 +303,6 @@
         "duration": 31145,
         "specs": [
           "cypress/e2e/model-architecture.cy.ts",
-          "cypress/e2e/agentic-point-coach-mark.cy.ts",
           "cypress/e2e/gpu-compare-agentic-detail.cy.ts",
           "cypress/e2e/compare-precision.cy.ts",
           "cypress/e2e/compare-redirect.cy.ts"
@@ -448,11 +436,9 @@
           "cypress/component/footer.cy.tsx",
           "cypress/component/data-table.cy.tsx",
           "cypress/component/cost-tier-selector.cy.tsx",
-          "cypress/component/umbp-run-label.cy.tsx",
           "cypress/component/trace-flamegraph.cy.tsx",
           "cypress/component/distribution-card.cy.tsx",
-          "cypress/component/scatter-label-overlap.cy.tsx",
-          "cypress/component/normalized-interactivity-help-link.cy.tsx"
+          "cypress/component/scatter-label-overlap.cy.tsx"
         ]
       },
       {
@@ -499,7 +485,6 @@
           "cypress/component/date-range-picker.cy.tsx",
           "cypress/component/eval-chart-controls.cy.tsx",
           "cypress/component/submissions-table.cy.tsx",
-          "cypress/component/comparison-series-theme.cy.tsx",
           "cypress/component/error-boundary.cy.tsx",
           "cypress/component/faq-question-link.cy.tsx",
           "cypress/component/frontier-points-panel.cy.tsx"

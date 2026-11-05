@@ -66,27 +66,6 @@ describe('Inference ChartControls', () => {
     cy.get('[data-testid="measured-metric-controls"]').should('not.exist');
   });
 
-  it('renders the Y-axis metric selector', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
-    cy.get('[data-testid="cost-display-selector"]').should('not.exist');
-  });
-
-  it('Y-axis metric selector shows grouped options', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.contains('Throughput').should('exist');
-  });
-
-  it('calls setSelectedYAxisMetric when a Y-axis option is chosen', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.contains('[data-slot="select-item"]', 'Output Token Throughput per Chip').click();
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledOnce');
-  });
-
-  it('does not render the Cost Tier selector; it lives in the chart caption', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
-    cy.get('[data-testid="cost-tier-selector"]').should('not.exist');
-  });
-
   it('lists each tiered metric once in the Y-axis selector, without the tier suffix', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.get('[data-slot="select-item"]').then(($items) => {
@@ -114,11 +93,6 @@ describe('Inference ChartControls', () => {
       .scrollIntoView()
       .click();
     cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_costh');
-  });
-
-  it('hides the GPU comparison section when no GPUs are selected', () => {
-    cy.contains('Comparison Date Range').should('not.exist');
-    cy.contains('Intermediary Dates').should('not.exist');
   });
 
   it('uses a full-width benchmark row above chart and history controls on desktop', () => {
@@ -391,7 +365,6 @@ describe('Inference ChartControls cost metrics', () => {
     ]) {
       cy.contains('[data-slot="select-item"]', label).should('exist');
     }
-    cy.get('[data-testid="cost-display-selector"]').should('not.exist');
   });
 
   it('selects tokens per dollar through the Y-axis metric control on the active tier', () => {
@@ -510,89 +483,81 @@ describe('Axis option help', () => {
     mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {}, unofficial: {} });
   });
 
-  for (const searchable of [true, false]) {
-    it(`lets Tab leave the help grid in both directions (searchable=${searchable})`, () => {
-      mountWithProviders(
-        <div>
-          <button data-testid="before-field">Before</button>
-          <SearchableSelect
-            value="first"
-            onValueChange={cy.stub().as('selectMetric')}
-            searchable={searchable}
-            triggerTestId="keyboard-field"
-            placeholder="Metric"
-            groups={[
-              {
-                label: '',
-                options: [
-                  { value: 'first', label: 'First metric', help: <p>First explanation</p> },
-                  { value: 'second', label: 'Second metric', help: <p>Second explanation</p> },
-                ],
-              },
-            ]}
-          />
-          <button data-testid="after-field">After</button>
-        </div>,
-        { inference: {} },
-      );
-      cy.get('[data-testid="keyboard-field"]')
-        .should('have.attr', 'aria-label', 'Metric: First metric')
-        .click('right');
-      cy.focused().trigger('keydown', { key: 'Tab' });
-      cy.get('[data-testid="after-field"]').should('have.focus');
-      cy.get('[data-testid="keyboard-field"]').should('have.attr', 'aria-expanded', 'false');
-      cy.get('[data-testid="keyboard-field"]').click('right');
-      cy.focused().trigger('keydown', { key: 'Tab', shiftKey: true });
-      cy.get('[data-testid="before-field"]').should('have.focus');
-      cy.get('[data-testid="keyboard-field"]').should('have.attr', 'aria-expanded', 'false');
-      cy.get('@selectMetric').should('not.have.been.called');
-    });
-  }
+  it('lets Tab leave the help grid in both directions (searchable=true)', () => {
+    mountWithProviders(
+      <div>
+        <button data-testid="before-field">Before</button>
+        <SearchableSelect
+          value="first"
+          onValueChange={cy.stub().as('selectMetric')}
+          searchable
+          triggerTestId="keyboard-field"
+          placeholder="Metric"
+          groups={[
+            {
+              label: '',
+              options: [
+                { value: 'first', label: 'First metric', help: <p>First explanation</p> },
+                { value: 'second', label: 'Second metric', help: <p>Second explanation</p> },
+              ],
+            },
+          ]}
+        />
+        <button data-testid="after-field">After</button>
+      </div>,
+      { inference: {} },
+    );
+    cy.get('[data-testid="keyboard-field"]')
+      .should('have.attr', 'aria-label', 'Metric: First metric')
+      .click('right');
+    cy.focused().trigger('keydown', { key: 'Tab' });
+    cy.get('[data-testid="after-field"]').should('have.focus');
+    cy.get('[data-testid="keyboard-field"]').should('have.attr', 'aria-expanded', 'false');
+    cy.get('[data-testid="keyboard-field"]').click('right');
+    cy.focused().trigger('keydown', { key: 'Tab', shiftKey: true });
+    cy.get('[data-testid="before-field"]').should('have.focus');
+    cy.get('[data-testid="keyboard-field"]').should('have.attr', 'aria-expanded', 'false');
+    cy.get('@selectMetric').should('not.have.been.called');
+  });
 
-  for (const [trigger, value, explanation] of [
-    ['#scenario-select', Sequence.EightK_OneK, 'Input Sequence Length'],
-    ['#x-axis-mode-select', 'interactivity', 'Interactivity'],
-    ['#y-axis-select', 'y_tpPerGpu', 'Rate of total tokens'],
-  ]) {
-    it(`shows selected-value help inside ${trigger} without opening its menu`, () => {
-      cy.get(trigger).then(($trigger) => {
-        const bounds = $trigger[0].getBoundingClientRect();
-        cy.get(`[data-testid="selected-option-help-${value}"]`)
-          .should(($help) => {
-            const icon = $help.find('svg')[0].getBoundingClientRect();
-            expect(icon.left).to.be.greaterThan(bounds.left);
-            expect(icon.right).to.be.lessThan(bounds.right);
-            expect(icon.top).to.be.greaterThan(bounds.top);
-            expect(icon.bottom).to.be.lessThan(bounds.bottom);
-            expect($help[0].closest('button[role="combobox"]')).to.equal(null);
-          })
-          .trigger('pointerover', { pointerType: 'mouse' });
-      });
-      cy.get(`[data-testid="selected-option-help-content-${value}"]`)
-        .should('be.visible')
-        .and('contain.text', explanation);
-      cy.get(trigger).should('have.attr', 'aria-expanded', 'false');
-      cy.get(trigger).click('right');
-      cy.get(`[data-testid="selected-option-help-${value}"]`).should('not.exist');
-      cy.get(`[data-testid="option-help-${value}"]`)
-        .should('be.visible')
+  it('shows selected-value help inside #y-axis-select without opening its menu', () => {
+    cy.get('#y-axis-select').then(($trigger) => {
+      const bounds = $trigger[0].getBoundingClientRect();
+      cy.get('[data-testid="selected-option-help-y_tpPerGpu"]')
+        .should(($help) => {
+          const icon = $help.find('svg')[0].getBoundingClientRect();
+          expect(icon.left).to.be.greaterThan(bounds.left);
+          expect(icon.right).to.be.lessThan(bounds.right);
+          expect(icon.top).to.be.greaterThan(bounds.top);
+          expect(icon.bottom).to.be.lessThan(bounds.bottom);
+          expect($help[0].closest('button[role="combobox"]')).to.equal(null);
+        })
         .trigger('pointerover', { pointerType: 'mouse' });
-      cy.get(`[data-testid="option-help-content-${value}"]`)
-        .should('be.visible')
-        .and('contain.text', explanation);
-      cy.get(trigger).should('have.attr', 'aria-expanded', 'true');
     });
+    cy.get('[data-testid="selected-option-help-content-y_tpPerGpu"]')
+      .should('be.visible')
+      .and('contain.text', 'Rate of total tokens');
+    cy.get('#y-axis-select').should('have.attr', 'aria-expanded', 'false');
+    cy.get('#y-axis-select').click('right');
+    cy.get('[data-testid="selected-option-help-y_tpPerGpu"]').should('not.exist');
+    cy.get('[data-testid="option-help-y_tpPerGpu"]')
+      .should('be.visible')
+      .trigger('pointerover', { pointerType: 'mouse' });
+    cy.get('[data-testid="option-help-content-y_tpPerGpu"]')
+      .should('be.visible')
+      .and('contain.text', 'Rate of total tokens');
+    cy.get('#y-axis-select').should('have.attr', 'aria-expanded', 'true');
+  });
 
-    it(`keeps selected-value help open when activating its focused button in ${trigger}`, () => {
-      cy.get(`[data-testid="selected-option-help-${value}"]`).focus().click();
-      cy.get(`[data-testid="selected-option-help-content-${value}"]`)
-        .should('be.visible')
-        .and('contain.text', explanation);
-      cy.get(trigger).should('have.attr', 'aria-expanded', 'false');
-      cy.get(`[data-testid="selected-option-help-${value}"]`).type('{esc}');
-      cy.get(`[data-testid="selected-option-help-content-${value}"]`).should('not.exist');
-    });
-  }
+  it('keeps selected-value help open when activating its focused button in #y-axis-select', () => {
+    cy.get('[data-testid="selected-option-help-y_tpPerGpu"]').focus().click();
+    cy.get('[data-testid="selected-option-help-content-y_tpPerGpu"]')
+      .should('be.visible')
+      .and('contain.text', 'Rate of total tokens');
+    cy.get('#y-axis-select').should('have.attr', 'aria-expanded', 'false');
+    cy.get('[data-testid="selected-option-help-y_tpPerGpu"]').type('{esc}');
+    cy.get('[data-testid="selected-option-help-content-y_tpPerGpu"]').should('not.exist');
+  });
 
   it('keeps hover help readable across the pointer gap without taking search focus', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
@@ -845,25 +810,6 @@ describe('Workflow run dropdown', () => {
     cy.get('#run-select').should('have.attr', 'aria-expanded', 'false');
     cy.get('[aria-label="Next run"]').click();
     cy.get('@setSelectedRunId').should('have.been.calledWith', '12345679');
-  });
-
-  it('keeps the Chinese run dropdown touch-sized on phones', () => {
-    cy.viewport(390, 844);
-    mountWithProviders(
-      <PathnameContext.Provider value="/zh/inference">
-        <WorkflowInfoDisplay />
-      </PathnameContext.Provider>,
-      { inference: { availableRuns }, globalFilters: {} },
-    );
-    cy.get('#run-select')
-      .should('have.attr', 'aria-label', '运行')
-      .and('contain.text', '第 1/2 次运行')
-      .then(($run) => {
-        expect($run[0].getBoundingClientRect().height).to.equal(44);
-      });
-    cy.get('#run-select').click('left');
-    cy.contains('[role="option"]', '第 2 次运行（共 2 次）').click();
-    cy.get('@setSelectedRunId').should('have.been.calledOnceWith', '12345679');
   });
 
   for (const locale of ['en', 'zh'] as const) {

@@ -380,7 +380,7 @@ export function createMockEvaluationContext(
   };
 }
 
-export function createMockReliabilityData(
+function createMockReliabilityData(
   overrides?: Partial<ModelSuccessRateData & { modelLabel: string }>,
 ): ModelSuccessRateData & { modelLabel: string } {
   return {

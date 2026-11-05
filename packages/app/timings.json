@@ -67,36 +67,6 @@
       ]
     },
     {
-      "spec": "cypress/e2e/agentic-point-coach-mark.cy.ts",
-      "duration": 7629,
-      "tests": [
-        {
-          "title": [
-            "Agentic chart without the retired point callout",
-            "keeps point details accessible without a first-visit callout on /en"
-          ],
-          "duration": 3705,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Agentic chart without the retired point callout",
-            "keeps point details accessible without a first-visit callout on /zh"
-          ],
-          "duration": 3504,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Agentic chart without the retired point callout",
-            "keeps unofficial overlay points clickable without a callout"
-          ],
-          "duration": 410,
-          "attempts": 1
-        }
-      ]
-    },
-    {
       "spec": "cypress/e2e/agentic-point-time-series.cy.ts",
       "duration": 19436,
       "tests": [
@@ -6865,20 +6835,6 @@
       ]
     },
     {
-      "spec": "cypress/e2e/tokens-per-currency.cy.ts",
-      "duration": 539,
-      "tests": [
-        {
-          "title": [
-            "Tokens per dollar and agentic controls",
-            "defaults the y-axis to TCO total tokens per dollar and preserves hardware comparison"
-          ],
-          "duration": 537,
-          "attempts": 1
-        }
-      ]
-    },
-    {
       "spec": "cypress/e2e/tpu-publication.cy.ts",
       "duration": 6277,
       "tests": [
@@ -7293,20 +7249,6 @@
             "keeps Chinese mobile configuration columns accessible by scrolling"
           ],
           "duration": 1096,
-          "attempts": 1
-        }
-      ]
-    },
-    {
-      "spec": "cypress/e2e/unofficial-watermark.cy.ts",
-      "duration": 1149,
-      "tests": [
-        {
-          "title": [
-            "Unofficial-run watermark",
-            "shows the full two-line warning on unofficial charts"
-          ],
-          "duration": 1147,
           "attempts": 1
         }
       ]

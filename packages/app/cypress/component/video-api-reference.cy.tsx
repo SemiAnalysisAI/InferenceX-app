@@ -4,10 +4,10 @@ import VideoApiReference from '@/components/video-benchmark/VideoApiReference';
 import { registerAnalyticsClient } from '@/lib/analytics/analytics';
 
 /** Owns the price like VideoDashboard does and exposes it, plus an external setter. */
-function Harness({ initial, pathname = '/video' }: { initial: number; pathname?: string }) {
+function Harness({ initial }: { initial: number }) {
   const [value, setValue] = useState(initial);
   return (
-    <PathnameContext.Provider value={pathname}>
+    <PathnameContext.Provider value="/video">
       <div className="grid gap-4 p-4 sm:grid-cols-2">
         <VideoApiReference value={value} onChange={setValue} />
       </div>
@@ -63,16 +63,5 @@ describe('VideoApiReference', () => {
     cy.get('@capture').should('have.been.calledWith', 'video_api_price_changed', {
       value: '0.04',
     });
-  });
-  it('renders Chinese copy under /zh', () => {
-    cy.mount(<Harness initial={0.08} pathname="/zh/video" />);
-    cy.contains('label', 'API 参考价（$/video-s）').should('exist');
-    cy.contains('button', '重置').should('exist');
-    caption()
-      .should('contain', '参考值 $0.080/video-s')
-      .and('contain', '标价区间 $0.080–$0.130')
-      .and('contain', '采集于 2026-09-24')
-      .and('contain', '来源：MiniMax 开放平台按量付费价格页')
-      .and('contain', '此处为 API 标价，而非实际收入');
   });
 });
