@@ -152,7 +152,29 @@ export interface ResultsChartSelection extends ResultsMetricContext {
   hidden: readonly string[];
 }
 
-/** One series per hardware and per named run, each with its own deployment frontier. */
+/** Points the chart can place: visible hardware with finite values on both axes. */
+function plottedPoints(
+  cells: readonly ResultCell[],
+  selection: ResultsChartSelection,
+): { hardwareKey: string; point: ResultsChartPoint }[] {
+  const x = RESULTS_X_METRICS[selection.x],
+    y = RESULTS_Y_METRICS[selection.y];
+  return cells.flatMap((cell) => {
+    const hardwareKey = cell.point.hardwareKey;
+    if (hardwareKey === null || selection.hidden.includes(hardwareKey)) return [];
+    const xValue = x.value(cell, selection),
+      yValue = y.value(cell, selection);
+    if (xValue === null || yValue === null || !Number.isFinite(xValue) || !Number.isFinite(yValue))
+      return [];
+    return [
+      {
+        hardwareKey,
+        point: { key: resultsPointKey(cell), cell, x: xValue, y: yValue, optimal: false },
+      },
+    ];
+  });
+}
+
 /**
  * Chip Config history: one series per selected deployment, its runs in measurement
  * order and joined by a line, and a separate series for the named overlay run.
@@ -162,21 +184,10 @@ export function resultsHistorySeries(
   cells: readonly ResultCell[],
   selection: ResultsChartSelection,
 ): ResultsChartSeries[] {
-  const x = RESULTS_X_METRICS[selection.x],
-    y = RESULTS_Y_METRICS[selection.y];
   const groups = new Map<string, ResultsChartPoint[]>();
-  for (const cell of cells) {
-    const hardwareKey = cell.point.hardwareKey;
-    if (hardwareKey === null || selection.hidden.includes(hardwareKey)) continue;
-    const xValue = x.value(cell, selection),
-      yValue = y.value(cell, selection);
-    if (xValue === null || yValue === null || !Number.isFinite(xValue) || !Number.isFinite(yValue))
-      continue;
-    const key = `${chipConfigKey(cell.point)}${cell.overlay ? '-overlay' : ''}`;
-    groups.set(key, [
-      ...(groups.get(key) ?? []),
-      { key: resultsPointKey(cell), cell, x: xValue, y: yValue, optimal: true },
-    ]);
+  for (const { point } of plottedPoints(cells, selection)) {
+    const key = `${chipConfigKey(point.cell.point)}${point.cell.overlay ? '-overlay' : ''}`;
+    groups.set(key, [...(groups.get(key) ?? []), { ...point, optimal: true }]);
   }
   return [...groups]
     .map(([key, points]) => {
@@ -199,6 +210,7 @@ export function resultsHistorySeries(
     );
 }
 
+/** One series per hardware and per named run, each with its own deployment frontier. */
 export function resultsChartSeries(
   cells: readonly ResultCell[],
   selection: ResultsChartSelection,
@@ -209,16 +221,10 @@ export function resultsChartSeries(
     string,
     { hardwareKey: string; overlay: boolean; points: ResultsChartPoint[] }
   >();
-  for (const cell of cells) {
-    const hardwareKey = cell.point.hardwareKey;
-    if (hardwareKey === null || selection.hidden.includes(hardwareKey)) continue;
-    const xValue = x.value(cell, selection),
-      yValue = y.value(cell, selection);
-    if (xValue === null || yValue === null || !Number.isFinite(xValue) || !Number.isFinite(yValue))
-      continue;
-    const key = cell.overlay ? `${hardwareKey}-overlay` : hardwareKey;
-    const group = groups.get(key) ?? { hardwareKey, overlay: cell.overlay, points: [] };
-    group.points.push({ key: resultsPointKey(cell), cell, x: xValue, y: yValue, optimal: false });
+  for (const { hardwareKey, point } of plottedPoints(cells, selection)) {
+    const key = point.cell.overlay ? `${hardwareKey}-overlay` : hardwareKey;
+    const group = groups.get(key) ?? { hardwareKey, overlay: point.cell.overlay, points: [] };
+    group.points.push(point);
     groups.set(key, group);
   }
   return [...groups]
