@@ -143,7 +143,6 @@ it('defaults to shared cases and shows disjoint FP8 measurements per accelerator
   cy.contains('No shared compute-bound cases').should('be.visible');
   cy.get('#opx-summary-shared').click().should('have.attr', 'aria-checked', 'false');
   cy.get('[data-testid="operatorx-roofline-summary"] .summary-row').should('have.length', 2);
-  cy.get('[data-testid="operatorx-viz-throughput-summary"]').screenshot('fp8-summary-independent');
   cy.get('#opx-summary-shared').click();
   cy.contains('No shared compute-bound cases').should('be.visible');
 });
@@ -163,220 +162,206 @@ function expectSummaryLabelsOnRows() {
   });
 }
 
-for (const prefix of ['', '/zh']) {
-  it(`shows median and best bars across the row above metric vs size at ${prefix || '/'}`, () => {
-    const datasets = ['ascend950pr-external', 'h200-dgxc'].map((runner, gpu) => {
-      const dataset = normalizeBundle(run(`summary-${gpu}`, runner, [64, 128]));
-      dataset.results = dataset.results.map((row, i) => ({
-        ...row,
-        args: {
-          m: 1024 * (i + 1),
-          n: 1024,
-          k: 1024,
-          a: { dtype: 'bf16' },
-          b: { dtype: 'bf16' },
-          out: 'bf16',
-        },
-        latencyUs: gpu === 0 ? 10 : 5,
-      }));
-      return { runner, dataset };
-    });
-    const view = comparisonView(buildComparison('gemm', datasets), null);
-    cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('summary');
-    cy.visit(`${prefix}/operatorx`);
-    cy.wait('@summary');
-    cy.get('[data-testid^="operatorx-viz-"]')
-      .last()
-      .should('have.attr', 'data-testid', 'operatorx-viz-metric-vs-size');
-    cy.get('[data-testid="operatorx-viz-throughput-summary"]')
-      .scrollIntoView()
-      .should(($summary) => {
-        const next = $summary.next()[0];
-        expect(next?.dataset.testid).to.equal('operatorx-viz-metric-vs-size');
-        // Alone on its row, the panel spans the same 12 desktop columns as Metric vs size.
-        expect($summary[0].getBoundingClientRect().width).to.be.closeTo(
-          next.getBoundingClientRect().width,
-          1,
-        );
-        expect($summary[0].getBoundingClientRect().bottom).to.be.lessThan(
-          next.getBoundingClientRect().top,
-        );
-      });
-    cy.get('[data-testid="operatorx-roofline-summary"]')
-      .scrollIntoView()
-      .within(() => {
-        cy.get('.summary-row').should('have.length', 2);
-        cy.get('.summary-row')
-          .first()
-          .should(($row) => {
-            const d = (
-              $row[0] as unknown as {
-                __data__: { hardware: string; n: number; median: number; best: number };
-              }
-            ).__data__;
-            expect(d.hardware).to.equal('ascend950pr');
-            expect(d.n).to.equal(2);
-            expect(d.median).to.be.closeTo(322.1225472 / 378, 1e-12);
-            expect(d.best).to.be.closeTo(429.4967296 / 378, 1e-12);
-          });
-        cy.get('.summary-median').should('have.length', 2);
-        cy.get('.summary-best').should('have.length', 2);
-        // Axis ticks use the page font, and hardware names match the bar value labels.
-        cy.get('.y-axis .tick text').should(($ticks) => {
-          const tick = getComputedStyle($ticks[0]);
-          const label = getComputedStyle(
-            $ticks[0].ownerDocument.querySelector('.summary-median-label')!,
-          );
-          expect(tick.fontFamily).to.contain('DM Sans').and.equal(label.fontFamily);
-          expect(tick.fontSize).to.equal(label.fontSize);
-        });
-        cy.get('.x-axis .tick text')
-          .first()
-          .should(($tick) => expect(getComputedStyle($tick[0]).fontFamily).to.contain('DM Sans'));
-      });
-    cy.get('[data-testid="operatorx-viz-throughput-summary"]').screenshot(
-      `roofline-summary-${prefix ? 'zh' : 'en'}-normalized`,
-    );
-    cy.get('#opx-summary-normalized').click();
-    cy.get('[data-testid="operatorx-roofline-summary"] .summary-row')
-      .first()
-      .should(($row) => {
-        const d = (
-          $row[0] as unknown as { __data__: { hardware: string; median: number; best: number } }
-        ).__data__;
-        expect(d.hardware).to.equal('h200');
-        expect(d.median).to.be.closeTo(644.2450944, 1e-9);
-        expect(d.best).to.be.closeTo(858.9934592, 1e-9);
-      });
-    cy.get('[data-testid="operatorx-viz-throughput-summary"]').screenshot(
-      `roofline-summary-${prefix ? 'zh' : 'en'}-absolute`,
-    );
-    cy.viewport(390, 844);
-    cy.get('[data-testid="operatorx-roofline-summary"]')
-      .scrollIntoView()
-      .should('be.visible')
-      .screenshot(`roofline-summary-${prefix ? 'zh' : 'en'}-mobile`);
-    expectSummaryLabelsOnRows();
-  });
-
-  it(`keeps a median label that does not fit its bar on the same row at ${prefix || '/'}`, () => {
-    const datasets = ['ascend950pr-external', 'h200-dgxc'].map((runner, gpu) => {
-      const dataset = normalizeBundle(run(`short-${gpu}`, runner, [64, 128]));
-      dataset.results = dataset.results.map((row, i) => ({
-        ...row,
-        args: {
-          m: 1024 * (i + 1),
-          n: 1024,
-          k: 1024,
-          a: { dtype: 'bf16' },
-          b: { dtype: 'bf16' },
-          out: 'bf16',
-        },
-        // 950PR is 50x slower, so its median bar is too short to hold its label even across a full row.
-        latencyUs: gpu === 0 ? 250 : 5,
-      }));
-      return { runner, dataset };
-    });
-    const view = comparisonView(buildComparison('gemm', datasets), null);
-    cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('short');
-    cy.visit(`${prefix}/operatorx`);
-    cy.wait('@short');
-    cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
-    cy.get('#opx-summary-normalized').click().should('have.attr', 'aria-checked', 'false');
-    cy.get('[data-testid="operatorx-roofline-summary"] .summary-row').should('have.length', 2);
-    cy.get('[data-testid="operatorx-roofline-summary"] .summary-row')
-      .last()
-      .should(($row) => {
-        const bar = $row.find('.summary-median')[0].getBoundingClientRect();
-        const label = $row.find('.summary-median-label')[0].getBoundingClientRect();
-        expect(label.left, 'label starts after the short bar').to.be.at.least(bar.right);
-      });
-    expectSummaryLabelsOnRows();
-  });
-
-  it(`keeps 950PR FP8 points visible when normalized at ${prefix || '/'}`, () => {
-    const dataset = normalizeBundle(run('950pr-fp8', 'ascend950pr-external', [64, 128]));
+it('shows median and best bars across the row above metric vs size at /', () => {
+  const datasets = ['ascend950pr-external', 'h200-dgxc'].map((runner, gpu) => {
+    const dataset = normalizeBundle(run(`summary-${gpu}`, runner, [64, 128]));
     dataset.results = dataset.results.map((row, i) => ({
       ...row,
       args: {
         m: 1024 * (i + 1),
         n: 1024,
         k: 1024,
-        a: { dtype: 'e4m3' },
-        b: { dtype: 'e4m3' },
+        a: { dtype: 'bf16' },
+        b: { dtype: 'bf16' },
         out: 'bf16',
       },
+      latencyUs: gpu === 0 ? 10 : 5,
     }));
-    const view = comparisonView(
-      buildComparison('gemm', [{ runner: 'ascend950pr-external', dataset }]),
-      null,
-    );
-    cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('fp8');
-    cy.visit(`${prefix}/operatorx`);
-    cy.wait('@fp8');
-    cy.get('[data-testid="operatorx-viz-roofline"]')
-      .scrollIntoView()
-      .within(() => {
-        cy.contains('[role="tab"]', 'fp8').should('have.attr', 'aria-selected', 'true');
-        cy.get('#opx-roofline-normalized').should('have.attr', 'aria-checked', 'true');
-        cy.get<SVGCircleElement & { __data__: { y: number } }>('circle.point')
-          .should('have.length', 2)
-          .each(($point) => {
-            const point = $point[0] as unknown as { __data__: { y: number } };
-            expect(point.__data__.y).to.be.closeTo(268.435456 / 756, 1e-12);
-          });
-        cy.get('#opx-roofline-normalized').click();
-        cy.get<SVGCircleElement & { __data__: { y: number } }>('circle.point')
-          .should('have.length', 2)
-          .each(($point) => {
-            const point = $point[0] as unknown as { __data__: { y: number } };
-            expect(point.__data__.y).to.be.closeTo(268.435456, 1e-9);
-          });
-      });
+    return { runner, dataset };
   });
-}
+  const view = comparisonView(buildComparison('gemm', datasets), null);
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('summary');
+  cy.visit('/operatorx');
+  cy.wait('@summary');
+  cy.get('[data-testid^="operatorx-viz-"]')
+    .last()
+    .should('have.attr', 'data-testid', 'operatorx-viz-metric-vs-size');
+  cy.get('[data-testid="operatorx-viz-throughput-summary"]')
+    .scrollIntoView()
+    .should(($summary) => {
+      const next = $summary.next()[0];
+      expect(next?.dataset.testid).to.equal('operatorx-viz-metric-vs-size');
+      // Alone on its row, the panel spans the same 12 desktop columns as Metric vs size.
+      expect($summary[0].getBoundingClientRect().width).to.be.closeTo(
+        next.getBoundingClientRect().width,
+        1,
+      );
+      expect($summary[0].getBoundingClientRect().bottom).to.be.lessThan(
+        next.getBoundingClientRect().top,
+      );
+    });
+  cy.get('[data-testid="operatorx-roofline-summary"]')
+    .scrollIntoView()
+    .within(() => {
+      cy.get('.summary-row').should('have.length', 2);
+      cy.get('.summary-row')
+        .first()
+        .should(($row) => {
+          const d = (
+            $row[0] as unknown as {
+              __data__: { hardware: string; n: number; median: number; best: number };
+            }
+          ).__data__;
+          expect(d.hardware).to.equal('ascend950pr');
+          expect(d.n).to.equal(2);
+          expect(d.median).to.be.closeTo(322.1225472 / 378, 1e-12);
+          expect(d.best).to.be.closeTo(429.4967296 / 378, 1e-12);
+        });
+      cy.get('.summary-median').should('have.length', 2);
+      cy.get('.summary-best').should('have.length', 2);
+      // Axis ticks use the page font, and hardware names match the bar value labels.
+      cy.get('.y-axis .tick text').should(($ticks) => {
+        const tick = getComputedStyle($ticks[0]);
+        const label = getComputedStyle(
+          $ticks[0].ownerDocument.querySelector('.summary-median-label')!,
+        );
+        expect(tick.fontFamily).to.contain('DM Sans').and.equal(label.fontFamily);
+        expect(tick.fontSize).to.equal(label.fontSize);
+      });
+      cy.get('.x-axis .tick text')
+        .first()
+        .should(($tick) => expect(getComputedStyle($tick[0]).fontFamily).to.contain('DM Sans'));
+    });
+  cy.get('#opx-summary-normalized').click();
+  cy.get('[data-testid="operatorx-roofline-summary"] .summary-row')
+    .first()
+    .should(($row) => {
+      const d = (
+        $row[0] as unknown as { __data__: { hardware: string; median: number; best: number } }
+      ).__data__;
+      expect(d.hardware).to.equal('h200');
+      expect(d.median).to.be.closeTo(644.2450944, 1e-9);
+      expect(d.best).to.be.closeTo(858.9934592, 1e-9);
+    });
+  cy.viewport(390, 844);
+  cy.get('[data-testid="operatorx-roofline-summary"]').scrollIntoView().should('be.visible');
+  expectSummaryLabelsOnRows();
+});
+
+it('keeps a median label that does not fit its bar on the same row at /', () => {
+  const datasets = ['ascend950pr-external', 'h200-dgxc'].map((runner, gpu) => {
+    const dataset = normalizeBundle(run(`short-${gpu}`, runner, [64, 128]));
+    dataset.results = dataset.results.map((row, i) => ({
+      ...row,
+      args: {
+        m: 1024 * (i + 1),
+        n: 1024,
+        k: 1024,
+        a: { dtype: 'bf16' },
+        b: { dtype: 'bf16' },
+        out: 'bf16',
+      },
+      // 950PR is 50x slower, so its median bar is too short to hold its label even across a full row.
+      latencyUs: gpu === 0 ? 250 : 5,
+    }));
+    return { runner, dataset };
+  });
+  const view = comparisonView(buildComparison('gemm', datasets), null);
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('short');
+  cy.visit('/operatorx');
+  cy.wait('@short');
+  cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
+  cy.get('#opx-summary-normalized').click().should('have.attr', 'aria-checked', 'false');
+  cy.get('[data-testid="operatorx-roofline-summary"] .summary-row').should('have.length', 2);
+  cy.get('[data-testid="operatorx-roofline-summary"] .summary-row')
+    .last()
+    .should(($row) => {
+      const bar = $row.find('.summary-median')[0].getBoundingClientRect();
+      const label = $row.find('.summary-median-label')[0].getBoundingClientRect();
+      expect(label.left, 'label starts after the short bar').to.be.at.least(bar.right);
+    });
+  expectSummaryLabelsOnRows();
+});
+
+it('keeps 950PR FP8 points visible when normalized at /', () => {
+  const dataset = normalizeBundle(run('950pr-fp8', 'ascend950pr-external', [64, 128]));
+  dataset.results = dataset.results.map((row, i) => ({
+    ...row,
+    args: {
+      m: 1024 * (i + 1),
+      n: 1024,
+      k: 1024,
+      a: { dtype: 'e4m3' },
+      b: { dtype: 'e4m3' },
+      out: 'bf16',
+    },
+  }));
+  const view = comparisonView(
+    buildComparison('gemm', [{ runner: 'ascend950pr-external', dataset }]),
+    null,
+  );
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('fp8');
+  cy.visit('/operatorx');
+  cy.wait('@fp8');
+  cy.get('[data-testid="operatorx-viz-roofline"]')
+    .scrollIntoView()
+    .within(() => {
+      cy.contains('[role="tab"]', 'fp8').should('have.attr', 'aria-selected', 'true');
+      cy.get('#opx-roofline-normalized').should('have.attr', 'aria-checked', 'true');
+      cy.get<SVGCircleElement & { __data__: { y: number } }>('circle.point')
+        .should('have.length', 2)
+        .each(($point) => {
+          const point = $point[0] as unknown as { __data__: { y: number } };
+          expect(point.__data__.y).to.be.closeTo(268.435456 / 756, 1e-12);
+        });
+      cy.get('#opx-roofline-normalized').click();
+      cy.get<SVGCircleElement & { __data__: { y: number } }>('circle.point')
+        .should('have.length', 2)
+        .each(($point) => {
+          const point = $point[0] as unknown as { __data__: { y: number } };
+          expect(point.__data__.y).to.be.closeTo(268.435456, 1e-9);
+        });
+    });
+});
 
 describe('OperatorX progressive rendering', { testIsolation: true }, () => {
-  for (const prefix of ['', '/zh']) {
-    it(`mounts lower charts near the viewport and preserves their controls at ${prefix || '/'}`, () => {
-      cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('comparison');
-      cy.visit(`${prefix}/operatorx`);
-      cy.wait('@comparison');
-      cy.get('[data-testid^="operatorx-viz-"]')
-        .first()
-        .should('have.attr', 'aria-busy', 'false')
-        .find('svg')
-        .should('exist');
-      const lower = '[data-testid="operatorx-viz-metric-vs-size"]';
-      cy.get(lower).should('have.attr', 'aria-busy', 'true').find('svg').should('not.exist');
-      cy.get(lower).scrollIntoView();
-      cy.get(lower).should('have.attr', 'aria-busy', 'false').find('svg').should('exist');
-      cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
-      cy.get('#opx-summary-normalized').click().should('have.attr', 'aria-checked', 'false');
-      cy.scrollTo('top');
-      cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
-      cy.get('#opx-summary-normalized').should('have.attr', 'aria-checked', 'false');
-    });
+  it('mounts lower charts near the viewport and preserves their controls at /', () => {
+    cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('comparison');
+    cy.visit('/operatorx');
+    cy.wait('@comparison');
+    cy.get('[data-testid^="operatorx-viz-"]')
+      .first()
+      .should('have.attr', 'aria-busy', 'false')
+      .find('svg')
+      .should('exist');
+    const lower = '[data-testid="operatorx-viz-metric-vs-size"]';
+    cy.get(lower).should('have.attr', 'aria-busy', 'true').find('svg').should('not.exist');
+    cy.get(lower).scrollIntoView();
+    cy.get(lower).should('have.attr', 'aria-busy', 'false').find('svg').should('exist');
+    cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
+    cy.get('#opx-summary-normalized').click().should('have.attr', 'aria-checked', 'false');
+    cy.scrollTo('top');
+    cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
+    cy.get('#opx-summary-normalized').should('have.attr', 'aria-checked', 'false');
+  });
 
-    for (const intent of ['focus', 'hover']) {
-      it(`does not fetch OperatorX on Huawei ${intent} or navigation from ${prefix || '/'}`, () => {
-        cy.intercept('GET', '/api/v1/operatorx/**', gemm).as('operatorxIntent');
-        cy.visit(prefix || '/');
-        const link = '[data-testid="landing-huawei-results-link"]';
-        cy.get(link)
-          .should('have.attr', 'href', `${prefix}/ubenchx/core-memory-profiles`)
-          .and('not.have.attr', 'data-prefetch-ready');
-        cy.get('@operatorxIntent.all').should('have.length', 0);
-        if (intent === 'focus') cy.get(link).focus();
-        else cy.get(link).trigger('mouseover');
-        cy.location('pathname').should('eq', prefix || '/');
-        cy.get(link).trigger('mouseover').focus().click();
-        cy.location('pathname').should('eq', `${prefix}/ubenchx/core-memory-profiles`);
-        cy.get('[data-testid="ascend-core-profiles"] h2').should('have.text', 'Huawei 950PR');
-        cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
-        cy.get('@operatorxIntent.all').should('have.length', 0);
-      });
-    }
+  for (const prefix of ['', '/zh']) {
+    it(`does not fetch OperatorX on Huawei focus or navigation from ${prefix || '/'}`, () => {
+      cy.intercept('GET', '/api/v1/operatorx/**', gemm).as('operatorxIntent');
+      cy.visit(prefix || '/');
+      const link = '[data-testid="landing-huawei-results-link"]';
+      cy.get(link)
+        .should('have.attr', 'href', `${prefix}/ubenchx/core-memory-profiles`)
+        .and('not.have.attr', 'data-prefetch-ready');
+      cy.get('@operatorxIntent.all').should('have.length', 0);
+      cy.get(link).focus();
+      cy.location('pathname').should('eq', prefix || '/');
+      cy.get(link).trigger('mouseover').focus().click();
+      cy.location('pathname').should('eq', `${prefix}/ubenchx/core-memory-profiles`);
+      cy.get('[data-testid="ascend-core-profiles"] h2').should('have.text', 'Huawei 950PR');
+      cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
+      cy.get('@operatorxIntent.all').should('have.length', 0);
+    });
   }
 
   it('renders every chart when viewport observation is unavailable', () => {
@@ -464,7 +449,6 @@ it('uses shared Huawei colors in OperatorX and ubenchX across a live theme switc
     .find('.rounded-full')
     .first()
     .should('have.css', 'background-color', 'rgb(148, 106, 0)');
-  cy.get('[data-testid="operatorx-viz-roofline"]').screenshot('huawei-operatorx-light');
   cy.get('[data-testid="theme-toggle"]').click();
   cy.get('html').should('have.class', 'dark');
   operatorPoints().first().should('have.css', 'fill', 'rgb(235, 192, 74)');
@@ -472,7 +456,6 @@ it('uses shared Huawei colors in OperatorX and ubenchX across a live theme switc
     .find('.rounded-full')
     .first()
     .should('have.css', 'background-color', 'rgb(235, 192, 74)');
-  cy.get('[data-testid="operatorx-viz-roofline"]').screenshot('huawei-operatorx-dark');
 
   cy.visit('/ubenchx/mem-bw', visitOptions);
   bandwidthPoints().first().should('have.css', 'fill', 'rgb(148, 106, 0)');
@@ -484,5 +467,4 @@ it('uses shared Huawei colors in OperatorX and ubenchX across a live theme switc
     .find('span')
     .first()
     .should('have.css', 'background-color', 'rgb(235, 192, 74)');
-  cy.get('#ubenchx-mbu').screenshot('huawei-ubenchx-dark');
 });

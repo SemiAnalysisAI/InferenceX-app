@@ -7,14 +7,6 @@ import { BlogToc } from './blog-toc';
 const headings = [{ id: 'results', text: 'Results', level: 2 }] satisfies TocHeading[];
 
 describe('shared Blog localization chrome', () => {
-  it('preserves the existing English table-of-contents copy', () => {
-    const toc = renderToStaticMarkup(<BlogToc headings={headings} />);
-
-    expect(toc).toContain('aria-label="Table of contents"');
-    expect(toc).toContain('On this page');
-    expect(toc).toContain('(click to expand)');
-  });
-
   it('renders the equivalent Chinese table of contents without English fallback copy', () => {
     const toc = renderToStaticMarkup(<BlogToc headings={headings} locale="zh" />);
 

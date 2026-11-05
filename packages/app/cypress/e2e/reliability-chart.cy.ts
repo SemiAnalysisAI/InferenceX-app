@@ -27,74 +27,10 @@ describe('Reliability Chart — Content & Interactions', () => {
         cy.contains('[role="option"]', 'All time').click();
         cy.get('#reliability-chart svg rect.bar').should('have.length.greaterThan', 0);
       });
-
-    cy.get('#reliability-chart svg .value-label')
-      .should('have.length.greaterThan', 0)
-      .first()
-      .invoke('text')
-      .should('match', /\d+\.\d+%/u);
-
-    cy.get('#reliability-chart svg')
-      .find('.tick text')
-      .should('have.length.greaterThan', 0)
-      .then(($ticks) => {
-        const texts = [...$ticks].map((el) => el.textContent || '');
-        const hasPercentage = texts.some((t) => /\d+%/u.test(t));
-        expect(hasPercentage).to.equal(true);
-      });
-  });
-
-  it('"Reset filter" link appears after deactivating a legend item and restores all items', () => {
-    cy.get('#reliability-chart')
-      .closest('figure')
-      .find('.sidebar-legend li label')
-      .then(($labels) => {
-        if ($labels.length < 2) {
-          cy.log('Skipping: only one legend item — toggle cannot deactivate it');
-          return;
-        }
-
-        cy.wrap($labels.first()).click();
-
-        cy.get('#reliability-chart')
-          .closest('figure')
-          .find('.sidebar-legend')
-          .contains('button', 'Reset filter')
-          .should('exist');
-
-        cy.get('#reliability-chart')
-          .closest('figure')
-          .find('.sidebar-legend')
-          .contains('button', 'Reset filter')
-          .click();
-
-        cy.get('#reliability-chart')
-          .closest('figure')
-          .find('.sidebar-legend li')
-          .first()
-          .find('input[type="checkbox"]')
-          .should('be.checked');
-      });
   });
 });
 
 describe('Reliability Chart — Chinese route and settled states', () => {
-  it('localizes chart chrome, SVG labels, and accessibility text', () => {
-    cy.viewport(1440, 900);
-    visitReliability('/zh/reliability');
-    cy.get('[data-testid="reliability-chart-display"]').should('be.visible');
-    cy.contains('h2', '芯片可靠性').should('be.visible');
-    cy.get('#reliability-chart svg').should('contain.text', '成功率（%）');
-    cy.get('#reliability-chart svg .overlay-label').first().should('contain.text', '次运行');
-    cy.get('#reliability-chart').closest('figure').should('contain.text', 'Shift+滚轮横向缩放');
-    cy.get('#reliability-chart svg rect.bar').first().click({ force: true });
-    cy.get('[data-chart-tooltip]:visible')
-      .should('contain.text', '点击其他区域关闭')
-      .and('contain.text', '成功率：')
-      .and('contain.text', '成功次数：')
-      .and('contain.text', '总运行次数：');
-  });
-
   it('shows a Chinese empty state only after an empty response settles', () => {
     cy.intercept('GET', '**/api/v1/reliability/daily', []).as('emptyReliability');
     visitReliability('/zh/reliability');

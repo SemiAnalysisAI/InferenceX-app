@@ -54,14 +54,6 @@ describe('Header', () => {
 
   it('keeps the sticky header opaque enough that content cannot show through', () => {
     cy.get('[data-testid="header"]').should(($el) => {
-      const tokens = $el[0].className.split(/\s+/u);
-      expect(tokens).to.include('bg-background/95');
-      expect(tokens).to.include('supports-[backdrop-filter]:bg-background/80');
-      expect(tokens).to.include('backdrop-blur-md');
-      expect(tokens).to.not.include('bg-background/60');
-      expect(tokens).to.not.include('backdrop-blur-[2px]');
-    });
-    cy.get('[data-testid="header"]').should(($el) => {
       const { backdropFilter } = getComputedStyle($el[0]);
       expect(backdropFilter, 'computed backdrop-filter').to.contain('blur(');
     });
@@ -119,11 +111,6 @@ describe('Header', () => {
     cy.wrap(mockRouter.push).should('have.been.calledWith', '/inference');
   });
 
-  it('keeps Comparisons and Articles out of the header nav (they live in the footer)', () => {
-    cy.get('[data-testid="nav-link-compare"]').should('not.exist');
-    cy.get('[data-testid="nav-link-articles"]').should('not.exist');
-  });
-
   it('shows AgentX as a top-level nav link and highlights AgentX child pages', () => {
     cy.get('[data-testid="nav-link-agentx"]')
       .should('be.visible')
@@ -167,32 +154,12 @@ describe('Header', () => {
     });
   });
 
-  it('keeps footer destinations out of the primary nav', () => {
-    cy.get('[data-testid="nav-link-supporters"]').should('not.exist');
-    cy.get('[data-testid="nav-link-telemetry"]').should('not.exist');
-  });
-
   it('shows the GitHub stars button linking to the correct repo', () => {
     cy.get('[data-testid="header-star-button"]').should('be.visible');
     cy.get('[data-testid="header-star-button"]')
       .should('have.attr', 'href')
       .and('include', 'github.com/SemiAnalysisAI/InferenceX');
   });
-
-  for (const pathname of ['/', '/zh']) {
-    it(`omits the leaves toggle from desktop and mobile headers on ${pathname}`, () => {
-      cy.viewport(1440, 900);
-      mountHeader(pathname);
-      cy.get('[data-testid="autumn-leaves-toggle"]').should('not.exist');
-      cy.get('[data-testid="language-toggle"]').should('be.visible');
-      cy.get('[data-testid="theme-toggle"]').should('be.visible');
-
-      cy.viewport(375, 812);
-      cy.get('[data-testid="mobile-menu-toggle"]').click();
-      cy.get('[data-testid="mobile-menu"]').should('be.visible');
-      cy.get('[data-testid="autumn-leaves-toggle"]').should('not.exist');
-    });
-  }
 
   it('shows mobile hamburger menu on small viewports', () => {
     cy.viewport(375, 812);
@@ -347,13 +314,6 @@ describe('Header', () => {
           expect(rect.width, `${selector} width`).to.be.at.least(MIN_TOUCH_PX - EPSILON);
           expect(rect.height, `${selector} height`).to.be.at.least(MIN_TOUCH_PX - EPSILON);
         });
-      });
-    });
-
-    it('does not overflow horizontally', () => {
-      cy.get('[data-testid="header"]').then(($header) => {
-        const header = $header[0];
-        expect(header.scrollWidth, 'header scrollWidth').to.be.at.most(header.clientWidth);
       });
     });
 

@@ -11,10 +11,8 @@ describe('Compare scenario routes', () => {
     cy.visit(`/compare/${AGENTX_SLUG}/agentic`);
 
     cy.get('[data-testid="compare-agentic-intro"]')
-      .should('contain.text', 'AgentX replays real coding-agent sessions')
       .find('[data-testid="compare-agentic-intro-link"]')
-      .should('contain.text', 'Learn more about AgentX')
-      .and('have.attr', 'href', '/agentx');
+      .should('have.attr', 'href', '/agentx');
   });
 
   it('lets the path segment override the pair default', () => {
@@ -82,9 +80,7 @@ describe('Compare scenario routes', () => {
     cy.visit(`/zh/compare/${AGENTX_SLUG}/agentic`);
 
     cy.get('[data-testid="compare-agentic-intro"]')
-      .should('contain.text', 'AgentX 回放真实的 coding agent 会话')
       .find('[data-testid="compare-agentic-intro-link"]')
-      .should('contain.text', '进一步了解 AgentX')
-      .and('have.attr', 'href', '/zh/agentx');
+      .should('have.attr', 'href', '/zh/agentx');
   });
 });

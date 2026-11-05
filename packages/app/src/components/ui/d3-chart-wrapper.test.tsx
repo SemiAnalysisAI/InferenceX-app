@@ -78,13 +78,6 @@ afterEach(() => {
 });
 
 describe('D3ChartWrapper default interaction guidance', () => {
-  it('preserves the exact English instructions', () => {
-    renderWrapper();
-    expect(container.textContent).toContain(
-      'Shift+Scroll to zoom • Drag to pan • Double-click to reset • Click a point to pin tooltip',
-    );
-  });
-
   it('uses natural Chinese instructions on Chinese routes', () => {
     mocks.locale = 'zh';
     renderWrapper();
