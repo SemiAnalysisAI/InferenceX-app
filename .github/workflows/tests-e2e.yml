@@ -32,13 +32,13 @@ jobs:
     name: Component tests (shard ${{ matrix.shard }})
     if: ${{ !github.event.pull_request.draft }}
     timeout-minutes: 15
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: blacksmith-16vcpu-ubuntu-2404
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -82,7 +82,7 @@ jobs:
           CI: true
           # cypress-split picks this shard's component specs, balanced by the
           # committed component-timings.json.
-          SPLIT: 8
+          SPLIT: 12
           SPLIT_INDEX1: ${{ matrix.shard }}
           SPLIT_FILE: component-timings.json
           SPLIT_OUTPUT_FILE: /tmp/cypress-split-component-out.json
@@ -97,13 +97,22 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  build:
-    name: Build app for E2E
+  cypress:
+    name: E2E (${{ matrix.browser }}, shard ${{ matrix.shard }})
     if: ${{ !github.event.pull_request.draft }}
     timeout-minutes: 15
     runs-on: blacksmith-16vcpu-ubuntu-2404
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: ${{ fromJSON(github.event_name == 'pull_request' && '["chrome"]' || '["chrome", "firefox"]') }}
+        shard:
+          [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
+    env:
+      # Chrome shard 1 is the only writer of the shared caches.
+      CACHE_WRITER: ${{ matrix.browser == 'chrome' && matrix.shard == 1 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -125,9 +134,9 @@ jobs:
             steps.setup-bun.outputs.bun-version }}-${{ hashFiles('bun.lock') }}
           restore-keys: |
             ${{ runner.os }}-bun-${{ runner.arch }}-${{ steps.setup-bun.outputs.bun-version }}-
-      # Persist .next/cache between builds (Turbopack compiler cache — enabled
-      # via turbopackFileSystemCacheForBuild in next.config.ts for CI — plus
-      # the incremental fetch cache), per
+      # Persist .next/cache between builds (the Turbopack compiler cache, enabled
+      # via turbopackFileSystemCacheForBuild in next.config.ts for CI, plus the
+      # incremental fetch cache), per
       # https://nextjs.org/docs/pages/guides/ci-build-caching#github-actions.
       # Runs before `bun install` so hashFiles never scans node_modules.
       - name: Restore Next.js build cache
@@ -144,82 +153,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('bun.lock') }}-
             ${{ runner.os }}-nextjs-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-        env:
-          CYPRESS_INSTALL_BINARY: '0'
-      - name: Save Bun package cache
-        if: ${{ steps.bun-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ steps.bun-cache.outputs.cache-primary-key }}
-      - name: Build app
-        run: bun run build
-        env:
-          E2E_FIXTURES: '1'
-      - name: Check client bundle
-        run: bun run check:bundle
-      - name: Save Next.js build cache
-        if: ${{ steps.nextjs-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: packages/app/.next/cache
-          key: ${{ steps.nextjs-cache.outputs.cache-primary-key }}
-      - name: Archive app build
-        run: >-
-          tar --use-compress-program='zstd -T0' -cf "$RUNNER_TEMP/e2e-app-build.tar.zst"
-          -C packages/app --exclude=.next/cache .next
-      - name: Upload app build
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: e2e-app-build
-          path: ${{ runner.temp }}/e2e-app-build.tar.zst
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 1
-
-  cypress:
-    name: E2E (${{ matrix.browser }}, shard ${{ matrix.shard }})
-    needs: build
-    if: ${{ !cancelled() && !github.event.pull_request.draft }}
-    timeout-minutes: 15
-    runs-on: blacksmith-8vcpu-ubuntu-2404
-    permissions:
-      contents: read
-      actions: read # Download the app build artifact from this run.
-    strategy:
-      fail-fast: false
-      matrix:
-        browser: ${{ fromJSON(github.event_name == 'pull_request' && '["chrome"]' || '["chrome", "firefox"]') }}
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-    steps:
-      - name: Require the app build
-        if: ${{ needs.build.result != 'success' }}
-        env:
-          BUILD_RESULT: ${{ needs.build.result }}
-        run: |
-          echo "::error::Build app for E2E finished with result: $BUILD_RESULT"
-          exit 1
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Setup Bun
-        id: setup-bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: package.json
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
-      - name: Restore Bun package cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ runner.arch }}-${{
-            steps.setup-bun.outputs.bun-version }}-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-${{ runner.arch }}-${{ steps.setup-bun.outputs.bun-version }}-
       - uses: browser-actions/setup-firefox@0bc507ddf224827e3b1af68e014d5e42ab93e795 # v1.7.2
         if: matrix.browser == 'firefox'
         with:
@@ -228,6 +161,27 @@ jobs:
         run: bun install --frozen-lockfile
         env:
           CYPRESS_INSTALL_BINARY: '0'
+      - name: Save Bun package cache
+        if: ${{ env.CACHE_WRITER == 'true' && steps.bun-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ steps.bun-cache.outputs.cache-primary-key }}
+      # Each shard builds the app itself: on 16 vCPU with the restored compiler
+      # cache this is faster than waiting for one build job and its artifact.
+      - name: Build app
+        run: bun run build
+        env:
+          E2E_FIXTURES: '1'
+      - name: Check client bundle
+        if: ${{ env.CACHE_WRITER == 'true' }}
+        run: bun run check:bundle
+      - name: Save Next.js build cache
+        if: ${{ env.CACHE_WRITER == 'true' && steps.nextjs-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: packages/app/.next/cache
+          key: ${{ steps.nextjs-cache.outputs.cache-primary-key }}
       - name: Restore Cypress binary cache
         id: cypress-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -241,19 +195,11 @@ jobs:
         working-directory: packages/app
         run: bunx cypress verify || bunx cypress install
       - name: Save Cypress binary cache
-        if: ${{ matrix.browser == 'chrome' && matrix.shard == 1 &&
-          steps.cypress-cache.outputs.cache-hit != 'true' }}
+        if: ${{ env.CACHE_WRITER == 'true' && steps.cypress-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/Cypress
           key: ${{ steps.cypress-cache.outputs.cache-primary-key }}
-      - name: Download app build
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: e2e-app-build
-          path: ${{ runner.temp }}
-      - name: Unpack app build
-        run: tar --zstd -xf "$RUNNER_TEMP/e2e-app-build.tar.zst" -C packages/app
       - name: Run integration tests
         uses: cypress-io/github-action@c541a95ea92d9239347a2355f2e895cd4b3f8060 # v7.4.6
         with:
@@ -268,11 +214,11 @@ jobs:
           E2E_FIXTURES: '1'
           CYPRESS_NO_COMMAND_LOG: '1'
           # cypress-split picks the subset of specs for this shard.
-          # SPLIT_INDEX1 is 1-based to match matrix.shard values [1..16].
+          # SPLIT_INDEX1 is 1-based to match matrix.shard values [1..24].
           # SPLIT_FILE seeds the balance from observed timings;
           # Each browser uses its own measurements. Raw per-test observations
           # are uploaded separately; the plugin's merged output is not evidence.
-          SPLIT: 16
+          SPLIT: 24
           SPLIT_INDEX1: ${{ matrix.shard }}
           SPLIT_FILE: ${{ matrix.browser == 'firefox' && 'timings-firefox.json' || 'timings.json' }}
           SPLIT_OUTPUT_FILE: /tmp/cypress-split-out.json
