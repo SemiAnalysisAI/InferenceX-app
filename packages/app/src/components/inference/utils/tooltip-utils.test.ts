@@ -286,17 +286,17 @@ describe('modeled system-power tooltip', () => {
   });
 
   it('keeps each power reading and its basis pill in the same grid cell', () => {
-    const host = document.createElement('div');
-    host.innerHTML = generateTooltipContent(config({ isPinned: true }));
-    const readings = host.querySelectorAll('[data-power-reading]');
+    const html = generateTooltipContent(config({ isPinned: true }));
+    const readings = [
+      ...html.matchAll(
+        /<div class="tooltip-line"[^>]*><strong>[^<]*<\/strong> <span data-power-reading>(?<reading>.*?)<\/span><\/div>/gu,
+      ),
+    ];
     expect(readings).toHaveLength(3);
-    for (const reading of readings) {
-      expect(reading.textContent).toContain('W/GPU');
-      expect(reading.querySelector('[data-testid="power-basis-pill"]')).not.toBeNull();
-      const row = reading.parentElement!;
-      expect(row.classList.contains('tooltip-line')).toBe(true);
-      expect(row.children).toHaveLength(2);
-      expect(row.children[1]).toBe(reading);
+    for (const match of readings) {
+      const reading = match.groups!.reading;
+      expect(reading).toContain('W/GPU');
+      expect(reading).toContain('data-testid="power-basis-pill"');
     }
   });
 
