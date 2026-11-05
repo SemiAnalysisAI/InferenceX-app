@@ -29,7 +29,7 @@ concurrency:
 
 jobs:
   component-tests:
-    name: Component tests (shard ${{ matrix.shard }})
+    name: Component tests (split ${{ matrix.split }}, shard ${{ matrix.shard }})
     if: ${{ !github.event.pull_request.draft }}
     timeout-minutes: 15
     runs-on: blacksmith-16vcpu-ubuntu-2404
@@ -38,7 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        include: [{split: 6, shard: 1}, {split: 6, shard: 2}, {split: 6, shard: 3}, {split: 6, shard: 4}, {split: 6, shard: 5}, {split: 6, shard: 6}, {split: 8, shard: 1}, {split: 8, shard: 2}, {split: 8, shard: 3}, {split: 8, shard: 4}, {split: 8, shard: 5}, {split: 8, shard: 6}, {split: 8, shard: 7}, {split: 8, shard: 8}, {split: 12, shard: 1}, {split: 12, shard: 2}, {split: 12, shard: 3}, {split: 12, shard: 4}, {split: 12, shard: 5}, {split: 12, shard: 6}, {split: 12, shard: 7}, {split: 12, shard: 8}, {split: 12, shard: 9}, {split: 12, shard: 10}, {split: 12, shard: 11}, {split: 12, shard: 12}]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -82,7 +82,7 @@ jobs:
           CI: true
           # cypress-split picks this shard's component specs, balanced by the
           # committed component-timings.json.
-          SPLIT: 12
+          SPLIT: ${{ matrix.split }}
           SPLIT_INDEX1: ${{ matrix.shard }}
           SPLIT_FILE: component-timings.json
           SPLIT_OUTPUT_FILE: /tmp/cypress-split-component-out.json
@@ -92,13 +92,13 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: cypress-timings-component-chrome-${{ matrix.shard }}
+          name: cypress-timings-component-chrome-${{ matrix.split }}-${{ matrix.shard }}
           path: /tmp/cypress-timings/observation.json
           if-no-files-found: error
           retention-days: 14
 
   cypress:
-    name: E2E (${{ matrix.browser }}, shard ${{ matrix.shard }})
+    name: E2E (split ${{ matrix.split }}, shard ${{ matrix.shard }})
     if: ${{ !github.event.pull_request.draft }}
     timeout-minutes: 15
     runs-on: blacksmith-16vcpu-ubuntu-2404
@@ -107,12 +107,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        browser: ${{ fromJSON(github.event_name == 'pull_request' && '["chrome"]' || '["chrome", "firefox"]') }}
-        shard:
-          [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
+        include: [{browser: chrome, split: 12, shard: 1}, {browser: chrome, split: 12, shard: 2}, {browser: chrome, split: 12, shard: 3}, {browser: chrome, split: 12, shard: 4}, {browser: chrome, split: 12, shard: 5}, {browser: chrome, split: 12, shard: 6}, {browser: chrome, split: 12, shard: 7}, {browser: chrome, split: 12, shard: 8}, {browser: chrome, split: 12, shard: 9}, {browser: chrome, split: 12, shard: 10}, {browser: chrome, split: 12, shard: 11}, {browser: chrome, split: 12, shard: 12}, {browser: chrome, split: 16, shard: 1}, {browser: chrome, split: 16, shard: 2}, {browser: chrome, split: 16, shard: 3}, {browser: chrome, split: 16, shard: 4}, {browser: chrome, split: 16, shard: 5}, {browser: chrome, split: 16, shard: 6}, {browser: chrome, split: 16, shard: 7}, {browser: chrome, split: 16, shard: 8}, {browser: chrome, split: 16, shard: 9}, {browser: chrome, split: 16, shard: 10}, {browser: chrome, split: 16, shard: 11}, {browser: chrome, split: 16, shard: 12}, {browser: chrome, split: 16, shard: 13}, {browser: chrome, split: 16, shard: 14}, {browser: chrome, split: 16, shard: 15}, {browser: chrome, split: 16, shard: 16}, {browser: chrome, split: 20, shard: 1}, {browser: chrome, split: 20, shard: 2}, {browser: chrome, split: 20, shard: 3}, {browser: chrome, split: 20, shard: 4}, {browser: chrome, split: 20, shard: 5}, {browser: chrome, split: 20, shard: 6}, {browser: chrome, split: 20, shard: 7}, {browser: chrome, split: 20, shard: 8}, {browser: chrome, split: 20, shard: 9}, {browser: chrome, split: 20, shard: 10}, {browser: chrome, split: 20, shard: 11}, {browser: chrome, split: 20, shard: 12}, {browser: chrome, split: 20, shard: 13}, {browser: chrome, split: 20, shard: 14}, {browser: chrome, split: 20, shard: 15}, {browser: chrome, split: 20, shard: 16}, {browser: chrome, split: 20, shard: 17}, {browser: chrome, split: 20, shard: 18}, {browser: chrome, split: 20, shard: 19}, {browser: chrome, split: 20, shard: 20}, {browser: chrome, split: 24, shard: 1}, {browser: chrome, split: 24, shard: 2}, {browser: chrome, split: 24, shard: 3}, {browser: chrome, split: 24, shard: 4}, {browser: chrome, split: 24, shard: 5}, {browser: chrome, split: 24, shard: 6}, {browser: chrome, split: 24, shard: 7}, {browser: chrome, split: 24, shard: 8}, {browser: chrome, split: 24, shard: 9}, {browser: chrome, split: 24, shard: 10}, {browser: chrome, split: 24, shard: 11}, {browser: chrome, split: 24, shard: 12}, {browser: chrome, split: 24, shard: 13}, {browser: chrome, split: 24, shard: 14}, {browser: chrome, split: 24, shard: 15}, {browser: chrome, split: 24, shard: 16}, {browser: chrome, split: 24, shard: 17}, {browser: chrome, split: 24, shard: 18}, {browser: chrome, split: 24, shard: 19}, {browser: chrome, split: 24, shard: 20}, {browser: chrome, split: 24, shard: 21}, {browser: chrome, split: 24, shard: 22}, {browser: chrome, split: 24, shard: 23}, {browser: chrome, split: 24, shard: 24}]
     env:
       # Chrome shard 1 is the only writer of the shared caches.
-      CACHE_WRITER: ${{ matrix.browser == 'chrome' && matrix.shard == 1 }}
+      CACHE_WRITER: ${{ matrix.split == 24 && matrix.shard == 1 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -218,7 +216,7 @@ jobs:
           # SPLIT_FILE seeds the balance from observed timings;
           # Each browser uses its own measurements. Raw per-test observations
           # are uploaded separately; the plugin's merged output is not evidence.
-          SPLIT: 24
+          SPLIT: ${{ matrix.split }}
           SPLIT_INDEX1: ${{ matrix.shard }}
           SPLIT_FILE: ${{ matrix.browser == 'firefox' && 'timings-firefox.json' || 'timings.json' }}
           SPLIT_OUTPUT_FILE: /tmp/cypress-split-out.json
@@ -228,7 +226,7 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: cypress-timings-e2e-${{ matrix.browser }}-${{ matrix.shard }}
+          name: cypress-timings-e2e-chrome-${{ matrix.split }}-${{ matrix.shard }}
           path: /tmp/cypress-timings/observation.json
           if-no-files-found: error
           retention-days: 14
