@@ -5,6 +5,7 @@ import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
 import { createAdminSql } from './etl/db-utils';
 import {
   applyChangelogBackfills,
+  applyRunFrameworkOverridesToChangelogs,
   planBenchmarkPoint,
   PURGED_RUNS,
   validateRunBackfills,
@@ -396,9 +397,18 @@ async function mapWorkflowDir(
     if (entries.length > 0) changelogs.push({ baseRef, headRef, entries });
   }
 
-  const correctedChangelogs = applyChangelogBackfills(githubRunId, ghInfo?.runAttempt, changelogs);
-  for (const backfillId of correctedChangelogs.backfillIds) {
+  const backfilledChangelogs = applyChangelogBackfills(githubRunId, ghInfo?.runAttempt, changelogs);
+  for (const backfillId of backfilledChangelogs.backfillIds) {
     warnings.push(`  [${dateDir}] applied changelog backfill ${backfillId}`);
+  }
+  const correctedChangelogs = applyRunFrameworkOverridesToChangelogs(
+    githubRunId,
+    backfilledChangelogs.changelogs,
+  );
+  for (const overrideId of correctedChangelogs.overrideIds) {
+    warnings.push(
+      `  [${dateDir}] applied run framework override ${overrideId} to changelog config keys`,
+    );
   }
   const evalsOnly = hasEvalsOnlyFlag(correctedChangelogs.changelogs);
   if (evalsOnly) {

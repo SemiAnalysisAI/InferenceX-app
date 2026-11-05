@@ -20,6 +20,7 @@ import {
   parseInt2,
 } from './normalizers';
 import { normalizeLegacyTpuRow } from './tpu-normalization';
+import { resolveRunFramework } from './run-framework-overrides';
 import { extractRuntimeMetadata } from './runtime-metadata';
 
 export { flattenAgenticAggRow };
@@ -195,10 +196,11 @@ export function mapBenchmarkRow(
       ? row.offload_mode
       : (descriptorToOnOff(row.kv_offloading) ?? descriptorToOnOff(row.offloading) ?? 'off');
 
-  const { framework, disagg: frameworkDisagg } = normalizeFramework(
+  const { framework: declaredFramework, disagg: frameworkDisagg } = normalizeFramework(
     String(row.framework ?? ''),
     row.disagg,
   );
+  const { framework } = resolveRunFramework(runId, declaredFramework);
   const precision = normalizePrecision(String(row.precision ?? ''));
   if (!PRECISION_KEYS.has(precision)) {
     tracker.unmappedPrecisions.add(precision);
