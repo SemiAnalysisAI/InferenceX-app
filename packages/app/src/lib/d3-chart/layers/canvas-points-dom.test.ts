@@ -238,7 +238,7 @@ describe('CanvasPointLayer pointer', () => {
 
 describe('CanvasPointLayer state', () => {
   it('reports every point in the snapshot with its style and client position', () => {
-    const { svg, layer } = placedLayer([
+    const { layer } = placedLayer([
       point('a', 10, 20),
       point('b', 30, 40),
       point('c', 50, 60, false),

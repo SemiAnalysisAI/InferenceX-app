@@ -353,7 +353,7 @@ export class CanvasPointLayer<T extends ScatterDatum> {
       return false;
     }
     if (this.canvas.parentNode !== host || this.canvas.nextSibling !== svg) {
-      host.insertBefore(this.canvas, svg);
+      svg.before(this.canvas);
       if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
       if (getComputedStyle(svg).position === 'static') svg.style.position = 'relative';
     }
