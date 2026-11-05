@@ -59,7 +59,7 @@ describe('CanvasPointLayer drawing', () => {
     const frames = installFrames();
     const calls = installRecordingContext();
     const { svg, layer } = mountLayer();
-    svg.querySelector('canvas')!.style.setProperty('--chart-c', ' teal ');
+    svg.parentElement!.style.setProperty('--chart-c', ' teal ');
     layer.join(
       [
         point('c1', -32, 40),
@@ -230,14 +230,10 @@ describe('CanvasPointLayer drawing', () => {
     vi.stubGlobal('devicePixelRatio', 2);
     const { svg, layer } = mountLayer();
     layer.join([point('a', 1, 1)], key, 100.4, 80);
-    const canvas = svg.querySelector('canvas')!;
-    const foreignObject = svg.querySelector('foreignObject')!;
+    layer.place(identity, identity);
+    const canvas = svg.previousElementSibling as HTMLCanvasElement;
     expect([canvas.width, canvas.height]).toEqual([201, 160]);
     expect([canvas.style.width, canvas.style.height]).toEqual(['100.4px', '80px']);
-    expect([foreignObject.getAttribute('width'), foreignObject.getAttribute('height')]).toEqual([
-      '100.4',
-      '80',
-    ]);
     layer.join([point('a', 1, 1)], key, 50, 30);
     expect([canvas.width, canvas.height]).toEqual([100, 60]);
     vi.stubGlobal('devicePixelRatio', undefined);

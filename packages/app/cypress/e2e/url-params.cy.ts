@@ -1,3 +1,5 @@
+import { CANVAS_POINT_SURFACE_CLASS } from '@/lib/d3-chart/layers/canvas-points';
+
 import { selectXAxisMode } from '../support/e2e';
 import { expandLegendAdvanced } from '../support/legend-advanced';
 import { type ScatterPoint, triggerAtPoint, visiblePoints } from '../support/scatter-points';
@@ -12,7 +14,10 @@ const withFixtureModel = (path: string) => {
 
 const inPlot = (points: ScatterPoint[]) =>
   visiblePoints(points).filter((point) => {
-    const plot = point.hitArea.parentElement!.querySelector('canvas')!;
+    const svg = point.hitArea.closest('svg')!;
+    const plot = svg.parentElement!.querySelector<HTMLCanvasElement>(
+      `.${CANVAS_POINT_SURFACE_CLASS}`,
+    )!;
     return (
       point.x >= 0 && point.x <= plot.clientWidth && point.y >= 0 && point.y <= plot.clientHeight
     );
