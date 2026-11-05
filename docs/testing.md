@@ -48,7 +48,7 @@ bun run test:e2e
 
 The local `bun run test:e2e` command is a curated smoke suite across the core page, chart, overlay, localization, and component paths. It is the default agent and developer check and is intended to stay under one minute once the app is running.
 
-The complete suite is `bun run test:e2e:full`. It runs all Cypress component and integration specs. GitHub Actions runs that same coverage as twelve component shards (Chrome) plus twenty-four integration shards per browser. Pull requests run Chrome only. Firefox runs in the merge queue, nightly, and on manual dispatch, following Cypress's cross-browser guidance. The CI workflow is the merge gate for the full E2E suite.
+The complete suite is `bun run test:e2e:full`. It runs all Cypress component and integration specs. GitHub Actions runs that same coverage as six component shards (Chrome) plus sixteen integration shards per browser. Pull requests run Chrome only. Firefox runs in the merge queue, nightly, and on manual dispatch, following Cypress's cross-browser guidance. The CI workflow is the merge gate for the full E2E suite.
 
 Each integration shard builds the app with `E2E_FIXTURES=1` on a 16 vCPU runner and then runs `next start`. With the restored Turbopack cache that build takes about 10 to 15 seconds, which is faster than waiting for a shared build job and downloading its output. The fixture build skips Next's TypeScript pass because Tests (Unit) typechecks the workspace. Chrome shard 1 is the only writer of the Bun package, Next.js build and Cypress binary caches, and the only shard that runs `check:bundle`.
 
@@ -58,7 +58,7 @@ component baseline. Their unit guard requires one positive duration for every
 current spec and rejects removed entries.
 
 CI uploads raw per-shard, per-test observations. Runs that include Firefox
-validate the complete 60-shard matrix before publishing
+validate the complete 38-shard matrix before publishing
 `cypress-timing-baselines`. Refresh all three baselines from a successful full
 run (dispatch the workflow on your branch to get one):
 

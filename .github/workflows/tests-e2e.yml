@@ -38,7 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        shard: [1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -82,7 +82,7 @@ jobs:
           CI: true
           # cypress-split picks this shard's component specs, balanced by the
           # committed component-timings.json.
-          SPLIT: 12
+          SPLIT: 6
           SPLIT_INDEX1: ${{ matrix.shard }}
           SPLIT_FILE: component-timings.json
           SPLIT_OUTPUT_FILE: /tmp/cypress-split-component-out.json
@@ -108,8 +108,7 @@ jobs:
       fail-fast: false
       matrix:
         browser: ${{ fromJSON(github.event_name == 'pull_request' && '["chrome"]' || '["chrome", "firefox"]') }}
-        shard:
-          [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     env:
       # Chrome shard 1 is the only writer of the shared caches.
       CACHE_WRITER: ${{ matrix.browser == 'chrome' && matrix.shard == 1 }}
@@ -214,11 +213,11 @@ jobs:
           E2E_FIXTURES: '1'
           CYPRESS_NO_COMMAND_LOG: '1'
           # cypress-split picks the subset of specs for this shard.
-          # SPLIT_INDEX1 is 1-based to match matrix.shard values [1..24].
+          # SPLIT_INDEX1 is 1-based to match matrix.shard values [1..16].
           # SPLIT_FILE seeds the balance from observed timings;
           # Each browser uses its own measurements. Raw per-test observations
           # are uploaded separately; the plugin's merged output is not evidence.
-          SPLIT: 24
+          SPLIT: 16
           SPLIT_INDEX1: ${{ matrix.shard }}
           SPLIT_FILE: ${{ matrix.browser == 'firefox' && 'timings-firefox.json' || 'timings.json' }}
           SPLIT_OUTPUT_FILE: /tmp/cypress-split-out.json
