@@ -16,6 +16,7 @@ export interface SupporterGroup {
   id: string;
   label: Record<Locale, string>;
   logos: WallLogo[];
+  /** Most logos per desktop row. Longer groups wrap into balanced, centered rows. */
   desktopColumns?: number;
 }
 
@@ -24,7 +25,7 @@ export interface SupporterGroup {
  * referenced here lands in the derived "Other" group, so new quotes always
  * show up on the wall without editing this list.
  */
-// Managed inference providers share the neocloud grid so their logos line up column for column.
+// Neocloud and managed-provider rows are capped at the same width.
 const PROVIDER_COLUMNS = 8;
 
 export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
@@ -123,6 +124,13 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
     ],
   },
 ];
+
+/** Logos per desktop row: the fewest rows the cap allows, filled as evenly as possible. */
+export function balancedRowSize(count: number, maxColumns: number): number {
+  const cap = Math.max(1, Math.min(maxColumns, count));
+  const rows = Math.ceil(count / cap);
+  return Math.max(1, Math.ceil(count / rows));
+}
 
 export const OTHER_GROUP_LABEL: Record<Locale, string> = { en: 'Other', zh: '其他' };
 
