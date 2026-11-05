@@ -78,26 +78,11 @@ export function getInferenceRunLabel(
   label: string,
   points: readonly (RunProvenance & { framework?: string })[],
 ): string {
-  const hasSmg = points.some((point) =>
-    inferenceFrameworkLabelOverride(
-      point.framework ?? '',
-      point.run_url,
-      point.router_name,
-    )?.startsWith('SMG '),
-  );
   const override = [
     ...new Set(
       points
-        .map(
-          (point) =>
-            inferenceFrameworkLabelOverride(
-              point.framework ?? '',
-              point.run_url,
-              point.router_name,
-            ) ??
-            (hasSmg && point.framework
-              ? resolveFrameworkPartLabel(undefined, point.framework)
-              : undefined),
+        .map((point) =>
+          inferenceFrameworkLabelOverride(point.framework ?? '', point.run_url, point.router_name),
         )
         .filter(Boolean),
     ),
@@ -119,9 +104,10 @@ export function getInferenceHardwareConfig(
   );
   if (!overrides.some(Boolean)) return config;
   const frameworkLabel = resolveFrameworkPartLabel(model, framework);
-  const label = [...new Set(overrides.map((override) => override ?? frameworkLabel))]
-    .sort()
-    .join(' / ');
+  // One SMG point names the whole curve; individual tooltips retain point metadata.
+  const label =
+    overrides.find((override) => override?.startsWith('SMG ')) ??
+    [...new Set(overrides.map((override) => override ?? frameworkLabel))].sort().join(' / ');
   return {
     ...config,
     suffix: config.suffix.replace(frameworkLabel, label),

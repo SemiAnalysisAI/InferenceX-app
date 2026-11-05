@@ -34,8 +34,9 @@ the collapsed state.
 ## Router-aware labels
 
 Inference series and table `label` values include `SMG SGLang` or `SMG vLLM`
-when runtime `router_name` is `smg`. Mixed-router series list both framework
-display names; missing router metadata does not imply SMG. These labels match
+when runtime `router_name` is `smg`. If any point in a series uses SMG, the
+entire series label uses that SMG framework name, with no mixed-name suffix.
+Table labels use each point's own metadata. These labels match
 the chart legends and line labels, including unofficial overlays. Continue
 using canonical `framework` and `hwKey` values for filtering and identity;
 router labels do not change measurements or add filter parameters.

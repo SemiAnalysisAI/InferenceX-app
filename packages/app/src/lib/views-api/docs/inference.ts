@@ -339,7 +339,7 @@ const seriesSchema = objectSchema(
     label: {
       ...stringSchema,
       description:
-        'Chart display label. Plain SGLang/vLLM points with router_name=smg use SMG SGLang/SMG vLLM; mixed-router series list both names. Canonical framework and hwKey are unchanged.',
+        'Chart display label. If any point in a plain SGLang/vLLM series has router_name=smg, the entire series is labeled SMG SGLang/SMG vLLM. Canonical framework and hwKey are unchanged.',
     },
     vendor: stringSchema,
     deployment: stringSchema,

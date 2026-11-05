@@ -97,9 +97,7 @@ describe('rowToAggDataEntry', () => {
         });
       }
       const mixed = transformBenchmarkRows([row, { ...row, id: 2, metrics: makeRow().metrics }]);
-      expect(mixed.hardwareConfig[key].suffix).toBe(
-        `(${[label, `SMG ${label}`].sort().join(' / ')})`,
-      );
+      expect(mixed.hardwareConfig[key].suffix).toBe(`(SMG ${label})`);
     },
   );
 

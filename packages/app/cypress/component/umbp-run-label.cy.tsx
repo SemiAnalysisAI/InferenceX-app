@@ -105,7 +105,7 @@ describe('router-aware framework labels', () => {
     ['sglang', 'SGLang'],
     ['vllm', 'vLLM'],
   ]) {
-    it(`renders SMG ${label} in official and unofficial legends and line labels`, () => {
+    it(`labels the entire official and unofficial curve SMG ${label} if any point uses SMG`, () => {
       cy.viewport(1440, 1000);
       const key = `mi355x_${framework}`;
       const url = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/41803503347';
@@ -113,7 +113,7 @@ describe('router-aware framework labels', () => {
         createMockInferenceData({
           hwKey: key,
           framework,
-          router_name: 'smg',
+          router_name: index === 1 ? 'smg' : undefined,
           run_url: url,
           precision: Precision.FP4,
           x,
@@ -172,12 +172,16 @@ describe('router-aware framework labels', () => {
       );
       cy.get('[data-testid="chart-legend"]')
         .should('contain.text', `MI355X (SMG ${label})`)
-        .and('contain.text', `✕ smg-test (SMG ${label})`);
+        .and('contain.text', `✕ smg-test (SMG ${label})`)
+        .and('not.contain.text', ' / ');
       cy.get('.line-label[data-line-key]:not([data-line-key^="overlay-"])').should(
         'contain.text',
-        `SMG ${label}`,
+        `MI355X (SMG ${label})`,
       );
-      cy.get('.line-label[data-line-key^="overlay-"]').should('contain.text', `SMG ${label}`);
+      cy.get('.line-label[data-line-key^="overlay-"]').should(
+        'contain.text',
+        `MI355X (SMG ${label})`,
+      );
       cy.get('.roofline-path').should('have.length.greaterThan', 0);
       cy.get('.overlay-roofline-path').should('have.length.greaterThan', 0);
       cy.screenshot(`smg-${framework}-labels`);

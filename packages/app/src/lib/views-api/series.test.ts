@@ -132,7 +132,7 @@ describe('buildInferenceSeries', () => {
           framework,
           label: `MI355X ${dashboard.hardwareConfig[key].suffix}`,
         });
-        expect(result.series[0].label).toContain(`SMG ${label}`);
+        expect(result.series[0].label).toBe(`MI355X (SMG ${label})`);
         expect(result.series[0].points).toHaveLength(input.length);
       }
     },

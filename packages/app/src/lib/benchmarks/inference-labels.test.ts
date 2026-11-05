@@ -33,19 +33,22 @@ describe('SMG router labels', () => {
     expect(inferenceFrameworkLabelOverride(framework, undefined, ' SMG ')).toBe(`SMG ${label}`);
   });
 
-  it.each(['sglang', 'vllm'])('preserves mixed %s router provenance', (framework) => {
-    const key = `mi355x_${framework}`;
-    const label = framework === 'sglang' ? 'SGLang' : 'vLLM';
-    const smg = { hwKey: key, framework, router_name: 'smg' };
-    const other = { hwKey: key, framework, router_name: undefined };
-    const mixedLabel = [`SMG ${label}`, label].sort().join(' / ');
-    const mixed = getInferenceHardwareConfig(key, undefined, [smg, other]);
-    expect(mixed.suffix).toBe(`(${mixedLabel})`);
-    expect(getInferenceHardwareConfig(key, undefined, [other, smg])).toEqual(mixed);
-    expect(getInferenceRunLabel('✕ mixed', [smg, other, smg])).toBe(`✕ mixed (${mixedLabel})`);
-    expect(getPointHardwareConfig(smg, mixed).suffix).toBe(`(SMG ${label})`);
-    expect(getPointHardwareConfig(other, mixed)).toBe(getHardwareConfig(key));
-  });
+  it.each(['sglang', 'vllm'])(
+    'labels the whole %s curve SMG when any point uses it',
+    (framework) => {
+      const key = `mi355x_${framework}`;
+      const label = framework === 'sglang' ? 'SGLang' : 'vLLM';
+      const smg = { hwKey: key, framework, router_name: 'smg' };
+      const other = { hwKey: key, framework, router_name: undefined };
+      const mixed = getInferenceHardwareConfig(key, undefined, [smg, other]);
+      expect(mixed.suffix).toBe(`(SMG ${label})`);
+      expect(getInferenceHardwareConfig(key, undefined, [other, smg])).toEqual(mixed);
+      expect(getInferenceRunLabel('✕ mixed', [smg, other, smg])).toBe(`✕ mixed (SMG ${label})`);
+      expect(getInferenceRunLabel('✕ mixed', [other, smg])).toBe(`✕ mixed (SMG ${label})`);
+      expect(getPointHardwareConfig(smg, mixed).suffix).toBe(`(SMG ${label})`);
+      expect(getPointHardwareConfig(other, mixed)).toBe(getHardwareConfig(key));
+    },
+  );
 
   it.each([undefined, null, '', 'sglang-router', 'vllm-router', 'not-smg'])(
     'does not infer SMG from the run or framework when router is %s',
