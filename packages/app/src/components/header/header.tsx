@@ -255,34 +255,50 @@ export const Header = () => {
                   aria-hidden
                   className="overflow-visible"
                 >
-                  <line
-                    x1="1"
-                    y1="4"
-                    x2="19"
-                    y2="4"
-                    className="origin-center transition-transform duration-200 motion-reduce:transition-none"
-                    style={
-                      mobileMenuOpen ? { transform: 'translateY(6px) rotate(45deg)' } : undefined
-                    }
-                  />
+                  <g
+                    className={cn(
+                      'transition-transform duration-150 ease-out motion-reduce:transition-none',
+                      mobileMenuOpen ? 'translate-y-[6px]' : 'delay-150',
+                    )}
+                  >
+                    <line
+                      x1="1"
+                      y1="4"
+                      x2="19"
+                      y2="4"
+                      className={cn(
+                        'origin-center transition-transform duration-150 ease-out [transform-box:fill-box] motion-reduce:transition-none',
+                        mobileMenuOpen && 'rotate-45 delay-150',
+                      )}
+                    />
+                  </g>
                   <line
                     x1="1"
                     y1="10"
                     x2="19"
                     y2="10"
-                    className="transition-opacity duration-150 motion-reduce:transition-none"
-                    style={mobileMenuOpen ? { opacity: 0 } : undefined}
+                    className={cn(
+                      'transition-opacity duration-150 motion-reduce:transition-none',
+                      mobileMenuOpen ? 'opacity-0' : 'delay-150',
+                    )}
                   />
-                  <line
-                    x1="1"
-                    y1="16"
-                    x2="19"
-                    y2="16"
-                    className="origin-center transition-transform duration-200 motion-reduce:transition-none"
-                    style={
-                      mobileMenuOpen ? { transform: 'translateY(-6px) rotate(-45deg)' } : undefined
-                    }
-                  />
+                  <g
+                    className={cn(
+                      'transition-transform duration-150 ease-out motion-reduce:transition-none',
+                      mobileMenuOpen ? '-translate-y-[6px]' : 'delay-150',
+                    )}
+                  >
+                    <line
+                      x1="1"
+                      y1="16"
+                      x2="19"
+                      y2="16"
+                      className={cn(
+                        'origin-center transition-transform duration-150 ease-out [transform-box:fill-box] motion-reduce:transition-none',
+                        mobileMenuOpen && '-rotate-45 delay-150',
+                      )}
+                    />
+                  </g>
                 </svg>
               </button>
               {mobileMenuOpen && (
