@@ -655,6 +655,11 @@ describe('VideoGenX results', () => {
         expect(getComputedStyle(container).overflowX).to.equal('auto');
         if (width < 768) expect(container.scrollWidth).to.be.greaterThan(container.clientWidth);
       });
+      cy.get('#video-results-table-title').should(($title) => {
+        expect($title[0].scrollWidth, 'table title fits beside the deadline').to.be.at.most(
+          $title[0].clientWidth,
+        );
+      });
       cy.get('[data-testid="video-results-clip"]').should(($tiles) => {
         expect($tiles, 'one tile per measured hardware').to.have.length(3);
         const first = $tiles[0].getBoundingClientRect();

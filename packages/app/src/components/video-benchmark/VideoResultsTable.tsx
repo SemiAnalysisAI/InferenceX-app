@@ -73,7 +73,7 @@ export default function VideoResultsTable({
   return (
     <section className="flex min-w-0 flex-col gap-3" aria-labelledby="video-results-table-title">
       <div className="flex flex-wrap items-end gap-3 border-t pt-4">
-        <div className="min-w-0 flex-1">
+        <div className="flex-1">
           <Heading as="h3" level="label" id="video-results-table-title" className="font-semibold">
             {s.title}
           </Heading>
