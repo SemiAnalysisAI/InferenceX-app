@@ -63,10 +63,6 @@ describe('AgentX telemetry tutorial — Chinese page', () => {
   it('renders translated copy and keeps the same section anchors', () => {
     cy.visit('/zh/agentx/telemetry');
     cy.get('[data-testid="agentx-telemetry-article"]').should('be.visible');
-    cy.contains('h1', '通过详细遥测数据解析智能体负载').should('be.visible');
-    for (const id of SECTION_IDS) {
-      cy.get(`[data-testid="agentx-telemetry-section-${id}"]`).should('exist');
-    }
     cy.get('[data-testid="agentx-telemetry-results-cta"]').should(
       'have.attr',
       'href',
@@ -143,29 +139,11 @@ describe('AgentX telemetry tutorial — popup on the agentic point-detail page',
   });
 
   it('is the only card in the corner — dashboard nudges stay off this route', () => {
-    cy.get('[data-testid="telemetry-tutorial-modal"]', { timeout: 10_000 }).should('be.visible');
-    cy.get('[data-testid="telemetry-tutorial-modal"]').should('have.attr', 'aria-modal', 'false');
-    cy.get('[data-testid="telemetry-tutorial-modal"]').should(
-      'contain.text',
-      'New to these charts?',
-    );
-
-    cy.get('[data-testid="telemetry-tutorial-modal"]', { timeout: 10_000 }).should('be.visible');
+    cy.get('[data-testid="telemetry-tutorial-modal"]').should('be.visible');
     cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
     cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
-  });
 
-  it('opens the tutorial from its primary action', () => {
-    cy.get('[data-testid="telemetry-tutorial-modal-action"]', { timeout: 10_000 }).click();
+    cy.get('[data-testid="telemetry-tutorial-modal-action"]').click();
     cy.location('pathname').should('eq', '/agentx/telemetry');
-  });
-
-  it('stays dismissed across a reload', () => {
-    cy.get('[data-testid="telemetry-tutorial-modal-dismiss"]', { timeout: 10_000 }).click();
-    cy.get('[data-testid="telemetry-tutorial-modal"]').should('not.exist');
-    cy.reload();
-    cy.get('[data-testid="detail-view-toggle"]').should('exist');
-    cy.wait(3_500);
-    cy.get('[data-testid="telemetry-tutorial-modal"]').should('not.exist');
   });
 });

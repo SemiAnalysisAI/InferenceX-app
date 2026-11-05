@@ -128,6 +128,35 @@ describe('computeTraceDerivedPayloads', () => {
     expect(streamed).toEqual(bounded);
   });
 
+  it('retains TokenSpeed KV and queue metrics through streamed ingest', async () => {
+    const serverBlob = gzipSync(
+      JSON.stringify({
+        metrics: {
+          'tokenspeed:kv_cache_usage_perc': metric([
+            { start_ns: 10e9, end_ns: 11e9, avg: 0.25 },
+            { start_ns: 11e9, end_ns: 12e9, avg: 0.75 },
+          ]),
+          'tokenspeed:num_requests_running': metric([{ start_ns: 10e9, end_ns: 11e9, avg: 3 }]),
+          'tokenspeed:num_requests_waiting': metric([{ start_ns: 10e9, end_ns: 11e9, avg: 2 }]),
+        },
+      }),
+    );
+    const bounded = await computeTraceDerivedPayloads(null, serverBlob);
+    const streamed = await computeTraceDerivedPayloads(
+      null,
+      serverBlob,
+      {},
+      {
+        maxInMemoryBytes: 1,
+      },
+    );
+
+    expect(streamed).toEqual(bounded);
+    expect(streamed.aggregateStats.kvCacheUtil).toMatchObject({ mean: 0.5, n: 2 });
+    expect(streamed.aggregateStats.prefixCacheHitRate).toBeNull();
+    expect(streamed.chartSeries?.queueDepth[0]).toMatchObject({ running: 3, waiting: 2, total: 5 });
+  });
+
   it('preserves independent malformed-input fallbacks', async () => {
     const profileBlob = makeProfileBlob();
     const malformedServer = Buffer.from('not-gzip');

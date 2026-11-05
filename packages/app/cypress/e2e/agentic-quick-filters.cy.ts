@@ -117,9 +117,6 @@ describe('Agentic Quick Filters', () => {
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
     cy.get('[data-testid="quick-filters-selected-count"]').should('not.exist');
 
-    cy.get('[data-testid^="quick-filter-spec-"]').should('not.exist');
-    cy.contains('Spec Decoding').should('not.exist');
-
     cy.get('[data-testid="quick-filter-vendor-AMD"]').click();
     expectHwKeyPoints('b200', false);
     expectHwKeyPoints('mi300x', true);

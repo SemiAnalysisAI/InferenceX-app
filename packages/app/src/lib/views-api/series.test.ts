@@ -134,6 +134,30 @@ describe('buildInferenceSeries', () => {
     expect(result.count).toBe(visible.length);
     expect(result.series[0].points[0].y).toBe(450.5);
   });
+  it.each(['sglang', 'vllm'])(
+    'matches the %s SMG dashboard label without changing API identities',
+    (framework) => {
+      const label = framework === 'sglang' ? 'SGLang' : 'vLLM';
+      const smg = makeRow({
+        hardware: 'mi355x',
+        framework,
+        metrics: { ...metrics(), router_name: 'smg' } as unknown as BenchmarkRow['metrics'],
+      });
+      const rows = [smg, makeRow({ hardware: 'mi355x', framework })];
+      for (const input of [[smg], rows, rows.toReversed()]) {
+        const result = buildInferenceSeries(input, BASE_OPTIONS);
+        const key = `mi355x_${framework}`;
+        const dashboard = transformBenchmarkRows(input);
+        expect(result.series[0]).toMatchObject({
+          hwKey: key,
+          framework,
+          label: `MI355X ${dashboard.hardwareConfig[key].suffix}`,
+        });
+        expect(result.series[0].label).toBe(`MI355X (SMG ${label})`);
+        expect(result.series[0].points).toHaveLength(input.length);
+      }
+    },
+  );
 
   it('uses the MoRI vLLM display label while preserving API framework and hardware keys', () => {
     const result = buildInferenceSeries(

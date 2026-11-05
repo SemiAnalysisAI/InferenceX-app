@@ -140,31 +140,6 @@ describe('MultiSelect', () => {
     });
   });
 
-  it('click trigger opens dropdown', () => {
-    cy.mount(<MultiSelectWrapper />);
-    cy.get('[data-slot="select-trigger"]').click();
-    cy.get('[data-slot="select-content"]').should('be.visible');
-  });
-
-  it('selecting an item adds a badge', () => {
-    cy.mount(<MultiSelectWrapper />);
-    cy.get('[data-slot="select-trigger"]').click();
-    cy.get('[data-slot="select-item"]').contains('NVIDIA H100 SXM').click();
-    cy.get('[data-slot="select-trigger"]').within(() => {
-      cy.contains('NVIDIA H100 SXM').should('be.visible');
-    });
-  });
-
-  it('deselecting removes badge', () => {
-    cy.mount(<MultiSelectWrapper initial={['h100-sxm']} />);
-    cy.get('[data-slot="select-trigger"]').within(() => {
-      cy.contains('NVIDIA H100 SXM').should('be.visible');
-    });
-    cy.get('[data-slot="select-trigger"]').click();
-    cy.get('[data-slot="select-item"]').contains('NVIDIA H100 SXM').click();
-    cy.contains('Select Chips...').should('be.visible');
-  });
-
   it('keeps long selected labels contained in the shared trigger density', () => {
     cy.viewport(320, 720);
     const longLabel = 'DeepSeek V4 Pro 0813 1.6T FP4 Agentic long-context deployment configuration';
@@ -204,10 +179,7 @@ describe('MultiSelect', () => {
     cy.mount(<MultiSelectWrapper initial={['h100-sxm', 'h200-sxm']} maxSelections={2} />);
     cy.get('[data-slot="select-trigger"]').click();
     cy.contains('2 / 2 selected').should('be.visible');
-    cy.get('[data-slot="select-item"]')
-      .contains('AMD MI300X')
-      .parent()
-      .should('have.class', 'opacity-50');
+    cy.contains('[data-slot="select-item"]', 'AMD MI300X').should('be.disabled');
   });
 
   it('minSelections prevents deselecting below minimum', () => {

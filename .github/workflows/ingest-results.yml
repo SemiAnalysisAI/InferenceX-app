@@ -299,6 +299,8 @@ jobs:
           POWER_PUBLICATION_MANIFEST: ${{ github.workspace }}/power-publication.json
           DATABASE_WRITE_RECEIPT: ${{ github.workspace }}/database-writes.json
           INGEST_REPORT_OUTPUT: ${{ github.workspace }}/ingest-report.json
+          SERVER_LOG_BLOCKS: '1'
+          GPU_SAMPLE_BLOBS: '1'
         run: |
           : "${INGEST_REPO:?BENCHMARK_REPO repository variable is not set}"
           bun run admin:db:ingest:ci

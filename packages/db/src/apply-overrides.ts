@@ -1,7 +1,8 @@
 import { isDeepStrictEqual } from 'node:util';
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils.js';
-import { configCacheKey } from './etl/config-cache.js';
+import { bulkUpsertAvailability } from './etl/benchmark-ingest.js';
+import { configCacheKey, createConfigCache } from './etl/config-cache.js';
 import { type Sql, createAdminSql } from './etl/db-utils.js';
 import { jsonbParam } from './lib/backfill-runner.js';
 import { planBenchmarkPointBackfill } from './lib/benchmark-point-backfill.js';
@@ -10,6 +11,7 @@ import {
   type BenchmarkPointBackfill,
   type ChangelogBackfill,
   type PurgedBenchmarkPoint,
+  backfillDesiredConfig,
   validateRunBackfills,
 } from './etl/run-overrides.js';
 
@@ -168,6 +170,8 @@ interface BenchmarkPointBackfillTarget {
   backfill: BenchmarkPointBackfill;
   resultId: number;
   metrics: Record<string, unknown>;
+  sourceSpecMethod: string;
+  date: string;
 }
 
 function benchmarkPointDescription(backfill: BenchmarkPointBackfill): string {
@@ -192,8 +196,12 @@ async function previewBenchmarkPointBackfill(
   const sourceRecipeFingerprint = backfill.recipeFingerprint ?? null;
   const desiredRecipeFingerprint = backfill.set.recipeFingerprint ?? sourceRecipeFingerprint;
   const { config } = backfill;
+  const specMethods = [
+    ...new Set([config.specMethod, backfill.set.specMethod ?? config.specMethod]),
+  ];
   const rows = await sql`
-    SELECT br.id, br.offload_mode, br.recipe_fingerprint, br.metrics
+    SELECT br.id, br.offload_mode, br.recipe_fingerprint, br.metrics, br.date::text AS date,
+           c.spec_method
     FROM benchmark_results br
     JOIN workflow_runs wr ON wr.id = br.workflow_run_id
     JOIN configs c ON c.id = br.config_id
@@ -203,7 +211,7 @@ async function previewBenchmarkPointBackfill(
       AND c.framework = ${config.framework}
       AND c.model = ${config.model}
       AND c.precision = ${config.precision}
-      AND c.spec_method = ${config.specMethod}
+      AND c.spec_method = ANY(${specMethods})
       AND c.disagg = ${config.disagg}
       AND c.is_multinode = ${config.isMultinode}
       AND c.prefill_tp = ${config.prefillTp}
@@ -239,6 +247,7 @@ async function previewBenchmarkPointBackfill(
     {
       offload_mode: row.offload_mode,
       recipe_fingerprint: row.recipe_fingerprint,
+      spec_method: row.spec_method,
       metrics: row.metrics,
     },
     backfill,
@@ -256,25 +265,55 @@ async function previewBenchmarkPointBackfill(
     backfill,
     resultId: row.id as number,
     metrics,
+    sourceSpecMethod: row.spec_method as string,
+    date: row.date as string,
   };
 }
 
 async function applyBenchmarkPointBackfillToDatabase(
   target: BenchmarkPointBackfillTarget,
 ): Promise<void> {
-  const { backfill, resultId, metrics } = target;
+  const { backfill, resultId, metrics, sourceSpecMethod, date } = target;
   const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;
   const desiredRecipeFingerprint =
     backfill.set.recipeFingerprint ?? backfill.recipeFingerprint ?? null;
-  const [updated] = await sql`
-    UPDATE benchmark_results
-    SET offload_mode = ${desiredOffloadMode},
-        recipe_fingerprint = ${desiredRecipeFingerprint},
-        metrics = ${jsonbParam(sql, metrics)}
-    WHERE id = ${resultId}
-    RETURNING id
-  `;
-  if (!updated) throw new Error(`${backfill.id}: benchmark row disappeared before update`);
+  const desiredConfig = backfillDesiredConfig(backfill);
+  await sql.begin(async (_tx) => {
+    const tx = _tx as unknown as Sql;
+    const configId = await createConfigCache(tx).getOrCreateConfig(desiredConfig);
+    const [updated] = await tx`
+      UPDATE benchmark_results
+      SET config_id = ${configId},
+          offload_mode = ${desiredOffloadMode},
+          recipe_fingerprint = ${desiredRecipeFingerprint},
+          metrics = ${jsonbParam(tx, metrics)}
+      WHERE id = ${resultId}
+      RETURNING id
+    `;
+    if (!updated) throw new Error(`${backfill.id}: benchmark row disappeared before update`);
+    if (sourceSpecMethod === desiredConfig.specMethod) return;
+    const availability = {
+      model: desiredConfig.model,
+      isl: backfill.isl,
+      osl: backfill.osl,
+      precision: desiredConfig.precision,
+      hardware: desiredConfig.hardware,
+      framework: desiredConfig.framework,
+      disagg: desiredConfig.disagg,
+    };
+    await bulkUpsertAvailability(
+      tx,
+      [
+        {
+          ...availability,
+          specMethod: desiredConfig.specMethod,
+          benchmarkType: backfill.benchmarkType,
+        },
+      ],
+      date,
+    );
+    await deleteStaleAvailability(tx, [{ ...availability, spec_method: sourceSpecMethod, date }]);
+  });
   console.log(`    ${backfill.id} patched.`);
 }
 
@@ -401,6 +440,13 @@ async function purgeBenchmarkResults(tx: Sql, resultIds: number[]): Promise<void
     `;
   }
 
+  await deleteStaleAvailability(tx, availKeys);
+}
+
+async function deleteStaleAvailability(
+  tx: Sql,
+  availKeys: readonly Record<string, unknown>[],
+): Promise<void> {
   if (availKeys.length > 0) {
     const models = availKeys.map((r) => r.model as string);
     const isls = availKeys.map((r) => r.isl as number | null);

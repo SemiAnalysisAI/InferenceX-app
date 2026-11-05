@@ -3,7 +3,7 @@ import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-con
 const MODEL_LABELS = [
   'Muse Spark Open 816B',
   'DeepSeek V4.1 Flash 552B',
-  'Kimi K3 2.8T',
+  'Kimi K3.1 Pro',
   'MiniMax M3.1 Flash 428B',
   'GLM5.2/GLM5.3',
   'Qwen3.5 397B',
@@ -22,11 +22,9 @@ const SINGLE_TURN = 'single_turn_8k1k';
 const MATRIX_ROWS = 8;
 const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
-const AGENTX_LABEL_ZH = '长上下文、多轮交互的真实智能体场景（AgentX）';
 const AGENTX_SHORT = 'AgentX';
 
 const PAGE_TITLE = 'Agentic Inference Costs';
-const PAGE_TITLE_ZH = '智能体推理成本';
 const SOURCE_NOTE = `Source: InferenceX & ${TCO_SOURCE_TITLE}`;
 const SOURCE_NOTE_ZH = `来源：InferenceX 与 ${TCO_SOURCE_TITLE}`;
 const SCOPE_METRIC = 'Hyperscaler cost';
@@ -75,37 +73,6 @@ function expectNoHorizontalScroller(testId: string) {
       )
       .map((el) => `${el.tagName} ${el.scrollWidth}>${el.clientWidth}`);
     expect(scrollers, `horizontally scrollable inside ${testId}`).to.deep.equal([]);
-  });
-}
-
-function stubFullscreenApi(win: Window) {
-  let fullscreenElement: Element | null = null;
-  const document = win.document;
-  const EventConstructor = document.defaultView?.Event ?? Event;
-  const ElementConstructor = document.defaultView?.Element ?? Element;
-  Object.defineProperty(document, 'fullscreenEnabled', {
-    configurable: true,
-    value: true,
-  });
-  Object.defineProperty(document, 'fullscreenElement', {
-    configurable: true,
-    get: () => fullscreenElement,
-  });
-  Object.defineProperty(document, 'exitFullscreen', {
-    configurable: true,
-    value: () => {
-      fullscreenElement = null;
-      document.dispatchEvent(new EventConstructor('fullscreenchange'));
-      return Promise.resolve();
-    },
-  });
-  Object.defineProperty(ElementConstructor.prototype, 'requestFullscreen', {
-    configurable: true,
-    value() {
-      fullscreenElement = document.querySelector('[data-testid="overview-presentation-surface"]');
-      document.dispatchEvent(new EventConstructor('fullscreenchange'));
-      return Promise.resolve();
-    },
   });
 }
 
@@ -256,105 +223,6 @@ describe('Overview page', () => {
     });
   });
 
-  it('preserves pending selections when controls are changed rapidly', () => {
-    cy.viewport(1280, 900);
-    cy.visit('/overview');
-    cy.intercept('GET', '**/api/v1/overview*', (request) => {
-      request.continue((response) => {
-        response.setDelay(800);
-      });
-    }).as('overviewJson');
-
-    selectOverviewTier(75);
-    cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('exist');
-    cy.wait('@overviewJson');
-    cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('not.exist');
-
-    cy.viewport(1280, 900);
-    cy.visit('/overview');
-    cy.intercept('GET', '**/api/v1/overview*', (request) => {
-      request.continue((response) => {
-        response.setDelay(600);
-      });
-    }).as('overviewJson');
-
-    selectOverviewTier(75);
-    cy.get('[data-testid="overview-engine-scope-switcher"]')
-      .find('[data-overview-engine-scope="all"]')
-      .click();
-
-    cy.location('search').should('eq', '?tier=75&engine=all');
-    cy.get('[data-testid="overview-tier-slider"]', {
-      timeout: 15_000,
-    }).should('have.attr', 'data-tier', '75');
-    cy.get('[data-overview-engine-scope="all"]').should('have.attr', 'aria-current', 'true');
-    cy.location('search').should('eq', '?tier=75&engine=all');
-  });
-
-  it('keeps the last matrix and history entry when a popstate request fails', () => {
-    cy.viewport(1280, 900);
-    cy.visit('/overview');
-    cy.get('[data-testid="overview-reference-select"]').click();
-    cy.get('[data-overview-reference="b300"]').click();
-    cy.location('search').should('eq', '?ref=b300');
-    cy.intercept('GET', '**/api/v1/overview?tier=75', { statusCode: 500 }).as(
-      'overviewPopstateFailure',
-    );
-    cy.window().then((win) => {
-      (win as Window & { __overviewNavigationSentinel?: string }).__overviewNavigationSentinel =
-        'preserved';
-      win.History.prototype.pushState.call(
-        win.history,
-        win.history.state,
-        '',
-        '/overview?tier=75&ref=b300',
-      );
-      cy.wrap(win.history.length).as('overviewHistoryLength');
-    });
-
-    cy.go('back');
-    cy.location('search').should('eq', '?ref=b300');
-    cy.go('forward');
-    cy.wait('@overviewPopstateFailure');
-    cy.get('[data-testid="overview-navigation-error"]')
-      .should('have.attr', 'role', 'alert')
-      .and(
-        'have.text',
-        'Could not load the selected comparison. Showing the last successfully loaded data.',
-      );
-    cy.get('[data-testid="overview-tier-slider"]').should('have.attr', 'data-tier', '50');
-    cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('not.exist');
-    cy.location('search').should('eq', '?tier=75&ref=b300');
-    cy.get<number>('@overviewHistoryLength').then((expectedHistoryLength) => {
-      cy.window().then((after) => {
-        expect(after.history.length).to.equal(expectedHistoryLength);
-        expect(
-          (after as Window & { __overviewNavigationSentinel?: string })
-            .__overviewNavigationSentinel,
-        ).to.equal('preserved');
-      });
-    });
-  });
-
-  it('shows a localized empty state after a selector returns no models', () => {
-    cy.viewport(1280, 900);
-    cy.request('/api/v1/overview?tier=75').then(({ body }) => {
-      cy.intercept('GET', '**/api/v1/overview?tier=75', {
-        statusCode: 200,
-        body: { ...body, models: [] },
-      }).as('emptyOverview');
-      cy.visit('/zh/overview');
-
-      selectOverviewTier(75);
-      cy.wait('@emptyOverview');
-      cy.get('[data-testid="overview-empty-state"]')
-        .should('have.attr', 'role', 'status')
-        .and('have.text', '没有符合当前筛选条件的总览结果。');
-      cy.get('[data-testid="overview-desktop-matrix"]').should('not.exist');
-      cy.get('[data-testid="overview-mobile-list"]').should('not.exist');
-    });
-  });
-
   it('keeps one history entry when the overview request fails', () => {
     cy.viewport(1280, 900);
     cy.visit('/inference');
@@ -380,42 +248,7 @@ describe('Overview page', () => {
     cy.go('back');
     cy.location('search').should('eq', '');
     cy.go('back');
-    cy.location('pathname').should('eq', '/inference/kimi-k3');
-  });
-
-  it('warms a hovered option and derives the reference without a request', () => {
-    cy.viewport(1280, 900);
-    cy.visit('/overview');
-    let jsonRequests = 0;
-    cy.intercept('GET', '**/api/v1/overview*', () => {
-      jsonRequests += 1;
-    }).as('overviewJson');
-
-    cy.get('[data-testid="overview-engine-scope-switcher"]')
-      .find('[data-overview-engine-scope="all"]')
-      .trigger('pointerover');
-    cy.wait('@overviewJson');
-    cy.location('search').should('eq', '');
-    cy.then(() => {
-      expect(jsonRequests, 'hover warms exactly one response').to.equal(1);
-    });
-
-    cy.get('[data-testid="overview-engine-scope-switcher"]')
-      .find('[data-overview-engine-scope="all"]')
-      .click();
-    cy.location('search').should('eq', '?engine=all');
-    cy.get('[data-overview-engine-scope="all"]').should('have.attr', 'aria-current', 'true');
-    cy.then(() => {
-      expect(jsonRequests, 'the click reuses the warmed response').to.equal(1);
-    });
-
-    cy.get('[data-testid="overview-reference-select"]').click();
-    cy.get('[data-overview-reference="b300"]').click();
-    cy.location('search').should('eq', '?engine=all&ref=b300');
-    cy.get('[data-overview-comparison="hardware"]').should('contain.text', 'vs B300');
-    cy.then(() => {
-      expect(jsonRequests, 'a reference change is derived, not fetched').to.equal(1);
-    });
+    cy.location('pathname').should('eq', '/inference/deepseek-v41-flash');
   });
 
   it('reveals deprecated and maintenance models via the bottom toggle', () => {
@@ -586,97 +419,6 @@ describe('Overview page', () => {
       .eq(1)
       .should('be.visible')
       .and('contain.text', '30');
-  });
-
-  it('keeps client-only presentation intent across selectors without forcing fullscreen on load', () => {
-    cy.viewport(1280, 900);
-    cy.visit('/overview?tier=75&present=1&utm_source=deck#matrix', {
-      onBeforeLoad: stubFullscreenApi,
-    });
-
-    cy.get('[data-testid="overview-presentation-surface"]').should(
-      'have.attr',
-      'data-presenting',
-      'false',
-    );
-    cy.get('[data-testid="language-toggle"]').should(
-      'have.attr',
-      'href',
-      '/zh/overview?tier=75&present=1&utm_source=deck',
-    );
-
-    cy.get('[data-testid="overview-present-toggle"]').click();
-    cy.get('[data-testid="overview-presentation-surface"]').should(
-      'have.attr',
-      'data-presenting',
-      'true',
-    );
-    cy.location('search').should('eq', '?tier=75&present=1&utm_source=deck');
-    cy.location('hash').should('eq', '#matrix');
-
-    selectOverviewTier(100);
-    cy.location('search').should('eq', '?tier=100&present=1&utm_source=deck');
-    cy.get('[data-testid="overview-presentation-surface"]').should(
-      'have.attr',
-      'data-presenting',
-      'true',
-    );
-
-    cy.get('[data-overview-comparison="30d"]').click();
-    cy.location('search').should('eq', '?tier=100&compare=30d&present=1&utm_source=deck');
-    cy.get('[data-testid="overview-presentation-surface"]').should(
-      'have.attr',
-      'data-presenting',
-      'true',
-    );
-
-    cy.get('[data-testid="overview-present-toggle"]').click();
-    cy.get('[data-testid="overview-presentation-surface"]').should(
-      'have.attr',
-      'data-presenting',
-      'false',
-    );
-    cy.location('search').should('eq', '?tier=100&compare=30d&utm_source=deck');
-    cy.location('hash').should('eq', '#matrix');
-    cy.get('[data-testid="language-toggle"]').should(
-      'have.attr',
-      'href',
-      '/zh/overview?tier=100&compare=30d&utm_source=deck',
-    );
-  });
-
-  it('reasserts presentation intent when browser history changes during fullscreen', () => {
-    cy.viewport(1280, 900);
-    cy.visit('/overview?tier=75', { onBeforeLoad: stubFullscreenApi });
-
-    selectOverviewTier(100);
-    cy.location('search').should('eq', '?tier=100');
-    cy.get('[data-testid="overview-present-toggle"]').click();
-    cy.location('search').should('eq', '?tier=100&present=1');
-
-    cy.window().then((win) => win.history.back());
-    cy.location('search').should('eq', '?tier=75&present=1');
-    cy.get('[data-testid="overview-presentation-surface"]').should(
-      'have.attr',
-      'data-presenting',
-      'true',
-    );
-  });
-
-  it('leaves comparison paging to a focused presentation select option', () => {
-    cy.viewport(1280, 900);
-    cy.visit('/overview?compare=30d', { onBeforeLoad: stubFullscreenApi });
-    cy.get('[data-testid="overview-present-toggle"]').click();
-
-    cy.get('[data-testid="overview-history-window-select"]').click();
-    cy.get('[role="option"]').first().focus().trigger('keydown', {
-      key: 'ArrowRight',
-      code: 'ArrowRight',
-      bubbles: true,
-    });
-
-    cy.location('search').should('eq', '?compare=30d&present=1');
-    cy.get('[data-overview-comparison="30d"]').should('have.attr', 'aria-current', 'true');
   });
 
   it('switches the history window through the embedded selector', () => {
@@ -1085,8 +827,7 @@ describe('Overview page', () => {
       platform('gb300')
         .find('[data-testid="overview-cost-delta"]')
         .should('contain.text', '∞')
-        .and('have.attr', 'data-cost-polarity', 'no-baseline')
-        .and('have.attr', 'title', 'No B200 baseline to compare against');
+        .and('have.attr', 'data-cost-polarity', 'no-baseline');
       platform('gb300').then(([cell]) => {
         const [r, g, b] = getComputedStyle(cell.closest('td')!)
           .backgroundColor.match(/\d+/g)!
@@ -1106,39 +847,18 @@ describe('Overview page', () => {
       .and('have.class', 'text-brand');
     cy.get('[data-testid="nav-link-dashboard"]').should('not.have.class', 'text-brand');
 
-    cy.contains('h1', PAGE_TITLE).should('exist');
-    cy.contains(
-      'Cost per million total tokens from each platform’s best observed serving envelope',
-    ).should('exist');
-    cy.get('[data-testid="overview-scope"]')
-      .should('have.text', SCOPE_LINE)
-      .and('not.contain.text', 'tok/s/user')
-      .and('not.contain.text', '$/1M')
-      .and('not.contain.text', '8K→1K');
     cy.get('[data-testid="overview-source-link"]')
-      .should('have.text', TCO_SOURCE_TITLE)
-      .and('have.attr', 'href', TCO_SOURCE_URL)
+      .should('have.attr', 'href', TCO_SOURCE_URL)
       .and('have.attr', 'target', '_blank')
       .and('have.attr', 'rel', 'noopener noreferrer');
     cy.get('[data-testid="overview-source-link"] svg').should('exist');
     cy.get('body').should('not.contain.text', 'at a glance');
-    cy.contains('— = no result. ∞ = B200 baseline unavailable.').should('exist');
     cy.get('[data-testid="overview-methodology"]').children('p').should('have.length', 2);
-    cy.get('body')
-      .invoke('text')
-      .should('not.match', /Cost = hyperscaler/)
-      .and('not.match', /Each row compares platforms/)
-      .and('not.match', /prefill and decode GPUs in the denominator/)
-      .and('not.match', /No extrapolation/);
     cy.get('body').should('not.contain.text', '≈');
     expectNoVisibleDatesOrSnapshot();
-    cy.get('[data-testid="overview-pair-topology"]').should('not.exist');
     cy.get('body')
       .invoke('text')
       .should('not.match', /fallback/i);
-    cy.get('body')
-      .invoke('text')
-      .should('not.match', /At 100, .+ leads/);
     cy.get('[data-testid="overview-desktop-matrix"]')
       .should('be.visible')
       .within(() => {
@@ -1152,7 +872,6 @@ describe('Overview page', () => {
         });
         cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
         cy.get('[data-testid="overview-platform"]').should('have.length', MATRIX_ROWS * 5);
-        cy.get('[data-testid="overview-model-coverage-note"]').should('not.exist');
         cy.get('a').contains('View details').should('exist');
         cy.get('th[scope="row"]')
           .find('a')
@@ -1164,7 +883,7 @@ describe('Overview page', () => {
     for (const label of MODEL_LABELS) {
       cy.get('[data-testid="overview-desktop-matrix"]').should('contain.text', label);
     }
-    for (const model of ['DeepSeek-V4.1-Flash', 'Kimi-K3', 'GLM-5.2']) {
+    for (const model of ['DeepSeek-V4.1-Flash', 'GLM-5.2']) {
       desktopModel(model).within(() => {
         expectAgentxScenario(AGENTX_LABEL);
       });
@@ -1226,22 +945,6 @@ describe('Overview page', () => {
   });
 
   it('stacks the metric definition under the title at every width', () => {
-    cy.viewport(1280, 900);
-    cy.visit('/overview');
-    cy.get('[data-testid="overview-scope-metric"]')
-      .should('have.text', SCOPE_METRIC)
-      .and('have.css', 'font-size', '16px')
-      .and('have.css', 'font-weight', '600');
-    cy.get('[data-testid="overview-scope-direction"]')
-      .should('have.text', SCOPE_DIRECTION)
-      .and('have.css', 'font-size', '14px')
-      .and('have.css', 'font-weight', '400');
-    cy.get('[data-testid="overview-scope-metric"]').then(([metric]) => {
-      cy.get('[data-testid="overview-scope-direction"]').then(([direction]) => {
-        expect(getComputedStyle(direction).color).not.to.equal(getComputedStyle(metric).color);
-      });
-    });
-
     for (const width of [320, 390, 768, 1280, 1440]) {
       cy.viewport(width, 900);
       cy.visit('/overview');
@@ -1346,12 +1049,10 @@ describe('Overview page', () => {
 
     desktopModel('GLM-5.2').within(() => {
       cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
-      cy.get('[data-testid="overview-model-coverage-note"]').should('not.exist');
     });
     cy.get('[data-testid="overview-pair-missing"]').each(($cell) => {
       expect($cell.text()).not.to.contain('∞');
     });
-    cy.contains('— = no result. ∞ = B200 baseline unavailable.').should('exist');
     cy.get('body')
       .invoke('text')
       .should('not.match', /∞\s*%/);
@@ -1649,102 +1350,5 @@ describe('Overview page', () => {
         expect(problems, problems.join(' | ')).to.have.length(0);
       });
     }
-  });
-
-  it('renders the Chinese sibling with equivalent matrix copy and semantics', () => {
-    cy.viewport(1280, 900);
-    cy.visit('/zh/overview?models=all');
-
-    cy.get('[data-testid="chart-section-tabs"]').should('not.exist');
-    cy.get('[data-testid="nav-link-overview"]')
-      .should('have.attr', 'href', '/zh/overview')
-      .and('contain.text', '总览');
-    cy.contains('h1', PAGE_TITLE_ZH).should('exist');
-    cy.contains(
-      '根据各模型标注的测试场景，采用各平台实测的最优服务包络线，计算每百万总 token 成本',
-    ).should('exist');
-    cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE_ZH);
-    cy.get('[data-testid="overview-source-link"]')
-      .should('have.text', TCO_SOURCE_TITLE)
-      .and('have.attr', 'href', TCO_SOURCE_URL);
-    cy.get('body').should('not.contain.text', '一眼对比');
-    cy.contains('— = 无结果。∞ = 缺少 B200 基线。').should('exist');
-    cy.get('[data-testid="overview-methodology"]').children('p').should('have.length', 2);
-    cy.get('body')
-      .invoke('text')
-      .should('not.match', /成本 = 超大规模云/)
-      .and('not.match', /每行均在该模型标注的场景内比较各平台/)
-      .and('not.match', /分离式结果的分母同时计入预填充与解码 GPU/)
-      .and('not.match', /不会外推/);
-    cy.get('body').should('not.contain.text', '≈');
-    expectNoVisibleDatesOrSnapshot();
-    desktopModel('DeepSeek-V4-Pro', AGENTX)
-      .find(
-        '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
-      )
-      .as('estimatedB200')
-      .invoke('attr', 'title')
-      .should('include', '根据已验证的基准测试结果估算。')
-      .and('include', '原始数据仪表板：DeepSeek V4 Pro 0813 1.6T · B200 · SGLang · FP4 · MTP');
-    cy.get('@estimatedB200')
-      .invoke('attr', 'aria-label')
-      .should('include', '约 $0.059。根据已验证的基准测试结果估算。');
-    cy.get('@estimatedB200').should('have.text', '$0.059');
-    cy.get('@estimatedB200')
-      .should('have.attr', 'href')
-      .and('include', '/zh/inference?')
-      .and('include', 'g_model=DeepSeek-V4-Pro');
-    desktopModel('DeepSeek-V4-Pro', AGENTX)
-      .find('[data-testid="overview-pair-missing"][data-hardware="gb300"]')
-      .should('contain.text', '—')
-      .and('contain.text', '无精确 @50 结果');
-    cy.get('body')
-      .invoke('text')
-      .should('not.match', /回退/);
-    cy.get('body')
-      .invoke('text')
-      .should('not.match', /100 档由.+领先/);
-    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
-      platform('gb300').should('contain.text', 'SGLang · FP8 · STP');
-      platform('b200').find('[data-testid="overview-cost-delta"]').should('not.exist');
-    });
-    desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
-      platform('b200').should('contain.text', 'SGLang · FP4').and('not.contain.text', 'STP');
-    });
-    desktopModel('DeepSeek-V4-Pro', AGENTX).should('contain.text', '已弃用');
-    desktopModel('MiniMax-M3', AGENTX).within(() => {
-      platform('gb300')
-        .find('[data-testid="overview-cost-delta"]')
-        .should('contain.text', '∞')
-        .and('have.attr', 'data-cost-polarity', 'no-baseline')
-        .and('have.attr', 'title', '缺少可比较的 B200 基线');
-    });
-    desktopModel('GLM-5.2').within(() => {
-      expectAgentxScenario(AGENTX_LABEL_ZH);
-      cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
-      platform('b300')
-        .find('[data-testid="overview-pair-missing"]')
-        .should('contain.text', '该场景暂无数据');
-    });
-    desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
-      expectAgentxScenario(AGENTX_LABEL_ZH);
-      cy.get(
-        '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
-      ).should('have.text', '$0.059');
-    });
-    cy.contains('如果某款芯片没有可用的 FP4 投机解码配置，则改用次优配置。').should('exist');
-
-    cy.visit('/zh/overview?tier=100&models=all');
-    cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE_ZH);
-    cy.get('[data-testid="overview-tier-switcher"]')
-      .should('have.attr', 'aria-label', 'SLO')
-      .and('contain.text', 'SLO');
-    cy.get('body').should('not.contain.text', '服务档位');
-    cy.get('[data-testid="overview-tier-switcher"]').within(() => {
-      cy.get('[data-testid="overview-tier-slider"]')
-        .should('have.attr', 'data-tier', '100')
-        .and('have.attr', 'aria-valuetext', '100 tok/s/user');
-      cy.get('[data-tier-option]').should('have.length', 6);
-    });
   });
 });

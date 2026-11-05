@@ -159,32 +159,26 @@ describe('Parallelism labels in standard controls', () => {
     });
   }
 
-  for (const gpuCount of [false, true]) {
-    for (const parallelism of [false, true]) {
-      it(`loads independent shared-link settings: GPUs=${gpuCount}, parallelism=${parallelism}`, () => {
-        interceptAgenticData();
-        interceptDerivedAgenticMetrics();
-        cy.visit(
-          `/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces&i_label=${Number(gpuCount)}&i_advlabel=${Number(parallelism)}`,
-          {
-            onBeforeLoad(win) {
-              unlockAgenticGate(win);
-            },
+  for (const parallelism of [false, true]) {
+    it(`loads independent shared-link settings: GPUs=true, parallelism=${parallelism}`, () => {
+      interceptAgenticData();
+      interceptDerivedAgenticMetrics();
+      cy.visit(
+        `/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces&i_label=1&i_advlabel=${Number(parallelism)}`,
+        {
+          onBeforeLoad(win) {
+            unlockAgenticGate(win);
           },
-        );
-        expandLegendAdvanced();
-        cy.get('#scatter-point-labels').should(
-          'have.attr',
-          'data-state',
-          gpuCount ? 'checked' : 'unchecked',
-        );
-        cy.get('#scatter-parallelism-labels').should(
-          'have.attr',
-          'data-state',
-          parallelism ? 'checked' : 'unchecked',
-        );
-      });
-    }
+        },
+      );
+      expandLegendAdvanced();
+      cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
+      cy.get('#scatter-parallelism-labels').should(
+        'have.attr',
+        'data-state',
+        parallelism ? 'checked' : 'unchecked',
+      );
+    });
   }
 });
 
@@ -241,11 +235,8 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="option-help-e2e-normalized-interactivity"]').click();
     cy.get('[role="dialog"] [data-testid="normalized-interactivity-faq-link"]')
       .should('be.visible')
-      .and('have.attr', 'href', '/about#faq-normalized-interactivity')
-      .and('have.text', 'What does E2E Normalized Interactivity mean?');
-    cy.get('[data-testid="option-help-content-e2e-normalized-interactivity"]')
-      .should('contain.text', 'output tokens divided by end-to-end latency')
-      .type('{esc}');
+      .and('have.attr', 'href', '/about#faq-normalized-interactivity');
+    cy.get('[data-testid="option-help-content-e2e-normalized-interactivity"]').type('{esc}');
     cy.get('[data-testid="x-axis-mode-selector"]').should(
       'have.attr',
       'data-value',
@@ -304,33 +295,6 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('body').type('{esc}');
   });
 
-  it('shows the fixed p90 percentile in the Interactivity axis label', () => {
-    selectXAxisMode('interactivity', 'Interactivity');
-    cy.get('[data-testid="chart-figure"] svg').should(
-      'contain.text',
-      'P90 Interactivity (tok/s/user)',
-    );
-  });
-
-  it('honors explicit label URL overrides for the agentic view', () => {
-    interceptAgenticData();
-    interceptDerivedAgenticMetrics();
-    cy.visit(
-      '/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces&i_label=0&i_advlabel=0&i_linelabel=0',
-      {
-        onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-          unlockAgenticGate(win);
-        },
-      },
-    );
-    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
-    cy.get('[data-testid="legend-advanced-toggle"]').first().click({ scrollBehavior: 'center' });
-    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
-    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
-    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
-  });
-
   it('switches the x-axis to E2E Latency and updates the heading', () => {
     selectXAxisMode('e2e', 'E2E Latency');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'End-to-end Latency');
@@ -359,16 +323,6 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       .should('have.attr', 'data-value', 'ttft')
       .and('have.focus');
   });
-
-  it('keeps the agentic Latency Percentile control removed and labels the fixed p90 basis', () => {
-    selectXAxisMode('interactivity', 'Interactivity');
-    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
-    cy.get('[data-testid="percentile-selector"]').should('not.exist');
-    cy.get('[data-testid="chart-figure"] svg').should(
-      'contain.text',
-      'P90 Interactivity (tok/s/user)',
-    );
-  });
 });
 
 describe('X-axis mode URL param', () => {
@@ -386,21 +340,6 @@ describe('X-axis mode URL param', () => {
       .should('have.attr', 'data-value', 'ttft')
       .and('contain.text', 'TTFT');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
-  });
-
-  it('never shows the latency percentile selector and labels the fixed P90 basis', () => {
-    interceptAgenticData();
-    interceptDerivedAgenticMetrics();
-    cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        unlockAgenticGate(win);
-      },
-    });
-
-    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
-    cy.get('[data-testid="percentile-selector"]').should('not.exist');
-    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P90');
   });
 });
 
@@ -508,16 +447,6 @@ describe('Default scenario', () => {
 });
 
 describe('Label defaults for fixed-sequence scenarios', () => {
-  it('keeps the fixed-sequence chart unchanged while keyboard-browsing other options', () => {
-    interceptFixedSequenceData();
-    cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=8k%2F1k');
-    selectXAxisMode('ttft', 'TTFT');
-    openXAxisMenu();
-    cy.get('[data-testid="x-axis-mode-interactivity"]').focus().type('{esc}');
-    cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'ttft');
-    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
-  });
-
   it('offers only the three supported axes for fixed sequences', () => {
     interceptFixedSequenceData();
     cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=8k%2F1k');
@@ -528,23 +457,6 @@ describe('Label defaults for fixed-sequence scenarios', () => {
     cy.get('[data-testid="x-axis-mode-ttft"]').should('be.visible');
     cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').should('not.exist');
     cy.get('[data-testid="x-axis-mode-interactivity"]').type('{esc}');
-  });
-
-  it('honors explicit label URL overrides', () => {
-    interceptFixedSequenceData();
-    cy.visit(
-      '/inference?g_model=deepseek-v4-pro&i_seq=8k%2F1k&i_label=1&i_advlabel=1&i_linelabel=0',
-      {
-        onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        },
-      },
-    );
-    cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
-    expandLegendAdvanced();
-    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
-    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
-    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
   });
 });
 

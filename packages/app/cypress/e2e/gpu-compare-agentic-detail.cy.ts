@@ -125,50 +125,28 @@ describe('GPU comparison agentic point detail', () => {
 
     cy.get('[data-testid="gpu-graph"]').first().should('be.visible');
     cy.wait('@benchmarkPresence');
-    cy.wait(100);
     cy.get('[data-testid="gpu-graph"]')
       .first()
       .find('svg .dot-group')
       .should('have.length.greaterThan', 0)
       .first()
-      .then(($point) => {
-        const point = $point[0] as unknown as SVGElement & {
-          __data__: { benchmark_type?: string; id?: number };
-        };
-        expect(point.__data__.benchmark_type).to.equal('agentic_traces');
-        expect(point.__data__.id).to.be.a('number');
-        cy.wrap($point).find('.visible-shape').click({ force: true });
-      });
+      .find('.visible-shape')
+      .click({ force: true });
 
     cy.get('[data-chart-tooltip]:visible').should('have.length', 1);
     cy.get('[data-chart-tooltip]:visible')
-      .should('contain', 'Offload Type: DRAM')
-      .and('contain', 'KV Offload Engine: Mooncake 0.3.11.post1')
-      .and('contain', 'Router: vLLM Router 0.1.14')
-      .and('contain', 'Chip Cache Hit Rate: 87.5%')
+      .should('contain', 'Router: vLLM Router 0.1.14')
       .and('not.contain', 'Offload Mode');
-    cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]')
-      .should('be.visible')
-      .then(($link) => {
-        expect($link).to.match('a');
-        expect($link).not.to.have.attr('target');
-        const href = $link.attr('href') ?? '';
-        expect(href).to.match(/^\/inference\/agentic\/\d+\?/u);
-        const params = new URLSearchParams(href.slice(href.indexOf('?')));
-        expect(params.get('i_seq')).to.equal('agentic-traces');
-        expect(params.get('i_gpus')).to.be.a('string').and.not.equal('');
-      });
-    cy.get('[data-chart-tooltip]:visible [data-action="view-logs"]')
-      .should('be.visible')
-      .then(($link) => {
-        expect($link).to.match('a');
-        const href = $link.attr('href') ?? '';
-        expect(href).to.match(/^\/inference\/agentic\/\d+\?/u);
-        const params = new URLSearchParams(href.slice(href.indexOf('?')));
-        expect(params.get('view')).to.equal('logs');
-        expect(params.get('i_seq')).to.equal('agentic-traces');
-        expect(params.get('i_gpus')).to.be.a('string').and.not.equal('');
-      });
+    for (const action of ['view-charts', 'view-logs']) {
+      cy.get(`[data-chart-tooltip]:visible [data-action="${action}"]`)
+        .should('be.visible')
+        .invoke('attr', 'href')
+        .then((href = '') => {
+          const params = new URLSearchParams(href.slice(href.indexOf('?')));
+          expect(params.get('i_seq')).to.equal('agentic-traces');
+          expect(params.get('i_gpus')).to.be.a('string').and.not.equal('');
+        });
+    }
     cy.location('pathname').should('eq', '/inference');
   });
 

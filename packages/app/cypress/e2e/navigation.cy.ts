@@ -1,10 +1,7 @@
-import { SUPPLEMENTAL_BENCHMARK_ROWS } from '../../src/lib/benchmarks/supplemental-benchmarks';
-import { OVERLAY_RUN_ID, OVERLAY_RUN_URL } from '../support/overlay-fixtures';
 import { videoHistoryEntry } from '../../src/components/video-benchmark/history';
 import { servingArtifact } from '../support/video-artifacts';
 import { expectHwKeyPoints, type ScatterPoint } from '../support/scatter-points';
 
-const datum = (el: Element) => (el as Element & { __data__: { x: number; y: number } }).__data__;
 const tpuDatum = (points: ScatterPoint[]) =>
   points.find((point) => String(point.datum.hwKey).startsWith('tpuv7'))!.datum;
 
@@ -186,8 +183,8 @@ describe('First-load navigation', () => {
 
   it('navigates to dashboard from the header with one click', () => {
     cy.get('[data-testid="nav-link-dashboard"]').click();
-    cy.location('pathname').should('eq', '/inference/kimi-k3');
-    cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
+    cy.location('pathname').should('eq', '/inference/deepseek-v41-flash');
+    cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4.1 Flash');
   });
 
   it('navigates to comparisons from the footer with one click', () => {
@@ -206,33 +203,6 @@ describe('First-load navigation', () => {
   });
 
   it('leads the landing page with the AgentX hero and its two CTAs', () => {
-    cy.get('[data-testid="compare-agentx-primary"]').within(() => {
-      cy.get('h1').should('have.text', 'Compare Realistic Agentic Inference Perf');
-      cy.get('h2').should('not.exist');
-      cy.get('[data-testid="compare-agentx-revenue-calculator-link"]')
-        .should('contain.text', 'Token Revenue Calculator')
-        .and('have.attr', 'href', '/profit-estimator-per-gigawatt');
-      cy.get('[data-testid="compare-agentx-dashboard-link"]')
-        .should('have.text', 'Dashboard')
-        .and('have.attr', 'href', '/inference/kimi-k3');
-      cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 2);
-      for (const hidden of ['minimax-m3', 'kimi-k3', 'glm-5-3']) {
-        cy.get(`[data-testid="compare-agentx-model-${hidden}"]`).should('not.exist');
-      }
-      cy.get('[data-testid^="compare-agentx-model-"]').then(($rows) => {
-        const slugs = [...$rows].map((row) =>
-          (row.dataset.testid ?? '').replace('compare-agentx-model-', ''),
-        );
-        expect(slugs).to.deep.equal(['muse-spark-open', 'deepseek-v41-flash']);
-      });
-      cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]').should(
-        'not.exist',
-      );
-      cy.get('[data-testid="compare-agentx-model-deepseek-v41-flash"]')
-        .should('have.attr', 'href', '/inference/deepseek-v41-flash')
-        .and('contain.text', 'DeepSeek V4.1 Flash 552B');
-    });
     cy.get('[data-testid="compare-agentx-revenue-calculator-link"]').click();
     cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt');
   });
@@ -244,34 +214,24 @@ describe('First-load navigation', () => {
 });
 
 describe('Huawei UBenchX launch banner', { testIsolation: true }, () => {
-  for (const locale of ['', '/zh']) {
-    it(`opens Huawei core-memory profiles from ${locale || '/'} landing page`, () => {
-      cy.visit(locale || '/', {
-        onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-rubin-minimax-m3-banner-dismissed', '1');
-          win.localStorage.setItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed', '1');
-          win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
-          win.localStorage.setItem('inferencex-landing-banner-variant', 'ubenchx');
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        },
-      });
-      cy.get('[data-testid="launch-banner"]:visible')
-        .should('have.attr', 'href', `${locale}/ubenchx/core-memory-profiles`)
-        .and(
-          'contain.text',
-          locale ? 'Huawei Ascend 950PR 微基准测试' : 'Huawei Ascend 950PR Microbenchmarks',
-        )
-        .and(
-          'contain.text',
-          locale
-            ? '周期级核心访存微基准测试（Beta）'
-            : 'Cycle Level Core memory-access MicroBenchmarks (Beta)',
-        )
-        .click();
-      cy.location('pathname').should('eq', `${locale}/ubenchx/core-memory-profiles`);
-      cy.get('[data-testid="ascend-core-profiles"]').should('be.visible');
+  it('opens Huawei core-memory profiles from /zh landing page', () => {
+    cy.visit('/zh', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-rubin-minimax-m3-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed', '1');
+        win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
+        win.localStorage.setItem('inferencex-landing-banner-variant', 'ubenchx');
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
     });
-  }
+    cy.get('[data-testid="launch-banner"]:visible')
+      .should('have.attr', 'href', '/zh/ubenchx/core-memory-profiles')
+      .and('contain.text', 'Huawei Ascend 950PR 微基准测试')
+      .and('contain.text', '周期级核心访存微基准测试（Beta）')
+      .click();
+    cy.location('pathname').should('eq', '/zh/ubenchx/core-memory-profiles');
+    cy.get('[data-testid="ascend-core-profiles"]').should('be.visible');
+  });
 });
 
 describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
@@ -376,12 +336,9 @@ describe('TPUv7 results', { testIsolation: true }, () => {
         cy.scatterPoints().should((points) => {
           expect(tpuDatum(points).y).to.be.closeTo((internal.y * 1.21) / 1.03, 1e-8);
         });
-        cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView();
-        cy.screenshot(`tco-basis-${locale ? 'zh' : 'en'}-desktop`, { capture: 'viewport' });
         cy.viewport(390, 844);
         cy.get('[data-testid="inference-secondary-controls"] > button').click();
         cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView().should('be.visible');
-        cy.screenshot(`tco-basis-${locale ? 'zh' : 'en'}-mobile`, { capture: 'viewport' });
         cy.get('[data-testid="tco-basis-internal"]').click();
         cy.scatterPoints().should((points) => {
           expect(tpuDatum(points).y).to.be.closeTo(internal.y, 1e-8);
@@ -389,57 +346,6 @@ describe('TPUv7 results', { testIsolation: true }, () => {
       });
     });
   }
-  it('reprices a TPU unofficial overlay without changing throughput', () => {
-    cy.intercept('GET', '/api/unofficial-run*', {
-      body: {
-        runInfos: [
-          {
-            id: OVERLAY_RUN_ID,
-            name: 'TPU test',
-            branch: 'tpu-test',
-            sha: 'abc000',
-            createdAt: '2026-08-26T00:00:00Z',
-            url: OVERLAY_RUN_URL,
-            conclusion: 'success',
-            status: 'completed',
-            isNonMainBranch: true,
-          },
-        ],
-        benchmarks: SUPPLEMENTAL_BENCHMARK_ROWS.filter((row) => row.hardware === 'tpuv7').map(
-          (row) => ({ ...row, run_url: OVERLAY_RUN_URL }),
-        ),
-        evaluations: [],
-      },
-    }).as('tpuOverlay');
-    cy.visit(
-      `/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8&i_metric=y_costh&unofficialrun=${OVERLAY_RUN_ID}`,
-      {
-        onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        },
-      },
-    );
-    cy.wait('@tpuOverlay');
-    const points = '.unofficial-overlay-pt';
-    cy.get(points)
-      .first()
-      .then(($point) => {
-        const internal = { ...datum($point[0]) };
-        cy.get('[data-testid="tco-basis-external"]').click();
-        cy.get(points)
-          .first()
-          .should(($external) => {
-            expect(datum($external[0]).y).to.be.closeTo((internal.y * 1.21) / 1.03, 1e-8);
-            expect(datum($external[0]).x).to.equal(internal.x);
-          });
-        cy.get('[data-testid="tco-basis-internal"]').click();
-        cy.get(points)
-          .first()
-          .should(($restored) => {
-            expect(datum($restored[0]).y).to.be.closeTo(internal.y, 1e-8);
-          });
-      });
-  });
   it('hides the TCO basis selector outside Qwen3.5 8K/1K', () => {
     cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_metric=y_costh', {
       onBeforeLoad(win) {

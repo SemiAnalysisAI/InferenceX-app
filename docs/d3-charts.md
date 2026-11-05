@@ -1,5 +1,16 @@
 # D3 Chart Design Rationale
 
+## Router-aware framework labels
+
+Inference line labels and legends use `router_name` from each point's runtime
+metadata. Plain `sglang` or `vllm` with router `smg` displays as `SMG SGLang`
+or `SMG vLLM`. If any point uses SMG, the entire curve's line label and legend
+use the SMG framework name without a mixed-name suffix. Curves with no SMG
+points keep the standard name, and point tooltips use only that point's
+metadata. This applies to official results and unofficial overlays.
+Hardware keys, framework filters and measurements do not change.
+The inference Views API uses the same helper for series and table labels.
+
 ## Desktop legend alignment
 
 The shared chart wrapper places the desktop legend 8px below the plot's top
@@ -91,6 +102,19 @@ During zoom/pan, point repositioning (cheap: transform attr update) runs on ever
 This keeps zoom at 60fps while deferring expensive work. Effect cleanup cancels a pending frame so it never updates removed DOM.
 
 ## HTML Strings for Tooltips
+
+Pinned point details reuse the compact hover card's KV cache bar, including the
+chip/CPU split and theoretical marker. TRT-LLM's combined rate stays a single
+segment; disabled offload does not contribute CPU hits. Missing chip measurements
+retain the available textual rates instead of inventing a bar. Concurrency and
+precision use explicit labels, and parallelism groups Prefill/Decode configurations by
+role with compact labels such as DEP4. The raw fields remain in an expandable
+configuration table. Prompt/generated token counts use a proportional bar with
+exact counts underneath; partial or invalid counts do not produce a split.
+Official, unofficial and historical points
+share this presentation; unofficial colors retain their per-run identity.
+This is presentation-only: benchmark values, API responses and `inferencex-skills`
+contracts are unchanged.
 
 Tooltips are built as HTML template literal strings, injected via D3's `.html()`. Using React elements would require:
 

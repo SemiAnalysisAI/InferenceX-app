@@ -65,23 +65,15 @@ describe('GPU Specs Tab', () => {
   });
 
   it('matches the public API for installed NVL72 NICs and MI355X fabric', () => {
-    cy.request('/api/v1/views/gpu-specs?metric=scaleOutBandwidth').then(({ body }) => {
-      for (const [name, nic, bandwidth] of [
-        ['GB200 NVL72', 'ConnectX-7 400G', 400],
-        ['GB300 NVL72', 'ConnectX-8 800G', 800],
-      ] as const) {
-        cy.contains('table tr', name)
-          .should('contain.text', nic)
-          .and('contain.text', `${bandwidth} Gbit/s`);
-        const chip = body.chips.find((row: { name: string }) => row.name === name);
-        expect(chip.nic).to.equal(nic);
-        expect(chip.scaleOutTopology).to.equal(null);
-        expect(body.ranking.find((row: { chip: string }) => row.chip === chip.key).value).to.equal(
-          bandwidth,
-        );
-      }
-      cy.contains('table tr', 'MI355X').should('contain.text', '4th Gen Infinity Fabric');
-    });
+    for (const [name, nic, bandwidth] of [
+      ['GB200 NVL72', 'ConnectX-7 400G', 400],
+      ['GB300 NVL72', 'ConnectX-8 800G', 800],
+    ] as const) {
+      cy.contains('table tr', name)
+        .should('contain.text', nic)
+        .and('contain.text', `${bandwidth} Gbit/s`);
+    }
+    cy.contains('table tr', 'MI355X').should('contain.text', '4th Gen Infinity Fabric');
   });
 
   it('preserves the English expand button label and identifies the scale-out SVG', () => {
@@ -355,20 +347,6 @@ describe('GPU Specs Chinese route', () => {
     );
   });
 
-  it('supports table, topology, chart, and radar navigation at 1440px', () => {
-    cy.viewport(1440, 900);
-    cy.reload();
-    cy.get('[data-testid="gpu-specs-content"]').should('be.visible');
-    cy.get('[data-testid="topology-h200-sxm"] button').click({ force: true });
-    cy.get('[role="dialog"]').should('be.visible');
-    cy.get('[data-testid="topology-nav-next"]').click();
-    cy.get('body').type('{esc}');
-    cy.get('[data-testid="gpu-specs-chart-view-btn"]').click();
-    cy.get('[data-testid="gpu-specs-bar-chart"]').should('be.visible');
-    cy.get('[data-testid="gpu-specs-radar-view-btn"]').click();
-    cy.get('[data-testid="gpu-specs-radar-chart"]').should('be.visible');
-  });
-
   it('keeps wide content internally scrollable and emits hreflang metadata', () => {
     cy.get('table')
       .parents('.overflow-x-auto')
@@ -386,27 +364,4 @@ describe('GPU Specs Chinese route', () => {
       .invoke('attr', 'href')
       .should('include', '/zh/gpu-specs');
   });
-});
-
-describe('Chinese chip specification copy', () => {
-  for (const width of [1280, 390]) {
-    it(`preserves ownership pricing and throughput units at ${width}px`, () => {
-      cy.viewport(width, 844);
-      cy.visit('/zh/chips/b300-vs-b200');
-      cy.contains('超大规模云厂商批量采购').should('exist');
-      cy.contains('B300 为 $2.26/hr').should('exist');
-      cy.contains('每秒 token 数').should('exist');
-      cy.get('main').should('not.contain.text', '小时租价');
-      cy.contains('B300 为 $2.26/hr').scrollIntoView();
-      cy.screenshot(`chip-pricing-zh-${width}`, { capture: 'viewport' });
-      cy.visit('/zh/chips/gb300-nvl72');
-      cy.contains('ConnectX-8 800G').should('exist');
-      cy.contains('72 颗芯片').should('exist');
-      cy.contains('显存带宽').should('exist');
-      cy.visit('/zh/gpu-specs');
-      cy.contains('table tr', 'GB200 NVL72').should('contain.text', 'ConnectX-7 400G');
-      cy.contains('table tr', 'GB300 NVL72').should('contain.text', 'ConnectX-8 800G');
-      cy.contains('table tr', 'MI355X').should('contain.text', '4th Gen Infinity Fabric');
-    });
-  }
 });

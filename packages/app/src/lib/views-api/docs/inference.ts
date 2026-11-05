@@ -336,7 +336,11 @@ const seriesSchema = objectSchema(
     gpu: stringSchema,
     framework: stringSchema,
     specMethod: stringSchema,
-    label: stringSchema,
+    label: {
+      ...stringSchema,
+      description:
+        'Chart display label. If any point in a plain SGLang/vLLM series has router_name=smg, the entire series is labeled SMG SGLang/SMG vLLM. Canonical framework and hwKey are unchanged.',
+    },
     vendor: stringSchema,
     deployment: stringSchema,
     kvOffload: booleanSchema,
@@ -364,7 +368,11 @@ const tableRowSchema = objectSchema(
     gpu: stringSchema,
     framework: stringSchema,
     specMethod: stringSchema,
-    label: stringSchema,
+    label: {
+      ...stringSchema,
+      description:
+        'Point-specific chart display label, including SMG SGLang/SMG vLLM when this point has router_name=smg. Canonical framework and hwKey are unchanged.',
+    },
     vendor: stringSchema,
     deployment: stringSchema,
     kvOffload: booleanSchema,

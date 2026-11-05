@@ -144,6 +144,7 @@ import type {
 } from '@/components/inference/types';
 import {
   generateOverlayTooltipContent,
+  generateHoverTooltipContent,
   generateTooltipContent,
 } from '@/components/inference/utils/tooltipUtils';
 import { usePowerTraceAction } from '@/components/inference/hooks/usePowerTraceAction';
@@ -1788,6 +1789,8 @@ const ScatterGraph = React.memo(
       [effectiveActiveHwTypes, selectedPrecisions, hiddenPowerVariants],
     );
 
+    const seriesColorRef = useRef({ getCssColor, resolveColor });
+    seriesColorRef.current = { getCssColor, resolveColor };
     const interactionRef = useRef({
       isPointVisible,
       isOverlayPointVisible,
@@ -2262,9 +2265,22 @@ const ScatterGraph = React.memo(
     const tooltipConfig = useMemo(
       () => ({
         rulerType: 'crosshair' as const,
-        content: (d: InferenceData, isPinned: boolean) =>
-          generateTooltipContent({
+        content: (d: InferenceData, isPinned: boolean) => {
+          const { getCssColor: css, resolveColor: rc } = seriesColorRef.current;
+          if (!isPinned) {
+            return generateHoverTooltipContent({
+              data: d,
+              xLabel,
+              yLabel,
+              selectedYAxisMetric,
+              hardwareConfig,
+              color: css(rc(d.hwKey as string)),
+              locale,
+            });
+          }
+          return generateTooltipContent({
             data: d,
+            color: css(rc(d.hwKey as string)),
             isPinned,
             xLabel,
             yLabel,
@@ -2282,7 +2298,8 @@ const ScatterGraph = React.memo(
             locale,
             powerLabelStyle,
             touch: touchCopy,
-          }),
+          });
+        },
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
         getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
         onHoverStart: (_sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) => {
@@ -3212,6 +3229,7 @@ const ScatterGraph = React.memo(
                 content: (point, pinned) =>
                   generateOverlayTooltipContent({
                     data: point,
+                    color: overlayRunColor(overlayRunIndex(point.run_url ?? null, runIndexByUrl)),
                     isPinned: pinned,
                     xLabel,
                     yLabel,

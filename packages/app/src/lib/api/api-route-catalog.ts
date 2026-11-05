@@ -1250,7 +1250,7 @@ export interface ApiContractSourceDigest {
 export const apiContractSourceDigests = [
   {
     source: '../constants/src/framework-aliases.ts',
-    sourceSha256: 'f7c6e857aa0a9ea7605d459b2c20457d34a0d8343a7f62bd7c472ae70fd49eb9',
+    sourceSha256: '6c220e6aed1465e647f2c3ffcb03828e0f98ac6b9edb4019f0dce6db10c4054e',
     reviewArea: {
       en: 'Shared engine labels, family classification and dashboard/read-only view filter parity.',
       zh: '共享引擎标签、系列分类，以及仪表板与只读视图的筛选一致性。',
@@ -1502,7 +1502,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-transform.ts',
-    sourceSha256: '97b97962a9c09df7d7abfe84b6f4cb78d0b0500c9e41bf1fd785d040fcb59ad4',
+    sourceSha256: '7ade60009996367fbd6bfcbcfd7ba155fd96e1676dcb0d320ca26821f948ba7a',
     reviewArea: {
       en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
       zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',
@@ -1756,7 +1756,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/series.ts',
-    sourceSha256: '25154a040bed12a1821ea59002c3533af91b2d96b407285f9b4623ef1b704dd8',
+    sourceSha256: '2ebcea69a14260ef63b76617fb2fd1d3c6a24c9f6c0c56d7bd68376370982c00',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1911,7 +1911,9 @@ export const apiContractSourceDigests = [
     // joins OVERVIEW_MODEL_SCENARIOS as AgentX-only. No parameter or response
     // shape change, so the docs stand.
     // GLM-5.3-Flash adds an AgentX-only row without changing the response shape.
-    sourceSha256: 'bcd4e439b197551b432f8d3e5798189f502f13aebc196a4f81579edaa75262c8',
+    // Kimi-K3.1-Pro (InferenceX#4803) joins OVERVIEW_MODEL_SCENARIOS as
+    // AgentX-only. No parameter or response shape change, so the docs stand.
+    sourceSha256: '75281dc574436f1dd84b76ffe115e395a1eb59ad1eda93f90f53a0138865086a',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',
@@ -1942,7 +1944,10 @@ export const apiContractSourceDigests = [
     // AgentX cookbook documents the model; no endpoint or parameter shape changes.
     // GLM-5.3-Flash / glm5.3flash is separate from GLM-5.2/5.3; the API
     // model documentation and AgentX cookbook describe the publication boundary.
-    sourceSha256: 'c635cd27433e15298093460ef8b1b2ae8cfe87928c2fc8352036a52bbe809aa9',
+    // Reviewed for the Kimi-K3.1-Pro addition (InferenceX#4803): one new DB key,
+    // `kimik3.1`, with its own display name and release date. No endpoint or
+    // parameter shape changes, so the docs stand.
+    sourceSha256: 'd331d67e91f5bf56eeee7c2d30c34448d498ddb33e21399bcb3854d5ed599c3d',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',
