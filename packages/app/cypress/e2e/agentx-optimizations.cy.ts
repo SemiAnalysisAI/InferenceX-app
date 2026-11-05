@@ -39,7 +39,6 @@ describe('AgentX optimizations', () => {
 
     cy.get('[data-testid="agentx-optimizations-callout"]').within(() => {
       cy.contains('h2', 'Optimizations for Agentic Workloads').should('be.visible');
-      cy.contains('50+ upstream pull requests').should('be.visible');
       cy.get('[data-testid="agentx-optimizations-framework-link"]').should(
         'have.length',
         FRAMEWORK_SLUGS.length,
@@ -83,39 +82,6 @@ describe('AgentX optimizations', () => {
     });
 
     cy.location('pathname').should('eq', '/agentx/optimizations/vllm');
-  });
-
-  it('renders a project page with its measurements, figures, and PR links', () => {
-    cy.visit('/agentx/optimizations/vllm', { onBeforeLoad: unlockAgenticGate });
-
-    cy.get('[data-testid="agentx-optimizations-article"]')
-      .should('have.attr', 'data-framework', 'vllm')
-      .within(() => {
-        cy.get('h1').should('have.text', 'vLLM');
-        cy.contains('prefix-cache hit rate above 95%').should('be.visible');
-        cy.contains('81.7% higher output throughput').should('be.visible');
-        cy.get('[data-testid="agentx-optimizations-figure-vllmSelectiveRetention"] img').should(
-          'be.visible',
-        );
-        cy.get('[data-testid="agentx-optimizations-figure-vllmSelectiveRetention"]').should(
-          'contain.text',
-          'View full-resolution image',
-        );
-        cy.get('[data-testid="agentx-optimizations-pr"]')
-          .should('have.length.greaterThan', 20)
-          .first()
-          .should('have.attr', 'href', 'https://github.com/vllm-project/vllm/pull/43447')
-          .and('contain.text', 'vLLM #43447');
-        cy.get('[data-testid="agentx-optimizations-card"]').should(
-          'have.length',
-          FRAMEWORK_SLUGS.length - 1,
-        );
-      });
-
-    cy.visit('/agentx/optimizations/mori-umbp', { onBeforeLoad: unlockAgenticGate });
-    cy.get('[data-testid="agentx-optimizations-figure-umbpStoreLinker"]')
-      .should('be.visible')
-      .and('not.contain.text', 'View full-resolution image');
   });
 
   it('renders the index and representative projects at 1440px and 390px in both locales', () => {

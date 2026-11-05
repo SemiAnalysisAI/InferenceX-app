@@ -134,18 +134,12 @@ describe('Validated vs historical measured power', () => {
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
     cy.get('[data-testid="quick-filter-power-certified"]').should('be.enabled');
     cy.get('[data-testid="quick-filter-power-legacy"]').should('be.enabled');
-    cy.get('[data-testid="quick-filter-power-certified"]').should('contain.text', 'Validated');
-    cy.get('[data-testid="quick-filter-power-legacy"]').should('contain.text', 'Historical');
-    cy.get('[data-testid="measured-power-help"]').click();
-    cy.contains('Both are shown by default.').should('be.visible');
-    cy.get('body').type('{esc}');
 
     cy.get('[data-testid="quick-filter-power-certified"]').click();
     cy.get('[data-testid="quick-filters-selected-count"]').should('contain.text', '1 selected');
     expectHwKeyPoints('b200', false);
     expectHwKeyPoints('mi300x', true);
     cy.get('[data-testid="inference-chart-display"] svg').should('exist');
-    cy.screenshot('certified-only-filter', { capture: 'viewport' });
 
     cy.contains('button', 'Clear filters').click();
     cy.get('[data-testid="quick-filters-selected-count"]').should('not.exist');

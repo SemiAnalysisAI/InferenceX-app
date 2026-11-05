@@ -38,7 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: [{split: 6, shard: 1}, {split: 6, shard: 2}, {split: 6, shard: 3}, {split: 6, shard: 4}, {split: 6, shard: 5}, {split: 6, shard: 6}, {split: 8, shard: 1}, {split: 8, shard: 2}, {split: 8, shard: 3}, {split: 8, shard: 4}, {split: 8, shard: 5}, {split: 8, shard: 6}, {split: 8, shard: 7}, {split: 8, shard: 8}, {split: 12, shard: 1}, {split: 12, shard: 2}, {split: 12, shard: 3}, {split: 12, shard: 4}, {split: 12, shard: 5}, {split: 12, shard: 6}, {split: 12, shard: 7}, {split: 12, shard: 8}, {split: 12, shard: 9}, {split: 12, shard: 10}, {split: 12, shard: 11}, {split: 12, shard: 12}]
+        shard: [1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -82,7 +82,7 @@ jobs:
           CI: true
           # cypress-split picks this shard's component specs, balanced by the
           # committed component-timings.json.
-          SPLIT: ${{ matrix.split }}
+          SPLIT: 6
           SPLIT_INDEX1: ${{ matrix.shard }}
           SPLIT_FILE: component-timings.json
           SPLIT_OUTPUT_FILE: /tmp/cypress-split-component-out.json
@@ -107,7 +107,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: [{browser: chrome, split: 12, shard: 1}, {browser: chrome, split: 12, shard: 2}, {browser: chrome, split: 12, shard: 3}, {browser: chrome, split: 12, shard: 4}, {browser: chrome, split: 12, shard: 5}, {browser: chrome, split: 12, shard: 6}, {browser: chrome, split: 12, shard: 7}, {browser: chrome, split: 12, shard: 8}, {browser: chrome, split: 12, shard: 9}, {browser: chrome, split: 12, shard: 10}, {browser: chrome, split: 12, shard: 11}, {browser: chrome, split: 12, shard: 12}, {browser: chrome, split: 16, shard: 1}, {browser: chrome, split: 16, shard: 2}, {browser: chrome, split: 16, shard: 3}, {browser: chrome, split: 16, shard: 4}, {browser: chrome, split: 16, shard: 5}, {browser: chrome, split: 16, shard: 6}, {browser: chrome, split: 16, shard: 7}, {browser: chrome, split: 16, shard: 8}, {browser: chrome, split: 16, shard: 9}, {browser: chrome, split: 16, shard: 10}, {browser: chrome, split: 16, shard: 11}, {browser: chrome, split: 16, shard: 12}, {browser: chrome, split: 16, shard: 13}, {browser: chrome, split: 16, shard: 14}, {browser: chrome, split: 16, shard: 15}, {browser: chrome, split: 16, shard: 16}, {browser: chrome, split: 20, shard: 1}, {browser: chrome, split: 20, shard: 2}, {browser: chrome, split: 20, shard: 3}, {browser: chrome, split: 20, shard: 4}, {browser: chrome, split: 20, shard: 5}, {browser: chrome, split: 20, shard: 6}, {browser: chrome, split: 20, shard: 7}, {browser: chrome, split: 20, shard: 8}, {browser: chrome, split: 20, shard: 9}, {browser: chrome, split: 20, shard: 10}, {browser: chrome, split: 20, shard: 11}, {browser: chrome, split: 20, shard: 12}, {browser: chrome, split: 20, shard: 13}, {browser: chrome, split: 20, shard: 14}, {browser: chrome, split: 20, shard: 15}, {browser: chrome, split: 20, shard: 16}, {browser: chrome, split: 20, shard: 17}, {browser: chrome, split: 20, shard: 18}, {browser: chrome, split: 20, shard: 19}, {browser: chrome, split: 20, shard: 20}, {browser: chrome, split: 24, shard: 1}, {browser: chrome, split: 24, shard: 2}, {browser: chrome, split: 24, shard: 3}, {browser: chrome, split: 24, shard: 4}, {browser: chrome, split: 24, shard: 5}, {browser: chrome, split: 24, shard: 6}, {browser: chrome, split: 24, shard: 7}, {browser: chrome, split: 24, shard: 8}, {browser: chrome, split: 24, shard: 9}, {browser: chrome, split: 24, shard: 10}, {browser: chrome, split: 24, shard: 11}, {browser: chrome, split: 24, shard: 12}, {browser: chrome, split: 24, shard: 13}, {browser: chrome, split: 24, shard: 14}, {browser: chrome, split: 24, shard: 15}, {browser: chrome, split: 24, shard: 16}, {browser: chrome, split: 24, shard: 17}, {browser: chrome, split: 24, shard: 18}, {browser: chrome, split: 24, shard: 19}, {browser: chrome, split: 24, shard: 20}, {browser: chrome, split: 24, shard: 21}, {browser: chrome, split: 24, shard: 22}, {browser: chrome, split: 24, shard: 23}, {browser: chrome, split: 24, shard: 24}]
+        browser: ${{ fromJSON(github.event_name == 'pull_request' && '["chrome"]' || '["chrome", "firefox"]') }}
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
     env:
       # Chrome shard 1 is the only writer of the shared caches.
       CACHE_WRITER: ${{ matrix.split == 24 && matrix.shard == 1 }}
@@ -212,11 +213,11 @@ jobs:
           E2E_FIXTURES: '1'
           CYPRESS_NO_COMMAND_LOG: '1'
           # cypress-split picks the subset of specs for this shard.
-          # SPLIT_INDEX1 is 1-based to match matrix.shard values [1..24].
+          # SPLIT_INDEX1 is 1-based to match matrix.shard values [1..20].
           # SPLIT_FILE seeds the balance from observed timings;
           # Each browser uses its own measurements. Raw per-test observations
           # are uploaded separately; the plugin's merged output is not evidence.
-          SPLIT: ${{ matrix.split }}
+          SPLIT: 20
           SPLIT_INDEX1: ${{ matrix.shard }}
           SPLIT_FILE: ${{ matrix.browser == 'firefox' && 'timings-firefox.json' || 'timings.json' }}
           SPLIT_OUTPUT_FILE: /tmp/cypress-split-out.json

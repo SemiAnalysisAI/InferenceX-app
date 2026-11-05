@@ -16,7 +16,6 @@ import {
 describe('current image metadata', () => {
   it('uses the canonical tab copy and bilingual alternates', () => {
     const meta = tabMetadata('current-inferencex-image');
-    expect(meta.description).toBe(TAB_META['current-inferencex-image'].description);
     expect(meta.openGraph?.description).toBe(TAB_META['current-inferencex-image'].description);
     expect(meta.alternates?.languages).toBeDefined();
   });

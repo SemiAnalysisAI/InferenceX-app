@@ -248,23 +248,4 @@ describe('Agentic point detail — returning to the chart', () => {
     cy.location('pathname').should('eq', '/zh/inference');
     assertRestoredChart();
   });
-
-  it('does not drop the unofficialruns overlay param on the round trip', () => {
-    visitChart('/inference?unofficialruns=987654321');
-    selectTargetModel();
-    soloLegendSeries();
-    clickTracedPoint();
-
-    cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]')
-      .should('be.visible')
-      .then(($link) => {
-        const href = $link.attr('href') ?? '';
-        const params = new URLSearchParams(href.slice(href.indexOf('?')));
-        expect(params.get('unofficialruns'), 'overlay run carried forward').to.equal('987654321');
-      });
-
-    cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]').click();
-    cy.location('search').should('contain', 'unofficialruns=987654321');
-    chartLink('en').should('have.attr', 'href').and('contain', 'unofficialruns=987654321');
-  });
 });

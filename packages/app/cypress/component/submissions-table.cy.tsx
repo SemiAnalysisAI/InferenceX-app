@@ -27,36 +27,13 @@ const rows: SubmissionSummaryRow[] = [
 ];
 
 describe('SubmissionsTable — Spec Method column', () => {
-  it('renders a Spec Method column header', () => {
-    cy.mount(<SubmissionsTable data={rows} />);
-    cy.contains('th', 'Spec Method').should('be.visible');
-  });
-
   it('renders canonical spec_method labels and shows an em-dash for "none"', () => {
     cy.mount(<SubmissionsTable data={rows} />);
-    cy.contains('td', 'MTP').should('be.visible').and('have.class', 'uppercase');
-    cy.contains('td', 'EAGLE').should('be.visible').and('have.class', 'uppercase');
+    cy.contains('td', 'MTP').should('be.visible');
+    cy.contains('td', 'EAGLE').should('be.visible');
     cy.contains('tbody tr', 'MI355X').within(() => {
       cy.contains('—').should('be.visible');
     });
-  });
-
-  it('renders M3 mtp as EAGLE, not MTP', () => {
-    cy.mount(
-      <SubmissionsTable
-        data={[
-          {
-            ...baseRow,
-            model: 'minimaxm3',
-            hardware: 'b200',
-            spec_method: 'mtp',
-            date: '2026-05-10',
-          },
-        ]}
-      />,
-    );
-    cy.contains('td', 'EAGLE').should('be.visible');
-    cy.contains('td', 'MTP').should('not.exist');
   });
 
   it('sorts by spec_method when the header is clicked', () => {

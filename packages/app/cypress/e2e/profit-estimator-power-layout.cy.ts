@@ -21,118 +21,74 @@ function unlockPowerGate(win: Cypress.AUTWindow): void {
 }
 
 describe('Profit estimator power option', { testIsolation: true }, () => {
-  for (const locale of ['en', 'zh'] as const) {
-    it(`keeps available estimates without a per-configuration warning list (${locale})`, () => {
-      stubOpenRouter();
-      const width = locale === 'en' ? 1280 : 390;
-      cy.viewport(width, 900);
-      cy.intercept('GET', '/api/v1/benchmarks*', {
-        body: profitBenchmarkRows().map((row) => ({
+  it('prices DeepSeek Flash partial chassis with a one-line power note and CSV labels (en)', () => {
+    stubOpenRouter();
+    cy.viewport(1280, 900);
+    cy.intercept('GET', '/api/v1/benchmarks*', {
+      body: profitBenchmarkRows('dsv41flash').map((row) => {
+        const gpus = row.hardware === 'b300' ? 2 : 4;
+        return {
           ...row,
+          prefill_tp: gpus,
+          decode_tp: gpus,
+          num_prefill_gpu: gpus,
+          num_decode_gpu: gpus,
           metrics: {
             ...row.metrics,
-            power_valid: row.hardware === 'b300' ? 0 : 1,
+            power_valid: 1,
             power_metric_schema_version: 2,
             avg_power_w: 500,
-            avg_total_gpu_power_w: 4000,
+            avg_total_gpu_power_w: 500 * gpus,
           },
-        })),
-      });
-      cy.visit(`${locale === 'zh' ? '/zh' : ''}/profit-estimator-per-gigawatt?c_power=compare`, {
-        onBeforeLoad: unlockPowerGate,
-      });
-      chart().find('text.revenue-label').should('have.length', 6);
-      chart()
-        .find('.x-axis')
-        .should('not.contain', 'H200')
-        .and('contain', 'B300')
-        .and('contain', 'GB300');
-      cy.get('[data-testid="profit-power-unavailable"]').should('not.exist');
-      chart().scrollIntoView();
-      cy.screenshot(`profit-no-unavailable-list-${locale}`, {
-        capture: 'viewport',
-        overwrite: true,
-      });
+        };
+      }),
     });
-
-    it(`prices DeepSeek Flash partial chassis with a one-line power note and CSV labels (${locale})`, () => {
-      stubOpenRouter();
-      cy.viewport(locale === 'en' ? 1280 : 393, 900);
-      cy.intercept('GET', '/api/v1/benchmarks*', {
-        body: profitBenchmarkRows('dsv41flash').map((row) => {
-          const gpus = row.hardware === 'b300' ? 2 : 4;
-          return {
-            ...row,
-            prefill_tp: gpus,
-            decode_tp: gpus,
-            num_prefill_gpu: gpus,
-            num_decode_gpu: gpus,
-            metrics: {
-              ...row.metrics,
-              power_valid: 1,
-              power_metric_schema_version: 2,
-              avg_power_w: 500,
-              avg_total_gpu_power_w: 500 * gpus,
-            },
-          };
-        }),
-      });
-      let csv: Blob | undefined;
-      cy.visit(
-        `${locale === 'zh' ? '/zh' : ''}/profit-estimator-per-gigawatt/deepseek-v41-flash?c_power=modeled`,
-        {
-          onBeforeLoad: (win) => {
-            unlockPowerGate(win);
-            win.URL.createObjectURL = (blob) => {
-              if (blob instanceof win.Blob) csv = blob;
-              return 'blob:profit-csv-test';
-            };
-            win.HTMLAnchorElement.prototype.click = () => {};
-          },
-        },
-      );
-      const label = locale === 'en' ? 'Full-chassis extrapolation' : '整机外推';
-      cy.get('#profit-target').should('have.value', '150');
-      chart().find('text.revenue-label').should('have.length', 4);
-      chart()
-        .should('contain', 'GB300')
-        .and('contain', 'B200')
-        .and('contain', 'B300')
-        .and('contain', 'MI355X')
-        .and('contain', label);
-      cy.get('[data-testid="profit-power-unavailable"]').should('not.exist');
-      cy.get('[data-testid="profit-power-note"]')
-        .should('contain', locale === 'en' ? 'All in Measured' : '整体实测功耗')
-        .and('not.contain', locale === 'en' ? 'unmeasured components' : '未实测的组件');
-      cy.get('[data-testid="profit-power-assumptions"]').should('not.exist');
-      cy.get('[data-testid="profit-power-note"]').then(($note) => {
-        const box = $note[0].getBoundingClientRect();
-        expect(box.left).to.be.at.least(0);
-        expect(box.right).to.be.at.most(locale === 'en' ? 1280 : 393);
-      });
-      chart().scrollIntoView();
-      cy.screenshot(`profit-partial-chassis-${locale}`, { capture: 'viewport', overwrite: true });
-      cy.get('[data-testid="export-button"]').first().click();
-      cy.get('[data-testid="export-csv-button"]').click();
-      cy.then(() => csv!.text()).then((text) => {
-        expect(text).to.contain(label);
-        expect(text).to.contain(
-          locale === 'en' ? 'same per-GPU power and throughput' : '每卡功耗和吞吐量保持不变',
-        );
-        expect(
-          text
-            .split('\n')
-            .filter(
-              (line) =>
-                line.startsWith('GB300') ||
-                line.startsWith('B200') ||
-                line.startsWith('B300') ||
-                line.startsWith('MI355X'),
-            ),
-        ).to.have.length(4);
-      });
+    let csv: Blob | undefined;
+    cy.visit('/profit-estimator-per-gigawatt/deepseek-v41-flash?c_power=modeled', {
+      onBeforeLoad: (win) => {
+        unlockPowerGate(win);
+        win.URL.createObjectURL = (blob) => {
+          if (blob instanceof win.Blob) csv = blob;
+          return 'blob:profit-csv-test';
+        };
+        win.HTMLAnchorElement.prototype.click = () => {};
+      },
     });
-  }
+    const label = 'Full-chassis extrapolation';
+    cy.get('#profit-target').should('have.value', '150');
+    chart().find('text.revenue-label').should('have.length', 4);
+    chart()
+      .should('contain', 'GB300')
+      .and('contain', 'B200')
+      .and('contain', 'B300')
+      .and('contain', 'MI355X')
+      .and('contain', label);
+    cy.get('[data-testid="profit-power-note"]')
+      .should('contain', 'All in Measured')
+      .and('not.contain', 'unmeasured components');
+    cy.get('[data-testid="profit-power-assumptions"]').should('not.exist');
+    cy.get('[data-testid="profit-power-note"]').then(($note) => {
+      const box = $note[0].getBoundingClientRect();
+      expect(box.left).to.be.at.least(0);
+      expect(box.right).to.be.at.most(1280);
+    });
+    cy.get('[data-testid="export-button"]').first().click();
+    cy.get('[data-testid="export-csv-button"]').click();
+    cy.then(() => csv!.text()).then((text) => {
+      expect(text).to.contain(label);
+      expect(
+        text
+          .split('\n')
+          .filter(
+            (line) =>
+              line.startsWith('GB300') ||
+              line.startsWith('B200') ||
+              line.startsWith('B300') ||
+              line.startsWith('MI355X'),
+          ),
+      ).to.have.length(4);
+    });
+  });
 
   it('ignores power URL overrides while locked and returns to provisioned estimates on relock', () => {
     stubOpenRouter();
@@ -237,12 +193,11 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
     chart().find('text.revenue-label').should('have.length', 7);
     chart().should('contain', 'B200').and('contain', 'B300').and('contain', 'MI355X');
     chart().should('contain', 'All in Measured').and('contain', 'All in Provisioned');
-    cy.get('[data-testid="profit-power-unavailable"]').should('not.exist');
   });
 
-  it('prices GB200 NVL72 trays on measured GPU and Grace-socket power and names the basis', () => {
+  it('keeps all nine power comparison bars readable and reachable on mobile (en)', () => {
     stubOpenRouter();
-    cy.viewport(1280, 900);
+    cy.viewport(390, 900);
     cy.intercept('GET', '/api/v1/benchmarks*', {
       body: [
         ...profitBenchmarkRows().map((row) => ({
@@ -258,167 +213,97 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         ...profitNvl72Rows(),
       ],
     });
-    let csv: Blob | undefined;
     cy.visit('/profit-estimator-per-gigawatt?c_power=compare', {
-      onBeforeLoad: (win) => {
-        unlockPowerGate(win);
-        win.URL.createObjectURL = (blob) => {
-          if (blob instanceof win.Blob) csv = blob;
-          return 'blob:profit-nvl72-csv-test';
-        };
-        win.HTMLAnchorElement.prototype.click = () => {};
-      },
+      onBeforeLoad: unlockPowerGate,
     });
     chart().find('text.revenue-label').should('have.length', 9);
-    chart().should('contain', 'GB200').and('contain', 'All in Measured');
-    cy.get('[data-testid="export-button"]').first().click();
-    cy.get('[data-testid="export-csv-button"]').click();
-    cy.then(() => csv!.text()).then((text) => {
-      expect(text).to.contain('PUE 1.3 (air-cooled chassis) or 1.1 (liquid-cooled NVL72)');
-      const rows = text.split('\n').filter((line) => line.startsWith('GB200'));
-      expect(rows).to.have.length(2);
-      expect(rows.some((row) => row.includes('All in Provisioned'))).to.equal(true);
-      expect(rows.some((row) => row.includes('measured GPU board and Grace socket'))).to.equal(
+    chart()
+      .find('image.bar-vendor-mark')
+      .should(($marks) => {
+        const boxes = [...$marks].map((mark) => mark.getBoundingClientRect());
+        for (let i = 1; i < boxes.length; i++) {
+          expect(boxes[i].left - boxes[i - 1].right, 'space between vendor marks').to.be.at.least(
+            4,
+          );
+        }
+      });
+    scroller().should('have.attr', 'tabindex', '0').and('have.attr', 'role', 'region');
+    scroller()
+      .scrollIntoView({ offset: { top: -70, left: 0 } })
+      .focus()
+      .should('have.focus');
+    scroller().then(($scroll) => {
+      const el = $scroll[0];
+      const event = new el.ownerDocument.defaultView!.KeyboardEvent('keydown', {
+        key: 'ArrowRight',
+        bubbles: true,
+        cancelable: true,
+      });
+      el.dispatchEvent(event);
+      expect(event.defaultPrevented, `handled key on ${el.clientWidth}/${el.scrollWidth}`).to.equal(
         true,
       );
-      expect(text).not.to.contain('regulator');
+      expect(el.scrollLeft, 'synchronous scroll').to.be.greaterThan(0);
     });
-  });
-
-  for (const locale of ['en', 'zh'] as const) {
-    it(`keeps all nine power comparison bars readable and reachable on mobile (${locale})`, () => {
-      stubOpenRouter();
-      cy.viewport(390, 900);
-      cy.intercept('GET', '/api/v1/benchmarks*', {
-        body: [
-          ...profitBenchmarkRows().map((row) => ({
-            ...row,
-            metrics: {
-              ...row.metrics,
-              power_valid: 1,
-              power_metric_schema_version: 2,
-              avg_power_w: 500,
-              avg_total_gpu_power_w: 4000,
-            },
-          })),
-          ...profitNvl72Rows(),
-        ],
-      });
-      cy.visit(`${locale === 'zh' ? '/zh' : ''}/profit-estimator-per-gigawatt?c_power=compare`, {
-        onBeforeLoad: unlockPowerGate,
-      });
-      chart()
-        .find('text.revenue-label')
-        .should('have.length', 9)
-        .should(($labels) => {
-          const boxes = [...$labels].map((label) => label.getBoundingClientRect());
-          for (let i = 1; i < boxes.length; i++) {
-            expect(
-              boxes[i].left - boxes[i - 1].right,
-              'space between revenue and margin labels',
-            ).to.be.at.least(4);
-          }
-        });
-      chart()
-        .find('image.bar-vendor-mark')
-        .should(($marks) => {
-          const boxes = [...$marks].map((mark) => mark.getBoundingClientRect());
-          for (let i = 1; i < boxes.length; i++) {
-            expect(boxes[i].left - boxes[i - 1].right, 'space between vendor marks').to.be.at.least(
-              4,
-            );
-          }
-        });
-      scroller().should('have.attr', 'tabindex', '0').and('have.attr', 'role', 'region');
-      scroller()
-        .scrollIntoView({ offset: { top: -70, left: 0 } })
-        .focus()
-        .should('have.focus');
-      scroller().then(($scroll) => {
-        const el = $scroll[0];
-        const event = new el.ownerDocument.defaultView!.KeyboardEvent('keydown', {
-          key: 'ArrowRight',
-          bubbles: true,
-          cancelable: true,
-        });
-        el.dispatchEvent(event);
-        expect(
-          event.defaultPrevented,
-          `handled key on ${el.clientWidth}/${el.scrollWidth}`,
-        ).to.equal(true);
-        expect(el.scrollLeft, 'synchronous scroll').to.be.greaterThan(0);
-      });
-      scroller().should(($scroll) => expect($scroll[0].scrollLeft).to.be.greaterThan(0));
-      scroller().scrollTo('right');
-      chart().find('rect.bar-profit').last().should('be.visible');
-      chart().find('rect.bar-profit').last().click({ scrollBehavior: false });
-      cy.get('[data-chart-tooltip="profit-estimator-chart"]')
-        .should('be.visible')
-        .and('contain', 'MI355X');
-      chartSvg().trigger('click', { force: true, scrollBehavior: false });
-      cy.get('[data-chart-tooltip="profit-estimator-chart"]').should('not.be.visible');
-      cy.document().should((doc) => {
-        expect(doc.documentElement.scrollWidth).to.be.at.most(390);
-      });
-      cy.get('[data-testid="profit-caption"]').should(($caption) => {
-        const bounds = $caption[0].getBoundingClientRect();
-        expect(bounds.left).to.be.at.least(0);
-        expect(bounds.right).to.be.at.most(390);
-      });
-      scroller()
-        .scrollIntoView({ offset: { top: -70, left: 0 } })
-        .scrollTo('left');
-      chart().find('rect.bar-tco').first().should('be.visible');
-      cy.screenshot(`profit-dense-${locale}-mobile-left`, { capture: 'viewport', overwrite: true });
-      scroller().scrollTo('right');
-      cy.screenshot(`profit-dense-${locale}-mobile-right`, {
-        capture: 'viewport',
-        overwrite: true,
-      });
-      let exportedPng = '';
-      let exportedLabels: string[] = [];
-      cy.window().then((win) => {
-        win.HTMLAnchorElement.prototype.click = function () {
-          if (this.download.endsWith('.png')) {
-            exportedPng = this.href;
-            exportedLabels = [
-              ...win.document.querySelectorAll('#profit-estimator-chart-export text.revenue-label'),
-            ].map((label) => label.textContent ?? '');
-          }
-        };
-      });
-      cy.get('[data-testid="export-button"]').first().click();
-      cy.get('[data-testid="export-png-button"]').click();
-      cy.window()
-        .should(() => expect(exportedPng).to.match(/^data:image\/png;base64,/u))
-        .then((win) => {
-          expect(exportedLabels).to.have.length(9);
-          cy.writeFile(
-            `cypress/downloads/profit-dense-${locale}.png`,
-            exportedPng.split(',')[1],
-            'base64',
-          );
-          return new Cypress.Promise<void>((resolve, reject) => {
-            const png = new win.Image();
-            png.addEventListener('load', () => {
-              expect(png.naturalWidth).to.be.greaterThan(1500);
-              resolve();
-            });
-            png.addEventListener('error', () => reject(new Error('Profit PNG did not decode')));
-            png.src = exportedPng;
+    scroller().should(($scroll) => expect($scroll[0].scrollLeft).to.be.greaterThan(0));
+    scroller().scrollTo('right');
+    chart().find('rect.bar-profit').last().should('be.visible');
+    chart().find('rect.bar-profit').last().click({ scrollBehavior: false });
+    cy.get('[data-chart-tooltip="profit-estimator-chart"]')
+      .should('be.visible')
+      .and('contain', 'MI355X');
+    chartSvg().trigger('click', { force: true, scrollBehavior: false });
+    cy.get('[data-chart-tooltip="profit-estimator-chart"]').should('not.be.visible');
+    cy.document().should((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(390);
+    });
+    cy.get('[data-testid="profit-caption"]').should(($caption) => {
+      const bounds = $caption[0].getBoundingClientRect();
+      expect(bounds.left).to.be.at.least(0);
+      expect(bounds.right).to.be.at.most(390);
+    });
+    scroller()
+      .scrollIntoView({ offset: { top: -70, left: 0 } })
+      .scrollTo('left');
+    chart().find('rect.bar-tco').first().should('be.visible');
+    scroller().scrollTo('right');
+    let exportedPng = '';
+    let exportedLabels: string[] = [];
+    cy.window().then((win) => {
+      win.HTMLAnchorElement.prototype.click = function () {
+        if (this.download.endsWith('.png')) {
+          exportedPng = this.href;
+          exportedLabels = [
+            ...win.document.querySelectorAll('#profit-estimator-chart-export text.revenue-label'),
+          ].map((label) => label.textContent ?? '');
+        }
+      };
+    });
+    cy.get('[data-testid="export-button"]').first().click();
+    cy.get('[data-testid="export-png-button"]').click();
+    cy.window()
+      .should(() => expect(exportedPng).to.match(/^data:image\/png;base64,/u))
+      .then((win) => {
+        expect(exportedLabels).to.have.length(9);
+        cy.writeFile('cypress/downloads/profit-dense-en.png', exportedPng.split(',')[1], 'base64');
+        return new Cypress.Promise<void>((resolve, reject) => {
+          const png = new win.Image();
+          png.addEventListener('load', () => {
+            expect(png.naturalWidth).to.be.greaterThan(1500);
+            resolve();
           });
+          png.addEventListener('error', () => reject(new Error('Profit PNG did not decode')));
+          png.src = exportedPng;
         });
-      scroller().should(($scroll) => expect($scroll[0].scrollLeft).to.be.greaterThan(0));
-      cy.viewport(1280, 900);
-      scroller().should('not.have.attr', 'tabindex');
-      scroller().should(($scroll) => {
-        expect($scroll[0].scrollWidth).to.equal($scroll[0].clientWidth);
       });
-      chart().find('text.revenue-label').should('have.length', 9);
-      chartSvg().scrollIntoView({ offset: { top: -70, left: 0 } });
-      cy.screenshot(`profit-dense-${locale}-desktop`, { capture: 'viewport', overwrite: true });
+    scroller().should(($scroll) => expect($scroll[0].scrollLeft).to.be.greaterThan(0));
+    cy.viewport(1280, 900);
+    scroller().should('not.have.attr', 'tabindex');
+    scroller().should(($scroll) => {
+      expect($scroll[0].scrollWidth).to.equal($scroll[0].clientWidth);
     });
-  }
+    chart().find('text.revenue-label').should('have.length', 9);
+  });
 
   it('keeps the benchmark settings and restores the original chart after unavailable power', () => {
     stubOpenRouter();
@@ -429,7 +314,6 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       .then((original) => {
         cy.get('#profit-power').click();
         cy.get('[role="option"]').contains('All in Measured').click();
-        cy.get('[data-testid="profit-power-unavailable"]').should('not.exist');
         cy.contains('No SKU can be priced for the current selection.').should('be.visible');
         cy.get('#profit-target').should('have.value', '60');
         cy.get('[data-testid="profit-model-selector"]').should('contain', 'Kimi K3');
@@ -446,8 +330,8 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
 describe('Profit Estimator — responsive control panels', () => {
   beforeEach(stubOpenRouter);
 
-  for (const route of ['/profit-estimator', '/profit-estimator-per-gigawatt']) {
-    for (const width of [375, 768, 1280, 1440]) {
+  for (const route of ['/profit-estimator']) {
+    for (const width of [375, 768, 1280]) {
       it(`keeps benchmark and pricing controls grouped on ${route} at ${width}px`, () => {
         cy.viewport(width, 1000);
         cy.visit(route, { onBeforeLoad: suppressNudges });

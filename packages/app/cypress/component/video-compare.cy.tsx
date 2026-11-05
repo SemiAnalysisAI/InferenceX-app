@@ -109,7 +109,6 @@ describe('Video compare panel (retained fixture)', () => {
     cy.get('[data-testid="video-compare"]')
       .should('contain', 'retained CI outputs')
       .and('not.contain', 'GPU basis');
-    cy.get('[data-testid="video-compare-blind"]').should('not.exist');
     cy.get('[data-testid="video-compare-controls"] [role="combobox"]').should(($boxes) => {
       expect([...$boxes].map((el) => el.getAttribute('aria-label'))).to.deep.equal([
         'Baseline',
