@@ -68,11 +68,8 @@ const config = (
   ...overrides,
 });
 
-const render = (html: string) => {
-  const el = document.createElement('div');
-  el.innerHTML = html;
-  return el;
-};
+// DOMParser builds an inert document, so test markup never executes.
+const render = (html: string) => new DOMParser().parseFromString(html, 'text/html').body;
 
 describe('formatHoverValue', () => {
   it('abbreviates large values and trims small ones', () => {
@@ -171,7 +168,11 @@ describe('generateHoverTooltipContent', () => {
     const text = render(
       generateHoverTooltipContent(
         config(
-          agenticPoint({ kv_offloading: 'none', kv_offload_backend: undefined, offload_mode: 'off' }),
+          agenticPoint({
+            kv_offloading: 'none',
+            kv_offload_backend: undefined,
+            offload_mode: 'off',
+          }),
         ),
       ),
     ).textContent!.replaceAll(/\s+/g, ' ');
