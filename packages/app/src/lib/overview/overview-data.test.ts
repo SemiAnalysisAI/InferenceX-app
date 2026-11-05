@@ -1320,6 +1320,7 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     expect(page.models.map((m) => `${m.model}/${m.scenario}`)).toEqual([
       `${Model.Muse_Spark_Open}/agentx`,
       `${Model.DeepSeek_V4_1_Flash}/agentx`,
+      `${Model.Kimi_K3_1_Pro}/agentx`,
       `${Model.MiniMax_M3_1_Flash}/agentx`,
       `${Model.GLM_5_2}/agentx`,
       `${Model.Qwen3_5}/agentx`,
