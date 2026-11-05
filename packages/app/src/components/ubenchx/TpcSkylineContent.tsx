@@ -1,17 +1,17 @@
 'use client';
 
+import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
+import { ResultContext } from '@/components/ui/result-context';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import { HuaweiSkuConfigurations } from './HuaweiSkuConfigurations';
+import { UbenchxHub } from './UbenchxHub';
 import { TPC_SKYLINE_RUNS } from './tpc-skyline-data';
 import { transformTpcSkylineRun } from './tpc-skyline-transform';
 
 const STRINGS = {
   en: {
-    pageTitle: 'TPC Skyline & SKU configurations',
-    pageSubtitle:
-      'NVIDIA scheduling-group measurements and Huawei 950PR SKU configurations, with separate methods and evidence',
     nvidia: 'NVIDIA measured TPC groupings',
     product: 'Product',
     gpcs: 'Measured # of GPCs',
@@ -26,9 +26,6 @@ const STRINGS = {
     aria: 'ubenchX TPC Skyline table',
   },
   zh: {
-    pageTitle: 'TPC Skyline 与 SKU 配置',
-    pageSubtitle:
-      '分别展示 NVIDIA 调度分组实测结果和 Huawei 950PR SKU 配置，并说明各自的方法及证据来源',
     nvidia: 'NVIDIA 实测 TPC 分组',
     product: '产品',
     gpcs: '实测 GPC 数量',
@@ -49,52 +46,61 @@ const RESULTS = Object.entries(TPC_SKYLINE_RUNS).map(([key, run]) =>
 );
 
 export function TpcSkylineContent() {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const sourceUrls = [...new Set(RESULTS.map((r) => r.metadata.sourceUrl))];
 
   return (
-    <div className="space-y-8">
-      <div>
-        <Heading level="section">{t.pageTitle}</Heading>
-        <p className="mt-1 text-sm text-muted-foreground">{t.pageSubtitle}</p>
-      </div>
+    <div className="flex flex-col gap-4">
+      <UbenchxHub current="tpc-skyline" />
 
       <section className="space-y-4">
-        <h3 className="text-lg font-medium">{t.nvidia}</h3>
-        <div className="overflow-x-auto rounded-lg border border-border/30">
-          <table className="w-full text-sm" aria-label={t.aria} data-testid="tpc-skyline-table">
-            <thead className="text-left whitespace-nowrap text-muted-foreground">
-              <tr>
-                <th scope="col" className="px-4 py-2.5 font-medium">
-                  {t.product}
-                </th>
-                <th scope="col" className="px-4 py-2.5 text-right font-medium">
-                  {t.gpcs}
-                </th>
-                <th scope="col" className="px-4 py-2.5 text-right font-medium">
-                  {t.sms}
-                </th>
-                <th scope="col" className="px-4 py-2.5 font-medium">
-                  {t.grouping}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {RESULTS.map((r) => (
-                <tr key={r.gpu} className="border-t border-border/30">
-                  <td className="px-4 py-2.5 whitespace-nowrap">{r.gpu}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">{r.gpcCount}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">{r.smCount}</td>
-                  <td className="px-4 py-2.5 font-mono whitespace-nowrap">
-                    [{r.tpcsPerGpc.join(', ')}]
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <figure className="relative min-w-0">
+          <Card>
+            <figcaption>
+              <Heading as="h2" level="card">
+                {t.nvidia}
+              </Heading>
+            </figcaption>
+            <div className="mt-3 overflow-x-auto rounded-lg border border-border/30">
+              <table className="w-full text-sm" aria-label={t.aria} data-testid="tpc-skyline-table">
+                <thead className="text-left whitespace-nowrap text-muted-foreground">
+                  <tr>
+                    <th scope="col" className="px-4 py-2.5 font-medium">
+                      {t.product}
+                    </th>
+                    <th scope="col" className="px-4 py-2.5 text-right font-medium">
+                      {t.gpcs}
+                    </th>
+                    <th scope="col" className="px-4 py-2.5 text-right font-medium">
+                      {t.sms}
+                    </th>
+                    <th scope="col" className="px-4 py-2.5 font-medium">
+                      {t.grouping}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {RESULTS.map((r) => (
+                    <tr key={r.gpu} className="border-t border-border/30">
+                      <td className="px-4 py-2.5 whitespace-nowrap">{r.gpu}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{r.gpcCount}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{r.smCount}</td>
+                      <td className="px-4 py-2.5 font-mono whitespace-nowrap">
+                        [{r.tpcsPerGpc.join(', ')}]
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-3">
+              <ResultContext locale={locale} layout="footer" source="SemiAnalysis InferenceX™" />
+            </div>
+          </Card>
+        </figure>
         <div className="space-y-1 text-xs text-muted-foreground">
-          <h4 className="text-sm font-medium text-foreground">{t.methodology}</h4>
+          <h3 className="text-sm font-medium text-foreground">{t.methodology}</h3>
           <p>{t.methodologyText}</p>
           {RESULTS.map((r) => (
             <p key={r.gpu}>

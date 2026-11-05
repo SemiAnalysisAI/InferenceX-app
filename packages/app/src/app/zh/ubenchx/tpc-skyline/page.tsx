@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 
 import { TpcSkylineContent } from '@/components/ubenchx/TpcSkylineContent';
-import { UbenchxHub } from '@/components/ubenchx/UbenchxHub';
 import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -27,10 +26,7 @@ export default function UbenchxTpcSkylinePageZh() {
   return (
     <main className="relative">
       <div className="container mx-auto px-4 pb-8 lg:px-8">
-        <div className="space-y-8">
-          <UbenchxHub current="tpc-skyline" />
-          <TpcSkylineContent />
-        </div>
+        <TpcSkylineContent />
       </div>
     </main>
   );

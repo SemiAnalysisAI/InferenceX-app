@@ -11,6 +11,7 @@ import {
   type CoreProfilePanel,
 } from './core-memory-profiles';
 import { SmL2Content } from './SmL2Heatmap';
+import { UbenchxHub } from './UbenchxHub';
 import {
   Select,
   SelectContent,
@@ -18,13 +19,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
+import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
+import { ResultContext } from '@/components/ui/result-context';
 
 const STRINGS = {
   en: {
     noPairs: 'No pairs',
-    title: 'Core memory-access profiles',
     hardware: 'Hardware',
+    hardwareTooltip: 'The device whose memory-access profiles are shown, or all of them.',
     allHardware: 'All hardware',
     comparison:
       'Compare memory-access grouping patterns on B200 and Huawei 950PR. Each device keeps its own color scale: B200 uses clock64 cycles; 950PR uses SYS_CNT ticks. Equal colors or numbers across devices do not mean equal latency.',
@@ -49,8 +53,8 @@ const STRINGS = {
   },
   zh: {
     noPairs: '无核心对',
-    title: '核心访存特征',
     hardware: '硬件',
+    hardwareTooltip: '要显示访存特征的硬件，或显示全部硬件。',
     allHardware: '全部硬件',
     comparison:
       '对比 B200 与 Huawei 950PR 的访存分组模式。各设备使用独立色标：B200 以 clock64 周期计，950PR 以 SYS_CNT ticks 计。不同设备上颜色或数值相同，并不代表延迟相同。',
@@ -95,7 +99,10 @@ function Panel({ panel, max, text }: { panel: CoreProfilePanel; max: number; tex
     (reason: string) => {
       setCell(null);
       setPinned(false);
-      track('ubenchx_core_profile_cell_cleared', { condition: panel.condition, reason });
+      track('ubenchx_core_profile_cell_cleared', {
+        condition: panel.condition,
+        reason,
+      });
     },
     [panel.condition],
   );
@@ -275,36 +282,48 @@ function Panel({ panel, max, text }: { panel: CoreProfilePanel; max: number; tex
   );
 }
 
-function AscendCoreProfiles() {
+function AscendCoreProfiles({ note }: { note?: string }) {
   const locale = useLocale(),
     t = STRINGS[locale];
   const result = useMemo(coreMemoryProfiles, []);
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-medium">Huawei 950PR</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{t.subtitle}</p>
-      </div>
-      <p className="text-sm text-muted-foreground">{t.limits}</p>
-      <div className="space-y-1 max-w-lg">
-        <p className="text-sm">{t.units}</p>
-        <div
-          className="h-4 rounded-sm"
-          style={{
-            background: `linear-gradient(to right, ${Array.from({ length: 11 }, (_, i) => `${d3.interpolateReds(i / 10)} ${i * 10}%`).join(', ')})`,
-          }}
-        />
-        <div className="flex justify-between text-xs tabular-nums">
-          <span>0</span>
-          <span>{result.colorLimits[1].toFixed(2)}</span>
-        </div>
-        <p className="text-xs text-muted-foreground">{t.sharedScale}</p>
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {result.panels.map((panel) => (
-          <Panel key={panel.condition} panel={panel} max={result.colorLimits[1]} text={t} />
-        ))}
-      </div>
+    <div className="space-y-4">
+      <figure className="relative min-w-0">
+        <Card>
+          <figcaption>
+            <Heading as="h2" level="card">
+              Huawei 950PR
+            </Heading>
+            <p className="mt-1 text-xs text-muted-foreground">{t.subtitle}</p>
+          </figcaption>
+          <div className="mt-3 space-y-6">
+            <p className="text-sm text-muted-foreground">{t.limits}</p>
+            <div className="space-y-1 max-w-lg">
+              <p className="text-sm">{t.units}</p>
+              <div
+                className="h-4 rounded-sm"
+                style={{
+                  background: `linear-gradient(to right, ${Array.from({ length: 11 }, (_, i) => `${d3.interpolateReds(i / 10)} ${i * 10}%`).join(', ')})`,
+                }}
+              />
+              <div className="flex justify-between text-xs tabular-nums">
+                <span>0</span>
+                <span>{result.colorLimits[1].toFixed(2)}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">{t.sharedScale}</p>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {result.panels.map((panel) => (
+                <Panel key={panel.condition} panel={panel} max={result.colorLimits[1]} text={t} />
+              ))}
+            </div>
+          </div>
+          <div className="mt-3">
+            <ResultContext locale={locale} layout="footer" source="SemiAnalysis InferenceX™" />
+            {note && <p className="mt-2 text-xs leading-5 text-muted-foreground/70">{note}</p>}
+          </div>
+        </Card>
+      </figure>
       <section className="space-y-1 text-xs text-muted-foreground">
         <h3 className="text-sm font-medium text-foreground">{t.methodology}</h3>
         <p>{t.method}</p>
@@ -322,49 +341,48 @@ export function CoreMemoryProfilesContent() {
   const t = STRINGS[locale];
   const [gpu, setGpu] = useState('all');
   return (
-    <div className="space-y-8">
-      <div>
-        <Heading level="section">{t.title}</Heading>
-        <p className="mt-1 max-w-4xl text-sm text-muted-foreground">{t.comparison}</p>
-      </div>
-      <div className="flex flex-col space-y-1.5 sm:w-72">
-        <label htmlFor="core-profile-hardware" className="text-sm font-medium">
-          {t.hardware}
-        </label>
-        <Select
-          value={gpu}
-          onValueChange={(value) => {
-            setGpu(value);
-            track('ubenchx_core_profile_hardware_selected', { gpu: value });
-          }}
-        >
-          <SelectTrigger
-            id="core-profile-hardware"
-            data-testid="core-profile-hardware"
-            className="w-full"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t.allHardware}</SelectItem>
-            {CORE_PROFILE_GPU_KEYS.map((key) => (
-              <SelectItem key={key} value={key}>
-                {key === CORE_PROFILE_GPU ? 'Huawei 950PR' : key}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+    <div className="flex flex-col gap-4">
+      <UbenchxHub
+        current="core-memory-profiles"
+        controls={
+          <div className="flex min-w-0 flex-col space-y-1.5">
+            <LabelWithTooltip
+              htmlFor="core-profile-hardware"
+              label={t.hardware}
+              tooltip={t.hardwareTooltip}
+            />
+            <Select
+              value={gpu}
+              onValueChange={(value) => {
+                setGpu(value);
+                track('ubenchx_core_profile_hardware_selected', { gpu: value });
+              }}
+            >
+              <SelectTrigger
+                id="core-profile-hardware"
+                data-testid="core-profile-hardware"
+                className="w-full"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t.allHardware}</SelectItem>
+                {CORE_PROFILE_GPU_KEYS.map((key) => (
+                  <SelectItem key={key} value={key}>
+                    {key === CORE_PROFILE_GPU ? 'Huawei 950PR' : key}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        }
+      />
       {(gpu === 'all' || gpu === CORE_PROFILE_GPU) && (
         <section data-testid="ascend-core-profiles">
-          <AscendCoreProfiles />
+          <AscendCoreProfiles note={gpu === 'all' ? t.comparison : undefined} />
         </section>
       )}
-      {gpu !== CORE_PROFILE_GPU && (
-        <section className={gpu === 'all' ? 'border-t pt-8' : undefined}>
-          <SmL2Content gpu={gpu} />
-        </section>
-      )}
+      {gpu !== CORE_PROFILE_GPU && <SmL2Content gpu={gpu} />}
     </div>
   );
 }

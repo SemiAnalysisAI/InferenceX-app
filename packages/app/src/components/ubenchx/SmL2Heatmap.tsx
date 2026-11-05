@@ -13,6 +13,9 @@ import {
   stickyHeaderBottom,
 } from '@/lib/d3-chart/tooltip-placement';
 import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
+import { ResultContext } from '@/components/ui/result-context';
 import { Stat } from '@/components/ui/stat';
 
 import { SM_L2_RUNS } from './sm-l2-data';
@@ -387,27 +390,38 @@ export function SmL2Content({ gpu = 'all' }: { gpu?: string }) {
   }
 
   return (
-    <div className="space-y-8" role="group" aria-label={t.aria}>
+    <div className="flex flex-col gap-4" role="group" aria-label={t.aria}>
       {results.map(({ key, view }) => (
-        <section key={key}>
-          <h2 className="mb-2 text-lg font-medium">
-            {key}: {t.heatmapTitle}
-          </h2>
-          <SmL2HeatmapChart result={view} locale={locale} />
+        <section key={key} className="space-y-4">
+          <figure className="relative min-w-0">
+            <Card>
+              <figcaption>
+                <Heading as="h2" level="card">
+                  {key}: {t.heatmapTitle}
+                </Heading>
+              </figcaption>
+              <div className="mt-3">
+                <SmL2HeatmapChart result={view} locale={locale} />
+              </div>
 
-          <dl className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {(
-              [
-                [t.statsIntraGpc, view.stats.intraGpcMean],
-                [t.statsInterGpc, view.stats.interGpcSameDieMean],
-                [t.statsCrossDie, view.stats.crossDieMean],
-              ] as const
-            ).map(([label, value]) => (
-              <Stat key={label} label={label} value={`${value.toFixed(1)} ${t.cycles}`} />
-            ))}
-          </dl>
+              <dl className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                {(
+                  [
+                    [t.statsIntraGpc, view.stats.intraGpcMean],
+                    [t.statsInterGpc, view.stats.interGpcSameDieMean],
+                    [t.statsCrossDie, view.stats.crossDieMean],
+                  ] as const
+                ).map(([label, value]) => (
+                  <Stat key={label} label={label} value={`${value.toFixed(1)} ${t.cycles}`} />
+                ))}
+              </dl>
+              <div className="mt-3">
+                <ResultContext locale={locale} layout="footer" source="SemiAnalysis InferenceX™" />
+              </div>
+            </Card>
+          </figure>
 
-          <div className="mt-4 space-y-1 text-xs text-muted-foreground">
+          <div className="space-y-1 text-xs text-muted-foreground">
             <h3 className="text-sm font-medium text-foreground">{t.methodology}</h3>
             <p>{t.methodologyText}</p>
             <p>

@@ -9,14 +9,13 @@ const dismissModal = {
 };
 
 describe('ubenchX hub and test routes', () => {
-  it('opens /ubenchx on the mem-bw view with the Beta title and test selector', () => {
+  it('opens /ubenchx on the mem-bw view with the Beta eyebrow and test selector', () => {
     cy.visit('/ubenchx', dismissModal);
     cy.url().should('include', '/ubenchx/mem-bw');
     cy.contains('h1', 'ubenchX microbenchmarks').should('be.visible');
-    cy.get('[data-testid="ubenchx-maturity"]').should('have.text', 'Beta');
+    cy.get('[data-testid="ubenchx-maturity"]').should('have.text', 'ubenchX · Beta');
     cy.get('[data-testid="nav-link-ubenchx"]').should('have.attr', 'href', '/ubenchx/mem-bw');
     cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'HBM bandwidth');
-    cy.contains('h2', 'HBM bandwidth').should('be.visible');
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
     cy.contains('H100 SXM').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').should('contain', 'MBU');
@@ -48,7 +47,7 @@ describe('ubenchX hub and test routes', () => {
     cy.get('[data-testid="ubenchx-test-select"]').click();
     cy.contains('[role="option"]', 'TPC Skyline').click();
     cy.url().should('include', '/ubenchx/tpc-skyline');
-    cy.contains('h2', 'TPC Skyline').should('be.visible');
+    cy.contains('h2', 'NVIDIA measured TPC groupings').should('be.visible');
     cy.get('[data-testid="tpc-skyline-table"] th').then(($th) => {
       expect([...$th].map((th) => th.textContent)).to.deep.equal([
         'Product',
@@ -181,7 +180,7 @@ it('unpins core-profile cells by repeated click or Enter and clears them outside
   cy.get(`${panel} svg`).trigger('keydown', { key: 'Enter' });
   cy.get(value).should('be.empty').and('not.be.visible');
   cy.get(`${panel} svg rect`).eq(1).click();
-  cy.contains('h2', 'Core memory-access profiles').click();
+  cy.contains('h1', 'ubenchX microbenchmarks').click();
   cy.get(value).should('be.empty').and('not.be.visible');
   cy.get(`${panel} svg rect`).eq(1).click();
   cy.get(`${panel} svg`).trigger('keydown', { key: 'Escape' });
@@ -340,7 +339,7 @@ describe('Huawei SKU configurations alongside measured TPC groups', () => {
     cy.visit('/zh/ubenchx/tpc-skyline', dismissModal);
     cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'TPC Skyline 与 SKU 配置');
     cy.get('[data-testid="huawei-sku-configurations"]').scrollIntoView();
-    cy.contains('h3', 'Huawei 950PR SKU 配置').should('be.visible');
+    cy.contains('h2', 'Huawei 950PR SKU 配置').should('be.visible');
     cy.get('[data-sku="PR_957c"]').should('contain', '84').and('contain', '112');
     cy.get('[data-testid="huawei-sku-configurations"] [role="region"]').as('tableRegion');
     cy.get('@tableRegion').then(($region) => {

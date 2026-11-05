@@ -1,6 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
+import { ResultContext } from '@/components/ui/result-context';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { huaweiSkuConfigurations } from './huawei-sku-configurations';
@@ -58,85 +61,93 @@ export function HuaweiSkuConfigurations() {
   const locale = useLocale();
   const t = STRINGS[locale];
   return (
-    <section
-      className="space-y-4 border-t border-border/30 pt-8"
-      data-testid="huawei-sku-configurations"
-    >
-      <h3 className="text-lg font-medium">{t.title}</h3>
-      <p className="max-w-4xl text-sm text-muted-foreground">{t.intro}</p>
-      <p className="text-xs text-muted-foreground lg:hidden">{t.scroll}</p>
-      <div
-        className="overflow-x-auto rounded-lg border border-border/30"
-        tabIndex={0}
-        role="region"
-        aria-label={t.title}
-      >
-        <table className="w-full text-sm" data-testid="huawei-sku-table">
-          <thead className="text-muted-foreground">
-            <tr>
-              {t.columns.map((label, index) => (
-                <th
-                  key={label}
-                  scope="col"
-                  className={`px-4 py-2.5 font-medium whitespace-nowrap ${index > 0 && index < t.columns.length - 1 ? 'text-right' : 'text-left'}`}
-                >
-                  {label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {huaweiSkuConfigurations().map((row) => (
-              <tr
-                key={row.sku}
-                data-sku={row.sku}
-                className={
-                  row.hasCoreProfileMeasurements
-                    ? 'border-t border-border/30 bg-muted/20'
-                    : 'border-t border-border/30'
-                }
-              >
-                <th scope="row" className="px-4 py-2.5 text-left whitespace-nowrap font-medium">
-                  {row.sku}
-                  {row.hasCoreProfileMeasurements && (
-                    <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                      {t.tested}
-                    </span>
-                  )}
-                </th>
-                {[
-                  row.cubeCores,
-                  row.vectorCores,
-                  row.aiCpuCores,
-                  row.cubeClockMHz,
-                  row.memoryGiB,
-                  row.l2MiB,
-                  row.ddrRate.base,
-                  row.virtualisationOptions.join(', '),
-                ].map((value, index) => (
-                  <td
-                    key={index}
-                    className={`px-4 py-2.5 tabular-nums whitespace-nowrap ${index < 7 ? 'text-right' : ''}`}
+    <section data-testid="huawei-sku-configurations">
+      <figure className="relative min-w-0">
+        <Card>
+          <figcaption>
+            <Heading as="h2" level="card">
+              {t.title}
+            </Heading>
+            <p className="mt-1 max-w-4xl text-xs text-muted-foreground">{t.intro}</p>
+          </figcaption>
+          <p className="mt-3 text-xs text-muted-foreground lg:hidden">{t.scroll}</p>
+          <div
+            className="mt-3 overflow-x-auto rounded-lg border border-border/30"
+            tabIndex={0}
+            role="region"
+            aria-label={t.title}
+          >
+            <table className="w-full text-sm" data-testid="huawei-sku-table">
+              <thead className="text-muted-foreground">
+                <tr>
+                  {t.columns.map((label, index) => (
+                    <th
+                      key={label}
+                      scope="col"
+                      className={`px-4 py-2.5 font-medium whitespace-nowrap ${index > 0 && index < t.columns.length - 1 ? 'text-right' : 'text-left'}`}
+                    >
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {huaweiSkuConfigurations().map((row) => (
+                  <tr
+                    key={row.sku}
+                    data-sku={row.sku}
+                    className={
+                      row.hasCoreProfileMeasurements
+                        ? 'border-t border-border/30 bg-muted/20'
+                        : 'border-t border-border/30'
+                    }
                   >
-                    {value}
-                  </td>
+                    <th scope="row" className="px-4 py-2.5 text-left whitespace-nowrap font-medium">
+                      {row.sku}
+                      {row.hasCoreProfileMeasurements && (
+                        <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                          {t.tested}
+                        </span>
+                      )}
+                    </th>
+                    {[
+                      row.cubeCores,
+                      row.vectorCores,
+                      row.aiCpuCores,
+                      row.cubeClockMHz,
+                      row.memoryGiB,
+                      row.l2MiB,
+                      row.ddrRate.base,
+                      row.virtualisationOptions.join(', '),
+                    ].map((value, index) => (
+                      <td
+                        key={index}
+                        className={`px-4 py-2.5 tabular-nums whitespace-nowrap ${index < 7 ? 'text-right' : ''}`}
+                      >
+                        {value}
+                      </td>
+                    ))}
+                  </tr>
                 ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p className="text-xs text-muted-foreground">{t.notes}</p>
-      <div className="space-y-2 rounded-lg bg-muted/30 px-4 py-3">
-        <p className="text-sm max-w-4xl">{t.measured}</p>
-        <Link
-          href={`${locale === 'zh' ? '/zh' : ''}/ubenchx/core-memory-profiles`}
-          className="text-sm underline underline-offset-4"
-          onClick={() => track('ubenchx_sku_profiles_opened', { gpu: 'PR_9579' })}
-        >
-          {t.profiles}
-        </Link>
-      </div>
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-3 space-y-2 rounded-lg bg-muted/30 px-4 py-3">
+            <p className="text-sm max-w-4xl">{t.measured}</p>
+            <Link
+              href={`${locale === 'zh' ? '/zh' : ''}/ubenchx/core-memory-profiles`}
+              className="text-sm underline underline-offset-4"
+              onClick={() => track('ubenchx_sku_profiles_opened', { gpu: 'PR_9579' })}
+            >
+              {t.profiles}
+            </Link>
+          </div>
+          <div className="mt-3">
+            <ResultContext locale={locale} layout="footer" source="SemiAnalysis InferenceX™" />
+            <p className="mt-2 text-xs leading-5 text-muted-foreground/70">{t.notes}</p>
+          </div>
+        </Card>
+      </figure>
     </section>
   );
 }

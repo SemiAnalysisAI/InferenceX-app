@@ -1,14 +1,16 @@
 'use client';
 
 import * as d3 from 'd3';
-import { useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { isDarkTheme } from '@/lib/themes/themes';
 import { generateVendorColors, getVendor } from '@/lib/charts/dynamic-colors';
 
-import { Card } from '@/components/ui/card';
 import ChartLegend from '@/components/ui/chart-legend';
+import { ChartSection } from '@/components/ui/chart-section';
 import { Heading } from '@/components/ui/heading';
+import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
+import { ResultContext } from '@/components/ui/result-context';
 import {
   Select,
   SelectContent,
@@ -22,6 +24,7 @@ import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
 
+import { UbenchxHub } from './UbenchxHub';
 import { UBENCHX_GPU_KEYS, UBENCHX_RUNS } from './ubenchx-data';
 import {
   transformUbenchxRun,
@@ -43,9 +46,6 @@ const GPU_COLORS: Record<string, string> = {
 
 const STRINGS = {
   en: {
-    pageTitle: 'HBM bandwidth',
-    pageSubtitle:
-      'Microbenchmark measuring device-memory copy bandwidth across message sizes on NVIDIA, AMD and Huawei accelerators',
     protocolNote:
       'Huawei uses amortized rotating-buffer graph timing; NVIDIA/AMD use Triton copy timing. Small-message latency is not directly comparable.',
     latencyTitle: 'Latency vs message size',
@@ -56,6 +56,8 @@ const STRINGS = {
     bwY: 'Bandwidth (TB/s)',
     xAxis: 'Message size',
     yMetric: 'Y-axis',
+    yMetricTooltip:
+      'The measurement plotted on the Y-axis, either memory bandwidth utilization, copy bandwidth or latency.',
     peakNote: 'MBU uses each device’s peak bandwidth',
     methodology: 'Methodology',
     methodologyText:
@@ -78,8 +80,6 @@ const STRINGS = {
     aria: 'ubenchX device-memory copy bandwidth charts',
   },
   zh: {
-    pageTitle: 'HBM 带宽',
-    pageSubtitle: '测量 NVIDIA、AMD 和 Huawei 加速器在不同消息大小下的显存拷贝带宽',
     protocolNote:
       'Huawei 使用轮转缓冲区的图执行摊销计时；NVIDIA/AMD 使用 Triton 拷贝计时。小消息延迟不能直接比较。',
     latencyTitle: '延迟 vs 消息大小',
@@ -90,6 +90,7 @@ const STRINGS = {
     bwY: '带宽（TB/s）',
     xAxis: '消息大小',
     yMetric: 'Y 轴',
+    yMetricTooltip: '图表 Y 轴显示的测量值，可选显存带宽利用率、拷贝带宽或延迟。',
     peakNote: 'MBU 按各设备的峰值带宽计算',
     methodology: '测试方法',
     methodologyText:
@@ -200,6 +201,8 @@ function UbenchxChart({
   locale,
   colors,
   theme,
+  caption,
+  footer,
 }: {
   chartId: string;
   allPoints: ChartPoint[];
@@ -209,6 +212,8 @@ function UbenchxChart({
   locale: Locale;
   colors: Record<string, string>;
   theme: 'light' | 'dark';
+  caption: ReactNode;
+  footer: ReactNode;
 }) {
   const t = STRINGS[locale];
   const [legendExpanded, setLegendExpanded] = useState(true);
@@ -252,97 +257,111 @@ function UbenchxChart({
   const xTickValues = useMemo(() => sizeAxisTicks(...xDomain), [xDomain]);
 
   return (
-    <D3Chart<ChartPoint>
+    <ChartSection
       chartId={chartId}
-      displayIdentity={theme}
-      data={visiblePoints}
-      height={440}
-      margin={{ top: 24, right: 20, bottom: 62, left: 78 }}
-      watermark="logo"
-      grabCursor
-      instructions={t.instructions}
-      xScale={{ type: 'log', domain: xDomain, nice: false }}
-      yScale={{ type: yScaleType, domain: yDomain, nice: yScaleType === 'linear' }}
-      xAxis={{
-        label: t.xAxis,
-        tickCount: 8,
-        tickValues: xTickValues,
-        tickFormat: (value) => formatBytes(Number(value)),
-      }}
-      yAxis={{
-        label: yLabel,
-        tickCount: 6,
-        tickValues: yTickValues,
-        tickFormat: (value) => {
-          const v = Number(value);
-          if (v === 0) return '0';
-          if (v >= 1000) return `${Number((v / 1000).toFixed(v >= 10000 ? 0 : 1))}k`;
-          if (v >= 1) return String(Number(v.toFixed(v >= 100 ? 0 : v >= 10 ? 1 : 2)));
-          return String(Number(v.toPrecision(2)));
-        },
-      }}
-      layers={[
-        {
-          type: 'line',
-          key: `ubenchx-line-${chartId}`,
-          lines,
-          config: {
-            getColor: (key) => colors[key] ?? '#888',
-            strokeWidth: 2.25,
-            curve: d3.curveMonotoneX,
+      analyticsPrefix="ubenchx"
+      zoomResetEvent={`ubenchx_zoom_reset_${chartId}`}
+      setIsLegendExpanded={setLegendExpanded}
+      exportFileName={`InferenceX_${chartId}`}
+    >
+      <D3Chart<ChartPoint>
+        chartId={chartId}
+        caption={caption}
+        footer={footer}
+        displayIdentity={theme}
+        data={visiblePoints}
+        height={440}
+        margin={{ top: 24, right: 20, bottom: 62, left: 78 }}
+        watermark="logo"
+        grabCursor
+        instructions={t.instructions}
+        xScale={{ type: 'log', domain: xDomain, nice: false }}
+        yScale={{
+          type: yScaleType,
+          domain: yDomain,
+          nice: yScaleType === 'linear',
+        }}
+        xAxis={{
+          label: t.xAxis,
+          tickCount: 8,
+          tickValues: xTickValues,
+          tickFormat: (value) => formatBytes(Number(value)),
+        }}
+        yAxis={{
+          label: yLabel,
+          tickCount: 6,
+          tickValues: yTickValues,
+          tickFormat: (value) => {
+            const v = Number(value);
+            if (v === 0) return '0';
+            if (v >= 1000) return `${Number((v / 1000).toFixed(v >= 10000 ? 0 : 1))}k`;
+            if (v >= 1) return String(Number(v.toFixed(v >= 100 ? 0 : v >= 10 ? 1 : 2)));
+            return String(Number(v.toPrecision(2)));
           },
-        },
-        {
-          type: 'point',
-          key: `ubenchx-points-${chartId}`,
-          data: visiblePoints,
-          config: {
-            getCx: () => 0,
-            getCy: () => 0,
-            getX: (point) => point.x,
-            getY: (point) => point.y,
-            getColor: (point) => colors[point.gpuKey] ?? '#888',
-            getRadius: () => 3.5,
-            stroke: 'var(--background)',
-            strokeWidth: 1,
-            keyFn: (point) => `${point.gpuKey}-${point.bytes}`,
-            maxPoints: Infinity,
+        }}
+        layers={[
+          {
+            type: 'line',
+            key: `ubenchx-line-${chartId}`,
+            lines,
+            config: {
+              getColor: (key) => colors[key] ?? '#888',
+              strokeWidth: 2.25,
+              curve: d3.curveMonotoneX,
+            },
           },
-        },
-      ]}
-      zoom={{
-        enabled: true,
-        resetEventName: `ubenchx_zoom_reset_${chartId}`,
-      }}
-      tooltip={{
-        rulerType: 'crosshair',
-        getRulerX: (point, scale) => (scale as d3.ScaleLogarithmic<number, number>)(point.x),
-        getRulerY: (point, scale) => scale(point.y),
-        attachToLayer: 1,
-        content: (point, isPinned) => formatTooltip(point, isPinned, STRINGS[locale], colors),
-      }}
-      legendElement={
-        <ChartLegend
-          variant="sidebar"
-          readOnly
-          disableActiveSort
-          isLegendExpanded={legendExpanded}
-          onExpandedChange={setLegendExpanded}
-          legendItems={gpuKeys.map((key) => ({
-            name: key,
-            label: key,
-            color: colors[key] ?? '#888',
-            isActive: !hidden.has(key),
-            onClick: () =>
-              setHidden((prev) => {
-                const next = new Set(prev);
-                if (!next.delete(key)) next.add(key);
-                return next;
-              }),
-          }))}
-        />
-      }
-    />
+          {
+            type: 'point',
+            key: `ubenchx-points-${chartId}`,
+            data: visiblePoints,
+            config: {
+              getCx: () => 0,
+              getCy: () => 0,
+              getX: (point) => point.x,
+              getY: (point) => point.y,
+              getColor: (point) => colors[point.gpuKey] ?? '#888',
+              getRadius: () => 3.5,
+              stroke: 'var(--background)',
+              strokeWidth: 1,
+              keyFn: (point) => `${point.gpuKey}-${point.bytes}`,
+              maxPoints: Infinity,
+            },
+          },
+        ]}
+        zoom={{
+          enabled: true,
+          resetEventName: `ubenchx_zoom_reset_${chartId}`,
+        }}
+        tooltip={{
+          rulerType: 'crosshair',
+          getRulerX: (point, scale) => (scale as d3.ScaleLogarithmic<number, number>)(point.x),
+          getRulerY: (point, scale) => scale(point.y),
+          attachToLayer: 1,
+          content: (point, isPinned) => formatTooltip(point, isPinned, STRINGS[locale], colors),
+        }}
+        legendElement={
+          <ChartLegend
+            variant="sidebar"
+            readOnly
+            disableActiveSort
+            isLegendExpanded={legendExpanded}
+            onExpandedChange={setLegendExpanded}
+            legendItems={gpuKeys.map((key) => ({
+              name: key,
+              label: key,
+              color: colors[key] ?? '#888',
+              isActive: !hidden.has(key),
+              onClick: () =>
+                setHidden((prev) => {
+                  const next = new Set(prev);
+                  if (!next.delete(key)) next.add(key);
+                  return next;
+                }),
+            }))}
+          />
+        }
+      />
+    </ChartSection>
   );
 }
 
@@ -377,8 +396,50 @@ export function UbenchxContent() {
     [viewResults, metric.key],
   );
 
+  const hub = (
+    <UbenchxHub
+      current="mem-bw"
+      controls={
+        <div className="flex min-w-0 flex-col space-y-1.5">
+          <LabelWithTooltip
+            htmlFor="ubenchx-metric-select"
+            label={t.yMetric}
+            tooltip={t.yMetricTooltip}
+          />
+          <Select
+            value={metric.key}
+            onValueChange={(value) => {
+              setMetricKey(value as ChartType);
+              track('ubenchx_metric_changed', { metric: value });
+            }}
+          >
+            <SelectTrigger
+              id="ubenchx-metric-select"
+              className="w-full"
+              data-testid="ubenchx-metric-select"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Y_METRICS.map((m) => (
+                <SelectItem key={m.key} value={m.key}>
+                  {t[m.label]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      }
+    />
+  );
+
   if (viewResults.length === 0) {
-    return <p className="text-sm text-muted-foreground">No data available</p>;
+    return (
+      <div className="flex flex-col gap-4">
+        {hub}
+        <p className="text-sm text-muted-foreground">No data available</p>
+      </div>
+    );
   }
 
   const gpuKeys = viewResults.map((r) => r.gpu);
@@ -386,58 +447,36 @@ export function UbenchxContent() {
   const sourceUrls = [...new Set(viewResults.map((r) => r.metadata.sourceUrl))];
 
   return (
-    <div className="space-y-8" role="group" aria-label={t.aria}>
-      <div>
-        <Heading level="section">{t.pageTitle}</Heading>
-        <p className="mt-1 text-sm text-muted-foreground">{t.pageSubtitle}</p>
-        <p className="mt-2 text-sm text-muted-foreground">{t.protocolNote}</p>
-      </div>
+    <div className="flex flex-col gap-4" role="group" aria-label={t.aria}>
+      {hub}
 
-      <div className="flex flex-col space-y-1.5 sm:w-72">
-        <label htmlFor="ubenchx-metric-select" className="text-sm font-medium">
-          {t.yMetric}
-        </label>
-        <Select
-          value={metric.key}
-          onValueChange={(value) => {
-            setMetricKey(value as ChartType);
-            track('ubenchx_metric_changed', { metric: value });
-          }}
-        >
-          <SelectTrigger
-            id="ubenchx-metric-select"
-            className="w-full"
-            data-testid="ubenchx-metric-select"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Y_METRICS.map((m) => (
-              <SelectItem key={m.key} value={m.key}>
-                {t[m.label]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <Card className="gap-2">
-        <div>
-          <Heading level="card">{t[metric.title]}</Heading>
-          {metric.key === 'mbu' && <p className="text-xs text-muted-foreground">{t.peakNote}</p>}
-        </div>
-        <UbenchxChart
-          key={metric.key}
-          chartId={`ubenchx-${metric.key}`}
-          allPoints={points}
-          gpuKeys={gpuKeys}
-          yLabel={t[metric.label]}
-          yScaleType={metric.scale}
-          locale={locale}
-          colors={colors}
-          theme={theme}
-        />
-      </Card>
+      <UbenchxChart
+        key={metric.key}
+        chartId={`ubenchx-${metric.key}`}
+        allPoints={points}
+        gpuKeys={gpuKeys}
+        yLabel={t[metric.label]}
+        yScaleType={metric.scale}
+        locale={locale}
+        colors={colors}
+        theme={theme}
+        caption={
+          <div className="md:pr-24">
+            <Heading as="h2" level="card">
+              {t[metric.title]}
+            </Heading>
+            {metric.key === 'mbu' && (
+              <p className="mt-1 text-xs text-muted-foreground">{t.peakNote}</p>
+            )}
+          </div>
+        }
+        footer={
+          <div className="mt-3">
+            <ResultContext locale={locale} layout="footer" source="SemiAnalysis InferenceX™" />
+            <p className="mt-2 text-xs leading-5 text-muted-foreground/70">{t.protocolNote}</p>
+          </div>
+        }
+      />
 
       <section className="space-y-1 text-xs text-muted-foreground wrap-break-word">
         <h3 className="text-sm font-medium text-foreground">{t.methodology}</h3>
