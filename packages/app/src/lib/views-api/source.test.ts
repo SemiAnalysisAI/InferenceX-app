@@ -21,6 +21,20 @@ describe('Kimi K3 TCO selection', () => {
   });
 });
 
+describe('Muse Spark Open TCO selection', () => {
+  it('preserves both pricing bases for agentic', () => {
+    const search = new URLSearchParams({ model: Model.Muse_Spark_Open, sequence: 'agentic' });
+    const defaults = selection(search);
+    expect(defaults.model).toBe(Model.Muse_Spark_Open);
+    expect(defaults.sequence).toBe(Sequence.AgenticTraces);
+    expect(defaults.tcoBasis).toBe('internal');
+    for (const basis of ['external', 'internal']) {
+      search.set('tcoBasis', basis);
+      expect(selection(search)).toEqual({ ...defaults, tcoBasis: basis });
+    }
+  });
+});
+
 describe('internal published GET response decoding', () => {
   it('reads real cachedJson output for a source request from a br caller', async () => {
     const evidence = { benchmarks: [{ id: 123, value: null }], label: '基准测试' };

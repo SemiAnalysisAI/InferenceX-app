@@ -359,6 +359,14 @@ describe('showsTcoBasisSelector', () => {
     },
   );
 
+  it('shows the selector for Muse Spark Open only on AgentX', () => {
+    for (const sequence of Object.values(Sequence)) {
+      expect(showsTcoBasisSelector(Model.Muse_Spark_Open, sequence)).toBe(
+        sequence === Sequence.AgenticTraces,
+      );
+    }
+  });
+
   it('keeps unrelated models hidden', () => {
     expect(showsTcoBasisSelector(Model.Kimi_K2_5, Sequence.AgenticTraces)).toBe(false);
     expect(showsTcoBasisSelector(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK)).toBe(false);
