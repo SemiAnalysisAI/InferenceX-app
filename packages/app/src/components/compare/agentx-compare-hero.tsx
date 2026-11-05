@@ -492,7 +492,7 @@ export function AgentXCompareHero({
               {t.eyebrow}
             </p>
             <div className="relative">
-              <Heading className="mt-3 max-w-2xl text-2xl/[1.8rem] font-semibold tracking-tight text-foreground lg:text-[2.4rem]/[2.4rem]">
+              <Heading className="mt-3 max-w-2xl text-2xl/[1.8rem] font-semibold tracking-tight text-balance text-foreground lg:text-[2.4rem]/[2.4rem]">
                 {t.title}
               </Heading>
               {surface === 'landing' && <MinecraftSplash />}
@@ -627,7 +627,7 @@ export function AgentXCompareHero({
                               </NewBadge>
                             )}
                           </span>
-                          <span className="mt-0.5 block font-mono text-xs text-brand">
+                          <span className="mt-1 block font-mono text-2xs font-semibold tracking-eyebrow text-brand uppercase">
                             {locale === 'zh' && 'subtitleZh' in result
                               ? result.subtitleZh
                               : result.subtitle}
@@ -677,7 +677,9 @@ export function AgentXCompareHero({
                           <NewBadge data-new-badge="agentx-ledger">{t.newModel}</NewBadge>
                         )}
                       </span>
-                      <span className="mt-0.5 block font-mono text-xs text-brand">AgentX</span>
+                      <span className="mt-1 block font-mono text-2xs font-semibold tracking-eyebrow text-brand uppercase">
+                        AgentX
+                      </span>
                     </span>
                   </span>
                   <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground">

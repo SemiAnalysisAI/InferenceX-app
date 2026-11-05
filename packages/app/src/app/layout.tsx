@@ -2,7 +2,7 @@ import '@/lib/runtime/polyfills';
 import './globals.css';
 
 import type { Metadata } from 'next';
-import { DM_Sans, Geist } from 'next/font/google';
+import { Outfit } from 'next/font/google';
 
 import { VercelAnalytics } from '@/components/analytics/vercel-analytics';
 import { Footer } from '@/components/footer/footer';
@@ -32,19 +32,13 @@ import {
   landingBannerPrepaintStyle as buildLandingBannerPrepaintStyle,
 } from '@/lib/nudges/landing-banner';
 
-const dm_sans = DM_Sans({
+// Outfit is the SemiAnalysis brand face for web. It is the app's only font preload (see
+// cypress/e2e/landing-performance.cy.ts), and it sits on <html> so the :root theme tokens can
+// resolve it.
+const outfit = Outfit({
   subsets: ['latin'],
   display: 'optional',
-  variable: '--font-dm-sans',
-});
-
-// On <html> so the :root `--font-mono` token can resolve it. Not preloaded: the landing page
-// budgets a single font preload (DM Sans), enforced by cypress/e2e/landing-performance.cy.ts.
-const geist = Geist({
-  subsets: ['latin'],
-  display: 'optional',
-  preload: false,
-  variable: '--font-geist',
+  variable: '--font-outfit',
 });
 
 export const metadata: Metadata = {
@@ -184,8 +178,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={geist.variable} suppressHydrationWarning>
-      <body className={`${dm_sans.variable} antialiased relative min-h-screen flex flex-col`}>
+    <html lang="en" className={outfit.variable} suppressHydrationWarning>
+      <body className="antialiased relative min-h-screen flex flex-col">
         <style
           id="landing-banner-prepaint-style"
           dangerouslySetInnerHTML={{ __html: landingBannerPrepaintStyle }}

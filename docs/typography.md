@@ -11,14 +11,14 @@ Defined in the `@theme` block of `packages/app/src/app/globals.css`:
 | `--text-2xs`              | `text-2xs`              | 0.6875rem (11px)                  | Micro labels one step below `text-xs`             |
 | `--text-3xs`              | `text-3xs`              | 0.625rem (10px)                   | Densest labels: table meta, tooltips, log gutters |
 | `--text-dialog-title`     | `text-dialog-title`     | 1.375rem (22px), 30px line height | Centered announcement dialog headings             |
-| `--tracking-eyebrow`      | `tracking-eyebrow`      | 0.08em                            | Uppercase eyebrow/kicker labels                   |
-| `--tracking-eyebrow-wide` | `tracking-eyebrow-wide` | 0.12em                            | Extra-wide uppercase labels                       |
-| `--tracking-heading`      | `tracking-heading`      | -0.04em                           | Tightened display/hero headings                   |
+| `--tracking-eyebrow`      | `tracking-eyebrow`      | 0.14em                            | Uppercase eyebrow/kicker labels                   |
+| `--tracking-eyebrow-wide` | `tracking-eyebrow-wide` | 0.2em                             | Extra-wide uppercase labels                       |
+| `--tracking-heading`      | `tracking-heading`      | -0.02em                           | Tightened display/hero headings                   |
 
 Font families (`@theme inline`):
 
-- `font-sans` — DM Sans, the body and heading face.
-- `font-mono` — the label and data face. Despite the name it is **not** a monospace: it is Geist with tabular figures (`tnum`), so numbers line up in tables and tooltips. DM Sans has no `tnum`, so `tabular-nums` on `font-sans` text does nothing.
+- `font-sans` — Outfit, the SemiAnalysis brand face for web, used for body text and headings.
+- `font-mono` — the label and data face. Despite the name it is **not** a monospace: it is Outfit with tabular figures (`tnum`), so numbers line up in tables and tooltips. Brand labels are `font-mono`, uppercase, semibold and tracked (`tracking-eyebrow`); never use a monospace for labels.
 - `font-code` — a real monospace for code, logs, raw payloads, config and image refs. `code`, `kbd`, `samp` and `pre` get it automatically.
 
 Rules of thumb:
@@ -31,7 +31,7 @@ Rules of thumb:
 ## Components
 
 - `<Heading>` (`src/components/ui/heading.tsx`) — cva-based visual heading levels (`display`, `page`, `section`, `card`, `label`) with the rendered tag chosen via `as`, so outline and visual size stay independent. New pages should use it instead of retyping size/weight/tracking recipes; existing headings migrate file-by-file as pages get touched — no sweep.
-- `<Eyebrow>` (`src/components/ui/eyebrow.tsx`) — the uppercase kicker label (`tone="brand" | "muted"`, `wide` for 0.12em tracking).
+- `<Eyebrow>` (`src/components/ui/eyebrow.tsx`) — the uppercase kicker label (`tone="brand" | "muted"`, `wide` for 0.2em tracking).
 
 Blog/article typography is owned by `@tailwindcss/typography` (`prose`) and is out of scope — don't migrate MDX content styles to these tokens.
 

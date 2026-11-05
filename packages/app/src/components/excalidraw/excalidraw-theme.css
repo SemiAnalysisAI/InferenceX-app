@@ -26,12 +26,11 @@
     U+A720-A7FF;
 }
 
-/* The body's next/font class defines --font-dm-sans; this selector outranks it so every
+/* <html>'s next/font class defines --font-outfit; redefining it on body means every
    sans-serif surface (including D3 chart labels) picks up the hand-drawn face. Code stays
    monospace for legibility. */
 .excalidraw body {
-  --font-dm-sans:
-    'Excalifont', 'Segoe Print', 'Comic Sans MS', var(--font-dm-sans-base, sans-serif);
+  --font-outfit: 'Excalifont', 'Segoe Print', 'Comic Sans MS', var(--font-outfit-base, sans-serif);
   --excalidraw-ink: #1e1e1e;
   --excalidraw-violet: #6965db;
   --excalidraw-violet-dark: #5b57d1;

@@ -215,9 +215,9 @@ html[data-inferencex-embed] .autumn-leaves {
   --color-surface-hover: color-mix(in oklab, var(--muted) 55%, transparent);
   --color-subtle: color-mix(in oklab, var(--muted-foreground) 55%, var(--background));
 
-  --font-sans: var(--font-dm-sans);
-  /* `font-mono` is the label and data face, not a monospace: Geist with tabular figures. */
-  --font-mono: var(--font-geist);
+  --font-sans: var(--font-outfit);
+  /* `font-mono` is the label and data face, not a monospace: Outfit with tabular figures. */
+  --font-mono: var(--font-outfit);
   --font-mono--font-feature-settings: 'tnum';
   /* Code, logs and raw payloads: `font-code`, plus code/kbd/samp/pre via preflight. */
   --font-code: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', monospace;
@@ -243,9 +243,9 @@ html[data-inferencex-embed] .autumn-leaves {
   --text-dialog-title: 1.375rem;
   --text-dialog-title--line-height: 1.875rem;
 
-  --tracking-eyebrow: 0.08em;
-  --tracking-eyebrow-wide: 0.12em;
-  --tracking-heading: -0.04em;
+  --tracking-eyebrow: 0.14em;
+  --tracking-eyebrow-wide: 0.2em;
+  --tracking-heading: -0.02em;
 }
 
 :root {
@@ -483,7 +483,7 @@ html[data-inferencex-embed] .autumn-leaves {
   --sidebar-border: #555555;
   --sidebar-ring: #888888;
 
-  --font-dm-sans: var(--font-minecraft, 'Monocraft', monospace);
+  --font-outfit: var(--font-minecraft, 'Monocraft', monospace);
   --font-mono: var(--font-minecraft, 'Monocraft', monospace);
 
   --radius: 0px;
@@ -608,7 +608,7 @@ html[data-inferencex-skin='vllm'].dark {
 }
 
 html[data-inferencex-skin='vllm'] body {
-  --font-dm-sans: var(--font-embed-sans, Inter, system-ui, sans-serif);
+  --font-outfit: var(--font-embed-sans, Inter, system-ui, sans-serif);
   --font-mono: var(--font-embed-mono, 'JetBrains Mono', ui-monospace, monospace);
 }
 

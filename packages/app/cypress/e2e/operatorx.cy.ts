@@ -225,12 +225,12 @@ it('shows median and best bars across the row above metric vs size at /', () => 
         const label = getComputedStyle(
           $ticks[0].ownerDocument.querySelector('.summary-median-label')!,
         );
-        expect(tick.fontFamily).to.contain('DM Sans').and.equal(label.fontFamily);
+        expect(tick.fontFamily).to.contain('Outfit').and.equal(label.fontFamily);
         expect(tick.fontSize).to.equal(label.fontSize);
       });
       cy.get('.x-axis .tick text')
         .first()
-        .should(($tick) => expect(getComputedStyle($tick[0]).fontFamily).to.contain('DM Sans'));
+        .should(($tick) => expect(getComputedStyle($tick[0]).fontFamily).to.contain('Outfit'));
     });
   cy.get('#opx-summary-normalized').click();
   cy.get('[data-testid="operatorx-roofline-summary"] .summary-row')

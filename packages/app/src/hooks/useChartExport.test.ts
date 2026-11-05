@@ -225,7 +225,7 @@ describe('useChartExport failure messages', () => {
 
 describe('getExportFontFamily', () => {
   it('uses the default sans stack for standard pages', () => {
-    expect(getExportFontFamily()).toContain('var(--font-dm-sans)');
+    expect(getExportFontFamily()).toContain('var(--font-outfit)');
     expect(getExportFontFamily()).toContain('"Segoe UI"');
   });
 });
