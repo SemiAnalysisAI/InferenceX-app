@@ -177,10 +177,10 @@ jobs:
           retention-days: 1
 
   cypress:
-    name: E2E (${{ matrix.browser }}, shard ${{ matrix.shard }}, ${{ matrix.runner }})
+    name: E2E (${{ matrix.browser }}, shard ${{ matrix.shard }}, ${{ matrix.mode }})
     if: ${{ !github.event.pull_request.draft }}
     timeout-minutes: 15
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.browser == 'firefox' && 'blacksmith-16vcpu-ubuntu-2404' || 'blacksmith-8vcpu-ubuntu-2404' }}
     permissions:
       contents: read
       actions: read # Download the app build artifact from this run.
@@ -189,11 +189,10 @@ jobs:
       matrix:
         browser: [chrome, firefox]
         shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-        runner: [blacksmith-8vcpu-ubuntu-2404, blacksmith-16vcpu-ubuntu-2404]
-        exclude:
-          - browser: firefox
-            runner: blacksmith-8vcpu-ubuntu-2404
+        mode: [base, fast]
     steps:
+      - name: Record CPU
+        run: lscpu | grep -E 'Model name|^CPU\(s\)|MHz'
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -251,7 +250,7 @@ jobs:
             build=$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100" --jq '.jobs[] | select(.name == "Build app for E2E") | .conclusion')
             if [ -n "$build" ] && [ "$build" != success ]; then echo "::error::Build app for E2E finished with result: $build"; exit 1; fi
             [ "$SECONDS" -lt "$deadline" ] || { echo '::error::Timed out waiting for the app build'; exit 1; }
-            sleep 5
+            sleep 2
           done
       - name: Download app build
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -268,10 +267,12 @@ jobs:
           start: bun run start
           wait-on: 'http://localhost:3000'
           browser: ${{ matrix.browser }}
+          command: ${{ matrix.mode == 'fast' && format('bunx cypress run --browser {0} --no-runner-ui --config experimentalFastVisibility=true', matrix.browser) || '' }}
           publish-summary: false
         env:
           CI: true
           E2E_FIXTURES: '1'
+          CYPRESS_NO_COMMAND_LOG: ${{ matrix.mode == 'fast' && '1' || '' }}
           # cypress-split picks the subset of specs for this shard.
           # SPLIT_INDEX1 is 1-based to match matrix.shard values [1..8].
           # SPLIT_FILE seeds the balance from observed timings;
@@ -287,7 +288,7 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: cypress-timings-e2e-${{ matrix.browser }}-${{ matrix.shard }}-${{ matrix.runner }}
+          name: cypress-timings-e2e-${{ matrix.browser }}-${{ matrix.shard }}-${{ matrix.mode }}
           path: /tmp/cypress-timings/observation.json
           if-no-files-found: error
           retention-days: 14

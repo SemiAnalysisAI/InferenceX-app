@@ -1,7 +1,7 @@
 {
   "provenance": {
     "revision": "850fb11a39366bfb0e429a2bfd8c6a9b32502fa5",
-    "runId": "41934494612",
+    "runId": "median-of-4-experiment-runs",
     "runAttempt": "1",
     "browser": "chrome",
     "kind": "e2e",
@@ -11,7 +11,7 @@
   "durations": [
     {
       "spec": "cypress/e2e/agentic-catalog.cy.ts",
-      "duration": 478,
+      "duration": 409,
       "tests": [
         {
           "title": [
@@ -33,7 +33,7 @@
     },
     {
       "spec": "cypress/e2e/agentic-detail-back-nav.cy.ts",
-      "duration": 4635,
+      "duration": 3731,
       "tests": [
         {
           "title": [
@@ -71,7 +71,7 @@
     },
     {
       "spec": "cypress/e2e/agentic-point-coach-mark.cy.ts",
-      "duration": 7828,
+      "duration": 7824,
       "tests": [
         {
           "title": [
@@ -101,7 +101,7 @@
     },
     {
       "spec": "cypress/e2e/agentic-point-time-series.cy.ts",
-      "duration": 22572,
+      "duration": 21544,
       "tests": [
         {
           "title": [
@@ -259,7 +259,7 @@
     },
     {
       "spec": "cypress/e2e/agentic-quick-filters.cy.ts",
-      "duration": 2149,
+      "duration": 2026,
       "tests": [
         {
           "title": [
@@ -273,7 +273,7 @@
     },
     {
       "spec": "cypress/e2e/agentic-workload-explorer.cy.ts",
-      "duration": 3063,
+      "duration": 2644,
       "tests": [
         {
           "title": [
@@ -303,7 +303,7 @@
     },
     {
       "spec": "cypress/e2e/agentx-dataset-click-path.cy.ts",
-      "duration": 1290,
+      "duration": 1209,
       "tests": [
         {
           "title": [
@@ -325,7 +325,7 @@
     },
     {
       "spec": "cypress/e2e/agentx-optimizations.cy.ts",
-      "duration": 2762,
+      "duration": 2374,
       "tests": [
         {
           "title": [
@@ -379,7 +379,7 @@
     },
     {
       "spec": "cypress/e2e/agentx-telemetry.cy.ts",
-      "duration": 13267,
+      "duration": 13379,
       "tests": [
         {
           "title": [
@@ -457,7 +457,7 @@
     },
     {
       "spec": "cypress/e2e/ai-chart.cy.ts",
-      "duration": 9827,
+      "duration": 8056,
       "tests": [
         {
           "title": [
@@ -543,7 +543,7 @@
     },
     {
       "spec": "cypress/e2e/api-documentation.cy.ts",
-      "duration": 5171,
+      "duration": 4802,
       "tests": [
         {
           "title": [
@@ -605,7 +605,7 @@
     },
     {
       "spec": "cypress/e2e/blog.cy.ts",
-      "duration": 8188,
+      "duration": 5658,
       "tests": [
         {
           "title": [
@@ -764,7 +764,7 @@
     },
     {
       "spec": "cypress/e2e/cache-reuse.cy.ts",
-      "duration": 3878,
+      "duration": 3865,
       "tests": [
         {
           "title": [
@@ -878,7 +878,7 @@
     },
     {
       "spec": "cypress/e2e/calculator-overlay.cy.ts",
-      "duration": 9478,
+      "duration": 7802,
       "tests": [
         {
           "title": [
@@ -992,7 +992,7 @@
     },
     {
       "spec": "cypress/e2e/certified-power-filter.cy.ts",
-      "duration": 4830,
+      "duration": 3096,
       "tests": [
         {
           "title": [
@@ -1030,7 +1030,7 @@
     },
     {
       "spec": "cypress/e2e/chart-header-toolbar-overlap.cy.ts",
-      "duration": 2036,
+      "duration": 1829,
       "tests": [
         {
           "title": [
@@ -1084,7 +1084,7 @@
     },
     {
       "spec": "cypress/e2e/chart-overflow-continuation.cy.ts",
-      "duration": 1469,
+      "duration": 1305,
       "tests": [
         {
           "title": [
@@ -1114,7 +1114,7 @@
     },
     {
       "spec": "cypress/e2e/collectivex.cy.ts",
-      "duration": 25074,
+      "duration": 25150,
       "tests": [
         {
           "title": [
@@ -1360,7 +1360,7 @@
     },
     {
       "spec": "cypress/e2e/compare-per-dollar-redirect.cy.ts",
-      "duration": 2428,
+      "duration": 1810,
       "tests": [
         {
           "title": [
@@ -1398,7 +1398,7 @@
     },
     {
       "spec": "cypress/e2e/compare-per-dollar-table.cy.ts",
-      "duration": 1812,
+      "duration": 1212,
       "tests": [
         {
           "title": [
@@ -1452,7 +1452,7 @@
     },
     {
       "spec": "cypress/e2e/compare-precision.cy.ts",
-      "duration": 2166,
+      "duration": 1939,
       "tests": [
         {
           "title": [
@@ -1498,7 +1498,7 @@
     },
     {
       "spec": "cypress/e2e/compare-redirect.cy.ts",
-      "duration": 1270,
+      "duration": 1248,
       "tests": [
         {
           "title": [
@@ -1536,7 +1536,7 @@
     },
     {
       "spec": "cypress/e2e/compare-scenario-routes.cy.ts",
-      "duration": 1774,
+      "duration": 1895,
       "tests": [
         {
           "title": [
@@ -1606,7 +1606,7 @@
     },
     {
       "spec": "cypress/e2e/compare-spec-decode.cy.ts",
-      "duration": 2679,
+      "duration": 1654,
       "tests": [
         {
           "title": [
@@ -1636,7 +1636,7 @@
     },
     {
       "spec": "cypress/e2e/compare-table.cy.ts",
-      "duration": 4401,
+      "duration": 2988,
       "tests": [
         {
           "title": [
@@ -1698,7 +1698,7 @@
     },
     {
       "spec": "cypress/e2e/csv-export-overlay.cy.ts",
-      "duration": 1638,
+      "duration": 1498,
       "tests": [
         {
           "title": [
@@ -1712,7 +1712,7 @@
     },
     {
       "spec": "cypress/e2e/csv-export.cy.ts",
-      "duration": 4784,
+      "duration": 3772,
       "tests": [
         {
           "title": [
@@ -1726,7 +1726,7 @@
     },
     {
       "spec": "cypress/e2e/current-inferencex-image.cy.ts",
-      "duration": 10781,
+      "duration": 9475,
       "tests": [
         {
           "title": [
@@ -1828,7 +1828,7 @@
     },
     {
       "spec": "cypress/e2e/custom-user-values.cy.ts",
-      "duration": 9686,
+      "duration": 7464,
       "tests": [
         {
           "title": [
@@ -1879,7 +1879,7 @@
     },
     {
       "spec": "cypress/e2e/datasets-distributions.cy.ts",
-      "duration": 6490,
+      "duration": 6290,
       "tests": [
         {
           "title": [
@@ -1957,7 +1957,7 @@
     },
     {
       "spec": "cypress/e2e/datasets-flamegraph-time.cy.ts",
-      "duration": 2933,
+      "duration": 2743,
       "tests": [
         {
           "title": [
@@ -2011,7 +2011,7 @@
     },
     {
       "spec": "cypress/e2e/datasets-methodology.cy.ts",
-      "duration": 3556,
+      "duration": 3318,
       "tests": [
         {
           "title": [
@@ -2105,7 +2105,7 @@
     },
     {
       "spec": "cypress/e2e/dropdown-switching.cy.ts",
-      "duration": 3160,
+      "duration": 2638,
       "tests": [
         {
           "title": [
@@ -2143,7 +2143,7 @@
     },
     {
       "spec": "cypress/e2e/evaluation-chart.cy.ts",
-      "duration": 10964,
+      "duration": 9078,
       "tests": [
         {
           "title": [
@@ -2253,7 +2253,7 @@
     },
     {
       "spec": "cypress/e2e/first-token-limits.cy.ts",
-      "duration": 5535,
+      "duration": 4436,
       "tests": [
         {
           "title": [
@@ -2349,7 +2349,7 @@
     },
     {
       "spec": "cypress/e2e/fixed-sequence-logs.cy.ts",
-      "duration": 741,
+      "duration": 802,
       "tests": [
         {
           "title": [
@@ -2363,7 +2363,7 @@
     },
     {
       "spec": "cypress/e2e/fleet-lifecycle.cy.ts",
-      "duration": 27082,
+      "duration": 25335,
       "tests": [
         {
           "title": [
@@ -2625,7 +2625,7 @@
     },
     {
       "spec": "cypress/e2e/framework-line-label.cy.ts",
-      "duration": 1962,
+      "duration": 2138,
       "tests": [
         {
           "title": [
@@ -2639,7 +2639,7 @@
     },
     {
       "spec": "cypress/e2e/gpu-compare-agentic-detail.cy.ts",
-      "duration": 5875,
+      "duration": 5104,
       "tests": [
         {
           "title": [
@@ -2685,7 +2685,7 @@
     },
     {
       "spec": "cypress/e2e/gpu-specs.cy.ts",
-      "duration": 8601,
+      "duration": 6878,
       "tests": [
         {
           "title": [
@@ -2891,7 +2891,7 @@
     },
     {
       "spec": "cypress/e2e/gradient-labels.cy.ts",
-      "duration": 3126,
+      "duration": 2669,
       "tests": [
         {
           "title": [
@@ -2937,7 +2937,7 @@
     },
     {
       "spec": "cypress/e2e/historical-trends.cy.ts",
-      "duration": 17213,
+      "duration": 13852,
       "tests": [
         {
           "title": [
@@ -3087,7 +3087,7 @@
     },
     {
       "spec": "cypress/e2e/inference-chart.cy.ts",
-      "duration": 37569,
+      "duration": 25922,
       "tests": [
         {
           "title": [
@@ -3409,7 +3409,7 @@
     },
     {
       "spec": "cypress/e2e/inference-replay.cy.ts",
-      "duration": 14933,
+      "duration": 14277,
       "tests": [
         {
           "title": [
@@ -3479,7 +3479,7 @@
     },
     {
       "spec": "cypress/e2e/jalapeno-preview-notice.cy.ts",
-      "duration": 4287,
+      "duration": 3570,
       "tests": [
         {
           "title": [
@@ -3549,7 +3549,7 @@
     },
     {
       "spec": "cypress/e2e/landing-dashboard-navigation.cy.ts",
-      "duration": 32739,
+      "duration": 20779,
       "tests": [
         {
           "title": [
@@ -3739,7 +3739,7 @@
     },
     {
       "spec": "cypress/e2e/landing-performance.cy.ts",
-      "duration": 1538,
+      "duration": 1256,
       "tests": [
         {
           "title": [
@@ -3785,7 +3785,7 @@
     },
     {
       "spec": "cypress/e2e/line-labels.cy.ts",
-      "duration": 3939,
+      "duration": 3845,
       "tests": [
         {
           "title": [
@@ -3847,7 +3847,7 @@
     },
     {
       "spec": "cypress/e2e/model-architecture.cy.ts",
-      "duration": 21850,
+      "duration": 17940,
       "tests": [
         {
           "title": [
@@ -4256,7 +4256,7 @@
     },
     {
       "spec": "cypress/e2e/model-route-slugs.cy.ts",
-      "duration": 23539,
+      "duration": 25208,
       "tests": [
         {
           "title": [
@@ -4582,7 +4582,7 @@
     },
     {
       "spec": "cypress/e2e/navigation.cy.ts",
-      "duration": 49649,
+      "duration": 24922,
       "tests": [
         {
           "title": [
@@ -4860,7 +4860,7 @@
     },
     {
       "spec": "cypress/e2e/nudge-system.cy.ts",
-      "duration": 30262,
+      "duration": 28056,
       "tests": [
         {
           "title": [
@@ -5090,7 +5090,7 @@
     },
     {
       "spec": "cypress/e2e/operatorx.cy.ts",
-      "duration": 10408,
+      "duration": 8502,
       "tests": [
         {
           "title": [
@@ -5230,7 +5230,7 @@
     },
     {
       "spec": "cypress/e2e/optional-theme-isolation.cy.ts",
-      "duration": 30532,
+      "duration": 20189,
       "tests": [
         {
           "title": [
@@ -5452,7 +5452,7 @@
     },
     {
       "spec": "cypress/e2e/overlay-legend-remove.cy.ts",
-      "duration": 1884,
+      "duration": 1620,
       "tests": [
         {
           "title": [
@@ -5482,7 +5482,7 @@
     },
     {
       "spec": "cypress/e2e/overlay-optimal-only.cy.ts",
-      "duration": 3140,
+      "duration": 1942,
       "tests": [
         {
           "title": [
@@ -5520,7 +5520,7 @@
     },
     {
       "spec": "cypress/e2e/overview-a11y.cy.ts",
-      "duration": 3756,
+      "duration": 3260,
       "tests": [
         {
           "title": [
@@ -5574,7 +5574,7 @@
     },
     {
       "spec": "cypress/e2e/overview.cy.ts",
-      "duration": 21739,
+      "duration": 20234,
       "tests": [
         {
           "title": [
@@ -5876,7 +5876,7 @@
     },
     {
       "spec": "cypress/e2e/powerx-compare.cy.ts",
-      "duration": 6267,
+      "duration": 5647,
       "tests": [
         {
           "title": [
@@ -5898,7 +5898,7 @@
     },
     {
       "spec": "cypress/e2e/powerx-timeline.cy.ts",
-      "duration": 1618,
+      "duration": 1240,
       "tests": [
         {
           "title": [
@@ -5912,7 +5912,7 @@
     },
     {
       "spec": "cypress/e2e/profit-estimator.cy.ts",
-      "duration": 67805,
+      "duration": 50705,
       "tests": [
         {
           "title": [
@@ -6509,7 +6509,7 @@
     },
     {
       "spec": "cypress/e2e/profit-power-curves.cy.ts",
-      "duration": 2192,
+      "duration": 2548,
       "tests": [
         {
           "title": [
@@ -6539,7 +6539,7 @@
     },
     {
       "spec": "cypress/e2e/profit-route-params.cy.ts",
-      "duration": 19561,
+      "duration": 12022,
       "tests": [
         {
           "title": [
@@ -6625,7 +6625,7 @@
     },
     {
       "spec": "cypress/e2e/reliability-chart.cy.ts",
-      "duration": 3517,
+      "duration": 3091,
       "tests": [
         {
           "title": [
@@ -6679,7 +6679,7 @@
     },
     {
       "spec": "cypress/e2e/resident-sequence-lengths.cy.ts",
-      "duration": 1121,
+      "duration": 898,
       "tests": [
         {
           "title": [
@@ -6701,7 +6701,7 @@
     },
     {
       "spec": "cypress/e2e/sanity.cy.ts",
-      "duration": 1678,
+      "duration": 1323,
       "tests": [
         {
           "title": [
@@ -6747,7 +6747,7 @@
     },
     {
       "spec": "cypress/e2e/site-search.cy.ts",
-      "duration": 2491,
+      "duration": 2368,
       "tests": [
         {
           "title": [
@@ -6785,7 +6785,7 @@
     },
     {
       "spec": "cypress/e2e/throughput-calculator.cy.ts",
-      "duration": 22679,
+      "duration": 12881,
       "tests": [
         {
           "title": [
@@ -7128,7 +7128,7 @@
     },
     {
       "spec": "cypress/e2e/tokens-per-currency.cy.ts",
-      "duration": 1472,
+      "duration": 753,
       "tests": [
         {
           "title": [
@@ -7142,7 +7142,7 @@
     },
     {
       "spec": "cypress/e2e/tpu-publication.cy.ts",
-      "duration": 4023,
+      "duration": 4504,
       "tests": [
         {
           "title": [
@@ -7196,7 +7196,7 @@
     },
     {
       "spec": "cypress/e2e/ttft-x-axis-toggle.cy.ts",
-      "duration": 12982,
+      "duration": 12894,
       "tests": [
         {
           "title": [
@@ -7418,7 +7418,7 @@
     },
     {
       "spec": "cypress/e2e/ubenchx.cy.ts",
-      "duration": 37703,
+      "duration": 31532,
       "tests": [
         {
           "title": [
@@ -7579,7 +7579,7 @@
     },
     {
       "spec": "cypress/e2e/unofficial-watermark.cy.ts",
-      "duration": 1608,
+      "duration": 1434,
       "tests": [
         {
           "title": [
@@ -7593,7 +7593,7 @@
     },
     {
       "spec": "cypress/e2e/url-params.cy.ts",
-      "duration": 17337,
+      "duration": 13170,
       "tests": [
         {
           "title": [
@@ -7833,7 +7833,7 @@
     },
     {
       "spec": "cypress/e2e/video-dashboard.cy.ts",
-      "duration": 4238,
+      "duration": 5052,
       "tests": [
         {
           "title": [
@@ -7895,7 +7895,7 @@
     },
     {
       "spec": "cypress/e2e/yaxis-metrics-render.cy.ts",
-      "duration": 10602,
+      "duration": 9042,
       "tests": [
         {
           "title": [
@@ -8093,7 +8093,7 @@
     },
     {
       "spec": "cypress/e2e/zh-pages.cy.ts",
-      "duration": 13513,
+      "duration": 13646,
       "tests": [
         {
           "title": [
