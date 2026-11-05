@@ -1005,7 +1005,7 @@ describe('mapBenchmarkRow', () => {
   });
 });
 
-describe('scrubWithheldPowerMetrics (direct — supplemental ingest path)', () => {
+describe('scrubWithheldPowerMetrics (direct)', () => {
   function supplementalMetrics(overrides: Record<string, any> = {}): Record<string, number> {
     const { workers: _workers, ...measured } = dirtyPowerPayload();
     return { tput_per_gpu: 567.8, ...measured, ...overrides };
@@ -1083,30 +1083,6 @@ describe('scrubWithheldPowerMetrics (direct — supplemental ingest path)', () =
     for (const key of MEASURED_POWER_METRIC_KEYS) {
       expect(metrics).not.toHaveProperty(key);
     }
-  });
-
-  it('recovers provenance companions nested under metrics and leaves the record flat', () => {
-    const metrics = supplementalMetrics({
-      power_valid: 0,
-      power_invalid_reasons: ['sampling_gap_exceeded', 'sampling_gap_exceeded', '<img src=x>'],
-      power_audit: { sample_count: 12, producer_sha: 'abc123', unknown_key: true },
-    });
-    normalizePowerContractMetrics(metrics, metrics);
-    scrubWithheldPowerMetrics(metrics);
-    const reasons = extractPowerInvalidReasons(metrics.power_invalid_reasons);
-    const audit = extractPowerAudit(metrics.power_audit);
-    delete metrics.power_invalid_reasons;
-    delete metrics.power_audit;
-
-    expect(reasons).toEqual(['sampling_gap_exceeded']);
-    expect(audit).toEqual({
-      sample_count: 12,
-      producer_sha: 'abc123',
-      exporter_image_sha256: null,
-    });
-    expect(metrics).not.toHaveProperty('power_invalid_reasons');
-    expect(metrics).not.toHaveProperty('power_audit');
-    expect(metrics.tput_per_gpu).toBe(567.8);
   });
 });
 

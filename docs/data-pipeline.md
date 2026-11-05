@@ -121,16 +121,15 @@ concurrency, offload mode, and the nullable recipe fingerprint), not surrogate k
 
 ### Results Published Outside CI
 
-Results measured outside our CI (OpenAI's Jalapeño points and CoreWeave's July Vera Rubin
-NVL72 curve) live in `packages/db/data/supplemental-bmk.json` and are stored by
-`bun run admin:db:ingest:supplemental`. Results from our own runs, including private-repo runs
-such as the TPU7x sweeps, are ingested from their GitHub run instead. Each snapshot becomes its own
-`workflow_runs` row with a fixed negative `github_run_id`, so snapshots never share a run
-and the benchmark natural key cannot fold one snapshot's points into another's. A snapshot's
-`html_url` is its source page, and the benchmark queries return it as `run_url` without the
-GitHub `/attempts/N` suffix. Rows may set `num_gpu` when the chip count is not `tp * ep`.
-A source that publishes only output throughput omits `tput_per_gpu`, and the dashboard then
-offers only output-token metrics for those points.
+The database is the source of truth for every result. Results measured outside our CI
+(OpenAI's Jalapeño points and CoreWeave's July Vera Rubin NVL72 curve) exist only there, each
+snapshot as its own `workflow_runs` row with a fixed negative `github_run_id` (-1 to -3), so
+snapshots never share a run and the benchmark natural key cannot fold one snapshot's points into
+another's. Results from our own runs, including private-repo runs such as the TPU7x sweeps, are
+ingested from their GitHub run. A snapshot's `html_url` is its source page, and the benchmark
+queries return it as `run_url` without the GitHub `/attempts/N` suffix. A source that publishes
+only output throughput omits `tput_per_gpu`, and the dashboard then offers only output-token
+metrics for those points.
 
 ### AgentX Curve Replacement Scope
 
