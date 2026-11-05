@@ -22,6 +22,7 @@ import {
 import { type Precision, getChartWatermark, getPrecisionLabel } from '@/lib/catalog/data-mappings';
 import { updateRepoUrl } from '@/lib/shared/utils';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { fmt as formatExact } from '@/components/inference/utils/tooltipUtils';
 
 import type { TrendDataPoint, TrendLineConfig } from '../types';
 
@@ -289,7 +290,9 @@ const TrendChart = React.memo(
               title={config?.label ?? ''}
               color={config?.color ?? '#888'}
               date={locale === 'zh' ? dateFormatter.format(new Date(d.raw.date)) : d.raw.date}
-              metrics={[{ value: formatLargeNumber(d.value), label: yLabel }]}
+              metrics={[
+                { value: formatLargeNumber(d.value), label: yLabel, exact: formatExact(d.value) },
+              ]}
               rows={[
                 { label: t.precision, value: getPrecisionLabel(d.precision as Precision) },
                 { label: t.target, value: `${d.raw.x} tok/s/user` },

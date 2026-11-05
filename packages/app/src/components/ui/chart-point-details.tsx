@@ -16,9 +16,13 @@ const STRINGS = {
 const LINK_CLASS =
   'cursor-pointer font-medium text-foreground underline decoration-muted-foreground/50 underline-offset-4 hover:decoration-foreground';
 
+const STRIP_VALUE_MAX = 8;
+const STRIP_LABEL_MAX = 14;
+
 export interface ChartPointDetailsMetric {
   value: string;
   label: string;
+  exact?: string;
 }
 
 export interface ChartPointDetailsRow {
@@ -70,6 +74,12 @@ export function ChartPointDetails<A extends string = string>({
 
   const externalLinks = links.filter((link) => link.external && link.href);
   const actions = links.filter((link) => !externalLinks.includes(link));
+  const facts = rows.filter(
+    (row) =>
+      !row.wide && row.value.length <= STRIP_VALUE_MAX && row.label.length <= STRIP_LABEL_MAX,
+  );
+  const strip = facts.length > 1 ? facts : [];
+  const lines = rows.filter((row) => !strip.includes(row));
 
   return (
     <section
@@ -111,29 +121,53 @@ export function ChartPointDetails<A extends string = string>({
           <X />
         </Button>
       </div>
-      {metrics.length > 0 && (
-        <dl className="mt-2.5 space-y-1 border-t border-border/50 pt-2.5">
-          {metrics.map((metric) => (
-            <DetailRow
-              key={metric.label}
-              label={metric.label}
-              value={metric.value}
-              valueClassName="text-sm font-semibold"
-            />
-          ))}
-        </dl>
-      )}
-      {rows.length > 0 && (
-        <dl className="mt-2.5 space-y-1 border-t border-border/50 pt-2.5">
-          {rows.map((row, index) => (
-            <DetailRow
-              key={`${row.label}-${index}`}
-              label={row.label}
-              value={row.value}
-              stacked={row.wide || row.value.length > 24}
-            />
-          ))}
-        </dl>
+      {(metrics.length > 0 || rows.length > 0) && (
+        <div className="inferencex-pinned-tooltip">
+          {metrics.length > 0 && (
+            <dl className="pinned-metrics">
+              {metrics.map((metric, index) => (
+                <div
+                  key={metric.label}
+                  className={metrics.length % 2 === 1 && index === 0 ? 'col-span-2' : undefined}
+                >
+                  <dt className="pinned-metric-label">{metric.label}</dt>
+                  <dd className="pinned-metric-value">{metric.value}</dd>
+                  {metric.exact && metric.exact !== metric.value && (
+                    <dd className="pinned-exact">{metric.exact}</dd>
+                  )}
+                </div>
+              ))}
+            </dl>
+          )}
+          {strip.length > 0 && (
+            <dl className="pinned-strip">
+              {strip.map((row, index) => (
+                <div key={`${row.label}-${index}`}>
+                  <dt>{row.label}</dt>
+                  <dd>{row.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+          {lines.length > 0 && (
+            <dl
+              className={cn(
+                'pinned-lines',
+                (metrics.length > 0 || strip.length > 0) && 'pinned-section',
+              )}
+            >
+              {lines.map((row, index) => (
+                <div
+                  key={`${row.label}-${index}`}
+                  className={cn('tooltip-line', row.wide && 'pinned-line-wide')}
+                >
+                  <dt>{row.label}</dt>
+                  <dd>{row.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </div>
       )}
       {children}
       {links.length > 0 && (
@@ -176,32 +210,5 @@ export function ChartPointDetails<A extends string = string>({
         </div>
       )}
     </section>
-  );
-}
-
-function DetailRow({
-  label,
-  value,
-  stacked = false,
-  valueClassName,
-}: {
-  label: string;
-  value: string;
-  stacked?: boolean;
-  valueClassName?: string;
-}) {
-  return (
-    <div className={stacked ? undefined : 'flex items-baseline justify-between gap-3'}>
-      <dt className="min-w-0 text-muted-foreground">{label}</dt>
-      <dd
-        className={cn(
-          'font-medium tabular-nums text-foreground',
-          stacked ? '[overflow-wrap:anywhere]' : 'shrink-0 whitespace-nowrap text-right',
-          valueClassName,
-        )}
-      >
-        {value}
-      </dd>
-    </div>
   );
 }

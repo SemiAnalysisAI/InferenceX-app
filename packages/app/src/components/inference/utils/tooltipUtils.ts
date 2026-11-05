@@ -991,7 +991,7 @@ export const buildPointDetails = (config: TooltipConfig): PointDetails => {
           ? formatTooltipDate(d.date, locale)
           : ownDate,
     html: `<div class="pinned-metrics">${pinnedMetricHTML(yLabel, d.y, selectedYAxisMetric)}${pinnedMetricHTML(xLabel, d.x)}</div>
-    <div data-pinned-config>${pinnedStatHTML(t.concurrency, d.conc.toLocaleString('en-US'))}${pinnedStatHTML(t.precision, d.precision.toUpperCase())}${pinnedStatHTML(t.totalChips, d.physicalChips ?? d.tp)}</div>
+    <div data-pinned-config class="pinned-strip">${pinnedStatHTML(t.concurrency, d.conc.toLocaleString('en-US'))}${pinnedStatHTML(t.precision, d.precision.toUpperCase())}${pinnedStatHTML(t.totalChips, d.physicalChips ?? d.tp)}</div>
     ${rowsHTML(tputRows)}
     ${topologyHTML(d, locale)}
     ${pinnedSectionHTML(cacheHTML(d, locale, config.color ?? 'var(--foreground)'))}

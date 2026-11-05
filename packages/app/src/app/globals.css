@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import './motion.css';
+@import '../components/ui/chart-point-details.css';
 @import '../components/inference/utils/pinnedTooltip.css';
 @plugin '@tailwindcss/typography';
 
