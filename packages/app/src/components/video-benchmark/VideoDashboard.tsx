@@ -308,10 +308,25 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
       deploymentCells.flatMap(({ metadata }) => (metadata.engine ? [metadata.engine] : [])),
     ),
   ];
+  // Chip Config plots earlier runs, so their popovers open cells outside the as-of set.
+  const detailPool = [...deploymentCells, ...projection.history];
   const detailCell =
     state.point === null
       ? undefined
-      : deploymentCells.find((cell) => shown(cell) && resultsPointKey(cell) === state.point);
+      : detailPool.find((cell) => shown(cell) && resultsPointKey(cell) === state.point);
+  const detailSiblings =
+    detailCell === undefined
+      ? []
+      : (deploymentCells.includes(detailCell)
+          ? deploymentCells
+          : projection.history.filter((cell) => cell.point.runId === detailCell.point.runId)
+        )
+          .filter(
+            (cell) =>
+              cell.point.hardwareKey === detailCell.point.hardwareKey &&
+              cell.overlay === detailCell.overlay,
+          )
+          .toSorted((a, b) => (a.point.participating ?? 0) - (b.point.participating ?? 0));
   // Left in the URL, a dead key would reopen its detail once its hardware is shown again.
   const deadPoint = state.point !== null && !loading && !error && detailCell === undefined;
   useEffect(() => {
@@ -441,13 +456,7 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
       {detailCell && (
         <VideoDeploymentDetail
           cell={detailCell}
-          siblings={deploymentCells
-            .filter(
-              (cell) =>
-                cell.point.hardwareKey === detailCell.point.hardwareKey &&
-                cell.overlay === detailCell.overlay,
-            )
-            .toSorted((a, b) => (a.point.participating ?? 0) - (b.point.participating ?? 0))}
+          siblings={detailSiblings}
           gpuCounts={options.gpuCounts}
           workloadLabel={workloadLabel ?? detailCell.point.workload}
           state={state}

@@ -344,6 +344,14 @@ describe('VideoGenX results', () => {
     points().should('have.length', 1);
     points('[data-hardware="b200"]').should('contain', '2026-09-09');
     cy.get('[data-testid="results-compare-history"]').should('contain', 'Comparison Date Range');
+    // Run 1/3 predates B200, so its history point lies outside the as-of cells yet still opens.
+    cy.get('[data-testid="results-run-context"] button[aria-label="Previous run"]').click();
+    cy.get('[data-testid="results-run-context"] button[aria-label="Previous run"]').click();
+    cy.get('#run-select').should('contain', 'Run 1/3');
+    points('[data-hardware="b200"] .visible-shape').click({ force: true });
+    cy.get('[data-chart-tooltip]:visible [data-action="view-telemetry"]').click();
+    cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
+    searchParam('r_point').should('match', /^34341996789:/u);
   });
 
   it('applies explicit scenario prices and utilisation to profit', () => {
