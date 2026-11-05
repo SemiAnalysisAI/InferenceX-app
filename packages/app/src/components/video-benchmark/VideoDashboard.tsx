@@ -81,7 +81,7 @@ const STRINGS = {
     compareRangeHelp:
       'The start and end execution dates of the runs plotted for the selected chip configs.',
     compareRangePlaceholder: 'Select date range',
-    secondaryControls: 'Chart, GPU count and run date',
+    secondaryControls: 'More chart controls',
     changed: 'changed',
     gpus: 'GPU count',
     date: 'Run date',
@@ -142,7 +142,7 @@ const STRINGS = {
     compareRange: '对比日期范围',
     compareRangeHelp: '图表绘制的所选芯片配置各次运行的起止执行日期。',
     compareRangePlaceholder: '选择日期范围',
-    secondaryControls: '图表、GPU 数量与运行日期',
+    secondaryControls: '更多图表设置',
     changed: '项已更改',
     gpus: 'GPU 数量',
     date: '运行日期',
