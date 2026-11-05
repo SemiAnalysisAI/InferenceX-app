@@ -116,7 +116,7 @@ describe('TCO calculator — unofficial run overlay', () => {
 
   describe('late overlay arrival', () => {
     it('keeps a GPU filter the user set before the run landed', () => {
-      interceptCalculatorOverlayRun({ runDelayMs: 2000 });
+      const releaseRun = interceptCalculatorOverlayRun({ holdRun: true });
       cy.visit(
         `/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}`,
         {
@@ -130,6 +130,7 @@ describe('TCO calculator — unofficial run overlay', () => {
       cy.get('.sidebar-legend label').contains('B300').click();
       cy.get(BARS).should('have.length', 1);
 
+      cy.then(releaseRun);
       cy.wait('@unofficialRun');
       cy.get(BARS).should('have.length', 3);
       cy.get(Y_TICKS).should('not.contain.text', SECOND_OFFICIAL_HARDWARE.toUpperCase());
