@@ -16,12 +16,12 @@ const observations = globSync('**/*.json', { cwd: resolve(input) }).map(
   (file) => JSON.parse(readFileSync(resolve(input, file), 'utf8')) as TimingObservation,
 );
 const groups = [
-  { kind: 'e2e', browser: 'chrome', shards: 8, output: 'timings.json' },
-  { kind: 'e2e', browser: 'firefox', shards: 8, output: 'timings-firefox.json' },
-  { kind: 'component', browser: 'chrome', shards: 4, output: 'component-timings.json' },
+  { kind: 'e2e', browser: 'chrome', shards: 16, output: 'timings.json' },
+  { kind: 'e2e', browser: 'firefox', shards: 16, output: 'timings-firefox.json' },
+  { kind: 'component', browser: 'chrome', shards: 8, output: 'component-timings.json' },
 ] as const;
 if (observations.length !== groups.reduce((sum, group) => sum + group.shards, 0)) {
-  throw new Error('Expected exactly 20 observations from the full browser/component matrix');
+  throw new Error('Expected exactly 40 observations from the full browser/component matrix');
 }
 if (
   new Set(

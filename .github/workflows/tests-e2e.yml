@@ -15,6 +15,11 @@ on:
       - 'patches/**'
       - 'tsconfig.json'
       - 'tsconfig.base.json'
+  # Firefox runs only here: in the merge queue, nightly, and on demand.
+  merge_group:
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
 
 permissions: {}
 
@@ -33,9 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Four shards; each repeats the dependency install and Cypress setup, so
-        # more shards stop paying off for the shorter component suite.
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -79,7 +82,7 @@ jobs:
           CI: true
           # cypress-split picks this shard's component specs, balanced by the
           # committed component-timings.json.
-          SPLIT: 4
+          SPLIT: 8
           SPLIT_INDEX1: ${{ matrix.shard }}
           SPLIT_FILE: component-timings.json
           SPLIT_OUTPUT_FILE: /tmp/cypress-split-component-out.json
@@ -98,7 +101,7 @@ jobs:
     name: Build app for E2E
     if: ${{ !github.event.pull_request.draft }}
     timeout-minutes: 15
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: blacksmith-16vcpu-ubuntu-2404
     permissions:
       contents: read
     steps:
@@ -188,8 +191,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        browser: [chrome, firefox]
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        browser: ${{ fromJSON(github.event_name == 'pull_request' && '["chrome"]' || '["chrome", "firefox"]') }}
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     steps:
       - name: Require the app build
         if: ${{ needs.build.result != 'success' }}
@@ -263,12 +266,13 @@ jobs:
         env:
           CI: true
           E2E_FIXTURES: '1'
+          CYPRESS_NO_COMMAND_LOG: '1'
           # cypress-split picks the subset of specs for this shard.
-          # SPLIT_INDEX1 is 1-based to match matrix.shard values [1..8].
+          # SPLIT_INDEX1 is 1-based to match matrix.shard values [1..16].
           # SPLIT_FILE seeds the balance from observed timings;
           # Each browser uses its own measurements. Raw per-test observations
           # are uploaded separately; the plugin's merged output is not evidence.
-          SPLIT: 8
+          SPLIT: 16
           SPLIT_INDEX1: ${{ matrix.shard }}
           SPLIT_FILE: ${{ matrix.browser == 'firefox' && 'timings-firefox.json' || 'timings.json' }}
           SPLIT_OUTPUT_FILE: /tmp/cypress-split-out.json
@@ -286,7 +290,8 @@ jobs:
   timings:
     name: Validate timings and shard balance
     needs: [component-tests, cypress]
-    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     permissions:
       contents: read
       actions: read # Read this run's per-shard timing artifacts for validation.

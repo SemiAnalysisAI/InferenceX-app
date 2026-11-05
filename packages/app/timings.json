@@ -5535,16 +5535,9 @@
       ]
     },
     {
-      "spec": "cypress/e2e/profit-estimator.cy.ts",
-      "duration": 36719,
+      "spec": "cypress/e2e/profit-estimator-models.cy.ts",
+      "duration": 11662,
       "tests": [
-        {
-          "title": [
-            "keeps the latest VR snapshot in the profit estimator, matching the private preference scope"
-          ],
-          "duration": 687,
-          "attempts": 1
-        },
         {
           "title": [
             "Earlier agentic models on profit estimators",
@@ -5623,227 +5616,6 @@
             "opens DeepSeek V4.1 Flash on profit-estimator-per-gigawatt with more measured SKUs than the former default"
           ],
           "duration": 426,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit estimator power option",
-            "keeps available estimates without a per-configuration warning list (en)"
-          ],
-          "duration": 358,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit estimator power option",
-            "prices DeepSeek Flash partial chassis with a one-line power note and CSV labels (en)"
-          ],
-          "duration": 499,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit estimator power option",
-            "keeps available estimates without a per-configuration warning list (zh)"
-          ],
-          "duration": 278,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit estimator power option",
-            "prices DeepSeek Flash partial chassis with a one-line power note and CSV labels (zh)"
-          ],
-          "duration": 398,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit estimator power option",
-            "ignores power URL overrides while locked and returns to provisioned estimates on relock"
-          ],
-          "duration": 347,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit estimator power option",
-            "keeps historical provisioned bars when measured power is unavailable (with current bars)"
-          ],
-          "duration": 158,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit estimator power option",
-            "keeps historical provisioned bars when measured power is unavailable (provisioned bars only)"
-          ],
-          "duration": 144,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit estimator power option",
-            "loads full telemetry and compares matching hardware when opened from a share URL"
-          ],
-          "duration": 167,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit estimator power option",
-            "prices GB200 NVL72 trays on measured GPU and Grace-socket power and names the basis"
-          ],
-          "duration": 305,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit estimator power option",
-            "keeps all nine power comparison bars readable and reachable on mobile (en)"
-          ],
-          "duration": 942,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit estimator power option",
-            "keeps all nine power comparison bars readable and reachable on mobile (zh)"
-          ],
-          "duration": 957,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit estimator power option",
-            "keeps the benchmark settings and restores the original chart after unavailable power"
-          ],
-          "duration": 450,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit Estimator per GW",
-            "opens with the documented defaults and a priced chart"
-          ],
-          "duration": 881,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit Estimator per GW",
-            "scales revenue with utilization but leaves TCO alone"
-          ],
-          "duration": 1015,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit Estimator per GW",
-            "clamps utilization and the license fee to 0–100 on blur"
-          ],
-          "duration": 508,
-          "attempts": 1
-        },
-        {
-          "title": ["Profit Estimator per GW", "uses the SKU legend as the bar filter"],
-          "duration": 174,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit Estimator per GW",
-            "lets the OpenRouter catalog or a custom price pair replace the list price"
-          ],
-          "duration": 728,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit Estimator per GW",
-            "lets a custom $/GPU/hr per chip replace the TCO tier"
-          ],
-          "duration": 982,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit Estimator per GW",
-            "switches to custom $/GPU/hr when a caption badge is edited"
-          ],
-          "duration": 501,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit Estimator per GW",
-            "explains a missing OpenRouter listing instead of drawing an unpriced chart"
-          ],
-          "duration": 1265,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit Estimator per GW — compare history",
-            "offers the agentic chip configs and shows the range picker once one is chosen"
-          ],
-          "duration": 543,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit Estimator per GW — compare history",
-            "prices the chosen chips on the range endpoints next to today"
-          ],
-          "duration": 912,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit Estimator per GW — compare history",
-            "hydrates the comparison from the URL and clears the range with the chips"
-          ],
-          "duration": 371,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit Estimator per GW — compare history",
-            "lists the Config Changelog for the chosen chips and pins a date onto the chart"
-          ],
-          "duration": 494,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit Estimator per GW — compare history",
-            "offers each same-day run as its own numbered bar and adds them all at once"
-          ],
-          "duration": 521,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit Estimator per GW — compare history",
-            "hydrates pinned runs from the URL and locks the range endpoints as \"On chart\""
-          ],
-          "duration": 170,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit Estimator per GW — compare history",
-            "serves the panel on the Chinese mirror with translated labels"
-          ],
-          "duration": 346,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Profit Estimator per GW — chart height follows the viewport",
-            "shrinks on a laptop-height viewport and grows back on a tall one"
-          ],
-          "duration": 202,
           "attempts": 1
         },
         {
@@ -6005,14 +5777,6 @@
         },
         {
           "title": [
-            "Profit Estimator per GW — Chinese mirror",
-            "renders /zh/profit-estimator-per-gigawatt with translated controls and caption"
-          ],
-          "duration": 233,
-          "attempts": 1
-        },
-        {
-          "title": [
             "Profit Estimator (per chip-hour)",
             "prices one chip-hour with the same defaults and TCO $/chip/hr as the expense"
           ],
@@ -6025,6 +5789,108 @@
             "serves the Kimi K3 slug, the Chinese mirror, and 404s other models"
           ],
           "duration": 161,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/profit-estimator-power-layout.cy.ts",
+      "duration": 12241,
+      "tests": [
+        {
+          "title": [
+            "Profit estimator power option",
+            "keeps available estimates without a per-configuration warning list (en)"
+          ],
+          "duration": 358,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit estimator power option",
+            "prices DeepSeek Flash partial chassis with a one-line power note and CSV labels (en)"
+          ],
+          "duration": 499,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit estimator power option",
+            "keeps available estimates without a per-configuration warning list (zh)"
+          ],
+          "duration": 278,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit estimator power option",
+            "prices DeepSeek Flash partial chassis with a one-line power note and CSV labels (zh)"
+          ],
+          "duration": 398,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit estimator power option",
+            "ignores power URL overrides while locked and returns to provisioned estimates on relock"
+          ],
+          "duration": 347,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit estimator power option",
+            "keeps historical provisioned bars when measured power is unavailable (with current bars)"
+          ],
+          "duration": 158,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit estimator power option",
+            "keeps historical provisioned bars when measured power is unavailable (provisioned bars only)"
+          ],
+          "duration": 144,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit estimator power option",
+            "loads full telemetry and compares matching hardware when opened from a share URL"
+          ],
+          "duration": 167,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit estimator power option",
+            "prices GB200 NVL72 trays on measured GPU and Grace-socket power and names the basis"
+          ],
+          "duration": 305,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit estimator power option",
+            "keeps all nine power comparison bars readable and reachable on mobile (en)"
+          ],
+          "duration": 942,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit estimator power option",
+            "keeps all nine power comparison bars readable and reachable on mobile (zh)"
+          ],
+          "duration": 957,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit estimator power option",
+            "keeps the benchmark settings and restores the original chart after unavailable power"
+          ],
+          "duration": 450,
           "attempts": 1
         },
         {
@@ -6089,6 +5955,152 @@
             "keeps benchmark and pricing controls grouped on /profit-estimator-per-gigawatt at 1440px"
           ],
           "duration": 923,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/profit-estimator-pricing.cy.ts",
+      "duration": 12399,
+      "tests": [
+        {
+          "title": [
+            "keeps the latest VR snapshot in the profit estimator, matching the private preference scope"
+          ],
+          "duration": 687,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW",
+            "opens with the documented defaults and a priced chart"
+          ],
+          "duration": 881,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW",
+            "scales revenue with utilization but leaves TCO alone"
+          ],
+          "duration": 1015,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW",
+            "clamps utilization and the license fee to 0–100 on blur"
+          ],
+          "duration": 508,
+          "attempts": 1
+        },
+        {
+          "title": ["Profit Estimator per GW", "uses the SKU legend as the bar filter"],
+          "duration": 174,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW",
+            "lets the OpenRouter catalog or a custom price pair replace the list price"
+          ],
+          "duration": 728,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW",
+            "lets a custom $/GPU/hr per chip replace the TCO tier"
+          ],
+          "duration": 982,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW",
+            "switches to custom $/GPU/hr when a caption badge is edited"
+          ],
+          "duration": 501,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW",
+            "explains a missing OpenRouter listing instead of drawing an unpriced chart"
+          ],
+          "duration": 1265,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — compare history",
+            "offers the agentic chip configs and shows the range picker once one is chosen"
+          ],
+          "duration": 543,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — compare history",
+            "prices the chosen chips on the range endpoints next to today"
+          ],
+          "duration": 912,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — compare history",
+            "hydrates the comparison from the URL and clears the range with the chips"
+          ],
+          "duration": 371,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — compare history",
+            "lists the Config Changelog for the chosen chips and pins a date onto the chart"
+          ],
+          "duration": 494,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — compare history",
+            "offers each same-day run as its own numbered bar and adds them all at once"
+          ],
+          "duration": 521,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — compare history",
+            "hydrates pinned runs from the URL and locks the range endpoints as \"On chart\""
+          ],
+          "duration": 170,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — compare history",
+            "serves the panel on the Chinese mirror with translated labels"
+          ],
+          "duration": 346,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — chart height follows the viewport",
+            "shrinks on a laptop-height viewport and grows back on a tall one"
+          ],
+          "duration": 202,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — Chinese mirror",
+            "renders /zh/profit-estimator-per-gigawatt with translated controls and caption"
+          ],
+          "duration": 233,
           "attempts": 1
         },
         {
