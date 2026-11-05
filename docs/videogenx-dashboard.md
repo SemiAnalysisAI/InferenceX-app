@@ -77,7 +77,9 @@ The page follows the inference and AgentX two-level layout. The overview has fou
    Each hardware and each overlay run is one series with its own Pareto frontier;
    Optimal Only hides dominated deployments. The sidebar legend toggles hardware,
    greys out roster hardware without a matched run, and holds the deployment-label
-   switch and the GPU basis and cost tier selects. Clicking a point pins a popover laid out like the
+   switch. Under the chart, a caption laid out like the inference one selects the cost
+   tier and GPU basis, names the update date and source, and lists each plotted
+   hardware's TCO $/chip/hr rate with its source link. Clicking a point pins a popover laid out like the
    inference tooltip: date, runtime, both axis values, GPUs, deployment, concurrency, cost, energy,
    power, valid clips and the GitHub Actions run link. Its View telemetry button opens the deployment detail. The Representative
    deployments table below has one row per hardware and unofficial run, showing the
@@ -282,7 +284,7 @@ browser playback and difference failure, bilingual layout and 390px overflow.
 页面沿用推理与 AgentX 的两级布局。概览页首将筛选分为基准测试配置（模型、工作负载、引擎）、图表配置（X/Y 指标）、
 部署（GPU 数量）和运行信息（运行日期）四组。图表绘制所选工作负载的全部实测部署：X 轴为单条视频中位延迟（默认）或 P90 延迟，所有部署生成的视频时长和帧率相同时，轴标题会注明这两项；
 Y 轴为每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时生成视频数或每条有效视频的 GPU 能耗；每种硬件及每个叠加运行
-各自绘制 Pareto 前沿。右侧图例可隐藏硬件，没有匹配运行的硬件显示为灰色，GPU 口径与成本档位也在图例中切换。
+各自绘制 Pareto 前沿。右侧图例可隐藏硬件，没有匹配运行的硬件显示为灰色，图表下方的说明行与推理页一致，可切换成本层级和 GPU 口径，并列出更新时间、来源、各硬件的 TCO $/chip/hr 价格及其来源链接。
 图表下方的“代表性部署”表格每种硬件及每个叠加运行一行，展示按参与计算的 GPU 折算后每 GPU 小时生成视频数最多的部署，窄屏可横向滚动。
 点击数据点会固定显示与推理页提示框布局一致的测量值（日期、Runtime、两个坐标轴的数值、GPU、部署、并发数、成本、能耗、功率、有效视频数和 GitHub Actions 运行链接），再点击“查看遥测”进入部署详情（`r_point`）；点击表格行则直接进入详情。详情入口在 `history.state` 中做标记，
 刷新或前进后页内返回仍会弹出该条目，浏览器后退也会回到原滚动位置；概览在后台保持挂载，视频、已加载的性能历史和图表状态不会丢失。

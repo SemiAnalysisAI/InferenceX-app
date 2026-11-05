@@ -383,6 +383,13 @@ describe('VideoGenX results', () => {
     searchParam('r_basis').should('equal', 'allocated');
     row('b200').find('td').eq(6).should('contain', '0.3');
     row('h200').find('td').eq(6).should('have.text', '—');
+    cy.get('[data-testid="results-cost-context"]')
+      .should('contain', 'B200: 1.73')
+      .and('not.contain', 'MI355X');
+    cy.get('[data-testid="results-cost-tier"]').click();
+    cy.contains('[data-select-option]', 'Rent - 3 Year Commit').click();
+    searchParam('r_tier').should('equal', 'r');
+    cy.get('[data-testid="results-cost-context"]').should('contain', 'B200: 3.7');
   });
 
   it('hides hardware from the chart and table through the legend and handles an empty selection', () => {

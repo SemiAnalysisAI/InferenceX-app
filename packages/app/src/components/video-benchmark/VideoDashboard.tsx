@@ -28,7 +28,6 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { hardwareLabel } from './hardware';
 import { leadCell } from './deployment';
-import { COST_TIERS, TIER_LABELS } from './metrics';
 import { useVideoPoints } from './use-video-points';
 import type { VideoInitialData } from './initial-data';
 import {
@@ -42,7 +41,6 @@ import {
   type VideoMode,
 } from './results';
 import {
-  COST_BASES,
   RESULTS_X_METRIC_KEYS,
   RESULTS_X_METRICS,
   RESULTS_Y_METRIC_KEYS,
@@ -52,6 +50,7 @@ import {
 } from './results-chart';
 import VideoDeploymentDetail from './VideoDeploymentDetail';
 import VideoResultsChart from './VideoResultsChart';
+import VideoCostContext from './VideoCostContext';
 import VideoResultsTable from './VideoResultsTable';
 import VideoResultsClips from './VideoResultsClips';
 import { resultsClipPoints } from './results-clips';
@@ -85,8 +84,6 @@ const STRINGS = {
       'One canonical 20-clip C1 workload; at least 10 valid samples on every hardware. Other runs remain in Performance history. A fixture replay reads retained evidence and is not a new measurement.',
     replay: 'Local replay · unpublished',
     chartTitle: (model: string, y: string, x: string) => `${model} · ${y} vs. ${x}`,
-    costBasis: 'GPU basis',
-    tier: 'Cost tier',
     participating: 'Participating GPUs',
     allocated: 'Allocated GPUs',
     howToRead: 'How to read these results',
@@ -141,8 +138,6 @@ const STRINGS = {
       '所有硬件共用一个固定的 20 条视频 C1 工作负载，至少需要 10 个有效样本。其他运行保留在性能历史中。Fixture 回放只读取已保留的证据，不是新测量。',
     replay: '本地回放 · 未发布',
     chartTitle: (model: string, y: string, x: string) => `${model} · ${y} vs ${x}`,
-    costBasis: 'GPU 口径',
-    tier: '成本档位',
     participating: '参与计算的 GPU',
     allocated: '分配的 GPU',
     howToRead: '如何解读这些结果',
@@ -388,48 +383,6 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
       </div>
     );
   };
-  const legendControls = (
-    <>
-      <div className="flex min-w-0 flex-col gap-1.5">
-        <Label htmlFor="results-cost-basis" className="text-xs">
-          {s.costBasis}
-        </Label>
-        <SearchableSelect
-          triggerId="results-cost-basis"
-          triggerTestId="results-cost-basis"
-          value={state.costBasis}
-          onValueChange={(value) => update({ costBasis: value as ResultsState['costBasis'] })}
-          groups={[
-            { label: '', options: COST_BASES.map((basis) => ({ value: basis, label: s[basis] })) },
-          ]}
-          placeholder={s.costBasis}
-          searchable={false}
-        />
-      </div>
-      <div className="flex min-w-0 flex-col gap-1.5">
-        <Label htmlFor="results-cost-tier" className="text-xs">
-          {s.tier}
-        </Label>
-        <SearchableSelect
-          triggerId="results-cost-tier"
-          triggerTestId="results-cost-tier"
-          value={state.costTier}
-          onValueChange={(value) => update({ costTier: value as ResultsState['costTier'] })}
-          groups={[
-            {
-              label: '',
-              options: COST_TIERS.map((tier) => ({
-                value: tier,
-                label: TIER_LABELS[tier][locale],
-              })),
-            },
-          ]}
-          placeholder={s.tier}
-          searchable={false}
-        />
-      </div>
-    </>
-  );
   const apiUrl = `/api/v1/views/video?view=overview&${resultsSearch(state)}`;
   const secondaryChanged = [
     state.xMetric !== DEFAULT_RESULTS_STATE.xMetric,
@@ -656,7 +609,22 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
                 onLabelsChange={setLabels}
                 onUpdate={update}
                 onOpen={openPoint}
-                controls={legendControls}
+              />
+              <VideoCostContext
+                state={state}
+                onUpdate={update}
+                hardwareKeys={roster.filter(
+                  (key) =>
+                    !hidden.has(key) &&
+                    deploymentCells.some((cell) => cell.point.hardwareKey === key),
+                )}
+                date={
+                  deploymentCells
+                    .map((cell) => cell.metadata.date)
+                    .filter((date): date is string => date !== null)
+                    .toSorted()
+                    .at(-1) ?? null
+                }
               />
               <VideoResultsTable
                 rows={representatives}

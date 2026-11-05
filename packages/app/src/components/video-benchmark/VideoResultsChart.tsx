@@ -1,7 +1,7 @@
 'use client';
 
 import { curveLinear } from 'd3';
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import ChartLegend, { type CommonLegendItemProps } from '@/components/ui/chart-legend';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { D3ChartHandle, LayerConfig, TooltipConfig } from '@/lib/d3-chart/D3Chart/types';
@@ -107,7 +107,6 @@ export default function VideoResultsChart({
   onLabelsChange,
   onUpdate,
   onOpen,
-  controls,
 }: {
   /** Official and named-run deployment cells across every GPU count, hidden hardware included. */
   cells: ResultCell[];
@@ -118,8 +117,6 @@ export default function VideoResultsChart({
   onLabelsChange: (labels: boolean) => void;
   onUpdate: (patch: Partial<ResultsState>) => void;
   onOpen: (pointKey: string, source: 'popover') => void;
-  /** GPU basis and cost tier selects rendered under the legend switches. */
-  controls: ReactNode;
 }) {
   const locale = useLocale();
   const s = STRINGS[locale];
@@ -421,7 +418,6 @@ export default function VideoResultsChart({
                   {s.unofficial} #{state.unofficialRun}
                 </p>
               )}
-              {controls}
             </div>
           }
         />
