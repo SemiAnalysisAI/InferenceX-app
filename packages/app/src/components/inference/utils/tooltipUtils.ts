@@ -8,6 +8,7 @@ import type { PowerBasisLabelStyle } from '@/lib/power/power-basis';
 import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
 import { chartStateHref } from '@/lib/routing/url-state';
 import { axisLabelUnit, chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import { formatLargeNumber } from '@/lib/charts/chart-rendering';
 import type {
   SystemPowerUnit,
   SystemPowerUnsupportedReason,
@@ -447,6 +448,11 @@ const CACHE_STRINGS = {
     theoreticalHitRate: 'Theoretical cache hit rate',
     legacyEnabled: 'Enabled (legacy data)',
     legacyDisabled: 'Disabled (legacy data)',
+    hit: 'KV cache hit',
+    chip: (v: string) => `Chip ${v}`,
+    chipCpu: (v: string) => `Chip + CPU ${v}`,
+    cpu: (v: string) => `CPU ${v}`,
+    theoretical: (v: string) => `theoretical ${v}`,
   },
   zh: {
     offloadType: 'offload 类型',
@@ -459,6 +465,11 @@ const CACHE_STRINGS = {
     theoreticalHitRate: '理论 Cache 命中率',
     legacyEnabled: '已启用（旧版数据）',
     legacyDisabled: '已禁用（旧版数据）',
+    hit: 'KV Cache 命中率',
+    chip: (v: string) => `芯片 ${v}`,
+    chipCpu: (v: string) => `芯片 + CPU ${v}`,
+    cpu: (v: string) => `CPU ${v}`,
+    theoretical: (v: string) => `理论 ${v}`,
   },
 } as const;
 
@@ -498,6 +509,56 @@ const cacheRows = (d: InferenceData, locale: Locale): PointDetailRow[] => {
   return rows;
 };
 
+const isRate = (v: number | null | undefined): v is number =>
+  v !== undefined && v !== null && !Number.isNaN(v);
+
+const sharePct = (v: number) => Math.max(0, Math.min(100, v * 100));
+
+const pointCacheHit = (d: InferenceData, locale: Locale): PointCacheHit | undefined => {
+  const chip = d.server_gpu_cache_hit_rate;
+  if (!isRate(chip)) return undefined;
+  const t = CACHE_STRINGS[locale];
+  const offloadEnabled = isKvOffloadEnabled(d);
+  const combined = offloadEnabled && frameworkFamily(d.framework) === 'trt';
+  const cpu =
+    offloadEnabled && !combined && isRate(d.server_cpu_cache_hit_rate)
+      ? d.server_cpu_cache_hit_rate
+      : null;
+  const offloadType = d.kv_offloading?.trim();
+  const offload = offloadEnabled
+    ? [
+        d.kv_offload_backend ? cacheImplementationLabel(d.kv_offload_backend) : null,
+        offloadType && offloadType.toLowerCase() !== 'none' ? offloadTypeLabel(offloadType) : null,
+      ]
+        .filter(Boolean)
+        .join(' → ')
+    : '';
+  const theoretical = d.theoretical_cache_hit_rate;
+  return {
+    label: offload ? `${t.hit} · ${offload}` : t.hit,
+    total: formatPct(chip + (cpu ?? 0))!,
+    segments: [
+      {
+        label: (combined ? t.chipCpu : t.chip)(formatPct(chip)!),
+        share: sharePct(chip),
+        opacity: 1,
+      },
+      ...(cpu === null
+        ? []
+        : [
+            {
+              label: t.cpu(formatPct(cpu)!),
+              share: Math.min(sharePct(cpu), 100 - sharePct(chip)),
+              opacity: 0.45,
+            },
+          ]),
+    ],
+    theoretical: isRate(theoretical)
+      ? { label: t.theoretical(formatPct(theoretical)!), share: sharePct(theoretical) }
+      : undefined,
+  };
+};
+
 const AGENTIC_STRINGS = {
   en: {
     speculativeDecoding: 'Speculative decoding',
@@ -532,6 +593,9 @@ const SPEC_ALGORITHM_LABELS: Record<string, string> = {
   nextn: 'NextN',
 };
 
+const specAlgorithmLabel = (algorithm: string): string =>
+  SPEC_ALGORITHM_LABELS[algorithm] ?? algorithm.toUpperCase();
+
 const speculativeDecodingLabel = (
   d: InferenceData,
   t: (typeof AGENTIC_STRINGS)[Locale],
@@ -539,16 +603,23 @@ const speculativeDecodingLabel = (
   const specMethod = d.spec_decoding ?? 'none';
   if (specMethod === 'none' || specMethod === '') return t.off;
   if (!d.spec_algorithm) return specMethodDisplayLabel(d.model, specMethod);
-  const algorithm = SPEC_ALGORITHM_LABELS[d.spec_algorithm] ?? d.spec_algorithm.toUpperCase();
   const draft = d.spec_draft_model;
-  return `${algorithm} (${!draft || draft === 'native' ? t.native : draft})`;
+  return `${specAlgorithmLabel(d.spec_algorithm)} (${!draft || draft === 'native' ? t.native : draft})`;
+};
+
+const speculativeRows = (d: InferenceData, locale: Locale): PointDetailRow[] => {
+  const t = AGENTIC_STRINGS[locale];
+  const label = speculativeDecodingLabel(d, t);
+  return d.benchmark_type === 'agentic_traces' || label !== t.off
+    ? [row(t.speculativeDecoding, label)]
+    : [];
 };
 
 const agenticRows = (d: InferenceData, locale: Locale): PointDetailRow[] => {
   if (d.benchmark_type !== 'agentic_traces') return [];
 
   const t = AGENTIC_STRINGS[locale];
-  const rows: PointDetailRow[] = [row(t.speculativeDecoding, speculativeDecodingLabel(d, t))];
+  const rows: PointDetailRow[] = [];
 
   if (d.num_requests_total !== undefined && d.num_requests_successful !== undefined) {
     const successPct =
@@ -797,7 +868,15 @@ const powerWithheldRows = (d: InferenceData, locale: Locale): PointDetailRow[] =
 
 export interface PointDetailMetric {
   value: string;
+  compact: string;
   label: string;
+}
+
+export interface PointCacheHit {
+  label: string;
+  total: string;
+  segments: { label: string; share: number; opacity: number }[];
+  theoretical?: { label: string; share: number };
 }
 
 export interface PointDetails {
@@ -807,6 +886,7 @@ export interface PointDetails {
   date: string;
   metrics: [PointDetailMetric, PointDetailMetric];
   summary: string;
+  cacheHit?: PointCacheHit;
   rows: PointDetailRow[];
   image?: string;
   powerHtml: string;
@@ -831,9 +911,15 @@ export const buildPointDetails = (config: TooltipConfig): PointDetails => {
             : []),
         ]
       : [];
+  const subtitle = [engines, d.precision.toUpperCase()].filter(Boolean).join(' · ');
+  const algorithm =
+    d.spec_algorithm && (d.spec_decoding ?? 'none') !== 'none'
+      ? specAlgorithmLabel(d.spec_algorithm)
+      : null;
+  const yValue = fmtY(d.y, selectedYAxisMetric);
   return {
     title: hw?.label ?? String(d.hwKey),
-    subtitle: [engines, d.precision.toUpperCase()].filter(Boolean).join(' · '),
+    subtitle,
     unofficial: overlayData ? t.unofficialRun : undefined,
     date:
       config.comparisonDate && d.actualDate && d.actualDate !== d.date
@@ -842,10 +928,22 @@ export const buildPointDetails = (config: TooltipConfig): PointDetails => {
           ? formatTooltipDate(d.date, locale)
           : ownDate,
     metrics: [
-      { value: fmtY(d.y, selectedYAxisMetric), label: yLabel },
-      { value: fmt(d.x), label: xLabel },
+      {
+        value: yValue,
+        compact: WATT_METRICS.has(selectedYAxisMetric) ? yValue : formatLargeNumber(d.y),
+        label: yLabel,
+      },
+      { value: fmt(d.x), compact: formatLargeNumber(d.x), label: xLabel },
     ],
-    summary: [getPointLabel(d), t.conc(d.conc), t.chips(chips)].join(' · '),
+    summary: [
+      getPointLabel(d),
+      t.conc(d.conc),
+      t.chips(chips),
+      algorithm && !subtitle.includes(algorithm) ? algorithm : null,
+    ]
+      .filter(Boolean)
+      .join(' · '),
+    cacheHit: pointCacheHit(d, locale),
     rows: [
       ...(overlayData
         ? [row(t.branch, overlayData.getRunForRow?.(d)?.branch ?? overlayData.label)]
@@ -858,6 +956,7 @@ export const buildPointDetails = (config: TooltipConfig): PointDetails => {
       row(t.concurrency, d.conc),
       ...cacheRows(d, locale),
       ...powerWithheldRows(d, locale),
+      ...speculativeRows(d, locale),
       ...agenticRows(d, locale),
     ],
     image: d.image ? shortenSha(d.image.trim()).replace(/\s+/u, '\n') : undefined,
@@ -874,6 +973,15 @@ export const buildPointDetails = (config: TooltipConfig): PointDetails => {
   };
 };
 
+const hoverCacheHtml = (cache: PointCacheHit, color: string): string => {
+  const dot = (opacity: number) =>
+    `<span style="width: 6px; height: 6px; border-radius: 9999px; background: ${color}; opacity: ${opacity}; flex-shrink: 0;"></span>`;
+  const marker = cache.theoretical
+    ? `<div style="position: absolute; top: 0; bottom: 0; left: calc(${cache.theoretical.share}% - 1px); width: 2px; background: var(--foreground); opacity: 0.6;"></div>`
+    : '';
+  return `<div style="display: flex; justify-content: space-between; gap: 12px; font-size: 11px; line-height: 14px; color: var(--muted-foreground);"><span>${escapeHtml(cache.label)}</span><span style="color: var(--foreground); font-weight: 600; font-variant-numeric: tabular-nums;">${cache.total}</span></div><div data-hover-cache-bar style="position: relative; display: flex; height: 6px; margin-top: 4px; border-radius: 3px; overflow: hidden; background: var(--border);">${cache.segments.map((s) => `<div style="width: ${s.share}%; background: ${color}; opacity: ${s.opacity};"></div>`).join('')}${marker}</div><div style="display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 4px; font-size: 11px; line-height: 14px; color: var(--muted-foreground); font-variant-numeric: tabular-nums;">${cache.segments.map((s) => `<span style="display: inline-flex; align-items: center; gap: 4px;">${dot(s.opacity)}${escapeHtml(s.label)}</span>`).join('')}${cache.theoretical ? `<span>${escapeHtml(cache.theoretical.label)}</span>` : ''}</div>`;
+};
+
 export const generatePointHoverCard = (details: PointDetails, color: string): string =>
   chartHoverCard(
     {
@@ -881,9 +989,10 @@ export const generatePointHoverCard = (details: PointDetails, color: string): st
       subtitle: details.subtitle,
       color,
       metrics: details.metrics.map((metric) => ({
-        value: metric.value,
+        value: metric.compact,
         label: axisLabelUnit(metric.label),
       })),
+      body: details.cacheHit ? hoverCacheHtml(details.cacheHit, color) : undefined,
       summary: details.summary,
       warning: details.unofficial,
     },

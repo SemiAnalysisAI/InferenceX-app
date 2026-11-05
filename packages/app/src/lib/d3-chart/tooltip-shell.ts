@@ -108,5 +108,11 @@ export function chartHoverCard(
   );
 }
 
-export const axisLabelUnit = (label: string): string =>
-  /[(（](?<unit>[^()（）]+)[)）]\s*$/u.exec(label)?.groups?.unit ?? label;
+export const axisLabelUnit = (label: string): string => {
+  const unit = /[(（](?<unit>[^()（）]+)[)）]\s*$/u.exec(label)?.groups?.unit;
+  if (!unit) return label;
+  const qualifier = /^\s*(?<q>[Pp]\d{1,3}(?:\.\d+)?|Median|Mean|中位数|平均)(?![A-Za-z0-9.])/u.exec(
+    label,
+  )?.groups?.q;
+  return qualifier ? `${qualifier} ${unit}` : unit;
+};

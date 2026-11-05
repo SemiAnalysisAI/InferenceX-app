@@ -16,6 +16,7 @@ describe('AgentX comparison links', () => {
   it('keeps the featured AgentX models in the editorial order', () => {
     expect(FEATURED_AGENTX_MODELS.map((model) => model.slug)).toEqual([
       'deepseek-v41-flash',
+      'kimi-k31-pro',
       'muse-spark-open',
       'kimi-k3',
       'deepseek-v4',
@@ -49,7 +50,7 @@ describe('AgentX comparison links', () => {
     expect(agentxDashboardHref('en', FEATURED_AGENTX_MODELS[0])).toBe(
       '/inference/deepseek-v41-flash',
     );
-    expect(agentxDashboardHref('zh', FEATURED_AGENTX_MODELS[3])).toBe('/zh/inference/deepseek-v4');
+    expect(agentxDashboardHref('zh', FEATURED_AGENTX_MODELS[4])).toBe('/zh/inference/deepseek-v4');
   });
 
   it('routes every featured model to its registered page without query parameters', () => {
@@ -105,14 +106,15 @@ describe('AgentX comparison links', () => {
     expect(overviewScenariosForModel(Model.MiniMax_M3_1_Flash)).toEqual(['agentx']);
   });
 
-  it('routes Kimi K3.1 Pro to AgentX without featuring it on the ledger', () => {
+  it('features Kimi K3.1 Pro on the ledger and routes it to AgentX', () => {
     const k31 = COMPARE_MODEL_SLUGS.find((model) => model.slug === 'kimi-k31-pro')!;
     expect(comparisonScenarioForModel(k31)).toEqual({
       label: 'AgentX',
       sequence: 'agentic-traces',
     });
     expect(agentxDashboardHref('en', k31)).toBe('/inference/kimi-k31-pro');
-    expect(FEATURED_AGENTX_MODELS).not.toContain(k31);
+    expect(agentxDashboardHref('zh', k31)).toBe('/zh/inference/kimi-k31-pro');
+    expect(FEATURED_AGENTX_MODELS[1]).toBe(k31);
     expect(overviewScenariosForModel(Model.Kimi_K3_1_Pro)).toEqual(['agentx']);
   });
 

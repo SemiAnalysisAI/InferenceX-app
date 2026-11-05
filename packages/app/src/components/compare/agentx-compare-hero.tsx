@@ -13,6 +13,7 @@ import { CompareIndexTrackedLink } from './compare-index-tracked-link';
 
 const MODEL_LOGOS: Record<string, string> = {
   'muse-spark-open': '/logos/muse-mascot.webp',
+  'kimi-k31-pro': '/logos/kimi-color.svg',
   'kimi-k3': '/logos/kimi-color.svg',
   'deepseek-v41-flash': '/logos/deepseek-color.svg',
   'deepseek-v4': '/logos/deepseek-color.svg',
@@ -374,6 +375,7 @@ const VENDOR_MARKS: readonly {
 ] as const;
 
 const LANDING_HIDDEN_LEDGER_MODELS: ReadonlySet<string> = new Set([
+  'muse-spark-open',
   'deepseek-v4',
   'qwen-3-8-flash-next',
   'qwen-3-5',

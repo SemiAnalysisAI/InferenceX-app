@@ -7,7 +7,7 @@ import type { Locale } from '@/lib/i18n/i18n';
 
 import { logoSize } from './logo-metrics';
 import { orgAnchorId } from './quotes-data';
-import type { SupporterGroup, WallLogo } from './supporter-groups';
+import { balancedRowSize, type SupporterGroup, type WallLogo } from './supporter-groups';
 import { SupporterLogoImage } from './supporter-logo-image';
 
 const STRINGS = {
@@ -22,7 +22,9 @@ const STRINGS = {
 } as const;
 
 // Phones show three logos per row (five on small tablets) with any short last
-// row centered; desktop spreads each group evenly across its row.
+// row centered. Desktop splits each group into as few rows as its column cap
+// allows, balances the logos across those rows (9 at a cap of 8 becomes 5 + 4,
+// not 8 + 1) and centers any shorter row.
 // Wordmarks and square marks get a balanced optical size from measured
 // geometry (see logo-metrics.ts). Logos sit bare on the page in full color;
 // mostly-black artwork flips to light in dark mode with a hue-preserving
@@ -53,7 +55,7 @@ function LogoTile({ item, jumpTo }: { item: WallLogo; jumpTo: (org: string) => s
   );
   const { quoteOrg } = item;
   return (
-    <li className="flex h-12 w-1/3 min-w-0 items-center justify-center px-1 sm:w-1/5 lg:h-16 lg:w-auto lg:px-0">
+    <li className="flex h-12 w-1/3 min-w-0 items-center justify-center px-1 sm:w-1/5 lg:h-16 lg:w-[calc(100%/var(--cols)_-_0.1px)] lg:px-1.5">
       {quoteOrg ? (
         <button
           type="button"
@@ -108,10 +110,13 @@ export function SupporterLogoWall({
                 aria-labelledby={labelId}
                 style={
                   {
-                    '--cols': group.desktopColumns ?? Math.min(group.logos.length, MAX_COLUMNS),
+                    '--cols': balancedRowSize(
+                      group.logos.length,
+                      group.desktopColumns ?? MAX_COLUMNS,
+                    ),
                   } as CSSProperties
                 }
-                className="flex flex-wrap items-center justify-center gap-y-3 lg:grid lg:grid-cols-[repeat(var(--cols),minmax(0,1fr))] lg:gap-x-3 lg:gap-y-2"
+                className="flex flex-wrap items-center justify-center gap-y-3 lg:gap-y-2"
               >
                 {group.logos.map((item) => (
                   <LogoTile key={`${item.label}-${item.logo}`} item={item} jumpTo={t.jumpTo} />

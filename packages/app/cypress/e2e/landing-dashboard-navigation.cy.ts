@@ -39,8 +39,8 @@ describe('Muse Spark Open results', () => {
     });
   });
   for (const prefix of ['', '/zh']) {
-    it(`opens the canonical Muse dashboard from ${prefix || '/'} with the mascot`, () => {
-      cy.visit(prefix || '/');
+    it(`opens the canonical Muse dashboard from ${prefix}/compare with the mascot`, () => {
+      cy.visit(`${prefix}/compare`);
       cy.get('[data-testid="compare-agentx-model-muse-spark-open"]')
         .should('contain.text', prefix ? '查看结果' : 'View results')
         .and('not.contain.text', prefix ? '预览' : 'Preview')
@@ -115,15 +115,17 @@ describe('landing model curation', () => {
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
         cy.get('[data-testid^="compare-agentx-model-"]').should(($links) => {
           expect([...$links].map((link) => link.getAttribute('href'))).to.deep.eq(
-            ['deepseek-v41-flash', 'muse-spark-open'].map((slug) => `${prefix}/inference/${slug}`),
+            ['deepseek-v41-flash', 'kimi-k31-pro'].map((slug) => `${prefix}/inference/${slug}`),
           );
         });
-        cy.get('[data-testid="compare-agentx-model-muse-spark-open"]')
-          .should('contain.text', 'Muse Spark Open 816B')
+        cy.get('[data-testid="compare-agentx-model-kimi-k31-pro"]')
+          .should('contain.text', 'Kimi K3.1 Pro')
+          .and('contain.text', 'AgentX')
           .and('contain.text', prefix ? '查看结果' : 'View results')
-          .and('not.contain.text', prefix ? '结果待发布' : 'Results pending')
           .find('img')
-          .should('have.attr', 'src', '/logos/muse-mascot.webp');
+          .should('have.attr', 'src', '/logos/kimi-color.svg');
+        cy.get('[data-new-badge="agentx-ledger"]').should('not.exist');
+        cy.get('[data-testid="compare-agentx-model-muse-spark-open"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-kimi-k3"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-glm-5-3"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-deepseek-v4"]').should('not.exist');
@@ -213,8 +215,15 @@ describe('landing model curation', () => {
         cy.get('[data-testid="landing-rubin-glm-5-3-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-rubin-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-jalapeno-results-link"]').should('not.exist');
-        cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 8);
-        for (const slug of ['deepseek-v4', 'qwen-3-8-flash-next', 'qwen-3-5', 'minimax-m3']) {
+        cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 9);
+        for (const slug of [
+          'kimi-k31-pro',
+          'muse-spark-open',
+          'deepseek-v4',
+          'qwen-3-8-flash-next',
+          'qwen-3-5',
+          'minimax-m3',
+        ]) {
           cy.get(`[data-testid="compare-agentx-model-${slug}"]`).should(
             'have.attr',
             'href',
@@ -239,6 +248,20 @@ describe('landing model curation', () => {
       cy.get('[data-testid="model-selector"]')
         .invoke('text')
         .should('match', /MiniMax[- ]M3\.1[- ]Flash/u);
+    });
+
+    it(`opens Kimi K3.1 Pro AgentX results from ${prefix || '/'} and retains them on reload`, () => {
+      cy.visit(prefix || '/');
+      cy.get('[data-testid="compare-agentx-model-kimi-k31-pro"]').click();
+      cy.location('pathname').should('eq', `${prefix}/inference/kimi-k31-pro`);
+      cy.get('[data-testid="model-selector"]')
+        .invoke('text')
+        .should('match', /Kimi[- ]K3\.1[- ]Pro/u);
+      cy.reload();
+      cy.location('pathname').should('eq', `${prefix}/inference/kimi-k31-pro`);
+      cy.get('[data-testid="model-selector"]')
+        .invoke('text')
+        .should('match', /Kimi[- ]K3\.1[- ]Pro/u);
     });
 
     it(`opens Kimi K3 AgentX TPU results from ${prefix || '/'} and retains them on reload`, () => {
