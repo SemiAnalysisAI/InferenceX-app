@@ -40,12 +40,8 @@ describe('explicit deployment chip counts', () => {
       expect(html).toContain(
         `${locale === 'en' ? 'Total chips' : '芯片总数'}${locale === 'en' ? ':' : '：'} 8`,
       );
-      expect(html).toContain(
-        `${locale === 'en' ? 'Tensor parallelism' : '张量并行 (TP)'}${locale === 'en' ? ':' : '：'} 1`,
-      );
-      expect(html).toContain(
-        `${locale === 'en' ? 'Expert parallelism' : '专家并行 (EP)'}${locale === 'en' ? ':' : '：'} 8`,
-      );
+      expect(html).toContain(`${locale === 'en' ? 'Parallelism strategy' : '并行策略'}EP8`);
+      expect(html).toContain(`TP EP DPA 1 8 ${locale === 'en' ? 'False' : '否'}`);
     }
   });
 

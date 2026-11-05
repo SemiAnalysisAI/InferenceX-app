@@ -138,7 +138,8 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
           const top = Math.round(rect.top);
           rows.set(top, [...(rows.get(top) ?? []), rect]);
         });
-        expect(modal.querySelectorAll('button[data-testid]')).to.have.length(2);
+        expect(modal.querySelectorAll('button[data-testid]')).to.have.length(4);
+        expect(rows.size).to.eq(2);
         expect(modal.querySelector('[data-testid="launch-modal-dismiss"]')).to.eq(null);
         const close = modal.querySelector('button[aria-label]')!;
         expect(close.getBoundingClientRect().width).to.eq(36);
@@ -180,6 +181,8 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
     for (const [action, logo] of [
       ['action', 'qwen-color.svg'],
       ['secondary-action', 'kimi-color.svg'],
+      ['additional-action-0', 'muse-mascot.webp'],
+      ['additional-action-1', 'zai-color.svg'],
     ]) {
       cy.get(`[data-testid="launch-modal-${action}"] img`)
         .should('have.attr', 'src', `/logos/${logo}`)
@@ -219,7 +222,7 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
     cy.get('[data-testid="launch-modal"]').should('be.visible').click(12, 12);
     cy.focused().should('have.attr', 'data-testid', 'launch-modal');
     cy.focused().trigger('keydown', { key: 'Tab', shiftKey: true });
-    cy.focused().should('have.attr', 'data-testid', 'launch-modal-secondary-action');
+    cy.focused().should('have.attr', 'data-testid', 'launch-modal-additional-action-1');
     cy.focused().trigger('keydown', { key: 'Tab' });
     cy.focused().should('have.attr', 'aria-label', 'Close');
     cy.get('[data-testid="launch-modal"]').should('be.visible');
@@ -260,6 +263,33 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
   });
 
   for (const prefix of ['', '/zh']) {
+    for (const [index, label, slug] of [
+      [0, 'Muse Spark', 'muse-spark-open'],
+      [1, 'GLM5.3', 'glm-5-3'],
+    ] as const) {
+      it(`opens ${label} with its intended filters from ${prefix || '/'}`, () => {
+        if (index === 1) interceptTpuLaunchData('GLM-5.2');
+        cy.visit(prefix || '/', { onBeforeLoad: showLaunchModal });
+        cy.get(`[data-testid="launch-modal-additional-action-${index}"]`)
+          .should('have.text', label)
+          .click();
+        cy.location('pathname').should('eq', `${prefix}/inference/${slug}`);
+        if (index === 1) {
+          cy.location('search').should('eq', '?g_model=GLM-5.2&i_seq=agentic-traces&i_prec=fp8');
+          cy.get('[data-testid="precision-multiselect"]')
+            .should('contain.text', 'FP8')
+            .and('not.contain.text', 'FP4');
+        }
+        cy.get('[data-testid="model-selector"]').should(
+          'contain.text',
+          index === 0 ? 'Muse Spark' : 'GLM5.3',
+        );
+        cy.window().then((win) => {
+          expect(Number(win.localStorage.getItem(LAUNCH_MODAL_KEY))).to.be.greaterThan(1);
+        });
+      });
+    }
+
     it(`opens Kimi K3 and persists dismissal from ${prefix || '/'} on mobile`, () => {
       cy.viewport(375, 812);
       cy.visit(prefix || '/', { onBeforeLoad: showLaunchModal });
@@ -267,7 +297,7 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
         .should('be.visible')
         .within(() => {
           cy.get('button[data-testid]')
-            .should('have.length', 2)
+            .should('have.length', 4)
             .each(($button) => {
               const rect = $button[0].getBoundingClientRect();
               expect(rect.left).to.be.at.least(0);

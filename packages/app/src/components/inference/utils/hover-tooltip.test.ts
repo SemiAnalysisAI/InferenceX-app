@@ -132,7 +132,7 @@ describe('generateHoverTooltipContent', () => {
   it('keeps every field in the details panel', () => {
     const details = detailsText(config(agenticPoint()));
     expect(details).toContain('Prompt tokens');
-    expect(details).toContain('Theoretical cache hit rate');
+    expect(details).toContain('theoretical 97.3%');
     expect(details).toContain('DFlash (RadixArk/Kimi-K3.1-Dflash2-Preview)');
   });
 

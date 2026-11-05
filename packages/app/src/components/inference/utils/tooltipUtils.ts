@@ -11,7 +11,7 @@ import type { PowerBasisLabelStyle } from '@/lib/power/power-basis';
 import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
 import { chartStateHref } from '@/lib/routing/url-state';
 import { axisLabelUnit, chartTooltipShellStyle } from '@/lib/d3-chart/tooltip-shell';
-import { getDisplayLabel } from '@/lib/shared/utils';
+import { formatNumber, getDisplayLabel } from '@/lib/shared/utils';
 import type {
   SystemPowerUnit,
   SystemPowerUnsupportedReason,
@@ -35,6 +35,7 @@ import {
 } from '@/components/inference/utils/powerTimeline';
 import { reconstructedRoleEnergy } from '@/components/inference/utils/role-energy';
 import {
+  configSegmentLabel,
   meaningfulParallelismSize,
   parallelismLabel,
 } from '@/components/inference/utils/parallelism-label';
@@ -59,6 +60,7 @@ export interface TooltipConfig {
   powerLabelStyle?: PowerBasisLabelStyle;
   overlayData?: OverlayData;
   comparisonDate?: boolean;
+  color?: string;
 }
 
 const asBool = (v: boolean | string | undefined): boolean | undefined =>
@@ -99,10 +101,10 @@ export const getPointLabel = (d: InferenceData): string => {
 const labelColon = (label: string) => (/[\u4E00-\u9FFF]/u.test(label) ? '：' : ':');
 
 const tooltipLine = (label: string, value: string | number) =>
-  `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${label}${labelColon(label)}</strong> ${value}</div>`;
+  `<div class="tooltip-line" style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${label}${labelColon(label)}</strong> ${value}</div>`;
 
 const formatPct = (v: number | undefined): string | null =>
-  v === undefined || v === null || Number.isNaN(v) ? null : `${(v * 100).toFixed(1)}%`;
+  v === undefined || v === null || !Number.isFinite(v) ? null : `${(v * 100).toFixed(1)}%`;
 
 const formatTooltipDate = (value: string, locale: Locale): string => {
   if (locale !== 'zh') return value;
@@ -125,6 +127,8 @@ const TOOLTIP_STRINGS = {
     branch: 'Branch',
     totalChips: 'Total chips',
     concurrency: 'Concurrency',
+    precision: 'Precision',
+    image: 'Image',
     inputTputPerChip: 'Input Token Throughput per Chip',
     outputTputPerChip: 'Output Token Throughput per Chip',
     powerData: 'Power measurement',
@@ -141,6 +145,8 @@ const TOOLTIP_STRINGS = {
     branch: '分支',
     totalChips: '芯片总数',
     concurrency: '并发数',
+    precision: '精度',
+    image: '镜像',
     inputTputPerChip: '每芯片输入 token 吞吐量',
     outputTputPerChip: '每芯片输出 token 吞吐量',
     powerData: '功耗测量',
@@ -153,14 +159,18 @@ const TOOLTIP_STRINGS = {
   },
 } as const;
 
-export interface PointDetailRow {
+interface PointDetailRow {
   label: string;
   value: string;
-  wide?: boolean;
 }
 
-const row = (label: string, value: string | number, wide = false): PointDetailRow =>
-  wide ? { label, value: String(value), wide } : { label, value: String(value) };
+const row = (label: string, value: string | number): PointDetailRow => ({
+  label,
+  value: String(value),
+});
+
+const rowsHTML = (rows: PointDetailRow[]): string =>
+  rows.map((r) => tooltipLine(escapeHtml(r.label), escapeHtml(r.value))).join('');
 
 const powerVariantRows = (
   d: InferenceData,
@@ -193,7 +203,7 @@ const powerTierRows = (
 ): PointDetailRow[] => {
   if (!isMeasuredEnergyConfigKey(selectedYAxisMetric) || !d.power_tier) return [];
   const t = TOOLTIP_STRINGS[locale];
-  return [row(t.powerData, d.power_tier === 'certified' ? t.powerCertified : t.powerLegacy, true)];
+  return [row(t.powerData, d.power_tier === 'certified' ? t.powerCertified : t.powerLegacy)];
 };
 
 const escapeHtml = (s: string): string =>
@@ -374,12 +384,14 @@ const modeledSystemPowerHTML = (
     return tooltipLine(t.unavailable, t.reasons[estimate.reason]);
   }
   const u = t.units[estimate.unit];
+  const reading = (watts: number, basis: 'gpu' | 'it' | 'facility') =>
+    `<span data-power-reading>${fmtWatts(watts)} W/GPU${powerBasisPillHtml(basis, locale)}</span>`;
   return `<div data-testid="tooltip-modeled-system-power" style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; font-size: 11px;">
     <strong>${t.heading}</strong>
-    ${tooltipLine(t.measuredGpu, `${fmtWatts(estimate.measuredGpuWattsPerGpu)} W/GPU${powerBasisPillHtml('gpu', locale)}`)}
+    ${tooltipLine(t.measuredGpu, reading(estimate.measuredGpuWattsPerGpu, 'gpu'))}
     ${estimate.unit === 'nvl72-tray' && estimate.measuredGraceSocketWatts !== null ? tooltipLine(t.graceSocket, `${fmtWatts(estimate.measuredGraceSocketWatts)} W/socket`) : ''}
-    ${tooltipLine(t.itPerGpu, `${fmtWatts(estimate.itWattsPerGpu)} W/GPU${powerBasisPillHtml('it', locale)}`)}
-    ${tooltipLine(t.facilityPerGpu, `${fmtWatts(estimate.deploymentFacilityWatts / estimate.gpuCount)} W/GPU${powerBasisPillHtml('facility', locale)}`)}
+    ${tooltipLine(t.itPerGpu, reading(estimate.itWattsPerGpu, 'it'))}
+    ${tooltipLine(t.facilityPerGpu, reading(estimate.deploymentFacilityWatts / estimate.gpuCount, 'facility'))}
     <details data-testid="tooltip-power-model-details" style="margin-top: 2px;">
     <summary style="cursor: pointer; color: var(--muted-foreground);">${t.details}</summary>
     ${tooltipLine(t.state, `${t.workloads[estimate.operatingState.workload]} · ${t.scaleOut(estimate.operatingState.scaleOut)}`)}
@@ -472,7 +484,7 @@ const CACHE_STRINGS = {
   },
 } as const;
 
-const cacheRows = (d: InferenceData, locale: Locale): PointDetailRow[] => {
+const cacheHTML = (d: InferenceData, locale: Locale, color: string): string => {
   const t = CACHE_STRINGS[locale];
   const rows: PointDetailRow[] = [];
   const offloadType = d.kv_offloading?.trim();
@@ -497,6 +509,10 @@ const cacheRows = (d: InferenceData, locale: Locale): PointDetailRow[] => {
     rows.push(row(t.router, versionedComponentLabel(d.router_name, d.router_version)!));
   }
 
+  const cache = pointCacheHit(d, locale);
+  if (cache) {
+    return `<div data-pinned-cache style="margin-bottom: 12px;">${hoverCacheHTML(cache, color)}</div>${rowsHTML(rows)}`;
+  }
   const gpuHit = formatPct(d.server_gpu_cache_hit_rate);
   const cpuHit = formatPct(d.server_cpu_cache_hit_rate);
   const theoreticalHit = formatPct(d.theoretical_cache_hit_rate);
@@ -505,11 +521,11 @@ const cacheRows = (d: InferenceData, locale: Locale): PointDetailRow[] => {
   if (gpuHit) rows.push(row(combinedHit ? t.combinedHitRate : t.gpuHitRate, gpuHit));
   if (cpuHit && offloadEnabled && !combinedHit) rows.push(row(t.cpuHitRate, cpuHit));
   if (theoreticalHit) rows.push(row(t.theoreticalHitRate, theoreticalHit));
-  return rows;
+  return rowsHTML(rows);
 };
 
 const isRate = (v: number | null | undefined): v is number =>
-  v !== undefined && v !== null && !Number.isNaN(v);
+  v !== undefined && v !== null && Number.isFinite(v);
 
 const sharePct = (v: number) => Math.max(0, Math.min(100, v * 100));
 
@@ -565,6 +581,7 @@ const AGENTIC_STRINGS = {
     requests: 'Requests',
     promptTokens: 'Prompt tokens',
     generatedTokens: 'Generated tokens',
+    tokens: 'Tokens',
   },
   zh: {
     speculativeDecoding: '投机解码',
@@ -572,14 +589,9 @@ const AGENTIC_STRINGS = {
     requests: '请求',
     promptTokens: '提示 token',
     generatedTokens: '生成 token',
+    tokens: 'Token 数',
   },
 } as const;
-
-const compactNumber = (value: number, locale: Locale): string =>
-  new Intl.NumberFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
-    notation: 'compact',
-    maximumFractionDigits: 1,
-  }).format(value);
 
 const speculativeRows = (d: InferenceData, locale: Locale): PointDetailRow[] => {
   const t = AGENTIC_STRINGS[locale];
@@ -593,12 +605,41 @@ const speculativeRows = (d: InferenceData, locale: Locale): PointDetailRow[] => 
     : [];
 };
 
-const agenticRows = (d: InferenceData, locale: Locale): PointDetailRow[] => {
-  if (d.benchmark_type !== 'agentic_traces') return [];
+const tokenBreakdownHTML = (d: InferenceData, locale: Locale): string => {
+  const prompt = d.total_prompt_tokens;
+  const generated = d.total_generation_tokens;
+  if (
+    prompt === undefined ||
+    generated === undefined ||
+    !Number.isFinite(prompt) ||
+    !Number.isFinite(generated) ||
+    prompt < 0 ||
+    generated < 0 ||
+    !Number.isFinite(prompt + generated)
+  )
+    return '';
+  const t = AGENTIC_STRINGS[locale];
+  const total = prompt + generated;
+  const promptWidth = total === 0 ? 0 : (prompt / total) * 100;
+  const generatedWidth = total === 0 ? 0 : 100 - promptWidth;
+  return `<div data-pinned-tokens class="pinned-token-breakdown">
+    <div class="pinned-bar-heading"><span>${t.tokens}</span><strong>${formatHoverValue(total)}</strong></div>
+    <div class="pinned-token-track" role="img" aria-label="${t.promptTokens}: ${formatNumber(prompt)}; ${t.generatedTokens}: ${formatNumber(generated)}">
+      <span data-token-prompt style="width: ${promptWidth}%;"></span>
+      <span data-token-generated style="width: ${generatedWidth}%;"></span>
+    </div>
+    <div class="pinned-token-legend">
+      <div><span class="pinned-token-label"><i class="token-prompt-dot"></i>${t.promptTokens}</span><span class="pinned-token-count">${formatNumber(prompt)}</span></div>
+      <div><span class="pinned-token-label"><i class="token-generated-dot"></i>${t.generatedTokens}</span><span class="pinned-token-count">${formatNumber(generated)}</span></div>
+    </div>
+  </div>`;
+};
+
+const runtimeHTML = (d: InferenceData, locale: Locale): string => {
+  const rows = speculativeRows(d, locale);
+  if (d.benchmark_type !== 'agentic_traces') return rowsHTML(rows);
 
   const t = AGENTIC_STRINGS[locale];
-  const rows: PointDetailRow[] = [];
-
   if (d.num_requests_total !== undefined && d.num_requests_successful !== undefined) {
     const successPct =
       d.num_requests_total > 0
@@ -609,14 +650,15 @@ const agenticRows = (d: InferenceData, locale: Locale): PointDetailRow[] => {
     );
   }
 
-  if (d.total_prompt_tokens !== undefined) {
-    rows.push(row(t.promptTokens, compactNumber(d.total_prompt_tokens, locale)));
+  const tokens = tokenBreakdownHTML(d, locale);
+  if (!tokens && d.total_prompt_tokens !== undefined) {
+    rows.push(row(t.promptTokens, formatNumber(d.total_prompt_tokens)));
   }
-  if (d.total_generation_tokens !== undefined) {
-    rows.push(row(t.generatedTokens, compactNumber(d.total_generation_tokens, locale)));
+  if (!tokens && d.total_generation_tokens !== undefined) {
+    rows.push(row(t.generatedTokens, formatNumber(d.total_generation_tokens)));
   }
 
-  return rows;
+  return rowsHTML(rows) + tokens;
 };
 
 const ACTION_STRINGS = {
@@ -711,9 +753,6 @@ const pointLinks = ({
   return links;
 };
 
-const shortenSha = (image: string) =>
-  image.replaceAll(/(?<shaPrefix>sha256:[a-f0-9]{7})[a-f0-9]+/giu, '$<shaPrefix>…');
-
 const PARALLELISM_STRINGS = {
   en: {
     strategy: 'Parallelism strategy',
@@ -735,6 +774,8 @@ const PARALLELISM_STRINGS = {
     yes: 'True',
     no: 'False',
     workers: 'Workers',
+    configuration: 'Configuration',
+    details: 'Configuration details',
   },
   zh: {
     strategy: '并行策略',
@@ -756,79 +797,115 @@ const PARALLELISM_STRINGS = {
     yes: '是',
     no: '否',
     workers: 'worker 数',
+    configuration: '配置',
+    details: '配置详情',
   },
 } as const;
 
-const contextParallelismParts = (dcp?: number, pcp?: number, dwdp?: number): string => {
-  const parts: string[] = [];
-  if (dcp !== undefined && dcp > 1) parts.push(`DCP: ${dcp}`);
-  if (pcp !== undefined && pcp > 1) parts.push(`PCP: ${pcp}`);
-  if (dwdp !== undefined && Number.isInteger(dwdp) && dwdp > 1) parts.push(`DWDP: ${dwdp}`);
-  return parts.length > 0 ? `${parts.join(', ')}, ` : '';
-};
-
-const parallelismRows = (d: InferenceData, locale: Locale): PointDetailRow[] => {
+const legacyParallelismRows = (d: InferenceData, locale: Locale): PointDetailRow[] => {
   const t = PARALLELISM_STRINGS[locale];
-  const deployment = d.disagg ? t.disaggregated : d.is_multinode ? t.multiNode : t.singleNode;
   const aggregateDcp = meaningfulParallelismSize(d.prefill_dcp_size, d.decode_dcp_size);
   const aggregatePcp = meaningfulParallelismSize(d.prefill_pcp_size, d.decode_pcp_size);
-  const rows = [row(t.deployment, deployment)];
+  const rows = [
+    row(t.deployment, d.is_multinode ? t.multiNode : t.singleNode),
+    row(t.strategy, t.gpuCount(d.physicalChips ?? d.tp)),
+  ];
+  if (aggregateDcp) rows.push(row(t.decodeContextParallelism, aggregateDcp));
+  if (aggregatePcp) rows.push(row(t.prefillContextParallelism, aggregatePcp));
+  return rows;
+};
+
+const topologyHTML = (d: InferenceData, locale: Locale): string => {
   if (
+    !d.disagg &&
     (d.ep === null || d.ep === undefined) &&
     (d.prefill_ep === null || d.prefill_ep === undefined) &&
     !(d.prefill_dwdp_size && d.prefill_dwdp_size > 1)
   ) {
-    rows.push(row(t.strategy, t.gpuCount(d.physicalChips ?? d.tp)));
-    if (aggregateDcp) rows.push(row(t.decodeContextParallelism, aggregateDcp));
-    if (aggregatePcp) rows.push(row(t.prefillContextParallelism, aggregatePcp));
-    return rows;
+    return `<div data-pinned-parallelism class="pinned-section">${rowsHTML(legacyParallelismRows(d, locale))}</div>`;
   }
-
-  if (d.is_multinode && d.disagg) {
-    const ptp = d.prefill_tp ?? d.tp;
-    const pep = d.prefill_ep ?? d.ep ?? 0;
-    const ppp = d.prefill_pp ?? d.pp ?? 1;
-    const pdpa = d.prefill_dp_attention ?? d.dp_attention ?? false;
-    const dtp = d.decode_tp ?? d.tp;
-    const dep = d.decode_ep ?? d.ep ?? 0;
-    const dpp = d.decode_pp ?? d.pp ?? 1;
-    const ddpa = d.decode_dp_attention ?? d.dp_attention ?? false;
-    const pw = d.prefill_num_workers ?? 1;
-    const dw = d.decode_num_workers ?? 1;
-    const prefillContext = contextParallelismParts(
-      d.prefill_dcp_size,
-      d.prefill_pcp_size,
-      d.prefill_dwdp_size,
+  const t = PARALLELISM_STRINGS[locale];
+  const bool = (v: boolean | string | undefined) =>
+    v === undefined ? '?' : asBool(v) ? t.yes : t.no;
+  type Cell = string | number | undefined;
+  const role = (prefill: boolean): Record<string, Cell> => ({
+    role: prefill ? t.prefill : t.decode,
+    chips: prefill ? d.num_prefill_gpu : d.num_decode_gpu,
+    TP: (prefill ? d.prefill_tp : d.decode_tp) ?? d.tp,
+    PP: (prefill ? d.prefill_pp : d.decode_pp) ?? d.pp,
+    EP: (prefill ? d.prefill_ep : d.decode_ep) ?? d.ep,
+    DPA: bool((prefill ? d.prefill_dp_attention : d.decode_dp_attention) ?? d.dp_attention),
+    workers: prefill ? d.prefill_num_workers : d.decode_num_workers,
+    DCP: prefill ? d.prefill_dcp_size : d.decode_dcp_size,
+    PCP: prefill ? d.prefill_pcp_size : d.decode_pcp_size,
+    DWDP: prefill ? d.prefill_dwdp_size : undefined,
+  });
+  const rows: Record<string, Cell>[] = d.disagg
+    ? [role(true), role(false)]
+    : [
+        {
+          TP: d.decode_tp ?? d.tp,
+          DP: d.dp,
+          PP: d.pp,
+          EP: d.ep,
+          DPA: bool(d.dp_attention),
+          DCP: meaningfulParallelismSize(d.prefill_dcp_size, d.decode_dcp_size),
+          PCP: meaningfulParallelismSize(d.prefill_pcp_size, d.decode_pcp_size),
+          DWDP: d.prefill_dwdp_size,
+          workers:
+            d.prefill_dwdp_size && d.prefill_dwdp_size > 1 ? d.prefill_num_workers : undefined,
+        },
+      ];
+  const columns = [
+    ...(d.disagg ? ['role', 'chips'] : []),
+    'TP',
+    'EP',
+    'DPA',
+    ...(d.disagg || rows.some((r) => r.workers !== undefined) ? ['workers'] : []),
+    ...['DP', 'PP', 'DCP', 'PCP', 'DWDP'].filter((key) =>
+      rows.some((r) => typeof r[key] === 'number' && Number(r[key]) >= (key === 'DP' ? 1 : 2)),
+    ),
+  ];
+  const labels: Record<string, string> = { role: '', chips: t.gpusUnit, workers: t.workers };
+  const titles: Record<string, string> = {
+    TP: t.tensorParallelism,
+    EP: t.expertParallelism,
+    DPA: t.dpAttention,
+    PP: t.pipelineParallelism,
+    DP: t.dataParallelism,
+    DCP: t.decodeContextParallelism,
+    PCP: t.prefillContextParallelism,
+  };
+  const deployment = d.disagg ? t.disaggregated : d.is_multinode ? t.multiNode : t.singleNode;
+  const compact = (r: Record<string, Cell>) => {
+    if (r.DPA === '?') return `TP${r.TP}${typeof r.EP === 'number' ? ` / EP${r.EP}` : ''}`;
+    return configSegmentLabel(
+      Number(r.TP),
+      r.EP as number | undefined,
+      r.DPA === t.yes,
+      r.PP as number | undefined,
+      r.DCP as number | undefined,
+      r.PCP as number | undefined,
+      r.DP as number | undefined,
+      r.DWDP as number | undefined,
     );
-    const decodeContext = contextParallelismParts(d.decode_dcp_size, d.decode_pcp_size);
-    rows.push(
-      row(
-        t.prefill,
-        `${d.num_prefill_gpu ?? '?'} ${t.gpusUnit}, TP: ${ptp}, ${ppp > 1 ? `PP: ${ppp}, ` : ''}${prefillContext}EP: ${pep}, DPA: ${pdpa ? t.yes : t.no}, ${t.workers}: ${pw}`,
-        true,
-      ),
-      row(
-        t.decode,
-        `${d.num_decode_gpu ?? '?'} ${t.gpusUnit}, TP: ${dtp}, ${dpp > 1 ? `PP: ${dpp}, ` : ''}${decodeContext}EP: ${dep}, DPA: ${ddpa ? t.yes : t.no}, ${t.workers}: ${dw}`,
-        true,
-      ),
-    );
-    return rows;
-  }
-
-  rows.push(row(t.tensorParallelism, d.decode_tp ?? d.tp));
-  if (d.prefill_dwdp_size && d.prefill_dwdp_size > 1) {
-    rows.push(row('DWDP', d.prefill_dwdp_size), row(t.workers, d.prefill_num_workers ?? 1));
-  }
-  if (d.dp !== undefined) rows.push(row(t.dataParallelism, d.dp));
-  if (d.pp !== null && d.pp !== undefined && d.pp > 1) {
-    rows.push(row(t.pipelineParallelism, d.pp));
-  }
-  if (aggregateDcp) rows.push(row(t.decodeContextParallelism, aggregateDcp));
-  if (aggregatePcp) rows.push(row(t.prefillContextParallelism, aggregatePcp));
-  if (d.ep !== null && d.ep !== undefined) rows.push(row(t.expertParallelism, d.ep));
-  rows.push(row(t.dpAttention, d.dp_attention ? t.yes : t.no));
-  return rows;
+  };
+  const rawTable = `<div class="pinned-table-scroll"><table class="pinned-topology" aria-label="${t.strategy}">
+    <thead><tr>${columns.map((key) => `<th scope="col" title="${titles[key] ?? labels[key] ?? key}">${labels[key] ?? key}</th>`).join(' ')}</tr></thead>
+    <tbody>${rows.map((r) => `<tr>${columns.map((key) => `<td>${escapeHtml(String(r[key] ?? '?'))}</td>`).join(' ')}</tr>`).join(' ')}</tbody>
+  </table></div>`;
+  return `<div data-pinned-parallelism class="pinned-section">
+    <div class="pinned-metric-label" style="margin-bottom: 10px;">${deployment}</div>
+    ${
+      d.disagg
+        ? `<div class="pinned-table-scroll"><table class="pinned-topology pinned-compact-topology" aria-label="${t.configuration}">
+      <thead><tr><th></th><th>${t.gpusUnit}</th><th>${t.configuration}</th><th>${t.workers}</th></tr></thead>
+      <tbody>${rows.map((r) => `<tr><td>${r.role}</td><td>${r.chips ?? '?'}</td><td><strong>${compact(r)}</strong></td><td>${r.workers ?? '?'}</td></tr>`).join(' ')}</tbody>
+    </table></div>`
+        : `<div class="pinned-config-summary"><span>${t.strategy}</span><strong>${compact(rows[0])}</strong></div>`
+    }
+    <details class="pinned-raw-topology"><summary>${t.details}</summary>${rawTable}</details>
+  </div>`;
 };
 
 const POWER_REASON_CODE_RE = /^[a-z][a-z0-9_]*$/u;
@@ -841,13 +918,8 @@ const powerWithheldRows = (d: InferenceData, locale: Locale): PointDetailRow[] =
     )
     .map((code) => code.replaceAll('_', ' '));
   if (codes.length === 0) return [];
-  return [row(TOOLTIP_STRINGS[locale].powerWithheld, codes.join(', '), true)];
+  return [row(TOOLTIP_STRINGS[locale].powerWithheld, codes.join(', '))];
 };
-
-export interface PointDetailMetric {
-  value: string;
-  label: string;
-}
 
 export interface PointCacheHit {
   label: string;
@@ -861,12 +933,21 @@ export interface PointDetails {
   subtitle: string;
   unofficial?: string;
   date: string;
-  metrics: [PointDetailMetric, PointDetailMetric];
-  rows: PointDetailRow[];
-  image?: string;
-  powerHtml: string;
+  html: string;
   links: PointDetailLink[];
 }
+
+const pinnedMetricHTML = (label: string, value: number, metricKey?: string) => `<div>
+  <div class="pinned-metric-label">${escapeHtml(label)}</div>
+  <div class="pinned-metric-value">${formatHoverValue(value, metricKey)}</div>
+  <div class="pinned-exact">${metricKey ? fmtY(value, metricKey) : fmt(value)}</div>
+</div>`;
+
+const pinnedStatHTML = (label: string, value: string | number) =>
+  `<div><span>${label}${labelColon(label)}</span> <strong>${escapeHtml(String(value))}</strong></div>`;
+
+const pinnedSectionHTML = (html: string) =>
+  html ? `<div class="pinned-section">${html}</div>` : '';
 
 export const buildPointDetails = (config: TooltipConfig): PointDetails => {
   const { data: d, xLabel, yLabel, selectedYAxisMetric, overlayData } = config;
@@ -875,7 +956,6 @@ export const buildPointDetails = (config: TooltipConfig): PointDetails => {
   const hwEntry = (overlayData?.hardwareConfig ?? config.hardwareConfig)[d.hwKey];
   const hw = hwEntry ? getPointHardwareConfig(d, hwEntry) : null;
   const engines = hw?.suffix?.replace(/^\((?<inner>.*)\)$/u, '$<inner>').replaceAll(', ', ' · ');
-  const chips = d.physicalChips ?? d.tp;
   const ownDate = formatTooltipDate(d.actualDate ?? d.date, locale);
   const tputRows =
     selectedYAxisMetric === 'y_tpPerGpu'
@@ -886,10 +966,23 @@ export const buildPointDetails = (config: TooltipConfig): PointDetails => {
             : []),
         ]
       : [];
-  const subtitle = [engines, d.precision.toUpperCase()].filter(Boolean).join(' · ');
+  const power =
+    rowsHTML([
+      ...powerTierRows(d, selectedYAxisMetric, locale),
+      ...powerVariantRows(d, selectedYAxisMetric, locale, config.powerLabelStyle),
+    ]) +
+    modeledSystemPowerHTML(d, selectedYAxisMetric, locale) +
+    rowsHTML(powerWithheldRows(d, locale)) +
+    workerPowerHTML(d, locale);
+  const branch = overlayData ? (overlayData.getRunForRow?.(d)?.branch ?? overlayData.label) : '';
+  const footer =
+    (branch ? tooltipLine(t.branch, escapeHtml(branch)) : '') +
+    (d.image
+      ? `<div class="pinned-image"><span>${t.image}</span><p>${escapeHtml(d.image.trim())}</p></div>`
+      : '');
   return {
     title: hw?.label ?? String(d.hwKey),
-    subtitle,
+    subtitle: engines ?? '',
     unofficial: overlayData ? t.unofficialRun : undefined,
     date:
       config.comparisonDate && d.actualDate && d.actualDate !== d.date
@@ -897,27 +990,14 @@ export const buildPointDetails = (config: TooltipConfig): PointDetails => {
         : config.comparisonDate
           ? formatTooltipDate(d.date, locale)
           : ownDate,
-    metrics: [
-      { value: fmtY(d.y, selectedYAxisMetric), label: yLabel },
-      { value: fmt(d.x), label: xLabel },
-    ],
-    rows: [
-      ...(overlayData
-        ? [row(t.branch, overlayData.getRunForRow?.(d)?.branch ?? overlayData.label)]
-        : []),
-      ...tputRows,
-      ...powerTierRows(d, selectedYAxisMetric, locale),
-      ...powerVariantRows(d, selectedYAxisMetric, locale, config.powerLabelStyle),
-      row(t.totalChips, chips),
-      ...parallelismRows(d, locale),
-      row(t.concurrency, d.conc),
-      ...cacheRows(d, locale),
-      ...powerWithheldRows(d, locale),
-      ...speculativeRows(d, locale),
-      ...agenticRows(d, locale),
-    ],
-    image: d.image ? shortenSha(d.image.trim()).replace(/\s+/u, '\n') : undefined,
-    powerHtml: modeledSystemPowerHTML(d, selectedYAxisMetric, locale) + workerPowerHTML(d, locale),
+    html: `<div class="pinned-metrics">${pinnedMetricHTML(yLabel, d.y, selectedYAxisMetric)}${pinnedMetricHTML(xLabel, d.x)}</div>
+    <div data-pinned-config>${pinnedStatHTML(t.concurrency, d.conc.toLocaleString('en-US'))}${pinnedStatHTML(t.precision, d.precision.toUpperCase())}${pinnedStatHTML(t.totalChips, d.physicalChips ?? d.tp)}</div>
+    ${rowsHTML(tputRows)}
+    ${topologyHTML(d, locale)}
+    ${pinnedSectionHTML(cacheHTML(d, locale, config.color ?? 'var(--foreground)'))}
+    ${pinnedSectionHTML(runtimeHTML(d, locale))}
+    ${pinnedSectionHTML(power)}
+    ${pinnedSectionHTML(footer)}`,
     links: pointLinks({
       point: d,
       runUrl: overlayData ? undefined : config.runUrl,

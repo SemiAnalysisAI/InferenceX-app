@@ -38,6 +38,100 @@ const expectVisiblePointCount = (scope: string, count: number) =>
   cy.scatterPoints(scope).should((points) => expect(visiblePoints(points)).to.have.length(count));
 
 describe('ScatterGraph', () => {
+  it('keeps compact hover and pins full cache and role details in the UI font', () => {
+    const data = [
+      createMockInferenceData({
+        hwKey: 'h100',
+        precision: Precision.FP4,
+        x: 20,
+        y: 80,
+        benchmark_type: 'agentic_traces',
+        framework: 'sglang',
+        disagg: true,
+        is_multinode: true,
+        physicalChips: 64,
+        conc: 10888,
+        prefill_tp: 2,
+        prefill_ep: 2,
+        prefill_dp_attention: true,
+        prefill_num_workers: 16,
+        num_prefill_gpu: 32,
+        decode_tp: 32,
+        decode_ep: 32,
+        decode_dp_attention: true,
+        decode_num_workers: 1,
+        num_decode_gpu: 32,
+        kv_offloading: 'dram',
+        kv_offload_backend: 'hicache',
+        server_gpu_cache_hit_rate: 0.707,
+        server_cpu_cache_hit_rate: 0.242,
+        theoretical_cache_hit_rate: 0.973,
+        total_prompt_tokens: 566443844,
+        total_generation_tokens: 4180360,
+      }),
+    ];
+    mountWithProviders(
+      <div style={{ width: 1000 }}>
+        <ScatterGraph
+          chartId="pinned-details-test"
+          modelLabel="DeepSeek R1"
+          data={data}
+          xLabel="Interactivity"
+          yLabel="Throughput"
+          chartDefinition={defaultChartDef}
+          transitionDuration={0}
+        />
+      </div>,
+      {
+        inference: { hardwareConfig: hwConfig, selectedPrecisions: [Precision.FP4] },
+        unofficial: {},
+      },
+    );
+    cy.scatterPoints()
+      .should('have.length', 1)
+      .then(([point]) => {
+        cy.wrap(point.hitArea).trigger('mousemove', {
+          clientX: point.clientX,
+          clientY: point.clientY,
+          force: true,
+        });
+        cy.get('[data-hover-tooltip]').should('contain.text', 'FP4 · conc 10888');
+        cy.get('[data-pinned-config]').should('not.exist');
+        clickScatterPoint(point);
+      });
+    cy.get('[data-pinned-config]')
+      .should('contain.text', 'Concurrency: 10,888')
+      .and('contain.text', 'Precision: FP4')
+      .and('not.have.css', 'font-family', 'monospace');
+    cy.get('[data-pinned-parallelism]')
+      .should('contain.text', 'Prefill')
+      .and('contain.text', 'Decode')
+      .and('contain.text', 'DEP2')
+      .find('.pinned-compact-topology tbody tr')
+      .should('have.length', 2)
+      .first()
+      .should('contain.text', 'DEP2');
+    cy.get('.pinned-raw-topology summary').click();
+    cy.get('.pinned-raw-topology tbody tr')
+      .first()
+      .should('be.visible')
+      .and('contain.text', '32 2 2 True 16');
+    cy.get('[data-pinned-cache]')
+      .should('contain.text', 'Chip 70.7%')
+      .and('contain.text', 'CPU 24.2%')
+      .and('contain.text', 'theoretical 97.3%')
+      .find('[data-hover-cache-bar]')
+      .should('be.visible');
+    cy.get('[data-pinned-tokens]')
+      .should('contain.text', '566,443,844')
+      .and('contain.text', '4,180,360');
+    cy.get('.inferencex-pinned-tooltip').should(($card) => {
+      expect($card[0].scrollWidth).to.equal($card[0].clientWidth);
+    });
+    cy.get('[data-testid="point-details-close"]').click();
+    cy.get('[data-pinned-config]').should('not.exist');
+  });
+
   it('keeps the frontier modes and overlay winners without exposing the retired hinterland', () => {
     const official = [
       createMockInferenceData({ hwKey: 'h100', precision: Precision.FP8, x: 20, y: 80 }),

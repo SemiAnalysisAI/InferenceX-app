@@ -2260,6 +2260,16 @@ const ScatterGraph = React.memo(
       [zoomResetEventName, eventPrefix, xScaleConfig._isLog, yScaleConfig.type, pointLabelsVisible],
     );
 
+    const pointColor = useCallback(
+      (d: InferenceData, isOverlay: boolean) =>
+        isOverlay
+          ? overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl))
+          : interactionRef.current.getCssColor(
+              interactionRef.current.resolveColor(String(d.hwKey)),
+            ),
+      [runIndexByUrl],
+    );
+
     const pointDetails = useCallback(
       (d: InferenceData, isOverlay: boolean) =>
         buildPointDetails({
@@ -2280,18 +2290,18 @@ const ScatterGraph = React.memo(
             : false,
           locale,
           powerLabelStyle,
+          color: pointColor(d, isOverlay),
         }),
-      [xLabel, yLabel, selectedYAxisMetric, hardwareConfig, overlayData, locale, powerLabelStyle],
-    );
-
-    const pointColor = useCallback(
-      (d: InferenceData, isOverlay: boolean) =>
-        isOverlay
-          ? overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl))
-          : interactionRef.current.getCssColor(
-              interactionRef.current.resolveColor(String(d.hwKey)),
-            ),
-      [runIndexByUrl],
+      [
+        xLabel,
+        yLabel,
+        selectedYAxisMetric,
+        hardwareConfig,
+        overlayData,
+        locale,
+        powerLabelStyle,
+        pointColor,
+      ],
     );
 
     const hoverCard = useCallback(

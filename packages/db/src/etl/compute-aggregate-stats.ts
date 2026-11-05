@@ -155,6 +155,7 @@ export const AGGREGATE_SERVER_METRIC_KEYS = new Set([
   'vllm:gpu_prefix_cache_hits',
   'vllm:gpu_prefix_cache_queries',
   'atom:kv_cache_usage_ratio',
+  'tokenspeed:kv_cache_usage_perc',
   'atom:prefix_cache_cached_tokens',
   'atom:prefix_cache_full_tokens',
   'atom:prefix_cache_hit_ratio',

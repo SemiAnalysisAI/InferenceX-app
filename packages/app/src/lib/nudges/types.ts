@@ -72,6 +72,7 @@ export interface NudgeContent {
   hideDismissButton?: boolean;
   primaryAction?: NudgeAction;
   secondaryAction?: NudgeAction;
+  additionalActions?: NudgeAction[];
   centered?: boolean;
   badge?: string;
   badgeZh?: string;

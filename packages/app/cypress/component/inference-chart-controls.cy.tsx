@@ -279,6 +279,23 @@ describe('Inference ChartControls cost metrics', () => {
     });
   }
 
+  for (const model of [Model.Muse_Spark_Open, Model.GLM_5_2, Model.GLM_5_3_Flash]) {
+    it(`switches the global TCO basis for ${model} on AgentX`, () => {
+      mountWithProviders(<CostControls showTcoBasis />, {
+        unofficial: {},
+        inference: {
+          selectedYAxisMetric: 'y_costh',
+          selectedModel: model,
+          selectedSequence: Sequence.AgenticTraces,
+        },
+        globalFilters: { selectedModel: model, effectiveSequence: Sequence.AgenticTraces },
+      });
+      cy.get('[data-testid="tco-basis-internal"]').should('have.attr', 'aria-pressed', 'true');
+      cy.get('[data-testid="tco-basis-external"]').click();
+      cy.get('@setTcoBasis_global').should('have.been.calledOnceWithExactly', 'external');
+    });
+  }
+
   it('hides the TCO basis toggle for other models and scenarios', () => {
     mountWithProviders(<CostControls showTcoBasis />, {
       unofficial: {},

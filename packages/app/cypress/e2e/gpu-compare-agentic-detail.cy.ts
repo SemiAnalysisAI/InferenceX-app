@@ -136,7 +136,7 @@ describe('GPU comparison agentic point detail', () => {
     cy.get('[data-testid="point-details-panel"]')
       .should('have.length', 1)
       .and('not.contain', 'Offload Mode');
-    cy.contains('[data-testid="point-details-panel"] [data-slot="stat"]', 'Router').should(
+    cy.contains('[data-testid="point-details-panel"] .tooltip-line', 'Router').should(
       'contain.text',
       'vLLM Router 0.1.14',
     );

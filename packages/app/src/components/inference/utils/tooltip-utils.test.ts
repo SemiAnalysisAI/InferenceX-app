@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 
 import type { HardwareConfig, InferenceData } from '@/components/inference/types';
+import { powerBasisPillHtml } from '@/components/inference/powerx/PowerBasisPill';
 import { modelSystemPower, type SystemPowerEstimate } from '@/lib/power/modeled-system-power';
 import { gb300DisaggRow } from '@/lib/power/nvl72-power.fixture';
 import {
@@ -17,6 +18,7 @@ import {
 } from '@/components/inference/utils/tooltipUtils';
 import {
   comparisonDetailsText,
+  detailsHtml,
   detailsText,
 } from '@/components/inference/utils/point-details-test-helpers';
 
@@ -138,7 +140,7 @@ describe('run-specific framework tooltip labels', () => {
       ];
       for (const html of outputs) {
         expect(html).toContain(
-          point === target ? 'MI355X\nMoRI UMBP SGLang · FP8' : 'MI355X\nMoRI SGLang · FP8',
+          point === target ? 'MI355X\nMoRI UMBP SGLang\n' : 'MI355X\nMoRI SGLang\n',
         );
         expect(html).not.toContain('MoRI SGLang / MoRI UMBP SGLang');
         if (point === historical) expect(html).not.toContain('MoRI UMBP SGLang');
@@ -166,11 +168,11 @@ describe('modeled system-power tooltip', () => {
     expect(html).toContain('Measured facility power');
     expect(html).not.toContain('Modeled');
     expect(html).toContain('2 full eight-GPU chassis · 16 GPUs');
-    expect(html).toContain('Operating state:</strong> agentic · scale-out on');
+    expect(html).toContain('Operating state: agentic · scale-out on');
     expect(html).toContain(
       'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
     );
-    expect(html).toContain(SYSTEM_POWER_MODEL_SOURCE_URL);
+    expect(detailsHtml(config())).toContain(SYSTEM_POWER_MODEL_SOURCE_URL);
     expect(html).not.toContain('12,000 W/GPU');
     expect(html).not.toContain('Unmeasured chassis GPUs');
   });
@@ -213,7 +215,7 @@ describe('modeled system-power tooltip', () => {
     const data = pt({ hwKey: 'gb300', modeledSystemPower: modelSystemPower(gb300DisaggRow()) });
     const html = detailsText(config({ data }));
     expect(html).toContain('2 full NVL72 compute trays · 8 GPUs');
-    expect(html).toContain('Measured Grace socket power:</strong> 98 W/socket');
+    expect(html).toContain('Measured Grace socket power: 98 W/socket');
     expect(html).toContain('Measured: GPU boards and whole Grace sockets');
     expect(html).toContain('each tray takes 1/18 of the rack');
     expect(html).toContain('PUE 1.1');
@@ -236,14 +238,14 @@ describe('modeled system-power tooltip', () => {
     ];
     for (const [data, expected] of cases) {
       const official = config({ data });
-      const overlay = detailsText({
+      const overlay = detailsHtml({
         ...official,
         overlayData: {
           label: 'PowerX comparison',
           hardwareConfig: mockHardwareConfig,
         } as TooltipConfig['overlayData'],
       });
-      for (const html of [overlay, comparisonDetailsText(official)]) {
+      for (const html of [overlay, detailsHtml({ ...official, comparisonDate: true })]) {
         for (const text of expected) expect(html).toContain(text);
         expect(html).toContain(SYSTEM_POWER_MODEL_REVISION);
       }
@@ -251,7 +253,7 @@ describe('modeled system-power tooltip', () => {
   });
 
   it('explains unsupported hardware on the measured baseline without substituting zero', () => {
-    const html = detailsText(
+    const html = detailsHtml(
       config({
         selectedYAxisMetric: 'y_measuredAvgPower',
         data: pt({
@@ -270,7 +272,7 @@ describe('modeled system-power tooltip', () => {
 
   it('sets every system-power line in the 11px tooltip text size', () => {
     const host = document.createElement('div');
-    host.innerHTML = buildPointDetails(config()).powerHtml;
+    host.innerHTML = detailsHtml(config());
     const section = host.querySelector('[data-testid="tooltip-modeled-system-power"]')!;
     const sizes = new Set<string>();
     const walker = document.createTreeWalker(section, NodeFilter.SHOW_TEXT);
@@ -283,11 +285,25 @@ describe('modeled system-power tooltip', () => {
     expect([...sizes]).toEqual(['11px']);
   });
 
+  it('keeps each power reading and its basis pill in the same grid cell', () => {
+    const html = detailsHtml(config());
+    expect(html.split('<span data-power-reading>')).toHaveLength(4);
+    for (const [watts, basis] of [
+      [500, 'gpu'],
+      [750, 'it'],
+      [900, 'facility'],
+    ] as const) {
+      const pill = powerBasisPillHtml(basis, 'en');
+      expect(html).toContain(`<span data-power-reading>${watts} W/GPU${pill}</span>`);
+      expect(html).not.toContain(`<span data-power-reading>${watts} W/GPU</span>${pill}`);
+    }
+  });
+
   it('keeps the hover card compact and leaves unrelated metrics unchanged', () => {
     const hover = generateHoverTooltipContent({ ...config(), color: 'red' });
     expect(hover).not.toContain('500 W/GPU');
     expect(hover).not.toContain('PUE 1.2');
-    expect(detailsText(config({ selectedYAxisMetric: 'y_tpPerGpu' }))).not.toContain(
+    expect(detailsHtml(config({ selectedYAxisMetric: 'y_tpPerGpu' }))).not.toContain(
       'tooltip-modeled-system-power',
     );
   });
@@ -299,14 +315,14 @@ describe('modeled system-power tooltip', () => {
     expect(html).toContain('实测数据中心功耗');
     expect(html).not.toContain('功耗估算');
     expect(html).toContain('2 个完整八卡机箱 · 16 张 GPU');
-    expect(html).toContain('运行状态：</strong> 智能体 · scale-out 开启');
+    expect(html).toContain('运行状态： 智能体 · scale-out 开启');
     expect(html).toContain('计入 GPU 机箱内的 CPU');
     expect(html).toContain('不计入独立的纯 CPU 前端或路由主机。');
   });
 
   it('breaks normalization and host scope into two compact lines in pinned tooltips', () => {
     for (const locale of ['en', 'zh'] as const) {
-      const html = detailsText(config({ locale }));
+      const html = detailsHtml(config({ locale }));
       const match = /(?<normalization>[^<>]+)<br\s*\/>(?<boundary>[^<>]+)<\/div>/u.exec(html);
       expect(match?.groups?.normalization).toContain(
         locale === 'en' ? 'all modeled chassis GPUs' : '建模机箱的 GPU 总数',
@@ -465,10 +481,10 @@ describe('buildPointDetails', () => {
     ],
     [{ spec_decoding: 'none', spec_algorithm: 'dspark', spec_draft_model: 'native' }, 'Off'],
   ])('labels speculative decoding by what the server ran: %j', (fields, label) => {
-    const { rows } = buildPointDetails(
+    const text = detailsText(
       tooltipConfig({ data: pt({ id: 3, benchmark_type: 'agentic_traces', ...fields }) }),
     );
-    expect(rows).toContainEqual({ label: 'Speculative decoding', value: label });
+    expect(text).toContain(`Speculative decoding: ${label}`);
   });
 
   it('routes fixed-sequence log actions to the fixed benchmark log viewer', () => {
@@ -514,8 +530,9 @@ describe('buildPointDetails', () => {
     );
 
     expect(html).toContain('请求： 9 / 10 (90%)');
-    expect(html).toContain('提示 token：');
-    expect(html).toContain('生成 token：');
+    expect(html).toContain('Token 数');
+    expect(html).toContain('提示 token12,345');
+    expect(html).toContain('生成 token678');
     expect(html).toContain('GitHub Actions 运行记录');
     expect(html).not.toContain('Requests:');
     expect(html).not.toContain('GitHub Actions run');
@@ -546,10 +563,11 @@ describe('buildPointDetails', () => {
     );
 
     expect(html).toContain('\n2026年1月2日\n');
-    expect(html).toContain('DPA: 是, worker 数: 2');
-    expect(html).toContain('DPA: 否, worker 数: 1');
-    expect(html).not.toContain('DPA: True');
-    expect(html).not.toContain('Workers:');
+    expect(html).toContain('个芯片 TP EP DPA worker 数');
+    expect(html).toContain('预填充 4 2 2 是 2');
+    expect(html).toContain('解码 4 4 4 否 1');
+    expect(html).not.toContain('True');
+    expect(html).not.toContain('Workers');
   });
 
   it('omits View charts when the point id is non-persisted (0 / NaN), even if pinned + hasTrace', () => {
@@ -605,20 +623,18 @@ describe('buildPointDetails', () => {
   });
 
   it('includes image field when present', () => {
-    expect(buildPointDetails(tooltipConfig({ data: pt({ image: 'vllm-v0.6.0' }) })).image).toBe(
-      'vllm-v0.6.0',
+    expect(detailsHtml(tooltipConfig({ data: pt({ image: 'vllm-v0.6.0' }) }))).toContain(
+      '<p>vllm-v0.6.0</p>',
     );
   });
 
-  it('splits image and SHA onto separate lines', () => {
-    const { image } = buildPointDetails(
-      tooltipConfig({ data: pt({ image: 'vllm-v0.6.0 abc123' }) }),
-    );
-    expect(image).toBe('vllm-v0.6.0\nabc123');
+  it('keeps the complete image and SHA', () => {
+    const html = detailsHtml(tooltipConfig({ data: pt({ image: 'vllm-v0.6.0 abc123' }) }));
+    expect(html).toContain('<p>vllm-v0.6.0 abc123</p>');
   });
 
   it('omits image section when no image', () => {
-    expect(buildPointDetails(tooltipConfig()).image).toBeUndefined();
+    expect(detailsHtml(tooltipConfig())).not.toContain('pinned-image');
   });
 
   it('includes output throughput when metric is y_tpPerGpu and field exists', () => {
@@ -725,7 +741,7 @@ describe('buildPointDetails', () => {
       }),
     );
     expect(html).toContain('KV transfer engine: NIXL');
-    expect(html).toContain('Chip cache hit rate: 87.5%');
+    expect(html).toContain('Chip 87.5%');
   });
 
   it('hides stale CPU cache hits when offload is disabled', () => {
@@ -741,9 +757,9 @@ describe('buildPointDetails', () => {
       }),
     );
 
-    expect(html).not.toContain('CPU cache hit rate');
-    expect(html).toContain('Chip cache hit rate: 80.0%');
-    expect(html).toContain('Theoretical cache hit rate: 90.0%');
+    expect(html).not.toContain('CPU');
+    expect(html).toContain('Chip 80.0%');
+    expect(html).toContain('theoretical 90.0%');
   });
 
   it('uses legacy offload mode to gate CPU cache hits when no descriptor exists', () => {
@@ -782,9 +798,8 @@ describe('buildPointDetails', () => {
       }),
     );
 
-    expect(html).toContain('Combined chip + CPU cache hit rate: 97.8%');
-    expect(html).not.toContain('\nCPU cache hit rate:');
-    expect(html).not.toContain('\nChip cache hit rate:');
+    expect(html).toContain('Chip + CPU 97.8%');
+    expect(html).not.toContain('CPU cache hit rate');
   });
 
   it('uses Chinese labels for new cache metadata on /zh surfaces', () => {
@@ -912,8 +927,8 @@ describe('buildPointDetails for unofficial overlays', () => {
       }),
     );
 
-    expect(html).toContain('Decode context parallelism (DCP): 8');
-    expect(html).toContain('Prefill context parallelism (PCP): 4');
+    expect(html).toContain('TP EP DPA DCP PCP');
+    expect(html).toContain('8 1 ? 8 4');
   });
 
   it('shows point-level speculative decoding for mixed agentic overlays', () => {
@@ -1023,15 +1038,15 @@ describe('buildPointDetails for comparison dates', () => {
       }),
     );
 
-    expect(html).toContain('Decode context parallelism (DCP): 8');
-    expect(html).toContain('Prefill context parallelism (PCP): 4');
+    expect(html).toContain('TP EP DPA DCP PCP');
+    expect(html).toContain('8 1 ? 8 4');
   });
 
-  it('splits image and SHA onto separate lines', () => {
+  it('keeps the complete image and SHA', () => {
     const html = comparisonDetailsText(
       tooltipConfig({ data: pt({ image: 'vllm-v0.6.0 abc123' }) }),
     );
-    expect(html).toContain('vllm-v0.6.0\nabc123');
+    expect(html).toContain('vllm-v0.6.0 abc123');
   });
 
   it('shows View charts only for points with stored trace data', () => {
@@ -1144,9 +1159,9 @@ describe('worker power drilldown', () => {
   it('renders the worker table in official, overlay and comparison details', () => {
     const config = tooltipConfig({ data: pt({ workers }) });
     const outputs = [
-      detailsText(config),
-      detailsText({ ...config, overlayData }),
-      comparisonDetailsText(config),
+      detailsHtml(config),
+      detailsHtml({ ...config, overlayData }),
+      detailsHtml({ ...config, comparisonDate: true }),
     ];
     for (const html of outputs) {
       expect(html).toContain('data-testid="tooltip-worker-power"');
@@ -1162,7 +1177,7 @@ describe('worker power drilldown', () => {
   });
 
   it('includes optional telemetry cells only when the worker carries them', () => {
-    const html = detailsText(tooltipConfig({ data: pt({ workers }) }));
+    const html = detailsHtml(tooltipConfig({ data: pt({ workers }) }));
     expect(html).toContain('68.4/79.2°C');
     expect(html).toContain('88.5%');
     expect(html).toContain('69.565 GiB');
@@ -1187,7 +1202,7 @@ describe('worker power drilldown', () => {
       num_gpus: 8,
       avg_power_w: 700 + i,
     }));
-    const html = detailsText(tooltipConfig({ data: pt({ workers: many }) }));
+    const html = detailsHtml(tooltipConfig({ data: pt({ workers: many }) }));
     expect(html).toContain('<strong>decode[7]</strong>');
     expect(html).not.toContain('<strong>decode[8]</strong>');
     expect(html).toContain('+2 more workers');

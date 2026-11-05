@@ -146,7 +146,7 @@ describe('NUDGE_REGISTRY integrity', () => {
     }
   });
 
-  it.each(['', '/zh'])('offers both launch models in the %s route tree', (prefix) => {
+  it.each(['', '/zh'])('offers all four launch models in the %s route tree', (prefix) => {
     const location = { pathname: prefix || '/', href: '' };
     vi.stubGlobal('window', { location });
     const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
@@ -162,6 +162,16 @@ describe('NUDGE_REGISTRY integrity', () => {
     expect(modal?.content.secondaryAction?.label).toBe('Kimi K3');
     modal?.content.secondaryAction?.onClick();
     expect(location.href).toBe(`${prefix}/inference/kimi-k3`);
+    expect(modal?.content.additionalActions?.map((action) => action.label)).toEqual([
+      'Muse Spark',
+      'GLM5.3',
+    ]);
+    modal?.content.additionalActions?.[0].onClick();
+    expect(location.href).toBe(`${prefix}/inference/muse-spark-open`);
+    modal?.content.additionalActions?.[1].onClick();
+    expect(location.href).toBe(
+      `${prefix}/inference/glm-5-3?g_model=GLM-5.2&i_seq=agentic-traces&i_prec=fp8`,
+    );
   });
 
   it('centers the TPUv7 launch modal on the landing page', () => {

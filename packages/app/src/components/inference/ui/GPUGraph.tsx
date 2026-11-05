@@ -1111,8 +1111,9 @@ const GPUGraph = React.memo(
             ? presenceRef.current?.log.has(d.id) === true
             : false,
           locale,
+          color: getColor(d),
         }),
-      [xLabel, yLabel, selectedYAxisMetric, hardwareConfig, overlayData, locale],
+      [xLabel, yLabel, selectedYAxisMetric, hardwareConfig, overlayData, getColor, locale],
     );
     const hoverCard = useCallback(
       (d: InferenceData, isOverlay: boolean) =>

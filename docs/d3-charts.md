@@ -103,6 +103,19 @@ This keeps zoom at 60fps while deferring expensive work. Effect cleanup cancels 
 
 ## HTML Strings for Tooltips
 
+Pinned point details reuse the compact hover card's KV cache bar, including the
+chip/CPU split and theoretical marker. TRT-LLM's combined rate stays a single
+segment; disabled offload does not contribute CPU hits. Missing chip measurements
+retain the available textual rates instead of inventing a bar. Concurrency and
+precision use explicit labels, and parallelism groups Prefill/Decode configurations by
+role with compact labels such as DEP4. The raw fields remain in an expandable
+configuration table. Prompt/generated token counts use a proportional bar with
+exact counts underneath; partial or invalid counts do not produce a split.
+Official, unofficial and historical points
+share this presentation; unofficial colors retain their per-run identity.
+This is presentation-only: benchmark values, API responses and `inferencex-skills`
+contracts are unchanged.
+
 Tooltips are built as HTML template literal strings, injected via D3's `.html()`. Using React elements would require:
 
 1. `ReactDOM.render()` inside a D3 event handler (breaks React's lifecycle)
