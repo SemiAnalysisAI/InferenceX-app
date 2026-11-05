@@ -190,7 +190,7 @@ export const Header = () => {
           </IntentPrefetchLink>
 
           <nav
-            className="hidden min-w-0 items-center gap-1 overflow-hidden xl:flex"
+            className="hidden min-w-0 items-center gap-1 overflow-hidden min-[1120px]:flex"
             {...analyticsPlacement('header_desktop')}
           >
             {navLinks.map(({ href, displayHref, label, testId, event }) => (
@@ -234,7 +234,7 @@ export const Header = () => {
             </span>
             <ModeToggle />
 
-            <div ref={menuRef} className="relative xl:hidden">
+            <div ref={menuRef} className="relative min-[1120px]:hidden">
               <button
                 type="button"
                 data-testid="mobile-menu-toggle"

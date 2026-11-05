@@ -244,8 +244,8 @@ describe('Header', () => {
     });
   });
 
-  it('keeps every primary link inside the header at the xl desktop breakpoint', () => {
-    cy.viewport(1280, 720);
+  it('keeps every primary link inside the header at the desktop nav breakpoint', () => {
+    cy.viewport(1120, 720);
     cy.get('[data-testid="header"]').then(($header) => {
       const header = $header[0];
       const bounds = header.getBoundingClientRect();
