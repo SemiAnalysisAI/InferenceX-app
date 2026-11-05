@@ -285,6 +285,21 @@ describe('modeled system-power tooltip', () => {
     }
   });
 
+  it('keeps each power reading and its basis pill in the same grid cell', () => {
+    const host = document.createElement('div');
+    host.innerHTML = generateTooltipContent(config({ isPinned: true }));
+    const readings = host.querySelectorAll('[data-power-reading]');
+    expect(readings).toHaveLength(3);
+    for (const reading of readings) {
+      expect(reading.textContent).toContain('W/GPU');
+      expect(reading.querySelector('[data-testid="power-basis-pill"]')).not.toBeNull();
+      const row = reading.parentElement!;
+      expect(row.classList.contains('tooltip-line')).toBe(true);
+      expect(row.children).toHaveLength(2);
+      expect(row.children[1]).toBe(reading);
+    }
+  });
+
   it('keeps hover compact and leaves unrelated metrics unchanged', () => {
     const hover = generateTooltipContent(config({ isPinned: false }));
     expect(hover).toContain('500 W/GPU');
