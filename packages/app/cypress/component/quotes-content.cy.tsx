@@ -218,34 +218,54 @@ describe('QuotesContent supporter logo wall', () => {
 });
 
 const wallLogo = (label: string) => ({ label, logo: 'nvidia-color.svg' });
-const centers = (id: string) =>
-  cy
-    .get(`[data-testid="supporter-group-${id}"] li`)
-    .then(($li) => [...$li].map((li) => Math.round(li.getBoundingClientRect().left)));
+const rowsOf = (id: string) =>
+  cy.get(`[data-testid="supporter-group-${id}"] ul`).then(($ul) => {
+    const list = $ul[0].getBoundingClientRect();
+    const rows = new Map<number, DOMRect[]>();
+    for (const li of $ul[0].querySelectorAll('li')) {
+      const box = li.getBoundingClientRect();
+      const top = Math.round(box.top);
+      rows.set(top, [...(rows.get(top) ?? []), box]);
+    }
+    return { list, rows: [...rows.values()] };
+  });
 
-describe('SupporterLogoWall columns', () => {
-  it('keeps an explicit column count when a group has fewer logos than columns', () => {
+describe('SupporterLogoWall rows', () => {
+  it('balances uneven groups across rows and centers the shorter row', () => {
     cy.viewport(1400, 800);
     cy.mount(
       <SupporterLogoWall
         groups={[
           {
-            id: 'wide',
-            label: { en: 'Wide', zh: 'Wide' },
-            desktopColumns: 4,
-            logos: ['a', 'b', 'c', 'd', 'e'].map(wallLogo),
+            id: 'nine',
+            label: { en: 'Nine', zh: 'Nine' },
+            desktopColumns: 8,
+            logos: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'].map(wallLogo),
           },
           {
-            id: 'short',
-            label: { en: 'Short', zh: 'Short' },
-            desktopColumns: 4,
-            logos: ['f', 'g', 'h'].map(wallLogo),
+            id: 'eleven',
+            label: { en: 'Eleven', zh: 'Eleven' },
+            desktopColumns: 6,
+            logos: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k'].map(wallLogo),
           },
         ]}
       />,
     );
-    centers('wide').then((wide) => {
-      centers('short').should('deep.equal', wide.slice(0, 3));
-    });
+    for (const [id, sizes] of [
+      ['nine', [5, 4]],
+      ['eleven', [6, 5]],
+    ] as const) {
+      rowsOf(id).then(({ list, rows }) => {
+        expect(
+          rows.map((r) => r.length),
+          id,
+        ).to.deep.equal(sizes);
+        const listCenter = (list.left + list.right) / 2;
+        for (const row of rows) {
+          const center = (row[0].left + row.at(-1)!.right) / 2;
+          expect(center, `${id} row centered`).to.be.closeTo(listCenter, 2);
+        }
+      });
+    }
   });
 });
