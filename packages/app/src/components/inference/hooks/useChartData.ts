@@ -12,7 +12,11 @@ import {
   type XAxisMode,
 } from './chart-data-core';
 
-import { DISPLAY_MODEL_TO_DB, rowToSequence } from '@semianalysisai/inferencex-constants';
+import {
+  benchmarkCurveScope,
+  DISPLAY_MODEL_TO_DB,
+  rowToSequence,
+} from '@semianalysisai/inferencex-constants';
 import { useQueries, useQuery } from '@tanstack/react-query';
 
 import chartDefinitions, {
@@ -209,15 +213,23 @@ export function useChartData(
     benchmarkQueryOptions(selectedModel, VR_DEFAULT_RUN.date, enabled && preferVr, true),
   );
 
-  // Unofficial runs shown as official join the snapshot the way an ingest would: rows up
-  // to the snapshot date, deduped per series with the official rows below.
+  // Unofficial runs shown as official join the snapshot up to its date. Like append-only
+  // ingests, every run of one curve extends it: the rows share the curve's latest date, so
+  // the per-curve dedupe below keeps all of them instead of only the newest run.
   const previewRows = useOfficialPreviewBenchmarkRows();
   const modelPreviewRows = useMemo(() => {
     if (!previewRows || asOfRunId || selectedRunId) return null;
     const dbModelKeys = DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel];
-    return previewRows.filter(
+    const rows = previewRows.filter(
       (row) => dbModelKeys.includes(row.model) && (!queryDate || row.date <= queryDate),
     );
+    const curveDates = new Map<string, string>();
+    for (const row of rows) {
+      const scope = benchmarkCurveScope(row);
+      const latest = curveDates.get(scope);
+      if (!latest || row.date > latest) curveDates.set(scope, row.date);
+    }
+    return rows.map((row) => ({ ...row, curve_date: curveDates.get(benchmarkCurveScope(row)) }));
   }, [previewRows, asOfRunId, selectedRunId, selectedModel, queryDate]);
 
   const allRows = useMemo(() => {
