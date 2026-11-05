@@ -154,7 +154,7 @@ describe('generateHoverTooltipContent', () => {
       }),
     ).textContent;
     expect(text).toContain('Prompt Tokens');
-    expect(text).toContain('Theoretical Cache Hit Rate');
+    expect(text).toContain('theoretical 97.3%');
     expect(text).toContain('RadixArk/Kimi-K3.1-Dflash2-Preview');
   });
 

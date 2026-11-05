@@ -2266,8 +2266,8 @@ const ScatterGraph = React.memo(
       () => ({
         rulerType: 'crosshair' as const,
         content: (d: InferenceData, isPinned: boolean) => {
+          const { getCssColor: css, resolveColor: rc } = seriesColorRef.current;
           if (!isPinned) {
-            const { getCssColor: css, resolveColor: rc } = seriesColorRef.current;
             return generateHoverTooltipContent({
               data: d,
               xLabel,
@@ -2280,6 +2280,7 @@ const ScatterGraph = React.memo(
           }
           return generateTooltipContent({
             data: d,
+            color: css(rc(d.hwKey as string)),
             isPinned,
             xLabel,
             yLabel,
@@ -3228,6 +3229,7 @@ const ScatterGraph = React.memo(
                 content: (point, pinned) =>
                   generateOverlayTooltipContent({
                     data: point,
+                    color: overlayRunColor(overlayRunIndex(point.run_url ?? null, runIndexByUrl)),
                     isPinned: pinned,
                     xLabel,
                     yLabel,

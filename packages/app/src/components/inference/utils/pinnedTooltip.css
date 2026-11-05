@@ -1,0 +1,264 @@
+.inferencex-pinned-tooltip {
+  width: min(480px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--foreground) 16%, transparent);
+  border-radius: 14px;
+  background: var(--popover);
+  color: var(--foreground);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 16%);
+  font-family: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+.inferencex-pinned-tooltip .pinned-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.inferencex-pinned-tooltip .pinned-date {
+  margin-top: 3px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.inferencex-pinned-tooltip .pinned-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin: 14px 0;
+}
+
+.inferencex-pinned-tooltip .pinned-metric-label {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.inferencex-pinned-tooltip .pinned-metric-value {
+  margin: 3px 0 0;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.6px;
+}
+
+.inferencex-pinned-tooltip .pinned-exact {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.inferencex-pinned-tooltip [data-pinned-config] {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  border-radius: 8px;
+}
+
+.inferencex-pinned-tooltip [data-pinned-config] span {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+
+.inferencex-pinned-tooltip [data-pinned-config] strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.inferencex-pinned-tooltip .pinned-section {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+.inferencex-pinned-tooltip .pinned-table-scroll {
+  overflow-x: auto;
+}
+
+.inferencex-pinned-tooltip .pinned-topology {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: right;
+}
+
+.inferencex-pinned-tooltip .pinned-topology th {
+  padding: 0 8px 8px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.inferencex-pinned-tooltip .pinned-topology td {
+  padding: 7px 8px;
+  white-space: nowrap;
+  border-top: 1px solid color-mix(in srgb, var(--foreground) 7%, transparent);
+}
+
+.inferencex-pinned-tooltip .pinned-topology :is(th, td):first-child {
+  padding-left: 0;
+  text-align: left;
+}
+
+.inferencex-pinned-tooltip .pinned-topology :is(th, td):last-child {
+  padding-right: 0;
+}
+
+.inferencex-pinned-tooltip .tooltip-line {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.9fr) minmax(0, 1.4fr);
+  gap: 16px;
+  margin: 6px 0 !important;
+  font-size: 12px !important;
+  color: var(--foreground) !important;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.inferencex-pinned-tooltip .tooltip-line > strong {
+  color: var(--muted-foreground);
+  font-weight: 400;
+  text-align: left;
+}
+
+.inferencex-pinned-tooltip .pinned-image {
+  margin-top: 12px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.inferencex-pinned-tooltip .pinned-image p {
+  margin: 6px 0 0;
+}
+
+.inferencex-pinned-tooltip .pinned-actions > div {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 12px !important;
+}
+
+.inferencex-pinned-tooltip .pinned-actions :is(a, button) {
+  padding: 8px 10px;
+  border-color: color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+.inferencex-pinned-tooltip .pinned-dismiss {
+  margin-top: 12px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  text-align: center;
+}
+
+.inferencex-pinned-tooltip .pinned-config-summary,
+.inferencex-pinned-tooltip .pinned-bar-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.inferencex-pinned-tooltip .pinned-config-summary > span {
+  color: var(--muted-foreground);
+}
+
+.inferencex-pinned-tooltip .pinned-config-summary > strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.inferencex-pinned-tooltip .pinned-compact-topology strong {
+  font-weight: 600;
+}
+
+.inferencex-pinned-tooltip .pinned-raw-topology {
+  margin-top: 8px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+
+.inferencex-pinned-tooltip .pinned-raw-topology summary {
+  cursor: pointer;
+}
+
+.inferencex-pinned-tooltip .pinned-raw-topology[open] summary {
+  margin-bottom: 12px;
+}
+
+.inferencex-pinned-tooltip .pinned-token-breakdown {
+  margin-top: 14px;
+}
+
+.inferencex-pinned-tooltip .pinned-token-track {
+  display: flex;
+  height: 7px;
+  margin: 8px 0;
+  overflow: hidden;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+.inferencex-pinned-tooltip [data-token-prompt],
+.inferencex-pinned-tooltip .token-prompt-dot {
+  background: #3b82f6;
+}
+
+.inferencex-pinned-tooltip [data-token-generated],
+.inferencex-pinned-tooltip .token-generated-dot {
+  background: #a78bfa;
+}
+
+.inferencex-pinned-tooltip .pinned-token-legend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  font-size: 11px;
+}
+
+.inferencex-pinned-tooltip .pinned-token-legend > :last-child {
+  text-align: right;
+}
+
+.inferencex-pinned-tooltip .pinned-token-label {
+  color: var(--muted-foreground);
+}
+
+.inferencex-pinned-tooltip .pinned-token-label i {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 5px;
+  border-radius: 50%;
+}
+
+.inferencex-pinned-tooltip .pinned-token-count {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+@media (max-width: 480px) {
+  .inferencex-pinned-tooltip {
+    padding: 16px;
+  }
+  .inferencex-pinned-tooltip .pinned-metrics {
+    gap: 12px;
+  }
+  .inferencex-pinned-tooltip .pinned-metric-value {
+    font-size: 23px;
+  }
+}

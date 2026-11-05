@@ -200,7 +200,7 @@ describe('modeled system-power tooltip', () => {
     expect(html).toContain('3,600 W');
     expect(html).not.toContain('6000 W');
     expect(html).not.toContain('7200 W');
-    expect(html).toContain('<strong>Total Chips:</strong> 4');
+    expect(html).toContain('<span>Total Chips:</span> <strong>4</strong>');
 
     const zh = generateTooltipContent(config({ data, locale: 'zh' }));
     expect(zh).toContain('1 个八卡机箱 · 实测 4/8 张 GPU，按满机箱外推');
@@ -610,9 +610,7 @@ describe('generateTooltipContent', () => {
         }),
       }),
     );
-    expect(html).toContain('max-height: min(70vh, calc(100dvh - 16px))');
-    expect(html).toContain('overflow-y: auto');
-    expect(html).toContain('max-width: min(320px, calc(100vw - 16px))');
+    expect(html).toContain('class="inferencex-pinned-tooltip"');
     expect(html).toContain('data-action="view-power-trace"');
   });
 
