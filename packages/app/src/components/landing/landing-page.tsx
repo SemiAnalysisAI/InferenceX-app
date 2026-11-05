@@ -29,7 +29,7 @@ const STRINGS = {
       'Every model, framework, precision, and parallelism setting is committed to the public repo as a shell script.',
     browseSubmissions: 'Browse submissions',
     viewRuns: 'View benchmark runs on GitHub Actions',
-    howItWorks: 'How it works',
+    howItWorks: 'See how it works',
     quickComparisons: 'Quick comparisons',
     quickComparisonsDesc: 'Common chip inference comparisons, preset and ready to open.',
   },
@@ -46,7 +46,7 @@ const STRINGS = {
     openRecipesDesc: '每个模型、框架、精度和并行配置都以 shell 脚本形式保存在公开仓库中。',
     browseSubmissions: '浏览提交记录',
     viewRuns: '查看 GitHub Actions 运行记录',
-    howItWorks: '了解复现流程',
+    howItWorks: '查看复现流程',
     quickComparisons: '快速对比',
     quickComparisonsDesc: '常用的芯片推理对比视图，已预设好，可直接打开。',
   },
@@ -118,7 +118,7 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
               <LandingTrackedLink
                 href={`${prefix}/about#reproducibility`}
                 analyticsEvent="landing_reproducibility_about_clicked"
-                className={cn(buttonVariants({ variant: 'ghost' }), 'text-muted-foreground')}
+                className={cn(buttonVariants({ variant: 'outline' }), 'motion-press')}
               >
                 {t.howItWorks}
               </LandingTrackedLink>

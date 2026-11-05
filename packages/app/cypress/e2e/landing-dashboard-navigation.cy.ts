@@ -158,10 +158,10 @@ describe('landing model curation', () => {
         );
         cy.get('[data-testid="landing-tpu-kimi-k3-results-link"]')
           .should('have.attr', 'href', `${prefix}${TPU_KIMI_RESULTS_HREF}`)
-          .and('contain.text', prefix ? 'TPU Kimi K3 提交结果' : 'TPU Kimi K3 submission')
+          .and('contain.text', 'Google TPU')
           .and(
             'contain.text',
-            prefix ? '2.8 万亿参数 · AgentX' : '2.8 trillion parameters · AgentX',
+            prefix ? 'Kimi K3 · 2.8 万亿参数 · AgentX' : 'Kimi K3 · 2.8T parameters · AgentX',
           );
         cy.get('[data-testid="landing-tpu-kimi-k3-google-logo"] path').should('have.length', 4);
         cy.get('[data-new-badge="landing-tpu-kimi-k3"]')
@@ -171,11 +171,11 @@ describe('landing model curation', () => {
           .next()
           .should('have.attr', 'data-testid', 'landing-rubin-glm-5-3-results-link')
           .and('have.attr', 'href', `${prefix}/inference/glm-5-3`)
+          .and('contain.text', 'Vera Rubin NVL72')
           .and(
             'contain.text',
-            prefix ? 'Vera Rubin NVL72 GLM 5.3 提交结果' : 'Vera Rubin NVL72 GLM 5.3 submission',
-          )
-          .and('contain.text', prefix ? '7440 亿参数 · AgentX' : '744 billion parameters · AgentX');
+            prefix ? 'GLM 5.3 · 7440 亿参数 · AgentX' : 'GLM 5.3 · 744B parameters · AgentX',
+          );
         cy.get('[data-testid="landing-rubin-glm-5-3-nvidia-logo"] path').should(
           'have.attr',
           'fill',

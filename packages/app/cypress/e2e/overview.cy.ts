@@ -3,7 +3,7 @@ import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-con
 const MODEL_LABELS = [
   'Muse Spark Open 816B',
   'DeepSeek V4.1 Flash 552B',
-  'Kimi K3.1 Pro',
+  'Kimi K3.1 Pro 2.8T',
   'MiniMax M3.1 Flash 428B',
   'GLM5.2/GLM5.3',
   'Qwen3.5 397B',

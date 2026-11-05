@@ -390,7 +390,8 @@ const LANDING_HARDWARE_RESULTS = [
     vendor: 'Huawei',
     title: 'Huawei Ascend 950PR',
     titleZh: '华为 Ascend 950PR',
-    subtitle: 'UbenchX',
+    subtitle: 'Core and memory profiles · UbenchX',
+    subtitleZh: '核心与内存性能剖析 · UbenchX',
     href: '/ubenchx/core-memory-profiles',
     model: 'ascend950pr',
     analyticsEvent: 'landing_huawei_results_clicked',
@@ -399,10 +400,10 @@ const LANDING_HARDWARE_RESULTS = [
   {
     id: 'tpu-kimi-k3',
     vendor: 'Google',
-    title: 'TPU Kimi K3 submission',
-    titleZh: 'TPU Kimi K3 提交结果',
-    subtitle: '2.8 trillion parameters · AgentX',
-    subtitleZh: '2.8 万亿参数 · AgentX',
+    title: 'Google TPU',
+    titleZh: 'Google TPU',
+    subtitle: 'Kimi K3 · 2.8T parameters · AgentX',
+    subtitleZh: 'Kimi K3 · 2.8 万亿参数 · AgentX',
     href: '/inference/kimi-k3',
     model: 'kimi-k3',
     analyticsEvent: 'landing_tpu_results_clicked',
@@ -411,10 +412,10 @@ const LANDING_HARDWARE_RESULTS = [
   {
     id: 'rubin-glm-5-3',
     vendor: 'NVIDIA',
-    title: 'Vera Rubin NVL72 GLM 5.3 submission',
-    titleZh: 'Vera Rubin NVL72 GLM 5.3 提交结果',
-    subtitle: '744 billion parameters · AgentX',
-    subtitleZh: '7440 亿参数 · AgentX',
+    title: 'Vera Rubin NVL72',
+    titleZh: 'Vera Rubin NVL72',
+    subtitle: 'GLM 5.3 · 744B parameters · AgentX',
+    subtitleZh: 'GLM 5.3 · 7440 亿参数 · AgentX',
     href: '/inference/glm-5-3',
     model: 'glm-5-3',
     analyticsEvent: 'landing_rubin_results_clicked',
@@ -434,12 +435,28 @@ const LANDING_HARDWARE_RESULTS = [
     vendor: 'MiniMax',
     title: 'MiniMax M3.1 Flash',
     titleZh: 'MiniMax M3.1 Flash',
-    subtitle: 'AgentX',
+    subtitle: '428B parameters · AgentX',
+    subtitleZh: '4280 亿参数 · AgentX',
     href: '/inference/minimax-m31-flash',
     model: 'minimax-m31-flash',
     analyticsEvent: 'landing_minimax_m31_flash_results_clicked',
   },
 ] as const;
+
+const MODEL_SIZE_SUFFIX = /\s(?<amount>\d+(?:\.\d+)?)(?<unit>[BT])$/;
+
+function ledgerTitle(label: string): string {
+  return label.replace(MODEL_SIZE_SUFFIX, '');
+}
+
+function ledgerSubtitle(label: string, locale: 'en' | 'zh'): string {
+  const size = MODEL_SIZE_SUFFIX.exec(label)?.groups;
+  if (!size) return 'AgentX';
+  const { amount, unit } = size;
+  if (locale === 'en') return `${amount}${unit} parameters · AgentX`;
+  const zh = unit === 'T' ? `${amount} 万亿` : `${Number(amount) * 10} 亿`;
+  return `${zh}参数 · AgentX`;
+}
 
 const STRINGS = {
   en: {
@@ -667,12 +684,14 @@ export function AgentXCompareHero({
                     )}
                     <span className="min-w-0">
                       <span className="flex items-center gap-2 text-sm font-medium leading-tight text-foreground">
-                        <span className="min-w-0">{model.label}</span>
+                        <span className="min-w-0">{ledgerTitle(model.label)}</span>
                         {isNewAgentxModel(model) && (
                           <NewBadge data-new-badge="agentx-ledger">{t.newModel}</NewBadge>
                         )}
                       </span>
-                      <span className="mt-1 block text-xs text-muted-foreground">AgentX</span>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {ledgerSubtitle(model.label, locale)}
+                      </span>
                     </span>
                   </span>
                   <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground">
