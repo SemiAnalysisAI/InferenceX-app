@@ -463,6 +463,28 @@ describe('generateTooltipContent', () => {
     ).not.toContain('data-action="view-logs"');
   });
 
+  it.each([
+    [{ spec_decoding: 'draft_model' }, 'Draft Model'],
+    [
+      {
+        spec_decoding: 'draft_model',
+        spec_algorithm: 'dflash',
+        spec_draft_model: 'RadixArk/Muse-Spark-Open-DFlash2',
+      },
+      'DFlash (RadixArk/Muse-Spark-Open-DFlash2)',
+    ],
+    [
+      { spec_decoding: 'mtp', spec_algorithm: 'dspark', spec_draft_model: 'native' },
+      'DSpark (native)',
+    ],
+    [{ spec_decoding: 'none', spec_algorithm: 'dspark', spec_draft_model: 'native' }, 'Off'],
+  ])('labels speculative decoding by what the server ran: %j', (fields, label) => {
+    const html = generateTooltipContent(
+      tooltipConfig({ data: pt({ id: 3, benchmark_type: 'agentic_traces', ...fields }) }),
+    );
+    expect(html).toContain(`<strong>Speculative Decoding:</strong> ${label}</div>`);
+  });
+
   it('routes fixed-sequence log actions to the fixed benchmark log viewer', () => {
     const html = generateTooltipContent(
       tooltipConfig({

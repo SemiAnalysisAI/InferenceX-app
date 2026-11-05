@@ -514,6 +514,7 @@ const AGENTIC_STRINGS = {
   en: {
     speculativeDecoding: 'Speculative Decoding',
     off: 'Off',
+    native: 'native',
     requests: 'Requests',
     promptTokens: 'Prompt Tokens',
     generatedTokens: 'Generated Tokens',
@@ -521,26 +522,39 @@ const AGENTIC_STRINGS = {
   zh: {
     speculativeDecoding: '投机解码',
     off: '关闭',
+    native: '原生',
     requests: '请求',
     promptTokens: '提示 token',
     generatedTokens: '生成 token',
   },
 } as const;
 
+const SPEC_ALGORITHM_LABELS: Record<string, string> = {
+  mtp: 'MTP',
+  dspark: 'DSpark',
+  dflash: 'DFlash',
+  eagle: 'EAGLE',
+  eagle3: 'EAGLE3',
+  nextn: 'NextN',
+};
+
+const speculativeDecodingLabel = (
+  d: InferenceData,
+  t: (typeof AGENTIC_STRINGS)[Locale],
+): string => {
+  const specMethod = d.spec_decoding ?? 'none';
+  if (specMethod === 'none' || specMethod === '') return t.off;
+  if (!d.spec_algorithm) return specMethodDisplayLabel(d.model, specMethod);
+  const algorithm = SPEC_ALGORITHM_LABELS[d.spec_algorithm] ?? d.spec_algorithm.toUpperCase();
+  const draft = d.spec_draft_model;
+  return `${algorithm} (${!draft || draft === 'native' ? t.native : escapeHtml(draft)})`;
+};
+
 const generateAgenticHTML = (d: InferenceData, locale: Locale): string => {
   if (d.benchmark_type !== 'agentic_traces') return '';
 
   const t = AGENTIC_STRINGS[locale];
-  const parts: string[] = [];
-  const specMethod = d.spec_decoding ?? 'none';
-  parts.push(
-    tooltipLine(
-      t.speculativeDecoding,
-      specMethod === 'none' || specMethod === ''
-        ? t.off
-        : specMethodDisplayLabel(d.model, specMethod),
-    ),
-  );
+  const parts: string[] = [tooltipLine(t.speculativeDecoding, speculativeDecodingLabel(d, t))];
 
   if (d.num_requests_total !== undefined && d.num_requests_successful !== undefined) {
     const successPct =

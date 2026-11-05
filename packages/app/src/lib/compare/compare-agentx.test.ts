@@ -105,6 +105,17 @@ describe('AgentX comparison links', () => {
     expect(overviewScenariosForModel(Model.MiniMax_M3_1_Flash)).toEqual(['agentx']);
   });
 
+  it('routes Kimi K3.1 Pro to AgentX without featuring it on the ledger', () => {
+    const k31 = COMPARE_MODEL_SLUGS.find((model) => model.slug === 'kimi-k31-pro')!;
+    expect(comparisonScenarioForModel(k31)).toEqual({
+      label: 'AgentX',
+      sequence: 'agentic-traces',
+    });
+    expect(agentxDashboardHref('en', k31)).toBe('/inference/kimi-k31-pro');
+    expect(FEATURED_AGENTX_MODELS).not.toContain(k31);
+    expect(overviewScenariosForModel(Model.Kimi_K3_1_Pro)).toEqual(['agentx']);
+  });
+
   it('routes GLM-5.3-Flash to AgentX without promoting it on the landing ledger', () => {
     const flash = COMPARE_MODEL_SLUGS.find((model) => model.slug === 'glm-5-3-flash')!;
     expect(comparisonScenarioForModel(flash)).toEqual({

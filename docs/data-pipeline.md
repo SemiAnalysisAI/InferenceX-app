@@ -242,7 +242,11 @@ Benchmark point backfills use the same complete point selector as audited point 
 `metricsMerge`, top-level `metricsRemove`, and `offloadMode`. Setting `offloadMode`
 updates both the first-class column and `metrics.offload_mode`; for example, a missed CPU
 KV offload annotation can set `offloadMode: 'on'` and merge `kv_offloading` plus backend
-metadata in one correction. Unrelated metrics remain unchanged.
+metadata in one correction. Unrelated metrics remain unchanged. Setting `specMethod`
+moves the point to the config that differs only in its speculative decoding method and
+adds that method's availability row, dropping the old method's row once no point uses
+it. `SPEC_METHOD_BACKFILLS` (`spec-method-backfills.ts`) uses it for AgentX points the
+matrix labeled `mtp` whose server never drafted.
 
 When extending an already-applied identity-changing correction, record its old
 `set` as `previousSet`. The recovery command accepts that declared prior patch
@@ -435,6 +439,22 @@ also unioned back into the window rather than dropped. Only after that volume-we
 aggregation is the semantic `[0, 1]` bound applied as a guard against residual counter timing
 skew. Older rows without the component rate series retain the stored-ratio fallback.
 
+### Speculative Decoding Algorithm and Draft Model
+
+`configs.spec_method` is the matrix label (`mtp`, `draft_model`, `none`) and says neither
+which algorithm a server ran nor what drafted. InferenceX results carry `spec_algorithm`
+(`mtp`, `dspark`, `dflash`, `eagle3`, in the golden AL identity vocabulary) and
+`spec_draft_model` (the drafter's repo, or `native` when the served checkpoint drafts for
+itself). Ingest stores both in `metrics`, and the AgentX tooltip shows them, for example
+"DFlash (RadixArk/Muse-Spark-Open-DFlash2)" or "DSpark (native)". Points without them fall
+back to the label.
+
+`db:backfill-spec-algorithm` fills both for stored AgentX points from their server logs
+(`etl/server-log-speculation.ts`): vLLM's and ATOM's `SpeculativeConfig`, SGLang's
+`server_args`, TensorRT-LLM's speculative config, and TileRT's `num_mtp`. Engines often name
+the served checkpoint, or a directory inside `/model`, as the draft model, so only a separate
+drafter's name (DSpark, DFlash, EAGLE, NextN, MTP or draft) is reported as one.
+
 ### Server-Log Artifact Bundles
 
 Server-log artifacts are stored as filename-keyed bundles rather than as a hard-coded list of
@@ -506,7 +526,7 @@ becomes `ς` instead of `σ`, and newer engines lower letters PostgreSQL 17 leav
 query therefore asks for every code point with the same PostgreSQL lowercase as each term
 character. Regenerate the table if the database's PostgreSQL major version or locale changes.
 
-`SERVER_LOG_BLOCKS=1` makes ingest write blocks next to the text columns.
+`SERVER_LOG_BLOCKS=1` makes ingest write blocks next to the text columns; `ingest-results.yml` sets it.
 `bun run admin:db:compact-server-logs` (`--log-id`, `--limit`, `--dry-run`, `--concurrency`) converts
 existing files, reading each file's text in ranges of 64 blocks. `--concurrency N` compacts N files at
 once on N connections; each file is its own transaction, so an interrupted run resumes by rerunning.
@@ -895,8 +915,8 @@ and every writer compares the decoded blob with those rows before storing it.
 `gpu_metric_samples` stays the source of truth. Edit samples only through ingest,
 which restamps `ingested_at`.
 
-Ingest writes the blob in the sample transaction when `GPU_SAMPLE_BLOBS=1`; leave it
-unset until migration 022 is applied on the target. Run
+Ingest writes the blob in the sample transaction when `GPU_SAMPLE_BLOBS=1`, which
+`ingest-results.yml` sets; apply migration 022 on a target before ingesting into it. Run
 `bun run admin:db:backfill-gpu-sample-blobs --yes` once after migration 022 and after
 bumping `GPU_SAMPLE_BLOB_FORMAT_VERSION` (`--run-id ID`, `--limit N` and `--force`
 narrow or redo it). `bun run admin:db:verify-gpu-sample-blobs --limit N` compares

@@ -5,15 +5,19 @@ import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
 
 vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 
+// Registered for ingest ahead of sourced architecture data and an article.
+const UNSOURCED_MODELS: readonly Model[] = [Model.GLM_5_3_Flash, Model.Kimi_K3_1_Pro];
+
 describe('ModelArchitectureInfoLink', () => {
-  it.each(['en', 'zh'] as const)(
-    'does not link a pending Flash registration to a missing %s article',
-    (locale) => {
-      expect(ModelArchitectureInfoLink({ model: Model.GLM_5_3_Flash, locale })).toBeNull();
+  it.each(UNSOURCED_MODELS)(
+    'does not link the pending %s registration to a missing article',
+    (model) => {
+      expect(ModelArchitectureInfoLink({ model, locale: 'en' })).toBeNull();
+      expect(ModelArchitectureInfoLink({ model, locale: 'zh' })).toBeNull();
     },
   );
 
-  it.each(MODEL_OPTIONS.filter((model) => model !== Model.GLM_5_3_Flash))(
+  it.each(MODEL_OPTIONS.filter((model) => !UNSOURCED_MODELS.includes(model)))(
     'preserves the sourced architecture link for %s in both locales',
     (model) => {
       expect(ModelArchitectureInfoLink({ model, locale: 'en' })).not.toBeNull();
