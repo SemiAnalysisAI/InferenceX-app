@@ -492,8 +492,12 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '记录的引擎名称，与 runtime revision 分开。',
   ],
   r_date: [
-    'Recorded execution date, YYYY-MM-DD; never publication date.',
-    '记录的执行日期，格式 YYYY-MM-DD；不以发布日期替代。',
+    'As-of execution date, YYYY-MM-DD; never publication date. Each official deployment shows its latest run measured on or before this date; named-run overlays are not filtered. runs lists every official run of the workload and run names the selected one.',
+    '截至该执行日期查看结果，格式 YYYY-MM-DD；不以发布日期替代。每个正式部署显示其在该日期或之前测得的最新运行；指定运行叠加不受此筛选。runs 列出该工作负载的全部正式运行，run 为当前选中的运行。',
+  ],
+  r_run: [
+    'GitHub Actions run ID on the r_date day to view as of; default is that day’s last run.',
+    'r_date 当天要查看截至哪一次运行的 GitHub Actions 运行 ID；默认为当天最后一次运行。',
   ],
   r_hidden: [
     'Comma-separated hardware keys hidden from the overview chart, table, deployment detail and clips.',
@@ -739,6 +743,20 @@ const NEW_VIEWS = {
       options: object,
       state: object,
       workloadKey: { type: ['string', 'null'] },
+      runs: {
+        ...objects,
+        description:
+          'Official runs of the selected workload in measurement order, each { id, date } with the GitHub Actions run ID and execution date.',
+        'x-description-zh':
+          '所选工作负载的正式运行，按测量时间排序；每项为 { id, date }，即 GitHub Actions 运行 ID 和执行日期。',
+      },
+      run: {
+        type: ['object', 'null'],
+        description:
+          'The run the official cells are shown as of (r_date and r_run); null when no official run matches.',
+        'x-description-zh':
+          '正式结果所截至的运行（由 r_date 和 r_run 决定）；没有匹配的正式运行时为 null。',
+      },
       excludedCount: { type: 'integer', minimum: 0 },
       sampleFloor: { type: 'integer', const: 10 },
       scheduledClips: { type: 'integer', const: 20 },

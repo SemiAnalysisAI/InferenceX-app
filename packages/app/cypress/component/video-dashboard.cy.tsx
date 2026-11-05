@@ -427,6 +427,20 @@ describe('VideoGenX results', () => {
     cy.location('search').should('not.contain', 'r_hidden=');
   });
 
+  it('views results as of an earlier run from the Run context and returns to the latest', () => {
+    mount({ search: '?r_y=videosPerGpuHour' });
+    cy.get('#run-select').should('contain', 'Run 3/3');
+    points().should('have.length', 3);
+    cy.get('[data-testid="results-run-context"] button[aria-label="Previous run"]').click();
+    cy.get('#run-select').should('contain', 'Run 2/3');
+    searchParam('r_run').should('equal', '34341996789');
+    points('[data-hardware="h200"]').should('not.exist');
+    points().should('have.length', 2);
+    cy.get('[data-testid="results-run-context"] button[aria-label="Next run"]').click();
+    cy.get('#run-select').should('contain', 'Run 3/3');
+    points().should('have.length', 3);
+  });
+
   it('applies explicit scenario prices and utilisation to profit', () => {
     // Synthetic additive evidence exercises controls absent from retained public
     // projections. It is never written to the committed history fixture.

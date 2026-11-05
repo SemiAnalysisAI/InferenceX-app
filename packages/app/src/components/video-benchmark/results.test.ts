@@ -171,7 +171,6 @@ describe('VideoGenX results contract', () => {
       { hidden: ['b200'] },
       { gpuCount: 2 },
       { engine: 'other' },
-      { date: '1900-01-01' },
       { model: 'other' },
       { resolution: '1×1' },
       { duration: 1 },
@@ -259,6 +258,31 @@ describe('VideoGenX results contract', () => {
       expect(resultProjection([], selection, [{ ...named, ...change }]).overlayCells).toEqual([]);
   });
 
+  it('shows each deployment as of the selected run date and run', () => {
+    const run = (id: string, runId: string, observedAt: string, hardwareKey = 'h200') => ({
+      ...eligible,
+      id,
+      runId,
+      observedAt,
+      hardwareKey,
+    });
+    // Newest publication first, as the history pages deliver them.
+    const rerun = run('h200:new', '300', '2026-11-03T05:00:00Z');
+    const b200 = run('b200', '200', '2026-11-03T01:00:00Z', 'b200');
+    const first = run('h200:old', '100', '2026-11-01T06:00:00Z');
+    const shown = (selection: Partial<ResultsState>) => {
+      const result = resultProjection([rerun, b200, first], { ...state(), ...selection });
+      return [result.run?.id, result.cells.map((c) => c.point.id).sort()];
+    };
+    const latest = resultProjection([rerun, b200, first], state());
+    expect(latest.runs.map((r) => r.id)).toEqual(['100', '200', '300']);
+    expect(latest.options.dates).toEqual(['2026-11-01', '2026-11-03']);
+    expect(shown({})).toEqual(['300', ['b200', 'h200:new']]);
+    expect(shown({ date: '2026-11-03', run: '200' })).toEqual(['200', ['b200', 'h200:old']]);
+    expect(shown({ date: '2026-11-01' })).toEqual(['100', ['h200:old']]);
+    expect(shown({ date: '2026-11-02', run: '300' })).toEqual(['100', ['h200:old']]);
+  });
+
   it('parses public control keys and preserves explicit zero prices', () => {
     const selection: ResultsState = {
       ...state(),
@@ -271,6 +295,7 @@ describe('VideoGenX results contract', () => {
       gpuCount: 4,
       engine: 'sglang',
       date: '2026-10-18',
+      run: '456',
       hidden: ['mi355x'],
       deadlineSeconds: 60,
       costTier: 'r',
@@ -286,7 +311,7 @@ describe('VideoGenX results contract', () => {
     };
     expect(
       parseResultsState(
-        'r_model=MiniMaxAI%2FMiniMax-H3&r_workload=selected-source%3Ac1&r_resolution=1344%C3%97768&r_duration=8&r_mode=t2v&r_steps=50&r_gpus=4&r_engine=sglang&r_date=2026-10-18&r_hidden=mi355x&r_deadline=60&r_tier=r&r_api=0.02&r_price_t2v=0&r_price_i2v=0.1&r_utilization=0.5&unofficialrun=123&r_x=p90&r_y=kjPerClip&r_basis=allocated&r_optimal=0&r_point=123%3Aselected-source%3Ac1',
+        'r_model=MiniMaxAI%2FMiniMax-H3&r_workload=selected-source%3Ac1&r_resolution=1344%C3%97768&r_duration=8&r_mode=t2v&r_steps=50&r_gpus=4&r_engine=sglang&r_date=2026-10-18&r_run=456&r_hidden=mi355x&r_deadline=60&r_tier=r&r_api=0.02&r_price_t2v=0&r_price_i2v=0.1&r_utilization=0.5&unofficialrun=123&r_x=p90&r_y=kjPerClip&r_basis=allocated&r_optimal=0&r_point=123%3Aselected-source%3Ac1',
       ),
     ).toEqual(selection);
     expect(parseResultsState(resultsSearch(selection))).toEqual(selection);

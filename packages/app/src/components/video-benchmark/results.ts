@@ -31,7 +31,10 @@ export interface ResultsState {
   steps: number | null;
   gpuCount: number | null;
   engine: string | null;
+  /** As-of execution date: each deployment's latest run measured on or before it. */
   date: string | null;
+  /** Run on the selected date to view as of; null is that date's last run. */
+  run: string | null;
   hidden: string[];
   deadlineSeconds: number;
   costTier: CostTier;
@@ -56,6 +59,7 @@ export const DEFAULT_RESULTS_STATE: ResultsState = {
   gpuCount: null,
   engine: null,
   date: null,
+  run: null,
   hidden: [],
   deadlineSeconds: 120,
   costTier: 'h',
@@ -81,6 +85,7 @@ export const RESULTS_QUERY_PARAMS = [
   'r_gpus',
   'r_engine',
   'r_date',
+  'r_run',
   'r_hidden',
   'r_deadline',
   'r_tier',
@@ -118,6 +123,7 @@ export function parseResultsState(search: string | URLSearchParams): ResultsStat
     gpuCount: numeric('r_gpus', null),
     engine: s.get('r_engine') || null,
     date: s.get('r_date') || null,
+    run: /^[1-9]\d*$/u.test(s.get('r_run') ?? '') ? s.get('r_run') : null,
     hidden: [...new Set((s.get('r_hidden') ?? '').split(',').filter(Boolean))],
     deadlineSeconds: numeric('r_deadline', 120)!,
     costTier: s.get('r_tier') === 'r' ? 'r' : 'h',
@@ -149,6 +155,7 @@ export function resultsSearch(state: ResultsState): string {
     r_gpus: state.gpuCount,
     r_engine: state.engine,
     r_date: state.date,
+    r_run: state.run,
     r_hidden: state.hidden.join(',') || null,
     r_deadline: state.deadlineSeconds,
     r_tier: state.costTier,
@@ -337,6 +344,26 @@ const latest = (input: VideoPoint[]) => {
   return [...groups.values()].flatMap(latestVideoCells);
 };
 
+/** One published official run of the selected workload, in measurement order. */
+export interface ResultsRun {
+  id: string;
+  /** Execution date of the run's first observation, YYYY-MM-DD. */
+  date: string;
+}
+
+/** Runs ordered by first observation, ties broken by GitHub run ID. */
+function workloadRuns(points: readonly VideoPoint[]): ResultsRun[] {
+  const first = new Map<string, string>();
+  for (const point of points) {
+    const observed = point.observedAt ?? '';
+    const seen = first.get(point.runId);
+    if (seen === undefined || observed < seen) first.set(point.runId, observed);
+  }
+  return [...first]
+    .toSorted(([a, aAt], [b, bAt]) => aAt.localeCompare(bAt) || Number(a) - Number(b))
+    .map(([id, observed]) => ({ id, date: observed.slice(0, 10) }));
+}
+
 function qualifies(p: VideoPoint): boolean {
   return Boolean(
     RESULTS_HARDWARE.some((key) => key === p.hardwareKey) &&
@@ -388,8 +415,7 @@ export function resultProjection(
       (state.duration === null || m.duration === state.duration) &&
       (!state.mode || m.mode === state.mode) &&
       (state.steps === null || m.steps === state.steps) &&
-      (!state.engine || m.engine === state.engine) &&
-      (!state.date || m.date === state.date)
+      (!state.engine || m.engine === state.engine)
     );
   };
   const matches = qualified.filter(matchesFilters);
@@ -402,8 +428,21 @@ export function resultProjection(
     state.workload === null
       ? preferred
       : ([...workloads].find(([, item]) => item.key === state.workload)?.[0] ?? null);
+  const runs = workloadRuns(
+    matches.filter((p) => p.workloadKey === workloadKey && p.runId !== state.unofficialRun),
+  );
+  const asOf = state.date === null ? runs : runs.filter((r) => r.date <= state.date!);
+  const day = asOf.at(-1)?.date ?? runs[0]?.date ?? null;
+  const dayRuns = runs.filter((r) => r.date === day);
+  const run = dayRuns.find((r) => r.id === state.run) ?? dayRuns.at(-1) ?? null;
+  const shownRuns = new Set(
+    runs.slice(0, run === null ? 0 : runs.indexOf(run) + 1).map((r) => r.id),
+  );
   const common = matches.filter(
-    (p) => p.workloadKey === workloadKey && !state.hidden.includes(p.hardwareKey ?? ''),
+    (p) =>
+      p.workloadKey === workloadKey &&
+      !state.hidden.includes(p.hardwareKey ?? '') &&
+      (p.runId === state.unofficialRun || shownRuns.has(p.runId)),
   );
   const deploymentCells = latest(common.filter((p) => p.runId !== state.unofficialRun)).map((p) =>
     resultCell(p, state),
@@ -425,7 +464,7 @@ export function resultProjection(
       return (
         (!state.model || m.model === state.model) &&
         (!state.engine || m.engine === state.engine) &&
-        (!state.date || m.date === state.date) &&
+        (state.date === null || day === null || (m.date !== null && m.date <= day)) &&
         (state.gpuCount === null || point.participating === state.gpuCount) &&
         !state.hidden.includes(point.hardwareKey ?? '') &&
         point.runId !== state.unofficialRun
@@ -449,6 +488,8 @@ export function resultProjection(
     allCells: deploymentCells,
     workloadMix,
     workloadKey,
+    runs,
+    run,
     options: {
       models: values(metadata.map((m) => m.model)),
       resolutions: values(metadata.map((m) => m.resolution)),
@@ -457,7 +498,7 @@ export function resultProjection(
       steps: values(metadata.map((m) => m.steps)),
       gpuCounts: values(available.map((p) => p.participating)),
       engines: values(metadata.map((m) => m.engine)),
-      dates: values(metadata.map((m) => m.date)),
+      dates: values(runs.map((r) => r.date)),
       workloads: [...workloads.values()]
         .filter((w) => !state.model || w.model === state.model)
         .map(({ key, label }) => ({ key, label })),

@@ -26,6 +26,8 @@ import { Label } from '@/components/ui/label';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { DatePicker } from '@/components/ui/date-picker';
+import { RUN_CONTEXT_GRID, RunField } from '@/components/inference/ui/WorkflowInfoDisplay';
 import { hardwareLabel } from './hardware';
 import { leadCell } from './deployment';
 import { useVideoPoints } from './use-video-points';
@@ -74,7 +76,6 @@ const STRINGS = {
     yAxis: 'Y-axis metric',
     all: 'All',
     stepsUnit: 'steps',
-    latest: 'Latest published',
     loading: 'Loading video results…',
     error: 'Could not load video results.',
     retry: 'Retry',
@@ -128,7 +129,6 @@ const STRINGS = {
     yAxis: 'Y 轴指标',
     all: '全部',
     stepsUnit: '步',
-    latest: '最新已发布结果',
     loading: '正在加载视频结果…',
     error: '无法加载视频结果。',
     retry: '重试',
@@ -258,6 +258,7 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
     [points, state, namedPoints],
   );
   const { options, roster } = projection;
+  const dayRuns = projection.runs.filter((run) => run.date === projection.run?.date);
   const hidden = useMemo(() => new Set(state.hidden), [state.hidden]);
   const shown = (cell: ResultCell) => !hidden.has(cell.point.hardwareKey ?? '');
   const workloadLabel = useMemo(() => {
@@ -388,7 +389,7 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
     state.xMetric !== DEFAULT_RESULTS_STATE.xMetric,
     state.yMetric !== DEFAULT_RESULTS_STATE.yMetric,
     state.gpuCount !== null,
-    state.date !== null,
+    state.date !== null || state.run !== null,
   ].filter(Boolean).length;
   const model = deploymentCells[0]?.metadata.model ?? state.model ?? s.title;
   const details = (id: string, title: string, open: boolean | undefined, children: ReactNode) => (
@@ -507,29 +508,37 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
                       />
                     </div>
                   </ControlPanel>
-                  <ControlPanel legend={s.runContext}>
-                    <div className="flex min-w-0 flex-col gap-1.5">
-                      <Label htmlFor="results-date">{s.date}</Label>
-                      <SearchableSelect
-                        triggerId="results-date"
-                        triggerTestId="results-date"
-                        value={state.date ?? ''}
-                        onValueChange={(value) => update({ date: value || null })}
-                        groups={[
-                          {
-                            label: '',
-                            options: [
-                              { value: '', label: s.latest },
-                              ...options.dates
-                                .toSorted()
-                                .toReversed()
-                                .map((v) => ({ value: v, label: v })),
-                            ],
-                          },
-                        ]}
-                        placeholder={s.date}
-                        searchable={false}
+                  <ControlPanel legend={s.runContext} data-testid="results-run-context">
+                    <div className={RUN_CONTEXT_GRID}>
+                      <DatePicker
+                        label={s.date}
+                        date={projection.run?.date}
+                        onChange={(date) => update({ date, run: null })}
+                        availableDates={options.dates}
+                        isCheckingAvailableDates={loading}
+                        isLatestRunSelected={projection.run?.id === projection.runs.at(-1)?.id}
+                        onGoToLatestRun={() => update({ date: null, run: null })}
                       />
+                      {projection.run && (
+                        <RunField
+                          runIds={dayRuns.map((run) => run.id)}
+                          runs={Object.fromEntries(
+                            dayRuns.map((run) => [
+                              run.id,
+                              {
+                                conclusion: 'success',
+                                runUrl: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${run.id}`,
+                              },
+                            ]),
+                          )}
+                          selectedRunId={projection.run.id}
+                          onSelect={(run, source) => {
+                            if (!run) return;
+                            track('video_results_run_selected', { source });
+                            update({ date: projection.run!.date, run });
+                          }}
+                        />
+                      )}
                     </div>
                   </ControlPanel>
                 </MobileControlSection>
@@ -618,13 +627,7 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
                     !hidden.has(key) &&
                     deploymentCells.some((cell) => cell.point.hardwareKey === key),
                 )}
-                date={
-                  deploymentCells
-                    .map((cell) => cell.metadata.date)
-                    .filter((date): date is string => date !== null)
-                    .toSorted()
-                    .at(-1) ?? null
-                }
+                date={projection.run?.date ?? null}
               />
               <VideoResultsTable
                 rows={representatives}
