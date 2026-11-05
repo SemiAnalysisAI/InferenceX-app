@@ -1,11 +1,14 @@
 'use client';
 
 import * as d3 from 'd3';
+import { useTheme } from 'next-themes';
 import { type ReactNode, useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
+import { VENDOR_LABELS, vendorColor, type Vendor } from '@/lib/charts/dynamic-colors';
+import { isDarkTheme } from '@/lib/themes/themes';
 import ChartLegend from '@/components/ui/chart-legend';
 import {
   D3Chart,
@@ -22,6 +25,8 @@ import {
   groupVolumeByWeek,
   ON_CHANGE_ONLY_START_DATE,
   selectVolumeRows,
+  type VendorCounts,
+  volumeVendors,
 } from './submissions-utils';
 
 export type ChartMode = 'weekly' | 'cumulative';
@@ -33,8 +38,6 @@ interface SubmissionsChartProps {
   footer?: ReactNode;
 }
 
-const NVIDIA_COLOR = '#76b900';
-const AMD_COLOR = '#ed1c24';
 const TOTAL_COLOR = '#6b7280';
 const CHART_MARGIN = { top: 24, right: 24, bottom: 40, left: 60 };
 const CHART_ID = 'submissions-chart';
@@ -63,19 +66,9 @@ function useNarrowViewport(): boolean {
 
 interface ChartPoint {
   date: number;
-  nvidia: number;
-  amd: number;
+  vendors: VendorCounts;
   total: number;
 }
-
-function lineColor(key: string): string {
-  if (key === 'nvidia') return NVIDIA_COLOR;
-  if (key === 'amd') return AMD_COLOR;
-  return TOTAL_COLOR;
-}
-
-const LINE_KEYS = ['nvidia', 'amd', 'total'] as const;
-type LineKey = (typeof LINE_KEYS)[number];
 
 const SUBMISSION_DATE_FORMATTERS: Record<Locale, Intl.DateTimeFormat> = {
   en: new Intl.DateTimeFormat('en-US', {
@@ -96,20 +89,15 @@ export function formatSubmissionDate(date: number | Date, locale: Locale): strin
   return SUBMISSION_DATE_FORMATTERS[locale].format(new Date(date));
 }
 
-function submissionMetrics(d: ChartPoint, locale: Locale) {
+function submissionMetrics(d: ChartPoint, vendors: readonly Vendor[], locale: Locale) {
   const numberLocale = locale === 'zh' ? 'zh-CN' : 'en-US';
   return [
-    { value: d.nvidia.toLocaleString(numberLocale), label: 'NVIDIA' },
-    { value: d.amd.toLocaleString(numberLocale), label: 'AMD' },
+    ...vendors.map((vendor) => ({
+      value: (d.vendors[vendor] ?? 0).toLocaleString(numberLocale),
+      label: VENDOR_LABELS[vendor],
+    })),
     { value: d.total.toLocaleString(numberLocale), label: SUBMISSIONS_STRINGS[locale].total },
   ];
-}
-
-function generateTooltipContent(d: ChartPoint, locale: Locale): string {
-  return chartHoverCard({
-    title: formatSubmissionDate(d.date, locale),
-    metrics: submissionMetrics(d, locale),
-  });
 }
 
 const SUBMISSIONS_STRINGS = {
@@ -137,20 +125,25 @@ const SUBMISSIONS_STRINGS = {
 
 export default function SubmissionsChart({ volume, mode, caption, footer }: SubmissionsChartProps) {
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
-  const [enabledLines, setEnabledLines] = useState<Set<LineKey>>(new Set(LINE_KEYS));
+  const [hiddenLines, setHiddenLines] = useState<ReadonlySet<string>>(new Set());
   const [onChangeOnly, setOnChangeOnly] = useState(true);
   const locale = useLocale();
   const isNarrowViewport = useNarrowViewport();
   const legendT = SUBMISSIONS_STRINGS[locale];
+  const { resolvedTheme } = useTheme();
+  const theme = isDarkTheme(resolvedTheme) ? 'dark' : 'light';
+  const vendors = useMemo(() => volumeVendors(volume), [volume]);
+  const lineKeys = useMemo(() => [...vendors, 'total'], [vendors]);
+
+  const lineColor = useCallback(
+    (key: string) => (key === 'total' ? TOTAL_COLOR : vendorColor(key as Vendor, theme)),
+    [theme],
+  );
 
   const toggleLine = useCallback((name: string) => {
-    setEnabledLines((prev) => {
+    setHiddenLines((prev) => {
       const next = new Set(prev);
-      if (next.has(name as LineKey)) {
-        next.delete(name as LineKey);
-      } else {
-        next.add(name as LineKey);
-      }
+      if (!next.delete(name)) next.add(name);
       return next;
     });
     track('submissions_line_toggled', { line: name });
@@ -158,54 +151,32 @@ export default function SubmissionsChart({ volume, mode, caption, footer }: Subm
 
   const legendItems = useMemo(
     () =>
-      LINE_KEYS.map((key) => ({
+      lineKeys.map((key) => ({
         name: key,
-        label: key === 'total' ? legendT.total : key === 'nvidia' ? 'NVIDIA' : 'AMD',
+        label: key === 'total' ? legendT.total : VENDOR_LABELS[key as Vendor],
         color: lineColor(key),
-        isActive: enabledLines.has(key),
+        isActive: !hiddenLines.has(key),
         onClick: toggleLine,
       })),
-    [enabledLines, legendT.total, toggleLine],
+    [lineKeys, hiddenLines, legendT.total, lineColor, toggleLine],
   );
-
-  const filteredVolume = useMemo(
-    () => selectVolumeRows(volume, mode, onChangeOnly),
-    [volume, onChangeOnly, mode],
-  );
-
-  const weeklyData = useMemo(() => groupVolumeByWeek(filteredVolume), [filteredVolume]);
-  const cumulativeData = useMemo(() => computeCumulative(filteredVolume), [filteredVolume]);
 
   const { chartPoints, lineData, xDomain, yDomain } = useMemo(() => {
-    const source =
-      mode === 'weekly'
-        ? weeklyData.map((d) => ({
-            date: new Date(d.week).getTime(),
-            nvidia: d.nvidia,
-            amd: d.nonNvidia,
-            total: d.total,
-          }))
-        : cumulativeData.map((d) => ({
-            date: new Date(d.date).getTime(),
-            nvidia: d.nvidia,
-            amd: d.nonNvidia,
-            total: d.total,
-          }));
-
+    const selected = selectVolumeRows(volume, mode, onChangeOnly);
+    const source = (mode === 'weekly' ? groupVolumeByWeek : computeCumulative)(selected).map(
+      (d) => ({ date: new Date(d.date).getTime(), vendors: d.vendors, total: d.total }),
+    );
     const lines: Record<string, { x: number; y: number }[]> = {};
-    if (enabledLines.has('nvidia')) lines.nvidia = source.map((p) => ({ x: p.date, y: p.nvidia }));
-    if (enabledLines.has('amd')) lines.amd = source.map((p) => ({ x: p.date, y: p.amd }));
-    if (enabledLines.has('total')) lines.total = source.map((p) => ({ x: p.date, y: p.total }));
+    for (const key of lineKeys) {
+      if (hiddenLines.has(key)) continue;
+      lines[key] = source.map((p) => ({
+        x: p.date,
+        y: key === 'total' ? p.total : (p.vendors[key as Vendor] ?? 0),
+      }));
+    }
 
     const xExt = d3.extent(source, (d) => d.date) as [number, number];
-    const visibleMax =
-      d3.max(source, (d) => {
-        let max = 0;
-        if (enabledLines.has('nvidia')) max = Math.max(max, d.nvidia);
-        if (enabledLines.has('amd')) max = Math.max(max, d.amd);
-        if (enabledLines.has('total')) max = Math.max(max, d.total);
-        return max;
-      }) ?? 0;
+    const visibleMax = d3.max(Object.values(lines).flat(), (p) => p.y) ?? 0;
     const yPad = mode === 'weekly' ? 1.1 : 1.05;
 
     return {
@@ -214,7 +185,7 @@ export default function SubmissionsChart({ volume, mode, caption, footer }: Subm
       xDomain: xExt,
       yDomain: [0, visibleMax * yPad] as [number, number],
     };
-  }, [mode, weeklyData, cumulativeData, enabledLines]);
+  }, [volume, mode, onChangeOnly, lineKeys, hiddenLines]);
 
   const layers: LayerConfig<ChartPoint>[] = useMemo(
     () => [
@@ -289,7 +260,7 @@ export default function SubmissionsChart({ volume, mode, caption, footer }: Subm
         },
       },
     ],
-    [legendT.markerLine1, legendT.markerLine2, lineData, locale],
+    [legendT.markerLine1, legendT.markerLine2, lineData, lineColor, locale],
   );
 
   if (chartPoints.length === 0) {
@@ -334,11 +305,15 @@ export default function SubmissionsChart({ volume, mode, caption, footer }: Subm
         }}
         tooltip={{
           rulerType: 'vertical',
-          content: (point) => generateTooltipContent(point, locale),
+          content: (point) =>
+            chartHoverCard({
+              title: formatSubmissionDate(point.date, locale),
+              metrics: submissionMetrics(point, vendors, locale),
+            }),
           details: (point, _isOverlay, close) => (
             <ChartPointDetails
               title={formatSubmissionDate(point.date, locale)}
-              metrics={submissionMetrics(point, locale)}
+              metrics={submissionMetrics(point, vendors, locale)}
               onClose={close}
             />
           ),

@@ -1,6 +1,7 @@
 import { DB_MODEL_TO_DISPLAY, GPU_VENDORS } from '@semianalysisai/inferencex-constants';
 
 import { buildAvailabilityHwKey } from '@/lib/charts/chart-utils';
+import { getVendor as getVendorKey, type Vendor } from '@/lib/charts/dynamic-colors';
 import type {
   SubmissionSummaryRow,
   SubmissionVolumeRow,
@@ -49,10 +50,6 @@ export function computePreviousImages(data: SubmissionSummaryRow[]): Map<string,
   return result;
 }
 
-export function isNonNvidia(hardware: string): boolean {
-  return getVendor(hardware) !== 'NVIDIA';
-}
-
 export function buildInferenceCompareUrl(
   currentRow: SubmissionSummaryRow,
   previousRow: SubmissionSummaryRow,
@@ -76,11 +73,26 @@ export function buildInferenceCompareUrl(
   return `/inference?${params.toString()}`;
 }
 
-export interface WeeklyVolume {
-  week: string;
-  nvidia: number;
-  nonNvidia: number;
+export const SUBMISSION_VENDORS: readonly Vendor[] = [
+  'nvidia',
+  'amd',
+  'openai',
+  'google',
+  'huawei',
+  'unknown',
+];
+
+export type VendorCounts = Partial<Record<Vendor, number>>;
+
+export interface VolumePoint {
+  date: string;
+  vendors: VendorCounts;
   total: number;
+}
+
+export function volumeVendors(volume: SubmissionVolumeRow[]): Vendor[] {
+  const present = new Set(volume.map((row) => getVendorKey(row.hardware)));
+  return SUBMISSION_VENDORS.filter((vendor) => present.has(vendor));
 }
 
 function getIsoWeekStart(dateStr: string): string {
@@ -103,62 +115,40 @@ export function selectVolumeRows(
     : volume;
 }
 
-export function groupVolumeByWeek(volume: SubmissionVolumeRow[]): WeeklyVolume[] {
-  const weekMap = new Map<string, { nvidia: number; nonNvidia: number }>();
-
+function countByVendor(
+  volume: SubmissionVolumeRow[],
+  bucket: (date: string) => string,
+): [string, VendorCounts][] {
+  const buckets = new Map<string, VendorCounts>();
   for (const row of volume) {
-    const week = getIsoWeekStart(row.date);
-    const entry = weekMap.get(week) ?? { nvidia: 0, nonNvidia: 0 };
-    if (isNonNvidia(row.hardware)) {
-      entry.nonNvidia += row.datapoints;
-    } else {
-      entry.nvidia += row.datapoints;
-    }
-    weekMap.set(week, entry);
+    const key = bucket(row.date);
+    const counts = buckets.get(key) ?? {};
+    const vendor = getVendorKey(row.hardware);
+    counts[vendor] = (counts[vendor] ?? 0) + row.datapoints;
+    buckets.set(key, counts);
   }
-
-  return [...weekMap.entries()]
-    .toSorted(([a], [b]) => a.localeCompare(b))
-    .map(([week, counts]) => ({
-      week,
-      nvidia: counts.nvidia,
-      nonNvidia: counts.nonNvidia,
-      total: counts.nvidia + counts.nonNvidia,
-    }));
+  return [...buckets.entries()].toSorted(([a], [b]) => a.localeCompare(b));
 }
 
-export interface CumulativePoint {
-  date: string;
-  nvidia: number;
-  nonNvidia: number;
-  total: number;
+export function groupVolumeByWeek(volume: SubmissionVolumeRow[]): VolumePoint[] {
+  return countByVendor(volume, getIsoWeekStart).map(([date, vendors]) => ({
+    date,
+    vendors,
+    total: Object.values(vendors).reduce((sum, count) => sum + count, 0),
+  }));
 }
 
-export function computeCumulative(volume: SubmissionVolumeRow[]): CumulativePoint[] {
-  const dateMap = new Map<string, { nvidia: number; nonNvidia: number }>();
-  for (const row of volume) {
-    const entry = dateMap.get(row.date) ?? { nvidia: 0, nonNvidia: 0 };
-    if (isNonNvidia(row.hardware)) {
-      entry.nonNvidia += row.datapoints;
-    } else {
-      entry.nvidia += row.datapoints;
+export function computeCumulative(volume: SubmissionVolumeRow[]): VolumePoint[] {
+  const running: VendorCounts = {};
+  let total = 0;
+  return countByVendor(volume, (date) => date).map(([date, counts]) => {
+    for (const vendor of SUBMISSION_VENDORS) {
+      const count = counts[vendor];
+      if (count === undefined) continue;
+      running[vendor] = (running[vendor] ?? 0) + count;
+      total += count;
     }
-    dateMap.set(row.date, entry);
-  }
-
-  const sorted = [...dateMap.entries()].toSorted(([a], [b]) => a.localeCompare(b));
-
-  let cumNvidia = 0;
-  let cumNonNvidia = 0;
-  return sorted.map(([date, counts]) => {
-    cumNvidia += counts.nvidia;
-    cumNonNvidia += counts.nonNvidia;
-    return {
-      date,
-      nvidia: cumNvidia,
-      nonNvidia: cumNonNvidia,
-      total: cumNvidia + cumNonNvidia,
-    };
+    return { date, vendors: { ...running }, total };
   });
 }
 

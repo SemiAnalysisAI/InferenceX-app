@@ -203,7 +203,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-submissions-view',
-    sourceSha256: 'cb183903e42941a66272deb3571a0750f264d3f917aff28a4f48f63566ade17e',
+    sourceSha256: 'ecfbca98e1deef38618b7576007365afaa71d78aabae3fe4670f00a8e28f75a2',
   },
   {
     source: 'src/app/api/v1/views/video/route.ts',
@@ -1010,7 +1010,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-submissions',
-    sourceSha256: 'e926912cbc10b87a1c33a1666c0709c521d88bd3f709a4cf33bba3bbc8deb5dc',
+    sourceSha256: '295297aefca483b6a223d170806eee85b35640e9be7f525b2959cf8e9deb500d',
   },
   {
     source: 'src/app/api/v1/tco-feed/route.ts',

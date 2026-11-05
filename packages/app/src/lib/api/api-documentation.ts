@@ -1572,8 +1572,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/submissions',
     summary: text('Read submission coverage', '读取提交覆盖'),
     description: text(
-      'Returns configuration-level submission summaries and daily hardware submission volume.',
-      '返回配置级提交汇总和每日硬件提交量。',
+      'Returns configuration-level submission summaries and daily hardware submission volume. Official-preview snapshots shown on the dashboards (Jalapeño, July Vera Rubin, TPU7x) are included with image null when the database has no run for the same model, hardware, framework and date.',
+      '返回配置级提交汇总和每日硬件提交量。仪表板中展示的官方预览快照（Jalapeño、7 月 Vera Rubin、TPU7x）在数据库中没有相同模型、硬件、框架和日期的运行时一并返回，其 image 为 null。',
     ),
     audience: 'public',
     stability: 'stable',

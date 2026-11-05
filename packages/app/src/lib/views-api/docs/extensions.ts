@@ -295,8 +295,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '布尔值，默认 true。仅周图按仪表板规则应用按变更运行的统计起点。',
   ],
   lines: [
-    'Submission chart lines: comma-separated nvidia, amd, total; amd includes non-NVIDIA rows as in the UI.',
-    '提交图曲线：nvidia、amd、total，以逗号分隔；amd 与界面一致，包含非 NVIDIA 行。',
+    'Submission chart lines, comma-separated from nvidia, amd, openai, google, huawei, unknown and total. Defaults to every vendor with submissions plus total, as in the UI.',
+    '提交图曲线，以逗号分隔，可选 nvidia、amd、openai、google、huawei、unknown 和 total。默认与界面一致，包含所有有提交记录的厂商及 total。',
   ],
   hardware: [
     'Image-view hardware key; whitespace is trimmed and case ignored. Default all.',

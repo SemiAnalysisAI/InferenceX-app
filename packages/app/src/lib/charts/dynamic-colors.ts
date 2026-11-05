@@ -78,6 +78,24 @@ export function generateVendorColors(
   return result;
 }
 
+export const VENDOR_LABELS: Record<Vendor, string> = {
+  nvidia: 'NVIDIA',
+  amd: 'AMD',
+  openai: 'OpenAI',
+  google: 'Google',
+  huawei: 'Huawei',
+  unknown: 'Unknown',
+};
+
+const VENDOR_BRAND_COLORS: Partial<Record<Vendor, string>> = {
+  nvidia: '#76b900',
+  amd: '#ed1c24',
+};
+
+export function vendorColor(vendor: Vendor, theme: 'light' | 'dark'): string {
+  return VENDOR_BRAND_COLORS[vendor] ?? generateVendorColors([vendor], theme)[vendor];
+}
+
 export function generateGpuDateColors(
   gpuKeys: string[],
   dateCount: number,

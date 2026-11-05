@@ -13,8 +13,8 @@ import {
   computeTotalStats,
   getVendor,
   groupVolumeByWeek,
-  isNonNvidia,
   submissionRowKey,
+  volumeVendors,
 } from './submissions-utils';
 
 describe('getVendor', () => {
@@ -28,18 +28,26 @@ describe('getVendor', () => {
     expect(getVendor('mi355x')).toBe('AMD');
   });
 
+  it('returns Google and OpenAI for TPU and Jalapeño', () => {
+    expect(getVendor('tpuv7')).toBe('Google');
+    expect(getVendor('jalapeno')).toBe('OpenAI');
+  });
+
   it('returns Unknown for unrecognized hardware', () => {
     expect(getVendor('tpu-v5')).toBe('Unknown');
   });
 });
 
-describe('isNonNvidia', () => {
-  it('returns false for NVIDIA GPUs', () => {
-    expect(isNonNvidia('h200')).toBe(false);
-  });
-
-  it('returns true for AMD GPUs', () => {
-    expect(isNonNvidia('mi355x')).toBe(true);
+describe('volumeVendors', () => {
+  it('lists vendors with submissions in display order', () => {
+    expect(
+      volumeVendors([
+        { date: '2026-01-05', hardware: 'tpuv7', datapoints: 1 },
+        { date: '2026-01-05', hardware: 'jalapeno', datapoints: 1 },
+        { date: '2026-01-05', hardware: 'mi355x', datapoints: 1 },
+        { date: '2026-01-05', hardware: 'h200', datapoints: 1 },
+      ]),
+    ).toEqual(['nvidia', 'amd', 'openai', 'google']);
   });
 });
 
@@ -47,18 +55,16 @@ describe('groupVolumeByWeek', () => {
   const volume: SubmissionVolumeRow[] = [
     { date: '2026-01-05', hardware: 'h100', datapoints: 10 },
     { date: '2026-01-06', hardware: 'mi300x', datapoints: 5 },
+    { date: '2026-01-07', hardware: 'tpuv7', datapoints: 3 },
     { date: '2026-01-12', hardware: 'h100', datapoints: 20 },
+    { date: '2026-01-13', hardware: 'jalapeno', datapoints: 4 },
   ];
 
-  it('groups by ISO week', () => {
-    const result = groupVolumeByWeek(volume);
-    expect(result).toHaveLength(2);
-    expect(result[0].week).toBe('2026-01-05');
-    expect(result[0].nvidia).toBe(10);
-    expect(result[0].nonNvidia).toBe(5);
-    expect(result[0].total).toBe(15);
-    expect(result[1].week).toBe('2026-01-12');
-    expect(result[1].total).toBe(20);
+  it('groups by ISO week with one count per vendor', () => {
+    expect(groupVolumeByWeek(volume)).toEqual([
+      { date: '2026-01-05', vendors: { nvidia: 10, amd: 5, google: 3 }, total: 18 },
+      { date: '2026-01-12', vendors: { nvidia: 20, openai: 4 }, total: 24 },
+    ]);
   });
 
   it('returns empty for empty input', () => {
@@ -71,13 +77,14 @@ describe('computeCumulative', () => {
     { date: '2026-01-01', hardware: 'h100', datapoints: 10 },
     { date: '2026-01-01', hardware: 'mi300x', datapoints: 5 },
     { date: '2026-01-02', hardware: 'h100', datapoints: 20 },
+    { date: '2026-01-02', hardware: 'tpuv7', datapoints: 2 },
   ];
 
-  it('computes running totals', () => {
-    const result = computeCumulative(volume);
-    expect(result).toHaveLength(2);
-    expect(result[0]).toEqual({ date: '2026-01-01', nvidia: 10, nonNvidia: 5, total: 15 });
-    expect(result[1]).toEqual({ date: '2026-01-02', nvidia: 30, nonNvidia: 5, total: 35 });
+  it('computes running totals per vendor', () => {
+    expect(computeCumulative(volume)).toEqual([
+      { date: '2026-01-01', vendors: { nvidia: 10, amd: 5 }, total: 15 },
+      { date: '2026-01-02', vendors: { nvidia: 30, amd: 5, google: 2 }, total: 37 },
+    ]);
   });
 
   it('returns empty for empty input', () => {

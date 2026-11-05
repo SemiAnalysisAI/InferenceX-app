@@ -243,6 +243,58 @@ describe('Chinese (/zh) pages', () => {
         .and('contain.text', '解码芯片数：');
     });
 
+    it('gives every vendor with submissions its own series, legend entry and dot', () => {
+      const row = {
+        model: 'dsr1',
+        framework: 'teacup',
+        precision: 'fp4',
+        spec_method: 'none',
+        disagg: false,
+        is_multinode: false,
+        num_prefill_gpu: 8,
+        num_decode_gpu: 8,
+        prefill_tp: 8,
+        prefill_ep: 1,
+        decode_tp: 8,
+        decode_ep: 1,
+        date: '2026-08-22',
+        total_datapoints: 8,
+        distinct_sequences: 1,
+        distinct_concurrencies: 8,
+        max_concurrency: 512,
+        image: null,
+      };
+      cy.intercept('GET', '**/api/v1/submissions', {
+        body: {
+          summary: ['h200', 'mi355x', 'jalapeno', 'tpuv7'].map((hardware) => ({
+            ...row,
+            hardware,
+          })),
+          volume: [
+            { date: '2026-08-17', hardware: 'h200', datapoints: 40 },
+            { date: '2026-08-17', hardware: 'mi355x', datapoints: 30 },
+            { date: '2026-08-22', hardware: 'jalapeno', datapoints: 28 },
+            { date: '2026-08-26', hardware: 'tpuv7', datapoints: 7 },
+          ],
+        },
+      }).as('vendorSubmissions');
+      cy.reload();
+      cy.wait('@vendorSubmissions');
+      cy.get('[role="group"][aria-label="基准测试提交活动图表"]').within(() => {
+        for (const label of ['NVIDIA', 'AMD', 'OpenAI', 'Google', '合计']) {
+          cy.contains('button, li', label).should('be.visible');
+        }
+      });
+      cy.get('[data-testid="jalapeno-official-preview-notice"]').should(
+        'contain.text',
+        'Jalapeño 结果为官方预览',
+      );
+      cy.get('[data-testid="tpuv7-official-preview-notice"]').should('be.visible');
+      for (const vendor of ['NVIDIA', 'AMD', 'OpenAI', 'Google']) {
+        cy.get(`tbody span[role="img"][aria-label="${vendor}"]`).should('be.visible');
+      }
+    });
+
     it('separates localized empty chart and table states', () => {
       cy.intercept('GET', '**/api/v1/submissions', { body: { summary: [], volume: [] } }).as(
         'emptySubmissions',

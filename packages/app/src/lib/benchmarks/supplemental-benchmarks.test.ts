@@ -9,6 +9,7 @@ import {
   withSupplementalAvailability,
   withSupplementalBenchmarkHistory,
   withSupplementalBenchmarks,
+  withSupplementalSubmissions,
 } from './supplemental-benchmarks';
 
 describe('supplemental benchmark snapshots', () => {
@@ -92,6 +93,51 @@ describe('supplemental benchmark snapshots', () => {
     const availability = withSupplementalAvailability([]);
     expect(availability).toHaveLength(6);
     expect(withSupplementalAvailability(availability)).toHaveLength(6);
+  });
+
+  it('adds snapshot runs to submissions once, without duplicating recorded runs', () => {
+    const submissions = withSupplementalSubmissions({ summary: [], volume: [] });
+    const jalapenoVolume = submissions.volume.filter((row) => row.hardware === 'jalapeno');
+    expect(jalapenoVolume).toEqual([
+      { date: '2026-08-17', hardware: 'jalapeno', datapoints: 8 },
+      { date: '2026-08-22', hardware: 'jalapeno', datapoints: 28 },
+    ]);
+    expect(submissions.volume.reduce((sum, row) => sum + row.datapoints, 0)).toBe(
+      SUPPLEMENTAL_BENCHMARK_ROWS.length,
+    );
+    expect(submissions.summary.reduce((sum, row) => sum + row.total_datapoints, 0)).toBe(
+      SUPPLEMENTAL_BENCHMARK_ROWS.length,
+    );
+    expect(
+      submissions.summary.find(
+        (row) => row.hardware === 'jalapeno' && row.date === '2026-08-17' && row.prefill_tp === 8,
+      ),
+    ).toMatchObject({
+      model: 'dsr1',
+      framework: 'teacup',
+      num_prefill_gpu: 8,
+      total_datapoints: 8,
+      distinct_sequences: 1,
+      distinct_concurrencies: 8,
+      max_concurrency: 512,
+    });
+    expect(submissions.summary.map((row) => row.date)).toEqual(
+      submissions.summary
+        .map((row) => row.date)
+        .toSorted()
+        .toReversed(),
+    );
+    expect(withSupplementalSubmissions(submissions)).toEqual(submissions);
+
+    const recordedTpu = submissions.summary.find((row) => row.hardware === 'tpuv7')!;
+    const withRecordedTpu = withSupplementalSubmissions({
+      summary: [recordedTpu],
+      volume: [{ date: recordedTpu.date, hardware: 'tpuv7', datapoints: 1 }],
+    });
+    expect(withRecordedTpu.summary.filter((row) => row.hardware === 'tpuv7')).toEqual([
+      recordedTpu,
+    ]);
+    expect(withRecordedTpu.volume.filter((row) => row.hardware === 'tpuv7')).toHaveLength(1);
   });
 
   it('limits only the July VR200 snapshot to output-token metrics', () => {

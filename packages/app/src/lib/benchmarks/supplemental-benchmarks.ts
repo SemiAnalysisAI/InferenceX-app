@@ -1,5 +1,10 @@
 import tpuv7Snapshot from './tpuv7-qwen35-snapshot.json';
 import type { AvailabilityRow, BenchmarkRow } from '@/lib/api/api';
+import type {
+  SubmissionSummaryRow,
+  SubmissionsResponse,
+  SubmissionVolumeRow,
+} from '@/lib/submissions/submissions-types';
 
 export type TokenMetricType = 'total' | 'input' | 'output';
 
@@ -436,6 +441,75 @@ export function withSupplementalAvailability(rows: AvailabilityRow[]): Availabil
     date: dataset.date,
   })).filter((row) => !existing.has(availabilityIdentity(row)));
   return additions.length > 0 ? [...rows, ...additions] : rows;
+}
+
+const submissionRunIdentity = (
+  row: Pick<SubmissionSummaryRow, 'model' | 'hardware' | 'framework' | 'date'>,
+) => `${row.model}|${row.hardware}|${row.framework}|${row.date}`;
+
+export function withSupplementalSubmissions({
+  summary,
+  volume,
+}: SubmissionsResponse): SubmissionsResponse {
+  const existing = new Set(summary.map(submissionRunIdentity));
+  const datasets = DATASETS.filter(
+    (dataset) => dataset.points.length > 0 && !existing.has(submissionRunIdentity(dataset)),
+  );
+  if (datasets.length === 0) return { summary, volume };
+
+  const configs = new Map<string, { row: SubmissionSummaryRow; concurrencies: Set<number> }>();
+  const days = new Map<string, SubmissionVolumeRow>();
+  for (const dataset of datasets) {
+    const dayKey = `${dataset.date}|${dataset.hardware}`;
+    const day = days.get(dayKey) ?? {
+      date: dataset.date,
+      hardware: dataset.hardware,
+      datapoints: 0,
+    };
+    day.datapoints += dataset.points.length;
+    days.set(dayKey, day);
+
+    for (const point of dataset.points) {
+      const row = toBenchmarkRow(dataset, point);
+      const configKey = `${dataset.id}|${row.prefill_tp}|${row.prefill_ep}|${row.num_prefill_gpu}`;
+      const config = configs.get(configKey) ?? {
+        row: {
+          model: row.model,
+          hardware: row.hardware,
+          framework: row.framework,
+          precision: row.precision,
+          spec_method: row.spec_method,
+          disagg: row.disagg,
+          is_multinode: row.is_multinode,
+          num_prefill_gpu: row.num_prefill_gpu,
+          num_decode_gpu: row.num_decode_gpu,
+          prefill_tp: row.prefill_tp,
+          prefill_ep: row.prefill_ep,
+          decode_tp: row.decode_tp,
+          decode_ep: row.decode_ep,
+          date: row.date,
+          total_datapoints: 0,
+          distinct_sequences: 1,
+          distinct_concurrencies: 0,
+          max_concurrency: 0,
+          image: row.image,
+        },
+        concurrencies: new Set<number>(),
+      };
+      config.row.total_datapoints += 1;
+      config.row.max_concurrency = Math.max(config.row.max_concurrency, row.conc);
+      config.concurrencies.add(row.conc);
+      config.row.distinct_concurrencies = config.concurrencies.size;
+      configs.set(configKey, config);
+    }
+  }
+
+  return {
+    summary: [...summary, ...[...configs.values()].map(({ row }) => row)].toSorted((a, b) =>
+      b.date.localeCompare(a.date),
+    ),
+    volume: [...volume, ...days.values()].toSorted((a, b) => a.date.localeCompare(b.date)),
+  };
 }
 
 function capabilityFor(hardware: string, framework: string, date: string) {
