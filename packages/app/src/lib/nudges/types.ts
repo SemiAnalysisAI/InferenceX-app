@@ -73,6 +73,7 @@ export interface NudgeContent {
   hideDismissButton?: boolean;
   primaryAction?: NudgeAction;
   secondaryAction?: NudgeAction;
+  additionalActions?: NudgeAction[];
   containerClassName?: string;
   centered?: boolean;
   actionClassName?: string;

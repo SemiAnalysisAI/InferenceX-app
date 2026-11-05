@@ -626,6 +626,19 @@ function ModalRenderer({
                 {localized(locale, content.secondaryAction.label, content.secondaryAction.labelZh)}
               </Button>
             )}
+            {content.additionalActions?.map((action, index) => (
+              <Button
+                key={action.label}
+                onClick={() => onAction(action)}
+                data-testid={
+                  content.testId ? `${content.testId}-additional-action-${index}` : undefined
+                }
+                className={`${centered ? 'min-h-11 [&_img]:size-5' : ''} ${content.actionClassName ?? ''}`}
+              >
+                {action.icon}
+                {localized(locale, action.label, action.labelZh)}
+              </Button>
+            ))}
           </div>
         </div>
       )}

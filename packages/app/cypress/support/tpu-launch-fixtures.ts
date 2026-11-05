@@ -33,9 +33,12 @@ export function assertTpuGb300Selected() {
   cy.get('body').type('{esc}');
 }
 
-type TpuLaunchModel = 'Qwen-3.5-397B-A17B' | 'Kimi-K3';
+type TpuLaunchModel = 'Qwen-3.5-397B-A17B' | 'Kimi-K3' | 'GLM-5.2';
 
 export function tpuLaunchRows(model: TpuLaunchModel = 'Qwen-3.5-397B-A17B') {
+  if (model === 'GLM-5.2') {
+    return qwenAgenticRows.map((row) => ({ ...row, model: 'glm5.3' }));
+  }
   return model === 'Kimi-K3'
     ? qwenAgenticRows.map((row) => ({ ...row, model: 'kimik3' }))
     : qwenAgenticRows;
