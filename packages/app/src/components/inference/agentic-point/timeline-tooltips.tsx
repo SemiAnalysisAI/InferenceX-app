@@ -16,11 +16,11 @@ const TOOLTIP_STRINGS = {
     queue: 'Queue wait',
     phase: 'Phase',
     depth: 'Agent depth',
-    worker: 'worker',
+    worker: 'Worker',
     started: 'Started at',
+    link: 'Click to view this conversation in the dataset →',
     inflight: 'In flight',
-    running: 'running',
-    waiting: 'waiting',
+    split: (running: number, waiting: number) => `${running} running · ${waiting} waiting`,
     completed: 'Completed',
     relative: (value: string) => `relative to t₀ (${value}s wall-clock)`,
   },
@@ -32,9 +32,9 @@ const TOOLTIP_STRINGS = {
     depth: 'Agent 深度',
     worker: 'worker',
     started: '开始时间',
+    link: '点击可在数据集中查看此对话 →',
     inflight: '在途',
-    running: '运行中',
-    waiting: '等待中',
+    split: (running: number, waiting: number) => `运行中 ${running} · 等待中 ${waiting}`,
     completed: '已完成',
     relative: (value: string) => `相对于 t₀（挂钟时间 ${value}s）`,
   },
@@ -47,21 +47,31 @@ export interface TooltipData {
   req: RequestRecord;
 }
 
-export function TimelineTooltip({ data }: { data: TooltipData }) {
+export function TimelineTooltip({ data, linkable }: { data: TooltipData; linkable?: boolean }) {
   const locale = useLocale();
   const t = TOOLTIP_STRINGS[locale];
   const { row, req } = data;
   const totalMs = (req.end - req.start) / 1e6;
   const queueMs = (req.start - req.credit) / 1e6;
+  const rows = [
+    req.isl === null ? null : ['ISL', req.isl.toLocaleString()],
+    req.osl === null ? null : ['OSL', req.osl.toLocaleString()],
+    [t.phase, req.phase],
+    req.ad > 0 ? [t.depth, String(req.ad)] : null,
+    [t.worker, shortenWid(req.wid)],
+    [t.started, formatTickLabel(req.start)],
+  ].filter((entry): entry is [string, string] => entry !== null);
   return (
     <FloatingTooltip x={data.x} y={data.y} data-testid="request-timeline-tooltip">
       <ChartHoverCardBody
-        title={row.label}
-        subtitle={
-          <>
-            {requestSourceLabel(req, locale)}
-            {req.cancelled && <span className="text-destructive"> · {t.cancelled}</span>}
-          </>
+        title={
+          <span className="flex min-w-0 items-baseline gap-1">
+            <span className="truncate">{row.label}</span>
+            <span className="shrink-0 font-normal text-muted-foreground">
+              {requestSourceLabel(req, locale)}
+              {req.cancelled && <span className="text-destructive"> · {t.cancelled}</span>}
+            </span>
+          </span>
         }
         color={row.color}
         metrics={[
@@ -69,16 +79,19 @@ export function TimelineTooltip({ data }: { data: TooltipData }) {
           { value: queueMs > 0.5 ? formatDuration(queueMs) : '—', label: t.queue },
           ...(req.ttftMs === null ? [] : [{ value: formatDuration(req.ttftMs), label: 'TTFT' }]),
         ]}
-        summary={[
-          req.isl === null ? null : `ISL ${req.isl.toLocaleString()}`,
-          req.osl === null ? null : `OSL ${req.osl.toLocaleString()}`,
-          `${t.phase} ${req.phase}`,
-          req.ad > 0 ? `${t.depth} ${req.ad}` : null,
-          `${t.worker} ${shortenWid(req.wid)}`,
-          `${t.started} ${formatTickLabel(req.start)}`,
-        ]
-          .filter(Boolean)
-          .join(' · ')}
+        summary={
+          <>
+            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 border-t border-border/50 pt-1.5">
+              {rows.map(([label, value]) => (
+                <div key={label} className="contents">
+                  <dt>{label}</dt>
+                  <dd className="truncate text-right text-foreground">{value}</dd>
+                </div>
+              ))}
+            </dl>
+            {linkable && <p className="mt-1.5 font-medium text-foreground">{t.link}</p>}
+          </>
+        }
       />
     </FloatingTooltip>
   );
@@ -111,11 +124,14 @@ export function CursorPopover({
         title={`t = ${tSec < 60 ? `${tSec.toFixed(3)} s` : `${(tSec / 60).toFixed(3)} m`}`}
         metrics={[
           { value: inflight, label: copy.inflight },
-          { value: running, label: copy.running },
-          { value: waiting, label: copy.waiting },
           { value: completed, label: copy.completed },
         ]}
-        summary={copy.relative((dataStart / 1e9).toFixed(0))}
+        summary={
+          <>
+            <p>{copy.split(running, waiting)}</p>
+            <p className="mt-0.5 opacity-80">{copy.relative((dataStart / 1e9).toFixed(0))}</p>
+          </>
+        }
       />
     </FloatingTooltip>
   );

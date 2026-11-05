@@ -35,16 +35,13 @@ export function UnofficialDomainNotice() {
       <div
         role="note"
         data-testid="unofficial-domain-notice"
-        className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3"
+        className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-destructive/60 bg-destructive/15 px-4 py-3"
       >
-        <TriangleAlert aria-hidden className="size-4 shrink-0 text-destructive" />
-        <p className="min-w-0 flex-1 text-sm text-foreground">
-          <span className="font-semibold text-[color-mix(in_oklch,var(--destructive)_70%,var(--foreground))]">
-            {t.title}
-          </span>
-          <span aria-hidden> · </span>
-          {t.text}
-        </p>
+        <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-red-600 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+          <TriangleAlert aria-hidden className="size-3.5 shrink-0" />
+          {t.title}
+        </span>
+        <p className="w-full min-w-0 text-sm text-foreground sm:w-auto sm:flex-1">{t.text}</p>
         <a
           href={SITE_URL}
           target="_blank"

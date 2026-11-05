@@ -584,14 +584,17 @@ export default function VideoCompare({
               >
                 <thead className="text-xs text-muted-foreground">
                   <tr>
-                    <th scope="col" className="px-3 py-2 font-medium">
+                    <th
+                      scope="col"
+                      className="w-px border-r border-border/40 px-3 py-2 font-medium whitespace-nowrap"
+                    >
                       {s.metric}
                     </th>
                     {ROLES.map((role) => (
                       <th
                         key={role}
                         scope="col"
-                        className="px-3 py-2 text-right font-medium"
+                        className="px-3 py-2 text-right font-medium whitespace-nowrap"
                         data-testid={`video-compare-${role}`}
                       >
                         <span className="inline-flex items-center gap-1.5 text-foreground">
@@ -605,7 +608,7 @@ export default function VideoCompare({
                         </span>
                       </th>
                     ))}
-                    <th scope="col" className="px-3 py-2 text-right font-medium">
+                    <th scope="col" className="px-3 py-2 text-right font-medium whitespace-nowrap">
                       {s.change}
                     </th>
                   </tr>
@@ -613,16 +616,21 @@ export default function VideoCompare({
                 <tbody className="tabular-nums">
                   {rows.map((row) => (
                     <tr key={row.id} className="border-t border-border/40" data-metric={row.id}>
-                      <th scope="row" className="px-3 py-2 font-normal text-muted-foreground">
+                      <th
+                        scope="row"
+                        className="w-px min-w-36 border-r border-border/40 px-3 py-2 font-normal text-muted-foreground sm:whitespace-nowrap"
+                      >
                         {locale === 'zh'
                           ? VIDEO_METRICS[row.id].labelZh
                           : VIDEO_METRICS[row.id].label}
                       </th>
-                      <td className="px-3 py-2 text-right">{formatMetric(row.baseline, row.id)}</td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-3 py-2 text-right whitespace-nowrap">
+                        {formatMetric(row.baseline, row.id)}
+                      </td>
+                      <td className="px-3 py-2 text-right whitespace-nowrap">
                         {formatMetric(row.candidate, row.id)}
                       </td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-3 py-2 text-right whitespace-nowrap">
                         <DeltaChip row={row} s={s} />
                       </td>
                     </tr>

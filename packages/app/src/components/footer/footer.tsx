@@ -100,7 +100,7 @@ const STRINGS = {
 const FOOTER_EVENT_PROPERTIES = { placement: 'footer' } as const;
 
 const LINK_CLASS =
-  'inline-flex min-h-11 items-center rounded-md py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8';
+  'inline-flex min-h-11 items-center rounded-md py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8';
 
 type FooterStringKey = keyof (typeof STRINGS)['en'];
 

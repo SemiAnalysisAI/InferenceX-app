@@ -1,7 +1,7 @@
 import { getPointHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import {
-  specAlgorithmLabel,
   speculativeDecodingLabel,
+  speculativeDecodingName,
 } from '@/lib/benchmarks/speculative-decoding';
 import { agenticDetailHref } from '@/lib/agentx/agentic-detail-link';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
@@ -10,8 +10,8 @@ import type { Locale } from '@/lib/i18n/i18n';
 import type { PowerBasisLabelStyle } from '@/lib/power/power-basis';
 import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
 import { chartStateHref } from '@/lib/routing/url-state';
-import { axisLabelUnit, chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
-import { formatLargeNumber } from '@/lib/charts/chart-rendering';
+import { axisLabelUnit, chartTooltipShellStyle } from '@/lib/d3-chart/tooltip-shell';
+import { getDisplayLabel } from '@/lib/shared/utils';
 import type {
   SystemPowerUnit,
   SystemPowerUnsupportedReason,
@@ -134,8 +134,6 @@ const TOOLTIP_STRINGS = {
     series: 'Series',
     roleEnergyShare: 'Share of request energy',
     run: 'GitHub Actions run',
-    conc: (n: number) => `conc ${n}`,
-    chips: (n: number) => `${n} chip${n === 1 ? '' : 's'}`,
   },
   zh: {
     unofficialRun: '✕ 非官方运行',
@@ -152,8 +150,6 @@ const TOOLTIP_STRINGS = {
     series: '系列',
     roleEnergyShare: '在请求能耗中的占比',
     run: 'GitHub Actions 运行记录',
-    conc: (n: number) => `并发 ${n}`,
-    chips: (n: number) => `${n} 个芯片`,
   },
 } as const;
 
@@ -468,7 +464,7 @@ const CACHE_STRINGS = {
     theoreticalHitRate: '理论 Cache 命中率',
     legacyEnabled: '已启用（旧版数据）',
     legacyDisabled: '已禁用（旧版数据）',
-    hit: 'KV Cache 命中率',
+    hit: 'KV cache 命中率',
     chip: (v: string) => `芯片 ${v}`,
     chipCpu: (v: string) => `芯片 + CPU ${v}`,
     cpu: (v: string) => `CPU ${v}`,
@@ -850,7 +846,6 @@ const powerWithheldRows = (d: InferenceData, locale: Locale): PointDetailRow[] =
 
 export interface PointDetailMetric {
   value: string;
-  compact: string;
   label: string;
 }
 
@@ -867,8 +862,6 @@ export interface PointDetails {
   unofficial?: string;
   date: string;
   metrics: [PointDetailMetric, PointDetailMetric];
-  summary: string;
-  cacheHit?: PointCacheHit;
   rows: PointDetailRow[];
   image?: string;
   powerHtml: string;
@@ -894,11 +887,6 @@ export const buildPointDetails = (config: TooltipConfig): PointDetails => {
         ]
       : [];
   const subtitle = [engines, d.precision.toUpperCase()].filter(Boolean).join(' · ');
-  const algorithm =
-    d.spec_algorithm && (d.spec_decoding ?? 'none') !== 'none'
-      ? specAlgorithmLabel(d.spec_algorithm)
-      : null;
-  const yValue = fmtY(d.y, selectedYAxisMetric);
   return {
     title: hw?.label ?? String(d.hwKey),
     subtitle,
@@ -910,22 +898,9 @@ export const buildPointDetails = (config: TooltipConfig): PointDetails => {
           ? formatTooltipDate(d.date, locale)
           : ownDate,
     metrics: [
-      {
-        value: yValue,
-        compact: WATT_METRICS.has(selectedYAxisMetric) ? yValue : formatLargeNumber(d.y),
-        label: yLabel,
-      },
-      { value: fmt(d.x), compact: formatLargeNumber(d.x), label: xLabel },
+      { value: fmtY(d.y, selectedYAxisMetric), label: yLabel },
+      { value: fmt(d.x), label: xLabel },
     ],
-    summary: [
-      getPointLabel(d),
-      t.conc(d.conc),
-      t.chips(chips),
-      algorithm && !subtitle.includes(algorithm) ? algorithm : null,
-    ]
-      .filter(Boolean)
-      .join(' · '),
-    cacheHit: pointCacheHit(d, locale),
     rows: [
       ...(overlayData
         ? [row(t.branch, overlayData.getRunForRow?.(d)?.branch ?? overlayData.label)]
@@ -955,28 +930,90 @@ export const buildPointDetails = (config: TooltipConfig): PointDetails => {
   };
 };
 
-const hoverCacheHtml = (cache: PointCacheHit, color: string): string => {
-  const dot = (opacity: number) =>
-    `<span style="width: 6px; height: 6px; border-radius: 9999px; background: ${color}; opacity: ${opacity}; flex-shrink: 0;"></span>`;
-  const marker = cache.theoretical
-    ? `<div style="position: absolute; top: 0; bottom: 0; left: calc(${cache.theoretical.share}% - 1px); width: 2px; background: var(--foreground); opacity: 0.6;"></div>`
-    : '';
-  return `<div style="display: flex; justify-content: space-between; gap: 12px; font-size: 11px; line-height: 14px; color: var(--muted-foreground);"><span>${escapeHtml(cache.label)}</span><span style="color: var(--foreground); font-weight: 600; font-variant-numeric: tabular-nums;">${cache.total}</span></div><div data-hover-cache-bar style="position: relative; display: flex; height: 6px; margin-top: 4px; border-radius: 3px; overflow: hidden; background: var(--border);">${cache.segments.map((s) => `<div style="width: ${s.share}%; background: ${color}; opacity: ${s.opacity};"></div>`).join('')}${marker}</div><div style="display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 4px; font-size: 11px; line-height: 14px; color: var(--muted-foreground); font-variant-numeric: tabular-nums;">${cache.segments.map((s) => `<span style="display: inline-flex; align-items: center; gap: 4px;">${dot(s.opacity)}${escapeHtml(s.label)}</span>`).join('')}${cache.theoretical ? `<span>${escapeHtml(cache.theoretical.label)}</span>` : ''}</div>`;
+const HOVER_STRINGS = {
+  en: {
+    conc: (n: number) => `conc ${n}`,
+    chips: (n: number) => `${n} ${n === 1 ? 'chip' : 'chips'}`,
+    details: 'Click for full details',
+  },
+  zh: {
+    conc: (n: number) => `并发 ${n}`,
+    chips: (n: number) => `${n} 芯片`,
+    details: '点击查看完整信息',
+  },
+} as const;
+
+export const formatHoverValue = (value: number, metric?: string): string => {
+  if (!Number.isFinite(value)) return String(value);
+  if (metric && WATT_METRICS.has(metric)) return fmtWatts(value);
+  const abs = Math.abs(value);
+  if (abs >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
+  if (abs >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
+  if (abs >= 1e4) return `${(value / 1e3).toFixed(1)}K`;
+  if (abs >= 100) return value.toFixed(0);
+  if (abs >= 10) return value.toFixed(1);
+  return String(parseFloat(value.toFixed(2)));
 };
 
-export const generatePointHoverCard = (details: PointDetails, color: string): string =>
-  chartHoverCard(
-    {
-      title: details.title,
-      subtitle: details.subtitle,
-      color,
-      metrics: details.metrics.map((metric) => ({
-        value: metric.compact,
-        label: axisLabelUnit(metric.label),
-      })),
-      body: details.cacheHit ? hoverCacheHtml(details.cacheHit, color) : undefined,
-      summary: details.summary,
-      warning: details.unofficial,
-    },
-    { pinned: false, border: details.unofficial ? '2px solid #dc2626' : undefined },
-  );
+const hoverSwatch = (color: string, size: number, opacity = 1) =>
+  `<span style="display: inline-block; flex: none; width: ${size}px; height: ${size}px; border-radius: 50%; background: ${color}; opacity: ${opacity}; margin-right: 5px;"></span>`;
+
+const hoverCacheHTML = (cache: PointCacheHit, color: string): string => `
+      <div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; margin-bottom: 4px; font-size: 11px;">
+        <span style="color: var(--muted-foreground);">${escapeHtml(cache.label)}</span>
+        <span style="color: var(--foreground); font-weight: 600;">${cache.total}</span>
+      </div>
+      <div data-hover-cache-bar style="position: relative; display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--border);">
+        ${cache.segments.map((s) => `<div style="width: ${s.share}%; background: ${color}; opacity: ${s.opacity};"></div>`).join('')}
+        ${cache.theoretical ? `<div style="position: absolute; top: 0; bottom: 0; left: calc(${cache.theoretical.share}% - 1px); width: 2px; background: var(--foreground); opacity: 0.6;"></div>` : ''}
+      </div>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 5px; font-size: 11px; color: var(--muted-foreground);">
+        ${cache.segments.map((s) => `<span style="display: inline-flex; align-items: center;">${hoverSwatch(color, 6, s.opacity)}${escapeHtml(s.label)}</span>`).join('')}
+        ${cache.theoretical ? `<span style="opacity: 0.8;">${escapeHtml(cache.theoretical.label)}</span>` : ''}
+      </div>`;
+
+export interface HoverTooltipConfig extends Pick<
+  TooltipConfig,
+  'data' | 'xLabel' | 'yLabel' | 'selectedYAxisMetric' | 'hardwareConfig' | 'locale' | 'overlayData'
+> {
+  color: string;
+}
+
+export const generateHoverTooltipContent = (config: HoverTooltipConfig): string => {
+  const { data: d, xLabel, yLabel, selectedYAxisMetric, overlayData, color } = config;
+  const locale = config.locale ?? 'en';
+  const t = HOVER_STRINGS[locale];
+  const hwEntry = (overlayData?.hardwareConfig ?? config.hardwareConfig)[d.hwKey];
+  const system = hwEntry ? getDisplayLabel(getPointHardwareConfig(d, hwEntry)) : String(d.hwKey);
+  const setup = [
+    t.chips(d.physicalChips ?? d.tp),
+    getPointLabel(d) || `TP${d.tp}`,
+    speculativeDecodingName({ method: d.spec_decoding, algorithm: d.spec_algorithm }, d.model),
+  ].filter(Boolean);
+  const cache = pointCacheHit(d, locale);
+  const value = (v: string, label: string) =>
+    `<span style="white-space: nowrap;"><span style="color: var(--foreground); font-weight: 600;">${v}</span> <span style="color: var(--muted-foreground);">${escapeHtml(axisLabelUnit(label))}</span></span>`;
+  const shell = chartTooltipShellStyle({
+    pinned: false,
+    border: overlayData ? '2px solid #dc2626' : undefined,
+    minWidth: 240,
+    maxWidth: 320,
+  });
+
+  return `
+    <div data-hover-tooltip style="${shell}; font-variant-numeric: tabular-nums; line-height: 1.35;">
+      ${overlayData ? `<div style="color: #dc2626; font-size: 11px; font-weight: 600; margin-bottom: 4px;">${TOOLTIP_STRINGS[locale].unofficialRun}</div>` : ''}
+      <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px;">
+        <span style="display: inline-flex; align-items: center; min-width: 0; color: var(--foreground); font-size: 12px; font-weight: 600;">${hoverSwatch(color, 8)}<span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(system)}</span></span>
+        <span style="flex: none; color: var(--muted-foreground); font-size: 11px;">${escapeHtml(d.precision.toUpperCase())} · ${t.conc(d.conc)}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 2px 16px; font-size: 12px;">
+        ${value(formatHoverValue(d.y, selectedYAxisMetric), yLabel)}
+        ${value(formatHoverValue(d.x), xLabel)}
+      </div>
+      <div style="margin-top: 2px; color: var(--muted-foreground); font-size: 11px;">${escapeHtml(setup.join(' · '))}</div>
+      ${cache ? hoverCacheHTML(cache, color) : ''}
+      <div style="margin-top: 8px; color: var(--muted-foreground); font-size: 10px; opacity: 0.75;">${t.details}</div>
+    </div>
+  `;
+};

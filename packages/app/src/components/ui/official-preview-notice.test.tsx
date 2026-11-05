@@ -92,4 +92,15 @@ describe('official preview notices', () => {
     expect(notice?.textContent).toContain('Vera Rubin NVL72 结果为官方预览');
     expect(notice?.textContent).toContain('随着验证和发布工作的推进');
   });
+
+  it('keeps the note semantics and full copy in the inline variant', () => {
+    const notice = renderNotice(
+      <VeraRubinOfficialPreviewNotice variant="inline" />,
+      'vera-rubin-official-preview-notice',
+    );
+    expect(notice?.tagName).toBe('P');
+    expect(notice?.getAttribute('role')).toBe('note');
+    expect(notice?.textContent).toContain('InferenceX Official Preview');
+    expect(notice?.textContent).toContain('Vera Rubin NVL72 results are an official preview');
+  });
 });

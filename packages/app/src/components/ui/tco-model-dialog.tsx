@@ -112,7 +112,7 @@ export function TcoModelDialog({ tier, onClose, source }: TcoModelDialogProps) {
           </ul>
           <p className="text-muted-foreground">{t.delivery}</p>
         </div>
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose}>
             {t.dismiss}
           </Button>

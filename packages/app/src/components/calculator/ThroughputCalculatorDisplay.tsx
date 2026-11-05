@@ -1292,9 +1292,17 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                     const captionContent = (
                       <>
                         {chartHeading}
-                        {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
-                        {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
-                        {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
+                        {(showsJalapenoPreview || showsVeraRubinPreview || showsTpuv7Preview) && (
+                          <div className="mt-3 space-y-1">
+                            {showsJalapenoPreview && (
+                              <JalapenoOfficialPreviewNotice variant="inline" />
+                            )}
+                            {showsVeraRubinPreview && (
+                              <VeraRubinOfficialPreviewNotice variant="inline" />
+                            )}
+                            {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice variant="inline" />}
+                          </div>
+                        )}
                       </>
                     );
                     const plottedBases = plottedChipBases(

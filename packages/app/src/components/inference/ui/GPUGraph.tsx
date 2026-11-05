@@ -72,7 +72,7 @@ import { comparisonEntryLabel } from '@/components/inference/utils/comparisonEnt
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import {
   buildPointDetails,
-  generatePointHoverCard,
+  generateHoverTooltipContent,
 } from '@/components/inference/utils/tooltipUtils';
 import { PointDetailsPanel } from '@/components/inference/ui/PointDetailsPanel';
 import { useComparisonSeries } from '@/components/inference/hooks/useComparisonSeries';
@@ -1114,6 +1114,20 @@ const GPUGraph = React.memo(
         }),
       [xLabel, yLabel, selectedYAxisMetric, hardwareConfig, overlayData, locale],
     );
+    const hoverCard = useCallback(
+      (d: InferenceData, isOverlay: boolean) =>
+        generateHoverTooltipContent({
+          data: d,
+          xLabel,
+          yLabel,
+          selectedYAxisMetric,
+          hardwareConfig,
+          overlayData: isOverlay ? (overlayData ?? undefined) : undefined,
+          color: getColor(d),
+          locale,
+        }),
+      [xLabel, yLabel, selectedYAxisMetric, hardwareConfig, overlayData, getColor, locale],
+    );
     const overlayPointsLayer: CustomLayerConfig = useMemo(() => {
       const updateLabels = (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
         zoomGroup
@@ -1192,8 +1206,7 @@ const GPUGraph = React.memo(
             tooltip,
             handle: chartRef.current,
             panel: true,
-            content: (point) =>
-              overlayData ? generatePointHoverCard(pointDetails(point, true), getColor(point)) : '',
+            content: (point) => (overlayData ? hoverCard(point, true) : ''),
             position: (event) => {
               const [mouseX, mouseY] = d3.pointer(event, container);
               return computeTooltipPosition(mouseX, mouseY, tooltip, container);
@@ -1250,7 +1263,7 @@ const GPUGraph = React.memo(
       pointLabelsVisible,
       useAdvancedLabels,
       showConcurrencyLabels,
-      pointDetails,
+      hoverCard,
       getColor,
     ]);
 
@@ -1440,8 +1453,7 @@ const GPUGraph = React.memo(
         }}
         tooltip={{
           rulerType: 'crosshair',
-          content: (d: InferenceData) =>
-            generatePointHoverCard(pointDetails(d, false), getColor(d)),
+          content: (d: InferenceData) => hoverCard(d, false),
           details: (d: InferenceData, isOverlay: boolean, close: () => void) => (
             <PointDetailsPanel
               details={pointDetails(d, isOverlay)}

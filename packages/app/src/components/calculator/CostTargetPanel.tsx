@@ -325,37 +325,39 @@ export default function CostTargetPanel({
                     testId="calculator-costcap-table"
                     analyticsPrefix="calculator_costcap_table"
                   />
-                  <ChipBasisNote
-                    visible={hasDisagg}
-                    testId="calculator-costcap-disagg-note"
-                    label={t.note}
-                    text={chipBasis === 'total' ? t.disaggFleetTotal : t.disaggFleet}
-                    chipBasis={chipBasisControl}
-                    showToggle={costType !== 'total'}
-                  />
-                  <p className="text-xs text-muted-foreground mt-3">
-                    {t.assumptions(getCostProviderLabel(costProvider))}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {t.source}
-                    <Link
-                      target="_blank"
-                      className="underline hover:text-foreground"
-                      href="https://semianalysis.com/datacenter-industry-model/"
-                    >
-                      SemiAnalysis Datacenter Industry Model
-                      <ExternalLinkIcon />
-                    </Link>
-                    {' & '}
-                    <Link
-                      target="_blank"
-                      className="underline hover:text-foreground"
-                      href="https://semianalysis.com/ai-cloud-tco-model/"
-                    >
-                      SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model
-                      <ExternalLinkIcon />
-                    </Link>
-                  </p>
+                  <div>
+                    <ChipBasisNote
+                      visible={hasDisagg}
+                      testId="calculator-costcap-disagg-note"
+                      label={t.note}
+                      text={chipBasis === 'total' ? t.disaggFleetTotal : t.disaggFleet}
+                      chipBasis={chipBasisControl}
+                      showToggle={costType !== 'total'}
+                    />
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {t.assumptions(getCostProviderLabel(costProvider))}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t.source}
+                      <Link
+                        target="_blank"
+                        className="underline hover:text-foreground"
+                        href="https://semianalysis.com/datacenter-industry-model/"
+                      >
+                        SemiAnalysis Datacenter Industry Model
+                        <ExternalLinkIcon />
+                      </Link>
+                      {' & '}
+                      <Link
+                        target="_blank"
+                        className="underline hover:text-foreground"
+                        href="https://semianalysis.com/ai-cloud-tco-model/"
+                      >
+                        SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model
+                        <ExternalLinkIcon />
+                      </Link>
+                    </p>
+                  </div>
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground" data-testid="calculator-costcap-empty">

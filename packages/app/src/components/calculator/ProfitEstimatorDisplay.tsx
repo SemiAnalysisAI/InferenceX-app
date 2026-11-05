@@ -1454,7 +1454,7 @@ function ProfitEstimatorInner({
                   legend={t.benchmarkGroup}
                   data-testid="profit-benchmark-panel"
                   className={cn(
-                    'grid-cols-1 items-end md:grid-cols-3 xl:[&_label]:min-h-10 xl:[&_label]:items-end',
+                    'grid-cols-1 items-end md:grid-cols-3 xl:[&_label]:min-h-10 xl:[&_label]:items-end xl:[&_label+*]:self-end',
                     // Four benchmark columns fit only on a full row; beside the pricing panel a
                     // fourth column wraps the target label to three lines and the rows misalign.
                     powerControlsEnabled && effectivePriceSource === 'custom' && 'xl:grid-cols-4',
@@ -1563,7 +1563,7 @@ function ProfitEstimatorInner({
                   legend={t.pricingGroup}
                   data-testid="profit-pricing-panel"
                   className={cn(
-                    'grid-cols-1 items-end xl:[&_label]:min-h-10 xl:[&_label]:items-end',
+                    'grid-cols-1 items-end xl:[&_label]:min-h-10 xl:[&_label]:items-end xl:[&_label+*]:self-end',
                     effectivePriceSource === 'custom'
                       ? 'xl:col-span-12 xl:grid-cols-4'
                       : cn('xl:col-span-4', showsTcoBasis && 'sm:grid-cols-2'),

@@ -568,7 +568,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
         onScroll={handleLogScroll}
         tabIndex={0}
       >
-        <code className="log-lines grid w-max min-w-full grid-cols-[auto_1fr] py-3">
+        <code className="log-lines grid w-max min-w-full grid-cols-[auto_1fr] [&>:nth-child(-n+2)]:pt-3 [&>:nth-last-child(-n+2)]:pb-3">
           {logLines.map((line, lineIndex) =>
             line.pieces.some((piece) => piece.highlighted) ? (
               <Fragment key={lineIndex}>

@@ -517,9 +517,9 @@ export default function ChartControls({
     </>
   );
 
-  // Wide screens pack the groups into two rows: what is measured (benchmark config) beside how
-  // it is plotted (chart config), then which run beside compare history. PowerX gives chart
-  // config its own row because it holds up to six cells.
+  // Benchmark config takes its own row. Chart config shares the next row with compare history
+  // (or takes it alone when that is hidden), and run context closes out the panel. PowerX keeps
+  // chart config on its own row because it holds up to six cells.
   const spans = powerXSurface
     ? {
         benchmark: 'lg:col-span-12',
@@ -528,10 +528,10 @@ export default function ChartControls({
         history: 'lg:col-span-4',
       }
     : {
-        benchmark: 'lg:col-span-12 xl:col-span-6',
-        chart: 'lg:col-span-6',
-        run: 'lg:col-span-6',
-        history: 'lg:col-span-6',
+        benchmark: 'lg:col-span-12',
+        chart: hideGpuComparison ? 'lg:col-span-12' : 'lg:col-span-8',
+        run: 'lg:order-last lg:col-span-12',
+        history: 'lg:col-span-4',
       };
 
   return (

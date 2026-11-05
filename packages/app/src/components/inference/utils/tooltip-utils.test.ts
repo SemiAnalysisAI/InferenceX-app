@@ -11,7 +11,7 @@ import {
 import { getInferenceHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import {
   buildPointDetails,
-  generatePointHoverCard,
+  generateHoverTooltipContent,
   getPointLabel,
   type TooltipConfig,
 } from '@/components/inference/utils/tooltipUtils';
@@ -284,7 +284,7 @@ describe('modeled system-power tooltip', () => {
   });
 
   it('keeps the hover card compact and leaves unrelated metrics unchanged', () => {
-    const hover = generatePointHoverCard(buildPointDetails(config()), 'red');
+    const hover = generateHoverTooltipContent({ ...config(), color: 'red' });
     expect(hover).not.toContain('500 W/GPU');
     expect(hover).not.toContain('PUE 1.2');
     expect(detailsText(config({ selectedYAxisMetric: 'y_tpPerGpu' }))).not.toContain(
@@ -823,11 +823,12 @@ describe('buildPointDetails', () => {
       hasLog: true,
       runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/1',
     });
-    const html = generatePointHoverCard(buildPointDetails(config), 'red');
+    const html = generateHoverTooltipContent({ ...config, color: 'red' });
     expect(html).toContain('user-select: none');
     expect(html).toContain('500');
     expect(html).toContain('>ms<');
-    expect(html).toContain('DPAEP32 · conc 64 · 16 chips');
+    expect(html).toContain('16 chips · DPAEP32');
+    expect(html).toContain('conc 64');
     expect(html).not.toContain('data-action');
     expect(html).not.toContain('dismiss');
   });
@@ -858,7 +859,7 @@ describe('buildPointDetails for unofficial overlays', () => {
   }
 
   it('includes red border style on the hover card', () => {
-    const html = generatePointHoverCard(buildPointDetails(overlayConfig()), 'red');
+    const html = generateHoverTooltipContent({ ...overlayConfig(), color: 'red' });
     expect(html).toContain('border: 2px solid #dc2626');
   });
 
@@ -1172,8 +1173,11 @@ describe('worker power drilldown', () => {
   });
 
   it('leaves the worker table out of the hover card', () => {
-    const details = buildPointDetails(tooltipConfig({ data: pt({ workers }) }));
-    expect(generatePointHoverCard(details, 'red')).not.toContain('tooltip-worker-power');
+    const html = generateHoverTooltipContent({
+      ...tooltipConfig({ data: pt({ workers }) }),
+      color: 'red',
+    });
+    expect(html).not.toContain('tooltip-worker-power');
   });
 
   it('caps the table at 8 rows with a "+N more workers" line', () => {

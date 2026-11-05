@@ -79,8 +79,9 @@ describe('TabNav — attached unofficial-run banner', () => {
     it(`keeps long branches and all actions inside the navigation at ${width}px`, () => {
       cy.viewport(width, 900);
       const longBranch = `experiment/${'very-long-branch-name-'.repeat(8)}`;
+      const zh = width === 768;
       mountTabNav({
-        pathname: width === 768 ? '/zh/inference' : '/inference',
+        pathname: zh ? '/zh/inference' : '/inference',
         runs: [bannerRun, { ...bannerRun, id: 2, branch: longBranch }],
       });
 
@@ -112,21 +113,23 @@ describe('TabNav — attached unofficial-run banner', () => {
           if (width < 640) expect(actionBounds.height, 'phone touch target').to.be.at.least(44);
         }
         const label = [...banner.querySelectorAll('span')].find(
-          (span) => span.textContent?.trim() === 'Non-official',
+          (span) => span.textContent?.trim() === (zh ? '非官方' : 'Non-official'),
         )!;
-        expect(label.getBoundingClientRect().height, 'warning label stays on one line').to.equal(
-          parseFloat(getComputedStyle(label).lineHeight),
-        );
+        const labelStyle = getComputedStyle(label);
+        expect(
+          label.getBoundingClientRect().height -
+            parseFloat(labelStyle.paddingTop) -
+            parseFloat(labelStyle.paddingBottom),
+          'warning label stays on one line',
+        ).to.equal(parseFloat(labelStyle.lineHeight));
       });
-      cy.get(`[aria-label="View workflow run for ${bannerRun.branch}"]`).should(
-        'have.attr',
-        'href',
-        bannerRun.url,
-      );
-      cy.get(`[aria-label="Dismiss ${bannerRun.branch}"]`).click();
+      cy.get(
+        `[aria-label="${zh ? `查看 ${bannerRun.branch} 的工作流运行` : `View workflow run for ${bannerRun.branch}`}"]`,
+      ).should('have.attr', 'href', bannerRun.url);
+      cy.get(`[aria-label="${zh ? '关闭' : 'Dismiss'} ${bannerRun.branch}"]`).click();
       cy.get('@dismissRun').should('have.been.calledOnceWith', String(bannerRun.id));
       cy.get('@clearUnofficialRun').should('not.have.been.called');
-      cy.get('[aria-label="Dismiss all unofficial runs"]').click();
+      cy.get(`[aria-label="${zh ? '关闭所有非官方运行' : 'Dismiss all unofficial runs'}"]`).click();
       cy.get('@clearUnofficialRun').should('have.been.calledOnce');
     });
   }

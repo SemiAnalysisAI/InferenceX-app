@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { HardwareConfig, InferenceData } from '@/components/inference/types';
 import {
-  buildPointDetails,
-  generatePointHoverCard,
+  formatHoverValue,
+  generateHoverTooltipContent,
   type TooltipConfig,
 } from '@/components/inference/utils/tooltipUtils';
 import { detailsText } from '@/components/inference/utils/point-details-test-helpers';
@@ -66,12 +66,27 @@ const config = (data: InferenceData, overrides: Partial<TooltipConfig> = {}): To
 
 const hover = (c: TooltipConfig) => {
   const host = document.createElement('div');
-  host.innerHTML = generatePointHoverCard(buildPointDetails(c), 'rgb(156, 204, 101)');
+  host.innerHTML = generateHoverTooltipContent({ ...c, color: 'rgb(156, 204, 101)' });
   return {
     text: (host.textContent ?? '').replaceAll(/\s+/g, ' '),
     hasCacheBar: host.querySelector('[data-hover-cache-bar]') !== null,
   };
 };
+
+describe('formatHoverValue', () => {
+  it('abbreviates large values and trims small ones', () => {
+    expect(formatHoverValue(31_264_799.83)).toBe('31.26M');
+    expect(formatHoverValue(1_550_000_000)).toBe('1.55B');
+    expect(formatHoverValue(45_678)).toBe('45.7K');
+    expect(formatHoverValue(144.092)).toBe('144');
+    expect(formatHoverValue(39.308)).toBe('39.3');
+    expect(formatHoverValue(0.8512)).toBe('0.85');
+  });
+
+  it('keeps watt metrics as whole watts', () => {
+    expect(formatHoverValue(893.079, 'y_measuredAvgPower')).toBe('893');
+  });
+});
 
 describe('axisLabelUnit', () => {
   it('keeps the unit and a leading percentile qualifier', () => {
@@ -88,29 +103,37 @@ describe('axisLabelUnit', () => {
   });
 });
 
-describe('generatePointHoverCard', () => {
-  it('shows compact headline values, the speculative algorithm and the cache bar', () => {
+describe('generateHoverTooltipContent', () => {
+  it('shows the headline values, compact config and cache bar', () => {
     const { text, hasCacheBar } = hover(config(agenticPoint()));
-    expect(text).toContain('B300 SGLang · FP4');
-    expect(text).toContain('31.3M');
-    expect(text).toContain('P90 tok/s/user');
-    expect(text).toContain('39.3');
-    expect(text).toContain('conc 40 · 8 chips · DFlash');
+    expect(text).toContain('B300 (SGLang)');
+    expect(text).toContain('FP4 · conc 40');
+    expect(text).toContain('31.26M tok/$');
+    expect(text).toContain('39.3 P90 tok/s/user');
+    expect(text).toContain('8 chips');
+    expect(text).toContain('DFlash');
     expect(text).toContain('KV cache hit · HiCache → DRAM');
     expect(text).toContain('94.9%');
     expect(text).toContain('Chip 70.7%');
     expect(text).toContain('CPU 24.2%');
     expect(text).toContain('theoretical 97.3%');
+    expect(text).toContain('Click for full details');
     expect(hasCacheBar).toBe(true);
   });
 
-  it('leaves the draft model, image and token counts to the details panel', () => {
+  it('leaves pinned-only details out of the hover card', () => {
     const { text } = hover(config(agenticPoint()));
     expect(text).not.toContain('sha256');
+    expect(text).not.toContain('566');
     expect(text).not.toContain('RadixArk');
+    expect(text).not.toContain('GitHub Actions');
+  });
+
+  it('keeps every field in the details panel', () => {
     const details = detailsText(config(agenticPoint()));
-    expect(details).toContain('DFlash (RadixArk/Kimi-K3.1-Dflash2-Preview)');
+    expect(details).toContain('Prompt tokens');
     expect(details).toContain('Theoretical cache hit rate');
+    expect(details).toContain('DFlash (RadixArk/Kimi-K3.1-Dflash2-Preview)');
   });
 
   it('shows the speculative row in the details panel for non-agentic points that use it', () => {
@@ -159,6 +182,16 @@ describe('generatePointHoverCard', () => {
     expect(text).not.toContain('CPU 24.2%');
   });
 
+  it('marks unofficial runs with a red border and label', () => {
+    const html = generateHoverTooltipContent({
+      ...config(agenticPoint()),
+      overlayData: { label: 'feature-branch', hardwareConfig, data: [] } as never,
+      color: 'red',
+    });
+    expect(html).toContain('border: 2px solid #dc2626');
+    expect(html).toContain('Unofficial run');
+  });
+
   it('renders Chinese copy', () => {
     const { text } = hover(
       config(agenticPoint(), {
@@ -168,18 +201,18 @@ describe('generatePointHoverCard', () => {
       }),
     );
     expect(text).toContain('并发 40');
+    expect(text).toContain('8 芯片');
     expect(text).toContain('P90 tok/s/user');
-    expect(text).toContain('KV Cache 命中率');
+    expect(text).toContain('KV cache 命中率');
     expect(text).toContain('理论 97.3%');
+    expect(text).toContain('点击查看完整信息');
   });
 
   it('escapes the hardware key when no config entry exists', () => {
-    const html = generatePointHoverCard(
-      buildPointDetails(
-        config(agenticPoint({ hwKey: '<img src=x>' as never }), { hardwareConfig: {} }),
-      ),
-      'red',
-    );
+    const html = generateHoverTooltipContent({
+      ...config(agenticPoint({ hwKey: '<img src=x>' as never }), { hardwareConfig: {} }),
+      color: 'red',
+    });
     expect(html).not.toContain('<img src=x>');
   });
 });

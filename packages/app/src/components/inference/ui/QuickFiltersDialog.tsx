@@ -393,7 +393,7 @@ export function QuickFiltersDialog({
                       key={option.value}
                       type="button"
                       size="sm"
-                      variant={active ? 'default' : 'outline'}
+                      variant={active ? 'brand' : 'outline'}
                       aria-pressed={active}
                       disabled={disabled}
                       title={disabled ? t.noData : undefined}
@@ -401,7 +401,6 @@ export function QuickFiltersDialog({
                         'font-normal',
                         group.key === 'topology' &&
                           'h-auto min-h-9 max-w-full whitespace-normal break-words py-2 text-left md:h-auto',
-                        active && 'bg-brand hover:bg-brand/90',
                       )}
                       data-testid={`quick-filter-${group.key}-${option.value}`}
                       onClick={() => handleToggle(group.key, option.value)}

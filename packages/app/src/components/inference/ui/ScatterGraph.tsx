@@ -145,7 +145,7 @@ import type {
 } from '@/components/inference/types';
 import {
   buildPointDetails,
-  generatePointHoverCard,
+  generateHoverTooltipContent,
   type PointDetailAction,
 } from '@/components/inference/utils/tooltipUtils';
 import { PointDetailsPanel } from '@/components/inference/ui/PointDetailsPanel';
@@ -2294,6 +2294,21 @@ const ScatterGraph = React.memo(
       [runIndexByUrl],
     );
 
+    const hoverCard = useCallback(
+      (d: InferenceData, isOverlay: boolean) =>
+        generateHoverTooltipContent({
+          data: d,
+          xLabel,
+          yLabel,
+          selectedYAxisMetric,
+          hardwareConfig,
+          overlayData: isOverlay ? (overlayData ?? undefined) : undefined,
+          color: pointColor(d, isOverlay),
+          locale,
+        }),
+      [xLabel, yLabel, selectedYAxisMetric, hardwareConfig, overlayData, pointColor, locale],
+    );
+
     const tooltipConfig = useMemo(() => {
       const onAction = (
         action: PointDetailAction,
@@ -2327,8 +2342,7 @@ const ScatterGraph = React.memo(
       };
       return {
         rulerType: 'crosshair' as const,
-        content: (d: InferenceData) =>
-          generatePointHoverCard(pointDetails(d, false), pointColor(d, false)),
+        content: (d: InferenceData) => hoverCard(d, false),
         details: (d: InferenceData, isOverlay: boolean, close: () => void) => (
           <PointDetailsPanel
             details={pointDetails(d, isOverlay)}
@@ -2364,7 +2378,7 @@ const ScatterGraph = React.memo(
         },
         attachToLayer: 1,
       };
-    }, [pointDetails, pointColor, openPowerTrace]);
+    }, [pointDetails, pointColor, hoverCard, openPowerTrace]);
 
     const layers = useMemo((): LayerConfig<InferenceData>[] => {
       const wattsAxis = metricPlotsWatts(selectedYAxisMetric);
@@ -3218,8 +3232,7 @@ const ScatterGraph = React.memo(
                 tooltip,
                 handle: chartRef.current,
                 panel: true,
-                content: (point) =>
-                  generatePointHoverCard(pointDetails(point, true), pointColor(point, true)),
+                content: (point) => hoverCard(point, true),
                 position: (event) => {
                   const [mouseX, mouseY] = d3.pointer(event, container);
                   return computeTooltipPosition(mouseX, mouseY, tooltip, container);
@@ -3792,8 +3805,7 @@ const ScatterGraph = React.memo(
       locale,
       powerLabelStyle,
       drawPerfRuler,
-      pointDetails,
-      pointColor,
+      hoverCard,
       touchScrub,
     ]);
 

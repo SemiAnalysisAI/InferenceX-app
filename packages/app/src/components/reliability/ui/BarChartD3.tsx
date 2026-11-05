@@ -397,7 +397,7 @@ export default function ReliabilityBarChartD3({
   const isEmpty = loading || error || chartData.length === 0;
 
   const emptyOverlay = isEmpty ? (
-    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/80">
+    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-card/60 backdrop-blur-[2px]">
       {error ? (
         <EmptyState
           data-testid="reliability-error"

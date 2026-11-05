@@ -165,7 +165,7 @@ export function BottomToast({
             }
           : undefined
       }
-      className={`fixed inset-x-0 bottom-0 z-50 touch-pan-y transition-[transform,opacity] duration-300 ease-out sm:inset-x-auto sm:right-6 sm:bottom-6 sm:max-w-xs ${
+      className={`fixed inset-x-0 bottom-0 z-50 touch-pan-y transition-[transform,opacity] duration-300 ease-out sm:inset-x-auto sm:right-6 sm:bottom-6 sm:max-w-sm ${
         animate ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
       }`}
     >

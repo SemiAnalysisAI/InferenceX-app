@@ -297,7 +297,7 @@ export function D3ChartWrapper({
               'no-export text-muted-foreground',
               hintWidth === null
                 ? 'mt-2 text-center text-xs'
-                : 'pointer-events-none relative ml-auto -mt-[21px] pr-3 text-right text-2xs leading-4',
+                : 'pointer-events-none relative ml-auto -mt-[21px] mb-1.5 pr-3 text-right text-2xs leading-4',
             )}
             style={hintWidth === null ? undefined : { maxWidth: hintWidth }}
           >

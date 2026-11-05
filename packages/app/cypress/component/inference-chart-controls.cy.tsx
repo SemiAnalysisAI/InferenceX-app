@@ -95,17 +95,18 @@ describe('Inference ChartControls', () => {
     cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_costh');
   });
 
-  it('places benchmark and chart config side by side above history controls on desktop', () => {
+  it('gives benchmark config its own row above chart config and compare history on desktop', () => {
     cy.viewport(1280, 900);
     cy.get('fieldset').should('have.length', 3);
     cy.get('fieldset').then(($groups) => {
       const [benchmark, chart, history] = [...$groups].map((group) =>
         group.getBoundingClientRect(),
       );
-      expect(chart.top).to.be.closeTo(benchmark.top, 1);
-      expect(benchmark.right).to.be.lessThan(chart.left);
-      expect(history.top).to.be.greaterThan(Math.max(benchmark.bottom, chart.bottom));
-      expect(history.left).to.be.closeTo(benchmark.left, 1);
+      expect(chart.top).to.be.greaterThan(benchmark.bottom);
+      expect(chart.left).to.be.closeTo(benchmark.left, 1);
+      expect(history.top).to.be.closeTo(chart.top, 1);
+      expect(chart.right).to.be.lessThan(history.left);
+      expect(history.right).to.be.closeTo(benchmark.right, 1);
       expect(benchmark.height, 'benchmark controls fit in a single row').to.be.lessThan(130);
     });
     cy.get('#model-select').then(($model) => {
@@ -175,7 +176,7 @@ describe('Inference ChartControls', () => {
     });
   });
 
-  it('keeps benchmark and chart settings in one row when history comparison is omitted', () => {
+  it('gives benchmark and chart settings full-width rows when history comparison is omitted', () => {
     cy.viewport(1280, 900);
     mountWithProviders(<InferenceChartControls hideGpuComparison />, {
       inference: {},
@@ -187,17 +188,16 @@ describe('Inference ChartControls', () => {
       .then(($groups) => {
         const benchmark = $groups[0].getBoundingClientRect();
         const chart = $groups[1].getBoundingClientRect();
-        expect(benchmark.top).to.equal(chart.top);
-        expect(benchmark.right).to.be.lessThan(chart.left);
+        expect(chart.top).to.be.greaterThan(benchmark.bottom);
+        expect(chart.left).to.be.closeTo(benchmark.left, 1);
+        expect(chart.right).to.be.closeTo(benchmark.right, 1);
         expect(benchmark.height, 'benchmark controls fit in a single row').to.be.lessThan(130);
       });
     cy.get('#model-select').then(($model) => {
       const model = $model[0].getBoundingClientRect();
-      cy.get('#scenario-select, #precision-select, [data-testid="yaxis-metric-selector"]').each(
-        ($control) => {
-          expect($control[0].getBoundingClientRect().top).to.be.closeTo(model.top, 1);
-        },
-      );
+      cy.get('#scenario-select, #precision-select').each(($control) => {
+        expect($control[0].getBoundingClientRect().top).to.be.closeTo(model.top, 1);
+      });
     });
   });
 
