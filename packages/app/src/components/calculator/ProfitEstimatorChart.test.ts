@@ -25,15 +25,18 @@ import {
   BAR_ICON_MIN_HEIGHT,
   barMarkHeight,
   CHART_HEIGHT,
-  CHART_HEIGHT_COMPACT,
   CHART_HEIGHT_MIN,
   CHART_VIEWPORT_RESERVE,
   chartHeightForViewport,
   STACK_HEADROOM_PX,
   stackHeadroomPx,
   rowLabel,
+  rowStepPx,
+  rowValueRoomPx,
   segmentLabelLines,
   stackTopValue,
+  wrapRowLabel,
+  wrapWords,
 } from './ProfitEstimatorChart';
 
 function row(overrides: Partial<ProfitEstimatorRow> = {}): ProfitEstimatorRow {
@@ -576,9 +579,48 @@ describe('chartHeightForViewport', () => {
     expect(chartHeightForViewport(100)).toBe(CHART_HEIGHT_MIN);
   });
 
-  it('respects the compact maximum and falls back to the maximum before mount', () => {
-    expect(chartHeightForViewport(2000, CHART_HEIGHT_COMPACT)).toBe(CHART_HEIGHT_COMPACT);
+  it('falls back to the maximum before mount', () => {
     expect(chartHeightForViewport(undefined)).toBe(CHART_HEIGHT);
-    expect(chartHeightForViewport(Number.NaN, CHART_HEIGHT_COMPACT)).toBe(CHART_HEIGHT_COMPACT);
+    expect(chartHeightForViewport(Number.NaN)).toBe(CHART_HEIGHT);
+  });
+});
+
+describe('phone row layout', () => {
+  it('wraps words to the width budget and keeps a long word whole', () => {
+    expect(wrapWords('Revenue per provisioned GW-year ($ USD)', 140, 12)).toEqual([
+      'Revenue per',
+      'provisioned GW-year',
+      '($ USD)',
+    ]);
+    expect(wrapWords('Supercalifragilistic', 20, 12)).toEqual(['Supercalifragilistic']);
+  });
+
+  it('puts the chip name first and wraps the qualifiers and date as muted lines', () => {
+    expect(wrapRowLabel('GB300 NVL72 (Dynamo vLLM) (FP4) • Nov 6', 110)).toEqual([
+      { text: 'GB300 NVL72', sub: false },
+      { text: '(Dynamo vLLM) (FP4)', sub: true },
+      { text: 'Nov 6', sub: true },
+    ]);
+    expect(wrapRowLabel('GB300 NVL72 (Dynamo vLLM) (FP4)', 80)).toEqual([
+      { text: 'GB300 NVL72', sub: false },
+      { text: '(Dynamo vLLM)', sub: true },
+      { text: '(FP4)', sub: true },
+    ]);
+  });
+
+  it('grows the row step only when a wrapped label needs more than the minimum', () => {
+    expect(rowStepPx([])).toBe(52);
+    expect(rowStepPx([[{ text: 'B200', sub: false }]])).toBe(52);
+    const tall = Array.from({ length: 4 }, (_, index) => ({ text: `${index}`, sub: index > 0 }));
+    expect(rowStepPx([tall])).toBe(14 + 3 * 12 + 12);
+  });
+
+  it('reserves room beside the bars for the widest revenue or margin label', () => {
+    const room = rowValueRoomPx([row(), row({ revenue: 25.24 })], 'chip-hour');
+    expect(room).toBeCloseTo(
+      estimateTextWidth(formatProfitUsd(1000, 'chip-hour', 1), CHART_TYPE.axisLabel) * 1.1 + 6,
+      5,
+    );
+    expect(rowValueRoomPx([], 'chip-hour')).toBe(6);
   });
 });

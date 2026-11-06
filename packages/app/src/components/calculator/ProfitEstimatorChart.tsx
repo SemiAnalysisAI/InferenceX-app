@@ -13,6 +13,7 @@ import {
 import { track } from '@/lib/analytics/analytics';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import { getChartWatermark } from '@/lib/catalog/data-mappings';
+import { widthTickCount } from '@/lib/d3-chart/chart-update';
 import { readableTextColor } from '@/lib/d3-chart/contrast-colors';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
@@ -54,16 +55,21 @@ export const CHART_HEIGHT = 720;
 export const CHART_HEIGHT_MIN = 440;
 export const CHART_VIEWPORT_RESERVE = 260;
 export const COMPACT_CHART_MAX_WIDTH = 640;
-const CHART_MARGIN_COMPACT = { top: 12, right: 8, bottom: 40, left: 64 };
-export const CHART_HEIGHT_COMPACT = 560;
+const ROW_MARGIN = { top: 8, right: 8 };
+const ROW_STEP_MIN_PX = 52;
+const ROW_STEP_PAD_PX = 12;
+const ROW_LABEL_SHARE = 0.36;
+const ROW_LABEL_GAP = 10;
+const ROW_NAME_LINE_PX = 14;
+const ROW_SUB_LINE_PX = 12;
+const ROW_VALUE_GAP = 6;
+const ROW_TICKS_PX = 22;
+const ROW_AXIS_LINE_PX = 15;
 
-export function chartHeightForViewport(
-  viewportHeightPx: number | undefined,
-  maxHeight: number = CHART_HEIGHT,
-): number {
-  if (!Number.isFinite(viewportHeightPx) || (viewportHeightPx as number) <= 0) return maxHeight;
+export function chartHeightForViewport(viewportHeightPx: number | undefined): number {
+  if (!Number.isFinite(viewportHeightPx) || (viewportHeightPx as number) <= 0) return CHART_HEIGHT;
   const available = Math.floor((viewportHeightPx as number) - CHART_VIEWPORT_RESERVE);
-  return Math.min(maxHeight, Math.max(CHART_HEIGHT_MIN, available));
+  return Math.min(CHART_HEIGHT, Math.max(CHART_HEIGHT_MIN, available));
 }
 
 function useViewportHeight(): number | undefined {
@@ -90,6 +96,22 @@ export function barLabelSlotPx(bandwidthPx: number, stepPx: number): number {
 export function estimateTextWidth(text: string, fontPx: number): number {
   return text.length * GLYPH_WIDTH_EM * fontPx;
 }
+
+export function wrapWords(text: string, maxPx: number, fontPx: number): string[] {
+  const lines: string[] = [];
+  let line = '';
+  for (const word of text.split(' ')) {
+    const next = line ? `${line} ${word}` : word;
+    if (line && estimateTextWidth(next, fontPx) > maxPx) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = next;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
 const X_LABEL_ROTATION = -50;
 
 export type XLabelLayout = 'stacked' | 'slanted';
@@ -106,6 +128,35 @@ export function splitHistoryLabel(label: string): [string, string] {
   const at = label.lastIndexOf(HISTORY_LABEL_SEP);
   if (at === -1) return [label, ''];
   return [label.slice(0, at), label.slice(at + HISTORY_LABEL_SEP.length)];
+}
+
+export interface RowLabelLine {
+  text: string;
+  sub: boolean;
+}
+
+export function wrapRowLabel(label: string, maxPx: number): RowLabelLine[] {
+  const [config, date] = splitHistoryLabel(label);
+  const [name, detail] = splitAxisLabel(config);
+  return [
+    ...wrapWords(name, maxPx, CHART_TYPE.axisLabel).map((text) => ({ text, sub: false })),
+    ...[detail, date]
+      .filter(Boolean)
+      .flatMap((part) =>
+        wrapWords(part, maxPx, CHART_TYPE.axisLabelSub).map((text) => ({ text, sub: true })),
+      ),
+  ];
+}
+
+function rowLabelHeightPx(lines: readonly RowLabelLine[]): number {
+  return lines.reduce((sum, line) => sum + (line.sub ? ROW_SUB_LINE_PX : ROW_NAME_LINE_PX), 0);
+}
+
+export function rowStepPx(labels: readonly (readonly RowLabelLine[])[]): number {
+  return Math.max(
+    ROW_STEP_MIN_PX,
+    ...labels.map((lines) => rowLabelHeightPx(lines) + ROW_STEP_PAD_PX),
+  );
 }
 
 export function xLabelLayout(labels: string[], slotPx: number, fontPx: number): XLabelLayout {
@@ -433,12 +484,13 @@ export function profitYDomain(
   rows: readonly ProfitEstimatorRow[],
   plotHeightPx = 0,
   headroomPx = STACK_HEADROOM_PX,
+  lossFootroomPx = LOSS_FOOTROOM_PX,
 ): [number, number] {
   if (rows.length === 0) return [0, 1];
   const top = Math.max(0, ...rows.map(stackTopValue));
   const bottom = Math.min(0, ...rows.map((row) => row.profit));
   const span = top - bottom;
-  const footroomPx = bottom < 0 ? LOSS_FOOTROOM_PX : 0;
+  const footroomPx = bottom < 0 ? lossFootroomPx : 0;
   const reservedPx = headroomPx + footroomPx;
   if (plotHeightPx > reservedPx * 2) {
     const unitsPerPx = span / (plotHeightPx - reservedPx);
@@ -447,15 +499,32 @@ export function profitYDomain(
   return [bottom * 1.12, top === 0 ? 1 : top + span * 0.3];
 }
 
+export function rowValueRoomPx(rows: readonly ProfitEstimatorRow[], basis: ProfitBasis): number {
+  const widest = Math.max(
+    0,
+    ...rows.map((row) =>
+      Math.max(
+        boldWidth(
+          formatProfitUsd(row.revenue, basis, REVENUE_LABEL_FULL.digits),
+          REVENUE_LABEL_FULL.fontPx,
+        ),
+        estimateTextWidth(operatorMarginLabel(row, '', 0), CHART_TYPE.annotation),
+      ),
+    ),
+  );
+  return widest + ROW_VALUE_GAP;
+}
+
 const PROFIT_Y_TICK_COUNT = 8;
 
 export function profitAxisTickFormat(
   basis: ProfitBasis,
   domain: readonly [number, number],
+  tickCount = PROFIT_Y_TICK_COUNT,
 ): (value: number) => string {
   if (basis !== 'chip-hour') return (value) => formatProfitUsd(value, basis, 0);
   const [start, stop] = d3.scaleLinear().domain(domain).nice().domain();
-  const digits = Number.isInteger(d3.tickStep(start, stop, PROFIT_Y_TICK_COUNT)) ? 0 : 2;
+  const digits = Number.isInteger(d3.tickStep(start, stop, tickCount)) ? 0 : 2;
   return (value) => formatUsdPerChipHour(value, digits);
 }
 
@@ -573,12 +642,8 @@ export default function ProfitEstimatorChart({
 }: ProfitEstimatorChartProps) {
   const chartRef = useRef<D3ChartHandle>(null);
   const { dimensions, setContainerRef } = useResponsiveChartDimensions({ height: CHART_HEIGHT });
-  const compact = dimensions.width > 0 && dimensions.width < COMPACT_CHART_MAX_WIDTH;
+  const horizontal = dimensions.width > 0 && dimensions.width < COMPACT_CHART_MAX_WIDTH;
   const viewportHeight = useViewportHeight();
-  const chartHeight = chartHeightForViewport(
-    viewportHeight,
-    compact ? CHART_HEIGHT_COMPACT : CHART_HEIGHT,
-  );
   const locale = useLocale();
   const t = STRINGS[locale];
   const strings = t;
@@ -586,14 +651,19 @@ export default function ProfitEstimatorChart({
 
   const segments = useMemo(() => buildProfitSegments(rows), [rows]);
 
-  const xScaleConfig = useMemo<ScaleConfig>(
-    () => ({ type: 'band', domain: rows.map((row) => row.resultKey), padding: BAND_PADDING }),
-    [rows],
-  );
+  const bandScaleConfig = useMemo<ScaleConfig>(() => {
+    const domain = rows.map((row) => row.resultKey);
+    return {
+      type: 'band',
+      domain: horizontal ? domain.toReversed() : domain,
+      padding: BAND_PADDING,
+    };
+  }, [rows, horizontal]);
   const labelMap = useMemo(
     () => new Map(rows.map((row) => [row.resultKey, rowLabel(row, hardwareConfig)])),
     [rows, hardwareConfig],
   );
+  const valueRoom = useMemo(() => rowValueRoomPx(rows, basis), [rows, basis]);
 
   const fillFor = useCallback(
     (segment: ProfitSegment): string => {
@@ -620,18 +690,19 @@ export default function ProfitEstimatorChart({
 
   const tooltipStateRef = useRef({ hardwareConfig, assumptions, locale });
   tooltipStateRef.current = { hardwareConfig, assumptions, locale };
-  const hoveredBarXRef = useRef(0);
-  const hoveredBarYRef = useRef(0);
 
   const layers = useMemo<LayerConfig<ProfitSegment>[]>(() => {
     const stackLayer: LayerConfig<ProfitSegment> = {
       type: 'custom',
       key: 'profit-stack',
       render: (group, ctx) => {
-        const xScale = ctx.xScale as d3.ScaleBand<string>;
-        const yScale = ctx.yScale as d3.ScaleLinear<number, number>;
-        const bandwidth = xScale.bandwidth();
-        const labelSlot = barLabelSlotPx(bandwidth, xScale.step());
+        const band = (horizontal ? ctx.yScale : ctx.xScale) as d3.ScaleBand<string>;
+        const value = (horizontal ? ctx.xScale : ctx.yScale) as d3.ScaleLinear<number, number>;
+        const bandwidth = band.bandwidth();
+        const labelSlot = barLabelSlotPx(bandwidth, band.step());
+        const bandStart = (row: ProfitEstimatorRow) => band(row.resultKey) ?? 0;
+        const bandMid = (row: ProfitEstimatorRow) => bandStart(row) + bandwidth / 2;
+        const span = (d: ProfitSegment) => Math.abs(value(d.y1) - value(d.y0));
 
         const lossRows = segments.filter((d) => d.kind === 'loss').map((d) => d.row);
         const defs = group
@@ -672,10 +743,10 @@ export default function ProfitEstimatorChart({
           .data([0])
           .join('line')
           .attr('class', 'zero-line')
-          .attr('x1', 0)
-          .attr('x2', ctx.width)
-          .attr('y1', yScale(0))
-          .attr('y2', yScale(0))
+          .attr('x1', horizontal ? value(0) : 0)
+          .attr('x2', horizontal ? value(0) : ctx.width)
+          .attr('y1', horizontal ? 0 : value(0))
+          .attr('y2', horizontal ? ctx.height : value(0))
           .attr('stroke', 'var(--foreground)')
           .attr('stroke-opacity', 0.6)
           .attr('stroke-width', 1);
@@ -686,10 +757,10 @@ export default function ProfitEstimatorChart({
           .join('rect')
           .attr('class', (d) => `bar bar-${d.kind}`)
           .attr('data-kind', (d) => d.kind)
-          .attr('x', (d) => xScale(d.row.resultKey) ?? 0)
-          .attr('width', bandwidth)
-          .attr('y', (d) => yScale(d.y1))
-          .attr('height', (d) => Math.max(0, yScale(d.y0) - yScale(d.y1)))
+          .attr('x', (d) => (horizontal ? value(d.y0) : bandStart(d.row)))
+          .attr('width', (d) => (horizontal ? span(d) : bandwidth))
+          .attr('y', (d) => (horizontal ? bandStart(d.row) : value(d.y1)))
+          .attr('height', (d) => (horizontal ? bandwidth : span(d)))
           .attr('fill', (d) => fillFor(d))
           .attr('fill-opacity', (d) =>
             d.kind === 'tco'
@@ -711,22 +782,24 @@ export default function ProfitEstimatorChart({
           profit: strings.profit,
           loss: strings.loss,
         };
-        const segmentLabels = segments.map((d) => {
-          const height = Math.max(0, yScale(d.y0) - yScale(d.y1));
-          return {
-            segment: d,
-            lines: segmentLabelLines(d.kind, d.row, height, labelText, bandwidth, basis),
-            height,
-          };
-        });
+        const segmentLabels = segments.map((d) => ({
+          segment: d,
+          lines: horizontal
+            ? segmentLabelLines(d.kind, d.row, bandwidth, labelText, span(d), basis)
+            : segmentLabelLines(d.kind, d.row, span(d), labelText, bandwidth, basis),
+        }));
         const segmentText = group
           .selectAll<SVGTextElement, (typeof segmentLabels)[number]>('.segment-label')
           .data(segmentLabels, (d) => d.segment.key)
           .join('text')
           .attr('class', (d) => `segment-label segment-label-${d.segment.kind}`)
-          .attr('x', (d) => (xScale(d.segment.row.resultKey) ?? 0) + bandwidth / 2)
+          .attr('x', (d) =>
+            horizontal ? (value(d.segment.y0) + value(d.segment.y1)) / 2 : bandMid(d.segment.row),
+          )
           .attr('y', (d) => {
-            const mid = (yScale(d.segment.y0) + yScale(d.segment.y1)) / 2;
+            const mid = horizontal
+              ? bandMid(d.segment.row)
+              : (value(d.segment.y0) + value(d.segment.y1)) / 2;
             return d.lines.length === 2 ? mid - CHART_TYPE.annotation * 0.15 : mid;
           })
           .attr('text-anchor', 'middle')
@@ -746,18 +819,21 @@ export default function ProfitEstimatorChart({
           .text((d) => d.line);
 
         const labelData = segments.filter((d) => d.kind === 'tco');
-        const stackTopPx = (d: ProfitSegment) => yScale(stackTopValue(d.row));
+        const slot = horizontal ? Number.POSITIVE_INFINITY : labelSlot;
+        const stackTopPx = (d: ProfitSegment) => value(stackTopValue(d.row));
         const revenueBaselineY = (d: ProfitSegment) => stackTopPx(d) - REVENUE_LABEL_GAP;
+        const revenueX = (row: ProfitEstimatorRow) =>
+          horizontal ? value(stackTopValue(row)) + ROW_VALUE_GAP : bandMid(row);
         const iconHeight = barMarkHeight(bandwidth);
         const revenueStyle = revenueLabelStyle(
           labelData.map((d) => d.row),
           basis,
-          labelSlot,
+          slot,
         );
         group
           .selectAll<SVGImageElement, ProfitSegment>('image.bar-vendor-mark')
           .data(
-            labelData.filter((d) => getAxisVendorIcon(d.row.hwKey)),
+            horizontal ? [] : labelData.filter((d) => getAxisVendorIcon(d.row.hwKey)),
             (d) => d.row.resultKey,
           )
           .join('image')
@@ -772,7 +848,7 @@ export default function ProfitEstimatorChart({
           .attr('height', iconHeight)
           .attr('x', (d) => {
             const w = barMarkWidth(getAxisVendorIcon(d.row.hwKey), iconHeight);
-            return (xScale(d.row.resultKey) ?? 0) + bandwidth / 2 - w / 2;
+            return bandMid(d.row) - w / 2;
           })
           .attr('y', (d) => revenueBaselineY(d) - CHART_TYPE.axisLabel - BAR_ICON_GAP - iconHeight)
           .attr('pointer-events', 'none');
@@ -781,9 +857,9 @@ export default function ProfitEstimatorChart({
           .data(labelData, (d) => d.row.resultKey)
           .join('text')
           .attr('class', 'revenue-label')
-          .attr('x', (d) => (xScale(d.row.resultKey) ?? 0) + bandwidth / 2)
-          .attr('y', revenueBaselineY)
-          .attr('text-anchor', 'middle')
+          .attr('x', (d) => revenueX(d.row))
+          .attr('y', (d) => (horizontal ? bandMid(d.row) : revenueBaselineY(d)))
+          .attr('text-anchor', horizontal ? 'start' : 'middle')
           .attr('font-size', px(revenueStyle.fontPx))
           .attr('font-weight', '600')
           .style('fill', 'var(--foreground)');
@@ -797,14 +873,22 @@ export default function ProfitEstimatorChart({
             },
             {
               row: d.row,
-              text: operatorMarginLabel(d.row, strings.marginShort, labelSlot),
+              text: operatorMarginLabel(
+                d.row,
+                strings.marginShort,
+                horizontal ? valueRoom - ROW_VALUE_GAP : labelSlot,
+              ),
               sub: true,
             },
           ])
           .join('tspan')
           .attr('class', (d) => (d.sub ? 'revenue-margin' : 'revenue-amount'))
-          .attr('x', (d) => (xScale(d.row.resultKey) ?? 0) + bandwidth / 2)
-          .attr('dy', (d) => (d.sub ? '1.2em' : '0'))
+          .attr('x', (d) => revenueX(d.row))
+          .attr('dy', (d) => {
+            if (d.sub) return '1.2em';
+            if (horizontal) return d.row.profit < 0 ? '-1em' : '-0.35em';
+            return '0';
+          })
           .attr('font-size', (d) => (d.sub ? px(CHART_TYPE.annotation) : null))
           .attr('font-weight', (d) => (d.sub ? '500' : '600'))
           .style('fill', (d) =>
@@ -816,11 +900,12 @@ export default function ProfitEstimatorChart({
           )
           .text((d) => d.text);
 
+        const lossSlot = horizontal ? valueRoom - ROW_VALUE_GAP : labelSlot;
         const lossStyle = lossLabelStyle(
           labelData.map((d) => d.row),
           strings.loss,
           basis,
-          labelSlot,
+          lossSlot,
         );
         group
           .selectAll<SVGTextElement, ProfitSegment>('.loss-label')
@@ -830,23 +915,37 @@ export default function ProfitEstimatorChart({
           )
           .join('text')
           .attr('class', 'loss-label')
-          .attr('x', (d) => (xScale(d.row.resultKey) ?? 0) + bandwidth / 2)
-          .attr('y', (d) => yScale(d.row.profit) + LOSS_LABEL_DY)
-          .attr('text-anchor', 'middle')
+          .attr('x', (d) => revenueX(d.row))
+          .attr('y', (d) =>
+            horizontal
+              ? bandMid(d.row) - revenueStyle.fontPx + 2.4 * CHART_TYPE.annotation
+              : value(d.row.profit) + LOSS_LABEL_DY,
+          )
+          .attr('text-anchor', horizontal ? 'start' : 'middle')
           .attr('font-size', px(CHART_TYPE.annotation))
           .attr('font-weight', '600')
           .style('fill', LOSS_FILL)
-          .text((d) => lossLabelText(d.row.profit, strings.loss, basis, lossStyle, labelSlot));
+          .text((d) => lossLabelText(d.row.profit, strings.loss, basis, lossStyle, lossSlot));
 
         return bars;
       },
     };
     return [stackLayer];
-  }, [segments, fillFor, outlineFor, labelColorFor, colorResolver, strings, basis]);
+  }, [
+    segments,
+    fillFor,
+    outlineFor,
+    labelColorFor,
+    colorResolver,
+    strings,
+    basis,
+    horizontal,
+    valueRoom,
+  ]);
 
   const tooltip = useMemo(
     () => ({
-      rulerType: 'vertical' as const,
+      rulerType: horizontal ? ('horizontal' as const) : ('vertical' as const),
       content: (segment: ProfitSegment) => {
         const state = tooltipStateRef.current;
         return generateProfitTooltipHTML(
@@ -869,16 +968,20 @@ export default function ProfitEstimatorChart({
           <ChartPointDetails {...details} color={colorResolver(segment.row)} onClose={close} />
         );
       },
-      getRulerX: () => hoveredBarXRef.current,
-      getRulerY: () => hoveredBarYRef.current,
+      getRulerX: (segment: ProfitSegment, xScale: unknown) => {
+        if (horizontal) return (xScale as d3.ScaleLinear<number, number>)(segment.y1);
+        const band = xScale as d3.ScaleBand<string>;
+        return (band(segment.row.resultKey) ?? 0) + band.bandwidth() / 2;
+      },
+      getRulerY: (segment: ProfitSegment, yScale: unknown) => {
+        if (!horizontal) return (yScale as d3.ScaleLinear<number, number>)(segment.y1);
+        const band = yScale as d3.ScaleBand<string>;
+        return (band(segment.row.resultKey) ?? 0) + band.bandwidth() / 2;
+      },
       onHoverStart: (
-        selection: d3.Selection<SVGRectElement, ProfitSegment, SVGGElement, unknown>,
+        _selection: d3.Selection<SVGRectElement, ProfitSegment, SVGGElement, unknown>,
         segment: ProfitSegment,
       ) => {
-        hoveredBarXRef.current =
-          Number.parseFloat(selection.attr('x') || '0') +
-          Number.parseFloat(selection.attr('width') || '0') / 2;
-        hoveredBarYRef.current = Number.parseFloat(selection.attr('y') || '0');
         const svgEl = chartRef.current?.getSvgElement();
         if (!svgEl) return;
         d3.select(svgEl)
@@ -903,40 +1006,88 @@ export default function ProfitEstimatorChart({
       },
       attachToLayer: 0,
     }),
-    [outlineFor, colorResolver],
+    [outlineFor, colorResolver, horizontal],
   );
 
-  const baseMargin = compact ? CHART_MARGIN_COMPACT : CHART_MARGIN;
+  const valueAxisLabel =
+    basis === 'gw-year' && assumptions.powerBasis && assumptions.powerBasis !== 'provisioned'
+      ? t.yAxisModeled
+      : horizontal
+        ? t.yAxisCompact[basis]
+        : t.yAxis[basis];
+  const rowLabels = useMemo(() => {
+    if (!horizontal) return new Map<string, RowLabelLine[]>();
+    const maxPx = Math.floor(dimensions.width * ROW_LABEL_SHARE) - ROW_LABEL_GAP;
+    return new Map([...labelMap].map(([key, label]) => [key, wrapRowLabel(label, maxPx)]));
+  }, [horizontal, dimensions.width, labelMap]);
+  const rowLabelWidth = Math.ceil(
+    Math.max(
+      0,
+      ...[...rowLabels.values()]
+        .flat()
+        .map((line) =>
+          estimateTextWidth(line.text, line.sub ? CHART_TYPE.axisLabelSub : CHART_TYPE.axisLabel),
+        ),
+    ),
+  );
+  const rowPlotWidth = dimensions.width - ROW_MARGIN.right - rowLabelWidth - ROW_LABEL_GAP;
+  const valueLabelLines = useMemo(
+    () => (horizontal ? wrapWords(valueAxisLabel, rowPlotWidth, CHART_TYPE.axisLabel) : []),
+    [horizontal, valueAxisLabel, rowPlotWidth],
+  );
+
   const minimumMargin = slantedMargins(
     [...labelMap.values()],
     MIN_BAR_STEP_PX,
     CHART_TYPE.axisLabelSub,
-    baseMargin,
+    CHART_MARGIN,
   );
-  const chartWidth = Math.max(
-    dimensions.width,
-    rows.length * MIN_BAR_STEP_PX + minimumMargin.left + minimumMargin.right,
-  );
+  const chartWidth = horizontal
+    ? dimensions.width
+    : Math.max(
+        dimensions.width,
+        rows.length * MIN_BAR_STEP_PX + minimumMargin.left + minimumMargin.right,
+      );
   const labelLayout = useMemo<XLabelLayout>(() => {
-    const plotWidth = chartWidth - baseMargin.left - baseMargin.right;
+    const plotWidth = chartWidth - CHART_MARGIN.left - CHART_MARGIN.right;
     const slot = rows.length > 0 ? plotWidth / rows.length : 0;
     return xLabelLayout([...labelMap.values()], slot, CHART_TYPE.axisLabelSub);
-  }, [chartWidth, baseMargin, rows.length, labelMap]);
+  }, [chartWidth, rows.length, labelMap]);
   const margin = useMemo(() => {
+    if (horizontal) {
+      return {
+        ...ROW_MARGIN,
+        left: rowLabelWidth + ROW_LABEL_GAP,
+        bottom: ROW_TICKS_PX + valueLabelLines.length * ROW_AXIS_LINE_PX,
+      };
+    }
     if (labelLayout === 'stacked') {
       const dated = [...labelMap.values()].some((label) => splitHistoryLabel(label)[1] !== '');
       return {
-        ...baseMargin,
+        ...CHART_MARGIN,
         bottom: X_LABEL_STACKED_BOTTOM + (dated ? X_LABEL_HISTORY_LINE_PX : 0),
       };
     }
-    const plotWidth = chartWidth - baseMargin.left - baseMargin.right;
+    const plotWidth = chartWidth - CHART_MARGIN.left - CHART_MARGIN.right;
     const slot = rows.length > 0 ? plotWidth / rows.length : 0;
-    return slantedMargins([...labelMap.values()], slot, CHART_TYPE.axisLabelSub, baseMargin);
-  }, [baseMargin, labelLayout, chartWidth, rows.length, labelMap]);
+    return slantedMargins([...labelMap.values()], slot, CHART_TYPE.axisLabelSub, CHART_MARGIN);
+  }, [
+    horizontal,
+    rowLabelWidth,
+    valueLabelLines.length,
+    labelLayout,
+    chartWidth,
+    rows.length,
+    labelMap,
+  ]);
+  const chartHeight = horizontal
+    ? margin.top +
+      margin.bottom +
+      Math.ceil(rowStepPx([...rowLabels.values()]) * (rows.length + BAND_PADDING))
+    : chartHeightForViewport(viewportHeight);
+  const plotWidth = chartWidth - margin.left - margin.right;
   const plotHeight = chartHeight - margin.top - margin.bottom;
   const bandwidth = useMemo(() => {
-    const plotWidth = chartWidth - margin.left - margin.right;
     if (plotWidth <= 0 || rows.length === 0) return 0;
     return d3
       .scaleBand<string>()
@@ -944,17 +1095,53 @@ export default function ProfitEstimatorChart({
       .range([0, plotWidth])
       .padding(BAND_PADDING)
       .bandwidth();
-  }, [chartWidth, margin, rows]);
-  const yDomain = useMemo(
-    () => profitYDomain(rows, plotHeight, stackHeadroomPx(barMarkHeight(bandwidth))),
-    [rows, plotHeight, bandwidth],
+  }, [plotWidth, rows]);
+  const valueDomain = useMemo(
+    () =>
+      horizontal
+        ? profitYDomain(rows, plotWidth, valueRoom, 0)
+        : profitYDomain(rows, plotHeight, stackHeadroomPx(barMarkHeight(bandwidth))),
+    [horizontal, rows, plotWidth, plotHeight, valueRoom, bandwidth],
   );
-  const yScaleConfig = useMemo<ScaleConfig>(
-    () => ({ type: 'linear', domain: yDomain, nice: true }),
-    [yDomain],
+  const valueScaleConfig = useMemo<ScaleConfig>(
+    () => ({ type: 'linear', domain: valueDomain, nice: !horizontal }),
+    [valueDomain, horizontal],
   );
 
-  const xAxisConfig = useMemo(
+  const rowAxisConfig = useMemo(
+    () => ({
+      grid: false,
+      tickFormat: (d: d3.AxisDomain) => labelMap.get(String(d)) ?? String(d),
+      customize: (axisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
+        axisGroup.selectAll<SVGGElement, d3.AxisDomain>('.tick').each(function (d) {
+          const lines = rowLabels.get(String(d)) ?? [];
+          const text = d3
+            .select(this)
+            .select<SVGTextElement>('text')
+            .attr('dy', null)
+            .attr('text-anchor', 'end')
+            .text(null);
+          const x = text.attr('x');
+          let top = -rowLabelHeightPx(lines) / 2;
+          for (const line of lines) {
+            const lineHeight = line.sub ? ROW_SUB_LINE_PX : ROW_NAME_LINE_PX;
+            text
+              .append('tspan')
+              .attr('x', x)
+              .attr('y', top + lineHeight * 0.76)
+              .attr('font-size', px(line.sub ? CHART_TYPE.axisLabelSub : CHART_TYPE.axisLabel))
+              .attr('font-weight', line.sub ? null : '500')
+              .style('fill', line.sub ? 'var(--muted-foreground)' : 'var(--foreground)')
+              .text(line.text);
+            top += lineHeight;
+          }
+        });
+      },
+    }),
+    [labelMap, rowLabels],
+  );
+
+  const columnAxisConfig = useMemo(
     () => ({
       grid: false,
       tickFormat: (d: d3.AxisDomain) => labelMap.get(String(d)) ?? String(d),
@@ -999,25 +1186,41 @@ export default function ProfitEstimatorChart({
     [labelMap, labelLayout],
   );
 
-  const yAxisConfig = useMemo(() => {
-    const formatYTick = profitAxisTickFormat(basis, yDomain);
+  const valueAxisConfig = useMemo(() => {
+    const formatTick = profitAxisTickFormat(
+      basis,
+      valueDomain,
+      horizontal ? widthTickCount(plotWidth, PROFIT_Y_TICK_COUNT) : PROFIT_Y_TICK_COUNT,
+    );
     return {
-      label:
-        basis === 'gw-year' && assumptions.powerBasis && assumptions.powerBasis !== 'provisioned'
-          ? t.yAxisModeled
-          : compact
-            ? t.yAxisCompact[basis]
-            : t.yAxis[basis],
-      tickFormat: (d: d3.AxisDomain) => formatYTick(Number(d)),
+      label: horizontal ? undefined : valueAxisLabel,
+      tickFormat: (d: d3.AxisDomain) => formatTick(Number(d)),
       tickCount: PROFIT_Y_TICK_COUNT,
     };
-  }, [compact, basis, assumptions.powerBasis, t.yAxis, t.yAxisCompact, t.yAxisModeled, yDomain]);
+  }, [horizontal, basis, valueDomain, plotWidth, valueAxisLabel]);
 
   const onRender = useMemo(
     () => (ctx: RenderContext) => {
-      ctx.layout.yAxisGroup.selectAll('text').style('font-variant-numeric', 'tabular-nums');
+      const { layout } = ctx;
+      (horizontal ? layout.xAxisGroup : layout.yAxisGroup)
+        .selectAll('text')
+        .style('font-variant-numeric', 'tabular-nums');
+      layout.g
+        .selectAll<SVGTextElement, string[]>('text.profit-value-label')
+        .data(horizontal ? [valueLabelLines] : [])
+        .join('text')
+        .attr('class', 'profit-value-label')
+        .attr('text-anchor', 'middle')
+        .attr('font-size', px(CHART_TYPE.axisLabel))
+        .style('fill', 'var(--foreground)')
+        .selectAll<SVGTSpanElement, string>('tspan')
+        .data((lines) => lines)
+        .join('tspan')
+        .attr('x', ctx.width / 2)
+        .attr('y', (_, index) => ctx.height + ROW_TICKS_PX + (index + 1) * ROW_AXIS_LINE_PX - 3)
+        .text((line) => line);
     },
-    [],
+    [horizontal, valueLabelLines],
   );
 
   const dataIdentity = useMemo(() => rows.map((row) => row.resultKey).join('|'), [rows]);
@@ -1040,6 +1243,7 @@ export default function ProfitEstimatorChart({
   return (
     <div className="w-full" ref={setContainerRef}>
       <D3Chart<ProfitSegment>
+        key={horizontal ? 'rows' : 'columns'}
         ref={chartRef}
         chartId="profit-estimator-chart"
         data={segments}
@@ -1050,10 +1254,10 @@ export default function ProfitEstimatorChart({
         watermark={getChartWatermark()}
         testId="profit-estimator-chart"
         clipContent={false}
-        xScale={xScaleConfig}
-        yScale={yScaleConfig}
-        xAxis={xAxisConfig}
-        yAxis={yAxisConfig}
+        xScale={horizontal ? valueScaleConfig : bandScaleConfig}
+        yScale={horizontal ? bandScaleConfig : valueScaleConfig}
+        xAxis={horizontal ? valueAxisConfig : columnAxisConfig}
+        yAxis={horizontal ? rowAxisConfig : valueAxisConfig}
         layers={layers}
         tooltip={tooltip}
         onRender={onRender}

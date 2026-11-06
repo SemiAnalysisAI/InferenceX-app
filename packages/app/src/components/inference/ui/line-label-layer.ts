@@ -209,10 +209,48 @@ function coversOtherPath(
 
 const LEADER_MIN_SHIFT = 12;
 const LEADER_MIN_GAP = 6;
+const LEADER_MAX_LENGTH = 40;
+const NARROW_LEADER_MAX_LENGTH = 32;
+const LEADER_OPACITY = 0.5;
+
+function turn(p: CartesianPoint, q: CartesianPoint, r: CartesianPoint): number {
+  return Math.sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
+}
+
+function segmentsCross(
+  a: CartesianPoint,
+  b: CartesianPoint,
+  c: CartesianPoint,
+  d: CartesianPoint,
+): boolean {
+  return turn(c, d, a) * turn(c, d, b) < 0 && turn(a, b, c) * turn(a, b, d) < 0;
+}
+
+function leaderCrossesOtherPath(
+  anchor: CartesianPoint,
+  end: CartesianPoint,
+  key: string,
+  occluders: readonly BoundedOccluder[],
+): boolean {
+  const reach = {
+    left: Math.min(anchor.x, end.x),
+    right: Math.max(anchor.x, end.x),
+    top: Math.min(anchor.y, end.y),
+    bottom: Math.max(anchor.y, end.y),
+  };
+  for (const { key: occluderKey, points, bounds } of occluders) {
+    if (occluderKey === key || !rectsOverlap(reach, bounds)) continue;
+    for (let i = 1; i < points.length; i++) {
+      if (segmentsCross(anchor, end, points[i - 1], points[i])) return true;
+    }
+  }
+  return false;
+}
 
 function syncLeader(
   node: SVGGElement,
-  label: LineLabelPlacement,
+  anchor: CartesianPoint,
+  color: string,
   local: RectBounds,
   tx: number,
   ty: number,
@@ -220,8 +258,8 @@ function syncLeader(
 ): void {
   const leader = node.querySelector<SVGLineElement>('.ll-leader');
   if (!leader) return;
-  const ax = label.x - tx;
-  const ay = label.y - ty;
+  const ax = anchor.x - tx;
+  const ay = anchor.y - ty;
   const ex = Math.min(Math.max(ax, local.left), local.right);
   const ey = Math.min(Math.max(ay, local.top), local.bottom);
   if (!show || Math.hypot(ax - ex, ay - ey) < LEADER_MIN_GAP) {
@@ -232,11 +270,39 @@ function syncLeader(
   leader.setAttribute('y1', String(ay));
   leader.setAttribute('x2', String(ex));
   leader.setAttribute('y2', String(ey));
-  leader.setAttribute('stroke', label.color);
+  leader.setAttribute('stroke', color);
   leader.removeAttribute('display');
 }
 
-const FAR_COLUMNS = 6;
+const ALTERNATE_ANCHORS = 4;
+
+function alternateAnchors(
+  key: string,
+  primary: CartesianPoint,
+  lines: readonly BoundedOccluder[],
+  bounds: RectBounds,
+): CartesianPoint[] {
+  const inside = lines
+    .filter((line) => line.key === key)
+    .flatMap((line) => line.points)
+    .filter(
+      (point) =>
+        point.x >= bounds.left &&
+        point.x <= bounds.right &&
+        point.y >= bounds.top &&
+        point.y <= bounds.bottom &&
+        (point.x !== primary.x || point.y !== primary.y),
+    );
+  const step = Math.max(1, inside.length / ALTERNATE_ANCHORS);
+  const picked: CartesianPoint[] = [];
+  for (let index = step / 2; index < inside.length; index += step) {
+    picked.push(inside[Math.floor(index)]);
+  }
+  return picked.sort(
+    (a, b) =>
+      Math.hypot(a.x - primary.x, a.y - primary.y) - Math.hypot(b.x - primary.x, b.y - primary.y),
+  );
+}
 
 function layoutPills(
   items: readonly PillLayoutItem[],
@@ -247,81 +313,115 @@ function layoutPills(
   occluders: readonly PillOccluder[],
 ): void {
   const placed: RectBounds[] = [...obstacles];
-  const limit =
-    bounds && bounds.right - bounds.left < NARROW_PLOT_WIDTH ? NARROW_PILL_LIMIT : Infinity;
+  const narrow = bounds !== null && bounds.right - bounds.left < NARROW_PLOT_WIDTH;
+  const limit = narrow ? NARROW_PILL_LIMIT : Infinity;
+  const maxLeader = narrow ? NARROW_LEADER_MAX_LENGTH : LEADER_MAX_LENGTH;
   const lines = occluders.filter((occluder) => occluder.points.length > 0).map(boundOccluder);
   let shown = 0;
 
   for (const { node, label } of items) {
+    const primary = { x: label.x, y: label.y };
     const tx0 = label.x + offsetX;
     const ty0 = label.y + offsetY;
     const local = bounds ? pillLocalBox(node) : null;
     if (!bounds || !local || !label.visible) {
       node.setAttribute('transform', `translate(${tx0},${ty0})`);
-      if (local) syncLeader(node, label, local, tx0, ty0, false);
+      if (local) syncLeader(node, primary, label.color, local, tx0, ty0, false);
       continue;
     }
 
-    const mirrorX = 2 * label.x - tx0 - local.left - local.right;
-    const mirrorY = 2 * label.y - ty0 - local.top - local.bottom;
-    const candidates: [number, number][] = [
-      [tx0, ty0],
-      [tx0, mirrorY],
-      [mirrorX, ty0],
-      [mirrorX, mirrorY],
-    ];
     const rowHeight = local.bottom - local.top + 4;
-    for (let row = 1; row <= 3; row++) {
-      for (const cx of [tx0, mirrorX]) {
-        candidates.push([cx, ty0 - row * rowHeight], [cx, ty0 + row * rowHeight]);
-      }
-    }
-    const farSlots = () => {
-      const columnStep = (local.right - local.left) / 2;
-      const colMin = Math.max(
-        -FAR_COLUMNS,
-        Math.floor((bounds.left - tx0 - local.left) / columnStep),
-      );
-      const colMax = Math.min(
-        FAR_COLUMNS,
-        Math.ceil((bounds.right - tx0 - local.right) / columnStep),
-      );
-      const rowMin = Math.floor((bounds.top - ty0 - local.top) / rowHeight);
-      const rowMax = Math.ceil((bounds.bottom - ty0 - local.bottom) / rowHeight);
-      const far: { slot: [number, number]; distance: number }[] = [];
-      for (let col = colMin; col <= colMax; col++) {
-        for (let row = rowMin; row <= rowMax; row++) {
-          far.push({
-            slot: [tx0 + col * columnStep, ty0 + row * rowHeight],
-            distance: Math.hypot(col * columnStep, row * rowHeight),
-          });
-        }
-      }
-      return far.sort((a, b) => a.distance - b.distance).map(({ slot }) => slot);
-    };
-
     const clampAt = ([cx, cy]: [number, number]) => {
       const shift = pillShiftIntoBounds(pillBoxAt(local, cx, cy), bounds);
       const tx = cx + shift.x;
       const ty = cy + shift.y;
       return { tx, ty, box: pillBoxAt(local, tx, ty) };
     };
-    const firstClean = (slots: readonly [number, number][]) => {
-      for (const slot of slots) {
-        const candidate = clampAt(slot);
-        if (placed.some((other) => rectsStrictlyOverlap(candidate.box, other))) continue;
-        if (!coversOtherPath(candidate.box, label.key, lines)) return candidate;
+    const placeNear = (anchor: CartesianPoint) => {
+      const ax = anchor.x + offsetX;
+      const ay = anchor.y + offsetY;
+      const mirrorX = 2 * anchor.x - ax - local.left - local.right;
+      const mirrorY = 2 * anchor.y - ay - local.top - local.bottom;
+      const candidates: [number, number][] = [
+        [ax, ay],
+        [ax, mirrorY],
+        [mirrorX, ay],
+        [mirrorX, mirrorY],
+      ];
+      for (let row = 1; row <= 3; row++) {
+        for (const cx of [ax, mirrorX]) {
+          candidates.push([cx, ay - row * rowHeight], [cx, ay + row * rowHeight]);
+        }
       }
-      return undefined;
+      const farSlots = () => {
+        const columnStep = (local.right - local.left) / 2;
+        const colReach = Math.ceil((maxLeader + local.right - local.left) / columnStep);
+        const rowReach = Math.ceil((maxLeader + local.bottom - local.top) / rowHeight);
+        const colMin = Math.max(
+          -colReach,
+          Math.floor((bounds.left - ax - local.left) / columnStep),
+        );
+        const colMax = Math.min(
+          colReach,
+          Math.ceil((bounds.right - ax - local.right) / columnStep),
+        );
+        const rowMin = Math.max(-rowReach, Math.floor((bounds.top - ay - local.top) / rowHeight));
+        const rowMax = Math.min(
+          rowReach,
+          Math.ceil((bounds.bottom - ay - local.bottom) / rowHeight),
+        );
+        const far: { slot: [number, number]; distance: number }[] = [];
+        for (let col = colMin; col <= colMax; col++) {
+          for (let row = rowMin; row <= rowMax; row++) {
+            far.push({
+              slot: [ax + col * columnStep, ay + row * rowHeight],
+              distance: Math.hypot(col * columnStep, row * rowHeight),
+            });
+          }
+        }
+        return far.sort((a, b) => a.distance - b.distance).map(({ slot }) => slot);
+      };
+      const firstClean = (slots: readonly [number, number][]) => {
+        for (const slot of slots) {
+          const candidate = clampAt(slot);
+          const { box } = candidate;
+          const end = {
+            x: Math.min(Math.max(anchor.x, box.left), box.right),
+            y: Math.min(Math.max(anchor.y, box.top), box.bottom),
+          };
+          const length = Math.hypot(end.x - anchor.x, end.y - anchor.y);
+          if (length > maxLeader) continue;
+          if (placed.some((other) => rectsStrictlyOverlap(box, other))) continue;
+          if (coversOtherPath(box, label.key, lines)) continue;
+          const moved = Math.hypot(candidate.tx - ax, candidate.ty - ay) > LEADER_MIN_SHIFT;
+          if (
+            moved &&
+            length >= LEADER_MIN_GAP &&
+            leaderCrossesOtherPath(anchor, end, label.key, lines)
+          ) {
+            continue;
+          }
+          return { ...candidate, anchor, moved };
+        }
+        return undefined;
+      };
+      return firstClean(candidates) ?? firstClean(farSlots());
     };
-    const fallback = clampAt(candidates[0]);
-    const chosen = shown < limit ? (firstClean(candidates) ?? firstClean(farSlots())) : undefined;
+
+    let chosen = shown < limit ? placeNear(primary) : undefined;
+    if (shown < limit && !chosen) {
+      for (const anchor of alternateAnchors(label.key, primary, lines, bounds)) {
+        chosen = placeNear(anchor);
+        if (chosen) break;
+      }
+    }
     if (!chosen) {
+      const fallback = clampAt([tx0, ty0]);
       node.setAttribute('transform', `translate(${fallback.tx},${fallback.ty})`);
       node.style.opacity = '0';
       node.dataset.visible = '0';
       node.setAttribute(PLACEMENT_HIDDEN_ATTR, '');
-      syncLeader(node, label, local, fallback.tx, fallback.ty, false);
+      syncLeader(node, primary, label.color, local, fallback.tx, fallback.ty, false);
       continue;
     }
     if (node.hasAttribute(PLACEMENT_HIDDEN_ATTR)) {
@@ -330,14 +430,7 @@ function layoutPills(
     }
 
     node.setAttribute('transform', `translate(${chosen.tx},${chosen.ty})`);
-    syncLeader(
-      node,
-      label,
-      local,
-      chosen.tx,
-      chosen.ty,
-      Math.hypot(chosen.tx - tx0, chosen.ty - ty0) > LEADER_MIN_SHIFT,
-    );
+    syncLeader(node, chosen.anchor, label.color, local, chosen.tx, chosen.ty, chosen.moved);
     placed.push(chosen.box);
     shown++;
   }
@@ -567,6 +660,7 @@ export function renderLineLabels(
           .append('line')
           .attr('class', 'll-leader')
           .attr('stroke-width', 1)
+          .attr('stroke-opacity', LEADER_OPACITY)
           .attr('display', 'none');
         labelGroup.append('rect').attr('class', 'll-bg').attr('rx', 4).attr('ry', 4);
         labelGroup

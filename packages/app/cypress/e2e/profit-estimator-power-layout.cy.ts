@@ -195,7 +195,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
     chart().should('contain', 'All in Measured').and('contain', 'All in Provisioned');
   });
 
-  it('keeps all nine power comparison bars readable and reachable on mobile (en)', () => {
+  it('keeps all nine power comparison bars readable on mobile without a scroll window (en)', () => {
     stubOpenRouter();
     cy.viewport(390, 900);
     cy.intercept('GET', '/api/v1/benchmarks*', {
@@ -217,38 +217,17 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       onBeforeLoad: unlockPowerGate,
     });
     chart().find('text.revenue-label').should('have.length', 9);
-    chart()
-      .find('image.bar-vendor-mark')
-      .should(($marks) => {
-        const boxes = [...$marks].map((mark) => mark.getBoundingClientRect());
-        for (let i = 1; i < boxes.length; i++) {
-          expect(boxes[i].left - boxes[i - 1].right, 'space between vendor marks').to.be.at.least(
-            4,
-          );
-        }
-      });
-    scroller().should('have.attr', 'tabindex', '0').and('have.attr', 'role', 'region');
-    scroller()
-      .scrollIntoView({ offset: { top: -70, left: 0 } })
-      .focus()
-      .should('have.focus');
-    scroller().then(($scroll) => {
-      const el = $scroll[0];
-      const event = new el.ownerDocument.defaultView!.KeyboardEvent('keydown', {
-        key: 'ArrowRight',
-        bubbles: true,
-        cancelable: true,
-      });
-      el.dispatchEvent(event);
-      expect(event.defaultPrevented, `handled key on ${el.clientWidth}/${el.scrollWidth}`).to.equal(
-        true,
-      );
-      expect(el.scrollLeft, 'synchronous scroll').to.be.greaterThan(0);
+    chart().find('image.bar-vendor-mark').should('not.exist');
+    scroller().should('not.have.attr', 'tabindex');
+    chart().contains('Scroll horizontally').should('not.exist');
+    chartSvg().should(($svg) => {
+      const plot = $svg[0].getBoundingClientRect();
+      expect(plot.right).to.be.at.most(390);
+      for (const bar of $svg[0].querySelectorAll('rect.bar')) {
+        expect(bar.getBoundingClientRect().right, 'bar inside the card').to.be.at.most(plot.right);
+      }
     });
-    scroller().should(($scroll) => expect($scroll[0].scrollLeft).to.be.greaterThan(0));
-    scroller().scrollTo('right');
-    chart().find('rect.bar-profit').last().should('be.visible');
-    chart().find('rect.bar-profit').last().click({ scrollBehavior: false });
+    chart().find('rect.bar-profit').last().click();
     cy.get('[data-chart-tooltip="profit-estimator-chart"]').should('not.be.visible');
     cy.get('[data-testid="point-details-panel"]').should('be.visible').and('contain', 'MI355X');
     chartSvg().trigger('click', { force: true, scrollBehavior: false });
@@ -261,11 +240,6 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       expect(bounds.left).to.be.at.least(0);
       expect(bounds.right).to.be.at.most(390);
     });
-    scroller()
-      .scrollIntoView({ offset: { top: -70, left: 0 } })
-      .scrollTo('left');
-    chart().find('rect.bar-tco').first().should('be.visible');
-    scroller().scrollTo('right');
     let exportedPng = '';
     let exportedLabels: string[] = [];
     cy.window().then((win) => {
@@ -288,14 +262,13 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         return new Cypress.Promise<void>((resolve, reject) => {
           const png = new win.Image();
           png.addEventListener('load', () => {
-            expect(png.naturalWidth).to.be.greaterThan(1500);
+            expect(png.naturalWidth).to.be.greaterThan(1000);
             resolve();
           });
           png.addEventListener('error', () => reject(new Error('Profit PNG did not decode')));
           png.src = exportedPng;
         });
       });
-    scroller().should(($scroll) => expect($scroll[0].scrollLeft).to.be.greaterThan(0));
     cy.viewport(1280, 900);
     scroller().should('not.have.attr', 'tabindex');
     scroller().should(($scroll) => {

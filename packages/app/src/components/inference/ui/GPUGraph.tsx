@@ -119,6 +119,7 @@ import {
   renderLineLabels,
   updateRenderedLineLabels,
   type LineLabelSeries,
+  type PillOccluder,
 } from '@/components/inference/ui/line-label-layer';
 import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
 
@@ -669,12 +670,24 @@ const GPUGraph = React.memo(
         yScale: ContinuousScale,
         zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
       ) => {
-        if (!showLineLabels) return [];
+        if (!showLineLabels) return { labels: [], occluders: [] };
         const series = buildSeries();
-        return placeLineLabels(series, xScale, yScale, {
-          collisionWidth: 160,
-          obstacles: parallelismLabelBoxes(zoomGroup.node()),
-        });
+        const labelKeyByGraph = new Map(series.map((entry) => [entry.seriesId, entry.key]));
+        const occluders: PillOccluder[] = [];
+        for (const [key, points] of Object.entries(rooflines)) {
+          if (points.length === 0 || !isRooflineVisible(key)) continue;
+          occluders.push({
+            key: labelKeyByGraph.get(seriesIdOf(points[0])) ?? key,
+            points: points.map((point) => ({ x: xScale(point.x), y: yScale(point.y) })),
+          });
+        }
+        return {
+          labels: placeLineLabels(series, xScale, yScale, {
+            collisionWidth: 160,
+            obstacles: parallelismLabelBoxes(zoomGroup.node()),
+          }),
+          occluders,
+        };
       };
 
       return {
@@ -682,41 +695,41 @@ const GPUGraph = React.memo(
         key: 'line-labels',
         displayIdentity: `${showLineLabels ? 'visible' : 'hidden'}:${showFrameworkLabel}:${paletteIdentity}`,
         render: (zoomGroup, ctx) => {
-          renderLineLabels(
+          const { labels, occluders } = placeLabels(
+            ctx.xScale as ContinuousScale,
+            ctx.yScale as ContinuousScale,
             zoomGroup,
-            placeLabels(ctx.xScale as ContinuousScale, ctx.yScale as ContinuousScale, zoomGroup),
-            {
-              seriesAttribute: 'data-graph-id',
-              opacity: showLineLabels ? 0.95 : 0,
-            },
           );
+          renderLineLabels(zoomGroup, labels, {
+            seriesAttribute: 'data-graph-id',
+            opacity: showLineLabels ? 0.95 : 0,
+            occluders,
+          });
         },
         onDisplayUpdate: (zoomGroup, ctx) => {
           const transform = d3.zoomTransform(ctx.layout.svg.node()!);
-          renderLineLabels(
+          const { labels, occluders } = placeLabels(
+            transform.rescaleX(ctx.xScale as ContinuousScale),
+            transform.rescaleY(ctx.yScale as ContinuousScale),
             zoomGroup,
-            placeLabels(
-              transform.rescaleX(ctx.xScale as ContinuousScale),
-              transform.rescaleY(ctx.yScale as ContinuousScale),
-              zoomGroup,
-            ),
-            {
-              seriesAttribute: 'data-graph-id',
-              opacity: showLineLabels ? 0.95 : 0,
-            },
           );
+          renderLineLabels(zoomGroup, labels, {
+            seriesAttribute: 'data-graph-id',
+            opacity: showLineLabels ? 0.95 : 0,
+            occluders,
+          });
           zoomGroup.selectAll('.line-label').raise();
         },
         onZoom: (zoomGroup, ctx) => {
-          updateRenderedLineLabels(
+          const { labels, occluders } = placeLabels(
+            ctx.newXScale as ContinuousScale,
+            ctx.newYScale as ContinuousScale,
             zoomGroup,
-            placeLabels(
-              ctx.newXScale as ContinuousScale,
-              ctx.newYScale as ContinuousScale,
-              zoomGroup,
-            ),
-            { opacity: showLineLabels ? 0.95 : 0 },
           );
+          updateRenderedLineLabels(zoomGroup, labels, {
+            opacity: showLineLabels ? 0.95 : 0,
+            occluders,
+          });
         },
       };
     }, [

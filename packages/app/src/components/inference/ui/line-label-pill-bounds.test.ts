@@ -443,6 +443,23 @@ const stripes = (top: number, bottom: number) =>
     ],
   }));
 
+const split = (y: number) => [
+  {
+    key: `left-${y}`,
+    points: [
+      { x: 0, y },
+      { x: 195, y },
+    ],
+  },
+  {
+    key: `right-${y}`,
+    points: [
+      { x: 205, y },
+      { x: 400, y },
+    ],
+  },
+];
+
 describe('pills keep clear of other series', () => {
   const crossing = {
     key: 'other',
@@ -486,16 +503,67 @@ describe('pills keep clear of other series', () => {
     expect(pillBox(zoomGroup, 'b300').ty).toBe(164);
   });
 
-  it('moves into empty plot space with a leader when every nearby slot covers a line', () => {
+  it('moves nearby with a faint leader that passes between other series', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('b300', 200, 150, 'B300')], {
+      seriesAttribute: 'data-hw-key',
+      occluders: [...split(136), ...split(164)],
+    });
+
+    const box = pillBox(zoomGroup, 'b300');
+    expect(box.bottom).toBeLessThan(136);
+    const leader = zoomGroup.select<SVGLineElement>('.line-label .ll-leader');
+    expect(leader.attr('display')).toBeNull();
+    expect(leader.attr('stroke-width')).toBe('1');
+    expect(leader.attr('stroke-opacity')).toBe('0.5');
+    const length = Math.hypot(
+      Number(leader.attr('x2')) - Number(leader.attr('x1')),
+      Number(leader.attr('y2')) - Number(leader.attr('y1')),
+    );
+    expect(length).toBeLessThanOrEqual(40);
+  });
+
+  it('hides a pill instead of moving it beyond the leader cap', () => {
     const { zoomGroup } = renderChart();
     renderLineLabels(zoomGroup, [placement('b300', 200, 150, 'B300')], {
       seriesAttribute: 'data-hw-key',
       occluders: stripes(60, 240),
     });
 
+    const node = zoomGroup.select<SVGGElement>('.line-label').node()!;
+    expect(node.style.opacity).toBe('0');
+    expect(node.dataset.visible).toBe('0');
+  });
+
+  it('hides a pill whose only nearby slots need a leader across another series', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('b300', 200, 150, 'B300')], {
+      seriesAttribute: 'data-hw-key',
+      occluders: stripes(140, 160),
+    });
+
+    expect(zoomGroup.select<SVGGElement>('.line-label').node()!.style.opacity).toBe('0');
+  });
+
+  it('moves to another point on its own line when the anchor has no clear slot', () => {
+    const { zoomGroup } = renderChart();
+    const own = {
+      key: 'b300',
+      points: [
+        { x: 200, y: 150 },
+        { x: 200, y: 50 },
+      ],
+    };
+    renderLineLabels(zoomGroup, [placement('b300', 200, 150, 'B300')], {
+      seriesAttribute: 'data-hw-key',
+      occluders: [own, ...stripes(100, 200)],
+    });
+
     const box = pillBox(zoomGroup, 'b300');
-    expect(box.bottom < 60 || box.top > 240).toBe(true);
-    expect(zoomGroup.select('.line-label .ll-leader').attr('display')).toBeNull();
+    expect(zoomGroup.select<SVGGElement>('.line-label').node()!.style.opacity).not.toBe('0');
+    expect(box.bottom).toBeLessThan(100);
+    expect(box.tx).toBe(208);
+    expect(box.ty).toBe(36);
   });
 
   it('hides a pill when every slot covers another series', () => {
