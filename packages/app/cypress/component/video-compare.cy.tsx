@@ -28,6 +28,30 @@ const pick = (label: string, option: string) => {
   cy.contains('[role="option"]', option).click();
 };
 const tileVideo = (key: string) => cy.get(`[data-hardware="${key}"] video`);
+const scrub = (time: number) => {
+  cy.window().then((win) => {
+    cy.get('[data-testid="video-results-scrub"]').then(($input) => {
+      const setValue = Object.getOwnPropertyDescriptor(
+        win.HTMLInputElement.prototype,
+        'value',
+      )!.set!;
+      setValue.call($input[0], String(time));
+      $input[0].dispatchEvent(new win.Event('input', { bubbles: true }));
+    });
+  });
+  cy.get('[data-testid="video-results-scrub"]').should('have.value', String(time));
+};
+/** Every tile and the reference, so a reloaded tile cannot fall behind the group unnoticed. */
+const expectClipsAt = (time: number) =>
+  cy
+    .get('[data-testid="video-results-clips"] video')
+    .each(($video) =>
+      cy
+        .wrap($video)
+        .should(($element) =>
+          expect(($element[0] as HTMLVideoElement).currentTime).to.be.closeTo(time, 0.08),
+        ),
+    );
 const expectAudio = (source: string | null) =>
   cy.get<HTMLVideoElement>('video').should(($videos) => {
     for (const video of $videos) {
@@ -291,24 +315,8 @@ describe('Video results synchronized clips', () => {
       .should('contain', 'A drummer taps a snare drum.')
       .and('contain', 'seed 11')
       .and('contain', 'take 1');
-    cy.window().then((win) => {
-      cy.get('[data-testid="video-results-scrub"]').then(($input) => {
-        const setValue = Object.getOwnPropertyDescriptor(
-          win.HTMLInputElement.prototype,
-          'value',
-        )!.set!;
-        setValue.call($input[0], '0.8');
-        $input[0].dispatchEvent(new win.Event('input', { bubbles: true }));
-      });
-    });
-    cy.get('[data-testid="video-results-scrub"]').should('have.value', '0.8');
-    cy.get('[data-testid="video-results-clip"] video').each(($video) =>
-      cy
-        .wrap($video)
-        .should(($element) =>
-          expect(($element[0] as HTMLVideoElement).currentTime).to.be.closeTo(0.8, 0.08),
-        ),
-    );
+    scrub(0.8);
+    expectClipsAt(0.8);
     cy.get('[data-testid="video-results-play"]').click();
     cy.get('[data-testid="video-results-clip"] video').each(($video) =>
       cy.wrap($video).should(($element) => {
@@ -381,9 +389,13 @@ describe('Video results synchronized clips', () => {
         .find('a')
         .should('have.attr', 'href', url),
     );
+    scrub(0.8);
+    expectClipsAt(0.8);
 
     cy.get('[data-testid="video-results-view"][data-view="difference"]').click();
     cy.get('@original-h200').then((url) => tileVideo('h200').should('have.attr', 'src', url));
+    // Swapping to the original reloads the tile; it must resume at the group's time, not 0.
+    expectClipsAt(0.8);
     // The h200 original equals the reference, so only the original yields a black difference.
     cy.get('[data-testid="video-results-clip"][data-hardware="h200"] canvas').should(($canvas) => {
       const rgba = ($canvas[0] as HTMLCanvasElement)
@@ -394,6 +406,7 @@ describe('Video results synchronized clips', () => {
 
     cy.get('[data-testid="video-results-view"][data-view="clip"]').click();
     cy.get('@preview-url').then((url) => tileVideo('h200').should('have.attr', 'src', url));
+    expectClipsAt(0.8);
   });
   it('falls back to the sealed original when a web rendition cannot be played', () => {
     mountResultsClips(['b200', 'h200'], '/video', false, undefined, ['h200'], true);

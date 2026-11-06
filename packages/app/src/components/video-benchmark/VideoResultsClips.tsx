@@ -381,6 +381,15 @@ function SynchronizedClips({
     );
   }, [group, visibleKey]);
 
+  // Changing a tile's source (view switch, rendition fallback) reloads it at 0. Before metadata,
+  // currentTime sets the start position, so the tile resumes at the time of a clip that kept its source.
+  useLayoutEffect(() => {
+    const anchor = [...videos.current.values()].find((video) => video.readyState > 0);
+    if (!anchor) return;
+    for (const video of videos.current.values())
+      if (video.readyState === 0) video.currentTime = anchor.currentTime;
+  }, [view, failedPreviews]);
+
   // Owns `muted`: <Activity> re-runs this body on reveal, whereas an unchanged muted prop would not be reapplied.
   useLayoutEffect(() => {
     if (audioSource !== audibleSource) setAudioSource(null);
