@@ -39,6 +39,14 @@ export const RUN_FRAMEWORK_OVERRIDES: readonly RunFrameworkOverride[] = [
     from: 'vllm',
     to: 'llmd-vllm',
   },
+  {
+    id: 'run-42071652809-kimik31-b200-direct-vllm',
+    reason:
+      'InferenceX PR #4797 ran every Kimi-K3.1-Pro B200 AgentX point on direct vllm serve (srt-slurm frontend.type vllm, dynamo install false: no Dynamo frontend, worker, router, etcd, or NATS), but the nvidia-master entry kimik3.1-fp4-b200-dynamo-vllm-agentic-dspark declares framework dynamo-vllm because the B200 native srt-slurm lane only matches that name. The points belong with plain vLLM.',
+    githubRunId: 42071652809,
+    from: 'dynamo-vllm',
+    to: 'vllm',
+  },
 ];
 
 /**
