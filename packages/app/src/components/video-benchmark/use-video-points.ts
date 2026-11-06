@@ -14,7 +14,7 @@ export function useVideoPoints(runId: string | null, initial?: VideoHistoryData 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [replay, setReplay] = useState(initial?.replay ?? false);
   const [attempt, setAttempt] = useState(0);
-  const [live, setLive] = useState<{ runId: string; page: VideoHistoryPage | null } | null>(null);
+  const [live, setLive] = useState<{ key: string; page: VideoHistoryPage | null } | null>(null);
   useEffect(() => {
     if (initial && attempt === 0) return;
     const controller = new AbortController();
@@ -45,8 +45,11 @@ export function useVideoPoints(runId: string | null, initial?: VideoHistoryData 
   const points = useMemo(() => videoPoints(pages), [pages]);
   const storedNamed = useMemo(() => namedRunPoints(pages, runId), [pages, runId]);
   const readLive = !loading && !loadError && storedNamed.length === 0 && runId !== null;
+  // Retry and reselecting a dismissed run read again, so a transient failure is not final.
+  const liveKey = runId === null ? null : `${attempt}:${runId}`;
+  if (runId === null && live !== null) setLive(null);
   useEffect(() => {
-    if (!readLive || runId === null || live?.runId === runId) return;
+    if (!readLive || runId === null || liveKey === null || live?.key === liveKey) return;
     const controller = new AbortController();
     (async () => {
       const response = await fetch(`/api/video-runs?run=${encodeURIComponent(runId)}&format=live`, {
@@ -58,18 +61,18 @@ export function useVideoPoints(runId: string | null, initial?: VideoHistoryData 
     })()
       .catch(() => null)
       .then((page) => {
-        if (!controller.signal.aborted) setLive({ runId, page });
+        if (!controller.signal.aborted) setLive({ key: liveKey, page });
       });
     return () => controller.abort();
-  }, [readLive, live?.runId, runId]);
-  const livePage = readLive && live?.runId === runId ? live.page : null;
+  }, [readLive, live?.key, liveKey, runId]);
+  const livePage = readLive && live?.key === liveKey ? live.page : null;
   const namedPoints = useMemo(
     () => (livePage ? namedRunPoints([livePage], runId) : storedNamed),
     [livePage, runId, storedNamed],
   );
   let namedSource: NamedRunSource = 'none';
   if (storedNamed.length > 0) namedSource = 'history';
-  else if (runId !== null && (loading || (readLive && live?.runId !== runId)))
+  else if (runId !== null && (loading || (readLive && live?.key !== liveKey)))
     namedSource = 'pending';
   else if (namedPoints.length > 0) namedSource = 'live';
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
