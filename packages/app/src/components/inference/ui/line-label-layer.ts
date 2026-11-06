@@ -192,23 +192,19 @@ function boundOccluder(occluder: PillOccluder): BoundedOccluder {
   return { ...occluder, bounds };
 }
 
-function coveredSeriesCost(
+function coversOtherPath(
   box: RectBounds,
   key: string,
   occluders: readonly BoundedOccluder[],
-): number {
-  let cost = 0;
+): boolean {
   for (const { key: occluderKey, points, bounds } of occluders) {
     if (occluderKey === key || !rectsOverlap(box, bounds)) continue;
-    if (points.length === 1) {
-      cost++;
-      continue;
-    }
+    if (points.length === 1) return true;
     for (let i = 1; i < points.length; i++) {
-      if (segmentHitsRect(points[i - 1], points[i], box)) cost++;
+      if (segmentHitsRect(points[i - 1], points[i], box)) return true;
     }
   }
-  return cost;
+  return false;
 }
 
 const LEADER_MIN_SHIFT = 12;
@@ -239,6 +235,8 @@ function syncLeader(
   leader.setAttribute('stroke', label.color);
   leader.removeAttribute('display');
 }
+
+const FAR_COLUMNS = 6;
 
 function layoutPills(
   items: readonly PillLayoutItem[],
@@ -278,29 +276,52 @@ function layoutPills(
         candidates.push([cx, ty0 - row * rowHeight], [cx, ty0 + row * rowHeight]);
       }
     }
+    const farSlots = () => {
+      const columnStep = (local.right - local.left) / 2;
+      const colMin = Math.max(
+        -FAR_COLUMNS,
+        Math.floor((bounds.left - tx0 - local.left) / columnStep),
+      );
+      const colMax = Math.min(
+        FAR_COLUMNS,
+        Math.ceil((bounds.right - tx0 - local.right) / columnStep),
+      );
+      const rowMin = Math.floor((bounds.top - ty0 - local.top) / rowHeight);
+      const rowMax = Math.ceil((bounds.bottom - ty0 - local.bottom) / rowHeight);
+      const far: { slot: [number, number]; distance: number }[] = [];
+      for (let col = colMin; col <= colMax; col++) {
+        for (let row = rowMin; row <= rowMax; row++) {
+          far.push({
+            slot: [tx0 + col * columnStep, ty0 + row * rowHeight],
+            distance: Math.hypot(col * columnStep, row * rowHeight),
+          });
+        }
+      }
+      return far.sort((a, b) => a.distance - b.distance).map(({ slot }) => slot);
+    };
 
-    const clamped = candidates.map(([cx, cy]) => {
+    const clampAt = ([cx, cy]: [number, number]) => {
       const shift = pillShiftIntoBounds(pillBoxAt(local, cx, cy), bounds);
       const tx = cx + shift.x;
       const ty = cy + shift.y;
       return { tx, ty, box: pillBoxAt(local, tx, ty) };
-    });
-    let chosen: (typeof clamped)[number] | undefined;
-    let leastCovered = Infinity;
-    for (const candidate of shown < limit ? clamped : []) {
-      if (placed.some((other) => rectsStrictlyOverlap(candidate.box, other))) continue;
-      const covered = coveredSeriesCost(candidate.box, label.key, lines);
-      if (covered >= leastCovered) continue;
-      chosen = candidate;
-      leastCovered = covered;
-      if (covered === 0) break;
-    }
+    };
+    const firstClean = (slots: readonly [number, number][]) => {
+      for (const slot of slots) {
+        const candidate = clampAt(slot);
+        if (placed.some((other) => rectsStrictlyOverlap(candidate.box, other))) continue;
+        if (!coversOtherPath(candidate.box, label.key, lines)) return candidate;
+      }
+      return undefined;
+    };
+    const fallback = clampAt(candidates[0]);
+    const chosen = shown < limit ? (firstClean(candidates) ?? firstClean(farSlots())) : undefined;
     if (!chosen) {
-      node.setAttribute('transform', `translate(${clamped[0].tx},${clamped[0].ty})`);
+      node.setAttribute('transform', `translate(${fallback.tx},${fallback.ty})`);
       node.style.opacity = '0';
       node.dataset.visible = '0';
       node.setAttribute(PLACEMENT_HIDDEN_ATTR, '');
-      syncLeader(node, label, local, clamped[0].tx, clamped[0].ty, false);
+      syncLeader(node, label, local, fallback.tx, fallback.ty, false);
       continue;
     }
     if (node.hasAttribute(PLACEMENT_HIDDEN_ATTR)) {

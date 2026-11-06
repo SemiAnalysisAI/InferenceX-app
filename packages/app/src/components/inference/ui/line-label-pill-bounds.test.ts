@@ -174,7 +174,7 @@ describe('clamped pills do not stack on their neighbours', () => {
 
   it('hides lower-priority pills that still collide after every nudge', () => {
     const { zoomGroup } = renderChart();
-    const keys = Array.from({ length: 16 }, (_, index) => `s${index}`);
+    const keys = Array.from({ length: 80 }, (_, index) => `s${index}`);
     renderLineLabels(
       zoomGroup,
       keys.map((key) => placement(key, 200, 150, 'MI355X (SGLang)')),
@@ -434,6 +434,15 @@ describe('line-label pills stay inside the plot bounding box', () => {
   });
 });
 
+const stripes = (top: number, bottom: number) =>
+  Array.from({ length: Math.floor((bottom - top) / 10) + 1 }, (_, index) => ({
+    key: `stripe-${index}`,
+    points: [
+      { x: 0, y: top + index * 10 },
+      { x: 400, y: top + index * 10 },
+    ],
+  }));
+
 describe('pills keep clear of other series', () => {
   const crossing = {
     key: 'other',
@@ -475,6 +484,30 @@ describe('pills keep clear of other series', () => {
     });
 
     expect(pillBox(zoomGroup, 'b300').ty).toBe(164);
+  });
+
+  it('moves into empty plot space with a leader when every nearby slot covers a line', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('b300', 200, 150, 'B300')], {
+      seriesAttribute: 'data-hw-key',
+      occluders: stripes(60, 240),
+    });
+
+    const box = pillBox(zoomGroup, 'b300');
+    expect(box.bottom < 60 || box.top > 240).toBe(true);
+    expect(zoomGroup.select('.line-label .ll-leader').attr('display')).toBeNull();
+  });
+
+  it('hides a pill when every slot covers another series', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('b300', 200, 150, 'B300')], {
+      seriesAttribute: 'data-hw-key',
+      occluders: stripes(0, 300),
+    });
+
+    const node = zoomGroup.select<SVGGElement>('.line-label').node()!;
+    expect(node.style.opacity).toBe('0');
+    expect(node.dataset.visible).toBe('0');
   });
 });
 

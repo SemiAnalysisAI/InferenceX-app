@@ -178,16 +178,17 @@ export default function SubmissionsChart({ volume, mode, caption, footer }: Subm
     }
 
     const xExt = d3.extent(source, (d) => d.date) as [number, number];
+    const markerLead = (xExt[1] - xExt[0]) * (isNarrowViewport ? 0.04 : 0.02);
     const visibleMax = d3.max(Object.values(lines).flat(), (p) => p.y) ?? 0;
     const yPad = mode === 'weekly' ? 1.1 : 1.05;
 
     return {
       chartPoints: source,
       lineData: lines,
-      xDomain: xExt,
+      xDomain: [Math.min(xExt[0], NIGHTLY_END_DATE - markerLead), xExt[1]] as [number, number],
       yDomain: [0, visibleMax * yPad] as [number, number],
     };
-  }, [volume, mode, onChangeOnly, lineKeys, hiddenLines]);
+  }, [volume, mode, onChangeOnly, lineKeys, hiddenLines, isNarrowViewport]);
 
   const layers: LayerConfig<ChartPoint>[] = useMemo(
     () => [

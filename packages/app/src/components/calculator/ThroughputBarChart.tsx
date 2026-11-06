@@ -159,6 +159,7 @@ const formatSig3 = d3.format('.3~r');
 const formatSig3Si = d3.format('.3~s');
 const compact = (value: number) =>
   Math.abs(value) >= 1000 ? formatSig3Si(value) : formatSig3(value);
+const xTickFormat = (value: d3.AxisDomain) => compact(Number(value));
 
 export function getValueLabel(
   d: InterpolatedResult,
@@ -407,7 +408,6 @@ function renderTopAxis(
   layout: ChartLayout,
   xScale: d3.ScaleLinear<number, number>,
   tickCount: number,
-  tickFormat: ((value: d3.NumberValue) => string) | undefined,
 ) {
   let axis = layout.g.select<SVGGElement>('.x-axis-top');
   if (axis.empty()) {
@@ -429,14 +429,7 @@ function renderTopAxis(
     .attr('height', TOP_AXIS_BAND_PX);
   axis
     .select<SVGGElement>('.x-axis-top-ticks')
-    .call(
-      d3
-        .axisTop(xScale)
-        .ticks(count)
-        .tickFormat(tickFormat ?? xScale.tickFormat(count))
-        .tickSize(0)
-        .tickPadding(8),
-    )
+    .call(d3.axisTop(xScale).ticks(count).tickFormat(xTickFormat).tickSize(0).tickPadding(8))
     .call((ticks) => ticks.select('.domain').remove());
 }
 
@@ -639,16 +632,6 @@ export default function ThroughputBarChart({
 
   const isMobileViewport = useIsMobileViewport();
   const xTickCount = isMobileViewport ? 4 : 6;
-  const xTickFormat = useMemo(
-    () =>
-      isMobileViewport
-        ? (d: d3.AxisDomain) => {
-            const n = Number(d);
-            return Math.abs(n) >= 1000 ? d3.format('~s')(n) : d3.format('~g')(n);
-          }
-        : undefined,
-    [isMobileViewport],
-  );
 
   const layers = useMemo(() => {
     const barLayer: HorizontalBarLayerConfig<InterpolatedResult> = {
@@ -713,7 +696,6 @@ export default function ThroughputBarChart({
           ctx.layout,
           (ctx.renderedXScale ?? xScale) as d3.ScaleLinear<number, number>,
           xTickCount,
-          xTickFormat,
         );
       },
       onDisplayUpdate: (zoomGroup, ctx) => {
@@ -729,13 +711,13 @@ export default function ThroughputBarChart({
           costType,
           resolveBarColor,
         );
-        renderTopAxis(ctx.layout, currentXScale, xTickCount, xTickFormat);
+        renderTopAxis(ctx.layout, currentXScale, xTickCount);
       },
       onZoom: (zoomGroup, ctx) => {
         const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
         const barColor = (d: InterpolatedResult) => resolveBarColor(d);
         positionLabelPairs(zoomGroup, newXScale, ctx.width, barMetric, costType, barColor);
-        renderTopAxis(ctx.layout, newXScale, xTickCount, xTickFormat);
+        renderTopAxis(ctx.layout, newXScale, xTickCount);
       },
     };
 
@@ -749,7 +731,6 @@ export default function ThroughputBarChart({
     paletteIdentity,
     resolveBarColor,
     xTickCount,
-    xTickFormat,
   ]);
 
   const tooltipStateRef = useRef({
@@ -845,7 +826,7 @@ export default function ThroughputBarChart({
 
   const xAxisConfig = useMemo(
     () => ({ tickCount: xTickCount, tickFormat: xTickFormat }),
-    [xTickCount, xTickFormat],
+    [xTickCount],
   );
 
   const renderDecorations = useMemo(

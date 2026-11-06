@@ -1110,7 +1110,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                 {isMobile && <div className="grid min-w-0 gap-3 md:hidden">{secondaryConfig}</div>}
                 <ControlPanel
                   legend={t.comparisonGroup}
-                  className="md:grid-cols-[auto_minmax(0,1fr)] md:gap-x-6"
+                  className="items-start md:grid-cols-[auto_minmax(0,1fr)] md:gap-x-6"
                 >
                   <div className="flex items-end gap-3">
                     <div className="flex flex-col space-y-1.5">

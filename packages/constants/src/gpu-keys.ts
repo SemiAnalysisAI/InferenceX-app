@@ -163,7 +163,7 @@ export const GPU_VENDORS: Record<string, string> = Object.fromEntries(
 export const GOOGLE_BLUE = '#4285F4';
 
 export const HUAWEI_CHART_PALETTE = {
-  colors: { light: '#A65A00', dark: '#EBC04A' },
+  colors: { light: '#A65A00', dark: '#BC6807' },
   oklch: { start: 80, end: 100, chroma: { light: 0.14, dark: 0.16 } },
   // iwanthue uses CIE Lab hue, not OKLCH.
   lab: { hmin: 75, hmax: 100 },
