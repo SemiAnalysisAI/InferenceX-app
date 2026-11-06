@@ -17,9 +17,9 @@ import {
   renditionPreviews,
   renditionReceiptPath,
   storedArtifacts,
-  storedIndexes,
   videoStorageEnabled,
 } from '@/lib/video/video-storage';
+import { storedIndexes } from '@/lib/video/video-history-store';
 import {
   mp4TopLevelBoxes,
   RENDITION_ARGS,

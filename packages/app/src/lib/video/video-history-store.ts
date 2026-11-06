@@ -87,6 +87,12 @@ async function historyState() {
   return { indexes, receipts, snapshots, latest };
 }
 
+/** Every stored artifact index, newest first. */
+export async function storedIndexes(): Promise<StoredIndex[]> {
+  const { indexes } = await historyState();
+  return indexes;
+}
+
 async function readRecords(latest: ListBlobResultBlob | undefined) {
   if (!latest) return new Map<string, HistoryRecord>();
   const response = await fetch(latest.url, { signal: AbortSignal.timeout(30000) });

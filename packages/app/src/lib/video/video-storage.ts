@@ -384,43 +384,6 @@ export async function storeVideoArtifact(
   return result;
 }
 
-export interface StoredIndex {
-  runId: string;
-  artifact: CIArtifact;
-  publishedAt: string;
-}
-
-export async function storedIndexes(): Promise<StoredIndex[]> {
-  if (!videoStorageEnabled()) return [];
-  const indexes: StoredIndex[] = [];
-  let cursor: string | undefined;
-  // ponytail: scan index metadata; add a materialized catalog if the published inventory grows large.
-  do {
-    const batch = await list({ prefix: `${PREFIX}/runs/`, cursor });
-    for (const blob of batch.blobs) {
-      const match =
-        /^h3-video-media\/v1\/runs\/(?<run>[1-9]\d*)\/(?<name>[^/]+)_(?<artifact>[1-9]\d*)\.json$/u.exec(
-          blob.pathname,
-        )?.groups;
-      if (!match || videoArtifactIdentity(match.name)?.run !== match.run) continue;
-      indexes.push({
-        runId: match.run,
-        publishedAt: blob.uploadedAt.toISOString(),
-        artifact: {
-          id: Number(match.artifact),
-          name: match.name,
-          expired: false,
-          size_in_bytes: 0,
-          stored: true,
-          indexUrl: blob.url,
-        },
-      });
-    }
-    cursor = batch.hasMore ? batch.cursor : undefined;
-  } while (cursor);
-  return indexes;
-}
-
 /**
  * Map each original MP4 SHA256 to its web playback rendition from one listing. A receipt is
  * written only after its validated MP4 upload, so its path alone identifies a playable rendition.
