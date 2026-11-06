@@ -10,6 +10,11 @@ export function SupporterLogoImage({
   darkClassName?: string;
 }) {
   // Morph's requested green-on-dark asset needs a dark backing in either theme.
-  const treatment = logo === 'morph.svg' ? 'rounded-sm bg-[#0a0a0a] px-1' : darkClassName;
+  const treatment =
+    logo === 'morph.svg'
+      ? 'rounded-sm bg-[#0a0a0a] px-1'
+      : logo === 'fireworks.svg'
+        ? ''
+        : darkClassName;
   return <img {...props} src={`/logos/${logo}`} className={`${className} ${treatment}`} />;
 }
