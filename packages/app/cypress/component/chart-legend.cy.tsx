@@ -116,28 +116,6 @@ describe('ChartLegend blocked items', () => {
     cy.contains('label', 'NVIDIA H100 SXM').should('have.class', 'cursor-pointer');
   });
 
-  it('keeps a hidden highlighted row at full strength and dims only its swatch', () => {
-    cy.mount(
-      <ChartLegend
-        legendItems={[
-          MOCK_ITEMS[0],
-          { ...MOCK_ITEMS[1], isActive: false, isHighlighted: true },
-          { ...MOCK_ITEMS[2], isActive: false },
-        ]}
-        variant="sidebar"
-        isLegendExpanded
-        onExpandedChange={() => {}}
-      />,
-    );
-    cy.contains('label', 'NVIDIA H200 SXM').within(() => {
-      cy.contains('span', 'NVIDIA H200 SXM')
-        .should('have.css', 'opacity', '1')
-        .and('have.css', 'font-weight', '700');
-      cy.get('.rounded-full').should('have.css', 'opacity', '0.3');
-    });
-    cy.contains('span', 'AMD MI300X').should('have.css', 'opacity', '0.5');
-  });
-
   it('ignores the blocked reason once the item is active', () => {
     cy.mount(
       <ChartLegend

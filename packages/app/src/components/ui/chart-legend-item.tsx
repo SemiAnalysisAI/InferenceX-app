@@ -76,7 +76,6 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
   const isBlocked = !isActive && Boolean(blockedReason);
   const canRestore = !isActive && !isBlocked;
   const blockedReasonId = `${id}-blocked-reason`;
-  const swatchOpacity = !isActive && (sidebarMode || isHighlighted) ? 0.3 : 1;
 
   const content = (
     <>
@@ -119,7 +118,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
                 'size-3 rounded-full transition-opacity',
                 (canRemove || canRestore) && 'group-hover/item:opacity-0!',
               )}
-              style={{ backgroundColor: color, opacity: swatchOpacity }}
+              style={{ backgroundColor: color, opacity: sidebarMode && !isActive ? 0.3 : 1 }}
             />
           ) : (
             <svg
@@ -131,7 +130,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
                 'transition-opacity',
                 (canRemove || canRestore) && 'group-hover/item:opacity-0!',
               )}
-              style={{ opacity: swatchOpacity }}
+              style={{ opacity: sidebarMode && !isActive ? 0.3 : 1 }}
               aria-hidden="true"
             >
               <line
@@ -178,7 +177,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
               : isLegendExpanded
                 ? 'whitespace-nowrap'
                 : 'whitespace-normal',
-            sidebarMode && !isActive && !isHighlighted && 'opacity-50',
+            sidebarMode && !isActive && 'opacity-50',
           )}
         >
           {label}
@@ -200,8 +199,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
 
   const wrapperClassName = cn(
     'transition-opacity duration-300',
-    !isActive && 'no-export',
-    !sidebarMode && (isActive || isHighlighted ? 'opacity-100' : 'opacity-50'),
+    isActive ? 'opacity-100' : sidebarMode ? 'no-export' : 'opacity-50 no-export',
     isHighlighted && 'text-red-900 dark:text-red-400 font-bold',
     onShowPoints && 'group/row flex w-full items-center',
   );
