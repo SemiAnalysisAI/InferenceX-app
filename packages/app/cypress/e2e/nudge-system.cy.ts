@@ -272,12 +272,12 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
   });
 
   for (const prefix of ['', '/zh']) {
-    for (const [index, label, slug] of [
-      [0, 'GLM5.3', 'glm-5-3'],
-      [1, 'Muse Spark', 'muse-spark-open'],
+    for (const [index, label, slug, model] of [
+      [0, 'GLM5.3', 'glm-5-3', 'GLM-5.2'],
+      [1, 'Muse Spark', 'muse-spark-open', 'Muse-Spark-Open'],
     ] as const) {
       it(`opens ${label} with its intended filters from ${prefix || '/'}`, () => {
-        if (label === 'GLM5.3') interceptTpuLaunchData('GLM-5.2');
+        interceptTpuLaunchData(model);
         cy.visit(prefix || '/', { onBeforeLoad: showLaunchModal });
         cy.get(`[data-testid="launch-modal-additional-action-${index}"]`)
           .should('have.text', label)

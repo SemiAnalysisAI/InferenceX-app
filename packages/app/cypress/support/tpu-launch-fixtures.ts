@@ -33,15 +33,17 @@ export function assertTpuGb300Selected() {
   cy.get('body').type('{esc}');
 }
 
-type TpuLaunchModel = 'Qwen-3.5-397B-A17B' | 'Kimi-K3' | 'GLM-5.2';
+const TPU_LAUNCH_DB_MODELS = {
+  'Qwen-3.5-397B-A17B': 'qwen3.5',
+  'Kimi-K3': 'kimik3',
+  'GLM-5.2': 'glm5.3',
+  'Muse-Spark-Open': 'musespark',
+} as const;
+
+type TpuLaunchModel = keyof typeof TPU_LAUNCH_DB_MODELS;
 
 export function tpuLaunchRows(model: TpuLaunchModel = 'Qwen-3.5-397B-A17B') {
-  if (model === 'GLM-5.2') {
-    return qwenAgenticRows.map((row) => ({ ...row, model: 'glm5.3' }));
-  }
-  return model === 'Kimi-K3'
-    ? qwenAgenticRows.map((row) => ({ ...row, model: 'kimik3' }))
-    : qwenAgenticRows;
+  return qwenAgenticRows.map((row) => ({ ...row, model: TPU_LAUNCH_DB_MODELS[model] }));
 }
 
 export function interceptTpuLaunchData(model: TpuLaunchModel = 'Qwen-3.5-397B-A17B') {
