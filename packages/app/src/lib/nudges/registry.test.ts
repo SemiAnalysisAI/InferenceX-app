@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { NUDGE_SLOTS } from './inline-slot';
 import { isDismissed, markDismissed, markShown } from './persistence';
 
 import {
@@ -24,7 +25,7 @@ describe('NUDGE_REGISTRY integrity', () => {
 
   it('every entry has a valid type', () => {
     for (const nudge of NUDGE_REGISTRY) {
-      expect(['toast', 'modal', 'banner', 'coach-mark']).toContain(nudge.type);
+      expect(['toast', 'modal', 'banner', 'coach-mark', 'inline']).toContain(nudge.type);
     }
   });
 
@@ -221,6 +222,17 @@ describe('NUDGE_REGISTRY integrity', () => {
     for (const nudge of NUDGE_REGISTRY.filter((n) => n.type === 'coach-mark')) {
       expect(typeof nudge.content.anchor?.resolve).toBe('function');
     }
+  });
+
+  it('renders chart guidance inline in its chart card instead of as a floating toast', () => {
+    const slots = Object.fromEntries(
+      NUDGE_REGISTRY.filter((n) => n.type === 'inline').map((n) => [n.id, n.content.slot]),
+    );
+    expect(slots).toEqual({
+      'gradient-label': NUDGE_SLOTS.inferenceLegend,
+      'filter-hint': NUDGE_SLOTS.inferenceLegend,
+      'eval-samples': NUDGE_SLOTS.evaluationTable,
+    });
   });
 
   it('does not register the retired agentic point callout', () => {

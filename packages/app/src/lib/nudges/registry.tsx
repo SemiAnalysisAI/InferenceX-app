@@ -21,6 +21,7 @@ import {
   OPERATORX_URL,
   TPUV7_QWEN_3_5_AGENTX_URL,
 } from '@/lib/nudges/landing-banner';
+import { NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
 
 import { GitHubIcon } from '@/components/ui/github-icon';
 import { GoogleIcon } from '@/components/ui/google-icon';
@@ -167,11 +168,10 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   },
   {
     id: 'gradient-label',
-    type: 'toast',
+    type: 'inline',
     trigger: { type: 'event', event: 'inferencex:parallelism-label-enabled' },
     dismissal: { type: 'session' },
     storageKey: 'inferencex-gradient-nudge-shown',
-    conditions: [{ check: notPhoneWidthPowerX }],
     priority: 25,
     scope: 'dashboard',
     content: {
@@ -190,6 +190,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
         },
       },
       testId: 'gradient-label-nudge',
+      slot: NUDGE_SLOTS.inferenceLegend,
     },
     analytics: {
       shown: 'gradient_nudge_shown',
@@ -200,7 +201,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
 
   {
     id: 'filter-hint',
-    type: 'toast',
+    type: 'inline',
     trigger: [
       { type: 'timer', delayMs: 2500 },
       { type: 'event', event: 'inferencex:tab-change', delayMs: 800 },
@@ -215,10 +216,11 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       title: 'Too much on the chart?',
       titleZh: '图表太拥挤？',
       description:
-        'Filter the legend on the right by vendor (NVIDIA or AMD), disaggregated or aggregated serving (disagg/agg), precision (FP8/FP4) and more to compare only what you care about.',
+        'Filter the legend below by vendor (NVIDIA or AMD), disaggregated or aggregated serving (disagg/agg), precision (FP8/FP4) and more to compare only what you care about.',
       descriptionZh:
-        '使用右侧图例按厂商 (NVIDIA 或 AMD)、分离式或聚合式服务 (disagg/agg)、精度 (FP8/FP4) 等筛选，只对比您关心的内容。',
+        '使用下方图例按厂商 (NVIDIA 或 AMD)、分离式或聚合式服务 (disagg/agg)、精度 (FP8/FP4) 等筛选，只对比您关心的内容。',
       testId: 'filter-hint-nudge',
+      slot: NUDGE_SLOTS.inferenceLegend,
     },
     analytics: {
       shown: 'filter_hint_nudge_shown',
@@ -228,7 +230,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
 
   {
     id: 'eval-samples',
-    type: 'toast',
+    type: 'inline',
     trigger: { type: 'timer', delayMs: 1500 },
     dismissal: {
       type: 'timed',
@@ -247,6 +249,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
         'Click the prompts icon at the end of any row to compare each prompt, the expected answer, and what the model actually responded.',
       descriptionZh: '点击任意行末尾的提示词图标，对比每条提示、预期答案和模型的实际回复。',
       testId: 'eval-samples-nudge',
+      slot: NUDGE_SLOTS.evaluationTable,
     },
     analytics: {
       shown: 'evaluation_samples_nudge_shown',

@@ -391,8 +391,8 @@ describe('Dashboard nudges — reproducibility toast', () => {
       expect(win.localStorage.getItem('inferencex-reproducibility-nudge-dismissed')).to.eq('1');
     });
     cy.reload();
-    // Both toasts share one slot and the reproducibility timer (1.5s) fires before the filter
-    // hint (2.5s), so the filter hint appearing proves the reproducibility nudge stayed hidden.
+    // The filter hint timer (2.5s) fires after the reproducibility timer (1.5s), so the inline
+    // filter hint appearing proves the reproducibility nudge stayed hidden.
     cy.get('[data-testid="filter-hint-nudge"]').should('be.visible');
     cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
   });
@@ -404,7 +404,7 @@ function suppressCompetingDashboardToasts(win: Cypress.AUTWindow) {
   win.sessionStorage.setItem('inferencex-star-nudge-shown', '1');
 }
 
-describe('Dashboard nudges — filter-hint toast', () => {
+describe('Dashboard nudges — inline filter hint', () => {
   it('does not show the filter-hint nudge outside the inference tab', () => {
     cy.clock(Date.now(), ['setTimeout', 'clearTimeout']).then((clock) => {
       cy.visit('/evaluation', { onBeforeLoad: suppressCompetingDashboardToasts });
@@ -436,7 +436,11 @@ describe('Dashboard nudges — filter-hint toast', () => {
   it('dismissal persists to localStorage and the nudge stays gone after reload', () => {
     cy.visit('/inference', { onBeforeLoad: suppressCompetingDashboardToasts });
     cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
-    cy.get('[data-testid="filter-hint-nudge"]').should('be.visible');
+    cy.get('[data-testid="filter-hint-nudge"]')
+      .should('be.visible')
+      .and('have.css', 'position', 'static')
+      .closest('[data-slot="chart-legend-wrapper"]')
+      .should('exist');
 
     cy.get('[data-testid="filter-hint-nudge"] button[aria-label]').first().click();
     cy.window()
@@ -450,7 +454,7 @@ describe('Dashboard nudges — filter-hint toast', () => {
   });
 });
 
-describe('Evaluation nudges — eval-samples toast', () => {
+describe('Evaluation nudges — inline eval-samples hint', () => {
   it('eval-samples open event refreshes the cooldown timestamp', () => {
     cy.visit('/evaluation', {
       onBeforeLoad(win) {

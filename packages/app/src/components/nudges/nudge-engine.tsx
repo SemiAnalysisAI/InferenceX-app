@@ -20,6 +20,11 @@ import {
   assignedLandingBannerVariant,
   LANDING_BANNER_DISMISSED_ATTRIBUTE,
 } from '@/lib/nudges/landing-banner';
+import {
+  isNudgeSlotMounted,
+  NUDGE_SLOT_MOUNTED_EVENT,
+  setInlineNudge,
+} from '@/lib/nudges/inline-slot';
 import { BottomToast } from '@/components/ui/bottom-toast';
 import { CoachMark } from '@/components/ui/coach-mark';
 import { Button } from '@/components/ui/button';
@@ -35,6 +40,8 @@ function isEligible(
   { requireAnchor = true, requireConditions = true } = {},
 ): boolean {
   if (requireAnchor && def.type === 'coach-mark' && !def.content.anchor?.resolve()) return false;
+  if (requireAnchor && def.type === 'inline' && !isNudgeSlotMounted(def.content.slot ?? ''))
+    return false;
   if (!isWithinSchedule(def.schedule)) return false;
   if (def.variant && def.variant !== assignedLandingBannerVariant()) return false;
   if (def.permanentSuppressKey && isPermanentlySuppressed(def.permanentSuppressKey)) return false;
@@ -72,9 +79,12 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
   );
   const [activeOverlayId, setActiveOverlayId] = useState<string | null>(null);
   const [activeCoachMarkId, setActiveCoachMarkId] = useState<string | null>(null);
+  const [activeInlineId, setActiveInlineId] = useState<string | null>(null);
   const bannerShownRef = useRef(false);
   const overlayShownRef = useRef(false);
   const coachMarkShownRef = useRef(false);
+  const inlineShownRef = useRef(false);
+  const pendingInlineRef = useRef<Set<string>>(new Set());
 
   const triggerCountsRef = useRef<Record<string, number>>({});
   const eventDetailRef = useRef<Record<string, unknown> | null>(null);
@@ -85,9 +95,17 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
   const activeCoachMark = activeCoachMarkId
     ? scopeNudges.find((n) => n.id === activeCoachMarkId)
     : null;
+  const activeInline = activeInlineId ? scopeNudges.find((n) => n.id === activeInlineId) : null;
 
   const showNudge = useCallback((def: NudgeDefinition) => {
     if (sessionDismissedRef.current.has(def.id)) return;
+    if (
+      def.type === 'inline' &&
+      !isNudgeSlotMounted(def.content.slot ?? '') &&
+      isEligible(def, { requireAnchor: false })
+    ) {
+      pendingInlineRef.current.add(def.id);
+    }
     if (!isEligible(def)) return;
 
     if (def.type === 'banner') {
@@ -98,6 +116,11 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
       if (coachMarkShownRef.current) return;
       coachMarkShownRef.current = true;
       setActiveCoachMarkId(def.id);
+    } else if (def.type === 'inline') {
+      if (inlineShownRef.current) return;
+      inlineShownRef.current = true;
+      pendingInlineRef.current.delete(def.id);
+      setActiveInlineId(def.id);
     } else {
       if (overlayShownRef.current) return;
       overlayShownRef.current = true;
@@ -137,6 +160,48 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     setActiveCoachMarkId(null);
     coachMarkShownRef.current = false;
   }, [activeCoachMark]);
+
+  const dismissInline = useCallback(() => {
+    if (!activeInline) return;
+    trackNudgeEvent(activeInline, 'dismissed');
+    markDismissed(activeInline.storageKey, activeInline.dismissal);
+    sessionDismissedRef.current.add(activeInline.id);
+    setActiveInlineId(null);
+    inlineShownRef.current = false;
+  }, [activeInline]);
+
+  const handleInlineAction = useCallback(() => {
+    if (!activeInline) return;
+    trackNudgeEvent(activeInline, 'action');
+    activeInline.content.action?.onClick(eventDetailRef.current ?? undefined);
+    if (!dismissesOnAction(activeInline)) return;
+    markDismissed(activeInline.storageKey, activeInline.dismissal);
+    sessionDismissedRef.current.add(activeInline.id);
+    setActiveInlineId(null);
+    inlineShownRef.current = false;
+  }, [activeInline]);
+
+  useEffect(() => {
+    const slot = activeInline?.content.slot;
+    if (!activeInline || !slot) return;
+    setInlineNudge(slot, {
+      def: activeInline,
+      onDismiss: dismissInline,
+      onAction: handleInlineAction,
+    });
+    return () => setInlineNudge(slot, null);
+  }, [activeInline, dismissInline, handleInlineAction]);
+
+  useEffect(() => {
+    const showPending = () => {
+      for (const id of pendingInlineRef.current) {
+        const def = scopeNudges.find((n) => n.id === id);
+        if (def) showNudge(def);
+      }
+    };
+    window.addEventListener(NUDGE_SLOT_MOUNTED_EVENT, showPending);
+    return () => window.removeEventListener(NUDGE_SLOT_MOUNTED_EVENT, showPending);
+  }, [scopeNudges, showNudge]);
 
   const handleCoachMarkAction = useCallback(() => {
     if (!activeCoachMark) return;
@@ -209,7 +274,7 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
 
     for (const def of sorted) {
       if (def.id === activeBannerId || def.id === activeOverlayId) continue;
-      if (def.id === activeCoachMarkId) continue;
+      if (def.id === activeCoachMarkId || def.id === activeInlineId) continue;
       if (!isEligible(def, { requireAnchor: false, requireConditions: false })) continue;
       if (sessionDismissedRef.current.has(def.id)) continue;
 
@@ -236,7 +301,14 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
       for (const fn of cleanups) fn();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeBannerId, activeOverlayId, activeCoachMarkId, scope, bannerVariantResolved]);
+  }, [
+    activeBannerId,
+    activeOverlayId,
+    activeCoachMarkId,
+    activeInlineId,
+    scope,
+    bannerVariantResolved,
+  ]);
 
   useEffect(() => {
     const handlers: [string, () => void][] = [];
@@ -251,11 +323,15 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
         } else if (def.type === 'coach-mark' && activeCoachMarkId === def.id) {
           setActiveCoachMarkId(null);
           coachMarkShownRef.current = false;
+        } else if (def.type === 'inline' && activeInlineId === def.id) {
+          setActiveInlineId(null);
+          inlineShownRef.current = false;
         } else if (activeOverlayId === def.id) {
           setActiveOverlayId(null);
           overlayShownRef.current = false;
         }
         sessionDismissedRef.current.add(def.id);
+        pendingInlineRef.current.delete(def.id);
         if (def.permanentSuppressKey) {
           try {
             localStorage.setItem(def.permanentSuppressKey, '1');
@@ -272,7 +348,7 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
         window.removeEventListener(event, handler);
       }
     };
-  }, [activeBannerId, activeOverlayId, activeCoachMarkId, scopeNudges]);
+  }, [activeBannerId, activeOverlayId, activeCoachMarkId, activeInlineId, scopeNudges]);
 
   const deferToastForCoachMark = Boolean(activeCoachMark?.content.anchor);
 

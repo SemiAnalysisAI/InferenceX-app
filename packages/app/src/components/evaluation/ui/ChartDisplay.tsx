@@ -8,6 +8,8 @@ import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
 import EvaluationTable from '@/components/evaluation/ui/EvaluationTable';
+import { InlineNudgeSlot } from '@/components/nudges/inline-nudge-slot';
+import { NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
 import { Card } from '@/components/ui/card';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { ChartSection } from '@/components/ui/chart-section';
@@ -243,6 +245,7 @@ export default function EvaluationChartDisplay() {
               ) : (
                 <>
                   {caption}
+                  <InlineNudgeSlot slot={NUDGE_SLOTS.evaluationTable} className="mb-3" />
                   <EvaluationTable data={tableData} />
                   <div className="mt-3">{footer}</div>
                 </>
