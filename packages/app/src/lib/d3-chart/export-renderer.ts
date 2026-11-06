@@ -8,7 +8,12 @@ import type { D3ChartProps, RenderContext } from './D3Chart/types';
 import { chartExportSources, type ChartExportScales } from './export-registry';
 import { getDomainAwareChartWatermark } from '@/lib/runtime/unofficial-domain';
 import type { ContinuousScale } from './types';
-import { CANVAS_POINT_LAYER_SELECTOR, canvasPointLayerOf } from './layers/canvas-point-registry';
+import {
+  CANVAS_POINT_LAYER_SELECTOR,
+  CANVAS_UNDERLAY_ATTRIBUTE,
+  canvasPointLayerOf,
+  revealCanvasUnderlay,
+} from './layers/canvas-point-registry';
 
 export function renderChartForExport(
   source: SVGSVGElement,
@@ -50,6 +55,9 @@ function renderExportChart<T>(
 ) {
   const { xAxis, yAxis, layers, clipContent = true } = props;
   namespaceExportIds(target);
+  for (const shape of target.querySelectorAll<SVGElement>(`[${CANVAS_UNDERLAY_ATTRIBUTE}]`)) {
+    revealCanvasUnderlay(shape);
+  }
   const layout = setupChartStructure(target, {
     chartId: `${props.chartId}-png`,
     containerWidth: width,

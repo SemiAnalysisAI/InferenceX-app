@@ -9,6 +9,7 @@ import {
   layoutPngExport,
   PNG_PIXEL_RATIO,
   PNG_FOOTER_HEIGHT,
+  renderCanvasChartsForExport,
   type PngAspectRatio,
 } from '@/lib/export/png-layout';
 
@@ -430,11 +431,13 @@ export async function exportChartImage(
         fontEmbedCSS = await htmlToImage.getFontEmbedCSS(exportElement);
       } catch {}
     }
+    const rerendered =
+      ratio !== 'auto' || (await renderCanvasChartsForExport(element, clone, exportElement));
     const captureDimensions =
       ratio === 'auto'
         ? getExportCaptureDimensions(exportElement)
         : await layoutPngExport(element, clone, exportElement, ratio);
-    if (ratio !== 'auto') {
+    if (rerendered) {
       // New D3 nodes need the same export styling as the original clone.
       for (const el of clone.querySelectorAll<HTMLElement>('.export-only')) {
         el.style.display = 'inline';

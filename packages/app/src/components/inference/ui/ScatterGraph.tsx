@@ -315,6 +315,10 @@ const VARIANT_DASH_BY_ID = new Map<string, string>(
 );
 
 const LINE_LABEL_RAISE = ['.line-label'] as const;
+const CANVAS_UNDERLAY = [
+  '.unofficial-overlay-pt > .offload-halo',
+  '.headroom-band, .overflow-continuations-layer, .rooflines-layer',
+] as const;
 
 function syncGradientStop(this: SVGStopElement, stop: { offset: number; color: string }): void {
   setAttrIfChanged(this, 'offset', `${(stop.offset * 100).toFixed(2)}%`);
@@ -3046,6 +3050,7 @@ const ScatterGraph = React.memo(
           },
           getShapeKey: (d) =>
             getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
+          underlay: CANVAS_UNDERLAY,
         },
         keyFn: buildPointId,
         canvas: ensureCanvasPointLayer,
@@ -3869,6 +3874,17 @@ const ScatterGraph = React.memo(
           canvasPointLayerOf<InferenceData>(
             getDisplaySelection()?.zoomGroup.node(),
           )?.restoreExportOrder(zoomNode, buildPointId);
+          const lines = zoomNode.querySelector(CANVAS_UNDERLAY[1]);
+          const halos = `.dot-group > .offload-halo, ${CANVAS_UNDERLAY[0]}`;
+          for (const halo of lines ? zoomNode.querySelectorAll(halos) : []) {
+            const owner = halo.parentElement as unknown as SVGGElement;
+            const anchor = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            anchor.setAttribute('transform', owner.getAttribute('transform') ?? '');
+            anchor.style.opacity = owner.style.opacity;
+            anchor.style.filter = owner.style.filter;
+            anchor.append(halo);
+            lines?.before(anchor);
+          }
         }
 
         if (pointLabelsVisible) avoidPointLabelCollisions(zoomGroup);
