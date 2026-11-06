@@ -5,6 +5,7 @@ import { Pause, Play, SkipBack } from 'lucide-react';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { Button } from '@/components/ui/button';
+import { rangeProgressStyle } from '@/components/ui/control-styles';
 
 const STRINGS = {
   en: {
@@ -235,7 +236,8 @@ export function ReplayControls({
         max={total}
         value={currentIndex}
         onChange={(e) => onSeek(Number(e.target.value))}
-        className="ml-1 flex-1 h-1 accent-primary cursor-pointer"
+        className="range-slider ml-1 h-4 flex-1"
+        style={rangeProgressStyle(currentIndex, 0, total)}
       />
 
       <span className="text-muted-foreground shrink-0 tabular-nums">

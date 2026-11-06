@@ -14,6 +14,7 @@ import {
   type OverviewTier,
 } from '@/lib/overview/overview-data';
 import { overviewTierHref } from '@/lib/overview/overview-links';
+import { rangeProgressStyle } from '@/components/ui/control-styles';
 
 import { useOverviewNavigation, useOverviewNavigationError } from './overview-navigation';
 
@@ -63,7 +64,6 @@ export function OverviewTierSlider({
   }, [navigationError, tier]);
 
   const selectedTier = OVERVIEW_TIERS[selectedIndex];
-  const progress = (selectedIndex / (OVERVIEW_TIERS.length - 1)) * 100;
 
   const commit = (index: number) => {
     const nextTier = OVERVIEW_TIERS[index];
@@ -126,10 +126,8 @@ export function OverviewTierSlider({
               pointerActive.current = false;
               setSelectedIndex(tierIndex(tier));
             }}
-            className="absolute top-1/2 z-10 h-1.5 w-full -translate-y-1/2 cursor-pointer appearance-none rounded-full bg-border accent-primary focus-visible:outline-none [&::-moz-range-progress]:h-1.5 [&::-moz-range-progress]:rounded-full [&::-moz-range-progress]:bg-primary [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:cursor-grab [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-background [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:shadow-sm [&::-moz-range-thumb]:active:cursor-grabbing [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-background [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:active:cursor-grabbing"
-            style={{
-              background: `linear-gradient(to right, var(--primary) 0%, var(--primary) ${progress}%, var(--border) ${progress}%, var(--border) 100%)`,
-            }}
+            className="range-slider absolute top-1/2 z-10 h-4 w-full -translate-y-1/2"
+            style={rangeProgressStyle(selectedIndex, 0, OVERVIEW_TIERS.length - 1)}
           />
           <div
             data-testid="overview-tier-ridges"

@@ -49,14 +49,12 @@ describe('Overview accessibility', () => {
 
         cy.get('[data-testid="overview-tier-slider"]').should(([slider]) => {
           const style = getComputedStyle(slider);
-          const primary = style.getPropertyValue('--primary').trim();
-          const channels = primary
-            .replace('#', '')
-            .match(/../g)!
-            .map((hex) => parseInt(hex, 16));
-          const accent = `rgb(${channels.join(', ')})`;
-          expect(style.accentColor, 'same accent token as the TCO range').to.equal(accent);
-          expect(style.backgroundImage, 'filled track uses the accent').to.contain(accent);
+          expect(slider, 'same range style as the TCO slider').to.have.class('range-slider');
+          expect(
+            style.getPropertyValue('--range-fill').trim(),
+            'fill uses the theme accent',
+          ).to.equal(style.getPropertyValue('--brand').trim());
+          expect(style.getPropertyValue('--range-progress').trim()).to.match(/%$/);
         });
 
         cy.injectAxe();

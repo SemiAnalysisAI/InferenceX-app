@@ -18,6 +18,7 @@ import { useInferenceDisplay, useInferenceFilters } from '@/components/inference
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import type { ChartDefinition } from '@/components/inference/types';
 import { Button } from '@/components/ui/button';
+import { rangeProgressStyle } from '@/components/ui/control-styles';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -694,7 +695,8 @@ function ReplayPanelContent({
           step={1}
           onChange={(e) => handleScrub(Number(e.target.value) / 1000)}
           onKeyDown={handleScrubKeyDown}
-          className="flex-1 min-w-[120px] h-2 cursor-pointer accent-foreground"
+          className="range-slider h-4 min-w-[120px] flex-1"
+          style={rangeProgressStyle(fraction, 0, 1)}
           aria-label={t.timeline}
           aria-valuetext={formatReplayDate(currentDate, locale) || undefined}
           data-testid="replay-scrubber"

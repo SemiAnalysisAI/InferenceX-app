@@ -11,6 +11,7 @@ import { track } from '@/lib/analytics/analytics';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
+import { rangeProgressStyle } from '@/components/ui/control-styles';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
@@ -303,10 +304,8 @@ export default function PowerChipCompare({
               onTargetChange?.();
             }}
             onPointerUp={() => track('inference_power_compare_target_changed')}
-            className={cn(
-              'min-w-0 flex-1 accent-secondary dark:accent-primary',
-              powerX && 'powerx-range text-secondary dark:text-primary',
-            )}
+            className={cn('range-slider h-4 min-w-0 flex-1', powerX && 'powerx-range text-brand')}
+            style={rangeProgressStyle(toStep(value), 0, SLIDER_STEPS)}
             data-testid="power-chip-compare-target"
             aria-valuetext={`${rate(value)} ${t.unit}`}
           />

@@ -22,6 +22,7 @@ import { compareSplits, parallelLabel } from '@semianalysisai/inferencex-db/oper
 import { BLOCK_COLORS } from '@/components/inference/ui/model-architecture-diagram-renderer';
 import { Card } from '@/components/ui/card';
 import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
+import { rangeProgressStyle } from '@/components/ui/control-styles';
 import {
   Dialog,
   DialogContent,
@@ -293,7 +294,8 @@ function SizeControls({
             if (sweep) onSweep(false);
             onChange(bins[at]);
           }}
-          className="relative w-full accent-primary"
+          className="range-slider relative h-4 w-full"
+          style={rangeProgressStyle(sweep ? all : bins.indexOf(bin), 0, all)}
           data-testid="operatorx-model-tokens"
         />
         <span
