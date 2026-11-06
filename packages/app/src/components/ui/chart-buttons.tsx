@@ -25,7 +25,7 @@ function useTitleSlot(enabled: boolean, placeRef: RefObject<HTMLElement | null>)
       return;
     }
     const host = document.createElement('div');
-    host.className = 'no-export mt-3';
+    host.className = 'no-export mt-2';
     let anchor: Element | null = null;
     const place = () => {
       const marker = placeRef.current;
@@ -168,7 +168,8 @@ export function ChartButtons({
       ref={slot ? undefined : placeRef}
       data-slot="chart-actions"
       className={cn(
-        'no-export export-buttons mb-3 min-w-0 flex-wrap items-center justify-end gap-2',
+        'no-export export-buttons min-w-0 flex-wrap items-center justify-start gap-2 md:justify-end',
+        slot ? 'mb-2' : 'mb-3',
         mobileVisible ? 'flex' : 'hidden md:flex',
         className,
       )}

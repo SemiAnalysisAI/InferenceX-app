@@ -2,10 +2,9 @@
 
 import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { DISPLAY_MODEL_TO_DB, HW_REGISTRY } from '@semianalysisai/inferencex-constants';
-import { Info, Plus, X } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { isDarkTheme } from '@/lib/themes/themes';
 import Link from 'next/link';
@@ -44,6 +43,7 @@ import ChartLegend from '@/components/ui/chart-legend';
 import { ChartShareActions, PricesSourceLink } from '@/components/ui/chart-display-helpers';
 import { ModelSelector } from '@/components/ui/chart-selectors';
 import { ControlPanel } from '@/components/ui/control-panel';
+import { DisclosureToggle } from '@/components/ui/disclosure-toggle';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -59,6 +59,7 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { InfoHelp } from '@/components/ui/option-info';
 import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/tco-model-dialog';
 import { CaptionPercentInput } from '@/components/ui/caption-percent-input';
+import { RangeField } from '@/components/ui/range-field';
 import { ResultContext, sourceLinkClassName } from '@/components/ui/result-context';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
@@ -204,7 +205,7 @@ const STRINGS = {
       'Per GPU-hour shows what one chip earns and costs in an hour. Per gigawatt counts how many of each chip one gigawatt of all-in utility power runs for a year, so chips with different power draw share one budget.',
     basisOptions: {
       'chip-hour': 'Per GPU-hour',
-      'gw-year': 'Per gigawatt (Beta)',
+      'gw-year': 'Per gigawatt',
     } satisfies Record<ProfitBasis, string>,
     benchmarkGroup: 'Benchmark config',
     secondaryControls: 'More chart controls',
@@ -279,7 +280,6 @@ const STRINGS = {
       'gw-year': 'Revenue per gigawatt formula',
       'chip-hour': 'Revenue per chip-hour formula',
     },
-    formulaToggle: 'Toggle formula notes',
     captionFormula: {
       'gw-year': (util: number, labCut: number) =>
         `Revenue = $/GPU/hr × GPU-hours per GW-year × ${util}% utilization. GPU-hours = (1,000,000 kW ÷ all-in kW per GPU) × 8,760 h. Model license fee = ${labCut}% of revenue. Profit = revenue − TCO − license fee. Margin above each bar is profit ÷ revenue.`,
@@ -338,7 +338,7 @@ const STRINGS = {
       '每 GPU 小时口径展示单颗芯片一小时的收入与成本。每吉瓦口径按一吉瓦全电源配置功率一年可运行的芯片数量折算，让功耗不同的芯片在同一功率预算下比较。',
     basisOptions: {
       'chip-hour': '每 GPU 小时',
-      'gw-year': '每吉瓦（Beta）',
+      'gw-year': '每吉瓦',
     } satisfies Record<ProfitBasis, string>,
     benchmarkGroup: '基准测试配置',
     secondaryControls: '更多图表设置',
@@ -413,7 +413,6 @@ const STRINGS = {
       'gw-year': '每吉瓦收入公式',
       'chip-hour': '每芯片小时收入公式',
     },
-    formulaToggle: '展开或收起公式说明',
     captionFormula: {
       'gw-year': (util: number, labCut: number) =>
         `收入 = $/GPU/hr × 每吉瓦年 GPU 小时数 × ${util}% 利用率。GPU 小时数 = (1,000,000 kW ÷ 每 GPU 全电源配置 kW) × 8,760 h。模型许可费 = 收入的 ${labCut}%。利润 = 收入 − TCO − 许可费。柱形上方的利润率 = 利润 ÷ 收入。`,
@@ -462,37 +461,32 @@ const STRINGS = {
 
 function InfoFold({
   title,
-  toggleLabel,
   children,
   testId,
 }: {
   title: string;
-  toggleLabel: string;
   children: React.ReactNode;
   testId: string;
 }) {
   const [open, setOpen] = useState(false);
+  const bodyId = useId();
   return (
     <div className="py-1 text-xs" data-testid={testId}>
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-label={toggleLabel}
-        className="flex w-full items-center gap-1.5 text-left text-foreground cursor-pointer"
+      <DisclosureToggle
+        open={open}
+        aria-controls={bodyId}
         onClick={() => {
           setOpen((prev) => !prev);
           track('profit_formula_toggled', { enabled: !open });
         }}
       >
-        <Info className="size-3.5 text-muted-foreground" aria-hidden />
-        <span className="flex-1">{title}</span>
-        {open ? (
-          <X className="size-3.5 text-muted-foreground" aria-hidden />
-        ) : (
-          <Plus className="size-3.5 text-muted-foreground" aria-hidden />
-        )}
-      </button>
-      {open && <div className="mt-2 text-muted-foreground">{children}</div>}
+        {title}
+      </DisclosureToggle>
+      {open && (
+        <div id={bodyId} className="mt-2 text-muted-foreground">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -660,6 +654,7 @@ function ProfitEstimatorInner({
 
   const {
     hardwareConfig,
+    ranges,
     getResults,
     loading: throughputLoading,
     error,
@@ -1088,6 +1083,11 @@ function ProfitEstimatorInner({
     setTargetRaw(e.target.value);
     const parsed = Number.parseFloat(e.target.value);
     if (Number.isFinite(parsed) && parsed > 0) setTargetValue(parsed);
+  }, []);
+
+  const handleTargetSlide = useCallback((value: number) => {
+    setTargetValue(value);
+    setTargetRaw(String(value));
   }, []);
 
   const handleTargetBlur = useCallback(() => {
@@ -1625,17 +1625,26 @@ function ProfitEstimatorInner({
                       label={t.targetAgenticLabel(percentileLabel)}
                       tooltip={t.targetAgenticTooltip(percentileLabel)}
                     />
-                    <Input
-                      id="profit-target"
-                      data-testid="profit-target-input"
-                      type="number"
-                      onWheel={blurOnWheel}
-                      inputMode="decimal"
-                      min={1}
-                      step={1}
-                      value={targetRaw}
-                      onChange={handleTargetChange}
-                      onBlur={handleTargetBlur}
+                    <RangeField
+                      label={t.targetAgenticLabel(percentileLabel)}
+                      min={ranges.interactivity.min}
+                      max={ranges.interactivity.max}
+                      value={targetValue}
+                      onSliderChange={handleTargetSlide}
+                      onSliderCommit={() =>
+                        track('profit_target_set', { mode, value: targetValue })
+                      }
+                      compact
+                      input={{
+                        id: 'profit-target',
+                        'data-testid': 'profit-target-input',
+                        onWheel: blurOnWheel,
+                        inputMode: 'decimal',
+                        min: 1,
+                        value: targetRaw,
+                        onChange: handleTargetChange,
+                        onBlur: handleTargetBlur,
+                      }}
                     />
                   </div>
                   {!isMobile && <div className="hidden md:contents">{benchmarkExtras}</div>}
@@ -1796,6 +1805,7 @@ function ProfitEstimatorInner({
                           options={(['chip-hour', 'gw-year'] as const).map((value) => ({
                             value,
                             label: t.basisOptions[value],
+                            badge: value === 'gw-year' ? t.betaQualifier : undefined,
                             testId: `profit-basis-${value}`,
                           }))}
                           onValueChange={handleBasisChange}
@@ -1962,11 +1972,7 @@ function ProfitEstimatorInner({
                 }
               />
               <div className="mt-1">
-                <InfoFold
-                  title={t.formulaTitle[basis]}
-                  toggleLabel={t.formulaToggle}
-                  testId="profit-formula-notes"
-                >
+                <InfoFold title={t.formulaTitle[basis]} testId="profit-formula-notes">
                   {t.captionFormula[basis](assumptions.utilizationPct, assumptions.labCutPct)}
                 </InfoFold>
               </div>

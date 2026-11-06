@@ -4,7 +4,7 @@ import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from 'lucide-react';
 import * as React from 'react';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { OptionInfo, SelectedOptionInfo } from '@/components/ui/option-info';
+import { OptionInfo } from '@/components/ui/option-info';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { matchesSearch } from '@/lib/shared/search-match';
@@ -57,7 +57,6 @@ interface SearchableSelectProps {
   placeholder?: string;
   initialLabel?: string;
   className?: string;
-  showSelectedHelp?: boolean;
   contentClassName?: string;
   triggerId?: string;
   triggerTestId?: string;
@@ -82,7 +81,6 @@ export function SearchableSelect({
   placeholder: placeholderProp,
   initialLabel,
   className,
-  showSelectedHelp = true,
   contentClassName,
   triggerId,
   triggerAriaLabel,
@@ -164,10 +162,6 @@ export function SearchableSelect({
     return undefined;
   }, [groups, value]);
   const triggerLabel = mounted ? (selectedLabel ?? placeholder) : (initialLabel ?? placeholder);
-  const selectedOption = groups
-    .flatMap((group) => group.options)
-    .find((option) => (mounted ? option.value === value : option.label === initialLabel));
-  const selectedHelp = showSelectedHelp ? selectedOption?.help : undefined;
 
   const handleSelect = (optionValue: string) => {
     if (disabled) return;
@@ -214,7 +208,7 @@ export function SearchableSelect({
 
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
-      <div className="relative">
+      <div>
         <PopoverTrigger asChild>
           <button
             ref={triggerRef}
@@ -248,7 +242,6 @@ export function SearchableSelect({
             <span
               className={cn(
                 'flex-1 text-left truncate',
-                selectedHelp && 'mr-7',
                 (mounted ? !selectedLabel : !initialLabel) && 'text-muted-foreground',
               )}
               title={triggerLabel}
@@ -263,20 +256,6 @@ export function SearchableSelect({
             />
           </button>
         </PopoverTrigger>
-        {selectedHelp && selectedOption && !isOpen && (
-          <div className="pointer-events-none absolute inset-y-0 left-3 right-9 flex items-center">
-            <span aria-hidden="true" className="invisible min-w-0 truncate text-sm">
-              {triggerLabel}
-            </span>
-            <SelectedOptionInfo
-              key={selectedOption.value}
-              label={selectedOption.label}
-              value={selectedOption.value}
-            >
-              {selectedHelp}
-            </SelectedOptionInfo>
-          </div>
-        )}
         <PopoverContent
           data-slot="select-content"
           align="start"

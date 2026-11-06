@@ -534,26 +534,11 @@ describe('Axis option help', () => {
     cy.get('@selectMetric').should('not.have.been.called');
   });
 
-  it('shows selected-value help inside #y-axis-select without opening its menu', () => {
-    cy.get('#y-axis-select').then(($trigger) => {
-      const bounds = $trigger[0].getBoundingClientRect();
-      cy.get('[data-testid="selected-option-help-y_tpPerGpu"]')
-        .should(($help) => {
-          const icon = $help.find('svg')[0].getBoundingClientRect();
-          expect(icon.left).to.be.greaterThan(bounds.left);
-          expect(icon.right).to.be.lessThan(bounds.right);
-          expect(icon.top).to.be.greaterThan(bounds.top);
-          expect(icon.bottom).to.be.lessThan(bounds.bottom);
-          expect($help[0].closest('button[role="combobox"]')).to.equal(null);
-        })
-        .trigger('pointerover', { pointerType: 'mouse' });
+  it('keeps metric help in the open #y-axis-select menu, not the closed control', () => {
+    cy.get('#y-axis-select').should(($trigger) => {
+      expect($trigger[0].parentElement!.querySelector('[data-slot="info-help"]')).to.equal(null);
     });
-    cy.get('[data-testid="selected-option-help-content-y_tpPerGpu"]')
-      .should('be.visible')
-      .and('contain.text', 'Rate of total tokens');
-    cy.get('#y-axis-select').should('have.attr', 'aria-expanded', 'false');
     cy.get('#y-axis-select').click('right');
-    cy.get('[data-testid="selected-option-help-y_tpPerGpu"]').should('not.exist');
     cy.get('[data-testid="option-help-y_tpPerGpu"]')
       .should('be.visible')
       .trigger('pointerover', { pointerType: 'mouse' });
@@ -561,16 +546,6 @@ describe('Axis option help', () => {
       .should('be.visible')
       .and('contain.text', 'Rate of total tokens');
     cy.get('#y-axis-select').should('have.attr', 'aria-expanded', 'true');
-  });
-
-  it('keeps selected-value help open when activating its focused button in #y-axis-select', () => {
-    cy.get('[data-testid="selected-option-help-y_tpPerGpu"]').focus().click();
-    cy.get('[data-testid="selected-option-help-content-y_tpPerGpu"]')
-      .should('be.visible')
-      .and('contain.text', 'Rate of total tokens');
-    cy.get('#y-axis-select').should('have.attr', 'aria-expanded', 'false');
-    cy.get('[data-testid="selected-option-help-y_tpPerGpu"]').type('{esc}');
-    cy.get('[data-testid="selected-option-help-content-y_tpPerGpu"]').should('not.exist');
   });
 
   it('keeps hover help readable across the pointer gap without taking search focus', () => {

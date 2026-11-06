@@ -4,14 +4,29 @@ import { cn } from '@/lib/shared/utils';
 
 const RANGE_TICK_COUNT = 5;
 const PHONE_RANGE_TICK_COUNT = 3;
+const MIN_LABEL_CLEARANCE = 0.1;
 
 export function rangeTicks(min: number, max: number, count = RANGE_TICK_COUNT): number[] {
-  return max > min ? d3.ticks(min, max, count) : [];
+  if (max <= min) return [];
+  return [
+    min,
+    ...d3
+      .ticks(min, max, count)
+      .filter((tick) => (tick - min) / (max - min) >= MIN_LABEL_CLEARANCE),
+  ];
 }
 
-export function RangeTicks({ min, max }: { min: number; max: number }) {
-  const ticks = rangeTicks(min, max);
+export function RangeTicks({
+  min,
+  max,
+  compact = false,
+}: {
+  min: number;
+  max: number;
+  compact?: boolean;
+}) {
   const phoneTicks = rangeTicks(min, max, PHONE_RANGE_TICK_COUNT);
+  const ticks = compact ? phoneTicks : rangeTicks(min, max);
   const all = [...new Set([...ticks, ...phoneTicks])].toSorted((a, b) => a - b);
   return (
     <div

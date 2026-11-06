@@ -13,7 +13,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
-import { OptionInfo, SelectedOptionInfo } from '@/components/ui/option-info';
+import { OptionInfo } from '@/components/ui/option-info';
 import { Model, MODEL_OPTIONS, Sequence } from '@/lib/catalog/data-mappings';
 
 describe('Consistent informational help', () => {
@@ -21,7 +21,7 @@ describe('Consistent informational help', () => {
     ['en', 390],
     ['zh', 1280],
   ] as const) {
-    it(`uses the same surface for label, selected-value, option and action hints (${locale}, ${width}px)`, () => {
+    it(`uses the same surface for label, option and action hints (${locale}, ${width}px)`, () => {
       cy.viewport(width, 844);
       const label = locale === 'zh' ? '配置' : 'Configuration';
       const explanation =
@@ -31,11 +31,6 @@ describe('Consistent informational help', () => {
           <div className="space-y-6 p-4" style={{ minHeight: 1200 }}>
             <LabelWithTooltip htmlFor="test-label" label={label} tooltip={explanation} />
             <input id="test-label" data-testid="unrelated-input" defaultValue="unchanged" />
-            <div className="flex h-9">
-              <SelectedOptionInfo label={label} value="test-selected">
-                {explanation}
-              </SelectedOptionInfo>
-            </div>
             <OptionInfo label={label} value="test-option">
               {explanation}
             </OptionInfo>
@@ -75,7 +70,6 @@ describe('Consistent informational help', () => {
       };
       for (const [trigger, content] of [
         ['option-help-test-label', 'option-help-content-test-label'],
-        ['selected-option-help-test-selected', 'selected-option-help-content-test-selected'],
         ['option-help-test-option', 'option-help-content-test-option'],
       ]) {
         cy.get(`[data-testid="${trigger}"] [data-slot="info-help-icon"]`).should(($icon) => {
@@ -217,24 +211,16 @@ function SelectableContextHarness() {
   );
 }
 
-function assertAgenticInfoInside(height: number) {
+function assertClosedScenarioHasNoHelp(height: number) {
   cy.get('[data-testid="scenario-selector"]').should(($control) => {
     const control = $control[0];
-    const bounds = control.getBoundingClientRect();
-    const info = control.parentElement!.querySelector(
-      '[data-testid="selected-option-help-agentic-traces"] svg',
+    expect(
+      control.parentElement!.querySelector('[data-slot="info-help"]'),
+      'the label carries the only help icon on the closed control',
+    ).to.equal(null);
+    expect(control.getBoundingClientRect().height, 'control keeps its shared height').to.equal(
+      height,
     );
-    expect(info, 'explainer is inside the scenario control').not.to.equal(null);
-    const icon = info!.getBoundingClientRect();
-    const label = control
-      .parentElement!.querySelector('[aria-hidden="true"].invisible')!
-      .getBoundingClientRect();
-    expect(icon.left - label.right, 'explainer is directly beside Agentic').to.be.closeTo(7, 1);
-    expect(icon.left).to.be.greaterThan(bounds.left);
-    expect(icon.right).to.be.lessThan(bounds.right);
-    expect(icon.top).to.be.greaterThan(bounds.top);
-    expect(icon.bottom).to.be.lessThan(bounds.bottom);
-    expect(bounds.height, 'control keeps its shared height').to.equal(height);
   });
 }
 
@@ -458,10 +444,11 @@ describe('Chart Selectors', () => {
   });
 
   describe('ScenarioSelector', () => {
-    it('explains the agentic workload in a tooltip that links to /agentx', () => {
+    it('explains the agentic workload in its menu option, linking to /agentx', () => {
       cy.mount(<ScenarioSelectorHarness />);
-      assertAgenticInfoInside(36);
-      cy.get('[data-testid="selected-option-help-agentic-traces"]').trigger('pointerover', {
+      assertClosedScenarioHasNoHelp(36);
+      cy.get('[data-testid="scenario-selector"]').click('right');
+      cy.get('[data-testid="option-help-agentic-traces"]').trigger('pointerover', {
         pointerType: 'mouse',
       });
 
@@ -480,11 +467,6 @@ describe('Chart Selectors', () => {
         })
         .click();
       cy.get('@followAgenticLink').should('have.been.calledOnceWith', false);
-      cy.get('[data-testid="scenario-selector"]').should('have.attr', 'aria-expanded', 'false');
-      cy.get('[data-testid="selected-option-help-agentic-traces"]').click();
-      cy.get('[data-testid="scenario-selector"]').should('have.attr', 'aria-expanded', 'false');
-      cy.get('[data-testid="scenario-selector"]').click();
-      cy.contains('[data-select-option]', '8K / 1K').should('be.visible');
     });
 
     for (const variant of ['field', 'caption'] as const) {
@@ -543,7 +525,7 @@ describe('Chart Selectors', () => {
     }
 
     for (const fixed of [true, false]) {
-      it(`${fixed ? 'omits the sole scenario' : 'keeps the Agentic explainer inside'} on Chinese phones`, () => {
+      it(`${fixed ? 'omits the sole scenario' : 'keeps the Agentic explainer in the menu'} on Chinese phones`, () => {
         cy.viewport(390, 720);
         cy.mount(
           <PathnameContext.Provider value="/zh/inference">
@@ -565,11 +547,12 @@ describe('Chart Selectors', () => {
         );
         if (fixed) {
           cy.get('[data-testid="scenario-selector"]').should('not.exist');
-          cy.get('[data-testid="selected-option-help-agentic-traces"]').should('not.exist');
+          cy.get('[data-testid="option-help-agentic-traces"]').should('not.exist');
           return;
         }
-        assertAgenticInfoInside(44);
-        cy.get('[data-testid="selected-option-help-agentic-traces"]').trigger('pointerover', {
+        assertClosedScenarioHasNoHelp(44);
+        cy.get('[data-testid="scenario-selector"]').click('right');
+        cy.get('[data-testid="option-help-agentic-traces"]').trigger('pointerover', {
           pointerType: 'mouse',
         });
         cy.contains('真实的长上下文、多轮、带子智能体（sub-agent）的智能体工作负载。').should(
@@ -690,14 +673,15 @@ describe('Chart Selectors', () => {
       cy.get('[data-slot="select-content"]').should('not.contain.text', 'Deprecated');
     });
 
-    it('hides the agentic explainer on fixed-sequence scenarios', () => {
+    it('keeps scenario explainers out of the closed control for every scenario', () => {
       cy.mount(<ScenarioSelectorHarness initial={Sequence.EightK_OneK} />);
       cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
-      cy.get('[data-testid="selected-option-help-agentic-traces"]').should('not.exist');
+      assertClosedScenarioHasNoHelp(36);
 
       cy.get('[data-testid="scenario-selector"]').click();
       cy.contains('[data-select-option]', 'Agentic').click();
-      cy.get('[data-testid="selected-option-help-agentic-traces"]').should('exist');
+      cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
+      assertClosedScenarioHasNoHelp(36);
     });
   });
 

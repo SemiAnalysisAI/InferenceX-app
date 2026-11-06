@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
-import { Eyebrow } from '@/components/ui/eyebrow';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import {
   Select,
@@ -21,7 +20,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 const STRINGS = {
   en: {
     title: 'ubenchX microbenchmarks',
-    eyebrow: 'ubenchX · Beta',
+    beta: 'Beta',
     subtitle:
       'Low-level accelerator microbenchmarks measuring fundamental hardware characteristics',
     controls: 'Benchmark config',
@@ -33,7 +32,7 @@ const STRINGS = {
   },
   zh: {
     title: 'ubenchX 微基准测试',
-    eyebrow: 'ubenchX · 测试版',
+    beta: 'Beta',
     subtitle: '底层加速器微基准测试，测量基础硬件特性',
     controls: '基准测试配置',
     test: '微基准测试',
@@ -68,12 +67,12 @@ export function UbenchxHub({
     <section>
       <Card>
         <div className="flex flex-col gap-4">
-          <div>
-            <Eyebrow as="p" className="mb-1" data-testid="ubenchx-maturity">
-              {t.eyebrow}
-            </Eyebrow>
-            <DashboardSectionHeader headingAs="h1" title={t.title} description={t.subtitle} />
-          </div>
+          <DashboardSectionHeader
+            headingAs="h1"
+            title={t.title}
+            qualifier={t.beta}
+            description={t.subtitle}
+          />
           <ControlPanel legend={t.controls}>
             <div className="grid min-w-0 items-start gap-3 sm:grid-cols-2">
               <div className="flex min-w-0 flex-col space-y-1.5">

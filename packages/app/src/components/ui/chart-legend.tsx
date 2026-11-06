@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, ChevronRight, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import React, { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { filterAndSortLegendItems } from '@/lib/charts/legend-utils';
@@ -9,6 +9,7 @@ import { cn } from '@/lib/shared/utils';
 
 import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from './atom-engine-footnote';
 import ChartLegendItem, { type CommonLegendItemProps } from './chart-legend-item';
+import { DisclosureToggle } from './disclosure-toggle';
 import { Label } from './label';
 import { InfoHelp } from './option-info';
 import { Switch } from './switch';
@@ -323,21 +324,19 @@ export default function ChartLegend({
         {renderSwitches(standardSwitches)}
         {advancedSwitches.length > 0 && (
           <div className="mt-2">
-            <button
-              type="button"
+            <DisclosureToggle
+              open={isAdvancedExpanded}
               data-testid="legend-advanced-toggle"
-              aria-expanded={isAdvancedExpanded}
               aria-controls={advancedControlsId}
               onClick={() => {
                 const expanded = !isAdvancedExpanded;
                 setIsAdvancedExpanded(expanded);
                 onAdvancedExpandedChange?.(expanded);
               }}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              className="text-xs"
             >
-              {isAdvancedExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               {t.advanced}
-            </button>
+            </DisclosureToggle>
             {isAdvancedExpanded && (
               <div
                 id={advancedControlsId}

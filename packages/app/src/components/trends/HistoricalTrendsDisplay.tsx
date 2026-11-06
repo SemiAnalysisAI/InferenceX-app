@@ -32,8 +32,7 @@ import {
 } from '@/components/ui/chart-display-helpers';
 import { ChipBasisCaption } from '@/components/ui/chip-basis-toggle';
 import { ControlPanel } from '@/components/ui/control-panel';
-import { rangeProgressStyle } from '@/components/ui/control-styles';
-import { RangeTicks } from '@/components/ui/range-ticks';
+import { RangeField } from '@/components/ui/range-field';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Heading, HeadingQualifier } from '@/components/ui/heading';
@@ -43,7 +42,6 @@ import { ModelLogo } from '@/components/ui/model-logo';
 import { exportToCsv } from '@/lib/export/csv-export';
 import { historicalTrendToCsv } from '@/lib/export/csv-export-helpers';
 import ChartLegend from '@/components/ui/chart-legend';
-import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getModelSortIndex } from '@/lib/catalog/constants';
@@ -194,8 +192,7 @@ export default function HistoricalTrendsDisplay() {
   const [targetInteractivity, setTargetInteractivity] = useState(35);
   const [interactivityInput, setInteractivityInput] = useState('35');
 
-  const handleSliderChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = Number(e.target.value);
+  const handleSliderChange = useCallback((val: number) => {
     setTargetInteractivity(val);
     setInteractivityInput(String(val));
   }, []);
@@ -378,40 +375,24 @@ export default function HistoricalTrendsDisplay() {
                     />
                     <p className="text-xs text-muted-foreground">{t.targetHint}</p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-                    <div className="min-w-0 flex-1">
-                      <input
-                        type="range"
-                        min={interactivityRange.min}
-                        max={interactivityRange.max}
-                        step={1}
-                        value={targetInteractivity}
-                        aria-label={targetLabel}
-                        data-testid="historical-target-slider"
-                        onChange={handleSliderChange}
-                        onPointerUp={() =>
-                          track('historical_trend_target_set', { value: targetInteractivity })
-                        }
-                        className="range-slider h-4 w-full"
-                        style={rangeProgressStyle(
-                          targetInteractivity,
-                          interactivityRange.min,
-                          interactivityRange.max,
-                        )}
-                      />
-                      <RangeTicks min={interactivityRange.min} max={interactivityRange.max} />
-                    </div>
-                    <Input
-                      type="number"
-                      value={interactivityInput}
-                      onChange={handleInputChange}
-                      onBlur={handleInputBlur}
-                      className="w-24 shrink-0"
-                      min={0}
-                      aria-label={targetLabel}
-                      data-testid="historical-target-input"
-                    />
-                  </div>
+                  <RangeField
+                    label={targetLabel}
+                    min={interactivityRange.min}
+                    max={interactivityRange.max}
+                    value={targetInteractivity}
+                    onSliderChange={handleSliderChange}
+                    onSliderCommit={() =>
+                      track('historical_trend_target_set', { value: targetInteractivity })
+                    }
+                    sliderTestId="historical-target-slider"
+                    input={{
+                      id: 'historical-target',
+                      value: interactivityInput,
+                      onChange: handleInputChange,
+                      onBlur: handleInputBlur,
+                      'data-testid': 'historical-target-input',
+                    }}
+                  />
                 </ControlPanel>
               )
             }

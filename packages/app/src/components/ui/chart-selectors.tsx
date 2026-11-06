@@ -383,7 +383,6 @@ export function ScenarioSelector({
 
   const select = (
     <SearchableSelect
-      showSelectedHelp={variant !== 'caption'}
       size={variant === 'caption' ? 'sm' : undefined}
       className={variant === 'caption' ? 'w-auto max-w-full text-xs' : undefined}
       value={value}

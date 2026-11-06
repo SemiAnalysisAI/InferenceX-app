@@ -3,6 +3,7 @@
 import { ChevronDown } from 'lucide-react';
 import { type ReactNode } from 'react';
 
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/shared/utils';
 import {
   SEGMENT_RADIUS_STYLE,
@@ -14,6 +15,7 @@ interface SegmentedToggleOptionBase<TValue extends string> {
   value: TValue;
   icon?: ReactNode;
   title?: string;
+  badge?: string;
   testId?: string;
   className?: string;
   disabled?: boolean;
@@ -56,7 +58,9 @@ interface SegmentedToggleProps<TValue extends string> {
 export function segmentedSelectOptionLabel<TValue extends string>(
   option: SegmentedToggleOption<TValue>,
 ): string {
-  const label = option.label ?? option.ariaLabel;
+  const label = option.badge
+    ? `${option.label ?? option.ariaLabel} · ${option.badge}`
+    : (option.label ?? option.ariaLabel);
   return option.title ? `${label} — ${option.title}` : label;
 }
 
@@ -140,6 +144,11 @@ export function SegmentedToggle<TValue extends string>({
         >
           {option.icon}
           {option.label}
+          {option.badge && (
+            <Badge variant="secondary" className="px-1.5 py-0">
+              {option.badge}
+            </Badge>
+          )}
         </button>
       ))}
     </div>

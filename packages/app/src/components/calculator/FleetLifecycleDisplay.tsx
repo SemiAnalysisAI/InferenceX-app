@@ -22,8 +22,7 @@ import {
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ControlPanel } from '@/components/ui/control-panel';
-import { rangeProgressStyle } from '@/components/ui/control-styles';
-import { RangeTicks } from '@/components/ui/range-ticks';
+import { RangeField } from '@/components/ui/range-field';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import ChartLegendItem from '@/components/ui/chart-legend-item';
@@ -34,7 +33,6 @@ import {
   PrecisionSelector,
   ScenarioSelector,
 } from '@/components/ui/chart-selectors';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
@@ -223,8 +221,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
   );
   const currentRange = ranges.interactivity;
 
-  const handleSliderChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = Number(event.target.value);
+  const handleSliderChange = useCallback((value: number) => {
     setRequestedTargetValue(value);
     setInputValue(String(value));
   }, []);
@@ -517,45 +514,29 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                           : t.targetTooltip
                       }
                     />
-                    <div className="flex items-center gap-4">
-                      <div className="min-w-0 flex-1">
-                        <input
-                          id="fleet-target"
-                          type="range"
-                          min={currentRange.min}
-                          max={currentRange.max}
-                          step={1}
-                          value={targetValue}
-                          onChange={handleSliderChange}
-                          onPointerUp={() =>
-                            track('fleet_target_slider_set', { mode, value: targetValue })
-                          }
-                          className="range-slider h-4 w-full"
-                          style={rangeProgressStyle(
-                            targetValue,
-                            currentRange.min,
-                            currentRange.max,
-                          )}
-                        />
-                        <RangeTicks min={currentRange.min} max={currentRange.max} />
-                      </div>
-                      <Input
-                        type="number"
-                        aria-label={
-                          isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
-                        }
-                        value={resolveCalculatorTargetInputValue(
+                    <RangeField
+                      label={
+                        isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
+                      }
+                      min={currentRange.min}
+                      max={currentRange.max}
+                      value={targetValue}
+                      onSliderChange={handleSliderChange}
+                      onSliderCommit={() =>
+                        track('fleet_target_slider_set', { mode, value: targetValue })
+                      }
+                      input={{
+                        id: 'fleet-target',
+                        value: resolveCalculatorTargetInputValue(
                           inputValue,
                           targetValue,
                           isTargetInputFocused,
-                        )}
-                        onFocus={handleInputFocus}
-                        onChange={handleInputChange}
-                        onBlur={handleInputBlur}
-                        className="w-24 shrink-0"
-                        min={0}
-                      />
-                    </div>
+                        ),
+                        onFocus: handleInputFocus,
+                        onChange: handleInputChange,
+                        onBlur: handleInputBlur,
+                      }}
+                    />
                   </div>
                 )}
               </ControlPanel>

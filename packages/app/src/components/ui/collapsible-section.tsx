@@ -1,8 +1,8 @@
 'use client';
 
-import { ChevronDownIcon } from 'lucide-react';
 import React, { useId, useState } from 'react';
 
+import { DisclosureToggle } from '@/components/ui/disclosure-toggle';
 import { Heading } from '@/components/ui/heading';
 import { cn } from '@/lib/shared/utils';
 
@@ -32,10 +32,10 @@ export function CollapsibleSection({
 
   return (
     <div className={className}>
-      <div className="flex items-center gap-2 mb-2">
-        <button
-          type="button"
-          aria-expanded={open}
+      <div className={cn('flex items-start', open && 'mb-2')}>
+        <DisclosureToggle
+          hanging
+          open={open}
           aria-controls={bodyId}
           aria-label={toggleLabel}
           title={toggleLabel}
@@ -45,12 +45,7 @@ export function CollapsibleSection({
             setOpen(next);
             onToggle?.(next);
           }}
-          className="text-muted-foreground hover:text-foreground rounded-sm outline-none cursor-pointer"
-        >
-          <ChevronDownIcon
-            className={cn('size-5 transition-transform duration-200', open && 'rotate-180')}
-          />
-        </button>
+        />
         {(open ? titleWhenOpen : true) && (
           <Heading as="h2" level="card">
             {title}

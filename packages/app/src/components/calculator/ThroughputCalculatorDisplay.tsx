@@ -6,7 +6,7 @@ import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import { track } from '@/lib/analytics/analytics';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import Link from 'next/link';
-import { BarChart3, ChevronDownIcon, Table2 } from 'lucide-react';
+import { BarChart3, Table2 } from 'lucide-react';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { useCallback, useMemo, useState } from 'react';
@@ -25,7 +25,7 @@ import {
   useGlobalFilterWorkflow,
 } from '@/providers/GlobalFilterContext';
 import { Card } from '@/components/ui/card';
-import { cn, getDisplayLabel } from '@/lib/shared/utils';
+import { getDisplayLabel } from '@/lib/shared/utils';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import ChartLegend from '@/components/ui/chart-legend';
 import { ChartShareActions, PricesSourceLink } from '@/components/ui/chart-display-helpers';
@@ -38,7 +38,6 @@ import {
   ScenarioSelector,
 } from '@/components/ui/chart-selectors';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
-import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import {
   includesJalapenoResult,
@@ -57,8 +56,8 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/tco-model-dialog';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
-import { rangeProgressStyle } from '@/components/ui/control-styles';
-import { RangeTicks } from '@/components/ui/range-ticks';
+import { DisclosureToggle } from '@/components/ui/disclosure-toggle';
+import { RangeField } from '@/components/ui/range-field';
 import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
 import { ChipBasisNote } from '@/components/ui/chip-basis-note';
 import { ChipBasisCaption } from '@/components/ui/chip-basis-toggle';
@@ -612,8 +611,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
 
   const currentRange = ranges.interactivity;
 
-  const handleSliderChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = Number(event.target.value);
+  const handleSliderChange = useCallback((value: number) => {
     setRequestedTargetValue(value);
     setInputValue(String(value));
   }, []);
@@ -930,10 +928,10 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     : baseChartTitle.title;
 
   const chartHeading = (
-    <div className="flex min-w-0 items-center gap-1 md:pr-64">
-      <button
-        type="button"
-        aria-expanded={chartOpen}
+    <div className="flex min-w-0 items-start md:pr-64">
+      <DisclosureToggle
+        hanging
+        open={chartOpen}
         aria-controls="calculator-chart-body"
         aria-label={t.toggleSection}
         title={t.toggleSection}
@@ -943,12 +941,8 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
           setChartOpen(next);
           track('calculator_section_toggled', { section: 'chart', enabled: next });
         }}
-        className="no-export -ml-1.5 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-      >
-        <ChevronDownIcon
-          className={cn('size-5 transition-transform duration-200', chartOpen && 'rotate-180')}
-        />
-      </button>
+        className="no-export"
+      />
       <Heading as="h2" level="card">
         <ModelLogo model={selectedModel} className="mr-2 size-6 align-[-0.3em]" />
         {chartTitle}
@@ -1174,47 +1168,29 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                           />
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="flex-1">
-                          <input
-                            type="range"
-                            aria-label={
-                              isAgenticSequence
-                                ? t.targetAgenticLabel(percentileLabel)
-                                : t.targetLabel
-                            }
-                            min={currentRange.min}
-                            max={currentRange.max}
-                            step={1}
-                            value={targetValue}
-                            onChange={handleSliderChange}
-                            onPointerUp={() =>
-                              track('calculator_target_slider_set', { mode, value: targetValue })
-                            }
-                            className="range-slider h-4 w-full"
-                            style={rangeProgressStyle(
-                              targetValue,
-                              currentRange.min,
-                              currentRange.max,
-                            )}
-                          />
-                          <RangeTicks min={currentRange.min} max={currentRange.max} />
-                        </div>
-                        <Input
-                          id="calc-target"
-                          type="number"
-                          value={resolveCalculatorTargetInputValue(
+                      <RangeField
+                        label={
+                          isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
+                        }
+                        min={currentRange.min}
+                        max={currentRange.max}
+                        value={targetValue}
+                        onSliderChange={handleSliderChange}
+                        onSliderCommit={() =>
+                          track('calculator_target_slider_set', { mode, value: targetValue })
+                        }
+                        input={{
+                          id: 'calc-target',
+                          value: resolveCalculatorTargetInputValue(
                             inputValue,
                             targetValue,
                             isTargetInputFocused,
-                          )}
-                          onFocus={handleInputFocus}
-                          onChange={handleInputChange}
-                          onBlur={handleInputBlur}
-                          className="w-24"
-                          min={0}
-                        />
-                      </div>
+                          ),
+                          onFocus: handleInputFocus,
+                          onChange: handleInputChange,
+                          onBlur: handleInputBlur,
+                        }}
+                      />
                     </div>
                   )}
                 </ControlPanel>

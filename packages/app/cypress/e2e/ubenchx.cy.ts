@@ -9,11 +9,11 @@ const dismissModal = {
 };
 
 describe('ubenchX hub and test routes', () => {
-  it('opens /ubenchx on the mem-bw view with the Beta eyebrow and test selector', () => {
+  it('opens /ubenchx on the mem-bw view with the Beta title badge and test selector', () => {
     cy.visit('/ubenchx', dismissModal);
     cy.url().should('include', '/ubenchx/mem-bw');
     cy.contains('h1', 'ubenchX microbenchmarks').should('be.visible');
-    cy.get('[data-testid="ubenchx-maturity"]').should('have.text', 'ubenchX · Beta');
+    cy.get('h1 [data-slot="badge"]').should('have.text', 'Beta');
     cy.get('[data-testid="nav-link-ubenchx"]').should('have.attr', 'href', '/ubenchx/mem-bw');
     cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'HBM bandwidth');
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
