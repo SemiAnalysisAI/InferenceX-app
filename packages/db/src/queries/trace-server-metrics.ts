@@ -28,6 +28,7 @@ import {
 } from '../etl/compute-chart-series';
 
 import type { DbClient } from '../connection.js';
+import { readServerMetricsGz } from '../lib/server-metrics-storage';
 import { writeBackChartSeries } from './agentic-shared';
 
 export type { MetricSourceDescriptor } from '../etl/chart-series-summary';
@@ -138,10 +139,6 @@ interface RawMetaRow extends PointMeta {
   metric_sources: KvMetricSource[];
   /** Derived from startup logs, plus allocated block counts for ATOM. */
   kv_cache_pool_tokens: string | null;
-}
-
-interface RawBlobRow {
-  blob: Buffer | null;
 }
 
 function buildMeta(row: RawMetaRow): PointMeta {
@@ -268,12 +265,7 @@ export async function getTraceServerMetrics(
   // pre-computed series is missing or stale. Disaggregated blobs can be tens
   // of MB compressed, so selecting this in the metadata query defeats the
   // fast path even when chart_series is current.
-  const blobRows = (await sql`
-    select server_metrics_json_gz as blob
-    from agentic_trace_replay
-    where id = ${row.trace_replay_id}
-  `) as unknown as RawBlobRow[];
-  const blob = blobRows[0]?.blob;
+  const blob = await readServerMetricsGz(sql, row.trace_replay_id);
   if (!blob) return null;
 
   // `computeChartSeries` streams blobs that exceed its in-memory fast-path
@@ -327,12 +319,7 @@ export async function getTraceServerMetricSource(
 
   if (row.chart_series_version === CHART_SERIES_VERSION) return row.metric_source;
 
-  const blobRows = (await sql`
-    select server_metrics_json_gz as blob
-    from agentic_trace_replay
-    where id = ${row.trace_replay_id}
-  `) as unknown as RawBlobRow[];
-  const blob = blobRows[0]?.blob;
+  const blob = await readServerMetricsGz(sql, row.trace_replay_id);
   if (!blob) return null;
   const series = await computeChartSeries(blob, {
     framework: row.framework,

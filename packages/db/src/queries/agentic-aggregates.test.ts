@@ -235,6 +235,7 @@ describe('getAgenticAggregates write-back', () => {
 
       const staleRow = {
         benchmark_result_id: 7,
+        trace_replay_id: 870,
         version: STATS_VERSION - 1,
         isl: null,
         osl: null,
@@ -247,7 +248,8 @@ describe('getAgenticAggregates write-back', () => {
         [{ benchmark_result_id: 7, trace_replay_id: 870, has_profile: true }],
         [{ parts: 0, inline_size: profileBlob.length }],
         [{ data: profileBlob }],
-        [{ benchmark_result_id: 7, server_blob: serverBlob }],
+        [{ size: serverBlob.length }],
+        [{ data: serverBlob }],
       ]);
 
       const result = await getAgenticAggregates(sql, [7]);
@@ -256,11 +258,11 @@ describe('getAgenticAggregates write-back', () => {
       expect(result[7]?.kvCacheUtil?.mean).toBeCloseTo(0.25, 6);
       expect(result[7]?.prefixCacheHitRate).toBeNull();
 
-      expect(calls).toHaveLength(6);
-      expect(calls[5]!.text).toContain('update agentic_trace_replay set aggregate_stats');
-      expect(calls[5]!.text).toContain('aggregate_stats = ?::jsonb');
+      expect(calls).toHaveLength(7);
+      expect(calls[6]!.text).toContain('update agentic_trace_replay set aggregate_stats');
+      expect(calls[6]!.text).toContain('aggregate_stats = ?::jsonb');
 
-      const [written, sketches, sketchesVersion, traceReplayId] = calls[5]!.values as [
+      const [written, sketches, sketchesVersion, traceReplayId] = calls[6]!.values as [
         WrittenStats,
         Buffer | null,
         number | null,
@@ -280,6 +282,7 @@ describe('getAgenticAggregates write-back', () => {
   it('does not write back for an id whose profile blob is missing/malformed', async () => {
     const staleRow = {
       benchmark_result_id: 7,
+      trace_replay_id: 870,
       version: STATS_VERSION - 1,
       isl: null,
       osl: null,
@@ -289,7 +292,7 @@ describe('getAgenticAggregates write-back', () => {
     const { sql, calls } = mockSql([
       [staleRow],
       [{ benchmark_result_id: 7, trace_replay_id: 870, profile_blob: null }],
-      [{ benchmark_result_id: 7, server_blob: null }],
+      [{ size: null }],
     ]);
 
     await getAgenticAggregates(sql, [7]);

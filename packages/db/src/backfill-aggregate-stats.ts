@@ -1,3 +1,4 @@
+import { readServerMetricsGz } from './lib/server-metrics-storage';
 import { readTraceProfileChunks } from './lib/trace-profile-storage';
 
 import { hasNoSslFlag } from './cli-utils.js';
@@ -53,7 +54,7 @@ async function main(): Promise<void> {
             select id
             from agentic_trace_replay
             where mod(id, ${flags.shardCount}) = ${flags.shardIndex} ${runFilter}
-            order by id
+            order by id desc
             ${flags.limit ? sql`limit ${flags.limit}` : sql``}
           `
         : await sql<{ id: number }[]>`
@@ -63,7 +64,7 @@ async function main(): Promise<void> {
                or coalesce((aggregate_stats->>'version')::int, -1) < ${STATS_VERSION})
               and mod(id, ${flags.shardCount}) = ${flags.shardIndex}
               ${runFilter}
-            order by id
+            order by id desc
             ${flags.limit ? sql`limit ${flags.limit}` : sql``}
           `;
       return candidates.map((candidate) => candidate.id);
@@ -83,14 +84,9 @@ async function main(): Promise<void> {
 
       // A stats-version upgrade may change server metric interpretation as well as
       // profile calculations. Re-read both before marking the bundle current.
-      const [serverRow] = await sql<{ server_metrics_json_gz: Buffer | null }[]>`
-        select server_metrics_json_gz
-        from agentic_trace_replay
-        where id = ${id}
-      `;
       const serverStats = await computeAggregateStats({
         profileBlob: null,
-        serverBlob: serverRow?.server_metrics_json_gz ?? null,
+        serverBlob: await readServerMetricsGz(sql, id),
       });
       const stats = mergeProfileStatsUpgrade(serverStats, profileStats);
 

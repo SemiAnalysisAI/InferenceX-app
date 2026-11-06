@@ -127,7 +127,6 @@ describe('getTraceServerMetrics', () => {
       recipe_fingerprint: 'exact-fingerprint',
     });
     expect(calls).toHaveLength(1);
-    expect(calls[0]).not.toContain('server_metrics_json_gz as blob');
     expect(calls[0]).toContain("atr.chart_series - 'metricSources'");
     expect(calls[0]).toContain("metric_source->'kvCacheUsageByEngine'");
     expect(calls[0]).toContain("br.metrics ->> 'kv_offload_backend'");
@@ -146,15 +145,18 @@ describe('getTraceServerMetrics', () => {
       ),
     );
     const stale = { ...currentSeries(), version: CHART_SERIES_VERSION - 1 };
-    const { sql, calls } = mockSql([[metaRow({ chart_series: stale })], [{ blob: raw }]]);
+    const { sql, calls } = mockSql([
+      [metaRow({ chart_series: stale })],
+      [{ size: raw.length }],
+      [{ data: raw }],
+    ]);
 
     const result = await getTraceServerMetrics(sql, 42);
 
     expect(result?.prefillTps).toEqual([{ t: 0, value: 321 }]);
-    expect(calls).toHaveLength(3);
-    expect(calls[1]).toContain('server_metrics_json_gz as blob');
-    expect(calls[2]).toContain('set chart_series = ');
-    expect(calls[2]).toContain('chart_series_summary_gz = ');
+    expect(calls).toHaveLength(4);
+    expect(calls[3]).toContain('set chart_series = ');
+    expect(calls[3]).toContain('chart_series_summary_gz = ');
   });
 
   it('returns null without a blob and does not issue a second query', async () => {
@@ -204,7 +206,6 @@ describe('getTraceServerMetricSource', () => {
     await expect(getTraceServerMetricSource(sql, 42, 'decode-0')).resolves.toEqual(metricSource);
     expect(calls).toHaveLength(1);
     expect(calls[0]).toContain("metric_source->'source'->>'id'");
-    expect(calls[0]).not.toContain('server_metrics_json_gz as blob');
   });
 });
 
