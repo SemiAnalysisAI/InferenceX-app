@@ -21,6 +21,7 @@ import {
   getShapeKeyForPrecision,
   logTickFormat,
 } from '@/lib/charts/chart-rendering';
+import { frameworkDasharray } from '@/lib/charts/framework-dash';
 import { type Precision, getChartWatermark, getPrecisionLabel } from '@/lib/catalog/data-mappings';
 import { updateRepoUrl } from '@/lib/shared/utils';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -247,6 +248,8 @@ const TrendChart = React.memo(
           lines: lineDataRecord,
           config: {
             getColor: (key: string) => safeIdToConfig.get(key)?.color ?? '#888',
+            getStrokeDasharray: (key: string) =>
+              frameworkDasharray(safeIdToConfig.get(key)?.hwKey ?? '') ?? 'none',
             strokeWidth: 2,
             curve: d3.curveMonotoneX,
             isDefined: (d: { x: number; y: number }) =>

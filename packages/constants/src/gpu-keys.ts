@@ -177,11 +177,11 @@ export const VENDOR_OKLCH_ZONES: Record<
   { start: number; end: number; chroma: { light: number; dark: number } }
 > = {
   huawei: HUAWEI_CHART_PALETTE.oklch,
-  amd: { start: 12, end: 42, chroma: { light: 0.18, dark: 0.22 } },
-  nvidia: { start: 120, end: 170, chroma: { light: 0.15, dark: 0.15 } },
+  amd: { start: 0, end: 40, chroma: { light: 0.18, dark: 0.22 } },
+  nvidia: { start: 110, end: 195, chroma: { light: 0.15, dark: 0.15 } },
   openai: { start: 290, end: 330, chroma: { light: 0.16, dark: 0.18 } },
   google: { start: 250, end: 275, chroma: { light: 0.16, dark: 0.18 } },
-  unknown: { start: 185, end: 235, chroma: { light: 0.12, dark: 0.14 } },
+  unknown: { start: 200, end: 240, chroma: { light: 0.12, dark: 0.14 } },
 };
 
 export const VENDOR_HSL_ZONES: Record<string, { start: number; span: number }[]> = {

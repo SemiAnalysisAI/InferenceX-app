@@ -38,7 +38,7 @@ interface SubmissionsChartProps {
   footer?: ReactNode;
 }
 
-const TOTAL_COLOR = '#6b7280';
+const TOTAL_COLOR = { light: '#6b7280', dark: '#a1a7ab' } as const;
 const CHART_MARGIN = { top: 24, right: 24, bottom: 60, left: 60 };
 const CHART_ID = 'submissions-chart';
 const NIGHTLY_END_DATE = new Date(ON_CHANGE_ONLY_START_DATE).getTime();
@@ -138,7 +138,7 @@ export default function SubmissionsChart({ volume, mode, caption, footer }: Subm
   const lineKeys = useMemo(() => [...vendors, 'total'], [vendors]);
 
   const lineColor = useCallback(
-    (key: string) => (key === 'total' ? TOTAL_COLOR : vendorColor(key as Vendor, theme)),
+    (key: string) => (key === 'total' ? TOTAL_COLOR[theme] : vendorColor(key as Vendor, theme)),
     [theme],
   );
 
@@ -257,7 +257,7 @@ export default function SubmissionsChart({ volume, mode, caption, footer }: Subm
         lines: lineData,
         config: {
           getColor: lineColor,
-          strokeWidth: 1.5,
+          getStrokeWidth: (key: string) => (key === 'total' ? 2 : 1.5),
           curve: mode === 'weekly' ? d3.curveLinear : d3.curveMonotoneX,
         },
       },

@@ -34,6 +34,20 @@ function pickLightness(index: number, count: number, theme: 'light' | 'dark'): n
   return max - (index / (count - 1)) * (max - min);
 }
 
+const GOLDEN_RATIO_FRACTION = 0.618_033_988_7;
+const LIGHTNESS_SEQUENCE_OFFSET = 0.6;
+
+function lightnessRanks(count: number): number[] {
+  const position = (i: number) => (i * GOLDEN_RATIO_FRACTION + LIGHTNESS_SEQUENCE_OFFSET) % 1;
+  const ranks: number[] = [];
+  Array.from({ length: count }, (_, i) => i)
+    .toSorted((a, b) => position(a) - position(b))
+    .forEach((index, rank) => {
+      ranks[index] = rank;
+    });
+  return ranks;
+}
+
 export function generateVendorColors(
   activeKeys: string[],
   theme: 'light' | 'dark',
@@ -65,14 +79,14 @@ export function generateVendorColors(
       result[keys[0]] = GOOGLE_BLUE;
       continue;
     }
-
+    const ranks = lightnessRanks(count);
     for (let i = 0; i < count; i++) {
       const hue =
         count <= 1
           ? (zone.start + zone.end) / 2
           : zone.start + ((i + 0.5) / count) * (zone.end - zone.start);
 
-      const lightness = pickLightness(i, count, theme);
+      const lightness = pickLightness(ranks[i], count, theme);
       result[keys[i]] = `oklch(${lightness.toFixed(3)} ${chroma} ${hue.toFixed(1)})`;
     }
   }

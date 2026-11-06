@@ -111,6 +111,7 @@ import {
 } from '@/lib/d3-chart/overlay-x-marker';
 import { useStableValue } from '@/hooks/useStableValue';
 import { perfRulerAxisMetricKey, usePerfRulerAxisReset } from '@/hooks/usePerfRulerAxisReset';
+import { frameworkDasharray } from '@/lib/charts/framework-dash';
 import {
   overlayRooflineDasharray,
   overlayRunColor,
@@ -1805,6 +1806,7 @@ const ScatterGraph = React.memo(
       presence,
       isPresencePending,
       showPowerTelemetry,
+      powerCompareMode,
     });
     interactionRef.current = {
       isPointVisible,
@@ -1819,6 +1821,7 @@ const ScatterGraph = React.memo(
       presence,
       isPresencePending,
       showPowerTelemetry,
+      powerCompareMode,
     };
 
     const perfRulerStore = usePerfRulerStore();
@@ -2571,7 +2574,13 @@ const ScatterGraph = React.memo(
             .attr('fill', 'none')
             .attr('stroke', (d) => d.stroke)
             .attr('stroke-width', 2.5)
-            .attr('stroke-dasharray', (d) => powerVariantDashById(d.variant) || null)
+            .attr(
+              'stroke-dasharray',
+              (d) =>
+                powerVariantDashById(d.variant) ||
+                (ir.powerCompareMode === 'none' ? frameworkDasharray(d.hw) : null) ||
+                null,
+            )
             .attr('d', (d) => lineGen(d.points))
             .style('transition', 'opacity 150ms ease')
             .style('opacity', (d) => (d.visible ? 1 : 0));
@@ -4325,6 +4334,10 @@ const ScatterGraph = React.memo(
                               ),
                             ),
                             color: overlayRunColor(idx),
+                            lineDasharray:
+                              powerCompareMode === 'none'
+                                ? overlayRooflineDasharray(idx)
+                                : undefined,
                             title: legendT.unofficialTitle(branch),
                             isHighlighted: true,
                             hw: `overlay-run-${info.id}`,
@@ -4385,6 +4398,8 @@ const ScatterGraph = React.memo(
                         name: hwConfig.name,
                         label: getDisplayLabel(hwConfig),
                         color: resolveColor(key),
+                        lineDasharray:
+                          powerCompareMode === 'none' ? frameworkDasharray(key) : undefined,
                         title: hwConfig.gpu,
                         isHighlighted: legendChangelogs.get(key)?.runId === selectedRunId,
                         hw: key,

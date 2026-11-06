@@ -66,6 +66,7 @@ import {
   Tpuv7OfficialPreviewNotice,
 } from '@/components/ui/official-preview-notice';
 import { metricChartTitle, metricLabel } from '@/lib/charts/chart-utils';
+import { frameworkDasharray } from '@/lib/charts/framework-dash';
 import {
   costTierOptionLabel,
   metricCostTier,
@@ -588,6 +589,8 @@ export default function HistoricalTrendsDisplay() {
                         name: hwConfig.name,
                         label: getDisplayLabel(hwConfig),
                         color: resolveColor(key),
+                        lineDasharray:
+                          chartView === 'line' ? (frameworkDasharray(key) ?? 'none') : undefined,
                         title: hwConfig.gpu,
                         hw: key,
                         isActive: activeHwTypes.has(key),

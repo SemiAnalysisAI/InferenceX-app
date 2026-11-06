@@ -53,6 +53,7 @@ import {
   overlayMarkerPosition,
   xMarkerPath,
 } from '@/lib/d3-chart/overlay-x-marker';
+import { frameworkDasharray } from '@/lib/charts/framework-dash';
 import {
   overlayRooflineDasharray,
   overlayRunColor,
@@ -618,9 +619,10 @@ const GPUGraph = React.memo(
     const getRooflineDasharray = useCallback(
       (key: string) => {
         const point = rooflines[key]?.[0];
-        return point && overlayPointSet.has(point)
+        if (!point) return null;
+        return overlayPointSet.has(point)
           ? overlayRooflineDasharray(overlayRunOf(point))
-          : null;
+          : (frameworkDasharray(point.hwKey) ?? null);
       },
       [rooflines, overlayPointSet, overlayRunOf],
     );
@@ -1081,6 +1083,7 @@ const GPUGraph = React.memo(
           hw: id,
           label: `✕ ${hardwareLabelFor(points)}`,
           color: overlayRunColor(runIndex),
+          lineDasharray: overlayRooflineDasharray(runIndex),
           title: legendT.unofficialTitle(branch),
           isActive: true,
           isRemovable: false,
@@ -1570,6 +1573,7 @@ const GPUGraph = React.memo(
                     hw: id,
                     label: comparisonEntryLabel(date, runNumbering),
                     color,
+                    lineDasharray: frameworkDasharray(hwKey),
                     title: getDisplayLabel(getHardwareConfig(hwKey, modelLabel)),
                     isActive: activeDates.has(id),
                     onClick: () => {

@@ -75,6 +75,29 @@ describe('generateVendorColors', () => {
       }
     },
   );
+
+  it.each(['light', 'dark'] as const)(
+    'separates neighbouring same-vendor series in lightness and shifts hue toward teal (%s)',
+    (theme) => {
+      const keys = [
+        'gb300_dynamo-sglang',
+        'gb300_dynamo-trt',
+        'gb300_dynamo-vllm',
+        'gb200_dynamo-sglang',
+        'gb200_dynamo-vllm',
+        'b300_sglang',
+        'b300_vllm',
+      ];
+      const colors = generateVendorColors(keys, theme);
+      const ordered = keys.toSorted((a, b) => hueOf(colors[a]) - hueOf(colors[b]));
+      for (let i = 1; i < ordered.length; i++) {
+        expect(
+          Math.abs(lightnessOf(colors[ordered[i]]) - lightnessOf(colors[ordered[i - 1]])),
+        ).toBeGreaterThanOrEqual(theme === 'light' ? 0.11 : 0.09);
+      }
+      expect(hueOf(colors[ordered.at(-1)!]) - hueOf(colors[ordered[0]])).toBeGreaterThan(55);
+    },
+  );
 });
 
 function lightnessOf(color: string): number {
