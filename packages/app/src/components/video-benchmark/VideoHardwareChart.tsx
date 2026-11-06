@@ -60,6 +60,7 @@ export default function VideoHardwareChart({
   colorFor,
   hidden,
   onSelect,
+  heading,
   legend,
   footer,
 }: {
@@ -68,6 +69,7 @@ export default function VideoHardwareChart({
   colorFor: (hardwareKey: string) => string;
   hidden: ReadonlySet<string>;
   onSelect?: (point: VideoPoint) => void;
+  heading?: ReactNode;
   legend?: ReactNode;
   footer?: ReactNode;
 }) {
@@ -225,9 +227,12 @@ export default function VideoHardwareChart({
         ) : undefined
       }
       caption={
-        <p className="text-xs text-muted-foreground" data-testid="video-chart-caption">
-          {multiLayout ? (state.optimal ? s.multiOptimal : s.multi) : s.single(layouts || '—')}
-        </p>
+        <div className="space-y-3">
+          {heading}
+          <p className="text-xs text-muted-foreground" data-testid="video-chart-caption">
+            {multiLayout ? (state.optimal ? s.multiOptimal : s.multi) : s.single(layouts || '—')}
+          </p>
+        </div>
       }
       legendElement={legend}
       footer={footer}

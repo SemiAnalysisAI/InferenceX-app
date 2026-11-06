@@ -694,7 +694,7 @@ export function PowerXReadout({
           <PowerBasisPill tag="gpu" className="ml-0" />
         </ReadoutBadge>
       )}
-      <span className="text-2xs" data-testid="powerx-readout-source">
+      <span className="no-export text-2xs" data-testid="powerx-readout-source">
         {source}
       </span>
     </p>

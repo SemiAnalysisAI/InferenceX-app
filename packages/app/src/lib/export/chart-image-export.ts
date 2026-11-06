@@ -9,13 +9,13 @@ import {
   layoutPngExport,
   PNG_PIXEL_RATIO,
   PNG_FOOTER_HEIGHT,
+  renderCanvasChartsForExport,
   type PngAspectRatio,
 } from '@/lib/export/png-layout';
 
 export interface ChartImageExportOptions {
   chartId: string;
   setIsLegendExpanded?: (expanded: boolean) => void;
-  hideLegend?: boolean;
   exportFileName?: string;
 }
 
@@ -212,12 +212,12 @@ export async function addWatermark(
 }
 
 export async function exportChartImage(
-  { chartId, setIsLegendExpanded, hideLegend = false, exportFileName }: ChartImageExportOptions,
+  { chartId, setIsLegendExpanded, exportFileName }: ChartImageExportOptions,
   ratio: PngAspectRatio,
   failureMessage: string,
 ) {
   let wasClosed = false;
-  if (setIsLegendExpanded && !hideLegend) {
+  if (setIsLegendExpanded) {
     const el = document.querySelector(`#${chartId}`);
     wasClosed = Boolean(el?.querySelector('[data-testid="legend-open-button"]'));
     if (wasClosed) {
@@ -243,13 +243,6 @@ export async function exportChartImage(
     clone.removeAttribute('id');
     const nestedExport = clone.querySelector(`[id="${chartId}-export"]`);
     if (nestedExport) nestedExport.remove();
-    if (hideLegend) {
-      for (const legend of clone.querySelectorAll(
-        '[data-slot="chart-legend-wrapper"], .legend-container',
-      )) {
-        legend.remove();
-      }
-    }
     for (const legend of clone.querySelectorAll<HTMLElement>(
       '[data-slot="chart-legend-wrapper"]',
     )) {
@@ -329,6 +322,8 @@ export async function exportChartImage(
       ) as HTMLElement | null;
       applyStyles(scrollContainer, {
         overflow: 'visible',
+        maxHeight: 'none',
+        maskImage: 'none',
         scrollbarGutter: 'auto',
         paddingRight: '8px',
       });
@@ -391,6 +386,7 @@ export async function exportChartImage(
         if (!hasVisibleControls) {
           scrollContainer.style.borderBottom = 'none';
           scrollContainer.style.paddingBottom = '0';
+          if (sibling) sibling.style.display = 'none';
         }
       }
     }
@@ -440,11 +436,13 @@ export async function exportChartImage(
         fontEmbedCSS = await htmlToImage.getFontEmbedCSS(exportElement);
       } catch {}
     }
+    const rerendered =
+      ratio !== 'auto' || (await renderCanvasChartsForExport(element, clone, exportElement));
     const captureDimensions =
       ratio === 'auto'
         ? getExportCaptureDimensions(exportElement)
         : await layoutPngExport(element, clone, exportElement, ratio);
-    if (ratio !== 'auto') {
+    if (rerendered) {
       // New D3 nodes need the same export styling as the original clone.
       for (const el of clone.querySelectorAll<HTMLElement>('.export-only')) {
         el.style.display = 'inline';

@@ -372,6 +372,29 @@ export default function VideoDashboard() {
       }
     />
   );
+  const chartView = !loading && !error && state.view === 'chart';
+  const heading = (
+    <>
+      <div className="min-w-0 pr-0 md:pr-56">
+        <Heading level="card">
+          {modelLabel} · {metricLabel(state.y, locale, options)}
+          <HeadingQualifier>
+            {s.vs} {metricLabel(state.x, locale, options)}
+          </HeadingQualifier>
+        </Heading>
+        {idle.length > 0 && (
+          <p className="mt-1 text-xs text-muted-foreground" data-testid="video-idle-note">
+            {s.idle(idle.join(locale === 'zh' ? '、' : ', '))}
+          </p>
+        )}
+      </div>
+      {replay && (
+        <p className="text-xs text-muted-foreground" role="status" data-testid="video-replay">
+          {s.replay}
+        </p>
+      )}
+    </>
+  );
   return (
     <div className="flex min-w-0 w-full flex-col gap-4" data-testid="video-dashboard">
       <section className="relative z-20">
@@ -417,24 +440,7 @@ export default function VideoDashboard() {
         }
       >
         <div className="space-y-3 px-4 md:px-6" data-testid="video-chart-card">
-          <div className="min-w-0 pr-0 md:pr-56">
-            <Heading level="card">
-              {modelLabel} · {metricLabel(state.y, locale, options)}
-              <HeadingQualifier>
-                {s.vs} {metricLabel(state.x, locale, options)}
-              </HeadingQualifier>
-            </Heading>
-            {idle.length > 0 && (
-              <p className="mt-1 text-xs text-muted-foreground" data-testid="video-idle-note">
-                {s.idle(idle.join(locale === 'zh' ? '、' : ', '))}
-              </p>
-            )}
-          </div>
-          {replay && (
-            <p className="text-xs text-muted-foreground" role="status" data-testid="video-replay">
-              {s.replay}
-            </p>
-          )}
+          {!chartView && heading}
           {loading && (
             <EmptyState bare role="status" className="min-h-110">
               {s.loading}
@@ -464,6 +470,7 @@ export default function VideoDashboard() {
                     run: p.runId,
                   })
                 }
+                heading={heading}
                 legend={legend}
                 footer={footer}
               />

@@ -331,7 +331,6 @@ export default function ChartDisplay({
     fixedSequenceStatistic,
     selectedXAxisMode,
     tokenRevenuePricing,
-    showLineLabels,
     showOffloadingLabel,
     powerCompare,
     tokenBasis,
@@ -1035,7 +1034,6 @@ export default function ChartDisplay({
         }
         hideImageExport={getViewMode(graphIndex) === 'table'}
         setIsLegendExpanded={setIsLegendExpanded}
-        hideLegendOnExport={showLineLabels}
         exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
         onExportMp4={
           replayAvailable ? () => replayHandlesRef.current[graphIndex]?.open() : undefined

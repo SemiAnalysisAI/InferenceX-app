@@ -1,3 +1,5 @@
+import { canvasPointLayerOf } from '@/lib/d3-chart/layers/canvas-point-registry';
+
 export type PngAspectRatio = 'auto' | '16:9' | '1:1';
 export const PNG_PIXEL_RATIO = 2;
 export const PNG_FOOTER_HEIGHT = 60;
@@ -8,16 +10,39 @@ export function getPngLayoutSize(ratio: Exclude<PngAspectRatio, 'auto'>, minHeig
   return { width: unit * w, height: unit * h };
 }
 
+function exportCharts(source: Element, clone: HTMLElement, container: HTMLElement) {
+  const original = [
+    ...source.querySelectorAll<SVGSVGElement>('svg[data-testid="d3-chart-svg"]'),
+  ].filter((svg) => !container.contains(svg));
+  const charts = [...clone.querySelectorAll<SVGSVGElement>('svg[data-testid="d3-chart-svg"]')];
+  return { original, charts };
+}
+
+export async function renderCanvasChartsForExport(
+  source: Element,
+  clone: HTMLElement,
+  container: HTMLElement,
+) {
+  const { original, charts } = exportCharts(source, clone, container);
+  const canvasCharts = original.flatMap((svg, index) =>
+    canvasPointLayerOf(svg) && charts[index] ? [[svg, charts[index]] as const] : [],
+  );
+  if (canvasCharts.length === 0) return false;
+  const { renderChartForExport } = await import('@/lib/d3-chart/export-renderer');
+  for (const [svg, chart] of canvasCharts) {
+    const [width, height] = ['width', 'height'].map((name) => Number(svg.getAttribute(name)));
+    renderChartForExport(svg, chart, width, height);
+  }
+  return true;
+}
+
 export async function layoutPngExport(
   source: Element,
   clone: HTMLElement,
   container: HTMLElement,
   ratio: Exclude<PngAspectRatio, 'auto'>,
 ) {
-  const original = [
-    ...source.querySelectorAll<SVGSVGElement>('svg[data-testid="d3-chart-svg"]'),
-  ].filter((svg) => !container.contains(svg));
-  const charts = [...clone.querySelectorAll<SVGSVGElement>('svg[data-testid="d3-chart-svg"]')];
+  const { original, charts } = exportCharts(source, clone, container);
   if (charts.length !== 1 || original.length !== 1) {
     throw new Error('Fixed PNG layouts require a single chart');
   }
@@ -58,7 +83,9 @@ export async function layoutPngExport(
       inner.style.setProperty('width', '100%', 'important');
       inner.style.setProperty('box-sizing', 'border-box', 'important');
     }
-    for (const label of legend.querySelectorAll<HTMLElement>('label, .legend-label')) {
+    for (const label of legend.querySelectorAll<HTMLElement>(
+      'label, label > span, .legend-label',
+    )) {
       label.style.whiteSpace = 'normal';
     }
   }
@@ -73,7 +100,9 @@ export async function layoutPngExport(
     const legendHeight = Math.max(
       0,
       ...[...clone.querySelectorAll<HTMLElement>('[data-slot="chart-legend-wrapper"]')].map(
-        (legend) => legend.getBoundingClientRect().height,
+        (legend) =>
+          legend.getBoundingClientRect().height +
+          Number.parseFloat(getComputedStyle(legend).marginTop),
       ),
     );
     const probeHeight = Math.max(size.height, legendHeight + 1);
