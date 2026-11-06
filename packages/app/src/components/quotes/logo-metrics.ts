@@ -68,6 +68,7 @@ export const LOGO_METRICS: Record<string, LogoMetrics> = {
   'vllm.svg': { ratio: 1, aspect: 0.96, fill: 0.75 },
   'voltage-park.svg': { ratio: 7.263, aspect: 7.08, fill: 1, invertInDark: true },
   'vultr.svg': { ratio: 1, aspect: 1.15, fill: 0.87, invertInDark: true },
+  'wafer.svg': { ratio: 3.5, aspect: 3.5, fill: 1, invertInDark: true },
   'weka.svg': { ratio: 4.839, aspect: 4.84, fill: 1, invertInDark: true },
   'zai-color.svg': { ratio: 1, aspect: 1, fill: 1, invertInDark: true },
 };

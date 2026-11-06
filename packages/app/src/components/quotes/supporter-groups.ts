@@ -103,6 +103,7 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
       { label: 'Tensormesh', logo: 'tensormesh.svg', quoteOrg: 'Tensormesh' },
       { label: 'Morph', logo: 'morph.svg', quoteOrg: 'Morph' },
       { label: 'Doubleword', logo: 'doubleword.png', quoteOrg: 'Doubleword' },
+      { label: 'Wafer', logo: 'wafer.svg', quoteOrg: 'Wafer' },
     ],
   },
   {
