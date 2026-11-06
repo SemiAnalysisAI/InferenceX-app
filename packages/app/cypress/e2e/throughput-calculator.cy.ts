@@ -604,40 +604,6 @@ describe('TCO Calculator', () => {
       });
     });
   });
-
-  describe('folding sections away', () => {
-    before(() => {
-      cy.window().then((win) => {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      });
-      cy.visit('/calculator');
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
-    });
-
-    it('folds the chart away, keeping its title as the handle', () => {
-      cy.get('[data-testid="calculator-chart-collapse"]').click();
-      cy.get('[data-testid="calculator-figure"]').should('not.exist');
-      cy.get('[data-testid="calculator-chart-section"] h2')
-        .should('have.length', 1)
-        .and('contain.text', 'Total Token Throughput per Chip');
-
-      cy.get('[data-testid="calculator-chart-collapse"]').click();
-      cy.get('[data-testid="calculator-figure"]').should('be.visible');
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
-    });
-
-    it('folds the cost-target section away, keeping its heading as the handle', () => {
-      cy.get('[data-testid="calc-costcap-input"]').should('be.visible');
-      cy.get('[data-testid="calculator-costcap-collapse"]').click();
-      cy.get('[data-testid="calc-costcap-input"]').should('not.exist');
-      cy.get('[data-testid="calculator-costcap-section"]').should(
-        'contain.text',
-        'Interactivity within a cost target',
-      );
-      cy.get('[data-testid="calculator-costcap-collapse"]').click();
-      cy.get('[data-testid="calc-costcap-input"]').should('be.visible');
-    });
-  });
 });
 
 describe('TCO Calculator Chinese route', () => {

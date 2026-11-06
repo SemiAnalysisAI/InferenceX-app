@@ -7,34 +7,25 @@ import { cn } from '@/lib/shared/utils';
 
 export function DisclosureToggle({
   open,
-  hanging = false,
   className,
   children,
   ...props
 }: Omit<ComponentProps<'button'>, 'type' | 'aria-expanded'> & {
   open: boolean;
-  hanging?: boolean;
 }) {
   return (
     <button
       type="button"
       aria-expanded={open}
       className={cn(
-        'relative inline-flex shrink-0 cursor-pointer items-center gap-1 text-muted-foreground transition-colors hover:text-foreground max-md:after:absolute',
-        hanging
-          ? 'mr-1 size-6 justify-center max-md:after:-inset-2.5 max-md:in-data-[slot=card]:order-last max-md:in-data-[slot=card]:mr-0 max-md:in-data-[slot=card]:ml-auto md:in-data-[slot=card]:mr-0 md:in-data-[slot=card]:-ml-6'
-          : 'max-md:after:inset-x-0 max-md:after:-inset-y-3.5',
+        'relative inline-flex shrink-0 cursor-pointer items-center gap-1 text-muted-foreground transition-colors hover:text-foreground max-md:after:absolute max-md:after:inset-x-0 max-md:after:-inset-y-3.5',
         className,
       )}
       {...props}
     >
       <ChevronRight
         aria-hidden="true"
-        className={cn(
-          'shrink-0 transition-transform duration-200',
-          hanging ? 'size-4' : 'size-3.5',
-          open && 'rotate-90',
-        )}
+        className={cn('size-3.5 shrink-0 transition-transform duration-200', open && 'rotate-90')}
       />
       {children}
     </button>

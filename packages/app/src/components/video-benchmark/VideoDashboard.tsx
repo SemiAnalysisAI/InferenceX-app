@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import ChartLegend from '@/components/ui/chart-legend';
 import { ChartSection } from '@/components/ui/chart-section';
-import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Heading, HeadingQualifier } from '@/components/ui/heading';
@@ -47,8 +46,6 @@ import { metricOptions } from './video-url-state';
 
 /** History filter params; a deep link carrying one opens the history section on load. */
 const HISTORY_SECTION_PARAMS = ['history-hardware', 'history-concurrency', 'history-query'];
-/** Compare choices; a deep link carrying one opens the Compare section on load. */
-const COMPARE_SECTION_PARAMS = ['v_base', 'v_cand', 'v_case'];
 const CSV_METRICS: readonly MetricId[] = [
   'p50Latency',
   'p90Latency',
@@ -71,10 +68,6 @@ const STRINGS = {
     optimalOnly: 'Optimal only',
     optimalInfo:
       "Show only each hardware's Pareto-optimal deployments for the selected axes; turn off to see the dominated deployments faded.",
-    compare: 'Compare',
-    evidence: 'Performance evidence',
-    toggleCompare: 'Show or hide the Compare section',
-    toggleEvidence: 'Show or hide performance evidence',
     tier: 'Cost tier',
     tierInfo: 'Which published TCO tier sets the $/chip/hr behind the cost metrics.',
     apiReference: 'API reference',
@@ -103,10 +96,6 @@ const STRINGS = {
     viewToggle: '图表或表格视图',
     optimalOnly: '仅最优',
     optimalInfo: '只显示各硬件在当前坐标轴下的 Pareto 最优部署；关闭后以淡色显示被支配的部署。',
-    compare: '对比',
-    evidence: '性能测量证据',
-    toggleCompare: '展开或收起“对比”区块',
-    toggleEvidence: '展开或收起性能测量证据',
     tier: '成本档位',
     tierInfo: '成本指标所用的 $/chip/hr 采用哪一档已发布的 TCO。',
     apiReference: 'API 参考价',
@@ -144,11 +133,9 @@ export default function VideoDashboard() {
   const hidden = useMemo(() => new Set(state.hidden), [state.hidden]);
   const [legendExpanded, setLegendExpanded] = useState(true);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [compareOpen, setCompareOpen] = useState(false);
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     setHistoryOpen(HISTORY_SECTION_PARAMS.some((key) => params.has(key)));
-    setCompareOpen(COMPARE_SECTION_PARAMS.some((key) => params.has(key)));
   }, []);
 
   const hardwareKeys = useMemo(() => VIDEO_HARDWARE_ROSTER.map((item) => item.key), []);
@@ -494,29 +481,10 @@ export default function VideoDashboard() {
         </div>
       </ChartSection>
       <VideoKpiCards points={cells} state={state} colorFor={colorFor} loading={loading} />
-      {/* These mount after the first fetch resolves, so the deep-link flag read on mount is settled. */}
       {!loading && !error && (
         <>
-          <CollapsibleSection
-            title={s.compare}
-            toggleLabel={s.toggleCompare}
-            defaultOpen={compareOpen}
-            titleWhenOpen={false}
-            testId="video-compare-toggle"
-            onToggle={(enabled) => track('video_compare_section_toggled', { enabled })}
-          >
-            <VideoCompare points={cells} options={options} colorFor={colorFor} />
-          </CollapsibleSection>
-          <CollapsibleSection
-            title={s.evidence}
-            toggleLabel={s.toggleEvidence}
-            defaultOpen={false}
-            titleWhenOpen={false}
-            testId="video-evidence-toggle"
-            onToggle={(enabled) => track('video_evidence_section_toggled', { enabled })}
-          >
-            <VideoEvidence points={cells} colorFor={colorFor} />
-          </CollapsibleSection>
+          <VideoCompare points={cells} options={options} colorFor={colorFor} />
+          <VideoEvidence points={cells} colorFor={colorFor} />
         </>
       )}
       <details

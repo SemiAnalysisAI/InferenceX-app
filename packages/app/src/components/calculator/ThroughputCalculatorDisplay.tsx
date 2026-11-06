@@ -56,7 +56,6 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/tco-model-dialog';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
-import { DisclosureToggle } from '@/components/ui/disclosure-toggle';
 import { RangeField } from '@/components/ui/range-field';
 import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
 import { ChipBasisNote } from '@/components/ui/chip-basis-note';
@@ -224,7 +223,6 @@ const STRINGS = {
     viewChart: 'Chart',
     viewTable: 'Table',
     viewModeAria: 'View mode',
-    toggleSection: 'Expand or fold this section',
     errorLoading: 'Error loading data. Please try a different selection.',
     clickToCompare: 'selected. Click another bar to compare.',
     clearSelection: 'Clear selection',
@@ -289,7 +287,6 @@ const STRINGS = {
     viewChart: '图表',
     viewTable: '表格',
     viewModeAria: '显示模式',
-    toggleSection: '展开或折叠此板块',
     errorLoading: '加载数据出错，请尝试其他选择。',
     clickToCompare: '已选中。点击其他柱形即可对比。',
     clearSelection: '清除选择',
@@ -434,7 +431,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const [highContrast, setHighContrast] = useState(false);
   const [viewMode, setViewMode] = useState<CalculatorViewMode>('chart');
-  const [chartOpen, setChartOpen] = useState(true);
   const [hideSkuAboveConfigLimit, setHideSkuAboveConfigLimit] = useState(true);
   const secondaryCount =
     (barMetric === 'throughput' ? 0 : 1) +
@@ -939,20 +935,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
 
   const chartHeading = (
     <div className="flex min-w-0 items-start md:pr-64">
-      <DisclosureToggle
-        hanging
-        open={chartOpen}
-        aria-controls="calculator-chart-body"
-        aria-label={t.toggleSection}
-        title={t.toggleSection}
-        data-testid="calculator-chart-collapse"
-        onClick={() => {
-          const next = !chartOpen;
-          setChartOpen(next);
-          track('calculator_section_toggled', { section: 'chart', enabled: next });
-        }}
-        className="no-export"
-      />
       <Heading as="h2" level="card">
         <ModelLogo model={selectedModel} className="mr-2 size-6 align-[-0.3em]" />
         {chartTitle}
@@ -1245,205 +1227,199 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
       )}
 
       <section data-testid="calculator-chart-section">
-        {chartOpen ? (
-          <figure
-            id="calculator-chart-body"
-            data-testid="calculator-figure"
-            className="relative min-w-0"
-          >
-            <Card className="relative">
-              <ChartButtons
-                className="md:absolute md:right-6 md:top-6 md:z-10 md:mb-0"
-                chartId="calculator-chart"
-                analyticsPrefix="calculator"
-                analyticsContext={selectionAnalyticsContext({
-                  model: selectedModel,
-                  sequence: selectedSequence,
-                  precisions: selectedPrecisions,
-                  gpuCount: visibleHwKeys.size,
-                })}
-                zoomResetEvent="d3chart_zoom_reset_calculator-chart"
-                onExportCsv={handleExportCsv}
-                setIsLegendExpanded={setIsLegendExpanded}
-                exportFileName={`InferenceX_calculator_${selectedModel}`}
-                leadingControls={
-                  <SegmentedToggle
-                    value={viewMode}
-                    options={viewModeOptions}
-                    onValueChange={handleViewModeChange}
-                    ariaLabel={t.viewModeAria}
-                    testId="calculator-view-toggle"
-                    className="shrink-0"
-                  />
-                }
-              />
-              {loading ? (
-                <Skeleton className="h-125 w-full" />
-              ) : (
-                <>
-                  {(() => {
-                    const captionContent = (
-                      <>
-                        {chartHeading}
-                        {(showsJalapenoPreview || showsVeraRubinPreview || showsTpuv7Preview) && (
-                          <div className="mt-3 space-y-1">
-                            {showsJalapenoPreview && (
-                              <JalapenoOfficialPreviewNotice variant="inline" />
-                            )}
-                            {showsVeraRubinPreview && (
-                              <VeraRubinOfficialPreviewNotice variant="inline" />
-                            )}
-                            {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice variant="inline" />}
-                          </div>
-                        )}
-                      </>
-                    );
-                    const plottedBases = plottedChipBases(
-                      barResults.map((r) => r.hwKey),
-                      (base) => base in HW_REGISTRY,
-                    );
-                    const priceTable =
-                      plottedBases.length > 0 && barMetric !== 'throughput' ? (
-                        <TcoPriceTable
-                          header={barMetric === 'power' ? 'kW' : undefined}
-                          rowLabel={barMetric === 'power' ? t.allInPower : undefined}
-                          twoDecimals={barMetric !== 'power'}
-                          items={plottedBases.map((base) => {
-                            const specs = HW_REGISTRY[base as keyof typeof HW_REGISTRY];
-                            return {
-                              base,
-                              label: specs.badgeLabel ?? base.toUpperCase(),
-                              value:
-                                barMetric === 'power'
-                                  ? String(specs.power)
-                                  : getGpuSpecs(base, tcoBasis)[costProvider].toFixed(2),
-                            };
-                          })}
-                          testId="calculator-cost-badges"
-                          cellTestId="calculator-cost-badge"
-                          inputIdPrefix="calculator-cost"
-                        />
-                      ) : undefined;
-                    const footerContent = (
-                      <div className="mt-3">
-                        <ResultContext
-                          locale={locale}
-                          layout="footer"
-                          chipBasis={
-                            costType === 'total' ? undefined : (
-                              <ChipBasisCaption control={chipBasisControl} />
-                            )
-                          }
-                          controlsEnd={priceTable}
-                          date={selectedRunDate}
-                          source={`${getModelLabel(selectedModel)} · ${selectedPrecisions
-                            .map((p) => getPrecisionLabel(p as Precision))
-                            .join(
-                              ', ',
-                            )} · ${getSequenceLabel(selectedSequence, locale)} · SemiAnalysis InferenceX™`}
-                          metaEnd={
-                            barMetric === 'cost' && plottedBases.length > 0 ? (
-                              <PricesSourceLink />
-                            ) : barMetric === 'power' && plottedBases.length > 0 ? (
-                              <span>
-                                {t.source}
-                                <Link
-                                  target="_blank"
-                                  className="text-brand hover:underline"
-                                  href="https://semianalysis.com/datacenter-industry-model/"
-                                >
-                                  SemiAnalysis Datacenter Industry Model
-                                  <ExternalLinkIcon />
-                                </Link>
-                              </span>
-                            ) : undefined
-                          }
-                        />
-                        <ChipBasisNote
-                          visible={barMetric === 'cost' && costType !== 'total'}
-                          testId="calculator-disagg-cost-note"
-                          label={t.note}
-                          text={chipBasis === 'total' ? t.disaggCostTotal : t.disaggCost}
-                          chipBasis={readOnlyChipBasisControl}
-                        />
-                        <ChipBasisNote
-                          visible={barMetric === 'throughput' || barMetric === 'power'}
-                          testId="calculator-disagg-throughput-note"
-                          label={t.note}
-                          text={
-                            chipBasis === 'total' ? t.disaggThroughputTotal : t.disaggThroughput
-                          }
-                          chipBasis={readOnlyChipBasisControl}
-                        />
-                      </div>
-                    );
-
-                    return viewMode === 'chart' ? (
-                      <ThroughputBarChart
-                        caption={captionContent}
-                        footer={footerContent}
-                        results={barResults}
-                        hardwareConfig={hardwareConfig}
-                        mode={mode}
-                        targetValue={targetValue}
-                        barMetric={barMetric}
-                        costType={costType}
-                        totalChipBasis={totalChipBasis}
-                        runUrl={runUrl}
-                        selectedBars={selectedBars}
-                        onBarSelect={handleBarSelect}
-                        colorResolver={resolveBarColor}
-                        legendElement={
-                          legendHwKeys.length > 0 ? (
-                            <ChartLegend
-                              variant="sidebar"
-                              legendItems={legendItems}
-                              onItemRemove={removeGpu}
-                              isLegendExpanded={isLegendExpanded}
-                              onExpandedChange={(expanded) => {
-                                setIsLegendExpanded(expanded);
-                                track('calculator_legend_expanded', { enabled: expanded });
-                              }}
-                              switches={[
-                                {
-                                  id: 'calc-high-contrast',
-                                  label: t.highContrast,
-                                  checked: highContrast,
-                                  onCheckedChange: (checked: boolean) => {
-                                    setHighContrast(checked);
-                                    track('calculator_high_contrast_toggled', { enabled: checked });
-                                  },
-                                },
-                              ]}
-                              reset={{
-                                id: 'calc-reset-filter',
-                                disabled: visibleHwKeys.size >= legendHwKeys.length,
-                                onClick: handleResetGpus,
-                              }}
-                              enableTooltips={true}
-                            />
+        <figure
+          id="calculator-chart-body"
+          data-testid="calculator-figure"
+          className="relative min-w-0"
+        >
+          <Card className="relative">
+            <ChartButtons
+              className="md:absolute md:right-6 md:top-6 md:z-10 md:mb-0"
+              chartId="calculator-chart"
+              analyticsPrefix="calculator"
+              analyticsContext={selectionAnalyticsContext({
+                model: selectedModel,
+                sequence: selectedSequence,
+                precisions: selectedPrecisions,
+                gpuCount: visibleHwKeys.size,
+              })}
+              zoomResetEvent="d3chart_zoom_reset_calculator-chart"
+              onExportCsv={handleExportCsv}
+              setIsLegendExpanded={setIsLegendExpanded}
+              exportFileName={`InferenceX_calculator_${selectedModel}`}
+              leadingControls={
+                <SegmentedToggle
+                  value={viewMode}
+                  options={viewModeOptions}
+                  onValueChange={handleViewModeChange}
+                  ariaLabel={t.viewModeAria}
+                  testId="calculator-view-toggle"
+                  className="shrink-0"
+                />
+              }
+            />
+            {loading ? (
+              <Skeleton className="h-125 w-full" />
+            ) : (
+              <>
+                {(() => {
+                  const captionContent = (
+                    <>
+                      {chartHeading}
+                      {(showsJalapenoPreview || showsVeraRubinPreview || showsTpuv7Preview) && (
+                        <div className="mt-3 space-y-1">
+                          {showsJalapenoPreview && (
+                            <JalapenoOfficialPreviewNotice variant="inline" />
+                          )}
+                          {showsVeraRubinPreview && (
+                            <VeraRubinOfficialPreviewNotice variant="inline" />
+                          )}
+                          {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice variant="inline" />}
+                        </div>
+                      )}
+                    </>
+                  );
+                  const plottedBases = plottedChipBases(
+                    barResults.map((r) => r.hwKey),
+                    (base) => base in HW_REGISTRY,
+                  );
+                  const priceTable =
+                    plottedBases.length > 0 && barMetric !== 'throughput' ? (
+                      <TcoPriceTable
+                        header={barMetric === 'power' ? 'kW' : undefined}
+                        rowLabel={barMetric === 'power' ? t.allInPower : undefined}
+                        twoDecimals={barMetric !== 'power'}
+                        items={plottedBases.map((base) => {
+                          const specs = HW_REGISTRY[base as keyof typeof HW_REGISTRY];
+                          return {
+                            base,
+                            label: specs.badgeLabel ?? base.toUpperCase(),
+                            value:
+                              barMetric === 'power'
+                                ? String(specs.power)
+                                : getGpuSpecs(base, tcoBasis)[costProvider].toFixed(2),
+                          };
+                        })}
+                        testId="calculator-cost-badges"
+                        cellTestId="calculator-cost-badge"
+                        inputIdPrefix="calculator-cost"
+                      />
+                    ) : undefined;
+                  const footerContent = (
+                    <div className="mt-3">
+                      <ResultContext
+                        locale={locale}
+                        layout="footer"
+                        chipBasis={
+                          costType === 'total' ? undefined : (
+                            <ChipBasisCaption control={chipBasisControl} />
+                          )
+                        }
+                        controlsEnd={priceTable}
+                        date={selectedRunDate}
+                        source={`${getModelLabel(selectedModel)} · ${selectedPrecisions
+                          .map((p) => getPrecisionLabel(p as Precision))
+                          .join(
+                            ', ',
+                          )} · ${getSequenceLabel(selectedSequence, locale)} · SemiAnalysis InferenceX™`}
+                        metaEnd={
+                          barMetric === 'cost' && plottedBases.length > 0 ? (
+                            <PricesSourceLink />
+                          ) : barMetric === 'power' && plottedBases.length > 0 ? (
+                            <span>
+                              {t.source}
+                              <Link
+                                target="_blank"
+                                className="text-brand hover:underline"
+                                href="https://semianalysis.com/datacenter-industry-model/"
+                              >
+                                SemiAnalysis Datacenter Industry Model
+                                <ExternalLinkIcon />
+                              </Link>
+                            </span>
                           ) : undefined
                         }
                       />
-                    ) : (
-                      <>
-                        <figcaption>{captionContent}</figcaption>
-                        <CalculatorTable
-                          results={results}
-                          costType={costType}
-                          hardwareConfig={hardwareConfig}
-                        />
-                        {footerContent}
-                      </>
-                    );
-                  })()}
-                </>
-              )}
-            </Card>
-          </figure>
-        ) : (
-          <Card>{chartHeading}</Card>
-        )}
+                      <ChipBasisNote
+                        visible={barMetric === 'cost' && costType !== 'total'}
+                        testId="calculator-disagg-cost-note"
+                        label={t.note}
+                        text={chipBasis === 'total' ? t.disaggCostTotal : t.disaggCost}
+                        chipBasis={readOnlyChipBasisControl}
+                      />
+                      <ChipBasisNote
+                        visible={barMetric === 'throughput' || barMetric === 'power'}
+                        testId="calculator-disagg-throughput-note"
+                        label={t.note}
+                        text={chipBasis === 'total' ? t.disaggThroughputTotal : t.disaggThroughput}
+                        chipBasis={readOnlyChipBasisControl}
+                      />
+                    </div>
+                  );
+
+                  return viewMode === 'chart' ? (
+                    <ThroughputBarChart
+                      caption={captionContent}
+                      footer={footerContent}
+                      results={barResults}
+                      hardwareConfig={hardwareConfig}
+                      mode={mode}
+                      targetValue={targetValue}
+                      barMetric={barMetric}
+                      costType={costType}
+                      totalChipBasis={totalChipBasis}
+                      runUrl={runUrl}
+                      selectedBars={selectedBars}
+                      onBarSelect={handleBarSelect}
+                      colorResolver={resolveBarColor}
+                      legendElement={
+                        legendHwKeys.length > 0 ? (
+                          <ChartLegend
+                            variant="sidebar"
+                            legendItems={legendItems}
+                            onItemRemove={removeGpu}
+                            isLegendExpanded={isLegendExpanded}
+                            onExpandedChange={(expanded) => {
+                              setIsLegendExpanded(expanded);
+                              track('calculator_legend_expanded', { enabled: expanded });
+                            }}
+                            switches={[
+                              {
+                                id: 'calc-high-contrast',
+                                label: t.highContrast,
+                                checked: highContrast,
+                                onCheckedChange: (checked: boolean) => {
+                                  setHighContrast(checked);
+                                  track('calculator_high_contrast_toggled', { enabled: checked });
+                                },
+                              },
+                            ]}
+                            reset={{
+                              id: 'calc-reset-filter',
+                              disabled: visibleHwKeys.size >= legendHwKeys.length,
+                              onClick: handleResetGpus,
+                            }}
+                            enableTooltips={true}
+                          />
+                        ) : undefined
+                      }
+                    />
+                  ) : (
+                    <>
+                      <figcaption>{captionContent}</figcaption>
+                      <CalculatorTable
+                        results={results}
+                        costType={costType}
+                        hardwareConfig={hardwareConfig}
+                      />
+                      {footerContent}
+                    </>
+                  );
+                })()}
+              </>
+            )}
+          </Card>
+        </figure>
       </section>
 
       {viewMode === 'chart' && selectedBars.size > 0 && (

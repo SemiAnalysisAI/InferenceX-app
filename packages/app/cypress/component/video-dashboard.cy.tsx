@@ -92,19 +92,12 @@ describe('Video hardware dashboard (retained fixture)', () => {
     cy.location('search').should('contain', 'v_optimal=0');
     points().should('have.length', 3);
   });
-  it('folds Compare and the evidence by default and opens Compare for compare deep links', () => {
+  it('shows Compare and the evidence open and restores Compare from deep links', () => {
     mount();
-    cy.get('[data-testid="video-compare"]').should('not.exist');
-    cy.get('[data-testid="video-compare-toggle"]').click();
     cy.get('[data-testid="video-compare"]').should('exist');
-    cy.get('[data-testid="video-compare-toggle"]').should('have.attr', 'aria-expanded', 'true');
-    cy.get('[data-testid="video-evidence-toggle"]').click();
-    cy.get('[data-testid="video-evidence-toggle"]').should('have.attr', 'aria-expanded', 'true');
     cy.contains('h2', 'Performance evidence').should('have.length', 1);
     mount('/video', '?v_cand=h200');
-    cy.get('[data-testid="video-compare"]').should('exist');
     cy.get('[data-testid="video-compare-candidate"]').should('contain', 'H200');
-    cy.get('[data-testid="video-evidence-toggle"]').should('have.attr', 'aria-expanded', 'false');
   });
   it('shows placeholders while loading instead of a false "Not measured"', () => {
     cy.intercept('GET', '/api/video-runs?format=history&page=1*', (req) => {

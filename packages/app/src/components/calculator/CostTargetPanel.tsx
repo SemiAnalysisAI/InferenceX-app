@@ -9,7 +9,7 @@ import { track } from '@/lib/analytics/analytics';
 import type { HardwareConfig } from '@/components/inference/types';
 import { Card } from '@/components/ui/card';
 import { ChipBasisNote } from '@/components/ui/chip-basis-note';
-import { CollapsibleSection } from '@/components/ui/collapsible-section';
+import { Heading } from '@/components/ui/heading';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
@@ -40,7 +40,6 @@ interface CostTargetPanelProps {
 
 const STRINGS = {
   en: {
-    toggleSection: 'Expand or fold this section',
     costCapTitle: 'Interactivity within a cost target',
     costCapDescription:
       'Set a cost ceiling per million tokens and find the highest interactivity each chip can serve without exceeding it.',
@@ -70,7 +69,6 @@ const STRINGS = {
     source: 'Source: ',
   },
   zh: {
-    toggleSection: '展开或折叠此板块',
     costCapTitle: '成本上限下的交互性',
     costCapDescription:
       '设定每百万 token 的成本上限，查看每款芯片在不超支前提下可提供的最高交互性。',
@@ -278,115 +276,106 @@ export default function CostTargetPanel({
     <TooltipProvider delayDuration={0}>
       <section data-testid="calculator-costcap-section">
         <Card>
-          <CollapsibleSection
-            title={t.costCapTitle}
-            toggleLabel={t.toggleSection}
-            testId="calculator-costcap-collapse"
-            onToggle={(open) =>
-              track('calculator_section_toggled', {
-                section: 'costcap',
-                enabled: open,
-              })
-            }
-          >
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-3">
-                <div className="min-w-0 text-sm text-muted-foreground">
-                  <p>{t.costCapDescription}</p>
-                  {costCap !== null && !hasRows && (
-                    <p className="mt-1" data-testid="calculator-costcap-empty">
-                      {t.costCapNoGpus}
-                    </p>
-                  )}
+          <Heading as="h2" level="card" className="mb-2">
+            {t.costCapTitle}
+          </Heading>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
+              <div className="min-w-0 text-sm text-muted-foreground">
+                <p>{t.costCapDescription}</p>
+                {costCap !== null && !hasRows && (
+                  <p className="mt-1" data-testid="calculator-costcap-empty">
+                    {t.costCapNoGpus}
+                  </p>
+                )}
+              </div>
+              <div className="grid shrink-0 grid-cols-2 gap-4 sm:flex sm:flex-wrap">
+                <div className="flex min-w-0 flex-col space-y-1.5 sm:max-w-48">
+                  <LabelWithTooltip
+                    htmlFor="calc-costcap"
+                    label={t.costCapLabel}
+                    shortLabel={t.costCapShortLabel}
+                    tooltip={t.costCapTooltip}
+                  />
+                  <Input
+                    id="calc-costcap"
+                    data-testid="calc-costcap-input"
+                    type="number"
+                    min={0}
+                    step="any"
+                    placeholder={t.costCapPlaceholder}
+                    value={costCapInput}
+                    onChange={handleCostCapChange}
+                    onBlur={handleCostCapBlur}
+                    className="w-full sm:w-32"
+                  />
                 </div>
-                <div className="grid shrink-0 grid-cols-2 gap-4 sm:flex sm:flex-wrap">
-                  <div className="flex min-w-0 flex-col space-y-1.5 sm:max-w-48">
-                    <LabelWithTooltip
-                      htmlFor="calc-costcap"
-                      label={t.costCapLabel}
-                      shortLabel={t.costCapShortLabel}
-                      tooltip={t.costCapTooltip}
-                    />
-                    <Input
-                      id="calc-costcap"
-                      data-testid="calc-costcap-input"
-                      type="number"
-                      min={0}
-                      step="any"
-                      placeholder={t.costCapPlaceholder}
-                      value={costCapInput}
-                      onChange={handleCostCapChange}
-                      onBlur={handleCostCapBlur}
-                      className="w-full sm:w-32"
-                    />
-                  </div>
-                  <div className="flex min-w-0 flex-col space-y-1.5 sm:max-w-48">
-                    <LabelWithTooltip
-                      htmlFor="calc-costcap-mw"
-                      label={t.mwLabel}
-                      shortLabel={t.mwShortLabel}
-                      tooltip={t.mwTooltip}
-                    />
-                    <Input
-                      id="calc-costcap-mw"
-                      data-testid="calc-costcap-mw-input"
-                      type="number"
-                      min={0}
-                      step="any"
-                      placeholder={t.mwPlaceholder}
-                      value={mwInput}
-                      onChange={(e) => onMwInputChange(e.target.value)}
-                      onBlur={() => track('calculator_costcap_mw_set', { mw: mwInput })}
-                      className="w-full sm:w-32"
-                    />
-                  </div>
+                <div className="flex min-w-0 flex-col space-y-1.5 sm:max-w-48">
+                  <LabelWithTooltip
+                    htmlFor="calc-costcap-mw"
+                    label={t.mwLabel}
+                    shortLabel={t.mwShortLabel}
+                    tooltip={t.mwTooltip}
+                  />
+                  <Input
+                    id="calc-costcap-mw"
+                    data-testid="calc-costcap-mw-input"
+                    type="number"
+                    min={0}
+                    step="any"
+                    placeholder={t.mwPlaceholder}
+                    value={mwInput}
+                    onChange={(e) => onMwInputChange(e.target.value)}
+                    onBlur={() => track('calculator_costcap_mw_set', { mw: mwInput })}
+                    className="w-full sm:w-32"
+                  />
                 </div>
               </div>
-              {hasRows && (
-                <>
-                  <DataTable
-                    data={costCapRows}
-                    columns={costCapColumns}
-                    testId="calculator-costcap-table"
-                    analyticsPrefix="calculator_costcap_table"
-                  />
-                  <div>
-                    <ChipBasisNote
-                      visible={hasDisagg}
-                      testId="calculator-costcap-disagg-note"
-                      label={t.note}
-                      text={chipBasis === 'total' ? t.disaggFleetTotal : t.disaggFleet}
-                      chipBasis={chipBasisControl}
-                      showToggle={costType !== 'total'}
-                    />
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      {t.assumptions(getCostProviderLabel(costProvider))}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {t.source}
-                      <Link
-                        target="_blank"
-                        className={sourceLinkClassName}
-                        href="https://semianalysis.com/datacenter-industry-model/"
-                      >
-                        SemiAnalysis Datacenter Industry Model
-                        <ExternalLinkIcon />
-                      </Link>
-                      {' & '}
-                      <Link
-                        target="_blank"
-                        className={sourceLinkClassName}
-                        href="https://semianalysis.com/ai-cloud-tco-model/"
-                      >
-                        SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model
-                        <ExternalLinkIcon />
-                      </Link>
-                    </p>
-                  </div>
-                </>
-              )}
             </div>
-          </CollapsibleSection>
+            {hasRows && (
+              <>
+                <DataTable
+                  data={costCapRows}
+                  columns={costCapColumns}
+                  testId="calculator-costcap-table"
+                  analyticsPrefix="calculator_costcap_table"
+                />
+                <div>
+                  <ChipBasisNote
+                    visible={hasDisagg}
+                    testId="calculator-costcap-disagg-note"
+                    label={t.note}
+                    text={chipBasis === 'total' ? t.disaggFleetTotal : t.disaggFleet}
+                    chipBasis={chipBasisControl}
+                    showToggle={costType !== 'total'}
+                  />
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {t.assumptions(getCostProviderLabel(costProvider))}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t.source}
+                    <Link
+                      target="_blank"
+                      className={sourceLinkClassName}
+                      href="https://semianalysis.com/datacenter-industry-model/"
+                    >
+                      SemiAnalysis Datacenter Industry Model
+                      <ExternalLinkIcon />
+                    </Link>
+                    {' & '}
+                    <Link
+                      target="_blank"
+                      className={sourceLinkClassName}
+                      href="https://semianalysis.com/ai-cloud-tco-model/"
+                    >
+                      SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model
+                      <ExternalLinkIcon />
+                    </Link>
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
         </Card>
       </section>
     </TooltipProvider>
