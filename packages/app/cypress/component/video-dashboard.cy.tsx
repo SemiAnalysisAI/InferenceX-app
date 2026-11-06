@@ -148,6 +148,9 @@ describe('VideoGenX results', () => {
     cy.get('label[for="video-results-optimal"]').click();
     points(overlay).should('have.length', 1).and('have.attr', 'data-optimal', 'true');
     searchParam('r_optimal').should('equal', '1');
+    points(overlay).trigger('mouseenter', { force: true });
+    cy.get('[data-hover-tooltip]').should('contain', 'Unofficial run #34341996789');
+    points(overlay).trigger('mouseleave', { force: true });
     toggleHardware('b200');
     row('b200').should('not.exist');
     points(overlay).should('not.exist');
@@ -412,11 +415,21 @@ describe('VideoGenX results', () => {
         observation.results = evidence(observation);
       },
     });
+    points('[data-hardware="b200"]').trigger('mouseenter', { force: true });
+    cy.get('[data-hover-tooltip]')
+      .should('contain', 'conc 1')
+      .and('contain', 'P50 s')
+      .and('contain', '4 GPU · TP2 × Ulysses 2')
+      .and('contain', 'Click for full details');
     points('[data-hardware="b200"] .visible-shape').click({ force: true });
-    cy.get('[data-chart-tooltip]:visible')
-      .should('contain', 'B200 · 4 GPU')
-      .and('contain', '4 participating · 8 allocated')
-      .and('contain', 'Deployment: TP2 × Ulysses 2')
+    cy.get('.inferencex-pinned-tooltip [data-pinned-config]')
+      .should('contain', 'GPUs (part. / alloc.): 4 / 8')
+      .and('contain', 'Concurrency: 1');
+    cy.get('.inferencex-pinned-tooltip .pinned-config-summary').should(
+      'contain',
+      'TP2 × Ulysses 2',
+    );
+    cy.get('.inferencex-pinned-tooltip')
       .find('a[href="https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34341996789"]')
       .should('contain', 'GitHub Actions Run');
     cy.get('[data-chart-tooltip]:visible [data-action="view-telemetry"]').click();

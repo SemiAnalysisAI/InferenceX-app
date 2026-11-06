@@ -85,9 +85,12 @@ The page follows the inference and AgentX two-level layout. The overview has fou
    greys out roster hardware without a matched run, and holds the deployment-label
    switch. Under the chart, a caption laid out like the inference one selects the cost
    tier and GPU basis, names the update date and source, and lists each plotted
-   hardware's TCO $/chip/hr rate with its source link. Clicking a point pins a popover laid out like the
-   inference tooltip: date, runtime, both axis values, GPUs, deployment, concurrency, cost, energy,
-   power, valid clips and the GitHub Actions run link. Its View telemetry button opens the deployment detail. The Representative
+   hardware's TCO $/chip/hr rate with its source link. Hovering a point shows the
+   inference chart's compact hover card (`hoverCardHTML`): hardware, concurrency, both axis values,
+   GPUs and deployment. Clicking pins the inference pinned card: date, both axis values,
+   concurrency, participating and allocated GPUs, valid clips, deployment, the other latency,
+   cost, energy, power, runtime and the GitHub Actions run link. Unofficial points carry the
+   run marker in both cards. Its View telemetry button opens the deployment detail. The Representative
    deployments table below has one row per hardware and unofficial run, showing the
    deployment with the most videos per participating GPU-hour. It scrolls
    horizontally on narrow screens, and a row opens the same detail.
@@ -292,7 +295,7 @@ browser playback and difference failure, bilingual layout and 390px overflow.
 Y 轴为每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时生成视频数或每条有效视频的 GPU 能耗；每种硬件及每个叠加运行
 各自绘制 Pareto 前沿。右侧图例可隐藏硬件，没有匹配运行的硬件显示为灰色，图表下方的说明行与推理页一致，可切换成本层级和 GPU 口径，并列出更新时间、来源、各硬件的 TCO $/chip/hr 价格及其来源链接。
 图表下方的“代表性部署”表格每种硬件及每个叠加运行一行，展示按参与计算的 GPU 折算后每 GPU 小时生成视频数最多的部署，窄屏可横向滚动。
-点击数据点会固定显示与推理页提示框布局一致的测量值（日期、Runtime、两个坐标轴的数值、GPU、部署、并发数、成本、能耗、功率、有效视频数和 GitHub Actions 运行链接），再点击“查看遥测”进入部署详情（`r_point`）；点击表格行则直接进入详情。详情入口在 `history.state` 中做标记，
+悬停数据点时显示与推理图表相同的精简悬停卡片（`hoverCardHTML`）：硬件、并发数、两个坐标轴的数值、GPU 和部署。点击后固定显示推理页同款详情卡片：日期、两个坐标轴的数值、并发数、参与和分配的 GPU、有效视频数、部署、另一项延迟、成本、能耗、功率、Runtime 和 GitHub Actions 运行链接；非官方运行的数据点在两种卡片中都会标出运行编号。再点击“查看遥测”进入部署详情（`r_point`）；点击表格行则直接进入详情。详情入口在 `history.state` 中做标记，
 刷新或前进后页内返回仍会弹出该条目，浏览器后退也会回到原滚动位置；概览在后台保持挂载，视频、已加载的性能历史和图表状态不会丢失。
 详情页分为遥测、有效性、来源三个标签页。未知、已筛除或已隐藏的 `r_point` 回到概览，结果加载后会从 URL 中移除，重新显示该硬件或分享时不会再打开它。如何解读、利润估算器与性能历史默认折叠，尚未采集的指标在“如何解读”中列出，
 不使用占位图表或示意数值。功率无效时不展示功率或能耗结论。默认保留四个硬件视频窗口；

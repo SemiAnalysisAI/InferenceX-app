@@ -1283,6 +1283,36 @@ const hoverCacheHTML = (d: InferenceData, color: string, locale: Locale): string
       </div>`;
 };
 
+export interface HoverCard {
+  /** Resolved series color for the swatch. */
+  color: string;
+  title: string;
+  /** Context beside the title, such as precision and concurrency. */
+  aside: string;
+  /** Plotted values, y first, each with its short axis label. */
+  values: readonly { value: string; label: string }[];
+  detail: string;
+  /** Trusted markup between the detail line and the footer. */
+  extraHTML?: string;
+  locale: Locale;
+}
+
+/** The compact hover card shell shared by every chart that pins a fuller card on click. */
+export const hoverCardHTML = (card: HoverCard): string => `
+    <div data-hover-tooltip style="${tooltipShellStyle({ isPinned: false })}; min-width: 240px; font-variant-numeric: tabular-nums; line-height: 1.35;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px;">
+        <span style="display: inline-flex; align-items: center; min-width: 0; color: var(--foreground); font-size: 12px; font-weight: 600;">${hoverSwatch(card.color, 8)}<span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(card.title)}</span></span>
+        <span style="flex: none; color: var(--muted-foreground); font-size: 11px;">${escapeHtml(card.aside)}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 2px 16px; font-size: 12px;">
+        ${card.values.map(({ value, label }) => `<span style="white-space: nowrap;"><span style="color: var(--foreground); font-weight: 600;">${escapeHtml(value)}</span> <span style="color: var(--muted-foreground);">${escapeHtml(label)}</span></span>`).join('')}
+      </div>
+      <div style="margin-top: 2px; color: var(--muted-foreground); font-size: 11px;">${escapeHtml(card.detail)}</div>
+      ${card.extraHTML ?? ''}
+      <div style="margin-top: 8px; color: var(--muted-foreground); font-size: 10px; opacity: 0.75;">${HOVER_STRINGS[card.locale].details}</div>
+    </div>
+  `;
+
 export interface HoverTooltipConfig {
   data: InferenceData;
   xLabel: string;
@@ -1310,22 +1340,16 @@ export const generateHoverTooltipContent = (config: HoverTooltipConfig): string 
     getPointLabel(d) || `TP${d.tp}`,
     hoverSpecLabel(d),
   ].filter(Boolean) as string[];
-  const value = (v: string, label: string) =>
-    `<span style="white-space: nowrap;"><span style="color: var(--foreground); font-weight: 600;">${v}</span> <span style="color: var(--muted-foreground);">${escapeHtml(shortAxisLabel(label))}</span></span>`;
-
-  return `
-    <div data-hover-tooltip style="${tooltipShellStyle({ isPinned: false })}; min-width: 240px; font-variant-numeric: tabular-nums; line-height: 1.35;">
-      <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px;">
-        <span style="display: inline-flex; align-items: center; min-width: 0; color: var(--foreground); font-size: 12px; font-weight: 600;">${hoverSwatch(color, 8)}<span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(String(system))}</span></span>
-        <span style="flex: none; color: var(--muted-foreground); font-size: 11px;">${escapeHtml(d.precision.toUpperCase())} · ${t.conc(d.conc)}</span>
-      </div>
-      <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 2px 16px; font-size: 12px;">
-        ${value(formatHoverValue(d.y, selectedYAxisMetric), yLabel)}
-        ${value(formatHoverValue(d.x), xLabel)}
-      </div>
-      <div style="margin-top: 2px; color: var(--muted-foreground); font-size: 11px;">${escapeHtml(config_.join(' · '))}</div>
-      ${hoverCacheHTML(d, color, locale)}
-      <div style="margin-top: 8px; color: var(--muted-foreground); font-size: 10px; opacity: 0.75;">${t.details}</div>
-    </div>
-  `;
+  return hoverCardHTML({
+    color,
+    title: String(system),
+    aside: `${d.precision.toUpperCase()} · ${t.conc(d.conc)}`,
+    values: [
+      { value: formatHoverValue(d.y, selectedYAxisMetric), label: shortAxisLabel(yLabel) },
+      { value: formatHoverValue(d.x), label: shortAxisLabel(xLabel) },
+    ],
+    detail: config_.join(' · '),
+    extraHTML: hoverCacheHTML(d, color, locale),
+    locale,
+  });
 };
