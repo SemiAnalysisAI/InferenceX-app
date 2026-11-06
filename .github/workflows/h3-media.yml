@@ -53,6 +53,10 @@ jobs:
     needs: publish
     # Runs after a successful publication, or alone for a backfill. Originals keep serving if it fails.
     if: ${{ !cancelled() && github.repository == 'SemiAnalysisAI/InferenceX-app' && (needs.publish.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.backfill_renditions)) }}
+    # One group per source run (or for backfill), so a queued encode never cancels another run's.
+    concurrency:
+      group: h3-media-renditions-${{ inputs.backfill_renditions && 'backfill' || inputs.run_id || github.event.client_payload.source_run_id }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.backfill_renditions && 180 || 30 }}
     steps:
