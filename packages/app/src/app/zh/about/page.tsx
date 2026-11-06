@@ -64,14 +64,14 @@ export default function AboutPageZh() {
               NeoCloud。更多详情请参阅以下文章：{' '}
               <Link
                 href="/zh/blog/inferencemax-open-source-inference-benchmarking"
-                className={READING_LINK_CLASS}
+                className={cn(READING_LINK_CLASS, 'whitespace-nowrap')}
               >
                 InferenceX v1
               </Link>
               、{' '}
               <Link
                 href="/zh/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper"
-                className={READING_LINK_CLASS}
+                className={cn(READING_LINK_CLASS, 'whitespace-nowrap')}
               >
                 InferenceX v2
               </Link>

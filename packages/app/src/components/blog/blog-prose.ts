@@ -1,5 +1,6 @@
 export const BLOG_PROSE_CLASS = [
-  'prose prose-neutral dark:prose-invert blog-prose max-w-none',
+  'prose prose-neutral dark:prose-invert blog-prose max-w-none [&>:first-child]:mt-0',
+  '[--tw-prose-body:var(--foreground)] [--tw-prose-invert-body:var(--foreground)]',
   'prose-p:max-w-measure prose-ul:max-w-measure prose-ol:max-w-measure prose-blockquote:max-w-measure prose-headings:max-w-measure prose-hr:max-w-measure',
   'prose-p:my-4 prose-p:text-base prose-p:leading-reading prose-li:leading-reading prose-ul:my-4 prose-ol:my-4 prose-blockquote:my-6',
   'prose-headings:scroll-mt-24 prose-headings:text-balance prose-headings:tracking-tight',

@@ -2,6 +2,7 @@ import Image from 'next/image';
 import type { CSSProperties, ReactNode } from 'react';
 
 import { ThemedFigureImage } from '@/components/blog/themed-figure-image';
+import { formatTokenPriceLabel } from '@/components/inference/token-revenue';
 import { JsonLd } from '@/components/seo/json-ld';
 import { Badge } from '@/components/ui/badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
@@ -178,8 +179,8 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
                 width={paper.chipImageWidth}
                 height={paper.chipImageHeight}
                 priority
-                sizes="(min-width: 1152px) 470px, (min-width: 768px) 42vw, 0px"
-                className="absolute bottom-[-9%] right-[-8%] w-[118%] max-w-none"
+                sizes="(min-width: 1152px) 1040px, (min-width: 768px) 80vw, 0px"
+                className="absolute inset-0 h-full w-full object-cover object-center"
                 style={CHIP_SHADOW_STYLE}
               />
             </div>
@@ -275,9 +276,9 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
                           </dt>{' '}
                           <dd className="inline">
                             {t.sellingPrices(
-                              chart.sellingPrices.input,
-                              chart.sellingPrices.cached,
-                              chart.sellingPrices.output,
+                              formatTokenPriceLabel(chart.sellingPrices.input),
+                              formatTokenPriceLabel(chart.sellingPrices.cached),
+                              formatTokenPriceLabel(chart.sellingPrices.output),
                               chart.sellingPrices.source,
                             )}
                           </dd>

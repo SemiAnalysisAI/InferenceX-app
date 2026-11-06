@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ShareButton } from '@/components/ui/share-button';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 
@@ -72,6 +73,7 @@ export function UbenchxHub({
             title={t.title}
             qualifier={t.beta}
             description={t.subtitle}
+            actions={<ShareButton />}
           />
           <ControlPanel legend={t.controls}>
             <div className="grid min-w-0 items-start gap-3 sm:grid-cols-2">

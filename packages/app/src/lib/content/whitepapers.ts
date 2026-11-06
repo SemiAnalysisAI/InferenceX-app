@@ -59,9 +59,9 @@ export interface WhitepaperChartMeta {
   tcoSourceTitle: string;
   tcoSourceHref: string;
   sellingPrices: {
-    input: string;
-    cached: string;
-    output: string;
+    input: number;
+    cached: number;
+    output: number;
     source: string;
   };
 }
@@ -131,7 +131,7 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
         srcDark: `${MI355X_ASSET_DIR}/figure-1-owned-hyperscaler-dark.png`,
         width: 2100,
         height: 810,
-        tcoBadge: 'MI355X: 1.5',
+        tcoBadge: 'MI355X: $1.50',
       },
       {
         id: 'figure-2',
@@ -139,7 +139,7 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
         srcDark: `${MI355X_ASSET_DIR}/figure-2-rental-3yr-dark.png`,
         width: 2100,
         height: 810,
-        tcoBadge: 'MI355X: 3',
+        tcoBadge: 'MI355X: $3.00',
       },
     ],
     chart: {
@@ -150,9 +150,9 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
       tcoSourceTitle: 'SemiAnalysis Market August 2026 Pricing Surveys & AI Cloud TCO Model',
       tcoSourceHref: TCO_SOURCE_URL,
       sellingPrices: {
-        input: '3',
-        cached: '0.3',
-        output: '15',
+        input: 3,
+        cached: 0.3,
+        output: 15,
         source: 'OpenRouter',
       },
     },
@@ -474,7 +474,7 @@ export const WHITEPAPER_COPY = {
     tcoBadgesLabel: 'TCO $/chip/hr:',
     sellingPriceLabel: 'Selling price per million tokens:',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
-      `Input $${input} · Cached input $${cached} · Output $${output} (${source})`,
+      `Input: $${input} · Cached input: $${cached} · Output: $${output} (${source})`,
   },
   zh: {
     indexTitle: '白皮书',
@@ -506,7 +506,7 @@ export const WHITEPAPER_COPY = {
     tcoBadgesLabel: 'TCO $/chip/hr：',
     sellingPriceLabel: '每百万 token 售价：',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
-      `输入 $${input} · 缓存输入 $${cached} · 输出 $${output}（${source}）`,
+      `输入：$${input} · 缓存输入：$${cached} · 输出：$${output}（${source}）`,
   },
 } as const;
 

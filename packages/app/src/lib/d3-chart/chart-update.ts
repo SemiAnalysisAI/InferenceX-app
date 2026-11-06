@@ -207,6 +207,13 @@ function drawAxis(
     .attr('font-size', 10)
     .attr('font-family', 'sans-serif')
     .attr('text-anchor', orient === 'left' ? 'end' : 'middle');
+  if (orient === 'bottom' && !positionScale.bandwidth) {
+    texts.attr('dx', function (value) {
+      const width = this.getComputedTextLength?.() ?? 0;
+      const overhang = position(value) + offset + width / 2 - Math.max(range0, range1);
+      return overhang > 0 ? -overhang : null;
+    });
+  }
   group.each(function () {
     Reflect.set(this, '__axis', position);
   });

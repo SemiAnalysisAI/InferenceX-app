@@ -15,7 +15,7 @@ import { cn } from '@/lib/shared/utils';
 
 import { AgentXMethodologyLink } from './agentx-methodology-link';
 
-export function AgentXQuickstartCallout({ locale }: { locale: Locale }) {
+export function AgentXQuickstartCallout({ locale, wide }: { locale: Locale; wide?: boolean }) {
   const t = AGENTX_QUICKSTART[locale];
   return (
     <section
@@ -28,7 +28,7 @@ export function AgentXQuickstartCallout({ locale }: { locale: Locale }) {
         {t.title}
       </h2>
       <p className={READING_TEXT_CLASS}>{t.summary}</p>
-      <CopyableCodeBlock locale={locale} label={t.run}>
+      <CopyableCodeBlock locale={locale} label={t.run} className={wide ? 'max-w-none' : undefined}>
         {AGENTX_COMMANDS}
       </CopyableCodeBlock>
       <AgentXMethodologyLink

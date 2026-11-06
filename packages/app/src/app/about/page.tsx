@@ -67,14 +67,14 @@ export default function AboutPage() {
               dollar NeoClouds. Learn more in our articles:{' '}
               <Link
                 href="/blog/inferencemax-open-source-inference-benchmarking"
-                className={READING_LINK_CLASS}
+                className={cn(READING_LINK_CLASS, 'whitespace-nowrap')}
               >
                 InferenceX v1
               </Link>
               ,{' '}
               <Link
                 href="/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper"
-                className={READING_LINK_CLASS}
+                className={cn(READING_LINK_CLASS, 'whitespace-nowrap')}
               >
                 InferenceX v2
               </Link>

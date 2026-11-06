@@ -207,7 +207,7 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
       <AgentXSessionReplay locale={locale} />
 
       <div className="space-y-8 px-5 py-6 sm:px-6">
-        <AgentXQuickstartCallout locale={locale} />
+        <AgentXQuickstartCallout locale={locale} wide />
 
         <AgentXOptimizationsCallout locale={locale} />
 

@@ -40,8 +40,7 @@ export interface ResultContextProps {
   metaEnd?: ReactNode;
 }
 
-const META_ITEM =
-  "before:mr-2 before:text-muted-foreground/60 before:content-['·'] first:before:content-none";
+const META_ITEM = "after:ml-2 after:text-muted-foreground/60 after:content-['·']";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/u;
 
@@ -231,7 +230,7 @@ export function ResultContext({
           </div>
         )}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <dl className="contents">
+          <dl className={cn('contents', !markers && '[&>:last-child]:after:content-none')}>
             {dateValue && (
               <div className={META_ITEM}>
                 <dt className="inline">
@@ -259,10 +258,7 @@ export function ResultContext({
             )}
           </dl>
           {markers && (
-            <div
-              data-testid="result-context-markers"
-              className={cn(META_ITEM, 'inline-flex items-center')}
-            >
+            <div data-testid="result-context-markers" className="inline-flex items-center">
               {markers}
             </div>
           )}

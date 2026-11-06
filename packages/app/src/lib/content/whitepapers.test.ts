@@ -138,7 +138,10 @@ describe('whitepaper registry', () => {
       '31.5%',
       '$2.45',
     ]);
-    expect(paper?.figures.map((figure) => figure.tcoBadge)).toEqual(['MI355X: 1.5', 'MI355X: 3']);
+    expect(paper?.figures.map((figure) => figure.tcoBadge)).toEqual([
+      'MI355X: $1.50',
+      'MI355X: $3.00',
+    ]);
     expect(paper?.chipImageWidth).toBe(1783);
     expect(paper?.chipImageHeight).toBe(1073);
     expect(paper?.chart.tcoSourceHref).toBe('https://semianalysis.com/ai-cloud-tco-model/');
