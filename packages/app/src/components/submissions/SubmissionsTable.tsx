@@ -14,7 +14,11 @@ import type { SubmissionSummaryRow } from '@/lib/submissions/submissions-types';
 import { getFrameworkLabel } from '@/lib/shared/utils';
 import { formatDisplayDate } from '@/lib/shared/display-date';
 import { Button } from '@/components/ui/button';
-import { TABLE_HEAD_CELL_STYLE, TABLE_HEAD_ROW_STYLE } from '@/components/ui/control-styles';
+import {
+  TABLE_ACTION_STYLE,
+  TABLE_HEAD_CELL_STYLE,
+  TABLE_HEAD_ROW_STYLE,
+} from '@/components/ui/control-styles';
 import { InfoHelp } from '@/components/ui/option-info';
 import { SearchInput } from '@/components/ui/search-input';
 import { VendorDot } from '@/components/ui/vendor-dot';
@@ -476,7 +480,7 @@ function SubmissionRow({
         </td>
         <td className="px-3 py-2">{getModelDisplayName(row.model)}</td>
         <td className="px-3 py-2 uppercase">{row.precision}</td>
-        <td className="px-3 py-2">
+        <td className="min-w-32 px-3 py-2">
           {row.spec_method && row.spec_method !== 'none' ? (
             resolveFrameworkPartLabel(DB_MODEL_TO_DISPLAY[row.model], row.spec_method)
           ) : (
@@ -493,7 +497,13 @@ function SubmissionRow({
             <TooltipProvider>
               <TooltipRoot>
                 <TooltipTrigger asChild>
-                  <Button asChild variant="outline" size="2xs" onClick={(e) => e.stopPropagation()}>
+                  <Button
+                    asChild
+                    variant="ghost"
+                    size="2xs"
+                    className={`-ml-2.5 ${TABLE_ACTION_STYLE}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <a
                       href={compareUrl}
                       data-testid="submissions-compare-runs-link-inline"

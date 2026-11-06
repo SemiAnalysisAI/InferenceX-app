@@ -35,6 +35,9 @@ export const TABLE_HEAD_ROW_STYLE = 'border-b border-border';
 
 export const TABLE_HEAD_CELL_STYLE = 'whitespace-nowrap text-xs font-medium text-muted-foreground';
 
+export const TABLE_ACTION_STYLE =
+  'border border-transparent hover:border-border focus-visible:border-border';
+
 export const SEGMENTED_CONTAINER_STYLE =
   'inline-flex min-h-11 min-w-0 max-w-full flex-wrap items-stretch rounded-md border border-border dark:border-input md:min-h-8';
 

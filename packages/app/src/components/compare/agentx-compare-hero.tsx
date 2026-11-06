@@ -515,7 +515,7 @@ export function AgentXCompareHero({
             <div
               aria-hidden="true"
               data-testid="compare-agentx-vendor-marks"
-              className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-foreground"
+              className="mt-6 grid grid-cols-3 items-center gap-x-4 gap-y-3 text-foreground sm:flex sm:flex-wrap sm:gap-x-6 sm:gap-y-2"
             >
               {VENDOR_MARKS.filter((mark) => surface === 'landing' || mark.name !== 'Huawei').map(
                 (mark) => (
@@ -525,7 +525,7 @@ export function AgentXCompareHero({
                     viewBox={mark.viewBox}
                     width={mark.width}
                     height={mark.height}
-                    className="shrink-0"
+                    className="h-auto max-w-full shrink-0"
                   >
                     {mark.gradients ? (
                       <defs>

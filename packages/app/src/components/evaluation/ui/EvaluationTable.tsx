@@ -9,6 +9,7 @@ import { type ParallelismPill, parallelismPills } from '@/components/evaluation/
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { Button } from '@/components/ui/button';
 import { ConfigPill } from '@/components/ui/config-pill';
+import { TABLE_ACTION_STYLE } from '@/components/ui/control-styles';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { track } from '@/lib/analytics/analytics';
 import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
@@ -272,7 +273,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
             <Button
               type="button"
               variant="ghost"
-              className="border border-transparent hover:border-border focus-visible:border-border"
+              className={TABLE_ACTION_STYLE}
               size="icon-2xs"
               onClick={() => openDrawer(row)}
               aria-label={t.promptsAriaLabel(row.configLabel)}

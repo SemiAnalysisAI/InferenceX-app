@@ -31,10 +31,9 @@ export function UnofficialDomainNotice() {
   if (!isUnofficial || isEmbedPathname(pathname)) return null;
 
   return (
-    <div className="container mx-auto px-4 lg:px-8 mb-4">
+    <div data-testid="unofficial-domain-notice" className="container mx-auto px-4 lg:px-8 mb-4">
       <div
         role="note"
-        data-testid="unofficial-domain-notice"
         className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-destructive/60 bg-destructive/15 px-4 py-3"
       >
         <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-red-600 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-white">

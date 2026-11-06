@@ -38,10 +38,10 @@ describe('SubmissionsTable — Spec Method column', () => {
 
   it('sorts by spec_method when the header is clicked', () => {
     cy.mount(<SubmissionsTable data={rows} />);
-    cy.contains('th', 'Spec method').click();
+    cy.contains('th', 'Spec method').find('button').click();
     cy.get('tbody tr').first().should('contain.text', 'MI355X');
     cy.get('tbody tr').last().should('contain.text', 'B300');
-    cy.contains('th', 'Spec method').click();
+    cy.contains('th', 'Spec method').find('button').click();
     cy.get('tbody tr').first().should('contain.text', 'B300');
     cy.get('tbody tr').last().should('contain.text', 'MI355X');
   });

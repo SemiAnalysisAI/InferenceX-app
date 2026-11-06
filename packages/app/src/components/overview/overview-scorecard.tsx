@@ -548,6 +548,9 @@ interface SurfaceProps {
   referenceHardware: OverviewReferenceHardware;
 }
 
+const HEADER_EDGE_COVER =
+  'relative after:absolute after:inset-x-0 after:top-full after:hidden after:h-0.5 after:bg-inherit [@container_scroll-state(stuck:top)]:after:block';
+
 export function DesktopOverviewMatrix({
   models,
   locale,
@@ -573,11 +576,11 @@ export function DesktopOverviewMatrix({
             <col key={platform.hardware} className="w-[15.6%]" />
           ))}
         </colgroup>
-        <thead className="sticky top-14 z-20 bg-card">
+        <thead className="sticky top-14 z-20 bg-card [container-type:scroll-state]">
           <tr className="text-xs text-muted-foreground">
             <th
               scope="col"
-              className="h-10 bg-card px-4 text-left font-medium shadow-[inset_0_-1px_0_var(--border),0_6px_6px_-6px_rgb(0_0_0/0.25)] lg:px-6"
+              className={`h-10 bg-card px-4 text-left font-medium shadow-[inset_0_-1px_0_var(--border),0_6px_6px_-6px_rgb(0_0_0/0.25)] lg:px-6 ${HEADER_EDGE_COVER}`}
             >
               {strings.modelHeader}
             </th>
@@ -585,7 +588,7 @@ export function DesktopOverviewMatrix({
               <th
                 key={platform.hardware}
                 scope="col"
-                className={`h-10 px-3 text-left ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-[color-mix(in_oklch,var(--muted)_50%,var(--card))] font-semibold text-foreground shadow-[inset_0_-1px_0_var(--border),inset_1px_0_0_var(--border),inset_-1px_0_0_var(--border),0_6px_6px_-6px_rgb(0_0_0/0.25)]' : 'bg-card font-medium shadow-[inset_0_-1px_0_var(--border),0_6px_6px_-6px_rgb(0_0_0/0.25)]'}`}
+                className={`h-10 px-3 text-left ${HEADER_EDGE_COVER} ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-[color-mix(in_srgb,var(--muted)_50%,var(--card))] font-semibold text-foreground shadow-[inset_0_-1px_0_var(--border),inset_1px_0_0_var(--border),inset_-1px_0_0_var(--border),0_6px_6px_-6px_rgb(0_0_0/0.25)] after:shadow-[inset_1px_0_0_var(--border),inset_-1px_0_0_var(--border)]' : 'bg-card font-medium shadow-[inset_0_-1px_0_var(--border),0_6px_6px_-6px_rgb(0_0_0/0.25)]'}`}
               >
                 {comparisonMode === 'hardware' && platform.hardware === referenceHardware
                   ? `${platform.hardwareLabel} · ${strings.referenceHeader}`
