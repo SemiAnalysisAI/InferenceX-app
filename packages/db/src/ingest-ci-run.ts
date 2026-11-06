@@ -254,7 +254,7 @@ const GITHUB_TOKEN = process.env.GITHUB_TOKEN!;
 
 const sql = createAdminSql({
   noSsl: hasNoSslFlag(),
-  max: 5,
+  max: 12,
   idle_timeout: 60,
 });
 
@@ -517,6 +517,8 @@ async function main(): Promise<void> {
     const traceWorkerPool = new TraceReplayWorkerPool(traceWorkerCount);
     const traceUploadLimiter = new AsyncSemaphore(Math.min(2, traceWorkerCount));
     const traceTasks: Promise<void>[] = [];
+    const serverLogLimiter = new AsyncSemaphore(4);
+    const serverLogTasks: Promise<void>[] = [];
     if (traceReplayPaths.size > 0) {
       console.log(
         `  Trace preparation: ${traceWorkerCount} worker(s) across ${os.availableParallelism()} vCPU(s), ` +
@@ -736,33 +738,8 @@ async function main(): Promise<void> {
             });
           }
 
+          let serverLogLinked: Promise<void> | undefined;
           if (parentDir.startsWith('bmk_') && insertedIds.length > 0) {
-            const logArtifact =
-              serverLogArtifacts.get(configKey) ??
-              serverLogArtifacts.get(stripBmkAndAgenticPrefix(parentDir));
-            if (logArtifact) {
-              try {
-                const serverLogStart = Date.now();
-                const logRoot = serverLogArtifactRoot(
-                  logArtifact.artifactDir,
-                  logArtifact.artifactName,
-                );
-                const logFiles = logRoot ? listServerLogFilePaths(logRoot) : [];
-                const totalBytes = logFiles.reduce(
-                  (bytes, logFile) => bytes + fs.statSync(logFile.path).size,
-                  0,
-                );
-                console.log(
-                  `    server_logs ${logFiles.length} .log/.out file(s) (${formatBytes(totalBytes)})`,
-                );
-                await withTransientDbRetry(`server_logs for ${configKey}`, () =>
-                  insertServerLogFilePaths(sql, insertedIds, logFiles),
-                );
-                console.log(`    server_logs linked (${elapsed(serverLogStart)})`);
-              } catch (error: any) {
-                tracker.recordDbError('server_logs', configKey, error);
-              }
-            }
             if (gpuMetricsArtifact && !gpuMetricsArtifactHoldsTelemetry(gpuMetricsArtifact)) {
               telemetryNotCollectedArtifacts.add(gpuMetricsArtifact.artifactName);
               report.counts.power.skipped++;
@@ -811,6 +788,36 @@ async function main(): Promise<void> {
                   if (point) point.error = error instanceof Error ? error.message : String(error);
                 }
               }
+            }
+            const logArtifact =
+              serverLogArtifacts.get(configKey) ??
+              serverLogArtifacts.get(stripBmkAndAgenticPrefix(parentDir));
+            if (logArtifact) {
+              // Queued after gpu_metrics so the two never lock this config's rows at once.
+              serverLogLinked = serverLogLimiter
+                .run(async () => {
+                  const serverLogStart = Date.now();
+                  const logRoot = await serverLogArtifactRoot(
+                    logArtifact.artifactDir,
+                    logArtifact.artifactName,
+                  );
+                  const logFiles = logRoot ? listServerLogFilePaths(logRoot) : [];
+                  const totalBytes = logFiles.reduce(
+                    (bytes, logFile) => bytes + fs.statSync(logFile.path).size,
+                    0,
+                  );
+                  console.log(
+                    `    server_logs ${configKey}: ${logFiles.length} .log/.out file(s) (${formatBytes(totalBytes)})`,
+                  );
+                  await withTransientDbRetry(`server_logs for ${configKey}`, () =>
+                    insertServerLogFilePaths(sql, insertedIds, logFiles),
+                  );
+                  console.log(`    server_logs ${configKey}: linked (${elapsed(serverLogStart)})`);
+                })
+                .catch((error: unknown) => {
+                  tracker.recordDbError('server_logs', configKey, error);
+                });
+              serverLogTasks.push(serverLogLinked);
             }
           }
 
@@ -878,6 +885,8 @@ async function main(): Promise<void> {
                             `timeline_requests=${prepared.timelineRequests} ` +
                             `(${(prepared.computeMs / 1000).toFixed(1)}s)`,
                         );
+                        // ATOM kv capacity and kv_cache_pool_tokens read the linked server log.
+                        await serverLogLinked;
                         const linked = await traceUploadLimiter.run(() =>
                           withTransientDbRetry(`trace_replay for ${suffix}`, () =>
                             persistPreparedTraceReplay(sql, unlinkedIds, prepared, {
@@ -912,6 +921,10 @@ async function main(): Promise<void> {
         }
       }
       console.log(`    finished ${relativeFile} (${elapsed(fileStart)})`);
+    }
+    if (serverLogTasks.length > 0) {
+      console.log(`  Waiting for ${serverLogTasks.length} queued server log task(s)`);
+      await Promise.all(serverLogTasks);
     }
     if (traceTasks.length > 0) {
       console.log(`  Waiting for ${traceTasks.length} queued trace replay task(s)`);
@@ -1154,13 +1167,6 @@ async function main(): Promise<void> {
   report.detail.evalSampleFiles = totalSampleFiles;
   report.detail.changelogEntriesWritten = totalChangelogs;
 
-  const [configCount] = await sql`select count(*)::int as n from configs`;
-  const [resultCount] = await sql`select count(*)::int as n from benchmark_results`;
-  const [statsCount] = await sql`select count(*)::int as n from run_stats`;
-  const [evalCount] = await sql`select count(*)::int as n from eval_results`;
-  const [sampleCount] = await sql`select count(*)::bigint as n from eval_samples`;
-  const [changelogCount] = await sql`select count(*)::int as n from changelog_entries`;
-
   console.log('\n=== Summary ===');
   console.log(
     `  Benchmark results: ${totalNewBmk} new, ${totalDupBmk} duplicate (ON CONFLICT updates)`,
@@ -1171,18 +1177,10 @@ async function main(): Promise<void> {
   console.log(`  Eval results:      ${totalEvals} new`);
   console.log(`  Eval samples:      ${totalSamples} new across ${totalSampleFiles} file(s)`);
   console.log(`  Changelog entries: ${totalChangelogs} written`);
-  printIngestSummaryFooter(
-    {
-      configs: configCount.n,
-      benchmarkResults: resultCount.n,
-      runStats: statsCount.n,
-      evalResults: evalCount.n,
-      evalSamples: sampleCount.n,
-      changelogEntries: changelogCount.n,
-    },
-    tracker,
-    { includeFailedRuns: true, includeUnmappedPrecisions: true },
-  );
+  printIngestSummaryFooter(null, tracker, {
+    includeFailedRuns: true,
+    includeUnmappedPrecisions: true,
+  });
 
   const { unmappedModels, unmappedHws, unmappedPrecisions } = tracker;
   report.unmapped = {

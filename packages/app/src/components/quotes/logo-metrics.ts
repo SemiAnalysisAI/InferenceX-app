@@ -30,7 +30,7 @@ export const LOGO_METRICS: Record<string, LogoMetrics> = {
   'deepseek-color.svg': { ratio: 1, aspect: 1.36, fill: 0.73 },
   'doubleword.png': { ratio: 4.524, aspect: 4.56, fill: 0.99, invertInDark: true },
   'embeddedllm.webp': { ratio: 3.871, aspect: 3.92, fill: 0.99, invertInDark: true },
-  'fireworks.svg': { ratio: 8.209, aspect: 8.21, fill: 1, invertInDark: true },
+  'fireworks-purple.svg': { ratio: 2.025, aspect: 2.025, fill: 1 },
   'firmus.svg': { ratio: 3.808, aspect: 4.04, fill: 0.94, invertInDark: true },
   'gmi-cloud.svg': { ratio: 3.571, aspect: 3.67, fill: 0.78, invertInDark: true },
   'google-color.svg': { ratio: 1, aspect: 0.98, fill: 1 },
@@ -68,6 +68,7 @@ export const LOGO_METRICS: Record<string, LogoMetrics> = {
   'vllm.svg': { ratio: 1, aspect: 0.96, fill: 0.75 },
   'voltage-park.svg': { ratio: 7.263, aspect: 7.08, fill: 1, invertInDark: true },
   'vultr.svg': { ratio: 1, aspect: 1.15, fill: 0.87, invertInDark: true },
+  'wafer.svg': { ratio: 3.5, aspect: 3.5, fill: 1, invertInDark: true },
   'weka.svg': { ratio: 4.839, aspect: 4.84, fill: 1, invertInDark: true },
   'zai-color.svg': { ratio: 1, aspect: 1, fill: 1, invertInDark: true },
 };

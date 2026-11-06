@@ -95,7 +95,7 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
     desktopColumns: PROVIDER_COLUMNS,
     logos: [
       { label: 'Together AI', logo: 'together-ai.svg', quoteOrg: 'Together AI' },
-      { label: 'Fireworks AI', logo: 'fireworks.svg', quoteOrg: 'Fireworks AI' },
+      { label: 'Fireworks AI', logo: 'fireworks-purple.svg', quoteOrg: 'Fireworks AI' },
       { label: 'GMI Cloud', logo: 'gmi-cloud.svg', quoteOrg: 'GMI Cloud' },
       { label: 'Nebius', logo: 'nebius.svg', quoteOrg: 'Nebius' },
       { label: 'Baseten', logo: 'baseten.svg', quoteOrg: 'Baseten' },
@@ -103,6 +103,7 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
       { label: 'Tensormesh', logo: 'tensormesh.svg', quoteOrg: 'Tensormesh' },
       { label: 'Morph', logo: 'morph.svg', quoteOrg: 'Morph' },
       { label: 'Doubleword', logo: 'doubleword.png', quoteOrg: 'Doubleword' },
+      { label: 'Wafer', logo: 'wafer.svg', quoteOrg: 'Wafer' },
     ],
   },
   {

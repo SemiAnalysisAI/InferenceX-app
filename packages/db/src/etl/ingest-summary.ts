@@ -15,17 +15,19 @@ export interface IngestSummaryOptions {
 }
 
 export function printIngestSummaryFooter(
-  totals: IngestDatabaseTotals,
+  totals: IngestDatabaseTotals | null,
   tracker: SkipTracker,
   options?: IngestSummaryOptions,
 ): void {
-  console.log(`\n  DB totals:`);
-  console.log(`    configs           ${totals.configs}`);
-  console.log(`    benchmark_results ${totals.benchmarkResults}`);
-  console.log(`    run_stats         ${totals.runStats}`);
-  console.log(`    eval_results      ${totals.evalResults}`);
-  console.log(`    eval_samples      ${totals.evalSamples}`);
-  console.log(`    changelog_entries ${totals.changelogEntries}`);
+  if (totals) {
+    console.log(`\n  DB totals:`);
+    console.log(`    configs           ${totals.configs}`);
+    console.log(`    benchmark_results ${totals.benchmarkResults}`);
+    console.log(`    run_stats         ${totals.runStats}`);
+    console.log(`    eval_results      ${totals.evalResults}`);
+    console.log(`    eval_samples      ${totals.evalSamples}`);
+    console.log(`    changelog_entries ${totals.changelogEntries}`);
+  }
 
   const { skips, unmappedModels, unmappedHws, unmappedPrecisions, unexpectedMetrics } = tracker;
   const skipLines: [string, number][] = [['no isl/osl (old format)', skips.noIslOsl]];

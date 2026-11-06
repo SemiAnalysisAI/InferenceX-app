@@ -157,3 +157,68 @@ describe('collectMetricPhases', () => {
     ).rejects.toThrow();
   });
 });
+
+const series = (start: number, length: number) => ({
+  series: Array.from({ length }, (_, i) => ({
+    labels: { note: `line\nbreak "quoted" \\ end ü 漢字 🚀 ${i}` },
+    timeslices: [{ start_ns: start + i, rate: i / 3 }],
+  })),
+});
+
+describe('collectMetricPhases streaming path', () => {
+  const doc = {
+    schema_version: '1.1',
+    metadata: { metrics: { wanted: 'must not be selected' } },
+    metrics: {
+      ignored: series(0, 2000),
+      wanted: series(100, 3000),
+      'quote"key': [1, { nested: true }, null],
+      scalar: 'last',
+    },
+    warmup_metrics: {
+      wanted: false,
+      empty: {},
+      scalar: series(50, 1000),
+    },
+    input_config: { metrics: ['wanted'] },
+  };
+  const wanted = new Set(['wanted', 'scalar', 'quote"key', 'empty']);
+  const pick = (phase: Record<string, unknown>) =>
+    Object.fromEntries(Object.entries(phase).filter(([key]) => wanted.has(key)));
+
+  it.each([
+    ['compact', JSON.stringify(doc)],
+    ['pretty-printed', JSON.stringify(doc, null, 2)],
+  ])('matches JSON.parse for %s JSON split across many gunzip chunks', async (_layout, json) => {
+    // Several 64 KiB gunzip chunks, so tokens and multi-byte characters straddle chunk edges.
+    expect(Buffer.byteLength(json)).toBeGreaterThan(8 * 64 * 1024);
+    const parsed = JSON.parse(json) as typeof doc;
+
+    const phases = await collectMetricPhases(gzipSync(json), wanted, 1);
+
+    expect(phases).toStrictEqual({
+      metrics: pick(parsed.metrics),
+      warmupMetrics: pick(parsed.warmup_metrics),
+      complete: false,
+    });
+    expect(Object.keys(phases.metrics)).toEqual(['wanted', 'quote"key', 'scalar']);
+    expect(Object.keys(phases.warmupMetrics)).toEqual(['wanted', 'empty', 'scalar']);
+  });
+
+  it.each([
+    ['an unterminated document', '{"metrics": {"wanted": 1}'],
+    ['an unterminated value', '{"metrics": {"wanted": [1, 2'],
+    ['trailing characters', '{"metrics": {"wanted": 1}} x'],
+    ['a whitespace-only document', '  \n'],
+  ])('rejects %s', async (_name, json) => {
+    await expect(collectMetricPhases(gzipSync(json), wanted, 1)).rejects.toThrow();
+  });
+
+  it('rejects a truncated gzip stream', async () => {
+    const blob = gzipSync(JSON.stringify(doc));
+
+    await expect(
+      collectMetricPhases(blob.subarray(0, blob.length >> 1), wanted, 1),
+    ).rejects.toThrow();
+  });
+});

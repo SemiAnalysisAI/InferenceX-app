@@ -72,6 +72,7 @@ import { comparisonEntryLabel } from '@/components/inference/utils/comparisonEnt
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import {
   generateGPUGraphTooltipContent,
+  generateHoverTooltipContent,
   generateOverlayTooltipContent,
 } from '@/components/inference/utils/tooltipUtils';
 import { useComparisonSeries } from '@/components/inference/hooks/useComparisonSeries';
@@ -1166,20 +1167,24 @@ const GPUGraph = React.memo(
             hoverPath: xMarkerPath(7, 0.7),
             tooltip,
             handle: chartRef.current,
-            content: (point, pinned) =>
-              overlayData
-                ? generateOverlayTooltipContent({
-                    data: point,
-                    color: overlayRunColor(overlayRunOf(point)),
-                    isPinned: pinned,
-                    xLabel,
-                    yLabel,
-                    selectedYAxisMetric,
-                    hardwareConfig: overlayData.hardwareConfig,
-                    overlayData,
-                    locale,
-                  })
-                : '',
+            content: (point, pinned) => {
+              if (!overlayData) return '';
+              const config = {
+                data: point,
+                color: overlayRunColor(overlayRunOf(point)),
+                isPinned: pinned,
+                xLabel,
+                yLabel,
+                selectedYAxisMetric,
+                hardwareConfig: overlayData.hardwareConfig,
+                overlayData,
+                comparisonLabel: comparisonEntryLabel(point.date, runNumbering),
+                locale,
+              };
+              return pinned
+                ? generateOverlayTooltipContent(config)
+                : generateHoverTooltipContent(config);
+            },
             position: (event) => {
               const [mouseX, mouseY] = d3.pointer(event, container);
               return computeTooltipPosition(mouseX, mouseY, tooltip, container);
@@ -1240,6 +1245,7 @@ const GPUGraph = React.memo(
       xLabel,
       yLabel,
       selectedYAxisMetric,
+      runNumbering,
       locale,
       attachPowerTraceAction,
     ]);
@@ -1430,10 +1436,11 @@ const GPUGraph = React.memo(
         }}
         tooltip={{
           rulerType: 'crosshair',
-          content: (d: InferenceData, isPinned: boolean) =>
-            generateGPUGraphTooltipContent({
+          content: (d: InferenceData, isPinned: boolean) => {
+            const config = {
               data: d,
-              color: getCssColor(resolveColor(d.hwKey)),
+              color: getCssColor(getColor(d)),
+              comparisonLabel: comparisonEntryLabel(d.date, runNumbering),
               isPinned,
               xLabel,
               yLabel,
@@ -1449,7 +1456,11 @@ const GPUGraph = React.memo(
                 ? presenceRef.current?.log.has(d.id) === true
                 : false,
               locale,
-            }),
+            };
+            return isPinned
+              ? generateGPUGraphTooltipContent(config)
+              : generateHoverTooltipContent(config);
+          },
           getRulerX: (d, xScale) => (xScale as d3.ScaleLinear<number, number>)(d.x),
           getRulerY: (d, yScale) => (yScale as d3.ScaleLinear<number, number>)(d.y),
           onHoverStart: (sel, d) =>

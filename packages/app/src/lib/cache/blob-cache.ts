@@ -106,12 +106,17 @@ export async function blobSet(key: string, json: string): Promise<void> {
 }
 
 /**
- * Delete cached blobs, optionally within a key prefix and keeping the key
- * subtrees in `keep`. No-op when unconfigured. Deletes go out in small batches,
- * and a rate-limited call waits for Blob's `retryAfter` and is sent again, so a
- * purge of thousands of blobs finishes instead of failing on the limit.
+ * Delete cached blobs, optionally within a key prefix, keeping the key subtrees
+ * in `keep` and, when `uploadedBefore` is given, every blob uploaded at or after
+ * it. No-op when unconfigured. Deletes go out in small batches, and a
+ * rate-limited call waits for Blob's `retryAfter` and is sent again, so a purge
+ * of thousands of blobs finishes instead of failing on the limit.
  */
-export async function blobPurge(keyPrefix = '', keep: string[] = []): Promise<number> {
+export async function blobPurge(
+  keyPrefix = '',
+  keep: string[] = [],
+  uploadedBefore?: Date,
+): Promise<number> {
   if (!blobEnabled()) return 0;
   const prefix = `${getPrefix()}${keyPrefix}`;
   const kept = keep.map((key) => `${getPrefix()}${key}`);
@@ -138,7 +143,11 @@ export async function blobPurge(keyPrefix = '', keep: string[] = []): Promise<nu
   do {
     const result = await withRateLimitRetry(list, { prefix, cursor });
     const urls = result.blobs
-      .filter((b) => !kept.some((k) => b.pathname.startsWith(k)))
+      .filter(
+        (b) =>
+          (!uploadedBefore || b.uploadedAt < uploadedBefore) &&
+          !kept.some((k) => b.pathname.startsWith(k)),
+      )
       .map((b) => b.url);
     for (let start = 0; start < urls.length; start += PURGE_BATCH_SIZE) {
       const batch = urls.slice(start, start + PURGE_BATCH_SIZE);
