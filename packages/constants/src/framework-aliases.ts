@@ -16,6 +16,7 @@ export const FW_REGISTRY: Record<string, FwEntry> = {
   sglang: { label: 'SGLang' },
   tilert: { label: 'TileRT' },
   teacup: { label: 'Teacup' },
+  tokenspeed: { label: 'TokenSpeed' },
   trt: { label: 'TRTLLM' },
   vllm: { label: 'vLLM' },
 };
@@ -40,6 +41,7 @@ export const FRAMEWORK_LABELS: Record<string, string> = {
     ]),
   ),
   mtp: 'MTP',
+  draft_model: 'Draft Model',
   aiperf: 'AIPerf',
 };
 

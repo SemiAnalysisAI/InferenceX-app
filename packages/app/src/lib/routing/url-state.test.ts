@@ -35,6 +35,11 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.g_tco).toBe('internal');
   });
 
+  it('defaults the chip basis to per pool so only the total basis is share-link state', async () => {
+    const { PARAM_DEFAULTS } = await import('@/lib/routing/url-state');
+    expect(PARAM_DEFAULTS.g_chips).toBe('pool');
+  });
+
   it('has an EMPTY default for i_seq so the selected scenario is always written', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/routing/url-state');
     expect(PARAM_DEFAULTS.i_seq).toBe('');
@@ -1061,5 +1066,30 @@ describe('buildShareUrl on the video dashboard', () => {
     setupWindow('?v_y=kjPerVideo', '/inference');
     const { buildShareUrl } = await import('@/lib/routing/url-state');
     expect(buildShareUrl()).not.toContain('v_y');
+  });
+});
+
+describe('VideoGenX results share state', () => {
+  it('does not carry reliability state into the VideoGenX r_ scope', async () => {
+    vi.resetModules();
+    const { location } = setupWindow('?r_range=last-month', '/reliability');
+    const { buildShareUrl } = await import('@/lib/routing/url-state');
+    location.pathname = '/zh/video';
+    location.search =
+      '?r_workload=source%3Ac1&r_gpus=4&r_deadline=60&r_price_t2v=0.08&unofficialrun=123';
+    const url = new URL(buildShareUrl());
+    expect(url.pathname).toBe('/zh/video');
+    expect(url.searchParams.get('r_workload')).toBe('source:c1');
+    expect(url.searchParams.get('r_gpus')).toBe('4');
+    expect(url.searchParams.get('r_deadline')).toBe('60');
+    expect(url.searchParams.get('r_price_t2v')).toBe('0.08');
+    expect(url.searchParams.get('unofficialruns')).toBe('123');
+    expect(url.searchParams.has('r_range')).toBe(false);
+  });
+
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 });

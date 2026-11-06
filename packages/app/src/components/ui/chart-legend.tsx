@@ -370,6 +370,7 @@ export default function ChartLegend({
         isLegendExpanded={itemsExpanded}
         sidebarMode={isSidebar}
         blockedReason={item.blockedReason}
+        idScope={item.idScope}
       />
     );
 
@@ -445,6 +446,7 @@ export default function ChartLegend({
                     isLegendExpanded={itemsExpanded}
                     sidebarMode={isSidebar}
                     blockedReason={item.blockedReason}
+                    idScope={item.idScope}
                     asFragment
                   />
                 </li>

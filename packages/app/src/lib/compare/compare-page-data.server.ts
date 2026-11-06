@@ -1,3 +1,5 @@
+import { cache } from 'react';
+
 import { rowToSequence } from '@semianalysisai/inferencex-constants';
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 
@@ -84,26 +86,30 @@ function buildComparePageDerivedData(
   };
 }
 
-export async function getComparePageDerivedData(
-  dbModelKeys: readonly string[],
-  a: string,
-  b: string,
-  requestedSequence?: string | null,
-  requestedPrecision?: string | null,
-  fallbackSequence?: string | null,
-): Promise<ComparePageDerivedData> {
-  const keys = [...dbModelKeys];
-  const pairRowsLoader = FIXTURES_MODE ? loadComparePairRows : getCachedComparePairRows;
-  const initialPairBenchmarkRows = await pairRowsLoader(keys, a, b);
-  return {
-    ...buildComparePageDerivedData(
+const readPagePairRows = cache((dbModelKeys: readonly string[], a: string, b: string) =>
+  (FIXTURES_MODE ? loadComparePairRows : getCachedComparePairRows)([...dbModelKeys], a, b),
+);
+
+export const getComparePageDerivedData = cache(
+  async (
+    dbModelKeys: readonly string[],
+    a: string,
+    b: string,
+    requestedSequence?: string | null,
+    requestedPrecision?: string | null,
+    fallbackSequence?: string | null,
+  ): Promise<ComparePageDerivedData> => {
+    const initialPairBenchmarkRows = await readPagePairRows(dbModelKeys, a, b);
+    return {
+      ...buildComparePageDerivedData(
+        initialPairBenchmarkRows,
+        a,
+        b,
+        requestedSequence ?? null,
+        requestedPrecision ?? null,
+        fallbackSequence ?? null,
+      ),
       initialPairBenchmarkRows,
-      a,
-      b,
-      requestedSequence ?? null,
-      requestedPrecision ?? null,
-      fallbackSequence ?? null,
-    ),
-    initialPairBenchmarkRows,
-  };
-}
+    };
+  },
+);

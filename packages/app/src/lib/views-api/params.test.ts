@@ -8,6 +8,7 @@ import { GPU_VENDORS } from '@semianalysisai/inferencex-constants';
 import { ViewsApiParamError } from './errors';
 import {
   matchesHardware,
+  FRAMEWORK_FAMILY_VALUES,
   MAX_RUN_ID_LIST,
   parseBoolParam,
   parseCostProviderParam,
@@ -25,6 +26,7 @@ import {
   parseRunIdParam,
   parseSequenceParam,
   parseTcoBasisParam,
+  parseChipBasisParam,
   resolveModelParam,
   VENDOR_VALUES,
   VIEWS_MODEL_NAMES,
@@ -80,6 +82,12 @@ describe('parseSequenceParam', () => {
 });
 
 describe('parseEnumParam / parseListParam', () => {
+  it('accepts the TokenSpeed family in public view filters', () => {
+    expect(parseListParam('TokenSpeed', 'frameworks', FRAMEWORK_FAMILY_VALUES)).toEqual([
+      'tokenspeed',
+    ]);
+  });
+
   it('matches case-insensitively and preserves canonical casing', () => {
     expect(parseEnumParam('P90', 'percentile', ['p75', 'p90'], 'p90')).toBe('p90');
   });
@@ -205,6 +213,13 @@ describe('dashboard-derived allowlists', () => {
     expect(parseCostProviderParam(null)).toBe('costh');
     expect(parseCostTypeParam(null)).toBe('total');
     expect(() => parseCostTypeParam('gross')).toThrow(ViewsApiParamError);
+  });
+
+  it('defaults chipBasis to the stored per-pool basis and accepts total', () => {
+    expect(parseChipBasisParam(null)).toBe('pool');
+    expect(parseChipBasisParam('total')).toBe('total');
+    expect(parseChipBasisParam('TOTAL')).toBe('total');
+    expect(() => parseChipBasisParam('decode')).toThrow(ViewsApiParamError);
   });
 });
 

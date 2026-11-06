@@ -4,7 +4,13 @@
 
 ## Read path
 
-`GET /api/video-runs?format=history&page=1` returns a versioned UI projection of existing stored H3 indexes. It lists `h3-video-media/v1/runs/` metadata, validates pathname identities, sorts by index storage time (artifact ID breaks ties), then reads at most ten indexes for one page. It neither downloads media nor calls the publication path. A matching immutable receipt under `h3-video-media/v1/approvals/` marks an entry `approved: true`; missing or invalid receipts leave it in History with `approved: false`. The repository visibility check still applies. This UI transport is not a stable public benchmark API.
+`GET /api/video-runs?format=history&page=1` returns a versioned UI projection of existing stored H3 indexes. Adding `pages=2` to `pages=5` returns that many consecutive pages in one response, with the same entries and `nextPage` as reading them one at a time. The route lists `h3-video-media/v1/runs/` and `h3-video-media/v1/approvals/` metadata, validates pathname identities, sorts by index storage time (artifact ID breaks ties), and reads one History snapshot (see below). An entry comes from the snapshot only while its record still names the index upload time and the approval receipt upload time it was built from. Any other index on the requested pages is projected directly, as before, from its full stored index and receipt. The read never downloads media, never writes and never calls the publication path. A matching immutable receipt under `h3-video-media/v1/approvals/` marks an entry `approved: true`. Missing or invalid receipts leave it in History with `approved: false`. The repository visibility check still applies, and a failed check discards the History read. This UI transport is not a stable public benchmark API.
+
+Every read first confirms that the H3 repository is public through the GitHub API and returns 503 otherwise. A public answer is trusted for one hour per server instance, so a repository that turns private can keep being served by a warm instance for up to an hour. A private or failed answer is never remembered. The authorized publication POST checks visibility on every call.
+
+### History snapshot
+
+A snapshot is one immutable JSON object at `h3-video-media/v1/runs/history/v<projection>/<milliseconds>-<suffix>.json` that maps each index pathname to its projected entry and the receipt upload time it was verified against (null without a receipt). Readers use the newest snapshot of the current `VIDEO_HISTORY_PROJECTION` (`src/lib/video/video-history-store.ts`). After the authorized POST approves an artifact, it writes a new snapshot that keeps every still-current record and adds that artifact's entry, then deletes all older snapshots except the one it replaced. `POST /api/video-runs` with the body `{"history":"backfill"}` and the same bearer secret projects every index without a current record. The Warm After Deploy workflow calls it after each production promotion, and it writes nothing when every record is current. A receipt that cannot be read during a build leaves that index out of the snapshot rather than recording it as unapproved. The projection version is part of the path. A test pins a digest of the sources that produce entries, so a change that could alter them bumps the version, and the next backfill rebuilds the snapshot. Two writers racing can drop each other's new record. Reads then project that index directly until the next publication or backfill, so the output never changes.
 
 The projection groups all cells under the original source inside one artifact entry. It reuses `storedBundle`, `servingCells`, `storedFidelityBundle`, and the existing tradeoff calculations. Invalid or unavailable indexes remain explicit error entries. Original execution time comes from `ci.started_at`; index publication time is separate and must never be substituted for execution time. Original run IDs and export run IDs remain distinct.
 
@@ -12,13 +18,37 @@ Two launchers produce the serving matrix, and `serving.ts` keys the contract on 
 
 Allocated GPU counts require retained Slurm `AllocTRES` or the validated AMD allocation binding; a native power document's `expected_gpu_count` describes telemetry coverage and cannot establish the reservation. Without allocation evidence, the count and allocation-normalized metrics remain null.
 
-Each observation also carries the cell's participating and allocated GPU counts, measurement wall seconds, clip duration and frame count, summed mean board watts, summed recorded enforced limits (null when no limit snapshot exists), the configured `tp_size` / `ulysses_degree` / `attention_backend` and the endpoint's replica count (`execution.deployment.replica_count`, null for bundles that predate it). The nullable `workloadKey` carries the full canonical workload identity when complete; prompts and seeds cannot be replaced by the shortened display label. These are additive, nullable fields under the same `schemaVersion: 1`; the hardware dashboard reads at most five pages and derives every displayed metric from them, so the browser never parses an artifact bundle for the chart.
+Each observation also carries the cell's participating and allocated GPU counts, measurement wall seconds, requested clip duration and frame count, summed mean board watts, summed recorded enforced limits (null when no limit snapshot exists), the configured `tp_size` / `ulysses_degree` / `attention_backend` and the endpoint's replica count (`execution.deployment.replica_count`, null for bundles that predate it). The nullable `workloadKey` carries the full canonical workload identity when complete; prompts and seeds cannot be replaced by the shortened display label. These are additive, nullable fields under the same `schemaVersion: 1`; the hardware dashboard reads at most five pages in one request and derives every displayed metric from them, so the browser never parses an artifact bundle for the chart.
+
+`videoSecondsPerHour` carries the validated decoded video seconds from technically
+valid measured requests divided by measurement wall seconds, multiplied by 3600.
+Warmup requests are excluded, and every valid measured request must have a positive
+recorded media duration. Fresh History projections emit this nullable field;
+older stored projections may omit it, which the dashboard treats as null. Missing
+output duration leaves video-second throughput, per-video-second cost and revenue
+unavailable.
+`durationSeconds` remains the requested plan duration for workload identity and
+filters; it never substitutes for decoded output duration.
 
 ## Publication and discovery
 
+Published History and media metadata reads reuse a process-local payload for at
+most 30 seconds, with at most 32 entries in each cache. History is keyed by its
+first page and page count. A cached payload is served only after the repository
+visibility check above passes. Failures, partial or unapproved History pages and
+absent media are not cached. Successful publication or History backfill clears
+both process caches; another process observes the new source within the 30-second
+bound. HTTP responses remain `private, no-store`. Replay keeps its existing
+verified, read-only snapshot and bypasses this cache.
+
+中文：已发布的 History 和媒体元数据在服务进程内最多复用 30 秒，两类缓存各保留最多 32 项；History 按起始页与页数分别缓存。
+缓存内容只在通过上述源仓库公开检查后返回；读取失败、不完整或未批准的 History 页和缺失媒体均不缓存。
+发布或 History 补建成功后清空当前进程缓存，其他进程最多延迟 30 秒看到新来源。HTTP 响应仍为
+`private, no-store`。本地回放继续复用原有的已校验只读快照。
+
 The `publish-video-results` repository dispatch supplies an explicit `source_run_id` and `merge_run_id`; manual `workflow_dispatch` requires a source `run_id`. There is no scheduled all-runs publisher. The job lists only that run's GitHub artifacts (including later artifact pages), then sends each exact run/artifact ID to bearer-protected `POST /api/video-runs` using the existing invalidation secret. It retries already stored indexes because they may lack an approval receipt. Failed artifacts do not prevent later artifacts from being attempted, but the job still fails. Authorization approves publication of the named source; it is not a benchmark qualification verdict.
 
-Native matrix artifacts use `h3-results-<run>-<attempt>-<recipe-fingerprint>` while legacy names remain readable. The sealed `artifact_name`, run/attempt, and `ci.head_sha` bind a new artifact to GitHub metadata. The actual benchmark checkout remains `git_commit`, which may differ from the Actions head when CI tests a merge commit. The authorized POST writes verified immutable objects before the index, checks index readback, then writes a separate immutable approval receipt bound to artifact identity, source seal and checkout. A repeat with the same identity reuses the receipt; a mismatched receipt does not authorize the source. Every public GET, including `format=media` on a cache miss, is read-only and returns 204 when stored media is absent. Legacy stored indexes and low-sample or failed sources remain in History, while only approval-backed observations enter default chart selectors; sample floors still apply.
+Native matrix artifacts use `h3-results-<run>-<attempt>-<recipe-fingerprint>` while legacy names remain readable. The sealed `artifact_name`, run/attempt, and `ci.head_sha` bind a new artifact to GitHub metadata. The actual benchmark checkout remains `git_commit`, which may differ from the Actions head when CI tests a merge commit. The authorized POST writes verified immutable objects before the index, checks index readback, then writes a separate immutable approval receipt bound to artifact identity, source seal and checkout, and finally records the artifact in a new History snapshot. A repeat with the same identity reuses the receipt; a mismatched receipt does not authorize the source. Every public GET, including `format=media` on a cache miss, is read-only and returns 204 when stored media is absent. Legacy stored indexes and low-sample or failed sources remain in History, while only approval-backed observations enter default chart selectors; sample floors still apply.
 
 ## Evidence boundaries
 
@@ -30,20 +60,136 @@ Native matrix artifacts use `h3-results-<run>-<attempt>-<recipe-fingerprint>` wh
 
 ## Local replay
 
+The metadata-only fixture answers published/media reads with 204, so server
+preloading does not fall through to production. Without `BLOB_READ_WRITE_TOKEN`
+the page skips that preload and the browser reads History itself, which is how
+the fixture and a replay reach it. An explicit original-artifact replay still
+supplies its verified media through the earlier replay gate.
+
+中文：纯元数据 fixture 的 published/media 请求返回 204，避免服务端预读转而访问生产环境。
+未设置 `BLOB_READ_WRITE_TOKEN` 时页面跳过该预读，由浏览器自行读取 History，fixture
+和回放数据即由此到达浏览器。显式原始产物回放仍通过优先执行的回放分支提供已校验媒体。
+
 Only in development, `E2E_FIXTURES=1` serves `cypress/fixtures/api/video-history.json` through the existing fixture loader and checksum manifest. The fixture is a metadata-only projection of retained H100/H200/B200 observations and two fidelity artifacts; it contains no infrastructure paths or video bytes. Its synthetic `approved: true` flags exercise the default chart layout and are not real publication receipts. Unknown publication timestamps remain null. The response header `X-VideoGenX-Replay: 1` causes a visible replay notice. These are historical retained observations, not newly measured results or a new publication.
+
+For a local browser replay of original artifacts, set `E2E_FIXTURES=1` and
+`E2E_VIDEO_REPLAY_MANIFEST=/absolute/replay-input.json` on the development server.
+The JSON manifest contains absolute `zipPath` and `metadataPath` fields, plus
+`expectedPlanSha256`, or an `artifacts` array of objects with those same fields.
+The server independently verifies each original ZIP against its metadata and
+plan hash, replaces History with their unapproved entries, and serves each exact
+run/artifact pair and its MP4 byte ranges through `/api/video-runs`. Empty arrays,
+duplicate run/artifact pairs, or any invalid member reject the entire collection.
+The original ZIPs are read-only. Unknown identities and paths cannot use the production fallback while
+this adapter is active. `format=replay-asset` is unavailable outside the gate.
+This mode preserves the original `releaseQualified=false` verdict and never
+creates an approval receipt. The ordinary fixture remains the default when no
+explicit manifest is set. Restart the development server after changing the
+manifest. The existing `unofficialrun` selector accepts one run ID; artifacts
+from that run compare only when their canonical workloads match.
+
+### Original CI ZIP reader check
+
+The replay manifest may also contain
+`quality: { path: "/absolute/quality.json", sha256: "<digest>" }`. This independent
+v1 attachment names the scorer revision/hash and original reference receipts, then
+binds each comparison to the candidate run/artifact/source/manifest/cell/slot/case/
+prompt/seed/media SHA. Each reference descriptor contains `receipt_path`,
+`receipt_sha256` and the adjacent SHA256SUMS file's `checksums_sha256`. The reader
+verifies receipt and referenced MP4 bytes before exposing scores or reference URLs.
+Private paths and free-text decoder errors never enter the JSON response; public
+checks contain allowlisted names/status and only numeric or boolean observations.
+Raw diagnostics remain in the sealed local attachment.
+
+Original ZIPs stay unchanged. Duplicate pairs, substituted identities, unsafe paths
+or invalid seals fail the attachment closed. Reference MP4s use the existing replay
+byte-range path with a receipt-scoped source identity and exact candidate
+run/artifact membership; unbound cases are unavailable. This route remains
+development-only. PSNR comes from complete decoded RGB24 comparison, not the browser
+difference canvas. Exact equality and incompatible media have distinct statuses
+with null PSNR. Original plan hashes, unjudged quality and releaseQualified=false
+remain visible.
+
+中文：回放配置可额外提供 `quality: { path, sha256 }`，读取独立封存的 v1 配对附件。读取前校验原始参考回执、相邻 SHA256SUMS 及所引用 MP4 字节，并精确绑定候选运行、产物、来源、manifest、测量单元、slot、用例、prompt、seed 和媒体 SHA。本机路径和解码器自由文本错误不进入 API；公开检查仅保留允许的名称、状态及数值或布尔观察值，完整诊断留在本地封存附件。重复配对、身份替换、不安全路径或封印失效均拒绝读取。参考视频按参考回执和候选 run/artifact 隔离，只提供该产物实际绑定的用例，不授予发布批准，也不修改原始 ZIP。
+
+### Matched-noise diagnostic replay
+
+The same local gate accepts a separate
+`diagnostics: { path: "/absolute/diagnostics.json", sha256: "<digest>" }`.
+This attachment binds new native candidate and reference receipts and MP4s to an
+exact original CI candidate as context. It never replaces that candidate's bytes,
+score, or identity. Each descriptor seals `diagnostic.json`, its adjacent
+`SHA256SUMS`, and the referenced MP4. Private receipt paths remain local.
+
+The verifier checks selected workload identity, captured video/audio noise hashes,
+shapes and dtypes, each rank's consumed-noise record, and full schedules. The two
+candidate receipts must agree on the required four-GPU Ulysses 2 / TP 2 topology,
+runtime/source/image, harness hash and effective-settings identities. The reference retains its
+own runtime and topology. These are checks of sealed receipt claims; the App does
+not fetch or verify remote tensor files.
+
+Diagnostic clips appear as a separate comparison choice and carry their native
+run/receipt/media identities. They add no History entries or performance points,
+do not count toward the sample floor, and inherit no latency, energy or cost.
+Original CI clips and scores remain available. Missing candidates remain absent;
+an incompatible comparison has no numeric PSNR. Publication and release status
+remain unchanged.
+
+中文：现有本地回放开关可额外读取独立的 `diagnostics: { path, sha256 }` 附件。新候选和参考视频使用各自封存的 native 回执与 MP4；原始 CI 身份仅作为上下文，不替换其媒体、得分或性能结果。读取器校验回执和媒体封印，并核对工作负载、视频与音频初始噪声的摘要、shape、dtype、各 rank 的消费记录及完整 schedule。两个候选必须使用相同的四卡 Ulysses 2 / TP 2 拓扑、runtime、源码、镜像、harness 摘要和有效配置；参考保留自身执行配置。App 校验的是封存回执中的记录，不读取远端张量文件。诊断作为独立选项展示，不新增 History 或性能点、不计入样本下限，也不沿用原 CI 的延迟、能耗和成本。缺失候选保持为空，发布状态不变。
+
+From `packages/app`, replay an unmodified native H3 CI ZIP with its original GitHub
+artifact-object JSON and the expected sealed plan SHA256:
+
+```sh
+bun --no-env-file scripts/replay-video-artifact.ts original.zip github-artifact.json EXPECTED_PLAN_SHA256
+```
+
+The command reads local files only and disables `fetch`. It requires the original
+archive size, SHA256 digest, artifact ID/name and workflow run/head identity, then
+uses the same archive, bundle, serving, History and Results readers as the app.
+It prints JSON containing each cell's plan hash, frame/case/distinct-prompt counts,
+completion and power verdicts, both GPU counts, source errors and Results diagnostics
+for every qualifying workload. Source errors, missing cells and mismatched expected
+plan hashes produce a nonzero exit. Recorded benchmark failures remain in the report.
+
+Local replay has no approval receipt: `approved` is false, `publishedAt` is null and
+`officialPoints` is zero. Named diagnostics still obey the Results sample and workload
+requirements. The command neither publishes metadata nor creates media URLs, and it
+does not modify fixtures. Reader acceptance of an older plan does not qualify a new
+workload or establish browser/API/playback, CI E2E, or release acceptance.
 
 ## 中文说明
 
+从 `packages/app` 使用上述 `bun --no-env-file` 命令，可离线读取未改动的原始 CI ZIP、
+GitHub 产物元数据和预期 plan SHA256。读取器校验原始字节摘要与执行身份，逐 cell 输出
+实际工作负载、完成/失败计数、功率结论和参与/已分配 GPU 数；来源错误、空 cells 或 plan
+哈希不符时以非零状态退出。此操作不写存储、不更新 fixture、不生成媒体地址，也不授予
+发布批准；`officialPoints` 应为 0。旧工作负载读取成功不能代替新 workload 的 CI E2E、
+页面/API/播放或发布验收。
+
 `publish-video-results` repository dispatch 明确传入 `source_run_id` 与 `merge_run_id`；手动 `workflow_dispatch` 必须指定来源 `run_id`，不再定时扫描全部运行。任务只列举指定运行的 GitHub 产物及其后续分页，对每个产物以现有失效密钥调用受 Bearer 保护的 `POST /api/video-runs`。已存索引仍会重试，以补写可能缺失的批准回执；某个产物失败后继续尝试后续产物，但任务最终报告失败。此授权只批准指定来源的发布，不代表 benchmark 通过质量验收。
 
-原生矩阵采用 `h3-results-<run>-<attempt>-<recipe-fingerprint>`，旧名称仍可读取。封存的 `artifact_name`、run/attempt 和 `ci.head_sha` 对应 GitHub 元数据；实际 benchmark checkout 仍单独记录为 `git_commit`，测试 merge commit 时它可以不同于 Actions head。授权 POST 先写已校验的不可变对象与索引，并确认索引可读，再写绑定产物身份、来源哈希和 checkout 的独立不可变批准回执。所有公开 GET（包括 `format=media` 未命中）都不写入；缺少媒体时返回 204。旧索引、失败或低样本来源仍在历史中；只有回执验证通过的观测进入默认图表，原有样本门槛继续适用。
+原生矩阵采用 `h3-results-<run>-<attempt>-<recipe-fingerprint>`，旧名称仍可读取。封存的 `artifact_name`、run/attempt 和 `ci.head_sha` 对应 GitHub 元数据；实际 benchmark checkout 仍单独记录为 `git_commit`，测试 merge commit 时它可以不同于 Actions head。授权 POST 先写已校验的不可变对象与索引，并确认索引可读，再写绑定产物身份、来源哈希和 checkout 的独立不可变批准回执，最后把该产物写入新的历史快照。所有公开 GET（包括 `format=media` 未命中）都不写入；缺少媒体时返回 204。旧索引、失败或低样本来源仍在历史中；只有回执验证通过的观测进入默认图表，原有样本门槛继续适用。
+
+历史快照是 `h3-video-media/v1/runs/history/v<projection>/<毫秒>-<后缀>.json` 下的一个不可变 JSON，按索引路径保存投影条目，以及构建时验证的批准回执上传时间（无回执时为 null）。读取只使用当前 `VIDEO_HISTORY_PROJECTION` 的最新快照。授权 POST 批准产物后写入新快照，保留仍然有效的记录并加入该产物，然后删除除被替换快照以外的旧快照。以同一 Bearer 密钥向 `POST /api/video-runs` 发送 `{"history":"backfill"}` 会为所有缺少有效记录的索引补建条目。Warm After Deploy 工作流在每次生产发布后调用它，所有记录有效时不写入。构建时读不到回执的索引不进快照，不会被记成未批准。投影版本写在路径中，测试固定生成条目的源码摘要，可能改变条目的修改须提升版本，下一次补建会重建快照。并发写入可能丢掉对方新增的记录，此后读取会直接投影该索引，直到下次发布或补建，输出不变。
 
 `/video` 与 `/zh/video` 首屏为跨硬件仪表板（见 [VideoGenX 仪表板](./videogenx-dashboard.md)）；本文描述的“性能历史”列表位于其下方可展开的区块，URL 带有 `history-*` 筛选参数（`history-hardware`、`history-concurrency`、`history-query`）时自动展开。每条记录链接到原始 GitHub Actions 运行。原有的按运行查看结果、trade-off 图表与 CI 运行浏览已随仪表板重建移除；视频对比由仪表板的 Compare 面板提供。
 
-历史读取只列举既有发布索引的元数据，按索引发布时间排序，每页最多读取十份完整索引；不下载或发布媒体。原始执行时间取自 `ci.started_at`，与发布时间、重新导出的时间分开。索引无效时保留错误记录，缺失指标保留 null。已分配 GPU 数须有保留的 Slurm `AllocTRES` 或通过验证的 AMD allocation binding；原生功率文档的 `expected_gpu_count` 仅描述遥测覆盖范围，不能证明预留数量。缺少分配证据时，该数量及按分配数量归一化的指标保持 null。每个 cell 另附参与/已分配 GPU 数、测量窗口秒数、视频时长与帧数、板卡平均功率之和、记录的生效功率上限之和（无快照时为 null）、配置的 `tp_size` / `ulysses_degree` / `attention_backend`，以及端点的副本数（`execution.deployment.replica_count`，早于该记录的产物包为 null）；`workloadKey` 在信息完整时保留完整工作负载身份，prompts 与 seeds 不能由缩写显示标签替代。这些都是同一 `schemaVersion: 1` 下可为空的附加字段，硬件仪表板最多读取五页，并据此推导全部指标，浏览器不再解析产物包。
+历史读取列举既有发布索引与批准回执的元数据，按索引发布时间排序，并读取一份历史快照。记录仍对应索引与回执上传时间的条目直接取自快照，其余条目才读取完整索引与回执。`pages=2` 至 `pages=5` 在一次响应中返回连续多页，条目与 `nextPage` 和逐页读取相同。读取不下载或发布媒体，也不写入。原始执行时间取自 `ci.started_at`，与发布时间、重新导出的时间分开。索引无效时保留错误记录，缺失指标保留 null。已分配 GPU 数须有保留的 Slurm `AllocTRES` 或通过验证的 AMD allocation binding；原生功率文档的 `expected_gpu_count` 仅描述遥测覆盖范围，不能证明预留数量。缺少分配证据时，该数量及按分配数量归一化的指标保持 null。每个 cell 另附参与/已分配 GPU 数、测量窗口秒数、视频时长与帧数、板卡平均功率之和、记录的生效功率上限之和（无快照时为 null）、配置的 `tp_size` / `ulysses_degree` / `attention_backend`，以及端点的副本数（`execution.deployment.replica_count`，早于该记录的产物包为 null）；`workloadKey` 在信息完整时保留完整工作负载身份，prompts 与 seeds 不能由缩写显示标签替代。这些都是同一 `schemaVersion: 1` 下可为空的附加字段，硬件仪表板以一次请求最多读取五页，并据此推导全部指标，浏览器不再解析产物包。
 
 serving 矩阵有两种来源，`serving.ts` 按 manifest 的 `evidence_kind` 区分契约：旧的受控 GPU supervisor（`controlled_h3_gpu`）写入 `controlled_serving_smoke` 回执、设备清单、功率上限快照和带完整计时的请求记录；原生 srt-slurm launcher（`srt_slurm_h3_service`，InferenceX #2916）写入 `srt_slurm_h3_service_receipt` 回执，并对 `h3_native_power` 功率文档做封印（`power.valid`、回执中的 `power.sha256` 与测量阶段必须一致），同时附带每个 cell 的 InferenceX sidecar（`aggregate.json`、`benchmark_concurrency_<N>.json`；`power_valid` 为 0 或 `energy_normalization` 不是 `clips` 时不显示对应数值），矩阵级的 `power_verified` 结论显示在来源行。原生产物包不记录 GPU 型号：投影优先读取 `ci.site.gpu_model`，其次从 `ci.ci.runner_name` 中识别注册表 SKU，都没有时硬件留空。srt-client 的运行记录没有逐请求延迟时，以 harness 汇总（`latency_median_seconds`、`valid_clips_per_second`，并与矩阵 cell 交叉核对）代替 P50 与吞吐量；P90 仍需要逐请求样本。功率未通过 `valid` 校验时一律显示为未测得，不显示数字。
 
 当前展示观测值，未选择匹配基线，也不计算 before/after。延迟、吞吐量使用提交到下载完成的窗口；板卡能耗使用记录的生成窗口。保真度、阈值校准、发布验收单独展示。筛选仅作用于已加载的页面，可继续加载较早结果。
 
 仅在开发环境中，`E2E_FIXTURES=1` 使用保留结果的脱敏元数据回放，遵循现有 fixture 校验和清单，并显示回放提示。fixture 中合成的 `approved: true` 仅验证图表布局，不是实际批准回执。未知发布时间保持为空；这不是新测量或新发布。
+
+原始产物的本地浏览器回放需在开发服务器设置 `E2E_FIXTURES=1` 和指向绝对路径的
+`E2E_VIDEO_REPLAY_MANIFEST`。该 JSON 文件填写原始 ZIP、GitHub 元数据的绝对路径
+`zipPath`、`metadataPath` 及 `expectedPlanSha256`；也可用 `artifacts` 数组列出多组相同字段。
+服务器逐一核对每份原始 ZIP 的元数据和 plan hash，以各自的未批准记录替换 History，
+并按准确的 run/artifact 身份通过现有 `/api/video-runs` 读取原始 MP4 字节。
+数组为空、run/artifact 身份重复或任一成员校验失败时，整组回放均不可用。输入 ZIP 不会被修改；
+未知身份或路径不会回退到线上读取，`format=replay-asset` 在此模式外返回 404。
+原有 `releaseQualified=false` 结论保持不变，也不会生成批准回执；不配置显式 manifest 时仍使用普通 fixture。
+修改 manifest 后需重启开发服务器。现有 `unofficialrun` 筛选仅接受一个 run ID；该运行内的产物
+只有在完整工作负载身份一致时才会并排比较。

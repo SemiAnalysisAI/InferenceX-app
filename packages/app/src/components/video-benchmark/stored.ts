@@ -1,6 +1,8 @@
 import { at, type Bundle, type Json } from './bundle';
 import type { CIArtifact } from './archive';
 import { fidelityEvidence, type FidelityBundle } from './fidelity';
+import type { ClipQuality } from './reference-quality';
+import type { DiagnosticPair } from './diagnostic-quality';
 
 export interface StoredSource {
   id: string;
@@ -26,6 +28,10 @@ export interface StoredArtifact {
   runId: string;
   artifact: CIArtifact;
   sources: StoredSource[];
+  /** Independently sealed reference pairs; never an approval or part of the original ZIP. */
+  quality?: ClipQuality[];
+  /** Native single-case diagnostics retain separate media and never become performance points. */
+  diagnostics?: DiagnosticPair[];
 }
 export function storedBundle(source: StoredSource): Bundle {
   const documents = new Map(source.documents);

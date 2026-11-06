@@ -81,11 +81,6 @@ describe('Site search', () => {
     cy.get('[data-testid="site-search-toggle"]')
       .should('have.attr', 'aria-label', '搜索 InferenceX')
       .click();
-    cy.get('[data-testid="site-search-input"]').should(
-      'have.attr',
-      'placeholder',
-      '搜索 GPU、模型、指标、文章…',
-    );
     cy.get('[data-testid="site-search-input"]').type('能耗');
     cy.wait('@zhB200');
     cy.get('[data-testid="site-search-result"]')

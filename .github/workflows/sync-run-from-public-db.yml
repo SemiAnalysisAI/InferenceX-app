@@ -78,12 +78,6 @@ jobs:
         env:
           CYPRESS_INSTALL_BINARY: '0'
 
-      - name: Run migrations
-        if: env.DRY_RUN != 'true'
-        env:
-          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
-        run: bun run admin:db:migrate --yes
-
       - name: Sync runs
         env:
           DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}

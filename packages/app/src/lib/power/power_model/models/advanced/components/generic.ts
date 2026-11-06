@@ -27,6 +27,8 @@ import {
 } from './base';
 
 export const OPTICS_800G_POWER_W = 15;
+const SYSTEM_SIDE_400G_BASELINE = system_side_transceiver_baseline(400, 8);
+const SYSTEM_SIDE_800G_BASELINE = system_side_transceiver_baseline(800, OPTICS_800G_POWER_W);
 
 type OptionalPower = Omit<FixedPowerComponentFields, 'power_w'> & { power_w?: number };
 
@@ -98,8 +100,8 @@ export class X86CPU extends CPU {
 export class DDR5DIMM extends GenericComponent {
   static override readonly typeName: string = 'DDR5DIMM';
   static readonly memory_type = 'DDR5';
-  static readonly idle_power_w = 3.8;
-  static readonly active_power_w = 7;
+  static readonly idle_power_w = 2.75;
+  static readonly active_power_w = 2.75;
   readonly capacity_gb: number;
   readonly state: 'idle' | 'active';
 
@@ -159,10 +161,7 @@ export class SystemSide400GTransceiver extends SystemSideTransceiver {
   static override readonly typeName: string = 'SystemSide400GTransceiver';
   static readonly bandwidth_gbps = 400;
 
-  constructor({
-    power_w = 8,
-    provenance = system_side_transceiver_baseline(400, 8),
-  }: OptionalPower = {}) {
+  constructor({ power_w = 8, provenance = SYSTEM_SIDE_400G_BASELINE }: OptionalPower = {}) {
     super({ power_w, provenance });
     if (this.power_w !== 8) {
       throw new ValidationError('400G system-side transceiver power must be 8 W');
@@ -184,7 +183,7 @@ export class SystemSide800GTransceiver extends SystemSideTransceiver {
 
   constructor({
     power_w = OPTICS_800G_POWER_W,
-    provenance = system_side_transceiver_baseline(800, OPTICS_800G_POWER_W),
+    provenance = SYSTEM_SIDE_800G_BASELINE,
   }: OptionalPower = {}) {
     super({ power_w, provenance });
     if (this.power_w !== OPTICS_800G_POWER_W) {

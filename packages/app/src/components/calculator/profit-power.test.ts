@@ -52,7 +52,7 @@ const source: BenchmarkRow = {
     avg_total_gpu_power_w: 6369.045,
   },
 };
-const MODELED_KW_PER_GPU = 1.5239234842430833;
+const MODELED_KW_PER_GPU = 1.5137113109310694;
 const point: GPUDataPoint = {
   sourceRow: source,
   hwKey: 'mi355x_atom',

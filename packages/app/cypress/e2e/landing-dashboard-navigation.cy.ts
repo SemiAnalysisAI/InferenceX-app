@@ -1,15 +1,30 @@
+import type { AvailabilityRow } from '@/lib/api/api';
+
+import { availabilityBody } from '../support/e2e';
 import { vrPublicationRows } from '../support/vr-publication-fixtures';
-import { assertTpuGb300Selected, interceptTpuLaunchData } from '../support/tpu-launch-fixtures';
+import {
+  interceptPreviewSnapshots,
+  previewAvailability,
+} from '../support/preview-snapshot-fixtures';
+import {
+  assertTpuGb300Selected,
+  interceptTpuLaunchData,
+  tpuLaunchRows,
+} from '../support/tpu-launch-fixtures';
 
 const minimaxM3RubinRows = vrPublicationRows.map((row) => ({ ...row, model: 'minimaxm3' }));
 
-function interceptMinimaxM3RubinData(rows: typeof minimaxM3RubinRows = minimaxM3RubinRows): void {
-  cy.fixture('api/availability.json').then((availability) => {
-    cy.intercept('GET', '/api/v1/availability*', {
-      body: [
-        ...availability.filter((row: { model: string }) => row.model !== 'minimaxm3'),
+function interceptMinimaxM3RubinData(
+  rows: typeof minimaxM3RubinRows = minimaxM3RubinRows,
+  extraAvailability: readonly AvailabilityRow[] = [],
+): void {
+  cy.fixture<AvailabilityRow[]>('api/availability.json').then((availability) => {
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody([
+        ...availability.filter((row) => row.model !== 'minimaxm3'),
         ...rows.map(({ metrics: _metrics, ...row }) => row),
-      ],
+        ...extraAvailability,
+      ]),
     });
   });
   cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
@@ -19,7 +34,7 @@ function interceptMinimaxM3RubinData(rows: typeof minimaxM3RubinRows = minimaxM3
   });
 }
 
-const TARGET = '/inference/kimi-k3';
+const TARGET = '/inference/deepseek-v41-flash';
 
 describe('Muse Spark Open results', () => {
   beforeEach(() => {
@@ -28,8 +43,8 @@ describe('Muse Spark Open results', () => {
     });
   });
   for (const prefix of ['', '/zh']) {
-    it(`opens the canonical Muse dashboard from ${prefix || '/'} with the mascot`, () => {
-      cy.visit(prefix || '/');
+    it(`opens the canonical Muse dashboard from ${prefix}/compare with the mascot`, () => {
+      cy.visit(`${prefix}/compare`);
       cy.get('[data-testid="compare-agentx-model-muse-spark-open"]')
         .should('contain.text', prefix ? '查看结果' : 'View results')
         .and('not.contain.text', prefix ? '预览' : 'Preview')
@@ -41,17 +56,12 @@ describe('Muse Spark Open results', () => {
         `${prefix}/inference/muse-spark-open`,
       );
       cy.get('[data-testid="compare-agentx-model-muse-spark-open"]').click();
-      cy.location('pathname', { timeout: 30000 }).should(
-        'eq',
-        `${prefix}/inference/muse-spark-open`,
-      );
+      cy.location('pathname').should('eq', `${prefix}/inference/muse-spark-open`);
       cy.location('search').should('eq', '');
       cy.get('[data-testid="model-selector"]').should(($selector) => {
         expect(['Muse Spark Open 816B', 'Muse-Spark-Open']).to.include($selector.text().trim());
       });
-      cy.get('[data-testid="scenario-selector"]')
-        .should('contain.text', prefix ? '智能体' : 'Agentic')
-        .and('be.disabled');
+      cy.get('[data-testid="scenario-selector"]').should('not.exist');
       cy.get('[data-slot="unofficial-banner"]').should('not.exist');
       cy.get('@museRun.all').should('have.length', 0);
     });
@@ -98,9 +108,7 @@ function assertTpuView() {
 
 function assertKimiTpuView() {
   cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
-  cy.get('[data-testid="scenario-selector"]')
-    .invoke('text')
-    .should('match', /Agentic|智能体/u);
+  cy.get('[data-testid="scenario-selector"]').should('not.exist');
   cy.location('search').should('eq', '');
 }
 
@@ -111,15 +119,17 @@ describe('landing model curation', () => {
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
         cy.get('[data-testid^="compare-agentx-model-"]').should(($links) => {
           expect([...$links].map((link) => link.getAttribute('href'))).to.deep.eq(
-            ['muse-spark-open', 'deepseek-v41-flash'].map((slug) => `${prefix}/inference/${slug}`),
+            ['deepseek-v41-flash', 'kimi-k31-pro'].map((slug) => `${prefix}/inference/${slug}`),
           );
         });
-        cy.get('[data-testid="compare-agentx-model-muse-spark-open"]')
-          .should('contain.text', 'Muse Spark Open 816B')
+        cy.get('[data-testid="compare-agentx-model-kimi-k31-pro"]')
+          .should('contain.text', 'Kimi K3.1 Pro')
+          .and('contain.text', 'AgentX')
           .and('contain.text', prefix ? '查看结果' : 'View results')
-          .and('not.contain.text', prefix ? '结果待发布' : 'Results pending')
           .find('img')
-          .should('have.attr', 'src', '/logos/muse-mascot.webp');
+          .should('have.attr', 'src', '/logos/kimi-color.svg');
+        cy.get('[data-new-badge="agentx-ledger"]').should('not.exist');
+        cy.get('[data-testid="compare-agentx-model-muse-spark-open"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-kimi-k3"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-glm-5-3"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-deepseek-v4"]').should('not.exist');
@@ -135,7 +145,7 @@ describe('landing model curation', () => {
           .next('nav')
           .find('[data-testid^="compare-agentx-model-"]')
           .first()
-          .should('have.attr', 'data-testid', 'compare-agentx-model-muse-spark-open');
+          .should('have.attr', 'data-testid', 'compare-agentx-model-deepseek-v41-flash');
         cy.get('[data-testid="landing-minimax-m31-flash-results-link"]')
           .should('contain.text', 'MiniMax M3.1 Flash')
           .and('contain.text', 'AgentX')
@@ -196,7 +206,7 @@ describe('landing model curation', () => {
           .next('nav')
           .find('[data-testid^="compare-agentx-model-"]')
           .first()
-          .should('have.attr', 'data-testid', 'compare-agentx-model-muse-spark-open');
+          .should('have.attr', 'data-testid', 'compare-agentx-model-deepseek-v41-flash');
       });
 
       cy.visit(`${prefix}/compare`);
@@ -206,8 +216,15 @@ describe('landing model curation', () => {
         cy.get('[data-testid="landing-rubin-glm-5-3-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-rubin-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-jalapeno-results-link"]').should('not.exist');
-        cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 8);
-        for (const slug of ['deepseek-v4', 'qwen-3-8-flash-next', 'qwen-3-5', 'minimax-m3']) {
+        cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 9);
+        for (const slug of [
+          'kimi-k31-pro',
+          'muse-spark-open',
+          'deepseek-v4',
+          'qwen-3-8-flash-next',
+          'qwen-3-5',
+          'minimax-m3',
+        ]) {
           cy.get(`[data-testid="compare-agentx-model-${slug}"]`).should(
             'have.attr',
             'href',
@@ -234,13 +251,18 @@ describe('landing model curation', () => {
         .should('match', /MiniMax[- ]M3\.1[- ]Flash/u);
     });
 
-    it(`keeps the Qwen3.5 AgentX TPU deep link working on ${prefix || '/'}`, () => {
-      interceptTpuLaunchData();
-      cy.visit(`${prefix}${TPU_RESULTS_HREF}`);
-      cy.location('pathname').should('eq', `${prefix}/inference/qwen-3-5`);
-      assertTpuView();
+    it(`opens Kimi K3.1 Pro AgentX results from ${prefix || '/'} and retains them on reload`, () => {
+      cy.visit(prefix || '/');
+      cy.get('[data-testid="compare-agentx-model-kimi-k31-pro"]').click();
+      cy.location('pathname').should('eq', `${prefix}/inference/kimi-k31-pro`);
+      cy.get('[data-testid="model-selector"]')
+        .invoke('text')
+        .should('match', /Kimi[- ]K3\.1[- ]Pro/u);
       cy.reload();
-      assertTpuView();
+      cy.location('pathname').should('eq', `${prefix}/inference/kimi-k31-pro`);
+      cy.get('[data-testid="model-selector"]')
+        .invoke('text')
+        .should('match', /Kimi[- ]K3\.1[- ]Pro/u);
     });
 
     it(`opens Kimi K3 AgentX TPU results from ${prefix || '/'} and retains them on reload`, () => {
@@ -257,18 +279,15 @@ describe('landing model curation', () => {
 
     it(`opens GLM 5.3 Rubin AgentX results from ${prefix || '/'}`, () => {
       const rows = vrPublicationRows.map((row) => ({ ...row, model: 'glm5.2' }));
-      cy.intercept('GET', '/api/v1/availability*', {
-        body: rows.map(({ metrics: _metrics, ...row }) => row),
+      cy.intercept('GET', '/api/v1/availability/compact', {
+        body: availabilityBody(rows.map(({ metrics: _metrics, ...row }) => row)),
       });
       cy.intercept('GET', '/api/v1/benchmarks*', { body: rows });
       cy.visit(prefix || '/');
       cy.get('[data-testid="landing-rubin-glm-5-3-results-link"]').click();
       cy.location('pathname').should('eq', `${prefix}/inference/glm-5-3`);
       cy.get('[data-testid="model-selector"]').should('contain.text', 'GLM5.3');
-      cy.get('[data-testid="scenario-selector"]').should(
-        'contain.text',
-        prefix ? '智能体' : 'Agentic',
-      );
+      cy.get('[data-testid="scenario-selector"]').should('not.exist');
       cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
       cy.reload();
       cy.location('pathname').should('eq', `${prefix}/inference/glm-5-3`);
@@ -284,10 +303,7 @@ describe('landing model curation', () => {
       cy.location('pathname').should('eq', `${prefix}/inference/minimax-m3`);
       cy.location('search').should('not.contain', 'i_spec=');
       cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
-      cy.get('[data-testid="scenario-selector"]').should(
-        'contain.text',
-        prefix ? '智能体' : 'Agentic',
-      );
+      cy.get('[data-testid="scenario-selector"]').should('not.exist');
       cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
       cy.reload();
       cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
@@ -298,6 +314,7 @@ describe('landing model curation', () => {
     });
 
     it(`opens Jalapeño R1 results from ${prefix || '/'}`, () => {
+      interceptPreviewSnapshots({ overFixtures: true });
       cy.visit(prefix || '/');
       cy.get('[data-testid="landing-jalapeno-results-link"]').click();
       cy.location('pathname').should('eq', `${prefix}/inference/deepseek-r1`);
@@ -313,42 +330,55 @@ describe('landing model curation', () => {
       cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
       cy.get('[data-testid="chart-legend"]').should('contain.text', 'Jalapeño');
     });
-
-    it(`does not carry TPU precision through Back into Rubin on ${prefix}/compare`, () => {
-      const rubinRows = [
-        ...minimaxM3RubinRows,
-        ...minimaxM3RubinRows
-          .filter((row) => row.hardware === 'vr200')
-          .map((row) => ({
-            ...row,
-            id: row.id + 1000,
-            hardware: 'h200',
-            precision: 'fp8',
-          })),
-      ];
-      interceptMinimaxM3RubinData(rubinRows);
-      interceptTpuLaunchData();
-      cy.visit(`${prefix}/compare`);
-      cy.visit(`${prefix}${TPU_RESULTS_HREF}`);
-      assertTpuView();
-      cy.go('back');
-      cy.location('pathname').should('eq', `${prefix}/compare`);
-      cy.get('[data-testid="compare-agentx-model-minimax-m3"]').click();
-      cy.get('[data-testid="precision-multiselect"]')
-        .should('contain.text', 'FP4')
-        .and('contain.text', 'FP8');
-      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
-      cy.reload();
-      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
-      cy.go('back');
-      cy.location('pathname').should('eq', `${prefix}/compare`);
-      cy.visit(prefix || '/');
-      cy.get('[data-testid="landing-jalapeno-results-link"]').click();
-      cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP4');
-      cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
-      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Jalapeño');
-    });
   }
+
+  it('keeps the Qwen3.5 AgentX TPU deep link working on /', () => {
+    interceptTpuLaunchData();
+    cy.visit(TPU_RESULTS_HREF);
+    cy.location('pathname').should('eq', '/inference/qwen-3-5');
+    assertTpuView();
+    cy.reload();
+    assertTpuView();
+  });
+
+  it('does not carry TPU precision through Back into Rubin on /compare', () => {
+    const rubinRows = [
+      ...minimaxM3RubinRows,
+      ...minimaxM3RubinRows
+        .filter((row) => row.hardware === 'vr200')
+        .map((row) => ({
+          ...row,
+          id: row.id + 1000,
+          hardware: 'h200',
+          precision: 'fp8',
+        })),
+    ];
+    interceptPreviewSnapshots();
+    interceptTpuLaunchData();
+    interceptMinimaxM3RubinData(rubinRows, [
+      ...tpuLaunchRows().map(({ metrics: _metrics, ...row }) => row),
+      ...previewAvailability,
+    ]);
+    cy.visit('/compare');
+    cy.visit(TPU_RESULTS_HREF);
+    assertTpuView();
+    cy.go('back');
+    cy.location('pathname').should('eq', '/compare');
+    cy.get('[data-testid="compare-agentx-model-minimax-m3"]').click();
+    cy.get('[data-testid="precision-multiselect"]')
+      .should('contain.text', 'FP4')
+      .and('contain.text', 'FP8');
+    cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
+    cy.reload();
+    cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
+    cy.go('back');
+    cy.location('pathname').should('eq', '/compare');
+    cy.visit('/');
+    cy.get('[data-testid="landing-jalapeno-results-link"]').click();
+    cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP4');
+    cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
+    cy.get('[data-testid="chart-legend"]').should('contain.text', 'Jalapeño');
+  });
 });
 
 describe('landing → full dashboard navigation', () => {
@@ -373,7 +403,7 @@ describe('landing → full dashboard navigation', () => {
   it('commits exactly one navigation and one history entry on a cold dashboard load', () => {
     const writes: HistoryWrite[] = [];
 
-    cy.intercept({ url: /\/inference\/kimi-k3/ }, (req) => {
+    cy.intercept({ url: /\/inference\/deepseek-v41-flash/ }, (req) => {
       if (req.headers['next-router-prefetch']) {
         req.reply({ statusCode: 404, body: '' });
         return;
@@ -417,7 +447,7 @@ describe('landing → full dashboard navigation', () => {
     });
 
     cy.get('[data-testid="compare-agentx-dashboard-link"]').click();
-    cy.location('pathname', { timeout: 15000 }).should('eq', TARGET);
+    cy.location('pathname').should('eq', TARGET);
 
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(1000);
@@ -446,34 +476,4 @@ describe('landing → full dashboard navigation', () => {
     cy.go('forward');
     cy.location('pathname').should('eq', TARGET);
   });
-});
-
-describe('Huawei UbenchX landing navigation', () => {
-  for (const prefix of ['', '/zh']) {
-    it(`links Huawei results to the localized core memory profiles from ${prefix || '/'}`, () => {
-      cy.visit(prefix || '/');
-      cy.get('[data-testid="landing-huawei-results-link"]')
-        .should('have.attr', 'href', `${prefix}/ubenchx/core-memory-profiles`)
-        .and('contain.text', prefix ? '华为 Ascend 950PR' : 'Huawei Ascend 950PR')
-        .and('contain.text', 'UbenchX')
-        .and('not.contain.text', 'OperatorX');
-      cy.get('[data-testid="landing-huawei-huawei-logo"] path').should(
-        'have.attr',
-        'fill',
-        '#FF0000',
-      );
-      cy.get('[data-testid="landing-huawei-results-link"]').click();
-      cy.location('pathname').should('eq', `${prefix}/ubenchx/core-memory-profiles`);
-      cy.get('[data-testid="ubenchx-test-select"]').should(
-        'contain.text',
-        prefix ? '核心访存特征' : 'Core memory-access profiles',
-      );
-      cy.get('[data-testid="core-profile-hardware"]').should(
-        'contain.text',
-        prefix ? '全部硬件' : 'All hardware',
-      );
-      cy.get('[data-testid="ascend-core-profiles"] h2').should('have.text', 'Huawei 950PR');
-      cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
-    });
-  }
 });

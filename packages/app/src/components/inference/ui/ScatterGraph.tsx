@@ -21,8 +21,7 @@ import {
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
 import { usePerfRulerStore } from '@/components/inference/perf-ruler-store';
-import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
-import { useLogAvailability } from '@/hooks/api/use-log-availability';
+import { useBenchmarkPresence } from '@/hooks/api/use-benchmark-presence';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import {
   avoidPointLabelCollisions,
@@ -72,11 +71,12 @@ import type {
 } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { raiseInOrder, setAttrIfChanged } from '@/lib/d3-chart/chart-update';
+import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
 import {
-  computeTooltipPosition,
-  syncPointLabel,
-  syncPointShape,
-} from '@/lib/d3-chart/layers/scatter-points';
+  CANVAS_POINT_LAYER_SELECTOR,
+  canvasPointLayerOf,
+} from '@/lib/d3-chart/layers/canvas-point-registry';
+import { ensureCanvasPointLayer, type PointHaloStyle } from '@/lib/d3-chart/layers/canvas-points';
 import {
   EMPTY_PERF_RULER_STATE,
   clampIsoX,
@@ -115,8 +115,6 @@ import {
   HIT_AREA_RADIUS,
   formatLargeNumber,
   logTickFormat,
-  applyHoverState,
-  applyNormalState,
   getShapeKeyForPrecision,
 } from '@/lib/charts/chart-rendering';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -146,10 +144,10 @@ import type {
 } from '@/components/inference/types';
 import {
   generateOverlayTooltipContent,
+  generateHoverTooltipContent,
   generateTooltipContent,
 } from '@/components/inference/utils/tooltipUtils';
 import { usePowerTraceAction } from '@/components/inference/hooks/usePowerTraceAction';
-import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
 import { describeEngineComparisonConflict } from '@/components/inference/ui/engine-comparison-conflict-toast';
 import { ScatterEmptyState } from '@/components/inference/ui/ScatterEmptyState';
 import { ALL_IN_MEASURED_EMPTY, type PowerBasisLabelStyle } from '@/lib/power/power-basis';
@@ -172,8 +170,6 @@ import {
   powerVariantLabel,
   powerVariantsInData,
 } from '@/components/inference/utils/power-compare';
-import FrontierPointsPanel from '@/components/inference/ui/FrontierPointsPanel';
-import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import {
   isAllInMeasuredConfigKey,
@@ -184,6 +180,11 @@ import {
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
 import { resolveScatterXAxisScale } from '@/components/inference/utils/x-axis-scale';
 import { pointLabelText } from './point-label';
+import {
+  OFFLOAD_HALO_DASHARRAY,
+  OFFLOAD_HALO_RADIUS,
+  OFFLOAD_HALO_STROKE_WIDTH,
+} from './OffloadHaloLegendKey';
 import {
   type ParetoPointLabel,
   getParetoLabel,
@@ -197,7 +198,7 @@ import {
   createKnownIssueLayer,
 } from '@/components/inference/utils/knownIssueAnnotations';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
-import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
+import { bestSeriesPerSku, skuColumns } from '@/components/inference/utils/best-series-per-sku';
 import { legendChangelogsByHardware } from '@/components/inference/utils/legend-changelog';
 import { powerBreakdownInteractivity } from '@/components/inference/utils/power-breakdown';
 import {
@@ -227,6 +228,20 @@ const FixedSequenceLogDialog = dynamic(
     ),
   { ssr: false },
 );
+
+const QuickFiltersDialog = dynamic(
+  () =>
+    import('@/components/inference/ui/QuickFiltersDialog').then(
+      (module) => module.QuickFiltersDialog,
+    ),
+  { ssr: false },
+);
+const LegendPointsDialog = dynamic(() => import('@/components/inference/ui/LegendPointsDialog'), {
+  ssr: false,
+});
+const FrontierPointsPanel = dynamic(() => import('@/components/inference/ui/FrontierPointsPanel'), {
+  ssr: false,
+});
 
 const formatChangelogDescription = (desc: string | string[]): React.JSX.Element => {
   if (typeof desc === 'string') {
@@ -275,6 +290,13 @@ const POWER_VARIANT_LEGEND_PREFIX = 'power-variant:';
 const POWER_VARIANT_POINT_OPACITY = 0.6;
 const pointOpacityForVariant = (d: InferenceData): number =>
   d.powerVariant ? POWER_VARIANT_POINT_OPACITY : 1;
+const POINT_OPACITY_TRANSITION_MS = 150;
+const OFFLOAD_HALO_STYLE: PointHaloStyle = {
+  radius: OFFLOAD_HALO_RADIUS,
+  strokeWidth: OFFLOAD_HALO_STROKE_WIDTH,
+  dash: OFFLOAD_HALO_DASHARRAY.split(' ').map(Number),
+  opacity: 0.9,
+};
 const powerVariantDashById = (variantId: string | null | undefined): string =>
   variantId ? (VARIANT_DASH_BY_ID.get(variantId) ?? '') : '';
 const VARIANT_DASH_BY_ID = new Map<string, string>(
@@ -293,7 +315,6 @@ const VARIANT_DASH_BY_ID = new Map<string, string>(
 );
 
 const LINE_LABEL_RAISE = ['.line-label'] as const;
-const POINT_DECORATION_RAISE = ['.offload-halo'] as const;
 
 function syncGradientStop(this: SVGStopElement, stop: { offset: number; color: string }): void {
   setAttrIfChanged(this, 'offset', `${(stop.offset * 100).toFixed(2)}%`);
@@ -777,8 +798,12 @@ const ScatterGraph = React.memo(
               direction === 'lower_left' ||
               direction === 'lower_right'
             ) {
-              const selection = bestSeriesPerSku(data, direction, selectedPrecisions);
-              for (const key of bestSeriesPerSku(overlayData.data, direction, selectedPrecisions)) {
+              const selection = bestSeriesPerSku(skuColumns(data), direction, selectedPrecisions);
+              for (const key of bestSeriesPerSku(
+                skuColumns(overlayData.data),
+                direction,
+                selectedPrecisions,
+              )) {
                 selection.add(`overlay:${key}`);
               }
               commitUnifiedSelection(selection);
@@ -1201,21 +1226,12 @@ const ScatterGraph = React.memo(
     );
 
     const pointsData = useMemo(() => Object.values(groupedData).flat(), [groupedData]);
-    const agenticIds = useMemo(() => {
-      const ids: number[] = [];
-      for (const p of pointsData) {
-        if (p.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(p.id)) ids.push(p.id);
-      }
-      return ids;
-    }, [pointsData]);
-    const { data: traceAvailability, isPending: isTraceAvailabilityPending } =
-      useTraceAvailability(agenticIds);
-
-    const persistedPointIds = useMemo(
-      () => pointsData.flatMap((point) => (isPersistedBenchmarkId(point.id) ? [point.id] : [])),
+    const hasPersistedPoint = useMemo(
+      () => pointsData.some((point) => isPersistedBenchmarkId(point.id)),
       [pointsData],
     );
-    const { data: persistedLogAvailability } = useLogAvailability(persistedPointIds);
+    const { data: presence, isPending: isPresencePending } =
+      useBenchmarkPresence(hasPersistedPoint);
     const [fixedLogPointId, setFixedLogPointId] = useState<number | null>(null);
     const [powerTelemetryPoint, setPowerTelemetryPoint] = useState<InferenceData | null>(null);
 
@@ -1568,17 +1584,30 @@ const ScatterGraph = React.memo(
     const applyParetoFadeRef = useRef<(group: RenderContext['layout']['zoomGroup']) => void>(
       () => {},
     );
+    const [fadedZoomGroups] = useState(() => new WeakSet<SVGGElement>());
     applyParetoFadeRef.current = (zoomGroup) => {
+      const node = zoomGroup.node();
+      if (!node) return;
+      const active = showParetoFrontier && frontierHwKeys.size > 0;
+      if (!active && !fadedZoomGroups.has(node)) return;
       zoomGroup
         .selectAll<SVGElement, { hwKey?: string; points?: InferenceData[] }>(
           '.dot-group, .roofline-path, .unofficial-overlay-pt, .overlay-roofline-path, .overflow-continuation, .parallelism-label, .line-label',
         )
         .style('filter', function (d) {
           const hw = this.dataset.hwKey ?? d?.hwKey ?? d?.points?.[0]?.hwKey;
-          return showParetoFrontier && frontierHwKeys.size > 0 && hw && !frontierHwKeys.has(hw)
-            ? 'opacity(0.2)'
-            : null;
+          return active && hw && !frontierHwKeys.has(hw) ? 'opacity(0.2)' : null;
         });
+      canvasPointLayerOf<InferenceData>(node)?.setFade(
+        active
+          ? (d) => {
+              const hw = String(d.hwKey);
+              return hw !== '' && !frontierHwKeys.has(hw);
+            }
+          : null,
+      );
+      if (active) fadedZoomGroups.add(node);
+      else fadedZoomGroups.delete(node);
     };
     const paretoHighlightLayer = useMemo<CustomLayerConfig>(() => {
       const render: NonNullable<CustomLayerConfig['render']> = (zoomGroup, ctx) => {
@@ -1760,6 +1789,8 @@ const ScatterGraph = React.memo(
       [effectiveActiveHwTypes, selectedPrecisions, hiddenPowerVariants],
     );
 
+    const seriesColorRef = useRef({ getCssColor, resolveColor });
+    seriesColorRef.current = { getCssColor, resolveColor };
     const interactionRef = useRef({
       isPointVisible,
       isOverlayPointVisible,
@@ -1770,8 +1801,8 @@ const ScatterGraph = React.memo(
       getCssColor,
       resolveColor,
       knownIssueAnnotations,
-      traceAvailability,
-      logAvailability: persistedLogAvailability,
+      presence,
+      isPresencePending,
       showPowerTelemetry,
     });
     interactionRef.current = {
@@ -1784,8 +1815,8 @@ const ScatterGraph = React.memo(
       getCssColor,
       resolveColor,
       knownIssueAnnotations,
-      traceAvailability,
-      logAvailability: persistedLogAvailability,
+      presence,
+      isPresencePending,
       showPowerTelemetry,
     };
 
@@ -2132,11 +2163,9 @@ const ScatterGraph = React.memo(
           variantId === null
             ? String(d.hwKey) === hwKey
             : (powerVariantId(d.powerVariant) || powerCompareBaseId) === variantId;
-        root
-          .selectAll<SVGGElement, InferenceData>('.dot-group')
-          .style('opacity', (d) =>
-            isPointVisible(d) ? (matchesPoint(d) ? pointOpacityForVariant(d) : 0.15) : 0,
-          );
+        canvasPointLayerOf<InferenceData>(svg)?.setOpacity((d) =>
+          isPointVisible(d) ? (matchesPoint(d) ? pointOpacityForVariant(d) : 0.15) : 0,
+        );
         root
           .selectAll<SVGElement, unknown>('.roofline-path, .official-overflow-continuation')
           .style('opacity', function () {
@@ -2160,9 +2189,9 @@ const ScatterGraph = React.memo(
       const svg = chartRef.current?.getSvgElement?.();
       if (!svg) return;
       const root = d3.select(svg);
-      root
-        .selectAll<SVGGElement, InferenceData>('.dot-group')
-        .style('opacity', (d) => (isPointVisible(d) ? pointOpacityForVariant(d) : 0));
+      canvasPointLayerOf<InferenceData>(svg)?.setOpacity((d) =>
+        isPointVisible(d) ? pointOpacityForVariant(d) : 0,
+      );
       root
         .selectAll<SVGElement, unknown>('.roofline-path, .official-overflow-continuation')
         .style('opacity', function () {
@@ -2236,9 +2265,22 @@ const ScatterGraph = React.memo(
     const tooltipConfig = useMemo(
       () => ({
         rulerType: 'crosshair' as const,
-        content: (d: InferenceData, isPinned: boolean) =>
-          generateTooltipContent({
+        content: (d: InferenceData, isPinned: boolean) => {
+          const { getCssColor: css, resolveColor: rc } = seriesColorRef.current;
+          if (!isPinned) {
+            return generateHoverTooltipContent({
+              data: d,
+              xLabel,
+              yLabel,
+              selectedYAxisMetric,
+              hardwareConfig,
+              color: css(rc(d.hwKey as string)),
+              locale,
+            });
+          }
+          return generateTooltipContent({
             data: d,
+            color: css(rc(d.hwKey as string)),
             isPinned,
             xLabel,
             yLabel,
@@ -2248,32 +2290,25 @@ const ScatterGraph = React.memo(
             runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
             hasTrace:
               d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)
-                ? (interactionRef.current.traceAvailability?.[d.id] ?? false)
+                ? (interactionRef.current.presence?.trace.has(d.id) ?? false)
                 : false,
             hasLog: isPersistedBenchmarkId(d.id)
-              ? (interactionRef.current.logAvailability?.[d.id] ?? false)
+              ? (interactionRef.current.presence?.log.has(d.id) ?? false)
               : false,
             locale,
             powerLabelStyle,
             touch: touchCopy,
-          }),
+          });
+        },
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
         getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
-        onHoverStart: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) => {
+        onHoverStart: (_sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) => {
           // PowerX: the chip comparison follows the hovered point's interactivity.
           if (compareFollowsHoverRef.current) compareFollowsHoverRef.current(d.x);
           activePointRef.current?.({ point: d, source: 'hover' });
-          applyHoverState(
-            sel.select('.visible-shape') as any,
-            getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
-          );
         },
-        onHoverEnd: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) => {
+        onHoverEnd: () => {
           activePointRef.current?.(null);
-          applyNormalState(
-            sel.select('.visible-shape') as any,
-            getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
-          );
         },
         onPointClick: (d: InferenceData) => {
           activePointRef.current?.({ point: d, source: 'pinned' });
@@ -2398,7 +2433,9 @@ const ScatterGraph = React.memo(
 
           let rooflinesLayer = zoomGroup.select<SVGGElement>('.rooflines-layer');
           if (rooflinesLayer.empty()) {
-            const firstDotGroup = zoomGroup.select('.dot-group').node() as SVGGElement | null;
+            const firstDotGroup = zoomGroup
+              .select(`.dot-group, ${CANVAS_POINT_LAYER_SELECTOR}`)
+              .node() as SVGGElement | null;
             const node = document.createElementNS('http://www.w3.org/2000/svg', 'g');
             node.setAttribute('class', 'rooflines-layer');
             const parent = zoomGroup.node()!;
@@ -2994,11 +3031,24 @@ const ScatterGraph = React.memo(
             precision: (d) => d.precision,
             'power-variant': (d) => d.powerVariant?.id ?? '',
             'benchmark-type': (d) => d.benchmark_type ?? '',
+            'has-trace': (d) =>
+              d.benchmark_type === 'agentic_traces' &&
+              isPersistedBenchmarkId(d.id) &&
+              interactionRef.current.presence?.trace.has(d.id) === true
+                ? 'true'
+                : null,
+            'trace-availability': (d) => {
+              if (d.benchmark_type !== 'agentic_traces' || !isPersistedBenchmarkId(d.id)) {
+                return null;
+              }
+              return interactionRef.current.isPresencePending ? 'pending' : 'resolved';
+            },
           },
           getShapeKey: (d) =>
             getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
         },
         keyFn: buildPointId,
+        canvas: ensureCanvasPointLayer,
       };
 
       const updateOverlayLabels = (
@@ -3179,6 +3229,7 @@ const ScatterGraph = React.memo(
                 content: (point, pinned) =>
                   generateOverlayTooltipContent({
                     data: point,
+                    color: overlayRunColor(overlayRunIndex(point.run_url ?? null, runIndexByUrl)),
                     isPinned: pinned,
                     xLabel,
                     yLabel,
@@ -3774,6 +3825,12 @@ const ScatterGraph = React.memo(
         zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (point) {
           renderOffloadHalo(d3.select(this), point, 'var(--foreground)', showOffloadingLabel);
         });
+        canvasPointLayerOf<InferenceData>(zoomGroup.node())?.setHalo(
+          showOffloadingLabel
+            ? (point) => (point.offload_mode === 'on' ? 'var(--foreground)' : null)
+            : null,
+          OFFLOAD_HALO_STYLE,
+        );
         zoomGroup
           .selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt')
           .each(function (point) {
@@ -3797,11 +3854,24 @@ const ScatterGraph = React.memo(
       (ctx: RenderContext) => {
         const { zoomGroup } = ctx.layout;
 
-        zoomGroup.selectAll('.dot-group').style('transition', 'opacity 150ms ease');
+        zoomGroup.selectAll<SVGGElement, unknown>('.dot-group').each(function () {
+          if (this.style.getPropertyValue('transition') === '') {
+            this.style.setProperty('transition', 'opacity 150ms ease');
+          }
+        });
+        const points = canvasPointLayerOf(zoomGroup.node());
+        if (points) points.setOpacityTransition(POINT_OPACITY_TRANSITION_MS);
 
         syncOffloadHalos(zoomGroup);
 
-        avoidPointLabelCollisions(zoomGroup);
+        const zoomNode = zoomGroup.node();
+        if (zoomNode && !points) {
+          canvasPointLayerOf<InferenceData>(
+            getDisplaySelection()?.zoomGroup.node(),
+          )?.restoreExportOrder(zoomNode, buildPointId);
+        }
+
+        if (pointLabelsVisible) avoidPointLabelCollisions(zoomGroup);
 
         if (xScaleConfig._isLog) {
           const xScale = (ctx.renderedXScale ?? ctx.xScale) as d3.ScaleLogarithmic<number, number>;
@@ -3818,6 +3888,9 @@ const ScatterGraph = React.memo(
       },
       [
         syncOffloadHalos,
+        getDisplaySelection,
+        buildPointId,
+        pointLabelsVisible,
         hardwareConfig,
         xScaleConfig._isLog,
         yScaleConfig.type,
@@ -3841,22 +3914,10 @@ const ScatterGraph = React.memo(
       const { zoomGroup } = display;
       const ir = interactionRef.current;
 
-      zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
-        const point = d3.select(this);
-        const visible = ir.isPointVisible(d);
-        point
-          .style('opacity', visible ? pointOpacityForVariant(d) : 0)
-          .style('pointer-events', visible ? 'auto' : 'none');
-        const color =
-          (showGradientLabels && gradientColorByPoint.get(d)) ||
-          ir.getCssColor(ir.resolveColor(d.hwKey as string));
-        syncPointShape(
-          point as unknown as d3.Selection<SVGGElement, unknown, null, undefined>,
-          getShapeKeyForPrecision(d.precision, ir.selectedPrecisions),
-          color,
-        );
-        raiseInOrder(point, POINT_DECORATION_RAISE);
-      });
+      const scatterLayer = layersRef.current.find((layer) => layer.key === 'points');
+      if (scatterLayer?.type === 'scatter') {
+        canvasPointLayerOf<InferenceData>(zoomGroup.node())?.restyle(scatterLayer.config);
+      }
 
       zoomGroup.selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt').each(function (d) {
         const visible = ir.isOverlayPointVisible(d);
@@ -3932,24 +3993,6 @@ const ScatterGraph = React.memo(
     ]);
 
     useLayoutEffect(() => {
-      const display = getDisplaySelection();
-      if (!display) return;
-      display.zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
-        const pointId = isPersistedBenchmarkId(d.id) ? d.id : null;
-        const persistedAgenticPoint = d.benchmark_type === 'agentic_traces' && pointId !== null;
-        d3.select(this)
-          .attr(
-            'data-has-trace',
-            pointId !== null && traceAvailability?.[pointId] === true ? 'true' : null,
-          )
-          .attr(
-            'data-trace-availability',
-            persistedAgenticPoint ? (isTraceAvailabilityPending ? 'pending' : 'resolved') : null,
-          );
-      });
-    }, [getDisplaySelection, dataIdentity, traceAvailability, isTraceAvailabilityPending]);
-
-    useLayoutEffect(() => {
       const visibilityChanged = lastPointLabelsVisibleRef.current !== pointLabelsVisible;
       const gpuCountChanged = lastShowGpuCountRef.current !== showPointLabels;
       const lineLabelsChanged = lastShowLineLabelsRef.current !== showLineLabels;
@@ -3972,14 +4015,13 @@ const ScatterGraph = React.memo(
       if (!display) return;
       const { svg, ctx, zoomGroup } = display;
       if (visibilityChanged || gpuCountChanged) {
-        zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (point) {
-          syncPointLabel(
-            this,
-            pointLabelText(point, showPointLabels, useAdvancedLabels, showConcurrencyLabels),
-            'var(--foreground)',
-            !pointLabelsVisible,
-          );
-        });
+        canvasPointLayerOf<InferenceData>(zoomGroup.node())?.setLabels(
+          pointLabelsVisible
+            ? (point) =>
+                pointLabelText(point, showPointLabels, useAdvancedLabels, showConcurrencyLabels)
+            : null,
+          'var(--foreground)',
+        );
       }
       if (
         (lineLabelsChanged || gradientLabelsChanged || frameworkLabelChanged) &&

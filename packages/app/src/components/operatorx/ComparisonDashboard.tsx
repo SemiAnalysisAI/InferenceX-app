@@ -25,7 +25,7 @@ import { CoverageStrip } from './CoverageStrip';
 import {
   hardwareLabel,
   operatorXColors,
-  sortHardware,
+  measuredHardware,
   toggleHardwareSelection,
 } from './compare/hardware';
 import { METRICS, metricById } from './compare/metrics';
@@ -67,6 +67,16 @@ function layout(visible: VizDefinition[]): { viz: VizDefinition; span: Span }[] 
 function setParam(key: string, value: string) {
   const params = new URLSearchParams(window.location.search);
   params.set(key, value);
+  replaceClientSearch(params);
+}
+
+/** The one-device option's select value (its split key is empty). */
+const ONE_DEVICE = '1';
+
+function setParallel(value: string) {
+  const params = new URLSearchParams(window.location.search);
+  if (value === ONE_DEVICE) params.delete('parallel');
+  else params.set('parallel', value);
   replaceClientSearch(params);
 }
 
@@ -149,7 +159,7 @@ function visibleVisualizations(op: ComparisonOp, baseline: string | null): VizDe
   return VISUALIZATIONS.filter((v) => v.ops.includes(op) && (baseline || !v.needsBaseline));
 }
 
-const CONTROL_LABELS = ['Workload', 'Metric', 'Baseline'] as const;
+const CONTROL_LABELS = ['Workload', 'Devices', 'Metric', 'Baseline'] as const;
 
 /**
  * Loading state laid out like the loaded dashboard (controls card, then the card grid with
@@ -165,7 +175,7 @@ function ComparisonSkeleton({ op }: { op: ComparisonOp }) {
       aria-label="Loading results…"
     >
       <Card className="relative z-10 py-4 md:py-5">
-        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
           {CONTROL_LABELS.map((label) => (
             <div key={label} className="min-w-0 space-y-1.5">
               <Label>{label}</Label>
@@ -204,7 +214,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
     isLoading,
     isPlaceholderData: switching,
     refetch,
-  } = useOperatorXComparison(op, search.get('workload'));
+  } = useOperatorXComparison(op, search.get('workload'), search.get('parallel'));
   const theme = isDarkTheme(useTheme().resolvedTheme) ? 'dark' : 'light';
   const [picked, setPicked] = useState<string[] | null>(null);
   const [pickedBaseline, setBaseline] = useState<string | null>(null);
@@ -212,8 +222,8 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   const queryClient = useQueryClient();
   useDialogCloseTracking(inspected !== null, 'operatorx_case_closed', { op });
 
-  const workload = view?.workloads.find((w) => w.id === view.workload);
-  const available = useMemo(() => sortHardware(workload?.hardware ?? []), [workload]);
+  // GPUs with measured results at the selected device split
+  const available = useMemo(() => (view ? measuredHardware([view]) : []), [view]);
   const colors = useMemo(
     () => operatorXColors(view?.hardware.map((h) => h.id) ?? [], theme),
     [view, theme],
@@ -270,7 +280,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   return (
     <div className="flex flex-col gap-4">
       <Card className="relative z-10 py-4 md:py-5" data-testid="operatorx-controls">
-        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
           <ControlGroup label="Workload" htmlFor="operatorx-workload">
             <SearchableSelect
               triggerId="operatorx-workload"
@@ -285,6 +295,26 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
                   options: view.workloads.map((w) => ({
                     value: w.id,
                     label: w.label,
+                  })),
+                },
+              ]}
+            />
+          </ControlGroup>
+          <ControlGroup label="Devices" htmlFor="operatorx-parallel">
+            <SearchableSelect
+              triggerId="operatorx-parallel"
+              value={view.parallel || ONE_DEVICE}
+              onValueChange={(v) => {
+                track('operatorx_parallel_selected', { op, parallel: v });
+                setParallel(v);
+              }}
+              searchable={false}
+              groups={[
+                {
+                  label: '',
+                  options: view.parallelOptions.map((o) => ({
+                    value: o.key || ONE_DEVICE,
+                    label: `${o.label} (${o.cases})`,
                   })),
                 },
               ]}

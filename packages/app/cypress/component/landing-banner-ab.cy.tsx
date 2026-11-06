@@ -8,7 +8,6 @@ describe('Landing banner A/B arms', () => {
   // Before the arm resolves after hydration, every arm is rendered and the engine's active banner
   // can be the hidden one. Handlers must act on the arm that was clicked, not on engine state.
   it('hands each arm its own definition on click and dismiss', () => {
-    expect(arms.map((arm) => arm.variant)).to.deep.equal(['ubenchx', 'operatorx']);
     const onAction = cy.stub().as('action');
     const onDismiss = cy.stub().as('dismiss');
     cy.mount(

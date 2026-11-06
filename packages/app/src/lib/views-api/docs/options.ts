@@ -69,7 +69,10 @@ const responseSchema = objectSchema(
         label: stringSchema,
         vendor: stringSchema,
         arch: stringSchema,
-        tdpW: numberSchema,
+        tdpW: {
+          ...numberSchema,
+          description: 'Per-chip rated TDP in watts, shared with chip pages. B300 uses 1100 W.',
+        },
         costPerHour: objectSchema({ h: numberSchema, r: numberSchema }),
       }),
     ),
@@ -124,6 +127,14 @@ const responseExample = {
   apiVersion: 'v1',
   params: { format: 'json' },
   models: [
+    {
+      name: 'Kimi-K3',
+      dbKeys: ['kimik3'],
+      category: 'deprecated',
+      releaseDate: '2026-07-27',
+      compareSlug: 'kimi-k3',
+      deprecatedSequences: ['1k/1k', '1k/8k'],
+    },
     {
       name: 'DeepSeek-V4-Pro',
       dbKeys: ['dsv4'],

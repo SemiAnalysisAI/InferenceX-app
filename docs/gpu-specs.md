@@ -17,6 +17,10 @@ not mean the NICs are absent.
 
 ### View/control coverage
 
+- B300's shared `HW_REGISTRY` TDP is 1100 W. `/chips/b300`, `/zh/chips/b300`,
+  their SEO/social descriptions, and `/api/v1/views/options` (`hardware[].tdpW`)
+  consume that value. Its 1.9 kW all-in provisioned power reference is unchanged.
+
 - `/chips/*`, `/zh/chips/*`, `/gpu-specs`, and `/zh/gpu-specs` share `GPU_SPECS` with
   `/api/v1/views/gpu-specs` (JSON and CSV). NIC, network technology, bandwidth and
   MI355X's fourth-generation Infinity Fabric therefore agree across these views.

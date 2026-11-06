@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { fetchEvaluations } from '@/lib/api/api';
+import { expandEvalRows } from '@/components/evaluation/compact-rows';
+import { fetchDashboardEvaluations } from '@/lib/api/api';
 
 export function useEvaluations() {
   return useQuery({
     queryKey: ['evaluations'],
-    queryFn: ({ signal }) => fetchEvaluations(signal),
+    queryFn: async ({ signal }) => expandEvalRows(await fetchDashboardEvaluations(signal)),
   });
 }

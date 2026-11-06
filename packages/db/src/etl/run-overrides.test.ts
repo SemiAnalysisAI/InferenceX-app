@@ -5,16 +5,21 @@ import {
   type PurgedBenchmarkPoint,
   applyBenchmarkPointBackfill,
   applyChangelogBackfills,
+  backfilledPoints,
   BENCHMARK_POINT_BACKFILLS,
   CHANGELOG_BACKFILLS,
   CONCLUSION_OVERRIDES,
   PURGED_BENCHMARK_POINTS,
   PURGED_RUN_ATTEMPTS,
   PURGED_RUNS,
+  RUN_FRAMEWORK_OVERRIDES,
+  applyRunFrameworkOverridesToChangelogs,
   isBenchmarkPointPurged,
   isRunAttemptPurged,
   planBenchmarkPoint,
   recordBackfilledPointIdentity,
+  resolveRunFramework,
+  rewriteConfigKeyFramework,
   validateRunBackfills,
 } from './run-overrides';
 
@@ -498,6 +503,93 @@ describe('planBenchmarkPoint', () => {
       registry.splice(registry.indexOf(backfill), 1);
     }
   });
+
+  it('relabels required-power points the same way ingest relabels retained points', () => {
+    const required = {
+      config: {
+        ...EXAMPLE_CONFIG,
+        hardware: 'b300',
+        framework: 'vllm',
+        model: 'kimik3',
+        disagg: false,
+        isMultinode: false,
+        prefillTp: 8,
+        prefillEp: 1,
+        prefillDpAttn: false,
+        prefillNumWorkers: 0,
+        decodeTp: 8,
+        decodeEp: 1,
+        decodeDpAttn: false,
+        decodeNumWorkers: 0,
+      },
+      benchmarkType: 'agentic_traces',
+      isl: null,
+      osl: null,
+      conc: 24,
+      offloadMode: 'on',
+      recipeFingerprint: '61ba8917bcdef3e354ba09a889270595338d97885bd465fedd01c9dbe7e9beaa',
+      metrics: {},
+    };
+    const [relabeled] = backfilledPoints({ githubRunId: 31893747354, runAttempt: 2 }, [required]);
+    expect(relabeled!.config.specMethod).toBe('none');
+  });
+
+  it('moves a non-drafting B300 Kimi-K3 point to the none config and leaves drafting points alone', () => {
+    const kimiB300 = {
+      ...EXAMPLE_CONFIG,
+      hardware: 'b300',
+      framework: 'vllm',
+      model: 'kimik3',
+      disagg: false,
+      isMultinode: false,
+      prefillTp: 8,
+      prefillEp: 1,
+      prefillDpAttn: false,
+      prefillNumWorkers: 0,
+      decodeTp: 8,
+      decodeEp: 1,
+      decodeDpAttn: false,
+      decodeNumWorkers: 0,
+    };
+    const kimiPoint = (conc: number) => ({
+      configId: 2182,
+      config: kimiB300,
+      benchmarkType: 'agentic_traces',
+      isl: null,
+      osl: null,
+      conc,
+      offloadMode: 'on',
+      recipeFingerprint: '61ba8917bcdef3e354ba09a889270595338d97885bd465fedd01c9dbe7e9beaa',
+      metrics: { median_itl: 0.1 },
+    });
+    const run = { githubRunId: 31893747354, runAttempt: 2 };
+    const seen = new Map<string, string>();
+
+    const relabeled = planBenchmarkPoint(run, kimiPoint(24), seen);
+    expect(relabeled.kind === 'planned' && relabeled.point.config).toEqual({
+      ...kimiB300,
+      specMethod: 'none',
+    });
+    expect(relabeled.kind === 'planned' && relabeled.point.metrics).toEqual({ median_itl: 0.1 });
+
+    const drafting = planBenchmarkPoint(run, kimiPoint(16), seen);
+    expect(drafting).toMatchObject({ kind: 'planned', backfillId: null });
+    expect(drafting.kind === 'planned' && drafting.point.config.specMethod).toBe('mtp');
+
+    expect(() =>
+      planBenchmarkPoint(
+        run,
+        { ...kimiPoint(24), configId: 2116, config: { ...kimiB300, specMethod: 'none' } },
+        seen,
+      ),
+    ).toThrow(/collision/u);
+  });
+
+  it('rejects a spec method correction that does not change the config', () => {
+    expect(() =>
+      validateRunBackfills([], [examplePointBackfill({ set: { specMethod: 'mtp' } })]),
+    ).toThrow(/specMethod/u);
+  });
 });
 
 describe('CONCLUSION_OVERRIDES', () => {
@@ -820,5 +912,162 @@ describe('isBenchmarkPointPurged', () => {
     } finally {
       registry.splice(registry.indexOf(point), 1);
     }
+  });
+});
+
+const validateFrameworkOverrides = (overrides: Parameters<typeof validateRunBackfills>[2]) => () =>
+  validateRunBackfills([], [], overrides);
+
+describe('RUN_FRAMEWORK_OVERRIDES', () => {
+  const LLMD_RUN = 40744397059;
+
+  it('reassigns the TPU v7 Qwen3.5 xPyD run from vllm to llmd-vllm', () => {
+    expect(RUN_FRAMEWORK_OVERRIDES).toContainEqual(
+      expect.objectContaining({
+        id: 'run-40744397059-llmd-vllm-router',
+        githubRunId: LLMD_RUN,
+        from: 'vllm',
+        to: 'llmd-vllm',
+      }),
+    );
+    expect(() => validateRunBackfills()).not.toThrow();
+  });
+
+  it('resolves the served framework only for the registered run and declared framework', () => {
+    expect(resolveRunFramework(LLMD_RUN, 'vllm')).toEqual({
+      framework: 'llmd-vllm',
+      overrideId: 'run-40744397059-llmd-vllm-router',
+    });
+    expect(resolveRunFramework(String(LLMD_RUN), 'vllm')).toEqual({
+      framework: 'llmd-vllm',
+      overrideId: 'run-40744397059-llmd-vllm-router',
+    });
+    expect(resolveRunFramework(LLMD_RUN, 'dynamo-vllm')).toEqual({
+      framework: 'dynamo-vllm',
+      overrideId: null,
+    });
+    expect(resolveRunFramework(LLMD_RUN + 1, 'vllm')).toEqual({
+      framework: 'vllm',
+      overrideId: null,
+    });
+    for (const runId of [undefined, null, '', 'abc', '0', -1, 1.5]) {
+      expect(resolveRunFramework(runId, 'vllm')).toEqual({ framework: 'vllm', overrideId: null });
+    }
+  });
+
+  it('rewrites only the framework segment of a changelog config key', () => {
+    expect(
+      rewriteConfigKeyFramework('qwen3.5-fp8-tpuv7-vllm-agentic-xpyd-mtp', 'vllm', 'llmd-vllm'),
+    ).toBe('qwen3.5-fp8-tpuv7-llmd-vllm-agentic-xpyd-mtp');
+    expect(rewriteConfigKeyFramework('dsv4-fp4-gb200-vllm', 'vllm', 'llmd-vllm')).toBe(
+      'dsv4-fp4-gb200-llmd-vllm',
+    );
+    for (const untouched of [
+      'dsv4-fp4-gb200-dynamo-vllm-mtp',
+      'dsv4-fp4-gb200-llmd-vllm',
+      'dsv4-fp4-gb200-vllmx',
+      'dsv4-fp4-gb200',
+      'vllm',
+      '',
+      '-fp4-gb200-vllm',
+    ]) {
+      expect(rewriteConfigKeyFramework(untouched, 'vllm', 'llmd-vllm')).toBe(untouched);
+    }
+  });
+
+  it('applies the override to changelog config keys and reports the override ID once', () => {
+    const changelogs = [
+      {
+        baseRef: 'a',
+        headRef: 'b',
+        entries: [
+          {
+            configKeys: ['qwen3.5-fp8-tpuv7-vllm-agentic-xpyd-mtp', 'dsv4-fp4-gb200-dynamo-vllm'],
+            description: 'x',
+            prLink: null,
+            evalsOnly: false,
+            appendOnly: false,
+          },
+          {
+            configKeys: ['qwen3.5-fp8-tpuv7-vllm-agentic-xpyd-mtp'],
+            description: 'y',
+            prLink: null,
+            evalsOnly: false,
+            appendOnly: false,
+          },
+        ],
+      },
+    ];
+    const result = applyRunFrameworkOverridesToChangelogs(LLMD_RUN, changelogs);
+    expect(result.overrideIds).toEqual(['run-40744397059-llmd-vllm-router']);
+    expect(result.changelogs[0].entries.map((entry) => entry.configKeys)).toEqual([
+      ['qwen3.5-fp8-tpuv7-llmd-vllm-agentic-xpyd-mtp', 'dsv4-fp4-gb200-dynamo-vllm'],
+      ['qwen3.5-fp8-tpuv7-llmd-vllm-agentic-xpyd-mtp'],
+    ]);
+    expect(result.changelogs[0].entries[0].description).toBe('x');
+    expect(changelogs[0].entries[0].configKeys[0]).toBe('qwen3.5-fp8-tpuv7-vllm-agentic-xpyd-mtp');
+
+    const other = applyRunFrameworkOverridesToChangelogs(LLMD_RUN + 1, changelogs);
+    expect(other).toEqual({ changelogs, overrideIds: [] });
+    const alreadyCorrect = applyRunFrameworkOverridesToChangelogs(LLMD_RUN, [
+      { baseRef: 'a', headRef: 'b', entries: [{ configKeys: ['dsv4-fp4-gb200-llmd-vllm'] }] },
+    ]);
+    expect(alreadyCorrect.overrideIds).toEqual([]);
+  });
+
+  it('validates every framework override field', () => {
+    const base = {
+      id: 'run-1-framework',
+      reason: 'declared framework differs from the served one',
+      githubRunId: 1,
+      from: 'vllm',
+      to: 'llmd-vllm',
+    };
+    expect(validateFrameworkOverrides([base])).not.toThrow();
+    expect(validateFrameworkOverrides([{ ...base, id: 'Bad_Id' }])).toThrow('kebab-case');
+    expect(validateFrameworkOverrides([base, { ...base, from: 'sglang' }])).toThrow(
+      'duplicate backfill id',
+    );
+    expect(validateFrameworkOverrides([base, { ...base, id: 'run-1-again' }])).toThrow(
+      'duplicate framework override for run 1:vllm',
+    );
+    expect(validateFrameworkOverrides([{ ...base, reason: ' ' }])).toThrow(
+      'reason must not be empty',
+    );
+    expect(validateFrameworkOverrides([{ ...base, githubRunId: 0 }])).toThrow('positive integer');
+    expect(validateFrameworkOverrides([{ ...base, githubRunId: [...PURGED_RUNS][0] }])).toThrow(
+      'PURGED_RUNS',
+    );
+    expect(validateFrameworkOverrides([{ ...base, from: '' }])).toThrow('non-empty lowercase');
+    expect(validateFrameworkOverrides([{ ...base, to: 'LLMD-VLLM' }])).toThrow(
+      'non-empty lowercase',
+    );
+    expect(validateFrameworkOverrides([{ ...base, from: 'trtllm' }])).toThrow('not an alias');
+    expect(validateFrameworkOverrides([{ ...base, to: 'vllm' }])).toThrow(
+      'from and to must differ',
+    );
+    expect(validateFrameworkOverrides([{ ...base, to: 'not-a-framework' }])).toThrow(
+      'registered framework key',
+    );
+  });
+
+  it('shares the stable ID namespace with the other audited corrections', () => {
+    expect(() =>
+      validateRunBackfills(
+        [
+          {
+            id: 'run-1-framework',
+            reason: 'r',
+            githubRunId: 1,
+            runAttempt: 1,
+            baseRef: 'a',
+            headRef: 'b',
+            set: { appendOnly: true },
+          },
+        ],
+        [],
+        [{ id: 'run-1-framework', reason: 'r', githubRunId: 1, from: 'vllm', to: 'llmd-vllm' }],
+      ),
+    ).toThrow('duplicate backfill id');
   });
 });

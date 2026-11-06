@@ -1,8 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 
-import 'katex/dist/katex.min.css';
-
 import ModelDetailContent from '@/components/model/ModelDetailContent';
 import { modelAliasDestination } from '@/components/model/model-page-copy';
 import { COMPARE_MODEL_ALIASES } from '@/lib/compare/compare-slug';

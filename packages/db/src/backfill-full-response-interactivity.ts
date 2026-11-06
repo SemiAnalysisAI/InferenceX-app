@@ -1,7 +1,7 @@
 import { readTraceProfileLines } from './lib/trace-profile-storage';
 
 import { hasNoSslFlag } from './cli-utils.js';
-import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
+import { createAdminSql } from './etl/db-utils.js';
 import { fullResponseMetricsFromLines } from './etl/full-response-interactivity.js';
 import {
   jsonbParam,
@@ -18,7 +18,7 @@ async function main(): Promise<void> {
   console.log(`  force = ${flags.force}`);
   console.log(`  limit = ${flags.limit ?? 'none'}`);
 
-  const processedCandidates = await runCandidateIdBackfill(
+  await runCandidateIdBackfill(
     async () => {
       const candidates = flags.force
         ? await sql<{ id: number }[]>`
@@ -71,8 +71,6 @@ async function main(): Promise<void> {
     },
     (count) => `${count} candidate benchmark row(s).`,
   );
-
-  if (processedCandidates && process.exitCode !== 1) await refreshLatestBenchmarks(sql);
 }
 
 runBackfillMain('backfill-full-response-interactivity', sql, main);

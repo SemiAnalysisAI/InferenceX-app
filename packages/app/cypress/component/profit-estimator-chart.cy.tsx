@@ -114,7 +114,6 @@ describe('ProfitEstimatorChart revenue labels', () => {
   it('never lets neighbouring revenue figures overlap on a phone', () => {
     cy.viewport(393, 852);
     mountChart(393);
-    cy.screenshot('profit-estimator-chart-phone', { overwrite: true });
     labelBoxes().then((boxes) => {
       for (let i = 0; i < boxes.length; i += 1) {
         for (let j = i + 1; j < boxes.length; j += 1) {
@@ -131,7 +130,6 @@ describe('ProfitEstimatorChart revenue labels', () => {
     cy.viewport(393, 852);
     mountChart(393, LOSING_ROWS);
     cy.get('[data-testid="profit-estimator-chart"] .loss-label').should('have.length', 2);
-    cy.screenshot('profit-estimator-chart-phone-loss', { overwrite: true });
     cy.get('[data-testid="profit-estimator-chart"] .loss-label').then(($labels) => {
       expect([...$labels].map((el) => el.textContent)).to.deep.equal([
         'Loss -$561M',
@@ -181,7 +179,6 @@ describe('ProfitEstimatorChart revenue labels', () => {
   it('keeps full precision on a desktop-width chart', () => {
     cy.viewport(1280, 900);
     mountChart(1100);
-    cy.screenshot('profit-estimator-chart-desktop', { overwrite: true });
     cy.get('[data-testid="profit-estimator-chart"] .revenue-amount')
       .first()
       .should('have.text', '$137.1B');

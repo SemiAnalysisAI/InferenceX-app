@@ -1,40 +1,33 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { VIDEO_HISTORY_MAX_PAGES, type VideoHistoryPage } from './history';
-import type { VideoPoint } from './metrics';
-import { videoPoints } from './points';
+import { namedRunPoints, videoPoints } from './points';
+import type { VideoHistoryData } from './initial-data';
 
-/** Load every published history page (bounded) and flatten it into chart points. */
-export function useVideoPoints() {
-  const [points, setPoints] = useState<VideoPoint[]>([]);
-  const [loading, setLoading] = useState(true);
+export function useVideoPoints(runId: string | null, initial?: VideoHistoryData | null) {
+  const [pages, setPages] = useState<VideoHistoryPage[]>(initial?.pages ?? []);
+  const [loading, setLoading] = useState(!initial);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [replay, setReplay] = useState(false);
+  const [replay, setReplay] = useState(initial?.replay ?? false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
+    if (initial && attempt === 0) return;
     const controller = new AbortController();
     setLoading(true);
     setLoadError(null);
     (async () => {
-      const pages: VideoHistoryPage[] = [];
-      let replayed = false;
-      for (let page = 1; page <= VIDEO_HISTORY_MAX_PAGES; page++) {
-        const response = await fetch(`/api/video-runs?format=history&page=${page}`, {
-          signal: controller.signal,
-          cache: 'no-store',
-        });
-        if (!response.ok) throw new Error(`Published history HTTP ${response.status}`);
-        replayed ||= response.headers.get('x-videogenx-replay') === '1';
-        const data = (await response.json()) as VideoHistoryPage;
-        if (data.schemaVersion !== 1 || !Array.isArray(data.entries))
-          throw new Error('Unsupported published history projection');
-        pages.push(data);
-        if (data.nextPage === null) break;
-      }
+      const response = await fetch(
+        `/api/video-runs?format=history&page=1&pages=${VIDEO_HISTORY_MAX_PAGES}`,
+        { signal: controller.signal, cache: 'no-store' },
+      );
+      if (!response.ok) throw new Error(`Published history HTTP ${response.status}`);
+      const data = (await response.json()) as VideoHistoryPage;
+      if (data.schemaVersion !== 1 || !Array.isArray(data.entries))
+        throw new Error('Unsupported published history projection');
       if (controller.signal.aborted) return;
-      setPoints(videoPoints(pages));
-      setReplay(replayed);
+      setPages([data]);
+      setReplay(response.headers.get('x-videogenx-replay') === '1');
     })()
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
@@ -44,7 +37,9 @@ export function useVideoPoints() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [attempt]);
+  }, [attempt, initial]);
+  const points = useMemo(() => videoPoints(pages), [pages]);
+  const namedPoints = useMemo(() => namedRunPoints(pages, runId), [pages, runId]);
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
-  return { points, loading, error: loadError, replay, retry };
+  return { points, namedPoints, loading, error: loadError, replay, retry };
 }

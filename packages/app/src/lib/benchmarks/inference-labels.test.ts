@@ -13,6 +13,70 @@ const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/349262
 const historicalUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34926284364';
 const hwKey = 'mi355x_mori-sglang';
 
+describe('SMG router labels', () => {
+  it.each([
+    ['sglang', 'SGLang'],
+    ['vllm', 'vLLM'],
+  ])('labels %s from router metadata in official and overlay paths', (framework, label) => {
+    const key = `mi355x_${framework}_mtp`;
+    const generic = getHardwareConfig(key);
+    const point = { hwKey: key, framework, router_name: 'smg' };
+    const config = getInferenceHardwareConfig(key, undefined, [point]);
+    expect(config.suffix).toBe(`(SMG ${label}, MTP)`);
+    expect(config.gpu).toBe(generic.gpu.replace(label, `SMG ${label}`));
+    expect(config.name).toBe(generic.name);
+    expect(config.label).toBe(generic.label);
+    expect(getHardwareConfig(key)).toBe(generic);
+    expect(generic.suffix).toBe(`(${label}, MTP)`);
+    expect(getInferenceRunLabel('✕ router-test', [point])).toBe(`✕ router-test (SMG ${label})`);
+    expect(getPointHardwareConfig(point, generic)).toEqual(config);
+    expect(inferenceFrameworkLabelOverride(framework, undefined, ' SMG ')).toBe(`SMG ${label}`);
+  });
+
+  it.each(['sglang', 'vllm'])(
+    'labels the whole %s curve SMG when any point uses it',
+    (framework) => {
+      const key = `mi355x_${framework}`;
+      const label = framework === 'sglang' ? 'SGLang' : 'vLLM';
+      const smg = { hwKey: key, framework, router_name: 'smg' };
+      const other = { hwKey: key, framework, router_name: undefined };
+      const mixed = getInferenceHardwareConfig(key, undefined, [smg, other]);
+      expect(mixed.suffix).toBe(`(SMG ${label})`);
+      expect(getInferenceHardwareConfig(key, undefined, [other, smg])).toEqual(mixed);
+      expect(getInferenceRunLabel('✕ mixed', [smg, other, smg])).toBe(`✕ mixed (SMG ${label})`);
+      expect(getInferenceRunLabel('✕ mixed', [other, smg])).toBe(`✕ mixed (SMG ${label})`);
+      expect(getPointHardwareConfig(smg, mixed).suffix).toBe(`(SMG ${label})`);
+      expect(getPointHardwareConfig(other, mixed)).toBe(getHardwareConfig(key));
+    },
+  );
+
+  it.each([undefined, null, '', 'sglang-router', 'vllm-router', 'not-smg'])(
+    'does not infer SMG from the run or framework when router is %s',
+    (router_name) => {
+      for (const framework of ['sglang', 'vllm']) {
+        const key = `mi355x_${framework}`;
+        const point = {
+          framework,
+          router_name,
+          run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/41803503347',
+        };
+        expect(getInferenceHardwareConfig(key, undefined, [point])).toBe(getHardwareConfig(key));
+        expect(getInferenceRunLabel('✕ smg-experiment', [point])).toBe('✕ smg-experiment');
+      }
+    },
+  );
+
+  it.each(['mori-sglang', 'sglang-disagg', 'vllm-disagg', 'dynamo-sglang', 'dynamo-vllm', 'atom'])(
+    'preserves the existing %s stack name',
+    (framework) => {
+      const key = `mi355x_${framework}`;
+      expect(getInferenceHardwareConfig(key, undefined, [{ router_name: 'smg' }])).toBe(
+        getHardwareConfig(key),
+      );
+    },
+  );
+});
+
 describe('temporary UMBP MoRI SGLang label for run 35879254139', () => {
   const targetUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/35879254139';
   const expiresAt = Date.parse('2026-10-10T00:00:00-04:00');

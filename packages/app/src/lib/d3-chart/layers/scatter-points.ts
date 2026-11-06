@@ -12,6 +12,7 @@ import {
 import type { ContinuousScale } from '../types';
 import { setAttrIfChanged, setStyleIfChanged, setTextIfChanged } from '../chart-update';
 import { CHART_TYPE, px } from '../typography';
+import { pointLabelAnchor, replacedPointShapes } from './point-label-order';
 
 export interface ScatterPointConfig<T> {
   getColor: (d: T) => string;
@@ -20,12 +21,15 @@ export interface ScatterPointConfig<T> {
   hideLabels?: boolean;
   getLabelText?: (d: T) => string;
   foreground?: string;
-  dataAttrs?: Record<string, (d: T) => string>;
+  dataAttrs?: Record<string, (d: T) => string | null>;
   selectedPrecisions?: readonly string[];
   getShapeKey?: (d: T) => ShapeKey;
 }
 
-const resolveShapeKey = (precision: string, selectedPrecisions?: readonly string[]): ShapeKey =>
+export const resolveShapeKey = (
+  precision: string,
+  selectedPrecisions?: readonly string[],
+): ShapeKey =>
   selectedPrecisions && selectedPrecisions.length > 0
     ? getShapeKeyForPrecision(precision, selectedPrecisions)
     : 'circle';
@@ -52,6 +56,7 @@ export function syncPointShape(
       null,
       undefined
     >;
+    if (existing) replacedPointShapes.add(shape.node()!);
     applyNormalState(shape, shapeKey);
   } else {
     setAttrIfChanged(existing, 'fill', fill);
@@ -107,17 +112,30 @@ export function renderScatterPoints<T extends { precision: string; x: number; y:
     syncPointShape(g, shapeKey, config.getColor(d));
   });
 
-  if (config.getLabelText && config.foreground) {
+  if (config.getLabelText && config.foreground && !config.hideLabels) {
     const labelGetter = config.getLabelText;
     const foreground = config.foreground;
     points.each(function (d) {
-      syncPointLabel(this, labelGetter(d), foreground, config.hideLabels);
+      syncPointLabel(this, labelGetter(d), foreground, false);
     });
   } else {
-    points.selectAll('.point-label').remove();
+    zoomGroup.selectAll('.dot-group > .point-label').remove();
   }
 
   return points;
+}
+
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+
+function isPointLabel(element: Element): element is SVGTextElement {
+  return element.localName === 'text' && element.classList.contains('point-label');
+}
+
+export function childPointLabel(group: Element): SVGTextElement | null {
+  for (let child = group.firstElementChild; child; child = child.nextElementSibling) {
+    if (isPointLabel(child)) return child;
+  }
+  return null;
 }
 
 export function syncPointLabel(
@@ -126,32 +144,43 @@ export function syncPointLabel(
   foreground: string,
   hideLabels: boolean | undefined,
 ): void {
+  const existing = childPointLabel(group);
+  if (hideLabels) {
+    existing?.remove();
+    return;
+  }
+  const { ownerDocument } = group;
+  const element = existing ?? ownerDocument.createElementNS(SVG_NAMESPACE, 'text');
   const lines = text.split('\n');
   const firstDy = `${-(0.8 + (lines.length - 1) * 1.1)}em`;
-  const label = d3
-    .select(group)
-    .selectAll<SVGTextElement, boolean>('.point-label')
-    .data([true])
-    .join('text');
-  const element = label.node();
-  if (!element) return;
   setAttrIfChanged(element, 'class', 'point-label');
   setAttrIfChanged(element, 'text-anchor', 'middle');
   setAttrIfChanged(element, 'fill', foreground);
   setAttrIfChanged(element, 'font-size', px(CHART_TYPE.dataLabel));
   setAttrIfChanged(element, 'font-weight', '700');
   setAttrIfChanged(element, 'pointer-events', 'none');
-  setStyleIfChanged(element, 'display', hideLabels ? 'none' : '');
-  setStyleIfChanged(element, 'opacity', hideLabels ? '0' : '1');
-  label
-    .selectAll<SVGTSpanElement, string>('tspan')
-    .data(lines)
-    .join('tspan')
-    .each(function (line, index) {
-      setAttrIfChanged(this, 'x', '0');
-      setAttrIfChanged(this, 'dy', index === 0 ? firstDy : '1.1em');
-      setTextIfChanged(this, line);
-    });
+  setStyleIfChanged(element, 'display', '');
+  setStyleIfChanged(element, 'opacity', '1');
+  let tspan = element.firstElementChild;
+  for (const [index, line] of lines.entries()) {
+    if (!tspan) {
+      tspan = ownerDocument.createElementNS(SVG_NAMESPACE, 'tspan');
+      element.append(tspan);
+    }
+    setAttrIfChanged(tspan, 'x', '0');
+    setAttrIfChanged(tspan, 'dy', index === 0 ? firstDy : '1.1em');
+    setTextIfChanged(tspan, line);
+    tspan = tspan.nextElementSibling;
+  }
+  while (tspan) {
+    const extra = tspan;
+    tspan = tspan.nextElementSibling;
+    extra.remove();
+  }
+  if (existing) return;
+  const anchor = pointLabelAnchor(group);
+  if (anchor) anchor.before(element);
+  else group.append(element);
 }
 
 export function updateScatterPointsForDisplay<
@@ -176,12 +205,15 @@ export function updateScatterPointsForDisplay<
       config.getColor(d),
     );
   });
-  points.selectAll<SVGTextElement, unknown>('.point-label').each(function () {
-    if (config.foreground) setAttrIfChanged(this, 'fill', config.foreground);
-    else this.removeAttribute('fill');
-    setStyleIfChanged(this, 'display', config.hideLabels ? 'none' : '');
-    setStyleIfChanged(this, 'opacity', config.hideLabels ? '0' : '1');
-  });
+  if (config.getLabelText && config.foreground) {
+    const labelGetter = config.getLabelText;
+    const foreground = config.foreground;
+    points.each(function (d) {
+      syncPointLabel(this, labelGetter(d), foreground, config.hideLabels);
+    });
+  } else {
+    zoomGroup.selectAll('.dot-group > .point-label').remove();
+  }
 }
 
 export interface TooltipContainerGeometry {

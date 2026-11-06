@@ -170,6 +170,81 @@ describe('GET /api/v1/views/calculator', () => {
     expect(entry.concurrency).toBe(expected!.concurrency);
   });
 
+  describe('chipBasis', () => {
+    const DISAGG_ROWS = [8, 16].map((conc) =>
+      makeRow({
+        hardware: 'gb300',
+        framework: 'dynamo-sglang',
+        disagg: true,
+        is_multinode: true,
+        num_prefill_gpu: 4,
+        num_decode_gpu: 12,
+        conc,
+        metrics: {
+          median_intvty: conc === 8 ? 50 : 30,
+          tput_per_gpu: conc === 8 ? 900 : 1500,
+          input_tput_per_gpu: conc === 8 ? 3000 : 5000,
+          output_tput_per_gpu: conc === 8 ? 100 : 166,
+        },
+      }),
+    );
+    const view = async (query: string) => {
+      mockGetLatestBenchmarks.mockResolvedValue(DISAGG_ROWS);
+      const response = await GET(
+        request(`/api/v1/views/calculator?model=DeepSeek-V4-Pro&sequence=1k/1k&${query}`),
+      );
+      return { status: response.status, body: await response.json() };
+    };
+
+    it('defaults to pool and echoes the resolved basis', async () => {
+      const { status, body } = await view('costType=output');
+      expect(status).toBe(200);
+      expect(body.params.chipBasis).toBe('pool');
+    });
+
+    it('rejects an unknown basis with the allowed values', async () => {
+      const { status, body } = await view('chipBasis=decode');
+      expect(status).toBe(400);
+      expect(body.param).toBe('chipBasis');
+      expect(body.allowed).toEqual(['pool', 'total']);
+    });
+
+    it.each(['pool', 'total'] as const)(
+      'matches the dashboard calculator math on the %s basis',
+      async (chipBasis) => {
+        const { body } = await view(`costType=output&chipBasis=${chipBasis}`);
+        expect(body.params.chipBasis).toBe(chipBasis);
+        const [entry] = body.hardware;
+        const { grouped } = buildGpuGroups(toCalculatorBenchmarkRows(DISAGG_ROWS, '1k/1k'), {
+          sequence: Sequence.OneK_OneK,
+          precisions: ['fp4'],
+          percentile: Percentile.P90,
+          tokenType: 'output',
+          chipBasis,
+          classify: (hwKey) => ({ key: hwKey, meta: { hwKey } }),
+        });
+        const expected = interpolateForGPU(
+          grouped[entry.hwKey],
+          35,
+          'interactivity_to_throughput',
+          'costh',
+        )!;
+        expect(entry.outputThroughput).toBeCloseTo(expected.outputTputValue, 10);
+        expect(entry.inputThroughput).toBeCloseTo(expected.inputTputValue, 10);
+      },
+    );
+
+    it('divides output by every chip on the total basis', async () => {
+      const poolView = await view('chipBasis=pool');
+      const totalView = await view('chipBasis=total');
+      const pool = poolView.body.hardware[0];
+      const total = totalView.body.hardware[0];
+      expect(total.outputThroughput).toBeCloseTo((pool.outputThroughput * 12) / 16, 9);
+      expect(total.inputThroughput).toBeCloseTo((pool.inputThroughput * 4) / 16, 9);
+      expect(total.value).toBeCloseTo(pool.value, 9);
+    });
+  });
+
   it('canonicalizes list params: gpu base key and full hwKey select the same group', async () => {
     const byBaseRes = await GET(
       request('/api/v1/views/calculator?model=DeepSeek-V4-Pro&sequence=1k/1k&gpus=B300'),

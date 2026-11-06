@@ -25,6 +25,10 @@ const { mockCachedJson } = vi.hoisted(() => ({
 vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: any[]) => any) => fn,
   cachedJson: mockCachedJson,
+  cachedJsonResponse:
+    (load: (...args: unknown[]) => Promise<unknown>, _keyPrefix: string, options?: unknown) =>
+    async (request: Request, ...args: unknown[]) =>
+      mockCachedJson(request, await load(...args), options),
 }));
 
 import { GET } from './route';

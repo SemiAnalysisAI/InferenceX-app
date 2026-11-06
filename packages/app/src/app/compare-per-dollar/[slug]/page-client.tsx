@@ -8,14 +8,13 @@ import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-con
 import type { GPUDataPoint } from '@/components/calculator/types';
 import { useThroughputData } from '@/components/calculator/useThroughputData';
 import { CompareTableRenderer } from '@/components/compare/compare-table-renderer';
+import { LazyCompareInferenceChart } from '@/components/compare/lazy-compare-inference-chart';
 import {
   GlobalFilterProvider,
   useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
 } from '@/providers/GlobalFilterContext';
-import { InferenceProvider } from '@/components/inference/InferenceContext';
-import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
 import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import type { BenchmarkRow } from '@/lib/api/api';
@@ -145,178 +144,172 @@ export default function ComparePerDollarPageClient({
       initialSequence={initialSequence}
       initialPrecisions={initialPrecisions}
     >
-      <InferenceProvider
-        activeTab="compare"
-        initialActiveHwTypes={[a, b]}
-        compareGpuPair={compareGpuPair}
-        initialYAxisMetric={PER_DOLLAR_DEFAULT_Y_AXIS}
-        benchmarkQueryScope={benchmarkQueryScope}
-        initialBenchmarkModel={initialModel}
-        initialBenchmarkRows={initialBenchmarkRows}
-        initialBenchmarkSequence={defaultSequence ?? undefined}
-      >
-        <div className="flex flex-col gap-4">
-          <Card className="flex w-full min-w-0 flex-col gap-3">
-            <header>
-              <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                {modelLabel} · {t.eyebrowSuffix}
-              </div>
-              <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">
-                {label} {t.h1Suffix}
-              </h1>
-              {isZh ? (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  对比 <strong>{aLabel}</strong>（{aVendor} {aArch}）与 <strong>{bLabel}</strong>（
-                  {bVendor} {bArch}）在 <strong>{modelLabel}</strong> 上的每百万 token
-                  成本。该指标采用 Hyperscaler 自有设备 TCO 口径，并按总 token
-                  数归一化，用于比较不同 LLM
-                  工作负载下的每美元性能。可在任一目标交互性下找出成本更低的
-                  SKU，并通过下方图表控件切换序列长度、精度和指标；操作方式与
-                  <Link href="/zh" className="underline hover:text-primary">
-                    {t.mainChartLinkText}
-                  </Link>
-                  相同。
-                </p>
-              ) : (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Cost per million tokens of <strong>{aLabel}</strong> ({aVendor} {aArch}) versus{' '}
-                  <strong>{bLabel}</strong> ({bVendor} {bArch}) on <strong>{modelLabel}</strong>.
-                  Large-hyperscaler-volume ownership TCO normalized by total tokens — performance
-                  per dollar across LLM workloads. Pick the more cost-efficient SKU at every target
-                  interactivity level. Use the chart controls below to switch sequences, precisions,
-                  and metrics — same interactions as{' '}
-                  <Link href="/" className="underline hover:text-primary">
-                    {t.mainChartLinkText}
-                  </Link>
-                  .
-                </p>
-              )}
-              {agenticIntro && (
-                <p
-                  className="mt-3 max-w-3xl text-sm text-foreground/80"
-                  data-testid="compare-agentic-intro"
-                >
-                  {agenticIntro.paragraph}{' '}
-                  <Link
-                    href={agenticIntro.href}
-                    data-testid="compare-agentic-intro-link"
-                    className="font-medium text-brand underline underline-offset-4 hover:no-underline"
-                  >
-                    {agenticIntro.linkLabel} →
-                  </Link>
-                </p>
-              )}
-              {narrative.length > 0 && (
-                <div
-                  className="mt-3 flex flex-col gap-2"
-                  data-testid="compare-per-dollar-narrative"
-                >
-                  {narrative.map((para, i) => (
-                    <p key={i} className="text-sm text-foreground/80">
-                      {para}
-                      {i === narrative.length - 1 && (
-                        <>
-                          {' '}
-                          <span className="text-muted-foreground italic">
-                            {isZh
-                              ? `（以上数据基于此 URL 对应的默认 ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} 配置；在控件中切换序列长度、精度或模型后，下方表格和图表会同步更新。）`
-                              : `(Numbers reflect the default ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} selection for this URL — table and chart below update if you change sequence, precision, or model in the controls.)`}
-                          </span>
-                        </>
-                      )}
-                    </p>
-                  ))}
-                </div>
-              )}
-              {(aCostPerGpuHr > 0 || bCostPerGpuHr > 0) && (
-                <p
-                  className="mt-2 text-xs text-muted-foreground"
-                  data-testid="compare-per-dollar-pricing"
-                >
-                  {t.pricingLabel} <strong>{aLabel}</strong>{' '}
-                  {aCostPerGpuHr > 0 ? `$${aCostPerGpuHr.toFixed(2)}/chip/hr` : '—'} ·{' '}
-                  <strong>{bLabel}</strong>{' '}
-                  {bCostPerGpuHr > 0 ? `$${bCostPerGpuHr.toFixed(2)}/chip/hr` : '—'}.{' '}
-                  {t.pricingSource}{' '}
-                  <a
-                    href={TCO_SOURCE_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline hover:text-primary"
-                    onClick={() => track('compare_per_dollar_tco_source_clicked', { slug })}
-                  >
-                    {TCO_SOURCE_TITLE}
-                  </a>
-                  .
-                </p>
-              )}
-              <p className="mt-2 text-sm">
+      <div className="flex flex-col gap-4">
+        <Card className="flex w-full min-w-0 flex-col gap-3">
+          <header>
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">
+              {modelLabel} · {t.eyebrowSuffix}
+            </div>
+            <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">
+              {label} {t.h1Suffix}
+            </h1>
+            {isZh ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                对比 <strong>{aLabel}</strong>（{aVendor} {aArch}）与 <strong>{bLabel}</strong>（
+                {bVendor} {bArch}）在 <strong>{modelLabel}</strong> 上的每百万 token
+                成本。该指标采用 Hyperscaler 自有设备 TCO 口径，并按总 token 数归一化，用于比较不同
+                LLM 工作负载下的每美元性能。可在任一目标交互性下找出成本更低的
+                SKU，并通过下方图表控件切换序列长度、精度和指标；操作方式与
+                <Link href="/zh" className="underline hover:text-primary">
+                  {t.mainChartLinkText}
+                </Link>
+                相同。
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Cost per million tokens of <strong>{aLabel}</strong> ({aVendor} {aArch}) versus{' '}
+                <strong>{bLabel}</strong> ({bVendor} {bArch}) on <strong>{modelLabel}</strong>.
+                Large-hyperscaler-volume ownership TCO normalized by total tokens — performance per
+                dollar across LLM workloads. Pick the more cost-efficient SKU at every target
+                interactivity level. Use the chart controls below to switch sequences, precisions,
+                and metrics — same interactions as{' '}
+                <Link href="/" className="underline hover:text-primary">
+                  {t.mainChartLinkText}
+                </Link>
+                .
+              </p>
+            )}
+            {agenticIntro && (
+              <p
+                className="mt-3 max-w-3xl text-sm text-foreground/80"
+                data-testid="compare-agentic-intro"
+              >
+                {agenticIntro.paragraph}{' '}
                 <Link
-                  href={isZh ? `/zh/compare/${slug}` : `/compare/${slug}`}
-                  className="underline hover:text-primary text-muted-foreground"
-                  onClick={() => track('compare_per_dollar_cross_link_to_full', { slug })}
+                  href={agenticIntro.href}
+                  data-testid="compare-agentic-intro-link"
+                  className="font-medium text-brand underline underline-offset-4 hover:no-underline"
                 >
-                  {t.fullComparisonLinkText}
+                  {agenticIntro.linkLabel} →
                 </Link>
               </p>
-              {chipPageLink && (
-                <p className="mt-2 text-sm" data-testid="compare-chip-page-link">
-                  <Link
-                    href={chipPageLink.href}
-                    className="underline hover:text-primary text-muted-foreground"
-                    onClick={() =>
-                      track('compare_per_dollar_cross_link_to_chip_page', {
-                        slug,
-                        chip_slug: chipPageLink.slug,
-                      })
-                    }
-                  >
-                    {chipPageLink.label} →
-                  </Link>
-                </p>
-              )}
-            </header>
-            <figure
-              className="mt-2 flex flex-col gap-2"
-              data-testid="compare-per-dollar-indexed-image"
-            >
-              <img
-                src={heroImageSrc}
-                alt={
-                  isZh
-                    ? `${modelLabel}：${aLabel} 与 ${bLabel} 在相同交互性水平下的每百万 token 成本`
-                    : `${modelLabel}: ${aLabel} versus ${bLabel} cost per million tokens at matched interactivity levels`
-                }
-                width={1200}
-                height={675}
-                loading="eager"
-                fetchPriority="high"
-                className="w-full rounded-lg border border-border/50"
-              />
-              <figcaption className="text-xs text-muted-foreground">
-                {isZh
-                  ? `${aLabel} 与 ${bLabel} 在此对比默认工作负载下的每百万 token 成本。成本越低表示每美元性能越高。`
-                  : `${aLabel} versus ${bLabel} cost per million tokens for this comparison's canonical default workload. Lower cost indicates better performance per dollar.`}
-              </figcaption>
-            </figure>
-            <CompareTableSection
-              a={a}
-              b={b}
-              aLabel={aLabel}
-              bLabel={bLabel}
-              ssrTableData={ssrTableData}
-              ssrSequence={defaultSequence}
-              ssrPrecisions={initialPrecisions}
-              initialModel={initialModel}
-              initialSequence={initialSequence}
-              initialCalculatorRows={initialCalculatorRows}
-              emptyStateText={t.emptyState}
-              isZh={isZh}
+            )}
+            {narrative.length > 0 && (
+              <div className="mt-3 flex flex-col gap-2" data-testid="compare-per-dollar-narrative">
+                {narrative.map((para, i) => (
+                  <p key={i} className="text-sm text-foreground/80">
+                    {para}
+                    {i === narrative.length - 1 && (
+                      <>
+                        {' '}
+                        <span className="text-muted-foreground italic">
+                          {isZh
+                            ? `（以上数据基于此 URL 对应的默认 ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} 配置；在控件中切换序列长度、精度或模型后，下方表格和图表会同步更新。）`
+                            : `(Numbers reflect the default ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} selection for this URL — table and chart below update if you change sequence, precision, or model in the controls.)`}
+                        </span>
+                      </>
+                    )}
+                  </p>
+                ))}
+              </div>
+            )}
+            {(aCostPerGpuHr > 0 || bCostPerGpuHr > 0) && (
+              <p
+                className="mt-2 text-xs text-muted-foreground"
+                data-testid="compare-per-dollar-pricing"
+              >
+                {t.pricingLabel} <strong>{aLabel}</strong>{' '}
+                {aCostPerGpuHr > 0 ? `$${aCostPerGpuHr.toFixed(2)}/chip/hr` : '—'} ·{' '}
+                <strong>{bLabel}</strong>{' '}
+                {bCostPerGpuHr > 0 ? `$${bCostPerGpuHr.toFixed(2)}/chip/hr` : '—'}.{' '}
+                {t.pricingSource}{' '}
+                <a
+                  href={TCO_SOURCE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-primary"
+                  onClick={() => track('compare_per_dollar_tco_source_clicked', { slug })}
+                >
+                  {TCO_SOURCE_TITLE}
+                </a>
+                .
+              </p>
+            )}
+            <p className="mt-2 text-sm">
+              <Link
+                href={isZh ? `/zh/compare/${slug}` : `/compare/${slug}`}
+                className="underline hover:text-primary text-muted-foreground"
+                onClick={() => track('compare_per_dollar_cross_link_to_full', { slug })}
+              >
+                {t.fullComparisonLinkText}
+              </Link>
+            </p>
+            {chipPageLink && (
+              <p className="mt-2 text-sm" data-testid="compare-chip-page-link">
+                <Link
+                  href={chipPageLink.href}
+                  className="underline hover:text-primary text-muted-foreground"
+                  onClick={() =>
+                    track('compare_per_dollar_cross_link_to_chip_page', {
+                      slug,
+                      chip_slug: chipPageLink.slug,
+                    })
+                  }
+                >
+                  {chipPageLink.label} →
+                </Link>
+              </p>
+            )}
+          </header>
+          <figure
+            className="mt-2 flex flex-col gap-2"
+            data-testid="compare-per-dollar-indexed-image"
+          >
+            <img
+              src={heroImageSrc}
+              alt={
+                isZh
+                  ? `${modelLabel}：${aLabel} 与 ${bLabel} 在相同交互性水平下的每百万 token 成本`
+                  : `${modelLabel}: ${aLabel} versus ${bLabel} cost per million tokens at matched interactivity levels`
+              }
+              width={1200}
+              height={675}
+              loading="eager"
+              fetchPriority="high"
+              className="w-full rounded-lg border border-border/50"
             />
-          </Card>
-          <InferenceChartDisplay />
-        </div>
-      </InferenceProvider>
+            <figcaption className="text-xs text-muted-foreground">
+              {isZh
+                ? `${aLabel} 与 ${bLabel} 在此对比默认工作负载下的每百万 token 成本。成本越低表示每美元性能越高。`
+                : `${aLabel} versus ${bLabel} cost per million tokens for this comparison's canonical default workload. Lower cost indicates better performance per dollar.`}
+            </figcaption>
+          </figure>
+          <CompareTableSection
+            a={a}
+            b={b}
+            aLabel={aLabel}
+            bLabel={bLabel}
+            ssrTableData={ssrTableData}
+            ssrSequence={defaultSequence}
+            ssrPrecisions={initialPrecisions}
+            initialModel={initialModel}
+            initialSequence={initialSequence}
+            initialCalculatorRows={initialCalculatorRows}
+            emptyStateText={t.emptyState}
+            isZh={isZh}
+          />
+        </Card>
+        <LazyCompareInferenceChart
+          activeTab="compare"
+          initialActiveHwTypes={[a, b]}
+          compareGpuPair={compareGpuPair}
+          initialYAxisMetric={PER_DOLLAR_DEFAULT_Y_AXIS}
+          benchmarkQueryScope={benchmarkQueryScope}
+          initialBenchmarkModel={initialModel}
+          initialBenchmarkRows={initialBenchmarkRows}
+          initialBenchmarkSequence={defaultSequence ?? undefined}
+        />
+      </div>
     </GlobalFilterProvider>
   );
 }

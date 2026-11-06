@@ -22,17 +22,12 @@ import { Button } from '@/components/ui/button';
 import { OFFICIAL_PREVIEW_SERIES } from '@/components/ui/official-preview-notice';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/catalog/constants';
-import {
-  getInferenceHardwareConfig,
-  getInferenceRunLabel,
-  getOverlayLineLabel,
-} from '@/lib/benchmarks/inference-labels';
+import { getInferenceHardwareConfig, getOverlayLineLabel } from '@/lib/benchmarks/inference-labels';
 import { getChartWatermark, Sequence } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/shared/utils';
 import { perfRulerAxisMetricKey, usePerfRulerAxisReset } from '@/hooks/usePerfRulerAxisReset';
-import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
-import { useLogAvailability } from '@/hooks/api/use-log-availability';
+import { useBenchmarkPresence } from '@/hooks/api/use-benchmark-presence';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import type {
@@ -447,26 +442,13 @@ const GPUGraph = React.memo(
 
     const scaleData = powerEnvelopeMode ? activeData : filteredData;
 
-    const agenticIds = useMemo(
-      () =>
-        officialPoints.flatMap((point) =>
-          point.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(point.id)
-            ? [point.id]
-            : [],
-        ),
+    const hasPersistedPoint = useMemo(
+      () => officialPoints.some((point) => isPersistedBenchmarkId(point.id)),
       [officialPoints],
     );
-    const { data: traceAvailability } = useTraceAvailability(agenticIds);
-    const traceAvailabilityRef = useRef(traceAvailability);
-    traceAvailabilityRef.current = traceAvailability;
-
-    const persistedPointIds = useMemo(
-      () => officialPoints.flatMap((point) => (isPersistedBenchmarkId(point.id) ? [point.id] : [])),
-      [officialPoints],
-    );
-    const { data: logAvailability } = useLogAvailability(persistedPointIds);
-    const logAvailabilityRef = useRef(logAvailability);
-    logAvailabilityRef.current = logAvailability;
+    const { data: presence } = useBenchmarkPresence(hasPersistedPoint);
+    const presenceRef = useRef(presence);
+    presenceRef.current = presence;
     const [fixedLogPointId, setFixedLogPointId] = useState<number | null>(null);
     const [powerTelemetryPoint, setPowerTelemetryPoint] = useState<InferenceData | null>(null);
     useDialogCloseTracking(quickFiltersOpen, 'inference_quick_filters_dialog_closed');
@@ -1096,7 +1078,7 @@ const GPUGraph = React.memo(
         return {
           name: `unofficial-run-${info?.id ?? runIndex} ${points[0].hwKey}`,
           hw: id,
-          label: getInferenceRunLabel(`✕ ${hardwareLabelFor(points)}`, points),
+          label: `✕ ${hardwareLabelFor(points)}`,
           color: overlayRunColor(runIndex),
           title: legendT.unofficialTitle(branch),
           isActive: true,
@@ -1188,6 +1170,7 @@ const GPUGraph = React.memo(
               overlayData
                 ? generateOverlayTooltipContent({
                     data: point,
+                    color: overlayRunColor(overlayRunOf(point)),
                     isPinned: pinned,
                     xLabel,
                     yLabel,
@@ -1450,6 +1433,7 @@ const GPUGraph = React.memo(
           content: (d: InferenceData, isPinned: boolean) =>
             generateGPUGraphTooltipContent({
               data: d,
+              color: getCssColor(resolveColor(d.hwKey)),
               isPinned,
               xLabel,
               yLabel,
@@ -1457,11 +1441,12 @@ const GPUGraph = React.memo(
               hardwareConfig,
               showPowerTelemetry: showPowerTelemetryRef.current,
               runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
-              hasTrace: isPersistedBenchmarkId(d.id)
-                ? traceAvailabilityRef.current?.[d.id] === true
-                : false,
+              hasTrace:
+                d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)
+                  ? presenceRef.current?.trace.has(d.id) === true
+                  : false,
               hasLog: isPersistedBenchmarkId(d.id)
-                ? logAvailabilityRef.current?.[d.id] === true
+                ? presenceRef.current?.log.has(d.id) === true
                 : false,
               locale,
             }),

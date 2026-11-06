@@ -29,6 +29,7 @@ describe('MODEL_RELEASE_DATES coverage', () => {
   });
 
   it('anchors each model to its weights publication, not its first sweep', () => {
+    expect(getModelReleaseDate(Model.Kimi_K3_1_Pro)).toBe('2026-11-04');
     expect(getModelReleaseDate(Model.MiniMax_M3_1_Flash)).toBe('2026-10-23');
     expect(getModelReleaseDate(Model.Kimi_K3)).toBe('2026-07-27');
     expect(getModelReleaseDate(Model.GLM_5_2)).toBe('2026-06-13');

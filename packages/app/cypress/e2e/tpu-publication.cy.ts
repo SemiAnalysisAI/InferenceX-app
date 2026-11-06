@@ -1,15 +1,20 @@
-import { expectNoPageOverflow } from '../support/e2e';
+import { compactTrendHistory } from '@/components/inference/hooks/trend-history-rows';
+
+import { availabilityBody, expectNoPageOverflow } from '../support/e2e';
 import preview from '../fixtures/tpu-preview.json';
+import { previewAvailability, previewRows } from '../support/preview-snapshot-fixtures';
 import type { InferenceData } from '../../src/components/inference/types';
 
 const query =
   'unofficialrun=30864013158&g_model=Qwen-3.5-397B-A17B&i_seq=8k%2F1k&i_prec=fp8&i_metric=y_tokensPerDollarH&i_advlabel=1';
 const overlayPoints = '[data-testid="inference-chart-display"] svg .unofficial-overlay-pt';
 
+const tpuSnapshotRows = previewRows.filter((row) => row.hardware === 'tpuv7');
+
 function interceptTpuPreview() {
   const gpuRows = preview.benchmarks.map((row) => ({ ...row, hardware: 'b200', run_url: null }));
-  cy.intercept('GET', '/api/v1/availability', {
-    body: [
+  cy.intercept('GET', '/api/v1/availability/compact', {
+    body: availabilityBody([
       {
         model: 'qwen3.5',
         isl: 8192,
@@ -22,9 +27,10 @@ function interceptTpuPreview() {
         benchmark_type: 'single_turn',
         date: '2026-08-03',
       },
-    ],
+      ...previewAvailability.filter((row) => row.hardware === 'tpuv7'),
+    ]),
   });
-  cy.intercept('GET', '/api/v1/benchmarks*', { body: gpuRows });
+  cy.intercept('GET', '/api/v1/benchmarks*', { body: [...gpuRows, ...tpuSnapshotRows] });
   cy.intercept('GET', '/api/unofficial-run*', { body: preview }).as('tpuPreview');
 }
 
@@ -73,28 +79,9 @@ describe('TPU publication preview', () => {
     cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
   });
 
-  it('restores the pricing basis on a Chinese share URL', () => {
-    cy.visit(`/zh/inference?${query}&g_tco=internal`);
-    cy.wait('@tpuPreview');
-    openChartControls();
-    cy.get('[data-testid="tco-basis-internal"]')
-      .first()
-      .should('have.attr', 'aria-pressed', 'true');
-    cy.contains('TCO 口径').should('be.visible');
-    cy.get('[data-testid="tco-basis-external"]').first().click();
-    cy.get(overlayPoints).should(($points) => {
-      const dp8 = [...$points]
-        .map((node) => (node as unknown as { __data__: InferenceData }).__data__)
-        .find((row) => row.dp === 8)!;
-      expect(dp8.y).to.be.closeTo((3674.8418266267754 * 3600) / 1.21, 0.001);
-    });
-    cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView({ offset: { top: -90, left: 0 } });
-    cy.screenshot('tco-caption-zh', { capture: 'viewport' });
-  });
-
   it('places the historical TCO selector beside Cost Tier and updates its export value', () => {
-    cy.intercept('GET', '/api/v1/benchmarks/history*', {
-      body: preview.benchmarks,
+    cy.intercept('GET', '/api/v1/benchmarks/history/trends*', {
+      body: compactTrendHistory([...preview.benchmarks, ...tpuSnapshotRows]),
     });
     cy.visit(
       '/historical?g_model=Qwen-3.5-397B-A17B&i_seq=8k%2F1k&i_prec=fp8&i_metric=y_tokensPerDollarH&g_tco=external',
@@ -168,10 +155,6 @@ describe('TPU publication preview', () => {
           });
         });
       expectNoPageOverflow();
-      cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView({
-        offset: { top: -100, left: 0 },
-      });
-      cy.screenshot(`tco-chart-${width}`, { capture: 'viewport' });
     });
   }
 });

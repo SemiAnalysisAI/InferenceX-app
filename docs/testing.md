@@ -3,6 +3,9 @@
 ## Structure
 
 **Unit tests**: Vitest, colocated with source (`*.test.ts` next to `*.ts`). Config: `packages/app/vitest.config.ts`.
+
+Unit test workers are reused across files (`isolate: false`), with isolation restored per file by `src/test/file-isolation-runner.ts`. Before each file, the runner re-evaluates every inlined (source) module and clears mocks, matching Vitest's own per-file reset. It also restores `process.env` and `globalThis` to the worker's starting state and gives `@vitest-environment jsdom` files a fresh JSDOM window. Packages loaded from `node_modules` stay cached in the worker, so a package must not keep per-test state at import time. Next's `node-environment-baseline` is loaded before any test so that its `AsyncLocalStorage` global never depends on file order. `src/test/environment-grouped-sequencer.ts` runs files with the same environment back to back, so workers rarely restart. Transformed modules are cached on disk (`experimental.fsModuleCache`, `node_modules/.experimental-vitest-cache`). CI restores that cache between runs.
+
 **Component tests**: Cypress, in `packages/app/cypress/component/`. Use these for isolated UI behavior with controlled providers, routes, and API intercepts.
 **Integration tests**: Cypress, in `packages/app/cypress/e2e/`. Use these for page routing, browser history, API fixture mode, and cross-component workflows. Config: `packages/app/cypress.config.ts`.
 
@@ -45,16 +48,19 @@ bun run test:e2e
 
 The local `bun run test:e2e` command is a curated smoke suite across the core page, chart, overlay, localization, and component paths. It is the default agent and developer check and is intended to stay under one minute once the app is running.
 
-The complete suite is `bun run test:e2e:full`. It runs all Cypress component and integration specs. GitHub Actions runs that same coverage as four component shards (Chrome) plus eight integration shards per browser, Chrome and Firefox. The CI workflow is the merge gate for the full E2E suite.
+The complete suite is `bun run test:e2e:full`. It runs all Cypress component and integration specs. GitHub Actions runs that same coverage as six component shards (Chrome) plus sixteen integration shards per browser, all on 8 vCPU runners. A sweep of shard counts and runner sizes (22 runs of each) found this the cheapest setup within a few seconds of the fastest one. Pull requests run Chrome only. Firefox runs in the merge queue, nightly, and on manual dispatch, following Cypress's cross-browser guidance. The CI workflow is the merge gate for the full E2E suite.
+
+Each integration shard builds the app with `E2E_FIXTURES=1` and then runs `next start`. With the restored Turbopack cache that build takes about 10 to 15 seconds, which is faster than waiting for a shared build job and downloading its output. The fixture build skips Next's TypeScript pass because Tests (Unit) typechecks the workspace. Chrome shard 1 is the only writer of the Bun package, Next.js build and Cypress binary caches, and the only shard that runs `check:bundle`.
 
 `packages/app/timings.json` and `timings-firefox.json` are the committed Chrome
 and Firefox `cypress-split` baselines. `component-timings.json` is the Chrome
 component baseline. Their unit guard requires one positive duration for every
 current spec and rejects removed entries.
 
-CI uploads raw per-shard, per-test observations and validates the complete
-20-shard matrix before publishing `cypress-timing-baselines`. Refresh all
-three baselines from a successful full run:
+CI uploads raw per-shard, per-test observations. Runs that include Firefox
+validate the complete 38-shard matrix before publishing
+`cypress-timing-baselines`. Refresh all three baselines from a successful full
+run (dispatch the workflow on your branch to get one):
 
 ```sh
 gh run download RUN_ID --pattern 'cypress-timings-*' --dir /tmp/cypress-observations

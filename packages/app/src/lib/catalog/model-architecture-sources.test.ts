@@ -8,10 +8,12 @@ const links = (raw: string) => (raw.match(/https?:\/\/[^\s)]+/gu) ?? []).sort();
 
 describe('architecture parity with published checkpoint configs', () => {
   it('covers every public model in the upstream evidence and every canonical model page', () => {
-    const sourcedModels = MODEL_OPTIONS.filter((model) => model !== Model.GLM_5_3_Flash);
+    // Registered for ingest ahead of sourced architecture data and a model page.
+    const unsourced: readonly string[] = [Model.GLM_5_3_Flash, Model.Kimi_K3_1_Pro];
+    const sourcedModels = MODEL_OPTIONS.filter((model) => !unsourced.includes(model));
     expect(fixtures.models.map(({ model }) => model).sort()).toEqual(sourcedModels.sort());
     expect(getModelPageSlugs().sort()).toEqual(
-      COMPARE_MODEL_SLUGS.filter(({ slug }) => slug !== 'glm-5-3-flash')
+      COMPARE_MODEL_SLUGS.filter(({ displayName }) => !unsourced.includes(displayName))
         .map(({ slug }) => slug)
         .sort(),
     );

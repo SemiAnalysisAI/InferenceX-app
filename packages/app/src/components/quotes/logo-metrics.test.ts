@@ -17,7 +17,7 @@ describe('logo wall sizing', () => {
 
   it('makes wordmarks shorter but wider than square marks', () => {
     const mark = logoSize('openai.svg');
-    for (const file of ['lambda.svg', 'oracle.svg', 'meta.svg']) {
+    for (const file of ['lambda.svg', 'oracle.svg', 'meta.svg', 'morph.svg']) {
       const word = logoSize(file);
       expect(word.height, file).toBeLessThan(mark.height);
       expect(word.width, file).toBeGreaterThan(mark.width);
@@ -39,13 +39,6 @@ describe('logo wall sizing', () => {
     for (const file of ['google-color.svg', 'microsoft.svg', 'nvidia-color.svg', 'oracle.svg']) {
       expect(logoSize(file).invertInDark, file).toBe(false);
     }
-  });
-
-  it('sizes the TokenSpeed mark + wordmark as a wide logo that flips in dark mode', () => {
-    const tokenspeed = logoSize('tokenspeed.webp');
-    expect(tokenspeed.width / tokenspeed.height).toBeGreaterThan(5);
-    expect(tokenspeed.height).toBeLessThan(BASE_ARTWORK_HEIGHT);
-    expect(tokenspeed.invertInDark).toBe(true);
   });
 
   it('falls back to a square base size for an unmeasured logo', () => {

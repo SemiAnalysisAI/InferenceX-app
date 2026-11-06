@@ -128,16 +128,21 @@ describe('renderRooflines', () => {
     }
   });
 
-  it('generates valid d attribute', () => {
+  it('draws each series through both scales with the default monotone curve', () => {
     const group = createMockGroup();
     const { xScale, yScale } = makeScales();
     renderRooflines(group as any, SAMPLE_ROOFLINES, xScale, yScale, makeConfig());
 
+    const line = d3
+      .line<{ x: number; y: number }>()
+      .x((d) => xScale(d.x))
+      .y((d) => yScale(d.y))
+      .curve(d3.curveMonotoneX);
     const paths = group.selectAll('.roofline-path');
+    expect(paths.elements.length).toBeGreaterThan(0);
     for (const el of paths.elements) {
-      const d = String(el.attrs['d']);
-      expect(d).toBeTruthy();
-      expect(d.startsWith('M')).toBe(true);
+      const { points } = el.datum as { points: { x: number; y: number }[] };
+      expect(el.attrs['d']).toBe(line(points));
     }
   });
 
@@ -213,7 +218,7 @@ describe('renderRooflines', () => {
           .elements.map((el) => [el.attrs['class'], el.attrs['stroke-dasharray']]),
       );
     const expected = {
-      'roofline-path roofline-modelA': null,
+      'roofline-path roofline-modelA': undefined,
       'roofline-path roofline-modelB': '2 3',
     };
 
@@ -268,18 +273,24 @@ describe('renderRooflines', () => {
     expect(paths.elements).toHaveLength(0);
   });
 
-  it('applies getOpacity via .each()', () => {
+  it('styles each curve with its getOpacity value', () => {
     const group = createMockGroup();
     const { xScale, yScale } = makeScales();
-
     const config = makeConfig({
       getOpacity: (key) => (key === 'modelA' ? 0.5 : 1),
     });
 
-    expect(config.getOpacity!('modelA')).toBe(0.5);
-    expect(config.getOpacity!('modelB')).toBe(1);
-
     renderRooflines(group as any, SAMPLE_ROOFLINES, xScale, yScale, config);
+
+    const opacities = Object.fromEntries(
+      group
+        .selectAll('.roofline-path')
+        .elements.map((el) => [el.attrs['class'], el.styles['opacity']]),
+    );
+    expect(opacities).toEqual({
+      'roofline-path roofline-modelA': 0.5,
+      'roofline-path roofline-modelB': 1,
+    });
   });
 });
 

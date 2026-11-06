@@ -17,6 +17,7 @@ import {
   runBackfillMain,
   runCandidateIdBackfill,
 } from './lib/backfill-runner.js';
+import { sequenceLengthSketchColumns } from './queries/agentic-shared.js';
 
 const flags = parseLimitForceFlags();
 const githubRunId = parseRunIdFlag();
@@ -80,27 +81,18 @@ async function main(): Promise<void> {
         readTraceProfileChunks(sql, id),
       );
 
-      let stats: AggregateStats;
-      const storedVersion = row.aggregate_stats?.version;
-      if (
-        !flags.force &&
-        storedVersion !== undefined &&
-        storedVersion >= 9 &&
-        storedVersion < STATS_VERSION
-      ) {
-        stats = mergeProfileStatsUpgrade(row.aggregate_stats!, profileStats);
-      } else {
-        const [serverRow] = await sql<{ server_metrics_json_gz: Buffer | null }[]>`
-          select server_metrics_json_gz
-          from agentic_trace_replay
-          where id = ${id}
-        `;
-        const serverStats = await computeAggregateStats({
-          profileBlob: null,
-          serverBlob: serverRow?.server_metrics_json_gz ?? null,
-        });
-        stats = mergeProfileStatsUpgrade(serverStats, profileStats);
-      }
+      // A stats-version upgrade may change server metric interpretation as well as
+      // profile calculations. Re-read both before marking the bundle current.
+      const [serverRow] = await sql<{ server_metrics_json_gz: Buffer | null }[]>`
+        select server_metrics_json_gz
+        from agentic_trace_replay
+        where id = ${id}
+      `;
+      const serverStats = await computeAggregateStats({
+        profileBlob: null,
+        serverBlob: serverRow?.server_metrics_json_gz ?? null,
+      });
+      const stats = mergeProfileStatsUpgrade(serverStats, profileStats);
 
       retainPopulatedFields(row.aggregate_stats, stats, [
         'isl',
@@ -109,9 +101,12 @@ async function main(): Promise<void> {
         'prefixCacheHitRate',
         'e2elPerOsl',
       ]);
+      const { sketches, version } = sequenceLengthSketchColumns(stats);
       await sql`
         update agentic_trace_replay
-        set aggregate_stats = ${jsonbParam(sql, stats)}
+        set aggregate_stats = ${jsonbParam(sql, stats)},
+          sequence_length_sketches = ${sketches},
+          sequence_length_sketches_version = ${version}
         where id = ${id}
           and coalesce((aggregate_stats->>'version')::int, -1) <= ${STATS_VERSION}
       `;

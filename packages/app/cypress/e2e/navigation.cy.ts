@@ -1,9 +1,10 @@
-import { SUPPLEMENTAL_BENCHMARK_ROWS } from '../../src/lib/benchmarks/supplemental-benchmarks';
-import { OVERLAY_RUN_ID, OVERLAY_RUN_URL } from '../support/overlay-fixtures';
 import { videoHistoryEntry } from '../../src/components/video-benchmark/history';
 import { servingArtifact } from '../support/video-artifacts';
+import { expectHwKeyPoints, type ScatterPoint } from '../support/scatter-points';
+import { interceptPreviewSnapshots } from '../support/preview-snapshot-fixtures';
 
-const datum = (el: Element) => (el as Element & { __data__: { x: number; y: number } }).__data__;
+const tpuDatum = (points: ScatterPoint[]) =>
+  points.find((point) => String(point.datum.hwKey).startsWith('tpuv7'))!.datum;
 
 describe('Chart Section Tabs — E2E', () => {
   before(() => {
@@ -183,8 +184,8 @@ describe('First-load navigation', () => {
 
   it('navigates to dashboard from the header with one click', () => {
     cy.get('[data-testid="nav-link-dashboard"]').click();
-    cy.location('pathname').should('eq', '/inference/kimi-k3');
-    cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
+    cy.location('pathname').should('eq', '/inference/deepseek-v41-flash');
+    cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4.1 Flash');
   });
 
   it('navigates to comparisons from the footer with one click', () => {
@@ -203,33 +204,6 @@ describe('First-load navigation', () => {
   });
 
   it('leads the landing page with the AgentX hero and its two CTAs', () => {
-    cy.get('[data-testid="compare-agentx-primary"]').within(() => {
-      cy.get('h1').should('have.text', 'Compare Realistic Agentic Inference Perf');
-      cy.get('h2').should('not.exist');
-      cy.get('[data-testid="compare-agentx-revenue-calculator-link"]')
-        .should('contain.text', 'Token Revenue Calculator')
-        .and('have.attr', 'href', '/profit-estimator-per-gigawatt');
-      cy.get('[data-testid="compare-agentx-dashboard-link"]')
-        .should('have.text', 'Dashboard')
-        .and('have.attr', 'href', '/inference/kimi-k3');
-      cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 2);
-      for (const hidden of ['minimax-m3', 'kimi-k3', 'glm-5-3']) {
-        cy.get(`[data-testid="compare-agentx-model-${hidden}"]`).should('not.exist');
-      }
-      cy.get('[data-testid^="compare-agentx-model-"]').then(($rows) => {
-        const slugs = [...$rows].map((row) =>
-          (row.dataset.testid ?? '').replace('compare-agentx-model-', ''),
-        );
-        expect(slugs).to.deep.equal(['muse-spark-open', 'deepseek-v41-flash']);
-      });
-      cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]').should(
-        'not.exist',
-      );
-      cy.get('[data-testid="compare-agentx-model-deepseek-v41-flash"]')
-        .should('have.attr', 'href', '/inference/deepseek-v41-flash')
-        .and('contain.text', 'DeepSeek V4.1 Flash 552B');
-    });
     cy.get('[data-testid="compare-agentx-revenue-calculator-link"]').click();
     cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt');
   });
@@ -241,34 +215,24 @@ describe('First-load navigation', () => {
 });
 
 describe('Huawei UBenchX launch banner', { testIsolation: true }, () => {
-  for (const locale of ['', '/zh']) {
-    it(`opens Huawei core-memory profiles from ${locale || '/'} landing page`, () => {
-      cy.visit(locale || '/', {
-        onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-rubin-minimax-m3-banner-dismissed', '1');
-          win.localStorage.setItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed', '1');
-          win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
-          win.localStorage.setItem('inferencex-landing-banner-variant', 'ubenchx');
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        },
-      });
-      cy.get('[data-testid="launch-banner"]:visible')
-        .should('have.attr', 'href', `${locale}/ubenchx/core-memory-profiles`)
-        .and(
-          'contain.text',
-          locale ? 'Huawei Ascend 950PR 微基准测试' : 'Huawei Ascend 950PR Microbenchmarks',
-        )
-        .and(
-          'contain.text',
-          locale
-            ? '周期级核心访存微基准测试（Beta）'
-            : 'Cycle Level Core memory-access MicroBenchmarks (Beta)',
-        )
-        .click();
-      cy.location('pathname').should('eq', `${locale}/ubenchx/core-memory-profiles`);
-      cy.get('[data-testid="ascend-core-profiles"]').should('be.visible');
+  it('opens Huawei core-memory profiles from /zh landing page', () => {
+    cy.visit('/zh', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-rubin-minimax-m3-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed', '1');
+        win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
+        win.localStorage.setItem('inferencex-landing-banner-variant', 'ubenchx');
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
     });
-  }
+    cy.get('[data-testid="launch-banner"]:visible')
+      .should('have.attr', 'href', '/zh/ubenchx/core-memory-profiles')
+      .and('contain.text', 'Huawei Ascend 950PR 微基准测试')
+      .and('contain.text', '周期级核心访存微基准测试（Beta）')
+      .click();
+    cy.location('pathname').should('eq', '/zh/ubenchx/core-memory-profiles');
+    cy.get('[data-testid="ascend-core-profiles"]').should('be.visible');
+  });
 });
 
 describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
@@ -341,12 +305,16 @@ describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
 });
 
 describe('TPUv7 results', { testIsolation: true }, () => {
+  beforeEach(() => {
+    interceptPreviewSnapshots({ overFixtures: true });
+  });
+
   for (const locale of ['', '/zh']) {
     it(`preserves TPUv7 FP8 cost basis in ${locale || '/'} share URLs`, () => {
       cy.visit(`${locale}/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8`);
       cy.location('pathname').should('eq', `${locale}/inference`);
       cy.get('[data-testid="inference-chart-display"]').should('be.visible');
-      cy.get('.dot-group[data-hw-key^="tpuv7"]').should('have.length.at.least', 1);
+      expectHwKeyPoints('tpuv7', true);
       cy.location('href').then((href) => {
         const url = new URL(href);
         url.searchParams.set('g_model', 'Qwen-3.5-397B-A17B');
@@ -355,97 +323,34 @@ describe('TPUv7 results', { testIsolation: true }, () => {
         url.searchParams.set('i_metric', 'y_costh');
         cy.visit(url.toString());
       });
-      const dots = '.dot-group[data-hw-key^="tpuv7"]';
-
       cy.get('[data-testid="tco-basis-internal"]').should('have.attr', 'aria-pressed', 'true');
-      cy.get(dots)
-        .first()
-        .then(($point) => {
-          const internal = { ...datum($point[0]) };
-          cy.get('[data-testid="tco-basis-external"]').click();
-          cy.get(dots)
-            .first()
-            .should(($external) => {
-              expect(datum($external[0]).y).to.be.closeTo((internal.y * 1.21) / 1.03, 1e-8);
-              expect(datum($external[0]).x).to.equal(internal.x);
-            });
-          cy.get('[data-testid="share-button"]').first().click();
-          cy.get('[data-testid="share-url-input"]')
-            .invoke('val')
-            .should('include', 'g_tco=external')
-            .then((url) => cy.visit(String(url)));
-          cy.get('[data-testid="tco-basis-external"]').should('have.attr', 'aria-pressed', 'true');
-          cy.get(dots)
-            .first()
-            .should(($external) => {
-              expect(datum($external[0]).y).to.be.closeTo((internal.y * 1.21) / 1.03, 1e-8);
-            });
-          cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView();
-          cy.screenshot(`tco-basis-${locale ? 'zh' : 'en'}-desktop`, { capture: 'viewport' });
-          cy.viewport(390, 844);
-          cy.get('[data-testid="inference-secondary-controls"] > button').click();
-          cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView().should('be.visible');
-          cy.screenshot(`tco-basis-${locale ? 'zh' : 'en'}-mobile`, { capture: 'viewport' });
-          cy.get('[data-testid="tco-basis-internal"]').click();
-          cy.get(dots)
-            .first()
-            .should(($restored) => {
-              expect(datum($restored[0]).y).to.be.closeTo(internal.y, 1e-8);
-            });
+      expectHwKeyPoints('tpuv7', true);
+      cy.scatterPoints().then((initial) => {
+        const internal = { ...tpuDatum(initial) };
+        cy.get('[data-testid="tco-basis-external"]').click();
+        cy.scatterPoints().should((points) => {
+          expect(tpuDatum(points).y).to.be.closeTo((internal.y * 1.21) / 1.03, 1e-8);
+          expect(tpuDatum(points).x).to.equal(internal.x);
         });
+        cy.get('[data-testid="share-button"]').first().click();
+        cy.get('[data-testid="share-url-input"]')
+          .invoke('val')
+          .should('include', 'g_tco=external')
+          .then((url) => cy.visit(String(url)));
+        cy.get('[data-testid="tco-basis-external"]').should('have.attr', 'aria-pressed', 'true');
+        cy.scatterPoints().should((points) => {
+          expect(tpuDatum(points).y).to.be.closeTo((internal.y * 1.21) / 1.03, 1e-8);
+        });
+        cy.viewport(390, 844);
+        cy.get('[data-testid="inference-secondary-controls"] > button').click();
+        cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView().should('be.visible');
+        cy.get('[data-testid="tco-basis-internal"]').click();
+        cy.scatterPoints().should((points) => {
+          expect(tpuDatum(points).y).to.be.closeTo(internal.y, 1e-8);
+        });
+      });
     });
   }
-  it('reprices a TPU unofficial overlay without changing throughput', () => {
-    cy.intercept('GET', '/api/unofficial-run*', {
-      body: {
-        runInfos: [
-          {
-            id: OVERLAY_RUN_ID,
-            name: 'TPU test',
-            branch: 'tpu-test',
-            sha: 'abc000',
-            createdAt: '2026-08-26T00:00:00Z',
-            url: OVERLAY_RUN_URL,
-            conclusion: 'success',
-            status: 'completed',
-            isNonMainBranch: true,
-          },
-        ],
-        benchmarks: SUPPLEMENTAL_BENCHMARK_ROWS.filter((row) => row.hardware === 'tpuv7').map(
-          (row) => ({ ...row, run_url: OVERLAY_RUN_URL }),
-        ),
-        evaluations: [],
-      },
-    }).as('tpuOverlay');
-    cy.visit(
-      `/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8&i_metric=y_costh&unofficialrun=${OVERLAY_RUN_ID}`,
-      {
-        onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        },
-      },
-    );
-    cy.wait('@tpuOverlay');
-    const points = '.unofficial-overlay-pt';
-    cy.get(points)
-      .first()
-      .then(($point) => {
-        const internal = { ...datum($point[0]) };
-        cy.get('[data-testid="tco-basis-external"]').click();
-        cy.get(points)
-          .first()
-          .should(($external) => {
-            expect(datum($external[0]).y).to.be.closeTo((internal.y * 1.21) / 1.03, 1e-8);
-            expect(datum($external[0]).x).to.equal(internal.x);
-          });
-        cy.get('[data-testid="tco-basis-internal"]').click();
-        cy.get(points)
-          .first()
-          .should(($restored) => {
-            expect(datum($restored[0]).y).to.be.closeTo(internal.y, 1e-8);
-          });
-      });
-  });
   it('hides the TCO basis selector outside Qwen3.5 8K/1K', () => {
     cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_metric=y_costh', {
       onBeforeLoad(win) {
@@ -466,20 +371,27 @@ describe('H3 video performance history', () => {
       nextPage: null,
     });
   });
-  it('opens published history behind the dashboard and restores its filters after reload', () => {
+  it('restores published history filters on reload and browser navigation', () => {
     const entry = videoHistoryEntry(servingArtifact(), '2026-09-09T00:00:00Z');
-    cy.intercept('GET', '/api/video-runs?format=history&page=1', {
+    cy.intercept('GET', '/api/video-runs?format=history&page=1*', {
       schemaVersion: 1,
-      entries: [entry],
+      entries: [
+        entry,
+        videoHistoryEntry(servingArtifact(124, 41, 'NVIDIA B200'), '2026-09-09T00:00:00Z'),
+      ],
       nextPage: null,
     }).as('history');
-    cy.visit('/video');
+    cy.visit('/zh/video?history-hardware=NVIDIA%20H200');
     cy.wait('@history');
-    cy.get('[data-testid="video-history"]').should('not.exist');
-    cy.get('[data-testid="video-history-section"] summary').click();
-    cy.get('[data-testid="video-history"] h1').should('contain', 'Performance history');
-    cy.get('[data-testid="video-history-observation"]').should('have.length', 3);
-    cy.get('[aria-label="Client concurrency"]').click();
+    cy.contains('summary', '性能历史').parent('details').should('have.attr', 'open');
+    cy.get('[data-testid="video-history"] h1').should('contain', '性能历史');
+    cy.get('[data-testid="video-history-observation"]')
+      .should('have.length', 3)
+      .each(($observation) => {
+        expect($observation).to.contain('NVIDIA H200').and.not.contain('NVIDIA B200');
+      });
+    cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
+    cy.get('[aria-label="客户端并发数"]').click();
     cy.contains('[role="option"]', 'C2').click();
     cy.get('[data-testid="video-history-observation"]')
       .should('have.length', 1)
@@ -489,7 +401,28 @@ describe('H3 video performance history', () => {
       .should('have.length', 1)
       .and('contain', 'C2')
       .and('contain', '240 / —');
-    cy.location('search').should('contain', 'history-concurrency=2');
+    cy.location('search').should((search) => {
+      const params = new URLSearchParams(search);
+      expect(params.get('history-concurrency')).to.equal('2');
+      expect(params.get('history-hardware')).to.equal('NVIDIA H200');
+    });
+    cy.window().then((win) => {
+      const next = new URL(win.location.href);
+      next.searchParams.set('history-concurrency', '4');
+      win.history.pushState(null, '', next);
+    });
+    cy.reload();
+    cy.get('[data-testid="video-history-observation"]')
+      .should('have.length', 1)
+      .and('contain', 'C4');
+    cy.go('back');
+    cy.get('[data-testid="video-history-observation"]')
+      .should('have.length', 1)
+      .and('contain', 'C2');
+    cy.go('forward');
+    cy.get('[data-testid="video-history-observation"]')
+      .should('have.length', 1)
+      .and('contain', 'C4');
   });
   it('keeps the hidden Video tab behind the shared unlock and noindex', () => {
     cy.viewport(1440, 1000);
@@ -505,12 +438,6 @@ describe('H3 video performance history', () => {
     );
     cy.get('[data-testid="tab-trigger-hidden"]').click();
     cy.contains('a', 'Video').should('have.attr', 'href', '/video');
-    cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
-  });
-  it('renders the Chinese history section for a history deep link', () => {
-    cy.visit('/zh/video?history-hardware=H200');
-    cy.get('[data-testid="video-history-section"]').should('have.attr', 'open');
-    cy.get('[data-testid="video-history"] h1').should('contain', '性能历史');
     cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
   });
 });

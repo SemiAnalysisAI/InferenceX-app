@@ -10,56 +10,46 @@ vi.mock('next/navigation', () => ({
 }));
 
 import { profitRouteInput } from './profit-route-input';
-import { resolveCalculatorUrlSeed } from './url-seed';
+import { calculatorUrlSeed } from './url-seed';
 
-describe('profit route server input', () => {
+describe('profit route input', () => {
   for (const tab of ['profit-estimator', 'profit-estimator-per-gigawatt'] as const) {
     for (const zh of [false, true]) {
-      it(`seeds the path model and target for ${zh ? 'zh' : 'en'} ${tab}`, async () => {
-        const { searchParams } = await profitRouteInput(tab, zh, {
-          params: Promise.resolve({
-            model: 'deepseek-v4',
-            filters: ['target', '24'],
-          }),
-          searchParams: Promise.resolve({ g_model: 'Kimi-K3', c_ivtarget: '99' }),
-        });
-        expect(resolveCalculatorUrlSeed(searchParams)).toMatchObject({
-          model: 'DeepSeek-V4-Pro',
-          profitTarget: 24,
-        });
-        expect(resolveCalculatorUrlSeed(searchParams).percentile).toBeUndefined();
+      const locale = zh ? '/zh' : '';
+
+      it(`seeds the path model and target over the query for ${locale || 'en'} ${tab}`, () => {
+        const seed = calculatorUrlSeed(
+          `${locale}/${tab}/deepseek-v4/target/24`,
+          '?g_model=Kimi-K3&c_ivtarget=99&i_pctl=p75',
+          undefined,
+        );
+        expect(seed).toMatchObject({ model: 'DeepSeek-V4-Pro', profitTarget: 24 });
+        expect(seed.percentile).toBeUndefined();
       });
 
-      it(`redirects legacy percentiles away for ${zh ? 'zh' : 'en'} ${tab}`, async () => {
-        const base = `${zh ? '/zh' : ''}/${tab}/deepseek-v4/target/24`;
-        for (const query of [{}, { i_pctl: 'p75' }, { percentile: 'p50' }]) {
-          await expect(
-            profitRouteInput(tab, zh, {
-              params: Promise.resolve({
-                model: 'deepseek-v4',
-                filters: ['target', '24', 'percentile', 'p75'],
-              }),
-              searchParams: Promise.resolve(query),
-            }),
-          ).rejects.toThrow(`308 ${base}`);
-        }
+      it(`redirects a legacy percentile segment away for ${locale || 'en'} ${tab}`, async () => {
         await expect(
-          profitRouteInput(tab, zh, {
-            params: Promise.resolve({ model: 'deepseek-v4', filters: ['target', '24'] }),
-            searchParams: Promise.resolve({ i_pctl: 'p75', utm_campaign: 'test' }),
-          }),
-        ).rejects.toThrow(`308 ${base}?utm_campaign=test`);
+          profitRouteInput(
+            tab,
+            zh,
+            Promise.resolve({
+              model: 'deepseek-v4',
+              filters: ['target', '24', 'percentile', 'p75'],
+            }),
+          ),
+        ).rejects.toThrow(`308 ${locale}/${tab}/deepseek-v4/target/24`);
       });
     }
   }
 
-  it('preserves route filters and query context when canonicalizing an alias', async () => {
+  it('canonicalizes an alias with its route filters', async () => {
     await expect(
-      profitRouteInput('profit-estimator', true, {
-        params: Promise.resolve({ model: 'DeepSeek-V4', filters: ['target', '24'] }),
-        searchParams: Promise.resolve({ utm_campaign: 'test' }),
-      }),
-    ).rejects.toThrow('308 /zh/profit-estimator/deepseek-v4/target/24?utm_campaign=test');
+      profitRouteInput(
+        'profit-estimator',
+        true,
+        Promise.resolve({ model: 'DeepSeek-V4', filters: ['target', '24'] }),
+      ),
+    ).rejects.toThrow('308 /zh/profit-estimator/deepseek-v4/target/24');
   });
 
   it('rejects unsupported models and malformed filters', async () => {
@@ -69,10 +59,7 @@ describe('profit route server input', () => {
       { model: 'deepseek-v4', filters: ['target'] },
     ]) {
       await expect(
-        profitRouteInput('profit-estimator', false, {
-          params: Promise.resolve(params),
-          searchParams: Promise.resolve({}),
-        }),
+        profitRouteInput('profit-estimator', false, Promise.resolve(params)),
       ).rejects.toThrow('404');
     }
   });

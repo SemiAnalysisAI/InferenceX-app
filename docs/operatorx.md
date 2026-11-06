@@ -84,7 +84,10 @@ is not cached. Local-directory sources keep the raw path.
 
 ### Bulk compact reads
 
-One SQL query loads the listed run revisions; merging keeps newest-first order.
+Compact reads load the listed run revisions in batches of eight, since Neon's HTTP
+driver rejects responses over 64 MiB and one run's GEMM comparison reaches ~5 MiB;
+merging keeps newest-first order. Projections are written as JSON objects. Rows
+written before that fix hold a double-encoded jsonb string and are parsed on read.
 Missing/stale projections alone use bounded raw fallback; only a missing table
 suppresses a SQL error. Responses and timeline identities are preserved.
 
@@ -127,20 +130,20 @@ normalization costs and must not be reported as an end-to-end production speedup
 
 ## Median and best throughput bars
 
-The Median and best throughput panel replaces Distribution per GPU and sits beside Head to head on desktop. Metric vs size is the last chart. Its horizontal bars show median throughput as a fill and the
+The Median and best throughput panel replaces Distribution per GPU and spans its own row; Metric vs size is the last chart. Its horizontal bars show median throughput as a fill and the
 best measured throughput as an outline, sorted by the displayed median. They follow
 the selected workload, hardware, precision and Normalized switch. Normalized bars
 show a fraction of each accelerator's peak; absolute bars show TFLOPS.
 
-**Shared cases only** is on by default: every bar uses the exact same cases, measured on every selected accelerator in the selected precision, with arithmetic intensity at or above every selected accelerator's ridge point (peak TFLOPS / bandwidth TB/s). An empty intersection stays empty; for example, FP8 cases measured only with fp32 block scales and only with ue8m0 block scales never overlap.
+**Shared cases only** is on by default: every bar uses the exact same cases, measured on every selected accelerator in the selected precision, and compute-bound on each: arithmetic intensity at or above its ridge point (peak TFLOPS / bandwidth TB/s) for a single-stage op; for staged MoE and attention cases and split cases with collectives, compute taking at least half the case's roofline time (see Roofline). An empty intersection stays empty; for example, FP8 cases measured only with fp32 block scales and only with ue8m0 block scales never overlap.
 
-Turning the switch off gives each accelerator its own successful positive finite measurements at or above its own ridge point. Each bar shows its case count. Case sets and quantization formats may differ; these medians are descriptive, not matched-shape speedup comparisons. Hardware lacking measurements or references is omitted without hiding other hardware. Even-sized cohorts average the middle two values. Best is maximum case throughput, not the fastest timing sample. Clicking opens the best case's timeline.
+Turning the switch off gives each accelerator its own successful positive finite measurements that are compute-bound on it, by the same test. Each bar shows its case count. Case sets and quantization formats may differ; these medians are descriptive, not matched-shape speedup comparisons. Hardware lacking measurements or references is omitted without hiding other hardware. Even-sized cohorts average the middle two values. Best is maximum case throughput, not the fastest timing sample. Clicking opens the best case's timeline.
 
 The page-owned comparison API accepts `rooflinePrecision=bf16|fp8|fp4`, `rooflineHardware=<comma-separated hardware keys>`, `rooflineNormalized=true|false`, and `rooflineSharedOnly=true|false`. Supplying any adds `rooflineSummary`, using the UI's pure helper. Defaults are workload precision, all hardware, normalized=true, sharedOnly=true. `cohort` is `per-hardware-compute-bound` or `shared-compute-bound`. `matchedCases` always counts shared cases before ridge filtering. `caseIndices` is the union of displayed bar indices; each bar also returns its own exact `caseIndices` and `n`. Other fields include `missingReferences`, `hardware`, `median`, `best`, `medianTflops`, `bestTflops`, and `bestCaseIndex`. Normalized values are fractions (1 = 100%); explicit TFLOPS fields remain absolute. Invalid selectors return 400. Without selectors the existing comparison response is unchanged.
 
-中文：“仅共同用例”默认开启：所有柱使用完全相同的用例，即在所选精度下每个所选加速器都有实测值，且算术强度不低于每个所选加速器的 roofline 拐点（峰值 TFLOPS / 带宽 TB/s）。没有交集时仍显示空状态；例如，只用 fp32 block scale 测量的 FP8 用例与只用 ue8m0 block scale 测量的用例不会重叠。
+中文：“仅共同用例”默认开启：所有柱使用完全相同的用例，即在所选精度下每个所选加速器都有实测值，且在每个所选加速器上均为计算受限：单阶段算子的算术强度不低于其 roofline 拐点（峰值 TFLOPS / 带宽 TB/s）；多阶段的 MoE 与注意力用例以及含集合通信的切分用例，则要求算力时间至少占该用例 roofline 时间的一半（见 Roofline 一节）。没有交集时仍显示空状态；例如，只用 fp32 block scale 测量的 FP8 用例与只用 ue8m0 block scale 测量的用例不会重叠。
 
-关闭该开关后，各加速器使用所选精度下各自成功、为正且有限的实测值，并按自身的 roofline 拐点筛选计算受限用例。每条柱显示用例数量。用例集合和量化格式可能不同，中位数用于描述各自结果，不代表相同形状下的性能对比。缺少实测值或参考值的硬件不显示，但不会阻止其他硬件显示。用例数为偶数时，中位数取中间两项的平均值；最佳值是用例吞吐量的最大值，不是单次最快计时。点击可查看最佳用例的时间线。
+关闭该开关后，各加速器使用所选精度下各自成功、为正且有限的实测值，并按同一标准筛选在该加速器上计算受限的用例。每条柱显示用例数量。用例集合和量化格式可能不同，中位数用于描述各自结果，不代表相同形状下的性能对比。缺少实测值或参考值的硬件不显示，但不会阻止其他硬件显示。用例数为偶数时，中位数取中间两项的平均值；最佳值是用例吞吐量的最大值，不是单次最快计时。点击可查看最佳用例的时间线。
 
 页面专属的对比 API 支持 `rooflinePrecision=bf16|fp8|fp4`、`rooflineHardware=<逗号分隔的硬件 key>`、`rooflineNormalized=true|false` 和 `rooflineSharedOnly=true|false`。传入任一参数时，响应会增加 `rooflineSummary`，与 UI 共用同一个纯函数计算。默认值为工作负载的 roofline 精度、返回的全部硬件、`normalized=true` 和 `sharedOnly=true`。`cohort` 为 `per-hardware-compute-bound` 或 `shared-compute-bound`。`matchedCases` 始终表示拐点过滤前的共同用例数；顶层 `caseIndices` 是所显示各柱用例的并集，每条柱另外返回自身的 `caseIndices` 和 `n`。其他字段包括 `missingReferences`、`hardware`、`median`、`best`、`medianTflops`、`bestTflops` 和 `bestCaseIndex`。归一化数值为比例（1 表示 100%），显式的 TFLOPS 字段始终为绝对值。无效参数返回 400；不传这些参数时，原有响应保持不变。
 
@@ -150,9 +153,13 @@ A case with `parallel` runs on `tp × dp` devices of one node. Following Inferen
 `operatorx/core/parallel.py`, its args keep the full unsplit shape and each dp group's
 batch, so MoE experts see `tokens × dp` tokens in total. Each case's `flops` and `bytes`
 (the useful-FLOP and ideal-DRAM-byte counts behind TFLOPS, bandwidth, utilization,
-roofline points and the median/best bars) are the node totals divided by `tp × dp`, which
-pairs one device's share with the measured latency. Arithmetic intensity does not depend
-on the device count. Cases without `parallel` are unchanged. A malformed `parallel` value
+roofline points and the median/best bars) are one device's share, which pairs with the
+measured latency. FLOPs are the node total divided by `tp × dp`. Bytes follow how vLLM
+shards the op: routed-expert weights and activations spread over all `tp × dp` devices;
+router and shared-expert weights are replicated in each dp group and split over its `tp`
+devices; a tensor-parallel GEMM reads `1/tp` of A and B but writes a full partial C before
+its all-reduce. Collectives are counted separately (see Roofline). Cases without `parallel`
+are unchanged. A malformed `parallel` value
 gives null counts, so the case shows its latency but no derived throughput. Before
 comparison format 2, sharded cases were credited with the whole node's work, which put
 them above the roofline (up to 3.4× the B300 bandwidth roof for DeepSeek-V4.1-Flash EP8/TP8).
@@ -209,8 +216,11 @@ valid `workload` always wins.
 中文：带 `parallel` 的用例在单节点的 `tp × dp` 个设备上运行。按照 InferenceX
 `operatorx/core/parallel.py` 的约定，参数保留未切分的完整形状和每个 dp 组的 batch，因此 MoE
 expert 共处理 `tokens × dp` 个 token。每个用例的 `flops`（有效 FLOP 数）和 `bytes`（理想 DRAM
-字节数）取节点总量除以 `tp × dp`，即单个设备承担的份额，与实测延迟相对应。TFLOPS、带宽、利用率、
-roofline 数据点以及中位数/最佳值柱状图都由这两个计数推导。算术强度不受设备数影响；不带 `parallel` 的用例保持不变。
+字节数）均为单个设备承担的份额，与实测延迟相对应。FLOP 数为节点总量除以 `tp × dp`。字节数按 vLLM
+的切分方式计算：路由 expert 权重和激活值分摊到全部 `tp × dp` 个设备；router 与共享 expert 权重在每个
+dp 组内复制，并在组内 `tp` 个设备间切分；张量并行 GEMM 读取 A 和 B 的 `1/tp`，但在 all-reduce 之前
+写出完整的部分 C。集合通信单独计算（见 Roofline 一节）。TFLOPS、带宽、利用率、roofline 数据点以及
+中位数/最佳值柱状图都由这两个计数推导。不带 `parallel` 的用例保持不变。
 `parallel` 取值无效时计数为 null，只显示延迟，不计算派生吞吐量。对比格式 2 之前，切分用例按整个节点的
 工作量计算，导致数据点高于 roofline（DeepSeek-V4.1-Flash EP8/TP8 在 B300 上最高达到带宽上限的 3.4 倍）。
 
@@ -272,6 +282,89 @@ Ascend 在浅色和深色图表中使用偏冷的深红色，与 AMD 的暖红�
 若没有分组满足条件，则沿用原有逻辑，选择最大的分组。missing、error 和 unsupported 结果不计入该条件。
 Roofline 在 BF16 有 FLOP/byte 计数时默认选择 BF16，否则选择数据点最多的受支持精度；
 Normalized 默认开启。用户主动选择的形状、精度和 Normalized 开关仍优先生效，不修改数据、硬件选择或测量值。
+
+## Roofline
+
+MoE and attention ops run several stages (projections, the attention core or
+recurrence, router, experts, shared experts), each at its own precision and
+intensity, and split cases add collectives. A case's roofline time on a GPU is
+the sum over its stages of the slower of compute (FLOPs at that GPU's peak for
+the stage's precision) and memory (bytes at peak bandwidth), plus each
+collective's bytes at the GPU's scale-up bandwidth: a tensor-parallel GEMM's
+all-reduce, an MoE's all-reduce, all-gather/reduce-scatter or expert-parallel
+dispatch/combine, and attention's dcp merge. Attention's own tensor-parallel
+all-reduce runs outside the op. Share of roofline is that time over measured
+latency. The roofline chart plots each case at its effective intensity: where
+the GPU's roofline reaches the case's bound, so the gap under the roof is the
+case's share of roofline. For a single-stage op this is plain FLOP/byte. The x axis
+reads "Arithmetic Intensity" (FLOP/byte, or over the ridge point when normalized) either
+way; the tooltip gives plain FLOP/byte and, for staged cases, the effective value.
+
+中文：MoE 与注意力算子包含多个阶段（投影、注意力核心或线性递归、路由、专家、共享专家），
+各阶段精度与算术强度不同，多卡切分还会引入集合通信。某用例在某 GPU 上的 roofline
+时间为各阶段中算力时间（按该阶段精度的峰值算力计算 FLOPs）与访存时间（按峰值带宽
+计算字节数）取较慢者之和，再加上各集合通信按 scale-up 带宽计算的时间：张量并行
+GEMM 的 all-reduce，MoE 的 all-reduce、all-gather/reduce-scatter 或专家并行的
+dispatch/combine，以及注意力的 dcp 合并。注意力自身的张量并行 all-reduce 不在算子
+内。Roofline 占比为该时间与实测延迟之比。Roofline 图按等效算术强度放置每个用例，
+即 GPU roofline 达到该用例上界的位置，因此点与屋顶之间的差距即为 roofline 占比；
+单阶段算子的等效强度就是普通的 FLOP/byte。横轴统一标为 "Arithmetic Intensity"
+（FLOP/byte，归一化时为与拐点之比）；提示框给出普通 FLOP/byte，多阶段用例另给等效值。
+
+## Model View
+
+Beside each measured op, Model View shows one row per selected GPU at the token count
+the slider picks (half-octave size bins; each value is the GPU's median over the op's
+cases in that bin). The slider has one more step past the largest size, **All**: there
+a shared token axis appears under it and each row's bars become line charts: one line
+per GPU over every size bin, log tokens across and log metric up, scaled to the row,
+with the row's largest and smallest values beside it. A GPU measured at one size shows
+as a dot. The tooltip then gives each GPU's range across sizes. Sliding back to a size
+restores the bars.
+
+Clicking an op opens its detail for one shape swept over the token count (`m` for GEMM,
+`tokens` for MoE and attention). A layer runs at several shard sizes across the serving
+configs, one per tensor-parallel degree (DeepSeek-R1 `o_proj` has `k` 16384, 4096, 2048
+and 1024), so the detail picks one, largest first, and lists the others to switch to.
+
+中文：Model View 在每个已测量算子旁，按滑块选择的 token 数为每个所选 GPU 显示一行
+（按半个倍频程分组；数值为该 GPU 在该组内各用例的中位数）。滑块在最大规模之后还有一档
+**All**：拖到这一档时，滑块下方出现共享的 token 坐标轴，各行的柱形换成折线图：每个 GPU
+一条线，覆盖全部规模分组，横轴为对数 token 数，纵轴为对数指标并按行缩放，旁边标出该行的
+最大值和最小值。只在一个规模上测量的 GPU 显示为一个点。此时提示框给出每个 GPU 在各规模上
+的取值范围。拖回任一规模即恢复柱形。
+
+点击算子打开其详情，只显示一个形状随 token 数（GEMM 为 `m`，MoE 和注意力为 `tokens`）
+变化的数据。同一层在不同服务配置中按张量并行度切分为不同大小（如 DeepSeek-R1 `o_proj` 的
+`k` 为 16384、4096、2048 和 1024），因此详情默认显示最大的一种，并可切换到其他切分。
+
+## Data API
+
+`GET /api/v1/views/operatorx` is the public, read-only OperatorX feed, listed in
+the API reference and OpenAPI document. It returns one row per case and GPU,
+from that GPU's newest stored result. Each row has the case key, op type,
+device split, testlist, the models and layers the case comes from, shape and
+precision labels, dimensions, per-GPU useful FLOPs and bytes, status, latency,
+TFLOPS, TB/s, roofline time and share (see Roofline), kernel, and the stored run ID
+and result index.
+
+- `op`: `gemm` (default), `moe` or `attention`.
+- `workload` (from `options.workloads`) or `model` (from `options.models`).
+- `parallel`: `1` for one device (tp=dp=ep=dcp=1), or a split such as `tp8`.
+- `hardware`, `status` (`ok` by default, or `all`), `page` (100 rows), `format=csv`.
+
+Unknown or repeated parameters and values outside the listed options return 400.
+Responses are cached until new results are ingested. A response built without an
+unreadable run is not cached. The other `/api/v1/operatorx/*` routes serve the
+page and may change with it.
+
+中文：`GET /api/v1/views/operatorx` 是公开的只读 OperatorX 数据接口，列于 API 参考与
+OpenAPI 文档中。每个用例与 GPU 返回一行，取该 GPU 最新存储的结果，包含用例键、算子类型、
+设备切分、testlist、所属模型与层、形状与精度标签、维度、每 GPU 有效 FLOPs 与字节数、
+状态、延迟、TFLOPS、TB/s、roofline 时间与占比、kernel，以及运行 ID 与结果索引。参数：
+`op`、`workload` 或 `model`、`parallel`（`1` 表示单卡）、`hardware`、`status`、`page`、
+`format=csv`。未知或重复的参数及不在可选项中的取值返回 400。在新结果入库前保持缓存；
+缺少无法读取的运行时不缓存。其余 `/api/v1/operatorx/*` 接口服务于页面，可能随页面变化。
 
 ## Persistence and deployment
 
@@ -374,18 +467,18 @@ successful finite positive latency across backends; ties keep the first result.
 If no backend succeeds, the first explicit status is retained without inventing a
 measurement. The newest-per-hardware/case/backend raw selection is unchanged.
 `measurements[hardware].backend` identifies the selected backend alongside its
-original run, revision, result index, kernel, and CUDA Graph flag. Head-to-head
-points and timeline inspection use these same selected measurements. Thus identical
+original run, revision, result index, kernel, and CUDA Graph flag. Chart points and
+timeline inspection use these same selected measurements. Thus identical
 BF16 cases measured by `torch_npu_linear` and `vllm` can be compared, while different
-precision or quantization arguments remain separate. No public OpenAPI operation
-is added: OperatorX remains a documented page-owned API.
+precision or quantization arguments remain separate. This adds no OpenAPI
+operation; the compare route stays page-owned.
 
 中文：对比 API 与所有图表按完整算子参数匹配测试用例，保留精度、量化、布局和形状差异，
 不再要求不同设备使用相同 backend。同一设备、同一用例有多个 backend 时，选择成功且延迟为
 有限正数的最快结果；延迟相同则保留首条结果。若没有成功结果，则保留首条明确状态，不补造测量值。
 原始数据仍按设备、用例和 backend 分别选取最新结果。`measurements[hardware].backend`
 记录所选 backend，并保留原始 run、revision、result index、kernel 和 CUDA Graph 标记；
-Head to head 与时间线使用同一条测量记录。OperatorX 仍使用页面专属 API，不新增公开 OpenAPI 接口。
+图表数据点与时间线使用同一条测量记录。OperatorX 仍使用页面专属 API，不新增公开 OpenAPI 接口。
 
 ### Parallel timeline reads
 

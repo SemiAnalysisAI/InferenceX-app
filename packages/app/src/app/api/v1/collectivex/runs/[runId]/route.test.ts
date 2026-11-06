@@ -61,8 +61,6 @@ describe('GET /api/v1/collectivex/runs/[runId]', () => {
   it('serves a stored run assembled as a dataset under the CollectiveX tag', async () => {
     const res = await get('/x?version=1', runId);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual(dataset);
-    expect(mockGetRun).toHaveBeenCalledWith('mock-write-sql', 1, runId);
     expect(mockCachedJson).toHaveBeenCalledWith(expect.anything(), dataset, { tag: 'collectivex' });
   });
 

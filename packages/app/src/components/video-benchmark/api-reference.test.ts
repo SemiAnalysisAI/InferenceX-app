@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatApiPrice, H3_API_REFERENCE } from './api-reference';
+import { H3_API_REFERENCE } from './api-reference';
 
 describe('H3 API price reference', () => {
   it('is a dated, sourced list price inside its own listed range', () => {
@@ -15,10 +15,5 @@ describe('H3 API price reference', () => {
     expect(label.en).toContain('no effective date');
     expect(label.zh).toContain('按量付费价格页');
     expect(label.zh).toContain('未标注生效日期');
-  });
-  it('formats USD per video-second to the input step, keeping a fourth decimal when typed', () => {
-    expect(formatApiPrice(0.08)).toBe('$0.080');
-    expect(formatApiPrice(0.05)).toBe('$0.050');
-    expect(formatApiPrice(0.0345)).toBe('$0.0345');
   });
 });

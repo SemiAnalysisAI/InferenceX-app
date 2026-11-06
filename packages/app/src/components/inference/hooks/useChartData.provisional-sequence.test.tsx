@@ -13,10 +13,6 @@ vi.mock(import('@/lib/api/api'), async (importOriginal) => ({
   ...(await importOriginal()),
   fetchBenchmarks: mockFetchBenchmarks,
 }));
-vi.mock(import('@/lib/benchmarks/supplemental-benchmarks'), async (importOriginal) => ({
-  ...(await importOriginal()),
-  withSupplementalBenchmarks: (rows: BenchmarkRow[]) => rows,
-}));
 
 import { useChartData } from './useChartData';
 

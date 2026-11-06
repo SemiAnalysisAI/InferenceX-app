@@ -5,7 +5,7 @@ const TIMELINE_NAME_MAX = 115;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
-export const TIMELINE_VERSION = 3;
+export const TIMELINE_VERSION = 4;
 
 export const KERNEL_CATEGORIES = [
   { id: 'gemm', label: 'GEMM' },
@@ -60,6 +60,33 @@ export interface OperatorXTimeline {
   events: [number, number, number, number][];
   kernels: TimelineKernel[];
   truncated: boolean;
+  /** A split case's ranks (the timeline is rank 0's); null on one device. */
+  ranks: TimelineRanks | null;
+}
+
+/**
+ * Per-rank timing of a split case: each iteration's latency is its slowest rank's, its
+ * fastest rank's is the floor, and their difference the skew (medians over iterations).
+ */
+export interface TimelineRanks {
+  world: number;
+  latencyUsMin: number | null;
+  skewUs: number | null;
+  /** Each rank's own median latency, by rank. */
+  latencyUs: (number | null)[];
+}
+
+function timelineRanks(metrics: Obj): TimelineRanks | null {
+  const r = isObj(metrics.ranks) ? metrics.ranks : null;
+  const world = r ? num(r.world) : null;
+  if (!r || !world) return null;
+  const latencyUs: (number | null)[] = Array.from({ length: world }, () => null);
+  for (const entry of Array.isArray(r.per_rank) ? r.per_rank : []) {
+    const rank = isObj(entry) ? num(entry.rank) : null;
+    if (rank !== null && rank >= 0 && rank < world)
+      latencyUs[rank] = num((entry as Obj).latency_us);
+  }
+  return { world, latencyUsMin: num(r.latency_us_min), skewUs: num(r.skew_us), latencyUs };
 }
 
 const dims = (v: unknown): number[] | null =>
@@ -123,5 +150,6 @@ export function compactTimeline(metrics: Obj | null | undefined): OperatorXTimel
     events,
     kernels,
     truncated: launched > events.length + 0.5,
+    ranks: timelineRanks(metrics!),
   };
 }

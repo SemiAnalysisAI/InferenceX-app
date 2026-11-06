@@ -26,7 +26,6 @@ import { gunzipJsonWithinLimit } from '../etl/gzip-json-stream';
 import type { DbClient } from '../connection.js';
 import { computeStoredProfileDistributions } from './derived-agentic-metrics';
 import {
-  fetchAggregateStatsRows,
   percentilesOf,
   sequenceLengthSketches,
   STATS_VERSION,
@@ -158,6 +157,7 @@ export function extractServerMetricSamples(json: string): {
     'sglang:token_usage',
     'atom:kv_cache_usage_ratio',
     'trtllm_kv_cache_utilization',
+    'tokenspeed:kv_cache_usage_perc',
   );
   const kvCacheUtil = [...aggregateSeriesByStart(kvSeriesAll, 'avg', 'avg').values()];
 
@@ -220,6 +220,8 @@ const TARGET_METRIC_KEYS = new Set([
   'atom:prefix_cache_cached_tokens',
   'atom:prefix_cache_full_tokens',
   'atom:prefix_cache_hit_ratio',
+  // TokenSpeed (device KV utilization only; no prefix-hit counter is exported)
+  'tokenspeed:kv_cache_usage_perc',
   // TensorRT-LLM
   'trtllm_kv_cache_utilization',
   'trtllm_kv_cache_hit_rate',
@@ -283,18 +285,29 @@ export async function getAgenticAggregates(
   // round-trip pulls everything we need for every requested id with no blob
   // decompression, so the slow blob-parsing fallback only runs for ids
   // whose stats are missing or were produced by an older `STATS_VERSION`.
-  const statsRows = await fetchAggregateStatsRows<AggregateStatsRow>(sql, benchmarkResultIds);
+  const statsRows = (await sql`
+    select
+      br.id as benchmark_result_id,
+      atr.aggregate_stats->'version' as version,
+      atr.aggregate_stats->'isl' as isl,
+      atr.aggregate_stats->'osl' as osl,
+      atr.aggregate_stats->'kvCacheUtil' as kv_cache_util,
+      atr.aggregate_stats->'prefixCacheHitRate' as prefix_cache_hit_rate
+    from benchmark_results br
+    join agentic_trace_replay atr on atr.id = br.trace_replay_id
+    where br.id = any(${benchmarkResultIds}::bigint[])
+  `) as unknown as AggregateStatsRow[];
 
   const idsNeedingProfile: number[] = [];
   const idsNeedingServer: number[] = [];
   for (const row of statsRows) {
     const id = Number(row.benchmark_result_id);
     const agg = blankAggregate(id);
-    if (row.stats && Number(row.stats.version) === STATS_VERSION) {
-      agg.isl = row.stats.isl ?? null;
-      agg.osl = row.stats.osl ?? null;
-      agg.kvCacheUtil = row.stats.kvCacheUtil ?? null;
-      agg.prefixCacheHitRate = row.stats.prefixCacheHitRate ?? null;
+    if (Number(row.version) === STATS_VERSION) {
+      agg.isl = row.isl ?? null;
+      agg.osl = row.osl ?? null;
+      agg.kvCacheUtil = row.kv_cache_util ?? null;
+      agg.prefixCacheHitRate = row.prefix_cache_hit_rate ?? null;
     } else {
       // No stats (or stale version) — schedule the blob-parse fallback below
       // so the response still surfaces data. Backfill should drain these.
@@ -426,13 +439,13 @@ export async function getAgenticAggregates(
   return result;
 }
 
-/** Shape of the JSONB column when read back via postgres-js. */
 interface AggregateStatsRow {
-  version: number;
+  benchmark_result_id: number;
+  version: unknown;
   isl: MetricPercentiles | null;
   osl: MetricPercentiles | null;
-  kvCacheUtil: MetricPercentiles | null;
-  prefixCacheHitRate: MetricPercentiles | null;
+  kv_cache_util: MetricPercentiles | null;
+  prefix_cache_hit_rate: MetricPercentiles | null;
 }
 
 /**

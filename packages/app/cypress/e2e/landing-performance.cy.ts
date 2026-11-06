@@ -43,17 +43,17 @@ function expectLowCls() {
 }
 
 describe('Landing page performance', () => {
-  it('links Anyscale to its localized quote without loading a landing-page logo', () => {
+  it('features Google instead of Anyscale and links to its localized quote without loading a logo', () => {
     for (const prefix of ['', '/zh']) {
       cy.visit(prefix || '/');
       cy.get('[data-testid="intro-section"]').within(() => {
-        cy.contains('a', 'Anyscale').should('have.attr', 'href', `${prefix}/quotes#quote-anyscale`);
-        cy.get('img[alt="Anyscale"]').should('not.exist');
-        cy.contains('a', 'Anyscale').click();
+        cy.contains('a', 'Google').should('have.attr', 'href', `${prefix}/quotes#quote-google`);
+        cy.get('img[alt="Google"]').should('not.exist');
+        cy.contains('a', 'Google').click();
       });
       cy.location('pathname').should('eq', `${prefix}/quotes`);
-      cy.location('hash').should('eq', '#quote-anyscale');
-      cy.get('#quote-anyscale').should('be.visible').and('contain.text', 'Seiji Eicher');
+      cy.location('hash').should('eq', '#quote-google');
+      cy.get('#quote-google').should('be.visible');
     }
   });
 

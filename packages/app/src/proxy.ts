@@ -3,6 +3,7 @@ import { NextResponse, type NextFetchEvent, type NextRequest, type ProxyConfig }
 import { EMBED_SKIN_HEADER, EMBED_THEME_HEADER, isEmbedPathname } from '@/lib/embed/embed-route';
 import { captureClientRequest } from '@/lib/analytics/cli-request-analytics';
 import { compareCanonicalRedirectUrl } from '@/lib/compare/compare-canonical-redirect';
+import { modelRouteRedirectUrl } from '@/lib/routing/model-route-redirect';
 import { powerXRedirectUrl } from '@/lib/routing/powerx-redirect';
 import { modelRequiresFeatureGate } from '@/lib/catalog/data-mappings';
 import {
@@ -13,18 +14,22 @@ import {
 const EMBED_CSP = 'frame-ancestors *';
 
 // Next reads this statically, so it must stay a literal. Only requests with work to do run the
-// proxy: CLI analytics on API routes, embed headers, legacy Inference power links that redirect
-// to PowerX, saved gated model selections, and compare share links whose slug needs
-// canonicalizing with their query intact.
+// proxy. That means CLI analytics on API routes (only the CLI and skill user agents are counted,
+// so browser API calls skip it), embed headers, legacy Inference power links that redirect to
+// PowerX, saved gated model selections, model-route aliases and retired profit percentiles, and
+// compare share links whose slug needs canonicalizing with their query intact.
 // A `has` query condition needs a named key, and a shared compare link can carry any parameter
 // (`i_metric`, `g_rundate`, `utm_*`), so compare detail document requests always match and the
-// redirect helper returns at once when the URL has no query. The scenario segment excludes dots
-// so the `*.png` social images under those paths skip it. Client RSC navigations follow in-app
-// links that already use canonical slugs, so they skip the proxy along with other pages and
-// static assets.
+// redirect helper returns at once when the URL has no query. The scenario segment lists the
+// scenarios (any case) so the social images under those paths skip it. Client RSC navigations
+// follow in-app links that already use canonical slugs, so they skip the compare entry along with
+// other pages and static assets.
 export const config: ProxyConfig = {
   matcher: [
-    '/api/:path*',
+    {
+      source: '/api/:path*',
+      has: [{ type: 'header', key: 'user-agent', value: 'inferencex-(?:cli|skill)/.*' }],
+    },
     '/embed/:path*',
     '/zh/embed/:path*',
     { source: '/:locale(zh)?/inference/:slug?', has: [{ type: 'query', key: 'i_metric' }] },
@@ -33,9 +38,19 @@ export const config: ProxyConfig = {
       source: '/:locale(zh)?/inference/:slug?',
       has: [{ type: 'query', key: 'g_model', value: 'GLM-5\\.3-Flash' }],
     },
+    '/:locale(zh)?/:tab(calculator|historical|profit-estimator|profit-estimator-per-gigawatt)/:slug(deepseek|kimi|kimi-k25|qwen|glm|glm-5|glm-5-2|minimax|minimax-m25|llama|gptoss|[^/]*[A-Z][^/]*)/:filters*',
+    {
+      source: '/:locale(zh)?/:tab(profit-estimator|profit-estimator-per-gigawatt)/:slug/:filters*',
+      has: [{ type: 'query', key: 'i_pctl' }],
+    },
+    {
+      source: '/:locale(zh)?/:tab(profit-estimator|profit-estimator-per-gigawatt)/:slug/:filters*',
+      has: [{ type: 'query', key: 'percentile' }],
+    },
+    '/:locale(zh)?/:tab(profit-estimator|profit-estimator-per-gigawatt)/:slug/:filters*/percentile/:rest+',
     {
       source:
-        '/:locale(zh)?/:family(compare|compare-per-dollar|compare-precision|compare-spec-decode)/:slug/:scenario([^/.]+)?',
+        '/:locale(zh)?/:family(compare|compare-per-dollar|compare-precision|compare-spec-decode)/:slug/:scenario([aA][gG][eE][nN][tT][iI][cC]|[18][kK]-[18][kK])?',
       missing: [{ type: 'header', key: 'rsc' }],
     },
   ],
@@ -48,6 +63,8 @@ export function proxy(request: NextRequest, event: Pick<NextFetchEvent, 'waitUnt
   if (powerX) return NextResponse.redirect(powerX);
   const compare = compareCanonicalRedirectUrl(request.nextUrl);
   if (compare) return NextResponse.redirect(compare, 308);
+  const modelRoute = modelRouteRedirectUrl(request.nextUrl);
+  if (modelRoute) return NextResponse.redirect(modelRoute, 308);
   // A saved gated selection must be known from the pathname during SSR,
   // before a fresh client provider can mount consumers on the default model.
   // This only canonicalizes presentation routes; it is not authorization.

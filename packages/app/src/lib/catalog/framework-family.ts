@@ -5,5 +5,6 @@ export function frameworkFamily(framework: string | undefined): string | undefin
   if (normalized.includes('sglang')) return 'sglang';
   if (normalized.includes('trt')) return 'trt';
   if (normalized.includes('atom')) return 'atom';
+  if (normalized === 'tokenspeed') return 'tokenspeed';
   return undefined;
 }

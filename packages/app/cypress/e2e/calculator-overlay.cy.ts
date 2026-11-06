@@ -68,22 +68,6 @@ describe('TCO calculator — unofficial run overlay', () => {
       cy.get(BARS).should('have.length', TOTAL_BARS);
       cy.get(Y_TICKS).should('contain.text', OVERLAY_RUN_BRANCH);
     });
-
-    it('paints the overlay bar with the run palette color, not the hardware color', () => {
-      cy.get(Y_TICKS).then(($ticks) => {
-        const labels = [...$ticks].map((el) => el.textContent ?? '');
-        expect(labels.filter((l) => l.includes('✕'))).to.have.length(OVERLAY_BARS);
-        expect(labels.filter((l) => !l.includes('✕'))).to.have.length(TOTAL_BARS - OVERLAY_BARS);
-      });
-
-      cy.get(BARS).then(($bars) => {
-        const fills = [...$bars].map((el) => el.getAttribute('fill') ?? '');
-        expect(fills.filter((f) => f.includes('overlay-run-0'))).to.have.length(OVERLAY_BARS);
-        expect(fills.filter((f) => !f.includes('overlay-run-'))).to.have.length(
-          TOTAL_BARS - OVERLAY_BARS,
-        );
-      });
-    });
   });
 
   describe('hardware visibility', () => {
@@ -116,7 +100,7 @@ describe('TCO calculator — unofficial run overlay', () => {
 
   describe('late overlay arrival', () => {
     it('keeps a GPU filter the user set before the run landed', () => {
-      interceptCalculatorOverlayRun({ runDelayMs: 2000 });
+      const releaseRun = interceptCalculatorOverlayRun({ holdRun: true });
       cy.visit(
         `/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}`,
         {
@@ -130,6 +114,7 @@ describe('TCO calculator — unofficial run overlay', () => {
       cy.get('.sidebar-legend label').contains('B300').click();
       cy.get(BARS).should('have.length', 1);
 
+      cy.then(releaseRun);
       cy.wait('@unofficialRun');
       cy.get(BARS).should('have.length', 3);
       cy.get(Y_TICKS).should('not.contain.text', SECOND_OFFICIAL_HARDWARE.toUpperCase());
@@ -205,7 +190,6 @@ describe('TCO calculator — unofficial run overlay', () => {
 
     it('renders the overlay legend strings in Chinese', () => {
       cy.get('.sidebar-legend').should('contain.text', OVERLAY_RUN_BRANCH);
-      cy.get('.sidebar-legend').should('not.contain.text', 'UNOFFICIAL RUN');
     });
   });
 

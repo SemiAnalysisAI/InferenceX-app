@@ -1,4 +1,7 @@
+import { CANVAS_POINT_LAYER_SELECTOR } from '@/lib/d3-chart/layers/canvas-point-registry';
+
 import { expandLegendAdvanced } from '../support/legend-advanced';
+import { POINT_LABELS } from '../support/scatter-points';
 
 describe('Line Labels Toggle', () => {
   before(() => {
@@ -37,14 +40,12 @@ describe('Line Labels Toggle', () => {
 
     cy.get('[data-testid="scatter-graph"] [data-testid="d3-chart-svg"]').then(($svg) => {
       const svg = $svg[0];
-      const dots = svg.querySelectorAll('.dot-group');
-      const labels = svg.querySelectorAll('g.line-label');
-      expect(dots.length, 'scatter dot groups exist').to.be.greaterThan(0);
-      expect(labels.length, 'line labels exist').to.be.greaterThan(0);
+      const points = svg.querySelector(CANVAS_POINT_LAYER_SELECTOR);
+      const firstLabel = svg.querySelector('g.line-label');
+      expect(points, 'scatter point layer exists').to.not.equal(null);
+      expect(firstLabel, 'line labels exist').to.not.equal(null);
 
-      const lastDot = dots.item(dots.length - 1)!;
-      const firstLabel = labels.item(0)!;
-      const relation = lastDot.compareDocumentPosition(firstLabel);
+      const relation = points!.compareDocumentPosition(firstLabel!);
       expect(
         relation & Node.DOCUMENT_POSITION_FOLLOWING,
         'line label follows the scatter points in DOM order (foreground)',
@@ -58,6 +59,9 @@ describe('Line Labels Toggle', () => {
 
     cy.get('[data-testid="scatter-graph"] [data-testid="d3-chart-svg"]').then(($svg) => {
       const svg = $svg[0];
+      const transformsBeforeZoom = [...svg.querySelectorAll('g.line-label')].map((label) =>
+        label.getAttribute('transform'),
+      );
       const r = svg.getBoundingClientRect();
       for (let i = 0; i < 3; i++) {
         svg.dispatchEvent(
@@ -71,20 +75,23 @@ describe('Line Labels Toggle', () => {
           }),
         );
       }
-    });
-    cy.wait(300);
 
-    cy.get('[data-testid="scatter-graph"] [data-testid="d3-chart-svg"]').then(($svg) => {
-      const svg = $svg[0];
-      const dots = svg.querySelectorAll('.dot-group');
-      const labels = svg.querySelectorAll('g.line-label');
-      expect(labels.length, 'line labels still exist after zoom').to.be.greaterThan(0);
-      const lastDot = dots.item(dots.length - 1)!;
-      const firstLabel = labels.item(0)!;
-      expect(
-        lastDot.compareDocumentPosition(firstLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
-        'line label still follows the scatter points after zoom (foreground)',
-      ).to.be.greaterThan(0);
+      // Zoom renders on the next animation frame, so retry until the labels have moved.
+      cy.wrap($svg).should(($zoomed) => {
+        const zoomedSvg = $zoomed[0];
+        const points = zoomedSvg.querySelector(CANVAS_POINT_LAYER_SELECTOR)!;
+        const labels = zoomedSvg.querySelectorAll('g.line-label');
+        expect(labels.length, 'line labels still exist after zoom').to.be.greaterThan(0);
+        expect(
+          [...labels].map((label) => label.getAttribute('transform')),
+          'line labels re-render for the zoomed scales',
+        ).not.to.deep.equal(transformsBeforeZoom);
+        const firstLabel = labels.item(0)!;
+        expect(
+          points.compareDocumentPosition(firstLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
+          'line label still follows the scatter points after zoom (foreground)',
+        ).to.be.greaterThan(0);
+      });
     });
   });
 
@@ -133,17 +140,6 @@ describe('Line Labels Toggle', () => {
     cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length.greaterThan', 0);
   });
 
-  it('legacy URL param i_nolabel=1 keeps GPU-count labels off on load', () => {
-    cy.visit('/inference?g_model=deepseek-v4-pro&i_nolabel=1', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      },
-    });
-    cy.get('[data-testid="scatter-graph"]').should('be.visible');
-    expandLegendAdvanced();
-    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
-  });
-
   it('URL param i_advlabel=1 renders parallelism without enabling GPU-count labels', () => {
     cy.visit('/inference?g_model=deepseek-v4-pro&i_advlabel=1', {
       onBeforeLoad(win) {
@@ -154,51 +150,8 @@ describe('Line Labels Toggle', () => {
     expandLegendAdvanced();
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
-    cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
+    cy.get(`[data-testid="scatter-graph"] ${POINT_LABELS}`)
       .filter(':visible')
       .should('have.length.greaterThan', 0);
-  });
-
-  it('legacy i_nolabel=1 suppresses GPU counts without suppressing explicit parallelism', () => {
-    cy.visit('/inference?g_model=deepseek-v4-pro&i_advlabel=1&i_nolabel=1', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      },
-    });
-    cy.get('[data-testid="scatter-graph"]').should('be.visible');
-    expandLegendAdvanced();
-    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
-    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
-    cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
-      .filter(':visible')
-      .should('have.length.greaterThan', 0);
-  });
-
-  it('places the precision between the GPU and engine when multiple precisions are selected', () => {
-    cy.visit('/inference?g_model=DeepSeek-R1-0528&i_linelabel=1&i_prec=fp4,fp8', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      },
-    });
-    cy.get('[data-testid="scatter-graph"]').should('be.visible');
-
-    cy.get('[data-testid="scatter-graph"] svg g.line-label .ll-text')
-      .should('have.length.greaterThan', 0)
-      .then(($texts) => {
-        const labels = $texts.toArray().map((el) => el.textContent ?? '');
-        expect(
-          labels.some((t) => /\bFP8\b/u.test(t)),
-          'an FP8 line label exists',
-        ).to.equal(true);
-        expect(
-          labels.some((t) => /\bFP4\b/u.test(t)),
-          'an FP4 line label exists',
-        ).to.equal(true);
-        for (const label of labels.filter((t) => /\bFP(?:4|8)\b/u.test(t) && /\(.+\)/u.test(t))) {
-          expect(label, 'precision precedes the engine suffix').to.match(
-            /^.+\sFP(?:4|8)\s\(.+\)$/u,
-          );
-        }
-      });
   });
 });

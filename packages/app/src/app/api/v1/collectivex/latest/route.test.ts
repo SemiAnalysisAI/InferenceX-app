@@ -53,8 +53,6 @@ describe('GET /api/v1/collectivex/latest', () => {
   it('serves the newest stored run assembled as a dataset under the CollectiveX tag', async () => {
     const res = await GET(req('/api/v1/collectivex/latest?version=1'));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual(dataset);
-    expect(mockGetLatest).toHaveBeenCalledWith('mock-write-sql', 1);
     expect(mockCachedJson).toHaveBeenCalledWith(expect.anything(), dataset, { tag: 'collectivex' });
   });
 

@@ -1,4 +1,4 @@
-import { unlockAgenticGate } from '../support/e2e';
+import { availabilityBody, interceptBenchmarkPresence, unlockAgenticGate } from '../support/e2e';
 
 const MODEL = 'dsv4';
 const DATE = '2026-09-01';
@@ -57,12 +57,14 @@ const rows = (runUrl: string | null, hardware: 'b200' | 'h200') =>
     run_url: runUrl,
   }));
 
-const agenticRows = [
-  ['b200', 'dynamo-vllm', 8, 2, 1, 16, 760],
-  ['h200', 'vllm', 16, 1, 2, 32, 168],
-  ['gb200', 'trt', 8, 1, 1, 8, 450],
-  ['b300', 'vllm', 8, 1, 1, 8, 0],
-].map(([hardware, framework, tp, pp, replicas, chips, watts], index) => ({
+const agenticRows = (
+  [
+    ['b200', 'dynamo-vllm', 8, 2, 1, 16, 760],
+    ['h200', 'vllm', 16, 1, 2, 32, 168],
+    ['gb200', 'trt', 8, 1, 1, 8, 450],
+    ['b300', 'vllm', 8, 1, 1, 8, 0],
+  ] satisfies [string, string, number, number, number, number, number][]
+).map(([hardware, framework, tp, pp, replicas, chips, watts], index) => ({
   ...rows(null, 'b200')[0],
   id: 990100 + index,
   model: 'kimik3',
@@ -102,13 +104,15 @@ describe('AgentX All in Measured chart and table', () => {
   ] as const) {
     it(`retains B200/H200 multinode rows and export at ${locale} ${width}px`, () => {
       cy.viewport(width, 900);
-      cy.intercept('GET', '/api/v1/availability', { body: agenticRows }).as('agenticAvailability');
+      cy.intercept('GET', '/api/v1/availability/compact', {
+        body: availabilityBody(agenticRows),
+      }).as('agenticAvailability');
       cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticRows }).as('agenticBenchmarks');
       cy.intercept('GET', '/api/v1/workflow-info*', {
         body: { runs: [], changelogs: [], configs: [] },
       });
-      cy.intercept('GET', '/api/v1/trace-availability*', { body: {} });
-      cy.intercept('GET', '/api/v1/log-availability*', { body: {} });
+      cy.intercept('GET', '/api/v1/workflow-changelogs*', { body: { dates: [] } });
+      interceptBenchmarkPresence();
       cy.intercept('GET', '/api/v1/resident-sequence-lengths*', { body: {} });
       const overlayBody = {
         runInfos: [
@@ -158,16 +162,11 @@ describe('AgentX All in Measured chart and table', () => {
         },
       });
       cy.wait(['@agenticAvailability', '@agenticBenchmarks', '@agenticOverlay']);
-      cy.get('[data-testid="chart-figure"]').first().find('.dot-group').should('have.length', 2);
+      cy.scatterPoints('[data-testid="chart-figure"]:first').should('have.length', 2);
       cy.get('[data-testid="chart-figure"]')
         .first()
         .find('.unofficial-overlay-pt')
         .should('have.length', 1);
-      cy.get('header').invoke('css', 'visibility', 'hidden');
-      cy.get('[data-testid="chart-figure"]')
-        .first()
-        .scrollIntoView()
-        .screenshot(`agentic-all-in-${locale}-chart`, { overwrite: true });
       cy.get('[data-testid="inference-table-view-btn"]').first().click();
       cy.get('[data-testid="chart-figure"]')
         .first()
@@ -185,9 +184,6 @@ describe('AgentX All in Measured chart and table', () => {
             );
           }
         });
-      cy.get('[data-testid="chart-figure"]')
-        .first()
-        .screenshot(`agentic-all-in-${locale}-table`, { overwrite: true });
       if (locale === 'zh') {
         cy.get('[data-testid="inference-results-table"]')
           .first()
@@ -203,11 +199,7 @@ describe('AgentX All in Measured chart and table', () => {
               );
             });
           });
-        cy.get('[data-testid="chart-figure"]')
-          .first()
-          .screenshot('agentic-all-in-zh-table-status', { overwrite: true });
       }
-      cy.get('header').invoke('css', 'visibility', '');
       cy.get('[data-testid="export-button"]').first().click();
       cy.get('[data-testid="export-csv-button"]').click();
       cy.then(() => csvBlob!.text()).then((csv) => {

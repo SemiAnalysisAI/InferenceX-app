@@ -1,5 +1,6 @@
 'use client';
 
+import { withTotalChipQualifier } from '@/lib/benchmarks/chip-basis';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import * as d3 from 'd3';
@@ -70,6 +71,8 @@ interface ThroughputBarChartProps {
   targetValue: number;
   barMetric: BarMetric;
   costType: CostType;
+  /** Input/Output values divided by every deployment chip; the axis label says so. */
+  totalChipBasis?: boolean;
   runUrl?: string;
   selectedBars: Set<string>;
   onBarSelect: (resultKey: string) => void;
@@ -444,6 +447,7 @@ export default function ThroughputBarChart({
   mode,
   barMetric,
   costType,
+  totalChipBasis = false,
   runUrl,
   selectedBars,
   onBarSelect,
@@ -728,12 +732,17 @@ export default function ThroughputBarChart({
         .attr('text-anchor', 'middle')
         .attr('font-size', '12px')
         .style('fill', 'var(--muted-foreground)')
-        .text(getMetricLabel(barMetric, mode, costType, locale));
+        .text(
+          totalChipBasis
+            ? (withTotalChipQualifier(getMetricLabel(barMetric, mode, costType, locale), locale) ??
+                '')
+            : getMetricLabel(barMetric, mode, costType, locale),
+        );
 
       const renderGroup = layout.g;
       applySelectionOpacities(renderGroup, selectedBarsRef.current);
     },
-    [barMetric, mode, costType, locale],
+    [barMetric, mode, costType, locale, totalChipBasis],
   );
 
   useEffect(() => {

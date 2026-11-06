@@ -27,6 +27,9 @@ export const DB_MODEL_TO_DISPLAY: Record<string, string> = {
   // K3 is a new architecture (Kimi Delta Attention + Attention Residuals, 2.8T),
   // not a K2 point release, so it gets its own display bucket.
   kimik3: 'Kimi-K3',
+  // K3.1 Pro (moonshotai/Kimi-K3.1-Pro) is a separate checkpoint from K3, so it
+  // gets its own display bucket rather than folding into Kimi-K3.
+  'kimik3.1': 'Kimi-K3.1-Pro',
   'minimaxm2.5': 'MiniMax-M2.5',
   'minimaxm2.7': 'MiniMax-M2.5',
   minimaxm3: 'MiniMax-M3',
@@ -75,14 +78,15 @@ export function sequenceToIslOsl(seq: string): { isl: number; osl: number } | nu
   return map[seq] ?? null;
 }
 
+const ISL_OSL_TO_SEQUENCE: Record<string, string> = {
+  '1024_1024': '1k/1k',
+  '1024_8192': '1k/8k',
+  '8192_1024': '8k/1k',
+};
+
 /** Convert ISL/OSL in tokens to a frontend sequence string. */
 export function islOslToSequence(isl: number, osl: number): string | null {
-  const map: Record<string, string> = {
-    '1024_1024': '1k/1k',
-    '1024_8192': '1k/8k',
-    '8192_1024': '8k/1k',
-  };
-  return map[`${isl}_${osl}`] ?? null;
+  return ISL_OSL_TO_SEQUENCE[`${isl}_${osl}`] ?? null;
 }
 
 /**
@@ -136,6 +140,11 @@ export const MODEL_RELEASE_DATES: Record<string, string> = {
   // InferenceX benchmark — recorded so the "cannot predate its own weights"
   // invariant above is checkable by eye at review time.
   //
+  // Moonshot opened the weights at moonshotai/Kimi-K3.1-Pro on 2026-11-04, the
+  // date it set at the 2026-10-23 API launch. The repo's only commit is dated
+  // 2026-11-02 04:13Z, before it went public. sweep: 2026-11-04 (InferenceX#4803)
+  // — day zero.
+  'Kimi-K3.1-Pro': '2026-11-04',
   // DeepSeek-V4.1-Flash — MIT weights published at deepseek-ai/DeepSeek-V4.1-Flash
   // on 2026-09-10 UTC (HF repo initial commit 02:17Z, tech report 05:34Z). The
   // vLLM bring-up image is tagged `deepseekv41-flash-0909`, a day earlier, but

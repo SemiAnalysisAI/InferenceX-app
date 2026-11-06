@@ -13,6 +13,7 @@ describe('frameworkFamily', () => {
     expect(frameworkFamily('dynamo-trt')).toBe('trt');
     expect(frameworkFamily('atom')).toBe('atom');
     expect(frameworkFamily('mooncake-atom')).toBe('atom');
+    expect(frameworkFamily('TokenSpeed')).toBe('tokenspeed');
   });
 
   it('returns undefined for unknown or missing frameworks', () => {

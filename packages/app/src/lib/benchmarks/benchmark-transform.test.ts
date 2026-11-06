@@ -4,12 +4,16 @@ import { describe, it, expect, vi } from 'vitest';
 import { getPointLabel } from '@/components/inference/utils/tooltipUtils';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { dedupeAgenticHistoryRuns } from '@/lib/benchmarks/benchmark-run-selection';
+import { Percentile } from '@/lib/catalog/data-mappings';
 
 import {
   applyUncachedTokenBasis,
+  benchmarkRowPhysicalChips,
   mergeRunScopedRows,
+  rowLatencyMetric,
   rowToAggDataEntry,
   transformBenchmarkRows,
+  type LatencyPercentile,
 } from './benchmark-transform';
 
 function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
@@ -70,6 +74,33 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
 }
 
 describe('rowToAggDataEntry', () => {
+  it.each(['sglang', 'vllm'])(
+    'uses SMG metadata for %s chart config without changing identity',
+    (framework) => {
+      const row = makeRow({
+        hardware: 'mi355x',
+        framework,
+        metrics: { ...makeRow().metrics, router_name: 'smg' } as unknown as BenchmarkRow['metrics'],
+        run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/41803503347',
+      });
+      const key = `mi355x_${framework}`;
+      const label = framework === 'sglang' ? 'SGLang' : 'vLLM';
+      const { chartData, hardwareConfig } = transformBenchmarkRows([row]);
+      expect(Object.keys(hardwareConfig)).toEqual([key]);
+      expect(hardwareConfig[key].suffix).toBe(`(SMG ${label})`);
+      for (const points of chartData) {
+        expect(points[0]).toMatchObject({
+          hwKey: key,
+          framework,
+          router_name: 'smg',
+          run_url: row.run_url,
+        });
+      }
+      const mixed = transformBenchmarkRows([row, { ...row, id: 2, metrics: makeRow().metrics }]);
+      expect(mixed.hardwareConfig[key].suffix).toBe(`(SMG ${label})`);
+    },
+  );
+
   it('carries the curve snapshot identity of append-only rows and leaves legacy rows without one', () => {
     const stitched = rowToAggDataEntry(
       makeRow({ curve_date: '2026-09-20', curve_workflow_run_id: 35843506474 }),
@@ -133,6 +164,15 @@ describe('rowToAggDataEntry', () => {
       expect(historical.hardwareConfig['mi355x_mori-sglang'].suffix).toBe('(MoRI SGLang)');
     },
   );
+
+  it('labels a hardware key from every contributing run, not only its first row', () => {
+    const run_url =
+      'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34926284365/attempts/1';
+    const umbp = makeRow({ hardware: 'mi355x', framework: 'mori-sglang', run_url });
+    const plain = { ...umbp, run_url: run_url.replace('34926284365', '34926284364') };
+    const { hardwareConfig } = transformBenchmarkRows([plain, umbp]);
+    expect(hardwareConfig['mi355x_mori-sglang'].suffix).toBe('(MoRI SGLang / MoRI UMBP SGLang)');
+  });
 
   it.each(['p75_power_w', 'p90_power_w'] as const)(
     'only exposes %s from validated schema-2 rows, including overlays without DB IDs',
@@ -250,6 +290,17 @@ describe('rowToAggDataEntry', () => {
     expect(entry.std_intvty).toBe(20);
   });
 
+  it('drops plain ITL at percentiles without full-response ITL once any percentile reports it', () => {
+    const row = makeRow({
+      benchmark_type: 'agentic_traces',
+      metrics: { median_full_response_itl: 0.005, p90_itl: 0.01, p90_intvty: 100 },
+    });
+    const entry = rowToAggDataEntry(row);
+
+    expect([entry.p90_itl, entry.p90_intvty, entry.median_intvty]).toEqual([0, 0, 200]);
+    expect(rowLatencyMetric(row, Percentile.P90, 'intvty')).toBe(0);
+  });
+
   it('defaults missing metrics to 0', () => {
     const entry = rowToAggDataEntry(makeRow({ metrics: {} }));
     expect(entry.tput_per_gpu).toBe(0);
@@ -305,6 +356,27 @@ describe('rowToAggDataEntry', () => {
     expect(entry.decode_tp).toBe(8);
     expect(entry.decode_ep).toBe(1);
     expect(entry.decode_pp).toBe(2);
+  });
+
+  it('selects the prefill-shaped topology when only the decode TP is zero', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({ disagg: false, prefill_tp: 8, decode_tp: 0, decode_ep: 1, num_decode_gpu: 8 }),
+    );
+    expect(entry.tp).toBe(8);
+  });
+
+  it('counts physical chips from the populated topology side, as the full entry does', () => {
+    const row = makeRow({
+      disagg: false,
+      prefill_tp: 8,
+      decode_tp: 0,
+      decode_ep: 0,
+      prefill_num_workers: 1,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 0,
+    });
+    expect(benchmarkRowPhysicalChips(row)).toBe(8);
+    expect(rowToAggDataEntry(row).physicalChips).toBe(8);
   });
 
   it('surfaces pipeline parallelism from the metrics JSONB', () => {
@@ -771,6 +843,50 @@ describe('rowToAggDataEntry', () => {
   });
 });
 
+describe('rowLatencyMetric', () => {
+  it('returns the rowToAggDataEntry latency field for every percentile and alias shape', () => {
+    let state = 11;
+    const random = () => {
+      state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
+      return state / 2 ** 32;
+    };
+    const VALUES = [undefined, undefined, 0, -0.5, 0.004, 0.02, 1.5, 7, Number.NaN];
+    const pick = () => VALUES[Math.floor(random() * VALUES.length)];
+    const percentiles: LatencyPercentile[] = [
+      'mean',
+      'median',
+      Percentile.P75,
+      Percentile.P90,
+      'p95',
+      'p99',
+      'p99.9',
+    ];
+    const suffixes = ['full_response_itl', 'itl', 'ttlt', 'e2el', 'ttft', 'intvty', 'tpot'];
+    for (let round = 0; round < 400; round++) {
+      const metrics: Record<string, number> = {};
+      for (const percentile of percentiles) {
+        for (const suffix of suffixes) {
+          const value =
+            random() < (suffix === 'full_response_itl' ? 0.1 : 0.6) ? pick() : undefined;
+          if (value !== undefined) metrics[`${percentile}_${suffix}`] = value;
+        }
+      }
+      const row = makeRow({
+        benchmark_type: random() < 0.6 ? 'agentic_traces' : 'single_turn',
+        metrics,
+      });
+      const entry = new Map(Object.entries(rowToAggDataEntry(row, { modelPower: false })));
+      for (const percentile of percentiles) {
+        for (const metric of ['intvty', 'e2el', 'ttft'] as const) {
+          expect(rowLatencyMetric(row, percentile, metric)).toBe(
+            entry.get(`${percentile}_${metric}`),
+          );
+        }
+      }
+    }
+  });
+});
+
 describe('rowToAggDataEntry — agentic measured power', () => {
   const agenticPowerMetrics = {
     tput_per_gpu: 100,
@@ -868,6 +984,75 @@ describe('rowToAggDataEntry — agentic measured power', () => {
     expect(point.measuredPrefillJPerInputToken).toBeUndefined();
     expect(point.measuredDecodeJPerOutputToken).toBeUndefined();
     expect(point.workers).toBeUndefined();
+  });
+});
+
+function chipBasisPoint(
+  row: BenchmarkRow,
+  tokenBasis?: 'total' | 'uncached',
+  chipBasis?: 'pool' | 'total',
+) {
+  return transformBenchmarkRows([row], 'median', undefined, tokenBasis, chipBasis).chartData[0][0];
+}
+
+describe('transformBenchmarkRows — chip basis', () => {
+  const disagg = (benchmark_type = 'single_turn') =>
+    makeRow({
+      hardware: 'gb300',
+      framework: 'dynamo-sglang',
+      disagg: true,
+      is_multinode: true,
+      prefill_num_workers: 1,
+      decode_num_workers: 1,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 12,
+      benchmark_type,
+      metrics: {
+        tput_per_gpu: 1000,
+        input_tput_per_gpu: 3600,
+        output_tput_per_gpu: 133,
+        median_intvty: 20,
+        median_e2el: 2,
+        theoretical_cache_hit_rate: 0.5,
+      },
+    });
+
+  it('defaults to the stored per-pool rates', () => {
+    const p = chipBasisPoint(disagg());
+    expect(p.outputTputPerGpu?.y).toBe(133);
+    expect(p.inputTputPerGpu?.y).toBe(3600);
+    expect(p.chip_basis).toBeUndefined();
+  });
+
+  it('divides input and output by every chip on the total basis, leaving total throughput', () => {
+    const p = chipBasisPoint(disagg(), 'total', 'total');
+    expect(p.outputTputPerGpu?.y).toBeCloseTo((133 * 12) / 16, 9);
+    expect(p.inputTputPerGpu?.y).toBeCloseTo(3600 / 4, 9);
+    expect(p.tpPerGpu?.y).toBe(1000);
+    expect(p.chip_basis).toBe('total');
+  });
+
+  it('removes the same uncached prefix from total throughput on either basis', () => {
+    const pool = chipBasisPoint(disagg('agentic_traces'), 'uncached', 'pool');
+    const total = chipBasisPoint(disagg('agentic_traces'), 'uncached', 'total');
+    // Prefix per total chip = input per prefill chip × 4/16 × hit rate.
+    expect(pool.tpPerGpu?.y).toBeCloseTo(1000 - 3600 * (4 / 16) * 0.5, 9);
+    expect(total.tpPerGpu?.y).toBeCloseTo(pool.tpPerGpu!.y, 9);
+    expect(pool.inputTputPerGpu?.y).toBeCloseTo(3600 * 0.5, 9);
+    expect(total.inputTputPerGpu?.y).toBeCloseTo(900 * 0.5, 9);
+  });
+
+  it('keeps the chart point key order on both bases', () => {
+    const row = disagg();
+    row.metrics.total_generation_tokens = 4096;
+    for (const basis of ['pool', 'total'] as const) {
+      const keys = Object.keys(chipBasisPoint(row, 'total', basis));
+      expect(keys.indexOf('chip_basis'), basis).toBe(keys.indexOf('num_decode_gpu') + 1);
+      expect(keys.indexOf('total_generation_tokens'), basis).toBe(
+        keys.indexOf('total_prompt_tokens') + 1,
+      );
+    }
+    expect(rowToAggDataEntry(row).total_generation_tokens).toBe(4096);
   });
 });
 
@@ -1253,6 +1438,17 @@ describe('rowToAggDataEntry — extended edge cases', () => {
     expect(entry.std_intvty).toBe(2.5);
     expect(entry.p99_intvty).toBe(22.1);
   });
+
+  it('derives mean TPOT interactivity only from a positive finite mean TPOT', () => {
+    const meanTpotIntvty = (mean_tpot?: number) =>
+      rowToAggDataEntry(makeRow({ metrics: mean_tpot === undefined ? {} : { mean_tpot } }))
+        .mean_tpot_intvty;
+    expect(meanTpotIntvty(0.02)).toBe(50);
+    expect(meanTpotIntvty(0)).toBeUndefined();
+    expect(meanTpotIntvty(-0.02)).toBeUndefined();
+    expect(meanTpotIntvty(Number.POSITIVE_INFINITY)).toBeUndefined();
+    expect(meanTpotIntvty()).toBeUndefined();
+  });
 });
 
 describe('transformBenchmarkRows — deployment topology', () => {
@@ -1290,6 +1486,8 @@ describe('transformBenchmarkRows — deployment topology', () => {
         hardware: 'h200',
         framework: 'dynamo-trt',
         disagg: true,
+        prefill_num_workers: 1,
+        decode_num_workers: 1,
         num_prefill_gpu: 4,
         num_decode_gpu: 12,
         decode_tp: 8,

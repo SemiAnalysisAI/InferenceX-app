@@ -236,6 +236,23 @@ describe('matchesQuickFilters', () => {
 });
 
 describe('applyQuickFilters', () => {
+  it('offers TokenSpeed and filters both official and unofficial points by its family', () => {
+    const official = point({ id: 42, hwKey: 'gb300_tokenspeed_mtp', framework: 'tokenspeed' });
+    const overlay = point({
+      run_url: 'https://github.com/example/actions/runs/2',
+      hwKey: 'gb300_tokenspeed_mtp',
+      framework: 'tokenspeed',
+    });
+    const other = point({ hwKey: 'gb300_sglang_mtp', framework: 'sglang' });
+    const points = [official, overlay, other];
+
+    expect(computeAvailableQuickFilters(points).frameworks).toEqual(['sglang', 'tokenspeed']);
+    expect(applyQuickFilters(points, filters({ frameworks: ['tokenspeed'] }))).toEqual([
+      official,
+      overlay,
+    ]);
+  });
+
   const data = [
     point({ hwKey: 'h100_vllm', disagg: false, spec_decoding: 'none' }),
     point({ hwKey: 'h100_vllm_mtp', disagg: false, spec_decoding: 'mtp' }),

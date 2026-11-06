@@ -14,6 +14,6 @@ export function useGpuMetricsPoint(id: number | null, enabled = false) {
     id,
     enabled && Boolean(id),
     undefined,
-    { staleTime: 0, refetchOnWindowFocus: true },
+    true,
   );
 }

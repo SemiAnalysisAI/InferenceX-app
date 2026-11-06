@@ -35,7 +35,7 @@ describe('CI ZIP import', () => {
       run_attempt: '2',
       git_commit: 'd'.repeat(40),
       artifact_name: name,
-      ci: { head_sha: 'a'.repeat(40) },
+      ci: { head_sha: 'a'.repeat(40), workflow_sha: 'e'.repeat(40) },
     });
     const blob = archive({
       'manifest.json': manifest,
@@ -44,6 +44,9 @@ describe('CI ZIP import', () => {
     const native = { ...artifact, name, workflow_run: { id: 10, head_sha: 'a'.repeat(40) } };
     const sources = await archiveSources(blob, native);
     expect(sources[0].id).toBe('10');
+    const dispatched = { ...native, workflow_run: { id: 10, head_sha: 'e'.repeat(40) } };
+    const [source] = await archiveSources(blob, dispatched);
+    expect(source.id).toBe('10');
     for (const altered of [
       { ...native, name: name.replace('-2-', '-1-') },
       { ...native, name: name.replace('c'.repeat(64), 'd'.repeat(64)) },

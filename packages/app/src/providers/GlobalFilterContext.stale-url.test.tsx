@@ -3,12 +3,15 @@ import { act, memo } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { AvailabilityRow } from '@/lib/api/api';
+import { type AvailabilityIndex, indexAvailability } from '@/lib/benchmarks/availability-index';
+import { compactAvailability } from '@/lib/benchmarks/compact-availability';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import type * as UrlStateModule from '@/lib/routing/url-state';
 
 const mocks = vi.hoisted(() => ({
   availability: {
-    data: [] as unknown[],
+    data: undefined as AvailabilityIndex | undefined,
     error: null as Error | null,
     isSuccess: true,
   },
@@ -45,6 +48,9 @@ import {
   useGlobalFilterRun,
   useGlobalFilterSelection,
 } from './GlobalFilterContext';
+
+const indexRows = (rows: readonly object[]) =>
+  indexAvailability(compactAvailability(rows as AvailabilityRow[]));
 
 const KIMI_K3_ROWS = [
   { model: 'kimik3', isl: null, osl: null, benchmark_type: 'agentic_traces' },
@@ -87,7 +93,7 @@ function mountProvider(): void {
 }
 
 beforeEach(() => {
-  mocks.availability.data = KIMI_K3_ROWS;
+  mocks.availability.data = indexRows(KIMI_K3_ROWS);
   mocks.getUrlParam.mockClear();
   mocks.setUrlParams.mockClear();
   mocks.hasExplicitUrlParam.mockClear();
@@ -122,14 +128,16 @@ describe('GlobalFilterProvider stale i_seq snapshot', () => {
 
 describe('GlobalFilterProvider stale i_prec snapshot', () => {
   beforeEach(() => {
-    mocks.availability.data = ['fp4', 'fp8'].map((precision) => ({
-      ...KIMI_K3_ROWS[0],
-      precision,
-      hardware: precision === 'fp4' ? 'vr200' : 'h200',
-      framework: 'trt',
-      spec_method: 'none',
-      disagg: false,
-    }));
+    mocks.availability.data = indexRows(
+      ['fp4', 'fp8'].map((precision) => ({
+        ...KIMI_K3_ROWS[0],
+        precision,
+        hardware: precision === 'fp4' ? 'vr200' : 'h200',
+        framework: 'trt',
+        spec_method: 'none',
+        disagg: false,
+      })),
+    );
     mocks.getUrlParam.mockImplementation((key) => (key === 'i_prec' ? 'fp8' : undefined));
   });
 
@@ -152,7 +160,7 @@ describe('GlobalFilterProvider stale i_prec snapshot', () => {
 
 describe('GlobalFilterProvider stale g_rundate snapshot', () => {
   beforeEach(() => {
-    mocks.availability.data = KIMI_K3_DATED_ROWS;
+    mocks.availability.data = indexRows(KIMI_K3_DATED_ROWS);
     mocks.getUrlParam.mockImplementation((key: string) =>
       key === 'g_rundate' ? STALE_RUN_DATE : undefined,
     );
@@ -172,5 +180,45 @@ describe('GlobalFilterProvider stale g_rundate snapshot', () => {
     mocks.hasExplicitUrlParam.mockImplementation((key: string) => key === 'g_rundate');
     mountProvider();
     expect(observedRunDate).toBe(STALE_RUN_DATE);
+  });
+});
+
+describe('GlobalFilterProvider chip basis', () => {
+  let observedChipBasis: string | undefined;
+  const ChipBasisProbe = memo(() => {
+    observedChipBasis = useGlobalFilterSelection().chipBasis;
+    return null;
+  });
+  const mount = (initialChipBasis?: 'pool' | 'total') => {
+    container = document.createElement('div');
+    root = createRoot(container);
+    act(() =>
+      root?.render(
+        <GlobalFilterProvider initialModel={Model.Kimi_K3} initialChipBasis={initialChipBasis}>
+          <ChipBasisProbe />
+        </GlobalFilterProvider>,
+      ),
+    );
+  };
+
+  beforeEach(() => {
+    mocks.hasExplicitUrlParam.mockImplementation((key: string) => key === 'g_chips');
+    mocks.getUrlParam.mockImplementation((key: string) => (key === 'g_chips' ? 'pool' : undefined));
+  });
+  afterEach(() => {
+    mocks.getUrlParam.mockImplementation((key: string) => (key === 'i_seq' ? '8k/1k' : undefined));
+  });
+
+  it('applies g_chips from the URL on dashboard pages', () => {
+    mocks.getUrlParam.mockImplementation((key: string) =>
+      key === 'g_chips' ? 'total' : undefined,
+    );
+    mount();
+    expect(observedChipBasis).toBe('total');
+  });
+
+  it('keeps an embed’s server-resolved basis over the URL', () => {
+    mount('total');
+    expect(observedChipBasis).toBe('total');
   });
 });

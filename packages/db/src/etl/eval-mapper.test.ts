@@ -57,6 +57,16 @@ function makeAggRow(overrides: Record<string, any> = {}): Record<string, any> {
 }
 
 describe('mapEvalRow', () => {
+  it('reassigns the framework for a registered run framework override', () => {
+    const meta = makeMeta({ infmax_model_prefix: 'qwen3.5', hw: 'tpuv7', precision: 'fp8' });
+    const [overridden] = mapEvalRow(meta, makeResults(), createSkipTracker(), 40744397059);
+    expect(overridden.config.framework).toBe('llmd-vllm');
+    const [otherRun] = mapEvalRow(meta, makeResults(), createSkipTracker(), 40744397060);
+    expect(otherRun.config.framework).toBe('vllm');
+    const [noRun] = mapEvalRow(meta, makeResults(), createSkipTracker());
+    expect(noRun.config.framework).toBe('vllm');
+  });
+
   it('maps valid meta + results to EvalParams array', () => {
     const tracker = createSkipTracker();
     const result = mapEvalRow(makeMeta(), makeResults(), tracker);

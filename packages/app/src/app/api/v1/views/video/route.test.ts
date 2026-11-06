@@ -1,14 +1,23 @@
 import { compareMetrics } from '@/components/video-benchmark/compare';
 import { resolveCompareSelection } from '@/components/video-benchmark/compare-url-state';
 import { concurrencyPlateau, powerUtilization } from '@/components/video-benchmark/evidence';
-import type {
-  VideoHistoryObservation,
-  VideoHistoryPage,
+import {
+  videoHistoryEntry,
+  type VideoHistoryObservation,
+  type VideoHistoryPage,
 } from '@/components/video-benchmark/history';
 import { metricValue } from '@/components/video-benchmark/metrics';
 import { listedVideoCells, plotVideoPoints } from '@/components/video-benchmark/plot';
-import { dashboardCells, videoPoints } from '@/components/video-benchmark/points';
+import { dashboardCells, namedRunPoints, videoPoints } from '@/components/video-benchmark/points';
+import { parseResultsState, resultProjection } from '@/components/video-benchmark/results';
 import { servingFixture } from '@/components/video-benchmark/serving.fixture';
+import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
+import { verifiedReferencePairs } from '@/components/video-benchmark/reference-quality';
+import {
+  publishedResultsSide,
+  resultsClipEvidence,
+  resultsClipPoints,
+} from '@/components/video-benchmark/results-clips';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
 import {
   metricOptions,
@@ -17,6 +26,7 @@ import {
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET } from './route';
+import retainedHistory from '../../../../../../cypress/fixtures/api/video-history.json';
 
 const source = vi.hoisted(() => vi.fn());
 vi.mock('@/app/api/video-runs/route', () => ({ GET: source }));
@@ -131,6 +141,15 @@ const pages = [
   ),
 ];
 const request = (query = '') => new NextRequest(`https://example.test/api/v1/views/video?${query}`);
+function historyResponse(req: NextRequest) {
+  const first = Number(req.nextUrl.searchParams.get('page')) - 1;
+  const read = pages.slice(first, first + Number(req.nextUrl.searchParams.get('pages') ?? 1));
+  return Response.json({
+    schemaVersion: 1,
+    entries: read.flatMap((item) => item.entries),
+    nextPage: read.at(-1)!.nextPage,
+  });
+}
 
 function storedServingArtifact(): StoredArtifact {
   const fixture = servingFixture();
@@ -164,13 +183,106 @@ function storedServingArtifact(): StoredArtifact {
 beforeEach(() => {
   source.mockReset();
   source.mockImplementation((req: NextRequest) => {
-    if (req.nextUrl.searchParams.get('format') === 'history')
-      return Response.json(pages[Number(req.nextUrl.searchParams.get('page')) - 1]);
+    if (req.nextUrl.searchParams.get('format') === 'history') return historyResponse(req);
     return new Response(null, { status: 204 });
   });
 });
 
 describe('published VideoGenX dashboard projection', () => {
+  it('prefers the older slower named clip over a faster official clip on the same hardware', async () => {
+    const named = referenceQualityFixture(20);
+    const official = referenceQualityFixture(20, '124', 8, '4'.repeat(64));
+    official.attachment.pairs[0].comparison.metrics.video_psnr_db = 35;
+    for (const f of [named, official]) {
+      f.stored.quality = verifiedReferencePairs(
+        f.attachment,
+        f.receipts,
+        [f.stored],
+        '9'.repeat(64),
+      );
+      const mediaPath = f.attachment.pairs[0].candidate.media_path;
+      f.stored.sources[0].assets = [
+        [mediaPath, { url: `/${f.stored.runId}.mp4`, downloadUrl: `/${f.stored.runId}.mp4` }],
+      ];
+    }
+    const namedEntry = videoHistoryEntry(named.stored, null);
+    const officialEntry = videoHistoryEntry(official.stored, null);
+    officialEntry.approved = true;
+    namedEntry.sources[0].observedAt = '2025-01-01T00:00:00Z';
+    officialEntry.sources[0].observedAt = '2026-01-01T00:00:00Z';
+    for (const entry of officialEntry.sources[0].observations) {
+      entry.p50 = 60;
+      entry.clipsGpuHour = 100;
+    }
+    const history: VideoHistoryPage = {
+      schemaVersion: 1,
+      nextPage: null,
+      entries: [officialEntry, namedEntry],
+    };
+    source.mockImplementation((req: NextRequest) =>
+      Response.json(
+        req.nextUrl.searchParams.get('format') === 'history'
+          ? history
+          : req.nextUrl.searchParams.get('run') === '123'
+            ? named.stored
+            : official.stored,
+      ),
+    );
+    const response = await GET(request('view=overview&unofficialrun=123'));
+    const body = await response.json();
+    expect(body.cells[0].point.runId).toBe('124');
+    expect(body.overlayCells[0].point.runId).toBe('123');
+    expect(body.clipQuality.status).toBe('ready');
+    expect(body.clipQuality.groups[0].clips[0].quality.releaseQualified).toBe(false);
+    expect(body.clipQuality.groups[0].clips[0].quality.candidate.run_id).toBe('123');
+    expect(body.clipQuality.groups[0].clips[0].quality.psnrDb).toBe(25);
+    const projection = resultProjection(
+      videoPoints([history]),
+      parseResultsState('unofficialrun=123'),
+      namedRunPoints([history], '123'),
+    );
+    const uiPoints = resultsClipPoints([...projection.cells, ...projection.overlayCells], {
+      tier: 'h',
+    });
+    expect(uiPoints.map((point) => point.runId)).toEqual(['123']);
+    expect(body.clipQuality.groups).toEqual(
+      resultsClipEvidence(uiPoints.map((point) => publishedResultsSide(named.stored, point))),
+    );
+    const clearedResponse = await GET(request('view=overview'));
+    const cleared = await clearedResponse.json();
+    expect(cleared.clipQuality.groups[0].clips[0].quality.candidate.run_id).toBe('124');
+    expect(cleared.clipQuality.groups[0].clips[0].quality.psnrDb).toBe(35);
+  });
+
+  it('returns the same results-page selection and economics with read-only stored media metadata', async () => {
+    const history = structuredClone(retainedHistory) as unknown as VideoHistoryPage;
+    history.nextPage = null;
+    source.mockImplementation(() => Response.json(history));
+    const query =
+      'view=overview&r_tier=r&r_deadline=60&r_utilization=0.5&r_hidden=mi355x&unofficialrun=123';
+    const response = await GET(request(query));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    const expected = resultProjection(videoPoints([history]), parseResultsState(query));
+    expect(body).toMatchObject(expected);
+    expect(body.cells.length).toBeGreaterThan(0);
+    expect(body.params.view).toBe('overview');
+    expect(body.coverage.pagesRead).toBe(1);
+    expect(
+      source.mock.calls.every(([req]) =>
+        ['history', 'published'].includes(req.nextUrl.searchParams.get('format')),
+      ),
+    ).toBe(true);
+    const mixed = await GET(request('view=overview&v_api=0.08'));
+    const wrongView = await GET(request('view=dashboard&r_tier=h'));
+    expect(mixed.status).toBe(400);
+    expect(wrongView.status).toBe(400);
+    const multiple = await GET(request('view=overview&unofficialruns=123,456'));
+    const aliases = await GET(request('view=overview&unofficialrun=123&unofficialruns=456'));
+    expect(multiple.status).toBe(400);
+    expect(aliases.status).toBe(400);
+  });
+
   it('keeps a stored legacy entry out of the default public dashboard', async () => {
     source.mockImplementation((req: NextRequest) =>
       req.nextUrl.searchParams.get('format') === 'history'
@@ -186,6 +298,17 @@ describe('published VideoGenX dashboard projection', () => {
     const body = await response.json();
     expect(body.rows).toEqual([]);
   });
+
+  it('keeps CSV headers when hardware selection removes every cell', async () => {
+    const response = await GET(
+      request('view=overview&format=csv&r_hidden=gb200,b200,mi355x,h200,h100'),
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
+    expect(await response.text()).toMatch(
+      /^channel,approved,published_at,run_id,artifact_id,.*\r\n$/u,
+    );
+  });
   it('defaults to the current dashboard, reads history pages and preserves numerical parity', async () => {
     const response = await GET(request());
     expect(response.status).toBe(200);
@@ -195,7 +318,7 @@ describe('published VideoGenX dashboard projection', () => {
     const { cells } = dashboardCells(videoPoints(pages));
     const options = metricOptions(state);
     expect(body.params.view).toBe('dashboard');
-    expect(body.coverage).toEqual({ pagesRead: 2, maxPages: 5, nextPage: null, truncated: false });
+    expect(body.coverage).toEqual({ pagesRead: 1, maxPages: 5, nextPage: null, truncated: false });
     expect(body.plot).toEqual(plotVideoPoints(cells, state, () => '', new Set()));
     expect(body.rows.map((row: { point: { id: string } }) => row.point.id)).toEqual(
       listedVideoCells(cells, state, new Set()).map((p) => p.id),
@@ -215,10 +338,10 @@ describe('published VideoGenX dashboard projection', () => {
     expect(body.evidence.power).toEqual(powerUtilization(cells));
     expect(body.evidence.plateau).toEqual(concurrencyPlateau(cells));
     expect(body.comparison.cases.status).toBe('not-requested');
-    expect(source).toHaveBeenCalledTimes(2);
-    expect(
-      source.mock.calls.every(([req]) => req.nextUrl.searchParams.get('format') === 'history'),
-    ).toBe(true);
+    expect(source).toHaveBeenCalledTimes(1);
+    expect(source.mock.calls[0][0].nextUrl.searchParams.toString()).toBe(
+      'format=history&page=1&pages=5',
+    );
   });
 
   it('shares axis, tier, optimal, API price, compare and hardware-filter semantics with the UI', async () => {
@@ -260,14 +383,28 @@ describe('published VideoGenX dashboard projection', () => {
   });
 
   it('reports the same five-page bound and never silently presents truncated history as complete', async () => {
-    source.mockImplementation((req: NextRequest) =>
-      Response.json(page([], Number(req.nextUrl.searchParams.get('page')) + 1)),
-    );
+    source.mockImplementation(() => Response.json(page([], 6)));
     const response = await GET(request());
     const body = await response.json();
-    expect(source).toHaveBeenCalledTimes(5);
+    expect(source).toHaveBeenCalledTimes(1);
     expect(body.coverage).toEqual({ pagesRead: 5, maxPages: 5, nextPage: 6, truncated: true });
     expect(body.rows).toEqual([]);
+  });
+
+  it.each([
+    [0, 1],
+    [1, 1],
+    [10, 1],
+    [11, 2],
+    [30, 3],
+    [41, 5],
+  ])('counts %i complete-history entries as %i pages read', async (count, pagesRead) => {
+    const entry = page([], null).entries[0];
+    const entries = Array.from({ length: count }, () => entry);
+    source.mockImplementation(() => Response.json({ schemaVersion: 1, entries, nextPage: null }));
+    const response = await GET(request());
+    const body = await response.json();
+    expect(body.coverage).toEqual({ pagesRead, maxPages: 5, nextPage: null, truncated: false });
   });
 
   it('keeps missing published comparison media distinct from an empty successful matched case list', async () => {
@@ -287,11 +424,9 @@ describe('published VideoGenX dashboard projection', () => {
   it('pairs published cases, clamps the requested index and excludes asset URLs and raw documents', async () => {
     const saved = storedServingArtifact();
     source.mockImplementation((req: NextRequest) =>
-      Response.json(
-        req.nextUrl.searchParams.get('format') === 'published'
-          ? saved
-          : pages[Number(req.nextUrl.searchParams.get('page')) - 1],
-      ),
+      req.nextUrl.searchParams.get('format') === 'published'
+        ? Response.json(saved)
+        : historyResponse(req),
     );
     const response = await GET(request('view=compare&v_case=9999'));
     const body = await response.json();
@@ -337,7 +472,7 @@ describe('published VideoGenX dashboard projection', () => {
     source.mockImplementation((req: NextRequest) =>
       req.nextUrl.searchParams.get('format') === 'published'
         ? Response.json({ error: 'secret-token' }, { status: 503 })
-        : Response.json(pages[Number(req.nextUrl.searchParams.get('page')) - 1]),
+        : historyResponse(req),
     );
     const compareResponse = await GET(request('view=compare'));
     const body = await compareResponse.json();

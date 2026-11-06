@@ -4,8 +4,8 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import { normalizeArtifactRows } from '@/app/api/unofficial-run/route';
 
+import { buildChartData } from './unofficial-chart-data';
 import {
-  buildChartData,
   overlaySelectionReducer,
   parseAvailableModelsAndSequences,
   parseUnofficialRunIds,
@@ -190,6 +190,37 @@ describe('buildChartData', () => {
     expect(total.tpPerGpu.y).toBe(900);
     expect(uncached.tpPerGpu.y).toBeCloseTo(660);
     expect(uncached.inputTputPerGpu?.y).toBeCloseTo(60);
+  });
+
+  it('rescales disaggregated overlay input/output rates on the total chip basis', () => {
+    const rows = [
+      stubRow({
+        hardware: 'gb300',
+        framework: 'dynamo-sglang',
+        disagg: true,
+        is_multinode: true,
+        prefill_num_workers: 1,
+        decode_num_workers: 1,
+        num_prefill_gpu: 4,
+        num_decode_gpu: 12,
+        isl: 1024,
+        osl: 1024,
+        metrics: {
+          tput_per_gpu: 1000,
+          output_tput_per_gpu: 133,
+          input_tput_per_gpu: 3600,
+          median_intvty: 50,
+          median_e2el: 1,
+        },
+      }),
+    ];
+    const [key] = Object.keys(buildChartData(rows));
+    const pool = buildChartData(rows)[key].interactivity.data[0];
+    const total = buildChartData(rows, 'total', 'total')[key].interactivity.data[0];
+    expect(pool.outputTputPerGpu?.y).toBe(133);
+    expect(total.outputTputPerGpu?.y).toBeCloseTo((133 * 12) / 16, 9);
+    expect(total.inputTputPerGpu?.y).toBeCloseTo(900, 9);
+    expect(total.tpPerGpu.y).toBe(1000);
   });
 
   it('maps DB model key to display name in chart data keys', () => {

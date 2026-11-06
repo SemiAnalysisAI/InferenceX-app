@@ -24,12 +24,3 @@ export function createAdminSql(
     ssl: connection.ssl,
   });
 }
-
-export async function refreshLatestBenchmarks(sql: Sql, concurrently = true): Promise<void> {
-  process.stdout.write('  Refreshing latest_benchmarks materialized view...');
-  const t0 = Date.now();
-  await (concurrently
-    ? sql`REFRESH MATERIALIZED VIEW CONCURRENTLY latest_benchmarks`
-    : sql`REFRESH MATERIALIZED VIEW latest_benchmarks`);
-  console.log(` ${Math.round((Date.now() - t0) / 1000)}s`);
-}

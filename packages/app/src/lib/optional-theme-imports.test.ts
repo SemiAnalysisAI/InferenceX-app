@@ -23,7 +23,7 @@ function imports(text: string): string[] {
     'module.tsx',
     text,
     ts.ScriptTarget.Latest,
-    true,
+    false,
     ts.ScriptKind.TSX,
   );
   const result: string[] = [];
@@ -58,6 +58,8 @@ function imports(text: string): string[] {
   return result;
 }
 
+const resolvedBases = new Map<string, string | undefined>();
+
 function resolve(from: string, specifier: string): string | undefined {
   const base = specifier.startsWith('@/')
     ? path.join(src, specifier.slice(2))
@@ -65,9 +67,14 @@ function resolve(from: string, specifier: string): string | undefined {
       ? path.resolve(path.dirname(from), specifier)
       : undefined;
   if (!base) return;
-  return ['', '.ts', '.tsx', '.js', '.jsx', '.css', '/index.ts', '/index.tsx']
-    .map((extension) => base + extension)
-    .find((candidate) => existsSync(candidate) && statSync(candidate).isFile());
+  if (!resolvedBases.has(base))
+    resolvedBases.set(
+      base,
+      ['', '.ts', '.tsx', '.js', '.jsx', '.css', '/index.ts', '/index.tsx']
+        .map((extension) => base + extension)
+        .find((candidate) => existsSync(candidate) && statSync(candidate).isFile()),
+    );
+  return resolvedBases.get(base);
 }
 
 function routeEntries(directory: string): string[] {

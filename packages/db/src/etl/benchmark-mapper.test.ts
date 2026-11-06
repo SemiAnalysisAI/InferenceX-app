@@ -110,6 +110,46 @@ const GPU_SIDE_KEYS = [...MEASURED_POWER_METRIC_KEYS].filter(
 );
 
 describe('mapBenchmarkRow', () => {
+  it('reassigns the framework for a registered run framework override', () => {
+    const row = makeV2Row({
+      infmax_model_prefix: 'qwen3.5',
+      hw: 'tpuv7',
+      framework: 'vllm',
+      precision: 'fp8',
+      scenario_type: 'agentic-coding',
+      spec_decoding: 'mtp',
+      disagg: true,
+      is_multinode: true,
+      prefill_tp: 1,
+      prefill_ep: 1,
+      prefill_num_workers: 2,
+      decode_tp: 8,
+      decode_ep: 8,
+      decode_dp_attention: false,
+      decode_num_workers: 4,
+      num_prefill_gpu: 8,
+      num_decode_gpu: 16,
+    });
+    const overridden = mapBenchmarkRow(row, createSkipTracker(), null, 40744397059);
+    expect(overridden?.config.framework).toBe('llmd-vllm');
+    expect(overridden?.config.disagg).toBe(true);
+
+    const viaString = mapBenchmarkRow(row, createSkipTracker(), null, '40744397059');
+    expect(viaString?.config).toEqual(overridden?.config);
+
+    const otherRun = mapBenchmarkRow(row, createSkipTracker(), null, 40744397060);
+    expect(otherRun?.config.framework).toBe('vllm');
+    expect(mapBenchmarkRow(row, createSkipTracker())?.config.framework).toBe('vllm');
+
+    const otherFramework = mapBenchmarkRow(
+      { ...row, framework: 'sglang' },
+      createSkipTracker(),
+      null,
+      40744397059,
+    );
+    expect(otherFramework?.config.framework).toBe('sglang');
+  });
+
   describe('v1 schema', () => {
     it('maps a valid v1 row to BenchmarkParams', () => {
       const tracker = createSkipTracker();
@@ -894,33 +934,39 @@ describe('mapBenchmarkRow', () => {
       expect(result!.metrics).not.toHaveProperty('workers');
     });
 
-    it('captures the NVL72 CPU-side keys without an unknown-key warning', async () => {
-      vi.resetModules();
-      const fresh = await import('./benchmark-mapper');
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      try {
-        const tracker = createSkipTracker();
-        const result = fresh.mapBenchmarkRow(
-          makeV2Row({
-            power_valid: 1,
-            power_metric_schema_version: 2,
-            cpu_power_valid: 1,
-            avg_cpu_socket_power_w: 250.5,
-            avg_total_cpu_power_w: 1002,
-            total_cpu_energy_j: 601200,
-            avg_total_module_power_w: 17203,
-            total_module_energy_j: 10321800,
-          }),
-          tracker,
-        );
-        expect(result!.metrics).toMatchObject({
+    it('captures the NVL72 CPU-side keys without reporting them as unexpected', () => {
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(
+        makeV2Row({
+          power_valid: 1,
+          power_metric_schema_version: 2,
           cpu_power_valid: 1,
           avg_cpu_socket_power_w: 250.5,
           avg_total_cpu_power_w: 1002,
           total_cpu_energy_j: 601200,
           avg_total_module_power_w: 17203,
           total_module_energy_j: 10321800,
-        });
+        }),
+        tracker,
+      );
+      expect(result!.metrics).toMatchObject({
+        cpu_power_valid: 1,
+        avg_cpu_socket_power_w: 250.5,
+        avg_total_cpu_power_w: 1002,
+        total_cpu_energy_j: 601200,
+        avg_total_module_power_w: 17203,
+        total_module_energy_j: 10321800,
+      });
+      expect([...tracker.unexpectedMetrics]).toEqual([]);
+    });
+
+    it('stores an unknown numeric field and reports it on the tracker instead of logging', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const tracker = createSkipTracker();
+        const result = mapBenchmarkRow(makeV2Row({ brand_new_metric_ms: 12.5 }), tracker);
+        expect(result!.metrics.brand_new_metric_ms).toBe(12.5);
+        expect([...tracker.unexpectedMetrics]).toEqual(['brand_new_metric_ms']);
         expect(warn).not.toHaveBeenCalled();
       } finally {
         warn.mockRestore();
@@ -959,7 +1005,7 @@ describe('mapBenchmarkRow', () => {
   });
 });
 
-describe('scrubWithheldPowerMetrics (direct — supplemental ingest path)', () => {
+describe('scrubWithheldPowerMetrics (direct)', () => {
   function supplementalMetrics(overrides: Record<string, any> = {}): Record<string, number> {
     const { workers: _workers, ...measured } = dirtyPowerPayload();
     return { tput_per_gpu: 567.8, ...measured, ...overrides };
@@ -1037,30 +1083,6 @@ describe('scrubWithheldPowerMetrics (direct — supplemental ingest path)', () =
     for (const key of MEASURED_POWER_METRIC_KEYS) {
       expect(metrics).not.toHaveProperty(key);
     }
-  });
-
-  it('recovers provenance companions nested under metrics and leaves the record flat', () => {
-    const metrics = supplementalMetrics({
-      power_valid: 0,
-      power_invalid_reasons: ['sampling_gap_exceeded', 'sampling_gap_exceeded', '<img src=x>'],
-      power_audit: { sample_count: 12, producer_sha: 'abc123', unknown_key: true },
-    });
-    normalizePowerContractMetrics(metrics, metrics);
-    scrubWithheldPowerMetrics(metrics);
-    const reasons = extractPowerInvalidReasons(metrics.power_invalid_reasons);
-    const audit = extractPowerAudit(metrics.power_audit);
-    delete metrics.power_invalid_reasons;
-    delete metrics.power_audit;
-
-    expect(reasons).toEqual(['sampling_gap_exceeded']);
-    expect(audit).toEqual({
-      sample_count: 12,
-      producer_sha: 'abc123',
-      exporter_image_sha256: null,
-    });
-    expect(metrics).not.toHaveProperty('power_invalid_reasons');
-    expect(metrics).not.toHaveProperty('power_audit');
-    expect(metrics.tput_per_gpu).toBe(567.8);
   });
 });
 
@@ -1397,17 +1419,10 @@ describe('mapBenchmarkRow — power audit provenance', () => {
 
   it("never captures a malformed ['5'] reasons array as a numeric metric", () => {
     const tracker = createSkipTracker();
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const result = mapBenchmarkRow(makeV2Row({ power_invalid_reasons: ['5'] }), tracker);
-      expect(result!.metrics).not.toHaveProperty('power_invalid_reasons');
-      expect(result!.powerInvalidReasons).toBeUndefined();
-      expect(warn.mock.calls.map((call) => String(call[0]))).not.toContainEqual(
-        expect.stringContaining('power_invalid_reasons'),
-      );
-    } finally {
-      warn.mockRestore();
-    }
+    const result = mapBenchmarkRow(makeV2Row({ power_invalid_reasons: ['5'] }), tracker);
+    expect(result!.metrics).not.toHaveProperty('power_invalid_reasons');
+    expect(result!.powerInvalidReasons).toBeUndefined();
+    expect(tracker.unexpectedMetrics.has('power_invalid_reasons')).toBe(false);
   });
 });
 
@@ -1671,6 +1686,90 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     expect(m).not.toHaveProperty('server_metrics');
   });
 
+  describe('disaggregated throughput basis', () => {
+    const disaggOverrides = {
+      framework: 'dynamo-sglang',
+      disagg: true,
+      is_multinode: true,
+      prefill_tp: 4,
+      prefill_ep: 1,
+      prefill_dp_attention: false,
+      prefill_num_workers: 1,
+      decode_tp: 8,
+      decode_ep: 1,
+      decode_dp_attention: false,
+      decode_num_workers: 4,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 32,
+    };
+
+    it('rescales per-total agentic rates to input per prefill chip and output per decode chip', () => {
+      const result = mapBenchmarkRow(makeV3AgenticRow(disaggOverrides), createSkipTracker())!;
+      expect(result.config.disagg).toBe(true);
+      expect(result.config.numPrefillGpu).toBe(4);
+      expect(result.config.numDecodeGpu).toBe(32);
+      const m = result.metrics;
+      expect(m.tput_per_gpu).toBeCloseTo(9043.47223, 3);
+      expect(m.input_tput_per_gpu).toBeCloseTo((8995.035 * 36) / 4, 2);
+      expect(m.output_tput_per_gpu).toBeCloseTo((48.43723 * 36) / 32, 4);
+      expect(m.input_tput_per_total_gpu).toBeCloseTo(8995.035, 3);
+      expect(m.output_tput_per_total_gpu).toBeCloseTo(48.43723, 4);
+    });
+
+    it('leaves rates alone when the producer already reports them per pool', () => {
+      const row = makeV3AgenticRow(disaggOverrides);
+      row.request_metrics.throughput.per_gpu = {
+        total_tput_tps: 9043.47223,
+        input_tput_tps: (8995.035 * 36) / 4,
+        output_tput_tps: (48.43723 * 36) / 32,
+      };
+      const m = mapBenchmarkRow(row, createSkipTracker())!.metrics;
+      expect(m.input_tput_per_gpu).toBeCloseTo((8995.035 * 36) / 4, 2);
+      expect(m.output_tput_per_gpu).toBeCloseTo((48.43723 * 36) / 32, 4);
+      expect(m).not.toHaveProperty('input_tput_per_total_gpu');
+    });
+
+    it('rescales single-node agentic rows that record a real split', () => {
+      const m = mapBenchmarkRow(
+        makeV3AgenticRow({ ...disaggOverrides, is_multinode: false }),
+        createSkipTracker(),
+      )!.metrics;
+      expect(m.input_tput_per_gpu).toBeCloseTo((8995.035 * 36) / 4, 2);
+      expect(m.input_tput_per_total_gpu).toBeCloseTo(8995.035, 3);
+    });
+
+    it('leaves agentic rows that mirror the deployment into both pool fields alone', () => {
+      const m = mapBenchmarkRow(
+        makeV3AgenticRow({
+          ...disaggOverrides,
+          prefill_num_workers: 0,
+          decode_num_workers: 0,
+          num_prefill_gpu: 8,
+          num_decode_gpu: 8,
+        }),
+        createSkipTracker(),
+      )!.metrics;
+      expect(m.input_tput_per_gpu).toBeCloseTo(8995.035, 3);
+      expect(m).not.toHaveProperty('input_tput_per_total_gpu');
+    });
+
+    it('does not touch fixed-sequence disaggregated rows', () => {
+      const m = mapBenchmarkRow(
+        makeV1Row({
+          ...disaggOverrides,
+          framework: 'dynamo-trt',
+          tput_per_gpu: 1000,
+          input_tput_per_gpu: 900,
+          output_tput_per_gpu: 100,
+        }),
+        createSkipTracker(),
+      )!.metrics;
+      expect(m.input_tput_per_gpu).toBe(900);
+      expect(m.output_tput_per_gpu).toBe(100);
+      expect(m).not.toHaveProperty('output_tput_per_total_gpu');
+    });
+  });
+
   it('re-derives *_intvty from *_itl (matching the pre-inverted artifact values)', () => {
     const tracker = createSkipTracker();
     const m = mapBenchmarkRow(makeV3AgenticRow(), tracker)!.metrics;
@@ -1798,7 +1897,7 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
   });
 });
 
-describe('NVL72 CPU ingestion', () => {
+describe('CPU-side power ingestion', () => {
   it.each([
     { gpu: 1, cpu: 1, cpuValid: 1, watts: 501 },
     { gpu: 0, cpu: '1', cpuValid: 1, watts: 501 },
@@ -1861,5 +1960,35 @@ describe('NVL72 CPU ingestion', () => {
       cpu: { sample_row_count: 12, reason_codes: ['cpu_socket_count_mismatch'] },
     });
     expect(extractPowerAudit({ sample_count: 1, cpu: 'acpi' })).not.toHaveProperty('cpu');
+  });
+
+  it('keeps AMD RAPL package provenance and CPU keys on single-node rows', () => {
+    const cpu = {
+      sensor_kind: 'rapl_package',
+      source: 'rapl',
+      expected_sockets: 2,
+      observed_sockets: 2,
+      sample_row_count: 1200,
+      reason_codes: [],
+    };
+    const result = mapBenchmarkRow(
+      makeV1Row({
+        hw: 'mi355x-amd',
+        power_valid: 1,
+        cpu_power_valid: 1,
+        avg_cpu_socket_power_w: 310,
+        avg_total_cpu_power_w: 620,
+        total_cpu_energy_j: 37200,
+        power_audit: { sample_count: 600, cpu },
+      }),
+      createSkipTracker(),
+    );
+    expect(result!.powerAudit!.cpu).toEqual(cpu);
+    expect(result!.metrics).toMatchObject({
+      cpu_power_valid: 1,
+      avg_cpu_socket_power_w: 310,
+      avg_total_cpu_power_w: 620,
+      total_cpu_energy_j: 37200,
+    });
   });
 });

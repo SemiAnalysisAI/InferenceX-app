@@ -1,14 +1,17 @@
 import type { ComparisonCase, ComparisonOp, ComparisonView, ComputePrecision } from './compare';
-import { parallelLabel } from './describe';
+import { splitSuffix } from './describe';
 
 export function sliceKey(op: ComparisonOp, c: ComparisonCase): string {
   if (op === 'gemm') {
     // Only split cases pay for parsing; GEMM workloads hold thousands of single-device cases.
     const split = c.key.includes('"parallel"')
-      ? parallelLabel(JSON.parse(c.key) as Record<string, unknown>)
+      ? splitSuffix(JSON.parse(c.key) as Record<string, unknown>)
       : '';
     return `N=${c.dims.n} K=${c.dims.k}${split} · ${c.precision}`;
   }
+  // attention: the same module, query length and context at every request count
+  if (op === 'attention')
+    return `${c.shape.replaceAll(/(?<lead>^|· |\+ )\d+×/gu, '$<lead>')} · ${c.precision}`;
   return `${c.shape.replace(/^T=\d+ /u, '')} · ${c.precision}`;
 }
 
@@ -16,7 +19,9 @@ export function slices(op: ComparisonOp, cases: ComparisonCase[]): Map<string, n
   const out = new Map<string, number[]>();
   cases.forEach((c, i) => {
     const k = sliceKey(op, c);
-    out.set(k, [...(out.get(k) ?? []), i]);
+    const indices = out.get(k);
+    if (indices) indices.push(i);
+    else out.set(k, [i]);
   });
   return out;
 }

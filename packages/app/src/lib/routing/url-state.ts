@@ -15,6 +15,7 @@ const URL_STATE_KEYS = [
   'g_rundate',
   'g_runid',
   'g_tco',
+  'g_chips',
   'i_seq',
   'i_prec',
   'i_metric',
@@ -107,6 +108,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   g_rundate: '',
   g_runid: '',
   g_tco: 'internal',
+  g_chips: 'pool',
   i_seq: '',
   i_prec: '',
   i_metric: '',
@@ -310,6 +312,7 @@ function collectTabParams(): URLSearchParams {
   const profitKeys: readonly string[] = Object.values(PROFIT_ROUTE_PARAMS);
   for (const [key, value] of Object.entries(currentState)) {
     if (
+      route?.key !== 'video' &&
       prefixes.some((p) => key.startsWith(p)) &&
       (!onProfitRoute || key === 'g_model' || profitKeys.includes(key))
     ) {
@@ -328,11 +331,11 @@ function collectTabParams(): URLSearchParams {
   }
 
   const liveParams = profitRouteSearch(window.location.pathname, window.location.search);
-  // The video dashboard keeps its `v_` state in the address bar, not in
-  // currentState, so routes that share that scope read it live.
+  // Video controls own their URL state; share every registered video scope
+  // from the live address bar, including the results view's r_ parameters.
   if (prefixes.some((prefix) => prefix === 'v_')) {
     for (const [key, value] of liveParams) {
-      if (key.startsWith('v_') && !filtered.has(key)) filtered.set(key, value);
+      if (prefixes.some((prefix) => key.startsWith(prefix))) filtered.set(key, value);
     }
   }
 

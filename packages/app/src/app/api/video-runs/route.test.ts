@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GET, POST } from './route';
+import { clearVideoReadCache } from '@/lib/video/video-read-cache';
+import { publishedVideoHistory, recordVideoHistory } from '@/lib/video/video-history-store';
 import {
   approveVideoPublication,
-  publishedVideoHistory,
   readStoredArtifact,
   storedArtifacts,
   storeVideoArtifact,
@@ -13,12 +14,15 @@ import {
 vi.mock('@/lib/video/video-storage', () => ({
   approveVideoPublication: vi.fn(),
   videoStorageEnabled: vi.fn(() => false),
-  publishedVideoHistory: vi.fn(() =>
-    Promise.resolve({ schemaVersion: 1, entries: [], nextPage: null }),
-  ),
   storedArtifacts: vi.fn(() => Promise.resolve([])),
   readStoredArtifact: vi.fn(),
   storeVideoArtifact: vi.fn(),
+}));
+vi.mock('@/lib/video/video-history-store', () => ({
+  publishedVideoHistory: vi.fn(() =>
+    Promise.resolve({ schemaVersion: 1, entries: [], nextPage: null }),
+  ),
+  recordVideoHistory: vi.fn(() => Promise.resolve({ entries: 1, built: 1, skipped: 0 })),
 }));
 const fetchMock = vi.fn<typeof fetch>();
 vi.stubGlobal('fetch', fetchMock);
@@ -30,11 +34,16 @@ const post = (body: unknown, secret = 'test-secret') =>
     headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+const HOUR_MS = 60 * 60 * 1000;
+vi.useFakeTimers({ toFake: ['Date'] });
 afterEach(() => {
+  clearVideoReadCache();
+  vi.setSystemTime(Date.now() + 2 * HOUR_MS);
   fetchMock.mockReset();
   vi.mocked(videoStorageEnabled).mockReturnValue(false);
   vi.mocked(storedArtifacts).mockResolvedValue([]);
   vi.mocked(publishedVideoHistory).mockClear();
+  vi.mocked(recordVideoHistory).mockClear();
   vi.mocked(readStoredArtifact).mockReset();
   vi.mocked(storeVideoArtifact).mockClear();
   vi.mocked(approveVideoPublication).mockReset();
@@ -42,7 +51,93 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe('repository visibility on reads', () => {
+  it('trusts a public answer for one hour and asks again after it', async () => {
+    fetchMock.mockResolvedValue(response({ private: false }));
+    await GET(request('?format=history&page=1'));
+    vi.setSystemTime(Date.now() + HOUR_MS - 1);
+    await GET(request('?format=history&page=1'));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.setSystemTime(Date.now() + 2);
+    fetchMock.mockResolvedValue(response({ private: true }));
+    const result = await GET(request('?format=history&page=1'));
+    expect(result.status).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('asks again on every read while the repository is not public', async () => {
+    fetchMock.mockResolvedValue(response({ private: true }));
+    await GET(request('?format=history&page=1'));
+    await GET(request('?format=history&page=1'));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('H3 CI artifact access', () => {
+  it('keeps metadata-only fixture media reads local instead of falling through to production', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('E2E_FIXTURES', '1');
+    const result = await GET(request('?run=10&artifact=20&format=published'));
+    expect(result.status).toBe(204);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('reuses History for 30 seconds without bypassing the visibility check', async () => {
+    fetchMock.mockImplementation(() => Promise.resolve(response({ private: true })));
+    const hidden = [await GET(request('?format=history')), await GET(request('?format=history'))];
+    expect(hidden.map((result) => result.status)).toEqual([503, 503]);
+    fetchMock.mockImplementation(() => Promise.resolve(response({ private: false })));
+    const served = await GET(request('?format=history'));
+    expect(served.status).toBe(200);
+    expect(publishedVideoHistory).toHaveBeenCalledTimes(1);
+    await GET(request('?format=history&page=1&pages=5'));
+    expect(publishedVideoHistory).toHaveBeenLastCalledWith(1, 5);
+    vi.setSystemTime(Date.now() + 30_000);
+    const expiredResult = await GET(request('?format=history'));
+    expect(expiredResult.headers.get('cache-control')).toBe('private, no-store');
+    expect(publishedVideoHistory).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not retain a failed History read', async () => {
+    fetchMock.mockImplementation(() => Promise.resolve(response({ private: false })));
+    vi.mocked(publishedVideoHistory).mockRejectedValueOnce(new Error('Unavailable'));
+    const failed = await GET(request('?format=history'));
+    const retried = await GET(request('?format=history'));
+    expect(failed.status).toBe(502);
+    expect(retried.status).toBe(200);
+    expect(publishedVideoHistory).toHaveBeenCalledTimes(2);
+  });
+
+  it('bounds retained History pages instead of accumulating arbitrary page keys', async () => {
+    fetchMock.mockImplementation(() => Promise.resolve(response({ private: false })));
+    for (let page = 1; page <= 33; page++) await GET(request(`?format=history&page=${page}`));
+    await GET(request('?format=history&page=33'));
+    expect(publishedVideoHistory).toHaveBeenCalledTimes(33);
+    await GET(request('?format=history&page=1'));
+    expect(publishedVideoHistory).toHaveBeenCalledTimes(34);
+  });
+
+  it('rereads unapproved History because approval lookup failures also appear as unapproved', async () => {
+    fetchMock.mockImplementation(() => Promise.resolve(response({ private: false })));
+    vi.mocked(publishedVideoHistory).mockResolvedValueOnce({
+      schemaVersion: 1,
+      nextPage: null,
+      entries: [
+        {
+          id: '10.20',
+          runId: '10',
+          artifact: { id: 20, name: 'h3-results-10-1', expired: false, size_in_bytes: 1 },
+          approved: false,
+          publishedAt: null,
+          sources: [],
+          error: null,
+        },
+      ],
+    });
+    await GET(request('?format=history'));
+    await GET(request('?format=history'));
+    expect(publishedVideoHistory).toHaveBeenCalledTimes(2);
+  });
+
   it('never serves synthetic History approval in production when fixture mode is set', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('E2E_FIXTURES', '1');
@@ -50,7 +145,7 @@ describe('H3 CI artifact access', () => {
     const result = await GET(request('?format=history&page=1'));
     expect(result.headers.get('x-videogenx-replay')).toBeNull();
     expect(await result.json()).toEqual({ schemaVersion: 1, entries: [], nextPage: null });
-    expect(publishedVideoHistory).toHaveBeenCalledWith(1);
+    expect(publishedVideoHistory).toHaveBeenCalledWith(1, 1);
   });
 
   it('serves synthetic History only in development fixture mode', async () => {
@@ -66,9 +161,45 @@ describe('H3 CI artifact access', () => {
     fetchMock.mockResolvedValueOnce(response({ private: false }));
     const result = await GET(request('?format=history&page=2'));
     expect(await result.json()).toEqual({ schemaVersion: 1, entries: [], nextPage: null });
-    expect(publishedVideoHistory).toHaveBeenCalledWith(2);
+    expect(publishedVideoHistory).toHaveBeenCalledWith(2, 1);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(storeVideoArtifact).not.toHaveBeenCalled();
+    expect(recordVideoHistory).not.toHaveBeenCalled();
+  });
+
+  it('reads up to five History pages in one request and rejects any other page count', async () => {
+    fetchMock.mockResolvedValue(response({ private: false }));
+    const result = await GET(request('?format=history&page=1&pages=5'));
+    expect(result.status).toBe(200);
+    expect(publishedVideoHistory).toHaveBeenCalledWith(1, 5);
+    const invalid = await Promise.all(
+      [
+        '?format=history&pages=6',
+        '?format=history&pages=0',
+        '?format=history&pages=01',
+        '?format=history&pages=x',
+        '?page=1&pages=2',
+        '?run=10&pages=2',
+      ].map((query) => GET(request(query))),
+    );
+    expect(invalid.map((item) => item.status)).toEqual([400, 400, 400, 400, 400, 400]);
+    expect(publishedVideoHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it('withholds History when the repository is no longer public', async () => {
+    vi.mocked(publishedVideoHistory).mockRejectedValueOnce(new Error('blob unavailable'));
+    fetchMock.mockResolvedValueOnce(response({ private: true }));
+    const result = await GET(request('?format=history&page=1&pages=5'));
+    expect(result.status).toBe(503);
+    vi.mocked(publishedVideoHistory).mockResolvedValueOnce({
+      schemaVersion: 1,
+      entries: [],
+      nextPage: 2,
+    });
+    fetchMock.mockResolvedValueOnce(response({ private: true }));
+    const hidden = await GET(request('?format=history&page=1'));
+    expect(hidden.status).toBe(503);
+    expect(await hidden.json()).toEqual({ error: 'Public H3 repository unavailable' });
   });
 
   it('discovers benchmark runs without including branch-named unit jobs', async () => {
@@ -199,10 +330,12 @@ describe('H3 CI artifact access', () => {
     const saved = { storageVersion: 1 as const, runId: '10', artifact, sources: [] };
     vi.mocked(storedArtifacts).mockResolvedValue([artifact]);
     vi.mocked(readStoredArtifact).mockResolvedValue(saved);
-    fetchMock.mockResolvedValueOnce(response({ private: false }));
+    fetchMock.mockImplementation(() => Promise.resolve(response({ private: false })));
     const result = await GET(request('?run=10&artifact=20&format=media'));
     expect(await result.json()).toEqual(saved);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const repeated = await GET(request('?run=10&artifact=20&format=published'));
+    expect(await repeated.json()).toEqual(saved);
+    expect(readStoredArtifact).toHaveBeenCalledTimes(1);
   });
   it('retains stored artifacts after GitHub removes them from the run', async () => {
     const artifact = {
@@ -286,6 +419,11 @@ describe('H3 published results in development', () => {
   it.each([
     ['?run=10', { run: { id: 10 }, artifacts: [saved.artifact] }, '?run=10'],
     ['?page=2', { runs: [{ id: 10 }], nextPage: 3 }, '?page=2'],
+    [
+      '?format=history&pages=5',
+      { schemaVersion: 1, entries: [], nextPage: null },
+      '?format=history&page=1&pages=5',
+    ],
   ])(
     'reuses published discovery for %s, including retained artifacts',
     async (query, data, upstream) => {
@@ -409,6 +547,9 @@ describe('explicit H3 publication', () => {
     vi.mocked(videoStorageEnabled).mockReturnValue(true);
     vi.mocked(readStoredArtifact).mockResolvedValue(saved as never);
     vi.mocked(approveVideoPublication).mockResolvedValue(receipt as never);
+    fetchMock.mockResolvedValueOnce(response({ private: false }));
+    await GET(request('?format=history'));
+    fetchMock.mockClear();
     fetchMock
       .mockResolvedValueOnce(response({ private: false }))
       .mockResolvedValueOnce(response(artifact));
@@ -425,6 +566,48 @@ describe('explicit H3 publication', () => {
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(storeVideoArtifact).not.toHaveBeenCalled();
+    await GET(request('?format=history'));
+    expect(publishedVideoHistory).toHaveBeenCalledTimes(2);
+    expect(recordVideoHistory).toHaveBeenCalledExactlyOnceWith(saved);
+    expect(vi.mocked(recordVideoHistory).mock.invocationCallOrder[0]).toBeGreaterThan(
+      vi.mocked(approveVideoPublication).mock.invocationCallOrder[0],
+    );
+  });
+
+  it('reports a publication whose History entry was not recorded as failed', async () => {
+    vi.stubEnv('INVALIDATE_SECRET', 'test-secret');
+    vi.mocked(videoStorageEnabled).mockReturnValue(true);
+    vi.mocked(readStoredArtifact).mockResolvedValue(saved as never);
+    vi.mocked(approveVideoPublication).mockResolvedValue(receipt as never);
+    vi.mocked(recordVideoHistory).mockRejectedValueOnce(new Error('snapshot write failed'));
+    fetchMock
+      .mockResolvedValueOnce(response({ private: false }))
+      .mockResolvedValueOnce(response(artifact));
+    const result = await POST(post({ runId: '10', artifactId: '20', mergeRunId: '99' }));
+    expect(result.status).toBe(502);
+  });
+
+  it('backfills History only for an authorized exact backfill request', async () => {
+    vi.stubEnv('INVALIDATE_SECRET', 'test-secret');
+    vi.mocked(videoStorageEnabled).mockReturnValue(true);
+    const unauthorized = await POST(post({ history: 'backfill' }, 'wrong'));
+    expect(unauthorized.status).toBe(401);
+    const rejected = await Promise.all(
+      [{ history: 'backfill', runId: '10' }, { history: 'rebuild' }].map((body) =>
+        POST(post(body)),
+      ),
+    );
+    expect(rejected.map((item) => item.status)).toEqual([400, 400]);
+    expect(recordVideoHistory).not.toHaveBeenCalled();
+    const result = await POST(post({ history: 'backfill' }));
+    expect(result.status).toBe(200);
+    expect(await result.json()).toEqual({ entries: 1, built: 1, skipped: 0 });
+    expect(recordVideoHistory).toHaveBeenCalledExactlyOnceWith(null);
+    vi.mocked(recordVideoHistory).mockRejectedValueOnce(new Error('list failed'));
+    const failed = await POST(post({ history: 'backfill' }));
+    expect(failed.status).toBe(502);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(approveVideoPublication).not.toHaveBeenCalled();
   });
 
   it('downloads only the named artifact on an authorized cold publication', async () => {

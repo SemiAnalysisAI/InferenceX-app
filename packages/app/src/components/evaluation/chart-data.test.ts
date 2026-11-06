@@ -44,6 +44,33 @@ function evalRow(overrides: Partial<EvalRow> = {}): EvalRow {
 }
 
 describe('buildEvaluationChartRows', () => {
+  it('counts legacy unsplit disaggregated deployments once and real splits as both pools', () => {
+    const chips = (overrides: Partial<EvalRow>) =>
+      buildEvaluationChartRows(
+        [
+          evalRow({
+            disagg: true,
+            framework: 'dynamo-sglang',
+            metrics: { em_strict: 0.8 },
+            ...overrides,
+          }),
+        ],
+        'gsm8k',
+        Model.DeepSeek_R1,
+        [Precision.FP8],
+        '2026-12-31',
+      )[0]?.physicalChips;
+    expect(chips({ num_prefill_gpu: 36, num_decode_gpu: 36 })).toBe(36);
+    expect(
+      chips({
+        num_prefill_gpu: 4,
+        num_decode_gpu: 12,
+        prefill_num_workers: 1,
+        decode_num_workers: 3,
+      }),
+    ).toBe(16);
+  });
+
   it('maps official rows for the selected benchmark/model/precision and date cutoff', () => {
     const rows = [
       evalRow({ config_id: 1, date: '2026-03-01', metrics: { em_strict: 0.8 } }),

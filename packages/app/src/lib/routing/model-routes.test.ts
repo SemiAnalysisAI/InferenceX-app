@@ -10,7 +10,6 @@ import {
   modelRoutePathnameRewrite,
   modelRouteAvailableForTab,
   modelRoutesForTab,
-  pathWithSearchParams,
   modelRouteSlug,
   parseModelRoutePathname,
   resolveModelRouteSlug,
@@ -178,10 +177,10 @@ describe('modelRoutesForTab', () => {
   it('serves Kimi K3, GLM 5.2/5.3, MiniMax M3, DeepSeek V4 Pro and DeepSeek V4.1 Flash on the profit estimators and every model elsewhere', () => {
     for (const tab of ['profit-estimator', 'profit-estimator-per-gigawatt'] as const) {
       expect(modelRoutesForTab(tab).map((route) => route.model)).toEqual([
-        Model.Kimi_K3,
         Model.DeepSeek_V4_1_Flash,
         Model.GLM_5_2,
         Model.DeepSeek_V4_Pro,
+        Model.Kimi_K3,
         Model.MiniMax_M3,
       ]);
       expect(modelRouteAvailableForTab(tab, Model.Qwen3_5)).toBe(false);
@@ -228,21 +227,5 @@ describe('modelRoutePath', () => {
     for (const tab of MODEL_ROUTE_TABS) {
       expect(modelRoutePath(tab, 'kimi-k3')).toBe(`/${tab}/kimi-k3`);
     }
-  });
-});
-
-describe('pathWithSearchParams', () => {
-  it('returns the bare path when there are no params', () => {
-    expect(pathWithSearchParams('/calculator/kimi-k26', {})).toBe('/calculator/kimi-k26');
-  });
-
-  it('keeps share-link params, including repeated keys and reserved characters', () => {
-    expect(
-      pathWithSearchParams('/calculator/kimi-k26', {
-        i_seq: '8k/1k',
-        unofficialruns: ['a', 'b'],
-        missing: undefined,
-      }),
-    ).toBe('/calculator/kimi-k26?i_seq=8k%2F1k&unofficialruns=a&unofficialruns=b');
   });
 });

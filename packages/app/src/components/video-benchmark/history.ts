@@ -4,11 +4,14 @@ import { nativeHardware } from './hardware';
 import { storedBundle, storedFidelityBundle, type StoredArtifact } from './stored';
 import { isNativeH3, servingCells } from './serving';
 import { efficiencyValue, latencyValue, tradeoffPoints } from './tradeoff';
+import { resultsEvidence, type ResultsEvidence } from './results-evidence';
 
 /** Shared bound for dashboard history reads in the browser and view API. */
 export const VIDEO_HISTORY_MAX_PAGES = 5;
+export const VIDEO_HISTORY_PAGE_SIZE = 10;
 
 export interface VideoHistoryObservation {
+  results?: ResultsEvidence | null;
   id: string;
   cell: string | null;
   hardware: string;
@@ -35,6 +38,8 @@ export interface VideoHistoryObservation {
   /** Replicas behind the endpoint (`execution.deployment.replica_count`); null before that record existed. */
   replicas: number | null;
   wallSeconds: number | null;
+  /** Valid decoded output seconds per measurement wall-hour; absent in older projections. */
+  videoSecondsPerHour?: number | null;
   durationSeconds: number | null;
   frameCount: number | null;
   /** Summed mean board W over the recorded generation window; null when the power phase is invalid. */
@@ -139,6 +144,7 @@ export function videoHistoryEntry(
         }).map((point) => {
           const cell = cells.find((item) => item.id === point.cellId);
           return {
+            results: cell ? resultsEvidence(bundle, cell) : null,
             id: point.id,
             cell: point.cellId ?? null,
             hardware: point.hardware || result.hardware,
@@ -161,6 +167,7 @@ export function videoHistoryEntry(
             allocated: point.allocated,
             replicas: point.replicas,
             wallSeconds: point.wall,
+            videoSecondsPerHour: point.secondsRate,
             durationSeconds: number(at(point.workload, 'generation', 'duration_seconds')),
             frameCount: number(at(point.workload, 'generation', 'frame_count')),
             avgPowerW: point.power,

@@ -80,17 +80,19 @@ const recordShifts = () =>
 describe('PowerX tutorial layout stability', () => {
   it('keeps every widget box in place while the views API loads', () => {
     cy.viewport(390, 844);
+    const held = Promise.withResolvers<void>();
     cy.intercept({ pathname: '/api/v1/views/inference' }, (request) => {
       const metric = new URL(request.url).searchParams.get('metric') ?? '';
-      request.reply({
-        delay: 2000,
-        body: {
-          series: VIEWS[metric] ?? [],
-          xAxis: { label: 'Interactivity' },
-          metric: { label: metric, labelZh: metric, unit: null },
-          count: (VIEWS[metric] ?? []).length,
-        },
-      });
+      return held.promise.then(() =>
+        request.reply({
+          body: {
+            series: VIEWS[metric] ?? [],
+            xAxis: { label: 'Interactivity' },
+            metric: { label: metric, labelZh: metric, unit: null },
+            count: (VIEWS[metric] ?? []).length,
+          },
+        }),
+      );
     });
     // Phone-width columns and a desktop-width column, in both locales.
     cy.mount(
@@ -110,6 +112,7 @@ describe('PowerX tutorial layout stability', () => {
     );
     recordShifts().then((shifts) =>
       positions('[data-marker], [data-testid="powerx-ladder-source"]').then((before) => {
+        cy.then(() => held.resolve());
         cy.get('[data-testid="powerx-ladder-source"]').should(($sources) => {
           for (const source of $sources) expect(source.textContent).to.contain('tok/s/user');
         });

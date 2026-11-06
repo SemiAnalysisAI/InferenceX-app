@@ -5,7 +5,7 @@ import {
   type ServerMetricsContext,
 } from './server-metrics-adapters';
 
-export const CHART_SERIES_VERSION = 19;
+export const CHART_SERIES_VERSION = 20;
 
 export interface TimeSeriesPoint {
   t: number;
@@ -83,6 +83,9 @@ export const CHART_METRIC_KEYS = new Set([
   'vllm:prompt_tokens',
   'vllm:generation_tokens',
   'vllm:prompt_tokens_by_source',
+  'tokenspeed:kv_cache_usage_perc',
+  'tokenspeed:num_requests_running',
+  'tokenspeed:num_requests_waiting',
   'sglang:token_usage',
   'sglang:cached_tokens',
   'sglang:prompt_tokens',
@@ -635,6 +638,7 @@ function buildSeriesFromMetrics(
       'vllm:gpu_cache_usage_perc',
       'sglang:token_usage',
       'atom:kv_cache_usage_ratio',
+      'tokenspeed:kv_cache_usage_perc',
     ) ?? trtKv;
   const engines = resolveLogicalEngines(kvSeries, tOf);
   const kvCacheUsage: TimeSeriesPoint[] = averageAcrossEngines(engines);
@@ -679,12 +683,14 @@ function buildSeriesFromMetrics(
     'sglang:num_running_reqs',
     'atom:requests_running',
     'trtllm_num_requests_running',
+    'tokenspeed:num_requests_running',
   );
   const waitSeries = pickSeries(
     'vllm:num_requests_waiting',
     'sglang:num_queue_reqs',
     'atom:requests_waiting',
     'trtllm_num_requests_waiting',
+    'tokenspeed:num_requests_waiting',
   );
   const runOnGrid = summedSeries(runSeries, tOf, 'avg', tickS);
   const waitByT = byT(summedSeries(waitSeries, tOf, 'avg', tickS));

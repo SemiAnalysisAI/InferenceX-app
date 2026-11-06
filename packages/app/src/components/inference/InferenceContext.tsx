@@ -12,7 +12,7 @@ import {
   useState,
 } from 'react';
 
-import { DISPLAY_MODEL_TO_DB, rowToSequence } from '@semianalysisai/inferencex-constants';
+import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import {
@@ -83,7 +83,7 @@ import { useParetoHighlightToggle } from './hooks/useParetoHighlightToggle';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
-import { buildAvailabilityHwKey } from '@/lib/charts/chart-utils';
+import { datesOfLines, linesForModels } from '@/lib/benchmarks/availability-index';
 import {
   getHardwareConfig,
   getModelSortIndex,
@@ -132,7 +132,7 @@ import { resolveLabelState, serializeLabelState } from './utils/label-defaults';
 import { defaultInferenceHardware, defaultInferenceXAxisMode } from './utils/model-defaults';
 import { powerXViewFor } from './powerx/powerx-views';
 import { usePowerXSurface } from './ui/powerx-surface';
-import { bestSeriesPerSku, withUnrankedSkus } from './utils/best-series-per-sku';
+import { bestSeriesPerSku, skuColumns, withUnrankedSkus } from './utils/best-series-per-sku';
 import { resolveBenchmarkSeed } from './utils/benchmark-seed';
 import {
   EMPTY_QUICK_FILTERS,
@@ -277,8 +277,14 @@ export function InferenceProvider({
   const isActive =
     activeTab === 'inference' || activeTab === 'historical' || activeTab === 'compare';
 
-  const { selectedModel, effectiveSequence, sequenceResolved, effectivePrecisions, tcoBasis } =
-    useGlobalFilterSelection();
+  const {
+    selectedModel,
+    effectiveSequence,
+    sequenceResolved,
+    effectivePrecisions,
+    tcoBasis,
+    chipBasis,
+  } = useGlobalFilterSelection();
   const {
     setSelectedModel,
     setSelectedSequence,
@@ -293,7 +299,7 @@ export function InferenceProvider({
     availableSequences,
     availablePrecisions,
     availableDates,
-    availabilityRows,
+    availability,
     availabilitySettled,
     availabilityError,
   } = useGlobalFilterAvailability();
@@ -745,6 +751,7 @@ export function InferenceProvider({
     fixedSequenceStatistic,
     tokenBasisForMetric(selectedYAxisMetric, tokenBasis),
     isActive && !sequenceResolved && !effectiveRunDate && !seedRows,
+    chipBasis,
   );
 
   const dbModelKeys = useMemo<string[]>(
@@ -754,25 +761,18 @@ export function InferenceProvider({
 
   const dateRangeAvailableDates = useMemo(() => {
     if (selectedGPUs.length === 0) return availableDates;
-    if (!availabilityRows) return availableDates;
-    const rows = availabilityRows.filter((r) => {
-      if (!dbModelKeys.includes(r.model)) return false;
-      if (rowToSequence(r) !== effectiveSequence) return false;
-      if (!effectivePrecisions.includes(r.precision)) return false;
-      if (!r.hardware) return false;
-      const hwKey = buildAvailabilityHwKey(
-        r.hardware,
-        r.framework,
-        r.spec_method,
-        r.disagg,
-        r.benchmark_type,
-      );
-      return selectedGPUs.includes(hwKey);
-    });
-    const dates = [...new Set(rows.map((r) => r.date))].toSorted();
+    if (!availability) return availableDates;
+    const lines = linesForModels(availability, dbModelKeys).filter(
+      (line) =>
+        line.sequence === effectiveSequence &&
+        effectivePrecisions.includes(line.precision) &&
+        line.hwKey !== null &&
+        selectedGPUs.includes(line.hwKey),
+    );
+    const dates = datesOfLines(availability, lines);
     return dates.length > 0 ? dates : availableDates;
   }, [
-    availabilityRows,
+    availability,
     dbModelKeys,
     effectiveSequence,
     effectivePrecisions,
@@ -781,25 +781,17 @@ export function InferenceProvider({
   ]);
 
   const availableGPUs = useMemo(() => {
-    if (!availabilityRows) return [];
+    if (!availability) return [];
     const hwKeys = new Set<string>();
-    for (const r of availabilityRows) {
-      if (!dbModelKeys.includes(r.model)) continue;
-      if (rowToSequence(r) !== effectiveSequence) continue;
-      if (!effectivePrecisions.includes(r.precision)) continue;
-      if (!r.hardware) continue;
+    for (const line of linesForModels(availability, dbModelKeys)) {
+      if (line.sequence !== effectiveSequence) continue;
+      if (!effectivePrecisions.includes(line.precision)) continue;
+      if (line.hwKey === null) continue;
       if (frameworkLock) {
-        const family = frameworkFamily(r.framework);
+        const family = frameworkFamily(line.framework);
         if (!family || !frameworkLock.includes(family)) continue;
       }
-      const hwKey = buildAvailabilityHwKey(
-        r.hardware,
-        r.framework,
-        r.spec_method,
-        r.disagg,
-        r.benchmark_type,
-      );
-      if (isKnownGpu(hwKey)) hwKeys.add(hwKey);
+      if (isKnownGpu(line.hwKey)) hwKeys.add(line.hwKey);
     }
     return [...hwKeys]
       .toSorted((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
@@ -808,7 +800,7 @@ export function InferenceProvider({
         label: getDisplayLabel(getHardwareConfig(hw, selectedModel)),
       }));
   }, [
-    availabilityRows,
+    availability,
     dbModelKeys,
     effectiveSequence,
     effectivePrecisions,
@@ -1197,7 +1189,7 @@ export function InferenceProvider({
     ) {
       return unrankedHwTypes;
     }
-    const best = bestSeriesPerSku(graph.data, direction, effectivePrecisions);
+    const best = bestSeriesPerSku(skuColumns(graph.data), direction, effectivePrecisions);
     if (best.size === 0) return unrankedHwTypes;
     return tableCandidates ? withUnrankedSkus(best, graph.data, tableCandidates) : best;
   }, [

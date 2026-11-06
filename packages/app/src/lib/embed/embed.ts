@@ -1,4 +1,5 @@
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
+import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
 import { Y_AXIS_METRICS } from '@/lib/charts/chart-utils';
 import { toSequence } from '@/lib/compare/compare-enum-coerce';
 import { sequenceForScenarioSegment } from '@/lib/compare/compare-scenario-route';
@@ -39,6 +40,8 @@ export interface EmbedOptions {
   skin: EmbedSkin | undefined;
   sequence: Sequence | undefined;
   yAxisMetric: string;
+  /** Disaggregated throughput denominator; `chips` or the dashboard's `g_chips`. */
+  chipBasis: ChipBasis;
 }
 
 export const EMBED_DEFAULT_Y_AXIS_METRIC = 'y_tpPerGpu';
@@ -78,7 +81,10 @@ export function parseEmbedOptions(
   const yAxisMetric =
     rawMetric && Y_AXIS_METRIC_KEYS.has(rawMetric) ? rawMetric : EMBED_DEFAULT_Y_AXIS_METRIC;
 
-  return { frameworks, theme, skin, sequence, yAxisMetric };
+  const rawChips = (first(searchParams.chips) ?? first(searchParams.g_chips))?.trim().toLowerCase();
+  const chipBasis: ChipBasis = rawChips === 'total' ? 'total' : DEFAULT_CHIP_BASIS;
+
+  return { frameworks, theme, skin, sequence, yAxisMetric, chipBasis };
 }
 
 export const EMBED_RESIZE_MESSAGE_TYPE = 'inferencex:embed-resize';

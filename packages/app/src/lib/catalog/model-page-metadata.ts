@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { MODEL_PAGE_COPY } from '@/components/model/model-page-copy';
 import { AUTHOR_HANDLE, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
+import { cachedDerivedData } from '../cache/api-cache';
 import { enAlternates, type Locale, ZH_OG_LOCALE, zhAlternates } from '../i18n/i18n';
 import { getHardwareByModelSlug } from '../compare/compare-availability';
 import { toModel } from '../compare/compare-enum-coerce';
@@ -10,13 +11,19 @@ import { getModelArchitecture } from './model-architectures';
 import { modelMetaDescription } from './model-meta-description';
 import { getLocalizedModelPage } from './model-pages-zh';
 
+const getMeasuredHardwareBySlug = cachedDerivedData(async (): Promise<Record<string, string[]>> => {
+  const bySlug: Record<string, string[]> = {};
+  for (const [slug, hardware] of await getHardwareByModelSlug()) bySlug[slug] = [...hardware];
+  return bySlug;
+}, 'model-measured-hardware-v1');
+
 /** Measured hardware keys for a model, or none when availability cannot be read. */
-async function measuredHardware(slug: string): Promise<ReadonlySet<string>> {
+async function measuredHardware(slug: string): Promise<readonly string[]> {
   try {
-    const hardwareByModel = await getHardwareByModelSlug();
-    return hardwareByModel.get(slug) ?? new Set();
+    const bySlug = await getMeasuredHardwareBySlug();
+    return Object.hasOwn(bySlug, slug) ? bySlug[slug] : [];
   } catch {
-    return new Set();
+    return [];
   }
 }
 

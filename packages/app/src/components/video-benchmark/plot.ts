@@ -5,7 +5,7 @@ import { metricValue, VIDEO_METRICS, type VideoPoint } from './metrics';
 import { latestVideoCells } from './points';
 import { metricOptions, type VideoDashboardState } from './video-url-state';
 
-export interface PlottedVideoPoint extends VideoPoint {
+interface PlottedVideoPoint extends VideoPoint {
   x: number;
   y: number;
   color: string;

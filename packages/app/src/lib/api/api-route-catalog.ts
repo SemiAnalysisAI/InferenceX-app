@@ -67,7 +67,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-calculator-view',
-    sourceSha256: '3d28ca187d502472c5754d0d29276ab9d717f08c8948db6900b83079323bebe5',
+    sourceSha256: '9262546d652a4dc4ba7ee03425891d072f020ba181202b6e2cab1e48a95018e0',
   },
   {
     source: 'src/app/api/v1/views/collectivex/route.ts',
@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-historical-view',
-    sourceSha256: 'd2f7768ffee4a60618ac4f9add87bbe571cc668424eb8d9f257d78fe82a546fb',
+    sourceSha256: '93fa90b5d58b10ef7e230ac2f736afa13627157c4921a589f9949127deab3a58',
   },
   {
     source: 'src/app/api/v1/views/inference/route.ts',
@@ -147,7 +147,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: '18d6658379e045492907836358cf5c29a1d901af6189498b519266c249244674',
+    sourceSha256: 'e61587be769b322f974fc275534e2abab57b4a936725379bda4da1cf5dea068f',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -211,7 +211,15 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-video-view',
-    sourceSha256: '418bfd2c37b2e690bb69e8d9b36fc0ce59255e3fe157a05d6e82cb3e95c29c02',
+    sourceSha256: '3e0cdcd26592b132b2b8978271852e05f54258803c83e0cffb81254c76dd2d31',
+  },
+  {
+    source: 'src/app/api/v1/views/operatorx/route.ts',
+    path: '/api/v1/views/operatorx',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-operatorx-view',
+    sourceSha256: '89aa6ffe658926222451497ae0e4a65c1d73237771ab31edfc17ff212abecd2a',
   },
   // Agentic Workload Explorer page backend (frozen ProxyTrace snapshot).
   {
@@ -562,7 +570,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; comparisons include hardware references, defaults, optional distribution quantiles and per-hardware or shared-cohort roofline median/best summaries with resolved controls.',
       zh: 'OperatorX 页面后端；对比结果包含硬件参考值和默认设置，并可按需返回分布分位数及基于各硬件自身用例或共同用例的 roofline 中位数与最佳值汇总，同时附带实际生效的参数。',
     },
-    sourceSha256: 'a80b749f58ba741aa7ac5ec6654b1290e1afb8f00e38f1411eb965a9db3e36f4',
+    sourceSha256: '733e41ed3e2ba2cc0ef394439b09f850e06c310c6b611c7a2507dfb221cb6dad',
   },
   {
     source: 'src/app/api/v1/operatorx/timelines/route.ts',
@@ -573,7 +581,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; serves the case drill-down kernel timelines in the page’s own compact shape.',
       zh: 'OperatorX 页面后端；以页面自身的紧凑结构提供用例详情的 kernel 时间线。',
     },
-    sourceSha256: 'c41b25c899b181bd5d687c795d12b74b8b279bbf55ee7e7b4c77f6d46abeff26',
+    sourceSha256: 'eaaf5647360300c025a65f5e4896ca3799aea85905a32f7e6258cea517620342',
   },
 
   {
@@ -582,7 +590,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-pareto',
-    sourceSha256: 'b93b93fcb8732977358dcead9ec6b26cc0e72f54000797ac558b1fd93e154e20',
+    sourceSha256: '97d069f55fb018229fbfe9afeb190af07508760c9feab32fca9cb1260046b033',
   },
   {
     source: 'src/app/api/gpu-metrics/route.ts',
@@ -623,10 +631,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'Hidden H3 viewer transport for public CI runs, checksum-verified artifact ZIPs and stored History. Every GET is read-only, including format=media on a cache miss (204). Synthetic History replay is development-only. History retains legacy indexes but labels only source-bound approval receipts as approved; default charts use those approved entries. This UI contract is not a public data API.',
-      zh: '供隐藏的 H3 查看器读取公开 CI 运行、校验和已验证的产物 ZIP 与已存历史。所有 GET 都只读，包括 format=media 未命中时返回 204。合成历史回放仅用于开发环境。历史保留旧索引，但只有与来源绑定的批准回执才标为 approved；默认图表只使用这些条目。此界面契约不是公开数据 API。',
+      en: 'Hidden H3 viewer transport for public CI runs, checksum-verified artifact ZIPs and stored History. Every GET is read-only, including format=media on a cache miss (204). History can return up to five pages in one response and serves entries from the newest History snapshot only while each record matches its index and receipt upload times. Synthetic History replay and explicit original-artifact replay with private MP4 ranges are development-only. History retains legacy indexes but labels only source-bound approval receipts as approved; default charts use those approved entries. Published History/media payloads have a 30-second process cache (32 entries each) and are served only after the public-repository check passes; errors, partial or unapproved History and missing media are not retained. Successful publication or History backfill clears that process cache. HTTP stays private, no-store. Metadata-only development fixtures return 204 for media. This UI contract is not a public data API.',
+      zh: '供隐藏的 H3 查看器读取公开 CI 运行、校验和已验证的产物 ZIP 与已存历史。所有 GET 都只读，包括 format=media 未命中时返回 204。历史可在一次响应中返回最多五页，只有记录仍与索引和回执上传时间一致时才使用最新历史快照中的条目。合成历史回放及读取原始产物 MP4 字节区间的显式回放仅用于开发环境。历史保留旧索引，但只有与来源绑定的批准回执才标为 approved；默认图表只使用这些条目。已发布 History／媒体载荷在服务进程内最多复用 30 秒，每类最多 32 项，且只在源仓库公开检查通过后返回；错误、不完整或未批准的 History 和缺失媒体不保留。发布或历史补建成功后清空当前进程缓存，HTTP 仍为 private, no-store。开发环境的纯元数据 fixture 对媒体请求返回 204。此界面契约不是公开数据 API。',
     },
-    sourceSha256: 'cf6b6a756c6b0a8e9b4c02ec027f303365ea3097ee2c77034e932f1f7ab50909',
+    sourceSha256: '0f9343a75208fbc47eb068ed74bdd1e36fe2fbea3bb5828d51242b7fa7c25303',
   },
   {
     source: 'src/app/api/video-runs/route.ts',
@@ -634,10 +642,10 @@ export const apiRouteCatalog = [
     method: 'POST',
     classification: 'admin',
     exclusionReason: {
-      en: 'Bearer-protected mutation for one explicit H3 source/artifact. It stores verified media and an immutable source-bound publication receipt; authorization does not assert benchmark qualification. This operator path is outside the public read API.',
-      zh: '受 Bearer 密钥保护的单个 H3 来源与产物写操作。它存储已校验媒体和绑定来源的不可变发布回执；授权不代表 benchmark 质量验收。此运维入口不属于公开只读 API。',
+      en: 'Bearer-protected mutation for one explicit H3 source/artifact. It stores verified media, an immutable source-bound publication receipt and a new History snapshot; authorization does not assert benchmark qualification. The body {"history":"backfill"} rebuilds missing History snapshot records from already stored indexes. This operator path is outside the public read API.',
+      zh: '受 Bearer 密钥保护的单个 H3 来源与产物写操作。它存储已校验媒体、绑定来源的不可变发布回执和新的历史快照；授权不代表 benchmark 质量验收。请求体 {"history":"backfill"} 会根据已存索引补建缺失的历史快照记录。此运维入口不属于公开只读 API。',
     },
-    sourceSha256: 'cf6b6a756c6b0a8e9b4c02ec027f303365ea3097ee2c77034e932f1f7ab50909',
+    sourceSha256: '0f9343a75208fbc47eb068ed74bdd1e36fe2fbea3bb5828d51242b7fa7c25303',
   },
   {
     source: 'src/app/api/unofficial-run/route.ts',
@@ -648,7 +656,7 @@ export const apiRouteCatalog = [
       en: 'UI-only overlay for unofficial workflow artifacts. Append-only runs also include the published curve points they extend when each shared topology keeps its image. Development on loopback hosts may explicitly opt into local artifact files via INFERENCEX_LOCAL_ARTIFACT_DIR; production only reads the public GitHub source. Artifact availability and shape are not stable. The CDN caches completed runs for an hour, queued or in-progress runs for 30 seconds, and missing runs for five minutes; a GitHub rate limit returns an uncached 503 with Retry-After.',
       zh: '仅供界面叠加非官方工作流产物。append-only 运行还会包含其所扩展的已发布曲线数据点，前提是两者共有的每种拓扑都使用同一镜像。开发环境通过本机地址访问时，可用 INFERENCEX_LOCAL_ARTIFACT_DIR 显式启用本地文件；生产环境仅从公开 GitHub 来源读取。产物的可用性和结构并不稳定。CDN 对已完成的运行缓存 1 小时，对排队中或进行中的运行缓存 30 秒，对不存在的运行缓存 5 分钟；触发 GitHub 速率限制时返回不缓存的 503，并附带 Retry-After。',
     },
-    sourceSha256: '312e22912abcf110e2fd9ec7a283a32e3c577a343eedab5fa00aac3f488d5fb1',
+    sourceSha256: '6ebfddfb38dc18e92e22039c68eb7609f3677193b8f2d4f0867e48f67ab41682',
   },
   {
     source: 'src/app/api/v1/agentic-aggregates/route.ts',
@@ -667,6 +675,28 @@ export const apiRouteCatalog = [
     sourceSha256: '42e8ae62eb369f4b172611d19b339865e40e507d41c4eedcedcc44cf8c88bcaf',
   },
   {
+    source: 'src/app/api/v1/availability/compact/route.ts',
+    path: '/api/v1/availability/compact',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Dashboard filter BFF: the published availability rows, sent once per distinct line with its dates as runs over a date dictionary.',
+      zh: '看板筛选专用 BFF：已发布的可用性行，每条不同的配置线只发送一次，其日期以日期字典上的区间表示。',
+    },
+    sourceSha256: '7fdb38e3400b62e42ee86ff74f6779796df8cd3f3b2ffd8b7177d850f81bb4c9',
+  },
+  {
+    source: 'src/app/api/v1/benchmark-presence/route.ts',
+    path: '/api/v1/benchmark-presence',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Inference chart BFF: trace and server-log presence for every benchmark point as id runs in one parameterless response, which the chart decodes into bitsets.',
+      zh: '推理图表专用 BFF：以 ID 区间形式在一个无参数响应中返回所有基准点的跟踪与服务器日志可用性，图表将其解码为位集。',
+    },
+    sourceSha256: '0d0463bf37bd2d23e5759fd192f8ac484e816fba2d4e2de184f5c54774509fc6',
+  },
+  {
     source: 'src/app/api/v1/benchmark-siblings/route.ts',
     path: '/api/v1/benchmark-siblings',
     method: 'GET',
@@ -680,7 +710,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmarks',
-    sourceSha256: 'c55c44a73e9c7500abc9e4a463588b08a1c1af05d5a274c298dff8a443ae9a7d',
+    sourceSha256: '1359d99e0678af6e80bf4263aa9708e375328cd7c90b5ab2c4a5a4295b56a4e7',
   },
   {
     source: 'src/app/api/v1/benchmarks/history/route.ts',
@@ -689,6 +719,17 @@ export const apiRouteCatalog = [
     classification: 'published-read',
     operationId: 'list-benchmark-history',
     sourceSha256: 'dcdda2fb8d266449de4f7a5e1b63dde13a628aa3ee52e44e7cc5a8ee5b28aa82',
+  },
+  {
+    source: 'src/app/api/v1/benchmarks/history/trends/route.ts',
+    path: '/api/v1/benchmarks/history/trends',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Historical Trends BFF: the published benchmark history rows dictionary-encoded by config and run, with only the metric keys and power fields a trend reads.',
+      zh: '历史趋势页面专用 BFF：按配置和运行字典编码的已发布基准历史行，只保留趋势读取的指标键和功耗字段。',
+    },
+    sourceSha256: '1f9c3e9daec93de23deb917cdc9e8b86885ae75ed5b1a690690e75936d358551',
   },
   {
     source: 'src/app/api/v1/collectivex/changelog/route.ts',
@@ -782,7 +823,7 @@ export const apiRouteCatalog = [
       en: 'UI drill-down for evaluation samples; its pagination and sample payload remain page-owned.',
       zh: '用于界面下钻评测样本；其分页和样本载荷仍由页面内部使用。',
     },
-    sourceSha256: '00a2fcaeb71bdfe27af1f6cd7a92122f2d7828c88f677b3e7fb3e8235b8e05c7',
+    sourceSha256: '43e825d7834a33ce24352107ade5bf4991ed7cae646e018a5c70e12da3a6c4e4',
   },
   {
     source: 'src/app/api/v1/evaluations/route.ts',
@@ -791,6 +832,17 @@ export const apiRouteCatalog = [
     classification: 'published-read',
     operationId: 'list-evaluations',
     sourceSha256: '5ccc3351d87ed9b3515314692ea506150d787935d2b86f47aa8b81dcb9eabc1d',
+  },
+  {
+    source: 'src/app/api/v1/evaluations/compact/route.ts',
+    path: '/api/v1/evaluations/compact',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Evaluation dashboard BFF: the published evaluation rows dictionary-encoded by config and run, with only the metric keys the chart reads.',
+      zh: '评估看板专用 BFF：按配置和运行字典编码的已发布评估行，只保留图表读取的指标键。',
+    },
+    sourceSha256: 'd809f016ce5f7f9fec7fec7928426b5f45b60476754cbf2da8511f54ca931457',
   },
   {
     source: 'src/app/api/v1/feedback/route.ts',
@@ -847,7 +899,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-log-availability',
-    sourceSha256: '9137745fa6826a14ec63e6b483666688949b4cef9140e64ff2eae8fd7b4164ef',
+    sourceSha256: '6aed139b34cef1ff8390de220c9bd12f6fcee2263c8e337946491cb7a4842570',
   },
   {
     source: 'src/app/api/v1/overview/route.ts',
@@ -869,15 +921,26 @@ export const apiRouteCatalog = [
     sourceSha256: 'de9a9c65f3300a1353367e501d0be853c448de49d0321d3495a46a869a03350f',
   },
   {
+    source: 'src/app/api/v1/reliability/daily/route.ts',
+    path: '/api/v1/reliability/daily',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Reliability dashboard BFF: the published reliability rows summed per date and GPU, which the chart aggregates into its date ranges.',
+      zh: '可靠性看板专用 BFF：已发布的可靠性行按日期和 GPU 汇总，图表再将其聚合为各日期范围。',
+    },
+    sourceSha256: '235ce2feca3079ef56024beaa96ecf601faee23cd695cf5dae69134f539ccbc2',
+  },
+  {
     source: 'src/app/api/v1/gpu-metrics-point/route.ts',
     path: '/api/v1/gpu-metrics-point',
     method: 'GET',
     classification: 'page-bff',
     exclusionReason: {
-      en: 'Point-detail BFF accepting a positive safe-integer id and returning linked PowerX telemetry series, per-GPU statistics computed from their stored samples and retained validation/audit metadata. Every read checks a live DB revision before using the Blob payload cache; responses use no-store, missing data returns 404, and database failures remain errors. Re-ingest, shared-link and statistics algorithm version changes do not require manual cache purges. The CI publication verifier reads it after each telemetry ingest. Coupled to the PowerX tab implementation.',
-      zh: '数据点详情 BFF；id 必须为正安全整数，返回关联的 PowerX 遥测序列、由已存样本计算的每 GPU 统计，以及保留的验证与审计元数据。每次读取先核对数据库版本再使用 Blob 缓存；响应使用 no-store，数据缺失返回 404，数据库故障仍作为错误返回。重新入库、共享链接及统计算法版本变化无需手动清理缓存。CI 发布校验会在每次遥测入库后读取此接口。与 PowerX 标签页实现紧密耦合。',
+      en: 'Point-detail BFF accepting a positive safe-integer id and returning linked PowerX telemetry series, per-GPU statistics computed from their stored samples and retained validation/audit metadata. Every read checks a live DB revision before using the Blob payload cache. Payloads are private, no-cache with an ETag derived from that revision, so a matching If-None-Match gets a 304 without loading the payload. Missing data returns a no-store 404, and database failures remain no-store errors. Re-ingest, shared-link and statistics algorithm version changes do not require manual cache purges. The CI publication verifier reads it after each telemetry ingest. Coupled to the PowerX tab implementation.',
+      zh: '数据点详情 BFF；id 必须为正安全整数，返回关联的 PowerX 遥测序列、由已存样本计算的每 GPU 统计，以及保留的验证与审计元数据。每次读取先核对数据库版本再使用 Blob 缓存。数据响应为 private, no-cache，ETag 由该版本派生，匹配的 If-None-Match 不加载数据直接返回 304。数据缺失返回 no-store 的 404，数据库故障仍作为 no-store 错误返回。重新入库、共享链接及统计算法版本变化无需手动清理缓存。CI 发布校验会在每次遥测入库后读取此接口。与 PowerX 标签页实现紧密耦合。',
     },
-    sourceSha256: 'de607d7ae70093d9575fe63158946574d2cd2bfbbd058b504602377995cd0a57',
+    sourceSha256: '71c43de4872edff0f166cab2a5a6ff70d8a69ecef33e8102723a69110ed8cd7a',
   },
   {
     source: 'src/app/api/v1/gpu-metrics-point/stats/route.ts',
@@ -896,7 +959,7 @@ export const apiRouteCatalog = [
       en: 'Agentic point-detail BFF with a compact dictionary-encoded request projection coupled to the chart implementation.',
       zh: '智能体数据点详情页专用 BFF；其字典编码的精简请求投影与图表实现紧密耦合。',
     },
-    sourceSha256: 'f96ebd3ebf149bc6d800c363a493aa84da905807cbf963ced90467161a58434d',
+    sourceSha256: '0e9511a09e917d6264ce4d9cc1e3d318ca9f409798c874f39ee159baa8c118c8',
   },
   {
     source: 'src/app/api/v1/request-timeline/route.ts',
@@ -904,7 +967,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-request-timeline',
-    sourceSha256: '9f0ae9edc79d4658ee9f8c8b4e05667468f977786105b80df852ad4744249b97',
+    sourceSha256: '046a7e5819338a3c5a0da91ff3d570cf94260aefa269c7efe20cbb3d4e8e0755',
   },
   {
     source: 'src/app/api/v1/resident-sequence-lengths/route.ts',
@@ -963,7 +1026,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-trace-availability',
-    sourceSha256: '340263c1a6b56c5bd9df5205dbc401d1d68905714855cac6b1c5f0eaa14fe629',
+    sourceSha256: 'de7b17f2fe8358da90d9d3153b9292650e0254678b0b47d36afb9b53ad095778',
   },
   {
     source: 'src/app/api/v1/trace-histograms/route.ts',
@@ -971,7 +1034,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-trace-histograms',
-    sourceSha256: '8fe52f2c2cef13a89f8d1d5ce70be89d0353da3f059afaabe1a392ee369af13d',
+    sourceSha256: '4d0b5d7759227096701164709b1406aaa84c29fbf84ef0fc0d0770c8f1ab6bfb',
   },
   {
     source: 'src/app/api/v1/trace-server-metric-source/route.ts',
@@ -991,6 +1054,17 @@ export const apiRouteCatalog = [
     classification: 'published-read',
     operationId: 'get-trace-server-metrics',
     sourceSha256: '858f01573385ef389d1d5177dd69ec1438347a98c6b6d0670ef0eff30fe052e6',
+  },
+  {
+    source: 'src/app/api/v1/workflow-changelogs/route.ts',
+    path: '/api/v1/workflow-changelogs',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Page-owned BFF that batches the comparison changelog dates for a date range into one response shaped for the GPU comparison UI.',
+      zh: '由页面拥有的 BFF；将日期范围内的比较变更日志合并为一个响应，其结构与 GPU 比较界面耦合。',
+    },
+    sourceSha256: '3dae537bf244650f8ebd2829b1f622dd88cd65427ec2b112a210604eda5aba2f',
   },
   {
     source: 'src/app/api/v1/workflow-info/route.ts',
@@ -1175,6 +1249,30 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: '../constants/src/framework-aliases.ts',
+    sourceSha256: '6c220e6aed1465e647f2c3ffcb03828e0f98ac6b9edb4019f0dce6db10c4054e',
+    reviewArea: {
+      en: 'Shared engine labels, family classification and dashboard/read-only view filter parity.',
+      zh: '共享引擎标签、系列分类，以及仪表板与只读视图的筛选一致性。',
+    },
+  },
+  {
+    source: 'src/lib/catalog/framework-family.ts',
+    sourceSha256: '8720fbb931453e16882584f846148b29688d07fbf296c2c829c286d638abfec5',
+    reviewArea: {
+      en: 'Shared engine labels, family classification and dashboard/read-only view filter parity.',
+      zh: '共享引擎标签、系列分类，以及仪表板与只读视图的筛选一致性。',
+    },
+  },
+  {
+    source: 'src/components/inference/utils/quickFilters.ts',
+    sourceSha256: 'ba6e41f71f0ebbecad861b2694dbfb8a72f1e1d4e27252a1eacc154702aaf388',
+    reviewArea: {
+      en: 'Shared engine labels, family classification and dashboard/read-only view filter parity.',
+      zh: '共享引擎标签、系列分类，以及仪表板与只读视图的筛选一致性。',
+    },
+  },
+  {
     source: 'src/components/ubenchx/ubenchx-transform.ts',
     sourceSha256: '9458ad2b969525fe68da5a3b54ac151384610d0bd2ba84585a9043b3a67bf949',
     reviewArea: {
@@ -1227,7 +1325,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/visualization.ts',
-    sourceSha256: '254d065ad3363fe986310bedd5b7db2802df08f2f769e2a6a850da38b6025c41',
+    sourceSha256: '219682fee3ecc82f24301310e4d32e05fb7e644ca757d0412ac018f64656f510',
     reviewArea: {
       en: 'OperatorX workload-resolved chart defaults and shared shape grouping used by UI and comparison API.',
       zh: 'OperatorX 按工作负载确定的图表默认值及形状分组，由 UI 与对比 API 共用。',
@@ -1235,7 +1333,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/compare.ts',
-    sourceSha256: '1f0631a7d4a62fbaf7132f604ead59a6e4c524c1f05cdf5762308f8e2bed12f8',
+    sourceSha256: '20c70bc20a005cc24013ebc7b8d6782c9adef46030ca4b3104c35447e4e11e51',
     reviewArea: {
       en: 'OperatorX page-owned comparison: workload filtering and optional hardware normalization references; excluded from published OpenAPI.',
       zh: 'OperatorX 页面专属对比：workload 筛选及可选的硬件归一化参考值；不纳入公开 OpenAPI。',
@@ -1243,7 +1341,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/operatorx/roofline-summary.ts',
-    sourceSha256: '47d966e7aa7934cea6daefed5e8a37f6cdd888f0ee8a1e428cad990624380b69',
+    sourceSha256: '3de17956e01ad89e1890140b35a8e7bbfc069e9e60fc22d09b45f121f050aeee',
     reviewArea: {
       en: 'OperatorX per-hardware and shared compute-bound cohorts, median/best throughput, precision and normalized values shared by the roofline bars and API.',
       zh: 'OperatorX 的各硬件自身及共同计算受限用例、吞吐量中位数与最佳值、精度及归一化数值，由 roofline 柱状图与 API 共用。',
@@ -1259,7 +1357,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/operatorx/service.ts',
-    sourceSha256: 'f14a3caf1bb3bd3f23d8fe4b9f71ae58a1842c26da3fd545ec67572e33d9808f',
+    sourceSha256: '961cc09469965dbf6db6beefcc4749966ebdf62175676123b8f49d28d92c8c28',
     reviewArea: {
       en: 'OperatorX bulk compact reads, revision-keyed shared Blob comparisons, raw fallback, partial/revision cache exclusion and bounded timeline reads.',
       zh: 'OperatorX 批量精简读取、按 revision 共享 Blob 对比缓存、原始数据回退、部分失败或 revision 变更时不缓存，以及时间线限流并行读取规则。',
@@ -1267,7 +1365,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/comparison-cache.ts',
-    sourceSha256: '82db8cd90b176c6f86328f64504f9417cd748788319dec43532d84d33a9b81f5',
+    sourceSha256: 'f3119d7400cd6502e37be933385f2c235abc30472f7d0eef0044721f1cf6befb',
     reviewArea: {
       en: 'Versioned ingest-time OperatorX projections and newest-first merge preserving statuses, source ordering and timeline provenance.',
       zh: 'OperatorX 写入时生成的版本化对比数据及最新优先合并规则，保留状态、来源顺序和时间线归属。',
@@ -1275,7 +1373,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/operatorx.ts',
-    sourceSha256: '134980fa91bf9ffb21659527f3834f10971afd2cc3b7d738673bb93dcb0b6c0e',
+    sourceSha256: '793510ecbecb53632b4e60701a979d535548a22fa7fb5524172be9ce3de7303b',
     reviewArea: {
       en: 'OperatorX raw and compact reads, atomic projection writes and revision-guarded backfill.',
       zh: 'OperatorX 原始及精简数据读取、事务内写入和按 revision 校验的 backfill。',
@@ -1308,7 +1406,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/gpu-metrics.ts',
-    sourceSha256: '8d1723849552e1c28c41d2c9dc07f03d605398e64bce5cc1df5942901296f4aa',
+    sourceSha256: 'edccaa7ce2419352fb19afebc8b563f82c51ab8cb24feda8e037dd7796a02915',
     reviewArea: {
       en: 'Stored PowerX telemetry reads: latest attempt, prefix and requested-source scoping, GPU metrics view artifact selection, point lookups, run inventory coverage, missing metric readings and per-GPU statistics computed from complete stored samples.',
       zh: '数据库 PowerX 遥测读取：最新 attempt、前缀与请求 source 范围、GPU 指标视图的产物选择、单点查询、run 清单覆盖范围、缺失指标读数，以及基于完整已存样本计算的每 GPU 统计。',
@@ -1364,7 +1462,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/equal-service-comparison.ts',
-    sourceSha256: '5d044897542c1067bff7fc3fed59669e813b6ab6b9eaf1a7ebe2f89db6645256',
+    sourceSha256: '616e2fc8b2e7bc2887390d77122a47981dc72ad78c767d8e4d954d01c40622eb',
     reviewArea: {
       en: 'Source-scoped equal-service interpolation, comparator-relative changes, endpoint provenance, prefill share projection and role points.',
       zh: '按完整来源限定的同等服务插值、相对基准变化、端点来源、prefill 占比视图以及各角色数据点。',
@@ -1380,7 +1478,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/power-fit.ts',
-    sourceSha256: '4e2e566d2ccfe495af23d40b83b56d7ec329792f472e6391250eb04aa269bf60',
+    sourceSha256: 'e2a2ac73954895d5af800633d989cc83ca46909e238e93cc353b1c36f44fda1a',
     reviewArea: {
       en: 'Per-source least-squares power fit on output per allocated GPU: intercept, marginal J/token, R², fitted range and registry TDP.',
       zh: '按来源对每个已分配 GPU 的输出做最小二乘功耗拟合：截距、边际 J/token、R²、拟合范围与注册表 TDP。',
@@ -1404,7 +1502,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-transform.ts',
-    sourceSha256: '4a59ccf2b1190d8165e45a54aee212814282f39f3271041221abe9ff7be7a68f',
+    sourceSha256: '7ade60009996367fbd6bfcbcfd7ba155fd96e1676dcb0d320ca26821f948ba7a',
     reviewArea: {
       en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
       zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',
@@ -1459,8 +1557,104 @@ export const apiContractSourceDigests = [
     },
   },
   {
+    source: 'src/components/video-benchmark/results.ts',
+    sourceSha256: '053712b28c1d10b8f08e345290be4afcfcca79829d9517eaf11e8936db6f1a54',
+    reviewArea: {
+      en: 'Shared VideoGenX results selectors, sample admission, dual GPU cost bases and modelled profit.',
+      zh: 'VideoGenX 结果页共用的筛选、样本准入、两种 GPU 成本口径及估算利润。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/results-chart.ts',
+    sourceSha256: 'fb395468324b5bd9d96263adeade0f8f7ce0efff0df27eb29c08b2e91c515b47',
+    reviewArea: {
+      en: 'VideoGenX results chart axes, accepted r_x/r_y metric keys, GPU basis and deployment detail key.',
+      zh: 'VideoGenX 结果图表的坐标轴、r_x/r_y 可接受的指标键、GPU 口径及部署详情键。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/results-csv.ts',
+    sourceSha256: '5a769d8f0acdddc566aa79da0ee37c4b32a6bbd73a1aa9a512700755a5d6f90a',
+    reviewArea: {
+      en: 'VideoGenX overview CSV identities, selected cells, units, missing values and dual GPU cost bases.',
+      zh: 'VideoGenX overview CSV 的身份、所选数据点、单位、缺失值与两种 GPU 成本口径。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/replay.ts',
+    sourceSha256: '2f895c22518ccdc442491b9088ed458e418a7cdf77ae847fc847a02ee341bb52',
+    reviewArea: {
+      en: 'Verified offline VideoGenX ZIP reader shared with development replay, without publication approval.',
+      zh: 'VideoGenX 离线 ZIP 校验读取器与开发回放共用，不授予发布批准。',
+    },
+  },
+  {
+    source: 'src/lib/video/video-read-cache.ts',
+    sourceSha256: '9eef70074624eb6714d0afce49403f8da0535787e7329da75b1012846a4f683b',
+    reviewArea: {
+      en: 'VideoGenX bounded published History and media cache, served only after the repository visibility check passes.',
+      zh: 'VideoGenX 已发布 History 与媒体的有界缓存，仅在仓库公开检查通过后返回。',
+    },
+  },
+  {
+    source: 'src/lib/video/video-replay.ts',
+    sourceSha256: 'f7095cc59ca891de5b57c96ebadde92b039c3a389ebb4ee70a14f3091ba6a781',
+    reviewArea: {
+      en: 'Development-only original artifact replay, exact source media membership and private byte-range delivery.',
+      zh: '仅开发环境使用的原始产物回放、精确来源媒体匹配及私有字节区间读取。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/results-evidence.ts',
+    sourceSha256: 'aac5717719255bf49d9c2e61f4ff2ad75c05559de2a0cae39d50fb587d5ecc05',
+    reviewArea: {
+      en: 'Sealed video completion, client timing and valid power metadata; absent measurements remain null.',
+      zh: '封印视频的完成数、客户端计时及有效功率元数据；缺失测量保留 null。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/reference-quality.ts',
+    sourceSha256: 'ba76cd4e72124871dd3ba104357631d1a2c632a3fa6b1fc7f7f760f4e0d5d4dd',
+    reviewArea: {
+      en: 'Sealed per-clip reference identity, decoded all-frame PSNR, exact equality, missing/incompatible states and safe public diagnostics.',
+      zh: '封存的逐条视频参考身份、解码全帧 PSNR、完全一致、缺失与不兼容状态，以及安全的公开诊断字段。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/diagnostic-quality.ts',
+    sourceSha256: 'e3da95c88795c677e46f5cdbdb2da8106980a7be37e47dd42b426493bd8da7ac',
+    reviewArea: {
+      en: 'Separate native diagnostic media and all-frame scores bound to original CI context, consumed-noise receipts and matching candidate controls; no performance or approval promotion.',
+      zh: '原生诊断视频与全帧评分独立保留，绑定原始 CI 上下文、实际使用的初始噪声回执及一致的候选配置；不提升性能证据或发布批准状态。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/results-clips.ts',
+    sourceSha256: 'd4b378c1784163ec053f5a92dd3ee4096ddaee170d569d63f223766bd11183a6',
+    reviewArea: {
+      en: 'Exact candidate/reference pairing and per-clip quality projection shared by Results and the overview API.',
+      zh: 'Results 与 overview API 共用的精确候选/参考配对及逐条质量投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/stored.ts',
+    sourceSha256: 'd78d3e1d4f73d3c15c06964ffb448a8ab686f61384ae44ca06af3149df4ffc09',
+    reviewArea: {
+      en: 'Original stored artifact identity and independently verified optional quality attachment without approval promotion.',
+      zh: '原始已存储产物身份及独立校验的可选质量附件，不提升发布批准状态。',
+    },
+  },
+  {
+    source: 'src/lib/video/video-quality.ts',
+    sourceSha256: 'e6f9a71f18fe856b0e3c543c3df3bb8868ad0433fdf684bef15be80e3ce7c47d',
+    reviewArea: {
+      en: 'Development-only quality manifest and original reference receipt/media byte seals; private filesystem paths stay local.',
+      zh: '仅开发环境使用的质量配置、原始参考回执和媒体字节封印；本机路径仅保留在本地。',
+    },
+  },
+  {
     source: 'src/components/video-benchmark/tradeoff.ts',
-    sourceSha256: 'da13cd1546412bf9793c62c93b7d80a0ad27cc75f431367b0cc5cd1af8e4c5c3',
+    sourceSha256: 'f7ec9e081fa5bb279d896ddc7e9dc176a338e29da5f6dcd40bf50e53727d542f',
     reviewArea: {
       en: 'Video source metrics and GPU allocation evidence shared by history and API projections.',
       zh: '历史与 API 投影共用的视频来源指标及 GPU 分配证据。',
@@ -1468,7 +1662,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/history.ts',
-    sourceSha256: '0dc86d885b6fbb1fdfe21b63152335519f245b7254ed542034c8e08b6066b7b9',
+    sourceSha256: '2473362f2b7d031950a31040e84e7b546284b7d4fce52010740f81a9102f236a',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1476,7 +1670,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/metrics.ts',
-    sourceSha256: 'd3713e5e2aca210c55be48c702d3d32f609cfa34b26fbda7d411d593ad963e2b',
+    sourceSha256: '714a52e0ee739d79736a76e67dec77c2607be24951647829b3132baf72a43996',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1484,7 +1678,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/points.ts',
-    sourceSha256: '81cfbf1e92b68598978db1b6a1a91c2b344719bae771d4eb3ba7ae357f544ec6',
+    sourceSha256: '6457e3497d721f1408561849fceeb6fd019d2d0ffd533b4d418d7de15026736e',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1492,7 +1686,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/plot.ts',
-    sourceSha256: '50e15dd8ee90b9e96b8b1083294070270044abaf26f540be9cf17f594a3883e3',
+    sourceSha256: '2b96b5e2913ed65c802e4981da467a9a86d250fc30b561770467463b706f8649',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1500,7 +1694,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/deployment.ts',
-    sourceSha256: 'f7416efa7fc30edabdefa3802775ba2bbbdcbe106b1651a200922d30cc41430d',
+    sourceSha256: '6e74b6d1d5b6e8908b3fefe2adff99fd6b21a283e76aa91956f8114e0d89cc86',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1508,7 +1702,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/evidence.ts',
-    sourceSha256: '9b634b47e4a9dc98c5fec645592f5b7ee5a984f144f2566177c0702ebf878f46',
+    sourceSha256: '6337852b266d377873567964a2709bf64f0ed1adfea3c237bde8521dc3cd4886',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1524,7 +1718,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/compare-url-state.ts',
-    sourceSha256: 'ba33d95eab86de143ab08ea661908168c00ef0b6f9470bc49dab1c9d9d04f732',
+    sourceSha256: 'ed290bb46eae01c07ac75f4f1ef3d4d117bb3f315c7fc82bbe43d1786c28e9ae',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1532,7 +1726,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/video-url-state.ts',
-    sourceSha256: 'deb6b936fdf5caf2562896ca8a96cb8a08fc5a61b3cde6dd38b866a9a3c27018',
+    sourceSha256: 'e926e74ff90b65ec1e8e993e9730cda8767eb9681e4c341d02095a96e87ee109',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1586,7 +1780,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/interpolated-trend-core.ts',
-    sourceSha256: '231c59a712838f58eabce02767abcdfbc48defcd5e6bc1ad9c8c939ee308cf95',
+    sourceSha256: '91b05094830ebe261810c935159c145c4ac95c1f8f3b9431242a167de1ebc187',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1595,7 +1789,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/chart-data-core.ts',
-    sourceSha256: 'e2b95516a6ebb16c312c711b540cc7ffff52ab184238bb5b2f40b6155b69d126',
+    sourceSha256: '6be86db9c2dd179a6c9a83480d2ce6725cbe6a9fb16b90a20215501f9cb6f2bb',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1613,7 +1807,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/calculator/throughput-data.ts',
-    sourceSha256: '9dbf3e828140b50023724ce129e25db90ce358ceed1e4051871d43a62ec267ef',
+    sourceSha256: 'bd4f108feade8cb2aa7ff83523bfdea271db8f03dfb95a32af819e83bf01932d',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1631,7 +1825,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: 'e2e3ecf4e5f5e0561d81c3eceee1b5d497011e3cd9a1182328cce6ec721ca7f9',
+    sourceSha256: '8204200a643c6ed136ccc0f0b63937ccea1ccb9e09cc34198281f170795ff084',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1640,7 +1834,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/source.ts',
-    sourceSha256: '4d2a0b9d81ea157923b2ca38a94133d037316f5b4623e52a322ecf0222eedc95',
+    sourceSha256: 'fa797c3a1d3c2018eb4d7438e1ac36f8a655b2604ff95e2dffd585ab227cf8f4',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1658,7 +1852,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/series.ts',
-    sourceSha256: '56d51db6c3d6b49417692ad822076d57935439ea21a907e19f72cb48a9cb6c80',
+    sourceSha256: '2ebcea69a14260ef63b76617fb2fd1d3c6a24c9f6c0c56d7bd68376370982c00',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1667,7 +1861,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: 'c2485ce0ed5195e41862f3d1620438d2b80db91149d131e4a8c55a651665e6c0',
+    sourceSha256: 'd1aecf9e584320d55b11de717e69df5cb909d1c88e339f68bb89661ccdcfd2c5',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1676,7 +1870,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/params.ts',
-    sourceSha256: '00dd4d4b6bd360e4ce7ea26027bd60a01693901f380ed772e212897dc6202a64',
+    sourceSha256: '21f92834ef015f770573923da19085fdb92a4cff9115c5e106b8c7e632cfed46',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1701,7 +1895,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/api-cache.ts',
-    sourceSha256: '3c4790f16dafceee25010f62a85735c8a0a079a14b02e3f4523c87ed4b5a0e7d',
+    sourceSha256: 'ee9a53a022a3ac049119b7ce77f902f1dc655da84b2eeec661039a69192c6c9c',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',
@@ -1717,10 +1911,18 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/blob-cache.ts',
-    sourceSha256: 'c1d051cb35e353877f75ad772a76de861d198d16d3b59c18b60c2af48230c39b',
+    sourceSha256: '525de423c7a17e401044de360570b0a2e399a157e079dc79a04be4684d962465',
     reviewArea: {
       en: 'Blob cache read, write, prefix migration, and purge behavior.',
       zh: 'Blob 缓存读取、写入、前缀迁移和清除行为。',
+    },
+  },
+  {
+    source: 'src/lib/benchmarks/benchmarks-endpoint.server.ts',
+    sourceSha256: '4153e258a16e27e99f9ec596bd548c0df44cd0e324ba14d3d9a56c8ee58ba010',
+    reviewArea: {
+      en: 'Benchmarks endpoint parameter validation, date/run/view selection, calculator trimming, power validity filtering and cache keys shared by the route, views and pareto.',
+      zh: '基准端点的参数校验、日期/运行/视图选择、计算器裁剪、功耗有效性过滤，以及路由、视图和 pareto 共用的缓存键。',
     },
   },
   {
@@ -1772,6 +1974,14 @@ export const apiContractSourceDigests = [
     },
   },
   {
+    source: 'src/lib/benchmarks/benchmark-presence.ts',
+    sourceSha256: '80b296617ffd59095fd4f149bb35ce680d5ab8477719c14cc5dc0d25df8572f3',
+    reviewArea: {
+      en: 'Trace and log availability ID-keyed boolean response built from presence runs.',
+      zh: '由可用性 ID 区间构建的跟踪与日志可用性按 ID 索引的布尔响应。',
+    },
+  },
+  {
     source: 'src/app/api/v1/id-routes.ts',
     sourceSha256: '4e4ba48759ce29206d6dc95f461526bd2e6856a3a9ea681c49a1a4f3365d40e7',
     reviewArea: {
@@ -1781,7 +1991,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api/api.ts',
-    sourceSha256: 'b1b01e8a22384e4a47eaa4e3605c58295311c7a8eba5e06e92a766e1c0675aa8',
+    sourceSha256: '42e8361265365e715285d59b8a3db2964531c247fd9dd47b355b05c2ff0de128',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',
@@ -1797,7 +2007,9 @@ export const apiContractSourceDigests = [
     // joins OVERVIEW_MODEL_SCENARIOS as AgentX-only. No parameter or response
     // shape change, so the docs stand.
     // GLM-5.3-Flash adds an AgentX-only row without changing the response shape.
-    sourceSha256: '69d7ebf49af0b92517814c7a90b02eee78482071131bbd969c76c82a1c1258f3',
+    // Kimi-K3.1-Pro (InferenceX#4803) joins OVERVIEW_MODEL_SCENARIOS as
+    // AgentX-only. No parameter or response shape change, so the docs stand.
+    sourceSha256: '75281dc574436f1dd84b76ffe115e395a1eb59ad1eda93f90f53a0138865086a',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',
@@ -1828,7 +2040,10 @@ export const apiContractSourceDigests = [
     // AgentX cookbook documents the model; no endpoint or parameter shape changes.
     // GLM-5.3-Flash / glm5.3flash is separate from GLM-5.2/5.3; the API
     // model documentation and AgentX cookbook describe the publication boundary.
-    sourceSha256: '2727c70b999445eab770a6095d362e33b94354aabb90bacaa35eb165f1b1ae52',
+    // Reviewed for the Kimi-K3.1-Pro addition (InferenceX#4803): one new DB key,
+    // `kimik3.1`, with its own display name and release date. No endpoint or
+    // parameter shape changes, so the docs stand.
+    sourceSha256: 'd331d67e91f5bf56eeee7c2d30c34448d498ddb33e21399bcb3854d5ed599c3d',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',
@@ -1854,11 +2069,27 @@ export const apiContractSourceDigests = [
     },
   },
   {
+    source: '../db/src/etl/compute-chart-series.ts',
+    sourceSha256: '04e7a27bc027f64a77eb585c2a8415d2398f54460522c22487fcec7124c9bef5',
+    reviewArea: {
+      en: 'Server metric chart version, supported engine metrics, source identity, and missing-data semantics.',
+      zh: '服务器指标图表版本、支持的引擎指标、来源标识以及缺失数据语义。',
+    },
+  },
+  {
     source: '../db/src/queries/agentic-aggregates.ts',
-    sourceSha256: '390d9ed94bf8f1712612a979ec29316f5a98b8faee34c71b77142e960103eeb2',
+    sourceSha256: '6cf88477d4aec60e6a2d276637281dbffe39bc42d37256511e10e6c741fa10a8',
     reviewArea: {
       en: 'Agentic aggregate percentile keys, nullability, and ID-keyed response shape.',
       zh: '智能体汇总百分位字段、可空性和按 ID 索引的响应结构。',
+    },
+  },
+  {
+    source: '../db/src/queries/benchmark-presence.ts',
+    sourceSha256: '2d2aefa31c04195afb8ab615e4c7164609c6c10c93e523267df4ea41857fbfac',
+    reviewArea: {
+      en: 'Which benchmark IDs count as having a stored trace or a linked server log.',
+      zh: '哪些基准 ID 被视为拥有已存储的跟踪或已关联的服务器日志。',
     },
   },
   {
@@ -1871,7 +2102,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmarks.ts',
-    sourceSha256: '8e9a09b505a8d01ca0660116d87692ac3c8ad57a5bf80bbde7fb041bf90acf22',
+    sourceSha256: '1d1d88901f19beb47400c004cefe0723b05c441bd36582226bc36ad517f748d9',
     reviewArea: {
       en: 'Benchmark row fields and latest, exact-run, history, and TCO query semantics.',
       zh: '基准行字段以及最新、精确运行、历史和 TCO 查询语义。',
@@ -1903,7 +2134,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/latest-images.ts',
-    sourceSha256: '8ae98eaa877d09b724837d6936aa324fce9c203d71b6e0fd94d4971b5b24d628',
+    sourceSha256: 'ea8a86775f1fd406ee1c33a636bb304e4ab886a809e1ba25e5fdae5a0af52318',
     reviewArea: {
       en: 'Latest runtime image row fields and per-configuration selection.',
       zh: '最新运行时镜像行字段和按配置选择逻辑。',
@@ -1924,7 +2155,7 @@ export const apiContractSourceDigests = [
     // stored timeline it cannot read. It returns the same RequestTimeline
     // document; current stored gzip can also stream directly with unchanged
     // CDN headers, bypassing the parsed-object Blob cache to bound memory.
-    sourceSha256: '3dc8d83421ac5b468aad7914f19fe8c9f081713dad86222ec395d01df28b3cb2',
+    sourceSha256: '86e27e59309ec99b5cc72064a317aa787deaf817d76a6593c88de83d8dc7dbc5',
     reviewArea: {
       en: 'Request timeline metadata, request event records, units, and nullable timings.',
       zh: '请求时间线元数据、请求事件记录、单位和可空计时字段。',
@@ -1932,7 +2163,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/server-logs.ts',
-    sourceSha256: '23cac33618e89dbd1a8795892065d24638add7e5842813eed6cc82c8a4ddb311',
+    sourceSha256: '05691469c87acdbca68886a2d4a0c7ccb12c1a79470fdfab0edc56ee16190860',
     reviewArea: {
       en: 'Log filename discovery, size-capped selected-file reads, bounded chunk metadata, budgeted complete-file search, availability, and legacy-schema fallback.',
       zh: '日志文件名发现、有大小上限的指定文件读取、有界分块元数据、有扫描预算的完整文件搜索、可用性以及旧版 schema 回退行为。',
@@ -1947,20 +2178,12 @@ export const apiContractSourceDigests = [
     },
   },
   {
-    source: '../db/src/queries/trace-availability.ts',
-    sourceSha256: '9a4363a57ae319cadae4780b2ac584798b16580755aae0a61f9b7a686848ceec',
-    reviewArea: {
-      en: 'Trace availability ID-keyed boolean response shape.',
-      zh: '跟踪可用性按 ID 索引的布尔响应结构。',
-    },
-  },
-  {
     source: '../db/src/queries/trace-histograms.ts',
     // Reviewed for gzip request-timeline storage (migration 017): gzip rows
     // stream the same ISL/OSL arrays in Node. Unreadable points are now logged
     // and, as before, omitted. The ID-keyed response shape is unchanged, so
     // the docs stand.
-    sourceSha256: 'a2f774da33065ca89703e41bf7d59f288281f0ad319e662319cbbb7d402d86b3',
+    sourceSha256: 'aa3d9b73237cf142eb48089a4baeb5db9930295b84b3662125a16e72b5325ff6',
     reviewArea: {
       en: 'Trace histogram input/output token arrays and ID-keyed response shape.',
       zh: '跟踪直方图输入/输出 token 数组和按 ID 索引的响应结构。',
@@ -1968,7 +2191,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/trace-server-metrics.ts',
-    sourceSha256: '5e5409267997e2ca5df90e6ffa74042090a332ac5bd29e3a52055b8674725bdb',
+    sourceSha256: '37209bcbb9589f3c582285596881e9e7d21ee1f52bc8952ec8c0745aa0f66fbd',
     reviewArea: {
       en: 'Trace server metric metadata, time-series groups, source labels, and units.',
       zh: '跟踪服务器指标元数据、时间序列分组、来源标签和单位。',
@@ -1976,7 +2199,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/workflow-info.ts',
-    sourceSha256: '7e7d6fc965a47655fe9fa6feb6d8282eff58c2aedca1bcdb59ac1e8c91128d31',
+    sourceSha256: '4825209f9df30095849595681634be0e259cb5f6641238939d1f607003993df4',
     reviewArea: {
       en: 'Availability rows plus workflow runs, changelogs, configurations, and run coverage responses.',
       zh: '可用配置行以及工作流运行、变更记录、配置和运行覆盖响应。',

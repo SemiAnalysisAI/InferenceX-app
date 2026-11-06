@@ -27,6 +27,7 @@ import { runViewsRoute, ViewsApiParamError } from './errors';
 import {
   parseCostProviderParam,
   parseCostTypeParam,
+  parseChipBasisParam,
   parseEnumParam,
   parseNumberMap,
   parseNumberParam,
@@ -45,7 +46,10 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
   return runViewsRoute(view, async () => {
     const search = request.nextUrl.searchParams;
     validateParams(search, VIEW_QUERY_PARAMS[view]);
-    const params = selection(search);
+    const params =
+      view === 'first-token'
+        ? { ...selection(search), chipBasis: parseChipBasisParam(search.get('chipBasis')) }
+        : selection(search);
     if (view !== 'first-token' && params.sequence !== Sequence.AgenticTraces)
       throw new ViewsApiParamError('sequence', 'This view requires agentic-traces', [
         'agentic-traces',
