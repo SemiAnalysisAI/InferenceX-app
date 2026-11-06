@@ -4445,7 +4445,6 @@ const ScatterGraph = React.memo(
                         {
                           id: 'scatter-log-scale',
                           label: legendT.logScale,
-                          advanced: true,
                           checked: logScale,
                           onCheckedChange: (checked: boolean) => {
                             setLogScale(checked);

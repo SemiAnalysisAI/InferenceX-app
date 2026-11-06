@@ -321,6 +321,34 @@ describe('clamped pills do not stack on their neighbours', () => {
     expect(next.tx).toBe(218);
     expect(next.ty).toBe(16);
   });
+
+  it('draws a series-coloured leader only for a pill moved away from its anchor', () => {
+    const { zoomGroup } = renderChart();
+    const keys = ['a', 'b', 'c', 'd', 'e'];
+    renderLineLabels(
+      zoomGroup,
+      keys.map((key) => placement(key, 200, 150, 'B300 (vLLM)')),
+      { seriesAttribute: 'data-hw-key' },
+    );
+
+    const leader = (key: string) =>
+      zoomGroup.select<SVGLineElement>(`.line-label[data-line-key="${key}"] .ll-leader`);
+    for (const key of keys.slice(0, 4)) expect(leader(key).attr('display')).toBe('none');
+    const moved = leader('e');
+    expect(moved.attr('display')).toBeNull();
+    expect(moved.attr('stroke')).toBe('#0f0');
+    const box = pillBox(zoomGroup, 'e');
+    expect(box.tx + Number(moved.attr('x1'))).toBe(200);
+    expect(box.ty + Number(moved.attr('y1'))).toBe(150);
+    const endX = box.tx + Number(moved.attr('x2'));
+    const endY = box.ty + Number(moved.attr('y2'));
+    expect(endX).toBeGreaterThanOrEqual(box.left);
+    expect(endX).toBeLessThanOrEqual(box.right);
+    expect([box.top, box.bottom]).toContain(endY);
+
+    updateRenderedLineLabels(zoomGroup, [placement('e', 200, 150, 'B300 (vLLM)')]);
+    expect(leader('e').attr('display')).toBe('none');
+  });
 });
 
 describe('line-label pills stay inside the plot bounding box', () => {

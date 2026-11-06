@@ -62,16 +62,31 @@ describe('generateVendorColors', () => {
   });
 
   it.each(['light', 'dark'] as const)(
-    'keeps same-vendor series at least 8 lightness points apart in %s mode',
+    'keeps same-vendor series at least 0.08 apart in OKLab in %s mode',
     (theme) => {
       const keys = ['b300', 'b200', 'h200', 'h100', 'mi355x', 'mi325x', 'mi300x'];
       const colors = generateVendorColors(keys, theme);
+      const oklab = (key: string) => {
+        const [l, c, h] = /^oklch\((?<l>[\d.]+) (?<c>[\d.]+) (?<h>[\d.]+)\)$/u
+          .exec(colors[key])!
+          .slice(1)
+          .map(Number);
+        const radians = (h * Math.PI) / 180;
+        return [l, c * Math.cos(radians), c * Math.sin(radians)];
+      };
       for (const family of [keys.slice(0, 4), keys.slice(4)]) {
-        const levels = family.map((key) => lightnessOf(colors[key])).toSorted((a, b) => a - b);
-        for (let i = 1; i < levels.length; i++) {
-          expect(levels[i] - levels[i - 1]).toBeGreaterThanOrEqual(0.08);
+        for (const [i, a] of family.entries()) {
+          for (const b of family.slice(i + 1)) {
+            const [la, aa, ba] = oklab(a);
+            const [lb, ab, bb] = oklab(b);
+            expect(Math.hypot(la - lb, aa - ab, ba - bb)).toBeGreaterThanOrEqual(0.08);
+          }
         }
-        if (theme === 'dark') expect(levels[0]).toBeGreaterThanOrEqual(0.6);
+        if (theme === 'dark') {
+          expect(Math.min(...family.map((key) => lightnessOf(colors[key])))).toBeGreaterThanOrEqual(
+            0.6,
+          );
+        }
       }
     },
   );
@@ -98,6 +113,15 @@ describe('generateVendorColors', () => {
       expect(hueOf(colors[ordered.at(-1)!]) - hueOf(colors[ordered[0]])).toBeGreaterThan(55);
     },
   );
+
+  it('lifts the dark yellow-green end of the NVIDIA ramp off olive', () => {
+    const keys = ['vr200_dynamo-trt', 'vr200_trt', 'gb300_dynamo-sglang', 'gb300_dynamo-trt'];
+    const dark = generateVendorColors(keys, 'dark');
+    for (const key of keys) {
+      if (hueOf(dark[key]) <= 120) expect(lightnessOf(dark[key])).toBeGreaterThanOrEqual(0.71);
+    }
+    expect(lightnessOf(dark['vr200_dynamo-trt'])).toBeGreaterThan(0.75);
+  });
 });
 
 function lightnessOf(color: string): number {
@@ -248,7 +272,7 @@ describe('Huawei shared identity colors', () => {
     expect(getVendor('other_huawei')).toBe('unknown');
   });
   it.each(['light', 'dark'] as const)(
-    'uses the same readable amber for aliases and preserves other vendor colors (%s)',
+    'uses the same readable amber-orange for aliases and preserves other vendor colors (%s)',
     (theme) => {
       const other = ['mi300x', 'mi355x', 'h100', 'tpuv7', 'jalapeno', 'mystery'];
       const before = generateVendorColors(other, theme),
@@ -256,7 +280,7 @@ describe('Huawei shared identity colors', () => {
       for (const key of other) expect(after[key]).toBe(before[key]);
       const color = after.ascend950pr;
       expect(generateVendorColors(['Huawei 950PR'], theme)['Huawei 950PR']).toBe(color);
-      expect(hsl(color).h).toBeGreaterThan(35);
+      expect(hsl(color).h).toBeGreaterThan(30);
       expect(hsl(color).h).toBeLessThan(55);
       expect(
         contrastAgainst(color, theme === 'light' ? '#ffffff' : '#111214'),

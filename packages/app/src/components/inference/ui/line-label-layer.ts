@@ -211,6 +211,35 @@ function coveredSeriesCost(
   return cost;
 }
 
+const LEADER_MIN_SHIFT = 12;
+const LEADER_MIN_GAP = 6;
+
+function syncLeader(
+  node: SVGGElement,
+  label: LineLabelPlacement,
+  local: RectBounds,
+  tx: number,
+  ty: number,
+  show: boolean,
+): void {
+  const leader = node.querySelector<SVGLineElement>('.ll-leader');
+  if (!leader) return;
+  const ax = label.x - tx;
+  const ay = label.y - ty;
+  const ex = Math.min(Math.max(ax, local.left), local.right);
+  const ey = Math.min(Math.max(ay, local.top), local.bottom);
+  if (!show || Math.hypot(ax - ex, ay - ey) < LEADER_MIN_GAP) {
+    leader.setAttribute('display', 'none');
+    return;
+  }
+  leader.setAttribute('x1', String(ax));
+  leader.setAttribute('y1', String(ay));
+  leader.setAttribute('x2', String(ex));
+  leader.setAttribute('y2', String(ey));
+  leader.setAttribute('stroke', label.color);
+  leader.removeAttribute('display');
+}
+
 function layoutPills(
   items: readonly PillLayoutItem[],
   offsetX: number,
@@ -231,6 +260,7 @@ function layoutPills(
     const local = bounds ? pillLocalBox(node) : null;
     if (!bounds || !local || !label.visible) {
       node.setAttribute('transform', `translate(${tx0},${ty0})`);
+      if (local) syncLeader(node, label, local, tx0, ty0, false);
       continue;
     }
 
@@ -270,6 +300,7 @@ function layoutPills(
       node.style.opacity = '0';
       node.dataset.visible = '0';
       node.setAttribute(PLACEMENT_HIDDEN_ATTR, '');
+      syncLeader(node, label, local, clamped[0].tx, clamped[0].ty, false);
       continue;
     }
     if (node.hasAttribute(PLACEMENT_HIDDEN_ATTR)) {
@@ -278,6 +309,14 @@ function layoutPills(
     }
 
     node.setAttribute('transform', `translate(${chosen.tx},${chosen.ty})`);
+    syncLeader(
+      node,
+      label,
+      local,
+      chosen.tx,
+      chosen.ty,
+      Math.hypot(chosen.tx - tx0, chosen.ty - ty0) > LEADER_MIN_SHIFT,
+    );
     placed.push(chosen.box);
     shown++;
   }
@@ -503,6 +542,11 @@ export function renderLineLabels(
           .append('g')
           .attr('class', 'line-label')
           .style('pointer-events', 'none');
+        labelGroup
+          .append('line')
+          .attr('class', 'll-leader')
+          .attr('stroke-width', 1)
+          .attr('display', 'none');
         labelGroup.append('rect').attr('class', 'll-bg').attr('rx', 4).attr('ry', 4);
         labelGroup
           .append('text')

@@ -519,6 +519,8 @@ export function PrecisionSelector({
         <MultiSelect
           key={isOnlySelectedPrecision ? 'fixed' : 'selectable'}
           disabled={isOnlySelectedPrecision}
+          plainSelectedText={isOnlySelectedPrecision}
+          className={isOnlySelectedPrecision ? 'disabled:opacity-100' : undefined}
           options={availablePrecisions.map((p) => ({
             value: p,
             label: getPrecisionLabel(p as Precision),

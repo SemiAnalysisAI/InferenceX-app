@@ -214,7 +214,7 @@ export default function SubmissionsChart({ volume, mode, caption, footer }: Subm
             .attr('stroke-dasharray', '6,4')
             .attr('opacity', 0.6);
 
-          const label = g.append('g').attr('transform', `translate(${x + 8}, 8)`);
+          const label = g.append('g').attr('transform', `translate(${x + 13}, 11)`);
           const text = label
             .append('text')
             .attr('fill', 'var(--foreground)')
@@ -237,18 +237,18 @@ export default function SubmissionsChart({ volume, mode, caption, footer }: Subm
             .attr('y', bbox.y - 3)
             .attr('width', bbox.width + 10)
             .attr('height', bbox.height + 6)
-            .attr('rx', 4)
-            .attr('fill', 'var(--muted)')
+            .attr('rx', 6)
+            .attr('fill', 'var(--card)')
             .attr('stroke', 'var(--border)')
-            .attr('stroke-width', 1)
-            .attr('opacity', 0.9);
+            .attr('stroke-opacity', 0.5)
+            .attr('stroke-width', 1);
         },
         onZoom: (group: d3.Selection<SVGGElement, unknown, null, undefined>, ctx: ZoomContext) => {
           const newXScale = ctx.newXScale as unknown as d3.ScaleTime<number, number>;
           const x = newXScale(NIGHTLY_END_DATE);
 
           group.select('.nightly-marker line').attr('x1', x).attr('x2', x);
-          group.select('.nightly-marker g').attr('transform', `translate(${x + 8}, 8)`);
+          group.select('.nightly-marker g').attr('transform', `translate(${x + 13}, 11)`);
         },
       },
       {

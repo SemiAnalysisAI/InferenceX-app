@@ -355,13 +355,8 @@ export default function ChartLegend({
   const itemClassName = (item: CommonLegendItemProps) =>
     cn(
       'transition-opacity duration-300',
-      isSidebar
-        ? item.isActive
-          ? ''
-          : 'no-export'
-        : item.isActive
-          ? 'opacity-100'
-          : 'opacity-50 no-export',
+      !item.isActive && 'no-export',
+      !isSidebar && (item.isActive || item.isHighlighted ? 'opacity-100' : 'opacity-50'),
       itemsExpanded && 'md:w-full md:block',
     );
 

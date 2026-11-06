@@ -34,6 +34,17 @@ function pickLightness(index: number, count: number, theme: 'light' | 'dark'): n
   return max - (index / (count - 1)) * (max - min);
 }
 
+const DARK_YELLOW_GREEN = { fullHue: 125, clearHue: 150, min: 0.72, max: 0.93 } as const;
+
+function liftDarkYellowGreen(lightness: number, hue: number): number {
+  const { min, max } = LIGHTNESS.dark;
+  const band = DARK_YELLOW_GREEN;
+  const weight = Math.min(1, Math.max(0, (band.clearHue - hue) / (band.clearHue - band.fullHue)));
+  const floor = min + weight * (band.min - min);
+  const ceiling = max + weight * (band.max - max);
+  return floor + ((lightness - min) * (ceiling - floor)) / (max - min);
+}
+
 const GOLDEN_RATIO_FRACTION = 0.618_033_988_7;
 const LIGHTNESS_SEQUENCE_OFFSET = 0.6;
 
@@ -86,7 +97,9 @@ export function generateVendorColors(
           ? (zone.start + zone.end) / 2
           : zone.start + ((i + 0.5) / count) * (zone.end - zone.start);
 
-      const lightness = pickLightness(ranks[i], count, theme);
+      const picked = pickLightness(ranks[i], count, theme);
+      const lightness =
+        theme === 'dark' && vendor === 'nvidia' ? liftDarkYellowGreen(picked, hue) : picked;
       result[keys[i]] = `oklch(${lightness.toFixed(3)} ${chroma} ${hue.toFixed(1)})`;
     }
   }

@@ -782,7 +782,12 @@ describe('Chart Selectors', () => {
         .should('be.visible')
         .and('have.text', 'FP8');
       cy.get('label[for="precision-select"]').should('have.text', 'Precision');
-      cy.get('[role="combobox"]').should('be.disabled').and('have.css', 'cursor', 'not-allowed');
+      cy.get('[role="combobox"]')
+        .should('be.disabled')
+        .and('have.css', 'cursor', 'not-allowed')
+        .and('have.css', 'opacity', '1');
+      cy.get('[data-slot="select-chip"]').should('not.exist');
+      cy.get('[data-slot="select-values"] .text-foreground').should('have.text', 'FP8');
     });
   });
 });

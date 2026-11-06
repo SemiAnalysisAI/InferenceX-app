@@ -26,6 +26,7 @@ import { SEG } from './trace-flamegraph';
 type Locale = 'en' | 'zh';
 
 const TICKS = [64_000, 128_000, 192_000, 256_000];
+const CACHED_FILL = 'bg-[#059669] dark:bg-[#10b981]/70';
 
 function tokens(n: number): string {
   return n >= 1000 ? `${Number((n / 1000).toFixed(1))}k` : String(n);
@@ -105,7 +106,7 @@ function Segment({
   minPx = 0,
 }: {
   value: number;
-  color: string;
+  color?: string;
   className?: string;
   minPx?: number;
 }) {
@@ -132,11 +133,7 @@ function Row({ row, frame, label }: { row: ReplayRow; frame: Frame; label: strin
         {label}
       </span>
       <div className={cn('flex h-2.5 flex-1', !shown && 'bg-foreground/5')}>
-        <Segment
-          value={shown?.cached ?? 0}
-          color={SEG.cached}
-          className="opacity-40 dark:opacity-70"
-        />
+        <Segment value={shown?.cached ?? 0} className={CACHED_FILL} />
         <Segment
           value={shown?.fresh ?? 0}
           color={SEG.uncached}
@@ -290,11 +287,8 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
                 {stat.color ? (
                   <span
                     aria-hidden="true"
-                    className={cn(
-                      'size-2 shrink-0',
-                      stat.key === 'cached' && 'opacity-40 dark:opacity-70',
-                    )}
-                    style={{ backgroundColor: stat.color }}
+                    className={cn('size-2 shrink-0', stat.key === 'cached' && CACHED_FILL)}
+                    style={stat.key === 'cached' ? undefined : { backgroundColor: stat.color }}
                   />
                 ) : null}
                 {stat.label}
