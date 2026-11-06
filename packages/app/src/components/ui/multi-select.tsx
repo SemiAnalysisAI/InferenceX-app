@@ -138,10 +138,13 @@ function MultiSelect({
   const isControlledOpen = open !== undefined;
   const isOpen = isControlledOpen ? open : internalIsOpen;
   const [exitPresent, setExitPresent] = React.useState(false);
+  React.useLayoutEffect(() => {
+    // Controlled reopens must clear the preserved filter before paint too.
+    if (isOpen) setSearch('');
+  }, [isOpen]);
   React.useEffect(() => {
     if (isOpen) {
       setExitPresent(true);
-      setSearch('');
       return;
     }
     // Wait for the actual CSS exit, including reduced-motion's zero-animation path.

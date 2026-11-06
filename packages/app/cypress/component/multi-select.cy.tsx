@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 import { MultiSelect, type MultiSelectOption } from '@/components/ui/multi-select';
@@ -41,6 +41,49 @@ function MultiSelectWrapper({
 }
 
 describe('MultiSelect', () => {
+  it('clears a preserved filter before the first frame of a controlled reopen', () => {
+    const onOpenFrame = cy.stub().as('openFrame');
+    function ControlledSelect() {
+      const [open, setOpen] = useState(false);
+      const root = useRef<HTMLDivElement>(null);
+      useLayoutEffect(() => {
+        const win = root.current?.ownerDocument.defaultView;
+        if (!open || !win) return;
+        const frame = win.requestAnimationFrame(() => {
+          const menu = root.current?.querySelector('[data-slot="select-content"]');
+          onOpenFrame(
+            menu?.querySelector('input')?.value,
+            menu?.querySelectorAll('[role="option"]').length,
+          );
+        });
+        return () => win.cancelAnimationFrame(frame);
+      }, [open]);
+      return (
+        <div ref={root}>
+          <button onClick={() => setOpen(true)}>Open externally</button>
+          <MultiSelect
+            options={OPTIONS}
+            value={[]}
+            onChange={() => {}}
+            open={open}
+            onOpenChange={setOpen}
+          />
+        </div>
+      );
+    }
+    cy.mount(<ControlledSelect />);
+    cy.contains('button', 'Open externally').click();
+    cy.get('@openFrame').should('have.been.calledWith', '', OPTIONS.length);
+    cy.get('input').type('H100{esc}');
+    cy.get('[data-slot="select-content"][data-state="closed"]').should(($menu) => {
+      expect($menu.find('input')).to.have.value('H100');
+      $menu[0].getAnimations().forEach((animation) => animation.pause());
+    });
+    cy.get('@openFrame').invoke('resetHistory');
+    cy.contains('button', 'Open externally').click();
+    cy.get('@openFrame').should('have.been.calledWith', '', OPTIONS.length);
+  });
+
   it('preserves filtered rows while closing and clears search after the exit', () => {
     cy.mount(<MultiSelectWrapper />);
     cy.get('[role="combobox"]').click();
