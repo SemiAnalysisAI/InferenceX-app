@@ -5,8 +5,14 @@ export const CANVAS_POINT_LAYER_SELECTOR = `.${CANVAS_POINT_LAYER_CLASS}`;
 export const POINT_HIT_AREA_CLASS = 'dot-hit-area';
 export const POINT_LABEL_ANCHOR_CLASS = 'point-label-anchor';
 export const POINTS_JOINED_ATTRIBUTE = 'data-points-joined';
+export const CANVAS_UNDERLAY_ATTRIBUTE = 'data-canvas-underlay';
 
 export const canvasPointLayers = new WeakMap<Element, unknown>();
+
+export function revealCanvasUnderlay(shape: SVGElement): void {
+  shape.removeAttribute(CANVAS_UNDERLAY_ATTRIBUTE);
+  shape.style.removeProperty('visibility');
+}
 
 export function canvasPointLayerOf<T extends ScatterDatum = ScatterDatum>(
   root: Element | null | undefined,
