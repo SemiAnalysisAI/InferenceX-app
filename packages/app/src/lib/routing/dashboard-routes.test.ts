@@ -49,16 +49,20 @@ describe('dashboard route registry', () => {
     expect(dashboardRouteForPathname('/historical/kimi-k3')?.key).toBe('historical');
   });
 
-  it('puts both profit estimators between Inference Performance and Accuracy Evals', () => {
+  it('orders primary tabs with the profit estimators before Accuracy Evals and Video after it', () => {
     const primary = DASHBOARD_ROUTES.filter((route) => route.navGroup === 'primary').map(
       (route) => route.key,
     );
-    expect(primary.slice(0, 4)).toEqual([
+    expect(primary).toEqual([
       'inference',
       'profit-estimator-per-gigawatt',
       'profit-estimator',
       'evaluation',
+      'video',
+      'submissions',
+      'operatorx',
     ]);
+    expect(getDashboardRoute('video').indexable).toBe(true);
     expect(primary).not.toContain('calculator');
     expect(primary).not.toContain('fleet');
     expect(primary).not.toContain('historical');

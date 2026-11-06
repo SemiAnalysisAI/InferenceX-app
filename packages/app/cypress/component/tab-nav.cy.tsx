@@ -271,6 +271,7 @@ describe('TabNav — Hidden popover for gated tabs', () => {
       'profit-estimator-per-gigawatt',
       'profit-estimator',
       'evaluation',
+      'video',
       'submissions',
     ]) {
       cy.get(`[data-testid="mobile-tab-${key}"]`).should('exist');

@@ -549,7 +549,7 @@ describe('VideoGenX results', () => {
     it(`keeps ${pathname} and its workload line readable at ${width} px`, () => {
       cy.viewport(width, 844);
       mount({ pathname, search: '?r_y=videosPerGpuHour' });
-      cy.get('[data-testid="video-results"] h1').should('contain', 'VideoGenX');
+      cy.contains('[data-testid="video-results"] h2', 'VideoGenX').should('be.visible');
       cy.get('#video-results-chart-title').should(
         'contain',
         pathname.startsWith('/zh') ? '每 GPU 小时生成视频数' : 'Videos per GPU-hour',

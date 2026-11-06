@@ -390,7 +390,6 @@ describe('H3 video performance history', () => {
       .each(($observation) => {
         expect($observation).to.contain('NVIDIA H200').and.not.contain('NVIDIA B200');
       });
-    cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
     cy.get('[aria-label="客户端并发数"]').click();
     cy.contains('[role="option"]', 'C2').click();
     cy.get('[data-testid="video-history-observation"]')
@@ -424,20 +423,19 @@ describe('H3 video performance history', () => {
       .should('have.length', 1)
       .and('contain', 'C4');
   });
-  it('keeps the hidden Video tab behind the shared unlock and noindex', () => {
-    cy.viewport(1440, 1000);
-    cy.visit('/video', {
-      onBeforeLoad(win) {
-        win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
-      },
+  for (const path of ['/video', '/zh/video']) {
+    it(`lists ${path} in primary navigation without the unlock and lets search engines index it`, () => {
+      cy.viewport(1440, 1000);
+      cy.visit(path, {
+        onBeforeLoad(win) {
+          win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+        },
+      });
+      cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
+      cy.get('[data-testid="tab-trigger-video"]')
+        .should('have.attr', 'href', path)
+        .and('have.attr', 'data-tab-active', 'true');
+      cy.get('head meta[name="robots"]').should('have.attr', 'content', 'index, follow');
     });
-    cy.get('video[data-role]').should('not.exist');
-    cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
-    cy.get('body').type(
-      '{upArrow}{upArrow}{downArrow}{downArrow}{leftArrow}{rightArrow}{leftArrow}{rightArrow}BA',
-    );
-    cy.get('[data-testid="tab-trigger-hidden"]').click();
-    cy.contains('a', 'Video').should('have.attr', 'href', '/video');
-    cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
-  });
+  }
 });

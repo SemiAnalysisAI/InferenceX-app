@@ -514,7 +514,6 @@ export default function VideoDashboard({
                     <ShareButton />
                   </div>
                 }
-                headingAs="h1"
               />
               <div className={styles.controls}>
                 <MobileControlSection

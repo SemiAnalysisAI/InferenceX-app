@@ -117,15 +117,23 @@ function toPoint(
  * Points arrive newest publication first, so the first occurrence wins; hardware
  * without a registry key is kept as-is because nothing can be compared against
  * it. Two server layouts of one hardware are different cells, so a GPUs-per-video
- * sweep adds points instead of replacing the existing one.
+ * sweep adds points instead of replacing the existing one. A cell published before
+ * layouts were recorded cannot be told apart from a newer layout at the same GPU
+ * count, so that newer cell supersedes it.
  */
 export function latestVideoCells(points: VideoPoint[]): VideoPoint[] {
   const seen = new Set<string>();
+  const seenGpuCounts = new Set<string>();
   return points.filter((point) => {
     if (point.hardwareKey === null) return true;
-    const key = `${point.hardwareKey}:${deploymentKey(point)}:${point.concurrency ?? 'na'}`;
-    if (seen.has(key)) return false;
+    const concurrency = point.concurrency ?? 'na';
+    const key = `${point.hardwareKey}:${deploymentKey(point)}:${concurrency}`;
+    const gpuCount = `${point.hardwareKey}:${point.participating ?? 'na'}:${concurrency}`;
+    const layoutUnknown =
+      typeof point.server?.tp !== 'number' || typeof point.server.ulysses !== 'number';
+    if (seen.has(key) || (layoutUnknown && seenGpuCounts.has(gpuCount))) return false;
     seen.add(key);
+    seenGpuCounts.add(gpuCount);
     return true;
   });
 }
