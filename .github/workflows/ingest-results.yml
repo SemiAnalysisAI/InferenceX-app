@@ -333,6 +333,10 @@ jobs:
         id: powerx
         run: bun packages/db/src/verify-power-publication.ts power-publication.json "${CACHE_INVALIDATE_URL%/api/v1/invalidate}"
 
+      - name: Verify database
+        if: ${{ !cancelled() && steps.overrides.outcome == 'success' }}
+        run: bun run admin:db:verify
+
       # Database write failures that are not PowerX problems fail this step
       # instead of the PowerX check. Runs even when an earlier step failed, so
       # the write receipt is always reported.

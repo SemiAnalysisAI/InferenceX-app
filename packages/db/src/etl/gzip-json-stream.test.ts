@@ -5,9 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   collectMetricPhases,
   gunzipJsonWithinLimit,
-  scanPrettyMetricPhases,
   streamCollectKeys,
-  streamCollectMetricPhases,
 } from './gzip-json-stream.js';
 
 describe('gunzipJsonWithinLimit', () => {
@@ -160,113 +158,67 @@ describe('collectMetricPhases', () => {
   });
 });
 
-const series = (start: number) => ({
-  series: Array.from({ length: 20 }, (_, i) => ({
-    labels: { note: 'line\nbreak "quoted" \\ end' },
+const series = (start: number, length: number) => ({
+  series: Array.from({ length }, (_, i) => ({
+    labels: { note: `line\nbreak "quoted" \\ end ü 漢字 🚀 ${i}` },
     timeslices: [{ start_ns: start + i, rate: i / 3 }],
   })),
 });
 
-describe('scanPrettyMetricPhases', () => {
+describe('collectMetricPhases streaming path', () => {
   const doc = {
     schema_version: '1.1',
-    metadata: {
-      metrics: { wanted: { nested: 'must not be selected' } },
-      warmup_metrics: { wanted: { nested: 'must not be selected' } },
-    },
+    metadata: { metrics: { wanted: 'must not be selected' } },
     metrics: {
-      ignored: series(100),
-      wanted: series(0),
+      ignored: series(0, 2000),
+      wanted: series(100, 3000),
       'quote"key': [1, { nested: true }, null],
-      'not wanted"': 'skip',
-      'slash\\': 42,
       scalar: 'last',
     },
     warmup_metrics: {
       wanted: false,
       empty: {},
-      scalar: series(50),
+      scalar: series(50, 1000),
     },
     input_config: { metrics: ['wanted'] },
   };
-  const wanted = new Set(['wanted', 'scalar', 'quote"key', 'slash\\', 'empty']);
-  const expected = {
-    metrics: {
-      wanted: doc.metrics.wanted,
-      'quote"key': [1, { nested: true }, null],
-      'slash\\': 42,
-      scalar: 'last',
-    },
-    warmupMetrics: {
-      wanted: false,
-      empty: {},
-      scalar: doc.warmup_metrics.scalar,
-    },
-    complete: false,
-  };
-  const pretty = gzipSync(JSON.stringify(doc, null, 2));
+  const wanted = new Set(['wanted', 'scalar', 'quote"key', 'empty']);
+  const pick = (phase: Record<string, unknown>) =>
+    Object.fromEntries(Object.entries(phase).filter(([key]) => wanted.has(key)));
 
-  it.each([64, 67, 100, 4096])(
-    'matches the token stream across %i-byte gunzip chunks',
-    async (chunkSize) => {
-      const scanned = await scanPrettyMetricPhases(pretty, wanted, chunkSize);
-      const streamed = await streamCollectMetricPhases(pretty, wanted);
+  it.each([
+    ['compact', JSON.stringify(doc)],
+    ['pretty-printed', JSON.stringify(doc, null, 2)],
+  ])('matches JSON.parse for %s JSON split across many gunzip chunks', async (_layout, json) => {
+    // Several 64 KiB gunzip chunks, so tokens and multi-byte characters straddle chunk edges.
+    expect(Buffer.byteLength(json)).toBeGreaterThan(8 * 64 * 1024);
+    const parsed = JSON.parse(json) as typeof doc;
 
-      expect(scanned).toEqual(expected);
-      expect(scanned).toEqual(streamed);
-      expect(Object.keys(scanned!.metrics)).toEqual(Object.keys(streamed.metrics));
-    },
-  );
+    const phases = await collectMetricPhases(gzipSync(json), wanted, 1);
 
-  it('is used by collectMetricPhases above the in-memory limit', async () => {
-    await expect(collectMetricPhases(pretty, wanted, 1)).resolves.toEqual(expected);
-  });
-
-  it('handles empty phases, duplicate members and trailing whitespace', async () => {
-    const blob = gzipSync(
-      '{\n  "metrics": {},\n  "warmup_metrics": {\n    "wanted": 1,\n    "other": 2,\n' +
-        '    "wanted": 3\n  }\n}\n',
-    );
-    const result = { metrics: {}, warmupMetrics: { wanted: 3 }, complete: false };
-
-    await expect(scanPrettyMetricPhases(blob, new Set(['wanted']))).resolves.toEqual(result);
-    await expect(streamCollectMetricPhases(blob, new Set(['wanted']))).resolves.toEqual(result);
+    expect(phases).toStrictEqual({
+      metrics: pick(parsed.metrics),
+      warmupMetrics: pick(parsed.warmup_metrics),
+      complete: false,
+    });
+    expect(Object.keys(phases.metrics)).toEqual(['wanted', 'quote"key', 'scalar']);
+    expect(Object.keys(phases.warmupMetrics)).toEqual(['wanted', 'empty', 'scalar']);
   });
 
   it.each([
-    ['compact JSON', JSON.stringify(doc), expected],
-    ['4-space indentation', JSON.stringify(doc, null, 4), expected],
-    ['tab indentation', JSON.stringify(doc, null, '\t'), expected],
-    [
-      'a single-line phase',
-      '{\n  "metrics": {"wanted": 1}\n}',
-      { metrics: { wanted: 1 }, warmupMetrics: {}, complete: false },
-    ],
-    [
-      'a non-object phase',
-      '{\n  "metrics": null,\n  "warmup_metrics": {\n    "wanted": 1\n  }\n}',
-      { metrics: {}, warmupMetrics: { wanted: 1 }, complete: false },
-    ],
-    [
-      'duplicate phase keys',
-      '{\n  "metrics": {\n    "wanted": 1\n  },\n  "metrics": {\n    "wanted": 3\n  }\n}',
-      { metrics: { wanted: 3 }, warmupMetrics: {}, complete: false },
-    ],
-    [
-      'a nested value at member indentation',
-      '{\n  "metrics": {\n    "wanted": [\n    "x"\n    ]\n  }\n}',
-      { metrics: { wanted: ['x'] }, warmupMetrics: {}, complete: false },
-    ],
-  ])('falls back to the token stream for %s', async (_name, json, result) => {
-    const blob = gzipSync(json);
-
-    await expect(scanPrettyMetricPhases(blob, wanted, 64)).resolves.toBeNull();
-    await expect(collectMetricPhases(blob, wanted, 1)).resolves.toEqual(result);
+    ['an unterminated document', '{"metrics": {"wanted": 1}'],
+    ['an unterminated value', '{"metrics": {"wanted": [1, 2'],
+    ['trailing characters', '{"metrics": {"wanted": 1}} x'],
+    ['a whitespace-only document', '  \n'],
+  ])('rejects %s', async (_name, json) => {
+    await expect(collectMetricPhases(gzipSync(json), wanted, 1)).rejects.toThrow();
   });
 
-  it('rejects layouts that do not end at the top-level object', async () => {
-    const truncated = gzipSync(JSON.stringify(doc, null, 2).slice(0, -2));
+  it('rejects a truncated gzip stream', async () => {
+    const blob = gzipSync(JSON.stringify(doc));
 
-    await expect(scanPrettyMetricPhases(truncated, wanted)).resolves.toBeNull();
+    await expect(
+      collectMetricPhases(blob.subarray(0, blob.length >> 1), wanted, 1),
+    ).rejects.toThrow();
   });
 });
