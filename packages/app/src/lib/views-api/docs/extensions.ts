@@ -467,8 +467,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '完整模型标识；未指定时选择硬件覆盖最多的合格工作负载。',
   ],
   r_workload: [
-    'Compact key from options.workloads; resolves to the complete canonical workloadKey internally. One shared 20-scheduled-clip C1 spec with at least 10 valid samples per hardware.',
-    'options.workloads 中的短 key，内部解析为完整 canonical workloadKey。所有硬件共用计划 20 条视频的 C1 spec，每种硬件至少 10 个有效样本。',
+    'Compact key from options.workloads; resolves to the complete canonical workloadKey internally. Any source point ID of the same workload also resolves, so shared links survive later publications. One shared 20-scheduled-clip C1 spec with at least 10 valid samples per hardware.',
+    'options.workloads 中的短 key，内部解析为完整 canonical workloadKey。同一工作负载任一数据点的 ID 也能解析，因此之后有新结果发布时，已分享的链接仍然有效。所有硬件共用计划 20 条视频的 C1 spec，每种硬件至少 10 个有效样本。',
   ],
   r_resolution: [
     'Exact width×height from the sealed plan, such as 1344×768.',

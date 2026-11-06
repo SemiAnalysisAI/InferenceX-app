@@ -243,6 +243,11 @@ describe('VideoGenX results contract', () => {
     expect(explicit.workloadKey).toBe(named.workloadKey);
     expect(new URLSearchParams(resultsSearch(explicit.state)).get('r_workload')).toBe(named.id);
     expect(resultProjection([eligible], { ...state(), workload: 'missing' }).cells).toEqual([]);
+    // A shared link keeps its workload after another point of it becomes the representative.
+    const republished = { ...eligible, id: 'republished:c1', hardwareKey: 'h200' };
+    const shared = resultProjection([republished, eligible], { ...state(), workload: eligible.id });
+    expect(shared.workloadKey).toBe(eligible.workloadKey);
+    expect(shared.state.workload).toBe(republished.id);
     expect(explicit.workloadMix.every((cell) => cell.point.approved === true)).toBe(true);
     const fallback = resultProjection([], selection, [named]);
     expect(fallback.cells).toEqual([]);

@@ -449,7 +449,7 @@ export function resultProjection(
   const workloadKey =
     state.workload === null
       ? preferred
-      : ([...workloads].find(([, item]) => item.key === state.workload)?.[0] ?? null);
+      : (available.find((point) => point.id === state.workload)?.workloadKey ?? null);
   const official = matches.filter(
     (p) => p.workloadKey === workloadKey && p.runId !== state.unofficialRun,
   );

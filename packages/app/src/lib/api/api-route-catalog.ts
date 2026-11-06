@@ -1558,7 +1558,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results.ts',
-    sourceSha256: '7adfab86ce87e978d65b5e901fa2e402a049ba6e94e1b3f987addb1e4d0f2057',
+    sourceSha256: '053712b28c1d10b8f08e345290be4afcfcca79829d9517eaf11e8936db6f1a54',
     reviewArea: {
       en: 'Shared VideoGenX results selectors, sample admission, dual GPU cost bases and modelled profit.',
       zh: 'VideoGenX 结果页共用的筛选、样本准入、两种 GPU 成本口径及估算利润。',
