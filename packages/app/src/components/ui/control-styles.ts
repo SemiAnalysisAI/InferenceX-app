@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+
 export const CONTROL_HEIGHT = {
   default: 'h-11 md:h-9',
   sm: 'h-11 md:h-8',
@@ -9,6 +11,11 @@ export const CONTROL_MIN_HEIGHT = {
 } as const;
 
 export const CONTROL_FOCUS = 'outline-none';
+
+export function rangeProgressStyle(value: number, min: number, max: number): CSSProperties {
+  const progress = max > min ? ((value - min) / (max - min)) * 100 : 0;
+  return { '--range-progress': `${Math.min(100, Math.max(0, progress))}%` } as CSSProperties;
+}
 
 export const HEADER_ACTION_STYLE =
   'inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-200 focus-visible:outline-none cursor-pointer';

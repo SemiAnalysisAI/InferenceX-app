@@ -57,6 +57,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/tco-model-dialog';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
+import { rangeProgressStyle } from '@/components/ui/control-styles';
 import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
 import { ChipBasisNote } from '@/components/ui/chip-basis-note';
 import { ChipBasisCaption } from '@/components/ui/chip-basis-toggle';
@@ -1111,10 +1112,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                         ariaLabel={t.metricLabel}
                         value={barMetric}
                         onValueChange={handleBarMetricChange}
-                        className="items-stretch gap-0 overflow-hidden md:h-9 md:p-0"
-                        buttonClassName="rounded-none px-3"
-                        activeButtonClassName="bg-primary text-foreground dark:text-primary-foreground"
-                        inactiveButtonClassName="bg-background text-muted-foreground hover:bg-muted"
                         options={BAR_METRIC_OPTIONS.map((opt) => ({
                           value: opt.value,
                           testId: `calculator-metric-${opt.value}`,
@@ -1179,13 +1176,12 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                             onPointerUp={() =>
                               track('calculator_target_slider_set', { mode, value: targetValue })
                             }
-                            className="w-full h-2 appearance-none rounded-full bg-secondary cursor-pointer
-                        [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4
-                        [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full
-                        [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer
-                        [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4
-                        [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary
-                        [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
+                            className="range-slider h-4 w-full"
+                            style={rangeProgressStyle(
+                              targetValue,
+                              currentRange.min,
+                              currentRange.max,
+                            )}
                           />
                           <div
                             className="relative h-4 text-xs tabular-nums text-muted-foreground"

@@ -248,9 +248,9 @@ html[data-inferencex-embed] .autumn-leaves {
 :root {
   --radius: 0.625rem;
 
-  --background: #eaebec;
+  --background: #eef0f2;
   --foreground: #131416;
-  --card: #f3f4f5;
+  --card: #ffffff;
   --card-foreground: #131416;
   --popover: #fafafa;
   --popover-foreground: #171717;
@@ -261,7 +261,7 @@ html[data-inferencex-embed] .autumn-leaves {
   --brand: var(--secondary);
   --muted: #b4b9bc;
   --muted-foreground: #27272a;
-  --accent: #fafafa;
+  --accent: #eef0f2;
   --accent-foreground: #1d1f21;
   --destructive: oklch(0.55 0.2 25);
   --success: oklch(0.52 0.1 155);
@@ -732,6 +732,56 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
 .chart-root .tick text {
   font-size: 10px;
   fill: var(--foreground);
+}
+
+.range-slider {
+  --range-fill: var(--brand);
+  --range-track: color-mix(in oklab, var(--muted-foreground) 25%, transparent);
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+.range-slider::-webkit-slider-runnable-track {
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--range-fill) var(--range-progress, 0%),
+    var(--range-track) var(--range-progress, 0%)
+  );
+}
+.range-slider::-moz-range-track {
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: var(--range-track);
+}
+.range-slider::-moz-range-progress {
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: var(--range-fill);
+}
+.range-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  margin-top: -0.3125rem;
+  border-radius: 9999px;
+  border: 2px solid var(--card);
+  background: var(--range-fill);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+}
+.range-slider::-moz-range-thumb {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  border: 2px solid var(--card);
+  background: var(--range-fill);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+}
+.range-slider:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 9999px;
 }
 
 /*

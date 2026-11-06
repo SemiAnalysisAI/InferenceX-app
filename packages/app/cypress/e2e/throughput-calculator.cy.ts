@@ -106,7 +106,7 @@ describe('TCO Calculator', () => {
       for (const { metric, title, badges } of metrics) {
         cy.get(`[data-testid="calculator-metric-${metric}"]`)
           .click()
-          .should('have.class', 'bg-primary');
+          .should('have.attr', 'aria-pressed', 'true');
         cy.get('[data-testid="calculator-chart-section"] h2').first().should('contain.text', title);
         cy.get('[data-testid="calculator-bar-chart"] svg .bar').should(
           'have.length.greaterThan',
