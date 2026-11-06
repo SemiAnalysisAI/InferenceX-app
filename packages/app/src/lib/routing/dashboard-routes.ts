@@ -76,6 +76,16 @@ export const DASHBOARD_SHELL_CAPABILITY_ROUTES = [
 
 export const DASHBOARD_ROUTES = [
   {
+    key: 'video',
+    path: '/video',
+    canonicalPath: '/video',
+    navGroup: 'feature-gated',
+    indexable: false,
+    localeMirrored: true,
+    providers: STANDALONE_DASHBOARD_PROVIDERS,
+    shareParamScopes: ['v_', 'r_'],
+  },
+  {
     key: 'inference',
     path: '/inference',
     canonicalPath: '/inference',
@@ -124,16 +134,6 @@ export const DASHBOARD_ROUTES = [
     localeMirrored: true,
     providers: FILTERED_DASHBOARD_PROVIDERS,
     shareParamScopes: ['g_', 'e_'],
-  },
-  {
-    key: 'video',
-    path: '/video',
-    canonicalPath: '/video',
-    navGroup: 'primary',
-    indexable: true,
-    localeMirrored: true,
-    providers: STANDALONE_DASHBOARD_PROVIDERS,
-    shareParamScopes: ['v_', 'r_'],
   },
   {
     key: 'historical',

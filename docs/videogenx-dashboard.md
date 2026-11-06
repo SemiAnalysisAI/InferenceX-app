@@ -1,9 +1,8 @@
 # VideoGenX results (/video)
 
 `VideoDashboard` renders the same shared results view at `/video` and `/zh/video`.
-Both routes are primary, indexable dashboard tabs in the route registry, listed after
-Accuracy Evals. The page reuses the published History reader and sealed media loader.
-All visible copy lives in component-local `STRINGS`.
+It preserves the existing feature gate, route registry, published History reader,
+and sealed media loader. All visible copy lives in component-local `STRINGS`.
 
 ## Selection and evidence
 
@@ -308,7 +307,7 @@ browser playback and difference failure, bilingual layout and 390px overflow.
 
 ## 中文说明
 
-`/video` 与 `/zh/video` 共用结果页，在路由注册表中作为可被搜索引擎收录的主导航标签页，排在准确率评估之后；页面沿用 History 和封存媒体读取器。
+`/video` 与 `/zh/video` 共用结果页，沿用现有路由、功能开关、History 和封存媒体读取器。
 未记录服务端布局（TP、Ulysses）的早期数据点无法与同一 GPU 数量下已记录布局的数据点区分，因此会被同一硬件、GPU 数量和并发数下更新的数据点取代；通过运行信息选择更早的运行时仍会显示。
 比较要求固定的 20 条视频 C1 工作负载，每种硬件至少 10 个有效样本；完整身份包含模型版本、
 生成参数、prompt、seed 和测量语义。较短 smoke、未完成及未匹配结果留在性能历史，不混入比较。

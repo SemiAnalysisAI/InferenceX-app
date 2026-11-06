@@ -114,9 +114,9 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
       'Current InferenceX Docker image tags per model, chip SKU and config, compared against the latest vLLM and SGLang releases to flag outdated tags.',
   },
   video: {
-    title: 'VideoGenX Video Generation Benchmarks',
+    title: 'VideoGenX Results',
     description:
-      'Compare MiniMax-H3 video generation latency, cost and GPU energy per clip on NVIDIA B200, H200, H100 and AMD MI355X, served with SGLang.',
+      'Compare matched generation clips, latency, throughput, GPU-board energy and both GPU cost bases with retained CI evidence.',
   },
   feedback: {
     title: 'User Feedback',
@@ -162,7 +162,7 @@ export const TAB_INTRO: Record<DashboardRouteKey, string> = {
   'current-inferencex-image':
     'The Docker image tags InferenceX currently runs, listed per model, chip SKU and config and compared against the latest upstream vLLM and SGLang releases to spot outdated images.',
   video:
-    'VideoGenX benchmarks MiniMax-H3 video generation served with SGLang on NVIDIA B200, H200, H100 and AMD MI355X. Every chip runs the same fixed workload of 20 clips at 1344×768 and 5 seconds each, at several GPU counts. The dashboard compares latency per clip, video-seconds per $1 of TCO, videos per GPU-hour and GPU-board energy per clip, and plays the generated clips side by side. Each point links to the GitHub Actions run that produced it.',
+    'Reads H3 CI artifacts in the browser to show run status, measurements and comparison verdicts. Comparison thresholds stay uncalibrated until backend labels are calibrated.',
   feedback:
     'Internal feedback viewer. Decrypts and shows user-submitted feedback in the browser with a key that never leaves this page.',
 };

@@ -107,9 +107,8 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
       '各模型、芯片 SKU 和配置的当前 InferenceX Docker 镜像标签。对比已部署镜像与最新 vLLM 和 SGLang 发布版本，标记过期标签。',
   },
   video: {
-    title: 'VideoGenX 视频生成基准测试',
-    description:
-      '使用 SGLang 部署 MiniMax-H3，对比其在 NVIDIA B200、H200、H100 与 AMD MI355X 上每条视频的生成延迟、成本和 GPU 能耗。',
+    title: 'VideoGenX 生成结果',
+    description: '比较匹配的视频、延迟、吞吐量、GPU 板卡能耗和两种 GPU 成本口径，并保留 CI 证据。',
   },
   feedback: {
     title: '用户反馈',
@@ -155,7 +154,7 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
   'current-inferencex-image':
     '本页面展示 InferenceX 当前使用的 Docker 镜像标签：按模型、芯片 SKU 和配置列出已部署版本，并与上游 vLLM、SGLang 最新发布版本对比，方便排查过期镜像。',
   video:
-    '本页面展示 VideoGenX 视频生成基准测试结果：MiniMax-H3 使用 SGLang 部署，在 NVIDIA B200、H200、H100 与 AMD MI355X 上按不同 GPU 数量运行同一组固定工作负载（20 条视频，1344×768，每条 5 秒）。页面对比单条视频延迟、每 1 美元 TCO 生成的视频秒数、每 GPU 小时生成视频数和每条视频的 GPU 板卡能耗，并同步播放各硬件生成的视频。每个数据点都链接到对应的 GitHub Actions 运行。',
+    '本页面只读展示已发布的视频生成结果，按同一 20 条视频 C1 工作负载比较各硬件；尚无实测证据的指标显示为空态。',
   feedback:
     '本页面为内部反馈查看器：使用解密密钥在浏览器中解密并查阅用户提交的反馈内容，密钥不会离开此页面。',
 };
