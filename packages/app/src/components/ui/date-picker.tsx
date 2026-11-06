@@ -37,7 +37,7 @@ const STRINGS = {
     latest: 'Latest',
     previousDate: 'Previous available date',
     nextDate: 'Next available date',
-    runDate: 'Run date:',
+    runDate: 'Run date',
     title: 'Select a run date',
     description: 'Select a run date to view the performance data for that run',
     checking: 'Checking available dates...',
@@ -53,7 +53,7 @@ const STRINGS = {
     latest: '最新',
     previousDate: '上一个可用日期',
     nextDate: '下一个可用日期',
-    runDate: '运行日期：',
+    runDate: '运行日期',
     title: '选择运行日期',
     description: '选择运行日期以查看该次运行的性能数据',
     checking: '正在检查可用日期...',
@@ -75,11 +75,6 @@ export interface DatePickerProps {
   isCheckingAvailableDates?: boolean;
   isLatestRunSelected?: boolean;
   onGoToLatestRun?: () => void;
-  /**
-   * Renders the picker as a labelled form field: the label sits above the control with
-   * Latest on its right, and the stepper fills the field width so it lines up with the
-   * other selectors in a control panel.
-   */
   label?: string;
 }
 
@@ -93,7 +88,7 @@ export function DatePicker({
   isCheckingAvailableDates,
   isLatestRunSelected = true,
   onGoToLatestRun,
-  label,
+  label: labelProp,
 }: DatePickerProps) {
   const fieldId = useId();
   const triggerId = `${fieldId}-trigger`;
@@ -102,6 +97,7 @@ export function DatePicker({
   const locale = useLocale();
   const t = STRINGS[locale];
   const resolvedPlaceholder = placeholder ?? t.placeholder;
+  const label = labelProp ?? t.runDate;
   const [open, setOpen] = useState(false);
   const [tempDate, setTempDate] = useState<string | undefined>(date);
   const [isApplying, _setIsApplying] = useState(false);
@@ -237,7 +233,7 @@ export function DatePicker({
       size="sm"
       onClick={handleGoToLatestExternal}
       disabled={isLatestDisabled || Boolean(isCheckingAvailableDates)}
-      className={label ? '-my-1.5 h-8 px-2' : 'px-2'}
+      className="-my-3 h-11 px-2 md:-my-1.5 md:h-8"
     >
       {t.latest}
     </Button>
@@ -245,8 +241,8 @@ export function DatePicker({
 
   const previousButton = (
     <Button
-      variant={label ? 'outline' : 'ghost'}
-      size={label ? 'icon' : 'icon-xs'}
+      variant="outline"
+      size="icon"
       onClick={handleGoPrevious}
       disabled={!canGoPrevious() || Boolean(isCheckingAvailableDates)}
       suppressHydrationWarning
@@ -258,8 +254,8 @@ export function DatePicker({
 
   const nextButton = (
     <Button
-      variant={label ? 'outline' : 'ghost'}
-      size={label ? 'icon' : 'icon-xs'}
+      variant="outline"
+      size="icon"
       onClick={handleGoNext}
       disabled={!canGoNext() || Boolean(isCheckingAvailableDates)}
       aria-label={t.nextDate}
@@ -271,31 +267,17 @@ export function DatePicker({
   const dialog = (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        {label ? (
-          <Button
-            id={triggerId}
-            variant="outline"
-            aria-labelledby={`${labelId} ${valueId}`}
-            className="w-full min-w-0 justify-start overflow-hidden px-3"
-          >
-            <Calendar className="size-4 text-muted-foreground" aria-hidden="true" />
-            <span id={valueId} className="min-w-0 truncate text-left tabular-nums">
-              {getDisplayText()}
-            </span>
-          </Button>
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            className="min-w-0 flex-1 overflow-hidden px-3 sm:min-w-[200px] sm:flex-none"
-          >
-            <Calendar className="mr-0 hidden size-4 sm:block" />
-            <strong className="sr-only sm:not-sr-only">{t.runDate}</strong>
-            <span className="tabular-nums inline-block min-w-0 truncate text-left sm:min-w-[6.5em]">
-              {getDisplayText()}
-            </span>
-          </Button>
-        )}
+        <Button
+          id={triggerId}
+          variant="outline"
+          aria-labelledby={`${labelId} ${valueId}`}
+          className="w-full min-w-0 justify-start overflow-hidden px-3"
+        >
+          <Calendar className="size-4 text-muted-foreground" aria-hidden="true" />
+          <span id={valueId} className="min-w-0 truncate text-left tabular-nums">
+            {getDisplayText()}
+          </span>
+        </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
@@ -344,28 +326,15 @@ export function DatePicker({
     </Dialog>
   );
 
-  if (label) {
-    return (
-      <div className="flex min-w-0 flex-col space-y-1.5" data-slot="date-field">
-        <div className="flex items-center justify-between gap-2">
-          <Label id={labelId} htmlFor={triggerId}>
-            {label}
-          </Label>
-          {latestButton}
-        </div>
-        <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1">
-          {previousButton}
-          {dialog}
-          {nextButton}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-2">
-      <div className="flex max-w-full items-center gap-0.5">
+    <div className="flex min-w-0 flex-col space-y-1.5" data-slot="date-field">
+      <div className="flex items-center justify-between gap-2">
+        <Label id={labelId} htmlFor={triggerId}>
+          {label}
+        </Label>
         {latestButton}
+      </div>
+      <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1">
         {previousButton}
         {dialog}
         {nextButton}

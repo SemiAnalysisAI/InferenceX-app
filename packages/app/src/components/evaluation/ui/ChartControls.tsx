@@ -140,8 +140,8 @@ export default function EvaluationChartControls() {
           testId="evaluation-secondary-controls"
         >
           <ControlPanel legend={t.runGroup} className="content-end">
-            <div className="flex min-w-0 flex-col gap-2 text-muted-foreground sm:flex-row sm:items-end">
-              <div className="min-w-0">
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end">
+              <div className="min-w-0 sm:w-64">
                 <DatePicker
                   date={selectedRunDate}
                   onChange={(date) => {
@@ -155,7 +155,7 @@ export default function EvaluationChartControls() {
 
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" className="self-start sm:self-auto">
+                  <Button variant="outline" className="self-start sm:self-auto">
                     <span className="font-medium">{t.changelog}</span>
                     <ChevronDownIcon />
                   </Button>

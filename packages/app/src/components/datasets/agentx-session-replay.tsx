@@ -121,18 +121,22 @@ function Row({ row, frame, label }: { row: ReplayRow; frame: Frame; label: strin
   const shown = visibleTokens(row, frame);
   const active = row.step === frame.step;
   return (
-    <li className="flex h-3 items-center gap-2" data-testid="agentx-session-replay-row">
+    <li className="flex h-3.5 items-center gap-2" data-testid="agentx-session-replay-row">
       <span
         className={cn(
-          'min-w-12 shrink-0 whitespace-nowrap text-right font-mono text-3xs leading-3 tabular-nums',
+          'min-w-12 shrink-0 whitespace-nowrap text-right text-3xs leading-3 tabular-nums',
           active ? 'font-semibold text-foreground' : 'text-muted-foreground',
-          shown ? 'opacity-100' : 'opacity-0',
+          shown ? 'opacity-100' : 'opacity-40',
         )}
       >
         {label}
       </span>
-      <div className="flex h-2 flex-1">
-        <Segment value={shown?.cached ?? 0} color={SEG.cached} className="opacity-40" />
+      <div className={cn('flex h-2.5 flex-1', !shown && 'bg-muted/60')}>
+        <Segment
+          value={shown?.cached ?? 0}
+          color={SEG.cached}
+          className="opacity-40 dark:opacity-70"
+        />
         <Segment
           value={shown?.fresh ?? 0}
           color={SEG.uncached}
@@ -239,7 +243,7 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
       </div>
       <p className="mt-2 min-h-10 text-sm leading-5 text-foreground sm:min-h-5">{caption}</p>
 
-      <p className="mt-3 ml-14 font-mono text-3xs text-muted-foreground" aria-hidden="true">
+      <p className="mt-3 ml-14 text-3xs text-muted-foreground" aria-hidden="true">
         {t.axis}
       </p>
       <div className="relative mt-0.5" aria-hidden="true">
@@ -252,7 +256,7 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
             />
           ))}
         </div>
-        <div className="relative mb-1 ml-14 h-4 font-mono text-3xs text-muted-foreground tabular-nums">
+        <div className="relative mb-1 ml-14 h-4 text-3xs text-muted-foreground tabular-nums">
           {TICKS.map((tick) => (
             <span
               key={tick}
@@ -286,7 +290,10 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
                 {stat.color ? (
                   <span
                     aria-hidden="true"
-                    className={cn('size-2 shrink-0', stat.key === 'cached' && 'opacity-40')}
+                    className={cn(
+                      'size-2 shrink-0',
+                      stat.key === 'cached' && 'opacity-40 dark:opacity-70',
+                    )}
                     style={{ backgroundColor: stat.color }}
                   />
                 ) : null}

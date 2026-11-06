@@ -34,10 +34,9 @@ import {
   makeRunComparisonEntry,
 } from '@/components/inference/utils/comparisonEntry';
 import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
-import ChartLegendItem from '@/components/ui/chart-legend-item';
+import ChartLegend from '@/components/ui/chart-legend';
 import { ChartShareActions, PricesSourceLink } from '@/components/ui/chart-display-helpers';
 import { ModelSelector } from '@/components/ui/chart-selectors';
 import { ControlPanel } from '@/components/ui/control-panel';
@@ -55,7 +54,7 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { InfoHelp } from '@/components/ui/option-info';
 import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/tco-model-dialog';
 import { CaptionPercentInput } from '@/components/ui/caption-percent-input';
-import { captionControlTriggerClassName, ResultContext } from '@/components/ui/result-context';
+import { ResultContext } from '@/components/ui/result-context';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -247,7 +246,9 @@ const STRINGS = {
     labCutTooltip:
       'Share of revenue paid to the model lab as a license fee on every token sold. It is owed even when compute alone exceeds revenue, so the operator can show a loss.',
     errorLoading: 'Error loading data. Please try a different selection.',
-    resetFilter: 'Reset filter',
+    utilizationShort: 'Utilization',
+    labCutShort: 'License fee',
+    highContrast: 'High contrast',
     pricingLoading: 'Loading OpenRouter pricing…',
     pricingUnavailable: (modelId: string | null) =>
       modelId
@@ -374,7 +375,9 @@ const STRINGS = {
     labCutTooltip:
       '每售出一个 token 以许可费形式支付给模型实验室的收入比例。即使算力支出已超过收入也需支付，因此运营方可能亏损。',
     errorLoading: '加载数据出错，请尝试其他选择。',
-    resetFilter: '重置筛选',
+    utilizationShort: '利用率',
+    labCutShort: '许可费',
+    highContrast: '高对比度',
     pricingLoading: '正在加载 OpenRouter 价格…',
     pricingUnavailable: (modelId: string | null) =>
       modelId
@@ -1034,7 +1037,9 @@ function ProfitEstimatorInner({
     [visibilityIntent, selectionKey, legendHwKeys],
   );
   const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
-  const { resolveColor } = useThemeColors({ highContrast: false, activeKeys: visibleKeysArray });
+  const [highContrast, setHighContrast] = useState(false);
+  const [isLegendExpanded, setIsLegendExpanded] = useState(true);
+  const { resolveColor } = useThemeColors({ highContrast, activeKeys: visibleKeysArray });
 
   const historyRanks = useMemo(
     () => profitHistoryDateRanks(fullEstimate.rows),
@@ -1216,7 +1221,7 @@ function ProfitEstimatorInner({
         searchable={false}
         trackPrefix="profit_cost_provider"
         size="sm"
-        className={captionControlTriggerClassName}
+        className="w-auto max-w-full text-xs"
         contentClassName="w-80"
         groups={[
           {
@@ -1244,7 +1249,10 @@ function ProfitEstimatorInner({
   );
 
   const utilizationControl = (
-    <span className="inline-flex items-center gap-0.5" data-testid="profit-utilization-control">
+    <span className="inline-flex items-center gap-1" data-testid="profit-utilization-control">
+      <label htmlFor="profit-utilization" className="font-medium text-foreground">
+        {t.utilizationShort}
+      </label>
       <CaptionPercentInput
         id="profit-utilization"
         testId="profit-utilization-input"
@@ -1264,7 +1272,10 @@ function ProfitEstimatorInner({
     </span>
   );
   const labCutControl = (
-    <span className="inline-flex items-center gap-0.5" data-testid="profit-lab-cut-control">
+    <span className="inline-flex items-center gap-1" data-testid="profit-lab-cut-control">
+      <label htmlFor="profit-lab-cut" className="font-medium text-foreground">
+        {t.labCutShort}
+      </label>
       <CaptionPercentInput
         id="profit-lab-cut"
         testId="profit-lab-cut-input"
@@ -1495,7 +1506,7 @@ function ProfitEstimatorInner({
                   legend={t.benchmarkGroup}
                   data-testid="profit-benchmark-panel"
                   className={cn(
-                    'grid-cols-1 items-end md:grid-cols-3 xl:[&_label]:min-h-10 xl:[&_label]:items-end xl:[&_label+*]:self-end',
+                    'grid-cols-1 items-end md:grid-cols-3',
                     // Four benchmark columns fit only on a full row; beside the pricing panel a
                     // fourth column wraps the target label to three lines and the rows misalign.
                     powerControlsEnabled && effectivePriceSource === 'custom' && 'xl:grid-cols-4',
@@ -1604,7 +1615,7 @@ function ProfitEstimatorInner({
                   legend={t.pricingGroup}
                   data-testid="profit-pricing-panel"
                   className={cn(
-                    'grid-cols-1 items-end xl:[&_label]:min-h-10 xl:[&_label]:items-end xl:[&_label+*]:self-end',
+                    'grid-cols-1 items-end',
                     effectivePriceSource === 'custom'
                       ? 'xl:col-span-12 xl:grid-cols-4'
                       : cn('xl:col-span-4', showsTcoBasis && 'sm:grid-cols-2'),
@@ -1834,31 +1845,6 @@ function ProfitEstimatorInner({
                 />
               </div>
             )}
-
-            {!loading && legendItems.length > 0 && (
-              <div
-                data-testid="profit-legend"
-                className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-border/30 pt-3"
-              >
-                <ul className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  {legendItems.map((item) => (
-                    <ChartLegendItem key={item.hw} {...item} sidebarMode />
-                  ))}
-                </ul>
-                {visibleHwKeys.size < legendHwKeys.length && (
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    data-testid="profit-reset-filter"
-                    onClick={handleResetGpus}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    {t.resetFilter}
-                  </Button>
-                )}
-              </div>
-            )}
           </div>
         </Card>
       </section>
@@ -1902,6 +1888,38 @@ function ProfitEstimatorInner({
                 assumptions={assumptions}
                 caption={caption}
                 footer={footer}
+                legendElement={
+                  legendItems.length > 0 ? (
+                    <div data-testid="profit-legend" className="contents">
+                      <ChartLegend
+                        variant="sidebar"
+                        legendItems={legendItems}
+                        isLegendExpanded={isLegendExpanded}
+                        onExpandedChange={(expanded) => {
+                          setIsLegendExpanded(expanded);
+                          track('profit_legend_expanded', { enabled: expanded });
+                        }}
+                        switches={[
+                          {
+                            id: 'profit-high-contrast',
+                            label: t.highContrast,
+                            checked: highContrast,
+                            onCheckedChange: (checked: boolean) => {
+                              setHighContrast(checked);
+                              track('profit_high_contrast_toggled', { enabled: checked });
+                            },
+                          },
+                        ]}
+                        reset={{
+                          id: 'profit-reset-filter',
+                          disabled: visibleHwKeys.size >= legendHwKeys.length,
+                          onClick: handleResetGpus,
+                        }}
+                        enableTooltips={true}
+                      />
+                    </div>
+                  ) : undefined
+                }
               />
               <div className="mt-1">
                 <InfoFold

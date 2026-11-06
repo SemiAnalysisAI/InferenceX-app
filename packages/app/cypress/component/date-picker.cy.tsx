@@ -39,13 +39,13 @@ function DatePickerWrapper({
 describe('DatePicker', () => {
   it('unavailable dates have visual indicator', () => {
     cy.mount(<DatePickerWrapper initialDate="2025-11-15" />);
-    cy.contains('Run date:').click();
+    cy.contains('Nov 15, 2025').click();
     cy.get('.grid-cols-7 button').contains(/^2$/u).should('be.disabled');
   });
 
   it('"Go to Latest" button navigates to latest available date', () => {
     cy.mount(<DatePickerWrapper initialDate="2025-11-15" />);
-    cy.contains('Run date:').click();
+    cy.contains('Nov 15, 2025').click();
     cy.contains('Go to latest').click();
     cy.contains('Apply').click();
     cy.contains('Dec 10, 2025').should('be.visible');
@@ -61,7 +61,7 @@ describe('DatePicker', () => {
 
   it('Apply button submits selected date', () => {
     cy.mount(<DatePickerWrapper initialDate="2025-11-15" />);
-    cy.contains('Run date:').click();
+    cy.contains('Nov 15, 2025').click();
     cy.get('.grid-cols-7 button').contains('10').click();
     cy.contains('Apply').click();
     cy.contains('Select a run date').should('not.exist');
@@ -70,7 +70,7 @@ describe('DatePicker', () => {
 
   it('Cancel reverts selection', () => {
     cy.mount(<DatePickerWrapper initialDate="2025-11-15" />);
-    cy.contains('Run date:').click();
+    cy.contains('Nov 15, 2025').click();
     cy.get('.grid-cols-7 button').contains('10').click();
     cy.contains('Cancel').click();
     cy.contains('Nov 15, 2025').should('be.visible');

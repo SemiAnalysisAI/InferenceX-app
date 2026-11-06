@@ -144,8 +144,11 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
           const isUnofficial = row.evalResultId <= 0;
           const runIdx = isUnofficial ? overlayRunIndex(row.runUrl, runIndexByUrl) : 0;
           return (
-            <span className="inline-flex items-center gap-1.5">
-              <span className="sm:whitespace-nowrap">
+            <span className="flex max-w-80 items-center gap-1.5 sm:w-max">
+              <span
+                className="min-w-0 sm:truncate"
+                title={row.engineLabel ? `${row.hwLabel} ${row.engineLabel}` : undefined}
+              >
                 <span className="font-medium">{row.hwLabel}</span>
                 {row.engineLabel && (
                   <span className="text-muted-foreground"> {row.engineLabel}</span>
@@ -153,7 +156,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
               </span>
               {isUnofficial && (
                 <span
-                  className="inline-flex items-center gap-1 rounded-md border border-destructive/30 bg-destructive/10 px-1 py-0.5 text-2xs font-medium text-destructive"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-md border border-destructive/30 bg-destructive/10 px-1 py-0.5 text-2xs font-medium text-destructive"
                   title={t.unofficialTitle}
                 >
                   <span
@@ -168,7 +171,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
           );
         },
         sortValue: (row) => `${row.hwLabel} ${row.engineLabel}`,
-        className: 'whitespace-nowrap',
+        className: 'w-px whitespace-nowrap',
         importance: 'key',
         pinned: true,
       },
@@ -251,14 +254,14 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         header: t.benchmark,
         cell: (row) => row.benchmark,
         sortValue: (row) => row.benchmark,
-        className: 'whitespace-nowrap',
+        className: 'w-px whitespace-nowrap',
         importance: 'secondary',
       },
       {
         header: t.date,
         cell: (row) => formatEvaluationDate(row.date, locale),
         sortValue: (row) => row.date,
-        className: 'whitespace-nowrap tabular-nums',
+        className: 'w-px whitespace-nowrap tabular-nums',
         importance: 'secondary',
       },
       {

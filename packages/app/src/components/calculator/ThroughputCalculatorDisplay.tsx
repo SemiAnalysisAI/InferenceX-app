@@ -9,7 +9,7 @@ import Link from 'next/link';
 import { BarChart3, ChevronDownIcon, Table2 } from 'lucide-react';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { useCallback, useMemo, useState } from 'react';
+import { type CSSProperties, useCallback, useMemo, useState } from 'react';
 
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
@@ -115,13 +115,6 @@ const COST_TYPE_OPTIONS: { value: CostType; label: string }[] = [
   { value: 'input', label: 'Input tokens' },
   { value: 'output', label: 'Output tokens' },
 ];
-
-/** Desktop column count matching the rendered selectors, so the row has no empty column. */
-const CONTROL_GRID_COLS: Record<number, string> = {
-  6: 'lg:grid-cols-6',
-  7: 'lg:grid-cols-7',
-  8: 'lg:grid-cols-8',
-};
 
 const BAR_METRIC_OPTIONS: { value: BarMetric; label: string }[] = [
   { value: 'throughput', label: 'Throughput' },
@@ -978,11 +971,21 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
             <TooltipProvider delayDuration={0}>
               <ControlPanel
                 legend={t.benchmarkGroup}
-                className={`md:grid-cols-2 ${
-                  CONTROL_GRID_COLS[
-                    6 + (isAgenticSequence && featureGateUnlocked ? 1 : 0) + (showsTcoBasis ? 1 : 0)
-                  ]
-                }`}
+                className="md:grid-cols-2 lg:grid-cols-(--calc-cols)"
+                style={
+                  {
+                    '--calc-cols': [
+                      'minmax(0,1fr)',
+                      'minmax(0,1fr)',
+                      'minmax(0,1fr)',
+                      ...(isAgenticSequence && featureGateUnlocked ? ['minmax(0,1fr)'] : []),
+                      'minmax(0,0.9fr)',
+                      'minmax(0,1.5fr)',
+                      'minmax(0,0.7fr)',
+                      ...(showsTcoBasis ? ['minmax(0,1fr)'] : []),
+                    ].join(' '),
+                  } as CSSProperties
+                }
               >
                 <ModelSelector
                   id="calc-model"

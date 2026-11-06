@@ -117,7 +117,7 @@ describe('Profit Estimator per GW', () => {
         cy.get('[data-testid="profit-reset-filter"]').click();
         bars().should('have.length', allBars);
         cy.get('[data-testid="profit-tco-badge"]').should('have.length', 4);
-        cy.get('[data-testid="profit-reset-filter"]').should('not.exist');
+        cy.get('[data-testid="profit-reset-filter"]').should('be.disabled');
       });
   });
 
