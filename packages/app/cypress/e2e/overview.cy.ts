@@ -691,13 +691,18 @@ describe('Overview page', () => {
           .and('have.text', 'All platforms');
       });
 
+    cy.get('[data-testid="overview-controls-panel"]')
+      .should('match', 'fieldset')
+      .and('contain.text', 'Benchmark config')
+      .within(() => {
+        cy.get('label').should('contain.text', 'SLO (tok/s/user)');
+        cy.get('label').should('contain.text', 'Engine scope');
+      });
     cy.get('[data-testid="overview-tier-switcher"]').then(([tier]) => {
       cy.get('[data-testid="overview-engine-scope-switcher"]').then(([scope]) => {
-        const tierRect = tier.getBoundingClientRect();
-        const scopeRect = scope.getBoundingClientRect();
-        expect((scopeRect.top + scopeRect.bottom) / 2).to.be.closeTo(
-          (tierRect.top + tierRect.bottom) / 2,
-          8,
+        expect(scope.getBoundingClientRect().top).to.be.closeTo(
+          tier.getBoundingClientRect().top,
+          2,
         );
       });
     });

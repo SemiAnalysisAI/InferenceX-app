@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { SEGMENTED_CONTAINER_STYLE, SEGMENT_RADIUS_STYLE } from '@/components/ui/control-styles';
+import { Label } from '@/components/ui/label';
 import { ModelLogo } from '@/components/ui/model-logo';
 import {
   OVERVIEW_DEFAULT_HISTORY_WINDOW,
@@ -588,7 +589,7 @@ export function DesktopOverviewMatrix({
               <th
                 key={platform.hardware}
                 scope="col"
-                className={`h-10 px-3 text-left ${HEADER_EDGE_COVER} ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-[color-mix(in_srgb,var(--muted)_50%,var(--card))] font-semibold text-foreground shadow-[inset_0_-1px_0_var(--border),inset_1px_0_0_var(--border),inset_-1px_0_0_var(--border),0_6px_6px_-6px_rgb(0_0_0/0.25)] after:shadow-[inset_1px_0_0_var(--border),inset_-1px_0_0_var(--border)]' : 'bg-card font-medium shadow-[inset_0_-1px_0_var(--border),0_6px_6px_-6px_rgb(0_0_0/0.25)]'}`}
+                className={`h-10 px-3 text-left ${HEADER_EDGE_COVER} ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-[color-mix(in_srgb,var(--muted)_15%,var(--card))] font-semibold text-foreground shadow-[inset_0_-1px_0_var(--border),inset_1px_0_0_var(--border),inset_-1px_0_0_var(--border),0_6px_6px_-6px_rgb(0_0_0/0.25)] after:shadow-[inset_1px_0_0_var(--border),inset_-1px_0_0_var(--border)] dark:bg-[color-mix(in_srgb,var(--muted)_50%,var(--card))]' : 'bg-card font-medium shadow-[inset_0_-1px_0_var(--border),0_6px_6px_-6px_rgb(0_0_0/0.25)]'}`}
               >
                 {comparisonMode === 'hardware' && platform.hardware === referenceHardware
                   ? `${platform.hardwareLabel} · ${strings.referenceHeader}`
@@ -641,7 +642,7 @@ export function DesktopOverviewMatrix({
                         referenceHardware,
                         referenceCost,
                       )}
-                      className={`px-3 py-2.5 align-top ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted/50 shadow-[inset_1px_0_0_var(--border),inset_-1px_0_0_var(--border)]' : ''}`}
+                      className={`px-3 py-2.5 align-top ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted/15 shadow-[inset_1px_0_0_var(--border),inset_-1px_0_0_var(--border)] dark:bg-muted/50' : ''}`}
                     >
                       <PlatformCell
                         locale={locale}
@@ -845,9 +846,9 @@ export function OverviewEngineScopeSwitcher({
     <nav
       data-testid="overview-engine-scope-switcher"
       aria-label={strings.engineScopeNavLabel}
-      className="flex w-full min-w-0 flex-col items-start gap-1 text-xs sm:w-auto sm:flex-row sm:items-center sm:gap-2"
+      className="flex w-full min-w-0 flex-col items-start gap-1.5 text-xs sm:w-auto"
     >
-      <span className="shrink-0 text-muted-foreground">{strings.engineScopeNavLabel}</span>
+      <Label>{strings.engineScopeNavLabel}</Label>
       <Select
         value={engineScope}
         onValueChange={(next: OverviewEngineScope) => {

@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
 
 import { Card } from '@/components/ui/card';
+import { ControlPanel } from '@/components/ui/control-panel';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Heading } from '@/components/ui/heading';
@@ -153,7 +154,11 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
                 </a>
               </p>
             </div>
-            <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-6">
+            <ControlPanel
+              legend={strings.controlsGroup}
+              data-testid="overview-controls-panel"
+              className="mt-3 grid-cols-1 sm:flex sm:flex-wrap sm:items-start sm:gap-x-6"
+            >
               <OverviewTierSwitcher
                 tier={data.tier}
                 engineScope={data.engineScope}
@@ -176,7 +181,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
                 locale={locale}
                 strings={strings}
               />
-            </div>
+            </ControlPanel>
           </header>
         </Card>
       )}

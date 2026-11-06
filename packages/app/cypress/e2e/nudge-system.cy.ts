@@ -330,6 +330,11 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
           expect(text.scrollHeight).to.be.at.most(text.clientHeight);
         }
       });
+    cy.get('[data-new-badge="launch-banner"]')
+      .parent()
+      .should('have.css', 'white-space', 'nowrap')
+      .and('contain.text', 'microbenchmarks');
+    cy.get('[data-testid="launch-banner"] > svg').should('have.css', 'align-self', 'flex-start');
   });
 
   it('dismissing the banner persists across reloads', () => {

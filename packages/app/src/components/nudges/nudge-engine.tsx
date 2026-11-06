@@ -799,6 +799,8 @@ export function BannerRenderer({
     onDismiss(def);
   };
 
+  const title = localized(locale, content.title, content.titleZh);
+  const titleBreak = title.lastIndexOf(' ');
   return (
     <section
       className="container mx-auto px-4 lg:px-8 mb-6 lg:mb-4"
@@ -811,17 +813,22 @@ export function BannerRenderer({
         className="group flex items-center gap-3 rounded-xl border border-border/30 bg-card px-4 py-3 transition-colors hover:bg-muted/40"
         data-testid={content.testId}
       >
-        <Icon className="size-4 shrink-0 text-muted-foreground" />
+        <Icon className="size-4 shrink-0 text-muted-foreground max-sm:mt-0.5 max-sm:self-start" />
         <div className="flex flex-1 flex-col sm:flex-row sm:items-center sm:gap-3 min-w-0">
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium leading-snug break-words">
-              <span className="align-middle">
-                {localized(locale, content.title, content.titleZh)}
-              </span>
-              {content.badge && (
-                <NewBadge data-new-badge="launch-banner" className="ml-2 align-middle" flashing>
-                  {localized(locale, content.badge, content.badgeZh)}
-                </NewBadge>
+              {content.badge ? (
+                <>
+                  <span className="align-middle">{title.slice(0, titleBreak + 1)}</span>
+                  <span className="whitespace-nowrap">
+                    <span className="align-middle">{title.slice(titleBreak + 1)}</span>
+                    <NewBadge data-new-badge="launch-banner" className="ml-2 align-middle" flashing>
+                      {localized(locale, content.badge, content.badgeZh)}
+                    </NewBadge>
+                  </span>
+                </>
+              ) : (
+                <span className="align-middle">{title}</span>
               )}
             </p>
             <p className="text-xs text-muted-foreground leading-snug break-words">

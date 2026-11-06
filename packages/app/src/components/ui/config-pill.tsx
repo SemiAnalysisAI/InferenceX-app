@@ -10,7 +10,7 @@ export function ConfigPill({ label, value, className }: ConfigPillProps) {
   return (
     <span
       className={cn(
-        'inline-flex h-5 items-center gap-1 rounded-sm border border-border px-1.5 text-xs leading-none whitespace-nowrap tabular-nums',
+        'inline-flex h-5 items-center gap-1 rounded-sm bg-foreground/[0.08] px-1.5 text-xs leading-none whitespace-nowrap tabular-nums',
         className,
       )}
     >

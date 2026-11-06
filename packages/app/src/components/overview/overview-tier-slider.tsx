@@ -15,6 +15,7 @@ import {
 } from '@/lib/overview/overview-data';
 import { overviewTierHref } from '@/lib/overview/overview-links';
 import { rangeProgressStyle } from '@/components/ui/control-styles';
+import { Label } from '@/components/ui/label';
 
 import { useOverviewNavigation, useOverviewNavigationError } from './overview-navigation';
 
@@ -99,12 +100,13 @@ export function OverviewTierSlider({
     <nav
       data-testid="overview-tier-switcher"
       aria-label={label}
-      className="flex min-w-0 items-start gap-3 text-xs"
+      className="flex w-full min-w-0 flex-col gap-1.5 text-xs sm:w-72"
     >
-      <span className="shrink-0 pt-1 text-muted-foreground">{label}</span>
-      <div className="w-[min(18rem,calc(100vw-8.5rem))] min-w-0 pt-1">
+      <Label htmlFor="overview-tier-slider">{`${label} (${unit})`}</Label>
+      <div className="w-full min-w-0 pt-1">
         <div className="relative h-4">
           <input
+            id="overview-tier-slider"
             data-testid="overview-tier-slider"
             type="range"
             min={0}
@@ -176,7 +178,6 @@ export function OverviewTierSlider({
           ))}
         </div>
       </div>
-      <span className="shrink-0 pt-1 text-muted-foreground">{unit}</span>
     </nav>
   );
 }

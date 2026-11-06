@@ -8,7 +8,7 @@ import { ChartSection } from '@/components/ui/chart-section';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Heading } from '@/components/ui/heading';
+import { Heading, HeadingQualifier } from '@/components/ui/heading';
 import { ResultContext } from '@/components/ui/result-context';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
@@ -38,6 +38,8 @@ const STRINGS = {
     noTableData: 'No submission records are available',
     chartModeAria: 'Chart mode',
     chartCaption: 'Submission activity',
+    qualifierWeekly: 'Weekly datapoints by vendor',
+    qualifierCumulative: 'Cumulative datapoints by vendor',
     chartSource: 'SemiAnalysis InferenceX™',
     statDatapoints: 'Datapoints generated',
     statConfigs: 'Distinct configurations',
@@ -62,6 +64,8 @@ const STRINGS = {
     noTableData: '暂无提交记录',
     chartModeAria: '图表模式',
     chartCaption: '提交活动',
+    qualifierWeekly: '按厂商统计的每周数据点',
+    qualifierCumulative: '按厂商统计的累计数据点',
     chartSource: 'SemiAnalysis InferenceX™',
     statDatapoints: '已生成数据点',
     statConfigs: '不同配置数',
@@ -196,6 +200,9 @@ export default function SubmissionsDisplay() {
               <div className="md:pr-72">
                 <Heading as="h3" level="card">
                   {t.chartCaption}
+                  <HeadingQualifier>
+                    {chartMode === 'weekly' ? t.qualifierWeekly : t.qualifierCumulative}
+                  </HeadingQualifier>
                 </Heading>
               </div>
             }
