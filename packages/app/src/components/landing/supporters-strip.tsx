@@ -20,13 +20,13 @@ export interface SupportersStripProps {
 export function SupportersStrip({ orgs, moreHref, moreLabel }: SupportersStripProps) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
+      <div className="flex flex-wrap gap-x-6 gap-y-2">
         {orgs.map((org) => (
           <Link
             key={org.label}
             href={org.href}
             prefetch={false}
-            className="max-w-full justify-self-start truncate text-sm text-muted-foreground transition-colors hover:text-foreground hover:underline"
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground hover:underline"
             onClick={(event) =>
               track('supporters_strip_org_clicked', {
                 org: org.label,
