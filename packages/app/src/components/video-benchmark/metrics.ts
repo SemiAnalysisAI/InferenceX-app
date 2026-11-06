@@ -83,8 +83,8 @@ export const COST_TIERS: readonly CostTier[] = ['h', 'r'];
 
 /** Same tier names the inference calculator uses for HW_REGISTRY costh/costr. */
 export const TIER_LABELS: Record<CostTier, { en: string; zh: string }> = {
-  h: { en: 'Owning at Large Hyperscaler Volume', zh: 'Hyperscaler 自有设备' },
-  r: { en: 'Rent - 3 Year Commit', zh: '租赁 - 3 年承诺' },
+  h: { en: 'Owning at large hyperscaler volume', zh: 'Hyperscaler 自有设备' },
+  r: { en: 'Rent – 3-year commit', zh: '租赁 - 3 年承诺' },
 };
 
 export const VIDEO_METRICS: Record<MetricId, MetricDefinition> = {

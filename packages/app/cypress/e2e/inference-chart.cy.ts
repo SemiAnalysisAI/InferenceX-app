@@ -174,7 +174,7 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="result-context"]')
-      .should('contain.text', 'Cost tier: Owning at Large Hyperscaler Volume')
+      .should('contain.text', 'Cost tier: Owning at large hyperscaler volume')
       .and('contain.text', 'Updated:')
       .and('contain.text', 'SemiAnalysis InferenceX')
       .and('not.contain.text', 'Model:')
@@ -267,7 +267,7 @@ describe('Inference Chart', () => {
     cy.get('#chart-0 input[aria-label="B200 $/chip/hr"]').should('have.value', '3.7');
     cy.get('#chart-0 [data-testid="cost-tier-selector"]').should(
       'contain.text',
-      'Rent - 3 Year Commit',
+      'Rent – 3-year commit',
     );
     cy.get('#chart-0').should(($chart) => assertContextBelowPlot($chart[0]!));
     expectNoPageOverflow();
@@ -301,7 +301,7 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="result-context-cost-tier"]')
-      .should('contain.text', 'Owning at Large Hyperscaler Volume')
+      .should('contain.text', 'Owning at large hyperscaler volume')
       .find('[data-testid="cost-tier-selector"]')
       .should('be.visible');
     cy.scatterPoints(CHART_DISPLAY).should('have.length.greaterThan', 0);

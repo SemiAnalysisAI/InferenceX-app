@@ -135,9 +135,7 @@ const COST_DELTA_CLASS = {
 const COST_DELTA_TOKEN = {
   cheaper: '--success',
   pricier: '--destructive',
-  even: '--muted-foreground',
 } as const;
-const COST_DELTA_NEUTRAL_ALPHA = 0.1;
 
 type CostDeltaPolarity = keyof typeof COST_DELTA_CLASS;
 
@@ -237,12 +235,10 @@ export function costDeltaCellStyle(
     referenceCost,
   );
   if (comparison === null) return undefined;
-  const { pct } = comparison;
   const polarity = comparisonPolarity(comparison);
-  if (polarity === 'no-baseline') return undefined;
-  const alpha =
-    pct === null || polarity === 'even' ? COST_DELTA_NEUTRAL_ALPHA : costDeltaAlpha(pct);
-  const mix = Math.round(alpha * 100);
+  if (polarity === 'no-baseline' || polarity === 'even' || comparison.pct === null)
+    return undefined;
+  const mix = Math.round(costDeltaAlpha(comparison.pct) * 100);
   return {
     backgroundColor: `color-mix(in oklch, var(${COST_DELTA_TOKEN[polarity]}) ${mix}%, transparent)`,
   };
@@ -563,7 +559,7 @@ export function DesktopOverviewMatrix({
               <th
                 key={platform.hardware}
                 scope="col"
-                className={`h-10 px-3 text-left font-medium shadow-[inset_0_-1px_0_var(--border)] ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted' : 'bg-card'}`}
+                className={`h-10 px-3 text-left shadow-[inset_0_-1px_0_var(--border)] ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-[color-mix(in_oklch,var(--muted)_30%,var(--card))] font-semibold text-foreground' : 'bg-card font-medium'}`}
               >
                 {comparisonMode === 'hardware' && platform.hardware === referenceHardware
                   ? `${platform.hardwareLabel} · ${strings.referenceHeader}`
@@ -825,12 +821,12 @@ export function OverviewEngineScopeSwitcher({
           className="w-full sm:hidden"
           data-testid="overview-engine-scope-select"
         >
-          <SelectValue>{strings.engineScopeOptions[engineScope]}</SelectValue>
+          <SelectValue>{strings.engineScopeShortOptions[engineScope]}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           {options.map((option) => (
             <SelectItem key={option} value={option}>
-              {strings.engineScopeOptions[option]}
+              {strings.engineScopeShortOptions[option]}
             </SelectItem>
           ))}
         </SelectContent>

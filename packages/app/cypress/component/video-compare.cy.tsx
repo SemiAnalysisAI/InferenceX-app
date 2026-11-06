@@ -104,7 +104,7 @@ describe('Video compare panel (retained fixture)', () => {
     metricRow('kjPerVideo').find('[data-tone="better"]').should('exist');
     cy.contains('[data-testid="video-compare"] p', 'Cost tier:').should(
       'have.text',
-      'Cost tier: Owning at Large Hyperscaler Volume.',
+      'Cost tier: Owning at large hyperscaler volume.',
     );
     cy.get('[data-testid="video-compare"]')
       .should('contain', 'retained CI outputs')
@@ -236,7 +236,7 @@ describe('Video compare panel (retained fixture)', () => {
       .and('contain', '同时播放')
       .and('contain', '成本档位：租赁 - 3 年承诺。');
     metricRow('p50Latency').should('contain', 'P50 出片时间');
-    // Rent - 3 Year Commit: $2.00 ÷ 5.3741 vs. $3.70 ÷ 11.526 per participating GPU-hour.
+    // Rent – 3-year commit: $2.00 ÷ 5.3741 vs. $3.70 ÷ 11.526 per participating GPU-hour.
     metricRow('dollarsPerVideo')
       .should('contain', '每条视频 TCO 成本')
       .and('contain', '$0.372')

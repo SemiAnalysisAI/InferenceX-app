@@ -559,7 +559,7 @@ export function AgentXCompareHero({
                 analyticsEvent="compare_agentx_revenue_calculator_clicked"
                 analyticsSurface={surface}
                 appNavigation
-                className="group motion-press inline-flex min-h-11 items-center gap-2 rounded-md bg-brand-fill px-5 py-2.5 font-medium text-primary-foreground transition-colors hover:bg-brand-fill/90"
+                className="group motion-press inline-flex min-h-11 items-center gap-2 rounded-md bg-brand-fill px-5 py-2.5 font-medium text-primary-foreground transition-colors hover:bg-brand-fill/90 max-[479px]:w-full max-[479px]:justify-center"
               >
                 {t.revenueCalculator}
                 <ArrowRight
@@ -574,7 +574,7 @@ export function AgentXCompareHero({
                 analyticsTarget={FEATURED_AGENTX_MODELS[0].slug}
                 analyticsSurface={surface}
                 appNavigation
-                className="group motion-press inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-5 py-2.5 font-medium text-foreground transition-colors hover:bg-muted"
+                className="group motion-press inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-5 py-2.5 font-medium text-foreground transition-colors hover:bg-muted max-[479px]:w-full max-[479px]:justify-center"
               >
                 {t.dashboard}
                 <ArrowRight

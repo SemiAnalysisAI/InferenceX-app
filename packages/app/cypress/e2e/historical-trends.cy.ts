@@ -243,14 +243,14 @@ describe('Historical Trends — Content & Interactions', () => {
       });
   });
 
-  it('offers the published tiers in the caption Cost Tier selector but no Custom User Values', () => {
+  it('offers the published tiers in the caption Cost Tier selector but no Custom user values', () => {
     cy.document().then((doc) => {
       delete doc.body.dataset.scrollLocked;
       doc.body.style.removeProperty('pointer-events');
     });
     cy.get('[data-testid="historical-trend-figure"] [data-testid="cost-tier-selector"]')
       .should('be.visible')
-      .and('contain.text', 'Owning at Large Hyperscaler Volume')
+      .and('contain.text', 'Owning at large hyperscaler volume')
       .click('right');
     cy.get('[data-testid="cost-tier-hyperscaler"]').should('exist');
     cy.get('[data-testid="cost-tier-rental"]').should('exist');
@@ -258,7 +258,7 @@ describe('Historical Trends — Content & Interactions', () => {
     cy.get('[data-testid="cost-tier-rental"]').click();
     cy.get('[data-testid="historical-trend-figure"] [data-testid="cost-tier-selector"]').should(
       'contain.text',
-      'Rent - 3 Year Commit',
+      'Rent – 3-year commit',
     );
   });
 });

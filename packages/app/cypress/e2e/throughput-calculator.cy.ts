@@ -213,13 +213,13 @@ describe('TCO Calculator', () => {
         cy.get('#calc-cost').click();
       });
       cy.get('[role="option"]').should('have.length', 7);
-      cy.get('[role="option"]').eq(0).should('contain.text', 'Owning at Large Hyperscaler Volume');
-      cy.get('[role="option"]').eq(1).should('contain.text', 'Rent - 3 Year Commit');
-      cy.get('[role="option"]').eq(2).should('contain.text', 'Rent - On Demand');
-      cy.get('[role="option"]').eq(3).should('contain.text', 'Rent - 1 Month Commit');
-      cy.get('[role="option"]').eq(4).should('contain.text', 'Rent - 6 Month Commit');
-      cy.get('[role="option"]').eq(5).should('contain.text', 'Rent - 1 Year Commit');
-      cy.get('[role="option"]').eq(6).should('contain.text', 'Rent - 2 Year Commit');
+      cy.get('[role="option"]').eq(0).should('contain.text', 'Owning at large hyperscaler volume');
+      cy.get('[role="option"]').eq(1).should('contain.text', 'Rent – 3-year commit');
+      cy.get('[role="option"]').eq(2).should('contain.text', 'Rent – on demand');
+      cy.get('[role="option"]').eq(3).should('contain.text', 'Rent – 1-month commit');
+      cy.get('[role="option"]').eq(4).should('contain.text', 'Rent – 6-month commit');
+      cy.get('[role="option"]').eq(5).should('contain.text', 'Rent – 1-year commit');
+      cy.get('[role="option"]').eq(6).should('contain.text', 'Rent – 2-year commit');
       cy.get('[role="option"] [data-testid="locked-tier-badge"]').should('have.length', 5);
       cy.get('body').type('{esc}');
 
@@ -230,7 +230,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="cost-provider-locked-rent_1_year"]').click();
       cy.get('[data-testid="tco-model-dialog"]')
         .should('be.visible')
-        .and('contain.text', 'Rent - 1 Year Commit');
+        .and('contain.text', 'Rent – 1-year commit');
       cy.get('[data-testid="tco-model-dialog-link"]').should(
         'have.attr',
         'href',
@@ -291,14 +291,14 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-metric-cost"]').click();
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
-        .should('contain.text', 'Owning at Large Hyperscaler Volume');
+        .should('contain.text', 'Owning at large hyperscaler volume');
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('#calc-cost').click();
       });
-      cy.get('[role="option"]').contains('Rent - 3 Year Commit').click();
+      cy.get('[role="option"]').contains('Rent – 3-year commit').click();
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
-        .should('contain.text', 'Rent - 3 Year Commit');
+        .should('contain.text', 'Rent – 3-year commit');
     });
 
     it('typing a new value in the number input updates the chart title', () => {
@@ -539,7 +539,7 @@ describe('TCO Calculator', () => {
 
     it('sits directly under the interactivity slider, since it inverts it', () => {
       cy.get('[data-testid="calculator-costcap-section"]').should('be.visible');
-      cy.get('[data-testid="calculator-costcap-empty"]').should('be.visible');
+      cy.get('[data-testid="calculator-costcap-empty"]').should('not.exist');
       cy.get('[data-testid="calculator-controls"]').then(($controls) => {
         cy.get('[data-testid="calculator-costcap-section"]').then(($costcap) => {
           const order = $controls[0]!.compareDocumentPosition($costcap[0]!);

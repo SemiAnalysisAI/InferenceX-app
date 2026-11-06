@@ -181,7 +181,7 @@ describe('Profit Estimator per GW', () => {
     );
     cy.get('[data-testid="result-context-cost-tier"]').should(
       'contain.text',
-      'Owning at Large Hyperscaler Volume',
+      'Owning at large hyperscaler volume',
     );
   });
 
@@ -189,7 +189,7 @@ describe('Profit Estimator per GW', () => {
     cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
     cy.get('[data-testid="result-context-cost-tier"]').should(
       'contain.text',
-      'Owning at Large Hyperscaler Volume',
+      'Owning at large hyperscaler volume',
     );
     expectTcoCost('mi355x', 'MI355X', '1.5');
     cy.get('[data-testid="profit-custom-cost-gb300"]').clear().type('4').blur();

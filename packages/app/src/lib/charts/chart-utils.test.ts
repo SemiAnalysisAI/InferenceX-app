@@ -1695,7 +1695,7 @@ describe('metricChartTitle', () => {
       'Total Tokens per $1 TCO',
     );
     expect(metricTitle(interactivity, 'y_tokensPerDollarH', 'en')).toBe(
-      'Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
+      'Total Tokens per $1 TCO (Owning at large hyperscaler volume)',
     );
     expect(metricChartTitle(interactivity, 'y_tokensPerDollarH', 'zh')).toBe(
       '每 1 美元 TCO 对应的总 token 数',

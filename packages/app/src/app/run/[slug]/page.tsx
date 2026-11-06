@@ -188,7 +188,7 @@ export default async function RunPage({ params }: Props) {
     colGpuHour: '$ / GPU / hr',
     colCostPerMtok: '$ / 1M tokens',
     priceTierLabels: {
-      hyperscaler: 'Owning at Large Hyperscaler Volume',
+      hyperscaler: 'Owning at large hyperscaler volume',
       retail: 'Retail',
     },
     emptyState: `The InferenceX fleet has not published benchmark runs for ${entry.model.seoName} on ${entry.chip.label} yet. Benchmarks re-run continuously; this page fills in automatically as soon as results land.`,

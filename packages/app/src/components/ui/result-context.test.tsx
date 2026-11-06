@@ -83,7 +83,7 @@ describe('ResultContext', () => {
         <ResultContext
           locale="en"
           precision="FP8"
-          costTier="Owning at Large Hyperscaler Volume"
+          costTier="Owning at large hyperscaler volume"
           date="2026-09-01"
           source="SemiAnalysis InferenceX™"
         />,
@@ -91,14 +91,14 @@ describe('ResultContext', () => {
     });
     const text = container.textContent ?? '';
     expect(text).toContain('Precision: FP8');
-    expect(text).toContain('Cost tier: Owning at Large Hyperscaler Volume');
+    expect(text).toContain('Cost tier: Owning at large hyperscaler volume');
     expect(text).toContain('Updated: Sep 1, 2026');
     expect(text).toContain('Source: SemiAnalysis InferenceX™');
     expect(text).not.toContain('Model:');
     expect(text).not.toContain('Workload:');
     expect(text).not.toContain('Metric:');
     expect(container.querySelector('[data-testid="result-context-cost-tier"]')?.textContent).toBe(
-      'Owning at Large Hyperscaler Volume',
+      'Owning at large hyperscaler volume',
     );
   });
 
@@ -108,8 +108,8 @@ describe('ResultContext', () => {
       createRoot(container).render(
         <ResultContext
           locale="en"
-          costTier="Rent - 3 Year Commit"
-          costTierControl={<button data-testid="tier-control">Rent - 3 Year Commit</button>}
+          costTier="Rent – 3-year commit"
+          costTierControl={<button data-testid="tier-control">Rent – 3-year commit</button>}
           date="2026-09-01"
         />,
       );
@@ -117,7 +117,7 @@ describe('ResultContext', () => {
     const dd = container.querySelector('[data-testid="result-context-cost-tier"]');
     expect(container.textContent).toContain('Cost tier:');
     expect(dd?.querySelector('.no-export [data-testid="tier-control"]')).not.toBeNull();
-    expect(dd?.querySelector('.export-only')?.textContent).toBe('Rent - 3 Year Commit');
+    expect(dd?.querySelector('.export-only')?.textContent).toBe('Rent – 3-year commit');
     expect(dd?.querySelector('.export-only')?.classList.contains('hidden')).toBe(true);
     expect(container.textContent).toContain('Updated: Sep 1, 2026');
   });
@@ -129,8 +129,8 @@ describe('ResultContext', () => {
         <ResultContext
           locale="en"
           layout="footer"
-          costTier="Rent - 3 Year Commit"
-          costTierControl={<button data-testid="tier-control">Rent - 3 Year Commit</button>}
+          costTier="Rent – 3-year commit"
+          costTierControl={<button data-testid="tier-control">Rent – 3-year commit</button>}
           date="2026-09-01"
           source="SemiAnalysis InferenceX™"
           controlsEnd={<table data-testid="prices" />}

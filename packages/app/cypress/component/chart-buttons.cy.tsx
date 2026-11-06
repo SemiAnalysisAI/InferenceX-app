@@ -300,7 +300,7 @@ describe('ChartButtons', () => {
           />
           <Card id="responsive-chart">
             <h2 data-testid="long-caption">
-              Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume) over time at 100
+              Total Tokens per $1 TCO (Owning at large hyperscaler volume) over time at 100
               tok/s/user
             </h2>
             <p>Full benchmark configuration and source details remain below the actions.</p>

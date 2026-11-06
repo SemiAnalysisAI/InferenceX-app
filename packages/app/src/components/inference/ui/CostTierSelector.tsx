@@ -40,7 +40,7 @@ const STRINGS = {
   en: {
     costTier: 'Cost tier',
     costTierTooltip:
-      'The $/chip/hr pricing basis behind cost and tokens-per-dollar metrics. InferenceX publishes Owning at Large Hyperscaler Volume and Rent - 3 Year Commit; the shorter rental terms are priced in the SemiAnalysis AI Cloud TCO Model.',
+      'The $/chip/hr pricing basis behind cost and tokens-per-dollar metrics. InferenceX publishes Owning at large hyperscaler volume and Rent – 3-year commit; the shorter rental terms are priced in the SemiAnalysis AI Cloud TCO Model.',
   },
   zh: {
     costTier: '成本层级',

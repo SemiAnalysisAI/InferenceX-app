@@ -189,10 +189,10 @@ export function getCostProviderLabel(provider: CostProvider, locale: Locale = 'e
   }
   switch (provider) {
     case 'costh': {
-      return 'Owning at Large Hyperscaler Volume';
+      return 'Owning at large hyperscaler volume';
     }
     case 'costr': {
-      return 'Rent - 3 Year Commit';
+      return 'Rent – 3-year commit';
     }
   }
 }

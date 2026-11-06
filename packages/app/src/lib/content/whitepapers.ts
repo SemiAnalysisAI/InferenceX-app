@@ -267,7 +267,7 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
         'Kimi K3 2.8T Agentic Revenue & Profit Estimates per GigaWatt Per Year at P90 45 tok/s/user Interactivity',
       figures: [
         {
-          costTier: 'Owning at Large Hyperscaler Volume',
+          costTier: 'Owning at large hyperscaler volume',
           caption:
             'Figure 1. Revenue and profit per GW-year, owned at hyperscaler volume ($1.50 per chip-hour). The bar totals $32.6B of revenue; segments from bottom to top are compute expense ($6.3B), model license fee ($9.8B), and profit ($16.5B, 50.7% margin).',
           alt: 'Figure 1: stacked bar of revenue per GW-year for MI355X on Kimi K3 2.8T, owned at $1.50 per GPU-hour. $32.6B of revenue splits into $6.3B compute expense, $9.8B model license fee, and $16.5B profit at a 50.7% margin.',

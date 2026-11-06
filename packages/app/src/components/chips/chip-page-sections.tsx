@@ -87,7 +87,7 @@ const STRINGS = {
       nic: 'NIC',
       tdp: 'TDP per chip',
       allInPower: 'All-in power per chip',
-      costHyperscaler: 'Owning at Large Hyperscaler Volume $/chip/hr',
+      costHyperscaler: 'Owning at large hyperscaler volume $/chip/hr',
       costRetail: 'Retail $/chip/hr',
     },
     notSupported: 'Not supported',

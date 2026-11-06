@@ -59,8 +59,8 @@ describe('Video hardware dashboard (retained fixture)', () => {
     kpi('b200').should('contain', '$0.321');
     cy.location('search').should('contain', 'v_tier=r');
     cy.get('[data-testid="video-chart-card"]')
-      .should('contain', 'Cost tier: Rent - 3 Year Commit')
-      .and('contain', 'Videos per $1 TCO (Rent - 3 Year Commit)');
+      .should('contain', 'Cost tier: Rent – 3-year commit')
+      .and('contain', 'Videos per $1 TCO (Rent – 3-year commit)');
     cy.get('[data-testid="video-tco-table"] thead th').eq(1).should('contain', 'B200');
     cy.get('[data-testid="video-tco-badge"]').first().should('contain', '3.70');
   });

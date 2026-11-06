@@ -17,6 +17,10 @@ export const OVERVIEW_STRINGS = {
       all: 'All platforms',
       community: 'Open-source community engines (vLLM/SGLang)',
     },
+    engineScopeShortOptions: {
+      all: 'All platforms',
+      community: 'Open-source (vLLM/SGLang)',
+    },
     comparisonNavLabel: 'Compare',
     comparisonOptions: {
       history: 'Change over time',
@@ -124,6 +128,10 @@ export const OVERVIEW_STRINGS = {
     engineScopeOptions: {
       all: '所有平台',
       community: '开源社区引擎（vLLM/SGLang）',
+    },
+    engineScopeShortOptions: {
+      all: '所有平台',
+      community: '开源（vLLM/SGLang）',
     },
     comparisonNavLabel: '对比方式',
     comparisonOptions: {

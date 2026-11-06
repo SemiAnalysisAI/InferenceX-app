@@ -56,7 +56,6 @@ const STRINGS = {
     colTputAtIv: 'Throughput (tok/s/chip)',
     colUsers: 'Concurrent users',
     notReachable: 'Not reachable',
-    costCapEmpty: 'Enter a cost target to find the serveable interactivity per chip',
     costCapNoGpus: 'No chips are visible to evaluate. Enable hardware in the chart legend.',
     note: 'Note:',
     disaggFleet:
@@ -85,7 +84,6 @@ const STRINGS = {
     colTputAtIv: '吞吐量 (tok/s/chip)',
     colUsers: '并发用户数',
     notReachable: '无法达到',
-    costCapEmpty: '输入成本上限，以查看每款芯片可服务的交互性',
     costCapNoGpus: '当前无可见芯片可评估。请在图表图例中启用硬件。',
     note: '注：',
     disaggFleet:
@@ -290,14 +288,14 @@ export default function CostTargetPanel({
               <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-6">
                 <div className="min-w-0 text-sm text-muted-foreground lg:order-last lg:pb-2">
                   <p>{t.costCapDescription}</p>
-                  {!hasRows && (
+                  {costCap !== null && !hasRows && (
                     <p className="mt-1" data-testid="calculator-costcap-empty">
-                      {costCap ? t.costCapNoGpus : t.costCapEmpty}
+                      {t.costCapNoGpus}
                     </p>
                   )}
                 </div>
-                <div className="flex shrink-0 flex-wrap gap-4">
-                  <div className="flex flex-col space-y-1.5 max-w-48">
+                <div className="grid shrink-0 grid-cols-2 gap-4 sm:flex sm:flex-wrap">
+                  <div className="flex min-w-0 flex-col space-y-1.5 sm:max-w-48">
                     <LabelWithTooltip
                       htmlFor="calc-costcap"
                       label={t.costCapLabel}
@@ -313,10 +311,10 @@ export default function CostTargetPanel({
                       value={costCapInput}
                       onChange={handleCostCapChange}
                       onBlur={handleCostCapBlur}
-                      className="w-32"
+                      className="w-full sm:w-32"
                     />
                   </div>
-                  <div className="flex flex-col space-y-1.5 max-w-48">
+                  <div className="flex min-w-0 flex-col space-y-1.5 sm:max-w-48">
                     <LabelWithTooltip
                       htmlFor="calc-costcap-mw"
                       label={t.mwLabel}
@@ -332,7 +330,7 @@ export default function CostTargetPanel({
                       value={mwInput}
                       onChange={(e) => onMwInputChange(e.target.value)}
                       onBlur={() => track('calculator_costcap_mw_set', { mw: mwInput })}
-                      className="w-32"
+                      className="w-full sm:w-32"
                     />
                   </div>
                 </div>

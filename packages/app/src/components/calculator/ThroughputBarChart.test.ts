@@ -293,12 +293,12 @@ describe('getCostProviderLabel', () => {
     expect(getCostProviderLabel('costr', 'zh')).toBe('租赁设备 · 3 年承诺');
   });
 
-  it('returns "Owning at Large Hyperscaler Volume" for costh', () => {
-    expect(getCostProviderLabel('costh')).toBe('Owning at Large Hyperscaler Volume');
+  it('returns "Owning at large hyperscaler volume" for costh', () => {
+    expect(getCostProviderLabel('costh')).toBe('Owning at large hyperscaler volume');
   });
 
-  it('returns "Rent - 3 Year Commit" for costr', () => {
-    expect(getCostProviderLabel('costr')).toBe('Rent - 3 Year Commit');
+  it('returns "Rent – 3-year commit" for costr', () => {
+    expect(getCostProviderLabel('costr')).toBe('Rent – 3-year commit');
   });
 });
 
@@ -359,21 +359,21 @@ describe('getChartTitle', () => {
   it('returns cost title with provider and cost type', () => {
     const title = getChartTitle('cost', 'interactivity_to_throughput', 30, 'input', 'costh');
     expect(title).toBe(
-      'Cost per million input tokens (Owning at Large Hyperscaler Volume) at 30 tok/s/user interactivity',
+      'Cost per million input tokens (Owning at large hyperscaler volume) at 30 tok/s/user interactivity',
     );
   });
 
   it('returns cost title with output cost type and rental provider', () => {
     const title = getChartTitle('cost', 'interactivity_to_throughput', 30, 'output', 'costr');
     expect(title).toBe(
-      'Cost per million output tokens (Rent - 3 Year Commit) at 30 tok/s/user interactivity',
+      'Cost per million output tokens (Rent – 3-year commit) at 30 tok/s/user interactivity',
     );
   });
 
   it('defaults to hyperscaler when no costProvider is specified for cost', () => {
     const title = getChartTitle('cost', 'throughput_to_interactivity', 500, 'total');
     expect(title).toBe(
-      'Cost per million total tokens (Owning at Large Hyperscaler Volume) at 500 tok/s/chip throughput',
+      'Cost per million total tokens (Owning at large hyperscaler volume) at 500 tok/s/chip throughput',
     );
   });
 });

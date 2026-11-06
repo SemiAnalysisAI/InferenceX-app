@@ -106,10 +106,10 @@ const COST_PROVIDER_OPTIONS: {
 }[] = [
   {
     value: 'costh',
-    label: 'Owning at Large Hyperscaler Volume',
+    label: 'Owning at large hyperscaler volume',
     labelZh: '自有 · 超大规模云厂商批量采购',
   },
-  { value: 'costr', label: 'Rent - 3 Year Commit', labelZh: '租赁 - 3 年承诺' },
+  { value: 'costr', label: 'Rent – 3-year commit', labelZh: '租赁 - 3 年承诺' },
 ];
 
 const COST_TYPE_OPTIONS: { value: CostType; label: string }[] = [

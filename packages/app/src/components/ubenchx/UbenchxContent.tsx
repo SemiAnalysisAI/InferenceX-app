@@ -531,7 +531,7 @@ export function UbenchxContent() {
                         {r.metadata.cann ? '—' : r.metadata.container}
                       </td>
                       <td className="py-1.5 text-right whitespace-nowrap">
-                        {Number((r.peakBandwidthGbps / 1000).toPrecision(3))} TB/s
+                        {(r.peakBandwidthGbps / 1000).toFixed(2)} TB/s
                       </td>
                     </tr>
                   ))}

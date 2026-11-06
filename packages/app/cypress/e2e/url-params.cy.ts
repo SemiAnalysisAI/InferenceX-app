@@ -173,7 +173,7 @@ describe('URL Parameter Persistence', () => {
       );
       cy.get('[data-testid="cost-tier-selector"]').should(
         'contain.text',
-        'Owning at Large Hyperscaler Volume',
+        'Owning at large hyperscaler volume',
       );
 
       cy.get('[data-testid="scatter-graph"]')
