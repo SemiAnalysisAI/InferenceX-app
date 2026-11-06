@@ -502,9 +502,7 @@ export function AgentXCompareHero({
     <section data-testid="compare-agentx-primary">
       <Card className="overflow-hidden p-0 md:p-0">
         <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(19rem,0.85fr)]">
-          <div
-            className={`flex flex-col p-6 md:p-8 lg:p-10 ${surface === 'landing' ? 'lg:pt-8' : 'justify-center'}`}
-          >
+          <div className="flex flex-col justify-center p-6 md:p-8 lg:p-10">
             <div className="relative">
               <Heading className="max-w-2xl text-3xl font-semibold text-foreground lg:text-4xl lg:tracking-heading">
                 {t.title}
@@ -561,7 +559,7 @@ export function AgentXCompareHero({
                 analyticsEvent="compare_agentx_revenue_calculator_clicked"
                 analyticsSurface={surface}
                 appNavigation
-                className="group motion-press inline-flex min-h-11 items-center gap-2 rounded-md bg-brand px-5 py-2.5 font-medium text-primary-foreground transition-colors hover:bg-brand/90"
+                className="group motion-press inline-flex min-h-11 items-center gap-2 rounded-md bg-brand-fill px-5 py-2.5 font-medium text-primary-foreground transition-colors hover:bg-brand-fill/90"
               >
                 {t.revenueCalculator}
                 <ArrowRight

@@ -13,7 +13,7 @@ describe('speculativeDecodingLabel', () => {
     expect(speculativeDecodingLabel({ method: 'mtp' }, undefined, 'en')).toBe('MTP');
     expect(
       speculativeDecodingLabel({ method: 'draft_model', algorithm: null }, undefined, 'en'),
-    ).toBe('Draft Model');
+    ).toBe('Draft model');
     expect(speculativeDecodingLabel({ method: 'mtp' }, 'Kimi-K3', 'en')).toBe('DSpark');
   });
 

@@ -233,6 +233,16 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
     cy.get('[data-testid^="mobile-tab-profit-estimator-"]').should('not.exist');
   });
 
+  it('surfaces a footer-only page as the active tab on desktop and mobile', () => {
+    mountTabNav({ pathname: '/zh/historical' });
+    cy.get('[data-testid="tab-trigger-historical"]')
+      .should('have.attr', 'data-tab-active', 'true')
+      .and('have.attr', 'href', '/zh/historical')
+      .and('contain.text', '历史趋势');
+    cy.get('[data-testid="mobile-tab-historical"]').should('have.attr', 'aria-current', 'page');
+    cy.get('[data-testid="tab-trigger-calculator"]').should('not.exist');
+  });
+
   it('preserves a comma-separated list of run ids verbatim', () => {
     mountTabNav({ search: '?unofficialruns=111,222,333' });
     cy.get('[data-testid="tab-trigger-evaluation"]').should(

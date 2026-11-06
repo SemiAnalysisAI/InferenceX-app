@@ -15,7 +15,7 @@ const buttonVariants = cva(
           'bg-primary text-foreground shadow-xs hover:bg-primary/90 dark:text-primary-foreground disabled:bg-muted disabled:text-muted-foreground dark:disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none',
         // The landing CTA style: blue with white text in light, orange with dark text in dark.
         brand:
-          'bg-brand text-primary-foreground shadow-xs hover:bg-brand/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none',
+          'bg-brand-fill text-primary-foreground shadow-xs hover:bg-brand-fill/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none',
         destructive:
           'bg-destructive text-white shadow-xs hover:bg-destructive/90 dark:bg-destructive/60',
         outline:

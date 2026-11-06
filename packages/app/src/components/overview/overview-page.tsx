@@ -7,6 +7,7 @@ import { TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
+import { Heading } from '@/components/ui/heading';
 import { OVERVIEW_HISTORY_WINDOW_DAYS, type OverviewPageData } from '@/lib/overview/overview-data';
 import { overviewHref } from '@/lib/overview/overview-links';
 
@@ -114,7 +115,9 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
         <Card className="md:py-5">
           <header>
             <div className="flex flex-col gap-y-1">
-              <h1 className="text-lg font-semibold">{strings.title}</h1>
+              <Heading as="h1" level="title">
+                {strings.title}
+              </Heading>
               <p
                 data-testid="overview-scope"
                 aria-label={strings.scopeAria}

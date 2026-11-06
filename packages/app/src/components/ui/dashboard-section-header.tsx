@@ -25,16 +25,35 @@ export function DashboardSectionHeader({
   descriptionClassName,
 }: DashboardSectionHeaderProps) {
   return (
-    <div className={cn('flex flex-wrap items-start justify-between gap-3', className)}>
-      <div className="min-w-0 flex-1 basis-60">
-        <Heading as={headingAs} level={level} className="mb-1">
-          {title}
-        </Heading>
-        {description !== undefined && (
-          <p className={cn('text-sm text-muted-foreground', descriptionClassName)}>{description}</p>
-        )}
-      </div>
-      {actions !== undefined && <div className="flex min-w-0 flex-wrap gap-2">{actions}</div>}
+    <div
+      className={cn(
+        'flex flex-wrap items-center justify-between gap-x-3 gap-y-1 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start',
+        className,
+      )}
+    >
+      <Heading as={headingAs} level={level} className="min-w-0 flex-1 basis-40 sm:col-start-1">
+        {title}
+      </Heading>
+      {actions !== undefined && (
+        <div
+          className={cn(
+            'flex min-w-0 flex-wrap gap-2 sm:col-start-2 sm:row-start-1',
+            description !== undefined && 'sm:row-span-2',
+          )}
+        >
+          {actions}
+        </div>
+      )}
+      {description !== undefined && (
+        <p
+          className={cn(
+            'basis-full text-sm text-muted-foreground sm:col-start-1',
+            descriptionClassName,
+          )}
+        >
+          {description}
+        </p>
+      )}
     </div>
   );
 }

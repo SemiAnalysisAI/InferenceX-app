@@ -466,7 +466,7 @@ describe('buildPointDetails', () => {
   });
 
   it.each([
-    [{ spec_decoding: 'draft_model' }, 'Draft Model'],
+    [{ spec_decoding: 'draft_model' }, 'Draft model'],
     [
       {
         spec_decoding: 'draft_model',

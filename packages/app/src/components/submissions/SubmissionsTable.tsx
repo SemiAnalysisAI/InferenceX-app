@@ -471,7 +471,7 @@ function SubmissionRow({
         </td>
         <td className="px-3 py-2">{getModelDisplayName(row.model)}</td>
         <td className="px-3 py-2 uppercase">{row.precision}</td>
-        <td className="px-3 py-2 uppercase">
+        <td className="px-3 py-2">
           {row.spec_method && row.spec_method !== 'none' ? (
             resolveFrameworkPartLabel(DB_MODEL_TO_DISPLAY[row.model], row.spec_method)
           ) : (

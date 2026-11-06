@@ -38,7 +38,7 @@ describe('AgentX optimizations', () => {
     cy.visit('/agentx', { onBeforeLoad: unlockAgenticGate });
 
     cy.get('[data-testid="agentx-optimizations-callout"]').within(() => {
-      cy.contains('h2', 'Optimizations for Agentic Workloads').should('be.visible');
+      cy.contains('h2', 'Optimizations for agentic workloads').should('be.visible');
       cy.get('[data-testid="agentx-optimizations-framework-link"]').should(
         'have.length',
         FRAMEWORK_SLUGS.length,
@@ -63,7 +63,7 @@ describe('AgentX optimizations', () => {
     cy.visit('/agentx/optimizations', { onBeforeLoad: unlockAgenticGate });
 
     cy.get('[data-testid="agentx-optimizations-index"]').within(() => {
-      cy.get('h1').should('have.text', 'Optimizations for Agentic Workloads');
+      cy.get('h1').should('have.text', 'Optimizations for agentic workloads');
       cy.get('[data-testid="agentx-optimizations-card"]').should(
         'have.length',
         FRAMEWORK_SLUGS.length,

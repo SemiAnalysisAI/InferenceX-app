@@ -135,8 +135,12 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
   const locale = pathname === '/zh' || pathname.startsWith('/zh/') ? 'zh' : 'en';
   const current = dashboardNavTabForPathname(pathname) ?? 'inference';
   const currentRoute = getDashboardRoute(current);
-  const lockedCurrentGatedTab =
-    !featureGateUnlocked && currentRoute.navGroup === 'feature-gated' ? currentRoute : null;
+  const surfacedCurrentTab =
+    currentRoute.navGroup === 'footer-only' ||
+    (!featureGateUnlocked && currentRoute.navGroup === 'feature-gated')
+      ? currentRoute
+      : null;
+  const stripTabs = surfacedCurrentTab ? [...PRIMARY_TABS, surfacedCurrentTab] : PRIMARY_TABS;
   const tabLabel = (route: DashboardRoute) =>
     locale === 'zh' ? TAB_LABELS_ZH[route.key] : TAB_LABELS_EN[route.key];
 
@@ -170,7 +174,7 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
         <MobileTabStrip
           ariaLabel={locale === 'zh' ? '选择图表' : 'Select chart'}
           current={current}
-          routes={[...PRIMARY_TABS, ...(lockedCurrentGatedTab ? [lockedCurrentGatedTab] : [])]}
+          routes={stripTabs}
           gatedRoutes={featureGateUnlocked ? GATED_TABS : []}
           gatedLabel={locale === 'zh' ? '隐藏' : 'Hidden'}
           tabLabel={tabLabel}
@@ -188,7 +192,7 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
             data-testid="chart-section-tabs"
             className="relative flex min-w-0 items-center gap-8"
           >
-            {PRIMARY_TABS.map((route) => (
+            {stripTabs.map((route) => (
               <IntentPrefetchLink
                 key={route.key}
                 href={tabHref(localePath(route.path, locale))}
@@ -246,7 +250,8 @@ function HiddenTabsPopover({
   locale: 'en' | 'zh';
 }) {
   const [open, setOpen] = useState(false);
-  const active = getDashboardRoute(current).navGroup === 'feature-gated';
+  const currentRoute = getDashboardRoute(current);
+  const active = currentRoute.navGroup === 'feature-gated';
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -255,7 +260,7 @@ function HiddenTabsPopover({
         data-ph-capture-attribute-tab="hidden"
         className={cn(tabLinkClass, currentTabClass(active), 'gap-1 cursor-pointer')}
       >
-        {locale === 'zh' ? '隐藏' : 'Hidden'}
+        {active ? tabLabel(currentRoute) : locale === 'zh' ? '隐藏' : 'Hidden'}
         <ChevronDown
           className={cn('size-4 transition-transform', open && 'rotate-180')}
           aria-hidden

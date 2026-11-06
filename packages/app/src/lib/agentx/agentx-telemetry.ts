@@ -93,7 +93,7 @@ export interface TelemetryGuide {
 
 export const AGENTX_TELEMETRY_GUIDE: TelemetryGuide = {
   eyebrow: 'AgentX tutorial',
-  title: 'Exploring Agentic Workloads: Detailed Telemetry',
+  title: 'Exploring agentic workloads: detailed telemetry',
   lead: 'A single AgentX datapoint represents thousands of requests across growing conversations, subagents, warmup periods, cache states, and dynamically changing in-flight load. This is how to open one up.',
   intro: [
     'AgentX required more than a new benchmark harness and dataset. We also spent some time rebuilding parts of the InferenceX visualization to make agentic results easier to explore and digest. A single point on a Pareto curve can hide a lot of useful information, so every point on an AgentX chart is now a doorway into the run behind it.',

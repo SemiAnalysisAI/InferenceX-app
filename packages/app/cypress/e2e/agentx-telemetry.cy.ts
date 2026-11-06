@@ -31,7 +31,7 @@ describe('AgentX telemetry tutorial — English page', () => {
 
   it('renders the article, every section, and every figure', () => {
     cy.get('[data-testid="agentx-telemetry-article"]').should('be.visible');
-    cy.contains('h1', 'Exploring Agentic Workloads: Detailed Telemetry').should('be.visible');
+    cy.contains('h1', 'Exploring agentic workloads: detailed telemetry').should('be.visible');
 
     for (const id of SECTION_IDS) {
       cy.get(`[data-testid="agentx-telemetry-section-${id}"]`).should('exist');

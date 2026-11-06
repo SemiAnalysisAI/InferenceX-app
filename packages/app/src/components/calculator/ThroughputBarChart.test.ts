@@ -305,7 +305,7 @@ describe('getCostProviderLabel', () => {
 describe('getChartTitle', () => {
   it('returns total throughput title with interactivity target label', () => {
     const title = getChartTitle('throughput', 'interactivity_to_throughput', 30, 'total');
-    expect(title).toBe('Total Token Throughput per Chip at 30 tok/s/user Interactivity');
+    expect(title).toBe('Total token throughput per chip at 30 tok/s/user interactivity');
   });
 
   it('includes the selected percentile in an agentic interactivity title', () => {
@@ -317,63 +317,63 @@ describe('getChartTitle', () => {
       undefined,
       'p90',
     );
-    expect(title).toBe('Total Token Throughput per Chip at 30 tok/s/user P90 Interactivity');
+    expect(title).toBe('Total token throughput per chip at 30 tok/s/user P90 interactivity');
   });
 
   it('returns input throughput title when costType is input', () => {
     const title = getChartTitle('throughput', 'interactivity_to_throughput', 30, 'input');
-    expect(title).toBe('Input Token Throughput per Chip at 30 tok/s/user Interactivity');
+    expect(title).toBe('Input token throughput per chip at 30 tok/s/user interactivity');
   });
 
   it('returns output throughput title when costType is output', () => {
     const title = getChartTitle('throughput', 'interactivity_to_throughput', 30, 'output');
-    expect(title).toBe('Output Token Throughput per Chip at 30 tok/s/user Interactivity');
+    expect(title).toBe('Output token throughput per chip at 30 tok/s/user interactivity');
   });
 
   it('returns interactivity title in throughput_to_interactivity mode', () => {
     const title = getChartTitle('throughput', 'throughput_to_interactivity', 500, 'total');
-    expect(title).toBe('Interactivity at 500 tok/s/chip Throughput');
+    expect(title).toBe('Interactivity at 500 tok/s/chip throughput');
   });
 
   it('returns total power title with target label', () => {
     const title = getChartTitle('power', 'interactivity_to_throughput', 25, 'total');
     expect(title).toBe(
-      'Total Tokens per Provisioned All-in Megawatt at 25 tok/s/user Interactivity',
+      'Total tokens per provisioned all-in megawatt at 25 tok/s/user interactivity',
     );
   });
 
   it('returns input power title when costType is input', () => {
     const title = getChartTitle('power', 'interactivity_to_throughput', 25, 'input');
     expect(title).toBe(
-      'Input Tokens per Provisioned All-in Megawatt at 25 tok/s/user Interactivity',
+      'Input tokens per provisioned all-in megawatt at 25 tok/s/user interactivity',
     );
   });
 
   it('returns output power title when costType is output', () => {
     const title = getChartTitle('power', 'interactivity_to_throughput', 25, 'output');
     expect(title).toBe(
-      'Output Tokens per Provisioned All-in Megawatt at 25 tok/s/user Interactivity',
+      'Output tokens per provisioned all-in megawatt at 25 tok/s/user interactivity',
     );
   });
 
   it('returns cost title with provider and cost type', () => {
     const title = getChartTitle('cost', 'interactivity_to_throughput', 30, 'input', 'costh');
     expect(title).toBe(
-      'Cost per Million Input Tokens (Owning at Large Hyperscaler Volume) at 30 tok/s/user Interactivity',
+      'Cost per million input tokens (Owning at Large Hyperscaler Volume) at 30 tok/s/user interactivity',
     );
   });
 
   it('returns cost title with output cost type and rental provider', () => {
     const title = getChartTitle('cost', 'interactivity_to_throughput', 30, 'output', 'costr');
     expect(title).toBe(
-      'Cost per Million Output Tokens (Rent - 3 Year Commit) at 30 tok/s/user Interactivity',
+      'Cost per million output tokens (Rent - 3 Year Commit) at 30 tok/s/user interactivity',
     );
   });
 
   it('defaults to hyperscaler when no costProvider is specified for cost', () => {
     const title = getChartTitle('cost', 'throughput_to_interactivity', 500, 'total');
     expect(title).toBe(
-      'Cost per Million Total Tokens (Owning at Large Hyperscaler Volume) at 500 tok/s/chip Throughput',
+      'Cost per million total tokens (Owning at Large Hyperscaler Volume) at 500 tok/s/chip throughput',
     );
   });
 });

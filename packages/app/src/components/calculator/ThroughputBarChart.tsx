@@ -210,23 +210,23 @@ export function getChartTitle(
     : '';
   const targetLabel =
     mode === 'interactivity_to_throughput'
-      ? `${targetValue} tok/s/user ${percentilePrefix}Interactivity`
-      : `${targetValue} tok/s/chip Throughput`;
+      ? `${targetValue} tok/s/user ${percentilePrefix}interactivity`
+      : `${targetValue} tok/s/chip throughput`;
 
   const tokenTypeLabel =
     costType === 'input' ? 'Input' : costType === 'output' ? 'Output' : 'Total';
 
   switch (barMetric) {
     case 'power': {
-      return `${tokenTypeLabel} Tokens per Provisioned All-in Megawatt at ${targetLabel}`;
+      return `${tokenTypeLabel} tokens per provisioned all-in megawatt at ${targetLabel}`;
     }
     case 'cost': {
       const providerLabel = getCostProviderLabel(costProvider || 'costh');
-      return `Cost per Million ${tokenTypeLabel} Tokens (${providerLabel}) at ${targetLabel}`;
+      return `Cost per million ${tokenTypeLabel.toLowerCase()} tokens (${providerLabel}) at ${targetLabel}`;
     }
     default: {
       return mode === 'interactivity_to_throughput'
-        ? `${tokenTypeLabel} Token Throughput per Chip at ${targetLabel}`
+        ? `${tokenTypeLabel} token throughput per chip at ${targetLabel}`
         : `Interactivity at ${targetLabel}`;
     }
   }
