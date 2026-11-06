@@ -1,4 +1,5 @@
 import { normalizeLegacyTpuRow, physicalChipCount } from './tpu-normalization';
+import { resolveRunFramework } from './run-framework-overrides';
 import { PRECISION_KEYS } from '@semianalysisai/inferencex-constants';
 import type { ConfigParams } from './config-cache';
 import { resolveConfigTopology } from './topology';
@@ -59,10 +60,11 @@ export function mapEvalRow(
   const taskEntries = Object.entries(tasksDict as Record<string, any>);
   if (taskEntries.length === 0) return [];
 
-  const { framework, disagg: disaggFromFw } = normalizeFramework(
+  const { framework: declaredFramework, disagg: disaggFromFw } = normalizeFramework(
     String(meta.framework ?? ''),
     meta.disagg,
   );
+  const { framework } = resolveRunFramework(runId, declaredFramework);
   const precision = normalizePrecision(String(meta.precision ?? ''));
   if (!PRECISION_KEYS.has(precision)) {
     tracker.unmappedPrecisions.add(precision);
@@ -133,10 +135,11 @@ export function mapAggEvalRow(
   const task = String(row.task ?? '').toLowerCase();
   if (!task) return null;
 
-  const { framework, disagg: disaggFromFw } = normalizeFramework(
+  const { framework: declaredFramework, disagg: disaggFromFw } = normalizeFramework(
     String(row.framework ?? ''),
     row.disagg,
   );
+  const { framework } = resolveRunFramework(runId, declaredFramework);
   const precision = normalizePrecision(String(row.precision ?? ''));
   if (!PRECISION_KEYS.has(precision)) {
     tracker.unmappedPrecisions.add(precision);

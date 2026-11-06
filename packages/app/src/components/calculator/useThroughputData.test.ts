@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
 import { overlayRunIndex } from '@/lib/charts/overlay-run-style';
-import { SUPPLEMENTAL_BENCHMARK_ROWS } from '@/lib/benchmarks/supplemental-benchmarks';
+import previewSnapshots from '../../../cypress/fixtures/preview-snapshots.json';
 
 import type { GPUDataPoint } from './types';
 import {
@@ -75,7 +75,9 @@ describe('sign', () => {
 });
 
 describe('snapshot token-metric capabilities', () => {
-  const julyVrRows = SUPPLEMENTAL_BENCHMARK_ROWS.filter((row) => row.hardware === 'vr200');
+  const julyVrRows = (previewSnapshots as unknown as BenchmarkRow[]).filter(
+    (row) => row.hardware === 'vr200',
+  );
   const options = {
     sequence: Sequence.EightK_OneK,
     precisions: ['fp4'],

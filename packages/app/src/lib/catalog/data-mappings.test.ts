@@ -359,6 +359,15 @@ describe('showsTcoBasisSelector', () => {
     },
   );
 
+  it.each([Model.Muse_Spark_Open, Model.GLM_5_2, Model.GLM_5_3_Flash])(
+    'shows the selector for %s only on AgentX',
+    (model) => {
+      for (const sequence of Object.values(Sequence)) {
+        expect(showsTcoBasisSelector(model, sequence)).toBe(sequence === Sequence.AgenticTraces);
+      }
+    },
+  );
+
   it('keeps unrelated models hidden', () => {
     expect(showsTcoBasisSelector(Model.Kimi_K2_5, Sequence.AgenticTraces)).toBe(false);
     expect(showsTcoBasisSelector(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK)).toBe(false);

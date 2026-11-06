@@ -19,7 +19,7 @@ import {
   type TcoBasis,
 } from '@/lib/catalog/constants';
 import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
-import { supportsTokenMetric } from '@/lib/benchmarks/supplemental-benchmarks';
+import { supportsTokenMetric } from '@/lib/benchmarks/token-metric-support';
 
 import {
   getCostField,
@@ -248,7 +248,8 @@ export function buildGpuGroups<M extends GroupMeta>(
     // read the rescaled copy.
     const ratedRow = withChipBasis(row, chipBasis);
     const m = ratedRow.metrics;
-    const tput = m.tput_per_gpu ?? 0;
+    // Output-only sources store no total; their output rate orders the frontier.
+    const tput = m.tput_per_gpu ?? m.output_tput_per_gpu ?? 0;
     const outputTput = m.output_tput_per_gpu ?? tput;
     const inputTput = m.input_tput_per_gpu ?? 0;
     const cacheHitRate = pricingCacheHitRate({

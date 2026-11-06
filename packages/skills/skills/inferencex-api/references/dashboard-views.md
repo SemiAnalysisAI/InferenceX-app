@@ -64,10 +64,11 @@ PNG 宽高比（自动 / 16:9 / 1:1）是下载菜单中仅用于图片导出的
 
 Use `tcoBasis=internal` (the default) or `tcoBasis=external` in cost-aware
 read-only views. Qwen3.5 and Kimi K3 expose the corresponding dashboard toggle
-on 8K/1K and Agentic Traces; inference charts show it for cost metrics when
-TPUv7 data is visible. The API accepts the pricing basis independently of
-control visibility. It changes configured ownership costs, not measured
-throughput; explicit custom costs remain user-controlled.
+on 8K/1K and Agentic Traces; Muse Spark Open, GLM-5.2 and GLM-5.3 Flash expose
+it on Agentic Traces. Inference charts show it for cost metrics when TPUv7 data
+is visible. The API accepts the pricing basis independently of control
+visibility. It changes configured ownership costs, not measured throughput;
+explicit custom costs remain user-controlled.
 
 Inference and historical charts place TCO Basis beside Cost Tier in the caption
 below the graph, including eligible unofficial overlays. PNG captions retain the
@@ -803,6 +804,14 @@ views. Keep using `vllm-disagg` as the raw framework key and
 `mi355x_vllm-disagg` as its MI355X hardware selector; the label does not rename
 stored data or API selectors.
 
+`TokenSpeed` uses the canonical framework key and family `tokenspeed`. Select it
+with `frameworks=tokenspeed` in inference and historical views; dashboard engine
+filters and embeds use the same family. `/api/v1/views/options` lists its label
+and family. Official runs and unofficial overlays share this classification.
+Trace server metrics support TokenSpeed device KV utilization (a 0–1 fraction)
+and running/waiting request counts. Cache-hit, host-cache and token-throughput
+series remain empty when the engine does not export those measurements.
+
 For every new or changed non-sensitive public-facing data view, implement or
 update its read-only API in the same PR. Reuse the UI's pure transforms, test
 selector effects and source semantics, and update OpenAPI, the route catalog,
@@ -973,6 +982,19 @@ existing inference view API for its results.
 `/inference/minimax-m31-flash` 和 `/zh/inference/minimax-m31-flash`。这条推荐入口仅用于
 导航至现有 AgentX 模型页面，不改变数据筛选条件、默认值、计算逻辑或 API 契约；结果仍由
 现有推理视图 API 提供。
+
+### Landing-page Kimi K3.1 Pro link
+
+The English and Chinese landing pages list Kimi K3.1 Pro in place of Muse Spark
+Open, linking to `/inference/kimi-k31-pro` and `/zh/inference/kimi-k31-pro`.
+`/compare` lists both models. This is presentation-only navigation to an existing
+AgentX model view; use `model=Kimi-K3.1-Pro&sequence=agentic-traces` with the
+existing inference view API for its results.
+
+中文：英文和中文首页以 Kimi K3.1 Pro 替换 Muse Spark Open，分别链接至
+`/inference/kimi-k31-pro` 和 `/zh/inference/kimi-k31-pro`；`/compare` 仍同时列出这两个模型。
+这条入口仅用于导航至现有 AgentX 模型页面；如需查询结果，可向现有推理视图 API 传入
+`model=Kimi-K3.1-Pro&sequence=agentic-traces`。
 
 ### Cross-backend case alignment
 

@@ -11,7 +11,7 @@ import {
   rowSupportsTrendMetric,
   trendMetricDependencies,
 } from './useInterpolatedTrendData';
-import { SUPPLEMENTAL_BENCHMARK_ROWS } from '@/lib/benchmarks/supplemental-benchmarks';
+import previewSnapshots from '../../../../cypress/fixtures/preview-snapshots.json';
 import interactivityCases from '../../../../../skills/test/fixtures/agentic-interactivity.json';
 import { agenticP90Interactivity } from '../../../../../skills/skills/inferencex-api/scripts/agentic-interactivity.mjs';
 import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
@@ -459,16 +459,17 @@ describe('cache-aware token revenue interpolation', () => {
 });
 
 describe('rowSupportsTrendMetric', () => {
-  it('limits the July Vera Rubin snapshot to output-token trend metrics', () => {
-    const julyRubin = SUPPLEMENTAL_BENCHMARK_ROWS.find((row) => row.hardware === 'vr200')!;
+  const julyRubin = (previewSnapshots as unknown as BenchmarkRow[]).find(
+    (row) => row.hardware === 'vr200',
+  )!;
 
+  it('limits the July Vera Rubin snapshot to output-token trend metrics', () => {
     expect(rowSupportsTrendMetric(julyRubin, 'y_outputTputPerGpu')).toBe(true);
     expect(rowSupportsTrendMetric(julyRubin, 'y_tpPerGpu')).toBe(false);
     expect(rowSupportsTrendMetric(julyRubin, 'y_inputTputPerGpu')).toBe(false);
   });
 
   it('drops the July Vera Rubin snapshot from total-token trend groups only', () => {
-    const julyRubin = SUPPLEMENTAL_BENCHMARK_ROWS.find((row) => row.hardware === 'vr200')!;
     const options = {
       selectedPrecisions: [julyRubin.precision],
       requestedMetrics: ['tpPerGpu' as const],
@@ -483,13 +484,10 @@ describe('rowSupportsTrendMetric', () => {
     ).toBe(1);
   });
 
-  it('leaves a future Vera Rubin snapshot unrestricted without capability metadata', () => {
-    const futureRubin = {
-      ...SUPPLEMENTAL_BENCHMARK_ROWS.find((row) => row.hardware === 'vr200')!,
-      date: '2026-09-01',
-    };
+  it('leaves a Vera Rubin row that stores total throughput unrestricted', () => {
+    const fullRubin = { ...julyRubin, metrics: { ...julyRubin.metrics, tput_per_gpu: 1000 } };
 
-    expect(rowSupportsTrendMetric(futureRubin, 'y_tpPerGpu')).toBe(true);
+    expect(rowSupportsTrendMetric(fullRubin, 'y_tpPerGpu')).toBe(true);
   });
 });
 

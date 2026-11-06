@@ -39,6 +39,12 @@ describe('MODEL_SPEC_METHOD_LABELS', () => {
 });
 
 describe('resolveFrameworkPartLabel', () => {
+  it('preserves TokenSpeed branding without renaming its data key', () => {
+    expect(resolveFrameworkPartLabel(undefined, 'tokenspeed')).toBe('TokenSpeed');
+    expect(resolveFrameworkPartLabel('Qwen3.8-Flash-Next', 'tokenspeed')).toBe('TokenSpeed');
+    expect(resolveFrameworkAlias('tokenspeed')).toBe('tokenspeed');
+  });
+
   it('labels disaggregated vLLM without renaming its data key', () => {
     expect(resolveFrameworkPartLabel(undefined, 'vllm-disagg')).toBe('MoRI vLLM');
     expect(resolveFrameworkAlias('vllm-disagg')).toBe('vllm-disagg');

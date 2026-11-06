@@ -230,7 +230,7 @@ function executeRecursiveBenchmarkQuery(
       br.date::text,
       br.workflow_run_id,
       wr.run_started_at::text,
-      CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url,
+      CASE WHEN wr.github_run_id < 0 THEN wr.html_url WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url,
       sp.snapshot_date::text AS curve_date,
       sp.snapshot_workflow_run_id AS curve_workflow_run_id,
       snapshot_wr.run_started_at::text AS curve_run_started_at
@@ -427,7 +427,7 @@ export async function getLatestBenchmarks(
       lb.date::text,
       lb.workflow_run_id,
       wr.run_started_at::text,
-      CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url,
+      CASE WHEN wr.github_run_id < 0 THEN wr.html_url WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url,
       p.snapshot_date::text AS curve_date,
       p.snapshot_workflow_run_id AS curve_workflow_run_id,
       snapshot_wr.run_started_at::text AS curve_run_started_at

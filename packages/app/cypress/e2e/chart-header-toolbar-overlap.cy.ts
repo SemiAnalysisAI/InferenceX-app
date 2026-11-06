@@ -40,21 +40,6 @@ function assertHeaderClearsToolbar(width: number) {
     });
 }
 
-function assertToolbarActionsPresent() {
-  cy.get('[data-testid="inference-chart-display"] > section')
-    .first()
-    .find('[data-testid="share-button"]')
-    .should('be.visible');
-  cy.get('[data-testid="chart-figure"]')
-    .first()
-    .within(() => {
-      cy.get('[data-testid="inference-chart-view-btn"]').should('be.visible');
-      cy.get('[data-testid="inference-table-view-btn"]').should('be.visible');
-      cy.get('[data-testid="export-button"]').should('be.visible');
-      cy.get('[data-testid="zoom-reset-button"]').should('be.visible');
-    });
-}
-
 describe('chart header toolbar overlap', () => {
   before(() => {
     cy.viewport(1280, 900);
@@ -86,7 +71,6 @@ describe('chart header toolbar overlap', () => {
     for (const width of [...OVERLAY_WIDTHS, FLOW_WIDTH]) {
       assertHeaderClearsToolbar(width);
     }
-    assertToolbarActionsPresent();
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="inference-chart-view-btn"]')

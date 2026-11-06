@@ -16,7 +16,7 @@ import {
   type TokenLengthSketch,
 } from '@semianalysisai/inferencex-constants';
 
-export const STATS_VERSION = 9;
+export const STATS_VERSION = 10;
 
 export const SEQUENCE_LENGTH_SKETCHES_VERSION = STATS_VERSION * 100 + SEQUENCE_LENGTH_SKETCH_FORMAT;
 

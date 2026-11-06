@@ -25,6 +25,7 @@ import { createAdminSql } from './etl/db-utils';
 import { materializePowerSeriesForRun } from './queries/gpu-power-series';
 import {
   applyChangelogBackfills,
+  applyRunFrameworkOverridesToChangelogs,
   backfilledPoints,
   isRunAttemptPurged,
   planBenchmarkPoint,
@@ -415,13 +416,17 @@ async function main(): Promise<void> {
       `  No changelog metadata artifact found; using fallback changelog: ${fallbackDescription}`,
     );
   }
-  const { changelogs, backfillIds: changelogBackfillIds } = applyChangelogBackfills(
-    runIdNum,
-    runAttemptNum,
-    parsedChangelogs,
-  );
+  const { changelogs: backfilledChangelogs, backfillIds: changelogBackfillIds } =
+    applyChangelogBackfills(runIdNum, runAttemptNum, parsedChangelogs);
   for (const backfillId of changelogBackfillIds) {
     console.log(`  Applied changelog backfill ${backfillId}`);
+  }
+  const { changelogs, overrideIds: frameworkOverrideIds } = applyRunFrameworkOverridesToChangelogs(
+    runIdNum,
+    backfilledChangelogs,
+  );
+  for (const overrideId of frameworkOverrideIds) {
+    console.log(`  Applied run framework override ${overrideId} to changelog config keys`);
   }
   const appendOnly = hasAppendOnlyFlag(changelogs);
   const evalsOnly = hasEvalsOnlyFlag(changelogs);

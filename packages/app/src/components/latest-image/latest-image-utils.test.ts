@@ -12,7 +12,6 @@ import {
   earliestSubmission,
   firstSubmissionDates,
   getActualLatestRelease,
-  getCurrentImageNodeTypeTooltip,
   imageRowDisplayModel,
   imageRowModel,
   imageRowSequence,
@@ -256,17 +255,6 @@ describe('getActualLatestRelease', () => {
     expect(getActualLatestRelease('vllm', undefined)).toBeNull();
     expect(getActualLatestRelease('trt', releases)).toBeNull();
     expect(getActualLatestRelease('vllm', { sglang: releases.sglang })).toBeNull();
-  });
-});
-
-describe('getCurrentImageNodeTypeTooltip', () => {
-  it('preserves the English Mori spelling while using MoRI in Chinese', () => {
-    expect(getCurrentImageNodeTypeTooltip('en')).toBe(
-      'Single node = non-disaggregated serving. Disaggregated = separate prefill/decode pools, including Dynamo, Mori, and llm-d.',
-    );
-    expect(getCurrentImageNodeTypeTooltip('zh')).toBe(
-      '单节点指非分离式推理；分离式配置使用独立的 prefill/decode 池，包括 Dynamo、MoRI 和 llm-d。',
-    );
   });
 });
 

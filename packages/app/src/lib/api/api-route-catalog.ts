@@ -680,10 +680,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'page-bff',
     exclusionReason: {
-      en: 'Dashboard filter BFF: the published availability rows plus the supplemental datasets, sent once per distinct line with its dates as runs over a date dictionary.',
-      zh: '看板筛选专用 BFF：已发布的可用性行加上补充数据集，每条不同的配置线只发送一次，其日期以日期字典上的区间表示。',
+      en: 'Dashboard filter BFF: the published availability rows, sent once per distinct line with its dates as runs over a date dictionary.',
+      zh: '看板筛选专用 BFF：已发布的可用性行，每条不同的配置线只发送一次，其日期以日期字典上的区间表示。',
     },
-    sourceSha256: 'c28f632ac500b9e02a5677827bb286081fc780daf4b2fc67b83518c29620232d',
+    sourceSha256: '7fdb38e3400b62e42ee86ff74f6779796df8cd3f3b2ffd8b7177d850f81bb4c9',
   },
   {
     source: 'src/app/api/v1/benchmark-presence/route.ts',
@@ -1249,6 +1249,30 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: '../constants/src/framework-aliases.ts',
+    sourceSha256: '6c220e6aed1465e647f2c3ffcb03828e0f98ac6b9edb4019f0dce6db10c4054e',
+    reviewArea: {
+      en: 'Shared engine labels, family classification and dashboard/read-only view filter parity.',
+      zh: '共享引擎标签、系列分类，以及仪表板与只读视图的筛选一致性。',
+    },
+  },
+  {
+    source: 'src/lib/catalog/framework-family.ts',
+    sourceSha256: '8720fbb931453e16882584f846148b29688d07fbf296c2c829c286d638abfec5',
+    reviewArea: {
+      en: 'Shared engine labels, family classification and dashboard/read-only view filter parity.',
+      zh: '共享引擎标签、系列分类，以及仪表板与只读视图的筛选一致性。',
+    },
+  },
+  {
+    source: 'src/components/inference/utils/quickFilters.ts',
+    sourceSha256: 'ba6e41f71f0ebbecad861b2694dbfb8a72f1e1d4e27252a1eacc154702aaf388',
+    reviewArea: {
+      en: 'Shared engine labels, family classification and dashboard/read-only view filter parity.',
+      zh: '共享引擎标签、系列分类，以及仪表板与只读视图的筛选一致性。',
+    },
+  },
+  {
     source: 'src/components/ubenchx/ubenchx-transform.ts',
     sourceSha256: '9458ad2b969525fe68da5a3b54ac151384610d0bd2ba84585a9043b3a67bf949',
     reviewArea: {
@@ -1756,7 +1780,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/interpolated-trend-core.ts',
-    sourceSha256: '9244bd94e390872a9ea82d685667588e664403aee0bc8d20e6ef616ccc0b7110',
+    sourceSha256: '91b05094830ebe261810c935159c145c4ac95c1f8f3b9431242a167de1ebc187',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1765,7 +1789,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/chart-data-core.ts',
-    sourceSha256: 'e2b95516a6ebb16c312c711b540cc7ffff52ab184238bb5b2f40b6155b69d126',
+    sourceSha256: '6be86db9c2dd179a6c9a83480d2ce6725cbe6a9fb16b90a20215501f9cb6f2bb',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1783,7 +1807,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/calculator/throughput-data.ts',
-    sourceSha256: '77455329d9249cf9f99a5b4aa8b53cfaa74ef8c9a5a5713851da756ef88a02aa',
+    sourceSha256: 'bd4f108feade8cb2aa7ff83523bfdea271db8f03dfb95a32af819e83bf01932d',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -2045,8 +2069,16 @@ export const apiContractSourceDigests = [
     },
   },
   {
+    source: '../db/src/etl/compute-chart-series.ts',
+    sourceSha256: '04e7a27bc027f64a77eb585c2a8415d2398f54460522c22487fcec7124c9bef5',
+    reviewArea: {
+      en: 'Server metric chart version, supported engine metrics, source identity, and missing-data semantics.',
+      zh: '服务器指标图表版本、支持的引擎指标、来源标识以及缺失数据语义。',
+    },
+  },
+  {
     source: '../db/src/queries/agentic-aggregates.ts',
-    sourceSha256: 'a7dc1bd4fff46597a9343c6b124dc4a1c38fc287c083556ae97d1b334ce248ba',
+    sourceSha256: '6cf88477d4aec60e6a2d276637281dbffe39bc42d37256511e10e6c741fa10a8',
     reviewArea: {
       en: 'Agentic aggregate percentile keys, nullability, and ID-keyed response shape.',
       zh: '智能体汇总百分位字段、可空性和按 ID 索引的响应结构。',
@@ -2070,7 +2102,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmarks.ts',
-    sourceSha256: '8435e87e23b68feb2cbe9ca5918c9d650a3102a009292794708ad63f315dd230',
+    sourceSha256: '1d1d88901f19beb47400c004cefe0723b05c441bd36582226bc36ad517f748d9',
     reviewArea: {
       en: 'Benchmark row fields and latest, exact-run, history, and TCO query semantics.',
       zh: '基准行字段以及最新、精确运行、历史和 TCO 查询语义。',

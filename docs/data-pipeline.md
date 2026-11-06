@@ -119,6 +119,18 @@ Every INSERT uses `ON CONFLICT DO UPDATE` or `DO NOTHING`. This means:
 The unique constraints match natural keys (for benchmarks, workflow/config/scenario,
 concurrency, offload mode, and the nullable recipe fingerprint), not surrogate keys.
 
+### Results Published Outside CI
+
+The database is the source of truth for every result. Results measured outside our CI
+(OpenAI's Jalapeño points and CoreWeave's July Vera Rubin NVL72 curve) exist only there, each
+snapshot as its own `workflow_runs` row with a fixed negative `github_run_id` (-1 to -3), so
+snapshots never share a run and the benchmark natural key cannot fold one snapshot's points into
+another's. Results from our own runs, including private-repo runs such as the TPU7x sweeps, are
+ingested from their GitHub run. A snapshot's `html_url` is its source page, and the benchmark
+queries return it as `run_url` without the GitHub `/attempts/N` suffix. A source that publishes
+only output throughput omits `tput_per_gpu`, and the dashboard then offers only output-token
+metrics for those points.
+
 ### AgentX Curve Replacement Scope
 
 For `agentic_traces`, a curve is identified by model, hardware, framework, precision,
@@ -272,6 +284,37 @@ number, it follows the purge path's conservative fallback and matches the exact 
 point across attempts; the log records the applied backfill ID. Changelog corrections are
 likewise applied to artifact metadata before `appendOnly`/`evalsOnly` run semantics are
 resolved and before the changelog is upserted.
+
+### Audited Framework Reassignments
+
+A sweep can serve one framework while its matrix entry declares another. The Qwen3.5
+TPU v7 AgentX xPyD run 40744397059 ran every engine behind the llm-d router but was
+declared as `vllm`, so its points were grouped with plain vLLM instead of `llmd-vllm`
+like the GB200 llm-d sweeps. Register such a run in `RUN_FRAMEWORK_OVERRIDES` in
+`packages/db/src/etl/run-framework-overrides.ts` (re-exported by `run-overrides.ts`; it
+is a separate dependency-free module because the mappers, which the app bundles for the
+unofficial-run route, read it at mapping time) with a stable `id`, a `reason`, the `githubRunId`,
+the canonical declared framework (`from`), and the canonical served framework (`to`,
+which must be a registered `FW_REGISTRY` key). Validation rejects aliases, unregistered
+targets, duplicate selectors, and purged runs.
+
+The benchmark and eval mappers substitute `to` for `from` before any config is
+resolved, so every ingest path (CI, GCS backup, re-ingest) stores benchmark rows, eval
+rows, and availability under the served framework, and changelog config keys are
+rewritten (`qwen3.5-fp8-tpuv7-vllm-agentic-xpyd-mtp` becomes
+`qwen3.5-fp8-tpuv7-llmd-vllm-agentic-xpyd-mtp`) so the changelog keeps matching the
+corrected series. Point purges and backfills for the same run must therefore name the
+served framework in their selectors.
+
+`bun run admin:db:apply-overrides` moves rows an earlier ingest stored under `from`:
+for each affected config it upserts the config that differs only in framework, repoints
+the run's benchmark and eval rows in one transaction, inserts the served-framework
+availability rows, deletes declared-framework availability rows that no remaining
+successful row supports, rewrites the run's changelog config keys, and refreshes
+`latest_benchmarks`. Unique constraints make a collision with an existing destination
+row fail the transaction rather than merging two points. The orphaned source configs
+are left in place; they are harmless and a future ingest of the same run resolves
+straight to the served-framework config.
 
 ### Syncing Public Runs Into a Downstream Database
 

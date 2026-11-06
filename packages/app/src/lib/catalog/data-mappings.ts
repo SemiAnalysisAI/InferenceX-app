@@ -487,6 +487,11 @@ export function isBestPerSkuDefaultOff(
 const MODEL_TCO_BASIS_SELECTOR: Partial<Record<Model, ReadonlySet<Sequence>>> = {
   [Model.Qwen3_5]: new Set([Sequence.EightK_OneK, Sequence.AgenticTraces]),
   [Model.Kimi_K3]: new Set([Sequence.EightK_OneK, Sequence.AgenticTraces]),
+  // Muse Spark Open exposes only Agentic Traces, where its TPUv7 results live.
+  [Model.Muse_Spark_Open]: new Set([Sequence.AgenticTraces]),
+  // GLM-5.2 and GLM-5.3 Flash have TPUv7 results on Agentic Traces only.
+  [Model.GLM_5_2]: new Set([Sequence.AgenticTraces]),
+  [Model.GLM_5_3_Flash]: new Set([Sequence.AgenticTraces]),
 };
 
 export function showsTcoBasisSelector(

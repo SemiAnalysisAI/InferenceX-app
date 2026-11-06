@@ -270,7 +270,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'landing',
     content: {
       icon: GoogleIcon,
-      title: 'TPUv7 prelimary results across multiple models',
+      title: 'TPUv7 preliminary results across multiple models',
       titleZh: 'TPUv7 多模型初步结果',
       description: 'AgentX Preview Submissions',
       descriptionZh: 'AgentX 预览版提交结果',
@@ -296,6 +296,26 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
           window.location.href = localizedNudgeHref('/inference/kimi-k3');
         },
       },
+      additionalActions: [
+        {
+          label: 'Muse Spark',
+          labelZh: 'Muse Spark',
+          icon: <ModelLogo model={Model.Muse_Spark_Open} />,
+          onClick: () => {
+            window.location.href = localizedNudgeHref('/inference/muse-spark-open');
+          },
+        },
+        {
+          label: 'GLM5.3',
+          labelZh: 'GLM5.3',
+          icon: <ModelLogo model={Model.GLM_5_2} />,
+          onClick: () => {
+            window.location.href = localizedNudgeHref(
+              '/inference/glm-5-3?g_model=GLM-5.2&i_seq=agentic-traces&i_prec=fp8',
+            );
+          },
+        },
+      ],
     },
     analytics: {
       shown: 'inference_tpuv7_agentx_modal_shown',

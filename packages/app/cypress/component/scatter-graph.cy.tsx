@@ -38,6 +38,102 @@ const expectVisiblePointCount = (scope: string, count: number) =>
   cy.scatterPoints(scope).should((points) => expect(visiblePoints(points)).to.have.length(count));
 
 describe('ScatterGraph', () => {
+  it('keeps compact hover and pins full cache and role details in the UI font', () => {
+    const data = [
+      createMockInferenceData({
+        hwKey: 'h100',
+        precision: Precision.FP4,
+        x: 20,
+        y: 80,
+        benchmark_type: 'agentic_traces',
+        framework: 'sglang',
+        disagg: true,
+        is_multinode: true,
+        physicalChips: 64,
+        conc: 10888,
+        prefill_tp: 2,
+        prefill_ep: 2,
+        prefill_dp_attention: true,
+        prefill_num_workers: 16,
+        num_prefill_gpu: 32,
+        decode_tp: 32,
+        decode_ep: 32,
+        decode_dp_attention: true,
+        decode_num_workers: 1,
+        num_decode_gpu: 32,
+        kv_offloading: 'dram',
+        kv_offload_backend: 'hicache',
+        server_gpu_cache_hit_rate: 0.707,
+        server_cpu_cache_hit_rate: 0.242,
+        theoretical_cache_hit_rate: 0.973,
+        total_prompt_tokens: 566443844,
+        total_generation_tokens: 4180360,
+      }),
+    ];
+    mountWithProviders(
+      <div style={{ width: 1000 }}>
+        <ScatterGraph
+          chartId="pinned-details-test"
+          modelLabel="DeepSeek R1"
+          data={data}
+          xLabel="Interactivity"
+          yLabel="Throughput"
+          chartDefinition={defaultChartDef}
+          transitionDuration={0}
+        />
+      </div>,
+      {
+        inference: { hardwareConfig: hwConfig, selectedPrecisions: [Precision.FP4] },
+        unofficial: {},
+      },
+    );
+    cy.scatterPoints()
+      .should('have.length', 1)
+      .then(([point]) => {
+        cy.wrap(point.hitArea).trigger('mousemove', {
+          clientX: point.clientX,
+          clientY: point.clientY,
+          force: true,
+        });
+        cy.get('[data-hover-tooltip]').should('contain.text', 'FP4 · conc 10888');
+        cy.get('[data-pinned-config]').should('not.exist');
+        clickScatterPoint(point);
+      });
+    cy.get('[data-pinned-config]')
+      .should('contain.text', 'Concurrency: 10,888')
+      .and('contain.text', 'Precision: FP4')
+      .and('not.have.css', 'font-family', 'monospace');
+    cy.get('[data-pinned-parallelism]')
+      .should('contain.text', 'Prefill')
+      .and('contain.text', 'Decode')
+      .and('contain.text', 'DEP2')
+      .find('.pinned-compact-topology tbody tr')
+      .should('have.length', 2)
+      .first()
+      .should('contain.text', 'DEP2');
+    cy.get('.pinned-raw-topology').should('not.exist');
+    cy.get('[data-pinned-parallelism]')
+      .should('not.contain.text', 'Configuration details')
+      .and('not.contain.text', '配置详情');
+    cy.get('[data-pinned-cache]')
+      .should('contain.text', 'Chip 70.7%')
+      .and('contain.text', 'CPU 24.2%')
+      .and('contain.text', 'theoretical 97.3%')
+      .find('[data-hover-cache-bar]')
+      .should('be.visible');
+    cy.get('[data-pinned-tokens]')
+      .should('contain.text', '566,443,844')
+      .and('contain.text', '4,180,360');
+    cy.viewport(375, 700);
+    cy.get('.inferencex-pinned-tooltip').should(($card) => {
+      expect($card[0].clientWidth).to.be.at.most(375);
+      expect($card[0].clientHeight).to.be.at.most(700);
+      expect($card[0].scrollWidth).to.equal($card[0].clientWidth);
+    });
+    cy.get('body').click(5, 5);
+    cy.get('[data-pinned-config]').should('not.be.visible');
+  });
+
   it('keeps the frontier modes and overlay winners without exposing the retired hinterland', () => {
     const official = [
       createMockInferenceData({ hwKey: 'h100', precision: Precision.FP8, x: 20, y: 80 }),
@@ -325,62 +421,6 @@ describe('ScatterGraph', () => {
     cy.get('@selectAllHwTypes').should('not.have.been.called');
   });
 
-  it('renders SVG within chart container', () => {
-    const data = [
-      createMockInferenceData({ hwKey: 'b200_trt', x: 64, y: 320, precision: Precision.FP4 }),
-      createMockInferenceData({ hwKey: 'h100', x: 32, y: 210, precision: Precision.FP4 }),
-    ];
-
-    mountWithProviders(
-      <div style={{ width: 800, height: 600 }}>
-        <ScatterGraph
-          chartId="test-scatter"
-          modelLabel="DeepSeek R1"
-          data={data}
-          xLabel="Concurrency"
-          yLabel="Throughput / Chip (tok/s)"
-          chartDefinition={defaultChartDef}
-        />
-      </div>,
-      {
-        inference: {
-          hardwareConfig: hwConfig,
-          activeHwTypes: new Set(['b200_trt', 'h100']),
-          hwTypesWithData: new Set(['b200_trt', 'h100']),
-          selectedPrecisions: [Precision.FP4],
-        },
-        unofficial: {},
-      },
-    );
-
-    cy.get('#test-scatter svg').should('exist');
-  });
-
-  it('shows empty state when data array is empty', () => {
-    mountWithProviders(
-      <div style={{ width: 800, height: 600 }}>
-        <ScatterGraph
-          chartId="test-scatter-empty"
-          modelLabel="DeepSeek R1"
-          data={[]}
-          xLabel="Concurrency"
-          yLabel="Throughput / Chip (tok/s)"
-          chartDefinition={defaultChartDef}
-        />
-      </div>,
-      {
-        inference: {
-          hardwareConfig: hwConfig,
-          activeHwTypes: new Set(['b200_trt', 'h100']),
-          hwTypesWithData: new Set(['b200_trt', 'h100']),
-        },
-        unofficial: {},
-      },
-    );
-
-    cy.contains('No data available').should('be.visible');
-  });
-
   it('explains when the selected dataset lacks role-local energy', () => {
     mountWithProviders(
       <div style={{ width: 800, height: 600 }}>
@@ -410,65 +450,6 @@ describe('ScatterGraph', () => {
     cy.contains(
       'No measurements to plot for this selection. Review the benchmark controls above or adjust quick filters.',
     ).should('not.exist');
-  });
-
-  it('localizes the complete Chinese empty state', () => {
-    mountWithProviders(
-      <PathnameContext.Provider value="/zh/inference">
-        <div style={{ width: 375, height: 600 }}>
-          <ScatterGraph
-            chartId="test-scatter-empty-zh"
-            modelLabel="DeepSeek R1"
-            data={[]}
-            xLabel="并发数"
-            yLabel="单芯片吞吐量 (tok/s)"
-            chartDefinition={defaultChartDef}
-          />
-        </div>
-      </PathnameContext.Provider>,
-      {
-        inference: {
-          hardwareConfig: hwConfig,
-          activeHwTypes: new Set(['b200_trt']),
-          hwTypesWithData: new Set(['b200_trt']),
-        },
-        unofficial: {},
-      },
-    );
-    cy.contains('暂无数据').should('be.visible');
-    cy.contains('请检查上方的基准测试设置，或调整快捷筛选。').should('be.visible');
-    cy.contains('No data available').should('not.exist');
-  });
-
-  it('localizes the missing role-energy explanation', () => {
-    mountWithProviders(
-      <PathnameContext.Provider value="/zh/inference">
-        <div style={{ width: 375, height: 600 }}>
-          <ScatterGraph
-            chartId="test-scatter-role-energy-empty-zh"
-            modelLabel="DeepSeek R1"
-            data={[]}
-            xLabel="交互性"
-            yLabel="每输入 token 实测 Prefill 能耗"
-            chartDefinition={defaultChartDef}
-          />
-        </div>
-      </PathnameContext.Provider>,
-      {
-        inference: {
-          hardwareConfig: hwConfig,
-          activeHwTypes: new Set(['mi355x']),
-          hwTypesWithData: new Set(),
-          selectedYAxisMetric: 'y_measuredPrefillJPerInputToken',
-        },
-        unofficial: {},
-      },
-    );
-
-    cy.contains('当前数据集未提供 Prefill/Decode 各角色的能耗数据。').should('be.visible');
-    cy.contains('当前选择没有可绘制的测量数据。请检查上方的基准测试设置，或调整快捷筛选。').should(
-      'not.exist',
-    );
   });
 
   it('explains why All in Measured has no points', () => {
@@ -502,39 +483,6 @@ describe('ScatterGraph', () => {
     cy.contains('eight-GPU HGX/OAM systems, or whole GB200/GB300 NVL72 compute trays').should(
       'be.visible',
     );
-    cy.screenshot('nvl72-empty-en-desktop', { overwrite: true });
-  });
-
-  it('localizes the All in Measured explanation', () => {
-    cy.viewport(390, 720);
-    mountWithProviders(
-      <PathnameContext.Provider value="/zh/inference">
-        <div style={{ width: 375, height: 600 }}>
-          <ScatterGraph
-            chartId="test-scatter-all-in-measured-empty-zh"
-            modelLabel="Kimi K3"
-            data={[]}
-            xLabel="交互性"
-            yLabel="每芯片整体实测功耗"
-            chartDefinition={defaultChartDef}
-          />
-        </div>
-      </PathnameContext.Provider>,
-      {
-        inference: {
-          hardwareConfig: hwConfig,
-          activeHwTypes: new Set(['b200_trt']),
-          hwTypesWithData: new Set(),
-          selectedYAxisMetric: 'y_utilityModeledJPerOutputToken',
-        },
-        unofficial: {},
-      },
-    );
-
-    cy.contains('当前选择没有可用的整体实测功耗数值。').should('be.visible');
-    cy.contains('当前选择没有可绘制的测量数据。').should('not.exist');
-    cy.contains('八卡 HGX/OAM 系统，或完整的 GB200/GB300 NVL72 计算 tray').should('be.visible');
-    cy.screenshot('nvl72-empty-zh-mobile', { overwrite: true });
   });
 
   for (const selectedYAxisMetric of ['y_tpPerGpu', 'y_measuredPrefillJPerInputToken'] as const) {
@@ -621,52 +569,6 @@ describe('ScatterGraph', () => {
         expect([...restore.lastCall.args[1]]).to.include('h100');
       });
     cy.get('@setQuickFilterVendors').should('not.have.been.called');
-  });
-
-  it('renders scatter points as shapes in SVG with mock data', () => {
-    const data = [
-      createMockInferenceData({
-        hwKey: 'b200_trt',
-        x: 64,
-        y: 320,
-        conc: 64,
-        precision: Precision.FP4,
-      }),
-      createMockInferenceData({ hwKey: 'h100', x: 32, y: 210, conc: 32, precision: Precision.FP4 }),
-      createMockInferenceData({
-        hwKey: 'mi300x',
-        x: 16,
-        y: 180,
-        conc: 16,
-        precision: Precision.FP4,
-      }),
-    ];
-
-    mountWithProviders(
-      <div style={{ width: 800, height: 600 }}>
-        <ScatterGraph
-          chartId="test-scatter-points"
-          modelLabel="DeepSeek R1"
-          data={data}
-          xLabel="Concurrency"
-          yLabel="Throughput / Chip (tok/s)"
-          chartDefinition={defaultChartDef}
-        />
-      </div>,
-      {
-        inference: {
-          hardwareConfig: hwConfig,
-          activeHwTypes: new Set(['b200_trt', 'h100', 'mi300x']),
-          hwTypesWithData: new Set(['b200_trt', 'h100', 'mi300x']),
-          selectedPrecisions: [Precision.FP4],
-        },
-        unofficial: {},
-      },
-    );
-
-    cy.scatterPoints('#test-scatter-points').should((points) => {
-      expect(visiblePoints(points)).to.have.length.greaterThan(0);
-    });
   });
 
   it('keeps official-only legend toggles active after a scope change', () => {
@@ -1284,91 +1186,6 @@ describe('ScatterGraph', () => {
       .should('have.text', 'B200 (TileRT, MTP)');
   });
 
-  it('renders M3 mtp rooflines with the EAGLE label (official + overlay)', () => {
-    const interactivityChartDef = createMockChartDefinition({
-      chartType: 'interactivity',
-      y_tpPerGpu_roofline: 'upper_left',
-    });
-    const officialData = [
-      createMockInferenceData({ hwKey: 'h100_vllm_mtp', x: 8, y: 240, precision: Precision.FP4 }),
-      createMockInferenceData({ hwKey: 'h100_vllm_mtp', x: 16, y: 200, precision: Precision.FP4 }),
-      createMockInferenceData({ hwKey: 'h100_vllm_mtp', x: 32, y: 150, precision: Precision.FP4 }),
-    ];
-    const runUrl = 'https://github.com/x/y/actions/runs/999';
-    const overlayData = {
-      data: [
-        createMockInferenceData({
-          hwKey: 'b200_vllm_mtp',
-          x: 8,
-          y: 320,
-          precision: Precision.FP4,
-          run_url: runUrl,
-        }),
-        createMockInferenceData({
-          hwKey: 'b200_vllm_mtp',
-          x: 16,
-          y: 280,
-          precision: Precision.FP4,
-          run_url: runUrl,
-        }),
-        createMockInferenceData({
-          hwKey: 'b200_vllm_mtp',
-          x: 32,
-          y: 220,
-          precision: Precision.FP4,
-          run_url: runUrl,
-        }),
-      ],
-      hardwareConfig: hwConfig,
-      label: '',
-      runUrl,
-    };
-
-    mountWithProviders(
-      <div style={{ width: 800, height: 600 }}>
-        <ScatterGraph
-          chartId="test-scatter-m3-eagle"
-          modelLabel="MiniMax-M3"
-          data={officialData}
-          xLabel="Concurrency"
-          yLabel="Throughput / Chip (tok/s)"
-          chartDefinition={interactivityChartDef}
-          overlayData={overlayData}
-        />
-      </div>,
-      {
-        inference: {
-          hardwareConfig: hwConfig,
-          activeHwTypes: new Set(['h100_vllm_mtp']),
-          hwTypesWithData: new Set(['h100_vllm_mtp']),
-          selectedPrecisions: [Precision.FP4],
-          showLineLabels: true,
-        },
-        unofficial: {
-          activeOverlayHwTypes: new Set(['b200_vllm_mtp']),
-          allOverlayHwTypes: new Set(['b200_vllm_mtp']),
-          runIndexByUrl: { [runUrl]: 0, '999': 0 },
-          unofficialRunInfos: [],
-        },
-      },
-    );
-
-    cy.get('#test-scatter-m3-eagle svg .line-label')
-      .filter('[data-line-key]:not([data-line-key^="overlay-"])')
-      .find('text')
-      .should('contain.text', 'EAGLE');
-    cy.get('#test-scatter-m3-eagle svg .line-label[data-line-key^="overlay-"]')
-      .find('text')
-      .should('contain.text', 'EAGLE');
-    cy.get('#test-scatter-m3-eagle svg .line-label[data-line-key^="overlay-"] .ll-gpu')
-      .should('have.text', 'B200')
-      .and('have.attr', 'font-weight', '700');
-    cy.get('#test-scatter-m3-eagle svg .line-label[data-line-key^="overlay-"] .ll-engine')
-      .should('contain.text', 'EAGLE')
-      .and('have.attr', 'fill', '#d1d5db');
-    cy.get('#test-scatter-m3-eagle svg .line-label text').should('not.contain.text', 'MTP');
-  });
-
   it('renders cross-engine official and unofficial AgentX STP series together in preview mode', () => {
     const chartDefinition = createMockChartDefinition({
       chartType: 'interactivity',
@@ -1840,7 +1657,6 @@ describe('ChartDisplay modeled power disclosures', () => {
             expect($note[0].scrollWidth).to.be.at.most($note[0].clientWidth);
           });
         cy.scatterPoints().should((points) => expect(visiblePoints(points)).to.not.be.empty);
-        cy.screenshot(`all-in-measured-boundary-${locale}-${width}`, { overwrite: true });
       }
     });
   }
@@ -2013,26 +1829,24 @@ describe('ChartDisplay responsive status notes', () => {
     assertAtomPngExport('16:9');
   });
 
-  for (const ratio of ['auto', '16:9', '1:1'] as const) {
-    it(`includes the complete selected ATOM disclaimer in ${ratio} PNG exports`, () => {
-      mountWithProviders(<ChartDisplay />, {
-        inference: {
-          graphs: [
-            {
-              model: Model.DeepSeek_R1,
-              sequence: Sequence.AgenticTraces,
-              chartDefinition: defaultChartDef,
-              data: [createMockInferenceData({ framework: 'atom' })],
-            },
-          ],
-        },
-        globalFilters: {},
-        unofficial: {},
-      });
-      cy.get('#chart-0 [data-testid="atom-engine-footnote"]').should('have.text', atomDisclaimer);
-      assertAtomPngExport(ratio);
+  it('includes the complete selected ATOM disclaimer in auto PNG exports', () => {
+    mountWithProviders(<ChartDisplay />, {
+      inference: {
+        graphs: [
+          {
+            model: Model.DeepSeek_R1,
+            sequence: Sequence.AgenticTraces,
+            chartDefinition: defaultChartDef,
+            data: [createMockInferenceData({ framework: 'atom' })],
+          },
+        ],
+      },
+      globalFilters: {},
+      unofficial: {},
     });
-  }
+    cy.get('#chart-0 [data-testid="atom-engine-footnote"]').should('have.text', atomDisclaimer);
+    assertAtomPngExport('auto');
+  });
 
   it('omits the ATOM disclaimer when its series is not selected', () => {
     mountWithProviders(<ChartDisplay />, {

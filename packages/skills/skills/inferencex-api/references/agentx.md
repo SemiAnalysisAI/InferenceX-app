@@ -71,8 +71,8 @@ uses reciprocal P90 full-response ITL, not the median or P90 of token rates.
 Muse Spark Open uses display model `Muse-Spark-Open`, raw DB key
 `musespark`, and dashboard route `/inference/muse-spark-open` (also under `/zh`).
 Use `model=Muse-Spark-Open` for benchmark reads and the inference view API,
-with `sequence=agentic-traces` for the latter. Landing-page and comparison results
-links open the canonical dashboard without an `unofficialRun` parameter.
+with `sequence=agentic-traces` for the latter. Comparison results links open the
+canonical dashboard without an `unofficialRun` parameter.
 Unofficial runs remain available through explicitly supplied overlay links; they
 do not populate the published benchmark API. Preserve empty API responses as no
 published data; do not substitute another model.

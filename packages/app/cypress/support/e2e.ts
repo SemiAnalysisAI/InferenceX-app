@@ -2,7 +2,6 @@ import 'cypress-axe';
 
 import type { AvailabilityRow } from '@/lib/api/api';
 import { compactAvailability } from '@/lib/benchmarks/compact-availability';
-import { withSupplementalAvailability } from '@/lib/benchmarks/supplemental-benchmarks';
 
 import { registerScatterPointsQuery } from './scatter-points';
 
@@ -98,7 +97,7 @@ export function interceptBenchmarkPresence({
 }
 
 export function availabilityBody(rows: readonly AvailabilityRow[]) {
-  return compactAvailability(withSupplementalAvailability([...rows]));
+  return compactAvailability([...rows]);
 }
 
 export function expectNoPageOverflow(): void {

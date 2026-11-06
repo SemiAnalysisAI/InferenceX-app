@@ -8,6 +8,7 @@ import { GPU_VENDORS } from '@semianalysisai/inferencex-constants';
 import { ViewsApiParamError } from './errors';
 import {
   matchesHardware,
+  FRAMEWORK_FAMILY_VALUES,
   MAX_RUN_ID_LIST,
   parseBoolParam,
   parseCostProviderParam,
@@ -81,6 +82,12 @@ describe('parseSequenceParam', () => {
 });
 
 describe('parseEnumParam / parseListParam', () => {
+  it('accepts the TokenSpeed family in public view filters', () => {
+    expect(parseListParam('TokenSpeed', 'frameworks', FRAMEWORK_FAMILY_VALUES)).toEqual([
+      'tokenspeed',
+    ]);
+  });
+
   it('matches case-insensitively and preserves canonical casing', () => {
     expect(parseEnumParam('P90', 'percentile', ['p75', 'p90'], 'p90')).toBe('p90');
   });

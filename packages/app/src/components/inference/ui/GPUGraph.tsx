@@ -1170,6 +1170,7 @@ const GPUGraph = React.memo(
               overlayData
                 ? generateOverlayTooltipContent({
                     data: point,
+                    color: overlayRunColor(overlayRunOf(point)),
                     isPinned: pinned,
                     xLabel,
                     yLabel,
@@ -1432,6 +1433,7 @@ const GPUGraph = React.memo(
           content: (d: InferenceData, isPinned: boolean) =>
             generateGPUGraphTooltipContent({
               data: d,
+              color: getCssColor(resolveColor(d.hwKey)),
               isPinned,
               xLabel,
               yLabel,

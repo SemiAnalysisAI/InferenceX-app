@@ -56,9 +56,10 @@ describe('Agentic Workload Explorer', () => {
   it('renders the overview inside the dashboard shell and navigates to sessions', () => {
     cy.visit('/agentic-workload-explorer');
     cy.wait('@overview');
-    cy.get('[data-testid="agentic-workload-explorer"]')
-      .should('contain.text', 'Agentic Workload Explorer')
-      .and('contain.text', 'Frozen snapshot');
+    cy.get('[data-testid="agentic-workload-explorer"]').should(
+      'contain.text',
+      'Agentic Workload Explorer',
+    );
     cy.get('[data-testid="chart-section-tabs"]').should('not.exist');
     cy.get('[data-testid="mobile-chart-select"]').should('not.exist');
     cy.get('nav[aria-label="Agentic Workload Explorer sections"]')
@@ -74,7 +75,6 @@ describe('Agentic Workload Explorer', () => {
 
     cy.visit('/zh/agentic-workload-explorer/sessions');
     cy.wait('@sessions');
-    cy.get('[data-testid="agentic-workload-explorer"]').should('contain.text', '冻结快照');
     cy.get('nav[aria-label="Agentic Workload Explorer 分区"]')
       .contains('a', '会话')
       .should('have.attr', 'aria-current', 'page');

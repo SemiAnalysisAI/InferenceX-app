@@ -187,8 +187,7 @@ function overlayRun(hw: string): Parameters<typeof createMockUnofficialRunContex
 
 const svg = () => cy.get('[data-testid="power-timeline-chart-svg"]');
 
-const status = (options?: Partial<Cypress.Timeoutable>) =>
-  cy.get('[data-testid="power-timeline-empty"]', options);
+const status = () => cy.get('[data-testid="power-timeline-empty"]');
 const plotSvg = () =>
   cy.get('[data-testid="power-timeline-chart-svg"] svg[data-testid="d3-chart-svg"]');
 
@@ -505,10 +504,10 @@ describe('PowerTimeline', () => {
 
     it('replaces the placeholder axes with a loading panel until telemetry arrives', () => {
       cy.viewport(PHONE, 800);
-      cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, {
-        body: response,
-        delay: 1500,
-      }).as('series');
+      const held = Promise.withResolvers<void>();
+      cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, (request) =>
+        held.promise.then(() => request.reply({ body: response })),
+      ).as('series');
       mountTimeline([measuredPoint('b200', 16, 700)], { width: '100%' });
       status()
         .should('have.attr', 'data-status', 'loading')
@@ -517,6 +516,7 @@ describe('PowerTimeline', () => {
         .and('contain.text', 'Loading GPU telemetry');
       // No fake 0–100 W scale, gridlines or watermark behind the panel.
       plotSvg().should('have.css', 'visibility', 'hidden');
+      cy.then(() => held.resolve());
       cy.wait('@series');
       status().should('not.exist');
       plotSvg().should('have.css', 'visibility', 'visible');
@@ -525,10 +525,11 @@ describe('PowerTimeline', () => {
 
     it('keeps drawn runs visible while another run is still loading', () => {
       cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('first');
-      cy.intercept('POST', `/api/gpu-metrics?runId=${SECOND_RUN_ID}*`, {
-        body: { ...response, series: [series('h100', 16, 500)] },
-        delay: 1500,
-      }).as('second');
+      const held = Promise.withResolvers<void>();
+      const body = { ...response, series: [series('h100', 16, 500)] };
+      cy.intercept('POST', `/api/gpu-metrics?runId=${SECOND_RUN_ID}*`, (request) =>
+        held.promise.then(() => request.reply({ body })),
+      ).as('second');
       mountTimeline([
         measuredPoint('b200', 16, 700),
         measuredPoint('h100', 16, 500, { run_url: SECOND_RUN_URL }),
@@ -537,6 +538,7 @@ describe('PowerTimeline', () => {
       status().should('have.attr', 'data-status', 'loading').and('contain.text', '1 more run');
       plotSvg().should('have.css', 'visibility', 'visible');
       cy.get('path.power-trace[data-hw="b200"]').should('exist');
+      cy.then(() => held.resolve());
       cy.wait('@second');
       status().should('not.exist');
     });
@@ -547,9 +549,7 @@ describe('PowerTimeline', () => {
         body: { error: 'artifact download failed' },
       }).as('series');
       mountTimeline([measuredPoint('b200', 16, 700)]);
-      status({ timeout: 10000 })
-        .should('have.attr', 'data-status', 'error')
-        .and('have.attr', 'role', 'alert');
+      status().should('have.attr', 'data-status', 'error').and('have.attr', 'role', 'alert');
       plotSvg().should('have.css', 'visibility', 'hidden');
       cy.get('[data-testid="power-timeline-status"] [role="alert"]').should(
         'contain.text',
