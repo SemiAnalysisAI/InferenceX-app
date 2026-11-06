@@ -22,6 +22,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { InputGroup, InputGroupInput } from '@/components/ui/input-group';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 function focusAppearance(element: Element) {
   const style = getComputedStyle(element);
@@ -77,6 +79,139 @@ function SearchForm({ onSubmit }: { onSubmit: React.FormEventHandler<HTMLFormEle
 }
 
 describe('component CSS harness', () => {
+  describe('shared interaction motion', () => {
+    afterEach(() => {
+      if (Cypress.isBrowser({ family: 'chromium' })) {
+        cy.then(() =>
+          Cypress.automation('remote:debugger:protocol', {
+            command: 'Emulation.setEmulatedMedia',
+            params: { features: [] },
+          }),
+        );
+      }
+    });
+
+    it('anchors popovers, retains their exit, and restores trigger focus', () => {
+      cy.mount(
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button>Open settings</Button>
+          </PopoverTrigger>
+          <PopoverContent>
+            <button>Setting</button>
+          </PopoverContent>
+        </Popover>,
+      );
+      cy.contains('button', 'Open settings').click();
+      cy.get('[data-slot="popover-content"]').should(($content) => {
+        const style = getComputedStyle($content[0]);
+        expect(style.animationName).to.equal('motion-surface-in');
+        expect(style.animationDuration).to.equal('0.2s');
+        expect(style.transformOrigin).not.to.equal('');
+      });
+      cy.contains('button', 'Setting').type('{esc}');
+      cy.get('[data-slot="popover-content"][data-state="closed"]').should(($content) => {
+        expect(getComputedStyle($content[0]).animationDuration).to.equal('0.16s');
+        expect(getComputedStyle($content[0]).animationName).to.equal('motion-surface-out');
+      });
+      cy.get('[data-slot="popover-content"]').should('not.exist');
+      cy.contains('button', 'Open settings').should('be.focused').click();
+      cy.contains('button', 'Setting').should('be.visible');
+    });
+
+    it('keeps dialogs centered throughout their entrance and closes on Escape', () => {
+      cy.mount(
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button>Open details</Button>
+          </DialogTrigger>
+          <DialogContent aria-describedby={undefined}>
+            <DialogTitle>Details</DialogTitle>
+          </DialogContent>
+        </Dialog>,
+      );
+      cy.contains('button', 'Open details').click();
+      cy.get('[role="dialog"]')
+        .should(($dialog) => {
+          const el = $dialog[0];
+          const animation = el.getAnimations()[0];
+          if (animation) {
+            animation.pause();
+            animation.currentTime = 50;
+          }
+          const rect = el.getBoundingClientRect();
+          const win = el.ownerDocument.defaultView!;
+          expect(rect.left + rect.width / 2).to.be.closeTo(win.innerWidth / 2, 1);
+          expect(rect.top + rect.height / 2).to.be.closeTo(win.innerHeight / 2, 1);
+          animation?.finish();
+        })
+        .type('{esc}');
+      cy.get('[role="dialog"]').should('not.exist');
+      cy.contains('button', 'Open details').should('be.focused');
+    });
+
+    it('crossfades copy success only after clipboard fulfillment and retries failures', () => {
+      cy.mount(
+        <CopyableCodeBlock locale="en">
+          {'curl https://inferencex.ai/api/v1/models'}
+        </CopyableCodeBlock>,
+      );
+      cy.window().then((win) => {
+        cy.stub(win.navigator.clipboard, 'writeText').as('copy').rejects(new Error('denied'));
+      });
+      cy.get('[data-testid="copyable-code-block"] button').click();
+      cy.contains('[role="status"]', 'Could not copy').should('be.visible');
+      cy.get('.motion-success').should('not.exist');
+      cy.get('@copy').then((stub) => (stub as unknown as sinon.SinonStub).resolves());
+      cy.get('[data-testid="copyable-code-block"] button').click();
+      cy.get('@copy').should('have.been.calledWith', 'curl https://inferencex.ai/api/v1/models');
+      cy.contains('[aria-live="polite"]', 'Copied').should('be.visible');
+      cy.get('[data-visible="true"] .motion-success').should('exist');
+      cy.get('[role="status"]').should('not.exist');
+    });
+
+    it('keeps switch geometry and semantics correct after rapid reversals', () => {
+      cy.mount(<Switch aria-label="Test setting" />);
+      cy.get('[role="switch"]').click().should('have.attr', 'aria-checked', 'true');
+      cy.get('[data-slot="switch-thumb"]').should('have.attr', 'data-moving', 'checked');
+      cy.get('[role="switch"]').click().should('have.attr', 'aria-checked', 'false');
+      cy.get('[data-slot="switch-thumb"]').should(($thumb) => {
+        expect(getComputedStyle($thumb[0]).translate).to.equal('0px');
+      });
+      cy.get('[role="switch"]').focus();
+      cy.press(Cypress.Keyboard.Keys.SPACE);
+      cy.get('[role="switch"]').should('have.attr', 'aria-checked', 'true');
+    });
+
+    it('removes surface, knob and feedback motion when reduced motion is requested', function () {
+      if (!Cypress.isBrowser({ family: 'chromium' })) this.skip();
+      cy.then(() =>
+        Cypress.automation('remote:debugger:protocol', {
+          command: 'Emulation.setEmulatedMedia',
+          params: { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] },
+        }),
+      );
+      cy.mount(
+        <div>
+          <SearchForm onSubmit={(event) => event.preventDefault()} />
+          <Switch aria-label="Reduced setting" />
+          <CopyableCodeBlock locale="en">example</CopyableCodeBlock>
+        </div>,
+      );
+      cy.get('[data-testid="search-filter"]').click();
+      cy.get('[data-slot="select-content"]').should('have.css', 'animation-name', 'none');
+      cy.get('[data-select-option]').should('have.css', 'animation-name', 'none');
+      cy.get('[data-slot="select-content"] input').first().type('second');
+      cy.contains('[data-select-option]', 'Second model').click();
+      cy.get('[data-testid="search-filter"]').should('contain.text', 'Second model');
+      cy.get('[role="switch"]').click().should('have.attr', 'aria-checked', 'true');
+      cy.get('[data-slot="switch-thumb"]')
+        .should('have.css', 'animation-name', 'none')
+        .and('have.css', 'transition-duration', '0s');
+      cy.get('.motion-feedback-icon').should('have.css', 'transition-duration', '0s');
+    });
+  });
+
   it('keeps focus undecorated without losing selection, validation, or input in light mode', () => {
     cy.mount(
       <div className="light space-y-3 p-4">

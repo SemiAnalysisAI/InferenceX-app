@@ -41,6 +41,37 @@ function MultiSelectWrapper({
 }
 
 describe('MultiSelect', () => {
+  it('keeps closing options inert and survives reopening during the exit', () => {
+    cy.mount(<MultiSelectWrapper />);
+    cy.get('[role="combobox"]').click();
+    cy.get('[data-slot="select-content"]').should('have.attr', 'data-state', 'open');
+    cy.get('input').type('{esc}');
+    cy.get('[data-slot="select-content"]').should(($content) => {
+      expect($content.attr('data-state')).to.equal('closed');
+      expect($content[0].inert).to.equal(true);
+      expect($content.attr('aria-hidden')).to.equal('true');
+      $content[0].getAnimations().forEach((animation) => animation.pause());
+    });
+    cy.get('[role="combobox"]').click();
+    cy.get('[data-slot="select-content"]')
+      .should('have.attr', 'data-state', 'open')
+      .then(($content) =>
+        Promise.allSettled(
+          $content[0].getAnimations().map((animation) => {
+            animation.play();
+            return animation.finished;
+          }),
+        ),
+      );
+    cy.get('[role="listbox"]').should('be.visible');
+    cy.get('[data-slot="select-content"]').should(($content) => {
+      expect($content[0].inert).to.equal(false);
+    });
+    cy.contains('[role="option"]', 'NVIDIA H100 SXM').click();
+    cy.get('[role="combobox"]').should('contain.text', 'NVIDIA H100 SXM');
+    cy.get('[role="listbox"]').should('not.exist');
+  });
+
   it('selects with the keyboard, skips unavailable values, and restores trigger focus', () => {
     cy.mount(
       <MultiSelectWrapper

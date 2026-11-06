@@ -5,10 +5,25 @@ import * as React from 'react';
 
 import { cn } from '@/lib/shared/utils';
 
-function Switch({ className, ...props }: React.ComponentProps<typeof SwitchPrimitive.Root>) {
+function Switch({
+  className,
+  onCheckedChange,
+  ...props
+}: React.ComponentProps<typeof SwitchPrimitive.Root>) {
+  const [moving, setMoving] = React.useState<'checked' | 'unchecked'>();
   return (
     <SwitchPrimitive.Root
       data-slot="switch"
+      onCheckedChange={(checked) => {
+        setMoving(
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            ? undefined
+            : checked
+              ? 'checked'
+              : 'unchecked',
+        );
+        onCheckedChange?.(checked);
+      }}
       className={cn(
         'peer data-[state=checked]:bg-foreground data-[state=unchecked]:bg-input dark:data-[state=unchecked]:bg-input/80 inline-flex h-[1.15rem] w-8 shrink-0 items-center rounded-full border border-transparent transition-all outline-none disabled:cursor-not-allowed disabled:opacity-50',
         className,
@@ -17,6 +32,8 @@ function Switch({ className, ...props }: React.ComponentProps<typeof SwitchPrimi
     >
       <SwitchPrimitive.Thumb
         data-slot="switch-thumb"
+        data-moving={moving}
+        onAnimationEnd={() => setMoving(undefined)}
         className={cn(
           'bg-background dark:data-[state=unchecked]:bg-foreground dark:data-[state=checked]:bg-primary-foreground pointer-events-none block size-4 rounded-full ring-0 transition-transform data-[state=checked]:translate-x-[calc(100%-2px)] data-[state=unchecked]:translate-x-0',
         )}

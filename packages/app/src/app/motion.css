@@ -2,6 +2,9 @@
   --motion-ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-reveal-duration: 550ms;
   --motion-reveal-distance: 12px;
+  --motion-control-enter: 200ms;
+  --motion-control-exit: 160ms;
+  --motion-ease-move: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
@@ -21,14 +24,25 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .motion-toast {
+    transition:
+      translate 300ms var(--motion-ease-enter),
+      transform 200ms var(--motion-ease-move),
+      opacity 300ms var(--motion-ease-enter);
+  }
+  .motion-toast[data-motion-state='closed'] {
+    transition-duration: 240ms;
+    transition-timing-function: var(--motion-ease-exit);
+  }
   .motion-press {
-    transition-property: color, background-color, border-color, opacity, transform;
+    transition-property: color, background-color, border-color, opacity, scale;
     transition-duration: 150ms;
     transition-timing-function: var(--motion-ease-enter);
   }
 
-  .motion-press:active {
-    transform: scale(0.98);
+  .motion-press:active:not(:disabled):not([aria-disabled='true']) {
+    scale: 0.97;
+    transition-duration: 0ms;
   }
 }
 
@@ -156,5 +170,186 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* Keep Radix presence mounted through exit. Transform leaves Tailwind's
+   independent translate (including centered dialogs) untouched. */
+@media (prefers-reduced-motion: no-preference) {
+  .motion-surface {
+    --motion-surface-x: 0px;
+    --motion-surface-y: 0px;
+    animation: motion-surface-in var(--motion-control-enter) var(--motion-ease-enter);
+  }
+
+  .motion-surface[data-side='bottom'] {
+    --motion-surface-y: -4px;
+  }
+  .motion-surface[data-side='top'] {
+    --motion-surface-y: 4px;
+  }
+  .motion-surface[data-side='left'] {
+    --motion-surface-x: 4px;
+  }
+  .motion-surface[data-side='right'] {
+    --motion-surface-x: -4px;
+  }
+
+  .motion-surface[data-state='closed'] {
+    animation: motion-surface-out var(--motion-control-exit) var(--motion-ease-exit);
+  }
+
+  .motion-overlay {
+    animation: motion-overlay-in var(--motion-control-enter) var(--motion-ease-enter);
+  }
+
+  .motion-overlay[data-state='closed'] {
+    animation: motion-overlay-out var(--motion-control-exit) var(--motion-ease-exit);
+  }
+
+  /* Stagger only the first five rows. Long/virtual lists stay immediately usable. */
+  .motion-surface:not([data-state='closed'])
+    :is([data-select-option], [data-slot='select-item']):nth-child(-n + 5) {
+    animation: motion-row-in 150ms var(--motion-ease-enter) backwards;
+    animation-delay: calc((var(--motion-row, 0)) * 30ms);
+  }
+  .motion-surface :is([data-select-option], [data-slot='select-item']):nth-child(2) {
+    --motion-row: 1;
+  }
+  .motion-surface :is([data-select-option], [data-slot='select-item']):nth-child(3) {
+    --motion-row: 2;
+  }
+  .motion-surface :is([data-select-option], [data-slot='select-item']):nth-child(4) {
+    --motion-row: 3;
+  }
+  .motion-surface :is([data-select-option], [data-slot='select-item']):nth-child(5) {
+    --motion-row: 4;
+  }
+
+  [data-slot='switch'] {
+    transition: background-color var(--motion-control-enter) var(--motion-ease-move);
+  }
+  [data-slot='switch-thumb'] {
+    transition: translate var(--motion-control-enter) var(--motion-ease-move);
+  }
+  [data-slot='switch-thumb'][data-moving='checked'] {
+    animation: motion-knob-right var(--motion-control-enter) var(--motion-ease-move);
+    transform-origin: right center;
+  }
+  [data-slot='switch-thumb'][data-moving='unchecked'] {
+    animation: motion-knob-left var(--motion-control-enter) var(--motion-ease-move);
+    transform-origin: left center;
+  }
+
+  .motion-feedback-icon {
+    transition:
+      opacity var(--motion-control-exit) var(--motion-ease-move),
+      filter var(--motion-control-exit) var(--motion-ease-move);
+  }
+  .motion-feedback-icon[data-visible='false'] {
+    opacity: 0;
+    filter: blur(2px);
+  }
+  .motion-feedback-icon[data-visible='true'] {
+    opacity: 1;
+    filter: blur(0);
+  }
+  .motion-success {
+    animation: motion-success 320ms var(--motion-ease-enter);
+  }
+}
+
+@keyframes motion-surface-in {
+  from {
+    opacity: 0;
+    transform: translate(var(--motion-surface-x), var(--motion-surface-y)) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes motion-surface-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--motion-surface-x), var(--motion-surface-y)) scale(0.95);
+  }
+}
+@keyframes motion-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes motion-overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes motion-row-in {
+  from {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0);
+  }
+}
+@keyframes motion-success {
+  0%,
+  100% {
+    scale: 1;
+  }
+  45% {
+    scale: 1.12;
+  }
+}
+@keyframes motion-knob-right {
+  0%,
+  100% {
+    scale: 1 1;
+  }
+  50% {
+    scale: 1.12 1;
+  }
+}
+@keyframes motion-knob-left {
+  0%,
+  100% {
+    scale: 1 1;
+  }
+  50% {
+    scale: 1.12 1;
+  }
+}
+
+.motion-feedback-icon[data-visible='false'] {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-surface,
+  .motion-surface [data-select-option],
+  .motion-surface [data-slot='select-item'],
+  .motion-overlay,
+  .motion-success,
+  [data-slot='switch-thumb'] {
+    animation: none !important;
+  }
+  .motion-press,
+  .motion-feedback-icon,
+  [data-slot='switch'],
+  [data-slot='switch-thumb'] {
+    transition: none !important;
   }
 }

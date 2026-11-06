@@ -30,7 +30,11 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function touch(type: 'touchstart' | 'touchend', x: number, y: number) {
+function touch(
+  type: 'touchstart' | 'touchmove' | 'touchend' | 'touchcancel',
+  x: number,
+  y: number,
+) {
   const point = { clientX: x, clientY: y, identifier: 0 };
   const event = new Event(type, { bubbles: true, cancelable: true });
   Object.assign(event, {
@@ -56,6 +60,38 @@ function renderToast(onDismiss: () => void) {
 }
 
 describe('BottomToast swipe to dismiss', () => {
+  it('resists beyond the dismiss threshold without tweening a held gesture', () => {
+    const onDismiss = vi.fn();
+    const toast = renderToast(onDismiss);
+    act(() => toast.dispatchEvent(touch('touchstart', 0, 700)));
+    act(() => toast.dispatchEvent(touch('touchmove', 400, 700)));
+    const offset = Number(
+      toast.style.transform.match(/translateX\((?<offset>.+)px\)/)?.groups?.offset,
+    );
+    expect(offset).toBeGreaterThan(80);
+    expect(offset).toBeLessThan(120);
+    expect(toast.style.transition).toBe('none');
+    act(() => toast.dispatchEvent(touch('touchcancel', 400, 700)));
+    expect(toast.style.transform).toBe('');
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
+
+  it('dismisses once at the shorter exit duration even after repeated requests', () => {
+    const media = vi
+      .spyOn(window, 'matchMedia')
+      .mockReturnValue({ matches: false } as MediaQueryList);
+    const onDismiss = vi.fn();
+    const toast = renderToast(onDismiss);
+    act(() => {
+      toast.querySelector<HTMLButtonElement>('button')!.click();
+      toast.querySelector<HTMLButtonElement>('button')!.click();
+    });
+    act(() => vi.advanceTimersByTime(239));
+    expect(onDismiss).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(1));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    media.mockRestore();
+  });
   it('dismisses on a quick horizontal flick with no touchmove', () => {
     const onDismiss = vi.fn();
     const toast = renderToast(onDismiss);

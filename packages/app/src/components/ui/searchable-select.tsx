@@ -333,7 +333,7 @@ export function SearchableSelect({
             }
           }}
           className={cn(
-            'z-[100] w-[var(--radix-popover-trigger-width)] overflow-hidden p-0 data-[state=open]:animate-none data-[state=closed]:animate-none',
+            'z-[100] w-[var(--radix-popover-trigger-width)] overflow-hidden p-0',
             contentClassName,
           )}
         >
