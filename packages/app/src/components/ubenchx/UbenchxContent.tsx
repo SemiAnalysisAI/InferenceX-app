@@ -195,7 +195,7 @@ function formatTooltip(
         },
         { value: `${point.mbuPercent.toFixed(1)}%`, label: t.tooltipMbu },
       ],
-      summary: `${t.tooltipPeak} ${point.peakBandwidthGbps / 1000} TB/s`,
+      summary: `${t.tooltipPeak} ${Number((point.peakBandwidthGbps / 1000).toPrecision(3))} TB/s`,
     },
     { pinned: isPinned },
   );
@@ -208,6 +208,7 @@ function UbenchxChart({
   yLabel,
   yScaleType,
   locale,
+  percent,
   colors,
   theme,
   caption,
@@ -219,6 +220,7 @@ function UbenchxChart({
   yLabel: string;
   yScaleType: 'log' | 'linear';
   locale: Locale;
+  percent: boolean;
   colors: Record<string, string>;
   theme: 'light' | 'dark';
   caption: ReactNode;
@@ -249,10 +251,10 @@ function UbenchxChart({
     return [d3.min(xs) ?? 1, d3.max(xs) ?? 1];
   }, [allPoints]);
 
-  const yDomain = useMemo<[number, number]>(
-    () => paddedDomain(allPoints.map((p) => p.y)),
-    [allPoints],
-  );
+  const yDomain = useMemo<[number, number]>(() => {
+    const ys = allPoints.map((p) => p.y);
+    return percent ? [0, Math.max(100, d3.max(ys) ?? 0)] : paddedDomain(ys);
+  }, [allPoints, percent]);
 
   const yTickValues = useMemo(() => {
     if (yScaleType !== 'log') return undefined;
@@ -292,7 +294,7 @@ function UbenchxChart({
         yScale={{
           type: yScaleType,
           domain: yDomain,
-          nice: yScaleType === 'linear',
+          nice: yScaleType === 'linear' && !percent,
         }}
         xAxis={{
           label: t.xAxis,
@@ -469,6 +471,7 @@ export function UbenchxContent() {
         yLabel={t[metric.label]}
         yScaleType={metric.scale}
         locale={locale}
+        percent={metric.key === 'mbu'}
         colors={colors}
         theme={theme}
         caption={
@@ -531,7 +534,7 @@ export function UbenchxContent() {
                         {r.metadata.cann ? '—' : r.metadata.container}
                       </td>
                       <td className="py-1.5 text-right whitespace-nowrap">
-                        {r.peakBandwidthGbps / 1000} TB/s
+                        {Number((r.peakBandwidthGbps / 1000).toPrecision(3))} TB/s
                       </td>
                     </tr>
                   ))}

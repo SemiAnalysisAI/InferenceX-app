@@ -123,26 +123,42 @@ describe('D3ChartWrapper touch-primary guidance', () => {
     expect(container.textContent).toContain('Hover over a bar for details');
     expect(container.textContent).not.toContain('Pinch');
   });
+
+  it('shows no default zoom hint on a chart without zoom', () => {
+    renderWrapper(undefined, false);
+    expect(container.querySelector('[data-testid="chart-instructions"]')).toBeNull();
+    stubTouchPrimary(true);
+    renderWrapper(undefined, false);
+    expect(container.querySelector('[data-testid="chart-instructions"]')).toBeNull();
+  });
 });
 
 describe('resolveChartInstructions', () => {
   it('replaces custom Shift+Scroll copy wholesale when the touch hint applies', () => {
     expect(
-      resolveChartInstructions('Shift+Scroll to zoom horizontally · Drag to pan', 'en', true),
+      resolveChartInstructions('Shift+Scroll to zoom horizontally · Drag to pan', 'en', true, true),
     ).toBe(EN_TOUCH);
-    expect(resolveChartInstructions('Shift+滚轮横向缩放 · 拖动平移 · 双击重置', 'zh', true)).toBe(
-      ZH_TOUCH,
-    );
+    expect(
+      resolveChartInstructions('Shift+滚轮横向缩放 · 拖动平移 · 双击重置', 'zh', true, true),
+    ).toBe(ZH_TOUCH);
   });
 
   it('falls back to the default copy per locale and pointer type', () => {
-    expect(resolveChartInstructions(undefined, 'en', false)).toBe(EN_MOUSE);
-    expect(resolveChartInstructions(undefined, 'zh', false)).toBe(ZH_MOUSE);
-    expect(resolveChartInstructions(undefined, 'en', true)).toBe(EN_TOUCH);
-    expect(resolveChartInstructions(undefined, 'zh', true)).toBe(ZH_TOUCH);
+    expect(resolveChartInstructions(undefined, 'en', true, false)).toBe(EN_MOUSE);
+    expect(resolveChartInstructions(undefined, 'zh', true, false)).toBe(ZH_MOUSE);
+    expect(resolveChartInstructions(undefined, 'en', true, true)).toBe(EN_TOUCH);
+    expect(resolveChartInstructions(undefined, 'zh', true, true)).toBe(ZH_TOUCH);
   });
 
   it('never invents a hint for an explicit empty string', () => {
-    expect(resolveChartInstructions('', 'en', true)).toBe('');
+    expect(resolveChartInstructions('', 'en', true, true)).toBe('');
+  });
+
+  it('drops the default zoom hint when the chart cannot zoom', () => {
+    expect(resolveChartInstructions(undefined, 'en', false, false)).toBe('');
+    expect(resolveChartInstructions(undefined, 'zh', false, true)).toBe('');
+    expect(resolveChartInstructions('Hover over a bar for details', 'en', false, true)).toBe(
+      'Hover over a bar for details',
+    );
   });
 });

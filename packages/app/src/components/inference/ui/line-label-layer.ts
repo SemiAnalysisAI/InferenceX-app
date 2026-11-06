@@ -1,7 +1,7 @@
 import * as d3 from 'd3';
 
 import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
-import { capOklchLightness } from '@/lib/charts/dynamic-colors';
+import { whiteTextFill } from '@/lib/charts/dynamic-colors';
 import { setAttrIfChanged, setStyleIfChanged } from '@/lib/d3-chart/chart-update';
 import { POINT_LABEL_ANCHOR_CLASS } from '@/lib/d3-chart/layers/canvas-point-registry';
 import { plotClipSize } from '@/lib/d3-chart/plot-bounds';
@@ -108,7 +108,6 @@ interface PillLayoutItem {
 
 const NARROW_PLOT_WIDTH = 360;
 const NARROW_PILL_LIMIT = 3;
-const PILL_MAX_LIGHTNESS = 0.68;
 
 function layoutPills(
   items: readonly PillLayoutItem[],
@@ -441,7 +440,7 @@ export function renderLineLabels(
       .attr('y', bbox.y - 3)
       .attr('width', bbox.width + space + 10)
       .attr('height', bbox.height + 6)
-      .attr('fill', capOklchLightness(label.color, PILL_MAX_LIGHTNESS));
+      .attr('fill', whiteTextFill(label.color));
 
     labelGroup
       .selectAll<SVGImageElement, LineLabelIconSpec>('.ll-logo')

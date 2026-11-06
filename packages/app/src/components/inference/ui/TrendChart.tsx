@@ -10,7 +10,9 @@ import {
   type ZoomContext,
   type ScaleConfig,
 } from '@/lib/d3-chart/D3Chart';
+import { chartFont, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import { axisLabelUnit, chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import { ChartPointDetails } from '@/components/ui/chart-point-details';
 import {
   applyHoverState,
@@ -341,7 +343,24 @@ const TrendChart = React.memo(
             : d3.timeFormat('%b %d')(new Date(Number(value)))) as any,
         tickCount: 10,
         customize: (g: d3.Selection<SVGGElement, unknown, null, undefined>) => {
-          g.selectAll('.tick text').attr('transform', 'rotate(-30)').attr('text-anchor', 'end');
+          const ticks = g.selectAll<SVGGElement, unknown>('.tick');
+          const xs = ticks
+            .nodes()
+            .map((node) =>
+              Number(
+                /translate\((?<x>[^,]+)/u.exec(node.getAttribute('transform') ?? '')?.groups?.x,
+              ),
+            );
+          const font = chartFont(CHART_TYPE.axisLabel);
+          const widest = Math.max(
+            0,
+            ...ticks.nodes().map((node) => measureTextWidth(node.textContent ?? '', font)),
+          );
+          const rotate = xs.some((x, i) => i > 0 && Math.abs(x - xs[i - 1]) < widest + 8);
+          ticks
+            .select('text')
+            .attr('transform', rotate ? 'rotate(-30)' : null)
+            .attr('text-anchor', rotate ? 'end' : null);
         },
       }),
       [axisDateFormatter, locale, t.date],

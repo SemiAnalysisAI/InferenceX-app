@@ -13,6 +13,7 @@ import {
 import { track } from '@/lib/analytics/analytics';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import { getChartWatermark } from '@/lib/catalog/data-mappings';
+import { readableTextColor } from '@/lib/d3-chart/contrast-colors';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   D3ChartHandle,
@@ -168,6 +169,7 @@ function barMarkWidth(
 
 const TCO_OPACITY = 0.22;
 const LAB_CUT_OPACITY = 0.5;
+const PROFIT_OPACITY = 0.9;
 const LOSS_FILL = 'var(--destructive)';
 const SEGMENT_TWO_LINE_MIN_PX = 34;
 const SEGMENT_ONE_LINE_MIN_PX = 17;
@@ -277,20 +279,6 @@ export function segmentLabelLines(
   if (heightPx >= SEGMENT_TWO_LINE_MIN_PX && fits(name)) return [name, amountText];
   if (heightPx >= SEGMENT_ONE_LINE_MIN_PX) return [amountText];
   return [];
-}
-
-function linearChannel(c: number): number {
-  const v = c / 255;
-  return v <= 0.039_28 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-}
-
-export function contrastingTextColor(fill: string): string {
-  const parsed = d3.color(fill)?.rgb();
-  if (!parsed) return '#ffffff';
-  const channel = linearChannel;
-  const luminance =
-    0.2126 * channel(parsed.r) + 0.7152 * channel(parsed.g) + 0.0722 * channel(parsed.b);
-  return luminance > 0.45 ? '#111111' : '#ffffff';
 }
 
 export interface RevenueLabelStyle {
@@ -610,7 +598,8 @@ export default function ProfitEstimatorChart({
 
   const labelColorFor = useCallback(
     (segment: ProfitSegment): string => {
-      if (segment.kind === 'profit') return contrastingTextColor(colorResolver(segment.row));
+      if (segment.kind === 'profit')
+        return readableTextColor(colorResolver(segment.row), PROFIT_OPACITY);
       return 'var(--foreground)';
     },
     [colorResolver],
@@ -696,7 +685,7 @@ export default function ProfitEstimatorChart({
                 ? LAB_CUT_OPACITY
                 : d.kind === 'loss'
                   ? 1
-                  : 0.9,
+                  : PROFIT_OPACITY,
           )
           .attr('stroke', (d) => outlineFor(d))
           .attr('stroke-width', (d) => (d.kind === 'profit' ? 0 : 1))

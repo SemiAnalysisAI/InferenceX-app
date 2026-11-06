@@ -1,3 +1,5 @@
+import { rgb } from 'd3';
+
 import {
   GOOGLE_BLUE,
   HUAWEI_CHART_COLORS,
@@ -239,8 +241,85 @@ export function shadeOklch(color: string, index: number): string {
   return `oklch(${lightness.toFixed(3)} ${groups.c} ${groups.h})`;
 }
 
-export function capOklchLightness(color: string, max: number): string {
+function oklchToLinearSrgb(l: number, c: number, h: number): [number, number, number] {
+  const a = c * Math.cos((h * Math.PI) / 180);
+  const b = c * Math.sin((h * Math.PI) / 180);
+  const lc = (l + 0.396_337_777_4 * a + 0.215_803_757_3 * b) ** 3;
+  const mc = (l - 0.105_561_345_8 * a - 0.063_854_172_8 * b) ** 3;
+  const sc = (l - 0.089_484_177_5 * a - 1.291_485_548 * b) ** 3;
+  return [
+    4.076_741_662_1 * lc - 3.307_711_591_3 * mc + 0.230_969_929_2 * sc,
+    -1.268_438_004_6 * lc + 2.609_757_401_1 * mc - 0.341_319_396_5 * sc,
+    -0.004_196_086_3 * lc - 0.703_418_614_7 * mc + 1.707_614_701 * sc,
+  ];
+}
+
+function srgbToOklch(color: string): [number, number, number] | null {
+  const parsed = rgb(color);
+  if (Number.isNaN(parsed.r)) return null;
+  const [r, g, b] = [parsed.r, parsed.g, parsed.b].map((channel) => {
+    const v = channel / 255;
+    return v <= 0.040_45 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  const lc = Math.cbrt(0.412_221_470_8 * r + 0.536_332_536_3 * g + 0.051_445_992_9 * b);
+  const mc = Math.cbrt(0.211_903_498_2 * r + 0.680_699_545_1 * g + 0.107_396_956_6 * b);
+  const sc = Math.cbrt(0.088_302_461_9 * r + 0.281_718_837_6 * g + 0.629_978_700_5 * b);
+  const a = 1.977_998_495_1 * lc - 2.428_592_205 * mc + 0.450_593_709_9 * sc;
+  const bb = 0.025_904_037_1 * lc + 0.782_771_766_2 * mc - 0.808_675_766 * sc;
+  const hue = (Math.atan2(bb, a) * 180) / Math.PI;
+  return [
+    0.210_454_255_3 * lc + 0.793_617_785 * mc - 0.004_072_046_8 * sc,
+    Math.hypot(a, bb),
+    hue < 0 ? hue + 360 : hue,
+  ];
+}
+
+function gamutChroma(l: number, c: number, h: number): number {
+  const fits = (chroma: number) =>
+    oklchToLinearSrgb(l, chroma, h).every((channel) => channel >= -1e-4 && channel <= 1 + 1e-4);
+  if (fits(c)) return c;
+  let lo = 0;
+  let hi = c;
+  for (let i = 0; i < 16; i++) {
+    const mid = (lo + hi) / 2;
+    if (fits(mid)) lo = mid;
+    else hi = mid;
+  }
+  return lo;
+}
+
+function oklchLuminance(l: number, c: number, h: number): number {
+  const [r, g, b] = oklchToLinearSrgb(l, c, h).map((channel) => Math.min(1, Math.max(0, channel)));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+const WHITE_TEXT_MIN_CONTRAST = 4.6;
+const WHITE_TEXT_MAX_LUMINANCE = 1.05 / WHITE_TEXT_MIN_CONTRAST - 0.05;
+const whiteTextFills = new Map<string, string>();
+
+export function whiteTextFill(color: string): string {
+  const cached = whiteTextFills.get(color);
+  if (cached) return cached;
   const groups = OKLCH_PATTERN.exec(color)?.groups;
-  if (!groups || Number(groups.l) <= max) return color;
-  return `oklch(${max.toFixed(3)} ${groups.c} ${groups.h})`;
+  const lch = groups ? [Number(groups.l), Number(groups.c), Number(groups.h)] : srgbToOklch(color);
+  let fill = color;
+  if (lch) {
+    const [l, c, h] = lch;
+    const luminanceAt = (lightness: number) =>
+      oklchLuminance(lightness, gamutChroma(lightness, c, h), h);
+    if (luminanceAt(l) > WHITE_TEXT_MAX_LUMINANCE) {
+      let lo = 0;
+      let hi = l;
+      for (let i = 0; i < 16; i++) {
+        const mid = (lo + hi) / 2;
+        if (luminanceAt(mid) <= WHITE_TEXT_MAX_LUMINANCE) lo = mid;
+        else hi = mid;
+      }
+      const lightness = Math.floor(lo * 1000) / 1000;
+      const chroma = Math.floor(gamutChroma(lightness, c, h) * 1000) / 1000;
+      fill = `oklch(${lightness.toFixed(3)} ${chroma.toFixed(3)} ${h.toFixed(1)})`;
+    }
+  }
+  whiteTextFills.set(color, fill);
+  return fill;
 }

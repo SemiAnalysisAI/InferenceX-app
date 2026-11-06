@@ -4,7 +4,7 @@ import { hsl, rgb } from 'd3';
 import { VENDOR_OKLCH_ZONES, VENDOR_HSL_ZONES } from '@semianalysisai/inferencex-constants';
 
 import {
-  capOklchLightness,
+  whiteTextFill,
   generateHighContrastGpuDateColors,
   generateGpuDateColors,
   generateVendorColors,
@@ -83,11 +83,22 @@ function lightnessOf(color: string): number {
   return Number(match!.groups!.l);
 }
 
-describe('capOklchLightness', () => {
-  it('darkens only oklch colors brighter than the cap', () => {
-    expect(capOklchLightness('oklch(0.880 0.15 124.2)', 0.68)).toBe('oklch(0.680 0.15 124.2)');
-    expect(capOklchLightness('oklch(0.500 0.15 124.2)', 0.68)).toBe('oklch(0.500 0.15 124.2)');
-    expect(capOklchLightness('#4285F4', 0.68)).toBe('#4285F4');
+describe('whiteTextFill', () => {
+  it('darkens yellow-green pills until white text reaches 4.5:1', () => {
+    expect(whiteTextFill('oklch(0.880 0.15 124.2)')).toBe('oklch(0.553 0.137 124.2)');
+  });
+
+  it('keeps fills that already pass', () => {
+    expect(whiteTextFill('oklch(0.450 0.15 150.0)')).toBe('oklch(0.450 0.15 150.0)');
+    expect(whiteTextFill('#1f4e79')).toBe('#1f4e79');
+  });
+
+  it('darkens light hex fills', () => {
+    expect(lightnessOf(whiteTextFill('#4285F4'))).toBeCloseTo(0.568, 2);
+  });
+
+  it('leaves unparseable fills alone', () => {
+    expect(whiteTextFill('var(--primary)')).toBe('var(--primary)');
   });
 });
 

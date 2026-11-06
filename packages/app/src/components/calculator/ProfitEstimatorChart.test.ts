@@ -8,7 +8,6 @@ import {
   barLabelSlotPx,
   buildProfitSegments,
   revenueLabelStyle,
-  contrastingTextColor,
   generateProfitTooltipHTML,
   profitPointDetails,
   estimateTextWidth,
@@ -362,19 +361,6 @@ describe('estimateTextWidth', () => {
   it('scales with glyph count and font size', () => {
     expect(estimateTextWidth('abcd', 10)).toBeCloseTo(22);
     expect(estimateTextWidth('', 10)).toBe(0);
-  });
-});
-
-describe('contrastingTextColor', () => {
-  it('puts dark text on light fills and light text on dark fills', () => {
-    expect(contrastingTextColor('#ffffff')).toBe('#111111');
-    expect(contrastingTextColor('#f2c94c')).toBe('#111111');
-    expect(contrastingTextColor('#000000')).toBe('#ffffff');
-    expect(contrastingTextColor('#1f4e79')).toBe('#ffffff');
-  });
-
-  it('falls back to white when the fill cannot be parsed', () => {
-    expect(contrastingTextColor('var(--primary)')).toBe('#ffffff');
   });
 });
 

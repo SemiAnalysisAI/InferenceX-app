@@ -32,10 +32,12 @@ export const TOUCH_PRIMARY_QUERY = '(hover: none) and (pointer: coarse)';
 export function resolveChartInstructions(
   instructions: string | undefined,
   locale: Locale,
-  useTouchHint: boolean,
+  zoomEnabled: boolean,
+  touchPrimary: boolean,
 ): string {
-  const resolved = instructions ?? DEFAULT_CHART_INSTRUCTIONS[locale];
-  return useTouchHint && resolved ? TOUCH_CHART_INSTRUCTIONS[locale] : resolved;
+  if (!zoomEnabled) return instructions ?? '';
+  if (touchPrimary && instructions !== '') return TOUCH_CHART_INSTRUCTIONS[locale];
+  return instructions ?? DEFAULT_CHART_INSTRUCTIONS[locale];
 }
 
 function PortalTooltip({
@@ -185,7 +187,8 @@ export function D3ChartWrapper({
   const resolvedInstructions = resolveChartInstructions(
     instructions,
     locale,
-    zoomEnabled && isTouchPrimary,
+    zoomEnabled,
+    isTouchPrimary,
   );
 
   const hasDetails = Boolean(details);
