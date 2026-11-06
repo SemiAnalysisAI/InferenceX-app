@@ -116,6 +116,13 @@ share this presentation; unofficial colors retain their per-run identity.
 This is presentation-only: benchmark values, API responses and `inferencex-skills`
 contracts are unchanged.
 
+Chip-history/date-comparison graphs use the same compact hover card as the main
+scatter chart. Hover preserves the comparison date/run label and any carried-forward
+source date; swatches and cache bars use the corresponding curve color. Clicking
+keeps the full pinned card. Unofficial history points use compact hover too, while
+retaining the unofficial warning, branch identity and per-run color. These are
+presentation-only changes with no API or `inferencex-skills` contract changes.
+
 Tooltips are built as HTML template literal strings, injected via D3's `.html()`. Using React elements would require:
 
 1. `ReactDOM.render()` inside a D3 event handler (breaks React's lifecycle)

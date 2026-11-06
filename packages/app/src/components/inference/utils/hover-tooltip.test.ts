@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 
-import type { HardwareConfig, InferenceData } from '@/components/inference/types';
+import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
 import {
   formatHoverValue,
   generateHoverTooltipContent,
@@ -140,6 +140,47 @@ describe('generateHoverTooltipContent', () => {
     expect(text).not.toContain('566,443,844');
     expect(text).not.toContain('RadixArk');
     expect(text).not.toContain('GitHub Actions');
+  });
+
+  it('keeps comparison dates and carried-forward source dates in compact hover', () => {
+    const html = generateHoverTooltipContent(
+      config(agenticPoint({ date: '2026-11-04', actualDate: '2026-11-02' }), {
+        comparisonLabel: '2026-11-04',
+        color: '#123456',
+      }),
+    );
+    expect(render(html).textContent).toContain('Date: 2026-11-04 (data from 2026-11-02)');
+    expect(html).toContain('background: #123456');
+    expect(html).toContain('data-hover-cache-bar');
+    expect(html).not.toContain('sha256');
+  });
+
+  it('preserves same-day run numbering without a misleading source-date note', () => {
+    const text = render(
+      generateHoverTooltipContent(
+        config(agenticPoint({ date: '2026-11-04~r123', actualDate: '2026-11-04' }), {
+          comparisonLabel: '2026-11-04 #2',
+        }),
+      ),
+    ).textContent;
+    expect(text).toContain('Date: 2026-11-04 #2');
+    expect(text).not.toContain('~r123');
+    expect(text).not.toContain('data from');
+  });
+
+  it('localizes comparison context and preserves unofficial provenance safely', () => {
+    const html = generateHoverTooltipContent(
+      config(agenticPoint({ date: '2026-11-04', actualDate: '2026-11-02' }), {
+        locale: 'zh',
+        comparisonLabel: '2026-11-04',
+        overlayData: { label: 'feat/<script>test</script>' } as OverlayData,
+      }),
+    );
+    expect(render(html).textContent).toContain('日期： 2026-11-04');
+    expect(render(html).textContent).toContain('2026年11月2日');
+    expect(html).toContain('data-hover-notice');
+    expect(html).toContain('feat/&lt;script&gt;test&lt;/script&gt;');
+    expect(html).not.toContain('<script>');
   });
 
   it('keeps every field in the pinned tooltip', () => {
