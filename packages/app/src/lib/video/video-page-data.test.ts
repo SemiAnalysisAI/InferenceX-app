@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET } from '@/app/api/video-runs/route';
 import { VIDEO_HISTORY_MAX_PAGES, videoHistoryEntry } from '@/components/video-benchmark/history';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
-import { loadVideoPageData } from './video-page-data';
+import { loadVideoPageData, videoPageState } from './video-page-data';
 
 vi.mock('@/app/api/video-runs/route', () => ({ GET: vi.fn() }));
 beforeEach(() => vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'test-token'));
@@ -72,5 +72,11 @@ describe('VideoGenX first document', () => {
     expect(initial.history?.pages[0].entries).toHaveLength(1);
     expect(initial.sides).toEqual({});
     expect(GET).toHaveBeenCalledTimes(2);
+  });
+
+  it('parses the URL selection for the streamed shell without reading data', () => {
+    expect(videoPageState({ unofficialrun: '456' }).unofficialRun).toBe('456');
+    expect(videoPageState({ unofficialrun: ['789', '456'] }).unofficialRun).toBe('789');
+    expect(GET).not.toHaveBeenCalled();
   });
 });

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
-import VideoDashboard from '@/components/video-benchmark/VideoDashboard';
+import VideoResultsPage from '@/components/video-benchmark/VideoResultsPage';
 import { tabMetadataZh } from '@/lib/routing/tab-meta-zh';
-import { loadVideoPageData, type VideoPageSearchParams } from '@/lib/video/video-page-data';
+import type { VideoPageSearchParams } from '@/lib/video/video-page-data';
 
 export const metadata: Metadata = {
   ...tabMetadataZh('video'),
@@ -12,6 +12,5 @@ export default async function VideoPage({
 }: {
   searchParams: Promise<VideoPageSearchParams>;
 }) {
-  const initialData = await loadVideoPageData(await searchParams);
-  return <VideoDashboard key={JSON.stringify(initialData.state)} initialData={initialData} />;
+  return <VideoResultsPage params={await searchParams} />;
 }

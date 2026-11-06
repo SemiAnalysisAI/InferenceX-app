@@ -8,15 +8,23 @@ import type { VideoHistoryData } from './initial-data';
 /** Where the named run's overlay comes from; `live` is an unstored run read from GitHub. */
 type NamedRunSource = 'none' | 'pending' | 'history' | 'live';
 
-export function useVideoPoints(runId: string | null, initial?: VideoHistoryData | null) {
+/**
+ * `pending` means the server is still streaming the cohort for this render, so
+ * the browser shows the loading state without starting its own read.
+ */
+export function useVideoPoints(
+  runId: string | null,
+  initial?: VideoHistoryData | null,
+  pending = false,
+) {
   const [pages, setPages] = useState<VideoHistoryPage[]>(initial?.pages ?? []);
-  const [loading, setLoading] = useState(!initial);
+  const [loading, setLoading] = useState(pending || !initial);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [replay, setReplay] = useState(initial?.replay ?? false);
   const [attempt, setAttempt] = useState(0);
   const [live, setLive] = useState<{ key: string; page: VideoHistoryPage | null } | null>(null);
   useEffect(() => {
-    if (initial && attempt === 0) return;
+    if (pending || (initial && attempt === 0)) return;
     const controller = new AbortController();
     setLoading(true);
     setLoadError(null);
@@ -41,7 +49,7 @@ export function useVideoPoints(runId: string | null, initial?: VideoHistoryData 
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [attempt, initial]);
+  }, [attempt, initial, pending]);
   const points = useMemo(() => videoPoints(pages), [pages]);
   const storedNamed = useMemo(() => namedRunPoints(pages, runId), [pages, runId]);
   const readLive = !loading && !loadError && storedNamed.length === 0 && runId !== null;
