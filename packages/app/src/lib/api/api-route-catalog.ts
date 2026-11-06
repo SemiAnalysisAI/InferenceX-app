@@ -1590,7 +1590,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/video/video-read-cache.ts',
-    sourceSha256: '9eef70074624eb6714d0afce49403f8da0535787e7329da75b1012846a4f683b',
+    sourceSha256: '5df88a66fb33e487e6b0ad459e3db656fe2a5916803f65466b9245d49e5bed09',
     reviewArea: {
       en: 'VideoGenX bounded published History, media and rendition-listing cache, served only after the repository visibility check passes.',
       zh: 'VideoGenX 已发布 History、媒体及转码回执列表的有界缓存，仅在仓库公开检查通过后返回。',
