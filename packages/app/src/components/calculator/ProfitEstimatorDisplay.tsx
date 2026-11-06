@@ -46,7 +46,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { TcoPriceTable } from '@/components/ui/editable-tco-badges';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
-import { Heading } from '@/components/ui/heading';
+import { Heading, HeadingQualifier } from '@/components/ui/heading';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
@@ -259,11 +259,13 @@ const STRINGS = {
         ? `OpenRouter has no price for ${modelId}. Switch Token price to Custom to enter one.`
         : 'This model has no OpenRouter listing. Switch Token price to Custom to enter a price.',
     chartTitle: {
-      'gw-year': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} revenue & profit estimates per gigawatt per year at ${percentile} ${target} tok/s/user interactivity (Beta)`,
-      'chip-hour': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} revenue & profit estimates per chip per hour at ${percentile} ${target} tok/s/user interactivity (Beta)`,
+      'gw-year': (model: string, workload: string) =>
+        `${model} ${workload} revenue & profit estimates per gigawatt per year`,
+      'chip-hour': (model: string, workload: string) =>
+        `${model} ${workload} revenue & profit estimates per chip per hour`,
     },
+    chartQualifier: (percentile: string, target: number) =>
+      `at ${percentile} ${target} tok/s/user interactivity`,
     sellingPriceLabel: 'Selling price per million tokens',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
       `Input: $${input} · Cached input: $${cached} · Output: $${output} (${source})`,
@@ -390,11 +392,13 @@ const STRINGS = {
         ? `OpenRouter 没有 ${modelId} 的价格。请将 Token 售价切换为自定义并输入价格。`
         : '该模型没有 OpenRouter 条目。请将 Token 售价切换为自定义并输入价格。',
     chartTitle: {
-      'gw-year': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} 每吉瓦每年收入与利润估算（${percentile} 交互性 ${target} tok/s/user）（Beta）`,
-      'chip-hour': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} 每芯片每小时收入与利润估算（${percentile} 交互性 ${target} tok/s/user）（Beta）`,
+      'gw-year': (model: string, workload: string) =>
+        `${model} ${workload} 每吉瓦每年收入与利润估算`,
+      'chip-hour': (model: string, workload: string) =>
+        `${model} ${workload} 每芯片每小时收入与利润估算`,
     },
+    chartQualifier: (percentile: string, target: number) =>
+      `（${percentile} 交互性 ${target} tok/s/user）`,
     sellingPriceLabel: '每百万 token 售价',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
       `输入：$${input} · 缓存输入：$${cached} · 输出：$${output}（${source}）`,
@@ -1336,9 +1340,8 @@ function ProfitEstimatorInner({
           {t.chartTitle[basis](
             getModelLabel(selectedModel),
             getSequenceLabel(Sequence.AgenticTraces, locale),
-            percentileLabel,
-            targetValue,
           )}
+          <HeadingQualifier>{t.chartQualifier(percentileLabel, targetValue)}</HeadingQualifier>
         </Heading>
         {powerControlsEnabled && (
           <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-power-note">

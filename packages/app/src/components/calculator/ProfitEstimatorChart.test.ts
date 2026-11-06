@@ -19,6 +19,7 @@ import {
   xLabelLayout,
   operatorMarginLabel,
   LOSS_FOOTROOM_PX,
+  profitAxisTickFormat,
   profitYDomain,
   BAR_ICON_MAX_HEIGHT,
   BAR_ICON_MIN_HEIGHT,
@@ -49,6 +50,22 @@ function row(overrides: Partial<ProfitEstimatorRow> = {}): ProfitEstimatorRow {
     ...overrides,
   };
 }
+
+describe('profitAxisTickFormat', () => {
+  it('drops zero cents when the axis steps in whole dollars', () => {
+    const format = profitAxisTickFormat('chip-hour', [0, 33]);
+    expect([0, 5, 35].map(format)).toEqual(['$0', '$5', '$35']);
+  });
+
+  it('keeps cents on every tick when the step is fractional', () => {
+    const format = profitAxisTickFormat('chip-hour', [0, 3.2]);
+    expect([0, 0.5, 1].map(format)).toEqual(['$0.00', '$0.50', '$1.00']);
+  });
+
+  it('leaves the compact gigawatt-year ticks alone', () => {
+    expect(profitAxisTickFormat('gw-year', [0, 40e9])(35e9)).toBe('$35B');
+  });
+});
 
 const hardwareConfig = {
   h200: { name: 'NVIDIA H200', label: 'H200', gpu: 'H200', framework: 'vllm' },

@@ -33,9 +33,10 @@ import {
 import { ChipBasisCaption } from '@/components/ui/chip-basis-toggle';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { rangeProgressStyle } from '@/components/ui/control-styles';
+import { RangeTicks } from '@/components/ui/range-ticks';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Heading } from '@/components/ui/heading';
+import { Heading, HeadingQualifier } from '@/components/ui/heading';
 import { ResultContext } from '@/components/ui/result-context';
 import { TcoPriceTable, plottedChipBases } from '@/components/ui/editable-tco-badges';
 import { ModelLogo } from '@/components/ui/model-logo';
@@ -93,8 +94,9 @@ const STRINGS = {
       'AgentX uses 1 / P90 full-response ITL in seconds, not P90 of token rates. Legacy ITL is used only when full-response mean/percentile ITL fields are absent. Missing or invalid P90 latency is omitted.',
     targetTooltip:
       "The interactivity operating point used for interpolation. Move the slider to see how each chip's performance changes at different interactivity levels.",
-    captionTitle: (yTitle: string, target: number, isAgentic: boolean) =>
-      `${yTitle} over time at ${target} tok/s/user ${isAgentic ? 'P90 ' : ''}interactivity`,
+    captionTitle: (yTitle: string) => `${yTitle} over time`,
+    captionQualifier: (target: number, isAgentic: boolean) =>
+      `at ${target} tok/s/user ${isAgentic ? 'P90 ' : ''}interactivity`,
     source: 'Source: SemiAnalysis InferenceX™',
     updated: 'Updated:',
     logScale: 'Log scale',
@@ -118,8 +120,9 @@ const STRINGS = {
     agenticTargetTooltip:
       'AgentX 交互性为 P90 全响应 ITL（秒）的倒数，不是 token 速率的 P90。仅当全响应 ITL 的均值和分位数字段均缺失时才使用旧版 ITL。P90 延迟缺失或无效的数据点不参与计算。',
     targetTooltip: '设置插值计算采用的交互性水平。移动滑块可比较不同交互性水平下的芯片性能。',
-    captionTitle: (yTitle: string, target: number, isAgentic: boolean) =>
-      `${yTitle} 随时间变化（${isAgentic ? 'P90 ' : ''}交互性 ${target} tok/s/user）`,
+    captionTitle: (yTitle: string) => `${yTitle} 随时间变化`,
+    captionQualifier: (target: number, isAgentic: boolean) =>
+      `（${isAgentic ? 'P90 ' : ''}交互性 ${target} tok/s/user）`,
     source: '来源：SemiAnalysis InferenceX™',
     updated: '更新时间：',
     logScale: '对数缩放',
@@ -395,23 +398,7 @@ export default function HistoricalTrendsDisplay() {
                           interactivityRange.max,
                         )}
                       />
-                      <div
-                        className="relative h-4 text-xs tabular-nums text-muted-foreground"
-                        style={{ marginLeft: 8, marginRight: 8 }}
-                      >
-                        {Array.from({ length: 6 }, (_, i) => (
-                          <span
-                            key={i}
-                            className="absolute -translate-x-1/2"
-                            style={{ left: `${(i / 5) * 100}%` }}
-                          >
-                            {Math.round(
-                              interactivityRange.min +
-                                (interactivityRange.max - interactivityRange.min) * (i / 5),
-                            )}
-                          </span>
-                        ))}
-                      </div>
+                      <RangeTicks min={interactivityRange.min} max={interactivityRange.max} />
                     </div>
                     <Input
                       type="number"
@@ -500,7 +487,10 @@ export default function HistoricalTrendsDisplay() {
                         />
                         {getModelLabel(selectedModel as Model)}{' '}
                         {getSequenceLabel(selectedSequence as Sequence, locale)}{' '}
-                        {t.captionTitle(currentYTitle, targetInteractivity, isAgentic)}
+                        {t.captionTitle(currentYTitle)}
+                        <HeadingQualifier>
+                          {t.captionQualifier(targetInteractivity, isAgentic)}
+                        </HeadingQualifier>
                       </Heading>
                     </div>
                     {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}

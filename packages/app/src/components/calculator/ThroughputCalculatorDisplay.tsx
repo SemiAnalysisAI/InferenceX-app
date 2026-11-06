@@ -30,7 +30,7 @@ import { ChartButtons } from '@/components/ui/chart-buttons';
 import ChartLegend from '@/components/ui/chart-legend';
 import { ChartShareActions, PricesSourceLink } from '@/components/ui/chart-display-helpers';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
-import { Heading } from '@/components/ui/heading';
+import { Heading, HeadingQualifier } from '@/components/ui/heading';
 import {
   ModelSelector,
   PercentileSelector,
@@ -58,6 +58,7 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/tco-model-dialog';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { rangeProgressStyle } from '@/components/ui/control-styles';
+import { RangeTicks } from '@/components/ui/range-ticks';
 import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
 import { ChipBasisNote } from '@/components/ui/chip-basis-note';
 import { ChipBasisCaption } from '@/components/ui/chip-basis-toggle';
@@ -84,6 +85,7 @@ import { exportToCsv } from '@/lib/export/csv-export';
 import { calculatorChartToCsv } from '@/lib/export/csv-export-helpers';
 
 import ThroughputBarChart, {
+  type ChartTitleParts,
   getChartTitle,
   getCostProviderLabel,
   getResultLabel,
@@ -334,27 +336,31 @@ export function getChartTitleZh(
   costType: CostType,
   costProvider?: CostProvider,
   interactivityPercentile?: string,
-): string {
+): ChartTitleParts {
   const percentilePrefix = interactivityPercentile
     ? `${interactivityPercentile.toUpperCase()} `
     : '';
-  const targetLabel =
+  const qualifier =
     mode === 'interactivity_to_throughput'
-      ? `${targetValue} tok/s/user ${percentilePrefix}交互性`
-      : `${targetValue} tok/s/chip 吞吐量`;
+      ? `（${targetValue} tok/s/user ${percentilePrefix}交互性）`
+      : `（${targetValue} tok/s/chip 吞吐量）`;
   const tokenTypeLabel = costType === 'input' ? '输入' : costType === 'output' ? '输出' : '总';
   switch (barMetric) {
     case 'power': {
-      return `${targetLabel}下每全电源配置兆瓦${tokenTypeLabel} token 吞吐量`;
+      return { title: `每全电源配置兆瓦${tokenTypeLabel} token 吞吐量`, qualifier };
     }
     case 'cost': {
       const providerLabel = getCostProviderLabel(costProvider || 'costh', 'zh');
-      return `${targetLabel}下每百万${tokenTypeLabel} token 成本（${providerLabel}）`;
+      return { title: `每百万${tokenTypeLabel} token 成本（${providerLabel}）`, qualifier };
     }
     default: {
-      return mode === 'interactivity_to_throughput'
-        ? `${targetLabel}下每芯片 ${tokenTypeLabel} token 吞吐量`
-        : `${targetLabel}下的交互性`;
+      return {
+        title:
+          mode === 'interactivity_to_throughput'
+            ? `每芯片 ${tokenTypeLabel} token 吞吐量`
+            : '交互性',
+        qualifier,
+      };
     }
   }
 }
@@ -920,8 +926,8 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
           isAgenticSequence ? selectedPercentile : undefined,
         );
   const chartTitle = totalChipBasis
-    ? (withTotalChipQualifier(baseChartTitle, locale) ?? baseChartTitle)
-    : baseChartTitle;
+    ? (withTotalChipQualifier(baseChartTitle.title, locale) ?? baseChartTitle.title)
+    : baseChartTitle.title;
 
   const chartHeading = (
     <div className="flex min-w-0 items-center gap-1 md:pr-64">
@@ -946,6 +952,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
       <Heading as="h2" level="card">
         <ModelLogo model={selectedModel} className="mr-2 size-6 align-[-0.3em]" />
         {chartTitle}
+        <HeadingQualifier>{baseChartTitle.qualifier}</HeadingQualifier>
       </Heading>
     </div>
   );
@@ -1191,23 +1198,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                               currentRange.max,
                             )}
                           />
-                          <div
-                            className="relative h-4 text-xs tabular-nums text-muted-foreground"
-                            style={{ marginLeft: 8, marginRight: 8 }}
-                          >
-                            {Array.from({ length: 6 }, (_, i) => (
-                              <span
-                                key={i}
-                                className="absolute -translate-x-1/2"
-                                style={{ left: `${(i / 5) * 100}%` }}
-                              >
-                                {Math.round(
-                                  currentRange.min +
-                                    (currentRange.max - currentRange.min) * (i / 5),
-                                )}
-                              </span>
-                            ))}
-                          </div>
+                          <RangeTicks min={currentRange.min} max={currentRange.max} />
                         </div>
                         <Input
                           id="calc-target"

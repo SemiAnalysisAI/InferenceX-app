@@ -80,7 +80,7 @@ import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ShareButton } from '@/components/ui/share-button';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Heading } from '@/components/ui/heading';
+import { Heading, HeadingQualifier } from '@/components/ui/heading';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
 import {
   MetricAssumptionNotes,
@@ -1238,38 +1238,42 @@ export default function ChartDisplay({
                               />
                               {getModelLabel(graph.model as Model)}{' '}
                               {getSequenceLabel(graph.sequence as Sequence, locale)}{' '}
-                              {metricChartTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
-                              {(() => {
-                                if (isPowerTimeline) return null;
-                                if (!isAgenticSequence) {
-                                  const heading = String(graph.chartDefinition.heading);
-                                  return locale === 'zh' ? zhHeading(heading) : heading;
-                                }
-                                const xField = graph.chartDefinition.x_scale_field;
-                                if (xField?.endsWith('_ttft')) {
-                                  const percentile = xField.replace(/_ttft$/u, '');
-                                  return t.vsTtft(
-                                    percentile === 'median' ? 'Median' : percentile.toUpperCase(),
-                                  );
-                                }
-
-                                if (graph.chartDefinition.chartType === 'e2e') {
-                                  const modeSpec = DERIVED_X_MODE_SPECS[selectedXAxisMode];
-                                  if (modeSpec) {
-                                    const heading =
-                                      locale === 'zh' && modeSpec.headingZh
-                                        ? modeSpec.headingZh
-                                        : modeSpec.heading;
-                                    return heading(selectedPercentile.toUpperCase());
+                              {metricChartTitle(graph.chartDefinition, selectedYAxisMetric, locale)}
+                              <HeadingQualifier>
+                                {(() => {
+                                  if (isPowerTimeline) return null;
+                                  if (!isAgenticSequence) {
+                                    const heading = String(graph.chartDefinition.heading);
+                                    return locale === 'zh' ? zhHeading(heading) : heading;
                                   }
-                                  return isAgenticSequence
-                                    ? t.vsE2eLatency(selectedPercentile.toUpperCase())
-                                    : t.vsE2eLatency();
-                                }
+                                  const xField = graph.chartDefinition.x_scale_field;
+                                  if (xField?.endsWith('_ttft')) {
+                                    const percentile = xField.replace(/_ttft$/u, '');
+                                    return t.vsTtft(
+                                      percentile === 'median' ? 'Median' : percentile.toUpperCase(),
+                                    );
+                                  }
 
-                                const configured = graph.chartDefinition.heading;
-                                return locale === 'zh' ? zhHeading(String(configured)) : configured;
-                              })()}
+                                  if (graph.chartDefinition.chartType === 'e2e') {
+                                    const modeSpec = DERIVED_X_MODE_SPECS[selectedXAxisMode];
+                                    if (modeSpec) {
+                                      const heading =
+                                        locale === 'zh' && modeSpec.headingZh
+                                          ? modeSpec.headingZh
+                                          : modeSpec.heading;
+                                      return heading(selectedPercentile.toUpperCase());
+                                    }
+                                    return isAgenticSequence
+                                      ? t.vsE2eLatency(selectedPercentile.toUpperCase())
+                                      : t.vsE2eLatency();
+                                  }
+
+                                  const configured = graph.chartDefinition.heading;
+                                  return locale === 'zh'
+                                    ? zhHeading(String(configured))
+                                    : configured;
+                                })()}
+                              </HeadingQualifier>
                             </Heading>
                             {embedded && !minimalChrome && (
                               <OptionInfo

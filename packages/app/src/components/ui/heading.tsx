@@ -10,7 +10,7 @@ const headingVariants = cva('text-foreground', {
       page: 'text-2xl font-semibold lg:text-4xl lg:tracking-heading',
       title: 'text-xl font-semibold md:text-2xl lg:text-title',
       section: 'text-xl font-medium',
-      card: 'text-base font-medium',
+      card: 'text-base font-medium max-sm:font-semibold max-sm:leading-snug',
       label: 'text-sm font-medium',
     },
   },
@@ -35,4 +35,17 @@ function Heading({
   );
 }
 
-export { Heading, headingVariants };
+function HeadingQualifier({ children }: { children: React.ReactNode }) {
+  if (children === null || children === undefined || children === '') return null;
+  const opensWithFullwidthBracket = typeof children === 'string' && /^[（【「]/u.test(children);
+  return (
+    <>
+      {opensWithFullwidthBracket ? null : ' '}
+      <span className="max-sm:mt-0.5 max-sm:block max-sm:text-sm max-sm:font-normal max-sm:text-muted-foreground">
+        {children}
+      </span>
+    </>
+  );
+}
+
+export { Heading, HeadingQualifier, headingVariants };

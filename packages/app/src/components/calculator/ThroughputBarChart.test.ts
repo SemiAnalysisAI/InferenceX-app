@@ -302,14 +302,26 @@ describe('getCostProviderLabel', () => {
   });
 });
 
+function fullTitle(...args: Parameters<typeof getChartTitle>) {
+  const { title, qualifier } = getChartTitle(...args);
+  return `${title} ${qualifier}`;
+}
+
 describe('getChartTitle', () => {
+  it('keeps the operating point out of the title so phones can show it as a subtitle', () => {
+    expect(getChartTitle('throughput', 'interactivity_to_throughput', 30, 'total')).toEqual({
+      title: 'Total token throughput per chip',
+      qualifier: 'at 30 tok/s/user interactivity',
+    });
+  });
+
   it('returns total throughput title with interactivity target label', () => {
-    const title = getChartTitle('throughput', 'interactivity_to_throughput', 30, 'total');
+    const title = fullTitle('throughput', 'interactivity_to_throughput', 30, 'total');
     expect(title).toBe('Total token throughput per chip at 30 tok/s/user interactivity');
   });
 
   it('includes the selected percentile in an agentic interactivity title', () => {
-    const title = getChartTitle(
+    const title = fullTitle(
       'throughput',
       'interactivity_to_throughput',
       30,
@@ -321,57 +333,57 @@ describe('getChartTitle', () => {
   });
 
   it('returns input throughput title when costType is input', () => {
-    const title = getChartTitle('throughput', 'interactivity_to_throughput', 30, 'input');
+    const title = fullTitle('throughput', 'interactivity_to_throughput', 30, 'input');
     expect(title).toBe('Input token throughput per chip at 30 tok/s/user interactivity');
   });
 
   it('returns output throughput title when costType is output', () => {
-    const title = getChartTitle('throughput', 'interactivity_to_throughput', 30, 'output');
+    const title = fullTitle('throughput', 'interactivity_to_throughput', 30, 'output');
     expect(title).toBe('Output token throughput per chip at 30 tok/s/user interactivity');
   });
 
   it('returns interactivity title in throughput_to_interactivity mode', () => {
-    const title = getChartTitle('throughput', 'throughput_to_interactivity', 500, 'total');
+    const title = fullTitle('throughput', 'throughput_to_interactivity', 500, 'total');
     expect(title).toBe('Interactivity at 500 tok/s/chip throughput');
   });
 
   it('returns total power title with target label', () => {
-    const title = getChartTitle('power', 'interactivity_to_throughput', 25, 'total');
+    const title = fullTitle('power', 'interactivity_to_throughput', 25, 'total');
     expect(title).toBe(
       'Total tokens per provisioned all-in megawatt at 25 tok/s/user interactivity',
     );
   });
 
   it('returns input power title when costType is input', () => {
-    const title = getChartTitle('power', 'interactivity_to_throughput', 25, 'input');
+    const title = fullTitle('power', 'interactivity_to_throughput', 25, 'input');
     expect(title).toBe(
       'Input tokens per provisioned all-in megawatt at 25 tok/s/user interactivity',
     );
   });
 
   it('returns output power title when costType is output', () => {
-    const title = getChartTitle('power', 'interactivity_to_throughput', 25, 'output');
+    const title = fullTitle('power', 'interactivity_to_throughput', 25, 'output');
     expect(title).toBe(
       'Output tokens per provisioned all-in megawatt at 25 tok/s/user interactivity',
     );
   });
 
   it('returns cost title with provider and cost type', () => {
-    const title = getChartTitle('cost', 'interactivity_to_throughput', 30, 'input', 'costh');
+    const title = fullTitle('cost', 'interactivity_to_throughput', 30, 'input', 'costh');
     expect(title).toBe(
       'Cost per million input tokens (Owning at large hyperscaler volume) at 30 tok/s/user interactivity',
     );
   });
 
   it('returns cost title with output cost type and rental provider', () => {
-    const title = getChartTitle('cost', 'interactivity_to_throughput', 30, 'output', 'costr');
+    const title = fullTitle('cost', 'interactivity_to_throughput', 30, 'output', 'costr');
     expect(title).toBe(
       'Cost per million output tokens (Rent – 3-year commit) at 30 tok/s/user interactivity',
     );
   });
 
   it('defaults to hyperscaler when no costProvider is specified for cost', () => {
-    const title = getChartTitle('cost', 'throughput_to_interactivity', 500, 'total');
+    const title = fullTitle('cost', 'throughput_to_interactivity', 500, 'total');
     expect(title).toBe(
       'Cost per million total tokens (Owning at large hyperscaler volume) at 500 tok/s/chip throughput',
     );
@@ -484,6 +496,15 @@ describe('getResultLabel', () => {
     expect(getResultLabel(makeResult({ hwKey: 'b300', precision: 'fp4' }), noConfig)).toBe(
       'B300 (FP4)',
     );
+  });
+
+  it('joins the framework and precision with a middle dot in one bracket', () => {
+    const config = {
+      b300: { label: 'B300', suffix: '(Dynamo SGLang)' },
+    } as unknown as Parameters<typeof getResultLabel>[1];
+    const label = getResultLabel(makeResult({ hwKey: 'b300', precision: 'fp4' }), config);
+    expect(label).toBe('B300 (Dynamo SGLang · FP4)');
+    expect(splitLabel(label, 'parens')).toEqual(['B300', '(Dynamo SGLang · FP4)']);
   });
 
   it('marks an overlay bar with ✕ and the branch name', () => {

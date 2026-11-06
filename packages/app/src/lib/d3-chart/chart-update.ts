@@ -18,7 +18,7 @@ export interface AxisUpdateConfig {
 
 const X_TICK_SPACING_PX = 80;
 
-function widthTickCount(width: number, requested = 10): number {
+export function widthTickCount(width: number, requested = 10): number {
   return Math.min(requested, Math.max(2, Math.floor(width / X_TICK_SPACING_PX)));
 }
 

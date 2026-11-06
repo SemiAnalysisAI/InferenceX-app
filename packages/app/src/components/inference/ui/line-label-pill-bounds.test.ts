@@ -3,7 +3,9 @@ import * as d3 from 'd3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  fitPillSegments,
   pillShiftIntoBounds,
+  pillWidthBudget,
   rectsStrictlyOverlap,
   renderLineLabels,
   updateRenderedLineLabels,
@@ -401,5 +403,80 @@ describe('line-label pills stay inside the plot bounding box', () => {
     });
 
     expect(pillBox(zoomGroup, 'b300').right).toBe(200);
+  });
+});
+
+describe('pills keep clear of other series', () => {
+  const crossing = {
+    key: 'other',
+    points: [
+      { x: 0, y: 136 },
+      { x: 400, y: 136 },
+    ],
+  };
+
+  it('moves off a line that its default slot would cover', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('b300', 200, 150, 'B300')], {
+      seriesAttribute: 'data-hw-key',
+      occluders: [crossing],
+    });
+
+    const box = pillBox(zoomGroup, 'b300');
+    expect(box.ty).toBe(164);
+    expect(box.top).toBeGreaterThan(136);
+  });
+
+  it('ignores its own series line', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('b300', 200, 150, 'B300')], {
+      seriesAttribute: 'data-hw-key',
+      occluders: [{ ...crossing, key: 'b300' }],
+    });
+
+    expect(pillBox(zoomGroup, 'b300').ty).toBe(136);
+  });
+
+  it('re-places on zoom with the projected lines', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('b300', 200, 150, 'B300')], {
+      seriesAttribute: 'data-hw-key',
+    });
+    updateRenderedLineLabels(zoomGroup, [placement('b300', 200, 150, 'B300')], {
+      occluders: [crossing],
+    });
+
+    expect(pillBox(zoomGroup, 'b300').ty).toBe(164);
+  });
+});
+
+describe('phone pill width budget', () => {
+  const measure = (text: string) => text.length * CHAR_WIDTH;
+  const segments = [
+    { className: 'll-gpu', text: 'GB300 NVL72', weight: '700' },
+    { className: 'll-engine', text: ' (Dynamo vLLM)', weight: '400' },
+  ];
+
+  it('gives narrow plots a share of their width and wide plots no cap', () => {
+    expect(pillWidthBudget(240)).toBeCloseTo(108);
+    expect(pillWidthBudget(800)).toBe(Infinity);
+  });
+
+  it('keeps the chip name and ellipsizes the framework inside its bracket', () => {
+    expect(fitPillSegments(segments, 120, measure).map((segment) => segment.text)).toEqual([
+      'GB300 NVL72',
+      ' (Dynam…)',
+    ]);
+  });
+
+  it('drops the framework when not even one letter fits', () => {
+    expect(fitPillSegments(segments, 70, measure).map((segment) => segment.text)).toEqual([
+      'GB300 NVL72',
+    ]);
+  });
+
+  it('leaves labels that fit untouched', () => {
+    expect(fitPillSegments(segments, Infinity, measure)).toEqual(segments);
+    expect(fitPillSegments(segments, 200, measure)).toEqual(segments);
   });
 });

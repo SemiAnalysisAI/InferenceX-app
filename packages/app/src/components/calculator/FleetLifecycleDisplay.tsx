@@ -23,6 +23,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { rangeProgressStyle } from '@/components/ui/control-styles';
+import { RangeTicks } from '@/components/ui/range-ticks';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import ChartLegendItem from '@/components/ui/chart-legend-item';
@@ -536,22 +537,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                             currentRange.max,
                           )}
                         />
-                        <div
-                          className="relative h-4 text-xs tabular-nums text-muted-foreground"
-                          style={{ marginLeft: 8, marginRight: 8 }}
-                        >
-                          {Array.from({ length: 6 }, (_, i) => (
-                            <span
-                              key={i}
-                              className="absolute -translate-x-1/2"
-                              style={{ left: `${(i / 5) * 100}%` }}
-                            >
-                              {Math.round(
-                                currentRange.min + (currentRange.max - currentRange.min) * (i / 5),
-                              )}
-                            </span>
-                          ))}
-                        </div>
+                        <RangeTicks min={currentRange.min} max={currentRange.max} />
                       </div>
                       <Input
                         type="number"

@@ -26,7 +26,8 @@ import type {
 import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
-import type { ContinuousScale } from '@/lib/d3-chart/types';
+import { setAttrIfChanged, widthTickCount } from '@/lib/d3-chart/chart-update';
+import type { ChartLayout, ContinuousScale } from '@/lib/d3-chart/types';
 import { getChartWatermark } from '@/lib/catalog/data-mappings';
 import type { Locale } from '@/lib/i18n/i18n';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
@@ -197,6 +198,11 @@ export function getCostProviderLabel(provider: CostProvider, locale: Locale = 'e
   }
 }
 
+export interface ChartTitleParts {
+  title: string;
+  qualifier: string;
+}
+
 export function getChartTitle(
   barMetric: BarMetric,
   mode: CalculatorMode,
@@ -204,30 +210,37 @@ export function getChartTitle(
   costType: CostType,
   costProvider?: CostProvider,
   interactivityPercentile?: string,
-): string {
+): ChartTitleParts {
   const percentilePrefix = interactivityPercentile
     ? `${interactivityPercentile.toUpperCase()} `
     : '';
-  const targetLabel =
+  const qualifier =
     mode === 'interactivity_to_throughput'
-      ? `${targetValue} tok/s/user ${percentilePrefix}interactivity`
-      : `${targetValue} tok/s/chip throughput`;
+      ? `at ${targetValue} tok/s/user ${percentilePrefix}interactivity`
+      : `at ${targetValue} tok/s/chip throughput`;
 
   const tokenTypeLabel =
     costType === 'input' ? 'Input' : costType === 'output' ? 'Output' : 'Total';
 
   switch (barMetric) {
     case 'power': {
-      return `${tokenTypeLabel} tokens per provisioned all-in megawatt at ${targetLabel}`;
+      return { title: `${tokenTypeLabel} tokens per provisioned all-in megawatt`, qualifier };
     }
     case 'cost': {
       const providerLabel = getCostProviderLabel(costProvider || 'costh');
-      return `Cost per million ${tokenTypeLabel.toLowerCase()} tokens (${providerLabel}) at ${targetLabel}`;
+      return {
+        title: `Cost per million ${tokenTypeLabel.toLowerCase()} tokens (${providerLabel})`,
+        qualifier,
+      };
     }
     default: {
-      return mode === 'interactivity_to_throughput'
-        ? `${tokenTypeLabel} token throughput per chip at ${targetLabel}`
-        : `Interactivity at ${targetLabel}`;
+      return {
+        title:
+          mode === 'interactivity_to_throughput'
+            ? `${tokenTypeLabel} token throughput per chip`
+            : 'Interactivity',
+        qualifier,
+      };
     }
   }
 }
@@ -268,10 +281,12 @@ export function getCostTypeLabel(costType: CostType): string {
 
 export function getResultLabel(d: InterpolatedResult, hardwareConfig: HardwareConfig): string {
   const config = hardwareConfig[d.hwKey] || getHardwareConfig(d.hwKey);
-  const baseName = config ? getDisplayLabel(config) : d.hwKey;
   const parts: string[] = [];
+  const framework = config?.suffix?.replace(/^\((?<inner>.*)\)$/u, '$<inner>');
+  if (framework) parts.push(framework);
   if (d.precision) parts.push(d.precision.toUpperCase());
   if (d.isOverlay) parts.push(`✕ ${d.runLabel ?? 'unofficial'}`);
+  const baseName = config?.label ?? d.hwKey;
   return parts.length > 0 ? `${baseName} (${parts.join(' · ')})` : baseName;
 }
 
@@ -380,6 +395,57 @@ function getColor(): string {
 }
 
 const BAR_OPACITY = 0.85;
+const TOP_AXIS_BAND_PX = 28;
+
+function renderTopAxis(
+  layout: ChartLayout,
+  xScale: d3.ScaleLinear<number, number>,
+  tickCount: number,
+  tickFormat: ((value: d3.NumberValue) => string) | undefined,
+) {
+  let axis = layout.g.select<SVGGElement>('.x-axis-top');
+  if (axis.empty()) {
+    axis = layout.g.append('g').attr('class', 'x-axis-top').style('pointer-events', 'none');
+    axis
+      .append('rect')
+      .attr('class', 'x-axis-top-band')
+      .attr('fill', 'var(--card)')
+      .attr('opacity', 0);
+    axis.append('g').attr('class', 'x-axis-top-ticks');
+  }
+  const count = widthTickCount(layout.width, tickCount);
+  axis.attr('data-plot-top', layout.margin.top).attr('data-plot-height', layout.height);
+  axis
+    .select('.x-axis-top-band')
+    .attr('x', -layout.margin.left)
+    .attr('y', -TOP_AXIS_BAND_PX)
+    .attr('width', layout.width + layout.margin.left + layout.margin.right)
+    .attr('height', TOP_AXIS_BAND_PX);
+  axis
+    .select<SVGGElement>('.x-axis-top-ticks')
+    .call(
+      d3
+        .axisTop(xScale)
+        .ticks(count)
+        .tickFormat(tickFormat ?? xScale.tickFormat(count))
+        .tickSize(0)
+        .tickPadding(8),
+    )
+    .call((ticks) => ticks.select('.domain').remove());
+}
+
+function stickTopAxis(svg: SVGSVGElement | null | undefined) {
+  const axis = svg?.querySelector<SVGGElement>('.x-axis-top');
+  if (!svg || !axis) return;
+  const headerBottom =
+    document.querySelector('.vt-site-header')?.getBoundingClientRect().bottom ?? 0;
+  const plotTop = svg.getBoundingClientRect().top + Number(axis.dataset.plotTop);
+  const maxOffset = Math.max(0, Number(axis.dataset.plotHeight) - TOP_AXIS_BAND_PX);
+  const offset = Math.min(maxOffset, Math.max(0, headerBottom + TOP_AXIS_BAND_PX - plotTop));
+  setAttrIfChanged(axis, 'transform', `translate(0,${offset})`);
+  const band = axis.querySelector('.x-axis-top-band');
+  if (band) setAttrIfChanged(band, 'opacity', offset > 0 ? '1' : '0');
+}
 
 function positionLabelPairs(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -486,11 +552,13 @@ export default function ThroughputBarChart({
   }, [sortedResults.length]);
 
   const dynamicMargin = useMemo(() => {
-    if (sortedResults.length === 0) return { top: 20, right: 20, bottom: 60, left: 80 };
+    if (sortedResults.length === 0) {
+      return { top: TOP_AXIS_BAND_PX + 4, right: 32, bottom: 60, left: 80 };
+    }
     const labels = sortedResults.map((r) => getLabel(r, hardwareConfig));
     return {
-      top: 20,
-      right: 20,
+      top: TOP_AXIS_BAND_PX + 4,
+      right: 32,
       bottom: 60,
       left: computeLeftMargin(labels, { split: 'parens', minMargin: 80, padding: 12 }),
     };
@@ -560,6 +628,19 @@ export default function ThroughputBarChart({
     [maxBarValue],
   );
 
+  const isMobileViewport = useIsMobileViewport();
+  const xTickCount = isMobileViewport ? 4 : 6;
+  const xTickFormat = useMemo(
+    () =>
+      isMobileViewport
+        ? (d: d3.AxisDomain) => {
+            const n = Number(d);
+            return Math.abs(n) >= 1000 ? d3.format('~s')(n) : d3.format('~g')(n);
+          }
+        : undefined,
+    [isMobileViewport],
+  );
+
   const layers = useMemo(() => {
     const barLayer: HorizontalBarLayerConfig<InterpolatedResult> = {
       type: 'horizontalBar',
@@ -619,6 +700,12 @@ export default function ThroughputBarChart({
 
         const barColor = (d: InterpolatedResult) => resolveBarColor(d);
         positionLabelPairs(zoomGroup, xScale, ctx.width, barMetric, costType, barColor);
+        renderTopAxis(
+          ctx.layout,
+          (ctx.renderedXScale ?? xScale) as d3.ScaleLinear<number, number>,
+          xTickCount,
+          xTickFormat,
+        );
       },
       onDisplayUpdate: (zoomGroup, ctx) => {
         const baseXScale = ctx.xScale as d3.ScaleLinear<number, number>;
@@ -633,16 +720,28 @@ export default function ThroughputBarChart({
           costType,
           resolveBarColor,
         );
+        renderTopAxis(ctx.layout, currentXScale, xTickCount, xTickFormat);
       },
       onZoom: (zoomGroup, ctx) => {
         const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
         const barColor = (d: InterpolatedResult) => resolveBarColor(d);
         positionLabelPairs(zoomGroup, newXScale, ctx.width, barMetric, costType, barColor);
+        renderTopAxis(ctx.layout, newXScale, xTickCount, xTickFormat);
       },
     };
 
     return [barLayer, labelLayer];
-  }, [sortedResults, barMetric, costType, mode, maxBarValue, paletteIdentity, resolveBarColor]);
+  }, [
+    sortedResults,
+    barMetric,
+    costType,
+    mode,
+    maxBarValue,
+    paletteIdentity,
+    resolveBarColor,
+    xTickCount,
+    xTickFormat,
+  ]);
 
   const tooltipStateRef = useRef({
     hardwareConfig,
@@ -735,22 +834,12 @@ export default function ThroughputBarChart({
     };
   }, [sortedResults, hardwareConfig]);
 
-  const isMobileViewport = useIsMobileViewport();
   const xAxisConfig = useMemo(
-    () =>
-      isMobileViewport
-        ? {
-            tickCount: 4,
-            tickFormat: (d: d3.AxisDomain) => {
-              const n = Number(d);
-              return Math.abs(n) >= 1000 ? d3.format('~s')(n) : d3.format('~g')(n);
-            },
-          }
-        : { tickCount: 6 },
-    [isMobileViewport],
+    () => ({ tickCount: xTickCount, tickFormat: xTickFormat }),
+    [xTickCount, xTickFormat],
   );
 
-  const onRender = useMemo(
+  const renderDecorations = useMemo(
     () => (ctx: RenderContext) => {
       const { layout, width, height } = ctx;
       let xLabelEl = layout.g.select<SVGTextElement>('.x-axis-label-calc');
@@ -775,6 +864,39 @@ export default function ThroughputBarChart({
     },
     [barMetric, mode, costType, locale, totalChipBasis],
   );
+  const onRender = useCallback(
+    (ctx: RenderContext) => {
+      renderDecorations(ctx);
+      stickTopAxis(ctx.layout.svg.node());
+    },
+    [renderDecorations],
+  );
+  const onExportRender = useCallback(
+    (ctx: RenderContext) => {
+      renderDecorations(ctx);
+      const topAxis = ctx.layout.g.select('.x-axis-top').attr('transform', null);
+      topAxis.select('.x-axis-top-band').attr('opacity', 0);
+    },
+    [renderDecorations],
+  );
+
+  useEffect(() => {
+    let frame = 0;
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        stickTopAxis(chartRef.current?.getSvgElement());
+      });
+    };
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+    };
+  }, []);
 
   useEffect(() => {
     const svgEl = chartRef.current?.getSvgElement();
@@ -823,7 +945,7 @@ export default function ThroughputBarChart({
       }
       tooltip={tooltip}
       onRender={onRender}
-      onExportRender={onRender}
+      onExportRender={onExportRender}
       legendElement={legendElement}
       caption={caption}
       footer={footer}

@@ -28,12 +28,15 @@ import { useBenchmarkPresence } from '@/hooks/api/use-benchmark-presence';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import {
   avoidPointLabelCollisions,
+  fitPillSegments,
   parallelismLabelBoxes,
+  pillWidthBudget,
   placeLineLabels,
   updateRenderedLineLabels,
   renderLineLabels,
   type LineLabelPlacement,
   type LineLabelSeries,
+  type PillOccluder,
 } from '@/components/inference/ui/line-label-layer';
 import {
   labelOpacityForActiveState,
@@ -2424,6 +2427,35 @@ const ScatterGraph = React.memo(
         );
       };
 
+      const pillOccluders = (xScale: ContinuousScale, yScale: ContinuousScale) => {
+        const ir = interactionRef.current;
+        const project = (points: readonly InferenceData[]) =>
+          points.map((point) => ({ x: xScale(point.x), y: yScale(point.y) }));
+        const occluders: PillOccluder[] = [];
+        for (const [key, points] of Object.entries(displayedRooflines)) {
+          const { hw, precision, variant } = parseScatterSeriesKey(key);
+          if (
+            !ir.effectiveActiveHwTypes.has(hw) ||
+            !ir.selectedPrecisions.includes(precision) ||
+            ir.hiddenPowerVariants.has(variant ?? '')
+          ) {
+            continue;
+          }
+          const byDate = groupDisplayedPoints(points);
+          for (const [date, datePoints] of byDate) {
+            occluders.push({
+              key: byDate.size === 1 ? key : `${key}__${encodeURIComponent(date)}`,
+              points: project(datePoints),
+            });
+          }
+        }
+        for (const [overlayKey, group] of Object.entries(displayedOverlayRooflines)) {
+          if (!ir.activeOverlayHwTypes.has(group.hwKey)) continue;
+          occluders.push({ key: `overlay-${overlayKey}`, points: project(group.points) });
+        }
+        return occluders;
+      };
+
       const rooflineLayer: CustomLayerConfig = {
         type: 'custom',
         key: 'rooflines',
@@ -2774,6 +2806,7 @@ const ScatterGraph = React.memo(
 
           renderLineLabels(zoomGroup, lineLabels, {
             seriesAttribute: 'data-series-id',
+            occluders: showLineLabels ? pillOccluders(xScale, yScale) : [],
             iconFor: (label) => getLineLabelVendorIcon(lineLabelHardwareKey(label.seriesId)),
             configureGroup: (labelGroup, label) => {
               labelGroup
@@ -2843,9 +2876,18 @@ const ScatterGraph = React.memo(
                     ...runSegments,
                     ...variantSegments,
                   ];
+              const textX = Number(text.attr('x') ?? 0);
+              const fitted = fitPillSegments(
+                segments,
+                pillWidthBudget(ctx.width) - textX - 10,
+                (value, weight) =>
+                  measureTextWidth(value, chartFont(CHART_TYPE.lineLabel, weight), {
+                    whiteSpace: 'pre-wrap',
+                  }),
+              );
               text
                 .selectAll<SVGTSpanElement, (typeof segments)[number]>('tspan')
-                .data(segments, (segment) => segment.className)
+                .data(fitted, (segment) => segment.className)
                 .join('tspan')
                 .attr('class', (segment) => segment.className)
                 .attr('fill', (segment) => segment.fill)
@@ -2853,7 +2895,6 @@ const ScatterGraph = React.memo(
                 .attr('x', null)
                 .attr('dy', null)
                 .text((segment) => segment.text);
-              const textX = Number(text.attr('x') ?? 0);
               const maxLineWidth = ctx.width - textX - 10;
               let lineWidth = 0;
               text
@@ -3017,7 +3058,9 @@ const ScatterGraph = React.memo(
               pinAnchors: pinLineLabels,
               obstacles: parallelismLabelBoxes(zoomGroup.node()),
             });
-            updateRenderedLineLabels(zoomGroup, zoomLabels);
+            updateRenderedLineLabels(zoomGroup, zoomLabels, {
+              occluders: pillOccluders(newXScale, newYScale),
+            });
           }
         },
       };

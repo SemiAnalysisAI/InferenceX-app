@@ -30,6 +30,7 @@ import { getAxisVendorIcon } from '@/lib/catalog/vendor-logos';
 
 import {
   formatProfitUsd,
+  formatUsdPerChipHour,
   type ProfitBasis,
   type ProfitEstimatorAssumptions,
   type ProfitEstimatorRow,
@@ -444,6 +445,18 @@ export function profitYDomain(
     return [bottom - unitsPerPx * footroomPx, top === 0 ? 1 : top + unitsPerPx * headroomPx];
   }
   return [bottom * 1.12, top === 0 ? 1 : top + span * 0.3];
+}
+
+const PROFIT_Y_TICK_COUNT = 8;
+
+export function profitAxisTickFormat(
+  basis: ProfitBasis,
+  domain: readonly [number, number],
+): (value: number) => string {
+  if (basis !== 'chip-hour') return (value) => formatProfitUsd(value, basis, 0);
+  const [start, stop] = d3.scaleLinear().domain(domain).nice().domain();
+  const digits = Number.isInteger(d3.tickStep(start, stop, PROFIT_Y_TICK_COUNT)) ? 0 : 2;
+  return (value) => formatUsdPerChipHour(value, digits);
 }
 
 export function rowLabel(
@@ -986,19 +999,19 @@ export default function ProfitEstimatorChart({
     [labelMap, labelLayout],
   );
 
-  const yAxisConfig = useMemo(
-    () => ({
+  const yAxisConfig = useMemo(() => {
+    const formatYTick = profitAxisTickFormat(basis, yDomain);
+    return {
       label:
         basis === 'gw-year' && assumptions.powerBasis && assumptions.powerBasis !== 'provisioned'
           ? t.yAxisModeled
           : compact
             ? t.yAxisCompact[basis]
             : t.yAxis[basis],
-      tickFormat: (d: d3.AxisDomain) => formatProfitUsd(Number(d), basis, 0),
-      tickCount: 8,
-    }),
-    [compact, basis, assumptions.powerBasis, t.yAxis, t.yAxisCompact, t.yAxisModeled],
-  );
+      tickFormat: (d: d3.AxisDomain) => formatYTick(Number(d)),
+      tickCount: PROFIT_Y_TICK_COUNT,
+    };
+  }, [compact, basis, assumptions.powerBasis, t.yAxis, t.yAxisCompact, t.yAxisModeled, yDomain]);
 
   const onRender = useMemo(
     () => (ctx: RenderContext) => {

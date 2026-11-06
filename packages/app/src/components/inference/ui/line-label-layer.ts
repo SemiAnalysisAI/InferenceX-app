@@ -106,8 +106,110 @@ interface PillLayoutItem {
   label: LineLabelPlacement;
 }
 
+export interface PillOccluder {
+  key: string;
+  points: readonly CartesianPoint[];
+}
+
 const NARROW_PLOT_WIDTH = 360;
 const NARROW_PILL_LIMIT = 3;
+const NARROW_PILL_SHARE = 0.45;
+
+export function pillWidthBudget(plotWidth: number): number {
+  return plotWidth < NARROW_PLOT_WIDTH ? plotWidth * NARROW_PILL_SHARE : Infinity;
+}
+
+export function fitPillSegments<TSegment extends { text: string; weight: string }>(
+  segments: readonly TSegment[],
+  maxWidth: number,
+  measure: (text: string, weight: string) => number,
+): TSegment[] {
+  if (segments.length === 0 || !Number.isFinite(maxWidth)) return [...segments];
+  const fitted = [segments[0]];
+  let used = measure(segments[0].text, segments[0].weight);
+  for (const segment of segments.slice(1)) {
+    const width = measure(segment.text, segment.weight);
+    if (used + width <= maxWidth) {
+      fitted.push(segment);
+      used += width;
+      continue;
+    }
+    const wrapped = /^(?<lead>\s*\()(?<body>.*)\)$/u.exec(segment.text)?.groups;
+    const lead = wrapped?.lead ?? '';
+    const body = wrapped?.body ?? segment.text;
+    const close = wrapped ? ')' : '';
+    for (let length = body.length - 1; length > 0; length--) {
+      const prefix = body.slice(0, length).trimEnd();
+      if (!prefix.trim()) break;
+      const text = `${lead}${prefix}…${close}`;
+      if (used + measure(text, segment.weight) <= maxWidth) {
+        fitted.push({ ...segment, text });
+        break;
+      }
+    }
+    break;
+  }
+  return fitted;
+}
+
+function segmentHitsRect(a: CartesianPoint, b: CartesianPoint, rect: RectBounds): boolean {
+  let t0 = 0;
+  let t1 = 1;
+  const clip = (p: number, q: number) => {
+    if (p === 0) return q >= 0;
+    const t = q / p;
+    if (p < 0) {
+      if (t > t1) return false;
+      if (t > t0) t0 = t;
+    } else {
+      if (t < t0) return false;
+      if (t < t1) t1 = t;
+    }
+    return true;
+  };
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  return (
+    clip(-dx, a.x - rect.left) &&
+    clip(dx, rect.right - a.x) &&
+    clip(-dy, a.y - rect.top) &&
+    clip(dy, rect.bottom - a.y)
+  );
+}
+
+interface BoundedOccluder extends PillOccluder {
+  bounds: RectBounds;
+}
+
+function boundOccluder(occluder: PillOccluder): BoundedOccluder {
+  const bounds = { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity };
+  for (const { x, y } of occluder.points) {
+    bounds.left = Math.min(bounds.left, x);
+    bounds.right = Math.max(bounds.right, x);
+    bounds.top = Math.min(bounds.top, y);
+    bounds.bottom = Math.max(bounds.bottom, y);
+  }
+  return { ...occluder, bounds };
+}
+
+function coveredSeriesCost(
+  box: RectBounds,
+  key: string,
+  occluders: readonly BoundedOccluder[],
+): number {
+  let cost = 0;
+  for (const { key: occluderKey, points, bounds } of occluders) {
+    if (occluderKey === key || !rectsOverlap(box, bounds)) continue;
+    if (points.length === 1) {
+      cost++;
+      continue;
+    }
+    for (let i = 1; i < points.length; i++) {
+      if (segmentHitsRect(points[i - 1], points[i], box)) cost++;
+    }
+  }
+  return cost;
+}
 
 function layoutPills(
   items: readonly PillLayoutItem[],
@@ -115,10 +217,12 @@ function layoutPills(
   offsetY: number,
   bounds: RectBounds | null,
   obstacles: readonly RectBounds[],
+  occluders: readonly PillOccluder[],
 ): void {
   const placed: RectBounds[] = [...obstacles];
   const limit =
     bounds && bounds.right - bounds.left < NARROW_PLOT_WIDTH ? NARROW_PILL_LIMIT : Infinity;
+  const lines = occluders.filter((occluder) => occluder.points.length > 0).map(boundOccluder);
   let shown = 0;
 
   for (const { node, label } of items) {
@@ -151,12 +255,16 @@ function layoutPills(
       const ty = cy + shift.y;
       return { tx, ty, box: pillBoxAt(local, tx, ty) };
     });
-    const chosen =
-      shown < limit
-        ? clamped.find(
-            (candidate) => !placed.some((other) => rectsStrictlyOverlap(candidate.box, other)),
-          )
-        : undefined;
+    let chosen: (typeof clamped)[number] | undefined;
+    let leastCovered = Infinity;
+    for (const candidate of shown < limit ? clamped : []) {
+      if (placed.some((other) => rectsStrictlyOverlap(candidate.box, other))) continue;
+      const covered = coveredSeriesCost(candidate.box, label.key, lines);
+      if (covered >= leastCovered) continue;
+      chosen = candidate;
+      leastCovered = covered;
+      if (covered === 0) break;
+    }
     if (!chosen) {
       node.setAttribute('transform', `translate(${clamped[0].tx},${clamped[0].ty})`);
       node.style.opacity = '0';
@@ -379,6 +487,7 @@ export function renderLineLabels(
       label: LineLabelPlacement,
     ) => void;
     bounds?: RectBounds | null;
+    occluders?: readonly PillOccluder[];
   },
 ): void {
   const opacity = options.opacity ?? 1;
@@ -461,6 +570,7 @@ export function renderLineLabels(
     offsetY,
     bounds,
     bounds ? pillObstacles(group, '.parallelism-label') : [],
+    options.occluders ?? [],
   );
 }
 
@@ -472,6 +582,7 @@ export function updateRenderedLineLabels(
     offsetX?: number;
     offsetY?: number;
     bounds?: RectBounds | null;
+    occluders?: readonly PillOccluder[];
   } = {},
 ): void {
   const byKey = new Map(labels.map((label) => [label.key, label]));
@@ -498,6 +609,7 @@ export function updateRenderedLineLabels(
     offsetY,
     bounds,
     bounds ? pillObstacles(group, '.parallelism-label') : [],
+    options.occluders ?? [],
   );
 }
 
