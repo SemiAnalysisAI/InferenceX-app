@@ -221,6 +221,7 @@ export function D3ChartWrapper({
 
   const hintRef = useRef<HTMLParagraphElement>(null);
   const [hintWidth, setHintWidth] = useState<number | null>(null);
+  const [hintInset, setHintInset] = useState(12);
   const fontsVersion = useFontsVersion();
   useEffect(() => {
     const svg = svgRef.current;
@@ -229,10 +230,14 @@ export function D3ChartWrapper({
     let frame = 0;
     const measure = () => {
       frame = 0;
+      const svgRight = svg.getBoundingClientRect().right;
       const label = svg.querySelector('.x-axis-label');
       const space = label?.textContent
-        ? Math.floor(svg.getBoundingClientRect().right - label.getBoundingClientRect().right - 36)
+        ? Math.floor(svgRight - label.getBoundingClientRect().right - 36)
         : 0;
+      const domain = svg.querySelector('.x-axis > .domain');
+      if (domain)
+        setHintInset(Math.max(0, Math.round(svgRight - domain.getBoundingClientRect().right)));
       setHintWidth(space * 2 >= natural + 24 ? space : null);
     };
     const schedule = () => {
@@ -300,9 +305,11 @@ export function D3ChartWrapper({
               'no-export text-balance text-muted-foreground',
               hintWidth === null
                 ? 'mt-2 text-center text-xs'
-                : 'pointer-events-none relative ml-auto -mt-[21px] mb-1.5 pr-3 text-right text-2xs leading-4',
+                : 'pointer-events-none relative ml-auto -mt-[21px] mb-1.5 text-right text-2xs leading-4',
             )}
-            style={hintWidth === null ? undefined : { maxWidth: hintWidth }}
+            style={
+              hintWidth === null ? undefined : { maxWidth: hintWidth, paddingRight: hintInset }
+            }
           >
             {resolvedInstructions}
           </p>

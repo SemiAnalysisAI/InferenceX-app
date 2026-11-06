@@ -1,28 +1,48 @@
-import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
+// @vitest-environment jsdom
+
+import { act, createElement } from 'react';
+import { createRoot } from 'react-dom/client';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
   describeEngineComparisonConflict,
-  EngineComparisonConflictToast,
-} from './engine-comparison-conflict-toast';
+  EngineComparisonConflictNotice,
+  EngineComparisonConflictProvider,
+} from './engine-comparison-conflict-notice';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: vi.fn(() => 'en') }));
+vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 
-describe('EngineComparisonConflictToast', () => {
+declare global {
+  var IS_REACT_ACT_ENVIRONMENT: boolean;
+}
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
+describe('EngineComparisonConflictNotice', () => {
   it.each([
-    ['en', 'vLLM &amp; SGLang on same SKU can’t share a graph'],
+    ['en', 'vLLM & SGLang on same SKU can’t share a graph'],
     ['zh', '同一 SKU 上的 vLLM 和 SGLang 无法在同一图表中显示'],
-  ] as const)('renders the %s title', (locale, title) => {
+  ] as const)('renders the %s title once inline across legends', (locale, title) => {
     vi.mocked(useLocale).mockReturnValue(locale);
-    const html = renderToStaticMarkup(
-      createElement(EngineComparisonConflictToast, {
-        detail: { kind: 'blocked', attempted: 'vllm', existing: 'sglang' },
-      }),
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    act(() =>
+      root.render(
+        createElement(EngineComparisonConflictProvider, {
+          detail: { kind: 'blocked', attempted: 'vllm', existing: 'sglang' },
+          onDismiss: () => {},
+          children: [
+            createElement(EngineComparisonConflictNotice, { key: 'first' }),
+            createElement(EngineComparisonConflictNotice, { key: 'second' }),
+          ],
+        }),
+      ),
     );
-    expect(html).toContain(title);
-    expect(html).not.toContain('&amp;amp;');
+    const notices = container.querySelectorAll('[data-testid="engine-comparison-conflict-notice"]');
+    expect(notices).toHaveLength(1);
+    expect(notices[0].textContent).toContain(title);
+    act(() => root.unmount());
   });
 });
 

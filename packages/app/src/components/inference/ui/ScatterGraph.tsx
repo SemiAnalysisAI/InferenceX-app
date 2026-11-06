@@ -156,7 +156,10 @@ import {
 } from '@/components/inference/utils/tooltipUtils';
 import { PointDetailsPanel } from '@/components/inference/ui/PointDetailsPanel';
 import { usePowerTraceAction } from '@/components/inference/hooks/usePowerTraceAction';
-import { describeEngineComparisonConflict } from '@/components/inference/ui/engine-comparison-conflict-toast';
+import {
+  describeEngineComparisonConflict,
+  EngineComparisonConflictNotice,
+} from '@/components/inference/ui/engine-comparison-conflict-notice';
 import { ScatterEmptyState } from '@/components/inference/ui/ScatterEmptyState';
 import { ALL_IN_MEASURED_EMPTY, type PowerBasisLabelStyle } from '@/lib/power/power-basis';
 import {
@@ -4331,6 +4334,7 @@ const ScatterGraph = React.memo(
               {!minimalChrome && (
                 <InlineNudgeSlot slot={NUDGE_SLOTS.inferenceLegend} className="mb-2" />
               )}
+              <EngineComparisonConflictNotice className="mb-2" />
               <ChartLegend
                 variant="sidebar"
                 onItemHover={handleLegendHover}

@@ -1,14 +1,21 @@
 'use client';
 
 import { AlertTriangle } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 
 import { FRAMEWORK_LABELS } from '@semianalysisai/inferencex-constants';
 
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
-import { BottomToast } from '@/components/ui/bottom-toast';
+import { InlineNotice } from '@/components/ui/inline-notice';
 
 export type EngineComparisonConflictDetail =
   | { kind: 'blocked'; attempted: string; existing: string | null }
@@ -100,19 +107,21 @@ const TITLES = {
   zh: '同一 SKU 上的 vLLM 和 SGLang 无法在同一图表中显示',
 } as const;
 
-interface Props {
+interface ConflictState {
   detail: EngineComparisonConflictDetail | null;
-  onDismiss?: () => void;
+  onDismiss: () => void;
   onCompare?: () => void;
 }
 
-export function EngineComparisonConflictToast({ detail, onDismiss, onCompare }: Props) {
-  const locale = useLocale();
-  const [seq, setSeq] = useState(0);
+const ConflictContext = createContext<ConflictState | null>(null);
 
+export function EngineComparisonConflictProvider({
+  children,
+  ...state
+}: ConflictState & { children: ReactNode }) {
+  const { detail } = state;
   useEffect(() => {
     if (!detail) return;
-    setSeq((n) => n + 1);
     track('inference_engine_comparison_conflict_blocked', {
       kind: detail.kind,
       attempted: detail.kind === 'blocked' ? detail.attempted : null,
@@ -122,14 +131,48 @@ export function EngineComparisonConflictToast({ detail, onDismiss, onCompare }: 
       partial: detail.kind === 'resolved' ? detail.partial : null,
     });
   }, [detail]);
+  return <ConflictContext.Provider value={state}>{children}</ConflictContext.Provider>;
+}
 
-  if (!detail) return null;
+let owners: symbol[] = [];
+const listeners = new Set<() => void>();
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function useIsFirstNotice(): boolean {
+  const [owner] = useState(() => Symbol('engine-conflict-notice'));
+  useEffect(() => {
+    owners = [...owners, owner];
+    for (const listener of listeners) listener();
+    return () => {
+      owners = owners.filter((entry) => entry !== owner);
+      for (const listener of listeners) listener();
+    };
+  }, [owner]);
+  return useSyncExternalStore(
+    subscribe,
+    () => owners[0] === owner,
+    () => false,
+  );
+}
+
+export function EngineComparisonConflictNotice({ className }: { className?: string }) {
+  const locale = useLocale();
+  const state = useContext(ConflictContext);
+  const isFirst = useIsFirstNotice();
+  if (!state?.detail || !isFirst) return null;
+  const { detail, onDismiss, onCompare } = state;
 
   return (
-    <BottomToast
-      key={seq}
-      testId="engine-comparison-conflict-toast"
-      icon={<AlertTriangle className="text-warning" />}
+    <InlineNotice
+      testId="engine-comparison-conflict-notice"
+      tone="warning"
+      icon={AlertTriangle}
       title={
         onCompare
           ? locale === 'zh'
@@ -147,6 +190,7 @@ export function EngineComparisonConflictToast({ detail, onDismiss, onCompare }: 
             }
           : undefined
       }
+      className={className}
     />
   );
 }

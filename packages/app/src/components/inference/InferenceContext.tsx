@@ -102,9 +102,9 @@ import {
 import { NORMALIZED_TOKEN_REVENUE_PRICING, usesTokenSalePricing } from './token-revenue';
 import { useLocale } from '@/lib/i18n/use-locale';
 import {
-  EngineComparisonConflictToast,
+  EngineComparisonConflictProvider,
   type EngineComparisonConflictDetail,
-} from '@/components/inference/ui/engine-comparison-conflict-toast';
+} from '@/components/inference/ui/engine-comparison-conflict-notice';
 import {
   effectiveLegendItems,
   exclusionResolutionFamilies,
@@ -1985,29 +1985,31 @@ export function InferenceProvider({
         actions={actionsValue}
       >
         <PerfRulerStoreContext.Provider value={perfRulerStore}>
-          {children}
+          <EngineComparisonConflictProvider
+            detail={
+              comparisonGuardLifted ||
+              (quietEngineResolution && engineConflict?.kind === 'resolved')
+                ? null
+                : engineConflict
+            }
+            onDismiss={dismissEngineConflict}
+            onCompare={
+              consentSupported
+                ? () => {
+                    const keys = selectedGpuState.length > 0 ? selectedGpuState : selectableHwTypes;
+                    requestEngineComparison(keys, () => {
+                      setBestPerSku(false);
+                      setActiveHwTypes(new Set(keys));
+                      setEngineConflict(null);
+                    });
+                  }
+                : undefined
+            }
+          >
+            {children}
+          </EngineComparisonConflictProvider>
         </PerfRulerStoreContext.Provider>
       </InferenceContextsProvider>
-      <EngineComparisonConflictToast
-        detail={
-          comparisonGuardLifted || (quietEngineResolution && engineConflict?.kind === 'resolved')
-            ? null
-            : engineConflict
-        }
-        onDismiss={dismissEngineConflict}
-        onCompare={
-          consentSupported
-            ? () => {
-                const keys = selectedGpuState.length > 0 ? selectedGpuState : selectableHwTypes;
-                requestEngineComparison(keys, () => {
-                  setBestPerSku(false);
-                  setActiveHwTypes(new Set(keys));
-                  setEngineConflict(null);
-                });
-              }
-            : undefined
-        }
-      />
       <EngineComparisonConfirmation
         open={engineConsent.open}
         onCancel={() => {

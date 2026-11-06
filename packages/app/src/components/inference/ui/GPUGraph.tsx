@@ -19,6 +19,7 @@ import {
 } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
 import { InlineNudgeSlot } from '@/components/nudges/inline-nudge-slot';
+import { EngineComparisonConflictNotice } from '@/components/inference/ui/engine-comparison-conflict-notice';
 import { NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
 import { Button } from '@/components/ui/button';
 import { OFFICIAL_PREVIEW_SERIES } from '@/components/ui/official-preview-notice';
@@ -1570,6 +1571,7 @@ const GPUGraph = React.memo(
         legendElement={
           <>
             <InlineNudgeSlot slot={NUDGE_SLOTS.inferenceLegend} className="mb-2" />
+            <EngineComparisonConflictNotice className="mb-2" />
             <ChartLegend
               variant="sidebar"
               grouped={true}

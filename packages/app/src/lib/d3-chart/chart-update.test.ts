@@ -91,6 +91,32 @@ describe('renderAxes', () => {
       expect(labels).toEqual(['2', '4']);
     });
 
+    it('hides the label next to a clamped last x tick when they collide', () => {
+      Object.defineProperty(SVGElement.prototype, 'getComputedTextLength', {
+        value: () => 60,
+        configurable: true,
+      });
+      try {
+        const layout = makeLayout();
+        const xScale = d3.scaleLinear().domain([0, layout.width]).range([0, layout.width]);
+        const yScale = d3.scaleLinear().domain([0, 50]).range([layout.height, 0]);
+
+        renderAxes(layout, xScale, yScale, {
+          xTickValues: [0, layout.width - 40, layout.width],
+          xTickFormat: String,
+        });
+
+        const ticks = layout.xAxisGroup.selectAll<SVGGElement, unknown>('.tick').nodes();
+        const text = (index: number) => ticks[index].querySelector('text')!;
+        expect(text(2).getAttribute('dx')).toBe('-30');
+        expect(text(1).getAttribute('visibility')).toBe('hidden');
+        expect(ticks[1].querySelector('line')).not.toBeNull();
+        expect(text(0).getAttribute('visibility')).toBeNull();
+      } finally {
+        Reflect.deleteProperty(SVGElement.prototype, 'getComputedTextLength');
+      }
+    });
+
     it('respects yTickCount', () => {
       const layout = makeLayout();
       const xScale = d3.scaleLinear().domain([0, 100]).range([0, layout.width]);

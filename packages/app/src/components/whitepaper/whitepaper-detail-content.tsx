@@ -245,61 +245,18 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
                 className="flex flex-col gap-4 rounded-xl border border-border/30 bg-card p-5 md:p-6"
                 data-testid="whitepaper-figure"
               >
-                <div className="flex flex-col gap-3">
-                  <Heading as="h3" level="card" className="text-balance">
-                    <img
-                      src={chart.modelLogoPath}
-                      alt=""
-                      aria-hidden="true"
-                      width={24}
-                      height={24}
-                      className="mr-2 inline-block size-6 shrink-0 object-contain align-[-0.3em]"
-                    />
-                    {copy.figureTitle}
-                    <HeadingQualifier>{copy.figureQualifier}</HeadingQualifier>
-                  </Heading>
-                  <ResultContext
-                    layout="footer"
-                    locale={locale}
-                    costTier={figureCopy.costTier}
-                    utilization={chart.utilization}
-                    licenseFee={chart.licenseFee}
-                    tcoBasis={
-                      <>
-                        <div>
-                          <dt className="inline font-medium text-foreground">{t.tcoBadgesLabel}</dt>{' '}
-                          <dd className="inline">{figure.tcoBadge}</dd>
-                        </div>
-                        <div>
-                          <dt className="inline font-medium text-foreground">
-                            {t.sellingPriceLabel}
-                          </dt>{' '}
-                          <dd className="inline">
-                            {t.sellingPrices(
-                              formatTokenPriceLabel(chart.sellingPrices.input),
-                              formatTokenPriceLabel(chart.sellingPrices.cached),
-                              formatTokenPriceLabel(chart.sellingPrices.output),
-                              chart.sellingPrices.source,
-                            )}
-                          </dd>
-                        </div>
-                      </>
-                    }
-                    date={paper.dataDate}
-                    source={chart.source}
-                    markers={
-                      <a
-                        href={chart.tcoSourceHref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={sourceLinkClassName}
-                      >
-                        {chart.tcoSourceTitle}
-                        <ExternalLinkIcon />
-                      </a>
-                    }
+                <Heading as="h3" level="card" className="text-balance">
+                  <img
+                    src={chart.modelLogoPath}
+                    alt=""
+                    aria-hidden="true"
+                    width={24}
+                    height={24}
+                    className="mr-2 inline-block size-6 shrink-0 object-contain align-[-0.3em]"
                   />
-                </div>
+                  {copy.figureTitle}
+                  <HeadingQualifier>{copy.figureQualifier}</HeadingQualifier>
+                </Heading>
                 <div className="-mx-1 overflow-x-auto px-1 pb-1">
                   <div
                     className="min-w-[36rem] overflow-hidden rounded-lg border border-border/30 sm:min-w-0"
@@ -317,6 +274,47 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
                 <p className="text-xs text-muted-foreground sm:hidden" aria-hidden="true">
                   {t.scrollHint}
                 </p>
+                <ResultContext
+                  layout="footer"
+                  locale={locale}
+                  costTier={figureCopy.costTier}
+                  utilization={chart.utilization}
+                  licenseFee={chart.licenseFee}
+                  tcoBasis={
+                    <>
+                      <div>
+                        <dt className="inline font-medium text-foreground">{t.tcoBadgesLabel}</dt>{' '}
+                        <dd className="inline">{figure.tcoBadge}</dd>
+                      </div>
+                      <div>
+                        <dt className="inline font-medium text-foreground">
+                          {t.sellingPriceLabel}
+                        </dt>{' '}
+                        <dd className="inline">
+                          {t.sellingPrices(
+                            formatTokenPriceLabel(chart.sellingPrices.input),
+                            formatTokenPriceLabel(chart.sellingPrices.cached),
+                            formatTokenPriceLabel(chart.sellingPrices.output),
+                            chart.sellingPrices.source,
+                          )}
+                        </dd>
+                      </div>
+                    </>
+                  }
+                  date={paper.dataDate}
+                  source={chart.source}
+                  markers={
+                    <a
+                      href={chart.tcoSourceHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={sourceLinkClassName}
+                    >
+                      {chart.tcoSourceTitle}
+                      <ExternalLinkIcon />
+                    </a>
+                  }
+                />
                 <figcaption className="max-w-measure text-sm leading-6 text-muted-foreground">
                   {figureCopy.caption}
                 </figcaption>

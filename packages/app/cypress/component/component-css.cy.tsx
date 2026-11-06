@@ -523,8 +523,8 @@ describe('component CSS harness', () => {
           const action = button.getBoundingClientRect();
           expect(action.right, 'action remains inside the card').to.be.at.most(bounds.right);
           if (width < 640) {
-            expect(action.top, 'mobile actions follow the description').to.be.greaterThan(
-              description.bottom,
+            expect(action.bottom, 'mobile actions stay above the description').to.be.at.most(
+              description.top,
             );
           } else {
             expect(action.left, 'desktop actions do not overlap the description').to.be.greaterThan(

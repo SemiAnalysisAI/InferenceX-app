@@ -253,7 +253,7 @@ describe('GPU comparison agentic point detail', () => {
       },
     });
 
-    cy.get('[data-testid="engine-comparison-conflict-toast"]')
+    cy.get('[data-testid="engine-comparison-conflict-notice"]')
       .should('be.visible')
       .and('contain.text', 'Kept vLLM and removed SGLang configs');
     cy.get('[data-testid="gpu-multiselect"] [data-slot="select-trigger"]')
@@ -287,6 +287,6 @@ describe('GPU comparison agentic point detail', () => {
       .should('contain.text', 'vLLM')
       .and('contain.text', 'SGLang');
     cy.contains('button', 'Jun 12, 2026').should('be.visible');
-    cy.get('[data-testid="engine-comparison-conflict-toast"]').should('not.exist');
+    cy.get('[data-testid="engine-comparison-conflict-notice"]').should('not.exist');
   });
 });

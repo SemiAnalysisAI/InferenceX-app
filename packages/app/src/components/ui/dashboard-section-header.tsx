@@ -31,7 +31,7 @@ export function DashboardSectionHeader({
   return (
     <div
       className={cn(
-        'flex flex-wrap items-center justify-between gap-x-3 gap-y-1 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start',
+        'flex flex-wrap items-start justify-between gap-x-3 gap-y-1 sm:grid sm:grid-cols-[minmax(0,1fr)_auto]',
         className,
       )}
     >
@@ -53,7 +53,7 @@ export function DashboardSectionHeader({
       {actions !== undefined && (
         <div
           className={cn(
-            'flex min-w-0 flex-wrap gap-2 sm:col-start-2 sm:row-start-1',
+            'flex min-w-0 flex-wrap gap-2 max-sm:-mt-2 sm:col-start-2 sm:row-start-1',
             description !== undefined && 'sm:row-span-2',
           )}
         >

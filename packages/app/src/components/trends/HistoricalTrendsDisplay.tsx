@@ -22,6 +22,7 @@ import ChartControls from '@/components/inference/ui/ChartControls';
 import { CostTierSelector } from '@/components/inference/ui/CostTierSelector';
 import { TcoBasisCaption } from '@/components/inference/ui/TcoBasisCaption';
 import TrendChart from '@/components/inference/ui/TrendChart';
+import { EngineComparisonConflictNotice } from '@/components/inference/ui/engine-comparison-conflict-notice';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import {
@@ -559,70 +560,73 @@ export default function HistoricalTrendsDisplay() {
                 logScale={logScale}
                 selectedPrecisions={selectedPrecisions}
                 legendElement={
-                  <ChartLegend
-                    variant="sidebar"
-                    hideAtomFootnote
-                    collapsible={chartView === 'line'}
-                    onItemRemove={removeHwType}
-                    legendItems={Object.entries(hardwareConfig)
-                      .filter(([key]) => hwTypesWithData.has(key))
-                      .toSorted(
-                        ([a], [b]) =>
-                          getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
-                      )
-                      .map(([key, hwConfig]) => ({
-                        name: hwConfig.name,
-                        label: getDisplayLabel(hwConfig),
-                        color: resolveColor(key),
-                        lineDasharray:
-                          chartView === 'line' ? (frameworkDasharray(key) ?? 'none') : undefined,
-                        title: hwConfig.gpu,
-                        hw: key,
-                        isActive: activeHwTypes.has(key),
-                        onClick: () => {
-                          toggleHwType(key);
-                          track('historical_hw_type_toggled', { gpu: key });
-                        },
-                      }))}
-                    isLegendExpanded={isLegendExpanded}
-                    onExpandedChange={(expanded) => {
-                      setIsLegendExpanded(expanded);
-                      track('historical_legend_expanded', { enabled: expanded });
-                    }}
-                    switches={[
-                      ...(chartView === 'line'
-                        ? [
-                            {
-                              id: 'historical-log-scale',
-                              label: t.logScale,
-                              checked: logScale,
-                              onCheckedChange: (checked: boolean) => {
-                                setLogScale(checked);
-                                track('historical_log_scale_toggled', { enabled: checked });
+                  <>
+                    <EngineComparisonConflictNotice className="mb-2" />
+                    <ChartLegend
+                      variant="sidebar"
+                      hideAtomFootnote
+                      collapsible={chartView === 'line'}
+                      onItemRemove={removeHwType}
+                      legendItems={Object.entries(hardwareConfig)
+                        .filter(([key]) => hwTypesWithData.has(key))
+                        .toSorted(
+                          ([a], [b]) =>
+                            getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
+                        )
+                        .map(([key, hwConfig]) => ({
+                          name: hwConfig.name,
+                          label: getDisplayLabel(hwConfig),
+                          color: resolveColor(key),
+                          lineDasharray:
+                            chartView === 'line' ? (frameworkDasharray(key) ?? 'none') : undefined,
+                          title: hwConfig.gpu,
+                          hw: key,
+                          isActive: activeHwTypes.has(key),
+                          onClick: () => {
+                            toggleHwType(key);
+                            track('historical_hw_type_toggled', { gpu: key });
+                          },
+                        }))}
+                      isLegendExpanded={isLegendExpanded}
+                      onExpandedChange={(expanded) => {
+                        setIsLegendExpanded(expanded);
+                        track('historical_legend_expanded', { enabled: expanded });
+                      }}
+                      switches={[
+                        ...(chartView === 'line'
+                          ? [
+                              {
+                                id: 'historical-log-scale',
+                                label: t.logScale,
+                                checked: logScale,
+                                onCheckedChange: (checked: boolean) => {
+                                  setLogScale(checked);
+                                  track('historical_log_scale_toggled', { enabled: checked });
+                                },
                               },
-                            },
-                          ]
-                        : []),
-                      {
-                        id: 'historical-high-contrast',
-                        label: t.highContrast,
-                        checked: highContrast,
-                        onCheckedChange: (checked: boolean) => {
-                          setHighContrast(checked);
-                          track('historical_high_contrast_toggled', { enabled: checked });
+                            ]
+                          : []),
+                        {
+                          id: 'historical-high-contrast',
+                          label: t.highContrast,
+                          checked: highContrast,
+                          onCheckedChange: (checked: boolean) => {
+                            setHighContrast(checked);
+                            track('historical_high_contrast_toggled', { enabled: checked });
+                          },
                         },
-                      },
-                    ]}
-                    reset={{
-                      id: 'historical-reset-filter',
-                      disabled: [...hwTypesWithData].every((key) => activeHwTypes.has(key)),
-                      onClick: () => {
-                        selectAllHwTypes();
-                        track('historical_legend_filter_reset');
-                      },
-                    }}
-                    enableTooltips={true}
-                  />
+                      ]}
+                      reset={{
+                        id: 'historical-reset-filter',
+                        disabled: [...hwTypesWithData].every((key) => activeHwTypes.has(key)),
+                        onClick: () => {
+                          selectAllHwTypes();
+                          track('historical_legend_filter_reset');
+                        },
+                      }}
+                      enableTooltips={true}
+                    />
+                  </>
                 }
               />
             </Card>

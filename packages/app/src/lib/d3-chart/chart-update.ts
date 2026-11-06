@@ -208,10 +208,22 @@ function drawAxis(
     .attr('font-family', 'sans-serif')
     .attr('text-anchor', orient === 'left' ? 'end' : 'middle');
   if (orient === 'bottom' && !positionScale.bandwidth) {
-    texts.attr('dx', function (value) {
-      const width = this.getComputedTextLength?.() ?? 0;
-      const overhang = position(value) + offset + width / 2 - Math.max(range0, range1);
-      return overhang > 0 ? -overhang : null;
+    const plotEnd = Math.max(range0, range1);
+    const boxes = texts
+      .nodes()
+      .map((node) => {
+        const width = node.getComputedTextLength?.() ?? 0;
+        const center = position(d3.select(node).datum()) + offset;
+        const overhang = center + width / 2 - plotEnd;
+        return { node, overhang, left: center - width / 2, right: center + width / 2 };
+      })
+      .toSorted((a, b) => a.left - b.left);
+    boxes.forEach((box, index) => {
+      const clamped = boxes[index + 1];
+      const collides =
+        clamped && clamped.overhang > 0 && clamped.left - clamped.overhang - box.right < 8;
+      setAttrIfChanged(box.node, 'dx', box.overhang > 0 ? String(-box.overhang) : null);
+      setAttrIfChanged(box.node, 'visibility', collides ? 'hidden' : null);
     });
   }
   group.each(function () {
@@ -359,8 +371,10 @@ function visibleTickValues(
   });
 }
 
-export function setAttrIfChanged(element: Element, name: string, value: string): void {
-  if (element.getAttribute(name) !== value) element.setAttribute(name, value);
+export function setAttrIfChanged(element: Element, name: string, value: string | null): void {
+  if (element.getAttribute(name) === value) return;
+  if (value === null) element.removeAttribute(name);
+  else element.setAttribute(name, value);
 }
 
 export function setStyleIfChanged(
