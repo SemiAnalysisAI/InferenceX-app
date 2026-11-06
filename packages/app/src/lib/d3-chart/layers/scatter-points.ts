@@ -25,6 +25,7 @@ export interface ScatterPointConfig<T> {
   dataAttrs?: Record<string, (d: T) => string | null>;
   selectedPrecisions?: readonly string[];
   getShapeKey?: (d: T) => ShapeKey;
+  underlay?: readonly string[];
 }
 
 export const resolveShapeKey = (

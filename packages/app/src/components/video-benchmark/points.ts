@@ -1,6 +1,7 @@
+import { canonical, type Json } from './bundle';
 import { deploymentKey } from './deployment';
 import { hardwareKey, hardwareSort } from './hardware';
-import type { VideoHistoryObservation, VideoHistoryPage } from './history';
+import type { VideoHistoryEntry, VideoHistoryObservation, VideoHistoryPage } from './history';
 import type { VideoPoint } from './metrics';
 
 const num = (value: unknown): number | null =>
@@ -12,28 +13,52 @@ const num = (value: unknown): number | null =>
  * official dashboard point merely because their samples and shape match.
  */
 export function videoPoints(pages: VideoHistoryPage[]): VideoPoint[] {
+  return historyPoints(
+    pages.flatMap((page) => page.entries.filter((entry) => entry.approved === true)),
+  );
+}
+
+export function namedRunPoints(pages: VideoHistoryPage[], runId: string | null): VideoPoint[] {
+  if (!runId || !/^[1-9]\d*$/u.test(runId) || !Number.isSafeInteger(Number(runId))) return [];
+  return historyPoints(
+    pages.flatMap((page) => page.entries.filter((entry) => entry.runId === runId)),
+  );
+}
+
+function historyPoints(entries: VideoHistoryEntry[]): VideoPoint[] {
   const seen = new Set<string>();
   const points: VideoPoint[] = [];
-  for (const page of pages)
-    for (const entry of page.entries)
-      if (entry.approved === true)
-        for (const source of entry.sources) {
-          if (source.kind !== 'observation') continue;
-          for (const observation of source.observations) {
-            if (seen.has(observation.id)) continue;
-            seen.add(observation.id);
-            points.push({
-              ...toPoint(observation, entry.runId, entry.artifact.id, source.observedAt),
-              publishedAt: entry.publishedAt,
-              approved: true,
-            });
-          }
-        }
+  for (const entry of entries)
+    for (const source of entry.sources) {
+      if (source.kind !== 'observation') continue;
+      for (const observation of source.observations) {
+        if (seen.has(observation.id)) continue;
+        seen.add(observation.id);
+        points.push({
+          ...toPoint(observation, entry.runId, entry.artifact.id, source.observedAt),
+          publishedAt: entry.publishedAt,
+          approved: entry.approved,
+        });
+      }
+    }
   return points.toSorted(
     (a, b) =>
       hardwareSort(a.hardwareKey ?? '') - hardwareSort(b.hardwareKey ?? '') ||
       (a.concurrency ?? 0) - (b.concurrency ?? 0),
   );
+}
+
+/**
+ * A plan's schema_version names its document format, not the workload; its fairness terms stay
+ * in the key. Stripped on read because recorded History snapshots carry the versioned key.
+ */
+function workloadIdentity(key: string | null | undefined): string | null {
+  if (typeof key !== 'string' || key.length === 0) return null;
+  if (!key.startsWith('{')) return key;
+  const identity = JSON.parse(key) as { plan?: Record<string, Json> } & Record<string, Json>;
+  if (identity.plan?.schema_version === undefined) return key;
+  const { schema_version: _version, ...plan } = identity.plan;
+  return canonical({ ...identity, plan });
 }
 
 /** Observations published before the additive fields existed read as null, never 0. */
@@ -45,6 +70,7 @@ function toPoint(
 ): VideoPoint {
   const server = o.server;
   return {
+    results: o.results ?? null,
     id: o.id,
     runId,
     artifactId,
@@ -54,8 +80,7 @@ function toPoint(
     runtime: o.runtime ?? '',
     model: o.model ?? '',
     workload: o.workload ?? '',
-    workloadKey:
-      typeof o.workloadKey === 'string' && o.workloadKey.length > 0 ? o.workloadKey : null,
+    workloadKey: workloadIdentity(o.workloadKey),
     concurrency: num(o.concurrency),
     participating: num(o.participating),
     allocated: num(o.allocated),
@@ -68,6 +93,7 @@ function toPoint(
     p50: num(o.p50),
     p90: num(o.p90),
     wallSeconds: num(o.wallSeconds),
+    videoSecondsPerHour: num(o.videoSecondsPerHour),
     durationSeconds: num(o.durationSeconds),
     frameCount: num(o.frameCount),
     energyKj: num(o.energyKj),

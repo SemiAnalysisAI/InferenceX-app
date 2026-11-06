@@ -1118,6 +1118,7 @@ const GPUGraph = React.memo(
           hardwareConfig,
           overlayData: isOverlay ? (overlayData ?? undefined) : undefined,
           comparisonDate: !isOverlay,
+          comparisonLabel: comparisonEntryLabel(d.date, runNumbering),
           showPowerTelemetry: showPowerTelemetryRef.current,
           runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
           hasTrace:
@@ -1130,7 +1131,16 @@ const GPUGraph = React.memo(
           locale,
           color: getColor(d),
         }),
-      [xLabel, yLabel, selectedYAxisMetric, hardwareConfig, overlayData, getColor, locale],
+      [
+        xLabel,
+        yLabel,
+        selectedYAxisMetric,
+        hardwareConfig,
+        overlayData,
+        getColor,
+        runNumbering,
+        locale,
+      ],
     );
     const hoverCard = useCallback(
       (d: InferenceData, isOverlay: boolean) =>
@@ -1142,9 +1152,19 @@ const GPUGraph = React.memo(
           hardwareConfig,
           overlayData: isOverlay ? (overlayData ?? undefined) : undefined,
           color: getColor(d),
+          comparisonLabel: comparisonEntryLabel(d.date, runNumbering),
           locale,
         }),
-      [xLabel, yLabel, selectedYAxisMetric, hardwareConfig, overlayData, getColor, locale],
+      [
+        xLabel,
+        yLabel,
+        selectedYAxisMetric,
+        hardwareConfig,
+        overlayData,
+        getColor,
+        runNumbering,
+        locale,
+      ],
     );
     const overlayPointsLayer: CustomLayerConfig = useMemo(() => {
       const updateLabels = (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {

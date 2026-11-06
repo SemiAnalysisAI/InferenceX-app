@@ -164,15 +164,15 @@ describe('NUDGE_REGISTRY integrity', () => {
     modal?.content.secondaryAction?.onClick();
     expect(location.href).toBe(`${prefix}/inference/kimi-k3`);
     expect(modal?.content.additionalActions?.map((action) => action.label)).toEqual([
-      'Muse Spark',
       'GLM5.3',
+      'Muse Spark',
     ]);
     modal?.content.additionalActions?.[0].onClick();
-    expect(location.href).toBe(`${prefix}/inference/muse-spark-open`);
-    modal?.content.additionalActions?.[1].onClick();
     expect(location.href).toBe(
       `${prefix}/inference/glm-5-3?g_model=GLM-5.2&i_seq=agentic-traces&i_prec=fp8`,
     );
+    modal?.content.additionalActions?.[1].onClick();
+    expect(location.href).toBe(`${prefix}/inference/muse-spark-open`);
   });
 
   it('centers the TPUv7 launch modal on the landing page', () => {

@@ -563,9 +563,9 @@ describe('buildPointDetails', () => {
     );
 
     expect(html).toContain('\n2026年1月2日\n');
-    expect(html).toContain('个芯片 TP EP DPA worker 数');
-    expect(html).toContain('预填充 4 2 2 是 2');
-    expect(html).toContain('解码 4 4 4 否 1');
+    expect(html).toContain('个芯片 配置 worker 数');
+    expect(html).toContain('预填充 4 DEP2 2');
+    expect(html).toContain('解码 4 TEP4 1');
     expect(html).not.toContain('True');
     expect(html).not.toContain('Workers');
   });
@@ -923,12 +923,11 @@ describe('buildPointDetails for unofficial overlays', () => {
   it('shows DCP and PCP for unofficial-run points', () => {
     const html = detailsText(
       overlayConfig({
-        data: pt({ ep: 1, decode_dcp_size: 8, prefill_pcp_size: 4 }),
+        data: pt({ ep: 1, dp_attention: false, decode_dcp_size: 8, prefill_pcp_size: 4 }),
       }),
     );
 
-    expect(html).toContain('TP EP DPA DCP PCP');
-    expect(html).toContain('8 1 ? 8 4');
+    expect(html).toContain('TP8/DCP8/PCP4');
   });
 
   it('shows point-level speculative decoding for mixed agentic overlays', () => {
@@ -1034,12 +1033,11 @@ describe('buildPointDetails for comparison dates', () => {
   it('shows DCP and PCP in comparison point tooltips', () => {
     const html = comparisonDetailsText(
       tooltipConfig({
-        data: pt({ ep: 1, decode_dcp_size: 8, prefill_pcp_size: 4 }),
+        data: pt({ ep: 1, dp_attention: false, decode_dcp_size: 8, prefill_pcp_size: 4 }),
       }),
     );
 
-    expect(html).toContain('TP EP DPA DCP PCP');
-    expect(html).toContain('8 1 ? 8 4');
+    expect(html).toContain('TP8/DCP8/PCP4');
   });
 
   it('keeps the complete image and SHA', () => {

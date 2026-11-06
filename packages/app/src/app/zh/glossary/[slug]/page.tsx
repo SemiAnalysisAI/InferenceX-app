@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { GlossaryFigure } from '@/components/glossary/glossary-figure';
 import { JsonLd } from '@/components/seo/json-ld';
 import { Heading } from '@/components/ui/heading';
 import { PagerCard } from '@/components/ui/pager-card';
@@ -175,6 +176,8 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
                 </h2>
                 <p className={cn(READING_TEXT_CLASS, 'mt-4')}>{entry.definition}</p>
               </section>
+
+              {entry.figure && <GlossaryFigure figure={entry.figure} />}
 
               {entry.measurement && (
                 <div className="mt-8 border-l-2 border-border pl-4">

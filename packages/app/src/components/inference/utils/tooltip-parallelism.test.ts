@@ -4,7 +4,6 @@ import type { InferenceData, HardwareConfig } from '@/components/inference/types
 import type { TooltipConfig } from '@/components/inference/utils/tooltipUtils';
 import {
   comparisonDetailsText,
-  detailsHtml,
   detailsText,
 } from '@/components/inference/utils/point-details-test-helpers';
 
@@ -82,6 +81,7 @@ describe('tooltip parallelism — standard (ep field present)', () => {
           prefill_tp: 1,
           prefill_ep: 1,
           prefill_dwdp_size: 8,
+          prefill_dp_attention: false,
           prefill_num_workers: 2,
           decode_tp: 8,
           decode_ep: 8,
@@ -90,8 +90,9 @@ describe('tooltip parallelism — standard (ep field present)', () => {
         }),
       }),
     );
-    expect(html).toContain('Chips TP EP DPA Workers DWDP');
-    expect(html).toContain('Prefill ? 1 1 ? 2 8');
+    expect(html).toContain('Chips Configuration Workers');
+    expect(html).toContain('Prefill ? DWDP8 2');
+    expect(html).toContain('Decode ? DEP8 1');
     expect(html).not.toContain('TP8');
   });
 
@@ -104,14 +105,15 @@ describe('tooltip parallelism — standard (ep field present)', () => {
           ep: 1,
           pp: 2,
           is_multinode: true,
+          dp_attention: false,
           disagg: false,
         }),
       }),
     );
 
     expect(html).toContain('Multi-node aggregate');
-    expect(html).toContain('TP EP DPA PP');
-    expect(html).toContain('8 1 ? 2');
+    expect(html).toContain('Parallelism strategy');
+    expect(html).toContain('TP8PP2');
     expect(html).not.toContain('Prefill');
     expect(html).not.toContain('Decode');
   });
@@ -119,29 +121,29 @@ describe('tooltip parallelism — standard (ep field present)', () => {
   it('shows TP, EP and DP attention for non-multinode data', () => {
     const html = detailsText(tooltipConfig({ data: pt({ tp: 4, ep: 8, dp_attention: false }) }));
     expect(html).toContain('Single-node aggregate');
-    expect(html).toContain('TP EP DPA');
-    expect(html).toContain('4 8 False');
+    expect(html).toContain('Parallelism strategyEP8');
+    expect(html).not.toContain('DPA');
   });
 
   it('shows dp_attention as True when enabled', () => {
     const html = detailsText(tooltipConfig({ data: pt({ tp: 4, ep: 8, dp_attention: true }) }));
-    expect(html).toContain('4 8 True');
+    expect(html).toContain('DPAEP8');
   });
 
   it('shows pipeline parallelism when pp > 1', () => {
     const html = detailsText(
       tooltipConfig({ data: pt({ tp: 16, decode_tp: 8, ep: 1, pp: 2, dp_attention: false }) }),
     );
-    expect(html).toContain('TP EP DPA PP');
-    expect(html).toContain('8 1 False 2');
+    expect(html).toContain('TP8PP2');
   });
 
   it('hides pipeline parallelism when pp is 1, 0, or absent', () => {
     for (const pp of [1, 0, undefined]) {
-      const html = detailsHtml(
+      const html = detailsText(
         tooltipConfig({ data: pt({ tp: 8, ep: 1, pp, dp_attention: false }) }),
       );
-      expect(html).not.toContain('>PP</th>');
+      expect(html).toContain('Parallelism strategyTP8');
+      expect(html).not.toContain('PP');
     }
   });
 
@@ -151,6 +153,7 @@ describe('tooltip parallelism — standard (ep field present)', () => {
         data: pt({
           tp: 8,
           ep: 1,
+          dp_attention: false,
           prefill_dcp_size: 1,
           decode_dcp_size: 8,
           prefill_pcp_size: 4,
@@ -159,12 +162,11 @@ describe('tooltip parallelism — standard (ep field present)', () => {
       }),
     );
 
-    expect(html).toContain('TP EP DPA DCP PCP');
-    expect(html).toContain('8 1 ? 8 4');
+    expect(html).toContain('TP8/DCP8/PCP4');
   });
 
   it('hides default DCP and PCP widths', () => {
-    const html = detailsHtml(
+    const html = detailsText(
       tooltipConfig({
         data: pt({
           tp: 8,
@@ -177,8 +179,8 @@ describe('tooltip parallelism — standard (ep field present)', () => {
       }),
     );
 
-    expect(html).not.toContain('>DCP</th>');
-    expect(html).not.toContain('>PCP</th>');
+    expect(html).not.toContain('DCP');
+    expect(html).not.toContain('PCP');
   });
 
   it('keeps an unknown expert width unknown when ep is null', () => {
@@ -186,8 +188,8 @@ describe('tooltip parallelism — standard (ep field present)', () => {
     (d as any).ep = null;
     (d as any).prefill_ep = 2;
     const html = detailsText(tooltipConfig({ data: d }));
-    expect(html).toContain('TP EP DPA');
-    expect(html).toContain('4 ? ?');
+    expect(html).toContain('Parallelism strategyTP4');
+    expect(html).not.toContain('EP');
   });
 });
 
@@ -214,9 +216,9 @@ describe('tooltip parallelism — multinode disagg', () => {
       }),
     );
     expect(html).toContain('Disaggregated');
-    expect(html).toContain('Chips TP EP DPA Workers');
-    expect(html).toContain('Prefill 16 4 4 False 2');
-    expect(html).toContain('Decode 24 8 32 True 3');
+    expect(html).toContain('Chips Configuration Workers');
+    expect(html).toContain('Prefill 16 TEP4 2');
+    expect(html).toContain('Decode 24 DPAEP32 3');
   });
 
   it('falls back to shared values and keeps missing role fields unknown', () => {
@@ -231,8 +233,8 @@ describe('tooltip parallelism — multinode disagg', () => {
         }),
       }),
     );
-    expect(html).toContain('Prefill ? 8 4 True ?');
-    expect(html).toContain('Decode ? 8 4 True ?');
+    expect(html).toContain('Prefill ? DPAEP4 ?');
+    expect(html).toContain('Decode ? DPAEP4 ?');
   });
 
   it('shows per-role PP only when a role uses it', () => {
@@ -246,9 +248,11 @@ describe('tooltip parallelism — multinode disagg', () => {
           prefill_tp: 8,
           prefill_ep: 1,
           prefill_pp: 2,
+          prefill_dp_attention: false,
           decode_tp: 8,
           decode_ep: 1,
           decode_pp: 1,
+          decode_dp_attention: false,
           prefill_num_workers: 1,
           decode_num_workers: 1,
           num_prefill_gpu: 16,
@@ -256,9 +260,8 @@ describe('tooltip parallelism — multinode disagg', () => {
         }),
       }),
     );
-    expect(html).toContain('Chips TP EP DPA Workers PP');
-    expect(html).toContain('Prefill 16 8 1 ? 1 2');
-    expect(html).toContain('Decode 8 8 1 ? 1 1');
+    expect(html).toContain('Prefill 16 TP8PP2 1');
+    expect(html).toContain('Decode 8 TP8 1');
   });
 
   it('shows per-role DCP and PCP in disaggregated details', () => {
@@ -273,19 +276,20 @@ describe('tooltip parallelism — multinode disagg', () => {
           prefill_ep: 1,
           prefill_dcp_size: 2,
           prefill_pcp_size: 4,
+          prefill_dp_attention: false,
           decode_tp: 8,
           decode_ep: 1,
           decode_dcp_size: 8,
           decode_pcp_size: 1,
+          decode_dp_attention: false,
           num_prefill_gpu: 8,
           num_decode_gpu: 8,
         }),
       }),
     );
 
-    expect(html).toContain('Chips TP EP DPA Workers DCP PCP');
-    expect(html).toContain('Prefill 8 8 1 ? ? 2 4');
-    expect(html).toContain('Decode 8 8 1 ? ? 8 1');
+    expect(html).toContain('Prefill 8 TP8/DCP2/PCP4 ?');
+    expect(html).toContain('Decode 8 TP8/DCP8 ?');
   });
 
   it('shows "?" for missing chip count fields', () => {
@@ -299,7 +303,7 @@ describe('tooltip parallelism — multinode disagg', () => {
         }),
       }),
     );
-    expect(html).toContain('Prefill ? 4 2');
+    expect(html).toContain('Prefill ? TP4 / EP2 ?');
   });
 
   it('also works with comparison details', () => {
@@ -320,8 +324,8 @@ describe('tooltip parallelism — multinode disagg', () => {
         }),
       }),
     );
-    expect(html).toContain('Prefill 8 4 4');
-    expect(html).toContain('Decode 16 8 8 True');
+    expect(html).toContain('Prefill 8 TP4 / EP4');
+    expect(html).toContain('Decode 16 DEP8');
   });
 });
 
@@ -334,23 +338,21 @@ describe('tooltip parallelism — zh locale', () => {
     const text = detailsText(config);
     expect(text).toContain('单节点聚合');
     expect(text).toContain('并行策略');
-    expect(text).toContain('配置详情');
+    expect(text).toContain('TP8PP2');
+    expect(text).not.toContain('配置详情');
     expect(text).not.toContain('Parallelism strategy');
-    const html = detailsHtml(config);
-    expect(html).toContain('title="张量并行 (TP)"');
-    expect(html).toContain('title="流水线并行 (PP)"');
   });
 
   it('localizes DCP and PCP labels', () => {
-    const html = detailsHtml(
+    const text = detailsText(
       tooltipConfig({
-        data: pt({ tp: 8, ep: 1, decode_dcp_size: 8, prefill_pcp_size: 4 }),
+        data: pt({ tp: 8, ep: 1, dp_attention: false, decode_dcp_size: 8, prefill_pcp_size: 4 }),
         locale: 'zh',
       }),
     );
 
-    expect(html).toContain('title="解码上下文并行 (DCP)"');
-    expect(html).toContain('title="预填充上下文并行 (PCP)"');
+    expect(text).toContain('并行策略');
+    expect(text).toContain('TP8/DCP8/PCP4');
   });
 
   it('localizes the old-data parallelism strategy line', () => {
@@ -374,9 +376,9 @@ describe('tooltip parallelism — zh locale', () => {
       }),
     );
     expect(html).toContain('分离式');
-    expect(html).toContain('个芯片 TP EP DPA worker 数');
-    expect(html).toContain('预填充 16 8 4');
-    expect(html).toContain('解码 24 8 4');
+    expect(html).toContain('个芯片 配置 worker 数');
+    expect(html).toContain('预填充 16 TP8 / EP4');
+    expect(html).toContain('解码 24 TP8 / EP4');
   });
 });
 

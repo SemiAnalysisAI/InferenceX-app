@@ -65,20 +65,6 @@
   font-weight: 600;
 }
 
-.inferencex-pinned-tooltip .pinned-raw-topology {
-  margin-top: 8px;
-  color: var(--muted-foreground);
-  font-size: 11px;
-}
-
-.inferencex-pinned-tooltip .pinned-raw-topology summary {
-  cursor: pointer;
-}
-
-.inferencex-pinned-tooltip .pinned-raw-topology[open] summary {
-  margin-bottom: 12px;
-}
-
 .inferencex-pinned-tooltip .pinned-token-breakdown {
   margin-top: 14px;
 }

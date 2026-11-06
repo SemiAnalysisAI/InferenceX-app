@@ -3,6 +3,7 @@ import {
   speculativeDecodingLabel,
   speculativeDecodingName,
 } from '@/lib/benchmarks/speculative-decoding';
+import { comparisonEntryDate } from '@/components/inference/utils/comparisonEntry';
 import { agenticDetailHref } from '@/lib/agentx/agentic-detail-link';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { frameworkFamily } from '@/lib/catalog/framework-family';
@@ -61,6 +62,8 @@ export interface TooltipConfig {
   overlayData?: OverlayData;
   comparisonDate?: boolean;
   color?: string;
+  /** Human-readable comparison date/run label, matching the history legend. */
+  comparisonLabel?: string;
 }
 
 const asBool = (v: boolean | string | undefined): boolean | undefined =>
@@ -124,6 +127,7 @@ const TOOLTIP_STRINGS = {
   en: {
     unofficialRun: '✕ Unofficial run',
     dataFrom: (d: string) => `(data from ${d})`,
+    date: 'Date',
     branch: 'Branch',
     totalChips: 'Total chips',
     concurrency: 'Concurrency',
@@ -142,6 +146,7 @@ const TOOLTIP_STRINGS = {
   zh: {
     unofficialRun: '✕ 非官方运行',
     dataFrom: (d: string) => `（数据来自 ${d}）`,
+    date: '日期',
     branch: '分支',
     totalChips: '芯片总数',
     concurrency: '并发数',
@@ -775,7 +780,6 @@ const PARALLELISM_STRINGS = {
     no: 'False',
     workers: 'Workers',
     configuration: 'Configuration',
-    details: 'Configuration details',
   },
   zh: {
     strategy: '并行策略',
@@ -798,7 +802,6 @@ const PARALLELISM_STRINGS = {
     no: '否',
     workers: 'worker 数',
     configuration: '配置',
-    details: '配置详情',
   },
 } as const;
 
@@ -856,26 +859,6 @@ const topologyHTML = (d: InferenceData, locale: Locale): string => {
             d.prefill_dwdp_size && d.prefill_dwdp_size > 1 ? d.prefill_num_workers : undefined,
         },
       ];
-  const columns = [
-    ...(d.disagg ? ['role', 'chips'] : []),
-    'TP',
-    'EP',
-    'DPA',
-    ...(d.disagg || rows.some((r) => r.workers !== undefined) ? ['workers'] : []),
-    ...['DP', 'PP', 'DCP', 'PCP', 'DWDP'].filter((key) =>
-      rows.some((r) => typeof r[key] === 'number' && Number(r[key]) >= (key === 'DP' ? 1 : 2)),
-    ),
-  ];
-  const labels: Record<string, string> = { role: '', chips: t.gpusUnit, workers: t.workers };
-  const titles: Record<string, string> = {
-    TP: t.tensorParallelism,
-    EP: t.expertParallelism,
-    DPA: t.dpAttention,
-    PP: t.pipelineParallelism,
-    DP: t.dataParallelism,
-    DCP: t.decodeContextParallelism,
-    PCP: t.prefillContextParallelism,
-  };
   const deployment = d.disagg ? t.disaggregated : d.is_multinode ? t.multiNode : t.singleNode;
   const compact = (r: Record<string, Cell>) => {
     if (r.DPA === '?') return `TP${r.TP}${typeof r.EP === 'number' ? ` / EP${r.EP}` : ''}`;
@@ -890,10 +873,7 @@ const topologyHTML = (d: InferenceData, locale: Locale): string => {
       r.DWDP as number | undefined,
     );
   };
-  const rawTable = `<div class="pinned-table-scroll"><table class="pinned-topology" aria-label="${t.strategy}">
-    <thead><tr>${columns.map((key) => `<th scope="col" title="${titles[key] ?? labels[key] ?? key}">${labels[key] ?? key}</th>`).join(' ')}</tr></thead>
-    <tbody>${rows.map((r) => `<tr>${columns.map((key) => `<td>${escapeHtml(String(r[key] ?? '?'))}</td>`).join(' ')}</tr>`).join(' ')}</tbody>
-  </table></div>`;
+
   return `<div data-pinned-parallelism class="pinned-section">
     <div class="pinned-metric-label" style="margin-bottom: 10px;">${deployment}</div>
     ${
@@ -904,7 +884,6 @@ const topologyHTML = (d: InferenceData, locale: Locale): string => {
     </table></div>`
         : `<div class="pinned-config-summary"><span>${t.strategy}</span><strong>${compact(rows[0])}</strong></div>`
     }
-    <details class="pinned-raw-topology"><summary>${t.details}</summary>${rawTable}</details>
   </div>`;
 };
 
@@ -980,16 +959,15 @@ export const buildPointDetails = (config: TooltipConfig): PointDetails => {
     (d.image
       ? `<div class="pinned-image"><span>${t.image}</span><p>${escapeHtml(d.image.trim())}</p></div>`
       : '');
+  const entryDate = comparisonEntryDate(d.date);
+  const comparisonDate = config.comparisonLabel ?? formatTooltipDate(entryDate, locale);
   return {
     title: hw?.label ?? String(d.hwKey),
     subtitle: engines ?? '',
     unofficial: overlayData ? t.unofficialRun : undefined,
-    date:
-      config.comparisonDate && d.actualDate && d.actualDate !== d.date
-        ? `${formatTooltipDate(d.date, locale)} ${t.dataFrom(ownDate)}`
-        : config.comparisonDate
-          ? formatTooltipDate(d.date, locale)
-          : ownDate,
+    date: config.comparisonDate
+      ? `${comparisonDate}${d.actualDate && d.actualDate !== entryDate ? ` ${t.dataFrom(ownDate)}` : ''}`
+      : (config.comparisonLabel ?? ownDate),
     html: `<div class="pinned-metrics">${pinnedMetricHTML(yLabel, d.y, selectedYAxisMetric)}${pinnedMetricHTML(xLabel, d.x)}</div>
     <div data-pinned-config class="pinned-strip">${pinnedStatHTML(t.concurrency, d.conc.toLocaleString('en-US'))}${pinnedStatHTML(t.precision, d.precision.toUpperCase())}${pinnedStatHTML(t.totalChips, d.physicalChips ?? d.tp)}</div>
     ${rowsHTML(tputRows)}
@@ -1054,7 +1032,14 @@ const hoverCacheHTML = (cache: PointCacheHit, color: string): string => `
 
 export interface HoverTooltipConfig extends Pick<
   TooltipConfig,
-  'data' | 'xLabel' | 'yLabel' | 'selectedYAxisMetric' | 'hardwareConfig' | 'locale' | 'overlayData'
+  | 'data'
+  | 'xLabel'
+  | 'yLabel'
+  | 'selectedYAxisMetric'
+  | 'hardwareConfig'
+  | 'locale'
+  | 'overlayData'
+  | 'comparisonLabel'
 > {
   color: string;
 }
@@ -1063,6 +1048,7 @@ export const generateHoverTooltipContent = (config: HoverTooltipConfig): string 
   const { data: d, xLabel, yLabel, selectedYAxisMetric, overlayData, color } = config;
   const locale = config.locale ?? 'en';
   const t = HOVER_STRINGS[locale];
+  const detailStrings = TOOLTIP_STRINGS[locale];
   const hwEntry = (overlayData?.hardwareConfig ?? config.hardwareConfig)[d.hwKey];
   const system = hwEntry ? getDisplayLabel(getPointHardwareConfig(d, hwEntry)) : String(d.hwKey);
   const setup = [
@@ -1071,6 +1057,15 @@ export const generateHoverTooltipContent = (config: HoverTooltipConfig): string 
     speculativeDecodingName({ method: d.spec_decoding, algorithm: d.spec_algorithm }, d.model),
   ].filter(Boolean);
   const cache = pointCacheHit(d, locale);
+  const branch = overlayData?.getRunForRow?.(d)?.branch ?? overlayData?.label;
+  const notice = overlayData ? `${detailStrings.unofficialRun}${branch ? ` · ${branch}` : ''}` : '';
+  const sourceDate =
+    d.actualDate && d.actualDate !== comparisonEntryDate(d.date)
+      ? ` ${detailStrings.dataFrom(formatTooltipDate(d.actualDate, locale))}`
+      : '';
+  const context = config.comparisonLabel
+    ? `${detailStrings.date}${labelColon(detailStrings.date)} ${config.comparisonLabel}${sourceDate}`
+    : '';
   const value = (v: string, label: string) =>
     `<span style="white-space: nowrap;"><span style="color: var(--foreground); font-weight: 600;">${v}</span> <span style="color: var(--muted-foreground);">${escapeHtml(axisLabelUnit(label))}</span></span>`;
   const shell = chartTooltipShellStyle({
@@ -1082,11 +1077,12 @@ export const generateHoverTooltipContent = (config: HoverTooltipConfig): string 
 
   return `
     <div data-hover-tooltip style="${shell}; font-variant-numeric: tabular-nums; line-height: 1.35;">
-      ${overlayData ? `<div style="color: #dc2626; font-size: 11px; font-weight: 600; margin-bottom: 4px;">${TOOLTIP_STRINGS[locale].unofficialRun}</div>` : ''}
+      ${notice ? `<div data-hover-notice style="color: #dc2626; font-size: 11px; font-weight: 600; margin-bottom: 4px;">${escapeHtml(notice)}</div>` : ''}
       <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px;">
         <span style="display: inline-flex; align-items: center; min-width: 0; color: var(--foreground); font-size: 12px; font-weight: 600;">${hoverSwatch(color, 8)}<span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(system)}</span></span>
         <span style="flex: none; color: var(--muted-foreground); font-size: 11px;">${escapeHtml(d.precision.toUpperCase())} · ${t.conc(d.conc)}</span>
       </div>
+      ${context ? `<div data-hover-context style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 6px;">${escapeHtml(context)}</div>` : ''}
       <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 2px 16px; font-size: 12px;">
         ${value(formatHoverValue(d.y, selectedYAxisMetric), yLabel)}
         ${value(formatHoverValue(d.x), xLabel)}

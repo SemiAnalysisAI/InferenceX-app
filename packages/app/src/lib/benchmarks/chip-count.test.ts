@@ -5,11 +5,11 @@ import {
   detailsText,
 } from '@/components/inference/utils/point-details-test-helpers';
 import { transformBenchmarkRows } from './benchmark-transform';
-import { SUPPLEMENTAL_BENCHMARK_ROWS } from './supplemental-benchmarks';
+import type { BenchmarkRow } from '@/lib/api/api';
+import previewSnapshots from '../../../cypress/fixtures/preview-snapshots.json';
 
-const source = SUPPLEMENTAL_BENCHMARK_ROWS.find(
-  (row) => row.model === 'gptoss120b' && row.conc === 256,
-)!;
+const previewRows = previewSnapshots as unknown as BenchmarkRow[];
+const source = previewRows.find((row) => row.model === 'gptoss120b' && row.conc === 256)!;
 
 describe('explicit deployment chip counts', () => {
   it.each(['en', 'zh'] as const)('renders the supplied EP8 point in every %s tooltip', (locale) => {
@@ -41,7 +41,6 @@ describe('explicit deployment chip counts', () => {
         `${locale === 'en' ? 'Total chips' : '芯片总数'}${locale === 'en' ? ':' : '：'} 8`,
       );
       expect(html).toContain(`${locale === 'en' ? 'Parallelism strategy' : '并行策略'}EP8`);
-      expect(html).toContain(`TP EP DPA 1 8 ${locale === 'en' ? 'False' : '否'}`);
     }
   });
 
@@ -90,7 +89,7 @@ describe('explicit deployment chip counts', () => {
   });
 
   it('preserves every supplied GPT-OSS topology, including single-chip points', () => {
-    const rows = SUPPLEMENTAL_BENCHMARK_ROWS.filter((row) => row.model === 'gptoss120b');
+    const rows = previewRows.filter((row) => row.model === 'gptoss120b');
     const { chartData } = transformBenchmarkRows(rows);
     expect(chartData[0].map((p) => [p.tp, p.decode_tp, p.ep])).toEqual([
       [4, 4, 1],

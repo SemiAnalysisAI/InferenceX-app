@@ -4,8 +4,10 @@ import {
   type TooltipConfig,
 } from '@/components/inference/utils/tooltipUtils';
 
+// Table cells sit side by side in the markup, so close each one with a space before stripping tags.
 export const htmlText = (html: string): string =>
   html
+    .replaceAll(/<\/t[dh]>/gu, ' ')
     .split(/<[^>]*>/u)
     .join('')
     .replaceAll(/\s+/gu, ' ');

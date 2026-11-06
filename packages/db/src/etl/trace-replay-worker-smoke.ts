@@ -63,7 +63,7 @@ async function waitUntil(predicate: () => boolean): Promise<void> {
   }
 }
 
-const pool = new TraceReplayWorkerPool(2);
+const pool = new TraceReplayWorkerPool(2, 1);
 const job = {
   profileExportJsonl,
   serverMetricsCsv,
@@ -80,14 +80,14 @@ try {
   const direct = fingerprint(
     await prepareTraceReplay(profileExportJsonl, serverMetricsCsv, serverMetricsJson),
   );
-  const tasks = Array.from({ length: 3 }, () =>
+  const tasks = Array.from({ length: 5 }, () =>
     pool.run(job, async (prepared) => {
       consumers += 1;
       await gate;
       return fingerprint(prepared);
     }),
   );
-  await waitUntil(() => consumers === 2);
+  await waitUntil(() => consumers === 3);
   await delay(50);
   const consumersBeforeRelease = consumers;
   release();
@@ -102,6 +102,12 @@ try {
   } catch {
     rejectedMissingInput = true;
   }
+  const consumeError = await pool
+    .run(job, () => Promise.reject(new Error('persist failed')))
+    .then(
+      () => null,
+      (error: Error) => error.message,
+    );
   const recoveredTimelineRequests = await pool.run(job, (prepared) =>
     Promise.resolve(prepared.timelineRequests),
   );
@@ -113,6 +119,7 @@ try {
       direct,
       results,
       rejectedMissingInput,
+      consumeError,
       recoveredTimelineRequests,
     }),
   );

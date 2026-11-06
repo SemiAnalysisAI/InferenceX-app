@@ -1,11 +1,16 @@
 import type { Metadata } from 'next';
-import VideoDashboard from '@/components/video-benchmark/VideoDashboard';
+import VideoResultsPage from '@/components/video-benchmark/VideoResultsPage';
 import { tabMetadataZh } from '@/lib/routing/tab-meta-zh';
+import type { VideoPageSearchParams } from '@/lib/video/video-page-data';
 
 export const metadata: Metadata = {
   ...tabMetadataZh('video'),
   robots: { index: false, follow: false },
 };
-export default function VideoPage() {
-  return <VideoDashboard />;
+export default async function VideoPage({
+  searchParams,
+}: {
+  searchParams: Promise<VideoPageSearchParams>;
+}) {
+  return <VideoResultsPage params={await searchParams} />;
 }

@@ -22,7 +22,7 @@ export interface VideoDashboardState {
   hidden: string[];
 }
 
-export const DEFAULT_VIDEO_DASHBOARD_STATE: VideoDashboardState = {
+const DEFAULT_VIDEO_DASHBOARD_STATE: VideoDashboardState = {
   x: 'p90Latency',
   y: 'videosPerDollar',
   tier: 'h',
@@ -73,21 +73,4 @@ export function readVideoDashboardState(search: string): VideoDashboardState {
     apiPrice: parseApiPrice(p.get('v_api')) ?? d.apiPrice,
     hidden: hiddenHardware(p.get('v_hidden')?.split(',') ?? []),
   };
-}
-
-/** Returns a new URL with defaults omitted; the input URL is not mutated. */
-export function writeVideoDashboardState(url: URL, state: VideoDashboardState): URL {
-  const out = new URL(url);
-  const d = DEFAULT_VIDEO_DASHBOARD_STATE;
-  const set = (key: string, value: string | null) =>
-    value === null ? out.searchParams.delete(key) : out.searchParams.set(key, value);
-  set('v_x', state.x === d.x ? null : state.x);
-  set('v_y', state.y === d.y ? null : state.y);
-  set('v_tier', state.tier === d.tier ? null : state.tier);
-  set('v_view', state.view === d.view ? null : state.view);
-  set('v_optimal', state.optimal ? null : '0');
-  const apiPrice = parseApiPrice(state.apiPrice);
-  set('v_api', apiPrice === null || apiPrice === d.apiPrice ? null : String(apiPrice));
-  set('v_hidden', hiddenHardware(state.hidden).join(',') || null);
-  return out;
 }

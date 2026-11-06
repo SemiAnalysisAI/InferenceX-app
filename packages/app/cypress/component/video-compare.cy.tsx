@@ -1,14 +1,17 @@
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
+import { useState } from 'react';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
-import type { MetricOptions, VideoPoint } from '@/components/video-benchmark/metrics';
+import type { VideoPoint } from '@/components/video-benchmark/metrics';
 import { dashboardCells, videoPoints } from '@/components/video-benchmark/points';
-import VideoCompare from '@/components/video-benchmark/VideoCompare';
+import VideoResultsClips from '@/components/video-benchmark/VideoResultsClips';
 import history from '../fixtures/api/video-history.json';
 import { servingArtifact } from '../support/video-artifacts';
+import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
+import { verifiedReferencePairs } from '@/components/video-benchmark/reference-quality';
 
 // Retained H100/H200/B200 C1/C2/C4 observations; clips come from synthetic stored artifacts.
 const points = videoPoints([history as unknown as VideoHistoryPage]);
-// The dashboard hands Compare its cells, so the retained native H200 run under the sample floor never becomes a side.
+// The retained native H200 run under the sample floor never becomes a side.
 const cells = dashboardCells(points).cells;
 const c1 = (key: string) => cells.find((p) => p.hardwareKey === key && p.concurrency === 1)!;
 const COLORS: Record<string, string> = {
@@ -17,232 +20,408 @@ const COLORS: Record<string, string> = {
   b200: 'rgb(70, 80, 90)',
 };
 const colorFor = (key: string) => COLORS[key] ?? 'rgb(0, 0, 0)';
-const OWNING: MetricOptions = { tier: 'h' };
 
 const mediaUrl = (point: VideoPoint) =>
   `/api/video-runs?run=${point.runId}&artifact=${point.artifactId}&format=published`;
-function media(point: VideoPoint, hardware: string, alias: string) {
-  cy.intercept(
-    'GET',
-    mediaUrl(point),
-    servingArtifact(Number(point.runId), point.artifactId, hardware),
-  ).as(alias);
-}
-
-/** Clips load on their own once the panel is in view, so overrides must be registered before mounting. */
-function mount(
-  pathname = '/video',
-  search = '',
-  data: VideoPoint[] = cells,
-  options: MetricOptions = OWNING,
-  beforeMount?: () => void,
-) {
-  media(c1('h100'), 'NVIDIA H100 80GB HBM3', 'h100');
-  media(c1('b200'), 'NVIDIA B200', 'b200');
-  media(c1('h200'), 'NVIDIA H200', 'h200');
-  cy.intercept('GET', 'https://media.test/**', { statusCode: 204 });
-  beforeMount?.();
-  cy.window().then((win) =>
-    win.history.replaceState(null, '', `${win.location.pathname}${search}`),
-  );
-  cy.mount(
-    <PathnameContext.Provider value={pathname}>
-      <VideoCompare points={data} options={options} colorFor={colorFor} />
-    </PathnameContext.Provider>,
-  );
-}
-const table = () => cy.get('[data-testid="video-compare-table"]');
-const metricRow = (id: string) => table().find(`tbody tr[data-metric="${id}"]`);
-const clip = (role: 'baseline' | 'candidate') =>
-  cy.get(`[data-testid="video-compare-clip"][data-role="${role}"]`);
 const pick = (label: string, option: string) => {
   cy.get(`[role="combobox"][aria-label="${label}"]`).click();
   cy.contains('[role="option"]', option).click();
 };
-
-describe('Video compare panel (retained fixture)', () => {
-  it('plays the same case from the slowest and fastest hardware side by side by default', () => {
-    mount();
-    cy.wait(['@h100', '@b200']);
-    cy.get('[data-testid="video-compare-prompt"]')
-      .should('contain', 'A drummer taps a snare drum.')
-      .and('contain', 'seed 11');
-    cy.get('[data-testid="video-compare-case-of"]').should('contain', 'Case 1 of');
-    clip('baseline')
-      .should('contain', 'H100')
-      .and('contain', '4 GPU · TP2 × Ulysses 2')
-      .and('contain', 'time to video 120 s')
-      .find('video')
-      .should('have.attr', 'src')
-      .and('include', 'measurement-r001-c001.mp4');
-    clip('candidate').should('contain', 'B200').find('video').should('exist');
-    cy.get('[data-testid="video-compare-baseline"]').should('contain', 'H100');
-    cy.get('[data-testid="video-compare-candidate"]').should('contain', 'B200');
-    table()
-      .find('tbody tr')
-      .should(($rows) => {
-        expect([...$rows].map((el) => el.dataset.metric)).to.deep.equal([
-          'p50Latency',
-          'dollarsPerVideo',
-          'kjPerVideo',
-        ]);
-      });
-    metricRow('p50Latency')
-      .should('contain', '167.3')
-      .and('contain', '77.9')
-      .and('contain', '-53.4%');
-    metricRow('p50Latency').find('[data-tone="better"]').should('exist');
-    // $1.17 ÷ 5.3741 videos/GPU-hr vs. $1.73 ÷ 11.526, both per participating GPU.
-    metricRow('dollarsPerVideo')
-      .should('contain', '$0.218')
-      .and('contain', '$0.150')
-      .and('contain', '-31.1%');
-    metricRow('kjPerVideo')
-      .should('contain', '431.1')
-      .and('contain', '301.1')
-      .and('contain', '-30.2%');
-    metricRow('kjPerVideo').find('[data-tone="better"]').should('exist');
-    cy.contains('[data-testid="video-compare"] p', 'Cost tier:').should(
-      'have.text',
-      'Cost tier: Owning at large hyperscaler volume.',
+const tileVideo = (key: string) => cy.get(`[data-hardware="${key}"] video`);
+const scrub = (time: number) => {
+  cy.window().then((win) => {
+    cy.get('[data-testid="video-results-scrub"]').then(($input) => {
+      const setValue = Object.getOwnPropertyDescriptor(
+        win.HTMLInputElement.prototype,
+        'value',
+      )!.set!;
+      setValue.call($input[0], String(time));
+      $input[0].dispatchEvent(new win.Event('input', { bubbles: true }));
+    });
+  });
+  cy.get('[data-testid="video-results-scrub"]').should('have.value', String(time));
+};
+/** Every tile and the reference, so a reloaded tile cannot fall behind the group unnoticed. */
+const expectClipsAt = (time: number) =>
+  cy
+    .get('[data-testid="video-results-clips"] video')
+    .each(($video) =>
+      cy
+        .wrap($video)
+        .should(($element) =>
+          expect(($element[0] as HTMLVideoElement).currentTime).to.be.closeTo(time, 0.08),
+        ),
     );
-    cy.get('[data-testid="video-compare"]')
-      .should('contain', 'retained CI outputs')
-      .and('not.contain', 'GPU basis');
-    cy.get('[data-testid="video-compare-controls"] [role="combobox"]').should(($boxes) => {
-      expect([...$boxes].map((el) => el.getAttribute('aria-label'))).to.deep.equal([
-        'Baseline',
-        'Candidate',
+const expectAudio = (source: string | null) =>
+  cy.get<HTMLVideoElement>('video').should(($videos) => {
+    for (const video of $videos) {
+      const hardware = video.closest<HTMLElement>('[data-hardware]')?.dataset.hardware;
+      expect(video.muted, hardware ?? 'reference').to.equal(!source || hardware !== source);
+    }
+  });
+
+// These decoder fixtures are test inputs, never benchmark evidence.
+function mountResultsClips(
+  keys = ['b200', 'h200'],
+  pathname = '/video',
+  diagnostics = false,
+  unofficialRun?: string,
+  previews: string[] = [],
+  brokenPreview = false,
+) {
+  const referenceMedia = { url: '', diagnosticUrl: '', previewUrl: '' };
+  cy.fixture('video-results/reference.mp4', 'base64').then((encoded: string) => {
+    cy.window().then((win) => {
+      const bytes = Uint8Array.from(win.atob(encoded), (char) => char.codePointAt(0)!);
+      referenceMedia.url = win.URL.createObjectURL(new win.Blob([bytes], { type: 'video/mp4' }));
+      if (diagnostics) {
+        referenceMedia.diagnosticUrl = win.URL.createObjectURL(
+          new win.Blob([bytes], { type: 'video/mp4' }),
+        );
+        cy.wrap(referenceMedia.diagnosticUrl).as('diagnostic-reference-url');
+      }
+    });
+  });
+  if (previews.length > 0)
+    // A visibly different stand-in for the web encode, so Difference against it would not be zero.
+    cy.fixture('video-results/candidate.mp4', 'base64').then((encoded: string) => {
+      cy.window().then((win) => {
+        const bytes = brokenPreview
+          ? Uint8Array.of(0, 0, 0, 8)
+          : Uint8Array.from(win.atob(encoded), (char) => char.codePointAt(0)!);
+        referenceMedia.previewUrl = win.URL.createObjectURL(
+          new win.Blob([bytes], { type: 'video/mp4' }),
+        );
+        cy.wrap(referenceMedia.previewUrl).as('preview-url');
+      });
+    });
+  for (const key of keys) {
+    cy.fixture(`video-results/${key === 'h200' ? 'reference' : 'candidate'}.mp4`, 'base64').then(
+      (encoded: string) => {
+        cy.window().then((win) => {
+          const bytes = Uint8Array.from(win.atob(encoded), (char) => char.codePointAt(0)!);
+          const url = win.URL.createObjectURL(new win.Blob([bytes], { type: 'video/mp4' }));
+          const point = c1(key);
+          const saved = servingArtifact(
+            Number(point.runId),
+            point.artifactId,
+            `NVIDIA ${key.toUpperCase()}`,
+          );
+          saved.sources[0].checksums = saved.sources[0].checksums.map(([path, sha]) => [
+            path,
+            path === 'manifest.json' ? point.id.split(':')[0] : sha,
+          ]);
+          saved.sources[0].assets = saved.sources[0].assets.map(([path, asset]) => [
+            path,
+            previews.includes(key)
+              ? { ...asset, url, previewUrl: referenceMedia.previewUrl }
+              : { ...asset, url },
+          ]);
+          cy.wrap(url).as(`original-${key}`);
+          const qualityFixture = referenceQualityFixture();
+          const [quality] = verifiedReferencePairs(
+            qualityFixture.attachment,
+            qualityFixture.receipts,
+            [qualityFixture.stored],
+            '9'.repeat(64),
+          );
+          quality.candidate = {
+            ...quality.candidate,
+            run_id: point.runId,
+            artifact_id: point.artifactId,
+            source_id: saved.sources[0].id,
+            manifest_sha256: point.id.split(':')[0],
+          };
+          quality.reference.url = referenceMedia.url;
+          saved.quality = [quality];
+          if (diagnostics) {
+            const diagnosticUrl = win.URL.createObjectURL(
+              new win.Blob([bytes], { type: 'video/mp4' }),
+            );
+            cy.wrap(diagnosticUrl).as(`diagnostic-${key}-url`);
+            saved.diagnostics = [
+              {
+                ...quality,
+                scope: 'matched-noise-diagnostic',
+                attachmentSha256: '8'.repeat(64),
+                origin: quality.candidate,
+                psnrDb: 30,
+                reference: { ...quality.reference, url: referenceMedia.diagnosticUrl },
+                candidate: {
+                  run_id: `native-${key}-rerun`,
+                  receipt_sha256: '7'.repeat(64),
+                  plan_sha256: quality.candidate.plan_sha256,
+                  hardware_key: key,
+                  gpu_count: 4,
+                  topology: { ulysses_degree: 2, tensor_parallel_degree: 2 },
+                  runtime_name: 'sglang',
+                  runtime_revision: '6'.repeat(40),
+                  source_revision: '5'.repeat(40),
+                  harness_sha256: '1'.repeat(64),
+                  image_digest: `sha256:${'4'.repeat(64)}`,
+                  effective_settings_sha256: '3'.repeat(64),
+                  noise: {},
+                  case_id: quality.candidate.case_id,
+                  prompt: quality.candidate.prompt,
+                  seed: quality.candidate.seed,
+                  media_path: `${key}/diagnostic.mp4`,
+                  media_sha256: '2'.repeat(64),
+                  url: diagnosticUrl,
+                },
+              },
+            ];
+          }
+          cy.intercept('GET', mediaUrl(point), saved).as(`results-${key}`);
+        });
+      },
+    );
+  }
+  const selectedPoints = keys.map(c1);
+  function Clips() {
+    const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
+    return (
+      <PathnameContext.Provider value={pathname}>
+        <button onClick={() => setHidden(hidden.size > 0 ? new Set() : new Set(['b200']))}>
+          Toggle B200
+        </button>
+        <VideoResultsClips
+          points={selectedPoints}
+          colorFor={colorFor}
+          hidden={hidden}
+          costs={{ [c1('b200').id]: { participating: 0.02, allocated: null } }}
+          unofficialRun={unofficialRun}
+        />
+      </PathnameContext.Provider>
+    );
+  }
+  cy.mount(<Clips />);
+  cy.wait(keys.map((key) => `@results-${key}` as const));
+}
+
+describe('Video results synchronized clips', () => {
+  it('selects one audio source during playback and resets audio when the case changes', () => {
+    mountResultsClips(['b200', 'h100'], '/video', true);
+    expectAudio(null);
+    cy.get('[data-testid="video-results-audio"]').should('contain', 'Muted').click();
+    cy.get('[role="option"]').should(($options) => {
+      expect([...$options].map((option) => option.textContent)).to.deep.equal([
+        'Muted',
+        'Listen to B200',
+        'Listen to H100',
       ]);
     });
-    cy.get('@h200.all').should('have.length', 0);
-  });
-  it('steps through cases with the arrows, keeping v_case in the URL', () => {
-    mount();
-    cy.wait(['@h100', '@b200']);
-    cy.get('[data-testid="video-compare-prev"]').should('be.disabled');
-    cy.get('[role="combobox"][aria-label="Case (prompt · seed)"]').should('not.exist');
-    cy.get('[data-testid="video-compare-next"]').click();
-    cy.get('[data-testid="video-compare-clip"] video').each(($video) =>
-      expect($video.attr('src')).to.include('measurement-r002-c001.mp4'),
-    );
-    cy.get('[data-testid="video-compare-case-of"]').should('contain', 'Case 2 of');
-    cy.location('search').should('contain', 'v_case=1');
-    cy.get('[data-testid="video-compare-next"]').click();
-    cy.get('[data-testid="video-compare-clip"] video').each(($video) =>
-      expect($video.attr('src')).to.include('measurement-r003-c001.mp4'),
-    );
-    cy.get('[data-testid="video-compare-case-of"]').should('contain', 'Case 3 of');
-    cy.location('search').should('contain', 'v_case=2');
-    cy.get('[data-testid="video-compare-prev"]').click();
-    cy.get('[data-testid="video-compare-case-of"]').should('contain', 'Case 2 of');
-    cy.location('search').should('contain', 'v_case=1');
-  });
-  it('drives both players together', () => {
-    mount();
-    cy.wait(['@h100', '@b200']);
-    cy.window().then((win) => {
-      cy.stub(win.HTMLMediaElement.prototype, 'play').as('play').resolves();
-      cy.stub(win.HTMLMediaElement.prototype, 'pause').as('pause');
+    cy.contains('[role="option"]', 'Listen to B200').click();
+    expectAudio('b200');
+    cy.get<HTMLVideoElement>('video').then(($videos) => {
+      for (const video of $videos) video.playbackRate = 0.1;
     });
-    cy.get('[data-testid="video-compare-play"]').click();
-    cy.get('@play').should('have.callCount', 2);
-    cy.get('[data-testid="video-compare-pause"]').click();
-    cy.get('@pause').should('have.callCount', 2);
-    cy.get('[data-testid="video-compare-restart"]').click();
-    cy.get('@play').should('have.callCount', 4);
+    cy.get('[data-testid="video-results-play"]').click();
+    pick('Audio', 'Listen to H100');
+    expectAudio('h100');
+    cy.get<HTMLVideoElement>('[data-hardware="h100"] video').should(($video) => {
+      expect($video[0].paused).to.equal(false);
+    });
+    cy.screenshot('audio-desktop-en');
+    pick('Audio', 'Muted');
+    expectAudio(null);
+    pick('Audio', 'Listen to B200');
+    pick('Case', 'drum-taps · take 1');
+    expectAudio(null);
+    cy.get('[data-testid="video-results-audio"]').should('contain', 'Muted');
   });
-  it('switches the candidate, fetching only the new side, and swaps on collision or request', () => {
-    mount();
-    cy.wait(['@h100', '@b200']);
-    pick('Candidate', 'H200');
-    cy.wait('@h200');
-    cy.get('[data-testid="video-compare-candidate"]').should('contain', 'H200');
-    clip('candidate').should('contain', 'H200');
-    metricRow('p50Latency').should('contain', '150.6').and('contain', '-10%');
-    metricRow('dollarsPerVideo').should('contain', '$0.204').and('contain', '-6.2%');
-    metricRow('kjPerVideo').should('contain', '411').and('contain', '-4.7%');
-    cy.location('search').should('contain', 'v_cand=h200');
-    cy.get('@h100.all').should('have.length', 1);
-    cy.get('@h200.all').should('have.length', 1);
-    // Choosing the baseline's hardware as candidate swaps the two sides; the swap button does too.
-    pick('Candidate', 'H100');
-    cy.get('[data-testid="video-compare-baseline"]').should('contain', 'H200');
-    cy.get('[data-testid="video-compare-candidate"]').should('contain', 'H100');
-    metricRow('p50Latency').should('contain', '+11.1%').find('[data-tone="worse"]').should('exist');
-    cy.get('[data-testid="video-compare-swap"]').click();
-    cy.get('[data-testid="video-compare-baseline"]').should('contain', 'H100');
-    cy.get('[data-testid="video-compare-candidate"]').should('contain', 'H200');
-    cy.get('@h200.all').should('have.length', 1);
+
+  it('resets hidden or failed audio sources and supports the Chinese unofficial-run view', () => {
+    cy.viewport(390, 900);
+    mountResultsClips(['b200', 'h100'], '/zh/video', false, c1('h100').runId);
+    cy.get('[data-hardware="h100"]').should('contain', '非官方运行');
+    pick('音频', '收听 B200');
+    expectAudio('b200');
+    cy.contains('button', 'Toggle B200').click();
+    expectAudio(null);
+    cy.get('[data-testid="video-results-audio"]').should('contain', '静音').click();
+    cy.get('[role="option"]').should('have.length', 2).and('not.contain', 'B200');
+    cy.contains('[role="option"]', '静音').click();
+    cy.contains('button', 'Toggle B200').click();
+    expectAudio(null);
+    pick('音频', '收听 H100');
+    expectAudio('h100');
+    cy.document().should((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+    cy.screenshot('audio-mobile-zh');
+    cy.get<HTMLVideoElement>('[data-hardware="h100"] video').then(($video) => {
+      $video[0].src = 'data:video/mp4;base64,YmFk';
+      $video[0].load();
+    });
+    expectAudio(null);
+    cy.get('[data-testid="video-results-audio"]').should('contain', '静音').click();
+    cy.get('[role="option"]').should('have.length', 2).and('not.contain', 'H100');
   });
-  it('restores v_base and v_cand from the URL and reports a failed media read with a retry', () => {
-    mount('/video', '?v_base=h200&v_cand=h100', cells, OWNING, () => {
-      cy.intercept('GET', mediaUrl(c1('h200')), { statusCode: 404, body: { error: 'gone' } }).as(
-        'missing',
+
+  it('keeps native rerun media and PSNR separate from the original CI performance', () => {
+    cy.viewport(390, 900);
+    mountResultsClips(['b200', 'h100'], '/video', true);
+    cy.get('[data-testid="video-results-case"]').should('contain', 'Matched-noise rerun');
+    const tile = '[data-testid="video-results-clip"][data-hardware="b200"]';
+    cy.get(tile).should('contain', '30 dB').and('contain', '4 GPU');
+    for (const label of ['Wall time', 'J / clip', 'Participating', 'Allocated'])
+      cy.get(tile).contains('dt', label).next('dd').should('have.text', '—');
+    cy.get('@diagnostic-b200-url').then((url) =>
+      cy.get(tile).find('video').should('have.attr', 'src', url),
+    );
+    cy.get('@diagnostic-reference-url').then((url) =>
+      cy.get('[data-testid="video-results-reference"] video').should('have.attr', 'src', url),
+    );
+    cy.get('[data-testid="video-results-sources"] summary').click();
+    cy.get('[data-testid="video-results-sources"]')
+      .should('contain', 'native-b200-rerun')
+      .and('contain', 'sglang 666666666666')
+      .and('contain', 'Receipt')
+      .and('not.contain', c1('b200').runId);
+    cy.window().its('innerWidth').should('eq', 390);
+    cy.document().should((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+    pick('Case', 'drum-taps · take 1');
+    cy.get(tile).should('contain', '25 dB');
+    cy.get(tile).contains('dt', 'Wall time').next('dd').should('have.text', '120 s');
+    cy.get(tile).contains('dt', 'Participating').next('dd').should('have.text', '0.02');
+    cy.get('[data-testid="video-results-sources"]').should('contain', c1('b200').runId);
+  });
+
+  it('decodes retained media, seeks and plays all three clips, then displays real pixel differences', () => {
+    mountResultsClips(['b200', 'h200', 'h100']);
+    cy.get('[data-testid="video-results-clip"] video')
+      .should('have.length', 3)
+      .each(($video) => {
+        cy.wrap($video).should(($element) => {
+          const video = $element[0] as HTMLVideoElement;
+          expect(video.readyState).to.be.greaterThan(0.8);
+          expect(video.videoWidth).to.equal(32);
+          expect(video.duration).to.equal(2);
+        });
+      });
+    cy.get('[data-testid="video-results-sources"]').should('not.have.attr', 'open');
+    cy.get('[data-testid="video-results-sources"] summary').focus();
+    cy.focused().should('contain', 'Prompt & sources').click();
+    cy.get('[data-testid="video-results-sources"]')
+      .should('contain', c1('b200').runId)
+      .and('contain', c1('b200').runtime)
+      .and('contain', c1('h200').runId)
+      .and('contain', c1('h100').runId)
+      .and('not.contain', 'web encode');
+
+    cy.get('[data-testid="video-results-prompt"]')
+      .should('contain', 'A drummer taps a snare drum.')
+      .and('contain', 'seed 11')
+      .and('contain', 'take 1');
+    scrub(0.8);
+    expectClipsAt(0.8);
+    cy.get('[data-testid="video-results-play"]').click();
+    cy.get('[data-testid="video-results-clip"] video').each(($video) =>
+      cy.wrap($video).should(($element) => {
+        const video = $element[0] as HTMLVideoElement;
+        expect(video.paused).to.equal(false);
+        expect(video.currentTime).to.be.greaterThan(0.8);
+      }),
+    );
+    cy.get('[data-testid="video-results-play"]').click();
+    cy.get('[data-testid="video-results-clip"] video').each(($video) =>
+      cy
+        .wrap($video)
+        .should(($element) => expect(($element[0] as HTMLVideoElement).paused).to.equal(true)),
+    );
+    cy.get('[data-testid="video-results-view-difference"]').click();
+    cy.get('[data-testid="video-results-clip"][data-hardware="h200"] canvas').should(($canvas) => {
+      const rgba = ($canvas[0] as HTMLCanvasElement)
+        .getContext('2d')!
+        .getImageData(0, 0, 1, 1).data;
+      expect([...rgba]).to.deep.equal([0, 0, 0, 255]);
+    });
+    cy.get('[data-testid="video-results-clip"][data-hardware="b200"] canvas').should(($canvas) => {
+      const rgba = ($canvas[0] as HTMLCanvasElement)
+        .getContext('2d')!
+        .getImageData(0, 0, 1, 1).data;
+      expect(rgba[0]).to.be.greaterThan(200);
+      expect(rgba[2]).to.be.greaterThan(200);
+      expect(rgba[3]).to.equal(255);
+    });
+    cy.get('[data-testid="video-results-clip"][data-hardware="b200"]')
+      .should('contain', '0.02')
+      .find('dl')
+      .should('contain', '—');
+  });
+  it('shows tiles only for measured hardware and cannot draw a difference after the reference decoder fails', () => {
+    mountResultsClips();
+    cy.get('[data-testid="video-results-clip"]')
+      .should('have.length', 2)
+      .then(($tiles) =>
+        expect([...$tiles].map((tile) => tile.dataset.hardware)).to.deep.equal(['b200', 'h200']),
       );
+    cy.get('[data-testid="video-results-reference"] video').then(($video) => {
+      const video = $video[0] as HTMLVideoElement;
+      video.src = 'data:video/mp4;base64,YmFk';
+      video.load();
     });
-    cy.get('[data-testid="video-compare-baseline"]').should('contain', 'H200');
-    cy.get('[data-testid="video-compare-candidate"]').should('contain', 'H100');
-    cy.wait('@missing');
-    cy.get('[data-testid="video-compare-clips"] [role="alert"]')
-      .should('contain', 'Could not load clips')
-      .and('contain', 'HTTP 404');
-    cy.contains('button', 'Retry').should('exist');
+    cy.get('[data-testid="video-results-view-difference"]').click();
+    cy.get(
+      '[data-testid="video-results-clip"][data-hardware="b200"] [data-testid="video-results-media-empty"]',
+    ).should('contain', 'reference');
+    cy.get('[data-testid="video-results-clips"]').should(
+      'contain',
+      'No sealed reference pair for this clip.',
+    );
   });
-  it('keeps a restored, repaired pair when one side changes', () => {
-    // v_cand on the default baseline makes restore swap the baseline to B200; that repair must
-    // stay explicit, so a later candidate change cannot re-default the baseline to H100.
-    mount('/video', '?v_cand=h100');
-    cy.wait(['@b200', '@h100']);
-    cy.get('[data-testid="video-compare-baseline"]').should('contain', 'B200');
-    cy.get('[data-testid="video-compare-candidate"]').should('contain', 'H100');
-    pick('Candidate', 'H200');
-    cy.wait('@h200');
-    cy.get('[data-testid="video-compare-baseline"]').should('contain', 'B200');
-    cy.get('[data-testid="video-compare-candidate"]').should('contain', 'H200');
-    cy.location('search').should('contain', 'v_base=b200').and('contain', 'v_cand=h200');
-  });
-  it('says when a run publishes no clips and keeps the metric deltas', () => {
-    mount('/video', '', cells, OWNING, () => {
-      cy.intercept('GET', mediaUrl(c1('b200')), { statusCode: 204 }).as('unpublished');
+  it('plays a web rendition in Clip view and the sealed original for Difference, also for an overlay', () => {
+    mountResultsClips(['b200', 'h200'], '/video', false, c1('h200').runId, ['h200']);
+    cy.get('[data-hardware="h200"]').should('contain', 'Unofficial run');
+    cy.get('@preview-url').then((url) => tileVideo('h200').should('have.attr', 'src', url));
+    cy.get('@original-b200').then((url) => tileVideo('b200').should('have.attr', 'src', url));
+    cy.get('[data-testid="video-results-sources"] summary').click();
+    cy.get('[data-testid="video-results-prompt"]').should(
+      'contain',
+      'Playback uses a web encode; Difference, PSNR and the media link use the original.',
+    );
+    cy.get('@original-h200').then((url) =>
+      cy
+        .get('[data-testid="video-results-sources"] tbody tr')
+        .eq(1)
+        .find('a')
+        .should('have.attr', 'href', url),
+    );
+    scrub(0.8);
+    expectClipsAt(0.8);
+
+    cy.get('[data-testid="video-results-view-difference"]').click();
+    cy.get('@original-h200').then((url) => tileVideo('h200').should('have.attr', 'src', url));
+    // Swapping to the original reloads the tile; it must resume at the group's time, not 0.
+    expectClipsAt(0.8);
+    // The h200 original equals the reference, so only the original yields a black difference.
+    cy.get('[data-testid="video-results-clip"][data-hardware="h200"] canvas').should(($canvas) => {
+      const rgba = ($canvas[0] as HTMLCanvasElement)
+        .getContext('2d')!
+        .getImageData(0, 0, 1, 1).data;
+      expect([...rgba]).to.deep.equal([0, 0, 0, 255]);
     });
-    cy.wait(['@h100', '@unpublished']);
-    cy.get('[data-testid="video-compare-clips"]').should(
-      'contain',
-      'Clips are not published for one of these runs',
-    );
-    cy.get('[data-testid="video-compare-clip"]').should('not.exist');
-    metricRow('p50Latency').should('contain', '-53.4%');
+
+    cy.get('[data-testid="video-results-view-clip"]').click();
+    cy.get('@preview-url').then((url) => tileVideo('h200').should('have.attr', 'src', url));
+    expectClipsAt(0.8);
   });
-  it('disables the selects when fewer than two hardware are measured', () => {
-    mount(
-      '/video',
-      '',
-      cells.filter((p) => p.hardwareKey === 'h200'),
+  it('falls back to the sealed original when a web rendition cannot be played', () => {
+    mountResultsClips(['b200', 'h200'], '/video', false, undefined, ['h200'], true);
+    cy.get('@original-h200').then((url) => tileVideo('h200').should('have.attr', 'src', url));
+    tileVideo('h200').should(($video) =>
+      expect(($video[0] as HTMLVideoElement).readyState).to.be.at.least(1),
     );
-    cy.get('[data-testid="video-compare-controls"]').should('have.attr', 'disabled');
-    cy.get('[data-testid="video-compare"]').should(
-      'contain',
-      'Comparison needs at least two measured hardware',
+    cy.get('[data-testid="video-results-clip"][data-hardware="h200"]').should(
+      'not.contain',
+      'This clip could not be played',
     );
-    cy.get('[data-testid="video-compare-table"]').should('not.exist');
-  });
-  it('renders Chinese copy on /zh/video', () => {
-    mount('/zh/video', '', cells, { tier: 'r' });
-    cy.wait(['@h100', '@b200']);
-    cy.get('[data-testid="video-compare"]')
-      .should('contain', '基线')
-      .and('contain', '候选')
-      .and('contain', '同时播放')
-      .and('contain', '成本档位：租赁 - 3 年承诺。');
-    metricRow('p50Latency').should('contain', 'P50 出片时间');
-    // Rent – 3-year commit: $2.00 ÷ 5.3741 vs. $3.70 ÷ 11.526 per participating GPU-hour.
-    metricRow('dollarsPerVideo')
-      .should('contain', '每条视频 TCO 成本')
-      .and('contain', '$0.372')
-      .and('contain', '$0.321');
-    metricRow('kjPerVideo').should('contain', '每条视频 GPU 板卡能耗');
-    cy.get('[data-testid="video-compare-case-of"]').should('contain', '第 1 /');
-    clip('baseline').should('contain', '出片时间 120 s');
+    // Every tile now plays an original, so the note must not claim a web encode.
+    cy.get('[data-testid="video-results-sources"] summary').click();
+    cy.get('[data-testid="video-results-prompt"]')
+      .should('contain', 'A drummer taps a snare drum.')
+      .and('not.contain', 'web encode');
   });
 });

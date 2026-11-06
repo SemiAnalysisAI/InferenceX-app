@@ -93,7 +93,6 @@ import { exportToCsv } from '@/lib/export/csv-export';
 import { inferenceChartToCsv } from '@/lib/export/csv-export-helpers';
 import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/benchmarks/known-issues';
 import { getDisplayLabel, getFrameworkLabel } from '@/lib/shared/utils';
-import { supportsChartTokenMetric } from '@/lib/benchmarks/supplemental-benchmarks';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   useOverlayScopeReconciliation,
@@ -116,6 +115,7 @@ import {
 import {
   derivedModeRoofline,
   isAgenticOnlyXAxisMode,
+  supportsPointTokenMetric,
   type RooflineDirection,
   type XAxisMode,
 } from '@/components/inference/hooks/useChartData';
@@ -562,9 +562,7 @@ export default function ChartDisplay({
       const pricedData = usesTokenSalePricing(selectedYAxisMetric)
         ? applyTokenRevenuePricing(rawData.data, tokenRevenuePricing)
         : rawData.data;
-      const capableData = pricedData.filter((point) =>
-        supportsChartTokenMetric(String(point.hwKey), point.date, tokenType),
-      );
+      const capableData = pricedData.filter((point) => supportsPointTokenMetric(point, tokenType));
       const processed = processOverlayChartDataWithClipping(
         capableData,
         chartType,

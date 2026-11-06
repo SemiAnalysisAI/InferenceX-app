@@ -2,14 +2,16 @@ import { Readable } from 'node:stream';
 import { createGunzip, gunzipSync } from 'node:zlib';
 
 import { chain } from 'stream-chain';
+import { getManyValues, type Many, none } from 'stream-chain/defs.js';
+import fixUtf8Stream from 'stream-chain/utils/fixUtf8Stream.js';
 
-import { parser } from 'stream-json';
 import Assembler from 'stream-json/assembler.js';
-import type { Token } from 'stream-json/parser.js';
+import { jsonParser, parser, type Token } from 'stream-json/parser.js';
 import { pick } from 'stream-json/filters/pick.js';
 import { streamObject } from 'stream-json/streamers/stream-object.js';
 
 const MAX_IN_MEMORY_JSON_BYTES = 128 * 1024 * 1024;
+const GUNZIP_CHUNK_BYTES = 64 * 1024;
 
 function isSizeLimitError(error: unknown): boolean {
   const code = error && (error as NodeJS.ErrnoException).code;
@@ -81,6 +83,13 @@ function updateDepth(depth: number, token: Token): number {
   return depth;
 }
 
+/**
+ * Collects the wanted members of the top-level `metrics` and `warmup_metrics`
+ * objects without building the rest of the document. stream-json's tokenizer
+ * is called once per gunzip chunk instead of behind an object-mode stream,
+ * because pushing every token through a stream costs about three times the
+ * tokenizing itself on multi-GiB AIPerf exports.
+ */
 async function streamCollectMetricPhases<T>(
   buffer: Buffer,
   wanted: ReadonlySet<string>,
@@ -95,21 +104,7 @@ async function streamCollectMetricPhases<T>(
   let valueTarget: Record<string, T> | null = null;
   let valueKey: string | null = null;
 
-  const tokens = chain([
-    Readable.from(buffer),
-    createGunzip(),
-    parser({
-      packKeys: true,
-      packStrings: true,
-      packNumbers: true,
-      streamKeys: false,
-      streamStrings: false,
-      streamNumbers: false,
-    }),
-  ]);
-
-  for await (const rawToken of tokens) {
-    const token = rawToken as Token;
+  const consume = (token: Token): void => {
     const depthBefore = depth;
 
     if (valueAssembler) {
@@ -121,7 +116,13 @@ async function streamCollectMetricPhases<T>(
         valueTarget = null;
         valueKey = null;
       }
-      continue;
+      return;
+    }
+
+    // Tokens nested inside an unwanted member value only move the depth.
+    if (depthBefore > 2) {
+      depth = updateDepth(depth, token);
+      return;
     }
 
     if (token.name === 'keyValue') {
@@ -162,7 +163,30 @@ async function streamCollectMetricPhases<T>(
       phase = null;
       metricKey = null;
     }
-  }
+  };
+  const consumeAll = (tokens: Many<Token> | typeof none): void => {
+    if (tokens === none) return;
+    for (const token of getManyValues(tokens)) consume(token);
+  };
+
+  // The two stages parser() composes: UTF-8 decoding across chunk boundaries,
+  // then the tokenizer. Passing `none` flushes each stage.
+  const decodeUtf8 = fixUtf8Stream();
+  const tokenize = jsonParser({
+    packKeys: true,
+    packStrings: true,
+    packNumbers: true,
+    streamKeys: false,
+    streamStrings: false,
+    streamNumbers: false,
+  });
+  const gunzipped = Readable.from(buffer).pipe(createGunzip({ chunkSize: GUNZIP_CHUNK_BYTES }));
+  for await (const chunk of gunzipped) consumeAll(tokenize(decodeUtf8(chunk as Buffer)));
+  consumeAll(tokenize(decodeUtf8(none)));
+  // Flushable<I, O> types only the data argument. Like every flushable() stage,
+  // the tokenizer also takes `none` to flush and to reject truncated input.
+  const flushTokenizer = tokenize as unknown as (end: typeof none) => Many<Token> | typeof none;
+  consumeAll(flushTokenizer(none));
 
   return { metrics, warmupMetrics, complete: false };
 }

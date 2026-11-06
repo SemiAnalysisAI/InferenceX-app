@@ -1,4 +1,14 @@
-import { at, number, readVerifiedFiles, ROLES, rows, safePath, text, type Json } from './bundle';
+import {
+  at,
+  canonical,
+  number,
+  readVerifiedFiles,
+  ROLES,
+  rows,
+  safePath,
+  text,
+  type Json,
+} from './bundle';
 import { videoArtifactIdentity } from './artifact-identity';
 
 export interface FidelityBundle {
@@ -10,15 +20,6 @@ export interface FidelityBundle {
   files: Map<string, Blob>;
 }
 const hash = (value: Json) => /^[a-f0-9]{64}$/u.test(text(value));
-const canonical = (value: Json): string => {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (value !== null && typeof value === 'object')
-    return `{${Object.keys(value)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`)
-      .join(',')}}`;
-  return JSON.stringify(value);
-};
 
 export function fidelityEvidence(
   documents: Map<string, Json>,

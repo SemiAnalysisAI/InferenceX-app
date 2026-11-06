@@ -57,7 +57,7 @@ const POWER_VALUES = Object.fromEntries(
   ]),
 );
 
-function MetricBadges({
+export function MetricBadges({
   label,
   values,
 }: {
@@ -77,7 +77,7 @@ function MetricBadges({
   );
 }
 
-function SourceLink({
+export function SourceLink({
   href,
   children,
   sourceLabel = 'Source:',

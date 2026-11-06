@@ -140,18 +140,17 @@ However, using `bun run admin:cache:invalidate` pointed at your local developmen
 
 Changes to `packages/db/src/etl/run-overrides.ts` that reach `main` or `master` are applied to the production database automatically by CI, followed by database verification, cache invalidation, and cache warmup. The override command remains available for local previews and manual recovery.
 
-| Script                                 | Description                              |
-| -------------------------------------- | ---------------------------------------- |
-| `bun run admin:db:migrate`             | Run database migrations                  |
-| `bun run admin:db:ingest:run`          | Ingest benchmark data from GitHub runs   |
-| `bun run admin:db:ingest:ci`           | Ingest benchmark data (CI mode)          |
-| `bun run admin:db:ingest:gcs`          | Ingest benchmark data from GCS           |
-| `bun run admin:db:ingest:supplemental` | Ingest supplemental data                 |
-| `bun run admin:db:apply-overrides`     | Preview or apply data overrides manually |
-| `bun run admin:db:reset`               | Reset the database                       |
-| `bun run admin:db:verify`              | Verify database integrity                |
-| `bun run admin:cache:invalidate`       | Invalidate API cache                     |
-| `bun run admin:cache:warmup`           | Warm up API cache                        |
+| Script                             | Description                              |
+| ---------------------------------- | ---------------------------------------- |
+| `bun run admin:db:migrate`         | Run database migrations                  |
+| `bun run admin:db:ingest:run`      | Ingest benchmark data from GitHub runs   |
+| `bun run admin:db:ingest:ci`       | Ingest benchmark data (CI mode)          |
+| `bun run admin:db:ingest:gcs`      | Ingest benchmark data from GCS           |
+| `bun run admin:db:apply-overrides` | Preview or apply data overrides manually |
+| `bun run admin:db:reset`           | Reset the database                       |
+| `bun run admin:db:verify`          | Verify database integrity                |
+| `bun run admin:cache:invalidate`   | Invalidate API cache                     |
+| `bun run admin:cache:warmup`       | Warm up API cache                        |
 
 ## Deployment
 

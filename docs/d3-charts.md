@@ -108,13 +108,20 @@ chip/CPU split and theoretical marker. TRT-LLM's combined rate stays a single
 segment; disabled offload does not contribute CPU hits. Missing chip measurements
 retain the available textual rates instead of inventing a bar. Concurrency and
 precision use explicit labels, and parallelism groups Prefill/Decode configurations by
-role with compact labels such as DEP4. The raw fields remain in an expandable
-configuration table. Prompt/generated token counts use a proportional bar with
+role with compact labels such as DEP4. There is no raw configuration table.
+Prompt/generated token counts use a proportional bar with
 exact counts underneath; partial or invalid counts do not produce a split.
 Official, unofficial and historical points
 share this presentation; unofficial colors retain their per-run identity.
 This is presentation-only: benchmark values, API responses and `inferencex-skills`
 contracts are unchanged.
+
+Chip-history/date-comparison graphs use the same compact hover card as the main
+scatter chart. Hover preserves the comparison date/run label and any carried-forward
+source date; swatches and cache bars use the corresponding curve color. Clicking
+opens the full point details panel. Unofficial history points use compact hover too, while
+retaining the unofficial warning, branch identity and per-run color. These are
+presentation-only changes with no API or `inferencex-skills` contract changes.
 
 Tooltips are built as HTML template literal strings, injected via D3's `.html()`. Using React elements would require:
 
@@ -124,6 +131,15 @@ Tooltips are built as HTML template literal strings, injected via D3's `.html()`
 HTML strings bypass React entirely. D3 writes them into a tooltip div that is portaled to `document.body` and positioned with `position: fixed`. This keeps tooltip updates at <1ms per frame.
 
 Wrap tooltip HTML with `chartTooltipShell(body, options)` from `src/lib/d3-chart/tooltip-shell.ts` (or put `chartTooltipShellStyle(options)` on your own wrapper) instead of writing the popover background, border, radius, padding and shadow inline. Options cover pinned text selection, a custom border, min and max width, pointer events for links, and scrolling for long content. `chartTooltipTitle(label, color?)` renders the heading with a series dot, and `chartTooltipDismiss(text)` renders the pinned hint.
+
+Pinned details close on clicks outside the chart SVG, the tooltip and the
+details panel, or on Escape, in desktop and mobile layouts. The shared wrapper
+listens in capture phase so outside controls that stop bubbling still dismiss the
+details without losing their own action. Clicks and Escape inside a Radix popover
+leave them open. Point switching and empty-plot dismissal remain owned by the
+chart; links and controls inside the details remain interactive. Mobile bottom
+sheets retain their backdrop and swipe dismissal. This applies to official and
+unofficial points without changing data, API, or `inferencex-skills` contracts.
 
 ## Pareto Front Direction
 

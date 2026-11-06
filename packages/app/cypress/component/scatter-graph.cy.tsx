@@ -38,6 +38,98 @@ const expectVisiblePointCount = (scope: string, count: number) =>
   cy.scatterPoints(scope).should((points) => expect(visiblePoints(points)).to.have.length(count));
 
 describe('ScatterGraph', () => {
+  for (const overlay of [false, true]) {
+    it(`dismisses pinned ${overlay ? 'unofficial' : 'official'} details outside the chart and on Escape`, () => {
+      const data = [
+        createMockInferenceData({
+          hwKey: 'b200_sglang',
+          precision: Precision.FP4,
+          x: 20,
+          y: 80,
+          conc: 16,
+        }),
+      ];
+      const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123';
+      const overlayData = overlay
+        ? {
+            data: [
+              createMockInferenceData({
+                hwKey: 'h100_vllm',
+                precision: Precision.FP4,
+                x: 50,
+                y: 40,
+                conc: 32,
+                run_url: runUrl,
+              }),
+            ],
+            hardwareConfig: hwConfig,
+            label: 'Preview',
+            runUrl,
+          }
+        : undefined;
+      function DismissalHarness() {
+        const [clicks, setClicks] = useState(0);
+        return (
+          <div style={{ width: 1000 }}>
+            <button
+              data-testid="outside-chart"
+              onClick={(event) => {
+                event.stopPropagation();
+                setClicks((value) => value + 1);
+              }}
+            >
+              Outside clicks: {clicks}
+            </button>
+            <ScatterGraph
+              chartId="outside-dismissal"
+              modelLabel="DeepSeek R1"
+              data={data}
+              xLabel="Interactivity"
+              yLabel="Throughput"
+              chartDefinition={defaultChartDef}
+              transitionDuration={0}
+              overlayData={overlayData}
+            />
+          </div>
+        );
+      }
+      mountWithProviders(<DismissalHarness />, {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_sglang']),
+          hwTypesWithData: new Set(['b200_sglang']),
+          selectedPrecisions: [Precision.FP4],
+        },
+        unofficial: {
+          isUnofficialRun: overlay,
+          activeOverlayHwTypes: new Set(['h100_vllm']),
+          allOverlayHwTypes: new Set(['h100_vllm']),
+        },
+      });
+      const pin = () => {
+        if (overlay) {
+          cy.get('#outside-dismissal .unofficial-overlay-pt').first().click();
+        } else {
+          cy.scatterPoints('#outside-dismissal')
+            .should('have.length', 1)
+            .then(([point]) => clickScatterPoint(point));
+        }
+        cy.get('#outside-dismissal [data-testid="point-details-panel"]')
+          .should('be.visible')
+          .find('[data-pinned-config]')
+          .should('contain.text', `Concurrency: ${overlay ? 32 : 16}`);
+      };
+      pin();
+      cy.get('[data-pinned-config]').click();
+      cy.get('#outside-dismissal [data-testid="point-details-panel"]').should('be.visible');
+      cy.get('[data-testid="outside-chart"]').click().should('have.text', 'Outside clicks: 1');
+      cy.get('[data-testid="point-details-panel"]').should('not.exist');
+      pin();
+      cy.get('body').trigger('keydown', { key: 'Escape' });
+      cy.get('[data-testid="point-details-panel"]').should('not.exist');
+    });
+  }
+
   it('keeps compact hover and pins full cache and role details in the UI font', () => {
     const data = [
       createMockInferenceData({
@@ -111,11 +203,10 @@ describe('ScatterGraph', () => {
       .should('have.length', 2)
       .first()
       .should('contain.text', 'DEP2');
-    cy.get('.pinned-raw-topology summary').click();
-    cy.get('.pinned-raw-topology tbody tr')
-      .first()
-      .should('be.visible')
-      .and('contain.text', '32 2 2 True 16');
+    cy.get('.pinned-raw-topology').should('not.exist');
+    cy.get('[data-pinned-parallelism]')
+      .should('not.contain.text', 'Configuration details')
+      .and('not.contain.text', '配置详情');
     cy.get('[data-pinned-cache]')
       .should('contain.text', 'Chip 70.7%')
       .and('contain.text', 'CPU 24.2%')

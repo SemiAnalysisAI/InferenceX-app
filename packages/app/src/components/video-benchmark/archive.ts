@@ -115,7 +115,17 @@ export async function archiveSources(blob: Blob, artifact: CIArtifact) {
       };
     });
   const manifest: Json = JSON.parse(await read('manifest.json').text());
+  verifyManifestIdentity(manifest, artifact);
+  return [
+    { id: text(at(manifest, 'run_id')), read: (path: string) => Promise.resolve(read(path)) },
+  ];
+}
+
+/** Binds a root manifest to the GitHub artifact name, run attempt and workflow revision. */
+export function verifyManifestIdentity(manifest: Json, artifact: CIArtifact) {
+  const identity = videoArtifactIdentity(artifact.name);
   if (
+    !identity ||
     at(manifest, 'run_id') !== identity.run ||
     at(manifest, 'run_attempt') !== identity.attempt ||
     ((identity.configuration || at(manifest, 'artifact_name') !== null) &&
@@ -123,10 +133,10 @@ export async function archiveSources(blob: Blob, artifact: CIArtifact) {
     (artifact.workflow_run !== undefined &&
       (String(artifact.workflow_run.id) !== identity.run ||
         ((identity.configuration || at(manifest, 'ci', 'head_sha') !== null) &&
-          artifact.workflow_run.head_sha !== at(manifest, 'ci', 'head_sha'))))
+          // A dispatched run tests ci.head_sha on the workflow at ci.workflow_sha, which GitHub reports.
+          ![at(manifest, 'ci', 'head_sha'), at(manifest, 'ci', 'workflow_sha')].includes(
+            artifact.workflow_run.head_sha,
+          ))))
   )
     throw new Error('Manifest and GitHub artifact identify different runs');
-  return [
-    { id: text(at(manifest, 'run_id')), read: (path: string) => Promise.resolve(read(path)) },
-  ];
 }

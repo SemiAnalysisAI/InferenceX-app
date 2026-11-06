@@ -62,6 +62,14 @@ class RecordingPath {
     this.ops.push(['arc', ...args]);
   }
 
+  moveTo(...args: unknown[]) {
+    this.ops.push(['moveTo', ...args]);
+  }
+
+  lineTo(...args: unknown[]) {
+    this.ops.push(['lineTo', ...args]);
+  }
+
   rect(...args: unknown[]) {
     this.ops.push(['rect', ...args]);
   }

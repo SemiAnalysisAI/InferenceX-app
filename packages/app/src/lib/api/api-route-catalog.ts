@@ -211,7 +211,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-video-view',
-    sourceSha256: 'a8476ee8bced1eab0bb8b7ea396daf05912af4439f284957ad277469c1b4ebc5',
+    sourceSha256: 'ad681cc19e3c1f01ca182853eca0c9e4e61f41845a08f3d221030dc112cb63d7',
   },
   {
     source: 'src/app/api/v1/views/operatorx/route.ts',
@@ -631,10 +631,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'Hidden H3 viewer transport for public CI runs, checksum-verified artifact ZIPs and stored History. Every GET is read-only, including format=media on a cache miss (204). History can return up to five pages in one response and serves entries from the newest History snapshot only while each record matches its index and receipt upload times. Synthetic History replay is development-only. History retains legacy indexes but labels only source-bound approval receipts as approved; default charts use those approved entries. This UI contract is not a public data API.',
-      zh: '供隐藏的 H3 查看器读取公开 CI 运行、校验和已验证的产物 ZIP 与已存历史。所有 GET 都只读，包括 format=media 未命中时返回 204。历史可在一次响应中返回最多五页，只有记录仍与索引和回执上传时间一致时才使用最新历史快照中的条目。合成历史回放仅用于开发环境。历史保留旧索引，但只有与来源绑定的批准回执才标为 approved；默认图表只使用这些条目。此界面契约不是公开数据 API。',
+      en: 'Hidden H3 viewer transport for public CI runs, checksum-verified artifact ZIPs and stored History. Every GET is read-only, including format=media on a cache miss (204). History can return up to five pages in one response and serves entries from the newest History snapshot only while each record matches its index and receipt upload times. Synthetic History replay and explicit original-artifact replay with private MP4 ranges are development-only. History retains legacy indexes but labels only source-bound approval receipts as approved; default charts use those approved entries. Published History pages (keyed by first page and page count) and media payloads are cached across instances under the video tag, without a GitHub read; pages whose index or approval reads failed and missing media are not retained. Publication and History backfill (also when they fail after a write) and ?scope=video expire that cache at once; entries also refresh in the background after 5 minutes, and pages past the end are not retained. Published media assets may carry an optional previewUrl, a web playback rendition matched by the sealed SHA256 of that asset from a shared listing of rendition receipts; renditions are encoded after publication, so that listing refreshes in the background after 60 seconds. url stays the sealed original, and a failed listing serves originals only. format=live with run reads an unstored run: for the newest attempt of each native h3-results configuration it range-reads only the JSON documents and SHA256SUMS from the GitHub artifact ZIP, verifies them against SHA256SUMS and the manifest identity, and returns a History-shaped page whose entries are never stored, approved or given media. A failed artifact read becomes an entry error. Successful artifact reads are reused per artifact ID and digest in a process cache of 32 entries; live pages are not cached under the video tag. HTTP stays private, no-store. Metadata-only development fixtures return 204 for media and an empty live page. This UI contract is not a public data API.',
+      zh: '供隐藏的 H3 查看器读取公开 CI 运行、校验和已验证的产物 ZIP 与已存历史。所有 GET 都只读，包括 format=media 未命中时返回 204。历史可在一次响应中返回最多五页，只有记录仍与索引和回执上传时间一致时才使用最新历史快照中的条目。合成历史回放及读取原始产物 MP4 字节区间的显式回放仅用于开发环境。历史保留旧索引，但只有与来源绑定的批准回执才标为 approved；默认图表只使用这些条目。已发布 History 页（按起始页与页数）与媒体载荷以 video 标签跨实例缓存，读取时不调用 GitHub；索引或批准回执读取失败的页和缺失媒体不保留。发布、历史补建（包括写入后失败的情况）或 ?scope=video 会立即使缓存失效；条目在 5 分钟后也会在后台刷新，超出末页的页不保留。已发布媒体可附带 previewUrl，即网页播放用的转码版本，由共享缓存的转码回执列表按媒体封存的 SHA256 匹配得到；转码在发布之后才完成，因此该列表 60 秒后会在后台刷新。url 仍指向封存的原始视频，列表读取失败时只返回原始视频。format=live 需同时提供 run，用于读取尚未存储的运行：对每个原生 h3-results 配置的最新一次尝试，只按字节区间读取 GitHub 产物 ZIP 中的 JSON 文档和 SHA256SUMS，经 SHA256SUMS 与 manifest 身份校验后，返回与 History 结构相同的页面；这些条目不会被存储或批准，也不附带媒体。单个产物读取失败时，对应条目记录错误。读取成功的产物按产物 ID 和摘要在服务进程内复用，最多 32 项；live 页面不进入 video 标签缓存。HTTP 仍为 private, no-store。开发环境的纯元数据 fixture 对媒体请求返回 204，对 live 请求返回空页面。此界面契约不是公开数据 API。',
     },
-    sourceSha256: '59c08afd7aac4829b23d2138b0e8ea0ebd3526a9f8aa8e3f9e05b6fcb60a3e3f',
+    sourceSha256: '283e8b04ffdac17da14fc21499ac8f8c0621f70e945af814b064c228cf6b6ef3',
   },
   {
     source: 'src/app/api/video-runs/route.ts',
@@ -645,7 +645,7 @@ export const apiRouteCatalog = [
       en: 'Bearer-protected mutation for one explicit H3 source/artifact. It stores verified media, an immutable source-bound publication receipt and a new History snapshot; authorization does not assert benchmark qualification. The body {"history":"backfill"} rebuilds missing History snapshot records from already stored indexes. This operator path is outside the public read API.',
       zh: '受 Bearer 密钥保护的单个 H3 来源与产物写操作。它存储已校验媒体、绑定来源的不可变发布回执和新的历史快照；授权不代表 benchmark 质量验收。请求体 {"history":"backfill"} 会根据已存索引补建缺失的历史快照记录。此运维入口不属于公开只读 API。',
     },
-    sourceSha256: '59c08afd7aac4829b23d2138b0e8ea0ebd3526a9f8aa8e3f9e05b6fcb60a3e3f',
+    sourceSha256: '283e8b04ffdac17da14fc21499ac8f8c0621f70e945af814b064c228cf6b6ef3',
   },
   {
     source: 'src/app/api/unofficial-run/route.ts',
@@ -680,10 +680,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'page-bff',
     exclusionReason: {
-      en: 'Dashboard filter BFF: the published availability rows plus the supplemental datasets, sent once per distinct line with its dates as runs over a date dictionary.',
-      zh: '看板筛选专用 BFF：已发布的可用性行加上补充数据集，每条不同的配置线只发送一次，其日期以日期字典上的区间表示。',
+      en: 'Dashboard filter BFF: the published availability rows, sent once per distinct line with its dates as runs over a date dictionary.',
+      zh: '看板筛选专用 BFF：已发布的可用性行，每条不同的配置线只发送一次，其日期以日期字典上的区间表示。',
     },
-    sourceSha256: 'c28f632ac500b9e02a5677827bb286081fc780daf4b2fc67b83518c29620232d',
+    sourceSha256: '7fdb38e3400b62e42ee86ff74f6779796df8cd3f3b2ffd8b7177d850f81bb4c9',
   },
   {
     source: 'src/app/api/v1/benchmark-presence/route.ts',
@@ -883,7 +883,7 @@ export const apiRouteCatalog = [
       en: 'Secret-protected cache invalidation mutation for operators; it is not a public application contract.',
       zh: '供运维人员使用的密钥保护缓存失效写操作；它不是公开应用契约。',
     },
-    sourceSha256: 'fcc7185f1c837a2d204e0d0114ba12da8baa40aed3e478b7f8aaf6d0409081aa',
+    sourceSha256: 'f52ae03aea2ccf9107a62dc8a7cf0e5f631be7059b2de221d636625ab68ef519',
   },
   {
     source: 'src/app/api/v1/latest-images/route.ts',
@@ -1010,7 +1010,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-submissions',
-    sourceSha256: '295297aefca483b6a223d170806eee85b35640e9be7f525b2959cf8e9deb500d',
+    sourceSha256: 'e926912cbc10b87a1c33a1666c0709c521d88bd3f709a4cf33bba3bbc8deb5dc',
   },
   {
     source: 'src/app/api/v1/tco-feed/route.ts',
@@ -1250,7 +1250,7 @@ export interface ApiContractSourceDigest {
 export const apiContractSourceDigests = [
   {
     source: '../constants/src/framework-aliases.ts',
-    sourceSha256: '6c220e6aed1465e647f2c3ffcb03828e0f98ac6b9edb4019f0dce6db10c4054e',
+    sourceSha256: 'f10297b86f7b29d2e88241344f02af488ecc1db43e096bb1913c4dcaab1531f9',
     reviewArea: {
       en: 'Shared engine labels, family classification and dashboard/read-only view filter parity.',
       zh: '共享引擎标签、系列分类，以及仪表板与只读视图的筛选一致性。',
@@ -1274,7 +1274,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/ubenchx/ubenchx-transform.ts',
-    sourceSha256: '9458ad2b969525fe68da5a3b54ac151384610d0bd2ba84585a9043b3a67bf949',
+    sourceSha256: '3a1cadb4113285742499a1faa3ea9d6c5c66f2459435a2a80ad0c17e4ceb138d',
     reviewArea: {
       en: 'ubenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
       zh: 'ubenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
@@ -1542,7 +1542,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/calculator/profit-estimator.ts',
-    sourceSha256: '0eeaaed822068e9aa782e6b40ad1bb9ae31f70ef755f67622767f3b89ade4d1a',
+    sourceSha256: 'eb0c310344460b42b0d8a790138b99f374fea8381c997f477098c94d185acf76',
     reviewArea: {
       en: 'Shared profit-estimator defaults and calculation parity, including model-specific target assumptions.',
       zh: '利润估算器的共享默认值与计算一致性，包括各模型的目标假设。',
@@ -1557,8 +1557,120 @@ export const apiContractSourceDigests = [
     },
   },
   {
+    source: 'src/components/video-benchmark/results.ts',
+    sourceSha256: '053712b28c1d10b8f08e345290be4afcfcca79829d9517eaf11e8936db6f1a54',
+    reviewArea: {
+      en: 'Shared VideoGenX results selectors, sample admission, dual GPU cost bases and modelled profit.',
+      zh: 'VideoGenX 结果页共用的筛选、样本准入、两种 GPU 成本口径及估算利润。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/results-chart.ts',
+    sourceSha256: 'fb395468324b5bd9d96263adeade0f8f7ce0efff0df27eb29c08b2e91c515b47',
+    reviewArea: {
+      en: 'VideoGenX results chart axes, accepted r_x/r_y metric keys, GPU basis and deployment detail key.',
+      zh: 'VideoGenX 结果图表的坐标轴、r_x/r_y 可接受的指标键、GPU 口径及部署详情键。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/results-csv.ts',
+    sourceSha256: '5a769d8f0acdddc566aa79da0ee37c4b32a6bbd73a1aa9a512700755a5d6f90a',
+    reviewArea: {
+      en: 'VideoGenX overview CSV identities, selected cells, units, missing values and dual GPU cost bases.',
+      zh: 'VideoGenX overview CSV 的身份、所选数据点、单位、缺失值与两种 GPU 成本口径。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/replay.ts',
+    sourceSha256: '2f895c22518ccdc442491b9088ed458e418a7cdf77ae847fc847a02ee341bb52',
+    reviewArea: {
+      en: 'Verified offline VideoGenX ZIP reader shared with development replay, without publication approval.',
+      zh: 'VideoGenX 离线 ZIP 校验读取器与开发回放共用，不授予发布批准。',
+    },
+  },
+  {
+    source: 'src/lib/video/video-read-cache.ts',
+    sourceSha256: 'dc3d364c85dc7b6198082f8dd6df1e89cdb7fe11e67229eaa45722e9ead98c3b',
+    reviewArea: {
+      en: 'VideoGenX published History, media and rendition-listing cache shared across instances under the video tag.',
+      zh: 'VideoGenX 已发布 History、媒体及转码回执列表以 video 标签跨实例共享的缓存。',
+    },
+  },
+  {
+    source: 'src/lib/video/video-renditions.ts',
+    sourceSha256: '7be3d6f4253b3d1c1eb14d74213a5722124ffb7c0a438e8d248b9bdd49181fe8',
+    reviewArea: {
+      en: 'VideoGenX web playback rendition receipts and the read-time previewUrl on published media; url, Difference and PSNR keep the sealed original.',
+      zh: 'VideoGenX 网页播放转码回执，以及读取时附加到已发布媒体的 previewUrl；url、差异预览和 PSNR 仍使用封存的原始视频。',
+    },
+  },
+  {
+    source: 'src/lib/video/video-live-run.ts',
+    sourceSha256: '97dc5178fa9097d9aafd31097fb0a4fb2e9765fb4129589463cf4de060714776',
+    reviewArea: {
+      en: 'VideoGenX live read of an unstored run: native result artifact selection, verified documents only, never stored, approved or given media.',
+      zh: 'VideoGenX 实时读取未存储的运行：选择原生结果产物，只读取经校验的文档，不存储、不批准，也不附带媒体。',
+    },
+  },
+  {
+    source: 'src/lib/video/video-replay.ts',
+    sourceSha256: 'f7095cc59ca891de5b57c96ebadde92b039c3a389ebb4ee70a14f3091ba6a781',
+    reviewArea: {
+      en: 'Development-only original artifact replay, exact source media membership and private byte-range delivery.',
+      zh: '仅开发环境使用的原始产物回放、精确来源媒体匹配及私有字节区间读取。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/results-evidence.ts',
+    sourceSha256: 'aac5717719255bf49d9c2e61f4ff2ad75c05559de2a0cae39d50fb587d5ecc05',
+    reviewArea: {
+      en: 'Sealed video completion, client timing and valid power metadata; absent measurements remain null.',
+      zh: '封印视频的完成数、客户端计时及有效功率元数据；缺失测量保留 null。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/reference-quality.ts',
+    sourceSha256: 'ba76cd4e72124871dd3ba104357631d1a2c632a3fa6b1fc7f7f760f4e0d5d4dd',
+    reviewArea: {
+      en: 'Sealed per-clip reference identity, decoded all-frame PSNR, exact equality, missing/incompatible states and safe public diagnostics.',
+      zh: '封存的逐条视频参考身份、解码全帧 PSNR、完全一致、缺失与不兼容状态，以及安全的公开诊断字段。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/diagnostic-quality.ts',
+    sourceSha256: 'e3da95c88795c677e46f5cdbdb2da8106980a7be37e47dd42b426493bd8da7ac',
+    reviewArea: {
+      en: 'Separate native diagnostic media and all-frame scores bound to original CI context, consumed-noise receipts and matching candidate controls; no performance or approval promotion.',
+      zh: '原生诊断视频与全帧评分独立保留，绑定原始 CI 上下文、实际使用的初始噪声回执及一致的候选配置；不提升性能证据或发布批准状态。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/results-clips.ts',
+    sourceSha256: 'f4a0eccdba30ad3d4ed9c5da26022513cf21d985364badb90475f2d459b0d756',
+    reviewArea: {
+      en: 'Exact candidate/reference pairing and per-clip quality projection shared by Results and the overview API.',
+      zh: 'Results 与 overview API 共用的精确候选/参考配对及逐条质量投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/stored.ts',
+    sourceSha256: '4d99e2539248c17a996d8fce5cf42943cb5a91349b04a27961866f21c90a06cc',
+    reviewArea: {
+      en: 'Original stored artifact identity, optional read-time playback previewUrl and independently verified optional quality attachment without approval promotion.',
+      zh: '原始已存储产物身份、读取时附加的可选播放 previewUrl，以及独立校验的可选质量附件，不提升发布批准状态。',
+    },
+  },
+  {
+    source: 'src/lib/video/video-quality.ts',
+    sourceSha256: 'e6f9a71f18fe856b0e3c543c3df3bb8868ad0433fdf684bef15be80e3ce7c47d',
+    reviewArea: {
+      en: 'Development-only quality manifest and original reference receipt/media byte seals; private filesystem paths stay local.',
+      zh: '仅开发环境使用的质量配置、原始参考回执和媒体字节封印；本机路径仅保留在本地。',
+    },
+  },
+  {
     source: 'src/components/video-benchmark/tradeoff.ts',
-    sourceSha256: 'da13cd1546412bf9793c62c93b7d80a0ad27cc75f431367b0cc5cd1af8e4c5c3',
+    sourceSha256: 'f7ec9e081fa5bb279d896ddc7e9dc176a338e29da5f6dcd40bf50e53727d542f',
     reviewArea: {
       en: 'Video source metrics and GPU allocation evidence shared by history and API projections.',
       zh: '历史与 API 投影共用的视频来源指标及 GPU 分配证据。',
@@ -1566,7 +1678,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/history.ts',
-    sourceSha256: '00562759b2400f6cba72177f75e9403c959cfb3fbd3f1eb49e8be4e0e6740265',
+    sourceSha256: '49932cb03796c2e4e8f1ced73418cbe0ad690e42bd73596690f8f393cb6df7bd',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1574,7 +1686,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/metrics.ts',
-    sourceSha256: 'd3713e5e2aca210c55be48c702d3d32f609cfa34b26fbda7d411d593ad963e2b',
+    sourceSha256: 'df07ac3fbb5cc7e0ff5e5a0c5d8706795dffdda6d9104b1e7b7f5c85b1739863',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1582,7 +1694,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/points.ts',
-    sourceSha256: '81cfbf1e92b68598978db1b6a1a91c2b344719bae771d4eb3ba7ae357f544ec6',
+    sourceSha256: '6457e3497d721f1408561849fceeb6fd019d2d0ffd533b4d418d7de15026736e',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1590,7 +1702,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/plot.ts',
-    sourceSha256: '50e15dd8ee90b9e96b8b1083294070270044abaf26f540be9cf17f594a3883e3',
+    sourceSha256: '2b96b5e2913ed65c802e4981da467a9a86d250fc30b561770467463b706f8649',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1598,7 +1710,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/deployment.ts',
-    sourceSha256: 'f7416efa7fc30edabdefa3802775ba2bbbdcbe106b1651a200922d30cc41430d',
+    sourceSha256: '6e74b6d1d5b6e8908b3fefe2adff99fd6b21a283e76aa91956f8114e0d89cc86',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1606,7 +1718,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/evidence.ts',
-    sourceSha256: '9b634b47e4a9dc98c5fec645592f5b7ee5a984f144f2566177c0702ebf878f46',
+    sourceSha256: '6337852b266d377873567964a2709bf64f0ed1adfea3c237bde8521dc3cd4886',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1614,7 +1726,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/compare.ts',
-    sourceSha256: '3ae75e6a93dd6db966a4a3b0d36caadc36178db28b766921759d0f26a3c2b073',
+    sourceSha256: '2031501278a03b6888885cfff2b8f66a45be33f745db4ccfe01ca34728ea2fd9',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1622,7 +1734,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/compare-url-state.ts',
-    sourceSha256: 'ba33d95eab86de143ab08ea661908168c00ef0b6f9470bc49dab1c9d9d04f732',
+    sourceSha256: 'ed290bb46eae01c07ac75f4f1ef3d4d117bb3f315c7fc82bbe43d1786c28e9ae',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1630,7 +1742,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/video-url-state.ts',
-    sourceSha256: 'deb6b936fdf5caf2562896ca8a96cb8a08fc5a61b3cde6dd38b866a9a3c27018',
+    sourceSha256: 'e926e74ff90b65ec1e8e993e9730cda8767eb9681e4c341d02095a96e87ee109',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1684,7 +1796,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/interpolated-trend-core.ts',
-    sourceSha256: '9244bd94e390872a9ea82d685667588e664403aee0bc8d20e6ef616ccc0b7110',
+    sourceSha256: '91b05094830ebe261810c935159c145c4ac95c1f8f3b9431242a167de1ebc187',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1693,7 +1805,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/chart-data-core.ts',
-    sourceSha256: 'e2b95516a6ebb16c312c711b540cc7ffff52ab184238bb5b2f40b6155b69d126',
+    sourceSha256: '6be86db9c2dd179a6c9a83480d2ce6725cbe6a9fb16b90a20215501f9cb6f2bb',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1711,7 +1823,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/calculator/throughput-data.ts',
-    sourceSha256: '77455329d9249cf9f99a5b4aa8b53cfaa74ef8c9a5a5713851da756ef88a02aa',
+    sourceSha256: 'bd4f108feade8cb2aa7ff83523bfdea271db8f03dfb95a32af819e83bf01932d',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1765,7 +1877,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: 'c7ab94562fea89409e03806ac560442765d86b123b21740af8645b5175a98d65',
+    sourceSha256: 'd1aecf9e584320d55b11de717e69df5cb909d1c88e339f68bb89661ccdcfd2c5',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1799,7 +1911,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/api-cache.ts',
-    sourceSha256: 'ee9a53a022a3ac049119b7ce77f902f1dc655da84b2eeec661039a69192c6c9c',
+    sourceSha256: 'c675a6503372b59bb2c4755308bafb6e02ac9b849f29e064cae45c2806a1fa7c',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',
@@ -1815,7 +1927,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/blob-cache.ts',
-    sourceSha256: '525de423c7a17e401044de360570b0a2e399a157e079dc79a04be4684d962465',
+    sourceSha256: 'c0dbff210e9a59e87e056062bafc16ed8b5678c95108800576ff17e3d331ed39',
     reviewArea: {
       en: 'Blob cache read, write, prefix migration, and purge behavior.',
       zh: 'Blob 缓存读取、写入、前缀迁移和清除行为。',
@@ -1974,7 +2086,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/etl/compute-chart-series.ts',
-    sourceSha256: '04e7a27bc027f64a77eb585c2a8415d2398f54460522c22487fcec7124c9bef5',
+    sourceSha256: '58aac3b66d93368fb19aad574636af843ed0d8150dff3b4a4c08804aaddf4095',
     reviewArea: {
       en: 'Server metric chart version, supported engine metrics, source identity, and missing-data semantics.',
       zh: '服务器指标图表版本、支持的引擎指标、来源标识以及缺失数据语义。',
@@ -2006,7 +2118,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmarks.ts',
-    sourceSha256: '8435e87e23b68feb2cbe9ca5918c9d650a3102a009292794708ad63f315dd230',
+    sourceSha256: '1d1d88901f19beb47400c004cefe0723b05c441bd36582226bc36ad517f748d9',
     reviewArea: {
       en: 'Benchmark row fields and latest, exact-run, history, and TCO query semantics.',
       zh: '基准行字段以及最新、精确运行、历史和 TCO 查询语义。',

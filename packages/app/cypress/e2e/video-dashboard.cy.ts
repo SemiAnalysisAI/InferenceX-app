@@ -1,40 +1,105 @@
-// The spec injects retained H100/H200/B200 C1/C2/C4 observations from
-// cypress/fixtures/api/video-history.json, including when CI starts a production server.
-describe('Video hardware dashboard (E2E fixtures)', () => {
+import { videoPoints } from '../../src/components/video-benchmark/points';
+import { parseResultsState, resultProjection } from '../../src/components/video-benchmark/results';
+import { readOnlyVideoRequests, resultHistory } from '../support/video-results';
+
+const row = (hardware: string) =>
+  cy.get(`[data-testid="results-table"] [data-testid="results-row"][data-hardware="${hardware}"]`);
+
+describe('VideoGenX results routes', () => {
   beforeEach(() => {
-    cy.intercept('GET', '/api/video-runs?format=history&page=1*', {
-      fixture: 'api/video-history.json',
-      headers: { 'X-VideoGenX-Replay': '1' },
-    }).as('history');
-    // The Compare panel fetches two published artifacts once in view; keep the spec offline.
-    cy.intercept('GET', '/api/video-runs?run=*', { statusCode: 204 }).as('media');
+    readOnlyVideoRequests();
+    resultHistory().then((page) => {
+      cy.intercept('GET', '/api/video-runs?format=history&page=1*', {
+        body: page,
+        headers: { 'X-VideoGenX-Replay': '1' },
+      }).as('history');
+    });
   });
-  it('keeps hardware visibility after reload and on a shared Chinese URL', () => {
-    cy.visit('/video');
-    cy.get('[data-testid="video-hardware-chart"] circle.point').should('have.length', 3);
-    cy.contains('[data-testid="video-legend"] li', 'H100').click();
-    cy.location('search').should('contain', 'v_hidden=h100');
-    cy.get('[data-testid="video-hardware-chart"] circle.point').should('have.length', 2);
+
+  it('keeps the shared fixture projection across reload, language changes and detail history', () => {
+    const search = 'r_hidden=b200&r_tier=r';
+    resultHistory().then((page) => {
+      const projection = resultProjection(videoPoints([page]), parseResultsState(search));
+      const h200 = projection.cells.find((cell) => cell.point.hardwareKey === 'h200');
+      expect(h200, 'H200 remains admitted').not.to.equal(undefined);
+      expect(projection.cells.map((cell) => cell.point.hardwareKey).sort()).to.deep.equal([
+        'h100',
+        'h200',
+      ]);
+      cy.visit(`/video?${search}`);
+      cy.wait('@history');
+      row('h200')
+        .closest('tr')
+        .find('td')
+        .eq(6)
+        .find('[data-value]')
+        .invoke('attr', 'data-value')
+        .then((value) => {
+          expect(
+            Number(value),
+            'UI matches the shared projection for the intercepted fixture',
+          ).to.equal(h200!.cost.participating!.perVideo);
+        });
+    });
+    cy.get('#checkbox-b200').should('not.be.checked');
     cy.reload();
-    cy.get('[data-testid="video-hardware-chart"] circle.point').should('have.length', 2);
-    cy.location('search').then((search) => cy.visit(`/zh/video${search}&v_view=table`));
-    cy.get('[data-testid="video-points-table"] tbody tr').should('have.length', 2);
-    cy.get('[data-testid="video-points-table"]').should('not.contain', 'H100');
-    cy.contains('[data-testid="video-legend"] li', 'H100').click();
-    cy.get('[data-testid="video-points-table"] tbody tr').should('have.length', 3);
-    cy.location('search').should('not.contain', 'v_hidden=');
+    cy.get('#checkbox-b200').should('not.be.checked');
+    cy.location('search').then((sharedSearch) => cy.visit(`/zh/video${sharedSearch}`));
+    cy.get('#checkbox-b200').should('not.be.checked');
+    cy.get('#video-results-chart-title').should('contain', '每 1 美元 TCO 生成的视频秒数');
+    row('h200').should('exist');
+    cy.get('label[for="checkbox-b200"]').click();
+    row('b200').should('exist');
+    cy.location('search').should('not.contain', 'r_hidden=');
+    row('h200').click();
+    cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
+    cy.location('search').should('contain', 'r_point=');
+    cy.go('back');
+    cy.get('[data-testid="video-results-detail"]').should('not.exist');
+    cy.location('search').should('not.contain', 'r_point=');
+    row('h200').should('be.visible');
+    cy.go('forward');
+    cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
+    cy.reload();
+    cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
+    cy.get('[data-testid="results-detail-back"]')
+      .should(([button]) => {
+        const hydrated = Object.keys(button).some((key) => key.startsWith('__reactProps'));
+        expect(hydrated, 'detail Back is hydrated').to.equal(true);
+      })
+      .click();
+    cy.location('search').should('not.contain', 'r_point=');
+    row('h200').should('be.visible');
+    cy.go('forward');
+    cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
   });
-  it('fits a phone viewport without horizontal page scroll in both locales', () => {
-    cy.viewport(390, 844);
-    for (const path of ['/video', '/zh/video']) {
-      cy.visit(path);
-      cy.get('[data-testid="video-hardware-chart"] circle.point').should('have.length', 3);
-      cy.get('[data-testid="video-kpi-card"]').should('have.length', 4);
-      cy.document().then((doc) => {
-        expect(doc.documentElement.scrollWidth, `${path} page width`).to.be.at.most(
-          doc.documentElement.clientWidth,
-        );
-      });
-    }
+
+  it('preserves the selected published overlay through filtering and dismisses it explicitly', () => {
+    cy.visit('/video?unofficialrun=34342452354&other=1&r_y=videosPerGpuHour');
+    cy.get('[data-testid="results-overlay"]').should('contain', '34342452354');
+    cy.get('[data-testid="results-overlay-dismiss"]').should('be.visible');
+    row('h200').should('exist');
+    cy.get('[data-testid="video-results-chart"] .dot-group[data-hardware="h200"]').should('exist');
+    cy.get('label[for="checkbox-h200"]').click();
+    row('h200').should('not.exist');
+    cy.get('[data-testid="video-results-chart"] .dot-group[data-hardware="h200"]').should(
+      'not.exist',
+    );
+    cy.location('search').should((search) => {
+      const params = new URLSearchParams(search);
+      expect(params.get('unofficialruns')).to.equal('34342452354');
+      expect(params.has('unofficialrun')).to.equal(false);
+    });
+    cy.get('label[for="checkbox-h200"]').click();
+    row('h200').should('exist');
+    cy.get('[data-testid="results-overlay-dismiss"]').click();
+    cy.location('search').should((search) => {
+      const params = new URLSearchParams(search);
+      expect(params.get('r_y')).to.equal('videosPerGpuHour');
+      expect(params.get('other')).to.equal('1');
+      expect(params.has('unofficialrun')).to.equal(false);
+      expect(params.has('unofficialruns')).to.equal(false);
+    });
+    row('h200').should('have.attr', 'data-overlay', 'false');
   });
 });

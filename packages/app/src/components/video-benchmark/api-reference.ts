@@ -24,8 +24,3 @@ export const H3_API_REFERENCE: ApiPriceReference = {
     zh: 'MiniMax 开放平台按量付费价格页 · H3 768P 输出 $0.08/s，2K 输出 $0.13/s（页面未标注生效日期）',
   },
 };
-
-/** `$0.080` style USD per video-second: at least the three decimals the input steps by. */
-export function formatApiPrice(value: number): string {
-  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 4 })}`;
-}

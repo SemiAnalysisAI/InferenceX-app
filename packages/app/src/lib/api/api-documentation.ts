@@ -1057,8 +1057,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/benchmarks',
     summary: text('Read benchmark results', '读取基准结果'),
     description: text(
-      'Returns raw benchmark rows for a display model. Use date for an as-of snapshot, exact=true for that exact date, runId to constrain the latest lookup, or exactRun=true with a numeric runId for that run’s logical snapshot. An AgentX curve is scoped by model, hardware, framework, precision, and workload: a normal run replaces all prior topology, speculative-decoding, and offload variants in that curve. Explicit append-only runs may include the preceding same-image snapshot; producer IDs and URLs are preserved. TPU tooltips and point-detail headers omit GitHub run links; API run_url remains the original producer URL. Historical snapshots remain accessible. view=calculator returns a trimmed page-owned projection (measured power metrics and workers are removed; its allowlist may change). powerValid=strictV2 selects validated schema-v2 power measurements and cannot be combined with view=calculator. Omit powerValid to keep general benchmark results regardless of power validity.',
-      '返回指定展示模型的原始基准测试数据行。使用 date 可获取截至指定日期的快照；exact=true 仅返回该日期的数据；runId 用于限定最新结果的查询范围；将 exactRun=true 与数值型 runId 搭配使用，可获取该次运行对应的逻辑快照。AgentX 按模型、硬件、框架、精度和工作负载划分曲线；常规运行会整体替换同一曲线中此前的所有拓扑、推测解码和 offload 变体。显式标记为 append-only 的运行可继承此前使用相同镜像的快照，并保留各数据点来源运行的 ID 和 URL。TPU 提示框和数据点详情页头部不显示 GitHub 运行链接，API 的 run_url 仍保留来源运行的原始 URL。历史快照仍可查询。view=calculator 返回页面专用的裁剪投影（会移除实测功率指标和 workers，其允许列表可能变化）。powerValid=strictV2 仅返回采用 schema v2 且功率测量通过验证的数据行，不能与 view=calculator 组合使用。省略 powerValid 则保留常规基准测试结果，不按功率有效性筛选。',
+      'Returns raw benchmark rows for a display model. Use date for an as-of snapshot, exact=true for that exact date, runId to constrain the latest lookup, or exactRun=true with a numeric runId for that run’s logical snapshot. An AgentX curve is scoped by model, hardware, framework, precision, and workload: a normal run replaces all prior topology, speculative-decoding, and offload variants in that curve. Explicit append-only runs may include the preceding same-image snapshot; producer IDs and URLs are preserved. TPU tooltips and point-detail headers omit GitHub run links; API run_url remains the original producer URL. Official preview results published outside CI carry their source page as run_url, or null. Historical snapshots remain accessible. view=calculator returns a trimmed page-owned projection (measured power metrics and workers are removed; its allowlist may change). powerValid=strictV2 selects validated schema-v2 power measurements and cannot be combined with view=calculator. Omit powerValid to keep general benchmark results regardless of power validity.',
+      '返回指定展示模型的原始基准测试数据行。使用 date 可获取截至指定日期的快照；exact=true 仅返回该日期的数据；runId 用于限定最新结果的查询范围；将 exactRun=true 与数值型 runId 搭配使用，可获取该次运行对应的逻辑快照。AgentX 按模型、硬件、框架、精度和工作负载划分曲线；常规运行会整体替换同一曲线中此前的所有拓扑、推测解码和 offload 变体。显式标记为 append-only 的运行可继承此前使用相同镜像的快照，并保留各数据点来源运行的 ID 和 URL。TPU 提示框和数据点详情页头部不显示 GitHub 运行链接，API 的 run_url 仍保留来源运行的原始 URL。非 CI 发布的官方预览结果以其来源页面作为 run_url，或为 null。历史快照仍可查询。view=calculator 返回页面专用的裁剪投影（会移除实测功率指标和 workers，其允许列表可能变化）。powerValid=strictV2 仅返回采用 schema v2 且功率测量通过验证的数据行，不能与 view=calculator 组合使用。省略 powerValid 则保留常规基准测试结果，不按功率有效性筛选。',
     ),
     audience: 'public',
     stability: 'stable',
@@ -1572,8 +1572,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/submissions',
     summary: text('Read submission coverage', '读取提交覆盖'),
     description: text(
-      'Returns configuration-level submission summaries and daily hardware submission volume. Official-preview snapshots shown on the dashboards (Jalapeño, July Vera Rubin, TPU7x) are included with image null when the database has no run for the same model, hardware, framework and date.',
-      '返回配置级提交汇总和每日硬件提交量。仪表板中展示的官方预览快照（Jalapeño、7 月 Vera Rubin、TPU7x）在数据库中没有相同模型、硬件、框架和日期的运行时一并返回，其 image 为 null。',
+      'Returns configuration-level submission summaries and daily hardware submission volume.',
+      '返回配置级提交汇总和每日硬件提交量。',
     ),
     audience: 'public',
     stability: 'stable',

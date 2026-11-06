@@ -553,7 +553,7 @@ and PNG export are presentation-only controls; they add no API routes or writabl
 snapshot access.
 
 Use positive safe run IDs written as plain digits (`1e3`, `0x10`, and `+5` are
-rejected); run lists such as `unofficialrun` and `runs` take up to eight unique IDs.
+rejected); run lists such as `unofficialrun` / `unofficialruns` and `runs` take up to eight unique IDs.
 Overlay run indices follow the input order after trimming whitespace and removing
 duplicates. Preserve those indices when attributing results to a run.
 `runId` selects an exact logical snapshot, not necessarily
@@ -821,6 +821,140 @@ flags do not make public data sensitive.
 ### Cache-reuse recipe selection
 
 Pass a returned `data.recipes[].key` as `recipe`; `params.recipe` identifies the resolved selection. Missing or stale keys use the dashboard default. Each run uses the selected recipe if available, otherwise its own best-covered recipe. Inspect each bar's source row for its recipe identity. Without official rows, choices come from matching overlay runs.
+
+### VideoGenX results overview
+
+`GET /api/v1/views/video?view=overview` returns the same nine-group projection as
+`/video` and `/zh/video`. It reads at most five stored history pages;
+`coverage.truncated` remains authoritative. It never triggers media publication.
+The earlier dashboard/compare and run/artifact results views remain available.
+
+HTTP responses remain `private, no-store`. The underlying published History and
+media metadata reader reuses payloads for at most 30 seconds in each server
+process (at most 32 entries per read kind) and serves them only after the
+public-repository check passes. Errors, partial or unapproved History and missing
+media are not retained; successful publication or History backfill clears that
+process cache. Page preloading, independent
+clip loading and real first-frame preloading are presentation-only exclusions:
+they add no API selectors and change no metrics or official/unofficial membership.
+
+中文：HTTP 响应仍为 `private, no-store`。底层已发布 History 和媒体元数据在服务进程内
+最多复用 30 秒，每类最多 32 项，且只在源仓库公开检查通过后返回。错误、不完整或未批准的 History
+和缺失媒体不保留，发布或 History 补建成功后清空当前进程缓存。页面预读、独立加载视频及真实首帧预读
+只影响展示，不新增 API 选择项，也不改变指标或正式／指定运行的归属。
+
+`roster` retains GB200, B200, MI355X and H200 as default slots. H100 is added when
+qualified approved evidence or the exact named diagnostic run is available; the
+same canonical workload and sample floor apply. `r_hidden=h100` hides its results
+and clips. Dismissing an unapproved H100 run removes its slot unless approved H100
+evidence remains. An older H100 workload does not qualify a newer workload.
+
+| UI controls                       | API parameters                                       | Contract                                                                                                                                                                                                                                                                                                                                                    |
+| --------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Model and frozen workload         | `r_model`, `r_workload`                              | Compact key from options.workloads resolves to full canonical identity; one 20-scheduled-clip C1 spec, at least 10 valid samples on every hardware; shorter historical runs remain History-only.                                                                                                                                                            |
+| Resolution, duration, mode, steps | `r_resolution`, `r_duration`, `r_mode`, `r_steps`    | Exact recorded plan metadata; duration is the requested value, not decoded output duration. No mode inferred from model names.                                                                                                                                                                                                                              |
+| GPU count, engine, execution date | `r_gpus`, `r_engine`, `r_date`                       | `deploymentCells` and `overlayDeploymentCells` preserve official and named-run GPU-count series before the GPU filter; cards and tables use filtered `cells` and `overlayCells`.                                                                                                                                                                            |
+| Hardware legend                   | `r_hidden`                                           | Applies to all groups and media selection.                                                                                                                                                                                                                                                                                                                  |
+| Deadline                          | `r_deadline`                                         | Seconds, default 120. Attainment = on-time valid / valid; goodput = on-time valid / wall seconds. Missing per-request timing stays null.                                                                                                                                                                                                                    |
+| TCO tier                          | `r_tier`                                             | `h` or `r`; return participating and allocated GPU bases together. Missing allocation stays null.                                                                                                                                                                                                                                                           |
+| Scenario prices                   | `r_price_t2v`, `r_price_i2v`, `r_price_r2v`, `r_api` | Nonnegative USD/video-second inputs, default null. `r_api` is used only when mode is unknown; prices are not borrowed across modes.                                                                                                                                                                                                                         |
+| Utilization                       | `r_utilization`                                      | Fraction 0-1, default 1. Modelled revenue scales; reserved GPU hourly cost does not.                                                                                                                                                                                                                                                                        |
+| Named run overlay                 | `unofficialrun` / `unofficialruns`                   | Exact run only, in separate `overlayCells` and `overlayDeploymentCells`, excluded from official cells, deployments and workload mix. A stored run keeps its actual approval. A run absent from History is read live from the JSON documents of its public `h3-results` artifacts: unapproved, `publishedAt` null, no media. Nothing is stored or published. |
+
+`cells` carries the source point, per-clip/frame energy, P95 only with 20 complete
+request samples, deadline metrics, both cost bases and modelled profit per GPU-hour.
+`evidence` includes recorded validity, hashes, completion counts and valid power
+samples. Missing quality, stage timing, memory and startup data remains null.
+Per-clip PSNR requires separately sealed pairs against the pinned official Diffusers
+reference. Playable clips or hardware labels alone do not establish a reference.
+Never replace nulls with example numbers.
+
+The comparison player's audio selector starts muted and enables one visible,
+playable hardware clip at a time. Changing the case or hiding or failing that
+source restores mute; the reference stays muted. This is presentation-only:
+audio selection is not a URL/API parameter and changes no returned data.
+
+中文：视频对比默认静音，可选择听一个硬件窗口的声音；切换用例、隐藏音源或音源播放失败后恢复静音，参考视频保持静音。音源选择仅影响播放，不是 URL 或 API 参数，也不改变返回数据。
+
+`point.videoSecondsPerHour` is the sum of validated decoded media durations from
+technically valid measured requests, divided by measurement wall seconds and
+multiplied by 3600; warmup is excluded. Video-second throughput divides this rate
+by 3600. Cost per video-second divides hourly GPU cost by this rate, independently
+for participating and allocated GPUs. Modelled revenue uses the same output rate
+times utilization and the entered price. Every valid measured request must have
+a positive recorded media duration. Otherwise, or when older stored History
+omits this optional field, video-second throughput, per-video-second cost,
+revenue and profit remain null. Requested `durationSeconds` stays in workload
+identity and filters and never fills missing output duration.
+
+中文：`point.videoSecondsPerHour` 按有效测量请求的实际解码视频总时长除以测量窗口时长，再乘以 3600，且排除 warmup。视频秒吞吐量、两种 GPU 口径的每视频秒成本及估算收入共用这一输出速率。任何有效测量请求缺少正的视频时长，或旧 History 未提供此可选字段时，这些指标及利润均为 null。`durationSeconds` 保留计划请求时长，仅用于工作负载身份与筛选，不补齐缺失的输出时长。
+
+`view=overview` returns `clipQuality: { status, groups }`. The status describes
+artifact-read coverage (`ready`, `partial`, `unavailable`), not quality. Every group
+retains scope, prompt, seed and nullable take; each clip retains hardware, point/slot/case/media
+identity and nullable `quality`. The UI uses this same matching projection. All
+groups are returned, so the case picker is presentation-only.
+
+Quality retains `attachmentSha256`, exact candidate run/artifact/source/manifest/
+cell/slot/case/prompt/seed/media identity and original plan SHA; the reference's
+separate receipt/plan/media hashes and pinned Diffusers/model/schedule identity; and
+the scorer revision/hash/method. `decoded-rgb24-all-frames` compares every decoded
+RGB pixel/frame using full-stream MSE, peak=1 after division by 255. `measured` has
+finite `psnrDb` in dB; `identical` means exact decoded equality with null PSNR;
+`incompatible` also withholds PSNR and retains safe public checks. Missing pairs
+are null. `qualityStatus=unjudged` and `releaseQualified=false` remain explicit.
+No threshold, semantic score or cohort average is implied.
+
+The reference plays separately with shared playback/scrub and its recorded schedule
+(currently 49 updates / 50 sigma points). It is not a hardware serving result.
+Original plan hashes remain separate even when an unrelated case differs; selected
+case, model, generation and fairness must match exactly. Cell-granularity CSV
+excludes per-clip quality. Original-artifact development replay can attach locally
+sealed pairs under its existing gate, without publishing or approving them. Private
+filesystem paths, raw decoder error text and reference arrays are excluded.
+
+中文：overview 的 `clipQuality` 与界面共用逐条视频匹配投影，返回全部用例组；status 仅表示产物读取覆盖情况，不是质量结论。缺失配对为 null；有证据时保留候选与参考各自的完整身份、原始计划哈希及 scorer 版本。PSNR 使用全部解码 RGB24 像素和帧。measured 返回有限 dB 值；identical 表示完全一致、PSNR 为 null；incompatible 保留安全的检查字段并隐藏数值。质量仍为 unjudged、releaseQualified=false，不设合格阈值或样本组均值。参考视频独立同步播放，不冒充硬件 serving 结果。CSV 不包含逐条质量汇总；开发回放不会发布或批准附件，本机路径、原始解码错误及参考数组不对外返回。
+
+Groups use `scope: ci | matched-noise-diagnostic`. A local diagnostic attachment
+adds separately sealed native rerun videos and scores; it does not replace the
+original CI clips or quality attachment. Diagnostic `take`, `pointId` and `slotId`
+are null. `contextPointId` and quality `origin` identify the original CI context;
+quality `candidate` identifies the new native run, receipt, media, runtime, noise
+and topology. Never join the diagnostic media to the original CI performance
+point to fill latency, energy or cost. No diagnostic contributes to History,
+performance projections, sample-floor counts or publication approval.
+
+The case picker defaults to the labelled diagnostic when present and retains all
+CI choices; all groups remain in the API. Native receipt checks require matching
+captured video/audio noise, complete schedules and the required candidate topology
+and effective settings. The App verifies sealed receipt claims and MP4 bytes,
+not remote tensor files. Missing hardware remains absent. These descriptive PSNR
+scores do not establish a quality pass or isolate a hardware effect.
+
+中文：scope 区分原 CI 视频与 matched-noise-diagnostic。诊断使用独立封存的新 native 视频和得分，不替换原媒体或质量附件。诊断的 take、pointId、slotId 为 null；contextPointId 和 origin 仅记录原 CI 上下文，candidate 记录新运行、回执、媒体、runtime、噪声和拓扑身份。不得把诊断媒体关联到原性能点来补齐延迟、能耗或成本；诊断不计入 History、性能投影、样本下限或发布批准。存在诊断时，用例选择器默认展示该选项并保留全部 CI 选项，API 始终返回全部组。App 校验封存回执和 MP4 字节，不读取远端张量；缺失硬件保持为空，PSNR 不代表质量合格或单独的硬件因果结论。
+
+Play/pause, scrub time, clip/difference rendering, theme, and expand controls are
+presentation-only exclusions. Media is read through the existing published-only
+route; source identities, pairing and unavailable states must remain visible.
+
+Example: `/api/v1/views/video?view=overview&r_tier=r&r_deadline=120&r_price_t2v=0.08&r_utilization=0.75`.
+
+`workloadMix` keeps separate eligible resolution/duration/mode cohorts under the model, engine, execution-date, GPU and hardware filters. It never pools their measurements. Profit is null outside the selected canonical workload because scenario prices do not transfer across resolutions or durations. Engine deployments remain distinct. Client-ready P50 uses its recorded field; legacy P50 is reused only when the canonical identity explicitly names the submit-to-downloaded-media boundary.
+
+The plural shared-link alias accepts exactly one positive run ID in this overview. Multiple IDs or both aliases together return HTTP 400; no extra source is ingested.
+
+Default points require a matching publication approval. The named channel never
+admits another run and clearing it cannot promote unapproved evidence. Dismissal
+retains a workload selector only if it remains in the approved choices. Approved
+cohorts retain default preference; a workload found only in the named run requires
+explicit selection or no matching approved cohort. Both channels use the same
+qualification and metric rules. Legacy dashboard/compare views stay approved-only.
+The overview returns JSON by default. `format=csv` is available only with `view=overview`; it exports the current official and named cells with exact source/workload/run/artifact identity, approval, units and participating/allocated GPU costs. `duration_s` retains the requested plan duration; `video_seconds_per_s`, next to `clips_per_s`, reports validated decoded output seconds per wall second. Empty CSV cells mean missing evidence. The response is private and no-store.
+
+中文：默认结果必须有匹配的发布批准记录。指定运行的通道只包含该运行，保留实际批准状态；
+清除叠加运行后不会将未批准数据转为正式结果。移除时，工作负载选择仅在已批准选项中仍然有效时保留。默认优先选择有已批准结果的工作负载；
+仅由指定运行提供的工作负载须明确选择，或在没有匹配的已批准结果时作为回退。两条通道共用准入和计算规则。
+旧 dashboard/compare 视图仍仅接纳已批准结果。overview 默认返回 JSON；仅 `view=overview` 接受 `format=csv`，导出当前筛选的正式及指定运行数据点，保留来源与批准状态、单位及参与/已分配 GPU 成本。`duration_s` 保留计划请求时长；紧邻 `clips_per_s` 的 `video_seconds_per_s` 表示每测量秒生成的有效解码视频秒数。空单元格表示缺失数据，CSV 响应设置 `Cache-Control: private, no-store`。
 
 ### Landing-page Huawei link
 

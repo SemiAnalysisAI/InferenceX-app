@@ -162,6 +162,7 @@ export const METRIC_KEYS = new Set([
   'theoretical_cache_hit_rate',
   'gpu_kv_cache_usage_pct',
   ...POWER_METRIC_KEYS,
+  'pp',
   'prefill_pp',
   'decode_pp',
   'dcp_size',

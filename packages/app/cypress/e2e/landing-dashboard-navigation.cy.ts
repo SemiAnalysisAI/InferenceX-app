@@ -3,6 +3,10 @@ import type { AvailabilityRow } from '@/lib/api/api';
 import { availabilityBody } from '../support/e2e';
 import { vrPublicationRows } from '../support/vr-publication-fixtures';
 import {
+  interceptPreviewSnapshots,
+  previewAvailability,
+} from '../support/preview-snapshot-fixtures';
+import {
   assertTpuGb300Selected,
   interceptTpuLaunchData,
   tpuLaunchRows,
@@ -313,6 +317,7 @@ describe('landing model curation', () => {
     });
 
     it(`opens Jalapeño R1 results from ${prefix || '/'}`, () => {
+      interceptPreviewSnapshots({ overFixtures: true });
       cy.visit(prefix || '/');
       cy.get('[data-testid="landing-jalapeno-results-link"]').click();
       cy.location('pathname').should('eq', `${prefix}/inference/deepseek-r1`);
@@ -351,11 +356,12 @@ describe('landing model curation', () => {
           precision: 'fp8',
         })),
     ];
+    interceptPreviewSnapshots();
     interceptTpuLaunchData();
-    interceptMinimaxM3RubinData(
-      rubinRows,
-      tpuLaunchRows().map(({ metrics: _metrics, ...row }) => row),
-    );
+    interceptMinimaxM3RubinData(rubinRows, [
+      ...tpuLaunchRows().map(({ metrics: _metrics, ...row }) => row),
+      ...previewAvailability,
+    ]);
     cy.visit('/compare');
     cy.visit(TPU_RESULTS_HREF);
     assertTpuView();

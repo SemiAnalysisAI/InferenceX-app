@@ -21,7 +21,6 @@
     "db:ingest:collectivex": "bun --env-file=../../.env src/ingest-collectivex.ts",
     "db:ingest:run": "bun --env-file=../../.env src/ingest-ci-run.ts --download",
     "db:ingest:gcs": "bun --env-file=../../.env src/ingest-gcs-backup.ts",
-    "db:ingest:supplemental": "bun --env-file=../../.env src/ingest-supplemental.ts",
     "db:migrate": "bun --env-file=../../.env src/migrate.ts",
     "db:migrate:collectivex": "bun --env-file=../../.env src/migrate-collectivex.ts",
     "db:apply-overrides": "bun --env-file=../../.env src/apply-overrides.ts",
@@ -62,8 +61,8 @@
     "kysely-neon": "^3.0.0",
     "pg": "^8.22.0",
     "postgres": "^3.4.9",
-    "stream-chain": "^4.2.5",
-    "stream-json": "^3.6.0"
+    "stream-chain": "^4.4.1",
+    "stream-json": "^3.8.0"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",

@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronRight } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -59,7 +59,7 @@ const STRINGS = {
     metricNote:
       'Latency and throughput cover submission to downloaded media. Energy uses the recorded generation window and participating GPU boards; lower is better. Failed attempts remain in the recorded measurement window.',
     samples: 'Valid latency samples',
-    replay: 'Retained-data replay for local verification; no new measurements or publication.',
+    replay: 'Local replay · unpublished. Original retained evidence; no new measurement.',
   },
   zh: {
     intro: '每条记录保留原始执行与产物标识。',
@@ -78,7 +78,7 @@ const STRINGS = {
     published: '存储时间',
     publication: '发布批准',
     approved: '已批准用于仪表板',
-    unapproved: '暂无匹配的发布批准回执',
+    unapproved: '未找到匹配的发布批准回执',
     execution: '原始执行时间',
     source: '原始运行',
     sourceSha: '源码 SHA',
@@ -106,7 +106,7 @@ const STRINGS = {
     metricNote:
       '延迟与吞吐量涵盖提交到媒体下载完成。能耗使用记录的生成时间窗口，按参与计算的 GPU 板卡统计，越低越好；失败尝试的耗时仍计入对应测量窗口。',
     samples: '有效延迟样本数',
-    replay: '本地验证使用保留数据回放，未重新测量或发布。',
+    replay: '本地回放 · 未发布。使用原始保留数据，未重新测量。',
   },
 };
 const STATUS: Record<string, { en: string; zh: string }> = {
@@ -150,6 +150,8 @@ export default function VideoHistory() {
   const [hardware, setHardware] = useState('');
   const [concurrency, setConcurrency] = useState('');
   const [query, setQuery] = useState('');
+  // Activity re-runs the mount effect when the overview is revealed; loaded pages must survive it.
+  const firstPageLoaded = useRef(false);
   async function load(page: number, signal?: AbortSignal) {
     setLoading(true);
     setError(false);
@@ -168,6 +170,7 @@ export default function VideoHistory() {
           : [...old, ...data.entries.filter((entry) => !old.some((item) => item.id === entry.id))],
       );
       setNextPage(data.nextPage);
+      if (page === 1) firstPageLoaded.current = true;
       setReplay(response.headers.get('x-videogenx-replay') === '1');
     } catch {
       if (!signal?.aborted) setError(true);
@@ -176,13 +179,20 @@ export default function VideoHistory() {
     }
   }
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    setHardware(params.get('history-hardware') ?? '');
-    setConcurrency(params.get('history-concurrency') ?? '');
-    setQuery(params.get('history-query') ?? '');
+    const read = () => {
+      const params = new URLSearchParams(location.search);
+      setHardware(params.get('history-hardware') ?? '');
+      setConcurrency(params.get('history-concurrency') ?? '');
+      setQuery(params.get('history-query') ?? '');
+    };
+    read();
+    window.addEventListener('popstate', read);
     const controller = new AbortController();
-    void load(1, controller.signal);
-    return () => controller.abort();
+    if (!firstPageLoaded.current) void load(1, controller.signal);
+    return () => {
+      window.removeEventListener('popstate', read);
+      controller.abort();
+    };
   }, []);
   const observations = entries.flatMap((entry) =>
     entry.sources.flatMap((source) => source.observations),

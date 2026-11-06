@@ -1,14 +1,19 @@
 import { cachedText } from '@/lib/cache/api-cache';
 import { escapeCsvCell } from '@/lib/export/csv-export';
 
-export function toCsv(rows: readonly Readonly<Record<string, unknown>>[]): string {
-  const columns: string[] = [];
+export function toCsv(
+  rows: readonly Readonly<Record<string, unknown>>[],
+  fixedColumns?: readonly string[],
+): string {
+  const columns: string[] = fixedColumns ? [...fixedColumns] : [];
   const seen = new Set<string>();
-  for (const row of rows) {
-    for (const key of Object.keys(row)) {
-      if (!seen.has(key)) {
-        seen.add(key);
-        columns.push(key);
+  if (!fixedColumns) {
+    for (const row of rows) {
+      for (const key of Object.keys(row)) {
+        if (!seen.has(key)) {
+          seen.add(key);
+          columns.push(key);
+        }
       }
     }
   }

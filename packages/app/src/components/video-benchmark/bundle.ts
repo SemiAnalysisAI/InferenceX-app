@@ -21,6 +21,16 @@ export function number(value: Json): number | null {
 export function text(value: Json): string {
   return typeof value === 'string' ? value : '';
 }
+/** Key-sorted JSON, so two documents compare equal whatever their key order. */
+export function canonical(value: Json): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value !== null && typeof value === 'object')
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`)
+      .join(',')}}`;
+  return JSON.stringify(value);
+}
 export function safePath(path: string): string {
   if (
     !path ||
@@ -51,9 +61,14 @@ export interface Bundle {
   checksums: Map<string, string>;
   manifestSha256: string;
 }
+/**
+ * Reads and hashes every SHA256SUMS path that `include` accepts. Skipped paths keep their
+ * sealed checksum, so manifest evidence and media identity checks still bind them.
+ */
 export async function readVerifiedFiles(
   read: (path: string) => Promise<Blob>,
   entryPoint: 'manifest.json' | 'comparison.json',
+  include: (path: string) => boolean = () => true,
 ) {
   const sums = await read('SHA256SUMS');
   if (sums.size > 1024 * 1024) throw new Error('Checksum inventory exceeds 1 MiB');
@@ -71,6 +86,7 @@ export async function readVerifiedFiles(
   const documents = new Map<string, Json>();
   let total = 0;
   for (const [path, hash] of checksums) {
+    if (!include(path)) continue;
     const blob = await read(path);
     total += blob.size;
     if (blob.size > 512 * 1024 ** 2 || total > 1024 ** 3)
@@ -83,8 +99,11 @@ export async function readVerifiedFiles(
   return { files, documents, checksums };
 }
 
-export async function loadBundle(read: (path: string) => Promise<Blob>): Promise<Bundle> {
-  const { files, documents, checksums } = await readVerifiedFiles(read, 'manifest.json');
+export async function loadBundle(
+  read: (path: string) => Promise<Blob>,
+  include?: (path: string) => boolean,
+): Promise<Bundle> {
+  const { files, documents, checksums } = await readVerifiedFiles(read, 'manifest.json', include);
   const manifest = documents.get('manifest.json') ?? null;
   if (
     at(manifest, 'schema_version') !== 1 ||

@@ -63,7 +63,7 @@ const WORKFLOW_STRINGS = {
   },
 } as const;
 
-const RUN_CONTEXT_GRID =
+export const RUN_CONTEXT_GRID =
   'grid min-w-0 items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,24rem)_minmax(0,24rem)_minmax(0,1fr)]';
 
 export function workflowRunCountLabel(index: number, total: number, locale: Locale): string {
@@ -132,6 +132,111 @@ function RunOptionLabel({
   );
 }
 
+export interface RunFieldRun {
+  conclusion: string | null;
+  runUrl: string;
+}
+
+/** The run select with previous/next steppers. The external-link icon opens the selected GitHub Actions run. */
+export function RunField({
+  runIds,
+  runs,
+  selectedRunId,
+  onSelect,
+}: {
+  runIds: readonly string[];
+  runs: Readonly<Record<string, RunFieldRun>>;
+  selectedRunId: string;
+  onSelect: (runId: string | undefined, source: 'previous' | 'next' | 'select') => void;
+}) {
+  const locale = useLocale();
+  const t = WORKFLOW_STRINGS[locale];
+  const selectedRunIndex = runIds.indexOf(selectedRunId);
+  const previousRunId = getAdjacentRunId(runIds, selectedRunId, 'previous');
+  const nextRunId = getAdjacentRunId(runIds, selectedRunId, 'next');
+  return (
+    <div className="flex min-w-0 flex-col space-y-1.5" data-slot="run-field">
+      <Label htmlFor="run-select">{t.run}</Label>
+      <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => onSelect(previousRunId, 'previous')}
+          disabled={previousRunId === undefined}
+          aria-label={t.previousRun}
+        >
+          <ChevronLeft className="size-4" />
+        </Button>
+        <Select value={selectedRunId} onValueChange={(value) => onSelect(value, 'select')}>
+          <SelectTrigger
+            id="run-select"
+            aria-label={t.run}
+            className="w-full [&_[data-external-link]_svg]:pointer-events-auto"
+            onClick={(e) => {
+              if ((e.target as HTMLElement).closest('[data-external-link]')) e.preventDefault();
+            }}
+            onPointerDown={(e) => {
+              const target = e.target as HTMLElement;
+              if (target.closest('[data-external-link]')) {
+                e.preventDefault();
+                e.stopPropagation();
+                const runUrl = runs[selectedRunId]?.runUrl;
+                if (runUrl) {
+                  window.open(updateRepoUrl(runUrl), '_blank', 'noopener,noreferrer');
+                }
+              }
+            }}
+          >
+            <SelectValue placeholder={t.run}>
+              {selectedRunIndex !== -1 && (
+                <RunOptionLabel
+                  conclusion={runs[selectedRunId].conclusion}
+                  label={t.runCountShort(selectedRunIndex + 1, runIds.length)}
+                  locale={locale}
+                />
+              )}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {runIds.map((run, index) => {
+              const runUrl = updateRepoUrl(runs[run].runUrl);
+              return (
+                <SelectItem
+                  key={run}
+                  value={run}
+                  onPointerDown={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest('[data-external-link]')) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      window.open(runUrl, '_blank', 'noopener,noreferrer');
+                    }
+                  }}
+                >
+                  <RunOptionLabel
+                    conclusion={runs[run].conclusion}
+                    label={t.runCount(index + 1, runIds.length)}
+                    locale={locale}
+                  />
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => onSelect(nextRunId, 'next')}
+          disabled={nextRunId === undefined}
+          aria-label={t.nextRun}
+        >
+          <ChevronRight className="size-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function WorkflowInfoDisplay() {
   const locale = useLocale();
   const t = WORKFLOW_STRINGS[locale];
@@ -145,9 +250,6 @@ export default function WorkflowInfoDisplay() {
   const runIds = Object.keys(availableRuns);
   const latestRunId = getLatestRunId(runIds);
   const isLatestRunSelected = latestRunId === undefined || selectedRunId === latestRunId;
-  const selectedRunIndex = runIds.indexOf(selectedRunId);
-  const previousRunId = getAdjacentRunId(runIds, selectedRunId, 'previous');
-  const nextRunId = getAdjacentRunId(runIds, selectedRunId, 'next');
 
   const selectRun = (runId: string | undefined, source: string) => {
     if (!runId) return;
@@ -240,85 +342,12 @@ export default function WorkflowInfoDisplay() {
           isLatestRunSelected={isLatestRunSelected}
           onGoToLatestRun={() => selectRun(latestRunId, 'latest')}
         />
-        <div className="flex min-w-0 flex-col space-y-1.5" data-slot="run-field">
-          <Label htmlFor="run-select">{t.run}</Label>
-          <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => selectRun(previousRunId, 'previous')}
-              disabled={previousRunId === undefined}
-              aria-label={t.previousRun}
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <Select value={selectedRunId} onValueChange={(value) => selectRun(value, 'select')}>
-              <SelectTrigger
-                id="run-select"
-                aria-label={t.run}
-                className="w-full [&_[data-external-link]_svg]:pointer-events-auto"
-                onClick={(e) => {
-                  if ((e.target as HTMLElement).closest('[data-external-link]')) e.preventDefault();
-                }}
-                onPointerDown={(e) => {
-                  const target = e.target as HTMLElement;
-                  if (target.closest('[data-external-link]')) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const runUrl = availableRuns[selectedRunId]?.runUrl;
-                    if (runUrl) {
-                      window.open(updateRepoUrl(runUrl), '_blank', 'noopener,noreferrer');
-                    }
-                  }
-                }}
-              >
-                <SelectValue placeholder={t.run}>
-                  {selectedRunIndex !== -1 && (
-                    <RunOptionLabel
-                      conclusion={availableRuns[selectedRunId].conclusion}
-                      label={t.runCountShort(selectedRunIndex + 1, runIds.length)}
-                      locale={locale}
-                    />
-                  )}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {runIds.map((run, index) => {
-                  const runUrl = updateRepoUrl(availableRuns[run].runUrl);
-                  return (
-                    <SelectItem
-                      key={run}
-                      value={run}
-                      onPointerDown={(e) => {
-                        const target = e.target as HTMLElement;
-                        if (target.closest('[data-external-link]')) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          window.open(runUrl, '_blank', 'noopener,noreferrer');
-                        }
-                      }}
-                    >
-                      <RunOptionLabel
-                        conclusion={availableRuns[run].conclusion}
-                        label={t.runCount(index + 1, runIds.length)}
-                        locale={locale}
-                      />
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => selectRun(nextRunId, 'next')}
-              disabled={nextRunId === undefined}
-              aria-label={t.nextRun}
-            >
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
-        </div>
+        <RunField
+          runIds={runIds}
+          runs={availableRuns}
+          selectedRunId={selectedRunId}
+          onSelect={selectRun}
+        />
         {changelogPopover}
       </div>
     </ControlPanel>

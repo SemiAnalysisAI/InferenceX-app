@@ -29,6 +29,90 @@ const mountGpuGraph = (
 ) => mountWithProviders(tree, { unofficial: {}, ...overrides });
 
 describe('GPUGraph', () => {
+  it('uses compact date-colored hover and full details for each history curve', () => {
+    const dates = ['2025-03-01', '2025-03-02'];
+    const data = dates.map((date, i) =>
+      createMockInferenceData({
+        id: 123 + i,
+        date,
+        hwKey: 'b200_sglang',
+        framework: 'sglang',
+        x: 32 + i * 32,
+        y: 180 + i * 30,
+        conc: 64,
+        tp: 4,
+        ep: 4,
+        dp_attention: true,
+        physicalChips: 4,
+        precision: Precision.FP4,
+        benchmark_type: 'agentic_traces',
+        image: 'test/image:full-details',
+        kv_offloading: 'dram',
+        kv_offload_backend: 'hicache',
+        server_gpu_cache_hit_rate: 0.7,
+        server_cpu_cache_hit_rate: 0.2,
+        theoretical_cache_hit_rate: 0.95,
+        total_prompt_tokens: 75000,
+        total_generation_tokens: 25000,
+      }),
+    );
+    mountGpuGraph(
+      <div style={{ width: 1000, height: 700 }}>
+        <GPUGraph
+          chartId="history-hover"
+          modelLabel="DeepSeek R1"
+          data={data}
+          xLabel="Interactivity"
+          yLabel="Throughput / Chip (tok/s)"
+          chartDefinition={defaultChartDef}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          selectedGPUs: ['b200_sglang'],
+          selectedDates: dates,
+          selectedDateRange: { startDate: '', endDate: '' },
+          activeDates: new Set(dates.map((date) => `${date}_b200_sglang`)),
+          selectedPrecisions: [Precision.FP4],
+          selectedSequence: Sequence.AgenticTraces,
+        },
+      },
+    );
+    for (const date of dates) {
+      const point = () =>
+        cy
+          .get('#history-hover .dot-group')
+          .filter((_i, el) => (el as unknown as { __data__: InferenceData }).__data__.date === date)
+          .first();
+      point()
+        .find('.visible-shape')
+        .invoke('attr', 'fill')
+        .then((color) => {
+          point().trigger('mouseenter').trigger('mousemove', { clientX: 400, clientY: 300 });
+          cy.get('[data-chart-tooltip="history-hover"]').should('have.css', 'display', 'block');
+          cy.get('[data-chart-tooltip="history-hover"] [data-hover-tooltip]')
+            .should('contain.text', date)
+            .and('contain.text', 'DEP4')
+            .and('contain.text', 'Click for full details')
+            .and('not.contain.text', 'test/image');
+          cy.get('[data-chart-tooltip="history-hover"] [data-hover-cache-bar] > div')
+            .first()
+            .invoke('attr', 'style')
+            .should('include', `background: ${color}`);
+          point().find('.visible-shape').click({ force: true });
+          cy.get('[data-testid="point-details-panel"]')
+            .should('contain.text', date)
+            .and('contain.text', 'DEP4')
+            .and('contain.text', 'test/image:full-details');
+          cy.get('[data-testid="point-details-panel"] [data-pinned-tokens]')
+            .should('contain.text', '75,000')
+            .and('contain.text', '25,000');
+          cy.get('#history-hover [data-testid="d3-chart-svg"]').click(5, 5, { force: true });
+        });
+    }
+  });
+
   it('toggles framework suffixes while keeping comparison dates and hardware labels', () => {
     const data = [8, 16, 32].map((x) =>
       createMockInferenceData({
@@ -286,6 +370,13 @@ describe('GPUGraph', () => {
     cy.get('#test-gpu-agentic-decorations [data-testid="agentic-optimization-note"]').should(
       'not.exist',
     );
+    cy.get('#test-gpu-agentic-decorations svg .dot-group')
+      .first()
+      .trigger('mouseenter')
+      .trigger('mousemove', { clientX: 400, clientY: 300 });
+    cy.get('[data-chart-tooltip]').should('have.css', 'display', 'block');
+    cy.get('[data-chart-tooltip] [data-hover-tooltip]').should('exist');
+    cy.get('[data-chart-tooltip]').should('contain.text', 'MTP');
     cy.get('#test-gpu-agentic-decorations svg .dot-group .visible-shape')
       .first()
       .click({ force: true });
@@ -844,6 +935,44 @@ describe('GPU comparison with unofficial runs', () => {
       />,
     );
   };
+
+  it('keeps unofficial warnings and run colors when hovering and pinning history overlays', () => {
+    mountComparison(
+      createMockChartDefinition({ chartType: 'interactivity', y_tpPerGpu_roofline: 'upper_left' }),
+      [official(DATES[0], 32, 250)],
+      [
+        {
+          ...overlay(64, 300),
+          benchmark_type: 'agentic_traces',
+          server_gpu_cache_hit_rate: 0.8,
+          total_prompt_tokens: 75000,
+          total_generation_tokens: 25000,
+        },
+      ],
+    );
+    cy.get('#gpu-overlay .unofficial-overlay-pt')
+      .first()
+      .trigger('mouseenter')
+      .trigger('mousemove', { clientX: 400, clientY: 300 });
+    cy.get('[data-chart-tooltip="gpu-overlay"]').should('have.css', 'display', 'block');
+    cy.get('[data-chart-tooltip="gpu-overlay"] [data-hover-notice]')
+      .should('contain.text', 'Unofficial run')
+      .and('contain.text', 'feat/power-sweep');
+    cy.get('[data-chart-tooltip="gpu-overlay"] [data-hover-context]').should(
+      'contain.text',
+      '2025-03-20',
+    );
+    cy.get('[data-chart-tooltip="gpu-overlay"] [data-hover-cache-bar] > div')
+      .first()
+      .invoke('attr', 'style')
+      .should('include', `background: ${overlayRunColor(0)}`);
+    cy.get('#gpu-overlay .unofficial-overlay-pt .overlay-x').first().click({ force: true });
+    cy.get('[data-testid="point-details-panel"]').should('contain.text', 'Unofficial run');
+    cy.get('[data-testid="point-details-panel"] [data-pinned-tokens]').should(
+      'contain.text',
+      '75,000',
+    );
+  });
 
   it('toggles official and unofficial offload halos without removing history points', () => {
     mountComparison(

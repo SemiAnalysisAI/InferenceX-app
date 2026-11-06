@@ -83,15 +83,6 @@ function PortalTooltip({
     };
   }, [sheet, tooltipRef]);
 
-  useEffect(() => {
-    if (!sheet) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onSheetDismissRef.current();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [sheet]);
-
   const node = (
     <div
       ref={tooltipRef}
@@ -194,24 +185,46 @@ export function D3ChartWrapper({
   const hasDetails = Boolean(details);
   const onDetailsCloseRef = useRef(onDetailsClose);
   onDetailsCloseRef.current = onDetailsClose;
-  useEffect(() => {
-    if (!hasDetails) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      if (
-        event.target instanceof Element &&
-        event.target.closest('[data-radix-popper-content-wrapper]')
-      ) {
-        return;
-      }
-      event.preventDefault();
-      onDetailsCloseRef.current?.();
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [hasDetails]);
-
   const legendSlotRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pinnedPoint) return;
+
+    const dismiss = () => {
+      if (hasDetails && onDetailsCloseRef.current) onDetailsCloseRef.current();
+      else dismissTooltip();
+      hideTooltipElements(tooltipRef, svgRef);
+    };
+    const inPopper = (target: EventTarget | null) =>
+      target instanceof Element && target.closest('[data-radix-popper-content-wrapper]') !== null;
+    const onOutsideClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      // Point switching and empty-plot clicks already belong to the chart.
+      if (svgRef.current?.contains(target) || tooltipRef.current?.contains(target)) return;
+      // The details panel sits in the legend slot and owns its own close button.
+      if (hasDetails && legendSlotRef.current?.contains(target)) return;
+      // The mobile backdrop owns its dismissal and stops the underlying click.
+      if (target instanceof Element && target.closest('[data-testid="chart-sheet-backdrop"]'))
+        return;
+      if (inPopper(target)) return;
+      dismiss();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || inPopper(event.target)) return;
+      if (hasDetails) event.preventDefault();
+      dismiss();
+    };
+
+    // Capture outside clicks even when a page control stops propagation.
+    document.addEventListener('click', onOutsideClick, true);
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('click', onOutsideClick, true);
+      window.removeEventListener('keydown', onKeyDown, true);
+    };
+  }, [pinnedPoint, hasDetails, dismissTooltip, hideTooltipElements, tooltipRef, svgRef]);
+
   const legendWidthRef = useRef(0);
   useLayoutEffect(() => {
     if (!hasDetails && legendSlotRef.current) {

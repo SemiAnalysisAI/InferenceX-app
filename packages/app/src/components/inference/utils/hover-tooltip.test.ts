@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 
-import type { HardwareConfig, InferenceData } from '@/components/inference/types';
+import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
 import {
   formatHoverValue,
   generateHoverTooltipContent,
@@ -64,12 +64,17 @@ const config = (data: InferenceData, overrides: Partial<TooltipConfig> = {}): To
   ...overrides,
 });
 
-const hover = (c: TooltipConfig) => {
+const textOf = (html: string) => {
   const host = document.createElement('div');
-  host.innerHTML = generateHoverTooltipContent({ ...c, color: 'rgb(156, 204, 101)' });
+  host.innerHTML = html;
+  return (host.textContent ?? '').replaceAll(/\s+/g, ' ');
+};
+
+const hover = (c: TooltipConfig) => {
+  const html = generateHoverTooltipContent({ ...c, color: 'rgb(156, 204, 101)' });
   return {
-    text: (host.textContent ?? '').replaceAll(/\s+/g, ' '),
-    hasCacheBar: host.querySelector('[data-hover-cache-bar]') !== null,
+    text: textOf(html),
+    hasCacheBar: html.includes('data-hover-cache-bar'),
   };
 };
 
@@ -143,6 +148,46 @@ describe('generateHoverTooltipContent', () => {
       config(agenticPoint({ benchmark_type: 'single_turn', spec_decoding: 'none' })),
     );
     expect(off).not.toContain('Speculative decoding');
+  });
+
+  it('keeps comparison dates and carried-forward source dates in compact hover', () => {
+    const html = generateHoverTooltipContent({
+      ...config(agenticPoint({ date: '2026-11-04', actualDate: '2026-11-02' }), {
+        comparisonLabel: '2026-11-04',
+      }),
+      color: '#123456',
+    });
+    expect(textOf(html)).toContain('Date: 2026-11-04 (data from 2026-11-02)');
+    expect(html).toContain('background: #123456');
+    expect(html).toContain('data-hover-cache-bar');
+    expect(html).not.toContain('sha256');
+  });
+
+  it('preserves same-day run numbering without a misleading source-date note', () => {
+    const { text } = hover(
+      config(agenticPoint({ date: '2026-11-04~r123', actualDate: '2026-11-04' }), {
+        comparisonLabel: '2026-11-04 #2',
+      }),
+    );
+    expect(text).toContain('Date: 2026-11-04 #2');
+    expect(text).not.toContain('~r123');
+    expect(text).not.toContain('data from');
+  });
+
+  it('localizes comparison context and preserves unofficial provenance safely', () => {
+    const html = generateHoverTooltipContent({
+      ...config(agenticPoint({ date: '2026-11-04', actualDate: '2026-11-02' }), {
+        locale: 'zh',
+        comparisonLabel: '2026-11-04',
+        overlayData: { label: 'feat/<script>test</script>', hardwareConfig } as OverlayData,
+      }),
+      color: 'red',
+    });
+    expect(textOf(html)).toContain('日期： 2026-11-04');
+    expect(textOf(html)).toContain('2026年11月2日');
+    expect(html).toContain('data-hover-notice');
+    expect(html).toContain('feat/&lt;script&gt;test&lt;/script&gt;');
+    expect(html).not.toContain('<script>');
   });
 
   it('omits the cache section when no hit rate was recorded', () => {
