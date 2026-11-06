@@ -257,7 +257,7 @@ describe('compareSide', () => {
   it('resolves the point’s C1 records and published media URLs from a stored artifact', () => {
     const side = compareSide(stored(h100.runId, h100.artifactId, 'NVIDIA H100 80GB HBM3'), h100);
     expect(side.records).toHaveLength(4);
-    expect(side.urls.get(side.records[0].mediaPath!)).toBe(
+    expect(side.media.get(side.records[0].mediaPath!)?.url).toBe(
       'https://media.test/gpu/c1/baseline/artifacts/measurement-r001-c001.mp4',
     );
   });

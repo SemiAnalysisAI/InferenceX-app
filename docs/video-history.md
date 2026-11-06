@@ -60,9 +60,41 @@ verified, read-only snapshot and bypasses this cache.
 仪表板、视图 API 和浏览器重试均在一次请求中读取全部有界分页。HTTP 响应仍为 `private, no-store`。
 本地回放继续复用原有的已校验只读快照，不经过此缓存。
 
-The `publish-video-results` repository dispatch supplies an explicit `source_run_id` and `merge_run_id`; manual `workflow_dispatch` requires a source `run_id`. There is no scheduled all-runs publisher. The job lists only that run's GitHub artifacts (including later artifact pages), then sends each exact run/artifact ID to bearer-protected `POST /api/video-runs` using the existing invalidation secret. It retries already stored indexes because they may lack an approval receipt. Failed artifacts do not prevent later artifacts from being attempted, but the job still fails. Authorization approves publication of the named source; it is not a benchmark qualification verdict.
+The `publish-video-results` repository dispatch supplies an explicit `source_run_id` and `merge_run_id`; manual `workflow_dispatch` takes a source `run_id`. There is no scheduled all-runs publisher. The job lists only that run's GitHub artifacts (including later artifact pages), then sends each exact run/artifact ID to bearer-protected `POST /api/video-runs` using the existing invalidation secret. It retries already stored indexes because they may lack an approval receipt. Failed artifacts do not prevent later artifacts from being attempted, but the job still fails. Authorization approves publication of the named source; it is not a benchmark qualification verdict.
 
 Native matrix artifacts use `h3-results-<run>-<attempt>-<recipe-fingerprint>` while legacy names remain readable. The sealed `artifact_name`, run/attempt, and `ci.head_sha` bind a new artifact to GitHub metadata. The actual benchmark checkout remains `git_commit`, which may differ from the Actions head when CI tests a merge commit. The authorized POST writes verified immutable objects before the index, checks index readback, then writes a separate immutable approval receipt bound to artifact identity, source seal and checkout, and finally records the artifact in a new History snapshot. A repeat with the same identity reuses the receipt; a mismatched receipt does not authorize the source. Every public GET, including `format=media` on a cache miss, is read-only and returns 204 when stored media is absent. Legacy stored indexes and low-sample or failed sources remain in History, while only approval-backed observations enter default chart selectors; sample floors still apply.
+
+### Web playback renditions
+
+The sealed CI MP4s are about 10 Mbit/s with the `moov` box at the end, so a browser
+must download most of each file before playback. After a successful publication, the
+separate `renditions` job in `h3-media` installs ffmpeg and runs
+`scripts/video-renditions.ts --run <source run>`; its failure leaves the publication result
+and the original media unchanged. A manual dispatch with `backfill_renditions` skips
+publication and processes every stored index instead. Only `publish` holds the
+`h3-media-publication` concurrency group: a group keeps one pending run and cancels older
+ones, so a long encode inside it could drop a publication. Each rendition job has its own group
+per source run (one for backfill), so jobs for different runs overlap; uploads never overwrite. An unreadable index is logged and fails the job after the other clips
+are encoded. For each sealed
+MP4 without a receipt, the script downloads the original, checks its recorded SHA256 and
+encodes the fixed `web-h264-crf23` profile: libx264 High, CRF 23, preset slow, yuv420p,
+audio copied and faststart. It rejects output that does not decode, is not faststart, or
+whose duration differs from the original by more than 0.05 s. It uploads the MP4 to
+`objects/<output sha256>/web-h264-crf23.mp4`, then writes the receipt
+`renditions/<source sha256>/web-h264-crf23/<output sha256>.json` with the ffmpeg version
+and arguments. The receipt marks the clip done, so a rerun after a crash repeats only
+unfinished clips. The output hash in the receipt path lets readers resolve every
+rendition from one listing. `--dry-run` lists the work and `--out-dir <dir>` encodes
+locally; neither writes to Blob. `--limit <n>` bounds a run.
+
+Published media reads add `previewUrl` to each asset whose sealed SHA256 has a receipt,
+from one listing shared across instances. Renditions are encoded after the publication
+purge, so the listing refreshes in the background after 60 seconds instead of waiting for
+the next publication. `url` stays the sealed
+original. A failed listing serves the originals only. Indexes, approvals and History
+are unchanged.
+
+中文：封存的 CI MP4 码率约 10 Mbit/s，且 `moov` 位于文件末尾，浏览器须先下载大部分文件才能播放。发布成功后，`h3-media` 中独立的 `renditions` job 安装 ffmpeg 并运行 `scripts/video-renditions.ts --run <source run>`；该 job 失败不影响发布结果和原始视频。手动触发并勾选 `backfill_renditions` 时跳过发布，处理全部已存储索引。只有 `publish` 占用 `h3-media-publication` 并发组：同一并发组只保留一个排队运行并取消更早的排队运行，长时间转码若在组内会导致发布被丢弃。每个转码 job 按来源运行使用独立并发组（补转共用一个），不同运行的转码可以并行，上传从不覆盖已有文件。无法读取的索引会记录日志，并在其余视频转码完成后让 job 失败。脚本对每个尚无回执的封存 MP4 下载原始文件、核对记录的 SHA256，并按固定的 `web-h264-crf23` 配置转码（libx264 High、CRF 23、preset slow、yuv420p、音频直接复制、faststart）。无法解码、不是 faststart 或时长与原始视频相差超过 0.05 秒的输出会被拒绝。脚本先上传 MP4，再写入记录 ffmpeg 版本和参数的回执；回执存在即表示完成，中断后重跑只处理未完成的视频；回执路径包含输出文件的 SHA256，因此读取端只需列出一次回执，就能得到全部转码版本的地址。`--dry-run` 只列出待处理项，`--out-dir` 在本地转码，均不写入 Blob；`--limit` 限制单次处理数量。读取已发布媒体时，某个媒体的封存 SHA256 有对应回执时，返回结果会附加 `previewUrl`；回执列表跨实例共享缓存。转码在发布清除缓存之后才完成，因此该列表 60 秒后在后台刷新，而不是等到下一次发布；`url` 仍是封存的原始视频，列表读取失败时只返回原始视频。索引、发布批准和 History 不变。
 
 ## Evidence boundaries
 

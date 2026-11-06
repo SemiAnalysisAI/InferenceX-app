@@ -9,7 +9,7 @@ import {
 import { leadCell } from './deployment';
 import { latestVideoCells } from './points';
 import { servingCells, type ServingCell } from './serving';
-import { storedBundle, type StoredArtifact, type StoredSource } from './stored';
+import { storedBundle, type StoredArtifact, type StoredMedia, type StoredSource } from './stored';
 
 /** Metrics the compare table shows, in row order. */
 export const COMPARE_METRICS = [
@@ -187,10 +187,10 @@ export function pairCases(
   return { pairs, unmatched: { baseline: unmatchedBaseline, candidate: unmatchedCandidate } };
 }
 
-/** Case records of one dashboard point plus the published URL of each media path. */
+/** Case records of one dashboard point plus the published media of each path. */
 export interface CompareSide {
   records: CaseRecord[];
-  urls: Map<string, string>;
+  media: Map<string, StoredMedia>;
 }
 
 /**
@@ -209,7 +209,7 @@ function sourceSide(
     manifestSha256: bundle.manifestSha256,
     side: {
       records: caseRecords(cell),
-      urls: new Map(source.assets.map(([path, asset]) => [path, asset.url])),
+      media: new Map(source.assets),
     },
   };
 }

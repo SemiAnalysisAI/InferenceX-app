@@ -1,11 +1,12 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeNextCache, resetFakeNextCache } from '@/lib/testing/fake-next-cache';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import { publishedVideoHistory } from './video-history-store';
-import { readStoredArtifact, storedArtifacts } from './video-storage';
+import { readStoredArtifact, renditionPreviews, storedArtifacts } from './video-storage';
 import {
   cachedPublishedArtifact,
   cachedVideoHistory,
+  RENDITION_LISTING_REVALIDATE_SECONDS,
   VIDEO_CACHE_REVALIDATE_SECONDS,
 } from './video-read-cache';
 import { purgeVideo } from '@/lib/cache/api-cache';
@@ -16,6 +17,7 @@ vi.mock('./video-history-store', () => ({ publishedVideoHistory: vi.fn() }));
 vi.mock('./video-storage', () => ({
   storedArtifacts: vi.fn(),
   readStoredArtifact: vi.fn(),
+  renditionPreviews: vi.fn(),
 }));
 
 const page = (entries: VideoHistoryPage['entries'] = []): VideoHistoryPage => ({
@@ -35,6 +37,9 @@ const entry = (runId: string, approved: boolean): VideoHistoryPage['entries'][nu
 const artifact = { id: 20, name: 'h3-results-10-1', expired: false, size_in_bytes: 0 };
 const saved = { storageVersion: 1 as const, runId: '10', artifact, sources: [] };
 
+beforeEach(() => {
+  vi.mocked(renditionPreviews).mockResolvedValue(new Map());
+});
 afterEach(() => {
   resetFakeNextCache();
   vi.resetAllMocks();
@@ -109,6 +114,21 @@ describe('shared VideoGenX read cache', () => {
     await expect(cachedPublishedArtifact('11', '20')).resolves.toBeNull();
     await expect(cachedPublishedArtifact('11', '20')).resolves.toBeNull();
     expect(storedArtifacts).toHaveBeenCalledTimes(3);
+  });
+
+  it('relists renditions on a short clock, because they are encoded after the publication purge', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(storedArtifacts).mockResolvedValue([artifact]);
+      vi.mocked(readStoredArtifact).mockResolvedValue(saved);
+      await cachedPublishedArtifact('10', '20');
+      vi.advanceTimersByTime(RENDITION_LISTING_REVALIDATE_SECONDS * 1000);
+      await cachedPublishedArtifact('10', '20');
+      expect(renditionPreviews).toHaveBeenCalledTimes(2);
+      expect(readStoredArtifact).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('rereads every page and artifact after a publication purge', async () => {
