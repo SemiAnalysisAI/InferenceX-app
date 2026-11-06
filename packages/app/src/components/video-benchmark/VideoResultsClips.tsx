@@ -626,9 +626,10 @@ function SynchronizedClips({
               {s.seed} {group.seed} · {diagnostic ? s.diagnostic : s.take(group.take)}
             </p>
           )}
-          {visible.some((key) => group?.clips.get(key)?.previewUrl) && (
-            <p className="text-muted-foreground">{s.webEncode}</p>
-          )}
+          {visible.some((key) => {
+            const preview = group?.clips.get(key)?.previewUrl;
+            return preview && !failedPreviews.has(preview);
+          }) && <p className="text-muted-foreground">{s.webEncode}</p>}
         </div>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[44rem] text-left">

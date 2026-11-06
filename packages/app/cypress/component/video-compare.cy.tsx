@@ -418,5 +418,10 @@ describe('Video results synchronized clips', () => {
       'not.contain',
       'This clip could not be played',
     );
+    // Every tile now plays an original, so the note must not claim a web encode.
+    cy.get('[data-testid="video-results-sources"] summary').click();
+    cy.get('[data-testid="video-results-prompt"]')
+      .should('contain', 'A drummer taps a snare drum.')
+      .and('not.contain', 'web encode');
   });
 });
