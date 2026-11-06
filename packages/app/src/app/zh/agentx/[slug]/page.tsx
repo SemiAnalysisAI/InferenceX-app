@@ -37,7 +37,7 @@ export default async function DatasetDetailPageZh({ params }: Props) {
   if (lookup.kind === 'missing') notFound();
   return (
     <main className="relative">
-      <div className="container mx-auto px-4 pb-8 lg:px-8">
+      <div className="container mx-auto px-4 lg:px-8">
         <DatasetDetail
           slug={slug}
           initialDataset={lookup.kind === 'found' ? lookup.record : undefined}

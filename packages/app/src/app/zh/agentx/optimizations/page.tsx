@@ -36,7 +36,7 @@ export default function AgentXOptimizationsPageZh() {
   return (
     <main className="relative">
       <JsonLd data={jsonLd} />
-      <div className="container mx-auto max-w-6xl px-4 pt-4 pb-8 lg:px-8 lg:pt-8">
+      <div className="container mx-auto max-w-6xl px-4 pt-4 lg:px-8 lg:pt-8">
         <AgentXOptimizationsIndex locale="zh" />
       </div>
     </main>

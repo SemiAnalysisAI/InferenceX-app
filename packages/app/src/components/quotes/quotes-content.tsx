@@ -92,7 +92,7 @@ export function QuotesContent({ locale = 'en' }: { locale?: Locale } = {}) {
   const t = STRINGS[locale];
   return (
     <main className="relative">
-      <div className="container mx-auto flex flex-col gap-10 px-4 pt-4 pb-8 lg:px-8 lg:pt-8">
+      <div className="container mx-auto flex flex-col gap-10 px-4 pt-4 lg:px-8 lg:pt-8">
         <header className="max-w-4xl">
           <h1 className="text-3xl font-semibold text-balance md:text-4xl">{t.heading}</h1>
           <p className="mt-3 text-base leading-7 text-muted-foreground lg:text-lg">{t.intro}</p>

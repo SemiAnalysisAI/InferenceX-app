@@ -48,7 +48,7 @@ export function BlogIndexContent({ locale }: { locale: Locale }) {
 
   return (
     <div
-      className="container mx-auto flex flex-col gap-8 px-4 pb-8 lg:gap-10 lg:px-8"
+      className="container mx-auto flex flex-col gap-8 px-4 lg:gap-10 lg:px-8"
       data-testid="blog-index-page"
     >
       <header className="flex flex-col gap-3 pt-4 lg:pt-8">

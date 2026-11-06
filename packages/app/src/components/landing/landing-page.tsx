@@ -62,7 +62,7 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
     <main className="relative">
       <LandingPageAnalytics />
       <NudgeEngine scope="landing" />
-      <div className="container mx-auto flex flex-col gap-6 px-4 pb-8 lg:px-8">
+      <div className="container mx-auto flex flex-col gap-6 px-4 lg:px-8">
         <div className="contents" {...analyticsPlacement('landing_hero')}>
           <AgentXCompareHero locale={locale} headingLevel="h1" surface="landing" />
         </div>

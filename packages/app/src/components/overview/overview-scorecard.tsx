@@ -108,7 +108,7 @@ function missingReasonCopy(platform: OverviewPlatformResult, strings: OverviewSt
 }
 
 const RAW_SOURCE_LINK_CLASS =
-  'inline-flex min-h-11 items-center rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none xl:min-h-0';
+  "relative inline-flex items-center rounded-sm underline decoration-dotted underline-offset-4 after:absolute after:inset-x-0 after:-inset-y-3 after:content-[''] hover:decoration-solid focus-visible:outline-none xl:after:hidden";
 
 function CellMissing({ hardware, reason }: { hardware: string; reason: string }) {
   return (
@@ -573,11 +573,11 @@ export function DesktopOverviewMatrix({
             <col key={platform.hardware} className="w-[15.6%]" />
           ))}
         </colgroup>
-        <thead className="sticky top-14 z-10 bg-card">
+        <thead className="sticky top-14 z-20 bg-card">
           <tr className="text-xs text-muted-foreground">
             <th
               scope="col"
-              className="h-10 bg-card px-4 text-left font-medium shadow-[inset_0_-1px_0_var(--border)] lg:px-6"
+              className="h-10 bg-card px-4 text-left font-medium shadow-[inset_0_-1px_0_var(--border),0_6px_6px_-6px_rgb(0_0_0/0.25)] lg:px-6"
             >
               {strings.modelHeader}
             </th>
@@ -585,7 +585,7 @@ export function DesktopOverviewMatrix({
               <th
                 key={platform.hardware}
                 scope="col"
-                className={`h-10 px-3 text-left ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-[color-mix(in_oklch,var(--muted)_50%,var(--card))] font-semibold text-foreground shadow-[inset_0_-1px_0_var(--border),inset_1px_0_0_var(--border),inset_-1px_0_0_var(--border)]' : 'bg-card font-medium shadow-[inset_0_-1px_0_var(--border)]'}`}
+                className={`h-10 px-3 text-left ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-[color-mix(in_oklch,var(--muted)_50%,var(--card))] font-semibold text-foreground shadow-[inset_0_-1px_0_var(--border),inset_1px_0_0_var(--border),inset_-1px_0_0_var(--border),0_6px_6px_-6px_rgb(0_0_0/0.25)]' : 'bg-card font-medium shadow-[inset_0_-1px_0_var(--border),0_6px_6px_-6px_rgb(0_0_0/0.25)]'}`}
               >
                 {comparisonMode === 'hardware' && platform.hardware === referenceHardware
                   ? `${platform.hardwareLabel} · ${strings.referenceHeader}`
@@ -825,7 +825,7 @@ export function OverviewEngineScopeSwitcher({
   strings: OverviewStrings;
 }) {
   const options: OverviewEngineScope[] = ['community', 'all'];
-  const optionClass = `inline-flex min-h-11 min-w-0 items-center ${SEGMENT_RADIUS_STYLE} px-2 py-1 text-left text-sm font-medium leading-snug focus-visible:outline-none md:min-h-6 md:py-0.5`;
+  const optionClass = `inline-flex min-h-9.5 min-w-0 items-center ${SEGMENT_RADIUS_STYLE} px-2 py-1 text-left text-sm font-medium leading-snug focus-visible:outline-none md:min-h-6 md:py-0.5`;
   const navigation = useOverviewNavigation();
   const optionHref = (option: OverviewEngineScope) =>
     overviewEngineScopeHref(

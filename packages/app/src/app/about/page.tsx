@@ -32,7 +32,7 @@ export default function AboutPage() {
   return (
     <main className="relative">
       <JsonLd data={faqJsonLd} />
-      <div className="container mx-auto flex flex-col gap-10 px-4 pb-8 lg:px-8">
+      <div className="container mx-auto flex flex-col gap-10 px-4 lg:px-8">
         <PromoVideo />
 
         <section>

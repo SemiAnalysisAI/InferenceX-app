@@ -284,13 +284,15 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
             value={stat.value}
             label={
               <span className="inline-flex items-center gap-1.5">
-                {stat.color ? (
-                  <span
-                    aria-hidden="true"
-                    className={cn('size-2 shrink-0', stat.key === 'cached' && CACHED_FILL)}
-                    style={stat.key === 'cached' ? undefined : { backgroundColor: stat.color }}
-                  />
-                ) : null}
+                <span
+                  aria-hidden="true"
+                  className={cn('size-2 shrink-0', stat.key === 'cached' && CACHED_FILL)}
+                  style={
+                    stat.key === 'cached' || !stat.color
+                      ? undefined
+                      : { backgroundColor: stat.color }
+                  }
+                />
                 {stat.label}
               </span>
             }

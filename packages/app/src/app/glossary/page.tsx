@@ -87,7 +87,7 @@ export default function GlossaryPage() {
   return (
     <main className="relative" {...analyticsPlacement('glossary')}>
       <JsonLd data={jsonLd} />
-      <div className="container mx-auto flex flex-col gap-10 px-4 pt-4 pb-8 lg:px-8 lg:pt-8">
+      <div className="container mx-auto flex flex-col gap-10 px-4 pt-4 lg:px-8 lg:pt-8">
         <header className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div>
             <h1 className="text-3xl font-semibold text-balance md:text-4xl">

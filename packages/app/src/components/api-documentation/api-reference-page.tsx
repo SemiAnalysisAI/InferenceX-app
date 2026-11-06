@@ -198,7 +198,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
   return (
     <main data-testid="api-reference" className="relative">
       <JsonLd data={jsonLd} />
-      <div className="container mx-auto flex flex-col gap-4 px-4 pb-8 lg:px-8">
+      <div className="container mx-auto flex flex-col gap-4 px-4 lg:px-8">
         <Card className="overflow-hidden p-0 md:p-0">
           <header className="grid lg:grid-cols-3">
             <div className="p-5 sm:p-6 lg:col-span-2 lg:p-8">

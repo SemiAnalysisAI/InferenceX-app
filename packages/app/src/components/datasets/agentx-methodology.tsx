@@ -186,7 +186,7 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
 
   return (
     <Card className="overflow-hidden p-0 md:p-0" data-testid="agentx-methodology">
-      <header className="border-b border-border/20 bg-muted/20 px-5 py-5 sm:px-6">
+      <header className="border-b border-border/20 px-5 py-5 sm:px-6">
         <p className="mb-2 text-xs font-medium text-muted-foreground">{t.eyebrow}</p>
         <Heading as="h1" level="title">
           {t.title}

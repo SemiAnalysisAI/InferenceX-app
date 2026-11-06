@@ -61,7 +61,7 @@ export function BlogPostContent({
     <main className="relative" data-testid="blog-post-page">
       <HashScroll />
       <ReadingProgressBar slug={slug} />
-      <div className="container mx-auto flex flex-col gap-10 px-4 pb-8 lg:gap-12 lg:px-8">
+      <div className="container mx-auto flex flex-col gap-10 px-4 lg:gap-12 lg:px-8">
         <section data-blog-section="true" className="flex flex-col gap-10 lg:gap-12">
           <header
             className="flex flex-col gap-5 border-b border-border/30 pb-8 pt-4 lg:pb-10 lg:pt-8"

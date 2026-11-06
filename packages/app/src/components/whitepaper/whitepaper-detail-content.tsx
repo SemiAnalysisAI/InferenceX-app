@@ -116,7 +116,7 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
     <main className="relative" data-testid="whitepaper-detail-page">
       <JsonLd data={buildWhitepaperJsonLd(paper, locale)} />
       <JsonLd data={buildWhitepaperBreadcrumbJsonLd(paper, locale)} />
-      <div className="container mx-auto flex flex-col gap-10 px-4 pt-4 pb-8 lg:gap-12 lg:px-8">
+      <div className="container mx-auto flex flex-col gap-10 px-4 pt-4 lg:gap-12 lg:px-8">
         <section
           className="dark relative isolate overflow-hidden rounded-xl border border-border/30 bg-[linear-gradient(135deg,#0b0c0e_0%,#131416_100%)] text-foreground lg:min-h-[420px]"
           data-testid="whitepaper-hero"

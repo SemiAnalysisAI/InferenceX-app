@@ -44,7 +44,7 @@ export const metadata: Metadata = {
 export default function LandAcknowledgementPageZh() {
   return (
     <main data-testid="land-acknowledgement-page" className="relative">
-      <div className="container mx-auto flex flex-col gap-10 px-4 pt-4 pb-8 lg:px-8 lg:pt-8">
+      <div className="container mx-auto flex flex-col gap-10 px-4 pt-4 lg:px-8 lg:pt-8">
         <header className="max-w-3xl">
           <p className="mb-3 text-xs font-medium text-muted-foreground">原住民传统领地声明</p>
           <h1 className="text-3xl font-semibold text-balance text-foreground md:text-4xl">

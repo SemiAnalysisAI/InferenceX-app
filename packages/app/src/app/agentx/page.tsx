@@ -34,7 +34,7 @@ export default function AgentXPage() {
   return (
     <main className="relative">
       <JsonLd data={jsonLd} />
-      <div className="container mx-auto flex flex-col gap-6 px-4 pb-8 lg:px-8">
+      <div className="container mx-auto flex flex-col gap-6 px-4 lg:px-8">
         <section>
           <AgentXMethodology locale="en" />
         </section>

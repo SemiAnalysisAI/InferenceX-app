@@ -25,7 +25,7 @@ export function WhitepaperIndexContent({ locale }: { locale: Locale }) {
   return (
     <main className="relative" data-testid="whitepaper-index-page">
       <JsonLd data={buildWhitepaperIndexJsonLd(locale)} />
-      <div className="container mx-auto flex flex-col gap-8 px-4 pb-8 lg:gap-10 lg:px-8">
+      <div className="container mx-auto flex flex-col gap-8 px-4 lg:gap-10 lg:px-8">
         <header className="flex flex-col gap-3 pt-4 lg:pt-8">
           <Heading as="h1" level="page" className="text-balance">
             {t.indexTitle}

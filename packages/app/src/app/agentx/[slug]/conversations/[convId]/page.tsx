@@ -26,7 +26,7 @@ export default async function ConversationPage({ params }: Props) {
   const { slug, convId } = await params;
   return (
     <main className="relative">
-      <div className="container mx-auto px-4 pb-8 lg:px-8">
+      <div className="container mx-auto px-4 lg:px-8">
         <Suspense>
           <ConversationView slug={slug} convId={convId} />
         </Suspense>

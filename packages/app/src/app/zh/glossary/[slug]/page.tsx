@@ -118,7 +118,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
   return (
     <main className="relative" {...analyticsPlacement('glossary')}>
       <JsonLd data={jsonLd} />
-      <div className="container mx-auto px-4 pt-4 pb-8 lg:px-8 lg:pt-8">
+      <div className="container mx-auto px-4 pt-4 lg:px-8 lg:pt-8">
         <article className="flex flex-col gap-10">
           <header className="border-b border-border/30 pb-8">
             <Link
