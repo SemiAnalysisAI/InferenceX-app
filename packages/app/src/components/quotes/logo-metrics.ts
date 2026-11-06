@@ -30,7 +30,7 @@ export const LOGO_METRICS: Record<string, LogoMetrics> = {
   'deepseek-color.svg': { ratio: 1, aspect: 1.36, fill: 0.73 },
   'doubleword.png': { ratio: 4.524, aspect: 4.56, fill: 0.99, invertInDark: true },
   'embeddedllm.webp': { ratio: 3.871, aspect: 3.92, fill: 0.99, invertInDark: true },
-  'fireworks.svg': { ratio: 2.025, aspect: 2.025, fill: 1 },
+  'fireworks-purple.svg': { ratio: 2.025, aspect: 2.025, fill: 1 },
   'firmus.svg': { ratio: 3.808, aspect: 4.04, fill: 0.94, invertInDark: true },
   'gmi-cloud.svg': { ratio: 3.571, aspect: 3.67, fill: 0.78, invertInDark: true },
   'google-color.svg': { ratio: 1, aspect: 0.98, fill: 1 },

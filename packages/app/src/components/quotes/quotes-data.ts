@@ -605,7 +605,7 @@ export const QUOTES: Quote[] = [
     title: 'Co-Founder & CTO, Fireworks AI',
     titleZh: 'Fireworks AI 联合创始人兼首席技术官',
     org: 'Fireworks AI',
-    logo: 'fireworks.svg',
+    logo: 'fireworks-purple.svg',
     link: 'https://fireworks.ai/',
   },
 ];
