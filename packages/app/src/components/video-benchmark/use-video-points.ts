@@ -5,14 +5,22 @@ import { VIDEO_HISTORY_MAX_PAGES, type VideoHistoryPage } from './history';
 import { namedRunPoints, videoPoints } from './points';
 import type { VideoHistoryData } from './initial-data';
 
-export function useVideoPoints(runId: string | null, initial?: VideoHistoryData | null) {
+/**
+ * `pending` means the server is still streaming the cohort for this render, so
+ * the browser shows the loading state without starting its own read.
+ */
+export function useVideoPoints(
+  runId: string | null,
+  initial?: VideoHistoryData | null,
+  pending = false,
+) {
   const [pages, setPages] = useState<VideoHistoryPage[]>(initial?.pages ?? []);
-  const [loading, setLoading] = useState(!initial);
+  const [loading, setLoading] = useState(pending || !initial);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [replay, setReplay] = useState(initial?.replay ?? false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
-    if (initial && attempt === 0) return;
+    if (pending || (initial && attempt === 0)) return;
     const controller = new AbortController();
     setLoading(true);
     setLoadError(null);
@@ -37,7 +45,7 @@ export function useVideoPoints(runId: string | null, initial?: VideoHistoryData 
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [attempt, initial]);
+  }, [attempt, initial, pending]);
   const points = useMemo(() => videoPoints(pages), [pages]);
   const namedPoints = useMemo(() => namedRunPoints(pages, runId), [pages, runId]);
   const retry = useCallback(() => setAttempt((n) => n + 1), []);

@@ -4,9 +4,9 @@
 
 ## Read path
 
-`GET /api/video-runs?format=history&page=1` returns a versioned UI projection of existing stored H3 indexes. Adding `pages=2` to `pages=5` returns that many consecutive pages in one response, with the same entries and `nextPage` as reading them one at a time. The route lists `h3-video-media/v1/runs/` and `h3-video-media/v1/approvals/` metadata, validates pathname identities, sorts by index storage time (artifact ID breaks ties), and reads one History snapshot (see below). An entry comes from the snapshot only while its record still names the index upload time and the approval receipt upload time it was built from. Any other index on the requested pages is projected directly, as before, from its full stored index and receipt. The read never downloads media, never writes and never calls the publication path. A matching immutable receipt under `h3-video-media/v1/approvals/` marks an entry `approved: true`. Missing or invalid receipts leave it in History with `approved: false`. The repository visibility check still applies, and a failed check discards the History read. This UI transport is not a stable public benchmark API.
+`GET /api/video-runs?format=history&page=1` returns a versioned UI projection of existing stored H3 indexes. Adding `pages=2` to `pages=5` returns that many consecutive pages in one response, with the same entries and `nextPage` as reading them one at a time. The route lists `h3-video-media/v1/runs/` and `h3-video-media/v1/approvals/` metadata, validates pathname identities, sorts by index storage time (artifact ID breaks ties), and reads one History snapshot (see below). An entry comes from the snapshot only while its record still names the index upload time and the approval receipt upload time it was built from. Any other index on the requested pages is projected directly, as before, from its full stored index and receipt. The read never downloads media, never writes and never calls the publication path. A matching immutable receipt under `h3-video-media/v1/approvals/` marks an entry `approved: true`. Missing or invalid receipts leave it in History with `approved: false`. This UI transport is not a stable public benchmark API.
 
-Every read first confirms that the H3 repository is public through the GitHub API and returns 503 otherwise. A public answer is trusted for one hour per server instance, so a repository that turns private can keep being served by a warm instance for up to an hour. A private or failed answer is never remembered. The authorized publication POST checks visibility on every call.
+Reads do not call GitHub: the H3 source repository is public, and only the authorized publication POST confirms its visibility, on every call.
 
 ### History snapshot
 
@@ -32,19 +32,33 @@ filters; it never substitutes for decoded output duration.
 
 ## Publication and discovery
 
-Published History and media metadata reads reuse a process-local payload for at
-most 30 seconds, with at most 32 entries in each cache. History is keyed by its
-first page and page count. A cached payload is served only after the repository
-visibility check above passes. Failures, partial or unapproved History pages and
-absent media are not cached. Successful publication or History backfill clears
-both process caches; another process observes the new source within the 30-second
-bound. HTTP responses remain `private, no-store`. Replay keeps its existing
+Published History pages and media metadata are cached across requests and
+instances in Next's tagged data cache under the `video` tag. An entry older than
+5 minutes is served once more while Next refreshes it in the background; this only
+bounds a read that raced a publication purge.
+The page render and the HTTP route hold separate entries for the same page,
+because Next keys `unstable_cache` on the compiled callback and the two bundles
+differ, so a page read does not warm the view API and vice versa; each entry is
+still shared across requests and instances, and the tag purge expires both.
+These reads do not call GitHub. A page whose index or approval receipt could not be read, a
+page read while storage is off, and absent media are returned but not retained,
+so the next read tries storage again. A page past the end is empty for any page number,
+so only page 1 is retained when empty. Unapproved entries are retained, because
+an approval only appears through publication. A publication or backfill expires
+the tag at once, also when it fails after a write, and
+`POST /api/v1/invalidate?scope=video` does the same by hand. History is keyed by its first page and page count, and the dashboard, the view
+API and the browser retry read the bounded cohort in one request. HTTP responses remain `private, no-store`. Replay keeps its existing
 verified, read-only snapshot and bypasses this cache.
 
-中文：已发布的 History 和媒体元数据在服务进程内最多复用 30 秒，两类缓存各保留最多 32 项；History 按起始页与页数分别缓存。
-缓存内容只在通过上述源仓库公开检查后返回；读取失败、不完整或未批准的 History 页和缺失媒体均不缓存。
-发布或 History 补建成功后清空当前进程缓存，其他进程最多延迟 30 秒看到新来源。HTTP 响应仍为
-`private, no-store`。本地回放继续复用原有的已校验只读快照。
+中文：已发布的 History 页和媒体元数据以 `video` 标签存入 Next 的数据缓存，跨请求、跨实例复用。
+超过 5 分钟的条目会再返回一次，同时由 Next 在后台刷新；这只用于兜底与发布失效同时进行的读取。页面渲染与 HTTP 路由对同一页各自持有一份缓存条目：Next 以编译后的回调文本作为
+`unstable_cache` 的键，而两个 bundle 并不相同，因此页面读取不会预热视图 API，反之亦然；
+每份条目仍跨请求、跨实例共享，标签失效会同时清除两者。这些读取不调用 GitHub。
+索引或批准回执读取失败的页、存储关闭时读到的页以及缺失的媒体会照常返回但不保留，下次仍会读取存储；
+超出末页的页对任何页码都为空，因此只有第 1 页在为空时也会保留；未批准条目会保留，因为批准只会通过发布产生。发布或历史补建会立即让该标签失效，即使在写入后失败也是如此；
+`POST /api/v1/invalidate?scope=video` 可手动触发同样的失效。History 按起始页与页数分别缓存，
+仪表板、视图 API 和浏览器重试均在一次请求中读取全部有界分页。HTTP 响应仍为 `private, no-store`。
+本地回放继续复用原有的已校验只读快照，不经过此缓存。
 
 The `publish-video-results` repository dispatch supplies an explicit `source_run_id` and `merge_run_id`; manual `workflow_dispatch` takes a source `run_id`. There is no scheduled all-runs publisher. The job lists only that run's GitHub artifacts (including later artifact pages), then sends each exact run/artifact ID to bearer-protected `POST /api/video-runs` using the existing invalidation secret. It retries already stored indexes because they may lack an approval receipt. Failed artifacts do not prevent later artifacts from being attempted, but the job still fails. Authorization approves publication of the named source; it is not a benchmark qualification verdict.
 
@@ -73,12 +87,14 @@ unfinished clips. The output hash in the receipt path lets readers resolve every
 rendition from one listing. `--dry-run` lists the work and `--out-dir <dir>` encodes
 locally; neither writes to Blob. `--limit <n>` bounds a run.
 
-Published media reads list the receipts once per 30-second cache window and add
-`previewUrl` to each asset whose sealed SHA256 has a receipt. `url` stays the sealed
+Published media reads add `previewUrl` to each asset whose sealed SHA256 has a receipt,
+from one listing shared across instances. Renditions are encoded after the publication
+purge, so the listing refreshes in the background after 60 seconds instead of waiting for
+the next publication. `url` stays the sealed
 original. A failed listing serves the originals only. Indexes, approvals and History
 are unchanged.
 
-中文：封存的 CI MP4 码率约 10 Mbit/s，且 `moov` 位于文件末尾，浏览器须先下载大部分文件才能播放。发布成功后，`h3-media` 中独立的 `renditions` job 安装 ffmpeg 并运行 `scripts/video-renditions.ts --run <source run>`；该 job 失败不影响发布结果和原始视频。手动触发并勾选 `backfill_renditions` 时跳过发布，处理全部已存储索引。只有 `publish` 占用 `h3-media-publication` 并发组：同一并发组只保留一个排队运行并取消更早的排队运行，长时间转码若在组内会导致发布被丢弃。每个转码 job 按来源运行使用独立并发组（补转共用一个），不同运行的转码可以并行，上传从不覆盖已有文件。无法读取的索引会记录日志，并在其余视频转码完成后让 job 失败。脚本对每个尚无回执的封存 MP4 下载原始文件、核对记录的 SHA256，并按固定的 `web-h264-crf23` 配置转码（libx264 High、CRF 23、preset slow、yuv420p、音频直接复制、faststart）。无法解码、不是 faststart 或时长与原始视频相差超过 0.05 秒的输出会被拒绝。脚本先上传 MP4，再写入记录 ffmpeg 版本和参数的回执；回执存在即表示完成，中断后重跑只处理未完成的视频；回执路径包含输出文件的 SHA256，因此读取端只需列出一次回执，就能得到全部转码版本的地址。`--dry-run` 只列出待处理项，`--out-dir` 在本地转码，均不写入 Blob；`--limit` 限制单次处理数量。读取已发布媒体时，回执列表按 30 秒缓存窗口刷新；某个媒体的封存 SHA256 有对应回执时，返回结果会附加 `previewUrl`；`url` 仍是封存的原始视频，列表读取失败时只返回原始视频。索引、发布批准和 History 不变。
+中文：封存的 CI MP4 码率约 10 Mbit/s，且 `moov` 位于文件末尾，浏览器须先下载大部分文件才能播放。发布成功后，`h3-media` 中独立的 `renditions` job 安装 ffmpeg 并运行 `scripts/video-renditions.ts --run <source run>`；该 job 失败不影响发布结果和原始视频。手动触发并勾选 `backfill_renditions` 时跳过发布，处理全部已存储索引。只有 `publish` 占用 `h3-media-publication` 并发组：同一并发组只保留一个排队运行并取消更早的排队运行，长时间转码若在组内会导致发布被丢弃。每个转码 job 按来源运行使用独立并发组（补转共用一个），不同运行的转码可以并行，上传从不覆盖已有文件。无法读取的索引会记录日志，并在其余视频转码完成后让 job 失败。脚本对每个尚无回执的封存 MP4 下载原始文件、核对记录的 SHA256，并按固定的 `web-h264-crf23` 配置转码（libx264 High、CRF 23、preset slow、yuv420p、音频直接复制、faststart）。无法解码、不是 faststart 或时长与原始视频相差超过 0.05 秒的输出会被拒绝。脚本先上传 MP4，再写入记录 ffmpeg 版本和参数的回执；回执存在即表示完成，中断后重跑只处理未完成的视频；回执路径包含输出文件的 SHA256，因此读取端只需列出一次回执，就能得到全部转码版本的地址。`--dry-run` 只列出待处理项，`--out-dir` 在本地转码，均不写入 Blob；`--limit` 限制单次处理数量。读取已发布媒体时，某个媒体的封存 SHA256 有对应回执时，返回结果会附加 `previewUrl`；回执列表跨实例共享缓存。转码在发布清除缓存之后才完成，因此该列表 60 秒后在后台刷新，而不是等到下一次发布；`url` 仍是封存的原始视频，列表读取失败时只返回原始视频。索引、发布批准和 History 不变。
 
 ## Evidence boundaries
 

@@ -130,8 +130,9 @@ describe('persistent H3 media', () => {
     vi.mocked(fetch).mockImplementation((url) =>
       Promise.resolve(Response.json(String(url).includes('/runs/') ? saved : approved)),
     );
-    const history = await publishedVideoHistory(1);
+    const { page: history, complete } = await publishedVideoHistory(1);
     expect(history.entries[0].approved).toBe(true);
+    expect(complete).toBe(true);
   });
 
   it('fails closed for a missing or mismatched approval without changing the stored source', async () => {

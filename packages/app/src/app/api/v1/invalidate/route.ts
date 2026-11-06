@@ -5,9 +5,11 @@ import { bearerMatches } from '@/lib/api/bearer-auth';
 import {
   COLLECTIVEX_CACHE_SCOPE,
   OPERATORX_CACHE_SCOPE,
+  VIDEO_CACHE_SCOPE,
   purgeAll,
   purgeCollectiveX,
   purgeOperatorX,
+  purgeVideo,
 } from '@/lib/cache/api-cache';
 
 export async function POST(request: Request) {
@@ -32,13 +34,20 @@ export async function POST(request: Request) {
     }
   }
 
-  // ?scope=collectivex or ?scope=operatorx purges only that cache scope. The
-  // default full purge covers CollectiveX but not OperatorX, which only its own
-  // ingest invalidates. ?immediate=true drops cached responses outright instead
-  // of serving them once more while they refresh, for corrections and retractions.
+  // ?scope=collectivex, ?scope=operatorx or ?scope=video purges only that cache
+  // scope. The default full purge covers CollectiveX but not OperatorX or video,
+  // which only their own publications invalidate. ?immediate=true drops cached
+  // responses outright instead of serving them once more while they refresh,
+  // for corrections and retractions; a video publication must reach the next
+  // read, so that scope always expires at once.
   const params = new URL(request.url).searchParams;
   const scope = params.get('scope');
-  if (scope && scope !== COLLECTIVEX_CACHE_SCOPE && scope !== OPERATORX_CACHE_SCOPE) {
+  if (
+    scope &&
+    scope !== COLLECTIVEX_CACHE_SCOPE &&
+    scope !== OPERATORX_CACHE_SCOPE &&
+    scope !== VIDEO_CACHE_SCOPE
+  ) {
     return NextResponse.json({ error: 'unknown scope' }, { status: 400 });
   }
   const immediateParam = params.get('immediate');
@@ -53,6 +62,10 @@ export async function POST(request: Request) {
   if (scope === OPERATORX_CACHE_SCOPE) {
     await purgeOperatorX({ immediate });
     return NextResponse.json({ invalidated: true, scope, immediate });
+  }
+  if (scope === VIDEO_CACHE_SCOPE) {
+    purgeVideo();
+    return NextResponse.json({ invalidated: true, scope, immediate: true });
   }
 
   await purgeAll({ immediate });

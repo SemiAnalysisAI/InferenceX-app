@@ -23,11 +23,8 @@ import {
   storeVideoArtifact,
   videoStorageEnabled,
 } from '@/lib/video/video-storage';
-import {
-  cachedPublishedArtifact,
-  cachedVideoHistory,
-  clearVideoReadCache,
-} from '@/lib/video/video-read-cache';
+import { purgeVideo } from '@/lib/cache/api-cache';
+import { cachedPublishedArtifact, cachedVideoHistory } from '@/lib/video/video-read-cache';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -59,18 +56,6 @@ function github(path: string, signal = AbortSignal.timeout(30000)) {
     cache: 'no-store',
     signal,
   });
-}
-
-const PUBLIC_REPOSITORY_TTL_MS = 60 * 60 * 1000;
-let repositoryPublicUntil = 0;
-
-async function repositoryIsPublic(): Promise<boolean> {
-  if (Date.now() < repositoryPublicUntil) return true;
-  const repository = await github('');
-  const repo = repository.ok ? await repository.json() : null;
-  if (repo?.private !== false) return false;
-  repositoryPublicUntil = Date.now() + PUBLIC_REPOSITORY_TTL_MS;
-  return true;
 }
 
 export async function GET(request: NextRequest) {
@@ -119,7 +104,7 @@ export async function GET(request: NextRequest) {
       !videoStorageEnabled() &&
       (!artifactId || media)
     ) {
-      // Production checks repository visibility; local reads must never publish on a cache miss.
+      // Read production's published results; a local read must never publish on a cache miss.
       const url = new URL('/api/video-runs', SITE_URL);
       if (history) url.searchParams.set('format', 'history');
       if (runId) url.searchParams.set('run', runId);
@@ -162,15 +147,8 @@ export async function GET(request: NextRequest) {
       }
       return NextResponse.json(data, { status: response.status, headers });
     }
-    // This public viewer must never expose artifacts from a repository that becomes private.
-    const historyRead = history ? cachedVideoHistory(Number(page), Number(pages)) : null;
-    void historyRead?.catch(() => undefined);
-    if (!(await repositoryIsPublic()))
-      return NextResponse.json(
-        { error: 'Public H3 repository unavailable' },
-        { status: 503, headers },
-      );
-    if (historyRead) return NextResponse.json(await historyRead, { headers });
+    if (history)
+      return NextResponse.json(await cachedVideoHistory(Number(page), Number(pages)), { headers });
     if (artifactId) {
       if (media && !videoStorageEnabled()) return new Response(null, { status: 204, headers });
       if (media) {
@@ -301,14 +279,15 @@ export async function POST(request: Request) {
   const { runId, artifactId, mergeRunId, history } = body as Record<string, unknown>;
   if (history === 'backfill' && Object.keys(body).length === 1) {
     try {
-      const result = await recordVideoHistory(null);
-      clearVideoReadCache();
-      return NextResponse.json(result, { headers });
+      return NextResponse.json(await recordVideoHistory(null), { headers });
     } catch {
       return NextResponse.json(
         { error: 'Video history backfill failed, retry shortly' },
         { status: 502, headers },
       );
+    } finally {
+      // A failed backfill may already have written a snapshot.
+      purgeVideo();
     }
   }
   if (
@@ -321,6 +300,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid publication identity' }, { status: 400, headers });
   const deadline = AbortSignal.timeout(270000);
   try {
+    // Publication accepts artifacts only from a public repository.
     const repository = await github('');
     const repo = repository.ok ? await repository.json() : null;
     if (repo?.private !== false)
@@ -375,12 +355,14 @@ export async function POST(request: Request) {
     }
     const receipt = await approveVideoPublication(runId, artifact, saved, mergeRunId, deadline);
     await recordVideoHistory(saved);
-    clearVideoReadCache();
     return NextResponse.json(receipt, { headers });
   } catch {
     return NextResponse.json(
       { error: 'Video publication failed; retry the exact source artifact' },
       { status: 502, headers },
     );
+  } finally {
+    // A publication that fails after its index or approval write has still changed what reads see.
+    purgeVideo();
   }
 }

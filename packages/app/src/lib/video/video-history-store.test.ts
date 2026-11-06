@@ -7,11 +7,17 @@ import type * as BlobSdk from '@vercel/blob';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
 import { servingArtifact } from '../../../cypress/support/video-artifacts';
 import {
-  publishedVideoHistory,
+  publishedVideoHistory as publishedVideoHistoryRead,
   recordVideoHistory,
   VIDEO_HISTORY_PROJECTION,
 } from './video-history-store';
 import { approvalPath, approveVideoPublication, storedArtifacts } from './video-storage';
+
+/** The served page; `complete` is asserted where retention matters. */
+const publishedVideoHistory = async (page: number, pages = 1) => {
+  const read = await publishedVideoHistoryRead(page, pages);
+  return read.page;
+};
 
 vi.mock('@vercel/blob', async (original) => ({
   ...(await original<typeof BlobSdk>()),
@@ -146,6 +152,18 @@ describe('published video history', () => {
     expect(page.entries[0].approved).toBe(false);
     expect(page.entries[0].sources[0].observations.length).toBeGreaterThan(0);
     expect(put).not.toHaveBeenCalled();
+    // A legacy entry without a receipt is still an exact read, so the shared cache may keep it.
+    const read = await publishedVideoHistoryRead(1);
+    expect(read.complete).toBe(true);
+  });
+
+  it('marks a page with an unreadable index as incomplete so it is not retained', async () => {
+    const saved = await publish(1, false);
+    save(indexPath(servingArtifact(102, 1002)), 'not json');
+    const { page, complete } = await publishedVideoHistoryRead(1);
+    expect(page.entries.map((entry) => Boolean(entry.error))).toEqual([true, false]);
+    expect(page.entries[1].runId).toBe(saved.runId);
+    expect(complete).toBe(false);
   });
 
   it('keeps suffixed native matrix indexes discoverable and rejects a different run in the name', async () => {
@@ -338,7 +356,7 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 2,
-      sources: 'fd1c739a1aaa4c7e7a490984cb6e9703ee67854438915b69c9a5cae1d78c4a15',
+      sources: 'b6b5c5339e16b6df5a7179d097eb60549155d7f98a7775de2cc86565d55b7d21',
     });
   });
 });

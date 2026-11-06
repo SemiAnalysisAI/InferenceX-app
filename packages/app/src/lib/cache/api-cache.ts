@@ -61,6 +61,30 @@ export function operatorXCacheTag(): string {
   return namespace ? `${OPERATORX_CACHE_SCOPE}:${namespace}` : OPERATORX_CACHE_SCOPE;
 }
 
+/**
+ * VideoGenX reads immutable Blob indexes and approval receipts that change only
+ * through an explicit publication (`POST /api/video-runs`). Projected History
+ * pages and published artifacts stay cached under this tag until that
+ * publication, or `/api/v1/invalidate?scope=video`, expires it. Their readers
+ * also set a short `revalidate` backstop for a read that races the purge.
+ */
+export const VIDEO_CACHE_SCOPE = 'video';
+
+/** Server data tag for VideoGenX reads, namespaced like the other scopes. */
+export function videoCacheTag(): string {
+  const namespace = cacheNamespace();
+  return namespace ? `${VIDEO_CACHE_SCOPE}:${namespace}` : VIDEO_CACHE_SCOPE;
+}
+
+/**
+ * Expire every cached VideoGenX read now. Its responses are private and never
+ * CDN cached, so there is no stale window worth keeping warm, and a publication
+ * must reach the next read on every instance.
+ */
+export function purgeVideo(): void {
+  revalidateTag(videoCacheTag(), { expire: 0 });
+}
+
 function cacheNamespace(): string {
   return process.env.CACHE_NAMESPACE?.trim() ?? '';
 }
@@ -121,6 +145,8 @@ interface CachedQueryOptions {
   revisioned?: boolean;
   /** Cache tag for the unstable_cache path (default 'db'). */
   tag?: string;
+  /** With `tag`: seconds after which an entry is refreshed even without a tag purge. */
+  revalidate?: number;
   shareDecodedResult?: boolean;
 }
 
@@ -302,6 +328,7 @@ export function cachedQuery<T, Args extends unknown[]>(
   if (options?.tag) {
     const tagged = unstable_cache(packed, [cacheKey(keyPrefix), fnSource], {
       tags: [options.tag],
+      revalidate: options.revalidate,
     });
     return async (...args: Args): Promise<T> => unpack(args, await tagged(...args));
   }

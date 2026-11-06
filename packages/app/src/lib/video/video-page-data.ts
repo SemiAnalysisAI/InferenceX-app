@@ -26,13 +26,18 @@ function request(params: Record<string, string>) {
   return videoRuns(new NextRequest(url));
 }
 
-/** Reuse the read-only transport in process, including its replay and visibility gates. */
-export async function loadVideoPageData(params: VideoPageSearchParams): Promise<VideoInitialData> {
+/** The URL-selected results state, which the shell can render before any data is read. */
+export function videoPageState(params: VideoPageSearchParams) {
   const search = new URLSearchParams();
   for (const [key, values] of Object.entries(params))
     for (const value of Array.isArray(values) ? values : values === undefined ? [] : [values])
       search.append(key, value);
-  const state = parseResultsState(search.toString());
+  return parseResultsState(search.toString());
+}
+
+/** Reuse the read-only transport in process, including its replay gate. */
+export async function loadVideoPageData(params: VideoPageSearchParams): Promise<VideoInitialData> {
+  const state = videoPageState(params);
   const initial: VideoInitialData = { state, history: null, sides: {} };
   // A seed stops the client read, and without storage the transport has only an empty
   // History; local fixture and replay data reach the browser through that client read.
