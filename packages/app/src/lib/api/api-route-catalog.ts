@@ -2070,7 +2070,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/etl/compute-chart-series.ts',
-    sourceSha256: '04e7a27bc027f64a77eb585c2a8415d2398f54460522c22487fcec7124c9bef5',
+    sourceSha256: 'a75c96ed5caf4155fc3999360da13b62c0f116173f71ee15c777e1a493a4abda',
     reviewArea: {
       en: 'Server metric chart version, supported engine metrics, source identity, and missing-data semantics.',
       zh: '服务器指标图表版本、支持的引擎指标、来源标识以及缺失数据语义。',
