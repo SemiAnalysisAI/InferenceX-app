@@ -3,7 +3,7 @@
 // after a crash redoes exactly the unfinished clips. Usage:
 //   bun packages/app/scripts/video-renditions.ts [--run <id>] [--limit <n>] [--dry-run | --out-dir <dir>]
 // --dry-run lists the work; --out-dir encodes and validates locally. Neither writes to Blob.
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -65,14 +65,13 @@ const probeDuration = (file: string) =>
       file,
     ]).trim(),
   );
+/** `-v error` prints decode errors to stderr, also when ffmpeg exits 0. */
 function decodeError(file: string) {
-  try {
-    return (
-      command('ffmpeg', ['-nostdin', '-v', 'error', '-i', file, '-f', 'null', '-']).trim() || null
-    );
-  } catch (error) {
-    return (error as { stderr?: string }).stderr?.trim() || String(error);
-  }
+  const result = spawnSync('ffmpeg', ['-nostdin', '-v', 'error', '-i', file, '-f', 'null', '-'], {
+    encoding: 'utf8',
+  });
+  const log = `${result.error?.message ?? ''}${result.stderr ?? ''}`.trim();
+  return log || (result.status === 0 ? null : `ffmpeg exited with status ${result.status}`);
 }
 
 const run = values.run;
