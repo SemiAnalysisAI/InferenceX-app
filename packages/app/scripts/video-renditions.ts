@@ -79,21 +79,32 @@ const run = values.run;
 const indexes = run
   ? await storedArtifacts(run).then((items) => items.map((artifact) => ({ runId: run, artifact })))
   : await storedIndexes();
+// One unreadable artifact must not stop a backfill of the others; it fails the job at the end.
+let unreadable = 0;
 const saved = await Promise.all(
-  indexes.map(({ runId, artifact }) => readStoredArtifact(runId, artifact)),
+  indexes.map(({ runId, artifact }) =>
+    readStoredArtifact(runId, artifact).catch((error: unknown) => {
+      unreadable++;
+      console.error(
+        `unreadable run ${runId} artifact ${artifact.id}: ${error instanceof Error ? error.message : error}`,
+      );
+      return null;
+    }),
+  ),
 );
 const artifacts = saved.flatMap((item) => (item ? [item] : []));
 const done = await renditionPreviews();
 const plan = renditionPlan(artifacts, new Set(done.keys()));
 const work = plan.pending.slice(0, limit);
 console.log(
-  `${artifacts.length} stored artifacts, ${plan.pending.length + plan.existing} sealed MP4s: ` +
+  `${artifacts.length} stored artifacts (${unreadable} unreadable), ` +
+    `${plan.pending.length + plan.existing} sealed MP4s: ` +
     `${plan.existing} with a ${RENDITION_PROFILE} receipt, ${plan.pending.length} pending, ` +
     `${work.length} selected`,
 );
 if (dryRun) {
   for (const clip of work) console.log(`pending ${clip.sha256} ${clip.path}`);
-  process.exit(0);
+  process.exit(unreadable > 0 ? 1 : 0);
 }
 
 const ffmpeg = command('ffmpeg', ['-version']).split('\n')[0];
@@ -190,4 +201,4 @@ console.log(
   `${work.length - failed} renditions ${outDir ? `written to ${outDir}` : 'published'}, ${failed} failed; ` +
     `${mb(sourceBytes)} MB originals -> ${mb(outputBytes)} MB renditions`,
 );
-if (failed > 0) process.exitCode = 1;
+if (failed > 0 || unreadable > 0) process.exitCode = 1;
