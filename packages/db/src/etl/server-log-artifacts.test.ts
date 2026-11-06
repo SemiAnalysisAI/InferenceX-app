@@ -70,7 +70,7 @@ describe('server-log artifact discovery', () => {
     expect(serverLogArtifactSuffix('agentic_config-c')).toBeNull();
   });
 
-  it('lists native srt-slurm single-node logs alongside the client logs', () => {
+  it('lists native srt-slurm single-node logs alongside the client logs', async () => {
     const artifactDir = tempRoot();
     fs.mkdirSync(path.join(artifactDir, 'results'));
     fs.writeFileSync(path.join(artifactDir, 'results', 'benchmark.log'), 'client\n');
@@ -81,44 +81,64 @@ describe('server-log artifact discovery', () => {
     });
 
     const artifact = { artifactName: 'server_logs_config-a', artifactDir };
-    const files = readServerLogArtifact(artifact);
+    const files = await readServerLogArtifact(artifact);
     expect(files.map((file) => file.fileName)).toEqual([
       'results/benchmark.log',
       'srt-setup.log',
       'srt-single-node-logs/logs/host-1_agg_w0.out',
     ]);
     expect(primaryServerLogFile(files)?.fileName).toBe('results/benchmark.log');
-    expect(readServerLogArtifact(artifact)).toEqual(files);
+    expect(await readServerLogArtifact(artifact)).toEqual(files);
   });
 
-  it('reads legacy single-node artifacts without an archive unchanged', () => {
+  it('reads legacy single-node artifacts without an archive unchanged', async () => {
     const artifactDir = tempRoot();
     fs.mkdirSync(path.join(artifactDir, 'results'));
     fs.writeFileSync(path.join(artifactDir, 'results', 'server.log'), 'server\n');
 
-    expect(serverLogArtifactRoot(artifactDir, 'server_logs_config-a')).toBe(artifactDir);
+    expect(await serverLogArtifactRoot(artifactDir, 'server_logs_config-a')).toBe(artifactDir);
     expect(fs.existsSync(path.join(artifactDir, 'srt-single-node-logs'))).toBe(false);
     expect(
-      readServerLogArtifact({
+      await readServerLogArtifact({
         artifactName: 'server_logs_config-a',
         artifactDir,
       }),
     ).toEqual([{ fileName: 'results/server.log', logText: 'server\n' }]);
   });
 
-  it('roots multinode artifacts at their extracted archive', () => {
+  it('roots multinode artifacts at their extracted archive', async () => {
     const artifactDir = tempRoot();
     writeLogsArchive(path.join(artifactDir, 'multinode_server_logs.tar.gz'), {
       'host-1_decode_w0.out': 'decode\n',
     });
 
     expect(
-      readServerLogArtifact({
+      await readServerLogArtifact({
         artifactName: 'multinode_server_logs_config-b',
         artifactDir,
       }),
     ).toEqual([{ fileName: 'host-1_decode_w0.out', logText: 'decode\n' }]);
-    expect(serverLogArtifactRoot(tempRoot(), 'multinode_server_logs_config-c')).toBeNull();
+    expect(await serverLogArtifactRoot(tempRoot(), 'multinode_server_logs_config-c')).toBeNull();
+  });
+
+  it('makes concurrent readers of one archive wait for the whole extraction', async () => {
+    const artifactDir = tempRoot();
+    const files = Object.fromEntries(
+      Array.from({ length: 50 }, (_, i) => [`logs/host-${i}.out`, `${'x'.repeat(100_000)}\n`]),
+    );
+    writeLogsArchive(path.join(artifactDir, 'multinode_server_logs.tar.gz'), files);
+
+    const extractedDir = path.join(artifactDir, 'multinode_server_logs');
+    const sizesSeen = await Promise.all(
+      [1, 2, 3].map(async () => {
+        const root = await serverLogArtifactRoot(artifactDir, 'multinode_server_logs_config-d');
+        expect(root).toBe(extractedDir);
+        return listServerLogFilePaths(extractedDir).map((file) => fs.statSync(file.path).size);
+      }),
+    );
+    for (const sizes of sizesSeen) {
+      expect(sizes).toEqual(Array.from({ length: 50 }, () => 100_001));
+    }
   });
 
   it('removes PostgreSQL-incompatible null bytes', () => {

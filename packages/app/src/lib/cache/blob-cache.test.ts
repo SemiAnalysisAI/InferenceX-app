@@ -241,6 +241,42 @@ describe('blobPurge', () => {
     ]);
   });
 
+  it('keeps blobs uploaded at or after the cutoff', async () => {
+    const cutoff = new Date('2026-11-05T12:00:00Z');
+    mockList.mockResolvedValue({
+      blobs: [
+        {
+          url: 'https://blob.example.com/old.json',
+          pathname: 'test-cache/generation/g1/a.json',
+          uploadedAt: new Date('2026-11-05T11:59:59.999Z'),
+        },
+        {
+          url: 'https://blob.example.com/at.json',
+          pathname: 'test-cache/generation/g2/a.json',
+          uploadedAt: cutoff,
+        },
+        {
+          url: 'https://blob.example.com/new.json',
+          pathname: 'test-cache/generation/g2/b.json',
+          uploadedAt: new Date('2026-11-05T12:00:01Z'),
+        },
+        {
+          url: 'https://blob.example.com/kept.json',
+          pathname: 'test-cache/operatorx/ns/cmp.json',
+          uploadedAt: new Date('2026-01-01T00:00:00Z'),
+        },
+      ],
+      hasMore: false,
+      cursor: '',
+    } as unknown as ListBlobResult);
+    mockDel.mockResolvedValue(undefined);
+
+    const deleted = await blobPurge('', ['operatorx/'], cutoff);
+
+    expect(deleted).toBe(1);
+    expect(mockDel).toHaveBeenCalledExactlyOnceWith(['https://blob.example.com/old.json']);
+  });
+
   it('returns 0 when no blobs exist', async () => {
     mockList.mockResolvedValue({
       blobs: [],

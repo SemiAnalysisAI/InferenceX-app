@@ -1,7 +1,8 @@
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { promisify } from 'node:util';
 
 import {
   capServerLogSlices,
@@ -134,19 +135,28 @@ export function primaryServerLogFile(files: readonly ServerLogFile[]): ServerLog
   );
 }
 
-function extractArchiveOnce(archivePath: string, extractedDir: string): boolean {
-  if (!fs.existsSync(extractedDir) && fs.existsSync(archivePath)) {
+const execFileAsync = promisify(execFile);
+const pendingExtractions = new Map<string, Promise<unknown>>();
+
+async function extractArchiveOnce(archivePath: string, extractedDir: string): Promise<boolean> {
+  let pending = pendingExtractions.get(extractedDir);
+  if (!pending && !fs.existsSync(extractedDir) && fs.existsSync(archivePath)) {
     fs.mkdirSync(extractedDir, { recursive: true });
-    execFileSync('tar', ['-xzf', archivePath, '-C', extractedDir], {
-      stdio: 'ignore',
-    });
+    pending = execFileAsync('tar', ['-xzf', archivePath, '-C', extractedDir]).finally(() =>
+      pendingExtractions.delete(extractedDir),
+    );
+    pendingExtractions.set(extractedDir, pending);
   }
+  await pending;
   return fs.existsSync(extractedDir) && fs.statSync(extractedDir).isDirectory();
 }
 
-export function serverLogArtifactRoot(artifactDir: string, artifactName: string): string | null {
+export async function serverLogArtifactRoot(
+  artifactDir: string,
+  artifactName: string,
+): Promise<string | null> {
   if (artifactName.startsWith('server_logs_')) {
-    extractArchiveOnce(
+    await extractArchiveOnce(
       path.join(artifactDir, 'srt-single-node-logs.tar.gz'),
       path.join(artifactDir, 'srt-single-node-logs'),
     );
@@ -155,21 +165,27 @@ export function serverLogArtifactRoot(artifactDir: string, artifactName: string)
   if (!artifactName.startsWith('multinode_server_logs_')) return null;
 
   const extractedDir = path.join(artifactDir, 'multinode_server_logs');
-  return extractArchiveOnce(path.join(artifactDir, 'multinode_server_logs.tar.gz'), extractedDir)
+  return (await extractArchiveOnce(
+    path.join(artifactDir, 'multinode_server_logs.tar.gz'),
+    extractedDir,
+  ))
     ? extractedDir
     : null;
 }
 
-export function readServerLogArtifact(artifact: ServerLogArtifact): ServerLogFile[] {
-  const root = serverLogArtifactRoot(artifact.artifactDir, artifact.artifactName);
+export async function readServerLogArtifact(artifact: ServerLogArtifact): Promise<ServerLogFile[]> {
+  const root = await serverLogArtifactRoot(artifact.artifactDir, artifact.artifactName);
   return root ? readServerLogFiles(root) : [];
 }
 
-export function readServerLogArtifactZip(zipPath: string, artifactName: string): ServerLogFile[] {
+export async function readServerLogArtifactZip(
+  zipPath: string,
+  artifactName: string,
+): Promise<ServerLogFile[]> {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'server-log-artifact-'));
   try {
     execFileSync('unzip', ['-oq', zipPath, '-d', tempDir], { stdio: 'ignore' });
-    return readServerLogArtifact({ artifactName, artifactDir: tempDir });
+    return await readServerLogArtifact({ artifactName, artifactDir: tempDir });
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
