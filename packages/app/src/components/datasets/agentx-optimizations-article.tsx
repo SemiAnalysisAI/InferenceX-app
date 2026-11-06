@@ -65,7 +65,7 @@ function SectionFigure({
           alt={figure.alt}
           width={asset.width}
           height={asset.height}
-          sizes="(max-width: 768px) 100vw, 832px"
+          sizes="(max-width: 768px) 100vw, 720px"
           quality={100}
           className="h-auto w-full bg-white"
         />
@@ -101,7 +101,7 @@ function SectionBlock({
       <h2 id={section.id} className={cn(ARTICLE_H2_CLASS, 'mb-4')}>
         {section.heading}
       </h2>
-      <div className="max-w-measure space-y-4 text-base leading-reading text-foreground">
+      <div className="space-y-4 text-base leading-reading text-foreground">
         {section.paragraphs.map((paragraph) => (
           <p key={paragraph}>
             <RichText text={paragraph} />
@@ -212,14 +212,12 @@ export function AgentXOptimizationsIndex({ locale }: { locale: Locale }) {
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
           {overview.title}
         </h1>
-        <p className="mt-5 max-w-measure text-lg leading-8 text-muted-foreground">
-          {overview.lead}
-        </p>
+        <p className="mt-5 text-lg leading-8 text-muted-foreground">{overview.lead}</p>
         <FactGrid items={overview.highlights} />
       </header>
 
       <div className="py-10">
-        <div className="max-w-measure space-y-4 text-base leading-reading text-foreground">
+        <div className="space-y-4 text-base leading-reading text-foreground">
           {overview.intro.map((paragraph) => (
             <p key={paragraph}>{paragraph}</p>
           ))}
@@ -229,9 +227,7 @@ export function AgentXOptimizationsIndex({ locale }: { locale: Locale }) {
           <h2 id="projects" className={cn(ARTICLE_H2_CLASS, 'mb-4')}>
             {overview.frameworksTitle}
           </h2>
-          <p className="max-w-measure text-base leading-reading text-foreground">
-            {overview.frameworksIntro}
-          </p>
+          <p className="text-base leading-reading text-foreground">{overview.frameworksIntro}</p>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {frameworks.map((framework) => (
               <FrameworkCard
@@ -283,9 +279,7 @@ export function AgentXOptimizationsArticle({ slug, locale }: { slug: string; loc
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
           {framework.name}
         </h1>
-        <p className="mt-5 max-w-measure text-lg leading-8 text-muted-foreground">
-          {framework.lead}
-        </p>
+        <p className="mt-5 text-lg leading-8 text-muted-foreground">{framework.lead}</p>
         <FactGrid items={framework.highlights} />
       </header>
 

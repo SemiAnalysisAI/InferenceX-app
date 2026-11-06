@@ -36,7 +36,7 @@ export function PromoVideo() {
   }
 
   return (
-    <div className="relative aspect-video w-full max-w-figure overflow-hidden rounded-xl border border-border/30 bg-black">
+    <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-border/30 bg-black">
       <video
         ref={videoRef}
         className="size-full"

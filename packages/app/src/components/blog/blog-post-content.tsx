@@ -79,7 +79,7 @@ export function BlogPostContent({
             data-testid="blog-post-hero"
           >
             <BlogBackLink href={basePath} label={t.backToIndex} />
-            <div className="flex max-w-4xl flex-col gap-4">
+            <div className="flex max-w-measure flex-col gap-4">
               {tags[0] && <Eyebrow as="p">{blogTagLabel(tags[0], locale)}</Eyebrow>}
               <Heading as="h1" level="reading">
                 {meta.title}
@@ -128,7 +128,7 @@ export function BlogPostContent({
             />
           </header>
 
-          <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-16 xl:grid-cols-[minmax(0,1fr)_18rem] xl:gap-20">
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,var(--container-measure))_17rem] lg:justify-between lg:gap-16 xl:grid-cols-[minmax(0,var(--container-measure))_18rem] xl:gap-20">
             <div className="flex min-w-0 flex-col gap-8">
               {headings.length > 0 && (
                 <BlogToc
@@ -144,7 +144,7 @@ export function BlogPostContent({
                 className={BLOG_PROSE_CLASS}
               >
                 {content}
-                <p className="mt-12 max-w-measure border-t border-border/30 pt-6 text-xs leading-5 text-muted-foreground">
+                <p className="mt-12 border-t border-border/30 pt-6 text-xs leading-5 text-muted-foreground">
                   {t.copyright}
                 </p>
               </article>

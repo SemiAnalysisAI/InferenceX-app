@@ -475,7 +475,7 @@ function MethodFigure({
           alt={copy.alt}
           width={asset.width}
           height={asset.height}
-          sizes="(max-width: 768px) 100vw, 832px"
+          sizes="(max-width: 768px) 100vw, 720px"
           quality={100}
           className="h-auto w-full"
         />
@@ -493,7 +493,7 @@ function MethodFigure({
 
 function Paragraphs({ items }: { items: readonly string[] }) {
   return (
-    <div className="max-w-measure space-y-4 text-base leading-reading text-foreground">
+    <div className="space-y-4 text-base leading-reading text-foreground">
       {items.map((item) => (
         <p key={item}>{item}</p>
       ))}
@@ -529,7 +529,7 @@ export function AgentXMethodologyArticle({ locale }: { locale: Locale }) {
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
           {t.title}
         </h1>
-        <p className="mt-5 max-w-measure text-lg leading-8 text-muted-foreground">{t.lead}</p>
+        <p className="mt-5 text-lg leading-8 text-muted-foreground">{t.lead}</p>
         <FactGrid items={t.facts} />
       </header>
 
@@ -616,7 +616,7 @@ export function AgentXMethodologyArticle({ locale }: { locale: Locale }) {
 
         <section aria-labelledby="scope" className="mt-14 border-t border-border/20 pt-10">
           <SectionHeading id="scope">{t.limitsTitle}</SectionHeading>
-          <p className="max-w-measure text-base leading-reading text-foreground">{t.limits}</p>
+          <p className="text-base leading-reading text-foreground">{t.limits}</p>
           <h3 className={cn(ARTICLE_H3_CLASS, 'mt-8')}>{t.sourcesTitle}</h3>
           <ul className="mt-3 grid gap-x-8 gap-y-2 sm:grid-cols-2">
             {t.sources.map((source) => (

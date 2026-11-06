@@ -231,7 +231,7 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
           </p>
         </section>
 
-        <section className="flex flex-col gap-6" aria-labelledby="whitepaper-figures">
+        <section className="flex max-w-measure flex-col gap-6" aria-labelledby="whitepaper-figures">
           <h2 id="whitepaper-figures" className="sr-only scroll-mt-24">
             {t.figures}
           </h2>
@@ -319,16 +319,14 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
           })}
         </section>
 
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-12 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,var(--container-measure))_18rem] lg:justify-between lg:gap-12 xl:grid-cols-[minmax(0,var(--container-measure))_20rem]">
           <div className="flex min-w-0 flex-col gap-12">
             <Section id="whitepaper-summary" title={t.summary}>
-              <p className="max-w-measure text-base leading-reading text-foreground">
-                {copy.abstract}
-              </p>
+              <p className="text-base leading-reading text-foreground">{copy.abstract}</p>
             </Section>
 
             <Section id="whitepaper-key-findings" title={t.keyFindings}>
-              <ol className="flex max-w-measure flex-col gap-4">
+              <ol className="flex flex-col gap-4">
                 {copy.keyFindings.map((finding, index) => (
                   <li key={finding} className="flex items-start gap-3">
                     <StepNumber>{index + 1}</StepNumber>
@@ -339,7 +337,7 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
             </Section>
 
             <Section id="whitepaper-method" title={t.method}>
-              <ol className="flex max-w-measure flex-col gap-4">
+              <ol className="flex flex-col gap-4">
                 {copy.methodSteps.map((step, index) => (
                   <li key={step} className="flex items-start gap-3">
                     <StepNumber>{index + 1}</StepNumber>

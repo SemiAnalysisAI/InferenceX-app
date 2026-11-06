@@ -58,7 +58,7 @@ export function AgentXQuickstartArticle({ locale }: { locale: Locale }) {
         </Link>
         <p className="mt-6 font-mono text-xs text-muted-foreground">agentx-harness · 1.0.7</p>
         <h1 className="mt-2 text-3xl font-semibold text-balance md:text-4xl">{t.title}</h1>
-        <p className="mt-4 max-w-measure leading-reading text-muted-foreground">{t.description}</p>
+        <p className="mt-4 leading-reading text-muted-foreground">{t.description}</p>
       </header>
       <div className="space-y-10 py-10">
         <section id="run" className="scroll-mt-24 space-y-3">

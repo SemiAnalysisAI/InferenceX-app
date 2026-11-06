@@ -5,7 +5,8 @@ export const READING_TOP_CLASS = 'pt-6 md:pt-8 lg:pt-10';
 export const READING_LINK_CLASS =
   'text-brand underline decoration-brand/40 decoration-1 underline-offset-[3px] [text-decoration-skip-ink:auto] transition-colors hover:decoration-brand';
 
-export const ARTICLE_PAGE_CLASS = 'container mx-auto max-w-4xl px-5 sm:px-6 lg:px-8';
+export const ARTICLE_PAGE_CLASS =
+  'mx-auto w-full max-w-[calc(var(--container-measure)+3rem)] px-5 sm:px-6 lg:max-w-[calc(var(--container-measure)+4rem)] lg:px-8';
 
 export const READING_DEK_CLASS = 'max-w-measure text-lg leading-7 text-muted-foreground';
 

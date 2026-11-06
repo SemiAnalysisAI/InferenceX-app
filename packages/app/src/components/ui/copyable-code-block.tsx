@@ -54,7 +54,7 @@ export function CopyableCodeBlock({
     <div
       data-testid="copyable-code-block"
       className={cn(
-        'w-full min-w-0 max-w-figure overflow-hidden rounded-lg border border-border/60 bg-card',
+        'w-full min-w-0 max-w-measure overflow-hidden rounded-lg border border-border/60 bg-card',
         className,
       )}
     >

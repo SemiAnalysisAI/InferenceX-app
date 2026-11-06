@@ -6,17 +6,16 @@ How text is sized and spaced in the app, and the ratchet gate that keeps it that
 
 Defined in the `@theme` block of `packages/app/src/app/globals.css`:
 
-| Token                 | Class               | Value                             | Use for                                             |
-| --------------------- | ------------------- | --------------------------------- | --------------------------------------------------- |
-| `--text-2xs`          | `text-2xs`          | 0.6875rem (11px)                  | Micro labels one step below `text-xs`               |
-| `--text-3xs`          | `text-3xs`          | 0.625rem (10px)                   | Densest labels: table meta, tooltips, log gutters   |
-| `--text-dialog-title` | `text-dialog-title` | 1.375rem (22px), 30px line height | Centered announcement dialog headings               |
-| `--text-title`        | `text-title`        | 1.75rem (28px), 36px line height  | Desktop size of the dashboard page title            |
-| `--container-measure` | `max-w-measure`     | 36rem (576px)                     | Body text measure on reading pages                  |
-| `--container-figure`  | `max-w-figure`      | 52rem (832px)                     | Figure, code block and media width on reading pages |
-| `--leading-reading`   | `leading-reading`   | 1.65 (1.8 under `:lang(zh)`)      | Body text line height on reading pages              |
-| `--tracking-eyebrow`  | `tracking-eyebrow`  | 0.16em                            | Easter-egg theme decorations only (no app UI)       |
-| `--tracking-heading`  | `tracking-heading`  | -0.04em                           | Display headings at `text-4xl` and larger only      |
+| Token                 | Class               | Value                             | Use for                                            |
+| --------------------- | ------------------- | --------------------------------- | -------------------------------------------------- |
+| `--text-2xs`          | `text-2xs`          | 0.6875rem (11px)                  | Micro labels one step below `text-xs`              |
+| `--text-3xs`          | `text-3xs`          | 0.625rem (10px)                   | Densest labels: table meta, tooltips, log gutters  |
+| `--text-dialog-title` | `text-dialog-title` | 1.375rem (22px), 30px line height | Centered announcement dialog headings              |
+| `--text-title`        | `text-title`        | 1.75rem (28px), 36px line height  | Desktop size of the dashboard page title           |
+| `--container-measure` | `max-w-measure`     | 45rem (720px)                     | The one column for text and media on reading pages |
+| `--leading-reading`   | `leading-reading`   | 1.65 (1.8 under `:lang(zh)`)      | Body text line height on reading pages             |
+| `--tracking-eyebrow`  | `tracking-eyebrow`  | 0.16em                            | Easter-egg theme decorations only (no app UI)      |
+| `--tracking-heading`  | `tracking-heading`  | -0.04em                           | Display headings at `text-4xl` and larger only     |
 
 Rules of thumb:
 
@@ -38,7 +37,7 @@ Rules of thumb:
 
 Radii follow one ladder, so corners nest: page and section surfaces (Card, dialogs, the mobile menu) are `rounded-xl`, panels inside them (`ControlPanel`, legends, notices) are `rounded-lg`, controls (buttons, selects, inputs, segmented containers, badges) are `rounded-md`, and items inside a control or menu (segments via `SEGMENT_RADIUS_STYLE`, popover menu rows, select chips) are `rounded-sm`. Siblings of one kind share a radius, and a child is never rounder than its parent.
 
-Blog/article typography is owned by `@tailwindcss/typography` (`prose`) via `BLOG_PROSE_CLASS`, and is out of scope for MDX content migration. Reading pages (blog, whitepapers, about, glossary, quotes, land acknowledgement, AgentX articles, hardware) share one layout. Wrap the page in `READING_PAGE_CLASS` (72rem frame) or `ARTICLE_PAGE_CLASS` (56rem frame, single-column articles) from `src/components/ui/reading-layout.ts`. Set body text with `READING_TEXT_CLASS` (`max-w-measure`, 16px, `leading-reading`, `text-foreground`; about 70 Latin or 36 CJK characters per line). Muted color is only for an explicit lead or dek. Article headings use `ARTICLE_H2_CLASS` (24px, 28px from `md`, semibold, with 40px or more above it) and `ARTICLE_H3_CLASS` (18px semibold), and `BLOG_PROSE_CLASS` matches that scale. Figures, tables, media and code blocks break out to `max-w-figure` or the full column. Rules inside an article stay at the measure, through `READING_SECTION_CLASS` for section breaks; only the page header rule spans the container. Code blocks use the card surface with a 1px border and `rounded-lg`, and only the `CopyableCodeBlock` header strip is grey. Previous and next links use `PagerCard`. `px-5` keeps 20px side margins on phones.
+Blog/article typography is owned by `@tailwindcss/typography` (`prose`) via `BLOG_PROSE_CLASS`, and is out of scope for MDX content migration. Reading pages (blog, whitepapers, about, glossary, quotes, land acknowledgement, AgentX articles, hardware) share one layout. Text and media share one 45rem (720px) column. Pages without a sidebar wrap in `ARTICLE_PAGE_CLASS` from `src/components/ui/reading-layout.ts`, which centres that column. Pages with a sidebar wrap in `READING_PAGE_CLASS` (72rem frame) and use `lg:grid-cols-[minmax(0,var(--container-measure))_<sidebar>] lg:justify-between`, so the column sits under the header and the sidebar on the right. Set body text with `READING_TEXT_CLASS` (`max-w-measure`, 16px, `leading-reading`, `text-foreground`; about 85-90 Latin or 45 CJK characters per line). Muted color is only for an explicit lead or dek. Article headings use `ARTICLE_H2_CLASS` (24px, 28px from `md`, semibold, with 40px or more above it) and `ARTICLE_H3_CLASS` (18px semibold), and `BLOG_PROSE_CLASS` matches that scale. Figures, tables, media, code blocks, pager cards and rules all fill the same column, through `READING_SECTION_CLASS` for section breaks; only the page header rule spans the container. Code blocks use the card surface with a 1px border and `rounded-lg`, and only the `CopyableCodeBlock` header strip is grey. Previous and next links use `PagerCard`. `px-5` keeps 20px side margins on phones.
 
 Every reading page adds `READING_TOP_CLASS` to its frame, so the H1 or back link sits the same distance below the site header (about 45px on phones and 61px on desktop). Inline links in body text use `READING_LINK_CLASS` (accent text, 1px underline 3px below the baseline at 40% accent, full accent on hover, paragraph weight). `BLOG_PROSE_CLASS` applies the same style to MDX links. Standalone calls to action and navigation links keep their own styles. Tags on article and whitepaper cards use the borderless `secondary` badge, and blog tags render through `blogTagLabel` (`src/lib/blog/blog-tag-label.ts`) so slugs stay in URLs while pills, eyebrows and filters show display labels.
 

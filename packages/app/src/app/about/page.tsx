@@ -11,9 +11,9 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
 import {
   ARTICLE_H2_CLASS,
+  ARTICLE_PAGE_CLASS,
   READING_DEK_CLASS,
   READING_LINK_CLASS,
-  READING_PAGE_CLASS,
   READING_SECTION_CLASS,
   READING_TOP_CLASS,
 } from '@/components/ui/reading-layout';
@@ -43,14 +43,14 @@ export default function AboutPage() {
   return (
     <main className="relative">
       <JsonLd data={faqJsonLd} />
-      <div className={cn(READING_PAGE_CLASS, READING_TOP_CLASS, 'flex flex-col gap-12')}>
+      <div className={cn(ARTICLE_PAGE_CLASS, READING_TOP_CLASS, 'flex flex-col gap-12')}>
         <section>
           <Eyebrow as="p">About InferenceX</Eyebrow>
-          <Heading as="h1" level="reading" className="mt-3 max-w-4xl">
+          <Heading as="h1" level="reading" className="mt-3">
             Open-source continuous agentic inference benchmark trusted by operators of
             trillion-dollar, gigawatt-scale token factories
           </Heading>
-          <div className="mt-4 flex max-w-measure flex-col gap-4 leading-reading text-foreground">
+          <div className="mt-4 flex flex-col gap-4 leading-reading text-foreground">
             <p className={READING_DEK_CLASS}>
               Software development and model releases move fast. Static benchmarks quickly become
               obsolete, and participants often submit software images purpose-built for the
@@ -90,12 +90,12 @@ export default function AboutPage() {
 
         <section id="reproducibility" className={READING_SECTION_CLASS}>
           <h2 className={ARTICLE_H2_CLASS}>Reproducibility</h2>
-          <p className="mt-3 max-w-measure leading-reading text-foreground">
+          <p className="mt-3 leading-reading text-foreground">
             Every data point on the dashboard is the output of a public GitHub Actions workflow run.
             The recipe, logs, artifacts, and the resulting database row are all linked end to end,
             so anyone can audit, rerun, or fork a benchmark.
           </p>
-          <ol className="mt-6 flex max-w-measure flex-col gap-4 leading-reading text-foreground">
+          <ol className="mt-6 flex flex-col gap-4 leading-reading text-foreground">
             <li className="flex gap-4">
               <span className="w-4 shrink-0 font-medium text-foreground tabular-nums">1</span>
               <div>

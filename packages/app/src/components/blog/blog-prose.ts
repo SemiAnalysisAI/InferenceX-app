@@ -11,6 +11,6 @@ export const BLOG_PROSE_CLASS = [
   'prose-blockquote:border-border prose-blockquote:font-normal prose-blockquote:not-italic prose-blockquote:text-muted-foreground',
   'prose-figcaption:mt-0 prose-figcaption:text-sm prose-figcaption:text-muted-foreground',
   'prose-img:rounded-xl prose-img:border prose-img:border-border/30',
-  'prose-pre:max-w-figure prose-pre:rounded-lg prose-pre:border prose-pre:border-border/60 prose-pre:bg-card prose-pre:text-foreground',
+  'prose-pre:max-w-measure prose-pre:rounded-lg prose-pre:border prose-pre:border-border/60 prose-pre:bg-card prose-pre:text-foreground',
   'prose-table:text-sm prose-th:text-muted-foreground prose-th:font-medium prose-hr:border-border/30',
 ].join(' ');

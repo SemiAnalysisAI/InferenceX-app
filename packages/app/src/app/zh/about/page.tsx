@@ -11,9 +11,9 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
 import {
   ARTICLE_H2_CLASS,
+  ARTICLE_PAGE_CLASS,
   READING_DEK_CLASS,
   READING_LINK_CLASS,
-  READING_PAGE_CLASS,
   READING_SECTION_CLASS,
   READING_TOP_CLASS,
 } from '@/components/ui/reading-layout';
@@ -43,13 +43,13 @@ export default function AboutPageZh() {
   return (
     <main className="relative">
       <JsonLd data={faqJsonLd} />
-      <div className={cn(READING_PAGE_CLASS, READING_TOP_CLASS, 'flex flex-col gap-12')}>
+      <div className={cn(ARTICLE_PAGE_CLASS, READING_TOP_CLASS, 'flex flex-col gap-12')}>
         <section>
           <Eyebrow as="p">关于 InferenceX</Eyebrow>
-          <Heading as="h1" level="reading" className="mt-3 max-w-4xl">
+          <Heading as="h1" level="reading" className="mt-3">
             持续运行的开源智能体推理基准测试，受到万亿美元级、吉瓦规模 Token 工厂运营方的信赖
           </Heading>
-          <div className="mt-4 flex max-w-measure flex-col gap-4 leading-reading text-foreground">
+          <div className="mt-4 flex flex-col gap-4 leading-reading text-foreground">
             <p className={READING_DEK_CLASS}>
               软件开发和模型发布的节奏极快。静态基准测试很快就会过时；参与者提交的软件镜像往往是为基准测试专门构建的，无法反映真实应用场景中的性能。
             </p>
@@ -87,11 +87,11 @@ export default function AboutPageZh() {
 
         <section id="reproducibility" className={READING_SECTION_CLASS}>
           <h2 className={ARTICLE_H2_CLASS}>可复现性</h2>
-          <p className="mt-3 max-w-measure leading-reading text-foreground">
+          <p className="mt-3 leading-reading text-foreground">
             仪表板上的每个数据点都由公开的 GitHub Actions
             工作流生成。测试配置、日志、产物及其对应的数据库记录彼此关联，任何人都可以核查结果来源、重新运行测试，或基于现有配置创建新的基准测试。
           </p>
-          <ol className="mt-6 flex max-w-measure flex-col gap-4 leading-reading text-foreground">
+          <ol className="mt-6 flex flex-col gap-4 leading-reading text-foreground">
             <li className="flex gap-4">
               <span className="w-4 shrink-0 font-medium text-foreground tabular-nums">1</span>
               <div>

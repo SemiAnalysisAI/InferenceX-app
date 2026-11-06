@@ -47,7 +47,7 @@ function SectionFigure({
           alt={figure.alt}
           width={asset.width}
           height={asset.height}
-          sizes="(max-width: 768px) 100vw, 832px"
+          sizes="(max-width: 768px) 100vw, 720px"
           quality={100}
           className="h-auto w-full"
         />
@@ -81,13 +81,13 @@ function SectionBlock({
       <h2 id={section.id} className={cn(ARTICLE_H2_CLASS, 'mb-4')}>
         {section.heading}
       </h2>
-      <div className="max-w-measure space-y-4 text-base leading-reading text-foreground">
+      <div className="space-y-4 text-base leading-reading text-foreground">
         {section.paragraphs.map((paragraph) => (
           <p key={paragraph}>{paragraph}</p>
         ))}
       </div>
       {section.bullets && section.bullets.length > 0 && (
-        <ul className="mt-4 max-w-measure space-y-2 border-l border-border/20 pl-4 text-base leading-reading text-foreground">
+        <ul className="mt-4 space-y-2 border-l border-border/20 pl-4 text-base leading-reading text-foreground">
           {section.bullets.map((bullet) => (
             <li key={bullet}>{bullet}</li>
           ))}
@@ -141,7 +141,7 @@ export function AgentXTelemetryArticle({ locale }: { locale: Locale }) {
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
           {guide.title}
         </h1>
-        <p className="mt-5 max-w-measure text-lg leading-8 text-muted-foreground">{guide.lead}</p>
+        <p className="mt-5 text-lg leading-8 text-muted-foreground">{guide.lead}</p>
         <FactGrid items={guide.highlights} />
         <AgentXTelemetryLink
           href={`${prefix}/inference?i_seq=agentic-traces`}
@@ -156,7 +156,7 @@ export function AgentXTelemetryArticle({ locale }: { locale: Locale }) {
       </header>
 
       <div className="py-10">
-        <div className="max-w-measure space-y-4 text-base leading-reading text-foreground">
+        <div className="space-y-4 text-base leading-reading text-foreground">
           {guide.intro.map((paragraph) => (
             <p key={paragraph}>{paragraph}</p>
           ))}

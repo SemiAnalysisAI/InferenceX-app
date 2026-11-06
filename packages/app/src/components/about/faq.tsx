@@ -78,7 +78,7 @@ export function FaqList({ title, items }: { title: string; items: readonly FaqIt
   return (
     <section className={READING_SECTION_CLASS}>
       <h2 className={cn(ARTICLE_H2_CLASS, 'mb-6')}>{title}</h2>
-      <dl className="max-w-measure divide-y divide-border/30">
+      <dl className="divide-y divide-border/30">
         {items.map((item) => (
           <div
             id={item.id}

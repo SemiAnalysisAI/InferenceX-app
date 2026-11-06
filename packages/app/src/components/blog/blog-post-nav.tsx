@@ -24,7 +24,7 @@ export function BlogPostNav({
   if (!prev && !next) return null;
 
   return (
-    <nav className="grid gap-4 sm:grid-cols-2" data-testid="blog-post-nav">
+    <nav className="grid max-w-measure gap-4 sm:grid-cols-2" data-testid="blog-post-nav">
       {prev ? (
         <PagerCard
           testId="blog-nav-prev"

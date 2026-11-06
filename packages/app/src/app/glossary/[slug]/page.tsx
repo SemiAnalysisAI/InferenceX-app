@@ -139,7 +139,7 @@ export default async function GlossaryTermPage({ params }: Props) {
               <span>{entry.category}</span>
               {entry.abbreviation && <span className="font-mono">{entry.abbreviation}</span>}
             </p>
-            <Heading as="h1" level="reading" className="mt-3 max-w-4xl">
+            <Heading as="h1" level="reading" className="mt-3 max-w-measure">
               {entry.term}
             </Heading>
             {entry.aliases && entry.aliases.length > 0 && (
@@ -149,8 +149,8 @@ export default async function GlossaryTermPage({ params }: Props) {
             )}
           </header>
 
-          <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-16">
-            <div className="min-w-0 max-w-measure">
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,var(--container-measure))_16rem] lg:justify-between lg:gap-16">
+            <div className="min-w-0">
               <section
                 aria-labelledby="plain-english-heading"
                 className="rounded-xl border border-border/30 bg-card p-5 md:p-6"
