@@ -85,6 +85,7 @@ import { calculatorChartToCsv } from '@/lib/export/csv-export-helpers';
 
 import ThroughputBarChart, {
   type ChartTitleParts,
+  calculatorBarFill,
   getChartTitle,
   getCostProviderLabel,
   getResultLabel,
@@ -517,10 +518,14 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     [visibilityIntent, selectionKey, legendHwKeys],
   );
   const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
-  const { resolveColor } = useThemeColors({
+  const { resolveColor, themeColors } = useThemeColors({
     highContrast,
     activeKeys: visibleKeysArray,
   });
+  const resolveBarColor = useMemo(() => {
+    const backdrop = themeColors.rootStyles?.getPropertyValue('--card').trim() ?? '';
+    return (hwKey: string) => calculatorBarFill(resolveColor(hwKey), backdrop);
+  }, [resolveColor, themeColors]);
 
   const hasAnyData = hasData || hasOverlayData;
   const targetValue = useMemo(
@@ -887,7 +892,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         .map(([key, config]) => ({
           name: config.name,
           label: getDisplayLabel(config),
-          color: resolveColor(key),
+          color: resolveBarColor(key),
           title: config.gpu,
           hw: key,
           isActive: visibleHwKeys.has(key),
@@ -900,7 +905,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     hardwareConfig,
     visibleHwKeys,
     toggleGpuVisibility,
-    resolveColor,
+    resolveBarColor,
   ]);
 
   // Input/Output values follow the chip basis; name the denominator on the total basis.
@@ -1368,7 +1373,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                         runUrl={runUrl}
                         selectedBars={selectedBars}
                         onBarSelect={handleBarSelect}
-                        colorResolver={resolveColor}
+                        colorResolver={resolveBarColor}
                         legendElement={
                           legendHwKeys.length > 0 ? (
                             <ChartLegend

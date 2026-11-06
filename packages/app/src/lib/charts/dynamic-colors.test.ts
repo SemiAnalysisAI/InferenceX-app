@@ -4,6 +4,7 @@ import { hsl, rgb } from 'd3';
 import { VENDOR_OKLCH_ZONES, VENDOR_HSL_ZONES } from '@semianalysisai/inferencex-constants';
 
 import {
+  insideLabelFill,
   whiteTextFill,
   generateHighContrastGpuDateColors,
   generateGpuDateColors,
@@ -146,6 +147,33 @@ describe('whiteTextFill', () => {
 
   it('leaves unparseable fills alone', () => {
     expect(whiteTextFill('var(--primary)')).toBe('var(--primary)');
+  });
+});
+
+describe('insideLabelFill', () => {
+  it('darkens mid fills that fail both text colours against the blended backdrop', () => {
+    expect(insideLabelFill('oklch(0.600 0.15 350.0)', 5.6, 0.85, '#ffffff')).toBe(
+      'oklch(0.458 0.150 350.0)',
+    );
+    expect(insideLabelFill('oklch(0.600 0.15 350.0)', 5.6, 0.85, 'oklch(1 0 0)')).toBe(
+      'oklch(0.458 0.150 350.0)',
+    );
+    expect(insideLabelFill('oklch(0.600 0.15 350.0)', 5.6, 0.85, '#18191c')).toBe(
+      'oklch(0.585 0.150 350.0)',
+    );
+  });
+
+  it('keeps fills where either text colour already passes', () => {
+    expect(insideLabelFill('oklch(0.880 0.15 124.2)', 5.6, 0.85, '#ffffff')).toBe(
+      'oklch(0.880 0.15 124.2)',
+    );
+    expect(insideLabelFill('oklch(0.400 0.15 150.0)', 5.6, 0.85, '#ffffff')).toBe(
+      'oklch(0.400 0.15 150.0)',
+    );
+  });
+
+  it('leaves unparseable fills alone', () => {
+    expect(insideLabelFill('var(--foreground)', 5.6, 0.85, '#ffffff')).toBe('var(--foreground)');
   });
 });
 

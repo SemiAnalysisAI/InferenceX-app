@@ -20,7 +20,7 @@ export function AtomEngineFootnote({ className }: { className?: string }) {
   return (
     <p
       data-testid="atom-engine-footnote"
-      className={cn('text-2xs text-muted-foreground leading-tight', className)}
+      className={cn('text-xs leading-5 text-muted-foreground', className)}
     >
       <sup>1</sup> {STRINGS[locale].atomFootnote}
     </p>

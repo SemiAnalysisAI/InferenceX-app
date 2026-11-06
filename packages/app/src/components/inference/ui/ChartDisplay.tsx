@@ -1474,9 +1474,7 @@ export default function ChartDisplay({
                       const chartFooter = (!powerXSurface || hasAtomSeries) && (
                         <div className="mt-3">
                           {!powerXSurface && chartContext}
-                          {hasAtomSeries && (
-                            <AtomEngineFootnote className="mt-2 text-xs leading-5" />
-                          )}
+                          {hasAtomSeries && <AtomEngineFootnote className="mt-2" />}
                         </div>
                       );
 
@@ -1632,7 +1630,7 @@ export default function ChartDisplay({
                               placement={powerCompare === 'roles' ? 'after' : 'before'}
                             />
                             {powerXWherePanelsOnly && hasAtomSeries && (
-                              <AtomEngineFootnote className="mt-2 text-xs leading-5" />
+                              <AtomEngineFootnote className="mt-2" />
                             )}
                           </>
                         );

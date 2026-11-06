@@ -65,6 +65,7 @@ const ROW_SUB_LINE_PX = 12;
 const ROW_VALUE_GAP = 6;
 const ROW_TICKS_PX = 22;
 const ROW_AXIS_LINE_PX = 15;
+const ROW_ORIGIN_MERGE_PX = 8;
 
 export function chartHeightForViewport(viewportHeightPx: number | undefined): number {
   if (!Number.isFinite(viewportHeightPx) || (viewportHeightPx as number) <= 0) return CHART_HEIGHT;
@@ -1205,6 +1206,14 @@ export default function ProfitEstimatorChart({
       (horizontal ? layout.xAxisGroup : layout.yAxisGroup)
         .selectAll('text')
         .style('font-variant-numeric', 'tabular-nums');
+      layout.yAxisGroup
+        .select('.domain')
+        .attr(
+          'visibility',
+          horizontal && (ctx.xScale as d3.ScaleLinear<number, number>)(0) < ROW_ORIGIN_MERGE_PX
+            ? 'hidden'
+            : null,
+        );
       layout.g
         .selectAll<SVGTextElement, string[]>('text.profit-value-label')
         .data(horizontal ? [valueLabelLines] : [])

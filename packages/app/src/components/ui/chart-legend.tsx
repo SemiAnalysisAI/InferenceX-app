@@ -38,7 +38,9 @@ const STRINGS = {
   },
 } as const;
 
-const SCROLL_FADE_MASK = 'linear-gradient(to bottom, black calc(100% - 24px), transparent)';
+const SCROLL_FADE_PX = 24;
+const OVERFLOW_STRIP_PX = 14;
+const STRETCHED_LEGEND_QUERY = '(min-width: 64rem)';
 
 export interface LegendSwitchConfig {
   id: string;
@@ -133,6 +135,7 @@ export default function ChartLegend({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [hasMoreBelow, setHasMoreBelow] = useState(false);
+  const [stripHeight, setStripHeight] = useState<number | null>(null);
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
   const advancedControlsId = useId();
 
@@ -148,18 +151,42 @@ export default function ChartLegend({
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const update = () => {
+    const panel = el.parentElement;
+    const updateScroll = () => {
       setIsOverflowing(el.scrollHeight > el.clientHeight - 0.5);
       setHasMoreBelow(el.scrollHeight - el.scrollTop - el.clientHeight > 1);
     };
+    const update = () => {
+      updateScroll();
+      if (!isSidebar || !panel || window.matchMedia(STRETCHED_LEGEND_QUERY).matches) {
+        setStripHeight(null);
+        return;
+      }
+      const room = Math.min(
+        el.scrollHeight,
+        Number.parseFloat(getComputedStyle(panel).maxHeight) -
+          (panel.offsetHeight - el.offsetHeight),
+      );
+      let lastRowBottom = 0;
+      for (const row of el.querySelectorAll('li')) {
+        const bottom = row.offsetTop + row.offsetHeight;
+        if (bottom + OVERFLOW_STRIP_PX <= room) lastRowBottom = Math.max(lastRowBottom, bottom);
+      }
+      setStripHeight(
+        el.scrollHeight > room + 0.5 && lastRowBottom > 0
+          ? lastRowBottom + OVERFLOW_STRIP_PX
+          : null,
+      );
+    };
     const observer = new ResizeObserver(update);
     observer.observe(el);
-    el.addEventListener('scroll', update, { passive: true });
+    if (panel) observer.observe(panel);
+    el.addEventListener('scroll', updateScroll, { passive: true });
     return () => {
       observer.disconnect();
-      el.removeEventListener('scroll', update);
+      el.removeEventListener('scroll', updateScroll);
     };
-  }, [items, isLegendExpanded]);
+  }, [items, isLegendExpanded, isSidebar]);
 
   const sortedItems = useMemo(() => {
     if (!isSidebar) return items;
@@ -192,7 +219,7 @@ export default function ChartLegend({
     ? cn(
         'relative px-2 py-3 rounded-lg border bg-background text-sm flex flex-col w-full min-h-0',
         isLegendExpanded
-          ? 'border-border/30 max-h-96 lg:max-h-[575px] legend-container sidebar-legend'
+          ? 'border-border/30 max-h-96 lg:max-h-[575px] lg:flex-1 legend-container sidebar-legend'
           : 'border-transparent no-export',
       )
     : grouped
@@ -426,11 +453,14 @@ export default function ChartLegend({
     </div>
   ) : null;
 
+  const fadeMask =
+    stripHeight === null
+      ? `linear-gradient(to bottom, black calc(100% - ${SCROLL_FADE_PX}px), transparent)`
+      : `linear-gradient(to bottom, black calc(100% - ${OVERFLOW_STRIP_PX}px), rgb(0 0 0 / 0.4) calc(100% - ${OVERFLOW_STRIP_PX}px), transparent)`;
   const scrollStyle: React.CSSProperties = {
     ...(!isSidebar && isOverflowing ? { scrollbarGutter: 'stable' } : undefined),
-    ...(hasMoreBelow
-      ? { maskImage: SCROLL_FADE_MASK, WebkitMaskImage: SCROLL_FADE_MASK }
-      : undefined),
+    ...(stripHeight === null ? undefined : { maxHeight: stripHeight }),
+    ...(hasMoreBelow ? { maskImage: fadeMask, WebkitMaskImage: fadeMask } : undefined),
   };
 
   const scrollContent =
@@ -481,7 +511,13 @@ export default function ChartLegend({
     );
 
   const content = (
-    <div className={isSidebar ? 'min-w-0 lg:flex lg:min-h-0 lg:flex-col' : 'relative'}>
+    <div
+      className={
+        isSidebar
+          ? 'min-w-0 lg:flex lg:min-h-0 lg:flex-col lg:in-data-[slot=chart-legend-wrapper]:flex-1'
+          : 'relative'
+      }
+    >
       <div
         data-testid={!isSidebar || isLegendExpanded ? 'chart-legend' : undefined}
         className={outerClasses}

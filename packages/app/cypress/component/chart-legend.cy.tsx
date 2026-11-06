@@ -437,6 +437,16 @@ describe('ChartLegend (sidebar variant)', () => {
             expect(panel.height).to.be.at.most(width < 1024 ? 384 : 575);
             expect(scroller.scrollHeight).to.be.greaterThan(scroller.clientHeight);
             expect(controls.bottom).to.be.at.most(panel.bottom);
+            if (width < 1024) {
+              const viewport = scroller.getBoundingClientRect();
+              const lastWhole = Math.max(
+                ...[...scroller.querySelectorAll('li')]
+                  .map((row) => row.getBoundingClientRect().bottom)
+                  .filter((bottom) => bottom <= viewport.bottom),
+              );
+              expect(viewport.bottom - lastWhole).to.be.closeTo(14, 0.5);
+              expect(controls.top).to.be.at.least(viewport.bottom);
+            }
           });
         cy.get('.sidebar-legend label').contains('Run 40 —').scrollIntoView().click();
         cy.get('#checkbox-series-39').should('not.be.checked');
@@ -450,7 +460,7 @@ describe('ChartLegend (sidebar variant)', () => {
     }
   }
 
-  it('fits a short list and keeps actions with the close button at 1280px', () => {
+  it('stretches a short list panel to the plot and keeps actions with the close button at 1280px', () => {
     cy.viewport(1280, 900);
     cy.mount(<ChartLegendWrapper inChart onQuickFilters={cy.stub().as('quickFilters')} />);
     cy.get('[data-testid="chart-legend"]')
@@ -461,7 +471,10 @@ describe('ChartLegend (sidebar variant)', () => {
         const controls = $legend
           .find('[data-testid="legend-display-controls"]')[0]
           .getBoundingClientRect();
-        expect(panel.height).to.be.lessThan(280);
+        const column = $legend[0]
+          .closest('[data-slot="chart-legend-wrapper"]')!
+          .getBoundingClientRect();
+        expect(panel.bottom).to.be.closeTo(column.bottom, 1);
         expect(controls.top - list.bottom).to.be.lessThan(16);
         expect(panel.right).to.be.at.most(1280);
       });
