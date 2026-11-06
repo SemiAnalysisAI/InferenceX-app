@@ -7,6 +7,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { DISPLAY_MODEL_TO_DB, HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { useTheme } from 'next-themes';
 import { isDarkTheme } from '@/lib/themes/themes';
+import { profitChartQualifier, profitChartTitle } from '@/lib/calculator/profit-chart-heading';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -140,7 +141,11 @@ const COST_PROVIDER_TIER: Record<ProfitCostProvider, CostTier> = {
   custom: 'custom',
 };
 
-const COST_PROVIDER_OPTIONS: { value: ProfitCostProvider; label: string; labelZh: string }[] = [
+const COST_PROVIDER_OPTIONS: {
+  value: ProfitCostProvider;
+  label: string;
+  labelZh: string;
+}[] = [
   ...(['costh', 'costr'] as const).map((value) => ({
     value,
     label: COST_TIER_LABELS[COST_PROVIDER_TIER[value]].option,
@@ -264,14 +269,6 @@ const STRINGS = {
       modelId
         ? `OpenRouter has no price for ${modelId}. Switch Token price to Custom to enter one.`
         : 'This model has no OpenRouter listing. Switch Token price to Custom to enter a price.',
-    chartTitle: {
-      'gw-year': (model: string, workload: string) =>
-        `${model} ${workload} revenue & profit estimates per gigawatt per year`,
-      'chip-hour': (model: string, workload: string) =>
-        `${model} ${workload} revenue & profit estimates per chip per hour`,
-    },
-    chartQualifier: (percentile: string, target: number) =>
-      `at ${percentile} ${target} tok/s/user interactivity`,
     sellingPriceLabel: 'Selling price per million tokens',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
       `Input: $${input} · Cached input: $${cached} · Output: $${output} (${source})`,
@@ -397,14 +394,6 @@ const STRINGS = {
       modelId
         ? `OpenRouter 没有 ${modelId} 的价格。请将 Token 售价切换为自定义并输入价格。`
         : '该模型没有 OpenRouter 条目。请将 Token 售价切换为自定义并输入价格。',
-    chartTitle: {
-      'gw-year': (model: string, workload: string) =>
-        `${model} ${workload} 每吉瓦每年收入与利润估算`,
-      'chip-hour': (model: string, workload: string) =>
-        `${model} ${workload} 每芯片每小时收入与利润估算`,
-    },
-    chartQualifier: (percentile: string, target: number) =>
-      `（${percentile} 交互性 ${target} tok/s/user）`,
     sellingPriceLabel: '每百万 token 售价',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
       `输入：$${input} · 缓存输入：$${cached} · 输出：$${output}（${source}）`,
@@ -675,7 +664,10 @@ function ProfitEstimatorInner({
   );
 
   const [selectedGPUs, setSelectedGPUs] = useState<string[]>([]);
-  const [selectedDateRange, setSelectedDateRange] = useState({ startDate: '', endDate: '' });
+  const [selectedDateRange, setSelectedDateRange] = useState({
+    startDate: '',
+    endDate: '',
+  });
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [historyHydrated, setHistoryHydrated] = useState(false);
   useEffect(() => {
@@ -904,7 +896,10 @@ function ProfitEstimatorInner({
     (base: string, raw: string) => {
       if (costProvider !== 'custom') {
         enterCustomCosts();
-        track('profit_cost_provider_changed', { provider: 'custom', via: 'tco_badge' });
+        track('profit_cost_provider_changed', {
+          provider: 'custom',
+          via: 'tco_badge',
+        });
       }
       setCustomCosts((prev) => ({ ...prev, [base]: raw }));
     },
@@ -963,7 +958,12 @@ function ProfitEstimatorInner({
   ]);
 
   const assumptions = useMemo(
-    () => ({ utilizationPct: utilization.value, labCutPct: labCut.value, basis, powerBasis }),
+    () => ({
+      utilizationPct: utilization.value,
+      labCutPct: labCut.value,
+      basis,
+      powerBasis,
+    }),
     [utilization.value, labCut.value, basis, powerBasis],
   );
 
@@ -1051,7 +1051,10 @@ function ProfitEstimatorInner({
   const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
   const [highContrast, setHighContrast] = useState(false);
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
-  const { resolveColor } = useThemeColors({ highContrast, activeKeys: visibleKeysArray });
+  const { resolveColor } = useThemeColors({
+    highContrast,
+    activeKeys: visibleKeysArray,
+  });
 
   const historyRanks = useMemo(
     () => profitHistoryDateRanks(fullEstimate.rows),
@@ -1343,11 +1346,15 @@ function ProfitEstimatorInner({
       <div className="mb-2 md:pr-12" data-testid="profit-caption">
         <Heading as="h2" level="card">
           <ModelLogo model={selectedModel} className="mr-2 size-6 align-[-0.3em]" />
-          {t.chartTitle[basis](
+          {profitChartTitle(
+            locale,
+            basis,
             getModelLabel(selectedModel),
             getSequenceLabel(Sequence.AgenticTraces, locale),
           )}
-          <HeadingQualifier>{t.chartQualifier(percentileLabel, targetValue)}</HeadingQualifier>
+          <HeadingQualifier>
+            {profitChartQualifier(locale, percentileLabel, targetValue)}
+          </HeadingQualifier>
         </Heading>
         {powerControlsEnabled && (
           <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-power-note">
@@ -1695,7 +1702,9 @@ function ProfitEstimatorInner({
                               setCustomOutputPrice(formatTokenPrice(pricing.outputPerMillion));
                             }
                             setPriceSource(next as PriceSource);
-                            track('profit_price_source_changed', { source: next });
+                            track('profit_price_source_changed', {
+                              source: next,
+                            });
                           }}
                           open={openDropdown === 'priceSource'}
                           onOpenChange={handleDropdownOpenChange('priceSource')}
@@ -1947,7 +1956,9 @@ function ProfitEstimatorInner({
                         isLegendExpanded={isLegendExpanded}
                         onExpandedChange={(expanded) => {
                           setIsLegendExpanded(expanded);
-                          track('profit_legend_expanded', { enabled: expanded });
+                          track('profit_legend_expanded', {
+                            enabled: expanded,
+                          });
                         }}
                         switches={[
                           {
@@ -1956,7 +1967,9 @@ function ProfitEstimatorInner({
                             checked: highContrast,
                             onCheckedChange: (checked: boolean) => {
                               setHighContrast(checked);
-                              track('profit_high_contrast_toggled', { enabled: checked });
+                              track('profit_high_contrast_toggled', {
+                                enabled: checked,
+                              });
                             },
                           },
                         ]}

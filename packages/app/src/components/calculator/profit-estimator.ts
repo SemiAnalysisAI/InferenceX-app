@@ -363,7 +363,7 @@ export function estimateProfitRows(
  */
 export function formatUsdCompact(value: number, digits = 1): string {
   if (!Number.isFinite(value)) return '—';
-  const sign = value < 0 ? '-' : '';
+  const sign = value < 0 ? '−' : '';
   const abs = Math.abs(value);
   if (abs >= 1e9) return `${sign}$${(abs / 1e9).toFixed(digits)}B`;
   if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(digits)}M`;
@@ -374,7 +374,7 @@ export function formatUsdCompact(value: number, digits = 1): string {
 /** Format a $/GPU/hr figure: cents matter, so a fixed two decimals with the sign in front. */
 export function formatUsdPerChipHour(value: number, digits = 2): string {
   if (!Number.isFinite(value)) return '—';
-  const sign = value < 0 ? '-' : '';
+  const sign = value < 0 ? '−' : '';
   return `${sign}$${Math.abs(value).toFixed(digits)}`;
 }
 

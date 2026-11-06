@@ -4,7 +4,11 @@ import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
-import { READING_PAGE_CLASS, READING_TOP_CLASS } from '@/components/ui/reading-layout';
+import {
+  READING_DEK_CLASS,
+  READING_PAGE_CLASS,
+  READING_TOP_CLASS,
+} from '@/components/ui/reading-layout';
 import {
   type AdjacentPosts,
   getPostThumbnail,
@@ -52,7 +56,11 @@ export function BlogPostContent({
   const basePath = blogIndexPath(locale);
   const { slug } = meta;
   const tags = meta.tags ?? [];
-  const shareLabels = { share: t.share, copyLink: t.copyLink, copied: t.copied };
+  const shareLabels = {
+    share: t.share,
+    copyLink: t.copyLink,
+    copied: t.copied,
+  };
   const ctaLabels = {
     eyebrow: t.ctaEyebrow,
     title: t.ctaTitle,
@@ -76,9 +84,7 @@ export function BlogPostContent({
               <Heading as="h1" level="reading">
                 {meta.title}
               </Heading>
-              <p className="max-w-measure text-lg leading-7 text-muted-foreground">
-                {meta.subtitle}
-              </p>
+              <p className={READING_DEK_CLASS}>{meta.subtitle}</p>
             </div>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
               <span>{AUTHOR_NAME}</span>

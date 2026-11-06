@@ -259,7 +259,7 @@ describe('profitPointDetails', () => {
       assumptions,
       'en',
     );
-    expect(details.metrics[0]).toEqual({ value: '-$190', label: 'Loss' });
+    expect(details.metrics[0]).toEqual({ value: '−$190', label: 'Loss' });
     expect(JSON.stringify(details.rows)).toContain('Model license fee');
     expect(JSON.stringify(details.rows)).toContain('$90');
   });
@@ -272,7 +272,7 @@ describe('profitPointDetails', () => {
       'en',
     );
     expect(details.summary).toContain('$2.16');
-    expect(details.metrics[0]?.value).toBe('-$0.22');
+    expect(details.metrics[0]?.value).toBe('−$0.22');
     expect(JSON.stringify(details)).not.toContain('/GPU/hr');
     const perGw = profitPointDetails(row(), hardwareConfig, assumptions, 'en');
     expect(JSON.stringify(perGw)).toContain('/GPU/hr');
@@ -323,7 +323,7 @@ describe('segmentLabelLines', () => {
 
   it('labels a loss with the loss word and the negative amount', () => {
     const lossRow = row({ tco: 1300, grossMargin: -300, labCut: 300, profit: -600 });
-    expect(segmentLabelLines('loss', lossRow, 40, SEGMENT_WORDS)).toEqual(['Loss', '-$600']);
+    expect(segmentLabelLines('loss', lossRow, 40, SEGMENT_WORDS)).toEqual(['Loss', '−$600']);
   });
 
   it('drops the name, then the amount, when the bar is too narrow (phones)', () => {
@@ -484,7 +484,7 @@ describe('lossLabelStyle', () => {
       word: true,
       digits: 1,
     });
-    expect(lossLabelText(-561.2e6, 'Loss', 'gw-year')).toBe('Loss -$561.2M');
+    expect(lossLabelText(-561.2e6, 'Loss', 'gw-year')).toBe('Loss −$561.2M');
   });
 
   it('narrows every loss figure until the widest fits a phone-width slot', () => {
@@ -493,16 +493,16 @@ describe('lossLabelStyle', () => {
     for (const losing of flashRows.filter((r) => r.profit < 0)) {
       const text = lossLabelText(losing.profit, 'Loss', 'gw-year', style, phoneSlot);
       expect(boldWidth(text, CHART_TYPE.annotation)).toBeLessThanOrEqual(phoneSlot);
-      expect(text).toMatch(/^(?:Loss )?-\$\d+(?:\.\d)?[MB]$/);
+      expect(text).toMatch(/^(?:Loss )?−\$\d+(?:\.\d)?[MB]$/);
     }
   });
 
   it('lets a bar keep its decimal when only a wider neighbour had to lose it', () => {
     const style = lossLabelStyle(flashRows, 'Loss', 'gw-year', phoneSlot);
     expect(style).toEqual({ word: false, digits: 0 });
-    expect(lossLabelText(-561.2e6, 'Loss', 'gw-year', style, phoneSlot)).toBe('-$561M');
-    expect(lossLabelText(-4.9e9, 'Loss', 'gw-year', style, phoneSlot)).toBe('-$4.9B');
-    expect(lossLabelText(-4.9e9, 'Loss', 'gw-year', { word: true, digits: 0 })).toBe('Loss -$5B');
+    expect(lossLabelText(-561.2e6, 'Loss', 'gw-year', style, phoneSlot)).toBe('−$561M');
+    expect(lossLabelText(-4.9e9, 'Loss', 'gw-year', style, phoneSlot)).toBe('−$4.9B');
+    expect(lossLabelText(-4.9e9, 'Loss', 'gw-year', { word: true, digits: 0 })).toBe('Loss −$5B');
   });
 
   it('drops the decimal before the word, and the word before the last decimal', () => {
@@ -523,7 +523,7 @@ describe('lossLabelStyle', () => {
       word: false,
       digits: 0,
     });
-    expect(lossLabelText(-561.2e6, 'Loss', 'gw-year', { word: false, digits: 0 })).toBe('-$561M');
+    expect(lossLabelText(-561.2e6, 'Loss', 'gw-year', { word: false, digits: 0 })).toBe('−$561M');
   });
 
   it('ignores profitable rows and falls back to the smallest style when nothing fits', () => {
@@ -540,10 +540,10 @@ describe('lossLabelStyle', () => {
       rows,
       'Loss',
       'chip-hour',
-      boldWidth('-$0.57', CHART_TYPE.annotation),
+      boldWidth('−$0.57', CHART_TYPE.annotation),
     );
     expect(style.word).toBe(false);
-    expect(lossLabelText(-0.57, 'Loss', 'chip-hour', style)).toBe('-$0.57');
+    expect(lossLabelText(-0.57, 'Loss', 'chip-hour', style)).toBe('−$0.57');
   });
 });
 

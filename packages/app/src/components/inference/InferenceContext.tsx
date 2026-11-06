@@ -1423,7 +1423,7 @@ export function InferenceProvider({
     if (exclusion) {
       const { result, droppedGroups } = resolveHwSelection(automaticSelection, previousSelection);
       setActiveHwTypes(result);
-      if (droppedGroups.length > 0) {
+      if (droppedGroups.length > 0 && hardwareDefaultsOverridden) {
         setEngineConflict({
           kind: 'resolved',
           ...exclusionResolutionFamilies(automaticSelection, result, exclusion),

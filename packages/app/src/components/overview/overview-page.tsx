@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Heading } from '@/components/ui/heading';
 import { sourceLinkClassName } from '@/components/ui/result-context';
+import { ShareButton } from '@/components/ui/share-button';
 import { OVERVIEW_HISTORY_WINDOW_DAYS, type OverviewPageData } from '@/lib/overview/overview-data';
 import { overviewHref } from '@/lib/overview/overview-links';
 
@@ -116,44 +117,47 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
       {presenting ? null : (
         <Card className="md:py-5">
           <header>
-            <div className="flex flex-col gap-y-1">
-              <Heading as="h1" level="title">
-                {strings.title}
-              </Heading>
-              <p
-                data-testid="overview-scope"
-                aria-label={strings.scopeAria}
-                className="inline-flex flex-wrap items-baseline gap-x-2 leading-snug"
-              >
-                <span
-                  data-testid="overview-scope-metric"
-                  className="text-base font-medium text-foreground"
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-col gap-y-1">
+                <Heading as="h1" level="title">
+                  {strings.title}
+                </Heading>
+                <p
+                  data-testid="overview-scope"
+                  aria-label={strings.scopeAria}
+                  className="inline-flex flex-wrap items-baseline gap-x-2 leading-snug"
                 >
-                  {strings.scopeMetric}
-                </span>{' '}
-                <span aria-hidden="true" className="text-sm text-muted-foreground">
-                  ·
-                </span>{' '}
-                <span
-                  data-testid="overview-scope-direction"
-                  className="text-sm font-normal text-muted-foreground"
-                >
-                  {strings.scopeDirection}
-                </span>
-              </p>
-              <p className="text-xs leading-tight text-muted-foreground">
-                {strings.sourcePrefix}
-                <a
-                  data-testid="overview-source-link"
-                  href={TCO_SOURCE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={sourceLinkClassName}
-                >
-                  {strings.sourceLinkText}
-                  <ExternalLinkIcon />
-                </a>
-              </p>
+                  <span
+                    data-testid="overview-scope-metric"
+                    className="text-base font-medium text-foreground"
+                  >
+                    {strings.scopeMetric}
+                  </span>{' '}
+                  <span aria-hidden="true" className="text-sm text-muted-foreground">
+                    ·
+                  </span>{' '}
+                  <span
+                    data-testid="overview-scope-direction"
+                    className="text-sm font-normal text-muted-foreground"
+                  >
+                    {strings.scopeDirection}
+                  </span>
+                </p>
+                <p className="text-xs leading-tight text-muted-foreground">
+                  {strings.sourcePrefix}
+                  <a
+                    data-testid="overview-source-link"
+                    href={TCO_SOURCE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={sourceLinkClassName}
+                  >
+                    {strings.sourceLinkText}
+                    <ExternalLinkIcon />
+                  </a>
+                </p>
+              </div>
+              <ShareButton className="shrink-0" />
             </div>
             <ControlPanel
               legend={strings.controlsGroup}

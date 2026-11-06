@@ -11,6 +11,7 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
 import {
   ARTICLE_H2_CLASS,
+  READING_DEK_CLASS,
   READING_LINK_CLASS,
   READING_PAGE_CLASS,
   READING_SECTION_CLASS,
@@ -49,12 +50,12 @@ export default function AboutPageZh() {
             持续运行的开源智能体推理基准测试，受到万亿美元级、吉瓦规模 Token 工厂运营方的信赖
           </Heading>
           <div className="mt-4 flex max-w-measure flex-col gap-4 leading-reading text-foreground">
-            <p>
+            <p className={READING_DEK_CLASS}>
               软件开发和模型发布的节奏极快。静态基准测试很快就会过时；参与者提交的软件镜像往往是为基准测试专门构建的，无法反映真实应用场景中的性能。
             </p>
             <p>
-              <strong className="font-medium text-foreground">InferenceX&trade;</strong>（原名
-              InferenceMAX）是我们建立的独立、厂商中立且可复现的基准测试平台。它覆盖 ML
+              <strong className="font-medium text-foreground">InferenceX&trade;</strong>
+              （原名 InferenceMAX）是我们建立的独立、厂商中立且可复现的基准测试平台。它覆盖 ML
               社区实际可用的各类 AI 加速器和服务栈，测试固定序列推理服务以及 AgentX
               长上下文、多轮智能体编码工作负载。
             </p>

@@ -172,6 +172,7 @@ export function EngineComparisonConflictNotice({ className }: { className?: stri
     <InlineNotice
       testId="engine-comparison-conflict-notice"
       tone="warning"
+      collapsible
       icon={AlertTriangle}
       title={
         onCompare

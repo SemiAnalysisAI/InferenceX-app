@@ -11,6 +11,7 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
 import {
   ARTICLE_H2_CLASS,
+  READING_DEK_CLASS,
   READING_LINK_CLASS,
   READING_PAGE_CLASS,
   READING_SECTION_CLASS,
@@ -50,7 +51,7 @@ export default function AboutPage() {
             trillion-dollar, gigawatt-scale token factories
           </Heading>
           <div className="mt-4 flex max-w-measure flex-col gap-4 leading-reading text-foreground">
-            <p>
+            <p className={READING_DEK_CLASS}>
               Software development and model releases move fast. Static benchmarks quickly become
               obsolete, and participants often submit software images purpose-built for the
               benchmark itself which do not reflect real world performance.

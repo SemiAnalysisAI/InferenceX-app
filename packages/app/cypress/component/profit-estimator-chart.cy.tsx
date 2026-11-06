@@ -156,7 +156,7 @@ describe('ProfitEstimatorChart revenue labels', () => {
     mountChart(393, LOSING_ROWS);
     cy.get('[data-testid="profit-estimator-chart"] .loss-label').should('have.length', 2);
     cy.get('[data-testid="profit-estimator-chart"] .loss-label').then(($labels) => {
-      expect([...$labels].map((el) => el.textContent)).to.deep.equal(['-$561M', '-$4.9B']);
+      expect([...$labels].map((el) => el.textContent)).to.deep.equal(['−$561M', '−$4.9B']);
     });
     cy.get('[data-testid="d3-chart-svg"]').then(($svg) => {
       const plot = $svg[0].getBoundingClientRect();
@@ -174,7 +174,7 @@ describe('ProfitEstimatorChart revenue labels', () => {
           expect(box.right, `"${$label.text()}" runs off the right of the chart`).to.be.at.most(
             plot.right,
           );
-          expect($label.text()).to.match(/^(?:Loss )?-\$\d+(?:\.\d)?[MB]$/);
+          expect($label.text()).to.match(/^(?:Loss )?−\$\d+(?:\.\d)?[MB]$/);
         });
       });
     });
@@ -185,7 +185,7 @@ describe('ProfitEstimatorChart revenue labels', () => {
     mountChart(1100, LOSING_ROWS);
     cy.get('[data-testid="profit-estimator-chart"] .loss-label')
       .first()
-      .should('have.text', 'Loss -$561.2M');
+      .should('have.text', 'Loss −$561.2M');
   });
 
   it('keeps full precision on a desktop-width chart', () => {

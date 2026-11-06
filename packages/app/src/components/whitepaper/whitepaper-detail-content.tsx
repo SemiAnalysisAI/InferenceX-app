@@ -257,23 +257,19 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
                   {copy.figureTitle}
                   <HeadingQualifier>{copy.figureQualifier}</HeadingQualifier>
                 </Heading>
-                <div className="-mx-1 overflow-x-auto px-1 pb-1">
-                  <div
-                    className="min-w-[36rem] overflow-hidden rounded-lg border border-border/30 sm:min-w-0"
-                    style={{ aspectRatio: `${figure.width} / ${figure.height}` }}
-                  >
-                    <ThemedFigureImage
-                      srcLight={figure.srcLight}
-                      srcDark={figure.srcDark}
-                      alt={figureCopy.alt}
-                      loading={index === 0 ? 'eager' : 'lazy'}
-                      className="block h-full w-full object-cover"
-                    />
-                  </div>
+                <div
+                  className="overflow-hidden rounded-lg border border-border/30"
+                  style={{ aspectRatio: `${figure.width} / ${figure.height}` }}
+                >
+                  <ThemedFigureImage
+                    srcLight={figure.srcLight}
+                    srcDark={figure.srcDark}
+                    alt={figureCopy.alt}
+                    loading={index === 0 ? 'eager' : 'lazy'}
+                    className="block h-auto w-full"
+                    fullSizeLabel={t.openFullSize}
+                  />
                 </div>
-                <p className="text-xs text-muted-foreground sm:hidden" aria-hidden="true">
-                  {t.scrollHint}
-                </p>
                 <ResultContext
                   layout="footer"
                   locale={locale}

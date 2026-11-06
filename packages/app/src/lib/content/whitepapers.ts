@@ -8,6 +8,7 @@ import {
   TCO_SOURCE_URL,
 } from '@semianalysisai/inferencex-constants';
 
+import { profitChartQualifier, profitChartTitle } from '../calculator/profit-chart-heading';
 import { enAlternates, type Locale, ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '../i18n/i18n';
 
 export interface WhitepaperKpi {
@@ -264,8 +265,8 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
         },
       ],
       authors: WHITEPAPER_AUTHORS,
-      figureTitle: 'Kimi K3 2.8T Agentic Revenue & Profit Estimates per GigaWatt Per Year',
-      figureQualifier: 'At P90 45 tok/s/user interactivity',
+      figureTitle: profitChartTitle('en', 'gw-year', 'Kimi K3 2.8T', 'Agentic'),
+      figureQualifier: profitChartQualifier('en', 'P90', 45),
       figures: [
         {
           costTier: 'Owning at large hyperscaler volume',
@@ -384,8 +385,8 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
         },
       ],
       authors: WHITEPAPER_AUTHORS_ZH,
-      figureTitle: 'Kimi K3 2.8T 智能体每吉瓦年收入与利润估算',
-      figureQualifier: 'P90 交互性 45 tok/s/user',
+      figureTitle: profitChartTitle('zh', 'gw-year', 'Kimi K3 2.8T', '智能体'),
+      figureQualifier: profitChartQualifier('zh', 'P90', 45),
       figures: [
         {
           costTier: '自有 · 超大规模云厂商批量采购',
@@ -465,7 +466,7 @@ export const WHITEPAPER_COPY = {
     pages: (count: number) => `${count} pages`,
     dataAsOf: (date: string) => `Data as of ${date}`,
     tags: 'Tags',
-    scrollHint: 'Scroll sideways to see the full chart',
+    openFullSize: 'Open full-size image in a new tab',
     keyNumbers: 'Key numbers',
     figures: 'Figures',
     onThisPage: 'On this page',
@@ -497,7 +498,7 @@ export const WHITEPAPER_COPY = {
     pages: (count: number) => `共 ${count} 页`,
     dataAsOf: (date: string) => `数据截至 ${date}`,
     tags: '标签',
-    scrollHint: '左右滑动查看完整图表',
+    openFullSize: '在新标签页中打开原尺寸图片',
     keyNumbers: '核心数字',
     figures: '图表',
     onThisPage: '本页目录',

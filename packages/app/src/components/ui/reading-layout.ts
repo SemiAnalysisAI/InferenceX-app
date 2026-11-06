@@ -7,6 +7,8 @@ export const READING_LINK_CLASS =
 
 export const ARTICLE_PAGE_CLASS = 'container mx-auto max-w-4xl px-5 sm:px-6 lg:px-8';
 
+export const READING_DEK_CLASS = 'max-w-measure text-lg leading-7 text-muted-foreground';
+
 export const READING_TEXT_CLASS = 'max-w-measure text-base leading-reading text-foreground';
 
 export const ARTICLE_H2_CLASS =
