@@ -271,7 +271,8 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
           return canOpen ? (
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
+              className="border border-transparent hover:border-border focus-visible:border-border"
               size="icon-2xs"
               onClick={() => openDrawer(row)}
               aria-label={t.promptsAriaLabel(row.configLabel)}

@@ -124,6 +124,20 @@ function CellMissing({ hardware, reason }: { hardware: string; reason: string })
   );
 }
 
+function isPlatformBlank(platform: OverviewPlatformResult): boolean {
+  return (
+    platform.missingReason !== null || platform.read.value === null || platform.costPerMtok === null
+  );
+}
+
+function NoResultsRow({ text }: { text: string }) {
+  return (
+    <p data-testid="overview-row-no-results" className="text-sm text-muted-foreground">
+      {text}
+    </p>
+  );
+}
+
 const COST_DELTA_NEUTRAL_BAND = 0.05;
 const COST_DELTA_SATURATION = 0.5;
 const COST_DELTA_CLASS = {
@@ -321,8 +335,8 @@ function CellValue({
   referenceLabel: string;
   phoneRow?: boolean;
 }) {
-  const { value, config, evidenceDate, evidenceTopologies } = member.read;
-  if (member.missingReason !== null || value === null || member.costPerMtok === null) {
+  const { config, evidenceDate, evidenceTopologies } = member.read;
+  if (isPlatformBlank(member) || member.costPerMtok === null) {
     return <CellMissing hardware={member.hardware} reason={missingReasonCopy(member, strings)} />;
   }
   const precisionLabel = config?.precision.toUpperCase() ?? member.precision?.toUpperCase() ?? null;
@@ -571,7 +585,7 @@ export function DesktopOverviewMatrix({
               <th
                 key={platform.hardware}
                 scope="col"
-                className={`h-10 px-3 text-left shadow-[inset_0_-1px_0_var(--border)] ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-[color-mix(in_oklch,var(--muted)_30%,var(--card))] font-semibold text-foreground' : 'bg-card font-medium'}`}
+                className={`h-10 px-3 text-left ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-[color-mix(in_oklch,var(--muted)_50%,var(--card))] font-semibold text-foreground shadow-[inset_0_-1px_0_var(--border),inset_1px_0_0_var(--border),inset_-1px_0_0_var(--border)]' : 'bg-card font-medium shadow-[inset_0_-1px_0_var(--border)]'}`}
               >
                 {comparisonMode === 'hardware' && platform.hardware === referenceHardware
                   ? `${platform.hardwareLabel} · ${strings.referenceHeader}`
@@ -585,6 +599,7 @@ export function DesktopOverviewMatrix({
             const referenceCost =
               model.platforms.find((platform) => platform.hardware === referenceHardware)
                 ?.costPerMtok ?? null;
+            const rowBlank = model.platforms.every(isPlatformBlank);
             return (
               <tr
                 key={`${model.model}-${model.scenario}`}
@@ -609,30 +624,36 @@ export function DesktopOverviewMatrix({
                     </OverviewDetailLink>
                   )}
                 </th>
-                {model.platforms.map((platform) => (
-                  <td
-                    key={platform.hardware}
-                    style={costDeltaCellStyle(
-                      platform,
-                      comparisonMode,
-                      referenceHardware,
-                      referenceCost,
-                    )}
-                    className={`px-3 py-2.5 align-top ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted/30' : ''}`}
-                  >
-                    <PlatformCell
-                      locale={locale}
-                      model={model}
-                      platform={platform}
-                      formatters={formatters}
-                      strings={strings}
-                      comparisonMode={comparisonMode}
-                      referenceHardware={referenceHardware}
-                      referenceCost={referenceCost}
-                      referenceLabel={referenceLabel}
-                    />
+                {rowBlank ? (
+                  <td colSpan={model.platforms.length} className="px-3 py-2.5 align-top">
+                    <NoResultsRow text={strings.noResultsRow} />
                   </td>
-                ))}
+                ) : (
+                  model.platforms.map((platform) => (
+                    <td
+                      key={platform.hardware}
+                      style={costDeltaCellStyle(
+                        platform,
+                        comparisonMode,
+                        referenceHardware,
+                        referenceCost,
+                      )}
+                      className={`px-3 py-2.5 align-top ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted/50 shadow-[inset_1px_0_0_var(--border),inset_-1px_0_0_var(--border)]' : ''}`}
+                    >
+                      <PlatformCell
+                        locale={locale}
+                        model={model}
+                        platform={platform}
+                        formatters={formatters}
+                        strings={strings}
+                        comparisonMode={comparisonMode}
+                        referenceHardware={referenceHardware}
+                        referenceCost={referenceCost}
+                        referenceLabel={referenceLabel}
+                      />
+                    </td>
+                  ))
+                )}
               </tr>
             );
           })}
@@ -666,41 +687,45 @@ export function MobileOverviewList({
               className="space-y-1 px-4 py-3"
             >
               <ModelName model={model} strings={strings} />
-              <div className="grid grid-cols-1">
-                {model.platforms.map((platform) => (
-                  <div
-                    key={platform.hardware}
-                    data-testid="overview-mobile-platform-row"
-                    data-hardware={platform.hardware}
-                    style={costDeltaCellStyle(
-                      platform,
-                      comparisonMode,
-                      referenceHardware,
-                      referenceCost,
-                    )}
-                    className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] items-baseline gap-x-3 border-b border-border/30 py-1 last:border-b-0"
-                  >
-                    <span
-                      data-testid="overview-mobile-hardware"
-                      className="whitespace-nowrap text-xs font-medium text-muted-foreground"
+              {model.platforms.every(isPlatformBlank) ? (
+                <NoResultsRow text={strings.noResultsRow} />
+              ) : (
+                <div className="grid grid-cols-1">
+                  {model.platforms.map((platform) => (
+                    <div
+                      key={platform.hardware}
+                      data-testid="overview-mobile-platform-row"
+                      data-hardware={platform.hardware}
+                      style={costDeltaCellStyle(
+                        platform,
+                        comparisonMode,
+                        referenceHardware,
+                        referenceCost,
+                      )}
+                      className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] items-baseline gap-x-3 border-b border-border/30 py-1 last:border-b-0"
                     >
-                      {platform.hardwareLabel}
-                    </span>
-                    <PlatformCell
-                      locale={locale}
-                      model={model}
-                      platform={platform}
-                      formatters={formatters}
-                      strings={strings}
-                      comparisonMode={comparisonMode}
-                      referenceHardware={referenceHardware}
-                      referenceCost={referenceCost}
-                      referenceLabel={referenceLabel}
-                      phoneRow
-                    />
-                  </div>
-                ))}
-              </div>
+                      <span
+                        data-testid="overview-mobile-hardware"
+                        className="whitespace-nowrap text-xs font-medium text-muted-foreground"
+                      >
+                        {platform.hardwareLabel}
+                      </span>
+                      <PlatformCell
+                        locale={locale}
+                        model={model}
+                        platform={platform}
+                        formatters={formatters}
+                        strings={strings}
+                        comparisonMode={comparisonMode}
+                        referenceHardware={referenceHardware}
+                        referenceCost={referenceCost}
+                        referenceLabel={referenceLabel}
+                        phoneRow
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
               {comparisonMode === 'hardware' && (
                 <OverviewDetailLink
                   href={detailHref(locale, model)}

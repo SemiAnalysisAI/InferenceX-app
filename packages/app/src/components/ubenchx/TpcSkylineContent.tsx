@@ -63,7 +63,7 @@ export function TpcSkylineContent() {
                 {t.nvidia}
               </Heading>
             </figcaption>
-            <div className="mt-3 overflow-x-auto rounded-lg border border-border/30">
+            <div className="mt-3 overflow-x-auto">
               <table className="w-full text-sm" aria-label={t.aria} data-testid="tpc-skyline-table">
                 <thead>
                   <tr className={TABLE_HEAD_ROW_STYLE}>

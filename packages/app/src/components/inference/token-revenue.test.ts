@@ -5,6 +5,7 @@ import {
   applyTokenRevenuePricing,
   cachedInputPricePerMillion,
   formatTokenPrice,
+  formatTokenPriceLabel,
   inputTokenShareForRevenue,
   NORMALIZED_TOKEN_REVENUE_PRICING,
   tokenRevenuePerGpuHour,
@@ -52,6 +53,12 @@ describe('token revenue', () => {
     expect(formatTokenPrice(1)).toBe('1');
     expect(formatTokenPrice(1.122)).toBe('1.122');
     expect(formatTokenPrice(0.000001)).toBe('0.000001');
+  });
+
+  it('formats price labels with at least two decimals', () => {
+    expect(formatTokenPriceLabel(3)).toBe('3.00');
+    expect(formatTokenPriceLabel(0.3)).toBe('0.30');
+    expect(formatTokenPriceLabel(1.122)).toBe('1.122');
   });
 
   it('keeps the normalized $1/M axis equal to million total tokens per GPU hour', () => {

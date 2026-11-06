@@ -137,23 +137,20 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
                   className="text-sm font-normal text-muted-foreground"
                 >
                   {strings.scopeDirection}
-                </span>{' '}
-                <span aria-hidden="true" className="text-sm text-muted-foreground">
-                  ·
-                </span>{' '}
-                <span className="text-sm font-normal text-muted-foreground">
-                  {strings.sourcePrefix}
-                  <a
-                    data-testid="overview-source-link"
-                    href={TCO_SOURCE_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none"
-                  >
-                    {strings.sourceLinkText}
-                    <ExternalLinkIcon />
-                  </a>
                 </span>
+              </p>
+              <p className="text-xs leading-tight text-muted-foreground">
+                {strings.sourcePrefix}
+                <a
+                  data-testid="overview-source-link"
+                  href={TCO_SOURCE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none"
+                >
+                  {strings.sourceLinkText}
+                  <ExternalLinkIcon />
+                </a>
               </p>
             </div>
             <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-6">

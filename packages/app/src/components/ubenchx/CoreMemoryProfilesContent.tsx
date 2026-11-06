@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
-import { Heading } from '@/components/ui/heading';
+import { Heading, HeadingQualifier } from '@/components/ui/heading';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { ResultContext, sourceLinkClassName } from '@/components/ui/result-context';
 
@@ -293,8 +293,8 @@ function AscendCoreProfiles({ note }: { note?: string }) {
           <figcaption>
             <Heading as="h2" level="card">
               Huawei 950PR
+              <HeadingQualifier>{t.subtitle}</HeadingQualifier>
             </Heading>
-            <p className="mt-1 text-xs text-muted-foreground">{t.subtitle}</p>
           </figcaption>
           <div className="mt-3 space-y-6">
             <p className="text-sm text-muted-foreground">{t.limits}</p>

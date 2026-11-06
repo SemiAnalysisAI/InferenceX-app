@@ -151,8 +151,11 @@ describe('Overview page', () => {
       cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS + 1);
       desktopModel('GLM-5.3-Flash', AGENTX)
         .should('contain.text', 'GLM 5.3 Flash')
-        .find('[data-testid="overview-platform"]')
-        .should('have.length', 5);
+        .then(($row) => {
+          const platforms = $row.find('[data-testid="overview-platform"]').length;
+          const blank = $row.find('[data-testid="overview-row-no-results"]').length;
+          expect(platforms === 5 || (platforms === 0 && blank === 1)).to.equal(true);
+        });
       cy.reload();
       cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS + 1);
       desktopModel('GLM-5.3-Flash', AGENTX).scrollIntoView().should('be.visible');
@@ -701,13 +704,17 @@ describe('Overview page', () => {
 
     desktopModel('GLM-5.2').within(() => {
       expectAgentxScenario(AGENTX_LABEL);
-      cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
+      cy.get('[data-testid="overview-pair-missing"]').should('not.exist');
+      cy.get('[data-testid="overview-row-no-results"]').should(
+        'have.text',
+        'No results at this SLO',
+      );
     });
     cy.get(
       '[data-testid="overview-engine-scope-switcher"] [data-overview-engine-scope="all"]',
     ).click();
     cy.location('search').should('eq', '?engine=all');
-    desktopModel('GLM-5.2').find('[data-testid="overview-pair-missing"]').should('have.length', 5);
+    desktopModel('GLM-5.2').find('[data-testid="overview-row-no-results"]').should('exist');
     selectOverviewTier(100);
     cy.location('search').should('eq', '?tier=100&engine=all');
 
@@ -865,7 +872,13 @@ describe('Overview page', () => {
           );
         });
         cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
-        cy.get('[data-testid="overview-platform"]').should('have.length', MATRIX_ROWS * 5);
+        cy.root().then(($root) => {
+          const blankRows = $root.find('[data-testid="overview-row-no-results"]').length;
+          cy.get('[data-testid="overview-platform"]').should(
+            'have.length',
+            (MATRIX_ROWS - blankRows) * 5,
+          );
+        });
         cy.get('a').contains('View details').should('exist');
         cy.get('th[scope="row"]')
           .find('a')
@@ -1042,7 +1055,7 @@ describe('Overview page', () => {
     });
 
     desktopModel('GLM-5.2').within(() => {
-      cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
+      cy.get('[data-testid="overview-row-no-results"]').should('have.length', 1);
     });
     cy.get('[data-testid="overview-pair-missing"]').each(($cell) => {
       expect($cell.text()).not.to.contain('∞');

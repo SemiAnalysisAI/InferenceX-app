@@ -51,7 +51,7 @@ import {
 } from '@/components/inference/metric-registry';
 import {
   cachedInputPricePerMillion,
-  formatTokenPrice,
+  formatTokenPriceLabel,
   usesTokenSalePricing,
 } from '@/components/inference/token-revenue';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
@@ -678,11 +678,13 @@ export default function ChartControls({
                         : openRouterPricingError || !tokenRevenuePricing
                           ? t.openRouterUnavailable
                           : t.openRouterSummary(
-                              formatTokenPrice(tokenRevenuePricing.inputPerMillion),
+                              formatTokenPriceLabel(tokenRevenuePricing.inputPerMillion),
                               selectedSequence === Sequence.AgenticTraces
-                                ? formatTokenPrice(cachedInputPricePerMillion(tokenRevenuePricing))
+                                ? formatTokenPriceLabel(
+                                    cachedInputPricePerMillion(tokenRevenuePricing),
+                                  )
                                 : null,
-                              formatTokenPrice(tokenRevenuePricing.outputPerMillion),
+                              formatTokenPriceLabel(tokenRevenuePricing.outputPerMillion),
                             )}{' '}
                       {openRouterModelId && (
                         <a

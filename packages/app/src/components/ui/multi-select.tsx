@@ -433,7 +433,7 @@ function MultiSelect({
                 <span
                   key={value[index]}
                   data-slot="select-chip"
-                  className="bg-muted text-foreground border border-border/40 inline-flex min-w-0 max-w-full items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0"
+                  className="bg-foreground/[0.08] text-foreground inline-flex min-w-0 max-w-full items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0"
                 >
                   {selectedOptions[index]?.icon}
                   <span className="min-w-0 truncate" title={label}>

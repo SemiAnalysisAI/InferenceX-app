@@ -25,7 +25,11 @@ import {
   useGlobalFilterRun,
   useGlobalFilterSelection,
 } from '@/providers/GlobalFilterContext';
-import { cachedInputPricePerMillion, formatTokenPrice } from '@/components/inference/token-revenue';
+import {
+  cachedInputPricePerMillion,
+  formatTokenPrice,
+  formatTokenPriceLabel,
+} from '@/components/inference/token-revenue';
 import { COST_TIER_LABELS, type CostTier } from '@/components/inference/metric-registry';
 import type { TokenRevenuePricing } from '@/components/inference/types';
 import ComparisonChangelog from '@/components/inference/ui/ComparisonChangelog';
@@ -1414,9 +1418,9 @@ function ProfitEstimatorInner({
       <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-selling-prices">
         <span className="font-medium text-foreground">{t.sellingPriceLabel}:</span>{' '}
         {t.sellingPrices(
-          formatTokenPrice(pricing.inputPerMillion),
-          formatTokenPrice(cachedInputPricePerMillion(pricing)),
-          formatTokenPrice(pricing.outputPerMillion),
+          formatTokenPriceLabel(pricing.inputPerMillion),
+          formatTokenPriceLabel(cachedInputPricePerMillion(pricing)),
+          formatTokenPriceLabel(pricing.outputPerMillion),
           priceSourceLabel,
         )}
         {effectivePriceSource === 'list' && listPricing && (

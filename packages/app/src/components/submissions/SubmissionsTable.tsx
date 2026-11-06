@@ -12,6 +12,7 @@ import { track } from '@/lib/analytics/analytics';
 import { MODEL_PREFIX_MAPPING, getModelLabel } from '@/lib/catalog/data-mappings';
 import type { SubmissionSummaryRow } from '@/lib/submissions/submissions-types';
 import { getFrameworkLabel } from '@/lib/shared/utils';
+import { formatDisplayDate } from '@/lib/shared/display-date';
 import { Button } from '@/components/ui/button';
 import { TABLE_HEAD_CELL_STYLE, TABLE_HEAD_ROW_STYLE } from '@/components/ui/control-styles';
 import { InfoHelp } from '@/components/ui/option-info';
@@ -337,7 +338,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
         clearLabel={t.clearSearch}
       />
       <p className="text-xs text-muted-foreground md:hidden">{t.scrollHint}</p>
-      <div className="overflow-x-auto rounded-lg border border-border/30">
+      <div className="overflow-x-auto">
         <table className="w-full min-w-[980px] text-sm">
           <thead>
             <tr className={TABLE_HEAD_ROW_STYLE}>
@@ -483,13 +484,7 @@ function SubmissionRow({
           )}
         </td>
         <td className="px-3 py-2">{getFrameworkLabel(row.framework)}</td>
-        <td className="px-3 py-2 tabular-nums">
-          {locale === 'zh'
-            ? new Intl.DateTimeFormat('zh-CN', { timeZone: 'UTC' }).format(
-                new Date(`${row.date}T00:00:00Z`),
-              )
-            : row.date}
-        </td>
+        <td className="px-3 py-2 tabular-nums">{formatDisplayDate(row.date, locale)}</td>
         <td className="px-3 py-2 text-right tabular-nums">
           {row.total_datapoints.toLocaleString(numberLocale)}
         </td>
@@ -523,7 +518,8 @@ function SubmissionRow({
                 <TooltipContent side="left" collisionPadding={10}>
                   <span>
                     {t.compareTipPre}
-                    {previousRun.date} → {row.date}
+                    {formatDisplayDate(previousRun.date, locale)} →{' '}
+                    {formatDisplayDate(row.date, locale)}
                     {t.compareTipPost}
                   </span>
                 </TooltipContent>
@@ -642,7 +638,8 @@ function SubmissionRow({
                       >
                         <GitCompare className="size-3.5" />
                         {t.compareTipPre}
-                        {previousRun.date} → {row.date}
+                        {formatDisplayDate(previousRun.date, locale)} →{' '}
+                        {formatDisplayDate(row.date, locale)}
                         {t.compareTipPost}
                       </a>
                     </Button>

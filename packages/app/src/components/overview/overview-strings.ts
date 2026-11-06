@@ -81,6 +81,7 @@ export const OVERVIEW_STRINGS = {
     historyCellStateLegend: (days: number) =>
       `Platforms without a valid ${days}-day comparison show current cost only.`,
     referenceHeader: 'Reference',
+    noResultsRow: 'No results at this SLO',
     modelScopeNavLabel: 'Inactive models',
     modelScopeShow: 'Show deprecated & maintenance-mode models',
     modelScopeHide: 'Hide deprecated & maintenance-mode models',
@@ -189,6 +190,7 @@ export const OVERVIEW_STRINGS = {
     historicalEvenAria: (baselineDate: string) => `与该平台 ${baselineDate} 的结果成本基本持平`,
     historyCellStateLegend: (days: number) => `缺少有效 ${days} 天对比的平台仅显示当前成本。`,
     referenceHeader: '基准',
+    noResultsRow: '此 SLO 下暂无结果',
     modelScopeNavLabel: '非活跃模型',
     modelScopeShow: '显示已弃用与维护模式模型',
     modelScopeHide: '隐藏已弃用与维护模式模型',

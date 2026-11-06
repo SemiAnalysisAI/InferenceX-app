@@ -14,7 +14,8 @@ import { Card } from '@/components/ui/card';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { ChartSection } from '@/components/ui/chart-section';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
-import { Heading } from '@/components/ui/heading';
+import { Heading, HeadingQualifier } from '@/components/ui/heading';
+import { ModelLogo } from '@/components/ui/model-logo';
 import { ResultContext } from '@/components/ui/result-context';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
@@ -42,8 +43,9 @@ export const EVALUATION_DISPLAY_STRINGS = {
     heading: 'Accuracy evals',
     description:
       'Benchmark results showing model quality versus throughput trade-offs across different chips, quantization levels, and inference configurations',
-    captionHeading: 'Evaluation score by hardware configuration',
-    scoreMetric: 'Score',
+    captionTitle: 'evaluation score',
+    captionQualifier: (precision: string) =>
+      precision ? `By hardware configuration · ${precision}` : 'By hardware configuration',
     queryError: 'Failed to load evaluation data',
     availabilityError: 'Failed to load filter availability data',
     combinedError: 'Failed to load evaluation and filter availability data',
@@ -55,8 +57,9 @@ export const EVALUATION_DISPLAY_STRINGS = {
     viewModeAria: '视图模式',
     heading: '准确率评估',
     description: '基准测试结果展示不同芯片、量化精度和推理配置下，模型质量与吞吐量之间的权衡',
-    captionHeading: '各硬件配置的评估得分',
-    scoreMetric: '得分',
+    captionTitle: '评估得分',
+    captionQualifier: (precision: string) =>
+      precision ? `按硬件配置 · ${precision}` : '按硬件配置',
     queryError: '评估数据加载失败',
     availabilityError: '筛选项可用性数据加载失败',
     combinedError: '评估数据与筛选项可用性数据均加载失败',
@@ -141,15 +144,18 @@ export default function EvaluationChartDisplay() {
     <>
       <div className="md:pr-72">
         <Heading as="h3" level="card">
-          {t.captionHeading}
+          {selectedModel ? (
+            <ModelLogo model={selectedModel as Model} className="mr-2 size-6 align-[-0.3em]" />
+          ) : null}
+          {selectedModel ? `${getModelLabel(selectedModel as Model)} ` : ''}
+          {selectedBenchmark ? `${selectedBenchmark.toUpperCase()} ` : ''}
+          {t.captionTitle}
+          <HeadingQualifier>
+            {t.captionQualifier(
+              selectedPrecisions.map((p) => getPrecisionLabel(p as Precision)).join(', '),
+            )}
+          </HeadingQualifier>
         </Heading>
-        <ResultContext
-          locale={locale}
-          model={selectedModel ? getModelLabel(selectedModel as Model) : '—'}
-          workload={selectedBenchmark?.toUpperCase() ?? '—'}
-          precision={selectedPrecisions.map((p) => getPrecisionLabel(p as Precision)).join(', ')}
-          metric={t.scoreMetric}
-        />
       </div>
     </>
   );

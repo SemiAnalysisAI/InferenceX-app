@@ -69,15 +69,10 @@ export function HuaweiSkuConfigurations() {
             <Heading as="h2" level="card">
               {t.title}
             </Heading>
-            <p className="mt-1 max-w-4xl text-xs text-muted-foreground">{t.intro}</p>
+            <p className="mt-1 max-w-4xl text-sm text-muted-foreground">{t.intro}</p>
           </figcaption>
           <p className="mt-3 text-xs text-muted-foreground lg:hidden">{t.scroll}</p>
-          <div
-            className="mt-3 overflow-x-auto rounded-lg border border-border/30"
-            tabIndex={0}
-            role="region"
-            aria-label={t.title}
-          >
+          <div className="mt-3 overflow-x-auto" tabIndex={0} role="region" aria-label={t.title}>
             <table className="w-full text-sm" data-testid="huawei-sku-table">
               <thead>
                 <tr className={TABLE_HEAD_ROW_STYLE}>

@@ -28,7 +28,7 @@ import {
 import {
   applyTokenRevenuePricing,
   cachedInputPricePerMillion,
-  formatTokenPrice,
+  formatTokenPriceLabel,
   usesTokenSalePricing,
 } from '@/components/inference/token-revenue';
 import {
@@ -1360,13 +1360,13 @@ export default function ChartDisplay({
                             costBasis={
                               usesTokenSalePricing(selectedYAxisMetric) && tokenRevenuePricing
                                 ? t.revenuePrices(
-                                    formatTokenPrice(tokenRevenuePricing.inputPerMillion),
+                                    formatTokenPriceLabel(tokenRevenuePricing.inputPerMillion),
                                     graph.sequence === Sequence.AgenticTraces
-                                      ? formatTokenPrice(
+                                      ? formatTokenPriceLabel(
                                           cachedInputPricePerMillion(tokenRevenuePricing),
                                         )
                                       : null,
-                                    formatTokenPrice(tokenRevenuePricing.outputPerMillion),
+                                    formatTokenPriceLabel(tokenRevenuePricing.outputPerMillion),
                                   )
                                 : undefined
                             }

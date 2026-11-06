@@ -9,7 +9,7 @@ import { generateVendorColors } from '@/lib/charts/dynamic-colors';
 import ChartLegend from '@/components/ui/chart-legend';
 import { ChartSection } from '@/components/ui/chart-section';
 import { TABLE_HEAD_CELL_STYLE, TABLE_HEAD_ROW_STYLE } from '@/components/ui/control-styles';
-import { Heading } from '@/components/ui/heading';
+import { Heading, HeadingQualifier } from '@/components/ui/heading';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { ResultContext, sourceLinkClassName } from '@/components/ui/result-context';
 import {
@@ -479,10 +479,8 @@ export function UbenchxContent() {
           <div className="md:pr-24">
             <Heading as="h2" level="card">
               {t[metric.title]}
+              {metric.key === 'mbu' && <HeadingQualifier>{t.peakNote}</HeadingQualifier>}
             </Heading>
-            {metric.key === 'mbu' && (
-              <p className="mt-1 text-xs text-muted-foreground">{t.peakNote}</p>
-            )}
           </div>
         }
         footer={
