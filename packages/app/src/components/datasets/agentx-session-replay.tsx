@@ -254,6 +254,7 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
           ))}
         </div>
         <div className="relative mb-1 ml-14 h-4 text-xs text-muted-foreground tabular-nums">
+          <span className="absolute top-0 left-0 pl-1">0</span>
           {TICKS.map((tick) => (
             <span
               key={tick}

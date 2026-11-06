@@ -279,8 +279,13 @@ export function DataTable<T>({
                         : 'none'
                     }
                   >
+                    {sortable && col.align === 'right' && (
+                      <span className="mr-1">
+                        <SortIndicator dir={activeDir} />
+                      </span>
+                    )}
                     {col.header}
-                    {sortable && (
+                    {sortable && col.align !== 'right' && (
                       <span className="ml-1">
                         <SortIndicator dir={activeDir} />
                       </span>

@@ -156,11 +156,14 @@ export function getMetricLabel(
 
 const fixed = (value: number, digits: number) =>
   value.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
-const formatSig3 = d3.format('.3~r');
-const formatSig3Si = d3.format('.3~s');
+const formatSig3 = d3.format('.3r');
+const formatSig3Si = d3.format('.3s');
 const compact = (value: number) =>
   Math.abs(value) >= 1000 ? formatSig3Si(value) : formatSig3(value);
-const xTickFormat = (value: d3.AxisDomain) => compact(Number(value));
+const formatTickSig3 = d3.format('.3~r');
+const formatTickSig3Si = d3.format('.3~s');
+const xTickFormat = (value: d3.AxisDomain) =>
+  Math.abs(Number(value)) >= 1000 ? formatTickSig3Si(Number(value)) : formatTickSig3(Number(value));
 
 export function getValueLabel(
   d: InterpolatedResult,
@@ -408,6 +411,10 @@ const TOP_AXIS_BAND_PX = 28;
 
 export function calculatorBarFill(color: string, backdrop: string): string {
   return insideLabelFill(color, BAR_FILL_CONTRAST, BAR_OPACITY, backdrop);
+}
+
+export function calculatorBarSwatch(fill: string, backdrop: string): string {
+  return backdrop ? `color-mix(in srgb, ${fill} ${BAR_OPACITY * 100}%, ${backdrop})` : fill;
 }
 
 function renderTopAxis(

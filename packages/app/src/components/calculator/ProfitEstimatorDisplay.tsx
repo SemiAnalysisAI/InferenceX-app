@@ -1596,7 +1596,7 @@ function ProfitEstimatorInner({
             />
 
             <TooltipProvider delayDuration={0}>
-              <div className="grid min-w-0 items-start gap-x-6 gap-y-4 xl:grid-cols-12">
+              <div className="grid min-w-0 items-stretch gap-x-6 gap-y-4 xl:grid-cols-12">
                 <ControlPanel
                   legend={t.benchmarkGroup}
                   data-testid="profit-benchmark-panel"
@@ -1791,7 +1791,7 @@ function ProfitEstimatorInner({
                       </div>
                     )}
                   </ControlPanel>
-                  <div className="grid min-w-0 items-start gap-x-6 gap-y-4 xl:col-span-12 xl:flex">
+                  <div className="grid min-w-0 items-stretch gap-x-6 gap-y-4 xl:col-span-12 xl:flex">
                     <ControlPanel
                       legend={t.chartGroup}
                       data-testid="profit-chart-panel"

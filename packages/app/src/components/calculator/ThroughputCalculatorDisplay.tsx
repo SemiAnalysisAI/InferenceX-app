@@ -86,6 +86,7 @@ import { calculatorChartToCsv } from '@/lib/export/csv-export-helpers';
 import ThroughputBarChart, {
   type ChartTitleParts,
   calculatorBarFill,
+  calculatorBarSwatch,
   getChartTitle,
   getCostProviderLabel,
   getResultLabel,
@@ -524,10 +525,11 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     highContrast,
     activeKeys: visibleKeysArray,
   });
-  const resolveBarColor = useMemo(() => {
-    const backdrop = themeColors.rootStyles?.getPropertyValue('--card').trim() ?? '';
-    return (hwKey: string) => calculatorBarFill(resolveColor(hwKey), backdrop);
-  }, [resolveColor, themeColors]);
+  const backdrop = themeColors.rootStyles?.getPropertyValue('--card').trim() ?? '';
+  const resolveBarColor = useMemo(
+    () => (hwKey: string) => calculatorBarFill(resolveColor(hwKey), backdrop),
+    [resolveColor, backdrop],
+  );
 
   const hasAnyData = hasData || hasOverlayData;
   const targetValue = useMemo(
@@ -894,7 +896,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         .map(([key, config]) => ({
           name: config.name,
           label: getDisplayLabel(config),
-          color: resolveBarColor(key),
+          color: calculatorBarSwatch(resolveBarColor(key), backdrop),
           title: config.gpu,
           hw: key,
           isActive: visibleHwKeys.has(key),
@@ -908,6 +910,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     visibleHwKeys,
     toggleGpuVisibility,
     resolveBarColor,
+    backdrop,
   ]);
 
   // Input/Output values follow the chip basis; name the denominator on the total basis.
@@ -1118,99 +1121,103 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                 testId="calculator-secondary-controls"
               >
                 {isMobile && <div className="grid min-w-0 gap-3 md:hidden">{secondaryConfig}</div>}
-                <ControlPanel
-                  legend={t.pricingGroup}
-                  data-testid="calculator-pricing-panel"
-                  className="md:grid-cols-2 lg:flex lg:flex-wrap lg:items-start"
-                >
-                  {pricingConfig}
-                </ControlPanel>
-                <ControlPanel
-                  legend={t.comparisonGroup}
-                  className="items-start md:grid-cols-[auto_minmax(0,1fr)] md:gap-x-6"
-                >
-                  <div className="flex items-end gap-3">
-                    <div className="flex flex-col space-y-1.5">
-                      <LabelWithTooltip label={t.metricLabel} tooltip={t.metricTooltip} />
-                      <SegmentedToggle
-                        role="group"
-                        size="default"
-                        ariaLabel={t.metricLabel}
-                        value={barMetric}
-                        onValueChange={handleBarMetricChange}
-                        options={BAR_METRIC_OPTIONS.map((opt) => ({
-                          value: opt.value,
-                          testId: `calculator-metric-${opt.value}`,
-                          label:
-                            opt.value === 'throughput'
-                              ? t.metricThroughput
-                              : opt.value === 'cost'
-                                ? t.metricCost
-                                : 'tok/s/MW',
-                        }))}
-                      />
+                <div className="contents lg:flex lg:items-stretch lg:gap-4">
+                  <ControlPanel
+                    legend={t.pricingGroup}
+                    data-testid="calculator-pricing-panel"
+                    className="md:grid-cols-2 lg:flex lg:w-fit lg:shrink-0 lg:flex-wrap lg:items-start"
+                  >
+                    {pricingConfig}
+                  </ControlPanel>
+                  <ControlPanel
+                    legend={t.comparisonGroup}
+                    className="items-start md:grid-cols-[auto_minmax(0,1fr)] md:gap-x-6 lg:flex-1 lg:grid-cols-1"
+                  >
+                    <div className="flex items-end gap-3">
+                      <div className="flex flex-col space-y-1.5">
+                        <LabelWithTooltip label={t.metricLabel} tooltip={t.metricTooltip} />
+                        <SegmentedToggle
+                          role="group"
+                          size="default"
+                          ariaLabel={t.metricLabel}
+                          value={barMetric}
+                          onValueChange={handleBarMetricChange}
+                          options={BAR_METRIC_OPTIONS.map((opt) => ({
+                            value: opt.value,
+                            testId: `calculator-metric-${opt.value}`,
+                            label:
+                              opt.value === 'throughput'
+                                ? t.metricThroughput
+                                : opt.value === 'cost'
+                                  ? t.metricCost
+                                  : 'tok/s/MW',
+                          }))}
+                        />
+                      </div>
                     </div>
-                  </div>
-                  {loading && <div aria-hidden="true" className="h-17" />}
-                  {!loading && hasAnyData && (
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                        <LabelWithTooltip
-                          htmlFor="calc-target"
+                    {loading && <div aria-hidden="true" className="h-17" />}
+                    {!loading && hasAnyData && (
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                          <LabelWithTooltip
+                            htmlFor="calc-target"
+                            label={
+                              isAgenticSequence
+                                ? t.targetAgenticLabel(percentileLabel)
+                                : t.targetLabel
+                            }
+                            tooltip={
+                              isAgenticSequence
+                                ? t.targetAgenticTooltip(percentileLabel)
+                                : t.targetTooltip
+                            }
+                          />
+                          <div
+                            className="flex items-center gap-2"
+                            data-testid="calculator-hide-over-limit-control"
+                          >
+                            <LabelWithTooltip
+                              htmlFor="calc-hide-over-limit"
+                              label={t.hideSkuAboveConfigLimitLabel}
+                              tooltip={t.hideSkuAboveConfigLimitHelp}
+                            />
+                            <Switch
+                              id="calc-hide-over-limit"
+                              checked={hideSkuAboveConfigLimit}
+                              onCheckedChange={handleHideSkuAboveLimitChange}
+                              className="shrink-0"
+                            />
+                          </div>
+                        </div>
+                        <RangeField
                           label={
                             isAgenticSequence
                               ? t.targetAgenticLabel(percentileLabel)
                               : t.targetLabel
                           }
-                          tooltip={
-                            isAgenticSequence
-                              ? t.targetAgenticTooltip(percentileLabel)
-                              : t.targetTooltip
+                          min={currentRange.min}
+                          max={currentRange.max}
+                          value={targetValue}
+                          onSliderChange={handleSliderChange}
+                          onSliderCommit={() =>
+                            track('calculator_target_slider_set', { mode, value: targetValue })
                           }
+                          input={{
+                            id: 'calc-target',
+                            value: resolveCalculatorTargetInputValue(
+                              inputValue,
+                              targetValue,
+                              isTargetInputFocused,
+                            ),
+                            onFocus: handleInputFocus,
+                            onChange: handleInputChange,
+                            onBlur: handleInputBlur,
+                          }}
                         />
-                        <div
-                          className="flex items-center gap-2"
-                          data-testid="calculator-hide-over-limit-control"
-                        >
-                          <LabelWithTooltip
-                            htmlFor="calc-hide-over-limit"
-                            label={t.hideSkuAboveConfigLimitLabel}
-                            tooltip={t.hideSkuAboveConfigLimitHelp}
-                          />
-                          <Switch
-                            id="calc-hide-over-limit"
-                            checked={hideSkuAboveConfigLimit}
-                            onCheckedChange={handleHideSkuAboveLimitChange}
-                            className="shrink-0"
-                          />
-                        </div>
                       </div>
-                      <RangeField
-                        label={
-                          isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
-                        }
-                        min={currentRange.min}
-                        max={currentRange.max}
-                        value={targetValue}
-                        onSliderChange={handleSliderChange}
-                        onSliderCommit={() =>
-                          track('calculator_target_slider_set', { mode, value: targetValue })
-                        }
-                        input={{
-                          id: 'calc-target',
-                          value: resolveCalculatorTargetInputValue(
-                            inputValue,
-                            targetValue,
-                            isTargetInputFocused,
-                          ),
-                          onFocus: handleInputFocus,
-                          onChange: handleInputChange,
-                          onBlur: handleInputBlur,
-                        }}
-                      />
-                    </div>
-                  )}
-                </ControlPanel>
+                    )}
+                  </ControlPanel>
+                </div>
               </MobileControlSection>
             </TooltipProvider>
           </div>

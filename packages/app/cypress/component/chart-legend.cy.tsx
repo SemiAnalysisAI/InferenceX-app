@@ -444,8 +444,13 @@ describe('ChartLegend (sidebar variant)', () => {
                   .map((row) => row.getBoundingClientRect().bottom)
                   .filter((bottom) => bottom <= viewport.bottom),
               );
-              expect(viewport.bottom - lastWhole).to.be.closeTo(14, 0.5);
-              expect(controls.top).to.be.at.least(viewport.bottom);
+              const strip = $legend
+                .find('[data-testid="legend-overflow-strip"]')[0]
+                .getBoundingClientRect();
+              expect(viewport.bottom - lastWhole).to.be.closeTo(0, 0.5);
+              expect(strip.top).to.be.closeTo(viewport.bottom, 0.5);
+              expect(strip.height).to.be.closeTo(14, 0.5);
+              expect(controls.top).to.be.at.least(strip.bottom);
             }
           });
         cy.get('.sidebar-legend label').contains('Run 40 —').scrollIntoView().click();
@@ -460,7 +465,7 @@ describe('ChartLegend (sidebar variant)', () => {
     }
   }
 
-  it('stretches a short list panel to the plot and keeps actions with the close button at 1280px', () => {
+  it('keeps the column stretched but sizes a short list panel to its content at 1280px', () => {
     cy.viewport(1280, 900);
     cy.mount(<ChartLegendWrapper inChart onQuickFilters={cy.stub().as('quickFilters')} />);
     cy.get('[data-testid="chart-legend"]')
@@ -474,7 +479,12 @@ describe('ChartLegend (sidebar variant)', () => {
         const column = $legend[0]
           .closest('[data-slot="chart-legend-wrapper"]')!
           .getBoundingClientRect();
-        expect(panel.bottom).to.be.closeTo(column.bottom, 1);
+        const stretched = $legend[0].parentElement!.getBoundingClientRect();
+        expect(stretched.bottom).to.be.closeTo(column.bottom, 1);
+        expect(getComputedStyle($legend[0].parentElement!).backgroundColor).to.equal(
+          'rgba(0, 0, 0, 0)',
+        );
+        expect(panel.bottom).to.be.lessThan(column.bottom - 16);
         expect(controls.top - list.bottom).to.be.lessThan(16);
         expect(panel.right).to.be.at.most(1280);
       });
