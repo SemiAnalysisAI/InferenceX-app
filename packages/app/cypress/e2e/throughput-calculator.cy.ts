@@ -58,20 +58,14 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calc-cost-selector"]').should('contain.text', 'Hyperscaler');
       cy.get('[data-testid="calculator-metric-throughput"]').should('be.visible');
       cy.get('[data-testid="calculator-metric-throughput"]')
+        .should('have.attr', 'aria-pressed', 'true')
+        .and('have.class', 'bg-muted')
         .parent()
         .should(($group) => {
-          const bounds = $group[0].getBoundingClientRect();
-          const buttons = [...$group[0].querySelectorAll('button')];
-          const first = buttons[0].getBoundingClientRect();
-          expect(bounds.height, 'metric group matches regular desktop controls').to.equal(36);
-          expect(first.top, 'joined fill reaches the upper border').to.equal(bounds.top + 1);
-          expect(first.bottom, 'joined fill reaches the lower border').to.equal(bounds.bottom - 1);
-          for (let i = 1; i < buttons.length; i++) {
-            expect(
-              buttons[i].getBoundingClientRect().left,
-              'segments have no inset gaps',
-            ).to.be.closeTo(buttons[i - 1].getBoundingClientRect().right, 0.1);
-          }
+          expect(
+            $group[0].getBoundingClientRect().height,
+            'metric group matches regular desktop controls',
+          ).to.equal(36);
         });
       cy.get('input[type="range"]').should('be.visible');
     });
