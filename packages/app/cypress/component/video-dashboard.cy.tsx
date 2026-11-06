@@ -5,6 +5,7 @@ import type {
   VideoHistoryPage,
 } from '@/components/video-benchmark/history';
 import { videoPoints } from '@/components/video-benchmark/points';
+import { parseResultsState } from '@/components/video-benchmark/results';
 import type { ResultsEvidence } from '@/components/video-benchmark/results-evidence';
 import { servingArtifact } from '../support/video-artifacts';
 import { readOnlyVideoRequests, resultHistory } from '../support/video-results';
@@ -88,6 +89,30 @@ const evidence = (observation: VideoHistoryObservation): ResultsEvidence => ({
 });
 
 describe('VideoGenX results', () => {
+  it('shows the loading state without reading History while the server streams the cohort', () => {
+    readOnlyVideoRequests();
+    cy.intercept('GET', '/api/video-runs?format=history&page=*', {
+      schemaVersion: 1,
+      entries: [],
+      nextPage: null,
+    }).as('history');
+    const initialData = { state: parseResultsState('?r_tier=r'), history: null, sides: {} };
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoDashboard initialData={initialData} pending />
+      </PathnameContext.Provider>,
+    );
+    cy.get('[role="status"]').should('contain', 'Loading video results');
+    cy.get('[data-testid="video-results"]').should('be.visible');
+    cy.get('@history.all').should('have.length', 0);
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoDashboard initialData={initialData} />
+      </PathnameContext.Provider>,
+    );
+    cy.wait('@history');
+  });
+
   for (const pathname of ['/zh/video']) {
     it(`retains publication approval and source power verdicts in ${pathname} History`, () => {
       const zh = pathname.startsWith('/zh');

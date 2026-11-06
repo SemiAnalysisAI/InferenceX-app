@@ -60,6 +60,29 @@ export function operatorXCacheTag(): string {
   return namespace ? `${OPERATORX_CACHE_SCOPE}:${namespace}` : OPERATORX_CACHE_SCOPE;
 }
 
+/**
+ * VideoGenX reads immutable Blob indexes and approval receipts that change only
+ * through an explicit publication (`POST /api/video-runs`). Projected History
+ * pages and published artifacts stay cached under this tag until that
+ * publication, or `/api/v1/invalidate?scope=video`, expires it.
+ */
+export const VIDEO_CACHE_SCOPE = 'video';
+
+/** Server data tag for VideoGenX reads, namespaced like the other scopes. */
+export function videoCacheTag(): string {
+  const namespace = cacheNamespace();
+  return namespace ? `${VIDEO_CACHE_SCOPE}:${namespace}` : VIDEO_CACHE_SCOPE;
+}
+
+/**
+ * Expire every cached VideoGenX read now. Its responses are private and never
+ * CDN cached, so there is no stale window worth keeping warm, and a publication
+ * must reach the next read on every instance.
+ */
+export function purgeVideo(): void {
+  revalidateTag(videoCacheTag(), { expire: 0 });
+}
+
 function cacheNamespace(): string {
   return process.env.CACHE_NAMESPACE?.trim() ?? '';
 }

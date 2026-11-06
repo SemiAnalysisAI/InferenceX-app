@@ -197,7 +197,14 @@ const onDetailEntry = () =>
 const cellLabel = (cell: ResultCell) =>
   `${hardwareLabel(cell.point.hardwareKey ?? '')}${cell.overlay ? ` · #${cell.point.runId}` : ''}`;
 
-export default function VideoDashboard({ initialData }: { initialData?: VideoInitialData }) {
+export default function VideoDashboard({
+  initialData,
+  pending = false,
+}: {
+  initialData?: VideoInitialData;
+  /** The server is still streaming `initialData`; show the loading state and do not read in the browser. */
+  pending?: boolean;
+}) {
   const locale = useLocale(),
     s = STRINGS[locale];
   const [state, setState] = useState<ResultsState>(initialData?.state ?? DEFAULT_RESULTS_STATE);
@@ -205,6 +212,7 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
   const { points, namedPoints, loading, error, replay, retry } = useVideoPoints(
     state.unofficialRun,
     initialData?.history,
+    pending,
   );
   const [historyOpen, setHistoryOpen] = useState(false);
   const [labels, setLabels] = useState(true);

@@ -631,10 +631,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'Hidden H3 viewer transport for public CI runs, checksum-verified artifact ZIPs and stored History. Every GET is read-only, including format=media on a cache miss (204). History can return up to five pages in one response and serves entries from the newest History snapshot only while each record matches its index and receipt upload times. Synthetic History replay and explicit original-artifact replay with private MP4 ranges are development-only. History retains legacy indexes but labels only source-bound approval receipts as approved; default charts use those approved entries. Published History/media payloads have a 30-second process cache (32 entries each) and are served only after the public-repository check passes; errors, partial or unapproved History and missing media are not retained. Successful publication or History backfill clears that process cache. HTTP stays private, no-store. Metadata-only development fixtures return 204 for media. This UI contract is not a public data API.',
-      zh: '供隐藏的 H3 查看器读取公开 CI 运行、校验和已验证的产物 ZIP 与已存历史。所有 GET 都只读，包括 format=media 未命中时返回 204。历史可在一次响应中返回最多五页，只有记录仍与索引和回执上传时间一致时才使用最新历史快照中的条目。合成历史回放及读取原始产物 MP4 字节区间的显式回放仅用于开发环境。历史保留旧索引，但只有与来源绑定的批准回执才标为 approved；默认图表只使用这些条目。已发布 History／媒体载荷在服务进程内最多复用 30 秒，每类最多 32 项，且只在源仓库公开检查通过后返回；错误、不完整或未批准的 History 和缺失媒体不保留。发布或历史补建成功后清空当前进程缓存，HTTP 仍为 private, no-store。开发环境的纯元数据 fixture 对媒体请求返回 204。此界面契约不是公开数据 API。',
+      en: 'Hidden H3 viewer transport for public CI runs, checksum-verified artifact ZIPs and stored History. Every GET is read-only, including format=media on a cache miss (204). History can return up to five pages in one response and serves entries from the newest History snapshot only while each record matches its index and receipt upload times. Synthetic History replay and explicit original-artifact replay with private MP4 ranges are development-only. History retains legacy indexes but labels only source-bound approval receipts as approved; default charts use those approved entries. Published History pages (keyed by first page and page count) and media payloads are cached across instances under the video tag, without a GitHub read; pages whose index or approval reads failed and missing media are not retained. Publication, History backfill and ?scope=video expire that cache at once. HTTP stays private, no-store. Metadata-only development fixtures return 204 for media. This UI contract is not a public data API.',
+      zh: '供隐藏的 H3 查看器读取公开 CI 运行、校验和已验证的产物 ZIP 与已存历史。所有 GET 都只读，包括 format=media 未命中时返回 204。历史可在一次响应中返回最多五页，只有记录仍与索引和回执上传时间一致时才使用最新历史快照中的条目。合成历史回放及读取原始产物 MP4 字节区间的显式回放仅用于开发环境。历史保留旧索引，但只有与来源绑定的批准回执才标为 approved；默认图表只使用这些条目。已发布 History 页（按起始页与页数）与媒体载荷以 video 标签跨实例缓存，读取时不调用 GitHub；索引或批准回执读取失败的页和缺失媒体不保留。发布、历史补建或 ?scope=video 会立即使缓存失效，HTTP 仍为 private, no-store。开发环境的纯元数据 fixture 对媒体请求返回 204。此界面契约不是公开数据 API。',
     },
-    sourceSha256: '0f9343a75208fbc47eb068ed74bdd1e36fe2fbea3bb5828d51242b7fa7c25303',
+    sourceSha256: '28de408128f84981ec65edc18f17a65d1c782523daf1bac82461016bdb435a82',
   },
   {
     source: 'src/app/api/video-runs/route.ts',
@@ -645,7 +645,7 @@ export const apiRouteCatalog = [
       en: 'Bearer-protected mutation for one explicit H3 source/artifact. It stores verified media, an immutable source-bound publication receipt and a new History snapshot; authorization does not assert benchmark qualification. The body {"history":"backfill"} rebuilds missing History snapshot records from already stored indexes. This operator path is outside the public read API.',
       zh: '受 Bearer 密钥保护的单个 H3 来源与产物写操作。它存储已校验媒体、绑定来源的不可变发布回执和新的历史快照；授权不代表 benchmark 质量验收。请求体 {"history":"backfill"} 会根据已存索引补建缺失的历史快照记录。此运维入口不属于公开只读 API。',
     },
-    sourceSha256: '0f9343a75208fbc47eb068ed74bdd1e36fe2fbea3bb5828d51242b7fa7c25303',
+    sourceSha256: '28de408128f84981ec65edc18f17a65d1c782523daf1bac82461016bdb435a82',
   },
   {
     source: 'src/app/api/unofficial-run/route.ts',
@@ -883,7 +883,7 @@ export const apiRouteCatalog = [
       en: 'Secret-protected cache invalidation mutation for operators; it is not a public application contract.',
       zh: '供运维人员使用的密钥保护缓存失效写操作；它不是公开应用契约。',
     },
-    sourceSha256: 'fcc7185f1c837a2d204e0d0114ba12da8baa40aed3e478b7f8aaf6d0409081aa',
+    sourceSha256: 'e33a6832b177e1120cefce2db671a1c50ea49649acb2137435bee1aec35492f0',
   },
   {
     source: 'src/app/api/v1/latest-images/route.ts',
@@ -1590,10 +1590,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/video/video-read-cache.ts',
-    sourceSha256: '9eef70074624eb6714d0afce49403f8da0535787e7329da75b1012846a4f683b',
+    sourceSha256: 'e83b1acc15600520397323c3173be27345d31d8e6cbf6ad66953ec102b9bb4ea',
     reviewArea: {
-      en: 'VideoGenX bounded published History and media cache, served only after the repository visibility check passes.',
-      zh: 'VideoGenX 已发布 History 与媒体的有界缓存，仅在仓库公开检查通过后返回。',
+      en: 'VideoGenX published History and media cache shared across instances under the video tag.',
+      zh: 'VideoGenX 已发布 History 与媒体以 video 标签跨实例共享的缓存。',
     },
   },
   {
@@ -1895,7 +1895,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/api-cache.ts',
-    sourceSha256: 'ee9a53a022a3ac049119b7ce77f902f1dc655da84b2eeec661039a69192c6c9c',
+    sourceSha256: '405b4525cb6b6d60906f888479e2c155236f4805c99270059f83969575b01a7c',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',

@@ -4,9 +4,9 @@
 
 ## Read path
 
-`GET /api/video-runs?format=history&page=1` returns a versioned UI projection of existing stored H3 indexes. Adding `pages=2` to `pages=5` returns that many consecutive pages in one response, with the same entries and `nextPage` as reading them one at a time. The route lists `h3-video-media/v1/runs/` and `h3-video-media/v1/approvals/` metadata, validates pathname identities, sorts by index storage time (artifact ID breaks ties), and reads one History snapshot (see below). An entry comes from the snapshot only while its record still names the index upload time and the approval receipt upload time it was built from. Any other index on the requested pages is projected directly, as before, from its full stored index and receipt. The read never downloads media, never writes and never calls the publication path. A matching immutable receipt under `h3-video-media/v1/approvals/` marks an entry `approved: true`. Missing or invalid receipts leave it in History with `approved: false`. The repository visibility check still applies, and a failed check discards the History read. This UI transport is not a stable public benchmark API.
+`GET /api/video-runs?format=history&page=1` returns a versioned UI projection of existing stored H3 indexes. Adding `pages=2` to `pages=5` returns that many consecutive pages in one response, with the same entries and `nextPage` as reading them one at a time. The route lists `h3-video-media/v1/runs/` and `h3-video-media/v1/approvals/` metadata, validates pathname identities, sorts by index storage time (artifact ID breaks ties), and reads one History snapshot (see below). An entry comes from the snapshot only while its record still names the index upload time and the approval receipt upload time it was built from. Any other index on the requested pages is projected directly, as before, from its full stored index and receipt. The read never downloads media, never writes and never calls the publication path. A matching immutable receipt under `h3-video-media/v1/approvals/` marks an entry `approved: true`. Missing or invalid receipts leave it in History with `approved: false`. This UI transport is not a stable public benchmark API.
 
-Every read first confirms that the H3 repository is public through the GitHub API and returns 503 otherwise. A public answer is trusted for one hour per server instance, so a repository that turns private can keep being served by a warm instance for up to an hour. A private or failed answer is never remembered. The authorized publication POST checks visibility on every call.
+Reads do not call GitHub: the H3 source repository is public, and only the authorized publication POST confirms its visibility, on every call.
 
 ### History snapshot
 
@@ -32,19 +32,30 @@ filters; it never substitutes for decoded output duration.
 
 ## Publication and discovery
 
-Published History and media metadata reads reuse a process-local payload for at
-most 30 seconds, with at most 32 entries in each cache. History is keyed by its
-first page and page count. A cached payload is served only after the repository
-visibility check above passes. Failures, partial or unapproved History pages and
-absent media are not cached. Successful publication or History backfill clears
-both process caches; another process observes the new source within the 30-second
-bound. HTTP responses remain `private, no-store`. Replay keeps its existing
+Published History pages and media metadata are cached across requests and
+instances in Next's tagged data cache under the `video` tag, with no time limit.
+The page render and the HTTP route hold separate entries for the same page,
+because Next keys `unstable_cache` on the compiled callback and the two bundles
+differ, so a page read does not warm the view API and vice versa; each entry is
+still shared across requests and instances, and the tag purge expires both.
+These reads do not call GitHub. A page whose index or approval receipt could not be read, a
+page read while storage is off, and absent media are returned but not retained,
+so the next read tries storage again. Unapproved entries are retained, because
+an approval only appears through publication. A successful publication expires
+the tag at once, and `POST /api/v1/invalidate?scope=video` does the same by
+hand.History is keyed by its first page and page count, and the dashboard, the view
+API and the browser retry read the bounded cohort in one request. HTTP responses remain `private, no-store`. Replay keeps its existing
 verified, read-only snapshot and bypasses this cache.
 
-中文：已发布的 History 和媒体元数据在服务进程内最多复用 30 秒，两类缓存各保留最多 32 项；History 按起始页与页数分别缓存。
-缓存内容只在通过上述源仓库公开检查后返回；读取失败、不完整或未批准的 History 页和缺失媒体均不缓存。
-发布或 History 补建成功后清空当前进程缓存，其他进程最多延迟 30 秒看到新来源。HTTP 响应仍为
-`private, no-store`。本地回放继续复用原有的已校验只读快照。
+中文：已发布的 History 页和媒体元数据以 `video` 标签存入 Next 的数据缓存，跨请求、跨实例复用，
+没有时间上限。页面渲染与 HTTP 路由对同一页各自持有一份缓存条目：Next 以编译后的回调文本作为
+`unstable_cache` 的键，而两个 bundle 并不相同，因此页面读取不会预热视图 API，反之亦然；
+每份条目仍跨请求、跨实例共享，标签失效会同时清除两者。这些读取不调用 GitHub。
+索引或批准回执读取失败的页、存储关闭时读到的页以及缺失的媒体会照常返回但不保留，下次仍会读取存储；
+未批准条目会保留，因为批准只会通过发布产生。发布成功后立即让该标签失效，
+`POST /api/v1/invalidate?scope=video` 可手动触发同样的失效。History 按起始页与页数分别缓存，
+仪表板、视图 API 和浏览器重试均在一次请求中读取全部有界分页。HTTP 响应仍为 `private, no-store`。
+本地回放继续复用原有的已校验只读快照，不经过此缓存。
 
 The `publish-video-results` repository dispatch supplies an explicit `source_run_id` and `merge_run_id`; manual `workflow_dispatch` requires a source `run_id`. There is no scheduled all-runs publisher. The job lists only that run's GitHub artifacts (including later artifact pages), then sends each exact run/artifact ID to bearer-protected `POST /api/video-runs` using the existing invalidation secret. It retries already stored indexes because they may lack an approval receipt. Failed artifacts do not prevent later artifacts from being attempted, but the job still fails. Authorization approves publication of the named source; it is not a benchmark qualification verdict.
 
