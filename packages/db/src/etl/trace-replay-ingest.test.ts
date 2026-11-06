@@ -198,6 +198,13 @@ describe('cacheHitRatesFromPromptTokenTotals sanity', () => {
         bySource: { 'cache hit (HBM)': 90, 'cache hit (CPU offload)': 11 },
       }),
     ).toBeNull();
+    // Float error from rate x duration must not reject a genuine 100% hit rate.
+    expect(
+      cacheHitRatesFromPromptTokenTotals({
+        ...totals,
+        bySource: { 'cache hit (HBM)': 100.00000000000001 },
+      })?.gpu,
+    ).toBeCloseTo(1, 12);
     expect(cacheHitRatesFromPromptTokenTotals({ ...totals, prompt: 0 })).toBeNull();
     expect(cacheHitRatesFromPromptTokenTotals(null)).toBeNull();
   });

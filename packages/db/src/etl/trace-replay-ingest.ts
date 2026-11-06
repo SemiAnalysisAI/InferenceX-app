@@ -101,7 +101,7 @@ export function cacheHitRatesFromPromptTokenTotals(
   const hbmFromBreakdown = sumOf('cache hit (HBM)') + sumOf('cache hit') + sumOf('local_cache_hit');
   const gpuHits = hbmFromBreakdown > 0 ? hbmFromBreakdown : totals.prefixCacheHits;
   // Counters disagreeing (hits > prompts) leave the run's own reported rate in place.
-  if (gpuHits + cpuHits > sumPrompts) return null;
+  if (gpuHits + cpuHits > sumPrompts * (1 + 1e-9)) return null;
 
   return {
     gpu: gpuHits / sumPrompts,
