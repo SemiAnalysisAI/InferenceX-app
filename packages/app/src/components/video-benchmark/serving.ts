@@ -85,7 +85,8 @@ export function servingCells(
       canonical(plan) === canonical(at(manifest, 'workload_plan')) &&
       devices.length > 0 &&
       new Set(devices).size === devices.length &&
-      devices.every((device) => typeof device === 'string' && device !== ''),
+      // NVIDIA reports GPU-<uuid>; AMD reports board serials. Any non-empty unique ID binds.
+      devices.every((device) => typeof device === 'string' && device.length > 0),
     'workload or GPU identity is missing or inconsistent',
   );
   const seen = new Set<number>();
