@@ -13,7 +13,7 @@ export function SupporterLogoImage({
   const treatment =
     logo === 'morph.svg'
       ? 'rounded-sm bg-[#0a0a0a] px-1'
-      : logo === 'fireworks.svg'
+      : logo === 'fireworks-purple.svg'
         ? ''
         : darkClassName;
   return <img {...props} src={`/logos/${logo}`} className={`${className} ${treatment}`} />;
