@@ -825,7 +825,7 @@ export function OverviewEngineScopeSwitcher({
   strings: OverviewStrings;
 }) {
   const options: OverviewEngineScope[] = ['community', 'all'];
-  const optionClass = `inline-flex min-h-9.5 min-w-0 items-center ${SEGMENT_RADIUS_STYLE} px-2 py-1 text-left text-sm font-medium leading-snug focus-visible:outline-none md:min-h-6 md:py-0.5`;
+  const optionClass = `inline-flex min-h-11 min-w-0 items-center ${SEGMENT_RADIUS_STYLE} px-2 py-1 text-left text-sm font-medium leading-snug focus-visible:outline-none md:min-h-6 md:py-0.5`;
   const navigation = useOverviewNavigation();
   const optionHref = (option: OverviewEngineScope) =>
     overviewEngineScopeHref(
