@@ -279,14 +279,15 @@ export async function POST(request: Request) {
   const { runId, artifactId, mergeRunId, history } = body as Record<string, unknown>;
   if (history === 'backfill' && Object.keys(body).length === 1) {
     try {
-      const result = await recordVideoHistory(null);
-      purgeVideo();
-      return NextResponse.json(result, { headers });
+      return NextResponse.json(await recordVideoHistory(null), { headers });
     } catch {
       return NextResponse.json(
         { error: 'Video history backfill failed, retry shortly' },
         { status: 502, headers },
       );
+    } finally {
+      // A failed backfill may already have written a snapshot.
+      purgeVideo();
     }
   }
   if (
@@ -354,12 +355,14 @@ export async function POST(request: Request) {
     }
     const receipt = await approveVideoPublication(runId, artifact, saved, mergeRunId, deadline);
     await recordVideoHistory(saved);
-    purgeVideo();
     return NextResponse.json(receipt, { headers });
   } catch {
     return NextResponse.json(
       { error: 'Video publication failed; retry the exact source artifact' },
       { status: 502, headers },
     );
+  } finally {
+    // A publication that fails after its index or approval write has still changed what reads see.
+    purgeVideo();
   }
 }

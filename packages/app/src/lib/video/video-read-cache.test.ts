@@ -3,7 +3,11 @@ import { fakeNextCache, resetFakeNextCache } from '@/lib/testing/fake-next-cache
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import { publishedVideoHistory } from './video-history-store';
 import { readStoredArtifact, storedArtifacts } from './video-storage';
-import { cachedPublishedArtifact, cachedVideoHistory } from './video-read-cache';
+import {
+  cachedPublishedArtifact,
+  cachedVideoHistory,
+  VIDEO_CACHE_REVALIDATE_SECONDS,
+} from './video-read-cache';
 import { purgeVideo } from '@/lib/cache/api-cache';
 
 vi.mock('next/cache', () => fakeNextCache);
@@ -52,6 +56,34 @@ describe('shared VideoGenX read cache', () => {
     expect(publishedVideoHistory).toHaveBeenNthCalledWith(1, 1, 1);
     expect(publishedVideoHistory).toHaveBeenNthCalledWith(2, 2, 1);
     expect(publishedVideoHistory).toHaveBeenNthCalledWith(3, 1, 5);
+  });
+
+  it('keeps an empty first page but not pages past the end, so arbitrary page numbers add no entries', async () => {
+    vi.mocked(publishedVideoHistory).mockResolvedValue({ page: page(), complete: true });
+    await cachedVideoHistory(1, 1);
+    await cachedVideoHistory(1, 1);
+    await cachedVideoHistory(9000, 1);
+    await cachedVideoHistory(9000, 1);
+    expect(publishedVideoHistory).toHaveBeenCalledTimes(3);
+  });
+
+  it('rereads a retained page after the backstop TTL, so a read racing a purge cannot stay stale', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(publishedVideoHistory).mockResolvedValue({
+        page: page([entry('10', true)]),
+        complete: true,
+      });
+      await cachedVideoHistory(1, 1);
+      vi.advanceTimersByTime(VIDEO_CACHE_REVALIDATE_SECONDS * 1000 - 1);
+      await cachedVideoHistory(1, 1);
+      expect(publishedVideoHistory).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(1);
+      await cachedVideoHistory(1, 1);
+      expect(publishedVideoHistory).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('returns an incomplete page but rereads it, because a failed approval lookup appears as unapproved', async () => {

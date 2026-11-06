@@ -3,6 +3,13 @@ import { cachedQuery, videoCacheTag } from '@/lib/cache/api-cache';
 import { publishedVideoHistory } from './video-history-store';
 import { readStoredArtifact, storedArtifacts } from './video-storage';
 
+/**
+ * Backstop for the publication purge. A read that started before a purge and finishes after it
+ * stores a pre-publication result, which this bounds; Next serves the entry stale while it
+ * refreshes, so no request waits on it.
+ */
+export const VIDEO_CACHE_REVALIDATE_SECONDS = 300;
+
 /** A value the shared cache must not keep: an incomplete History read or absent media. */
 class UnretainedError<T> extends Error {
   readonly value: T;
@@ -29,7 +36,7 @@ function retained<T, Args extends unknown[]>(
       return value;
     },
     keyPrefix,
-    { tag: videoCacheTag() },
+    { tag: videoCacheTag(), revalidate: VIDEO_CACHE_REVALIDATE_SECONDS },
   );
   return async (...args) => {
     try {
@@ -43,7 +50,8 @@ function retained<T, Args extends unknown[]>(
 
 export const cachedVideoHistory = retained('video:history', async (page: number, pages: number) => {
   const { page: value, complete } = await publishedVideoHistory(page, pages);
-  return { value, retain: complete };
+  // A page past the end is empty for any number; keeping it would let requests grow the cache.
+  return { value, retain: complete && (page === 1 || value.entries.length > 0) };
 });
 
 export const cachedPublishedArtifact = retained(

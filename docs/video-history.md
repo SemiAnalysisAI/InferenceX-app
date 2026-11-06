@@ -33,26 +33,29 @@ filters; it never substitutes for decoded output duration.
 ## Publication and discovery
 
 Published History pages and media metadata are cached across requests and
-instances in Next's tagged data cache under the `video` tag, with no time limit.
+instances in Next's tagged data cache under the `video` tag. An entry older than
+5 minutes is served once more while Next refreshes it in the background; this only
+bounds a read that raced a publication purge.
 The page render and the HTTP route hold separate entries for the same page,
 because Next keys `unstable_cache` on the compiled callback and the two bundles
 differ, so a page read does not warm the view API and vice versa; each entry is
 still shared across requests and instances, and the tag purge expires both.
 These reads do not call GitHub. A page whose index or approval receipt could not be read, a
 page read while storage is off, and absent media are returned but not retained,
-so the next read tries storage again. Unapproved entries are retained, because
-an approval only appears through publication. A successful publication expires
-the tag at once, and `POST /api/v1/invalidate?scope=video` does the same by
-hand.History is keyed by its first page and page count, and the dashboard, the view
+so the next read tries storage again. A page past the end is empty for any page number,
+so only page 1 is retained when empty. Unapproved entries are retained, because
+an approval only appears through publication. A publication or backfill expires
+the tag at once, also when it fails after a write, and
+`POST /api/v1/invalidate?scope=video` does the same by hand. History is keyed by its first page and page count, and the dashboard, the view
 API and the browser retry read the bounded cohort in one request. HTTP responses remain `private, no-store`. Replay keeps its existing
 verified, read-only snapshot and bypasses this cache.
 
-中文：已发布的 History 页和媒体元数据以 `video` 标签存入 Next 的数据缓存，跨请求、跨实例复用，
-没有时间上限。页面渲染与 HTTP 路由对同一页各自持有一份缓存条目：Next 以编译后的回调文本作为
+中文：已发布的 History 页和媒体元数据以 `video` 标签存入 Next 的数据缓存，跨请求、跨实例复用。
+超过 5 分钟的条目会再返回一次，同时由 Next 在后台刷新；这只用于兜底与发布失效同时进行的读取。页面渲染与 HTTP 路由对同一页各自持有一份缓存条目：Next 以编译后的回调文本作为
 `unstable_cache` 的键，而两个 bundle 并不相同，因此页面读取不会预热视图 API，反之亦然；
 每份条目仍跨请求、跨实例共享，标签失效会同时清除两者。这些读取不调用 GitHub。
 索引或批准回执读取失败的页、存储关闭时读到的页以及缺失的媒体会照常返回但不保留，下次仍会读取存储；
-未批准条目会保留，因为批准只会通过发布产生。发布成功后立即让该标签失效，
+超出末页的页对任何页码都为空，因此只有第 1 页在为空时也会保留；未批准条目会保留，因为批准只会通过发布产生。发布或历史补建会立即让该标签失效，即使在写入后失败也是如此；
 `POST /api/v1/invalidate?scope=video` 可手动触发同样的失效。History 按起始页与页数分别缓存，
 仪表板、视图 API 和浏览器重试均在一次请求中读取全部有界分页。HTTP 响应仍为 `private, no-store`。
 本地回放继续复用原有的已校验只读快照，不经过此缓存。

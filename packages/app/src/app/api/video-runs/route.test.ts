@@ -504,17 +504,21 @@ describe('explicit H3 publication', () => {
     );
   });
 
-  it('reports a publication whose History entry was not recorded as failed', async () => {
+  it('reports a publication whose History entry was not recorded as failed and still drops cached History', async () => {
     vi.stubEnv('INVALIDATE_SECRET', 'test-secret');
     vi.mocked(videoStorageEnabled).mockReturnValue(true);
     vi.mocked(readStoredArtifact).mockResolvedValue(saved as never);
     vi.mocked(approveVideoPublication).mockResolvedValue(receipt as never);
     vi.mocked(recordVideoHistory).mockRejectedValueOnce(new Error('snapshot write failed'));
+    await GET(request('?format=history'));
     fetchMock
       .mockResolvedValueOnce(response({ private: false }))
       .mockResolvedValueOnce(response(artifact));
     const result = await POST(post({ runId: '10', artifactId: '20', mergeRunId: '99' }));
     expect(result.status).toBe(502);
+    // The approval receipt was written, so History projected before it is stale.
+    await GET(request('?format=history'));
+    expect(publishedVideoHistory).toHaveBeenCalledTimes(2);
   });
 
   it('backfills History only for an authorized exact backfill request', async () => {

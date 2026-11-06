@@ -124,7 +124,8 @@ selected clip metadata, when video storage is configured; without it the browser
 reads History itself. The existing read-only handler is called in process,
 preserving its local replay gate, and reads the complete cohort in one request.
 The projected pages and published artifacts are cached across instances under
-the `video` tag until a publication or `?scope=video` expires it. Initial props
+the `video` tag until a publication or `?scope=video` expires it, with a
+5-minute background refresh as a backstop. Initial props
 contain History and parsed clip sides, including known missing media, rather
 than raw artifact documents. Hydration reuses them; later clip reads update
 independently and keep matching content visible. This loading behavior is a
