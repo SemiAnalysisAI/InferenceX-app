@@ -60,7 +60,8 @@ describe('aggregate stats backfill', () => {
     );
     state.sql
       .mockResolvedValueOnce([{ aggregate_stats: legacy }])
-      .mockResolvedValueOnce([{ server_metrics_json_gz: serverBlob }])
+      .mockResolvedValueOnce([{ size: serverBlob.length }])
+      .mockResolvedValueOnce([{ data: serverBlob }])
       .mockResolvedValueOnce([]);
 
     await import('./backfill-aggregate-stats');

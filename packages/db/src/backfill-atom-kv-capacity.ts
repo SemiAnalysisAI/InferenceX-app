@@ -8,6 +8,7 @@ import type { RawMetric } from './etl/compute-chart-series.js';
 import { createAdminSql } from './etl/db-utils.js';
 import { collectMetricPhases } from './etl/gzip-json-stream.js';
 import { parseRunIdFlag, runBackfillMain, runCandidateIdBackfill } from './lib/backfill-runner.js';
+import { readServerMetricsGz } from './lib/server-metrics-storage.js';
 
 function requiredRunId(): number {
   const runId = parseRunIdFlag();
@@ -33,17 +34,12 @@ async function main(): Promise<void> {
       return rows.map((row) => row.id);
     },
     async (id) => {
-      const [row] = await sql<{ blob: Buffer | null }[]>`
-        select atr.server_metrics_json_gz as blob
-        from benchmark_results br
-        join agentic_trace_replay atr on atr.id = br.trace_replay_id
-        where br.id = ${id}
+      const [row] = await sql<{ trace_replay_id: number }[]>`
+        select trace_replay_id from benchmark_results where id = ${id}
       `;
-      if (!row?.blob) throw new Error('Missing ATOM metrics artifact');
-      const phases = await collectMetricPhases<RawMetric>(
-        row.blob,
-        new Set([ATOM_KV_BLOCKS_METRIC]),
-      );
+      const blob = row ? await readServerMetricsGz(sql, Number(row.trace_replay_id)) : null;
+      if (!blob) throw new Error('Missing ATOM metrics artifact');
+      const phases = await collectMetricPhases<RawMetric>(blob, new Set([ATOM_KV_BLOCKS_METRIC]));
       const blocks = atomKvCacheBlocksFromMetricPhases(phases.metrics, phases.warmupMetrics);
       if (blocks === null) throw new Error('Missing or non-constant ATOM pool block count');
       if ((await updateAtomKvCachePoolTokens(sql, [id], blocks)) !== 1) {
