@@ -764,7 +764,6 @@ const PARALLELISM_STRINGS = {
     no: 'False',
     workers: 'Workers',
     configuration: 'Configuration',
-    details: 'Configuration details',
   },
   zh: {
     strategy: '并行策略',
@@ -787,7 +786,6 @@ const PARALLELISM_STRINGS = {
     no: '否',
     workers: 'worker 数',
     configuration: '配置',
-    details: '配置详情',
   },
 } as const;
 
@@ -911,26 +909,6 @@ const pinnedTopologyHTML = (d: InferenceData, locale: Locale): string => {
             d.prefill_dwdp_size && d.prefill_dwdp_size > 1 ? d.prefill_num_workers : undefined,
         },
       ];
-  const columns = [
-    ...(d.disagg ? ['role', 'chips'] : []),
-    'TP',
-    'EP',
-    'DPA',
-    ...(d.disagg || rows.some((r) => r.workers !== undefined) ? ['workers'] : []),
-    ...['DP', 'PP', 'DCP', 'PCP', 'DWDP'].filter((key) =>
-      rows.some((r) => typeof r[key] === 'number' && Number(r[key]) >= (key === 'DP' ? 1 : 2)),
-    ),
-  ];
-  const labels: Record<string, string> = { role: '', chips: t.gpusUnit, workers: t.workers };
-  const titles: Record<string, string> = {
-    TP: t.tensorParallelism,
-    EP: t.expertParallelism,
-    DPA: t.dpAttention,
-    PP: t.pipelineParallelism,
-    DP: t.dataParallelism,
-    DCP: t.decodeContextParallelism,
-    PCP: t.prefillContextParallelism,
-  };
   const deployment = d.disagg ? t.disaggregated : d.is_multinode ? t.multiNode : t.singleNode;
   const compact = (row: Record<string, Cell>) => {
     // Unknown DPA cannot be labeled DEP/TEP without guessing.
@@ -946,10 +924,6 @@ const pinnedTopologyHTML = (d: InferenceData, locale: Locale): string => {
       row.DWDP as number | undefined,
     );
   };
-  const rawTable = `<div class="pinned-table-scroll"><table class="pinned-topology" aria-label="${t.strategy}">
-    <thead><tr>${columns.map((key) => `<th scope="col" title="${titles[key] ?? labels[key] ?? key}">${labels[key] ?? key}</th>`).join(' ')}</tr></thead>
-    <tbody>${rows.map((row) => `<tr>${columns.map((key) => `<td>${escapeHtml(String(row[key] ?? '?'))}</td>`).join(' ')}</tr>`).join(' ')}</tbody>
-  </table></div>`;
   return `<div data-pinned-parallelism class="pinned-section">
     <div class="pinned-metric-label" style="margin-bottom: 10px;">${deployment}</div>
     ${
@@ -960,7 +934,6 @@ const pinnedTopologyHTML = (d: InferenceData, locale: Locale): string => {
     </table>`
         : `<div class="pinned-config-summary"><span>${t.strategy}</span><strong>${compact(rows[0])}</strong></div>`
     }
-    <details class="pinned-raw-topology"><summary>${t.details}</summary>${rawTable}</details>
   </div>`;
 };
 

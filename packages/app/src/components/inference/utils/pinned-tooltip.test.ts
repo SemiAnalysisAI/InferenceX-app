@@ -57,6 +57,7 @@ const config = (overrides: Partial<TooltipConfig> = {}): TooltipConfig => ({
 // Assert text only; do not insert generated markup into a document.
 const text = (html: string) =>
   html
+    .replaceAll(/<\/t[dh]>/gu, ' ')
     .split(/<[^>]*>/u)
     .join('')
     .replaceAll(/\s+/gu, ' ');
@@ -77,9 +78,9 @@ describe.each([
     const content = text(html);
     expect(content).toContain('Concurrency: 10,888');
     expect(content).toContain('Precision: FP4');
-    expect(content).toContain('Chips TP EP DPA Workers');
-    expect(content).toContain('Prefill 32 2 2 True 16');
-    expect(content).toContain('Decode 32 32 32 True 1');
+    expect(content).toContain('Chips Configuration Workers');
+    expect(content).toContain('Prefill 32 DEP2 16');
+    expect(content).toContain('Decode 32 DEP32 1');
     expect(content).toContain('196.123');
     expect(content).toContain('566,443,844');
     expect(content).toContain('4,180,360');
@@ -134,9 +135,8 @@ describe.each([
         }),
       ),
     );
-    expect(content).toContain('Chips TP EP DPA Workers PP DCP PCP DWDP');
-    expect(content).toContain('Prefill 32 2 2 False 16 2 4 8 2');
-    expect(content).toContain('Decode 32 32 32 False 1');
+    expect(content).toContain('Prefill 32 DWDP2PP2/DCP4/PCP8 16');
+    expect(content).toContain('Decode 32 TEP32 1');
   });
 
   it('keeps aggregate topology distinct and unknown role metadata unknown', () => {
@@ -144,8 +144,7 @@ describe.each([
       render(config({ data: point({ disagg: false, ep: 4, dp: 2, dp_attention: false }) })),
     );
     expect(aggregate).toContain('Multi-node aggregate');
-    expect(aggregate).toContain('TP EP DPA DP');
-    expect(aggregate).toContain('32 4 False 2');
+    expect(aggregate).toContain('EP4/DP2');
     expect(aggregate).not.toContain('Prefill');
     const missing = text(
       render(
@@ -154,37 +153,47 @@ describe.each([
         }),
       ),
     );
-    expect(missing).toContain('Prefill 32 2 2 ? ?');
+    expect(missing).toContain('Prefill 32 TP2 / EP2 ?');
   });
 
   it('uses the existing Chinese labels', () => {
     const content = text(render(config({ locale: 'zh' })));
     expect(content).toContain('并发数： 10,888');
     expect(content).toContain('精度： FP4');
-    expect(content).toContain('个芯片 TP EP DPA worker 数');
-    expect(content).toContain('预填充 32 2 2 是 16');
+    expect(content).toContain('个芯片 配置 worker 数');
+    expect(content).toContain('预填充 32 DEP2 16');
     expect(content).toContain('KV cache 命中率');
     expect(content).toContain('理论 97.3%');
   });
 
-  it('uses compact DEP labels without removing the raw configuration', () => {
-    const html = render(config());
-    expect(html).toContain('DEP2');
-    expect(html).toContain('DEP32');
-    expect(html).toContain('<details class="pinned-raw-topology">');
-    const aggregate = render(
-      config({
-        data: point({
-          disagg: false,
-          tp: 4,
-          decode_tp: 4,
-          ep: 4,
-          dp_attention: true,
+  it.each(['en', 'zh'] as const)(
+    'keeps compact configuration without the details accordion (%s)',
+    (locale) => {
+      const html = render(config({ locale }));
+      expect(html).toContain('DEP2');
+      expect(html).toContain('DEP32');
+      expect(html).not.toContain('pinned-raw-topology');
+      expect(html).not.toContain('Configuration details');
+      expect(html).not.toContain('配置详情');
+      expect(html).not.toContain('pinned-table-scroll');
+      const aggregate = render(
+        config({
+          locale,
+          data: point({
+            disagg: false,
+            tp: 4,
+            decode_tp: 4,
+            ep: 4,
+            dp_attention: true,
+          }),
         }),
-      }),
-    );
-    expect(aggregate).toContain('DEP4');
-  });
+      );
+      expect(aggregate).toContain('DEP4');
+      expect(aggregate).not.toContain('pinned-raw-topology');
+      expect(aggregate).not.toContain('Configuration details');
+      expect(aggregate).not.toContain('配置详情');
+    },
+  );
 
   it('draws the token split proportionally while keeping exact counts', () => {
     const html = render(

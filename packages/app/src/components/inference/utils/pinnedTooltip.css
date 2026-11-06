@@ -84,10 +84,6 @@
   border-top: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
 }
 
-.inferencex-pinned-tooltip .pinned-table-scroll {
-  overflow-x: auto;
-}
-
 .inferencex-pinned-tooltip .pinned-topology {
   width: 100%;
   border-collapse: collapse;
@@ -183,20 +179,6 @@
 
 .inferencex-pinned-tooltip .pinned-compact-topology strong {
   font-weight: 600;
-}
-
-.inferencex-pinned-tooltip .pinned-raw-topology {
-  margin-top: 8px;
-  color: var(--muted-foreground);
-  font-size: 11px;
-}
-
-.inferencex-pinned-tooltip .pinned-raw-topology summary {
-  cursor: pointer;
-}
-
-.inferencex-pinned-tooltip .pinned-raw-topology[open] summary {
-  margin-bottom: 12px;
 }
 
 .inferencex-pinned-tooltip .pinned-token-breakdown {
