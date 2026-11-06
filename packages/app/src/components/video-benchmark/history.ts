@@ -204,3 +204,9 @@ export function videoHistoryEntry(
     error: sources.length === 0 ? 'Published artifact has no sources' : null,
   };
 }
+
+/** An unstored run read from its GitHub artifacts: never published, never approved. */
+export function liveHistoryEntry(saved: StoredArtifact): VideoHistoryEntry {
+  const entry = videoHistoryEntry(saved, null);
+  return { ...entry, artifact: { ...entry.artifact, stored: false }, approved: false };
+}

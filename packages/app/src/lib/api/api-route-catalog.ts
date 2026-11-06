@@ -211,7 +211,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-video-view',
-    sourceSha256: '3e0cdcd26592b132b2b8978271852e05f54258803c83e0cffb81254c76dd2d31',
+    sourceSha256: 'ad681cc19e3c1f01ca182853eca0c9e4e61f41845a08f3d221030dc112cb63d7',
   },
   {
     source: 'src/app/api/v1/views/operatorx/route.ts',
@@ -631,10 +631,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'Hidden H3 viewer transport for public CI runs, checksum-verified artifact ZIPs and stored History. Every GET is read-only, including format=media on a cache miss (204). History can return up to five pages in one response and serves entries from the newest History snapshot only while each record matches its index and receipt upload times. Synthetic History replay and explicit original-artifact replay with private MP4 ranges are development-only. History retains legacy indexes but labels only source-bound approval receipts as approved; default charts use those approved entries. Published History/media payloads have a 30-second process cache (32 entries each) and are served only after the public-repository check passes; errors, partial or unapproved History and missing media are not retained. Successful publication or History backfill clears that process cache. HTTP stays private, no-store. Metadata-only development fixtures return 204 for media. This UI contract is not a public data API.',
-      zh: '供隐藏的 H3 查看器读取公开 CI 运行、校验和已验证的产物 ZIP 与已存历史。所有 GET 都只读，包括 format=media 未命中时返回 204。历史可在一次响应中返回最多五页，只有记录仍与索引和回执上传时间一致时才使用最新历史快照中的条目。合成历史回放及读取原始产物 MP4 字节区间的显式回放仅用于开发环境。历史保留旧索引，但只有与来源绑定的批准回执才标为 approved；默认图表只使用这些条目。已发布 History／媒体载荷在服务进程内最多复用 30 秒，每类最多 32 项，且只在源仓库公开检查通过后返回；错误、不完整或未批准的 History 和缺失媒体不保留。发布或历史补建成功后清空当前进程缓存，HTTP 仍为 private, no-store。开发环境的纯元数据 fixture 对媒体请求返回 204。此界面契约不是公开数据 API。',
+      en: 'Hidden H3 viewer transport for public CI runs, checksum-verified artifact ZIPs and stored History. Every GET is read-only, including format=media on a cache miss (204). History can return up to five pages in one response and serves entries from the newest History snapshot only while each record matches its index and receipt upload times. Synthetic History replay and explicit original-artifact replay with private MP4 ranges are development-only. History retains legacy indexes but labels only source-bound approval receipts as approved; default charts use those approved entries. Published History/media payloads have a 30-second process cache (32 entries each) and are served only after the public-repository check passes; errors, partial or unapproved History and missing media are not retained. Successful publication or History backfill clears that process cache. format=live with run reads an unstored run after the same public-repository check: for the newest attempt of each native h3-results configuration it range-reads only the JSON documents and SHA256SUMS from the GitHub artifact ZIP, verifies them against SHA256SUMS and the manifest identity, and returns a History-shaped page whose entries are never stored, approved or given media. A failed artifact read becomes an entry error. Successful artifact reads are reused per artifact ID and digest in a process cache of 32 entries. HTTP stays private, no-store. Metadata-only development fixtures return 204 for media and an empty live page. This UI contract is not a public data API.',
+      zh: '供隐藏的 H3 查看器读取公开 CI 运行、校验和已验证的产物 ZIP 与已存历史。所有 GET 都只读，包括 format=media 未命中时返回 204。历史可在一次响应中返回最多五页，只有记录仍与索引和回执上传时间一致时才使用最新历史快照中的条目。合成历史回放及读取原始产物 MP4 字节区间的显式回放仅用于开发环境。历史保留旧索引，但只有与来源绑定的批准回执才标为 approved；默认图表只使用这些条目。已发布 History／媒体载荷在服务进程内最多复用 30 秒，每类最多 32 项，且只在源仓库公开检查通过后返回；错误、不完整或未批准的 History 和缺失媒体不保留。发布或历史补建成功后清空当前进程缓存。format=live 需同时提供 run，通过同样的源仓库公开检查后读取尚未存储的运行：对每个原生 h3-results 配置的最新一次尝试，只按字节区间读取 GitHub 产物 ZIP 中的 JSON 文档和 SHA256SUMS，经 SHA256SUMS 与 manifest 身份校验后，返回与 History 结构相同的页面；这些条目不会被存储或批准，也不附带媒体。单个产物读取失败时，对应条目记录错误。读取成功的产物按产物 ID 和摘要在服务进程内复用，最多 32 项。HTTP 仍为 private, no-store。开发环境的纯元数据 fixture 对媒体请求返回 204，对 live 请求返回空页面。此界面契约不是公开数据 API。',
     },
-    sourceSha256: '0f9343a75208fbc47eb068ed74bdd1e36fe2fbea3bb5828d51242b7fa7c25303',
+    sourceSha256: 'e090c6930107e8849a46a2726549e3c5a9f5504f925bf77cdd6e69d4d21ab029',
   },
   {
     source: 'src/app/api/video-runs/route.ts',
@@ -645,7 +645,7 @@ export const apiRouteCatalog = [
       en: 'Bearer-protected mutation for one explicit H3 source/artifact. It stores verified media, an immutable source-bound publication receipt and a new History snapshot; authorization does not assert benchmark qualification. The body {"history":"backfill"} rebuilds missing History snapshot records from already stored indexes. This operator path is outside the public read API.',
       zh: '受 Bearer 密钥保护的单个 H3 来源与产物写操作。它存储已校验媒体、绑定来源的不可变发布回执和新的历史快照；授权不代表 benchmark 质量验收。请求体 {"history":"backfill"} 会根据已存索引补建缺失的历史快照记录。此运维入口不属于公开只读 API。',
     },
-    sourceSha256: '0f9343a75208fbc47eb068ed74bdd1e36fe2fbea3bb5828d51242b7fa7c25303',
+    sourceSha256: 'e090c6930107e8849a46a2726549e3c5a9f5504f925bf77cdd6e69d4d21ab029',
   },
   {
     source: 'src/app/api/unofficial-run/route.ts',
@@ -1597,6 +1597,14 @@ export const apiContractSourceDigests = [
     },
   },
   {
+    source: 'src/lib/video/video-live-run.ts',
+    sourceSha256: 'ad134e6e8eea96164703f4caf8d6a81eaa0b0d7d36f82bb7da51a1f4887e5c9f',
+    reviewArea: {
+      en: 'VideoGenX live read of an unstored run: native result artifact selection, verified documents only, never stored, approved or given media.',
+      zh: 'VideoGenX 实时读取未存储的运行：选择原生结果产物，只读取经校验的文档，不存储、不批准，也不附带媒体。',
+    },
+  },
+  {
     source: 'src/lib/video/video-replay.ts',
     sourceSha256: 'f7095cc59ca891de5b57c96ebadde92b039c3a389ebb4ee70a14f3091ba6a781',
     reviewArea: {
@@ -1662,7 +1670,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/history.ts',
-    sourceSha256: '2473362f2b7d031950a31040e84e7b546284b7d4fce52010740f81a9102f236a',
+    sourceSha256: '49932cb03796c2e4e8f1ced73418cbe0ad690e42bd73596690f8f393cb6df7bd',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
