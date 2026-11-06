@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
+import { TABLE_HEAD_CELL_STYLE, TABLE_HEAD_ROW_STYLE } from '@/components/ui/control-styles';
 import { ResultContext } from '@/components/ui/result-context';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
@@ -78,13 +79,13 @@ export function HuaweiSkuConfigurations() {
             aria-label={t.title}
           >
             <table className="w-full text-sm" data-testid="huawei-sku-table">
-              <thead className="text-muted-foreground">
-                <tr>
+              <thead>
+                <tr className={TABLE_HEAD_ROW_STYLE}>
                   {t.columns.map((label, index) => (
                     <th
                       key={label}
                       scope="col"
-                      className={`px-4 py-2.5 font-medium whitespace-nowrap ${index > 0 && index < t.columns.length - 1 ? 'text-right' : 'text-left'}`}
+                      className={`${TABLE_HEAD_CELL_STYLE} px-4 py-2.5 ${index > 0 && index < t.columns.length - 1 ? 'text-right' : 'text-left'}`}
                     >
                       {label}
                     </th>

@@ -4,16 +4,15 @@ import { ControlPanel } from '@/components/ui/control-panel';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
-import { ChevronDownIcon } from 'lucide-react';
 
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
-import { Button } from '@/components/ui/button';
 import { ModelSelector, PrecisionSelector } from '@/components/ui/chart-selectors';
 import { DatePicker } from '@/components/ui/date-picker';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { RunChangelog } from '@/components/ui/run-changelog';
+import { formatDisplayDate } from '@/lib/shared/display-date';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
 
 const STRINGS = {
@@ -25,7 +24,6 @@ const STRINGS = {
       'The standardized test used to measure model performance. Common benchmarks include reasoning, coding, and knowledge-based evaluations.',
     selectBenchmark: 'Select benchmark',
     selectRunDate: 'Select run date',
-    changelog: 'Changelog',
     newResultsOn: 'New results on',
     noNewResults: 'No new results for this model on this date',
     secondaryControls: 'More run controls',
@@ -39,7 +37,6 @@ const STRINGS = {
       '用于衡量模型性能的标准化测试。常见的基准测试包括推理能力、编程能力和知识评估。',
     selectBenchmark: '选择基准测试',
     selectRunDate: '选择运行日期',
-    changelog: '变更记录',
     newResultsOn: '新结果 ·',
     noNewResults: '该日期该模型无新结果',
     secondaryControls: '更多运行设置',
@@ -48,7 +45,8 @@ const STRINGS = {
 };
 
 export default function EvaluationChartControls() {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown<string>();
 
   const {
@@ -153,40 +151,29 @@ export default function EvaluationChartControls() {
                 />
               </div>
 
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="self-start sm:self-auto">
-                    <span className="font-medium">{t.changelog}</span>
-                    <ChevronDownIcon />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  collisionPadding={12}
-                  className="max-h-[min(32rem,calc(100vh-1.5rem))] w-[min(400px,calc(100vw-1.5rem))] overflow-y-auto"
-                >
-                  <div className="flex min-w-0 flex-col gap-3">
-                    <div className="text-xs font-medium tabular-nums">
-                      {t.newResultsOn} {selectedRunDate}
-                    </div>
-                    {changelogEntries.length > 0 ? (
-                      changelogEntries.map((entry) => (
-                        <div key={entry.benchmark} className="flex min-w-0 flex-col gap-1 text-xs">
-                          <div className="font-medium">{entry.benchmark.toUpperCase()}</div>
-                          <ul className="list-disc break-words pl-4 [overflow-wrap:anywhere]">
-                            {entry.configs.map((config) => (
-                              <li key={config} className="break-words [overflow-wrap:anywhere]">
-                                {config}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-xs text-muted-foreground">{t.noNewResults}</p>
-                    )}
+              <RunChangelog>
+                <div className="flex min-w-0 flex-col gap-3">
+                  <div className="text-xs font-medium tabular-nums">
+                    {t.newResultsOn} {selectedRunDate && formatDisplayDate(selectedRunDate, locale)}
                   </div>
-                </PopoverContent>
-              </Popover>
+                  {changelogEntries.length > 0 ? (
+                    changelogEntries.map((entry) => (
+                      <div key={entry.benchmark} className="flex min-w-0 flex-col gap-1 text-xs">
+                        <div className="font-medium">{entry.benchmark.toUpperCase()}</div>
+                        <ul className="list-disc break-words pl-4 [overflow-wrap:anywhere]">
+                          {entry.configs.map((config) => (
+                            <li key={config} className="break-words [overflow-wrap:anywhere]">
+                              {config}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground">{t.noNewResults}</p>
+                  )}
+                </div>
+              </RunChangelog>
             </div>
           </ControlPanel>
         </MobileControlSection>

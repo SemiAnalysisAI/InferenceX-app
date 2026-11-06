@@ -8,6 +8,7 @@ import { generateVendorColors } from '@/lib/charts/dynamic-colors';
 
 import ChartLegend from '@/components/ui/chart-legend';
 import { ChartSection } from '@/components/ui/chart-section';
+import { TABLE_HEAD_CELL_STYLE, TABLE_HEAD_ROW_STYLE } from '@/components/ui/control-styles';
 import { Heading } from '@/components/ui/heading';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { ResultContext } from '@/components/ui/result-context';
@@ -497,16 +498,12 @@ export function UbenchxContent() {
             <div className="mt-3 overflow-x-auto" data-testid="ubenchx-device-specs">
               <table className="w-full text-left text-xs text-muted-foreground tabular-nums">
                 <thead>
-                  <tr className="border-b border-border/60">
+                  <tr className={TABLE_HEAD_ROW_STYLE}>
                     {specHeaders.map((header, index) => (
                       <th
                         key={header}
                         scope="col"
-                        className={
-                          index === specHeaders.length - 1
-                            ? 'py-1.5 text-right font-medium whitespace-nowrap'
-                            : 'py-1.5 pr-4 font-medium whitespace-nowrap'
-                        }
+                        className={`${TABLE_HEAD_CELL_STYLE} py-1.5 ${index === specHeaders.length - 1 ? 'text-right' : 'pr-4'}`}
                       >
                         {header}
                       </th>

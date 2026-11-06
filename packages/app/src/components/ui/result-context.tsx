@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import type { Locale } from '@/lib/i18n/i18n';
+import { formatDisplayDate } from '@/lib/shared/display-date';
 import { cn } from '@/lib/shared/utils';
 
 export const captionControlTriggerClassName =
@@ -39,6 +40,11 @@ export interface ResultContextProps {
 
 const META_ITEM =
   "before:mr-2 before:text-muted-foreground/60 before:content-['·'] first:before:content-none";
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/u;
+
+const metaDate = (value: string, locale: Locale) =>
+  ISO_DATE.test(value) ? formatDisplayDate(value, locale) : value;
 
 export function CaptionField({
   label,
@@ -154,8 +160,11 @@ export function ResultContext({
           licenseFee: 'Model license fee assumption',
         };
   const hasRange = Boolean(dateRange?.start && dateRange.end);
-  const selectedDates = dates && dates.length > 1 ? dates.join(', ') : date;
-  const dateValue = hasRange ? `${dateRange!.start} → ${dateRange!.end}` : selectedDates;
+  const selectedDates =
+    dates && dates.length > 1 ? dates.map((d) => metaDate(d, locale)).join(', ') : date;
+  const dateValue = hasRange
+    ? `${metaDate(dateRange!.start, locale)} → ${metaDate(dateRange!.end, locale)}`
+    : selectedDates && metaDate(selectedDates, locale);
   const dateLabel = hasRange
     ? labels.range
     : dates && dates.length > 1

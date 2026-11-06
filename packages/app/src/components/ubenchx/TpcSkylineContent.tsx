@@ -2,6 +2,7 @@
 
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
+import { TABLE_HEAD_CELL_STYLE, TABLE_HEAD_ROW_STYLE } from '@/components/ui/control-styles';
 import { ResultContext } from '@/components/ui/result-context';
 import { useLocale } from '@/lib/i18n/use-locale';
 
@@ -64,18 +65,18 @@ export function TpcSkylineContent() {
             </figcaption>
             <div className="mt-3 overflow-x-auto rounded-lg border border-border/30">
               <table className="w-full text-sm" aria-label={t.aria} data-testid="tpc-skyline-table">
-                <thead className="text-left whitespace-nowrap text-muted-foreground">
-                  <tr>
-                    <th scope="col" className="px-4 py-2.5 font-medium">
+                <thead>
+                  <tr className={TABLE_HEAD_ROW_STYLE}>
+                    <th scope="col" className={`${TABLE_HEAD_CELL_STYLE} px-4 py-2.5 text-left`}>
                       {t.product}
                     </th>
-                    <th scope="col" className="px-4 py-2.5 text-right font-medium">
+                    <th scope="col" className={`${TABLE_HEAD_CELL_STYLE} px-4 py-2.5 text-right`}>
                       {t.gpcs}
                     </th>
-                    <th scope="col" className="px-4 py-2.5 text-right font-medium">
+                    <th scope="col" className={`${TABLE_HEAD_CELL_STYLE} px-4 py-2.5 text-right`}>
                       {t.sms}
                     </th>
-                    <th scope="col" className="px-4 py-2.5 font-medium">
+                    <th scope="col" className={`${TABLE_HEAD_CELL_STYLE} px-4 py-2.5 text-left`}>
                       {t.grouping}
                     </th>
                   </tr>

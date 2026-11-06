@@ -251,7 +251,7 @@ describe('Overview page', () => {
     cy.location('pathname').should('eq', '/inference/deepseek-v41-flash');
   });
 
-  it('reveals deprecated and maintenance models via the bottom toggle', () => {
+  it('reveals deprecated and maintenance models via the toolbar toggle', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
     cy.get('[data-testid="overview-desktop-model"][data-model="gpt-oss-120b"]').should('not.exist');
@@ -365,7 +365,7 @@ describe('Overview page', () => {
     cy.get('[data-testid="overview-presentation-surface"]')
       .find('[data-testid="overview-comparison-switcher"]')
       .should('have.length', 1)
-      .and('have.class', 'justify-center');
+      .and('have.class', 'justify-start');
     cy.get('[data-testid="overview-comparison-switcher"]')
       .should('have.attr', 'aria-label', 'Compare')
       .within(() => {
@@ -1157,12 +1157,13 @@ describe('Overview page', () => {
       cy.get('[data-testid="mobile-chart-select"]').should('not.exist');
       cy.get('[data-testid="overview-mobile-list"]').should('be.visible');
       cy.get('[data-testid="overview-tier-switcher"]').should('be.visible');
-      cy.get('[data-testid="overview-engine-scope-switcher"]')
+      cy.get('[data-testid="overview-engine-scope-switcher"]').should('be.visible');
+      cy.get('[data-testid="overview-engine-scope-select"]')
         .should('be.visible')
-        .find('[data-overview-engine-scope]')
-        .each(($option) => {
-          expect($option[0].getBoundingClientRect().height).to.be.at.least(44);
+        .then(([select]) => {
+          expect(select.getBoundingClientRect().height).to.be.at.least(44);
         });
+      cy.get('[data-overview-engine-scope]').should('not.be.visible');
       cy.get('[data-testid="overview-desktop-matrix"]').should('not.exist');
       mobileModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
         cy.get('[data-testid="overview-platform"]').should('have.length', 5);

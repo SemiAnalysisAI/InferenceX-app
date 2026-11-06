@@ -1,21 +1,14 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
-  Search,
-  X,
-} from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { useUnofficialDomain } from '@/hooks/useUnofficialDomain';
 import { track } from '@/lib/analytics/analytics';
 import { useSearchTracking } from '@/lib/analytics/use-search-tracking';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
-import { CONTROL_SEARCH_CLEAR_STYLE, CONTROL_SEARCH_STYLE } from '@/components/ui/control-styles';
+import { TABLE_HEAD_CELL_STYLE, TABLE_HEAD_ROW_STYLE } from '@/components/ui/control-styles';
+import { SearchInput } from '@/components/ui/search-input';
 import {
   Select,
   SelectContent,
@@ -204,31 +197,18 @@ export function DataTable<T>({
       {(searchable || hasPresets) && (
         <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
           {searchable && (
-            <div className="relative w-full sm:w-80">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-              <input
-                ref={searchRef}
-                type="text"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(0);
-                }}
-                placeholder={t.search}
-                className={`${CONTROL_SEARCH_STYLE} rounded-md border border-border pl-8 pr-11 md:pr-8`}
-                aria-label={t.searchAria}
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={clearSearch}
-                  className={`${CONTROL_SEARCH_CLEAR_STYLE} absolute right-0 top-1/2 -translate-y-1/2`}
-                  aria-label={t.clearSearch}
-                >
-                  <X className="size-3" />
-                </button>
-              )}
-            </div>
+            <SearchInput
+              ref={searchRef}
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(0);
+              }}
+              onClear={clearSearch}
+              placeholder={t.search}
+              aria-label={t.searchAria}
+              clearLabel={t.clearSearch}
+            />
           )}
           {hasPresets && (
             <div className="flex items-center gap-2">
@@ -265,7 +245,7 @@ export function DataTable<T>({
         )}
         <table className="w-full text-sm relative">
           <thead className="sticky top-0 bg-card z-1">
-            <tr className="border-b border-border">
+            <tr className={TABLE_HEAD_ROW_STYLE}>
               {visibleColumns.map((col) => {
                 const i = columns.indexOf(col);
                 const sortable = Boolean(col.sortValue);
@@ -278,7 +258,7 @@ export function DataTable<T>({
                 return (
                   <th
                     key={i}
-                    className={`whitespace-nowrap py-2 px-3 font-medium text-muted-foreground ${ALIGN_CLASSES[col.align ?? 'left']} ${col.className ?? ''} ${col.pinned ? 'sticky left-0 z-2 border-r border-border/50 bg-card' : ''} ${sortable ? 'cursor-pointer select-none hover:text-foreground transition-colors' : ''}`}
+                    className={`${TABLE_HEAD_CELL_STYLE} py-2 px-3 ${ALIGN_CLASSES[col.align ?? 'left']} ${col.className ?? ''} ${col.pinned ? 'sticky left-0 z-2 border-r border-border/50 bg-card md:border-r-0' : ''} ${sortable ? 'cursor-pointer select-none hover:text-foreground transition-colors' : ''}`}
                     tabIndex={sortable ? 0 : undefined}
                     onClick={sortable ? () => handleSort(i) : undefined}
                     onKeyDown={
@@ -345,7 +325,7 @@ export function DataTable<T>({
                         <td
                           key={columns.indexOf(col)}
                           colSpan={span > 1 ? span : undefined}
-                          className={`px-3 py-2 ${ALIGN_CLASSES[col.align ?? 'left']} ${col.align === 'right' || col.align === 'center' ? 'tabular-nums' : ''} ${col.className ?? ''} ${col.pinned ? 'sticky left-0 z-1 border-r border-border/50 bg-card' : ''}`}
+                          className={`px-3 py-2 ${ALIGN_CLASSES[col.align ?? 'left']} ${col.align === 'right' || col.align === 'center' ? 'tabular-nums' : ''} ${col.className ?? ''} ${col.pinned ? 'sticky left-0 z-1 border-r border-border/50 bg-card md:border-r-0' : ''}`}
                         >
                           {col.pinned ? (
                             <div className="w-40 max-w-40 whitespace-normal [overflow-wrap:anywhere] sm:w-auto sm:max-w-none">

@@ -9,14 +9,13 @@ import { Button } from '@/components/ui/button';
 import {
   CalendarMonthPanel,
   formatCalendarDate,
-  formatDisplayDate,
   getCalendarMonthNavState,
   getLatestSelectableDate,
   isCalendarDateOutOfRange,
-  parseCalendarDate,
   resolveCalendarDateBounds,
   useCalendarMonth,
 } from '@/components/ui/calendar-picker-utils';
+import { formatDisplayDate, parseCalendarDate } from '@/lib/shared/display-date';
 import {
   Dialog,
   DialogClose,

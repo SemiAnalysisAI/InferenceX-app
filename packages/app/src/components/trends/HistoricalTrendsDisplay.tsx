@@ -134,14 +134,6 @@ const STRINGS = {
   },
 };
 
-function historicalRunDate(date: string, locale: 'en' | 'zh'): string {
-  if (locale !== 'zh') return date;
-  const [year, month, day] = date.split('-').map(Number);
-  return Number.isInteger(year) && Number.isInteger(month) && Number.isInteger(day)
-    ? `${year}年${month}月${day}日`
-    : date;
-}
-
 export default function HistoricalTrendsDisplay() {
   const [chartView, setChartView] = useState<'line' | 'waterfall'>('line');
   const PerformanceChart = chartView === 'waterfall' ? ImprovementWaterfallChart : TrendChart;
@@ -552,9 +544,7 @@ export default function HistoricalTrendsDisplay() {
                             <ChipBasisCaption control={chipBasisControl} />
                           ) : undefined
                         }
-                        date={
-                          selectedRunDate ? historicalRunDate(selectedRunDate, locale) : undefined
-                        }
+                        date={selectedRunDate || undefined}
                         source="SemiAnalysis InferenceX™"
                         controlsEnd={
                           costAssumptions && costBases.length > 0 ? (

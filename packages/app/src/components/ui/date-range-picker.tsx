@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import {
   CalendarMonthPanel,
   formatCalendarDate,
-  formatDisplayDate,
   getCalendarMonthNavState,
   isCalendarDateOutOfRange,
   resolveCalendarDateBounds,
@@ -26,6 +25,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/shared/utils';
+import { formatDisplayDate } from '@/lib/shared/display-date';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {

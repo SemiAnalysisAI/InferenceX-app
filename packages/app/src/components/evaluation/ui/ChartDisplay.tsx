@@ -23,22 +23,11 @@ import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { type Precision, getPrecisionLabel } from '@/lib/catalog/data-mappings';
 import { exportToCsv } from '@/lib/export/csv-export';
 import { evaluationChartToCsv } from '@/lib/export/csv-export-helpers';
-import type { Locale } from '@/lib/i18n/i18n';
 
 import EvaluationChartControls from './ChartControls';
-import EvalBarChartD3, { formatEvaluationDate } from './BarChartD3';
+import EvalBarChartD3 from './BarChartD3';
 
 type EvalViewMode = 'chart' | 'table';
-
-export function evaluationCaptionDate(date: string, locale: Locale): string {
-  if (locale === 'zh') return formatEvaluationDate(date, locale);
-  return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    timeZone: 'UTC',
-  });
-}
 
 export const EVALUATION_DISPLAY_STRINGS = {
   en: {
@@ -163,7 +152,7 @@ export default function EvaluationChartDisplay() {
     <ResultContext
       locale={locale}
       layout="footer"
-      date={selectedRunDate ? evaluationCaptionDate(selectedRunDate, locale) : undefined}
+      date={selectedRunDate}
       source={
         isUnofficialRun
           ? locale === 'zh'

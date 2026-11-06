@@ -31,6 +31,10 @@ export const CONTROL_SEARCH_CLEAR_STYLE =
 
 export const CONTROL_OPTION_STYLE = 'min-h-11 md:min-h-8';
 
+export const TABLE_HEAD_ROW_STYLE = 'border-b border-border';
+
+export const TABLE_HEAD_CELL_STYLE = 'whitespace-nowrap text-xs font-medium text-muted-foreground';
+
 export const SEGMENTED_CONTAINER_STYLE =
   'inline-flex min-h-11 min-w-0 max-w-full flex-wrap items-stretch rounded-md border border-border dark:border-input gap-0.5 [--segmented-inset:1px] md:[--segmented-inset:3px] md:p-0.5 md:min-h-8';
 

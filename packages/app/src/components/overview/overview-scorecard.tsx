@@ -2,7 +2,16 @@
 
 import { type ComponentPropsWithoutRef, useEffect, useRef } from 'react';
 
+import { track } from '@/lib/analytics/analytics';
+
 import { buttonVariants } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { SEGMENTED_CONTAINER_STYLE, SEGMENT_RADIUS_STYLE } from '@/components/ui/control-styles';
 import { ModelLogo } from '@/components/ui/model-logo';
 import {
@@ -646,7 +655,7 @@ export function MobileOverviewList({
               data-testid="overview-mobile-model"
               data-model={model.model}
               data-scenario={model.scenario}
-              className="space-y-2 px-4 py-3.5"
+              className="space-y-1 px-4 py-3"
             >
               <ModelName model={model} strings={strings} />
               <div className="grid grid-cols-1">
@@ -661,11 +670,11 @@ export function MobileOverviewList({
                       referenceHardware,
                       referenceCost,
                     )}
-                    className="grid min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] items-baseline gap-x-3 border-b border-border/30 py-1.5 last:border-b-0"
+                    className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] items-baseline gap-x-3 border-b border-border/30 py-1 last:border-b-0"
                   >
                     <span
                       data-testid="overview-mobile-hardware"
-                      className="text-xs font-medium text-muted-foreground"
+                      className="whitespace-nowrap text-xs font-medium text-muted-foreground"
                     >
                       {platform.hardwareLabel}
                     </span>
@@ -784,14 +793,49 @@ export function OverviewEngineScopeSwitcher({
 }) {
   const options: OverviewEngineScope[] = ['community', 'all'];
   const optionClass = `inline-flex min-h-11 min-w-0 items-center ${SEGMENT_RADIUS_STYLE} px-2 py-1 text-left text-sm font-medium leading-snug focus-visible:outline-none md:min-h-6 md:py-0.5`;
+  const navigation = useOverviewNavigation();
+  const optionHref = (option: OverviewEngineScope) =>
+    overviewEngineScopeHref(
+      locale,
+      option,
+      tier,
+      comparisonMode,
+      referenceHardware,
+      modelScope,
+      rowScope,
+      hardwareRowScope,
+    );
   return (
     <nav
       data-testid="overview-engine-scope-switcher"
       aria-label={strings.engineScopeNavLabel}
-      className="flex min-w-0 flex-col items-start gap-1 text-xs sm:flex-row sm:items-center sm:gap-2"
+      className="flex w-full min-w-0 flex-col items-start gap-1 text-xs sm:w-auto sm:flex-row sm:items-center sm:gap-2"
     >
       <span className="shrink-0 text-muted-foreground">{strings.engineScopeNavLabel}</span>
-      <div className={SEGMENTED_CONTAINER_STYLE}>
+      <Select
+        value={engineScope}
+        onValueChange={(next: OverviewEngineScope) => {
+          if (next === engineScope) return;
+          track('overview_selector_changed', { control: 'engine', value: next });
+          navigation.push(optionHref(next), ['engine']);
+        }}
+      >
+        <SelectTrigger
+          aria-label={strings.engineScopeNavLabel}
+          className="w-full sm:hidden"
+          data-testid="overview-engine-scope-select"
+        >
+          <SelectValue>{strings.engineScopeOptions[engineScope]}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option} value={option}>
+              {strings.engineScopeOptions[option]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <div className={`${SEGMENTED_CONTAINER_STYLE} max-sm:hidden`}>
         {options.map((option) =>
           option === engineScope ? (
             <ActiveSwitcherOption
@@ -807,16 +851,7 @@ export function OverviewEngineScopeSwitcher({
             <OverviewNavLink
               key={option}
               data-overview-engine-scope={option}
-              href={overviewEngineScopeHref(
-                locale,
-                option,
-                tier,
-                comparisonMode,
-                referenceHardware,
-                modelScope,
-                rowScope,
-                hardwareRowScope,
-              )}
+              href={optionHref(option)}
               analytics={{ control: 'engine', value: option }}
               searchKeys={['engine']}
               className={`${optionClass} text-muted-foreground transition-colors hover:text-foreground`}
@@ -879,7 +914,7 @@ export function OverviewComparisonSwitcher({
     <nav
       data-testid="overview-comparison-switcher"
       aria-label={strings.comparisonNavLabel}
-      className="flex flex-wrap justify-center gap-x-1 gap-y-1.5 sm:gap-x-1.5"
+      className="flex flex-wrap justify-start gap-x-1 gap-y-1.5 sm:gap-x-1.5"
     >
       {comparisonMode === 'hardware' ? (
         <ActiveSwitcherOption

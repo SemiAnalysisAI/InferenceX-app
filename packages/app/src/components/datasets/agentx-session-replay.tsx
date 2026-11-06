@@ -131,7 +131,7 @@ function Row({ row, frame, label }: { row: ReplayRow; frame: Frame; label: strin
       >
         {label}
       </span>
-      <div className={cn('flex h-2.5 flex-1', !shown && 'bg-muted/60')}>
+      <div className={cn('flex h-2.5 flex-1', !shown && 'bg-foreground/5')}>
         <Segment
           value={shown?.cached ?? 0}
           color={SEG.cached}

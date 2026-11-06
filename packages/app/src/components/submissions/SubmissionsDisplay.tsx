@@ -18,7 +18,7 @@ import { submissionsVolumeToCsv } from '@/lib/export/csv-export-helpers';
 import { useSubmissions } from '@/hooks/api/use-submissions';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-import SubmissionsChart, { type ChartMode, formatSubmissionDate } from './SubmissionsChart';
+import SubmissionsChart, { type ChartMode } from './SubmissionsChart';
 import SubmissionsTable from './SubmissionsTable';
 import { computeTotalStats } from './submissions-utils';
 
@@ -203,7 +203,7 @@ export default function SubmissionsDisplay() {
               <ResultContext
                 locale={locale}
                 layout="footer"
-                date={latestDate ? formatSubmissionDate(new Date(latestDate), locale) : undefined}
+                date={latestDate}
                 source={t.chartSource}
               />
             }

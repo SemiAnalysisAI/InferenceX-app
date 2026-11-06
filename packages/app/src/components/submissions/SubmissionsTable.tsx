@@ -13,8 +13,9 @@ import { MODEL_PREFIX_MAPPING, getModelLabel } from '@/lib/catalog/data-mappings
 import type { SubmissionSummaryRow } from '@/lib/submissions/submissions-types';
 import { getFrameworkLabel } from '@/lib/shared/utils';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { TABLE_HEAD_CELL_STYLE, TABLE_HEAD_ROW_STYLE } from '@/components/ui/control-styles';
 import { InfoHelp } from '@/components/ui/option-info';
+import { SearchInput } from '@/components/ui/search-input';
 import { VendorDot } from '@/components/ui/vendor-dot';
 import {
   TooltipProvider,
@@ -37,6 +38,7 @@ import {
 const STRINGS = {
   en: {
     searchPlaceholder: 'Search configs',
+    clearSearch: 'Clear search',
     colGpu: 'Chip',
     colModel: 'Model',
     colPrecision: 'Precision',
@@ -99,6 +101,7 @@ const STRINGS = {
   },
   zh: {
     searchPlaceholder: '搜索配置',
+    clearSearch: '清除搜索',
     colGpu: '芯片',
     colModel: '模型',
     colPrecision: '精度',
@@ -219,7 +222,7 @@ function SortHeader({
 }) {
   return (
     <th
-      className={`px-3 py-2 text-xs font-medium text-muted-foreground select-none ${align === 'right' ? 'text-right' : 'text-left'}`}
+      className={`${TABLE_HEAD_CELL_STYLE} px-3 py-2 select-none ${align === 'right' ? 'text-right' : 'text-left'}`}
       aria-sort={sortKey === field ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
     >
       <button
@@ -317,8 +320,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <Input
-        type="text"
+      <SearchInput
         value={search}
         onChange={(e) => handleSearchChange(e.target.value)}
         onBlur={() => {
@@ -330,13 +332,15 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
           }
         }}
         placeholder={t.searchPlaceholder}
-        className="max-w-sm"
+        aria-label={t.searchPlaceholder}
+        onClear={() => handleSearchChange('')}
+        clearLabel={t.clearSearch}
       />
       <p className="text-xs text-muted-foreground md:hidden">{t.scrollHint}</p>
       <div className="overflow-x-auto rounded-lg border border-border/30">
         <table className="w-full min-w-[980px] text-sm">
-          <thead className="bg-muted/40">
-            <tr>
+          <thead>
+            <tr className={TABLE_HEAD_ROW_STYLE}>
               <th className="w-8 px-2" />
               {(
                 [
@@ -360,7 +364,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
                 />
               ))}
               <th
-                className="px-3 py-2 text-left text-xs font-medium text-muted-foreground select-none"
+                className={`${TABLE_HEAD_CELL_STYLE} px-3 py-2 text-left select-none`}
                 scope="col"
               >
                 {t.colCompare}

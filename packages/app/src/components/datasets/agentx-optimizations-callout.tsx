@@ -1,5 +1,6 @@
 import { ArrowRight } from 'lucide-react';
 
+import { badgeVariants } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import {
   getLocalizedFrameworks,
@@ -47,10 +48,7 @@ export function AgentXOptimizationsCallout({ locale }: { locale: Locale }) {
                 analyticsTarget={framework.slug}
                 data-testid="agentx-optimizations-framework-link"
                 data-framework={framework.slug}
-                className={cn(
-                  buttonVariants({ variant: 'outline', size: 'sm' }),
-                  'font-normal text-muted-foreground hover:text-foreground',
-                )}
+                className={cn(badgeVariants(), 'min-h-6 font-normal')}
               >
                 {framework.name}
               </AgentXOptimizationsLink>

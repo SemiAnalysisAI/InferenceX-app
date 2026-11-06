@@ -63,7 +63,7 @@ describe('ResultContext', () => {
     expect(context.querySelector('[data-testid="result-context"]')?.textContent).toContain(
       'Model: DeepSeek-R1-0528',
     );
-    expect(context.textContent).toContain('Date range: 2026-08-01 → 2026-08-31');
+    expect(context.textContent).toContain('Date range: Aug 1, 2026 → Aug 31, 2026');
     expect(context.textContent).toContain('Source: SemiAnalysis InferenceX™');
     expect(context.textContent).not.toContain('Source: Source:');
     expect(context.textContent).toContain('Cost basis: Input $1/M tok · Output $8/M tok');
@@ -72,7 +72,7 @@ describe('ResultContext', () => {
   it('localizes labels while preserving technical values', () => {
     const context = renderContext('zh');
     expect(context.textContent).toContain('模型: DeepSeek-R1-0528');
-    expect(context.textContent).toContain('日期范围: 2026-08-01 → 2026-08-31');
+    expect(context.textContent).toContain('日期范围: 2026年8月1日 → 2026年8月31日');
     expect(context.textContent).toContain('成本口径: Input $1/M tok · Output $8/M tok');
   });
 
@@ -92,7 +92,7 @@ describe('ResultContext', () => {
     const text = container.textContent ?? '';
     expect(text).toContain('Precision: FP8');
     expect(text).toContain('Cost tier: Owning at Large Hyperscaler Volume');
-    expect(text).toContain('Updated: 2026-09-01');
+    expect(text).toContain('Updated: Sep 1, 2026');
     expect(text).toContain('Source: SemiAnalysis InferenceX™');
     expect(text).not.toContain('Model:');
     expect(text).not.toContain('Workload:');
@@ -119,7 +119,7 @@ describe('ResultContext', () => {
     expect(dd?.querySelector('.no-export [data-testid="tier-control"]')).not.toBeNull();
     expect(dd?.querySelector('.export-only')?.textContent).toBe('Rent - 3 Year Commit');
     expect(dd?.querySelector('.export-only')?.classList.contains('hidden')).toBe(true);
-    expect(container.textContent).toContain('Updated: 2026-09-01');
+    expect(container.textContent).toContain('Updated: Sep 1, 2026');
   });
 
   it('lays out the chart footer as a controls row and one meta line', () => {
@@ -144,7 +144,7 @@ describe('ResultContext', () => {
     expect(dt.querySelector('.sr-only')?.textContent).toBe('Cost tier');
     expect(dt.querySelector('.export-only.hidden')?.textContent).toBe('Cost tier:');
     expect(container.querySelector('[data-testid="prices"]')).not.toBeNull();
-    expect(container.textContent).toContain('Updated 2026-09-01');
+    expect(container.textContent).toContain('Updated Sep 1, 2026');
     expect(container.querySelector('[data-testid="result-context-markers"]')?.textContent).toBe(
       'KV offload on',
     );
@@ -169,7 +169,7 @@ describe('ResultContext', () => {
     expect(
       [...(row?.children ?? [])].map((child) => (child as HTMLElement).dataset.testid),
     ).toEqual(['scenario-slot', 'tco-slot', 'chip-slot']);
-    expect(container.textContent).toContain('Updated 2026-09-01');
+    expect(container.textContent).toContain('Updated Sep 1, 2026');
   });
 
   it('shows utilization and the model license fee when given, in both locales', () => {
@@ -242,7 +242,7 @@ describe('ResultContext', () => {
         />,
       );
     });
-    expect(container.textContent).toContain('Dates: 2026-08-01, 2026-08-15, 2026-08-31');
-    expect(container.textContent).not.toContain('Updated: 2026-08-31');
+    expect(container.textContent).toContain('Dates: Aug 1, 2026, Aug 15, 2026, Aug 31, 2026');
+    expect(container.textContent).not.toContain('Updated: Aug 31, 2026');
   });
 });
