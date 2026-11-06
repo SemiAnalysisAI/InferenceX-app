@@ -65,7 +65,7 @@ function Stat({
         {value}
       </dd>
       {detail !== undefined && detail !== null && detail !== '' && (
-        <dd className="order-3 mt-0.5 text-2xs tabular-nums text-muted-foreground">{detail}</dd>
+        <dd className="order-3 mt-0.5 text-xs tabular-nums text-muted-foreground">{detail}</dd>
       )}
     </div>
   );

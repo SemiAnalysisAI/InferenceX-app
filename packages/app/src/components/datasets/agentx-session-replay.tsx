@@ -281,6 +281,7 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
           <Stat
             key={stat.key}
             valueFirst
+            valueClassName="pl-3.5"
             value={stat.value}
             label={
               <span className="inline-flex items-center gap-1.5">
