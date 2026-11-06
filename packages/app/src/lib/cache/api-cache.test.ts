@@ -49,6 +49,7 @@ import {
   cachedQuery,
   purgeAll,
   purgeCollectiveX,
+  purgeVideo,
   cachedJson,
   cachedJsonResponse,
   cachedGzipJson,
@@ -561,6 +562,22 @@ describe('purgeAll', () => {
     expect(mockRevalidateTag).toHaveBeenCalledWith('db:staging', { expire: 0 });
     expect(mockRevalidateTag).toHaveBeenCalledWith('db-page:staging', 'max');
     expect(mockRevalidateTag).toHaveBeenCalledWith('db-cdn:staging', 'max');
+  });
+});
+
+describe('purgeVideo', () => {
+  it('expires the video tag at once — its responses are private and never CDN cached', () => {
+    purgeVideo();
+
+    expect(mockBlobPurge).not.toHaveBeenCalled();
+    expect(mockRevalidateTag).toHaveBeenCalledExactlyOnceWith('video', { expire: 0 });
+  });
+
+  it('isolates the video tag by namespace', () => {
+    process.env.CACHE_NAMESPACE = 'staging';
+    purgeVideo();
+
+    expect(mockRevalidateTag).toHaveBeenCalledExactlyOnceWith('video:staging', { expire: 0 });
   });
 });
 

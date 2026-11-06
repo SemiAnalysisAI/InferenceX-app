@@ -118,17 +118,20 @@ The overview page (`/overview`, `/zh/overview`) is prerendered with the default 
 
 ### API responses
 
-VideoGenX (`/video` and `/zh/video`) dynamically reads its URL selection, complete
-bounded History cohort and selected clip metadata before rendering, when video
-storage is configured; without it the browser reads History itself. The existing
-read-only handler is called in process, preserving its repository visibility and
-local replay gates. Initial props contain History and parsed clip sides, including
-known missing media, rather than raw artifact documents. Hydration reuses them;
-later clip reads update independently and keep matching content visible. This
-loading behavior is a presentation-only API coverage exclusion: selectors,
-measurements, defaults and unofficial-run membership are unchanged. The page is
-not ISR cached. The transport's bounded process cache is documented in
-[Video History](./video-history.md).
+VideoGenX (`/video` and `/zh/video`) streams its shell with the URL selection
+first and then the dashboard with the complete bounded History cohort and
+selected clip metadata, when video storage is configured; without it the browser
+reads History itself. The existing read-only handler is called in process,
+preserving its local replay gate, and reads the complete cohort in one request.
+The projected pages and published artifacts are cached across instances under
+the `video` tag until a publication or `?scope=video` expires it, with a
+5-minute background refresh as a backstop. Initial props
+contain History and parsed clip sides, including known missing media, rather
+than raw artifact documents. Hydration reuses them; later clip reads update
+independently and keep matching content visible. This loading behavior is a
+presentation-only API coverage exclusion: selectors, measurements, defaults and
+unofficial-run membership are unchanged. The page is not ISR cached. The cache
+is documented in [Video History](./video-history.md#publication-and-discovery).
 
 `cachedJson()` (`lib/cache/api-cache.ts`) takes the incoming request. It serves brotli, then gzip, then plain JSON according to `Accept-Encoding`, so a client that sends no header (curl, scripts) gets plain JSON. Every response carries `Vary: Accept-Encoding` and a strong `ETag` hashed from the payload and the chosen encoding. A matching `If-None-Match` returns a bodiless `304`. Brotli runs at quality 9 below 1 MiB of JSON, 8 up to 4 MiB and 7 above. On the production payloads that keeps every body within 2.3% of quality 9 and cuts the brotli CPU by about a third (the 12.7 MB history payload goes from 396 ms to 228 ms). A lower quality is part of the ETag (`"<hash>-br8"`, `"<hash>-br7"`), because the encoded bytes differ. Responses with a `version` ETag are validated before the body exists, so they always use quality 9. Route handlers that call other handlers directly use `sourceRequest()`, which sends no `Accept-Encoding`, so they always read plain JSON. Benchmark rows skip that hop. The views and `/api/v1/pareto` call `loadBenchmarks()` (`lib/benchmarks/benchmarks-endpoint.server.ts`), which returns the rows `/api/v1/benchmarks` serializes without stringifying, hashing and re-parsing them.
 
@@ -148,7 +151,7 @@ Historical Trends reads `/api/v1/benchmarks/history/trends` instead of the publi
 
 `/api/v1/gpu-metrics-point` cannot be cached by the CDN, because a re-ingest changes the telemetry behind an unchanged URL. It sends `Cache-Control: private, no-cache` with an ETag derived from the payload cache prefix, the point id, the live telemetry revision and the encoding (`cachedJson(..., { version })`). Each request reads the revision first, and `notModifiedJson()` answers a matching `If-None-Match` with a `304` before the payload is loaded, serialized or compressed. Missing points and errors stay `no-store`.
 
-Server data (`unstable_cache` plus Blob) and CDN responses (the `db-cdn` tag) are tagged separately. `cachedQuery` keeps two `unstable_cache` entries per query. Route handlers read the `db`-tagged one, and ISR renders (sitemap included) read a separately keyed `db-page` one. On ingest, `purgeAll()` expires `db` immediately, only marks `db-page` and `db-cdn` stale (`revalidateTag(tag, 'max')`), and deletes the old blobs after responding. The next visitor gets the previous response at once while the CDN refetches in the background, and that refetch reads the database because the route entries are already gone. Expiring route data with `'max'` instead would hand the stale entry to the CDN's refetch and cache it for another day. ISR pages keep serving their previous HTML, because a stale `unstable_cache` entry is refetched in the foreground during regeneration, and the stale value is kept if that refetch fails. Corrections and retractions (`apply-run-overrides.yml`, `cache-refresh.yml`) run `admin:cache:invalidate <origin> --immediate`, which posts `/api/v1/invalidate?immediate=true` and expires every tag outright so retracted data is never served again. CollectiveX and OperatorX have no server data layer, so their tags are marked stale too, and their scoped purges (`?scope=collectivex` or `?scope=operatorx`) also honor `immediate=true`. Deleting a CollectiveX run purges immediately, because the admin who deleted it reloads right away.
+Server data (`unstable_cache` plus Blob) and CDN responses (the `db-cdn` tag) are tagged separately. `cachedQuery` keeps two `unstable_cache` entries per query. Route handlers read the `db`-tagged one, and ISR renders (sitemap included) read a separately keyed `db-page` one. On ingest, `purgeAll()` expires `db` immediately, only marks `db-page` and `db-cdn` stale (`revalidateTag(tag, 'max')`), and deletes the old blobs after responding. The next visitor gets the previous response at once while the CDN refetches in the background, and that refetch reads the database because the route entries are already gone. Expiring route data with `'max'` instead would hand the stale entry to the CDN's refetch and cache it for another day. ISR pages keep serving their previous HTML, because a stale `unstable_cache` entry is refetched in the foreground during regeneration, and the stale value is kept if that refetch fails. Corrections and retractions (`apply-run-overrides.yml`, `cache-refresh.yml`) run `admin:cache:invalidate <origin> --immediate`, which posts `/api/v1/invalidate?immediate=true` and expires every tag outright so retracted data is never served again. CollectiveX and OperatorX have no server data layer, so their tags are marked stale too, and their scoped purges (`?scope=collectivex` or `?scope=operatorx`) also honor `immediate=true`. VideoGenX's `?scope=video` always expires its tag at once, because its responses are private and never CDN cached. Deleting a CollectiveX run purges immediately, because the admin who deleted it reloads right away.
 
 The ingest workflow then runs `bun run admin:cache:warmup <origin> --dashboard`, and production promotions run the same warmup in `warm-after-deploy.yml`. The script requests the dashboard APIs with a browser `Accept-Encoding` and reads every body, because the CDN keeps one variant per encoding and only caches a streamed response that was read to the end. The post-ingest PowerX verifier sends `Pragma: no-cache`, which makes the CDN revalidate a stale entry before it answers.
 

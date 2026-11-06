@@ -1,17 +1,22 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
-const { mockPurgeAll, mockPurgeCollectiveX, mockPurgeOperatorX } = vi.hoisted(() => ({
-  mockPurgeAll: vi.fn(),
-  mockPurgeCollectiveX: vi.fn(),
-  mockPurgeOperatorX: vi.fn(),
-}));
+const { mockPurgeAll, mockPurgeCollectiveX, mockPurgeOperatorX, mockPurgeVideo } = vi.hoisted(
+  () => ({
+    mockPurgeAll: vi.fn(),
+    mockPurgeCollectiveX: vi.fn(),
+    mockPurgeOperatorX: vi.fn(),
+    mockPurgeVideo: vi.fn(),
+  }),
+);
 
 vi.mock('@/lib/cache/api-cache', () => ({
   COLLECTIVEX_CACHE_SCOPE: 'collectivex',
   OPERATORX_CACHE_SCOPE: 'operatorx',
+  VIDEO_CACHE_SCOPE: 'video',
   purgeAll: mockPurgeAll,
   purgeCollectiveX: mockPurgeCollectiveX,
   purgeOperatorX: mockPurgeOperatorX,
+  purgeVideo: mockPurgeVideo,
 }));
 
 import { POST } from './route';
@@ -162,6 +167,15 @@ describe('POST /api/v1/invalidate', () => {
     expect(body).toEqual({ invalidated: true, scope: 'collectivex', immediate: false });
     expect(mockPurgeCollectiveX).toHaveBeenCalledExactlyOnceWith({ immediate: false });
     expect(mockPurgeAll).not.toHaveBeenCalled();
+  });
+
+  it('purges only the video scope, which always expires at once', async () => {
+    const res = await POST(postReq({ Authorization: 'Bearer test-secret-123' }, '?scope=video'));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ invalidated: true, scope: 'video', immediate: true });
+    expect(mockPurgeVideo).toHaveBeenCalledOnce();
+    expect(mockPurgeAll).not.toHaveBeenCalled();
+    expect(mockPurgeCollectiveX).not.toHaveBeenCalled();
   });
 
   it('waits for the OperatorX shared cache purge before reporting success', async () => {
