@@ -27,7 +27,6 @@
     "db:backfill-agentic-disagg-throughput": "bun --env-file=../../.env src/backfill-agentic-disagg-throughput.ts",
     "db:backfill-aggregate-stats": "bun --env-file=../../.env src/backfill-aggregate-stats.ts",
     "db:backfill-atom-kv-capacity": "bun --env-file=../../.env src/backfill-atom-kv-capacity.ts",
-    "db:backfill-cache-hit-rates": "bun --env-file=../../.env src/backfill-cache-hit-rates.ts",
     "db:backfill-chart-series": "bun --env-file=../../.env src/backfill-chart-series.ts",
     "db:backfill-chart-series-summary": "bun --env-file=../../.env src/backfill-chart-series-summary.ts",
     "db:backfill-dataset-stats": "bun --env-file=../../.env src/backfill-dataset-stats.ts",
