@@ -79,13 +79,23 @@ function PortalTooltip({
   }, [sheet, tooltipRef]);
 
   useEffect(() => {
-    if (!sheet) return;
+    if (!pinned) return;
+    const onOutsideClick = (event: MouseEvent) => {
+      if (tooltipRef.current && event.composedPath().includes(tooltipRef.current)) return;
+      onSheetDismissRef.current();
+    };
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onSheetDismissRef.current();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [sheet]);
+    // Capture sees outside controls even when they stop propagation. It also
+    // runs before a chart point's click handler pins its replacement card.
+    document.addEventListener('click', onOutsideClick, true);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('click', onOutsideClick, true);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [pinned, tooltipRef]);
 
   const node = (
     <div
@@ -116,7 +126,6 @@ function PortalTooltip({
           aria-label={SHEET_STRINGS[locale].close}
           onClick={(event) => {
             event.stopPropagation();
-            onSheetDismissRef.current();
           }}
           className="fixed inset-0 z-[9998] cursor-default bg-black/45 backdrop-blur-[1px] animate-in fade-in-0 duration-200 md:hidden"
         />

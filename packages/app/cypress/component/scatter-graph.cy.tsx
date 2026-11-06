@@ -134,6 +134,46 @@ describe('ScatterGraph', () => {
     cy.get('[data-pinned-config]').should('not.be.visible');
   });
 
+  for (const dismissal of ['outside click', 'Escape']) {
+    it(`dismisses pinned details with ${dismissal} on desktop`, () => {
+      mountWithProviders(
+        <div style={{ width: 1000 }}>
+          <button data-testid="outside-tooltip" onClick={(event) => event.stopPropagation()}>
+            Outside chart
+          </button>
+          <ScatterGraph
+            data={[createMockInferenceData({ hwKey: 'h100', precision: Precision.FP8 })]}
+            xLabel="Output Speed"
+            yLabel="Throughput"
+            modelLabel="DeepSeek R1"
+            chartDefinition={defaultChartDef}
+            chartId="dismiss-details-test"
+            transitionDuration={0}
+          />
+        </div>,
+        {
+          inference: { hardwareConfig: hwConfig, selectedPrecisions: [Precision.FP8] },
+          unofficial: {},
+        },
+      );
+      cy.get('[data-testid="scatter-graph"] svg').should('exist');
+      cy.scatterPoints().then(([point]) => clickScatterPoint(point));
+      cy.get('[data-chart-tooltip="dismiss-details-test"]')
+        .should('be.visible')
+        .find('.inferencex-pinned-tooltip')
+        .should('be.visible');
+      cy.get('.pinned-title').click();
+      cy.get('[data-chart-tooltip="dismiss-details-test"]').should('be.visible');
+      if (dismissal === 'outside click') {
+        cy.get('[data-testid="outside-tooltip"]').click();
+      } else {
+        cy.get('body').trigger('keydown', { key: 'Escape', eventConstructor: 'KeyboardEvent' });
+      }
+      cy.get('[data-chart-tooltip="dismiss-details-test"]').should('not.be.visible');
+      cy.get('#dismiss-details-test .ruler-group').should('not.be.visible');
+    });
+  }
+
   it('keeps the frontier modes and overlay winners without exposing the retired hinterland', () => {
     const official = [
       createMockInferenceData({ hwKey: 'h100', precision: Precision.FP8, x: 20, y: 80 }),
