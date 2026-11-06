@@ -39,7 +39,7 @@ interface SubmissionsChartProps {
 }
 
 const TOTAL_COLOR = '#6b7280';
-const CHART_MARGIN = { top: 24, right: 24, bottom: 40, left: 60 };
+const CHART_MARGIN = { top: 24, right: 24, bottom: 60, left: 60 };
 const CHART_ID = 'submissions-chart';
 const NIGHTLY_END_DATE = new Date(ON_CHANGE_ONLY_START_DATE).getTime();
 const NARROW_VIEWPORT_QUERY = '(max-width: 39.999rem)';
@@ -110,6 +110,7 @@ const SUBMISSIONS_STRINGS = {
     instructions: 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
     aria: 'Benchmark submission activity chart',
     yAxis: 'Datapoints',
+    xAxis: { weekly: 'Week', cumulative: 'Date' },
   },
   zh: {
     onChangeOnly: '仅显示变更触发的运行',
@@ -120,6 +121,7 @@ const SUBMISSIONS_STRINGS = {
     instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置',
     aria: '基准测试提交活动图表',
     yAxis: '数据点数量',
+    xAxis: { weekly: '周', cumulative: '日期' },
   },
 } as const;
 
@@ -256,11 +258,11 @@ export default function SubmissionsChart({ volume, mode, caption, footer }: Subm
         config: {
           getColor: lineColor,
           strokeWidth: 1.5,
-          curve: d3.curveMonotoneX,
+          curve: mode === 'weekly' ? d3.curveLinear : d3.curveMonotoneX,
         },
       },
     ],
-    [legendT.markerLine1, legendT.markerLine2, lineData, lineColor, locale],
+    [legendT.markerLine1, legendT.markerLine2, lineData, lineColor, locale, mode],
   );
 
   if (chartPoints.length === 0) {
@@ -285,7 +287,11 @@ export default function SubmissionsChart({ volume, mode, caption, footer }: Subm
         xScale={{ type: 'time', domain: [new Date(xDomain[0]), new Date(xDomain[1])], nice: false }}
         yScale={{ type: 'linear', domain: yDomain, nice: true }}
         xAxis={{
+          label: legendT.xAxis[mode],
           tickCount: isNarrowViewport ? 3 : 6,
+          tickValues: isNarrowViewport
+            ? d3.utcMonth.every(6)!.range(new Date(xDomain[0]), new Date(xDomain[1] + 1))
+            : undefined,
           tickFormat: (value) => formatSubmissionDate(Number(value), locale),
         }}
         yAxis={{

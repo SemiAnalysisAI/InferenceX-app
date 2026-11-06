@@ -180,7 +180,7 @@ export default function ChartLegend({
 
   const outerClasses = isSidebar
     ? cn(
-        'relative px-2 py-3 rounded-lg border bg-background text-sm flex flex-col w-full',
+        'relative px-2 py-3 rounded-lg border bg-background text-sm flex flex-col w-full min-h-0',
         isLegendExpanded
           ? 'border-border/30 max-h-96 lg:max-h-[575px] legend-container sidebar-legend'
           : 'border-transparent no-export',
@@ -217,7 +217,7 @@ export default function ChartLegend({
   ];
   const scrollClasses = isSidebar
     ? cn(
-        'overflow-y-auto flex-initial min-h-0 space-y-0.5',
+        'relative overflow-y-auto flex-initial min-h-0 space-y-0.5',
         hasSidebarControls && 'border-b border-border/50 pb-2',
       )
     : grouped
@@ -240,7 +240,7 @@ export default function ChartLegend({
             onClick={action.onClick}
             disabled={action.disabled}
             className={cn(
-              'text-xs text-muted-foreground enabled:hover:text-foreground enabled:cursor-pointer disabled:opacity-50',
+              'text-xs text-muted-foreground enabled:hover:text-foreground enabled:cursor-pointer disabled:opacity-80',
               isSidebar
                 ? 'min-h-8 rounded-md px-2 enabled:hover:bg-muted transition-colors'
                 : 'mt-2 underline',
@@ -477,7 +477,7 @@ export default function ChartLegend({
     );
 
   const content = (
-    <div className={isSidebar ? 'min-w-0' : 'relative'}>
+    <div className={isSidebar ? 'min-w-0 lg:flex lg:min-h-0 lg:flex-col' : 'relative'}>
       <div
         data-testid={!isSidebar || isLegendExpanded ? 'chart-legend' : undefined}
         className={outerClasses}

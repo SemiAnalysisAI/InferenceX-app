@@ -23,6 +23,7 @@ import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 
 import { UbenchxHub } from './UbenchxHub';
 import { UBENCHX_GPU_KEYS, UBENCHX_RUNS } from './ubenchx-data';
@@ -262,7 +263,11 @@ function UbenchxChart({
     return ticks;
   }, [yScaleType, yDomain]);
 
-  const xTickValues = useMemo(() => sizeAxisTicks(...xDomain), [xDomain]);
+  const isMobile = useIsMobileViewport();
+  const xTickValues = useMemo(
+    () => sizeAxisTicks(...xDomain, isMobile ? 4 : 7),
+    [xDomain, isMobile],
+  );
 
   return (
     <ChartSection

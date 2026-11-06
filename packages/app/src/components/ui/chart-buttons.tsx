@@ -3,9 +3,11 @@
 import { track } from '@/lib/analytics/analytics';
 import type { SelectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { Download, FileSpreadsheet, Image, Maximize2, RotateCcw, Video } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { useChartExport, type PngAspectRatio } from '@/hooks/useChartExport';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/shared/utils';
@@ -13,6 +15,51 @@ import { useLocale } from '@/lib/i18n/use-locale';
 
 const MENU_ITEM_STYLE =
   'flex min-h-11 w-full items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer md:min-h-8';
+
+function useTitleSlot(enabled: boolean, placeRef: RefObject<HTMLElement | null>) {
+  const [slot, setSlot] = useState<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const toolbar = placeRef.current;
+    const container = toolbar?.parentElement;
+    if (!enabled || !toolbar || !container || getComputedStyle(toolbar).position === 'absolute') {
+      return;
+    }
+    const host = document.createElement('div');
+    host.className = 'no-export mt-3';
+    let anchor: Element | null = null;
+    const place = () => {
+      const marker = placeRef.current;
+      const heading = container.querySelector('h1, h2, h3, h4, h5, h6');
+      anchor =
+        marker &&
+        heading &&
+        marker.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING
+          ? heading
+          : null;
+      while (
+        anchor?.parentElement &&
+        anchor.parentElement !== container &&
+        anchor.parentElement.tagName !== 'FIGCAPTION'
+      ) {
+        anchor = anchor.parentElement;
+      }
+      if (!anchor) host.remove();
+      else if (anchor.nextSibling !== host) anchor.after(host);
+      setSlot(anchor ? host : null);
+    };
+    place();
+    const observer = new MutationObserver(() => {
+      if (!anchor?.isConnected || anchor.nextSibling !== host) place();
+    });
+    observer.observe(container, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      host.remove();
+      setSlot(null);
+    };
+  }, [enabled, placeRef]);
+  return slot;
+}
 
 interface ChartButtonsProps {
   chartId: string;
@@ -112,8 +159,13 @@ export function ChartButtons({
     onExportMp4?.();
   };
 
-  return (
+  const placeRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobileViewport();
+  const slot = useTitleSlot(mobileVisible && isMobile, placeRef);
+
+  const toolbar = (
     <div
+      ref={slot ? undefined : placeRef}
       data-slot="chart-actions"
       className={cn(
         'no-export export-buttons mb-3 min-w-0 flex-wrap items-center justify-end gap-2',
@@ -220,6 +272,14 @@ export function ChartButtons({
         )}
       </div>
     </div>
+  );
+  return slot ? (
+    <>
+      <div ref={placeRef} hidden />
+      {createPortal(toolbar, slot)}
+    </>
+  ) : (
+    toolbar
   );
 }
 

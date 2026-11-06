@@ -1172,7 +1172,8 @@ describe('ScatterGraph', () => {
       '#test-scatter-ingested-singleton-label svg .line-label[data-hw-key="b200_tilert_mtp"] .ll-engine',
     )
       .should('have.text', ' (TileRT, MTP)')
-      .and('have.attr', 'fill', '#d1d5db');
+      .and('have.attr', 'fill', 'white')
+      .and('have.attr', 'font-weight', '400');
 
     expandLegendAdvanced();
     cy.get('#scatter-line-labels').click();

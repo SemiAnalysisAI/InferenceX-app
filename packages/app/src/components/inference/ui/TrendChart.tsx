@@ -39,7 +39,7 @@ export interface TrendChartProps {
   lowerIsBetter?: boolean;
 }
 
-const CHART_MARGIN = { top: 20, right: 30, bottom: 64, left: 60 };
+const CHART_MARGIN = { top: 20, right: 30, bottom: 64, left: 66 };
 
 const STRINGS = {
   en: {

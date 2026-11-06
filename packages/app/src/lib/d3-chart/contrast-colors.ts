@@ -46,3 +46,12 @@ export function contrastColors(bgColor: string, opacity = 1, backdrop = 'var(--c
   const lum = relativeLuminance(...rgb);
   return lum > 0.3 ? '#131416' : 'white';
 }
+
+const DARK_TEXT_LUMINANCE = relativeLuminance(0x13, 0x14, 0x16);
+
+export function readableTextColor(bgColor: string, opacity = 1, backdrop = 'var(--card)'): string {
+  const rgb = parseRgb(resolveCssColor(bgColor), opacity, backdrop);
+  if (!rgb) return 'white';
+  const lum = relativeLuminance(...rgb);
+  return (lum + 0.05) / (DARK_TEXT_LUMINANCE + 0.05) > 1.05 / (lum + 0.05) ? '#131416' : 'white';
+}

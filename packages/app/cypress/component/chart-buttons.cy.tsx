@@ -273,7 +273,7 @@ describe('ChartButtons', () => {
   });
 
   for (const width of [320, 1280]) {
-    it(`keeps wrapping actions above long captions at ${width}px without losing actions`, () => {
+    it(`keeps wrapping actions clear of long captions at ${width}px without losing actions`, () => {
       cy.viewport(width, 800);
       const onModeChange = cy.stub().as('modeChange');
       const onExportCsv = cy.stub().as('responsiveCsv');
@@ -310,10 +310,16 @@ describe('ChartButtons', () => {
 
       cy.get('[data-slot="chart-actions"]').should(($toolbar) => {
         const toolbar = $toolbar[0].getBoundingClientRect();
-        const caption = $toolbar[0]
-          .parentElement!.querySelector('[data-testid="long-caption"]')!
+        const caption = $toolbar[0].ownerDocument
+          .querySelector('[data-testid="long-caption"]')!
           .getBoundingClientRect();
-        expect(toolbar.bottom, 'toolbar does not cover the title').to.be.at.most(caption.top);
+        if (width < 768) {
+          expect(toolbar.top, 'phones show the title before the toolbar').to.be.at.least(
+            caption.bottom,
+          );
+        } else {
+          expect(toolbar.bottom, 'toolbar does not cover the title').to.be.at.most(caption.top);
+        }
         for (const button of $toolbar[0].querySelectorAll('button')) {
           const bounds = button.getBoundingClientRect();
           expect(bounds.left, 'button remains inside the row').to.be.at.least(toolbar.left);

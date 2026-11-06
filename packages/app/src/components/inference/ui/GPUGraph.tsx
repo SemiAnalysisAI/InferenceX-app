@@ -135,7 +135,7 @@ const FixedSequenceLogDialog = dynamic(() =>
   ),
 );
 
-const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
+const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 72 };
 
 const OVERLAY_SERIES_PREFIX = 'overlay-run';
 

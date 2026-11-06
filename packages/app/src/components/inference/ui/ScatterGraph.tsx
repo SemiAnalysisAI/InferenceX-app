@@ -269,7 +269,7 @@ const formatChangelogDescription = (desc: string | string[]): React.JSX.Element 
   );
 };
 
-const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
+const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 72 };
 
 function groupPointsByDate(points: InferenceData[]): Map<string, InferenceData[]> {
   const byDate = new Map<string, InferenceData[]>();
@@ -2802,7 +2802,7 @@ const ScatterGraph = React.memo(
                   ? remainingLabel.slice(0, -engineLabel.length)
                   : remainingLabel;
               const runSegments = runTag
-                ? [{ className: 'll-run', text: runTag, fill: '#d1d5db', weight: '400' }]
+                ? [{ className: 'll-run', text: runTag, fill: 'white', weight: '400' }]
                 : [];
               const variantSegments = suffix
                 ? [{ className: 'll-variant', text: suffix, fill: 'white', weight: '500' }]
@@ -2825,7 +2825,7 @@ const ScatterGraph = React.memo(
                           {
                             className: 'll-engine',
                             text: engineLabel,
-                            fill: '#d1d5db',
+                            fill: 'white',
                             weight: '400',
                           },
                         ]

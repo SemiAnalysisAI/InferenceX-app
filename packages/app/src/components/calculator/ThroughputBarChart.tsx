@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/chart-point-details';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
-import { contrastColors } from '@/lib/d3-chart/contrast-colors';
+import { readableTextColor } from '@/lib/d3-chart/contrast-colors';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   CustomLayerConfig,
@@ -400,7 +400,7 @@ function positionLabelPairs(
   overlayLabels.each(function (d) {
     const text = d3.select(this).text();
     const prev = maxWidths.get(d.resultKey) ?? 0;
-    maxWidths.set(d.resultKey, Math.max(prev, measureTextWidth(text, '500 10px sans-serif')));
+    maxWidths.set(d.resultKey, Math.max(prev, measureTextWidth(text, '500 12px sans-serif')));
   });
 
   const apply = (sel: d3.Selection<SVGTextElement, InterpolatedResult, SVGGElement, unknown>) => {
@@ -410,7 +410,9 @@ function positionLabelPairs(
       const fitsInside = barEnd > maxW + 24;
       const outsideX = Math.min(barEnd + 6, Math.max(0, chartWidth - maxW - 2));
       const clamped = !fitsInside && outsideX < barEnd + 6;
-      const fill = fitsInside ? contrastColors(getBarColor(d), BAR_OPACITY) : 'var(--foreground)';
+      const fill = fitsInside
+        ? readableTextColor(getBarColor(d), BAR_OPACITY)
+        : 'var(--foreground)';
       const label = d3
         .select(this)
         .attr('x', fitsInside ? barEnd - 10 : outsideX)
@@ -586,7 +588,7 @@ export default function ThroughputBarChart({
           .data(sortedResults, (d) => d.resultKey)
           .join('text')
           .attr('class', 'value-label')
-          .attr('y', (d) => (yScale(d.resultKey) ?? 0) + yScale.bandwidth() / 2 - 6)
+          .attr('y', (d) => (yScale(d.resultKey) ?? 0) + yScale.bandwidth() / 2 - 7)
           .attr('dy', '0.35em')
           .attr('font-size', '12px')
           .attr('font-weight', '600')
@@ -601,7 +603,7 @@ export default function ThroughputBarChart({
           .attr('class', 'overlay-label')
           .attr('y', (d) => (yScale(d.resultKey) ?? 0) + yScale.bandwidth() / 2 + 8)
           .attr('dy', '0.35em')
-          .attr('font-size', '10px')
+          .attr('font-size', '12px')
           .attr('font-weight', '500')
           .style('fill', 'var(--muted-foreground)')
           .style('pointer-events', 'none')

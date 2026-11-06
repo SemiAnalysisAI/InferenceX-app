@@ -250,6 +250,16 @@ export async function exportChartImage(
         legend.remove();
       }
     }
+    for (const legend of clone.querySelectorAll<HTMLElement>(
+      '[data-slot="chart-legend-wrapper"]',
+    )) {
+      legend.style.alignSelf = 'flex-start';
+      applyStyles(legend.lastElementChild as HTMLElement | null, {
+        height: 'auto',
+        minHeight: '0',
+        overflow: 'visible',
+      });
+    }
 
     const figcaption = clone.querySelector('figcaption');
     if (figcaption) {

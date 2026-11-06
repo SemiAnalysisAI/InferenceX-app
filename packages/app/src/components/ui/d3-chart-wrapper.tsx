@@ -315,7 +315,10 @@ export function D3ChartWrapper({
           className={cn(
             'relative mt-3 w-full',
             legendElement
-              ? 'lg:max-w-96 lg:shrink-0 lg:self-start lg:mt-[var(--chart-legend-top)]'
+              ? cn(
+                  'lg:max-w-96 lg:shrink-0 lg:mt-[var(--chart-legend-top)]',
+                  hasDetails ? 'lg:self-start' : 'lg:self-stretch',
+                )
               : 'max-w-96',
             legendElement &&
               (hasDetails
@@ -330,7 +333,15 @@ export function D3ChartWrapper({
           }
         >
           {details}
-          <div className={hasDetails ? 'hidden' : 'contents'}>{legendElement}</div>
+          <div
+            className={
+              hasDetails
+                ? 'hidden'
+                : 'contents lg:flex lg:h-0 lg:min-h-full lg:flex-col lg:overflow-y-auto'
+            }
+          >
+            {legendElement}
+          </div>
         </div>
       )}
     </div>
