@@ -14,6 +14,7 @@ import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
+import { sourceLinkClassName } from '@/components/ui/result-context';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { getGpuSpecs, getHardwareConfig } from '@/lib/catalog/constants';
 import { readUrlParams, writeUrlParams } from '@/lib/routing/url-state';
@@ -289,8 +290,8 @@ export default function CostTargetPanel({
             }
           >
             <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-6">
-                <div className="min-w-0 text-sm text-muted-foreground lg:order-last lg:pb-2">
+              <div className="flex flex-col gap-3">
+                <div className="min-w-0 text-sm text-muted-foreground">
                   <p>{t.costCapDescription}</p>
                   {costCap !== null && !hasRows && (
                     <p className="mt-1" data-testid="calculator-costcap-empty">
@@ -365,7 +366,7 @@ export default function CostTargetPanel({
                       {t.source}
                       <Link
                         target="_blank"
-                        className="underline hover:text-foreground"
+                        className={sourceLinkClassName}
                         href="https://semianalysis.com/datacenter-industry-model/"
                       >
                         SemiAnalysis Datacenter Industry Model
@@ -374,7 +375,7 @@ export default function CostTargetPanel({
                       {' & '}
                       <Link
                         target="_blank"
-                        className="underline hover:text-foreground"
+                        className={sourceLinkClassName}
                         href="https://semianalysis.com/ai-cloud-tco-model/"
                       >
                         SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model

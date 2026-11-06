@@ -55,11 +55,16 @@ const ALIGN_CLASSES = {
   center: 'text-center',
 } as const;
 
-const SORT_ICON = {
-  asc: <ArrowUp className="inline size-3" />,
-  desc: <ArrowDown className="inline size-3" />,
-  none: <ArrowUpDown className="inline size-3 opacity-50" />,
-};
+export function SortIndicator({ dir }: { dir: 'asc' | 'desc' | null }) {
+  if (dir === 'asc') return <ArrowUp aria-hidden="true" className="inline size-3" />;
+  if (dir === 'desc') return <ArrowDown aria-hidden="true" className="inline size-3" />;
+  return (
+    <ArrowUpDown
+      aria-hidden="true"
+      className="inline size-3 opacity-0 transition-opacity group-hover/sort:opacity-50 group-focus-visible/sort:opacity-50"
+    />
+  );
+}
 
 const STRINGS = {
   en: {
@@ -249,16 +254,11 @@ export function DataTable<T>({
               {visibleColumns.map((col) => {
                 const i = columns.indexOf(col);
                 const sortable = Boolean(col.sortValue);
-                const sortIcon =
-                  sort.columnIndex === i && sort.dir
-                    ? SORT_ICON[sort.dir]
-                    : sortable
-                      ? SORT_ICON.none
-                      : null;
+                const activeDir = sort.columnIndex === i && sort.dir ? sort.dir : null;
                 return (
                   <th
                     key={i}
-                    className={`${TABLE_HEAD_CELL_STYLE} py-2 px-3 ${ALIGN_CLASSES[col.align ?? 'left']} ${col.className ?? ''} ${col.pinned ? 'sticky left-0 z-2 border-r border-border/50 bg-card md:border-r-0' : ''} ${sortable ? 'cursor-pointer select-none hover:text-foreground transition-colors' : ''}`}
+                    className={`${TABLE_HEAD_CELL_STYLE} py-2 px-3 ${ALIGN_CLASSES[col.align ?? 'left']} ${col.className ?? ''} ${col.pinned ? 'sticky left-0 z-2 border-r border-border/50 bg-card md:border-r-0' : ''} ${sortable ? 'group/sort cursor-pointer select-none hover:text-foreground transition-colors' : ''}`}
                     tabIndex={sortable ? 0 : undefined}
                     onClick={sortable ? () => handleSort(i) : undefined}
                     onKeyDown={
@@ -280,7 +280,11 @@ export function DataTable<T>({
                     }
                   >
                     {col.header}
-                    {sortIcon && <span className="ml-1">{sortIcon}</span>}
+                    {sortable && (
+                      <span className="ml-1">
+                        <SortIndicator dir={activeDir} />
+                      </span>
+                    )}
                   </th>
                 );
               })}

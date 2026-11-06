@@ -9,7 +9,7 @@ import { useEphemeralUrlState } from '@/hooks/useUrlState';
 import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { rememberChartStateInUrl } from '@/lib/routing/url-state';
 import * as d3 from 'd3';
-import { chartFont, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
+import { chartFont, measureTextWidth, useFontsVersion } from '@/lib/d3-chart/dynamic-margins';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import dynamic from 'next/dynamic';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -120,7 +120,7 @@ import {
 import { nearestScrubCandidate, type ScrubCandidate } from '@/lib/charts/powerx-scrub';
 import {
   HIT_AREA_RADIUS,
-  formatLargeNumber,
+  compactAxisTickFormat,
   logTickFormat,
   getShapeKeyForPrecision,
 } from '@/lib/charts/chart-rendering';
@@ -274,6 +274,8 @@ const formatChangelogDescription = (desc: string | string[]): React.JSX.Element 
 };
 
 const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 72 };
+const Y_AXIS_LABEL_GUTTER = 32;
+const Y_AXIS_MARGIN_STEP = 12;
 
 function groupPointsByDate(points: InferenceData[]): Map<string, InferenceData[]> {
   const byDate = new Map<string, InferenceData[]>();
@@ -1506,17 +1508,39 @@ const ScatterGraph = React.memo(
       [xLabel, xScaleConfig._isLog],
     );
 
+    const yTickFormat = useMemo(
+      () => compactAxisTickFormat(yScaleConfig.domain),
+      [yScaleConfig.domain],
+    );
+
     const yAxisConfig = useMemo(
       () => ({
         label: yLabel,
         tickFormat:
-          yScaleConfig.type === 'log'
-            ? undefined
-            : (d: d3.AxisDomain) => formatLargeNumber(d as number),
+          yScaleConfig.type === 'log' ? undefined : (d: d3.AxisDomain) => yTickFormat(d as number),
         tickCount: 10,
       }),
-      [yLabel, yScaleConfig.type],
+      [yLabel, yScaleConfig.type, yTickFormat],
     );
+
+    const fontsVersion = useFontsVersion();
+    const chartMargin = useMemo(() => {
+      if (yScaleConfig.type === 'log' || typeof document === 'undefined') return CHART_MARGIN;
+      const font = chartFont(CHART_TYPE.axisLabel);
+      const widest = Math.max(
+        0,
+        ...d3
+          .scaleLinear()
+          .domain(yScaleConfig.domain)
+          .nice()
+          .ticks(10)
+          .map((tick) => measureTextWidth(yTickFormat(tick), font)),
+      );
+      const left =
+        Math.ceil((widest + Y_AXIS_LABEL_GUTTER) / Y_AXIS_MARGIN_STEP) * Y_AXIS_MARGIN_STEP;
+      return { ...CHART_MARGIN, left: Math.max(48, left) };
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- re-measure once web fonts load
+    }, [yScaleConfig.type, yScaleConfig.domain, yTickFormat, fontsVersion]);
 
     const isPointVisible = useCallback(
       (d: InferenceData) =>
@@ -4276,7 +4300,7 @@ const ScatterGraph = React.memo(
           data={pointsData}
           dataIdentity={dataIdentity}
           metricIdentity={metricIdentity}
-          margin={CHART_MARGIN}
+          margin={chartMargin}
           watermark={getChartWatermark(isUnofficialRun)}
           testId="scatter-graph"
           grabCursor={true}

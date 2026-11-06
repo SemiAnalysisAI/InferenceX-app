@@ -19,6 +19,7 @@ import {
   TABLE_HEAD_CELL_STYLE,
   TABLE_HEAD_ROW_STYLE,
 } from '@/components/ui/control-styles';
+import { SortIndicator } from '@/components/ui/data-table';
 import { InfoHelp } from '@/components/ui/option-info';
 import { SearchInput } from '@/components/ui/search-input';
 import { VendorDot } from '@/components/ui/vendor-dot';
@@ -232,13 +233,13 @@ function SortHeader({
     >
       <button
         type="button"
-        className={`inline-flex items-center gap-1 hover:text-foreground ${align === 'right' ? 'flex-row-reverse' : ''}`}
+        className={`group/sort inline-flex items-center gap-1 hover:text-foreground ${align === 'right' ? 'flex-row-reverse' : ''}`}
         onClick={() => onSort(field)}
       >
         {label}
-        {sortKey === field && (
-          <span className="text-foreground">{sortDir === 'asc' ? '↑' : '↓'}</span>
-        )}
+        <span className={sortKey === field ? 'text-foreground' : undefined}>
+          <SortIndicator dir={sortKey === field ? sortDir : null} />
+        </span>
       </button>
     </th>
   );

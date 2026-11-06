@@ -1,4 +1,5 @@
 import type * as d3 from 'd3';
+import { scaleLinear } from 'd3';
 
 import { formatNumber } from '@/lib/shared/utils';
 
@@ -157,6 +158,9 @@ export const applyHoverState = (
 };
 
 export const formatLargeNumber = (value: number): string => {
+  if (Math.abs(value) >= 1_000_000_000) {
+    return `${(value / 1_000_000_000).toFixed(value % 1_000_000_000 === 0 ? 0 : 1)}B`;
+  }
   if (Math.abs(value) >= 1_000_000) {
     return `${(value / 1_000_000).toFixed(value % 1_000_000 === 0 ? 0 : 1)}M`;
   }
@@ -165,6 +169,12 @@ export const formatLargeNumber = (value: number): string => {
   }
   if (Number.isInteger(value)) return formatNumber(value);
   return Number(value.toFixed(Math.abs(value) >= 10 ? 1 : 2)).toString();
+};
+
+export const compactAxisTickFormat = (domain: readonly number[]) => {
+  const max = scaleLinear().domain(domain).nice().domain()[1];
+  if (Math.abs(max) < 1_000_000_000) return formatLargeNumber;
+  return (value: number) => (value === 0 ? '0' : `${Number((value / 1_000_000_000).toFixed(2))}B`);
 };
 
 export const logTickFormat = (scale: d3.ScaleLogarithmic<number, number>) => {

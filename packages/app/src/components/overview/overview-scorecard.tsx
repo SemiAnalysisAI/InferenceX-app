@@ -1,6 +1,6 @@
 'use client';
 
-import { type ComponentPropsWithoutRef, useEffect, useRef } from 'react';
+import { type ComponentPropsWithoutRef, type CSSProperties, useEffect, useRef } from 'react';
 
 import { track } from '@/lib/analytics/analytics';
 
@@ -552,6 +552,20 @@ interface SurfaceProps {
 const HEADER_EDGE_COVER =
   'relative after:absolute after:inset-x-0 after:top-full after:hidden after:h-0.5 after:bg-inherit [@container_scroll-state(stuck:top)]:after:block';
 
+function referenceBandStyle(
+  platforms: readonly OverviewPlatformResult[],
+  comparisonMode: OverviewComparisonMode,
+  referenceHardware: OverviewReferenceHardware,
+): CSSProperties | undefined {
+  const index = platforms.findIndex((platform) => platform.hardware === referenceHardware);
+  if (comparisonMode !== 'hardware' || index === -1) return undefined;
+  const start = `${(index / platforms.length) * 100}%`;
+  const end = `${((index + 1) / platforms.length) * 100}%`;
+  return {
+    backgroundImage: `linear-gradient(to right, transparent ${start}, var(--border) ${start}, var(--border) calc(${start} + 1px), var(--ref-fill) calc(${start} + 1px), var(--ref-fill) calc(${end} - 1px), var(--border) calc(${end} - 1px), var(--border) ${end}, transparent ${end})`,
+  };
+}
+
 export function DesktopOverviewMatrix({
   models,
   locale,
@@ -629,7 +643,11 @@ export function DesktopOverviewMatrix({
                   )}
                 </th>
                 {rowBlank ? (
-                  <td colSpan={model.platforms.length} className="px-3 py-2.5 align-top">
+                  <td
+                    colSpan={model.platforms.length}
+                    style={referenceBandStyle(model.platforms, comparisonMode, referenceHardware)}
+                    className="px-3 py-2.5 align-top [--ref-fill:color-mix(in_srgb,var(--muted)_15%,transparent)] dark:[--ref-fill:color-mix(in_srgb,var(--muted)_50%,transparent)]"
+                  >
                     <NoResultsRow text={strings.noResultsRow} />
                   </td>
                 ) : (

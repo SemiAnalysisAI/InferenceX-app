@@ -172,7 +172,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
           );
         },
         sortValue: (row) => `${row.hwLabel} ${row.engineLabel}`,
-        className: 'w-px whitespace-nowrap',
+        className: 'whitespace-nowrap',
         importance: 'key',
         pinned: true,
       },
@@ -229,7 +229,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
               ),
         sortValue: (row) => (row.disagg ? row.prefillTp * (row.prefillNumWorkers || 1) : row.tp),
         colSpan: (row) => (row.disagg ? 1 : 2),
-        className: 'whitespace-nowrap',
+        className: 'w-px whitespace-nowrap',
         importance: 'key',
       },
       {
@@ -240,7 +240,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
             workers(row.decodeNumWorkers || 1),
           ),
         sortValue: (row) => (row.disagg ? row.tp * (row.decodeNumWorkers || 1) : row.tp),
-        className: 'whitespace-nowrap',
+        className: 'w-px whitespace-nowrap',
         importance: 'key',
       },
       {

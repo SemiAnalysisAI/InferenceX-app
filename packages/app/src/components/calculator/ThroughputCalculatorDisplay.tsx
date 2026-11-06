@@ -191,7 +191,8 @@ const CALCULATOR_VIEW_MODE_OPTIONS: SegmentedToggleOption<CalculatorViewMode>[] 
 const STRINGS = {
   en: {
     title: 'TCO calculator',
-    benchmarkGroup: 'Configuration & economics',
+    benchmarkGroup: 'Benchmark config',
+    pricingGroup: 'Pricing config',
     comparisonGroup: 'Comparison target',
     secondaryControls: 'More chart controls',
     changed: 'changed',
@@ -256,7 +257,8 @@ const STRINGS = {
   },
   zh: {
     title: 'TCO 计算器',
-    benchmarkGroup: '配置与经济性',
+    benchmarkGroup: '基准测试配置',
+    pricingGroup: '定价配置',
     comparisonGroup: '对比目标',
     secondaryControls: '更多图表设置',
     changed: '项已更改',
@@ -999,80 +1001,83 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         onOpenChange={handleDropdownOpenChange('precision')}
         availablePrecisions={availablePrecisions}
       />
-      <div className="contents lg:flex lg:gap-3">
-        <div className="flex flex-col space-y-1.5">
-          <LabelWithTooltip
-            htmlFor="calc-cost"
-            label={t.costProviderLabel}
-            tooltip={t.costProviderTooltip}
+    </>
+  );
+
+  const pricingConfig = (
+    <>
+      <div className="flex flex-col space-y-1.5">
+        <LabelWithTooltip
+          htmlFor="calc-cost"
+          label={t.costProviderLabel}
+          tooltip={t.costProviderTooltip}
+        />
+        <div data-testid="calc-cost-selector">
+          <MultiSelect
+            triggerId="calc-cost"
+            options={[
+              ...COST_PROVIDER_OPTIONS.map((provider) => ({
+                value: provider.value,
+                label: locale === 'zh' ? provider.labelZh : provider.label,
+              })),
+              ...lockedCostProviderOptions(locale),
+            ]}
+            value={[costProvider]}
+            onChange={(values) => {
+              const next = values[0];
+              if (!next) return;
+              if (interceptLockedTier(next)) return;
+              handleCostProviderChange(next);
+            }}
+            open={openDropdown === 'costProvider'}
+            onOpenChange={handleDropdownOpenChange('costProvider')}
+            placeholder={t.costProviderPlaceholder}
+            minSelections={1}
+            maxSelections={1}
+            showClearAll={false}
+            searchable={false}
+            plainSelectedText
+            showSelectionSummary={false}
           />
-          <div data-testid="calc-cost-selector">
-            <MultiSelect
-              triggerId="calc-cost"
-              options={[
-                ...COST_PROVIDER_OPTIONS.map((provider) => ({
-                  value: provider.value,
-                  label: locale === 'zh' ? provider.labelZh : provider.label,
-                })),
-                ...lockedCostProviderOptions(locale),
-              ]}
-              value={[costProvider]}
-              onChange={(values) => {
-                const next = values[0];
-                if (!next) return;
-                if (interceptLockedTier(next)) return;
-                handleCostProviderChange(next);
-              }}
-              open={openDropdown === 'costProvider'}
-              onOpenChange={handleDropdownOpenChange('costProvider')}
-              placeholder={t.costProviderPlaceholder}
-              minSelections={1}
-              maxSelections={1}
-              showClearAll={false}
-              searchable={false}
-              plainSelectedText
-              showSelectionSummary={false}
-            />
-          </div>
         </div>
-        <div className="flex flex-col space-y-1.5">
-          <LabelWithTooltip
-            htmlFor="calc-cost-type"
-            label={t.tokenTypeLabel}
-            tooltip={t.tokenTypeTooltip}
-          />
-          <div data-testid="calc-cost-type-selector">
-            <MultiSelect
-              triggerId="calc-cost-type"
-              options={COST_TYPE_OPTIONS.map((ct) => ({
-                value: ct.value,
-                label: costTypeLabels[ct.value],
-              }))}
-              value={[costType]}
-              onChange={(values) => {
-                const next = values[0];
-                if (!next) return;
-                handleCostTypeChange(next);
-              }}
-              open={openDropdown === 'costType'}
-              onOpenChange={handleDropdownOpenChange('costType')}
-              placeholder={t.tokenTypePlaceholder}
-              minSelections={1}
-              maxSelections={1}
-              showClearAll={false}
-              searchable={false}
-              plainSelectedText
-              showSelectionSummary={false}
-            />
-          </div>
-        </div>
-        {showsTcoBasis && (
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <LabelWithTooltip label={t.tcoBasisLabel} tooltip={t.tcoBasisTooltip} />
-            <TcoBasisToggle source="calculator" className="md:h-9" />
-          </div>
-        )}
       </div>
+      <div className="flex flex-col space-y-1.5">
+        <LabelWithTooltip
+          htmlFor="calc-cost-type"
+          label={t.tokenTypeLabel}
+          tooltip={t.tokenTypeTooltip}
+        />
+        <div data-testid="calc-cost-type-selector">
+          <MultiSelect
+            triggerId="calc-cost-type"
+            options={COST_TYPE_OPTIONS.map((ct) => ({
+              value: ct.value,
+              label: costTypeLabels[ct.value],
+            }))}
+            value={[costType]}
+            onChange={(values) => {
+              const next = values[0];
+              if (!next) return;
+              handleCostTypeChange(next);
+            }}
+            open={openDropdown === 'costType'}
+            onOpenChange={handleDropdownOpenChange('costType')}
+            placeholder={t.tokenTypePlaceholder}
+            minSelections={1}
+            maxSelections={1}
+            showClearAll={false}
+            searchable={false}
+            plainSelectedText
+            showSelectionSummary={false}
+          />
+        </div>
+      </div>
+      {showsTcoBasis && (
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <LabelWithTooltip label={t.tcoBasisLabel} tooltip={t.tcoBasisTooltip} />
+          <TcoBasisToggle source="calculator" className="md:h-9" />
+        </div>
+      )}
     </>
   );
 
@@ -1113,6 +1118,13 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                 testId="calculator-secondary-controls"
               >
                 {isMobile && <div className="grid min-w-0 gap-3 md:hidden">{secondaryConfig}</div>}
+                <ControlPanel
+                  legend={t.pricingGroup}
+                  data-testid="calculator-pricing-panel"
+                  className="md:grid-cols-2 lg:flex lg:flex-wrap lg:items-start"
+                >
+                  {pricingConfig}
+                </ControlPanel>
                 <ControlPanel
                   legend={t.comparisonGroup}
                   className="items-start md:grid-cols-[auto_minmax(0,1fr)] md:gap-x-6"

@@ -105,7 +105,7 @@ const STRINGS = {
     retry: 'Reload page',
     trendLoadError: 'Historical trend data could not be loaded',
     trendRetry: 'Retry loading trend data',
-    targetHint: 'Adjust the operating point used by the trend interpolation',
+    targetHint: 'Adjust the operating point used by the trend interpolation.',
     targetGroup: 'Trend target',
   },
   zh: {
@@ -131,7 +131,7 @@ const STRINGS = {
     retry: '重新加载页面',
     trendLoadError: '历史趋势数据加载失败',
     trendRetry: '重试加载趋势数据',
-    targetHint: '调整趋势插值所使用的交互性水平',
+    targetHint: '调整趋势插值所使用的交互性水平。',
     targetGroup: '趋势目标',
   },
 };
@@ -367,14 +367,11 @@ export default function HistoricalTrendsDisplay() {
               !loading &&
               hasInteractivityChart && (
                 <ControlPanel legend={t.targetGroup} className="gap-1.5">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <LabelWithTooltip
-                      htmlFor="historical-target"
-                      label={targetLabel}
-                      tooltip={isAgentic ? t.agenticTargetTooltip : t.targetTooltip}
-                    />
-                    <p className="text-xs text-muted-foreground">{t.targetHint}</p>
-                  </div>
+                  <LabelWithTooltip
+                    htmlFor="historical-target"
+                    label={targetLabel}
+                    tooltip={`${t.targetHint}${locale === 'zh' ? '' : ' '}${isAgentic ? t.agenticTargetTooltip : t.targetTooltip}`}
+                  />
                   <RangeField
                     label={targetLabel}
                     min={interactivityRange.min}

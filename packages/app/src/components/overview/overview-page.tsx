@@ -9,6 +9,7 @@ import { ControlPanel } from '@/components/ui/control-panel';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Heading } from '@/components/ui/heading';
+import { sourceLinkClassName } from '@/components/ui/result-context';
 import { OVERVIEW_HISTORY_WINDOW_DAYS, type OverviewPageData } from '@/lib/overview/overview-data';
 import { overviewHref } from '@/lib/overview/overview-links';
 
@@ -147,7 +148,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
                   href={TCO_SOURCE_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none"
+                  className={sourceLinkClassName}
                 >
                   {strings.sourceLinkText}
                   <ExternalLinkIcon />
