@@ -27,6 +27,31 @@ const pick = (label: string, option: string) => {
   cy.get(`[role="combobox"][aria-label="${label}"]`).click();
   cy.contains('[role="option"]', option).click();
 };
+const tileVideo = (key: string) => cy.get(`[data-hardware="${key}"] video`);
+const scrub = (time: number) => {
+  cy.window().then((win) => {
+    cy.get('[data-testid="video-results-scrub"]').then(($input) => {
+      const setValue = Object.getOwnPropertyDescriptor(
+        win.HTMLInputElement.prototype,
+        'value',
+      )!.set!;
+      setValue.call($input[0], String(time));
+      $input[0].dispatchEvent(new win.Event('input', { bubbles: true }));
+    });
+  });
+  cy.get('[data-testid="video-results-scrub"]').should('have.value', String(time));
+};
+/** Every tile and the reference, so a reloaded tile cannot fall behind the group unnoticed. */
+const expectClipsAt = (time: number) =>
+  cy
+    .get('[data-testid="video-results-clips"] video')
+    .each(($video) =>
+      cy
+        .wrap($video)
+        .should(($element) =>
+          expect(($element[0] as HTMLVideoElement).currentTime).to.be.closeTo(time, 0.08),
+        ),
+    );
 const expectAudio = (source: string | null) =>
   cy.get<HTMLVideoElement>('video').should(($videos) => {
     for (const video of $videos) {
@@ -41,8 +66,10 @@ function mountResultsClips(
   pathname = '/video',
   diagnostics = false,
   unofficialRun?: string,
+  previews: string[] = [],
+  brokenPreview = false,
 ) {
-  const referenceMedia = { url: '', diagnosticUrl: '' };
+  const referenceMedia = { url: '', diagnosticUrl: '', previewUrl: '' };
   cy.fixture('video-results/reference.mp4', 'base64').then((encoded: string) => {
     cy.window().then((win) => {
       const bytes = Uint8Array.from(win.atob(encoded), (char) => char.codePointAt(0)!);
@@ -55,6 +82,19 @@ function mountResultsClips(
       }
     });
   });
+  if (previews.length > 0)
+    // A visibly different stand-in for the web encode, so Difference against it would not be zero.
+    cy.fixture('video-results/candidate.mp4', 'base64').then((encoded: string) => {
+      cy.window().then((win) => {
+        const bytes = brokenPreview
+          ? Uint8Array.of(0, 0, 0, 8)
+          : Uint8Array.from(win.atob(encoded), (char) => char.codePointAt(0)!);
+        referenceMedia.previewUrl = win.URL.createObjectURL(
+          new win.Blob([bytes], { type: 'video/mp4' }),
+        );
+        cy.wrap(referenceMedia.previewUrl).as('preview-url');
+      });
+    });
   for (const key of keys) {
     cy.fixture(`video-results/${key === 'h200' ? 'reference' : 'candidate'}.mp4`, 'base64').then(
       (encoded: string) => {
@@ -73,8 +113,11 @@ function mountResultsClips(
           ]);
           saved.sources[0].assets = saved.sources[0].assets.map(([path, asset]) => [
             path,
-            { ...asset, url },
+            previews.includes(key)
+              ? { ...asset, url, previewUrl: referenceMedia.previewUrl }
+              : { ...asset, url },
           ]);
+          cy.wrap(url).as(`original-${key}`);
           const qualityFixture = referenceQualityFixture();
           const [quality] = verifiedReferencePairs(
             qualityFixture.attachment,
@@ -265,30 +308,15 @@ describe('Video results synchronized clips', () => {
       .should('contain', c1('b200').runId)
       .and('contain', c1('b200').runtime)
       .and('contain', c1('h200').runId)
-      .and('contain', c1('h100').runId);
+      .and('contain', c1('h100').runId)
+      .and('not.contain', 'web encode');
 
     cy.get('[data-testid="video-results-prompt"]')
       .should('contain', 'A drummer taps a snare drum.')
       .and('contain', 'seed 11')
       .and('contain', 'take 1');
-    cy.window().then((win) => {
-      cy.get('[data-testid="video-results-scrub"]').then(($input) => {
-        const setValue = Object.getOwnPropertyDescriptor(
-          win.HTMLInputElement.prototype,
-          'value',
-        )!.set!;
-        setValue.call($input[0], '0.8');
-        $input[0].dispatchEvent(new win.Event('input', { bubbles: true }));
-      });
-    });
-    cy.get('[data-testid="video-results-scrub"]').should('have.value', '0.8');
-    cy.get('[data-testid="video-results-clip"] video').each(($video) =>
-      cy
-        .wrap($video)
-        .should(($element) =>
-          expect(($element[0] as HTMLVideoElement).currentTime).to.be.closeTo(0.8, 0.08),
-        ),
-    );
+    scrub(0.8);
+    expectClipsAt(0.8);
     cy.get('[data-testid="video-results-play"]').click();
     cy.get('[data-testid="video-results-clip"] video').each(($video) =>
       cy.wrap($video).should(($element) => {
@@ -343,5 +371,57 @@ describe('Video results synchronized clips', () => {
       'contain',
       'No sealed reference pair for this clip.',
     );
+  });
+  it('plays a web rendition in Clip view and the sealed original for Difference, also for an overlay', () => {
+    mountResultsClips(['b200', 'h200'], '/video', false, c1('h200').runId, ['h200']);
+    cy.get('[data-hardware="h200"]').should('contain', 'Unofficial run');
+    cy.get('@preview-url').then((url) => tileVideo('h200').should('have.attr', 'src', url));
+    cy.get('@original-b200').then((url) => tileVideo('b200').should('have.attr', 'src', url));
+    cy.get('[data-testid="video-results-sources"] summary').click();
+    cy.get('[data-testid="video-results-prompt"]').should(
+      'contain',
+      'Playback uses a web encode; Difference, PSNR and the media link use the original.',
+    );
+    cy.get('@original-h200').then((url) =>
+      cy
+        .get('[data-testid="video-results-sources"] tbody tr')
+        .eq(1)
+        .find('a')
+        .should('have.attr', 'href', url),
+    );
+    scrub(0.8);
+    expectClipsAt(0.8);
+
+    cy.get('[data-testid="video-results-view"][data-view="difference"]').click();
+    cy.get('@original-h200').then((url) => tileVideo('h200').should('have.attr', 'src', url));
+    // Swapping to the original reloads the tile; it must resume at the group's time, not 0.
+    expectClipsAt(0.8);
+    // The h200 original equals the reference, so only the original yields a black difference.
+    cy.get('[data-testid="video-results-clip"][data-hardware="h200"] canvas').should(($canvas) => {
+      const rgba = ($canvas[0] as HTMLCanvasElement)
+        .getContext('2d')!
+        .getImageData(0, 0, 1, 1).data;
+      expect([...rgba]).to.deep.equal([0, 0, 0, 255]);
+    });
+
+    cy.get('[data-testid="video-results-view"][data-view="clip"]').click();
+    cy.get('@preview-url').then((url) => tileVideo('h200').should('have.attr', 'src', url));
+    expectClipsAt(0.8);
+  });
+  it('falls back to the sealed original when a web rendition cannot be played', () => {
+    mountResultsClips(['b200', 'h200'], '/video', false, undefined, ['h200'], true);
+    cy.get('@original-h200').then((url) => tileVideo('h200').should('have.attr', 'src', url));
+    tileVideo('h200').should(($video) =>
+      expect(($video[0] as HTMLVideoElement).readyState).to.be.at.least(1),
+    );
+    cy.get('[data-testid="video-results-clip"][data-hardware="h200"]').should(
+      'not.contain',
+      'This clip could not be played',
+    );
+    // Every tile now plays an original, so the note must not claim a web encode.
+    cy.get('[data-testid="video-results-sources"] summary').click();
+    cy.get('[data-testid="video-results-prompt"]')
+      .should('contain', 'A drummer taps a snare drum.')
+      .and('not.contain', 'web encode');
   });
 });

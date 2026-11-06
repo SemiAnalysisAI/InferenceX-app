@@ -114,7 +114,10 @@ export function publishedResultsSide(saved: StoredArtifact, point: VideoPoint): 
 export interface ResultsClip {
   side: ResultsClipSide;
   record: CaseRecord;
+  /** Sealed original: Difference, PSNR pairing and the media link. */
   url: string;
+  /** Lighter web rendition of `url` for Clip view playback. */
+  previewUrl?: string;
   quality: ClipQuality | DiagnosticPair | null;
 }
 export interface ResultsClipGroup {
@@ -132,7 +135,7 @@ export function resultsClipGroups(sides: ResultsClipSide[]): ResultsClipGroup[] 
     if (!side.generationKey) continue;
     for (const record of side.records) {
       const take = Number(/^measurement-r(?<take>\d+)-c\d+$/u.exec(record.slotId)?.groups?.take);
-      const url = record.mediaPath === null ? undefined : side.urls.get(record.mediaPath);
+      const media = record.mediaPath === null ? undefined : side.media.get(record.mediaPath);
       if (
         !record.prompt ||
         record.seed === null ||
@@ -141,7 +144,7 @@ export function resultsClipGroups(sides: ResultsClipSide[]): ResultsClipGroup[] 
         take < 1 ||
         record.valid !== true ||
         record.status !== 'succeeded' ||
-        !url
+        !media
       )
         continue;
       const key = JSON.stringify([side.generationKey, record.prompt, record.seed, take]);
@@ -157,7 +160,8 @@ export function resultsClipGroups(sides: ResultsClipSide[]): ResultsClipGroup[] 
       group.clips.set(side.hardwareKey, {
         side,
         record,
-        url,
+        url: media.url,
+        previewUrl: media.previewUrl,
         quality: side.quality.get(record.slotId) ?? null,
       });
       groups.set(key, group);

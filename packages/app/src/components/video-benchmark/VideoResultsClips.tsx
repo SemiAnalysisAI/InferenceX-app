@@ -49,6 +49,7 @@ const STRINGS = {
       'Single-clip rerun with fixed noise and parallelism. Charts below use the original 20-clip run.',
     diagnosticMetric: 'Not provided for this diagnostic.',
     media: 'Media',
+    webEncode: 'Playback uses a web encode; Difference, PSNR and the media link use the original.',
     seed: 'seed',
     take: (n: number) => `take ${n}`,
     noPair: 'No retained clips share a verified prompt, seed, take and generation configuration.',
@@ -115,6 +116,7 @@ const STRINGS = {
       '单条视频重跑，使用固定的初始噪声和并行配置。下方图表仍展示原始 20 条视频的测试结果。',
     diagnosticMetric: '此次重跑未提供该指标。',
     media: '视频文件',
+    webEncode: '播放使用网页转码版本；“差异”视图、PSNR 和视频文件链接仍使用原始视频。',
     seed: 'seed',
     take: (n: number) => `第 ${n} 次`,
     noPair: '没有 prompt、seed、重复次数和生成配置均已核实一致的保留视频。',
@@ -346,6 +348,8 @@ function SynchronizedClips({
   const [view, setView] = useState<'clip' | 'difference'>('clip');
   const [durations, setDurations] = useState<Record<string, number>>({});
   const [errors, setErrors] = useState<ReadonlySet<string>>(new Set());
+  /** Web renditions that failed to load; their clips play the sealed original instead. */
+  const [failedPreviews, setFailedPreviews] = useState<ReadonlySet<string>>(new Set());
   const [differenceErrors, setDifferenceErrors] = useState<ReadonlySet<string>>(new Set());
   // One tile per measured hardware, like the chart legend; roster entries without a cell get none.
   const visible = RESULTS_HARDWARE.filter(
@@ -376,6 +380,15 @@ function SynchronizedClips({
         : previous,
     );
   }, [group, visibleKey]);
+
+  // Changing a tile's source (view switch, rendition fallback) reloads it at 0. Before metadata,
+  // currentTime sets the start position, so the tile resumes at the time of a clip that kept its source.
+  useLayoutEffect(() => {
+    const anchor = [...videos.current.values()].find((video) => video.readyState > 0);
+    if (!anchor) return;
+    for (const video of videos.current.values())
+      if (video.readyState === 0) video.currentTime = anchor.currentTime;
+  }, [view, failedPreviews]);
 
   // Owns `muted`: <Activity> re-runs this body on reveal, whereas an unchanged muted prop would not be reapplied.
   useLayoutEffect(() => {
@@ -613,6 +626,10 @@ function SynchronizedClips({
               {s.seed} {group.seed} · {diagnostic ? s.diagnostic : s.take(group.take)}
             </p>
           )}
+          {visible.some((key) => {
+            const preview = group?.clips.get(key)?.previewUrl;
+            return preview && !failedPreviews.has(preview);
+          }) && <p className="text-muted-foreground">{s.webEncode}</p>}
         </div>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[44rem] text-left">
@@ -778,7 +795,13 @@ function SynchronizedClips({
                       if (element) videos.current.set(key, element);
                       else videos.current.delete(key);
                     }}
-                    src={clip.url}
+                    src={
+                      view === 'difference' && pairedReference
+                        ? clip.url
+                        : clip.previewUrl && !failedPreviews.has(clip.previewUrl)
+                          ? clip.previewUrl
+                          : clip.url
+                    }
                     crossOrigin="anonymous"
                     muted
                     playsInline
@@ -796,7 +819,12 @@ function SynchronizedClips({
                       if (Number.isFinite(value) && value > 0)
                         setDurations((previous) => ({ ...previous, [key]: value }));
                     }}
-                    onError={() => setErrors((previous) => new Set([...previous, key]))}
+                    onError={(event) => {
+                      const preview = clip.previewUrl;
+                      if (preview && event.currentTarget.currentSrc === preview)
+                        setFailedPreviews((previous) => new Set([...previous, preview]));
+                      else setErrors((previous) => new Set([...previous, key]));
+                    }}
                   />
                 )}
                 {view === 'difference' && clip && (

@@ -1,7 +1,8 @@
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
 import { cachedQuery, videoCacheTag } from '@/lib/cache/api-cache';
 import { publishedVideoHistory } from './video-history-store';
-import { readStoredArtifact, storedArtifacts } from './video-storage';
+import { readStoredArtifact, renditionPreviews, storedArtifacts } from './video-storage';
+import { withRenditionPreviews } from './video-renditions';
 
 /**
  * Backstop for the publication purge. A read that started before a purge and finishes after it
@@ -9,6 +10,8 @@ import { readStoredArtifact, storedArtifacts } from './video-storage';
  * refreshes, so no request waits on it.
  */
 export const VIDEO_CACHE_REVALIDATE_SECONDS = 300;
+/** Renditions are encoded after the publication purge, so their listing refreshes on its own. */
+export const RENDITION_LISTING_REVALIDATE_SECONDS = 60;
 
 /** A value the shared cache must not keep: an incomplete History read or absent media. */
 class UnretainedError<T> extends Error {
@@ -54,7 +57,7 @@ export const cachedVideoHistory = retained('video:history', async (page: number,
   return { value, retain: complete && (page === 1 || value.entries.length > 0) };
 });
 
-export const cachedPublishedArtifact = retained(
+const cachedStoredArtifact = retained(
   'video:artifact',
   async (runId: string, artifactId: string) => {
     const saved = await storedArtifacts(runId);
@@ -65,3 +68,22 @@ export const cachedPublishedArtifact = retained(
     return { value, retain: value !== null };
   },
 );
+
+// Entries, not the Map: the shared cache stores JSON.
+const cachedRenditionListing = cachedQuery(
+  async () => [...(await renditionPreviews())],
+  'video:renditions',
+  { tag: videoCacheTag(), revalidate: RENDITION_LISTING_REVALIDATE_SECONDS },
+);
+
+export async function cachedPublishedArtifact(runId: string, artifactId: string) {
+  const [saved, previews] = await Promise.all([
+    cachedStoredArtifact(runId, artifactId),
+    // A missing rendition listing only costs download size; the sealed originals still play.
+    cachedRenditionListing().then(
+      (entries) => new Map(entries),
+      () => new Map<string, string>(),
+    ),
+  ]);
+  return saved && withRenditionPreviews(saved, previews);
+}
