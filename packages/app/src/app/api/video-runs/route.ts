@@ -9,12 +9,13 @@ import {
 } from '@semianalysisai/inferencex-constants';
 import { getGithubToken } from '@/lib/github/github-artifacts';
 import { loadFixture } from '@/lib/testing/test-fixtures';
+import { localVideoReplayResponse } from '@/lib/video/video-replay';
 import { bearerMatches } from '@/lib/api/bearer-auth';
 import {
   VIDEO_HISTORY_MAX_PAGES,
   type VideoHistoryPage,
 } from '@/components/video-benchmark/history';
-import { publishedVideoHistory, recordVideoHistory } from '@/lib/video/video-history-store';
+import { recordVideoHistory } from '@/lib/video/video-history-store';
 import {
   approveVideoPublication,
   readStoredArtifact,
@@ -22,6 +23,11 @@ import {
   storeVideoArtifact,
   videoStorageEnabled,
 } from '@/lib/video/video-storage';
+import {
+  cachedPublishedArtifact,
+  cachedVideoHistory,
+  clearVideoReadCache,
+} from '@/lib/video/video-read-cache';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -90,7 +96,16 @@ export async function GET(request: NextRequest) {
       { error: 'Invalid CI run, artifact or page' },
       { status: 400, headers },
     );
-  if (history && process.env.NODE_ENV === 'development' && process.env.E2E_FIXTURES === '1') {
+  const localReplay = await localVideoReplayResponse(request);
+  if (localReplay) return localReplay;
+  if (query.get('format') === 'replay-asset') return new Response(null, { status: 404, headers });
+  if (
+    process.env.NODE_ENV === 'development' &&
+    process.env.E2E_FIXTURES === '1' &&
+    (history || media)
+  ) {
+    // The committed History fixture has metadata only; media needs an explicit local replay.
+    if (media) return new Response(null, { status: 204, headers });
     const fixture = loadFixture<VideoHistoryPage>('video-history');
     return NextResponse.json(
       Number(page) === 1 ? fixture : { schemaVersion: 1, entries: [], nextPage: null },
@@ -148,7 +163,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(data, { status: response.status, headers });
     }
     // This public viewer must never expose artifacts from a repository that becomes private.
-    const historyRead = history ? publishedVideoHistory(Number(page), Number(pages)) : null;
+    const historyRead = history ? cachedVideoHistory(Number(page), Number(pages)) : null;
     void historyRead?.catch(() => undefined);
     if (!(await repositoryIsPublic()))
       return NextResponse.json(
@@ -159,12 +174,8 @@ export async function GET(request: NextRequest) {
     if (artifactId) {
       if (media && !videoStorageEnabled()) return new Response(null, { status: 204, headers });
       if (media) {
-        const saved = await storedArtifacts(runId!);
-        const stored = saved.find((a) => String(a.id) === artifactId);
-        if (stored) {
-          const result = await readStoredArtifact(runId!, stored);
-          if (result) return NextResponse.json(result, { headers });
-        }
+        const result = await cachedPublishedArtifact(runId!, artifactId);
+        if (result) return NextResponse.json(result, { headers });
         return new Response(null, { status: 204, headers });
       }
       const metaResponse = await github(`/actions/artifacts/${artifactId}`);
@@ -290,7 +301,9 @@ export async function POST(request: Request) {
   const { runId, artifactId, mergeRunId, history } = body as Record<string, unknown>;
   if (history === 'backfill' && Object.keys(body).length === 1) {
     try {
-      return NextResponse.json(await recordVideoHistory(null), { headers });
+      const result = await recordVideoHistory(null);
+      clearVideoReadCache();
+      return NextResponse.json(result, { headers });
     } catch {
       return NextResponse.json(
         { error: 'Video history backfill failed, retry shortly' },
@@ -362,6 +375,7 @@ export async function POST(request: Request) {
     }
     const receipt = await approveVideoPublication(runId, artifact, saved, mergeRunId, deadline);
     await recordVideoHistory(saved);
+    clearVideoReadCache();
     return NextResponse.json(receipt, { headers });
   } catch {
     return NextResponse.json(

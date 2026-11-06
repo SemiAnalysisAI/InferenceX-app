@@ -3470,36 +3470,6 @@
       ]
     },
     {
-      "spec": "cypress/component/video-api-reference.cy.tsx",
-      "duration": 995,
-      "tests": [
-        {
-          "title": [
-            "VideoApiReference",
-            "shows the dated reference with its source and applies valid prices as typed"
-          ],
-          "duration": 303,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "VideoApiReference",
-            "keeps the last valid price while the box is empty or zero and snaps back on blur"
-          ],
-          "duration": 255,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "VideoApiReference",
-            "resets to the reference, adopts external values and tracks committed changes"
-          ],
-          "duration": 425,
-          "attempts": 1
-        }
-      ]
-    },
-    {
       "spec": "cypress/component/video-compare.cy.tsx",
       "duration": 2103,
       "tests": [
@@ -3637,92 +3607,6 @@
             "states each published source’s GPU power verdict in the history list"
           ],
           "duration": 90,
-          "attempts": 1
-        }
-      ]
-    },
-    {
-      "spec": "cypress/component/video-evidence.cy.tsx",
-      "duration": 381,
-      "tests": [
-        {
-          "title": [
-            "Video performance evidence (retained fixture)",
-            "keeps the concurrency table within the stated shared layout (en, 1280px)"
-          ],
-          "duration": 72,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Video performance evidence (retained fixture)",
-            "keeps the concurrency table within the stated shared layout (zh, 390px)"
-          ],
-          "duration": 45,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Video performance evidence (retained fixture)",
-            "does not call low board power compute saturation"
-          ],
-          "duration": 27,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Video performance evidence (retained fixture)",
-            "does not call higher throughput and lower latency a queueing plateau"
-          ],
-          "duration": 26,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Video performance evidence (retained fixture)",
-            "reads board power against the recorded enforced limit per measured hardware"
-          ],
-          "duration": 41,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Video performance evidence (retained fixture)",
-            "bounds the power meter to its declared range when mean power exceeds the recorded limit"
-          ],
-          "duration": 33,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Video performance evidence (retained fixture)",
-            "tabulates concurrency measurements with ratios against each hardware C1 cell"
-          ],
-          "duration": 45,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Video performance evidence (retained fixture)",
-            "compares observed speedups with spec-sheet ratios without attributing a bottleneck"
-          ],
-          "duration": 40,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Video performance evidence (retained fixture)",
-            "hides the plateau and scaling exhibits when only one hardware at C1 is measured"
-          ],
-          "duration": 31,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Video performance evidence (retained fixture)",
-            "renders nothing when no cell is measured"
-          ],
-          "duration": 7,
           "attempts": 1
         }
       ]

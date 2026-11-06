@@ -1,4 +1,4 @@
-import { at, number, rows, safePath, text, type Bundle, type Json } from './bundle';
+import { at, canonical, number, rows, safePath, text, type Bundle, type Json } from './bundle';
 
 export interface ServingCell {
   id: string;
@@ -37,16 +37,6 @@ const RECEIPTS = {
 
 function requireValue(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`Invalid H3 serving matrix: ${message}`);
-}
-
-function canonical(value: Json): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (value !== null && typeof value === 'object')
-    return `{${Object.keys(value)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`)
-      .join(',')}}`;
-  return JSON.stringify(value);
 }
 
 export function servingCells(
