@@ -204,7 +204,11 @@ When Effect 2 rebuilds the SVG (data shape change), the current zoom transform i
 1. **Hover**: Show tooltip + rulers, follow cursor
 2. **Click**: Pin tooltip (freeze position, enable text selection + pointer events)
 3. **While pinned**: Hover handlers disabled (prevents tooltip from jumping)
-4. **Dismiss**: Click elsewhere, or zoom starts (via deferred rAF to avoid re-render during zoom event)
+4. **Dismiss**: Click anywhere outside the portaled card, press Escape, or start zooming (via deferred rAF to avoid re-render during zoom event). Outside clicks are captured at the document before point handlers run, so controls that stop bubbling still dismiss and clicking another point can pin its replacement. Inside-card clicks preserve text selection and action links. Listeners are removed when the card is unpinned or unmounted.
+
+The shared wrapper applies this lifecycle to official, historical, and unofficial
+charts on desktop and mobile. This is presentation-only; API responses, filters,
+and `inferencex-skills` contracts do not change.
 
 The rAF deferral on zoom-dismiss is critical — calling `setState` synchronously inside a D3 zoom handler causes React to re-render mid-zoom, creating visible jank.
 

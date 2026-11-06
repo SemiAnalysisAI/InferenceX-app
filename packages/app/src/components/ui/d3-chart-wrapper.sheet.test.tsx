@@ -102,3 +102,80 @@ describe('D3ChartWrapper mobile detail sheet', () => {
     expect(backdrop()).toBeNull();
   });
 });
+
+describe('D3ChartWrapper pinned tooltip dismissal', () => {
+  beforeEach(() => {
+    stubMatchMedia({ [MOBILE_VIEWPORT_QUERY]: false, [COARSE_POINTER_QUERY]: false });
+  });
+
+  it('dismisses on outside clicks even when the target stops propagation', () => {
+    const { dismissTooltip, hideTooltipElements } = renderWrapper(true);
+    const outside = document.createElement('button');
+    container.append(outside);
+    outside.addEventListener('click', (event) => event.stopPropagation());
+
+    act(() => outside.click());
+
+    expect(dismissTooltip).toHaveBeenCalledTimes(1);
+    expect(hideTooltipElements).toHaveBeenCalledTimes(1);
+  });
+
+  it('dismisses desktop details with Escape, but not other keys', () => {
+    const { dismissTooltip } = renderWrapper(true);
+    act(() =>
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })),
+    );
+    expect(dismissTooltip).not.toHaveBeenCalled();
+    act(() =>
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })),
+    );
+    expect(dismissTooltip).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves clicks and action handlers inside the portaled card', () => {
+    const { dismissTooltip } = renderWrapper(true);
+    const action = document.createElement('button');
+    const onAction = vi.fn();
+    action.addEventListener('click', onAction);
+    tooltip()!.append(action);
+
+    act(() => action.click());
+
+    expect(onAction).toHaveBeenCalledTimes(1);
+    expect(dismissTooltip).not.toHaveBeenCalled();
+  });
+
+  it('does not dismiss the click that opens a card', () => {
+    renderWrapper(false);
+    const opener = document.createElement('button');
+    container.append(opener);
+    let dismissTooltip: ReturnType<typeof vi.fn> | undefined;
+    opener.addEventListener('click', () => {
+      dismissTooltip = renderWrapper(true).dismissTooltip;
+    });
+
+    act(() => opener.click());
+
+    expect(dismissTooltip).toBeDefined();
+    expect(dismissTooltip).not.toHaveBeenCalled();
+  });
+
+  it('removes dismissal handlers when unpinned or unmounted', () => {
+    const first = renderWrapper(true);
+    const unpinned = renderWrapper(false);
+    act(() => {
+      document.body.click();
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
+    expect(first.dismissTooltip).not.toHaveBeenCalled();
+    expect(unpinned.dismissTooltip).not.toHaveBeenCalled();
+
+    const last = renderWrapper(true);
+    act(() => root.render(null));
+    act(() => {
+      document.body.click();
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
+    expect(last.dismissTooltip).not.toHaveBeenCalled();
+  });
+});
