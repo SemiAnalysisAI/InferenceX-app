@@ -33,13 +33,21 @@ export interface GlossaryEntry {
   articleSlugs: readonly string[];
 }
 
-/** An image shown under the technical definition. `caption` accepts inline `[label](https://…)` links. */
-export interface GlossaryFigure {
+/** One image in a glossary figure. */
+export interface GlossaryFigureImage {
   /** Path under `public/`. */
   src: string;
   width: number;
   height: number;
   alt: string;
+}
+
+/**
+ * Images shown side by side, at equal height, under the technical definition.
+ * `caption` accepts inline `[label](https://…)` links.
+ */
+export interface GlossaryFigure {
+  images: readonly GlossaryFigureImage[];
   caption: string;
 }
 
@@ -2633,10 +2641,20 @@ const entries = [
       value: '$0.181 per million tokens vs $0.222 (B200) and $0.276 (B300)',
     },
     figure: {
-      src: '/images/glossary/tpuv7-ironwood-package.webp',
-      width: 2000,
-      height: 1279,
-      alt: 'Annotated photo of the TPUv7 Ironwood package: two compute dies split by the die-to-die boundary, four HBM3E stacks on each side, the ICI SerDes chiplet above the dies, and a dummy die at each top corner.',
+      images: [
+        {
+          src: '/images/glossary/tpuv7-ironwood-package-photo.webp',
+          width: 780,
+          height: 835,
+          alt: 'Photo of the TPUv7 Ironwood package on its display stand, with Ironwood engraved below it.',
+        },
+        {
+          src: '/images/glossary/tpuv7-ironwood-package.webp',
+          width: 2000,
+          height: 1279,
+          alt: 'The same photo annotated: two compute dies split by the die-to-die boundary, four HBM3E stacks on each side, the ICI SerDes chiplet above the dies, and a dummy die at each top corner.',
+        },
+      ],
       caption: 'Source: SemiAnalysis, [Google](https://docs.cloud.google.com/tpu/docs/tpu7x)',
     },
     relatedTerms: ['tpu', 'mxu', 'sparsecore', 'ici', 'fp8', 'performance-per-dollar'],
