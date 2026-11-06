@@ -13,7 +13,7 @@ async function VideoResults({ params }: { params: VideoPageSearchParams }) {
 
 /**
  * Streams the page in two parts: the controls for the URL-selected state go out
- * with the document, and the dashboard with its History cohort and clip sides
+ * with the document as an inert shell, and the dashboard with its History cohort and clip sides
  * replaces them once the server reads finish. Both locale routes render this.
  */
 export default function VideoResultsPage({ params }: { params: VideoPageSearchParams }) {

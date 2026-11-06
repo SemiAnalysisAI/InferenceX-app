@@ -251,7 +251,9 @@ This does not establish sustained capacity.
 ## Control coverage
 
 Both language routes stream in two parts. The document carries the page shell,
-with the controls for the URL-selected state and a loading status, and the
+with the controls for the URL-selected state and a loading status. The shell is
+`inert` (visible but not operable), because the dashboard remounts in its place and
+would drop edits made there. The
 dashboard with the complete bounded History cohort and exact selected clip
 metadata replaces it once the server reads finish; the browser does not read
 History on its own while that is pending. Without video storage the server
@@ -265,7 +267,7 @@ read after a publication waits on storage. This is a presentation-only loading
 change: the read-only API selectors, defaults, calculations and
 official/unofficial source membership remain unchanged.
 
-中文：中英文页面分两段流式输出：文档先带出页面骨架，即 URL 所选状态的控件和加载提示；
+中文：中英文页面分两段流式输出：文档先带出页面骨架，即 URL 所选状态的控件和加载提示。骨架设为 `inert`（可见但不可操作），因为仪表板会在原处重新挂载，在骨架中所做的修改会丢失；
 服务端读取完成后，再以带有完整有界 History 数据和所选视频元数据的仪表板替换它，
 等待期间浏览器不会自行读取 History；未配置视频存储时服务端不预填数据，仍由浏览器读取 History。hydration 复用成功读取和已确认缺失的结果；失败仍可重试。
 后续媒体源独立显示，不会先清空仍匹配的视频。视频通过 `preload=auto` 请求真实首帧字节，

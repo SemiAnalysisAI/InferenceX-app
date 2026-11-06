@@ -88,6 +88,16 @@ const evidence = (observation: VideoHistoryObservation): ResultsEvidence => ({
   failures: { timeout: 0, oom: 0, engine: 0, transport: 0, other: 0 },
 });
 
+/** The streamed dashboard replaces the pending shell, so an edit made in it would be lost. */
+const focusFirstControl = (focusable: boolean) =>
+  cy
+    .get('[data-testid="video-results"] button')
+    .first()
+    .should(($button) => {
+      $button[0].focus();
+      expect($button[0].ownerDocument.activeElement === $button[0]).to.equal(focusable);
+    });
+
 describe('VideoGenX results', () => {
   it('shows the loading state without reading History while the server streams the cohort', () => {
     readOnlyVideoRequests();
@@ -105,12 +115,14 @@ describe('VideoGenX results', () => {
     cy.get('[role="status"]').should('contain', 'Loading video results');
     cy.get('[data-testid="video-results"]').should('be.visible');
     cy.get('@history.all').should('have.length', 0);
+    focusFirstControl(false);
     cy.mount(
       <PathnameContext.Provider value="/video">
         <VideoDashboard initialData={initialData} />
       </PathnameContext.Provider>,
     );
     cy.wait('@history');
+    focusFirstControl(true);
   });
 
   for (const pathname of ['/zh/video']) {

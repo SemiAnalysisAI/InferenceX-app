@@ -460,6 +460,8 @@ export default function VideoDashboard({
     <div
       className={`${styles.page} mx-auto w-full min-w-0 max-w-7xl py-4`}
       data-testid="video-results"
+      // The streamed dashboard remounts in place of this shell, so edits made here would be lost.
+      inert={pending}
     >
       {detailCell && (
         <VideoDeploymentDetail
