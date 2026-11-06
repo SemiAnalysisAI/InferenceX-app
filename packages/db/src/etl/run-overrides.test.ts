@@ -955,6 +955,40 @@ describe('RUN_FRAMEWORK_OVERRIDES', () => {
     }
   });
 
+  it('reassigns the Kimi-K3.1-Pro B200 direct vLLM run from dynamo-vllm to vllm', () => {
+    const run = 42071652809;
+    expect(resolveRunFramework(run, 'dynamo-vllm')).toEqual({
+      framework: 'vllm',
+      overrideId: 'run-42071652809-kimik31-b200-direct-vllm',
+    });
+    expect(resolveRunFramework(run, 'vllm')).toEqual({ framework: 'vllm', overrideId: null });
+    expect(resolveRunFramework(run + 1, 'dynamo-vllm')).toEqual({
+      framework: 'dynamo-vllm',
+      overrideId: null,
+    });
+    const changelogs = [
+      {
+        baseRef: 'a',
+        headRef: 'b',
+        entries: [
+          {
+            configKeys: ['kimik3.1-fp4-b200-dynamo-vllm-agentic-dspark'],
+            description: 'x',
+            prLink: null,
+            evalsOnly: false,
+            appendOnly: false,
+          },
+        ],
+      },
+    ];
+    const result = applyRunFrameworkOverridesToChangelogs(run, changelogs);
+    expect(result.overrideIds).toEqual(['run-42071652809-kimik31-b200-direct-vllm']);
+    expect(result.changelogs[0].entries[0].configKeys).toEqual([
+      'kimik3.1-fp4-b200-vllm-agentic-dspark',
+    ]);
+    expect(() => validateRunBackfills()).not.toThrow();
+  });
+
   it('rewrites only the framework segment of a changelog config key', () => {
     expect(
       rewriteConfigKeyFramework('qwen3.5-fp8-tpuv7-vllm-agentic-xpyd-mtp', 'vllm', 'llmd-vllm'),

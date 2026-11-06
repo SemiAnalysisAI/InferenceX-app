@@ -980,9 +980,12 @@ dispatched merge ingests it also sends `ingest-results-completed` to `BENCHMARK_
 
 A dispatched ingest whose artifacts come from the dispatching run first polls that run every 10 s
 until GitHub reports it completed, for at most 300 s, and then proceeds either way.
-`admin:db:prepare:ci` downloads the planned artifacts eight at a time, starting them in name order,
-and starts no new download after one fails its three attempts. `admin:db:verify` runs after cache
-invalidation, warmup and the PowerX check, so its whole-database counts never delay fresh data.
+`admin:db:prepare:ci` downloads the planned artifacts eight at a time, largest first, and starts no
+new download after one fails its three attempts. It skips `job_event*` and `al_gate*` artifacts and
+server logs without a same-suffix `bmk_` artifact, since ingest never reads them. `admin:db:verify`
+runs after cache invalidation, warmup and the PowerX check, so its whole-database counts never delay
+fresh data. The invalidate request is capped at 120 s per curl attempt so a slow blob purge cannot
+hold the job for minutes.
 
 ### PowerX publication receipts
 

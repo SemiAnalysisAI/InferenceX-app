@@ -139,6 +139,11 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
           rows.set(top, [...(rows.get(top) ?? []), rect]);
         });
         expect(modal.querySelectorAll('button[data-testid]')).to.have.length(4);
+        expect(
+          [...modal.querySelectorAll('button[data-testid]')].map((button) =>
+            button.textContent?.trim(),
+          ),
+        ).to.deep.eq(['Qwen3.5', 'Kimi K3', 'GLM5.3', 'Muse Spark']);
         expect(rows.size).to.eq(2);
         expect(modal.querySelector('[data-testid="launch-modal-dismiss"]')).to.eq(null);
         const close = modal.querySelector('button[aria-label]')!;
@@ -150,6 +155,10 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
         );
         expect(Math.abs(actions[0].width - actions[1].width)).to.be.lessThan(1);
         expect(actions[0].top).to.eq(actions[1].top);
+        expect(actions[2].top).to.eq(actions[3].top);
+        expect(actions[2].top).to.be.greaterThan(actions[0].top);
+        expect(actions[0].left).to.be.lessThan(actions[1].left);
+        expect(actions[2].left).to.be.lessThan(actions[3].left);
         expect(actions[0].height).to.be.at.least(44);
         const heading = modal.querySelector('h2')!.getBoundingClientRect();
         const badge = modal.querySelector('[data-new-badge]')!.getBoundingClientRect();
@@ -181,8 +190,8 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
     for (const [action, logo] of [
       ['action', 'qwen-color.svg'],
       ['secondary-action', 'kimi-color.svg'],
-      ['additional-action-0', 'muse-mascot.webp'],
-      ['additional-action-1', 'zai-color.svg'],
+      ['additional-action-0', 'zai-color.svg'],
+      ['additional-action-1', 'muse-mascot.webp'],
     ]) {
       cy.get(`[data-testid="launch-modal-${action}"] img`)
         .should('have.attr', 'src', `/logos/${logo}`)
@@ -263,27 +272,24 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
   });
 
   for (const prefix of ['', '/zh']) {
-    for (const [index, label, slug] of [
-      [0, 'Muse Spark', 'muse-spark-open'],
-      [1, 'GLM5.3', 'glm-5-3'],
+    for (const [index, label, slug, model] of [
+      [0, 'GLM5.3', 'glm-5-3', 'GLM-5.2'],
+      [1, 'Muse Spark', 'muse-spark-open', 'Muse-Spark-Open'],
     ] as const) {
       it(`opens ${label} with its intended filters from ${prefix || '/'}`, () => {
-        if (index === 1) interceptTpuLaunchData('GLM-5.2');
+        interceptTpuLaunchData(model);
         cy.visit(prefix || '/', { onBeforeLoad: showLaunchModal });
         cy.get(`[data-testid="launch-modal-additional-action-${index}"]`)
           .should('have.text', label)
           .click();
         cy.location('pathname').should('eq', `${prefix}/inference/${slug}`);
-        if (index === 1) {
+        if (label === 'GLM5.3') {
           cy.location('search').should('eq', '?g_model=GLM-5.2&i_seq=agentic-traces&i_prec=fp8');
           cy.get('[data-testid="precision-multiselect"]')
             .should('contain.text', 'FP8')
             .and('not.contain.text', 'FP4');
         }
-        cy.get('[data-testid="model-selector"]').should(
-          'contain.text',
-          index === 0 ? 'Muse Spark' : 'GLM5.3',
-        );
+        cy.get('[data-testid="model-selector"]').should('contain.text', label);
         cy.window().then((win) => {
           expect(Number(win.localStorage.getItem(LAUNCH_MODAL_KEY))).to.be.greaterThan(1);
         });

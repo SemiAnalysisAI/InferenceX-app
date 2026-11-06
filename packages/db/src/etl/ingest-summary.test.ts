@@ -12,12 +12,12 @@ const totals = {
   changelogEntries: 6,
 };
 
-function printedLines(unexpectedMetrics: string[]): string[] {
+function printedLines(unexpectedMetrics: string[], withTotals = true): string[] {
   const tracker = createSkipTracker();
   for (const key of unexpectedMetrics) tracker.unexpectedMetrics.add(key);
   const log = vi.spyOn(console, 'log').mockImplementation(() => {});
   try {
-    printIngestSummaryFooter(totals, tracker);
+    printIngestSummaryFooter(withTotals ? totals : null, tracker);
     return log.mock.calls.map(([line]) => String(line));
   } finally {
     log.mockRestore();
@@ -45,5 +45,15 @@ describe('printIngestSummaryFooter unexpected metrics', () => {
 
   it('prints no unexpected metrics section when every metric is known', () => {
     expect(printedLines([]).some((line) => line.includes(UNEXPECTED_HEADER))).toBe(false);
+  });
+
+  it('omits the DB totals block when no totals are given', () => {
+    const lines = printedLines(['goodput'], false);
+
+    expect(lines.some((line) => line.includes('DB totals'))).toBe(false);
+    expect(lines.some((line) => line.includes('benchmark_results'))).toBe(false);
+    expect(lines.slice(lines.findIndex((line) => line.includes(UNEXPECTED_HEADER)) + 1)).toEqual([
+      '    goodput',
+    ]);
   });
 });

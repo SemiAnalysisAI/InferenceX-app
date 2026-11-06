@@ -38,8 +38,8 @@ export async function POST(request: Request) {
   // scope. The default full purge covers CollectiveX but not OperatorX or video,
   // which only their own publications invalidate. ?immediate=true drops cached
   // responses outright instead of serving them once more while they refresh,
-  // for corrections and retractions; video entries are never served stale, so
-  // that scope always expires at once.
+  // for corrections and retractions; a video publication must reach the next
+  // read, so that scope always expires at once.
   const params = new URL(request.url).searchParams;
   const scope = params.get('scope');
   if (
@@ -68,6 +68,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ invalidated: true, scope, immediate: true });
   }
 
-  const blobsDeleted = await purgeAll({ immediate });
-  return NextResponse.json({ invalidated: true, blobsDeleted, immediate });
+  await purgeAll({ immediate });
+  return NextResponse.json({ invalidated: true, blobPurge: 'scheduled', immediate });
 }

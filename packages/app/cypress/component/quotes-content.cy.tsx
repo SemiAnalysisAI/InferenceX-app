@@ -143,6 +143,7 @@ describe('QuotesContent supporter logo wall', () => {
       'Tensormesh',
       'Morph',
       'Doubleword',
+      'Wafer',
     ];
     for (const locale of ['en', 'zh'] as const) {
       cy.viewport(375, 812);
@@ -215,6 +216,55 @@ describe('QuotesContent supporter logo wall', () => {
       cy.get('#quote-morph').should('contain.text', 'Nicholas Khami');
     }
   });
+
+  for (const locale of ['en', 'zh'] as const) {
+    for (const theme of ['light', 'dark']) {
+      it(`preserves the purple Fireworks mark in both locations (${locale}, ${theme})`, () => {
+        for (const width of [375, 1440]) {
+          cy.viewport(width, 900);
+          cy.mount(
+            <div className={theme}>
+              <QuotesContent locale={locale} />
+            </div>,
+          );
+          for (const section of [
+            '[data-testid="supporter-group-managed-inference-providers"]',
+            '#quote-fireworks-ai',
+          ]) {
+            cy.get(`${section} img[alt="Fireworks AI"]`).should(($images) => {
+              const image = $images[0] as HTMLImageElement;
+              expect(image.currentSrc).to.match(/\/logos\/fireworks-purple\.svg$/);
+              expect(image.naturalWidth).to.be.greaterThan(0);
+              expect(getComputedStyle(image).filter).to.equal('none');
+              expect(getComputedStyle(image).opacity).to.equal('1');
+              const bounds = image.getBoundingClientRect();
+              expect(bounds.left).to.be.at.least(0);
+              expect(bounds.right).to.be.at.most(width);
+              const canvas = image.ownerDocument.createElement('canvas');
+              canvas.width = 64;
+              canvas.height = 32;
+              const ctx = canvas.getContext('2d')!;
+              ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+              const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+              let opaquePixels = 0;
+              let incorrectPixels = 0;
+              for (let i = 0; i < pixels.length; i += 4) {
+                if (pixels[i + 3] === 255) {
+                  opaquePixels++;
+                  if (pixels[i] !== 103 || pixels[i + 1] !== 32 || pixels[i + 2] !== 255) {
+                    incorrectPixels++;
+                  }
+                }
+              }
+              expect(opaquePixels).to.be.greaterThan(0);
+              expect(incorrectPixels).to.equal(0);
+            });
+          }
+          cy.get('#quote-fireworks-ai').should('contain.text', 'Dmytro Dzhulgakov');
+        }
+      });
+    }
+  }
 });
 
 const wallLogo = (label: string) => ({ label, logo: 'nvidia-color.svg' });
