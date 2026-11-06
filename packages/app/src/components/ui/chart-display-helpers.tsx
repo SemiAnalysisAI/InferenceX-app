@@ -12,6 +12,7 @@ import {
 import { isMetricKey, metricCostTier } from '@/components/inference/metric-registry';
 import { publishedCostsForTier } from '@/components/inference/published-costs';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
+import { sourceLinkClassName } from '@/components/ui/result-context';
 import { ShareButton } from '@/components/ui/share-button';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
@@ -101,7 +102,7 @@ export function PricesSourceLink() {
   return (
     <span data-testid="tco-prices-source">
       {locale === 'zh' ? '价格来源：' : 'Prices: '}
-      <Link target="_blank" className="text-brand hover:underline" href={TCO_SOURCE_URL}>
+      <Link target="_blank" className={sourceLinkClassName} href={TCO_SOURCE_URL}>
         {TCO_SOURCE_TITLE}
         <ExternalLinkIcon />
       </Link>

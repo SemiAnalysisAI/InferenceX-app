@@ -279,10 +279,20 @@ function CostDeltaBadge({
       data-history-status={comparisonMode === 'hardware' ? undefined : status}
       title={aria}
       className={`inline-flex items-center whitespace-nowrap rounded-sm px-1 py-0.5 text-xs font-medium tabular-nums ${
-        phoneRow ? 'col-start-2 justify-self-start' : 'xl:col-start-2 xl:justify-self-end'
+        phoneRow
+          ? 'col-start-2 justify-self-start'
+          : pct === null
+            ? 'self-center'
+            : 'xl:col-start-2 xl:justify-self-end'
       } ${COST_DELTA_CLASS[polarity]}`}
     >
-      <span aria-hidden="true">{pct === null ? '∞' : formatters.percent.format(pct)}</span>
+      {pct === null ? (
+        <span aria-hidden="true" className="text-base leading-none">
+          ∞
+        </span>
+      ) : (
+        <span aria-hidden="true">{formatters.percent.format(pct)}</span>
+      )}
       <span className="sr-only">{aria}</span>
     </span>
   );
@@ -367,7 +377,9 @@ function CellValue({
         className={
           phoneRow
             ? 'grid grid-cols-[max-content_minmax(0,1fr)] items-baseline gap-x-1.5 gap-y-0.5'
-            : 'flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 xl:grid xl:grid-cols-[minmax(max-content,1fr)_3.5rem]'
+            : comparison?.pct === null
+              ? 'flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5'
+              : 'flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 xl:grid xl:grid-cols-[minmax(max-content,1fr)_3.5rem]'
         }
       >
         <span
@@ -697,7 +709,7 @@ export function MobileOverviewList({
                     model.modelLabel,
                     strings.scenarioLabels[model.scenario],
                   )}
-                  className="min-h-11 w-full justify-between text-sm"
+                  className="min-h-11 text-sm"
                 >
                   {strings.detailLink}
                 </OverviewDetailLink>

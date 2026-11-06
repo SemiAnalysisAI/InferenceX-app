@@ -11,7 +11,7 @@ import { ChartSection } from '@/components/ui/chart-section';
 import { TABLE_HEAD_CELL_STYLE, TABLE_HEAD_ROW_STYLE } from '@/components/ui/control-styles';
 import { Heading } from '@/components/ui/heading';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
-import { ResultContext } from '@/components/ui/result-context';
+import { ResultContext, sourceLinkClassName } from '@/components/ui/result-context';
 import {
   Select,
   SelectContent,
@@ -549,7 +549,7 @@ export function UbenchxContent() {
                       href={url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="underline hover:text-foreground"
+                      className={sourceLinkClassName}
                     >
                       {url.includes('/pull/') ? `PR #${name}` : name}
                     </a>

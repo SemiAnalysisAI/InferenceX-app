@@ -15,7 +15,7 @@ import {
 import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
-import { ResultContext } from '@/components/ui/result-context';
+import { ResultContext, sourceLinkClassName } from '@/components/ui/result-context';
 import { Stat } from '@/components/ui/stat';
 
 import { SM_L2_RUNS } from './sm-l2-data';
@@ -434,7 +434,7 @@ export function SmL2Content({ gpu = 'all' }: { gpu?: string }) {
                 href={view.metadata.sourceUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline"
+                className={sourceLinkClassName}
               >
                 {view.metadata.sourceUrl}
               </a>

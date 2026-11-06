@@ -7,6 +7,8 @@ import { cn } from '@/lib/shared/utils';
 export const captionControlTriggerClassName =
   'h-6 md:h-6 w-auto gap-1 rounded-sm border-input bg-transparent px-1.5 py-0 text-xs font-medium text-foreground shadow-none hover:bg-muted/60 dark:bg-transparent dark:hover:bg-muted/60 [&_svg]:size-3';
 
+export const sourceLinkClassName = 'text-brand hover:underline';
+
 export interface ResultContextProps {
   locale: Locale;
   model?: string;

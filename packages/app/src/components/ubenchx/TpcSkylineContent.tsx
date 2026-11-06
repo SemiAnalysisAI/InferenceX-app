@@ -3,7 +3,7 @@
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
 import { TABLE_HEAD_CELL_STYLE, TABLE_HEAD_ROW_STYLE } from '@/components/ui/control-styles';
-import { ResultContext } from '@/components/ui/result-context';
+import { ResultContext, sourceLinkClassName } from '@/components/ui/result-context';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import { HuaweiSkuConfigurations } from './HuaweiSkuConfigurations';
@@ -117,7 +117,7 @@ export function TpcSkylineContent() {
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="break-all underline"
+                className={`break-all ${sourceLinkClassName}`}
               >
                 {url}
               </a>

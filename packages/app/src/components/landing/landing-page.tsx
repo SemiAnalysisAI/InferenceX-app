@@ -70,18 +70,20 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
         <IntroSection locale={locale} />
 
         <section className="flex flex-col gap-6" {...analyticsPlacement('landing_section')}>
-          <Card>
-            <h2 className="text-lg font-semibold text-balance">{t.reproTitle}</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{t.reproP1}</p>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
-              <span className="font-medium text-foreground tabular-nums">
-                {t.reproStatPrefix}
-                {weeklyDatapoints}
-                {t.reproStatSuffix}
-              </span>{' '}
-              {t.reproStatTail}
-            </p>
-            <dl className="mt-5 grid max-w-3xl gap-4 sm:grid-cols-2 sm:gap-8">
+          <Card className="lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:gap-x-12">
+            <div>
+              <h2 className="text-lg font-semibold text-balance">{t.reproTitle}</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{t.reproP1}</p>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
+                <span className="font-medium text-foreground tabular-nums">
+                  {t.reproStatPrefix}
+                  {weeklyDatapoints}
+                  {t.reproStatSuffix}
+                </span>{' '}
+                {t.reproStatTail}
+              </p>
+            </div>
+            <dl className="mt-5 grid gap-4 sm:grid-cols-2 sm:gap-8 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-0 lg:grid-cols-1 lg:content-center lg:gap-6">
               <div>
                 <dt className="text-sm font-medium text-foreground">{t.actionsRunsTitle}</dt>
                 <dd className="mt-1 text-sm leading-6 text-muted-foreground">

@@ -496,7 +496,7 @@ export default function ChartControls({
     ? xAxisWide
       ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)_minmax(0,1fr)]'
       : 'sm:grid-cols-[11rem_minmax(0,1fr)_minmax(0,1fr)]'
-    : 'sm:grid-cols-2';
+    : 'sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]';
 
   const benchmarkSelectors = (
     <>

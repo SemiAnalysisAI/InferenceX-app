@@ -55,7 +55,7 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { InfoHelp } from '@/components/ui/option-info';
 import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/tco-model-dialog';
 import { CaptionPercentInput } from '@/components/ui/caption-percent-input';
-import { ResultContext } from '@/components/ui/result-context';
+import { ResultContext, sourceLinkClassName } from '@/components/ui/result-context';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -188,9 +188,10 @@ function priceSourceOptions(
 const STRINGS = {
   en: {
     title: {
-      'gw-year': 'Revenue & profit estimator per gigawatt (Beta)',
-      'chip-hour': 'Revenue & profit estimator (Beta)',
+      'gw-year': 'Revenue & profit estimator per gigawatt',
+      'chip-hour': 'Revenue & profit estimator',
     },
+    betaQualifier: 'Beta',
     description:
       'Estimated revenue, compute cost, model license fee and operator profit for each chip from measured throughput at a target interactivity, per GPU-hour or per gigawatt-year',
     chartGroup: 'Chart config',
@@ -321,9 +322,10 @@ const STRINGS = {
   },
   zh: {
     title: {
-      'gw-year': '每吉瓦收入与利润估算器（Beta）',
-      'chip-hour': '收入与利润估算器（Beta）',
+      'gw-year': '每吉瓦收入与利润估算器',
+      'chip-hour': '收入与利润估算器',
     },
+    betaQualifier: 'Beta',
     description:
       '基于目标交互性下的实测吞吐量，按每 GPU 小时或每吉瓦年估算各芯片的收入、算力支出、模型许可费与运营方利润',
     chartGroup: '图表配置',
@@ -1422,7 +1424,7 @@ function ProfitEstimatorInner({
             {' '}
             <Link
               target="_blank"
-              className="underline hover:text-foreground"
+              className={sourceLinkClassName}
               href={listPricing.sourceUrl}
               data-testid="profit-list-price-source"
             >
@@ -1584,6 +1586,7 @@ function ProfitEstimatorInner({
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader
               title={t.title[basis]}
+              qualifier={t.betaQualifier}
               description={t.description}
               actions={<ChartShareActions />}
             />

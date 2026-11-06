@@ -22,7 +22,7 @@ import {
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
-import { ResultContext } from '@/components/ui/result-context';
+import { ResultContext, sourceLinkClassName } from '@/components/ui/result-context';
 
 const STRINGS = {
   en: {
@@ -328,7 +328,12 @@ function AscendCoreProfiles({ note }: { note?: string }) {
         <h3 className="text-sm font-medium text-foreground">{t.methodology}</h3>
         <p>{t.method}</p>
         <p>{t.concurrentLimit}</p>
-        <a className="underline" href={result.sourceUrl} target="_blank" rel="noopener noreferrer">
+        <a
+          className={sourceLinkClassName}
+          href={result.sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           {t.source}
         </a>
       </section>
