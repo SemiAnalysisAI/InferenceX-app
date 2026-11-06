@@ -3,6 +3,7 @@ import {
   resolveFrameworkPartLabel,
 } from '@semianalysisai/inferencex-constants';
 
+import { hasPoolSplit } from '@/lib/benchmarks/chip-basis';
 import type { EvalChangelogEntry, EvaluationChartData } from '@/components/evaluation/types';
 import type { EvalRow } from '@/lib/api/api';
 import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
@@ -151,7 +152,9 @@ export function buildEvaluationChartRows(
         framework: item.framework,
         tp: item.decode_tp,
         dp: item.metrics.dp,
-        physicalChips: item.disagg
+        // Legacy unsplit disaggregated rows mirror the deployment into both pool
+        // fields, so only a real split adds the two (as on the inference chart).
+        physicalChips: hasPoolSplit(item)
           ? item.num_prefill_gpu + item.num_decode_gpu
           : item.num_decode_gpu,
         ep: item.decode_ep,

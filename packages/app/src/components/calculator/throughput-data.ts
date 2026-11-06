@@ -1,8 +1,15 @@
-import { rowToSequence } from '@semianalysisai/inferencex-constants';
+import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
 
-import type { AggDataEntry, HardwareConfig } from '@/components/inference/types';
+import {
+  DEFAULT_CHIP_BASIS,
+  measuredInputShare,
+  withChipBasis,
+  type ChipBasis,
+  type ChipBasisRow,
+} from '@/lib/benchmarks/chip-basis';
+import type { HardwareConfig } from '@/components/inference/types';
 import type { BenchmarkRow } from '@/lib/api/api';
-import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
+import { rowLatencyMetric } from '@/lib/benchmarks/benchmark-transform';
 import { pricingCacheHitRate } from '@/lib/calculator/cache-pricing';
 import { getHardwareKey } from '@/lib/charts/chart-utils';
 import {
@@ -12,7 +19,7 @@ import {
   type TcoBasis,
 } from '@/lib/catalog/constants';
 import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
-import { supportsTokenMetric } from '@/lib/benchmarks/supplemental-benchmarks';
+import { supportsTokenMetric } from '@/lib/benchmarks/token-metric-support';
 
 import {
   getCostField,
@@ -62,11 +69,11 @@ export interface OverlayGroupMeta extends GroupMeta {
 }
 
 function getAgenticMetric(
-  entry: AggDataEntry,
+  row: BenchmarkRow,
   percentile: Percentile,
   suffix: 'intvty' | 'e2el' | 'ttft',
 ): number {
-  const value = entry[`${percentile}_${suffix}` as keyof AggDataEntry];
+  const value = rowLatencyMetric(row, percentile, suffix);
   return typeof value === 'number' ? value : 0;
 }
 
@@ -78,14 +85,14 @@ function getAgenticMetric(
  * a zero would clear every cap.
  */
 function firstTokenSeconds(
-  entry: AggDataEntry,
+  row: BenchmarkRow,
   sequence: Sequence,
   percentile: Percentile,
 ): number | undefined {
   const value =
     sequence === Sequence.AgenticTraces
-      ? getAgenticMetric(entry, percentile, 'ttft')
-      : entry.median_ttft;
+      ? getAgenticMetric(row, percentile, 'ttft')
+      : rowLatencyMetric(row, 'median', 'ttft');
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
@@ -125,28 +132,41 @@ function firstTokenSeconds(
 /**
  * Fraction of a config's tokens that are input tokens.
  *
- * The obvious formula — `input / (input + output)` off the per-GPU rates — is
- * wrong for disaggregated runs, and wrong by a lot. Those rows report
- * `input_tput_per_gpu` per *prefill* chip and `output_tput_per_gpu` per *decode*
- * chip, while `tput_per_gpu` is per chip overall. Across production history the
- * two rates sum to between 1.0x and 16.1x the total, exactly tracking
- * `(prefill + decode) x (isl/prefill + osl/decode) / (isl + osl)`. Aggregated
- * rows sum to 1.0000x on all 937 of them.
+ * Disaggregated rows report `input_tput_per_gpu` per *prefill* chip and
+ * `output_tput_per_gpu` per *decode* chip, while `tput_per_gpu` is per chip
+ * overall, so `input / (input + output)` off the stored rates is wrong for them.
+ * `measuredInputShare` first puts the rates on one denominator (every
+ * deployment chip), which also keeps the mix independent of the chip-basis
+ * toggle, and accepts rows still carrying raw per-total producer rates.
  *
- * So: trust the measured rates when they are self-consistent, and fall back to
- * the structural mix when they are not. For a fixed sequence the structural mix
- * is exactly ISL:OSL — every request has that shape, so no config can change it.
+ * Then: trust the measured rates when they are self-consistent, and fall back to
+ * the structural mix when they are not (a legacy row without a real prefill/decode
+ * split, or missing rates). For a fixed sequence the structural mix is ISL:OSL.
  * For agentic traces it is the run's own prompt:generation token counts.
  *
  * Returns null when nothing in the row pins the mix down.
  */
-function inputTokenShare(row: BenchmarkRow, inputTput: number, outputTput: number): number | null {
-  const tput = row.metrics.tput_per_gpu ?? 0;
-  const sum = inputTput + outputTput;
+function inputTokenShare(row: ChipBasisRow): number | null {
   // Self-consistent: the rates share the denominator `tput_per_gpu` uses, so the
-  // split they imply is the measured one. 1% covers float noise, not a
-  // prefill/decode mismatch (the smallest of those in production is 1.63x).
-  if (tput > 0 && sum > 0 && Math.abs(sum / tput - 1) <= 0.01) return inputTput / sum;
+  // split they imply is the measured one. 1% covers float noise.
+  const m = row.metrics;
+  const measured = measuredInputShare(
+    {
+      disagg: row.disagg,
+      chip_basis: row.chip_basis,
+      num_prefill_gpu: row.num_prefill_gpu,
+      num_decode_gpu: row.num_decode_gpu,
+      prefill_num_workers: row.prefill_num_workers,
+      decode_num_workers: row.decode_num_workers,
+      isl: row.isl,
+      osl: row.osl,
+      tput_per_gpu: m.tput_per_gpu,
+      input_tput_per_gpu: m.input_tput_per_gpu,
+      output_tput_per_gpu: m.output_tput_per_gpu,
+    },
+    0.01,
+  );
+  if (measured !== null) return measured;
 
   const { isl, osl } = row;
   if (typeof isl === 'number' && typeof osl === 'number' && isl + osl > 0) {
@@ -180,6 +200,8 @@ export function buildGpuGroups<M extends GroupMeta>(
     /** Token basis selected by the consumer; applies to official and overlay rows. */
     tokenType?: CostType;
     tcoBasis?: TcoBasis;
+    /** Which chips divide disaggregated input/output throughput. Defaults to per pool. */
+    chipBasis?: ChipBasis;
     /** Derive a row's group key + metadata. Return null to drop the row. */
     classify: (hwKey: string, row: BenchmarkRow) => { key: string; meta: M } | null;
   },
@@ -194,6 +216,7 @@ export function buildGpuGroups<M extends GroupMeta>(
     percentile = Percentile.P90,
     tokenType = 'total',
     tcoBasis = DEFAULT_TCO_BASIS,
+    chipBasis = DEFAULT_CHIP_BASIS,
     classify,
   } = options;
   const grouped: Record<string, GPUDataPoint[]> = {};
@@ -205,9 +228,14 @@ export function buildGpuGroups<M extends GroupMeta>(
     if (!precisions.includes(row.precision)) continue;
     if (!supportsTokenMetric(row, tokenType)) continue;
 
-    const entry = rowToAggDataEntry(row);
-    const hwKey = getHardwareKey(entry);
-    const hwConfig = getHardwareConfig(hwKey, entry.model);
+    const hwKey = getHardwareKey({
+      hw: row.hardware,
+      framework: row.framework,
+      disagg: row.disagg,
+      benchmark_type: row.benchmark_type,
+      spec_decoding: row.spec_method,
+    });
+    const hwConfig = getHardwareConfig(hwKey, DB_MODEL_TO_DISPLAY[row.model] ?? row.model);
     if (!hwConfig) continue;
 
     const classified = classify(hwKey, row);
@@ -216,36 +244,46 @@ export function buildGpuGroups<M extends GroupMeta>(
 
     if (!hwConfigMap[hwKey]) hwConfigMap[hwKey] = { ...hwConfig, name: hwKey };
 
-    const m = row.metrics;
-    const tput = m.tput_per_gpu ?? 0;
+    // Callers match `row` by identity (classify, sourceRow), so only the rates
+    // read the rescaled copy.
+    const ratedRow = withChipBasis(row, chipBasis);
+    const m = ratedRow.metrics;
+    // Output-only sources store no total; their output rate orders the frontier.
+    const tput = m.tput_per_gpu ?? m.output_tput_per_gpu ?? 0;
     const outputTput = m.output_tput_per_gpu ?? tput;
     const inputTput = m.input_tput_per_gpu ?? 0;
-    const cacheHitRate = pricingCacheHitRate({ ...m, hw: row.hardware });
+    const cacheHitRate = pricingCacheHitRate({
+      server_gpu_cache_hit_rate: m.server_gpu_cache_hit_rate,
+      server_external_cache_hit_rate: m.server_external_cache_hit_rate,
+      server_cpu_cache_hit_rate: m.server_cpu_cache_hit_rate,
+      theoretical_cache_hit_rate: m.theoretical_cache_hit_rate,
+      hw: row.hardware,
+    });
     const theoreticalRate =
       typeof m.theoretical_cache_hit_rate === 'number' &&
       Number.isFinite(m.theoretical_cache_hit_rate)
         ? Math.max(0, Math.min(1, m.theoretical_cache_hit_rate))
         : null;
-    const tokenShare = inputTokenShare(row, inputTput, outputTput);
+    const tokenShare = inputTokenShare(ratedRow);
     const specs = getGpuSpecs(hwKey, tcoBasis);
     const power = specs.power;
 
     if (!grouped[groupKey]) grouped[groupKey] = [];
     groupMeta[groupKey] = meta;
 
-    const ttft = firstTokenSeconds(entry, sequence, percentile);
+    const ttft = firstTokenSeconds(row, sequence, percentile);
 
     grouped[groupKey].push({
       sourceRow: row,
       hwKey,
       interactivity:
         sequence === Sequence.AgenticTraces
-          ? getAgenticMetric(entry, percentile, 'intvty')
-          : entry.median_intvty,
+          ? getAgenticMetric(row, percentile, 'intvty')
+          : rowLatencyMetric(row, 'median', 'intvty'),
       ...(ttft === undefined ? {} : { ttft }),
       ...(sequence === Sequence.AgenticTraces
         ? {
-            e2eLatency: getAgenticMetric(entry, percentile, 'e2el'),
+            e2eLatency: getAgenticMetric(row, percentile, 'e2el'),
             date: row.date,
           }
         : {}),
@@ -257,7 +295,7 @@ export function buildGpuGroups<M extends GroupMeta>(
       ...(tokenShare === null ? {} : { inputTokenShare: tokenShare }),
       concurrency: row.conc,
       tp: row.decode_tp,
-      dp: entry.dp,
+      dp: row.metrics.dp,
       precision: row.precision,
       ep: row.decode_ep,
       dp_attention: row.decode_dp_attention,

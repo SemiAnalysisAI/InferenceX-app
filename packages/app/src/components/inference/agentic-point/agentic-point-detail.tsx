@@ -34,9 +34,7 @@ import {
   type StagePhase,
 } from './phase-slice';
 import { PointSummary } from './point-summary';
-import { PowerTelemetryView } from './power-telemetry-view';
 import { RequestMetricOverTime, SequenceMetricCard } from './request-metric-cards';
-import { ServerLogViewer } from './server-log-viewer';
 import {
   InflightUniqueTokensCard,
   KvCacheUtilizationCard,
@@ -166,6 +164,14 @@ export function showMetricSourceToolbar({
 
 const RequestTimelineView = dynamic(() =>
   import('./request-timeline').then((module_) => module_.RequestTimelineView),
+);
+
+const PowerTelemetryView = dynamic(() =>
+  import('./power-telemetry-view').then((module_) => module_.PowerTelemetryView),
+);
+
+const ServerLogViewer = dynamic(() =>
+  import('./server-log-viewer').then((module_) => module_.ServerLogViewer),
 );
 
 interface Props {

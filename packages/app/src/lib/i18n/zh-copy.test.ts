@@ -102,7 +102,12 @@ function walk(directory: string): string[] {
     .sort();
 }
 
-const sourceFiles: string[] = SCAN_ROOTS.filter((root) => fs.existsSync(root)).flatMap(walk);
+const sources = SCAN_ROOTS.filter((root) => fs.existsSync(root))
+  .flatMap(walk)
+  .map((file) => ({
+    relative: path.relative(APP_DIR, file),
+    source: fs.readFileSync(file, 'utf8'),
+  }));
 
 function chineseLinesFromSource(relative: string, source: string): Line[] {
   const isProse = path.extname(relative) === '.mdx';
@@ -120,11 +125,9 @@ function chineseLinesFromSource(relative: string, source: string): Line[] {
   });
 }
 
-const chineseLines: Line[] = sourceFiles.flatMap((file) => {
-  const relative = path.relative(APP_DIR, file);
-  if (GUARD_SOURCES.has(relative)) return [];
-  return chineseLinesFromSource(relative, fs.readFileSync(file, 'utf8'));
-});
+const chineseLines: Line[] = sources.flatMap(({ relative, source }) =>
+  GUARD_SOURCES.has(relative) ? [] : chineseLinesFromSource(relative, source),
+);
 
 function report(violations: Violation[]): string {
   return violations
@@ -138,10 +141,8 @@ function expectClean(violations: Violation[]): void {
 }
 
 describe('zh copy — the tree obeys every mechanical rule', () => {
-  const bilingualLines: Line[] = sourceFiles.flatMap((file) => {
-    const relative = path.relative(APP_DIR, file);
+  const bilingualLines: Line[] = sources.flatMap(({ relative, source }) => {
     if (GUARD_SOURCES.has(relative) || relative.includes('.test.')) return [];
-    const source = fs.readFileSync(file, 'utf8');
     if (!/\bzh:\s*\{/u.test(source)) return [];
     return source.split('\n').map((text, index) => ({ file: relative, line: index + 1, text }));
   });
@@ -223,14 +224,13 @@ describe('zh copy — coverage', () => {
 });
 
 describe('zh copy — generic bilingual dictionary parity', () => {
-  const dictionaryFiles = sourceFiles.filter((file) => {
-    const relative = path.relative(APP_DIR, file);
-    return /\.tsx?$/u.test(relative) && !relative.includes('.test.');
-  });
+  const dictionarySources = sources.filter(
+    ({ relative }) => /\.tsx?$/u.test(relative) && !relative.includes('.test.'),
+  );
 
   it('keeps every explicit en/zh object key shape aligned', () => {
-    const violations = dictionaryFiles.flatMap((file) =>
-      findDictionaryParityViolations(path.relative(APP_DIR, file), fs.readFileSync(file, 'utf8')),
+    const violations = dictionarySources.flatMap(({ relative, source }) =>
+      findDictionaryParityViolations(relative, source),
     );
     expect(violations).toEqual([]);
   });

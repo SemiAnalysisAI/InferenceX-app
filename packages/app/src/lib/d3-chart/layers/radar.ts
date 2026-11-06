@@ -1,5 +1,6 @@
 import * as d3 from 'd3';
 
+import { setStyleIfChanged, writeAttrs, writeText } from '../chart-update';
 import { CHART_TYPE, px } from '../typography';
 
 export interface RadarConfig<T = any> {
@@ -42,7 +43,7 @@ export function renderRadar<T>(
   if (radarG.empty()) {
     radarG = group.append('g').attr('class', 'radar-center');
   }
-  radarG.attr('transform', `translate(${centerX},${centerY})`);
+  writeAttrs(radarG, { transform: `translate(${centerX},${centerY})` });
 
   if (radius <= 0) {
     return radarG.selectAll<SVGCircleElement, RadarDot<T>>('.radar-dot').data([] as RadarDot<T>[]);
@@ -59,89 +60,109 @@ export function renderRadar<T>(
   const rPerLevel = radius / levels;
 
   const gridData = d3.range(1, levels + 1);
-  radarG
-    .selectAll<SVGCircleElement, number>('.radar-grid')
-    .data(gridData, (d) => d)
-    .join('circle')
-    .attr('class', 'radar-grid')
-    .attr('cx', 0)
-    .attr('cy', 0)
-    .attr('r', (d) => rPerLevel * d)
-    .attr('fill', 'none')
-    .attr('stroke', 'var(--border-alt)')
-    .attr('stroke-width', 0.5)
-    .attr('stroke-dasharray', (d) => (d < levels ? '2,3' : 'none'));
+  writeAttrs(
+    radarG
+      .selectAll<SVGCircleElement, number>('.radar-grid')
+      .data(gridData, (d) => d)
+      .join('circle'),
+    {
+      class: 'radar-grid',
+      cx: 0,
+      cy: 0,
+      r: (d) => rPerLevel * d,
+      fill: 'none',
+      stroke: 'var(--border-alt)',
+      'stroke-width': 0.5,
+      'stroke-dasharray': (d) => (d < levels ? '2,3' : 'none'),
+    },
+  );
 
-  radarG
-    .selectAll<SVGTextElement, number>('.radar-grid-label')
-    .data(gridData, (d) => d)
-    .join('text')
-    .attr('class', 'radar-grid-label')
-    .attr('x', 4)
-    .attr('y', (d) => -rPerLevel * d + 4)
-    .attr('font-size', px(CHART_TYPE.micro))
-    .attr('fill', 'var(--border)')
-    .attr('opacity', 0.6)
-    .text((d) => `${Math.round((d / levels) * 100)}%`);
+  const gridLabels = writeAttrs(
+    radarG
+      .selectAll<SVGTextElement, number>('.radar-grid-label')
+      .data(gridData, (d) => d)
+      .join('text'),
+    {
+      class: 'radar-grid-label',
+      x: 4,
+      y: (d) => -rPerLevel * d + 4,
+      'font-size': px(CHART_TYPE.micro),
+      fill: 'var(--border)',
+      opacity: 0.6,
+    },
+  );
+  writeText(gridLabels, (d) => `${Math.round((d / levels) * 100)}%`);
 
-  radarG
-    .selectAll<SVGLineElement, number>('.radar-spoke')
-    .data(d3.range(numAxes), (d) => d)
-    .join('line')
-    .attr('class', 'radar-spoke')
-    .attr('x1', 0)
-    .attr('y1', 0)
-    .attr('x2', (_, i) => cosAngles[i] * radius)
-    .attr('y2', (_, i) => sinAngles[i] * radius)
-    .attr('stroke', 'var(--border)')
-    .attr('stroke-width', 0.8)
-    .attr('opacity', 0.4);
+  writeAttrs(
+    radarG
+      .selectAll<SVGLineElement, number>('.radar-spoke')
+      .data(d3.range(numAxes), (d) => d)
+      .join('line'),
+    {
+      class: 'radar-spoke',
+      x1: 0,
+      y1: 0,
+      x2: (_, i) => cosAngles[i] * radius,
+      y2: (_, i) => sinAngles[i] * radius,
+      stroke: 'var(--border)',
+      'stroke-width': 0.8,
+      opacity: 0.4,
+    },
+  );
 
   const labelRadius = radius + 20;
   const axisData = axes.map((a, i) => ({ ...a, index: i }));
-  radarG
-    .selectAll<SVGTextElement, (typeof axisData)[0]>('.radar-axis-label')
-    .data(axisData, (d) => d.label)
-    .join('text')
-    .attr('class', 'radar-axis-label')
-    .attr('x', (d) => cosAngles[d.index] * labelRadius)
-    .attr('y', (d) => sinAngles[d.index] * labelRadius)
-    .attr('text-anchor', (d) => {
-      const cos = cosAngles[d.index];
-      if (Math.abs(cos) < 0.1) return 'middle';
-      return cos > 0 ? 'start' : 'end';
-    })
-    .attr('dominant-baseline', 'central')
-    .attr('font-size', px(CHART_TYPE.dataLabel))
-    .attr('font-weight', '500')
-    .attr('fill', 'var(--foreground)')
-    .text((d) => d.label);
+  const axisLabels = writeAttrs(
+    radarG
+      .selectAll<SVGTextElement, (typeof axisData)[0]>('.radar-axis-label')
+      .data(axisData, (d) => d.label)
+      .join('text'),
+    {
+      class: 'radar-axis-label',
+      x: (d) => cosAngles[d.index] * labelRadius,
+      y: (d) => sinAngles[d.index] * labelRadius,
+      'text-anchor': (d) => {
+        const cos = cosAngles[d.index];
+        if (Math.abs(cos) < 0.1) return 'middle';
+        return cos > 0 ? 'start' : 'end';
+      },
+      'dominant-baseline': 'central',
+      'font-size': px(CHART_TYPE.dataLabel),
+      'font-weight': '500',
+      fill: 'var(--foreground)',
+    },
+  );
+  writeText(axisLabels, (d) => d.label);
 
   const lineGen = d3
     .line<[number, number]>()
     .x((d) => d[0])
     .y((d) => d[1]);
 
-  radarG
-    .selectAll<SVGPathElement, T>('.radar-polygon')
-    .data(data, keyFn ?? ((_, i) => i))
-    .join('path')
-    .attr('class', 'radar-polygon')
-    .attr('d', (d) => {
-      const points: [number, number][] = [];
-      for (let i = 0; i < numAxes; i++) {
-        const val = getValue(d, i);
-        const r = val === null ? 0 : val * radius;
-        points.push([cosAngles[i] * r, sinAngles[i] * r]);
-      }
-      points.push(points[0]);
-      return lineGen(points);
-    })
-    .attr('fill', (d) => getColor(d))
-    .attr('fill-opacity', 0.08)
-    .attr('stroke', (d) => getColor(d))
-    .attr('stroke-width', 1.5)
-    .attr('stroke-opacity', 0.7);
+  writeAttrs(
+    radarG
+      .selectAll<SVGPathElement, T>('.radar-polygon')
+      .data(data, keyFn ?? ((_, i) => i))
+      .join('path'),
+    {
+      class: 'radar-polygon',
+      d: (d) => {
+        const points: [number, number][] = [];
+        for (let i = 0; i < numAxes; i++) {
+          const val = getValue(d, i);
+          const r = val === null ? 0 : val * radius;
+          points.push([cosAngles[i] * r, sinAngles[i] * r]);
+        }
+        points.push(points[0]);
+        return lineGen(points);
+      },
+      fill: (d) => getColor(d),
+      'fill-opacity': 0.08,
+      stroke: (d) => getColor(d),
+      'stroke-width': 1.5,
+      'stroke-opacity': 0.7,
+    },
+  );
 
   const dots: RadarDot<T>[] = [];
   for (let di = 0; di < data.length; di++) {
@@ -163,16 +184,19 @@ export function renderRadar<T>(
     }
   }
 
-  return radarG
+  const radarDots = radarG
     .selectAll<SVGCircleElement, RadarDot<T>>('.radar-dot')
     .data(dots, (d) => d.key)
-    .join('circle')
-    .attr('class', 'radar-dot')
-    .attr('cx', (d) => d.cx)
-    .attr('cy', (d) => d.cy)
-    .attr('r', 3.5)
-    .attr('fill', (d) => d.color)
-    .attr('stroke', 'white')
-    .attr('stroke-width', 1)
-    .style('cursor', 'pointer');
+    .join('circle');
+  return writeAttrs(radarDots, {
+    class: 'radar-dot',
+    cx: (d) => d.cx,
+    cy: (d) => d.cy,
+    r: 3.5,
+    fill: (d) => d.color,
+    stroke: 'white',
+    'stroke-width': 1,
+  }).each(function () {
+    setStyleIfChanged(this, 'cursor', 'pointer');
+  });
 }

@@ -1,6 +1,6 @@
 import type { ChartDefinition } from './types';
 import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
-import type { TokenMetricType } from '@/lib/benchmarks/supplemental-benchmarks';
+import type { TokenMetricType } from '@/lib/benchmarks/token-metric-support';
 import { POWER_BASIS_FIELDS } from '@/lib/power/power-basis';
 
 export type RooflineDirection = 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';

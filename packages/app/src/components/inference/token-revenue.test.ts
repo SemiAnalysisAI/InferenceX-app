@@ -129,6 +129,29 @@ describe('token revenue', () => {
     expect(tokenRevenuePerGpuHour(disaggregated, openRouterPricing)).toBeCloseTo(10.4, 10);
   });
 
+  it('reads the measured mix of a real prefill/decode split identically on both chip bases', () => {
+    const split = {
+      disagg: true,
+      prefill_num_workers: 1,
+      decode_num_workers: 1,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 12,
+      tput_per_gpu: 1_000,
+      isl: null,
+      osl: null,
+    };
+    // 900 input + 100 output per deployment chip, stored per pool.
+    const pool = point({ ...split, input_tput_per_gpu: 3_600, output_tput_per_gpu: 400 / 3 });
+    const total = point({
+      ...split,
+      chip_basis: 'total',
+      input_tput_per_gpu: 900,
+      output_tput_per_gpu: 100,
+    });
+    expect(inputTokenShareForRevenue(pool)).toBeCloseTo(0.9, 10);
+    expect(inputTokenShareForRevenue(total)).toBeCloseTo(0.9, 10);
+  });
+
   it('uses measured prompt and generation totals for agentic disaggregated rows', () => {
     const agentic = point({
       disagg: true,
@@ -200,6 +223,20 @@ describe('token revenue', () => {
     });
 
     expect(tokenRevenuePerGpuHour(unknownMix, openRouterPricing)).toBeNull();
+  });
+
+  it('returns priced copies, re-prices last and leaves the input points untouched', () => {
+    const priced = point({ tokenRevenuePerGpuHour: { y: 9, roof: false } });
+    const unpriced = point();
+    const inputs = [priced, unpriced];
+    const before = structuredClone(inputs);
+
+    const out = applyTokenRevenuePricing(inputs, openRouterPricing);
+
+    expect(out[0]).not.toBe(priced);
+    expect(out[1]).not.toBe(unpriced);
+    expect(inputs).toStrictEqual(before);
+    for (const result of out) expect(Object.keys(result).at(-1)).toBe('tokenRevenuePerGpuHour');
   });
 });
 

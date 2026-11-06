@@ -1,5 +1,3 @@
-'use client';
-
 import { Fragment } from 'react';
 
 import { Card } from '@/components/ui/card';
@@ -8,8 +6,9 @@ import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 
 import type { Locale } from '@/lib/i18n/i18n';
 
-import { CompanyLogo, highlightBrand } from './quote-utils';
+import { CompanyLogo } from './quote-utils';
 import { QUOTES, orgAnchorId } from './quotes-data';
+import { SUPPORTER_GROUPS } from './supporter-groups';
 import { SupporterLogoWall } from './supporter-logo-wall';
 
 const STRINGS = {
@@ -29,6 +28,19 @@ const firstQuoteIndexForOrg: Record<string, number> = {};
 QUOTES.forEach((q, i) => {
   if (!(q.org in firstQuoteIndexForOrg)) firstQuoteIndexForOrg[q.org] = i;
 });
+
+function highlightBrand(text: string) {
+  const parts = text.split(/(?<brand>InferenceMAX™?|InferenceX™?|InferenceMAX|InferenceX)/giu);
+  return parts.map((part, i) =>
+    /^inference(?:max|x)/iu.test(part) ? (
+      <span key={i} className="text-brand font-semibold">
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  );
+}
 
 function QuoteCard({
   id,
@@ -91,7 +103,7 @@ export function QuotesContent({ locale = 'en' }: { locale?: Locale } = {}) {
             <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">{t.heading}</h1>
             <p className="mt-3 text-base lg:text-lg text-muted-foreground">{t.intro}</p>
             <div className="mt-6 pt-6 border-t border-border/40">
-              <SupporterLogoWall locale={locale} />
+              <SupporterLogoWall locale={locale} groups={SUPPORTER_GROUPS} />
             </div>
             <div className="mt-6 pt-6 border-t border-border/40">
               <div className="mx-auto flex max-w-4xl flex-col gap-8 md:gap-10">

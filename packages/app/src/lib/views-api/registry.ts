@@ -17,6 +17,7 @@ export const VIEW_QUERY_PARAMS = {
     'unofficialrun',
   ],
   calculator: [
+    'chipBasis',
     'costProvider',
     'costType',
     'costcap',
@@ -75,6 +76,7 @@ export const VIEW_QUERY_PARAMS = {
   ],
   evaluation: ['unofficialrun', 'benchmark', 'date', 'format', 'gpus', 'model', 'precisions'],
   'first-token': [
+    'chipBasis',
     'caps',
     'costProvider',
     'costType',
@@ -124,6 +126,7 @@ export const VIEW_QUERY_PARAMS = {
   ],
   'gpu-specs': ['format', 'metric'],
   historical: [
+    'chipBasis',
     'chart',
     'deployment',
     'end',
@@ -142,6 +145,7 @@ export const VIEW_QUERY_PARAMS = {
     'vendors',
   ],
   inference: [
+    'chipBasis',
     'topologies',
     'allPoints',
     'best',
@@ -181,6 +185,7 @@ export const VIEW_QUERY_PARAMS = {
     'headroom',
   ],
   'model-architectures': ['model'],
+  operatorx: ['format', 'hardware', 'model', 'op', 'page', 'parallel', 'status', 'workload'],
   options: ['format'],
   overview: ['compare', 'engine', 'format', 'hwrows', 'models', 'ref', 'rows', 'tier'],
   'profit-estimator': [
@@ -248,6 +253,16 @@ export const VIEW_QUERY_PARAMS = {
     'selected',
     'slot',
     'source',
+    'v_x',
+    'v_y',
+    'v_tier',
+    'v_view',
+    'v_optimal',
+    'v_api',
+    'v_hidden',
+    'v_base',
+    'v_cand',
+    'v_case',
     'view',
     'workload',
     'xAxis',
@@ -280,10 +295,7 @@ export const DASHBOARD_API_COVERAGE = {
       'Feature-gated Agentic Workload Explorer reads a frozen, anonymized ProxyTrace snapshot from a separate database through page-owned /api/v1/agentic-workload-explorer/* routes whose shapes follow the pages; no stable public read-only view is published.',
   },
   powerx: { view: 'inference' },
-  operatorx: {
-    exclusion:
-      'Feature-gated OperatorX explorer uses page-owned routes; no stable public read-only view is published.',
-  },
+  operatorx: { view: 'operatorx' },
   collectivex: { view: 'collectivex' },
   'current-inferencex-image': { view: 'current-inferencex-image' },
   video: { view: 'video' },

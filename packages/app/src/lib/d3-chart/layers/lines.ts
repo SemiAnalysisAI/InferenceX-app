@@ -1,6 +1,9 @@
 import * as d3 from 'd3';
 
+import { setAttrIfChanged, writeAttrs } from '../chart-update';
 import type { ContinuousScale } from '../types';
+
+import { projectedLinePath } from './line-path-cache';
 
 type AnyXScale = ContinuousScale | d3.ScaleTime<number, number>;
 
@@ -25,15 +28,8 @@ export function renderLines(
   yScale: ContinuousScale,
   config: LineConfig,
 ): void {
-  const lineGenerator = d3
-    .line<{ x: number; y: number }>()
-    .x((d) => (xScale as d3.ScaleLinear<number, number>)(d.x))
-    .y((d) => yScale(d.y))
-    .curve(config.curve ?? d3.curveMonotoneX);
-
-  if (config.isDefined) {
-    lineGenerator.defined(config.isDefined);
-  }
+  const project = xScale as d3.ScaleLinear<number, number>;
+  const curve = config.curve ?? d3.curveMonotoneX;
 
   const entries: LineEntry[] = Object.entries(lines)
     .filter(([, points]) => points.length > 0)
@@ -47,14 +43,18 @@ export function renderLines(
 
   selection.exit().remove();
 
-  entered
-    .merge(selection)
-    .attr('class', (d) => `line-path line-${d.key}`)
-    .attr('data-line-key', (d) => d.key)
-    .attr('stroke', (d) => config.getColor(d.key))
-    .attr('stroke-dasharray', (d) => config.getStrokeDasharray?.(d.key) ?? null)
-    .attr('stroke-width', (d) => config.getStrokeWidth?.(d.key) ?? config.strokeWidth ?? 2)
-    .attr('d', (d) => lineGenerator(d.points));
+  writeAttrs(entered.merge(selection), {
+    class: (d) => `line-path line-${d.key}`,
+    'data-line-key': (d) => d.key,
+    stroke: (d) => config.getColor(d.key),
+    'stroke-dasharray': (d) => config.getStrokeDasharray?.(d.key) ?? null,
+    'stroke-width': (d) => config.getStrokeWidth?.(d.key) ?? config.strokeWidth ?? 2,
+  }).each(function (d) {
+    writeLinePath(
+      this,
+      projectedLinePath(this, d.points, project, yScale, curve, config.isDefined),
+    );
+  });
 }
 
 export function updateLinesOnZoom(
@@ -64,19 +64,19 @@ export function updateLinesOnZoom(
   yScale: ContinuousScale,
   config?: Pick<LineConfig, 'curve' | 'isDefined'>,
 ): void {
-  const lineGenerator = d3
-    .line<{ x: number; y: number }>()
-    .x((d) => (xScale as d3.ScaleLinear<number, number>)(d.x))
-    .y((d) => yScale(d.y))
-    .curve(config?.curve ?? d3.curveMonotoneX);
+  const project = xScale as d3.ScaleLinear<number, number>;
+  const curve = config?.curve ?? d3.curveMonotoneX;
 
-  if (config?.isDefined) {
-    lineGenerator.defined(config.isDefined);
-  }
-
-  // Keys are data (e.g. "Huawei 950PR"), so match the attribute instead of building a selector.
   group.selectAll<SVGPathElement, unknown>('.line-path').each(function () {
     const key = this.dataset.lineKey ?? '';
-    if (Object.hasOwn(lines, key)) d3.select(this).datum(lines[key]).attr('d', lineGenerator);
+    if (!Object.hasOwn(lines, key)) return;
+    const points = lines[key];
+    d3.select(this).datum(points);
+    writeLinePath(this, projectedLinePath(this, points, project, yScale, curve, config?.isDefined));
   });
+}
+
+function writeLinePath(element: SVGPathElement, path: string | null): void {
+  if (path === null) element.removeAttribute('d');
+  else setAttrIfChanged(element, 'd', path);
 }

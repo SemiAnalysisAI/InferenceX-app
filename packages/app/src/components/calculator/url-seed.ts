@@ -9,6 +9,7 @@ import {
   Sequence,
   SEQUENCE_OPTIONS,
 } from '@/lib/catalog/data-mappings';
+import { profitRouteSearch } from '@/lib/routing/profit-estimator-routes';
 
 export interface CalculatorUrlSeed {
   model?: Model;
@@ -18,11 +19,10 @@ export interface CalculatorUrlSeed {
   runDate?: string;
   runId?: string;
   profitTarget?: number;
-  profitRouteKey?: string;
 }
 
-export function parseProfitTargetParam(value: string | undefined): number | undefined {
-  if (value === undefined || !/^\d+(?:\.\d+)?$/u.test(value)) return undefined;
+export function parseProfitTargetParam(value: string | null): number | undefined {
+  if (value === null || !/^\d+(?:\.\d+)?$/u.test(value)) return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
@@ -32,28 +32,20 @@ export function profitTargetUrlValue(model: Model, target: number): string {
   return target === profitModelDefaults(model).interactivity ? '' : String(target);
 }
 
-function pickString(value: string | string[] | undefined): string | undefined {
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return value[0];
-  return undefined;
-}
-
-export function resolveCalculatorUrlSeed(
-  sp: Record<string, string | string[] | undefined>,
-): CalculatorUrlSeed {
+export function resolveCalculatorUrlSeed(params: URLSearchParams): CalculatorUrlSeed {
   const seed: CalculatorUrlSeed = {};
 
-  const modelParam = pickString(sp.g_model);
+  const modelParam = params.get('g_model');
   if (modelParam && (MODEL_OPTIONS as readonly string[]).includes(modelParam)) {
     seed.model = modelParam as Model;
   }
 
-  const seqParam = pickString(sp.i_seq);
+  const seqParam = params.get('i_seq');
   if (seqParam && (SEQUENCE_OPTIONS as readonly string[]).includes(seqParam)) {
     seed.sequence = seqParam as Sequence;
   }
 
-  const precParam = pickString(sp.i_prec);
+  const precParam = params.get('i_prec');
   if (precParam) {
     const precs = precParam
       .split(',')
@@ -61,25 +53,34 @@ export function resolveCalculatorUrlSeed(
     if (precs.length > 0) seed.precisions = precs;
   }
 
-  const percentileParam = pickString(sp.i_pctl);
+  const percentileParam = params.get('i_pctl');
   if (percentileParam && (PERCENTILE_OPTIONS as readonly string[]).includes(percentileParam)) {
     seed.percentile = percentileParam as Percentile;
   }
 
-  const runDateParam = pickString(sp.g_rundate);
+  const runDateParam = params.get('g_rundate');
   if (runDateParam && /^\d{4}-\d{2}-\d{2}$/u.test(runDateParam)) {
     seed.runDate = runDateParam;
   }
 
-  const profitTarget = parseProfitTargetParam(pickString(sp.c_ivtarget));
+  const profitTarget = parseProfitTargetParam(params.get('c_ivtarget'));
   if (profitTarget !== undefined) seed.profitTarget = profitTarget;
 
-  const runIdParam = pickString(sp.g_runid);
+  const runIdParam = params.get('g_runid');
   if (runIdParam && /^[A-Za-z0-9_-]{1,64}$/u.test(runIdParam)) {
     seed.runId = runIdParam;
   }
 
   return seed;
+}
+
+export function calculatorUrlSeed(
+  pathname: string,
+  search: string,
+  routeModel: Model | undefined,
+): CalculatorUrlSeed {
+  const seed = resolveCalculatorUrlSeed(profitRouteSearch(pathname, search));
+  return { ...seed, model: seed.model ?? routeModel };
 }
 
 export { Model, Percentile, Precision, Sequence };

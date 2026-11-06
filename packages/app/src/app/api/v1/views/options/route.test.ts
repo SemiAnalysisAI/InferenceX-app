@@ -56,6 +56,11 @@ describe('GET /api/v1/views/options', () => {
     expect(dsv4).toBeDefined();
     expect(dsv4.dbKeys).toContain('dsv4');
     expect(dsv4.category).toBe('deprecated');
+    expect(body.models.find((m: { name: string }) => m.name === 'Kimi-K3')).toMatchObject({
+      dbKeys: ['kimik3'],
+      category: 'deprecated',
+      compareSlug: 'kimi-k3',
+    });
     expect(body.models.find((m: { name: string }) => m.name === 'GLM-5.3-Flash')).toMatchObject({
       dbKeys: ['glm5.3flash'],
       releaseDate: null,
@@ -90,10 +95,10 @@ describe('GET /api/v1/views/options', () => {
         .filter((model: { category: string }) => model.category === 'default')
         .map((model: { name: string }) => model.name),
     ).toEqual([
-      'Kimi-K3',
       'DeepSeek-V4.1-Flash',
       'GLM-5.2',
       'GLM-5.3-Flash',
+      'Kimi-K3.1-Pro',
       'MiniMax-M3.1-Flash',
       'Muse-Spark-Open',
       'Qwen-3.5-397B-A17B',
@@ -105,12 +110,32 @@ describe('GET /api/v1/views/options', () => {
     );
   });
 
+  it('exposes model-specific sequence retirement without retiring Qwen3.5 or global 8K/1K', async () => {
+    const res = await GET(request('/api/v1/views/options'));
+    const body = await res.json();
+    const qwen = body.models.find((model: { name: string }) => model.name === 'Qwen-3.5-397B-A17B');
+    expect(qwen.category).toBe('default');
+    expect(qwen.deprecatedSequences).toContain('8k/1k');
+    expect(qwen.deprecatedSequences).toContain('1k/1k');
+    expect(qwen.deprecatedSequences).not.toContain('agentic-traces');
+    expect(
+      body.sequences.find((sequence: { key: string }) => sequence.key === '8k/1k'),
+    ).toMatchObject({
+      deprecated: false,
+    });
+    const dsr1 = body.models.find((model: { name: string }) => model.name === 'DeepSeek-R1-0528');
+    expect(dsr1.deprecatedSequences).not.toContain('8k/1k');
+  });
+
   it('describes hardware and metrics from the registries', async () => {
     const bodyRes = await GET(request('/api/v1/views/options'));
     const body = await bodyRes.json();
     const h200 = body.hardware.find((h: { key: string }) => h.key === 'h200');
     expect(h200.vendor).toBe('NVIDIA');
     expect(h200.costPerHour.h).toBeGreaterThan(0);
+    expect(body.hardware.find((h: { key: string }) => h.key === 'b300')).toMatchObject({
+      tdpW: 1100,
+    });
 
     const metric = body.metrics.find((m: { configKey: string }) => m.configKey === 'y_tpPerGpu');
     expect(metric).toBeDefined();

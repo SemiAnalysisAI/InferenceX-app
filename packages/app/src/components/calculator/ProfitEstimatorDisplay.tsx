@@ -20,7 +20,8 @@ import {
   resolveCalculatorVisibility,
   type CalculatorVisibilityIntent,
 } from '@/components/calculator/ThroughputCalculatorDisplay';
-import { type CalculatorUrlSeed, profitTargetUrlValue } from '@/components/calculator/url-seed';
+import { profitTargetUrlValue } from '@/components/calculator/url-seed';
+import { CalculatorUrlSeedBoundary } from '@/components/calculator/url-seed-boundary';
 import {
   GlobalFilterProvider,
   useGlobalFilterActions,
@@ -62,7 +63,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ALL_IN_MEASURED_NOTE, POWER_BASIS_LABELS } from '@/lib/power/power-basis';
-import { AIR_COOLED_SYSTEM_PUE, LIQUID_COOLED_RACK_PUE } from '@/lib/power/system-power-model';
+import { AIR_COOLED_SYSTEM_PUE, LIQUID_COOLED_RACK_PUE } from '@/lib/power/facility-pue';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { useHeldHeight } from '@/hooks/useHeldHeight';
@@ -469,22 +470,25 @@ export const PROFIT_BASIS_TAB: Record<ProfitBasis, ModelRouteTab> = {
 };
 
 export default function ProfitEstimatorDisplay({
-  urlSeed,
+  routeModel,
   basis,
 }: {
-  urlSeed?: CalculatorUrlSeed;
+  routeModel: Model;
   basis: ProfitBasis;
 }) {
   return (
-    <GlobalFilterProvider
-      key={`${basis}:${urlSeed?.model}:${urlSeed?.profitTarget}:${urlSeed?.profitRouteKey}`}
-      initialModel={urlSeed?.model}
-      initialSequence={Sequence.AgenticTraces}
-      initialRunDate={urlSeed?.runDate}
-      initialRunId={urlSeed?.runId}
-    >
-      <ProfitEstimatorInner initialTarget={urlSeed?.profitTarget} basis={basis} />
-    </GlobalFilterProvider>
+    <CalculatorUrlSeedBoundary routeModel={routeModel}>
+      {(urlSeed) => (
+        <GlobalFilterProvider
+          initialModel={urlSeed.model}
+          initialSequence={Sequence.AgenticTraces}
+          initialRunDate={urlSeed.runDate}
+          initialRunId={urlSeed.runId}
+        >
+          <ProfitEstimatorInner initialTarget={urlSeed.profitTarget} basis={basis} />
+        </GlobalFilterProvider>
+      )}
+    </CalculatorUrlSeedBoundary>
   );
 }
 
@@ -539,18 +543,18 @@ function ProfitEstimatorInner({
   const showsTcoBasis = useShowsTcoBasisSelector();
   const { setSelectedModel, setSelectedSequence } = useGlobalFilterActions();
   const { selectedRunDate } = useGlobalFilterRun();
-  const { availableModels, availabilityRows } = useGlobalFilterAvailability();
+  const { availableModels, availability } = useGlobalFilterAvailability();
   const selectedSequence = Sequence.AgenticTraces;
   const agenticModels = useMemo(() => {
     const allowed = modelRoutesForTab(PROFIT_BASIS_TAB[basis]).map((route) => route.model);
     const withData = modelsWithAgenticData(
       availableModels,
-      availabilityRows,
+      availability?.lines,
       (m) => DISPLAY_MODEL_TO_DB[m] ?? [m],
     );
     const both = allowed.filter((m) => withData.includes(m));
     return both.length > 0 ? both : allowed;
-  }, [availableModels, availabilityRows, basis]);
+  }, [availableModels, availability, basis]);
   const modelAllowed = agenticModels.includes(selectedModel);
   useEffect(() => {
     if (!modelAllowed && agenticModels[0]) {
@@ -659,12 +663,11 @@ function ProfitEstimatorInner({
     [selectedModel],
   );
   const historyChipOptions = useMemo(
-    () =>
-      profitHistoryChipOptions(availabilityRows, dbModelKeys, selectedPrecisions, selectedModel),
-    [availabilityRows, dbModelKeys, selectedPrecisions, selectedModel],
+    () => profitHistoryChipOptions(availability, dbModelKeys, selectedPrecisions, selectedModel),
+    [availability, dbModelKeys, selectedPrecisions, selectedModel],
   );
   useEffect(() => {
-    if (!availabilityRows || selectedGPUs.length === 0 || historyChipOptions.length === 0) return;
+    if (!availability || selectedGPUs.length === 0 || historyChipOptions.length === 0) return;
     const offered = new Set(historyChipOptions.map((o) => o.value));
     const kept = selectedGPUs.filter((hw) => offered.has(hw));
     if (kept.length === selectedGPUs.length) return;
@@ -676,14 +679,13 @@ function ProfitEstimatorInner({
       setUrlParam('i_dstart', '');
       setUrlParam('i_dend', '');
     }
-  }, [availabilityRows, historyChipOptions, selectedGPUs, setUrlParam]);
+  }, [availability, historyChipOptions, selectedGPUs, setUrlParam]);
   const historyAvailableDates = useMemo(
-    () =>
-      profitHistoryAvailableDates(availabilityRows, dbModelKeys, selectedPrecisions, selectedGPUs),
-    [availabilityRows, dbModelKeys, selectedPrecisions, selectedGPUs],
+    () => profitHistoryAvailableDates(availability, dbModelKeys, selectedPrecisions, selectedGPUs),
+    [availability, dbModelKeys, selectedPrecisions, selectedGPUs],
   );
   useEffect(() => {
-    if (!historyHydrated || !availabilityRows || selectedGPUs.length === 0) return;
+    if (!historyHydrated || !availability || selectedGPUs.length === 0) return;
     const { startDate, endDate } = selectedDateRange;
     if (!startDate || !endDate) return;
     const available = new Set(historyAvailableDates);
@@ -694,7 +696,7 @@ function ProfitEstimatorInner({
     setUrlParam('i_dend', '');
   }, [
     historyHydrated,
-    availabilityRows,
+    availability,
     selectedGPUs.length,
     selectedDateRange,
     historyAvailableDates,

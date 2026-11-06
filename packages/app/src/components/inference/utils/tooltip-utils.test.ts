@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 
 import type { HardwareConfig, InferenceData } from '@/components/inference/types';
+import { powerBasisPillHtml } from '@/components/inference/powerx/PowerBasisPill';
 import { modelSystemPower, type SystemPowerEstimate } from '@/lib/power/modeled-system-power';
 import { gb300DisaggRow } from '@/lib/power/nvl72-power.fixture';
 import {
@@ -200,7 +201,7 @@ describe('modeled system-power tooltip', () => {
     expect(html).toContain('3,600 W');
     expect(html).not.toContain('6000 W');
     expect(html).not.toContain('7200 W');
-    expect(html).toContain('<strong>Total Chips:</strong> 4');
+    expect(html).toContain('<span>Total Chips:</span> <strong>4</strong>');
 
     const zh = generateTooltipContent(config({ data, locale: 'zh' }));
     expect(zh).toContain('1 个八卡机箱 · 实测 4/8 张 GPU，按满机箱外推');
@@ -282,6 +283,20 @@ describe('modeled system-power tooltip', () => {
         sizes.add(el && el !== host ? el.style.fontSize : 'inherited');
       }
       expect([...sizes]).toEqual(['11px']);
+    }
+  });
+
+  it('keeps each power reading and its basis pill in the same grid cell', () => {
+    const html = generateTooltipContent(config({ isPinned: true }));
+    expect(html.split('<span data-power-reading>')).toHaveLength(4);
+    for (const [watts, basis] of [
+      [500, 'gpu'],
+      [750, 'it'],
+      [900, 'facility'],
+    ] as const) {
+      const pill = powerBasisPillHtml(basis, 'en');
+      expect(html).toContain(`<span data-power-reading>${watts} W/GPU${pill}</span>`);
+      expect(html).not.toContain(`<span data-power-reading>${watts} W/GPU</span>${pill}`);
     }
   });
 
@@ -463,6 +478,28 @@ describe('generateTooltipContent', () => {
     ).not.toContain('data-action="view-logs"');
   });
 
+  it.each([
+    [{ spec_decoding: 'draft_model' }, 'Draft Model'],
+    [
+      {
+        spec_decoding: 'draft_model',
+        spec_algorithm: 'dflash',
+        spec_draft_model: 'RadixArk/Muse-Spark-Open-DFlash2',
+      },
+      'DFlash (RadixArk/Muse-Spark-Open-DFlash2)',
+    ],
+    [
+      { spec_decoding: 'mtp', spec_algorithm: 'dspark', spec_draft_model: 'native' },
+      'DSpark (native)',
+    ],
+    [{ spec_decoding: 'none', spec_algorithm: 'dspark', spec_draft_model: 'native' }, 'Off'],
+  ])('labels speculative decoding by what the server ran: %j', (fields, label) => {
+    const html = generateTooltipContent(
+      tooltipConfig({ data: pt({ id: 3, benchmark_type: 'agentic_traces', ...fields }) }),
+    );
+    expect(html).toContain(`<strong>Speculative Decoding:</strong> ${label}</div>`);
+  });
+
   it('routes fixed-sequence log actions to the fixed benchmark log viewer', () => {
     const html = generateTooltipContent(
       tooltipConfig({
@@ -588,9 +625,7 @@ describe('generateTooltipContent', () => {
         }),
       }),
     );
-    expect(html).toContain('max-height: min(70vh, calc(100dvh - 16px))');
-    expect(html).toContain('overflow-y: auto');
-    expect(html).toContain('max-width: min(320px, calc(100vw - 16px))');
+    expect(html).toContain('class="inferencex-pinned-tooltip"');
     expect(html).toContain('data-action="view-power-trace"');
   });
 

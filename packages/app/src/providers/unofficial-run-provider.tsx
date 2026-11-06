@@ -9,14 +9,14 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useState,
 } from 'react';
 
-import type { ChartDefinition, HardwareConfig, InferenceData } from '@/components/inference/types';
+import type { HardwareConfig, InferenceData } from '@/components/inference/types';
 import { UnofficialBanner } from '@/components/ui/unofficial-banner';
-import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkRow, EvalRow } from '@/lib/api/api';
-import { benchmarkCurveDate } from '@/lib/benchmarks/benchmark-run-selection';
-import { transformBenchmarkRows, type TokenBasis } from '@/lib/benchmarks/benchmark-transform';
+import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
+import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
 import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
 import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
 import { setProfitRouteUnofficialRuns } from '@/lib/routing/profit-estimator-routes';
@@ -24,7 +24,8 @@ import { useClientRouteSearch } from '@/hooks/useClientSearch';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import { ApiRequestError } from '@/lib/api/api-request-error';
 
-import chartDefinitions from '@/components/inference/metric-registry';
+import type * as UnofficialChartDataModule from './unofficial-chart-data';
+import type { UnofficialChartData } from './unofficial-chart-data';
 
 interface UnofficialRunInfo {
   id: number;
@@ -37,14 +38,6 @@ interface UnofficialRunInfo {
   status: string;
   isNonMainBranch: boolean;
 }
-
-type UnofficialChartData = Record<
-  string,
-  {
-    e2e: { data: InferenceData[]; gpus: HardwareConfig };
-    interactivity: { data: InferenceData[]; gpus: HardwareConfig };
-  }
->;
 
 interface UnofficialRunResponse {
   runInfos: UnofficialRunInfo[];
@@ -97,6 +90,7 @@ export interface UnofficialRunContextType {
     sequence: Sequence,
     chartType: 'e2e' | 'interactivity',
     tokenBasis?: TokenBasis,
+    chipBasis?: ChipBasis,
   ) => {
     data: InferenceData[];
     hardwareConfig: HardwareConfig;
@@ -123,49 +117,6 @@ export function useOverlayScopeReconciliation(input: OverlayScopeInput | null): 
   useEffect(() => {
     if (input) reconcileOverlayScope(input);
   }, [input, reconcileOverlayScope]);
-}
-
-export function buildChartData(
-  benchmarks: BenchmarkRow[],
-  tokenBasis: TokenBasis = 'total',
-): UnofficialChartData {
-  const groups = new Map<string, BenchmarkRow[]>();
-  for (const row of benchmarks) {
-    const displayModel = DB_MODEL_TO_DISPLAY[row.model] ?? row.model;
-    const sequence = rowToSequence(row);
-    if (!sequence) continue;
-    const key = `${displayModel}_${sequence}`;
-    if (!groups.has(key)) groups.set(key, []);
-    // Same date semantics as the official chart: snapshot date, with the measured date kept.
-    const chartRow = {
-      ...row,
-      date: benchmarkCurveDate(row),
-      actualDate: row.date,
-    };
-    groups.get(key)!.push(chartRow);
-  }
-
-  const result: UnofficialChartData = {};
-  for (const [key, rows] of groups) {
-    const { chartData, hardwareConfig } = transformBenchmarkRows(
-      rows,
-      'median',
-      'external',
-      tokenBasis,
-    );
-    const e2eIdx = (chartDefinitions as ChartDefinition[]).findIndex((d) => d.chartType === 'e2e');
-    const interactivityIdx = (chartDefinitions as ChartDefinition[]).findIndex(
-      (d) => d.chartType === 'interactivity',
-    );
-    result[key] = {
-      e2e: { data: chartData[e2eIdx] ?? [], gpus: hardwareConfig },
-      interactivity: {
-        data: chartData[interactivityIdx] ?? [],
-        gpus: hardwareConfig,
-      },
-    };
-  }
-  return result;
 }
 
 export function parseAvailableModelsAndSequences(
@@ -368,7 +319,9 @@ async function fetchUnofficialRuns(
   signal: AbortSignal,
 ): Promise<UnofficialRunResponse> {
   const url = `/api/unofficial-run?runId=${encodeURIComponent(ids.join(','))}`;
-  const response = await fetch(url, { cache: 'no-store', signal });
+  // Default cache mode: the route's Cache-Control already keeps in-progress
+  // runs fresh, and `no-store` would make every load bypass the CDN copy.
+  const response = await fetch(url, { signal });
   const data = (await response.json()) as Partial<UnofficialRunResponse> & {
     error?: string;
   };
@@ -406,17 +359,39 @@ export function UnofficialRunProvider({
     refetchOnMount: 'always',
   });
 
-  const unofficialRunInfos = query.data?.runInfos ?? EMPTY_UNOFFICIAL_RUN_INFOS;
+  const [chartDataModule, setChartDataModule] = useState<typeof UnofficialChartDataModule | null>(
+    null,
+  );
+  const hasRunIds = runIds.length > 0;
+  useEffect(() => {
+    if (hasRunIds && !chartDataModule)
+      void import('./unofficial-chart-data').then(setChartDataModule);
+  }, [hasRunIds, chartDataModule]);
+  const runData = chartDataModule ? query.data : undefined;
+
+  const unofficialRunInfos = runData?.runInfos ?? EMPTY_UNOFFICIAL_RUN_INFOS;
   const unofficialRunInfo = unofficialRunInfos[0] ?? null;
-  const unofficialBenchmarkRows = query.data?.benchmarks ?? null;
-  const unofficialEvalRows = query.data?.evaluations ?? null;
+  const unofficialBenchmarkRows = runData?.benchmarks ?? null;
+  const unofficialEvalRows = runData?.evaluations ?? null;
   const unofficialChartData = useMemo(
-    () => (unofficialBenchmarkRows ? buildChartData(unofficialBenchmarkRows) : null),
+    () =>
+      unofficialBenchmarkRows && chartDataModule
+        ? chartDataModule.buildChartData(unofficialBenchmarkRows)
+        : null,
+    [unofficialBenchmarkRows, chartDataModule],
+  );
+  // Non-default token and chip bases are built on first request and kept per row set.
+  const overlayVariantCache = useMemo(
+    () => new Map<string, UnofficialChartData>(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [unofficialBenchmarkRows],
   );
   const unofficialUncachedChartData = useMemo(
-    () => (unofficialBenchmarkRows ? buildChartData(unofficialBenchmarkRows, 'uncached') : null),
-    [unofficialBenchmarkRows],
+    () =>
+      unofficialBenchmarkRows && chartDataModule
+        ? chartDataModule.buildChartData(unofficialBenchmarkRows, 'uncached')
+        : null,
+    [unofficialBenchmarkRows, chartDataModule],
   );
   const availableModelsAndSequences = useMemo(
     () => parseAvailableModelsAndSequences(unofficialChartData),
@@ -491,14 +466,29 @@ export function UnofficialRunProvider({
       sequence: Sequence,
       chartType: 'e2e' | 'interactivity',
       tokenBasis: TokenBasis = 'total',
+      chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
     ) => {
-      const source = tokenBasis === 'uncached' ? unofficialUncachedChartData : unofficialChartData;
+      let source = tokenBasis === 'uncached' ? unofficialUncachedChartData : unofficialChartData;
+      if (chipBasis !== DEFAULT_CHIP_BASIS && unofficialBenchmarkRows && chartDataModule) {
+        const key = `${tokenBasis}:${chipBasis}`;
+        source = overlayVariantCache.get(key) ?? null;
+        if (!source) {
+          source = chartDataModule.buildChartData(unofficialBenchmarkRows, tokenBasis, chipBasis);
+          overlayVariantCache.set(key, source);
+        }
+      }
       const chartGroup = source?.[`${model}_${sequence}`];
       if (!chartGroup) return null;
       const dataForChart = chartType === 'e2e' ? chartGroup.e2e : chartGroup.interactivity;
       return { data: dataForChart.data, hardwareConfig: dataForChart.gpus };
     },
-    [unofficialChartData, unofficialUncachedChartData],
+    [
+      unofficialChartData,
+      unofficialUncachedChartData,
+      unofficialBenchmarkRows,
+      chartDataModule,
+      overlayVariantCache,
+    ],
   );
 
   const resetOverlaySelection = useCallback(() => {
@@ -511,7 +501,7 @@ export function UnofficialRunProvider({
     dispatchSelection({ type: 'selection', official, overlay });
   }, []);
 
-  const loading = runIds.length > 0 && query.isFetching;
+  const loading = hasRunIds && (query.isFetching || !chartDataModule);
   const error = query.error instanceof Error ? query.error.message : null;
 
   const contextValue = useMemo<UnofficialRunContextType>(

@@ -1,7 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-import { normalizeArtifactRows, normalizeEvalArtifactRows } from './route';
+import {
+  githubRateLimitRetryAfter,
+  normalizeArtifactRows,
+  normalizeEvalArtifactRows,
+  unofficialRunCacheControl,
+} from './route';
 
 const mockGetEntries = vi.fn();
 vi.mock('adm-zip', () => ({
@@ -443,6 +448,71 @@ describe('normalizeEvalArtifactRows', () => {
     );
 
     expect(rows).toEqual([]);
+  });
+});
+
+describe('unofficialRunCacheControl', () => {
+  it('caches long only when every run has completed', () => {
+    expect(unofficialRunCacheControl([{ status: 'completed' }, { status: 'completed' }])).toContain(
+      's-maxage=3600',
+    );
+    expect(unofficialRunCacheControl([{ status: 'completed' }, { status: 'in_progress' }])).toBe(
+      'public, max-age=0, s-maxage=30',
+    );
+    expect(unofficialRunCacheControl([])).toBe('public, max-age=0, s-maxage=30');
+  });
+});
+
+function response(status: number, headers: Record<string, string>) {
+  return new Response(null, { status, headers });
+}
+
+function mockRunWithBenchmarks(status: string | null) {
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () =>
+      Promise.resolve({
+        id: 123,
+        head_branch: 'feature',
+        created_at: '2026-01-01T00:00:00Z',
+        html_url: 'http://github.com/run/123',
+        status,
+      }),
+  });
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () =>
+      Promise.resolve({
+        artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: 'http://dl' }],
+      }),
+  });
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+  });
+  mockGetEntries.mockReturnValue([
+    { entryName: 'results.json', getData: () => Buffer.from(JSON.stringify([rawRow()])) },
+  ]);
+}
+
+describe('githubRateLimitRetryAfter', () => {
+  it('ignores failures that are not rate limits', () => {
+    expect(githubRateLimitRetryAfter(response(404, {}))).toBeNull();
+    expect(githubRateLimitRetryAfter(response(403, { 'x-ratelimit-remaining': '10' }))).toBeNull();
+  });
+
+  it('derives the wait from the primary rate-limit reset time', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000_000_000);
+    expect(
+      githubRateLimitRetryAfter(
+        response(403, { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1000090' }),
+      ),
+    ).toBe('90');
+    vi.restoreAllMocks();
+  });
+
+  it('falls back to a minute for a secondary limit without timing headers', () => {
+    expect(githubRateLimitRetryAfter(response(429, {}))).toBe('60');
   });
 });
 
@@ -900,6 +970,94 @@ describe('GET /api/unofficial-run', () => {
       task: 'gsm8k',
     });
     expect(body.evaluations[0].run_url).toBe('http://github.com/run/321');
+  });
+
+  it('caches a completed run at the CDN for an hour under the dashboard tag', async () => {
+    mockRunWithBenchmarks('completed');
+    const res = await GET(makeRequest('runId=123'));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Cache-Control')).toBe(
+      'public, max-age=60, s-maxage=3600, stale-while-revalidate=86400',
+    );
+    expect(res.headers.get('Vercel-Cache-Tag')).toBe('db-cdn');
+    const body = await res.json();
+    expect(body.benchmarks).toHaveLength(1);
+  });
+
+  it('sends plain JSON without Vary so the CDN keeps one entry per run', async () => {
+    mockRunWithBenchmarks('completed');
+    const res = await GET(
+      new NextRequest('http://localhost/api/unofficial-run?runId=123', {
+        headers: { 'Accept-Encoding': 'gzip, deflate, br, zstd' },
+      }),
+    );
+    expect(res.headers.get('Content-Encoding')).toBeNull();
+    expect(res.headers.get('Vary')).toBeNull();
+    const body = await res.json();
+    expect(body.benchmarks).toHaveLength(1);
+  });
+
+  it.each(['in_progress', 'queued', null])(
+    'caches a %s run for 30 seconds only',
+    async (status) => {
+      mockRunWithBenchmarks(status);
+      const res = await GET(makeRequest('runId=123'));
+      expect(res.status).toBe(200);
+      expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=30');
+    },
+  );
+
+  it('caches a missing run briefly so repeated polling stays off GitHub', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      headers: new Headers(),
+    });
+    const res = await GET(makeRequest('runId=999'));
+    expect(res.status).toBe(404);
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=300');
+  });
+
+  it('keeps a no-artifact 404 short-lived because the listing may have failed', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ id: 123, status: 'completed' }),
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ artifacts: [] }),
+    });
+    const res = await GET(makeRequest('runId=123'));
+    expect(res.status).toBe(404);
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=30');
+  });
+
+  it('turns a GitHub rate limit into an uncached 503 with Retry-After', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      statusText: 'Forbidden',
+      headers: new Headers({ 'x-ratelimit-remaining': '0', 'retry-after': '120' }),
+    });
+    const res = await GET(makeRequest('runId=123'));
+    expect(res.status).toBe(503);
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+    expect(res.headers.get('Retry-After')).toBe('120');
+    const body = await res.json();
+    expect(body.error).toContain('rate limit');
+  });
+
+  it('passes a non-rate-limit GitHub 403 through uncached', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      statusText: 'Forbidden',
+      headers: new Headers({ 'x-ratelimit-remaining': '4000' }),
+    });
+    const res = await GET(makeRequest('runId=123'));
+    expect(res.status).toBe(403);
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
   });
 
   it('returns 500 on unexpected error', async () => {

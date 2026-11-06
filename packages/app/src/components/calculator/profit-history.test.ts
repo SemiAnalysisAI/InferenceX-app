@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import type { AvailabilityRow, BenchmarkRow, RunConfigRow } from '@/lib/api/api';
+import { indexAvailability } from '@/lib/benchmarks/availability-index';
+import { compactAvailability } from '@/lib/benchmarks/compact-availability';
 import { Percentile } from '@/lib/catalog/data-mappings';
 import { modeledPowerAtTarget } from './profit-power';
 
@@ -123,13 +125,20 @@ describe('profitHistoryEntryLabel', () => {
 });
 
 describe('profitHistoryChipOptions', () => {
-  const rows = [
-    availability({ hardware: 'gb300', framework: 'sglang' }),
-    availability({ hardware: 'b200', framework: 'sglang' }),
-    availability({ hardware: 'mi355x', framework: 'vllm', model: 'glm5.2' }),
-    availability({ hardware: 'h200', framework: 'vllm', benchmark_type: 'single_turn', isl: 1024 }),
-    availability({ hardware: 'b300', framework: 'vllm', precision: 'fp8' }),
-  ];
+  const rows = indexAvailability(
+    compactAvailability([
+      availability({ hardware: 'gb300', framework: 'sglang' }),
+      availability({ hardware: 'b200', framework: 'sglang' }),
+      availability({ hardware: 'mi355x', framework: 'vllm', model: 'glm5.2' }),
+      availability({
+        hardware: 'h200',
+        framework: 'vllm',
+        benchmark_type: 'single_turn',
+        isl: 1024,
+      }),
+      availability({ hardware: 'b300', framework: 'vllm', precision: 'fp8' }),
+    ]),
+  );
 
   it('offers known agentic configs for the model at the selected precisions, in registry order', () => {
     const options = profitHistoryChipOptions(rows, KIMI_KEYS, ['fp4']);
@@ -143,11 +152,13 @@ describe('profitHistoryChipOptions', () => {
 });
 
 describe('profitHistoryAvailableDates', () => {
-  const rows = [
-    availability({ date: '2026-08-31' }),
-    availability({ date: '2026-06-14' }),
-    availability({ date: '2026-07-01', hardware: 'gb300' }),
-  ];
+  const rows = indexAvailability(
+    compactAvailability([
+      availability({ date: '2026-08-31' }),
+      availability({ date: '2026-06-14' }),
+      availability({ date: '2026-07-01', hardware: 'gb300' }),
+    ]),
+  );
 
   it('lists the sorted run dates of the selected chips only', () => {
     expect(profitHistoryAvailableDates(rows, KIMI_KEYS, ['fp4'], ['b200_sglang'])).toEqual([

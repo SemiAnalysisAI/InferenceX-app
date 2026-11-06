@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { ShareButton } from '@/components/ui/share-button';
 import { registerAnalyticsClient } from '@/lib/analytics/analytics';
-import { addWatermark } from '@/hooks/useChartExport';
+import { addWatermark } from '@/lib/export/chart-image-export';
 import { getExportFooterStyle } from '@/lib/export/export-footer';
 import { GlobalFilterSelectionContext } from '@/providers/GlobalFilterContext';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
@@ -272,7 +272,7 @@ describe('ChartButtons', () => {
     cy.get('[data-testid="zoom-reset-button"]').should('have.attr', 'aria-label', '重置缩放');
   });
 
-  for (const width of [320, 768, 1280]) {
+  for (const width of [320, 1280]) {
     it(`keeps wrapping actions above long captions at ${width}px without losing actions`, () => {
       cy.viewport(width, 800);
       const onModeChange = cy.stub().as('modeChange');

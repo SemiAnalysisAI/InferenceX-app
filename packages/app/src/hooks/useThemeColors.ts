@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { isDarkTheme } from '@/lib/themes/themes';
-import { generateHighContrastColors } from '@/lib/charts/chart-utils';
+import { generateHighContrastColors } from '@/lib/charts/high-contrast-colors';
 import { getChartThemeColors } from '@/lib/charts/chart-rendering';
 import { generateVendorColors } from '@/lib/charts/dynamic-colors';
 

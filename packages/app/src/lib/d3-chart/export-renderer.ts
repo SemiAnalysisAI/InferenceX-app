@@ -5,18 +5,10 @@ import { raiseInOrder, renderAxes, renderGrid, type AnyScale } from './chart-upd
 import { renderLayer } from './D3Chart/layer-renderer';
 import type { BuiltScale } from './D3Chart/scale-builders';
 import type { D3ChartProps, RenderContext } from './D3Chart/types';
+import { chartExportSources, type ChartExportScales } from './export-registry';
 import { getDomainAwareChartWatermark } from '@/lib/runtime/unofficial-domain';
 import type { ContinuousScale } from './types';
-
-type ExportRenderer = (target: SVGSVGElement, width: number, height: number) => void;
-const renderers = new WeakMap<SVGSVGElement, ExportRenderer>();
-
-export function registerChartExportRenderer(source: SVGSVGElement, render: ExportRenderer) {
-  renderers.set(source, render);
-  return () => {
-    renderers.delete(source);
-  };
-}
+import { CANVAS_POINT_LAYER_SELECTOR, canvasPointLayerOf } from './layers/canvas-point-registry';
 
 export function renderChartForExport(
   source: SVGSVGElement,
@@ -24,15 +16,22 @@ export function renderChartForExport(
   width: number,
   height: number,
 ) {
-  const render = renderers.get(source);
-  if (!render) throw new Error('This chart is not ready for PNG layout');
+  const snapshot = chartExportSources.get(source);
+  if (!snapshot) throw new Error('This chart is not ready for PNG layout');
   // D3 joins need the original bindings, which cloneNode does not copy.
   const originals = [source, ...source.querySelectorAll('*')];
   const copies = [target, ...target.querySelectorAll('*')];
   originals.forEach((node, index) => {
     if (copies[index]) d3.select(copies[index]).datum(d3.select(node).datum());
   });
-  render(target, width, height);
+  snapshot((props, scales) => {
+    const layers = props.layers.map((layer) => {
+      if (layer.type !== 'scatter' || !layer.canvas) return layer;
+      const points = canvasPointLayerOf<(typeof layer.data)[number]>(source);
+      return points ? { ...layer, data: points.orderedLike(layer.data, layer.keyFn) } : layer;
+    });
+    renderExportChart(target, width, height, { ...props, layers }, scales);
+  });
 }
 
 function ticks(axis: D3ChartProps['xAxis'], scale: BuiltScale) {
@@ -42,12 +41,12 @@ function ticks(axis: D3ChartProps['xAxis'], scale: BuiltScale) {
 }
 
 /** Rebuild geometry on the clone only. Never invoke live-chart lifecycle callbacks. */
-export function renderExportChart<T>(
+function renderExportChart<T>(
   target: SVGSVGElement,
   width: number,
   height: number,
   props: D3ChartProps<T>,
-  visibleScales: { xScale: BuiltScale; yScale: BuiltScale },
+  visibleScales: ChartExportScales,
 ) {
   const { xAxis, yAxis, layers, clipContent = true } = props;
   namespaceExportIds(target);
@@ -101,7 +100,10 @@ export function renderExportChart<T>(
     tooltipElement: document.createElement('div'),
   };
   const group = clipContent ? layout.zoomGroup : layout.g;
-  for (const layer of layers) renderLayer(layer, group, xScale, yScale, layout, ctx);
+  for (const clone of group.node()?.querySelectorAll(CANVAS_POINT_LAYER_SELECTOR) ?? []) {
+    clone.remove();
+  }
+  for (const layer of layers) renderLayer(layer, group, xScale, yScale, layout, ctx, 'export');
   raiseInOrder(group, ['.dot-group', '.point', '.line-label']);
   props.onExportRender?.(ctx);
   namespaceExportIds(target);
@@ -116,8 +118,10 @@ function namespaceExportIds(target: SVGSVGElement) {
     [...target.querySelectorAll('[id]')].find((other) => other.id === `${node.id}-png`)?.remove();
     node.id = `${node.id}-png`;
   }
+  if (ids.size === 0) return;
   for (const node of target.querySelectorAll('*')) {
     for (const attribute of node.attributes) {
+      if (!attribute.value.includes('#')) continue;
       let value = attribute.value;
       for (const [id, replacement] of ids) {
         value = value.replaceAll(`url(#${id})`, `url(#${replacement})`);

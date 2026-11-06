@@ -6,14 +6,13 @@ import { useEffect, useMemo } from 'react';
 import type { GPUDataPoint } from '@/components/calculator/types';
 import { useThroughputData } from '@/components/calculator/useThroughputData';
 import { CompareTableRenderer } from '@/components/compare/compare-table-renderer';
+import { LazyCompareInferenceChart } from '@/components/compare/lazy-compare-inference-chart';
 import {
   GlobalFilterProvider,
   useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
 } from '@/providers/GlobalFilterContext';
-import { InferenceProvider } from '@/components/inference/InferenceContext';
-import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
 import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
@@ -116,153 +115,148 @@ export default function CompareSpecDecodePageClient({
       initialSequence={initialSequence}
       initialPrecisions={initialPrecisions}
     >
-      <InferenceProvider
-        activeTab="compare"
-        initialActiveHwTypes={[gpu]}
-        compareGpuPair={[gpu, gpu]}
-        initialYAxisMetric={DEFAULT_Y_AXIS}
-      >
-        <div className="flex flex-col gap-4">
-          <Card className="flex w-full min-w-0 flex-col gap-3">
-            <header>
-              <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                {modelLabel} · {t.eyebrowSuffix}
-              </div>
-              <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">
-                {isZh
-                  ? `${gpuLabel} ${precisionLabel}：启用 ${aLabel} 与关闭投机解码的对比`
-                  : `${gpuLabel} ${precisionLabel}: ${aLabel} vs ${bLabel} ${t.h1Suffix}`}
-              </h1>
-              {isZh ? (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  在 <strong>{gpuLabel}</strong> {precisionLabel}（{gpuVendor} {gpuArch}）上运行{' '}
-                  <strong>{modelLabel}</strong> 时，对比启用 <strong>{aLabel}</strong>
-                  和关闭投机解码两种配置的表现，涵盖不同 LLM
-                  工作负载下的吞吐量、成本和交互性。可通过下方图表控件切换序列长度和指标，操作方式与
-                  <Link href="/zh" className="underline hover:text-primary">
-                    {t.mainChartLinkText}
-                  </Link>
-                  相同。
-                </p>
-              ) : (
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Speculative decoding comparison of <strong>{aLabel}</strong> versus{' '}
-                  <strong>{bLabel}</strong> on <strong>{gpuLabel}</strong> {precisionLabel} (
-                  {gpuVendor} {gpuArch}) running <strong>{modelLabel}</strong>. Throughput, cost,
-                  and interactivity differences across LLM workloads. Use the chart controls below
-                  to switch sequences and metrics — same interactions as{' '}
-                  <Link href="/" className="underline hover:text-primary">
-                    {t.mainChartLinkText}
-                  </Link>
-                  .
-                </p>
-              )}
-              <div
-                className="mt-3 flex items-start gap-2 rounded-md border-l-2 border-amber-500 bg-amber-500/5 px-3 py-2"
-                data-testid="compare-spec-decode-mtp-caveat"
-              >
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
-                    {isZh ? t.mtpCaveatTitle : STRINGS.en.mtpCaveatTitle}
-                  </span>
-                  <p className="text-xs text-muted-foreground">
-                    {isZh ? t.mtpCaveat : STRINGS.en.mtpCaveat}
-                  </p>
-                </div>
-              </div>
-              {agenticIntro && (
-                <p
-                  className="mt-3 max-w-3xl text-sm text-foreground/80"
-                  data-testid="compare-agentic-intro"
-                >
-                  {agenticIntro.paragraph}{' '}
-                  <Link
-                    href={agenticIntro.href}
-                    data-testid="compare-agentic-intro-link"
-                    className="font-medium text-brand underline underline-offset-4 hover:no-underline"
-                  >
-                    {agenticIntro.linkLabel} →
-                  </Link>
-                </p>
-              )}
-              {narrative.length > 0 && (
-                <div
-                  className="mt-3 flex flex-col gap-2"
-                  data-testid="compare-spec-decode-narrative"
-                >
-                  {narrative.map((para, i) => (
-                    <p key={i} className="text-sm text-foreground/80">
-                      {para}
-                      {i === narrative.length - 1 && (
-                        <>
-                          {' '}
-                          <span className="text-muted-foreground italic">
-                            {isZh
-                              ? `（以上数据基于此 URL 固定的 ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} 工作负载；切换序列长度或模型后，表格和图表会同步更新。表格始终使用本页指定的精度，控件中的精度选项只影响图表。）`
-                              : `(Numbers reflect this URL's pinned ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} workload — changing sequence or model updates both the table and chart; the table stays pinned to this page's precision, so precision toggles in the controls affect the chart only.)`}
-                          </span>
-                        </>
-                      )}
-                    </p>
-                  ))}
-                </div>
-              )}
-              <div className="mt-2 flex flex-wrap gap-4 text-sm">
-                <Link
-                  href={isZh ? '/zh/compare-spec-decode' : '/compare-spec-decode'}
-                  className="underline hover:text-primary text-muted-foreground"
-                  onClick={() => track('compare_spec_decode_cross_link_to_index', { slug })}
-                >
-                  {t.indexLinkText} →
+      <div className="flex flex-col gap-4">
+        <Card className="flex w-full min-w-0 flex-col gap-3">
+          <header>
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">
+              {modelLabel} · {t.eyebrowSuffix}
+            </div>
+            <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mt-1">
+              {isZh
+                ? `${gpuLabel} ${precisionLabel}：启用 ${aLabel} 与关闭投机解码的对比`
+                : `${gpuLabel} ${precisionLabel}: ${aLabel} vs ${bLabel} ${t.h1Suffix}`}
+            </h1>
+            {isZh ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                在 <strong>{gpuLabel}</strong> {precisionLabel}（{gpuVendor} {gpuArch}）上运行{' '}
+                <strong>{modelLabel}</strong> 时，对比启用 <strong>{aLabel}</strong>
+                和关闭投机解码两种配置的表现，涵盖不同 LLM
+                工作负载下的吞吐量、成本和交互性。可通过下方图表控件切换序列长度和指标，操作方式与
+                <Link href="/zh" className="underline hover:text-primary">
+                  {t.mainChartLinkText}
                 </Link>
-                <Link
-                  href={isZh ? '/zh' : '/'}
-                  className="underline hover:text-primary text-muted-foreground"
-                  onClick={() => track('compare_spec_decode_cross_link_to_dashboard', { slug })}
-                >
-                  {t.dashboardLinkText} →
+                相同。
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Speculative decoding comparison of <strong>{aLabel}</strong> versus{' '}
+                <strong>{bLabel}</strong> on <strong>{gpuLabel}</strong> {precisionLabel} (
+                {gpuVendor} {gpuArch}) running <strong>{modelLabel}</strong>. Throughput, cost, and
+                interactivity differences across LLM workloads. Use the chart controls below to
+                switch sequences and metrics — same interactions as{' '}
+                <Link href="/" className="underline hover:text-primary">
+                  {t.mainChartLinkText}
                 </Link>
-              </div>
-            </header>
-            <figure
-              className="mt-2 flex flex-col gap-2"
-              data-testid="compare-spec-decode-indexed-image"
+                .
+              </p>
+            )}
+            <div
+              className="mt-3 flex items-start gap-2 rounded-md border-l-2 border-amber-500 bg-amber-500/5 px-3 py-2"
+              data-testid="compare-spec-decode-mtp-caveat"
             >
-              <img
-                src={heroImageSrc}
-                alt={
-                  isZh
-                    ? `${modelLabel}：${gpuLabel} ${precisionLabel} 上两种配置（启用 ${aLabel}、关闭投机解码）在相同交互性水平下的对比`
-                    : `${modelLabel}: ${gpuLabel} ${precisionLabel} ${aLabel} versus ${bLabel} speculative decoding comparison at matched interactivity levels`
-                }
-                width={1200}
-                height={675}
-                loading="eager"
-                fetchPriority="high"
-                className="w-full rounded-lg border border-border/50"
-              />
-              <figcaption className="text-xs text-muted-foreground">
-                {isZh
-                  ? `${gpuLabel} ${precisionLabel} 上两种配置（启用 ${aLabel}、关闭投机解码）的对比（默认工作负载）。`
-                  : `${gpuLabel} ${precisionLabel} ${aLabel} versus ${bLabel} speculative decoding comparison for this page's canonical default workload.`}
-              </figcaption>
-            </figure>
-            <CompareTableSection
-              gpu={gpu}
-              method={method}
-              precision={defaultPrecision}
-              aLabel={isZh ? `启用 ${aLabel}` : aLabel}
-              bLabel={isZh ? '关闭投机解码' : bLabel}
-              ssrTableData={ssrTableData}
-              ssrSequence={defaultSequence}
-              ssrModel={initialModel}
-              ssrPrecisions={defaultPrecision ? [defaultPrecision] : (initialPrecisions ?? [])}
-              emptyStateText={t.emptyState}
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                  {isZh ? t.mtpCaveatTitle : STRINGS.en.mtpCaveatTitle}
+                </span>
+                <p className="text-xs text-muted-foreground">
+                  {isZh ? t.mtpCaveat : STRINGS.en.mtpCaveat}
+                </p>
+              </div>
+            </div>
+            {agenticIntro && (
+              <p
+                className="mt-3 max-w-3xl text-sm text-foreground/80"
+                data-testid="compare-agentic-intro"
+              >
+                {agenticIntro.paragraph}{' '}
+                <Link
+                  href={agenticIntro.href}
+                  data-testid="compare-agentic-intro-link"
+                  className="font-medium text-brand underline underline-offset-4 hover:no-underline"
+                >
+                  {agenticIntro.linkLabel} →
+                </Link>
+              </p>
+            )}
+            {narrative.length > 0 && (
+              <div className="mt-3 flex flex-col gap-2" data-testid="compare-spec-decode-narrative">
+                {narrative.map((para, i) => (
+                  <p key={i} className="text-sm text-foreground/80">
+                    {para}
+                    {i === narrative.length - 1 && (
+                      <>
+                        {' '}
+                        <span className="text-muted-foreground italic">
+                          {isZh
+                            ? `（以上数据基于此 URL 固定的 ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} 工作负载；切换序列长度或模型后，表格和图表会同步更新。表格始终使用本页指定的精度，控件中的精度选项只影响图表。）`
+                            : `(Numbers reflect this URL's pinned ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} workload — changing sequence or model updates both the table and chart; the table stays pinned to this page's precision, so precision toggles in the controls affect the chart only.)`}
+                        </span>
+                      </>
+                    )}
+                  </p>
+                ))}
+              </div>
+            )}
+            <div className="mt-2 flex flex-wrap gap-4 text-sm">
+              <Link
+                href={isZh ? '/zh/compare-spec-decode' : '/compare-spec-decode'}
+                className="underline hover:text-primary text-muted-foreground"
+                onClick={() => track('compare_spec_decode_cross_link_to_index', { slug })}
+              >
+                {t.indexLinkText} →
+              </Link>
+              <Link
+                href={isZh ? '/zh' : '/'}
+                className="underline hover:text-primary text-muted-foreground"
+                onClick={() => track('compare_spec_decode_cross_link_to_dashboard', { slug })}
+              >
+                {t.dashboardLinkText} →
+              </Link>
+            </div>
+          </header>
+          <figure
+            className="mt-2 flex flex-col gap-2"
+            data-testid="compare-spec-decode-indexed-image"
+          >
+            <img
+              src={heroImageSrc}
+              alt={
+                isZh
+                  ? `${modelLabel}：${gpuLabel} ${precisionLabel} 上两种配置（启用 ${aLabel}、关闭投机解码）在相同交互性水平下的对比`
+                  : `${modelLabel}: ${gpuLabel} ${precisionLabel} ${aLabel} versus ${bLabel} speculative decoding comparison at matched interactivity levels`
+              }
+              width={1200}
+              height={675}
+              loading="eager"
+              fetchPriority="high"
+              className="w-full rounded-lg border border-border/50"
             />
-          </Card>
-          <InferenceChartDisplay />
-        </div>
-      </InferenceProvider>
+            <figcaption className="text-xs text-muted-foreground">
+              {isZh
+                ? `${gpuLabel} ${precisionLabel} 上两种配置（启用 ${aLabel}、关闭投机解码）的对比（默认工作负载）。`
+                : `${gpuLabel} ${precisionLabel} ${aLabel} versus ${bLabel} speculative decoding comparison for this page's canonical default workload.`}
+            </figcaption>
+          </figure>
+          <CompareTableSection
+            gpu={gpu}
+            method={method}
+            precision={defaultPrecision}
+            aLabel={isZh ? `启用 ${aLabel}` : aLabel}
+            bLabel={isZh ? '关闭投机解码' : bLabel}
+            ssrTableData={ssrTableData}
+            ssrSequence={defaultSequence}
+            ssrModel={initialModel}
+            ssrPrecisions={defaultPrecision ? [defaultPrecision] : (initialPrecisions ?? [])}
+            emptyStateText={t.emptyState}
+          />
+        </Card>
+        <LazyCompareInferenceChart
+          activeTab="compare"
+          initialActiveHwTypes={[gpu]}
+          compareGpuPair={[gpu, gpu]}
+          initialYAxisMetric={DEFAULT_Y_AXIS}
+        />
+      </div>
     </GlobalFilterProvider>
   );
 }

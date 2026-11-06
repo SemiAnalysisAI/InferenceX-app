@@ -8,6 +8,7 @@ import {
   trackPageview,
   trackVirtualPageview,
 } from '@/lib/analytics/analytics';
+import { isBotBrowser } from '@/lib/analytics/bot-user-agent';
 import { markNavigationStart } from '@/lib/analytics/navigation-timing';
 import { maskCapturedNetworkRequest } from '@/lib/analytics/network-request-mask';
 import { installOutboundLinkTracking } from '@/lib/analytics/outbound-links';
@@ -31,7 +32,7 @@ const disabledAnalyticsClient = { capture: () => undefined };
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     installChunkLoadRecovery();
-    if (!POSTHOG_KEY || process.env.NODE_ENV !== 'production') {
+    if (!POSTHOG_KEY || process.env.NODE_ENV !== 'production' || isBotBrowser()) {
       registerAnalyticsClient(disabledAnalyticsClient);
       return;
     }

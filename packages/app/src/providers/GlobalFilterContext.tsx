@@ -14,7 +14,7 @@ import {
   useState,
 } from 'react';
 
-import { DISPLAY_MODEL_TO_DB, rowToSequence } from '@semianalysisai/inferencex-constants';
+import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
@@ -56,8 +56,14 @@ import {
   resolveEffectivePrecisions,
 } from '@/lib/benchmarks/default-precisions';
 import { resolveEffectiveSequence } from '@/lib/benchmarks/default-sequence';
-import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api/api';
+import type { WorkflowInfoResponse } from '@/lib/api/api';
+import {
+  type AvailabilityIndex,
+  datesOfLines,
+  linesForModels,
+} from '@/lib/benchmarks/availability-index';
 import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
+import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
 
 const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
@@ -69,6 +75,8 @@ export interface GlobalFilterSelectionContextType {
   selectedSequence: Sequence;
   selectedPrecisions: string[];
   tcoBasis: TcoBasis;
+  /** Which chips divide disaggregated input/output throughput. */
+  chipBasis: ChipBasis;
   effectiveSequence: Sequence;
   sequenceResolved: boolean;
   effectivePrecisions: string[];
@@ -84,6 +92,7 @@ export interface ModelSelectionOptions {
 
 export interface GlobalFilterActionsContextType {
   setTcoBasis: (basis: TcoBasis) => void;
+  setChipBasis: (basis: ChipBasis) => void;
   setSelectedModel: (model: Model, options?: ModelSelectionOptions) => void;
   setSelectedSequence: (sequence: Sequence) => void;
   setSelectedPrecisions: (precisions: string[]) => void;
@@ -103,7 +112,7 @@ export interface GlobalFilterAvailabilityContextType {
   availableSequences: Sequence[];
   availablePrecisions: string[];
   availableDates: string[];
-  availabilityRows: AvailabilityRow[] | undefined;
+  availability: AvailabilityIndex | undefined;
   availabilitySettled: boolean;
   availabilityError: string | null;
   availabilityIsError: boolean;
@@ -217,6 +226,7 @@ export function GlobalFilterProvider({
   initialPrecisions,
   initialRunDate,
   initialRunId,
+  initialChipBasis,
 }: {
   children: ReactNode;
   initialModel?: Model;
@@ -224,6 +234,8 @@ export function GlobalFilterProvider({
   initialPrecisions?: string[];
   initialRunDate?: string;
   initialRunId?: string;
+  /** Starting chip basis for surfaces without URL state, such as embeds. */
+  initialChipBasis?: ChipBasis;
 }) {
   const { getUrlParam, setUrlParams } = useUrlState();
 
@@ -240,7 +252,7 @@ export function GlobalFilterProvider({
   // and the render immediately after relocking. Every consumer sees this value.
   const selectedModel = isModelVisible(requestedModel, featureGateUnlocked)
     ? requestedModel
-    : Model.Kimi_K3;
+    : Model.DeepSeek_V4_1_Flash;
   useIsomorphicLayoutEffect(() => {
     if (!modelGatePending) setInferenceNavigationModel(selectedModel);
   }, [selectedModel, modelGatePending]);
@@ -293,6 +305,7 @@ export function GlobalFilterProvider({
 
   const [requestedRunId, setRequestedRunId] = useState<string>(() => initialRunId ?? '');
   const [tcoBasis, setTcoBasis] = useState<TcoBasis>(DEFAULT_TCO_BASIS);
+  const [chipBasis, setChipBasis] = useState<ChipBasis>(initialChipBasis ?? DEFAULT_CHIP_BASIS);
 
   useIsomorphicLayoutEffect(() => {
     refreshUrlParams();
@@ -348,11 +361,18 @@ export function GlobalFilterProvider({
       applyIfMatches('g_runid', RUNID_RE, setRequestedRunId);
     }
     setTcoBasis(getUrlParam('g_tco') === 'external' ? 'external' : DEFAULT_TCO_BASIS);
+    // Profit-estimator routes carry no g_chips segment; keep the session's basis
+    // there instead of resetting it, and apply it again on return.
+    // Embeds resolve their own basis server-side (`initialChipBasis`); the URL must
+    // not override it on the client.
+    if (initialChipBasis === undefined && hasExplicitUrlParam('g_chips')) {
+      setChipBasis(getUrlParam('g_chips') === 'total' ? 'total' : DEFAULT_CHIP_BASIS);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   const {
-    data: availabilityRows,
+    data: availability,
     error: availabilityQueryError,
     isError: availabilityIsError,
     isPending: availabilityPending,
@@ -370,9 +390,9 @@ export function GlobalFilterProvider({
     [selectedModel],
   );
 
-  const modelRows = useMemo(
-    () => availabilityRows?.filter((r) => dbModelKeys.includes(r.model)) ?? [],
-    [availabilityRows, dbModelKeys],
+  const modelLines = useMemo(
+    () => (availability ? linesForModels(availability, dbModelKeys) : []),
+    [availability, dbModelKeys],
   );
 
   const availableModels = useMemo(() => {
@@ -380,11 +400,11 @@ export function GlobalFilterProvider({
     return MODEL_OPTIONS.filter((m) => {
       if (!isModelVisible(m, featureGateUnlocked)) return false;
       if (unofficialModels.has(m)) return true;
-      if (!availabilityRows) return !modelRequiresObservations(m);
+      if (!availability) return !modelRequiresObservations(m);
       const keys = DISPLAY_MODEL_TO_DB[m] ?? [m];
-      return availabilityRows.some((r) => keys.includes(r.model));
+      return keys.some((key) => availability.linesByModel.has(key));
     });
-  }, [availabilityRows, unofficialAvailable, featureGateUnlocked]);
+  }, [availability, unofficialAvailable, featureGateUnlocked]);
 
   const lastAutoSwitchKeyRef = useRef<string>('');
   useEffect(() => {
@@ -404,19 +424,18 @@ export function GlobalFilterProvider({
     const unofficialSeqs = unofficialAvailable
       .filter((a) => a.model === selectedModel)
       .map((a) => a.sequence as Sequence);
-    const dbSeqs = modelRows.map((r) => rowToSequence(r)).filter((s): s is Sequence => s !== null);
+    const dbSeqs = modelLines.map((line) => line.sequence).filter((s): s is Sequence => s !== null);
     const merged = [...new Set([...dbSeqs, ...unofficialSeqs])].filter(
       (s) => !isSequenceHiddenForModel(selectedModel, s),
     );
     return merged.length > 0
       ? merged
       : SEQUENCE_OPTIONS.filter((sequence) => !isSequenceHiddenForModel(selectedModel, sequence));
-  }, [modelRows, unofficialAvailable, selectedModel]);
+  }, [modelLines, unofficialAvailable, selectedModel]);
 
   const availabilityLoaded = useMemo(
-    () =>
-      availabilityRows !== undefined || unofficialAvailable.some((a) => a.model === selectedModel),
-    [availabilityRows, unofficialAvailable, selectedModel],
+    () => availability !== undefined || unofficialAvailable.some((a) => a.model === selectedModel),
+    [availability, unofficialAvailable, selectedModel],
   );
 
   const resolvedSequence = useMemo(
@@ -432,22 +451,26 @@ export function GlobalFilterProvider({
   const sequenceResolved = resolvedSequence !== null;
   const effectiveSequence = resolvedSequence ?? APP_DEFAULT_SEQUENCE;
 
+  const sequenceLines = useMemo(
+    () => modelLines.filter((line) => line.sequence === effectiveSequence),
+    [modelLines, effectiveSequence],
+  );
+
   const availablePrecisions = useMemo(() => {
     const unofficialPrecs = unofficialAvailable
       .filter((a) => a.model === selectedModel && a.sequence === effectiveSequence)
       .flatMap((a) => a.precisions);
-    if (!availabilityRows) {
+    if (!availability) {
       return unofficialPrecs.length > 0 ? [...new Set(unofficialPrecs)].toSorted() : ['fp4'];
     }
-    const rows = modelRows.filter((r) => rowToSequence(r) === effectiveSequence);
-    const dbPrecs = rows.map((r) => r.precision);
+    const dbPrecs = sequenceLines.map((line) => line.precision);
     const merged = [...new Set([...dbPrecs, ...unofficialPrecs])].toSorted();
     return merged.length > 0 ? merged : ['fp4'];
-  }, [availabilityRows, modelRows, effectiveSequence, unofficialAvailable, selectedModel]);
+  }, [availability, sequenceLines, effectiveSequence, unofficialAvailable, selectedModel]);
 
   const precisionCurveCounts = useMemo(
-    () => countCurvesByPrecision(modelRows.filter((r) => rowToSequence(r) === effectiveSequence)),
-    [modelRows, effectiveSequence],
+    () => countCurvesByPrecision(sequenceLines),
+    [sequenceLines],
   );
 
   const unofficialPrecisionsForSelection = useMemo(
@@ -480,14 +503,10 @@ export function GlobalFilterProvider({
   );
 
   const availableDates = useMemo(() => {
-    if (!availabilityRows) return [];
-    const seqRows = modelRows.filter((r) => rowToSequence(r) === effectiveSequence);
-    const rows = seqRows.filter((r) => effectivePrecisions.includes(r.precision));
-    if (rows.length === 0) {
-      return [...new Set(seqRows.map((r) => r.date))].toSorted();
-    }
-    return [...new Set(rows.map((r) => r.date))].toSorted();
-  }, [availabilityRows, modelRows, effectiveSequence, effectivePrecisions]);
+    if (!availability) return [];
+    const lines = sequenceLines.filter((line) => effectivePrecisions.includes(line.precision));
+    return datesOfLines(availability, lines.length > 0 ? lines : sequenceLines);
+  }, [availability, sequenceLines, effectivePrecisions]);
 
   const setSelectedRunDateManual = useCallback((date: string) => {
     requestedRunDateExplicitRef.current = true;
@@ -541,6 +560,7 @@ export function GlobalFilterProvider({
       g_model: selectedModel,
       ...getRequestedRunUrlParams(requestedRunDate, requestedRunId),
       g_tco: tcoBasis,
+      g_chips: chipBasis,
       i_seq: sequenceResolved ? effectiveSequence : undefined,
       i_prec: precisionExplicit ? effectivePrecisions.join(',') : undefined,
     });
@@ -556,6 +576,7 @@ export function GlobalFilterProvider({
     requestedRunDate,
     requestedRunId,
     tcoBasis,
+    chipBasis,
     effectiveSequence,
     sequenceResolved,
     effectivePrecisions,
@@ -569,6 +590,7 @@ export function GlobalFilterProvider({
       selectedSequence,
       selectedPrecisions,
       tcoBasis,
+      chipBasis,
       effectiveSequence,
       sequenceResolved,
       effectivePrecisions,
@@ -578,6 +600,7 @@ export function GlobalFilterProvider({
       selectedSequence,
       selectedPrecisions,
       tcoBasis,
+      chipBasis,
       effectiveSequence,
       sequenceResolved,
       effectivePrecisions,
@@ -587,6 +610,7 @@ export function GlobalFilterProvider({
   const actionsValue = useMemo<GlobalFilterActionsContextType>(
     () => ({
       setTcoBasis,
+      setChipBasis,
       setSelectedModel: selectModel,
       setSelectedSequence,
       setSelectedPrecisions,
@@ -618,7 +642,7 @@ export function GlobalFilterProvider({
       availableSequences,
       availablePrecisions,
       availableDates,
-      availabilityRows,
+      availability,
       availabilitySettled,
       availabilityError,
       availabilityIsError,
@@ -629,7 +653,7 @@ export function GlobalFilterProvider({
       availableSequences,
       availablePrecisions,
       availableDates,
-      availabilityRows,
+      availability,
       availabilitySettled,
       availabilityError,
       availabilityIsError,

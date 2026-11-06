@@ -12,7 +12,6 @@ import {
   earliestSubmission,
   firstSubmissionDates,
   getActualLatestRelease,
-  getCurrentImageNodeTypeTooltip,
   imageRowDisplayModel,
   imageRowModel,
   imageRowSequence,
@@ -259,17 +258,6 @@ describe('getActualLatestRelease', () => {
   });
 });
 
-describe('getCurrentImageNodeTypeTooltip', () => {
-  it('preserves the English Mori spelling while using MoRI in Chinese', () => {
-    expect(getCurrentImageNodeTypeTooltip('en')).toBe(
-      'Single node = non-disaggregated serving. Disaggregated = separate prefill/decode pools, including Dynamo, Mori, and llm-d.',
-    );
-    expect(getCurrentImageNodeTypeTooltip('zh')).toBe(
-      '单节点指非分离式推理；分离式配置使用独立的 prefill/decode 池，包括 Dynamo、MoRI 和 llm-d。',
-    );
-  });
-});
-
 function imageRow(
   model: string,
   scenario: 'agentic' | '1k/1k' | '1k/8k' | '8k/1k' | { isl: number; osl: number },
@@ -312,17 +300,21 @@ describe('imageRowSequence', () => {
 
 describe('isActiveImageRow', () => {
   it('keeps active models on scenarios they still sweep', () => {
+    const qwenNext = imageRow('qwen3.8next', '8k/1k');
+    expect(imageRowModel(qwenNext)).toBe(Model.Qwen3_8_Flash_Next);
+    expect(isActiveImageRow(qwenNext)).toBe(true);
     expect(isActiveImageRow(imageRow('dsv41flash', 'agentic'))).toBe(true);
-    expect(isActiveImageRow(imageRow('qwen3.5', '8k/1k'))).toBe(true);
     expect(isActiveImageRow(imageRow('qwen3.5', 'agentic'))).toBe(true);
     expect(isActiveImageRow(imageRow('minimaxm31flash', 'agentic'))).toBe(true);
     expect(isActiveImageRow(imageRow('dsr1', '8k/1k'))).toBe(true);
   });
 
-  it('drops the per-model retired MiniMax M3 and DeepSeek V4 Pro 8K/1K sweeps while keeping 8K/1K elsewhere', () => {
+  it('drops retired 8K/1K sweeps while keeping active 8K/1K and Qwen3.5 AgentX', () => {
     expect(isActiveImageRow(imageRow('minimaxm3', '8k/1k'))).toBe(false);
     expect(isActiveImageRow(imageRow('dsv4', '8k/1k'))).toBe(false);
-    expect(isActiveImageRow(imageRow('qwen3.5', '8k/1k'))).toBe(true);
+    expect(isActiveImageRow(imageRow('qwen3.5', '8k/1k'))).toBe(false);
+    expect(isActiveImageRow(imageRow('qwen3.5', 'agentic'))).toBe(true);
+    expect(isActiveImageRow(imageRow('dsr1', '8k/1k'))).toBe(true);
   });
 
   it('drops globally retired 1K/1K and 1K/8K sweeps for every model', () => {
@@ -332,6 +324,8 @@ describe('isActiveImageRow', () => {
   });
 
   it('drops deprecated models on every scenario, including point-release buckets', () => {
+    expect(isActiveImageRow(imageRow('kimik3', 'agentic'))).toBe(false);
+    expect(isActiveImageRow(imageRow('kimik3', '8k/1k'))).toBe(false);
     expect(isActiveImageRow(imageRow('dsv4', 'agentic'))).toBe(false);
     expect(isActiveImageRow(imageRow('dsv4', { isl: 4096, osl: 512 }))).toBe(false);
     expect(isActiveImageRow(imageRow('minimaxm3', 'agentic'))).toBe(false);

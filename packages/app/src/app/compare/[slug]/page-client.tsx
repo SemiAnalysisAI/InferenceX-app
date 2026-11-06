@@ -6,19 +6,19 @@ import { useEffect, useMemo } from 'react';
 import type { GPUDataPoint } from '@/components/calculator/types';
 import { useThroughputData } from '@/components/calculator/useThroughputData';
 import { CompareTableRenderer } from '@/components/compare/compare-table-renderer';
+import { LazyCompareInferenceChart } from '@/components/compare/lazy-compare-inference-chart';
 import {
   GlobalFilterProvider,
   useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
 } from '@/providers/GlobalFilterContext';
-import { InferenceProvider } from '@/components/inference/InferenceContext';
-import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
 import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
+import type { CompareChipPageLink } from '@/lib/compare/compare-chip-link';
 import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
 import type { CompareTableData } from '@/lib/compare/compare-table-view';
 
@@ -62,6 +62,7 @@ interface ComparePageClientProps {
   bVendor: string;
   aArch: string;
   bArch: string;
+  chipPageLink?: CompareChipPageLink | null;
   locale?: 'en' | 'zh';
 }
 
@@ -84,6 +85,7 @@ export default function ComparePageClient({
   bVendor,
   aArch,
   bArch,
+  chipPageLink = null,
   locale = 'en',
 }: ComparePageClientProps) {
   useEffect(() => {
@@ -111,109 +113,123 @@ export default function ComparePageClient({
       initialSequence={initialSequence}
       initialPrecisions={initialPrecisions}
     >
-      <InferenceProvider
-        activeTab="compare"
-        initialActiveHwTypes={[a, b]}
-        compareGpuPair={compareGpuPair}
-        benchmarkQueryScope={benchmarkQueryScope}
-        initialBenchmarkModel={initialModel}
-        initialBenchmarkRows={initialBenchmarkRows}
-        initialBenchmarkSequence={defaultSequence ?? undefined}
-      >
-        <div className="flex flex-col gap-4">
-          <Card className="flex flex-col gap-3">
-            <header>
-              <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                {modelLabel} · {t.eyebrowSuffix}
-              </div>
-              <h1 className="vt-compare-title text-2xl lg:text-3xl font-bold tracking-tight mt-1">
-                {label}
-              </h1>
-              {isZh ? (
-                <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
-                  对比 <strong>{aLabel}</strong>（{aVendor} {aArch}）与 <strong>{bLabel}</strong>（
-                  {bVendor} {bArch}）在 <strong>{modelLabel}</strong> 上的 AI
-                  推理基准测试结果，涵盖不同 LLM
-                  工作负载下的延迟、吞吐量和成本。可通过下方图表控件切换序列长度、精度和指标，操作方式与
-                  <Link href="/zh" className="underline hover:text-primary">
-                    {t.mainChartLinkText}
-                  </Link>
-                  相同。
-                </p>
-              ) : (
-                <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
-                  Head-to-head AI inference benchmark comparison of <strong>{aLabel}</strong> (
-                  {aVendor} {aArch}) and <strong>{bLabel}</strong> ({bVendor} {bArch}) on{' '}
-                  <strong>{modelLabel}</strong>. Latency, throughput, and cost across LLM workloads.
-                  Use the chart controls below to switch sequences, precisions, and metrics — same
-                  interactions as{' '}
-                  <Link href="/" className="underline hover:text-primary">
-                    {t.mainChartLinkText}
-                  </Link>
-                  .
-                </p>
-              )}
-              {agenticIntro && (
-                <p
-                  className="mt-3 max-w-3xl text-sm text-foreground/80"
-                  data-testid="compare-agentic-intro"
-                >
-                  {agenticIntro.paragraph}{' '}
-                  <Link
-                    href={agenticIntro.href}
-                    data-testid="compare-agentic-intro-link"
-                    className="font-medium text-brand underline underline-offset-4 hover:no-underline"
-                  >
-                    {agenticIntro.linkLabel} →
-                  </Link>
-                </p>
-              )}
-              {narrative.length > 0 && (
-                <div className="mt-3 flex flex-col gap-2 max-w-3xl" data-testid="compare-narrative">
-                  {narrative.map((para, i) => (
-                    <p key={i} className="text-sm text-foreground/80">
-                      {para}
-                      {i === narrative.length - 1 && (
-                        <>
-                          {' '}
-                          <span className="text-muted-foreground italic">
-                            {isZh
-                              ? `（以上数据基于此 URL 对应的默认 ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} 配置；在控件中切换序列长度、精度或模型后，下方表格和图表会同步更新。）`
-                              : `(Numbers reflect the default ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} selection for this URL — table and chart below update if you change sequence, precision, or model in the controls.)`}
-                          </span>
-                        </>
-                      )}
-                    </p>
-                  ))}
-                </div>
-              )}
-              <p className="mt-2 text-sm">
+      <div className="flex flex-col gap-4">
+        <Card className="flex flex-col gap-3">
+          <header>
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">
+              {modelLabel} · {t.eyebrowSuffix}
+            </div>
+            <h1 className="vt-compare-title text-2xl lg:text-3xl font-bold tracking-tight mt-1">
+              {label}
+            </h1>
+            {isZh ? (
+              <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
+                对比 <strong>{aLabel}</strong>（{aVendor} {aArch}）与 <strong>{bLabel}</strong>（
+                {bVendor} {bArch}）在 <strong>{modelLabel}</strong> 上的 AI
+                推理基准测试结果，涵盖不同 LLM
+                工作负载下的延迟、吞吐量和成本。可通过下方图表控件切换序列长度、精度和指标，操作方式与
+                <Link href="/zh" className="underline hover:text-primary">
+                  {t.mainChartLinkText}
+                </Link>
+                相同。
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
+                Head-to-head AI inference benchmark comparison of <strong>{aLabel}</strong> (
+                {aVendor} {aArch}) and <strong>{bLabel}</strong> ({bVendor} {bArch}) on{' '}
+                <strong>{modelLabel}</strong>. Latency, throughput, and cost across LLM workloads.
+                Use the chart controls below to switch sequences, precisions, and metrics — same
+                interactions as{' '}
+                <Link href="/" className="underline hover:text-primary">
+                  {t.mainChartLinkText}
+                </Link>
+                .
+              </p>
+            )}
+            {agenticIntro && (
+              <p
+                className="mt-3 max-w-3xl text-sm text-foreground/80"
+                data-testid="compare-agentic-intro"
+              >
+                {agenticIntro.paragraph}{' '}
                 <Link
-                  href={isZh ? `/zh/compare-per-dollar/${slug}` : `/compare-per-dollar/${slug}`}
-                  className="underline hover:text-primary text-muted-foreground"
-                  onClick={() => track('compare_cross_link_to_per_dollar', { slug })}
+                  href={agenticIntro.href}
+                  data-testid="compare-agentic-intro-link"
+                  className="font-medium text-brand underline underline-offset-4 hover:no-underline"
                 >
-                  {t.perDollarLinkText}
+                  {agenticIntro.linkLabel} →
                 </Link>
               </p>
-            </header>
-            <CompareTableSection
-              a={a}
-              b={b}
-              aLabel={aLabel}
-              bLabel={bLabel}
-              ssrTableData={ssrTableData}
-              ssrSequence={defaultSequence}
-              ssrPrecisions={initialPrecisions}
-              initialModel={initialModel}
-              initialSequence={initialSequence}
-              initialCalculatorRows={initialCalculatorRows}
-              emptyStateText={t.emptyState}
-            />
-          </Card>
-          <InferenceChartDisplay />
-        </div>
-      </InferenceProvider>
+            )}
+            {narrative.length > 0 && (
+              <div className="mt-3 flex flex-col gap-2 max-w-3xl" data-testid="compare-narrative">
+                {narrative.map((para, i) => (
+                  <p key={i} className="text-sm text-foreground/80">
+                    {para}
+                    {i === narrative.length - 1 && (
+                      <>
+                        {' '}
+                        <span className="text-muted-foreground italic">
+                          {isZh
+                            ? `（以上数据基于此 URL 对应的默认 ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} 配置；在控件中切换序列长度、精度或模型后，下方表格和图表会同步更新。）`
+                            : `(Numbers reflect the default ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} selection for this URL — table and chart below update if you change sequence, precision, or model in the controls.)`}
+                        </span>
+                      </>
+                    )}
+                  </p>
+                ))}
+              </div>
+            )}
+            <p className="mt-2 text-sm">
+              <Link
+                href={isZh ? `/zh/compare-per-dollar/${slug}` : `/compare-per-dollar/${slug}`}
+                className="underline hover:text-primary text-muted-foreground"
+                onClick={() => track('compare_cross_link_to_per_dollar', { slug })}
+              >
+                {t.perDollarLinkText}
+              </Link>
+            </p>
+            {chipPageLink && (
+              <p className="mt-2 text-sm" data-testid="compare-chip-page-link">
+                <Link
+                  href={chipPageLink.href}
+                  className="underline hover:text-primary text-muted-foreground"
+                  onClick={() =>
+                    track('compare_cross_link_to_chip_page', {
+                      slug,
+                      chip_slug: chipPageLink.slug,
+                    })
+                  }
+                >
+                  {chipPageLink.label} →
+                </Link>
+              </p>
+            )}
+          </header>
+          <CompareTableSection
+            a={a}
+            b={b}
+            aLabel={aLabel}
+            bLabel={bLabel}
+            ssrTableData={ssrTableData}
+            ssrSequence={defaultSequence}
+            ssrPrecisions={initialPrecisions}
+            initialModel={initialModel}
+            initialSequence={initialSequence}
+            initialCalculatorRows={initialCalculatorRows}
+            emptyStateText={t.emptyState}
+          />
+        </Card>
+        <LazyCompareInferenceChart
+          activeTab="compare"
+          initialActiveHwTypes={[a, b]}
+          compareGpuPair={compareGpuPair}
+          benchmarkQueryScope={benchmarkQueryScope}
+          initialBenchmarkModel={initialModel}
+          initialBenchmarkRows={initialBenchmarkRows}
+          initialBenchmarkSequence={defaultSequence ?? undefined}
+        />
+      </div>
     </GlobalFilterProvider>
   );
 }

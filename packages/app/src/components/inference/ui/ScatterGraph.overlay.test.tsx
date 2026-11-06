@@ -16,6 +16,7 @@ import {
   overlayState,
   point,
   rebuildCount,
+  scatterPoints,
 } from './ScatterGraph.test-harness';
 
 const measurements = (offset: number, runUrl?: string): InferenceData[] => [
@@ -55,14 +56,14 @@ describe('ScatterGraph unofficial overlays', () => {
     const labels = () =>
       [...container.querySelectorAll('.line-label .ll-text')].map((n) => n.textContent);
     expect(labels().filter((label) => label?.includes('TRTLLM'))).toHaveLength(2);
-    const dot = container.querySelector('.dot-group');
+    const pointLayer = container.querySelector('.canvas-point-layer');
     const overlay = container.querySelector('.overlay-roofline-path');
     const color = overlay?.getAttribute('stroke');
     const builds = rebuildCount();
     inferenceState.current = { ...inferenceState.current, showFrameworkLabel: false };
     rerender();
     expect(labels()).toEqual(['B200', 'B200']);
-    expect(container.querySelector('.dot-group')).toBe(dot);
+    expect(container.querySelector('.canvas-point-layer')).toBe(pointLayer);
     expect(container.querySelector('.overlay-roofline-path')).toBe(overlay);
     expect(overlay?.getAttribute('stroke')).toBe(color);
     expect(rebuildCount()).toBe(builds);
@@ -241,22 +242,27 @@ describe('ScatterGraph unofficial overlays', () => {
       },
     });
     const buildsAfterMount = rebuildCount();
-    const groups = [
-      ...container.querySelectorAll<SVGGElement>('.dot-group, .unofficial-overlay-pt'),
-    ];
+    const official = () => scatterPoints(container);
+    const overlayGroups = [...container.querySelectorAll<SVGGElement>('.unofficial-overlay-pt')];
     const curves = [...container.querySelectorAll('.roofline-path, .overlay-roofline-path')];
     const paths = curves.map((curve) => curve.getAttribute('d'));
     const axes = [...container.querySelectorAll('.x-axis, .y-axis')];
     const axisGeometry = axes.map((axis) => axis.innerHTML);
-    const positions = groups.map((group) => group.getAttribute('transform'));
-    expect(groups).toHaveLength(9);
+    const officialPositions = official().map((entry) => [entry.x, entry.y]);
+    const overlayPositions = overlayGroups.map((group) => group.getAttribute('transform'));
+    expect(official().length + overlayGroups.length).toBe(9);
     expect(curves).toHaveLength(3);
     expect(paths.every(Boolean)).toBe(true);
 
     for (const showAllMeasurements of [false, true, false]) {
       inferenceState.current = { ...inferenceState.current, hideNonOptimal: !showAllMeasurements };
       rerender();
-      for (const group of groups) {
+      for (const entry of official()) {
+        const visible = showAllMeasurements || (entry.datum as InferenceData).x !== 20;
+        expect(entry.opacity).toBe(visible ? 1 : 0);
+        expect(entry.interactive).toBe(visible);
+      }
+      for (const group of overlayGroups) {
         const datum = (group as SVGGElement & { __data__: InferenceData }).__data__;
         const visible = showAllMeasurements || datum.x !== 20;
         expect(group.style.opacity).toBe(visible ? '1' : '0');
@@ -264,7 +270,10 @@ describe('ScatterGraph unofficial overlays', () => {
       }
       expect(curves.map((curve) => curve.getAttribute('d'))).toEqual(paths);
       expect(axes.map((axis) => axis.innerHTML)).toEqual(axisGeometry);
-      expect(groups.map((group) => group.getAttribute('transform'))).toEqual(positions);
+      expect(official().map((entry) => [entry.x, entry.y])).toEqual(officialPositions);
+      expect(overlayGroups.map((group) => group.getAttribute('transform'))).toEqual(
+        overlayPositions,
+      );
       expect(rebuildCount()).toBe(buildsAfterMount);
     }
     unmount();
@@ -331,14 +340,14 @@ describe('ScatterGraph unofficial overlays', () => {
       } as unknown as Parameters<typeof ScatterGraph>[0]['overlayData'],
     });
     const buildsAfterMount = rebuildCount();
-    const officialLabel = container.querySelector<SVGTextElement>('.dot-group .point-label');
+    const officialLabel = () =>
+      container.querySelector<SVGTextElement>('.point-label-anchor .point-label');
     const overlayLabel = container.querySelector<SVGTextElement>(
       '.unofficial-overlay-pt .overlay-label',
     );
 
-    expect(officialLabel).not.toBeNull();
+    expect(officialLabel()).toBeNull();
     expect(overlayLabel).not.toBeNull();
-    expect(officialLabel!.style.display).toBe('none');
     expect(overlayLabel!.style.display).toBe('none');
     const mutationRecords: MutationRecord[] = [];
     const observer = new MutationObserver((records) => mutationRecords.push(...records));
@@ -350,7 +359,7 @@ describe('ScatterGraph unofficial overlays', () => {
     };
     rerender();
 
-    expect(officialLabel!.style.display).toBe('');
+    expect(officialLabel()!.style.display).toBe('');
     expect(overlayLabel!.style.display).toBe('');
     mutationRecords.push(...observer.takeRecords());
     observer.disconnect();

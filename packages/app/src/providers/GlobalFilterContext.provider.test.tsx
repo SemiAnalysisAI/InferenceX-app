@@ -4,13 +4,19 @@ import { createRoot, type Root } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { AvailabilityRow } from '@/lib/api/api';
+import { type AvailabilityIndex, indexAvailability } from '@/lib/benchmarks/availability-index';
+import { compactAvailability } from '@/lib/benchmarks/compact-availability';
 import { Model, Precision, Sequence } from '@/lib/catalog/data-mappings';
+
+const indexRows = (rows: readonly object[]) =>
+  indexAvailability(compactAvailability(rows as AvailabilityRow[]));
 
 const mocks = vi.hoisted(() => ({
   featureGateUnlocked: false,
   featureGateHydratesUnlocked: false,
   availability: {
-    data: [] as unknown[] | undefined,
+    data: undefined as AvailabilityIndex | undefined,
     error: null as Error | null,
     isError: false,
     isPending: false,
@@ -168,7 +174,7 @@ beforeEach(() => {
   consumerRequestModels.length = 0;
   mocks.setNavigationModel.mockClear();
   mocks.workflowDates.mockClear();
-  mocks.availability.data = [];
+  mocks.availability.data = indexRows([]);
   mocks.availability.error = null;
   mocks.availability.isError = false;
   mocks.availability.isPending = false;
@@ -314,9 +320,9 @@ describe('GlobalFilterProvider context isolation', () => {
   });
 
   it('does not offer Muse in shared selectors without its measurements', () => {
-    mocks.availability.data = [
+    mocks.availability.data = indexRows([
       { model: 'kimik3', precision: 'fp4', sequence: 'agentic-traces' },
-    ] as unknown[];
+    ]);
     mountProvider();
 
     expect(availabilitySnapshot?.availableModels).not.toContain(Model.Muse_Spark_Open);
@@ -326,9 +332,9 @@ describe('GlobalFilterProvider context isolation', () => {
   });
 
   it('offers Muse in shared selectors once measurements exist', () => {
-    mocks.availability.data = [
+    mocks.availability.data = indexRows([
       { model: 'musespark', precision: 'fp4', sequence: 'agentic-traces' },
-    ] as unknown[];
+    ]);
     mountProvider();
 
     expect(availabilitySnapshot?.availableModels).toContain(Model.Muse_Spark_Open);
@@ -369,7 +375,7 @@ describe('GlobalFilterProvider context isolation', () => {
 
   it('offers Flash once its own database observations exist', () => {
     mocks.featureGateUnlocked = true;
-    mocks.availability.data = [
+    mocks.availability.data = indexRows([
       {
         model: 'glm5.3flash',
         precision: 'fp8',
@@ -377,7 +383,7 @@ describe('GlobalFilterProvider context isolation', () => {
         isl: null,
         osl: null,
       },
-    ];
+    ]);
     mountProvider();
     expect(availabilitySnapshot?.availableModels).toContain(Model.GLM_5_3_Flash);
     expect(availabilitySnapshot?.availableModels).not.toContain(Model.GLM_5_2);
@@ -397,9 +403,9 @@ describe('GlobalFilterProvider context isolation', () => {
   });
 
   it('does not unlock Flash from observations, an unofficial run, or an explicit selection', () => {
-    mocks.availability.data = [
+    mocks.availability.data = indexRows([
       { model: 'glm5.3flash', precision: 'fp8', sequence: 'agentic-traces' },
-    ];
+    ]);
     mocks.unofficialAvailable = [
       { model: Model.GLM_5_3_Flash, sequence: Sequence.AgenticTraces, precision: Precision.FP8 },
     ];
@@ -421,7 +427,7 @@ describe('GlobalFilterProvider context isolation', () => {
       mocks.featureGateUnlocked = false;
       rerenderProvider?.();
     });
-    expect(selectionSnapshot?.selectedModel).toBe(Model.Kimi_K3);
+    expect(selectionSnapshot?.selectedModel).toBe(Model.DeepSeek_V4_1_Flash);
     expect(availabilitySnapshot?.availableModels).not.toContain(Model.GLM_5_3_Flash);
   });
 

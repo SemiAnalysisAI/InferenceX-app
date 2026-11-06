@@ -13,6 +13,7 @@ import { CompareIndexTrackedLink } from './compare-index-tracked-link';
 
 const MODEL_LOGOS: Record<string, string> = {
   'muse-spark-open': '/logos/muse-mascot.webp',
+  'kimi-k31-pro': '/logos/kimi-color.svg',
   'kimi-k3': '/logos/kimi-color.svg',
   'deepseek-v41-flash': '/logos/deepseek-color.svg',
   'deepseek-v4': '/logos/deepseek-color.svg',
@@ -374,6 +375,7 @@ const VENDOR_MARKS: readonly {
 ] as const;
 
 const LANDING_HIDDEN_LEDGER_MODELS: ReadonlySet<string> = new Set([
+  'muse-spark-open',
   'deepseek-v4',
   'qwen-3-8-flash-next',
   'qwen-3-5',
@@ -557,7 +559,7 @@ export function AgentXCompareHero({
                 data-testid="compare-agentx-dashboard-link"
                 href={agentxDashboardHref(locale, FEATURED_AGENTX_MODELS[0])}
                 analyticsEvent="compare_agentx_dashboard_clicked"
-                analyticsTarget="kimi-k3"
+                analyticsTarget={FEATURED_AGENTX_MODELS[0].slug}
                 analyticsSurface={surface}
                 appNavigation
                 className="group motion-press inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-5 py-2.5 font-semibold text-foreground transition-colors hover:bg-muted"

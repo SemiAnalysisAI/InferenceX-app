@@ -5,7 +5,7 @@ import { parseArgs } from 'node:util';
 
 import { hasNoSslFlag, requireIngestRepo } from './cli-utils.js';
 import { AsyncSemaphore } from './etl/async-semaphore.js';
-import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
+import { createAdminSql } from './etl/db-utils.js';
 import { ingestGpuMetricsArtifact } from './etl/gpu-metrics-ingest.js';
 import { readPowerAuditValidations } from './etl/gpu-metrics-artifacts.js';
 import type { RecoveredPowerAudit } from './etl/power-audit-validations.js';
@@ -559,7 +559,6 @@ async function main(): Promise<void> {
     }
   }
 
-  await refreshLatestBenchmarks(sql);
   console.log(
     `\n=== backfill complete: ${artifactsProcessed} artifact(s), ${seriesStored} series, ` +
       `${samplesStored} sample(s), ${pointsLinked} point link(s), ` +

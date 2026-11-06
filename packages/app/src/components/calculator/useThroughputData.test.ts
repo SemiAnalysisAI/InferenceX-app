@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
 import { overlayRunIndex } from '@/lib/charts/overlay-run-style';
-import { SUPPLEMENTAL_BENCHMARK_ROWS } from '@/lib/benchmarks/supplemental-benchmarks';
+import previewSnapshots from '../../../cypress/fixtures/preview-snapshots.json';
 
 import type { GPUDataPoint } from './types';
 import {
@@ -75,7 +75,9 @@ describe('sign', () => {
 });
 
 describe('snapshot token-metric capabilities', () => {
-  const julyVrRows = SUPPLEMENTAL_BENCHMARK_ROWS.filter((row) => row.hardware === 'vr200');
+  const julyVrRows = (previewSnapshots as unknown as BenchmarkRow[]).filter(
+    (row) => row.hardware === 'vr200',
+  );
   const options = {
     sequence: Sequence.EightK_OneK,
     precisions: ['fp4'],
@@ -1000,6 +1002,84 @@ describe('buildGpuGroups', () => {
     expect(first.tpPerMw).toBeGreaterThan(0);
   });
 
+  it('reads a missing fixed-sequence median interactivity as zero', () => {
+    const { grouped } = buildGpuGroups([makeRow({ metrics: { tput_per_gpu: 900 } })], {
+      ...shared,
+      classify: singlePrecisionClassify,
+    });
+    expect(Object.values(grouped)[0][0].interactivity).toBe(0);
+  });
+
+  describe('chip basis', () => {
+    const disagg = makeRow({
+      hardware: 'gb300',
+      framework: 'dynamo-sglang',
+      disagg: true,
+      is_multinode: true,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 12,
+      metrics: {
+        median_intvty: 50,
+        tput_per_gpu: 1000,
+        input_tput_per_gpu: 3600,
+        output_tput_per_gpu: 133,
+      },
+    });
+    const point = (
+      chipBasis?: 'pool' | 'total',
+      classify: (
+        hwKey: string,
+        row: BenchmarkRow,
+      ) => {
+        key: string;
+        meta: { hwKey: string };
+      } = singlePrecisionClassify,
+    ) =>
+      Object.values(buildGpuGroups([disagg], { ...shared, chipBasis, classify }).grouped)[0]![0]!;
+
+    it('keeps per-pool input and output rates by default', () => {
+      const p = point();
+      expect(p.inputThroughput).toBe(3600);
+      expect(p.outputThroughput).toBe(133);
+      expect(p.throughput).toBe(1000);
+    });
+
+    it('measures the token mix per deployment chip on the default pool basis', () => {
+      expect(point().inputTokenShare).toBeCloseTo(900 / (900 + (133 * 12) / 16), 9);
+    });
+
+    it('divides input, output and their costs by every chip on the total basis', () => {
+      const pool = point('pool');
+      const total = point('total');
+      expect(total.inputThroughput).toBeCloseTo(3600 / 4, 9);
+      expect(total.outputThroughput).toBeCloseTo((133 * 12) / 16, 9);
+      expect(total.throughput).toBe(1000);
+      expect(total.costhOutput).toBeCloseTo((pool.costhOutput * 16) / 12, 9);
+      expect(total.costhi).toBeCloseTo(pool.costhi * 4, 9);
+      expect(total.costh).toBe(pool.costh);
+      // Rates on one denominator now sum to the total, so the measured split is used.
+      expect(total.inputTokenShare).toBeCloseTo(900 / 1000, 2);
+    });
+
+    it('hands classify and sourceRow the stored row so callers can match it by identity', () => {
+      const seen: BenchmarkRow[] = [];
+      const p = point('total', (hwKey, row) => {
+        seen.push(row);
+        return singlePrecisionClassify(hwKey);
+      });
+      expect(seen).toEqual([disagg]);
+      expect(seen[0]).toBe(disagg);
+      expect(p.sourceRow).toBe(disagg);
+    });
+
+    it('leaves aggregated rows identical under both bases', () => {
+      const aggregated = (chipBasis: 'pool' | 'total') =>
+        buildGpuGroups([makeRow()], { ...shared, chipBasis, classify: singlePrecisionClassify })
+          .grouped;
+      expect(aggregated('total')).toEqual(aggregated('pool'));
+    });
+  });
+
   describe('time to first token', () => {
     const only = (row: BenchmarkRow, sequence = Sequence.OneK_OneK, percentile?: Percentile) => {
       const { grouped } = buildGpuGroups([row], {
@@ -1125,6 +1205,12 @@ describe('buildGpuGroups', () => {
     it('clamps into [0,1] — real rows report a GPU rate as high as 1.185', () => {
       expect(only(withMetrics({ server_gpu_cache_hit_rate: 1.185 })).cacheHitRate).toBe(1);
       expect(only(withMetrics({ server_gpu_cache_hit_rate: -0.2 })).cacheHitRate).toBe(0);
+    });
+
+    it('falls back to the theoretical rate only on fallback hardware', () => {
+      const theoretical = { theoretical_cache_hit_rate: 0.4 };
+      expect(only({ ...withMetrics(theoretical), hardware: 'gb300' }).cacheHitRate).toBe(0.4);
+      expect(only(withMetrics(theoretical)).cacheHitRate).toBeUndefined();
     });
   });
 

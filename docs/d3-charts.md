@@ -1,5 +1,16 @@
 # D3 Chart Design Rationale
 
+## Router-aware framework labels
+
+Inference line labels and legends use `router_name` from each point's runtime
+metadata. Plain `sglang` or `vllm` with router `smg` displays as `SMG SGLang`
+or `SMG vLLM`. If any point uses SMG, the entire curve's line label and legend
+use the SMG framework name without a mixed-name suffix. Curves with no SMG
+points keep the standard name, and point tooltips use only that point's
+metadata. This applies to official results and unofficial overlays.
+Hardware keys, framework filters and measurements do not change.
+The inference Views API uses the same helper for series and table labels.
+
 ## Desktop legend alignment
 
 The shared chart wrapper places the desktop legend 8px below the plot's top
@@ -91,6 +102,19 @@ During zoom/pan, point repositioning (cheap: transform attr update) runs on ever
 This keeps zoom at 60fps while deferring expensive work. Effect cleanup cancels a pending frame so it never updates removed DOM.
 
 ## HTML Strings for Tooltips
+
+Pinned point details reuse the compact hover card's KV cache bar, including the
+chip/CPU split and theoretical marker. TRT-LLM's combined rate stays a single
+segment; disabled offload does not contribute CPU hits. Missing chip measurements
+retain the available textual rates instead of inventing a bar. Concurrency and
+precision use explicit labels, and parallelism groups Prefill/Decode configurations by
+role with compact labels such as DEP4. The raw fields remain in an expandable
+configuration table. Prompt/generated token counts use a proportional bar with
+exact counts underneath; partial or invalid counts do not produce a split.
+Official, unofficial and historical points
+share this presentation; unofficial colors retain their per-run identity.
+This is presentation-only: benchmark values, API responses and `inferencex-skills`
+contracts are unchanged.
 
 Tooltips are built as HTML template literal strings, injected via D3's `.html()`. Using React elements would require:
 
@@ -195,6 +219,32 @@ Label loops that size a background rect to its text (`.ll-bg`/`.pl-bg`, point-la
 Every `setAttribute`, inline-style write, `textContent` assignment, and node move produces a `MutationObserver` record, **even when the value is unchanged**. PostHog session replay (rrweb) serializes each record — a moved node is re-serialized with its whole subtree — and the agentic-point coach mark rescans on them. A throttled Chrome profile of a legend toggle attributed ~40% of the main-thread work to rrweb processing these records; most came from blind re-syncs of hundreds of point labels, decoration rings, gradient stops, and `.raise()` calls that were already in order.
 
 Hot re-sync paths (data, metric, and display phases; zoom frames; point-label placement) therefore use the write-if-changed helpers in `src/lib/d3-chart/chart-update.ts`: `setAttrIfChanged`, `setStyleIfChanged`, `setTextIfChanged`, and `raiseInOrder` (sequential `.raise()` semantics, skipped when each parent's tail is already in that order). They compare against the live DOM, not a cache, so a label the placement pass moved is still restored correctly. Reads of attributes and inline styles never force layout. Initial enter-path construction can keep plain `.attr()` chains — new nodes produce one add record regardless. Tests for these paths assert a repeated pass emits zero mutation records.
+
+The shared layers (`bars`, `horizontal-bars`, `points`, `error-bars`, `bar-labels`, `lines`, `rooflines`, `radar`) and the grid write through `writeAttrs`/`writeText`, which apply the same comparison to a whole attribute map per node. Axes are drawn by `renderAxes`'s own copy of the d3-axis algorithm (same join, keys, ordering, enter attributes and `__axis` bookkeeping), with every update write going through the comparison; transitions still use the d3 generator. A test pins its output to d3-axis byte for byte, including after a `customize` callback has replaced tick text with `tspan`s. Line and roofline `d` strings are cached per path on the projected coordinates, curve and defined mask (`layers/line-path-cache.ts`), so a pass whose geometry did not move skips building the path string.
+
+When the data phase runs while zoomed, the zoom transform is re-applied right after the rebuild. The grid, axes and the layers whose zoom handler rewrites every scale-dependent attribute (bar, horizontal bar, point, error bar, line, bar label) are drawn with the zoomed scales up front, so the re-applied transform finds nothing to change. Rooflines, scatter, radar and custom layers still render with the base scales, since their zoom handlers either skip some nodes or receive scale-sensitive context. The proximity overlay is removed before `raiseInOrder`, so the raised marks are already at the tail and do not move.
+
+## Build Only What Is Visible
+
+Point labels default to off, so the scatter layer builds a `.point-label` only while labels are shown and removes it when they are hidden (`syncPointLabel`). Previously every point carried a hidden `text` and `tspan`, which is half of each point's subtree. A label built late takes the stacking slot it would have had if it had been built with its point. That slot is after the hit circle, the original shape and any theme marker, and before offload halos or shapes re-created for a new precision (`lib/d3-chart/layers/point-label-order.ts`). The orange-chicken marker uses the same slot when a point has no label. A new label is filled in while detached, so it lands as one DOM insertion.
+
+Turning labels on builds one label per point, so that path avoids selector engines and live collections. `syncPointLabel` and the collision placement find a point's label by walking its element children (`childPointLabel`) and walk a label's tspans the same way, instead of `querySelector`, a d3 join or `children`. In jsdom those cost several microseconds per point, which made building every label slower than the old style flip on hidden labels.
+
+Other passes skip work that cannot change anything. A point without an offload halo skips the halo join. The Pareto fade does not walk the chart's marks while the frontier is off and no fade was applied to that zoom group. Point-label collision placement runs only while labels are visible. The dot `transition` style is written once per dot.
+
+A width change re-runs the data phase. `useResponsiveChartDimensions` applies the first change of a resize at once and collapses later changes into one per `RESIZE_COALESCE_MS` (100 ms), ending on the final width. A window or panel drag therefore renders about ten times a second instead of once per frame.
+
+## Canvas Point Layer
+
+`ScatterGraph` draws its official points on one canvas instead of one SVG group per point (`canvas: ensureCanvasPointLayer` on the scatter layer, `lib/d3-chart/layers/canvas-points.ts`). Thousands of `.dot-group` subtrees were most of the chart's DOM, and every data, zoom and legend pass walked them. The layer keeps per-point state in typed arrays (positions, target and shown opacity, fade, shape, palette slot, halo slot) and repaints in one `requestAnimationFrame` after any change. Other charts, unofficial overlays, rooflines and line labels stay SVG. The scatter layer passes the factory in, and shared code (`layer-renderer.ts`, the tooltip hooks, export) finds a live layer through `canvas-point-registry.ts`, so charts that never draw canvas points do not ship the layer.
+
+Everything a user sees matches the SVG it replaced. Points are drawn in the order a keyed d3 join would have left the DOM (`canvas-point-order.ts`, duplicates included), so overlapping points stack the same way. Opacity changes animate with the CSS `ease` curve over the same 150 ms, and coordinate transitions use the shared 300 ms cubic tween. The Pareto fade multiplies opacity by 0.2 like the `opacity(0.2)` filter. Offload halos are dashed strokes with the halo legend's radius and dash. Theme colours given as `var(--name)` resolve against the canvas's computed style, and a theme class change repaints every live layer.
+
+Pointer input goes through one transparent `.dot-hit-area` path, the union of the interactive points' hit circles, so the cursor and event targets still follow the points. A uniform grid (`canvas-point-hit.ts`) answers which point is under the pointer. The last drawn interactive point within the hit radius wins, as the topmost SVG circle did, and hidden points never match. Point labels remain SVG text in `.point-label-anchor` groups, built only for visible points, so collision placement and label CSS are unchanged.
+
+PNG and SVG export still render real `.dot-group` elements through the SVG scatter path, in the live draw order. The old export cloned the live groups, so their child order and style order carried the chart's history. `restoreExportOrder` reproduces that history from what the layer tracked. A point whose shape type changed while it lived has its shape after its label, and a point that was faded before its first transition write keeps `filter` ahead of `transition`. A repeated key stays the fresh group the SVG join would have re-created.
+
+Tests and Cypress read points from the layer element rather than the DOM. `.canvas-point-layer` exposes `scatterPoints()`, one snapshot per point with its datum, key, plot and client coordinates, opacity, interactivity, shape, colour, halo, fade, hover state, label and `data-*` attributes. `data-points-joined` counts joins that added points, so `.canvas-point-layer:not([data-points-joined="0"])` means points have rendered. Clicks and hovers are dispatched on `.dot-hit-area` at a point's `clientX`/`clientY` (`cypress/support/scatter-points.ts`).
 
 ## Huawei series identity
 

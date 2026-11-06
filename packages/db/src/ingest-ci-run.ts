@@ -21,10 +21,12 @@ import {
   listRunArtifacts,
 } from './lib/github-artifacts';
 import { pairServerLogArtifacts } from './lib/server-log-backfill';
-import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
+import { createAdminSql } from './etl/db-utils';
 import { materializePowerSeriesForRun } from './queries/gpu-power-series';
 import {
   applyChangelogBackfills,
+  applyRunFrameworkOverridesToChangelogs,
+  backfilledPoints,
   isRunAttemptPurged,
   planBenchmarkPoint,
   validateRunBackfills,
@@ -197,7 +199,7 @@ if (isDownloadMode) {
 
   for (const artifact of byLogical.values()) {
     console.log(`  ${artifact.name}`);
-    downloadArtifact(artifact, artifactsDir);
+    await downloadArtifact(artifact, artifactsDir);
   }
 
   console.log(`\n  Downloaded ${byLogical.size} artifact(s)`);
@@ -414,13 +416,17 @@ async function main(): Promise<void> {
       `  No changelog metadata artifact found; using fallback changelog: ${fallbackDescription}`,
     );
   }
-  const { changelogs, backfillIds: changelogBackfillIds } = applyChangelogBackfills(
-    runIdNum,
-    runAttemptNum,
-    parsedChangelogs,
-  );
+  const { changelogs: backfilledChangelogs, backfillIds: changelogBackfillIds } =
+    applyChangelogBackfills(runIdNum, runAttemptNum, parsedChangelogs);
   for (const backfillId of changelogBackfillIds) {
     console.log(`  Applied changelog backfill ${backfillId}`);
+  }
+  const { changelogs, overrideIds: frameworkOverrideIds } = applyRunFrameworkOverridesToChangelogs(
+    runIdNum,
+    backfilledChangelogs,
+  );
+  for (const overrideId of frameworkOverrideIds) {
+    console.log(`  Applied run framework override ${overrideId} to changelog config keys`);
   }
   const appendOnly = hasAppendOnlyFlag(changelogs);
   const evalsOnly = hasEvalsOnlyFlag(changelogs);
@@ -647,7 +653,11 @@ async function main(): Promise<void> {
               `config ${configId}, conc ${row.conc}`,
           );
         }
-        resolved.push(plan.point);
+        resolved.push(
+          plan.point.config === row.config
+            ? plan.point
+            : { ...plan.point, configId: await getOrCreateConfig(plan.point.config) },
+        );
       }
       const attached = attachAgentxAudits(
         windows,
@@ -909,7 +919,14 @@ async function main(): Promise<void> {
     }
     await traceWorkerPool.close();
     if (requiredPower)
-      assertRequiredPowerPointsRetained(requiredPower.points, retainedPowerPoints, 'after_insert');
+      assertRequiredPowerPointsRetained(
+        backfilledPoints(
+          { githubRunId: runIdNum, runAttempt: runAttemptNum },
+          requiredPower.points,
+        ),
+        retainedPowerPoints,
+        'after_insert',
+      );
     console.log(`  Benchmarks: +${totalNewBmk} new, ${totalDupBmk} dup`);
     if (totalTraceReplayLinked > 0 || tracker.skips.traceReplayMissing > 0) {
       console.log(
@@ -1193,8 +1210,6 @@ async function main(): Promise<void> {
       }),
     );
   }
-
-  await refreshLatestBenchmarks(sql);
 
   console.log('\n=== ingest-ci-run complete ===');
   console.log('  Invalidate API cache: bun run admin:cache:invalidate');

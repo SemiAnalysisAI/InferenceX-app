@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
-import { Suspense } from 'react';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
+import { compareChipPageLink } from '@/lib/compare/compare-chip-link';
 import { JsonLd } from '@/components/seo/json-ld';
 import {
   isAgenticSequence,
@@ -31,11 +31,10 @@ import {
 import { compareSocialImages } from '@/lib/compare/compare-meta';
 import { zhAlternates } from '@/lib/i18n/i18n';
 import { socialMetadata } from '@/lib/seo/social-metadata';
-import { CompareDetailRouteSkeleton } from '@/components/motion/route-skeletons';
 
 import ComparePageClient from '../../../compare/[slug]/page-client';
 
-export const revalidate = 3600;
+export const revalidate = 86400;
 
 export function generateStaticParams(): { slug: string }[] {
   return [];
@@ -124,9 +123,8 @@ export function renderComparePageZh(slug: string, { scenarioSegment }: ScenarioO
   }
 
   return (
-    <Suspense fallback={<CompareDetailRouteSkeleton />}>
-      <CompareDetailZh parsed={parsed} canonical={canonical} scenarioSegment={scenarioSegment} />
-    </Suspense>
+    // ISR HTML is complete when served; a Suspense fallback would only delay the reveal.
+    <CompareDetailZh parsed={parsed} canonical={canonical} scenarioSegment={scenarioSegment} />
   );
 }
 
@@ -217,6 +215,7 @@ async function CompareDetailZh({
         bVendor={bMeta?.vendor ?? ''}
         aArch={aMeta?.arch ?? ''}
         bArch={bMeta?.arch ?? ''}
+        chipPageLink={compareChipPageLink(parsed.a, parsed.b, 'zh')}
         locale="zh"
       />
     </>

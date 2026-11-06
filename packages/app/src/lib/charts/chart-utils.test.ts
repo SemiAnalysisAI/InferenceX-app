@@ -9,12 +9,12 @@ import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/
 import { chartDefinitions } from '@/components/inference/metric-registry';
 import {
   buildAvailabilityHwKey,
-  generateHighContrastColors,
   getNestedYValue,
   getHardwareKey,
   normalizeEvalHardwareKey,
   createChartDataPoint,
   buildDerivedChartFields,
+  deploymentChipCount,
   paretoFrontUpperRight,
   paretoFrontLowerRight,
   paretoFrontLowerLeft,
@@ -24,6 +24,7 @@ import {
   metricLabel,
   xAxisLabel,
 } from '@/lib/charts/chart-utils';
+import { generateHighContrastColors } from '@/lib/charts/high-contrast-colors';
 
 vi.mock('@/lib/catalog/constants', async (importOriginal) => {
   const actual = await importOriginal<typeof ConstantsModule>();
@@ -534,9 +535,31 @@ describe('createChartDataPoint', () => {
   });
 
   it('computes tp from prefill+decode GPU counts when disagg is true', () => {
-    const e = entry({ disagg: true, num_prefill_gpu: 4, num_decode_gpu: 2, tp: 99 });
+    const e = entry({
+      disagg: true,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 2,
+      prefill_num_workers: 1,
+      decode_num_workers: 1,
+      tp: 99,
+    });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.tp).toBe(6);
+  });
+
+  it('counts a legacy unsplit disaggregated deployment once, not once per pool', () => {
+    const e = entry({
+      disagg: true,
+      num_prefill_gpu: 36,
+      num_decode_gpu: 36,
+      prefill_num_workers: 0,
+      decode_num_workers: 0,
+      tp: 36,
+    });
+    expect(
+      createChartDataPoint('2025-11-01', e, 'median_intvty', 'tput_per_gpu', 'gb200_dynamo-trt')
+        .physicalChips,
+    ).toBe(36);
   });
 
   it('uses original tp when disagg is false', () => {
@@ -702,6 +725,47 @@ describe('createChartDataPoint', () => {
   });
 });
 
+describe('power-normalized derived fields', () => {
+  const powered = entry({
+    tput_per_gpu: 900,
+    output_tput_per_gpu: 600,
+    input_tput_per_gpu: 300,
+    avg_power_w: 400,
+  });
+  const powerKeys = [
+    'tpPerMw',
+    'inputTputPerMw',
+    'outputTputPerMw',
+    'jTotal',
+    'jOutput',
+    'jInput',
+    'measuredPowerPercentTdp',
+  ] as const;
+  const point = (power: number, tdp: number) =>
+    createChartDataPoint('2025-01-01', powered, 'median_e2el', 'tput_per_gpu', 'h100', {
+      power,
+      tdp,
+      costh: 2.8,
+      costr: 0.7,
+    });
+
+  it('omits them for hardware without a power figure', () => {
+    const unpowered = point(0, 0);
+    for (const key of powerKeys) expect(unpowered[key], key).toBeUndefined();
+  });
+
+  it('derives them for hardware below one kilowatt', () => {
+    const light = point(0.5, 0.5);
+    expect(light.tpPerMw?.y).toBeCloseTo((900 * 1000) / 0.5, 9);
+    expect(light.inputTputPerMw?.y).toBeCloseTo((300 * 1000) / 0.5, 9);
+    expect(light.outputTputPerMw?.y).toBeCloseTo((600 * 1000) / 0.5, 9);
+    expect(light.jTotal?.y).toBeCloseTo((0.5 * 1000) / 900, 9);
+    expect(light.jOutput?.y).toBeCloseTo((0.5 * 1000) / 600, 9);
+    expect(light.jInput?.y).toBeCloseTo((0.5 * 1000) / 300, 9);
+    expect(light.measuredPowerPercentTdp?.y).toBeCloseTo((400 / 0.5) * 100, 9);
+  });
+});
+
 describe('buildDerivedChartFields', () => {
   it('matches full inference formulas while emitting only requested history fields', () => {
     const e = entry({
@@ -750,6 +814,46 @@ describe('buildDerivedChartFields', () => {
     expect(historicalFields.tpPerGpu).toEqual({ y: 1000, roof: false });
     expect(historicalFields.measuredJPerTotalToken).toBeUndefined();
     expect(Object.keys(historicalFields)).toEqual(['tpPerGpu']);
+  });
+
+  it('emits exactly the requested measured and power-boundary key', () => {
+    const measured = entry({
+      output_tput_per_gpu: 600,
+      avg_power_w: 500,
+      joules_per_successful_query: 7200,
+      disagg: true,
+      num_prefill_gpu: 2,
+      num_decode_gpu: 4,
+      benchmark_type: 'single_turn',
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      joules_per_input_token: 0.5,
+      joules_per_output_token: 2,
+      prefill_joules_per_input_token: 0.4,
+      decode_joules_per_output_token: 1.5,
+    });
+    const full = buildDerivedChartFields(measured, 'h100');
+    for (const key of [
+      'measuredAvgPower',
+      'measuredPowerTimeline',
+      'measuredJPerSuccessfulQuery',
+      'measuredWhPerSuccessfulQuery',
+      'reconstructedPrefillJPerOutputToken',
+      'gpuProvisionedJPerOutputToken',
+      'gpuProvisionedJPerTotalToken',
+    ] as const) {
+      expect(full[key]).toBeDefined();
+      expect(buildDerivedChartFields(measured, 'h100', [key])).toEqual({ [key]: full[key] });
+    }
+  });
+});
+
+describe('deploymentChipCount', () => {
+  it('counts TPU v7 deployments by allocated chips, keyed on the exact tpuv7 base', () => {
+    const topology = { disagg: false, num_prefill_gpu: 0, num_decode_gpu: 4, tp: 8, pp: 1 };
+    expect(deploymentChipCount(topology, 'tpuv7')).toBe(4);
+    expect(deploymentChipCount(topology, 'tpuv7_vllm')).toBe(4);
+    expect(deploymentChipCount(topology, 'tpuv7x_vllm')).toBe(8);
   });
 });
 
@@ -892,11 +996,13 @@ describe('createChartDataPoint power-boundary fields', () => {
     expect(p.measuredJPerOutputToken).toEqual({ y: 10, roof: false });
   });
 
-  it('normalizes fixed-sequence disaggregated energy by all GPUs while jOutput stays per decode GPU', () => {
+  it('normalizes disaggregated energy by all GPUs while jOutput stays per decode GPU', () => {
     const p = boundaryPoint(
       entry({
         output_tput_per_gpu: 400,
         disagg: true,
+        prefill_num_workers: 1,
+        decode_num_workers: 1,
         benchmark_type: 'single_turn',
         num_prefill_gpu: 4,
         num_decode_gpu: 4,
@@ -911,13 +1017,33 @@ describe('createChartDataPoint power-boundary fields', () => {
       entry({
         output_tput_per_gpu: 400,
         disagg: true,
+        prefill_num_workers: 1,
+        decode_num_workers: 1,
         benchmark_type: 'agentic_traces',
         num_prefill_gpu: 4,
         num_decode_gpu: 4,
       }),
     );
-    expect(agentic.gpuProvisionedJPerOutputToken).toBeUndefined();
-    expect(agentic.utilityProvisionedJPerOutputToken).toBeUndefined();
+    expect(agentic.gpuProvisionedJPerOutputToken?.y).toBeCloseTo((700 * 8) / (400 * 4), 10);
+    expect(agentic.utilityProvisionedJPerOutputToken?.y).toBeCloseTo((700_000 * 8) / (400 * 4), 10);
+
+    const totalBasis = boundaryPoint(
+      entry({
+        output_tput_per_gpu: 200,
+        disagg: true,
+        prefill_num_workers: 1,
+        decode_num_workers: 1,
+        chip_basis: 'total',
+        benchmark_type: 'single_turn',
+        num_prefill_gpu: 4,
+        num_decode_gpu: 4,
+      }),
+    );
+    expect(totalBasis.gpuProvisionedJPerOutputToken?.y).toBeCloseTo(
+      p.gpuProvisionedJPerOutputToken!.y,
+      10,
+    );
+    expect(totalBasis.jOutput?.y).toBeCloseTo(700_000 / 200, 10);
   });
 });
 

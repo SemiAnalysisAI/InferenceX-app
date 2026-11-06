@@ -1,4 +1,5 @@
 'use client';
+import { chipBasisCsvNote } from '@/lib/benchmarks/chip-basis';
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics/analytics';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
@@ -17,11 +18,8 @@ import chartDefinitions, {
 import { metricRowLabel } from '@/components/inference/axis-metric-explanations';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
-import {
-  AIR_COOLED_SYSTEM_PUE,
-  LIQUID_COOLED_RACK_PUE,
-  SYSTEM_POWER_MODEL_REVISION,
-} from '@/lib/power/system-power-model';
+import { AIR_COOLED_SYSTEM_PUE, LIQUID_COOLED_RACK_PUE } from '@/lib/power/facility-pue';
+import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
 import {
   ALL_IN_MEASURED_AGENTIC_NOTE,
   ALL_IN_MEASURED_EMPTY,
@@ -39,7 +37,7 @@ import {
   useInferenceDisplay,
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
-import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
+import { useGlobalFilterActions, useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 import type {
   AggDataEntry,
   ChartDefinition,
@@ -54,7 +52,7 @@ import {
 } from '@/components/inference/utils/comparisonEntry';
 import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
-import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
+import { bestSeriesPerSku, skuColumns } from '@/components/inference/utils/best-series-per-sku';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import { formatMetricValue } from '@/components/inference/utils/tooltipUtils';
 import {
@@ -65,7 +63,6 @@ import {
   PowerXViewTabs,
   usePowerXStrings,
 } from '@/components/inference/powerx/PowerXLayout';
-import { PowerXHeadroomTable } from '@/components/inference/powerx/PowerXHeadroomTable';
 import {
   POWERX_DEFAULT_METRIC,
   powerXShowsHeadroom,
@@ -91,7 +88,6 @@ import { exportToCsv } from '@/lib/export/csv-export';
 import { inferenceChartToCsv } from '@/lib/export/csv-export-helpers';
 import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/benchmarks/known-issues';
 import { getDisplayLabel, getFrameworkLabel } from '@/lib/shared/utils';
-import { supportsChartTokenMetric } from '@/lib/benchmarks/supplemental-benchmarks';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   useOverlayScopeReconciliation,
@@ -107,10 +103,14 @@ import {
   isModelDeprecated,
   sequenceKind,
 } from '@/lib/catalog/data-mappings';
-import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
+import {
+  shouldFetchComparisonChangelogs,
+  useComparisonChangelogs,
+} from '@/hooks/api/use-comparison-changelogs';
 import {
   derivedModeRoofline,
   isAgenticOnlyXAxisMode,
+  supportsPointTokenMetric,
   type RooflineDirection,
   type XAxisMode,
 } from '@/components/inference/hooks/useChartData';
@@ -128,6 +128,7 @@ import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from '@/components/ui/atom-e
 import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
 import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
 import { ResultContext } from '@/components/ui/result-context';
+import { InferenceScenarioSelector } from './InferenceScenarioSelector';
 import { ModelLogo } from '@/components/ui/model-logo';
 
 import ChartNotices from './ChartNotices';
@@ -138,7 +139,6 @@ import { CostTierSelector } from './CostTierSelector';
 import { TcoBasisCaption } from './TcoBasisCaption';
 import { InferenceTcoBadges } from './InferenceTcoBadges';
 import { XAxisModeSelector } from './XAxisModeSelector';
-import ComparisonChangelog from './ComparisonChangelog';
 import CustomPowers from './CustomPowers';
 import ReplayLauncher, { type ReplayLauncherHandle } from '../replay/ReplayLauncher';
 
@@ -147,8 +147,6 @@ import { hasRoleTelemetry } from '../utils/power-chip-coverage';
 import { useFirstChartRenderTiming } from './use-first-chart-render-timing';
 import { useCenterOnEnter } from '@/hooks/useCenterOnEnter';
 
-// Off by default (table view, GPU-over-time, power timeline and PowerX Where panels), so they
-// load on first use instead of shipping with every dashboard, compare page and blog chart.
 const chartViewSkeleton = () => <Skeleton className="h-[600px] w-full" />;
 const InferenceTable = dynamic(() => import('@/components/inference/ui/InferenceTable'), {
   loading: chartViewSkeleton,
@@ -160,6 +158,12 @@ const PowerTimeline = dynamic(() => import('@/components/inference/ui/PowerTimel
 const PowerAnalysisPanels = dynamic(() => import('@/components/inference/ui/PowerAnalysisPanels'), {
   loading: chartViewSkeleton,
 });
+const PowerXHeadroomTable = dynamic(() =>
+  import('@/components/inference/powerx/PowerXHeadroomTable').then(
+    (module) => module.PowerXHeadroomTable,
+  ),
+);
+const ComparisonChangelog = dynamic(() => import('./ComparisonChangelog'));
 
 type InferenceViewMode = 'chart' | 'table';
 
@@ -410,6 +414,13 @@ export default function ChartDisplay({
   const workflowInfoBenchmarkType =
     selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined;
 
+  const [changelogOpened, setChangelogOpened] = useState(false);
+  const changelogsEnabled = shouldFetchComparisonChangelogs({
+    embedded,
+    changelogOpened,
+    selectedDateRange,
+    selectedDates,
+  });
   const {
     changelogs,
     loading: changelogsLoading,
@@ -419,6 +430,7 @@ export default function ChartDisplay({
     selectedDateRange,
     dateRangeAvailableDates,
     workflowInfoBenchmarkType,
+    changelogsEnabled,
   );
 
   const modelDbKeys = useMemo(
@@ -504,7 +516,16 @@ export default function ChartDisplay({
     activeOverlayHwTypes,
     localOfficialOverride,
   } = useUnofficialRun();
-  const { tcoBasis } = useGlobalFilterSelection();
+  const { tcoBasis, chipBasis } = useGlobalFilterSelection();
+  const { setChipBasis } = useGlobalFilterActions();
+  const chipBasisControl = useMemo(
+    () => ({ value: chipBasis, onChange: setChipBasis, source: 'inference' }),
+    [chipBasis, setChipBasis],
+  );
+  const readOnlyChipBasisControl = useMemo(
+    () => ({ ...chipBasisControl, readOnly: true }),
+    [chipBasisControl],
+  );
 
   const overlayDataByChartType = useMemo(() => {
     if (!unofficialRunInfo || !getOverlayData) {
@@ -512,12 +533,19 @@ export default function ChartDisplay({
     }
 
     const overlayTokenBasis = tokenBasisForMetric(selectedYAxisMetric, tokenBasis);
-    const e2eRaw = getOverlayData(selectedModel, selectedSequence, 'e2e', overlayTokenBasis);
+    const e2eRaw = getOverlayData(
+      selectedModel,
+      selectedSequence,
+      'e2e',
+      overlayTokenBasis,
+      chipBasis,
+    );
     const interactivityRaw = getOverlayData(
       selectedModel,
       selectedSequence,
       'interactivity',
       overlayTokenBasis,
+      chipBasis,
     );
 
     const getRunForRow = (row: InferenceData) => {
@@ -547,9 +575,7 @@ export default function ChartDisplay({
       const pricedData = usesTokenSalePricing(selectedYAxisMetric)
         ? applyTokenRevenuePricing(rawData.data, tokenRevenuePricing)
         : rawData.data;
-      const capableData = pricedData.filter((point) =>
-        supportsChartTokenMetric(String(point.hwKey), point.date, tokenType),
-      );
+      const capableData = pricedData.filter((point) => supportsPointTokenMetric(point, tokenType));
       const processed = processOverlayChartDataWithClipping(
         capableData,
         chartType,
@@ -627,6 +653,7 @@ export default function ChartDisplay({
     tokenRevenuePricing,
     tcoBasis,
     tokenBasis,
+    chipBasis,
     compareGpuPair,
   ]);
 
@@ -683,8 +710,12 @@ export default function ChartDisplay({
       return { official: officialScope, overlay: overlayScope };
     }
     const overlay = overlayDataByChartType[wantedType];
-    const officialBest = bestSeriesPerSku(graph.data, direction, selectedPrecisions);
-    const overlayBest = bestSeriesPerSku(overlay?.data ?? [], direction, selectedPrecisions);
+    const officialBest = bestSeriesPerSku(skuColumns(graph.data), direction, selectedPrecisions);
+    const overlayBest = bestSeriesPerSku(
+      skuColumns(overlay?.data ?? []),
+      direction,
+      selectedPrecisions,
+    );
     return {
       official: officialBest.size > 0 ? officialBest : officialScope,
       overlay: overlayBest.size > 0 ? overlayBest : overlayScope,
@@ -1062,7 +1093,9 @@ export default function ChartDisplay({
             `InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`,
             headers,
             rows,
-            issueNotes,
+            // The fixed input/output throughput columns follow the chip basis on
+            // every metric, not just the plotted one.
+            [...issueNotes, chipBasisCsvNote(chipBasis, locale)],
           );
         }}
       />
@@ -1264,6 +1297,18 @@ export default function ChartDisplay({
                         <div>
                           <ResultContext
                             locale={locale}
+                            scenario={
+                              !powerXSurface && !embedded && !minimalChrome ? (
+                                <InferenceScenarioSelector
+                                  variant="caption"
+                                  id={
+                                    graphIndex === 0
+                                      ? 'scenario-select'
+                                      : `scenario-select-${graphIndex}`
+                                  }
+                                />
+                              ) : undefined
+                            }
                             deprecated={isModelDeprecated(selectedModel)}
                             precision={
                               embedded
@@ -1327,13 +1372,20 @@ export default function ChartDisplay({
                                 : undefined
                             }
                           />
-                          {!minimalChrome && (
+                          {minimalChrome ? (
+                            <MetricAssumptionNotes
+                              selectedYAxisMetric={selectedYAxisMetric}
+                              chipBasis={readOnlyChipBasisControl}
+                              caveatsOnly
+                            />
+                          ) : (
                             <MetricAssumptionNotes
                               tcoBasis={tcoBasis}
                               selectedYAxisMetric={selectedYAxisMetric}
                               activeHwKeys={captionHwKeys}
                               userCosts={userCosts}
                               renderCostBadges={renderInferenceTcoBadges}
+                              chipBasis={chipBasisControl}
                             />
                           )}
                           {powerXLayout &&
@@ -1626,6 +1678,7 @@ export default function ChartDisplay({
                     />
                   )}
                   <ChartControls
+                    scenarioInFooter={!powerXSurface}
                     showXAxisMode
                     runContext={selectedGPUs.length === 0 ? <WorkflowInfoDisplay /> : undefined}
                     powerXControls={
@@ -1657,6 +1710,10 @@ export default function ChartDisplay({
                   selectedSequence={selectedSequence}
                   defaultExpanded={!embedded}
                   loading={changelogsLoading}
+                  deferred={!changelogsEnabled}
+                  onExpandedChange={(expanded) => {
+                    if (expanded) setChangelogOpened(true);
+                  }}
                   totalDatesQueried={totalDatesQueried}
                   selectedDates={selectedDates}
                   selectedDateRange={selectedDateRange}
@@ -1689,6 +1746,12 @@ export default function ChartDisplay({
         aria-busy={isRefetching || undefined}
       >
         {displayGraphs}
+        {!powerXSurface && !embedded && !minimalChrome && renderableGraphs.length === 0 && (
+          <ResultContext
+            locale={locale}
+            scenario={<InferenceScenarioSelector variant="caption" />}
+          />
+        )}
       </div>
     </div>
   );

@@ -1,13 +1,15 @@
 import { useLayoutEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import { getDomainAwareChartWatermark } from '@/lib/runtime/unofficial-domain';
-import { registerChartExportRenderer, renderExportChart } from '../export-renderer';
+import { registerChartExportRenderer } from '../export-registry';
 
 import {
   computeTooltipPosition,
   getTooltipContainerGeometry,
   invalidateTooltipGeometry,
 } from '../layers/scatter-points';
+import { CANVAS_POINT_LAYER_SELECTOR, canvasPointLayerOf } from '../layers/canvas-point-registry';
+import type { PointPositions, ScatterDatum } from '../layers/canvas-points';
 import { DEFAULT_CHART_MARGIN, setupChartStructure } from '../chart-setup';
 import {
   raiseInOrder,
@@ -27,7 +29,14 @@ import {
   updateLayerForMetric,
   updateLayerPositionOnZoom,
 } from './layer-renderer';
-import type { AxisConfig, D3ChartProps, LayerConfig, RenderContext, ZoomContext } from './types';
+import type {
+  AxisConfig,
+  D3ChartProps,
+  LayerConfig,
+  RenderContext,
+  ZoomConfig,
+  ZoomContext,
+} from './types';
 
 interface RendererDeps {
   svgRef: React.RefObject<SVGSVGElement | null>;
@@ -84,6 +93,41 @@ function gridVisibility(xAxis?: AxisConfig, yAxis?: AxisConfig): GridVisibility 
   return { x: xAxis?.grid ?? true, y: yAxis?.grid ?? true };
 }
 
+const ZOOM_REWRITES_LAYER: Record<LayerConfig['type'], boolean> = {
+  bar: true,
+  horizontalBar: true,
+  point: true,
+  errorBar: true,
+  line: true,
+  barLabel: true,
+  roofline: false,
+  scatter: false,
+  radar: false,
+  custom: false,
+};
+
+function rescaleForZoom(
+  xScale: BuiltScale,
+  yScale: BuiltScale,
+  zoomConfig: ZoomConfig | undefined,
+  transform: d3.ZoomTransform,
+): { xScale: BuiltScale; yScale: BuiltScale } {
+  const axes = zoomConfig?.axes ?? 'both';
+  let zoomedX = xScale;
+  let zoomedY = yScale;
+  if ((axes === 'x' || axes === 'both') && !isBandScale(xScale)) {
+    zoomedX = zoomConfig?.rescaleX
+      ? zoomConfig.rescaleX(xScale as ContinuousScale, transform)
+      : transform.rescaleX(xScale as ContinuousScale);
+  }
+  if ((axes === 'y' || axes === 'both') && !isBandScale(yScale)) {
+    zoomedY = zoomConfig?.rescaleY
+      ? zoomConfig.rescaleY(yScale as ContinuousScale, transform)
+      : transform.rescaleY(yScale as ContinuousScale);
+  }
+  return { xScale: zoomedX, yScale: zoomedY };
+}
+
 export interface ZoomFrameBatcher {
   schedule: (work: () => void) => void;
   flush: () => void;
@@ -126,9 +170,10 @@ export function createZoomFrameBatcher(
 export interface TransitionGeometry {
   transforms: Map<SVGGElement, string>;
   paths: Map<SVGPathElement, string>;
+  points: PointPositions | null;
 }
 
-const RAISE_ORDER = ['.dot-group', '.point', '.line-label'] as const;
+const RAISE_ORDER = ['.dot-group', CANVAS_POINT_LAYER_SELECTOR, '.point', '.line-label'] as const;
 const LINE_LABEL_RAISE = ['.line-label'] as const;
 const TRANSITION_POINT_SELECTOR = '.dot-group';
 const TRANSITION_ROOFLINE_SELECTOR = '.roofline-path';
@@ -138,15 +183,27 @@ function isGeometryVisible(element: SVGElement): boolean {
   return element.style.opacity !== '0' && element.style.display !== 'none';
 }
 
-function metricGeometryVisibility<T>(layers: LayerConfig<T>[]): GeometryVisibility {
+function scatterOpacity<T>(layers: LayerConfig<T>[]) {
   const scatterLayer = layers.find((layer) => layer.type === 'scatter');
-  const getOpacity = scatterLayer?.type === 'scatter' ? scatterLayer.config.getOpacity : undefined;
+  return scatterLayer?.type === 'scatter' ? scatterLayer.config.getOpacity : undefined;
+}
+
+function metricGeometryVisibility<T>(layers: LayerConfig<T>[]): GeometryVisibility {
+  const getOpacity = scatterOpacity(layers);
   if (!getOpacity) return isGeometryVisible;
 
   return (element) =>
     element.matches('.dot-group')
       ? getOpacity(d3.select(element).datum() as Parameters<typeof getOpacity>[0]) > 0
       : isGeometryVisible(element);
+}
+
+function metricPointVisibility<T>(
+  layers: LayerConfig<T>[],
+): ((datum: ScatterDatum) => boolean) | null {
+  const getOpacity = scatterOpacity(layers);
+  if (!getOpacity) return null;
+  return (datum) => getOpacity(datum as Parameters<typeof getOpacity>[0]) > 0;
 }
 
 export function captureTransitionGeometry(
@@ -160,7 +217,11 @@ export function captureTransitionGeometry(
   group.selectAll<SVGPathElement, unknown>(TRANSITION_ROOFLINE_SELECTOR).each(function () {
     if (isGeometryVisible(this)) paths.set(this, this.getAttribute('d') || '');
   });
-  return { transforms, paths };
+  return {
+    transforms,
+    paths,
+    points: canvasPointLayerOf(group.node())?.capturePositions() ?? null,
+  };
 }
 
 export function animateTransitionGeometry(
@@ -168,8 +229,12 @@ export function animateTransitionGeometry(
   previous: TransitionGeometry | null,
   durationMs: number | undefined = 0,
   isVisible: GeometryVisibility = isGeometryVisible,
+  isPointVisible: ((datum: ScatterDatum) => boolean) | null = null,
 ): void {
   if (!previous || durationMs <= 0) return;
+  if (previous.points) {
+    canvasPointLayerOf(group.node())?.animateFrom(previous.points, durationMs, isPointVisible);
+  }
   group.selectAll<SVGGElement, unknown>(TRANSITION_POINT_SELECTOR).each(function () {
     if (!isVisible(this)) {
       d3.select(this).interrupt('data-update');
@@ -304,27 +369,17 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
   useLayoutEffect(() => {
     const source = svgRef.current;
     if (!source) return;
-    return registerChartExportRenderer(source, (target, width, height) => {
+    return registerChartExportRenderer(source, (draw) => {
       const scales = scalesRef.current ?? {
         xScale: d3.scaleLinear(),
         yScale: d3.scaleLinear(),
       };
-      const transform = d3.zoomTransform(source);
-      const axes = zoomConfig?.axes ?? 'both';
-      let { xScale, yScale } = scales;
-      if (zoomConfig?.enabled) {
-        if (axes !== 'y' && !isBandScale(xScale)) {
-          xScale = zoomConfig.rescaleX
-            ? zoomConfig.rescaleX(xScale as ContinuousScale, transform)
-            : transform.rescaleX(xScale);
-        }
-        if (axes !== 'x' && !isBandScale(yScale)) {
-          yScale = zoomConfig.rescaleY
-            ? zoomConfig.rescaleY(yScale as ContinuousScale, transform)
-            : transform.rescaleY(yScale);
-        }
-      }
-      renderExportChart(target, width, height, props, { xScale, yScale });
+      draw(
+        props,
+        zoomConfig?.enabled
+          ? rescaleForZoom(scales.xScale, scales.yScale, zoomConfig, d3.zoomTransform(source))
+          : scales,
+      );
     });
   });
 
@@ -410,13 +465,21 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
         : buildScale({ type: 'linear', domain: [0, 1] }, [height, 0]);
       scalesRef.current = { xScale, yScale };
 
+      const initialTransform = zoomTransformRef.current;
+      const restoresZoom =
+        zoomConfig?.enabled &&
+        (initialTransform.k !== 1 || initialTransform.x !== 0 || initialTransform.y !== 0);
+      const shown = restoresZoom
+        ? rescaleForZoom(xScale, yScale, zoomConfig, initialTransform)
+        : { xScale, yScale };
+
       if (hasScales) {
-        const xTickValues = resolveTickValues(xAxisConfig?.tickValues, xScale as AnyScale);
-        const yTickValues = resolveTickValues(yAxisConfig?.tickValues, yScale as AnyScale);
+        const xTickValues = resolveTickValues(xAxisConfig?.tickValues, shown.xScale as AnyScale);
+        const yTickValues = resolveTickValues(yAxisConfig?.tickValues, shown.yScale as AnyScale);
         renderGrid(
           layout,
-          xScale as AnyScale,
-          yScale as any,
+          shown.xScale as AnyScale,
+          shown.yScale as any,
           yAxisConfig?.tickCount ?? 5,
           0,
           xTickValues,
@@ -424,7 +487,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           'both',
           gridVisibility(xAxisConfig, yAxisConfig),
         );
-        renderAxes(layout, xScale as AnyScale, yScale as any, {
+        renderAxes(layout, shown.xScale as AnyScale, shown.yScale as any, {
           xTickFormat: xAxisConfig?.tickFormat,
           yTickFormat: yAxisConfig?.tickFormat,
           xTickCount: xAxisConfig?.tickCount,
@@ -456,16 +519,26 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
 
       const layerSelections: (d3.Selection<any, any, any, any> | null)[] = [];
       for (const layer of layers) {
-        const sel = renderLayer(layer, renderGroup, xScale, yScale, layout, ctx);
+        const layerScales = ZOOM_REWRITES_LAYER[layer.type] ? shown : { xScale, yScale };
+        const sel = renderLayer(
+          layer,
+          renderGroup,
+          layerScales.xScale,
+          layerScales.yScale,
+          layout,
+          ctx,
+        );
         layerSelections.push(sel);
       }
       customLayerDisplayIdentitiesRef.current = customLayerDisplayIdentities(layers);
       lastDisplayIdentityRef.current = displayIdentity;
 
+      const getDataX = tooltipConfig?.proximityHover ? tooltipConfig.getDataX : undefined;
+      if (getDataX) renderGroup.selectAll('.proximity-overlay').remove();
       raiseInOrder(renderGroup, RAISE_ORDER);
 
       if (tooltipConfig) {
-        if (tooltipConfig.proximityHover && tooltipConfig.getDataX) {
+        if (getDataX) {
           const rulers = createRulers(
             renderGroup,
             tooltipConfig.rulerType,
@@ -475,11 +548,8 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           );
           const { rulerGroup, verticalRuler, horizontalRuler } = rulers;
           const containerEl = svgRef.current!.parentElement as HTMLDivElement;
-          const getDataX = tooltipConfig.getDataX;
           const sortedData = [...data].toSorted((a, b) => getDataX(a) - getDataX(b));
           const bisector = d3.bisector<T, number>((d) => getDataX(d)).center;
-
-          renderGroup.selectAll('.proximity-overlay').remove();
 
           renderGroup
             .append('rect')
@@ -647,22 +717,12 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
                 hideTooltipElements(tooltipRef, svgRef);
               }
 
-              let newXScale: BuiltScale = zoomXScale;
-              let newYScale: BuiltScale = zoomYScale;
-              if (currentZoomAxes === 'x' || currentZoomAxes === 'both') {
-                if (currentZoomConfig?.rescaleX && !isBandScale(zoomXScale)) {
-                  newXScale = currentZoomConfig.rescaleX(zoomXScale as ContinuousScale, transform);
-                } else if (!isBandScale(zoomXScale)) {
-                  newXScale = transform.rescaleX(zoomXScale as ContinuousScale);
-                }
-              }
-              if (currentZoomAxes === 'y' || currentZoomAxes === 'both') {
-                if (currentZoomConfig?.rescaleY && !isBandScale(zoomYScale)) {
-                  newYScale = currentZoomConfig.rescaleY(zoomYScale as ContinuousScale, transform);
-                } else if (!isBandScale(zoomYScale)) {
-                  newYScale = transform.rescaleY(zoomYScale as ContinuousScale);
-                }
-              }
+              const { xScale: newXScale, yScale: newYScale } = rescaleForZoom(
+                zoomXScale,
+                zoomYScale,
+                currentZoomConfig,
+                transform,
+              );
 
               const zoomContext: ZoomContext = {
                 ...zoomBaseContext,
@@ -880,6 +940,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
       previousGeometry,
       transitionDuration,
       metricGeometryVisibility(layers),
+      metricPointVisibility(layers),
     );
     customLayerDisplayIdentitiesRef.current = customLayerDisplayIdentities(layers);
     lastDisplayIdentityRef.current = displayIdentity;

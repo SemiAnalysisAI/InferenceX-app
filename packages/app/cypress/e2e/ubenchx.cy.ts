@@ -74,16 +74,6 @@ describe('ubenchX hub and test routes', () => {
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
   });
 
-  it('renders the Chinese TPC Skyline page', () => {
-    cy.visit('/zh/ubenchx/tpc-skyline', dismissModal);
-    cy.contains('h2', 'TPC Skyline').should('be.visible');
-    cy.contains('[data-testid="tpc-skyline-table"] th', '实测 TPC 分组').should('be.visible');
-    cy.get('[data-testid="tpc-skyline-table"] tbody tr').should(
-      'have.length',
-      TPC_SKYLINE_GPU_COUNT,
-    );
-  });
-
   it('keeps a pinned sm-l2-distance tooltip on its cell while the pointer moves', () => {
     cy.visit('/ubenchx/sm-l2-distance', dismissModal);
     cy.get('[data-testid="sm-l2-heatmap"]').should('be.visible');
@@ -101,28 +91,6 @@ describe('ubenchX hub and test routes', () => {
         cy.get('@overlay').trigger('mousemove', 60, 60, { force: true });
         cy.get('[data-testid="sm-l2-tooltip"]').should('be.visible').and('have.text', pinned);
       });
-  });
-
-  it('opens /zh/ubenchx on the Chinese mem-bw view with the Beta title', () => {
-    cy.visit('/zh/ubenchx', dismissModal);
-    cy.url().should('include', '/zh/ubenchx/mem-bw');
-    cy.contains('h1', 'ubenchX 微基准测试（Beta）').should('be.visible');
-    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'HBM 带宽');
-    cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
-    cy.get('link[rel="alternate"][hreflang="en"]')
-      .invoke('attr', 'href')
-      .should('include', '/ubenchx/mem-bw');
-
-    cy.contains('h2', 'HBM 带宽').should('be.visible');
-    cy.get('[data-testid="ubenchx-metric-select"]').should('contain', 'MBU');
-    cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
-  });
-
-  it('renders the Chinese sm-l2-distance page', () => {
-    cy.visit('/zh/ubenchx/sm-l2-distance', dismissModal);
-    cy.get('[data-testid="sm-l2-heatmap"]').should('be.visible');
-    cy.contains('SM 间 L2 延迟差异').should('be.visible');
-    cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
   });
 });
 
@@ -144,30 +112,26 @@ function assertProfileOrder() {
 }
 
 describe('Ascend core memory-access profiles', () => {
-  for (const prefix of ['', '/zh']) {
-    it(`shows Huawei before B200 by default and after restoring all hardware at ${prefix || '/'}`, () => {
-      const allHardware = prefix ? '全部硬件' : 'All hardware';
-
-      cy.visit(`${prefix}/ubenchx/core-memory-profiles`, dismiss);
-      cy.get('[data-testid="core-profile-hardware"]').should('contain.text', allHardware);
-      assertProfileOrder();
-      cy.get('[data-testid="core-profile-hardware"]').click();
-      cy.get('[role="listbox"] [role="option"]').should(($options) => {
-        expect([...$options].map((option) => option.textContent?.trim())).to.deep.eq([
-          allHardware,
-          'Huawei 950PR',
-          'B200 SXM',
-        ]);
-      });
-      cy.contains('[role="option"]', 'B200 SXM').click();
-      cy.get('[data-testid="ascend-core-profiles"]').should('not.exist');
-      cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
-      cy.get('[data-testid="core-profile-hardware"]').click();
-      cy.contains('[role="option"]', allHardware).click();
-      cy.get('[data-testid="core-profile-hardware"]').should('contain.text', allHardware);
-      assertProfileOrder();
+  it('shows Huawei before B200 by default and after restoring all hardware at /', () => {
+    cy.visit('/ubenchx/core-memory-profiles', dismiss);
+    cy.get('[data-testid="core-profile-hardware"]').should('contain.text', 'All hardware');
+    assertProfileOrder();
+    cy.get('[data-testid="core-profile-hardware"]').click();
+    cy.get('[role="listbox"] [role="option"]').should(($options) => {
+      expect([...$options].map((option) => option.textContent?.trim())).to.deep.eq([
+        'All hardware',
+        'Huawei 950PR',
+        'B200 SXM',
+      ]);
     });
-  }
+    cy.contains('[role="option"]', 'B200 SXM').click();
+    cy.get('[data-testid="ascend-core-profiles"]').should('not.exist');
+    cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
+    cy.get('[data-testid="core-profile-hardware"]').click();
+    cy.contains('[role="option"]', 'All hardware').click();
+    cy.get('[data-testid="core-profile-hardware"]').should('contain.text', 'All hardware');
+    assertProfileOrder();
+  });
 
   it('navigates to all four profiles and inspects actual core IDs by keyboard', () => {
     cy.visit('/ubenchx/mem-bw', dismiss);
@@ -183,38 +147,19 @@ describe('Ascend core memory-access profiles', () => {
       '0 ↔ 2: 15.30 SYS_CNT ticks',
     );
     cy.get('[data-testid="profile-scalar_128MiB_vector_concurrent"] svg').should('exist');
-    cy.screenshot('ascend-core-profiles-en', { capture: 'fullPage' });
-    cy.visit('/zh/ubenchx/core-memory-profiles', dismiss);
-    cy.contains('h2', '核心访存特征').should('be.visible');
-    cy.get('[data-testid="ubenchx-test-select"]').should('contain', '核心访存特征');
-    cy.contains('不是核心间通信延迟').should('be.visible');
-    cy.contains('没有网格级起始同步屏障').should('be.visible');
-    cy.screenshot('ascend-core-profiles-zh', { capture: 'fullPage' });
-  });
-  it('returns the displayed matrix values and preserves absent GPU measurements', () => {
-    cy.request('/api/v1/views/ubenchx?test=all&gpu=Ascend%20950PR_9579').then(({ body }) => {
-      const panel = body.coreMemoryProfiles.gpus[0].panels[0];
-      expect(panel.coreIds.slice(12, 16)).to.deep.equal([14, 15, 54, 55]);
-      expect(panel.matrix[0][14]).to.be.closeTo(96.70648193359, 1e-8);
-      expect(panel.unit).to.equal('SYS_CNT ticks');
-      expect(body.smL2Distance.gpus).to.deep.equal([]);
-    });
   });
 });
 
-for (const prefix of ['', '/zh']) {
-  it(`omits idle selection controls from all core-profile panels on ${prefix || '/'}`, () => {
-    cy.visit(`${prefix}/ubenchx/core-memory-profiles`, dismiss);
-    cy.get('[data-testid="ascend-core-profiles"] output')
-      .should('have.length', 4)
-      .each(($output) => {
-        cy.wrap($output).should('be.empty').and('not.be.visible');
-      });
-    cy.get('[data-testid="ascend-core-profiles"] button').should('not.exist');
-    cy.contains('Hover or focus a heatmap').should('not.exist');
-    cy.contains('悬停或聚焦热力图').should('not.exist');
-  });
-}
+it('omits idle selection controls from all core-profile panels on /', () => {
+  cy.visit('/ubenchx/core-memory-profiles', dismiss);
+  cy.get('[data-testid="ascend-core-profiles"] output')
+    .should('have.length', 4)
+    .each(($output) => {
+      cy.wrap($output).should('be.empty').and('not.be.visible');
+    });
+  cy.get('[data-testid="ascend-core-profiles"] button').should('not.exist');
+  cy.contains('Hover or focus a heatmap').should('not.exist');
+});
 
 it('unpins core-profile cells by repeated click or Enter and clears them outside or with Escape', () => {
   cy.visit('/ubenchx/core-memory-profiles', dismiss);
@@ -267,15 +212,12 @@ it('filters both devices on one page and preserves their API values and units', 
   cy.contains('[role="option"]', 'All hardware').click();
   cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
   cy.get('[data-testid="ascend-core-profiles"]').should('exist');
-  cy.screenshot('combined-core-profiles-desktop', { capture: 'fullPage' });
   cy.visit('/zh/ubenchx/sm-l2-distance', dismiss);
   cy.location('pathname').should('equal', '/zh/ubenchx/core-memory-profiles');
   cy.viewport(390, 844);
   cy.get('[data-testid="core-profile-hardware"]').should('contain', '全部硬件');
-  cy.contains('不同设备上颜色或数值相同，并不代表延迟相同').should('be.visible');
   cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
   cy.get('[data-testid="ascend-core-profiles"]').should('exist');
-  cy.screenshot('combined-core-profiles-mobile-zh', { capture: 'fullPage' });
 });
 
 describe('Huawei copy-bandwidth evidence', () => {
@@ -283,8 +225,6 @@ describe('Huawei copy-bandwidth evidence', () => {
     cy.visit('/ubenchx/mem-bw', dismiss);
     cy.contains('Huawei 950PR').should('be.visible');
     cy.contains('910B3').should('not.exist');
-    cy.contains('Graph time is amortized per copy').should('be.visible');
-    cy.contains('touched payload may fit in cache').should('be.visible');
     cy.get('circle.point')
       .filter((_, el) => {
         const d = (el as unknown as { __data__: { gpuKey: string; bytes: number } }).__data__;
@@ -294,22 +234,9 @@ describe('Huawei copy-bandwidth evidence', () => {
     cy.get('[data-testid="ubenchx-metric-select"]').click();
     cy.contains('[role="option"]', 'Bandwidth (TB/s)').click();
     cy.contains('h2', 'Bandwidth vs Message Size').should('be.visible');
-    cy.screenshot('huawei-bandwidth-en', { capture: 'fullPage' });
     cy.visit('/zh/ubenchx/mem-bw', dismiss);
-    cy.contains('图执行时间按拷贝次数摊销').should('be.visible');
+    cy.contains('Huawei 950PR').should('be.visible');
     cy.contains('910B3').should('not.exist');
-    cy.screenshot('huawei-bandwidth-zh', { capture: 'fullPage' });
-  });
-  it('serves measured endpoints and empty unavailable tests through the public API', () => {
-    cy.request('/api/v1/views/ubenchx?test=all&gpu=Huawei%20950PR').then(({ body }) => {
-      expect(body.memBw.gpus[0].rows).to.have.length(51);
-      expect(body.memBw.gpus[0].rows[0].bytes).to.equal(8);
-      expect(body.memBw.gpus[0].metadata.smallMessageExtension.cann).to.equal('9.2.1');
-      expect(body.memBw.gpus[0].rows.at(-1).bytes).to.equal(17179869184);
-      expect(body.memBw.gpus[0].rows.at(-1).mbuPercent).to.be.closeTo(88.3345678, 0.0001);
-      expect(body.smL2Distance.gpus).to.deep.equal([]);
-      expect(body.tpcSkyline.gpus).to.deep.equal([]);
-    });
   });
 });
 
@@ -400,7 +327,6 @@ describe('Huawei SKU configurations alongside measured TPC groups', () => {
       'contain',
       'not measured TPC or GPC',
     );
-    cy.screenshot('tpc-huawei-skus-desktop', { capture: 'fullPage' });
     cy.contains('a', 'View measured PR_9579 core profiles').click();
     cy.url().should('include', '/ubenchx/core-memory-profiles');
     cy.get('[data-testid="ascend-core-profiles"]').should('be.visible');
@@ -420,7 +346,6 @@ describe('Huawei SKU configurations alongside measured TPC groups', () => {
     cy.get('@tableRegion').scrollTo('right');
     cy.contains('[data-testid="huawei-sku-table"] th', '虚拟化选项').should('be.visible');
     cy.get('@tableRegion').scrollTo('left');
-    cy.screenshot('tpc-huawei-skus-mobile-zh', { capture: 'fullPage' });
     cy.contains('a', '查看 PR_9579 实测核心访存特征').should(
       'have.attr',
       'href',

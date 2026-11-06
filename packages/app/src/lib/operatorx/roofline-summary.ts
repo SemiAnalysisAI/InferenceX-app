@@ -5,6 +5,7 @@ import type {
   ComputePrecision,
 } from '@semianalysisai/inferencex-db/operatorx/compare';
 import { peakBandwidthTBs, peakTflops } from '@/components/operatorx/compare/hardware';
+import { computeBound } from '@/components/operatorx/compare/roofline-bound';
 
 export interface RooflineSummaryParams {
   precision: ComputePrecision | null;
@@ -65,18 +66,14 @@ export function rooflineSummary(view: ComparisonView, params: RooflineSummaryPar
   const caseIndices =
     missingReferences.length > 0
       ? []
-      : shared.filter((i) => {
-          const c = view.cases[i];
-          return hardware.every((hw) => {
-            const { peak, bandwidth } = reference.get(hw)!;
-            return c.flops! / c.bytes! >= peak! / bandwidth!;
-          });
-        });
+      : shared.filter((i) =>
+          hardware.every((hw) => computeBound(view.cases[i], hw, params.precision)),
+        );
   const sharedOnly = params.sharedOnly ?? true;
   const bars: RooflineSummaryBar[] = hardware
     .flatMap((hw) => {
       if (missingReferences.includes(hw)) return [];
-      const { peak, bandwidth } = reference.get(hw)!;
+      const { peak } = reference.get(hw)!;
       const indices = sharedOnly
         ? caseIndices
         : view.cases.flatMap((c, i) =>
@@ -85,7 +82,7 @@ export function rooflineSummary(view: ComparisonView, params: RooflineSummaryPar
             c.bytes &&
             c.bytes > 0 &&
             Number.isFinite(c.bytes) &&
-            c.flops! / c.bytes >= peak! / bandwidth!
+            computeBound(c, hw, params.precision)
               ? [i]
               : [],
           );

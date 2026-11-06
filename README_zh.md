@@ -140,18 +140,17 @@ bun run dev
 
 合并到 `main` 或 `master` 的 `packages/db/src/etl/run-overrides.ts` 变更会由 CI 自动应用到生产数据库，随后执行数据库校验、缓存失效和缓存预热。覆盖命令仍可用于本地预览和手动恢复。
 
-| 脚本                                   | 说明                                     |
-| -------------------------------------- | ---------------------------------------- |
-| `bun run admin:db:migrate`             | 运行数据库迁移                           |
-| `bun run admin:db:ingest:run`          | 从 GitHub Actions 运行中摄取基准测试数据 |
-| `bun run admin:db:ingest:ci`           | 摄取基准测试数据（CI 模式）              |
-| `bun run admin:db:ingest:gcs`          | 从 GCS 摄取基准测试数据                  |
-| `bun run admin:db:ingest:supplemental` | 摄取补充数据                             |
-| `bun run admin:db:apply-overrides`     | 手动预览或应用数据覆盖                   |
-| `bun run admin:db:reset`               | 重置数据库                               |
-| `bun run admin:db:verify`              | 校验数据库完整性                         |
-| `bun run admin:cache:invalidate`       | 失效 API 缓存                            |
-| `bun run admin:cache:warmup`           | 预热 API 缓存                            |
+| 脚本                               | 说明                                     |
+| ---------------------------------- | ---------------------------------------- |
+| `bun run admin:db:migrate`         | 运行数据库迁移                           |
+| `bun run admin:db:ingest:run`      | 从 GitHub Actions 运行中摄取基准测试数据 |
+| `bun run admin:db:ingest:ci`       | 摄取基准测试数据（CI 模式）              |
+| `bun run admin:db:ingest:gcs`      | 从 GCS 摄取基准测试数据                  |
+| `bun run admin:db:apply-overrides` | 手动预览或应用数据覆盖                   |
+| `bun run admin:db:reset`           | 重置数据库                               |
+| `bun run admin:db:verify`          | 校验数据库完整性                         |
+| `bun run admin:cache:invalidate`   | 失效 API 缓存                            |
+| `bun run admin:cache:warmup`       | 预热 API 缓存                            |
 
 ## 部署
 

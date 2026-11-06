@@ -1,4 +1,9 @@
 import type { AggDataEntry, InferenceData, PowerBasisFieldKey } from '@/components/inference/types';
+import {
+  disaggDeploymentChips,
+  exactPerTotalChipRates,
+  hasPoolSplit,
+} from '@/lib/benchmarks/chip-basis';
 
 export const POWER_BASES = [
   'gpu-measured',
@@ -119,61 +124,24 @@ export const POWER_BASIS_FIELDS: Record<
   },
 };
 
-export interface PowerBasisInput {
-  tdpWatts: number | null;
-  utilityWatts: number | null;
-  gpuSecondsPerOutputToken: number | null;
-  gpuSecondsPerTotalToken: number | null;
-  measuredWatts: number | null;
-  measuredJPerOutputToken: number | null;
-  measuredJPerTotalToken: number | null;
-  /** Modeled IT W per GPU (no PUE); the facility figure minus the PUE overhead. */
-  modeledItWattsPerGpu: number | null;
-  modeledFacilityWattsPerGpu: number | null;
-}
-
-export type PowerBasisValues = Record<PowerBasisFieldKey, number | null>;
-
 export const isPositive = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value > 0;
 const count = (value: unknown): value is number => isPositive(value) && Number.isSafeInteger(value);
 const orNull = (value: number): number | null => (isPositive(value) ? value : null);
+const UNAVAILABLE: PowerBasisNormalization = { allocatedGpus: null, totalOutputTokPerSec: null };
 
-export function computePowerBasisFields(input: PowerBasisInput): PowerBasisValues {
-  const tdp = isPositive(input.tdpWatts) ? input.tdpWatts : null;
-  const utility = isPositive(input.utilityWatts) ? input.utilityWatts : null;
-  const measuredWatts = isPositive(input.measuredWatts) ? input.measuredWatts : null;
-  const modeled =
-    measuredWatts !== null && isPositive(input.modeledFacilityWattsPerGpu)
-      ? input.modeledFacilityWattsPerGpu
-      : null;
-  const modeledIt =
-    measuredWatts !== null && isPositive(input.modeledItWattsPerGpu)
-      ? input.modeledItWattsPerGpu
-      : null;
-
-  const provisionedEnergy = (watts: number | null, gpuSecondsPerToken: number | null) =>
-    watts !== null && isPositive(gpuSecondsPerToken) ? orNull(watts * gpuSecondsPerToken) : null;
-
-  // Modeled energies scale the measured J/token by the modeled-to-measured watt ratio.
-  const modeledEnergy = (watts: number | null, measuredJ: number | null) =>
-    watts !== null && measuredWatts !== null && isPositive(measuredJ)
-      ? orNull((measuredJ * watts) / measuredWatts)
-      : null;
-
-  return {
-    gpuProvisionedJPerOutputToken: provisionedEnergy(tdp, input.gpuSecondsPerOutputToken),
-    gpuProvisionedJPerTotalToken: provisionedEnergy(tdp, input.gpuSecondsPerTotalToken),
-    utilityProvisionedJPerOutputToken: provisionedEnergy(utility, input.gpuSecondsPerOutputToken),
-    utilityProvisionedJPerTotalToken: provisionedEnergy(utility, input.gpuSecondsPerTotalToken),
-    itModeledWatts: modeledIt,
-    itModeledJPerOutputToken: modeledEnergy(modeledIt, input.measuredJPerOutputToken),
-    itModeledJPerTotalToken: modeledEnergy(modeledIt, input.measuredJPerTotalToken),
-    utilityModeledWatts: modeled,
-    utilityModeledJPerOutputToken: modeledEnergy(modeled, input.measuredJPerOutputToken),
-    utilityModeledJPerTotalToken: modeledEnergy(modeled, input.measuredJPerTotalToken),
-  };
-}
+export const POWER_BASIS_FIELD_KEYS: Readonly<Record<PowerBasisFieldKey, true>> = {
+  gpuProvisionedJPerOutputToken: true,
+  gpuProvisionedJPerTotalToken: true,
+  utilityProvisionedJPerOutputToken: true,
+  utilityProvisionedJPerTotalToken: true,
+  itModeledWatts: true,
+  itModeledJPerOutputToken: true,
+  itModeledJPerTotalToken: true,
+  utilityModeledWatts: true,
+  utilityModeledJPerOutputToken: true,
+  utilityModeledJPerTotalToken: true,
+};
 
 type PowerBasisEntry = Pick<
   AggDataEntry,
@@ -181,8 +149,13 @@ type PowerBasisEntry = Pick<
   | 'output_tput_per_gpu'
   | 'disagg'
   | 'benchmark_type'
+  | 'chip_basis'
   | 'num_prefill_gpu'
   | 'num_decode_gpu'
+  | 'prefill_num_workers'
+  | 'decode_num_workers'
+  | 'isl'
+  | 'osl'
   | 'avg_power_w'
   | 'joules_per_output_token'
   | 'joules_per_total_token'
@@ -194,34 +167,45 @@ interface PowerBasisNormalization {
   totalOutputTokPerSec: number | null;
 }
 
-export function powerBasisNormalization(
-  entry: Pick<
-    PowerBasisEntry,
-    'output_tput_per_gpu' | 'disagg' | 'benchmark_type' | 'num_prefill_gpu' | 'num_decode_gpu'
-  >,
-): PowerBasisNormalization {
-  const perGpu = entry.output_tput_per_gpu;
-  const unavailable = { allocatedGpus: null, totalOutputTokPerSec: null };
-  if (!isPositive(perGpu)) return unavailable;
-  if (!entry.disagg) return { allocatedGpus: 1, totalOutputTokPerSec: perGpu };
-  if (entry.benchmark_type !== 'single_turn') return unavailable;
-  const prefill = entry.num_prefill_gpu;
-  const decode = entry.num_decode_gpu;
-  if (!count(prefill) || !count(decode)) return unavailable;
-  return { allocatedGpus: prefill + decode, totalOutputTokPerSec: perGpu * decode };
-}
+/** Fields `powerBasisNormalization` reads; every chart point and entry carries them. */
+export type PowerNormalizationInput = Partial<
+  Pick<
+    AggDataEntry,
+    | 'tput_per_gpu'
+    | 'input_tput_per_gpu'
+    | 'output_tput_per_gpu'
+    | 'disagg'
+    | 'chip_basis'
+    | 'num_prefill_gpu'
+    | 'num_decode_gpu'
+    | 'prefill_num_workers'
+    | 'decode_num_workers'
+    | 'isl'
+    | 'osl'
+  >
+>;
 
-function provisionedGpuSecondsPerToken(
-  entry: PowerBasisEntry,
-): Pick<PowerBasisInput, 'gpuSecondsPerOutputToken' | 'gpuSecondsPerTotalToken'> {
-  const { allocatedGpus, totalOutputTokPerSec } = powerBasisNormalization(entry);
-  if (!isPositive(allocatedGpus) || !isPositive(totalOutputTokPerSec)) {
-    return { gpuSecondsPerOutputToken: null, gpuSecondsPerTotalToken: null };
-  }
-  return {
-    gpuSecondsPerOutputToken: allocatedGpus / totalOutputTokPerSec,
-    gpuSecondsPerTotalToken: isPositive(entry.tput_per_gpu) ? 1 / entry.tput_per_gpu : null,
-  };
+/**
+ * Whole-deployment output tokens/s and the chips that produced them. Aggregated
+ * rows normalize per chip. Disaggregated rows use every deployment chip with the
+ * output rate converted to that same denominator, on either chip basis; legacy rows
+ * without recorded pool sizes count their deployment once, not once per pool.
+ */
+export function powerBasisNormalization(entry: PowerNormalizationInput): PowerBasisNormalization {
+  const perGpu = entry.output_tput_per_gpu;
+  if (!isPositive(perGpu)) return UNAVAILABLE;
+  if (!entry.disagg) return { allocatedGpus: 1, totalOutputTokPerSec: perGpu };
+  const split = hasPoolSplit(entry);
+  const chips = split
+    ? entry.num_prefill_gpu! + entry.num_decode_gpu!
+    : disaggDeploymentChips(entry);
+  const output = split
+    ? entry.chip_basis === 'total'
+      ? perGpu
+      : perGpu * (entry.num_decode_gpu! / chips!)
+    : exactPerTotalChipRates(entry)?.output;
+  if (!count(chips) || !isPositive(output)) return UNAVAILABLE;
+  return { allocatedGpus: chips, totalOutputTokPerSec: output * chips };
 }
 
 export function modeledFacilityWattsPerGpu(
@@ -249,24 +233,80 @@ export function modeledItWattsPerGpu(
 
 export type PowerBasisChartFields = Partial<Pick<InferenceData, PowerBasisFieldKey>>;
 
-export function buildPowerBasisChartFields(
+export function writePowerBasisChartFields(
+  fields: PowerBasisChartFields,
   entry: PowerBasisEntry,
   specs: { tdp?: number; power?: number },
-): PowerBasisChartFields {
-  const values = computePowerBasisFields({
-    tdpWatts: specs.tdp ?? null,
-    utilityWatts: isPositive(specs.power) ? specs.power * 1000 : null,
-    ...provisionedGpuSecondsPerToken(entry),
-    measuredWatts: entry.avg_power_w ?? null,
-    measuredJPerOutputToken: entry.joules_per_output_token ?? null,
-    measuredJPerTotalToken: entry.joules_per_total_token ?? null,
-    modeledItWattsPerGpu: modeledItWattsPerGpu(entry),
-    modeledFacilityWattsPerGpu: modeledFacilityWattsPerGpu(entry),
-  });
-  const fields: PowerBasisChartFields = {};
-  for (const key of Object.keys(values) as PowerBasisFieldKey[]) {
-    const y = values[key];
-    if (y !== null) fields[key] = { y, roof: false };
+  request: Readonly<Partial<Record<PowerBasisFieldKey, true>>> | undefined,
+): void {
+  const all = request === undefined;
+  const { allocatedGpus, totalOutputTokPerSec } = powerBasisNormalization(entry);
+  if (isPositive(allocatedGpus) && isPositive(totalOutputTokPerSec)) {
+    const perOutputToken = allocatedGpus / totalOutputTokPerSec;
+    const perTotalToken = isPositive(entry.tput_per_gpu) ? 1 / entry.tput_per_gpu : null;
+    const outputKnown = isPositive(perOutputToken);
+    const totalKnown = isPositive(perTotalToken);
+    const tdp = specs.tdp;
+    if (isPositive(tdp)) {
+      if (outputKnown) {
+        const y = orNull(tdp * perOutputToken);
+        if (y !== null && (all || request.gpuProvisionedJPerOutputToken))
+          fields.gpuProvisionedJPerOutputToken = { y, roof: false };
+      }
+      if (totalKnown) {
+        const y = orNull(tdp * perTotalToken);
+        if (y !== null && (all || request.gpuProvisionedJPerTotalToken))
+          fields.gpuProvisionedJPerTotalToken = { y, roof: false };
+      }
+    }
+    const utility = (specs.power ?? 0) * 1000;
+    if (isPositive(utility)) {
+      if (outputKnown) {
+        const y = orNull(utility * perOutputToken);
+        if (y !== null && (all || request.utilityProvisionedJPerOutputToken))
+          fields.utilityProvisionedJPerOutputToken = { y, roof: false };
+      }
+      if (totalKnown) {
+        const y = orNull(utility * perTotalToken);
+        if (y !== null && (all || request.utilityProvisionedJPerTotalToken))
+          fields.utilityProvisionedJPerTotalToken = { y, roof: false };
+      }
+    }
   }
-  return fields;
+  const measuredWatts = entry.avg_power_w;
+  if (!isPositive(measuredWatts)) return;
+  const modeledIt = modeledItWattsPerGpu(entry);
+  const modeled = modeledFacilityWattsPerGpu(entry);
+  if (modeledIt === null && modeled === null) return;
+  const perOutputJ = entry.joules_per_output_token;
+  const perTotalJ = entry.joules_per_total_token;
+  const outputJKnown = isPositive(perOutputJ);
+  const totalJKnown = isPositive(perTotalJ);
+  if (modeledIt !== null) {
+    if (all || request.itModeledWatts) fields.itModeledWatts = { y: modeledIt, roof: false };
+    if (outputJKnown) {
+      const y = orNull((perOutputJ * modeledIt) / measuredWatts);
+      if (y !== null && (all || request.itModeledJPerOutputToken))
+        fields.itModeledJPerOutputToken = { y, roof: false };
+    }
+    if (totalJKnown) {
+      const y = orNull((perTotalJ * modeledIt) / measuredWatts);
+      if (y !== null && (all || request.itModeledJPerTotalToken))
+        fields.itModeledJPerTotalToken = { y, roof: false };
+    }
+  }
+  if (modeled !== null) {
+    if (all || request.utilityModeledWatts)
+      fields.utilityModeledWatts = { y: modeled, roof: false };
+    if (outputJKnown) {
+      const y = orNull((perOutputJ * modeled) / measuredWatts);
+      if (y !== null && (all || request.utilityModeledJPerOutputToken))
+        fields.utilityModeledJPerOutputToken = { y, roof: false };
+    }
+    if (totalJKnown) {
+      const y = orNull((perTotalJ * modeled) / measuredWatts);
+      if (y !== null && (all || request.utilityModeledJPerTotalToken))
+        fields.utilityModeledJPerTotalToken = { y, roof: false };
+    }
+  }
 }

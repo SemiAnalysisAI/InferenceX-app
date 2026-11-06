@@ -28,6 +28,30 @@ describe('CI ZIP import', () => {
     const bundle = await loadBundle(source.read);
     expect(bundle.manifestSha256).toBe(hash(manifest));
   });
+  it('binds each native matrix artifact to its sealed name, run attempt and workflow revision', async () => {
+    const name = `h3-results-10-2-${'c'.repeat(64)}`;
+    const manifest = JSON.stringify({
+      run_id: '10',
+      run_attempt: '2',
+      git_commit: 'd'.repeat(40),
+      artifact_name: name,
+      ci: { head_sha: 'a'.repeat(40) },
+    });
+    const blob = archive({
+      'manifest.json': manifest,
+      SHA256SUMS: `${hash(manifest)}  manifest.json`,
+    });
+    const native = { ...artifact, name, workflow_run: { id: 10, head_sha: 'a'.repeat(40) } };
+    const sources = await archiveSources(blob, native);
+    expect(sources[0].id).toBe('10');
+    for (const altered of [
+      { ...native, name: name.replace('-2-', '-1-') },
+      { ...native, name: name.replace('c'.repeat(64), 'd'.repeat(64)) },
+      { ...native, workflow_run: { id: 10, head_sha: 'b'.repeat(40) } },
+      { ...native, workflow_run: { id: 11, head_sha: 'a'.repeat(40) } },
+    ])
+      await expect(archiveSources(blob, altered)).rejects.toThrow();
+  });
   it('preserves original execution identities in an exported archive', async () => {
     const index = JSON.stringify({
       schema_version: '1.0.0',

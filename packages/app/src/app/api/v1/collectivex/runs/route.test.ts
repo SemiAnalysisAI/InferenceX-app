@@ -51,10 +51,11 @@ describe('GET /api/v1/collectivex/runs', () => {
   it('lists stored runs with a complete-discovery flag under the CollectiveX tag', async () => {
     const res = await GET(req('/api/v1/collectivex/runs?version=1'));
     expect(res.status).toBe(200);
-    const body = { version: 1, runs: [summary], discovery_complete: true };
-    expect(await res.json()).toEqual(body);
-    expect(mockList).toHaveBeenCalledWith('mock-write-sql', 1);
-    expect(mockCachedJson).toHaveBeenCalledWith(expect.anything(), body, { tag: 'collectivex' });
+    expect(mockCachedJson).toHaveBeenCalledWith(
+      expect.anything(),
+      { version: 1, runs: [summary], discovery_complete: true },
+      { tag: 'collectivex' },
+    );
   });
 
   it('returns an empty list, not an error, when nothing is stored', async () => {

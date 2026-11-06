@@ -5,6 +5,8 @@ export interface RuntimeMetadata {
   kv_p2p_transfer?: string;
   router_name?: string;
   router_version?: string;
+  spec_algorithm?: string;
+  spec_draft_model?: string;
 }
 
 function nonEmptyString(value: unknown): string | undefined {
@@ -41,6 +43,11 @@ export function extractRuntimeMetadata(row: Record<string, unknown>): RuntimeMet
     metadata.router_name = router.name;
     if (router.version) metadata.router_version = router.version;
   }
+
+  const algorithm = nonEmptyString(row.spec_algorithm);
+  if (algorithm) metadata.spec_algorithm = algorithm;
+  const draftModel = nonEmptyString(row.spec_draft_model);
+  if (draftModel) metadata.spec_draft_model = draftModel;
 
   return metadata;
 }

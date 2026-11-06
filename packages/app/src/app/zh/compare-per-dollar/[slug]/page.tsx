@@ -3,6 +3,7 @@ import { notFound, permanentRedirect } from 'next/navigation';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
+import { compareChipPageLink } from '@/lib/compare/compare-chip-link';
 import { JsonLd } from '@/components/seo/json-ld';
 import { comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
 import {
@@ -29,7 +30,7 @@ import { socialMetadata } from '@/lib/seo/social-metadata';
 
 import ComparePerDollarPageClient from '../../../compare-per-dollar/[slug]/page-client';
 
-export const revalidate = 3600;
+export const revalidate = 86400;
 
 export function generateStaticParams(): { slug: string }[] {
   return [];
@@ -187,6 +188,7 @@ export async function renderPerDollarPageZh(slug: string, { scenarioSegment }: S
         bVendor={bMeta?.vendor ?? ''}
         aArch={aMeta?.arch ?? ''}
         bArch={bMeta?.arch ?? ''}
+        chipPageLink={compareChipPageLink(parsed.a, parsed.b, 'zh')}
         aCostPerGpuHr={aCostPerGpuHr}
         bCostPerGpuHr={bCostPerGpuHr}
         heroImageSrc={`/compare-per-dollar/${canonical}/performance-per-dollar.png?lang=zh`}

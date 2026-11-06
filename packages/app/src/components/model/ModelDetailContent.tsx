@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { KatexStyles } from '@/components/blog/katex-styles';
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
@@ -17,6 +18,7 @@ import {
   modelDashboardHref,
   modelEnglishArticleHref,
   modelIndexHref,
+  modelInferenceHref,
 } from './model-page-copy';
 
 export default async function ModelDetailContent({
@@ -29,7 +31,7 @@ export default async function ModelDetailContent({
   locale: Locale;
 }) {
   const { meta, entry, raw } = page;
-  const { content } = await compileBlogMdx(raw);
+  const { content, hasMath } = await compileBlogMdx(raw);
   const scenario = comparisonScenarioForModel(entry);
   const dashboardQuery = new URLSearchParams({
     g_model: entry.displayName,
@@ -37,6 +39,7 @@ export default async function ModelDetailContent({
     i_optimal: '1',
   });
   const t = MODEL_PAGE_COPY[locale];
+  const inferenceHref = modelInferenceHref(slug, locale);
   const localePrefix = locale === 'zh' ? '/zh' : '';
   const pageUrl = `${SITE_URL}${localePrefix}/model/${slug}`;
 
@@ -98,6 +101,15 @@ export default async function ModelDetailContent({
               </Heading>
             </div>
             <p className="mt-3 text-base lg:text-lg text-muted-foreground">{meta.description}</p>
+            {inferenceHref && (
+              <Link
+                href={inferenceHref}
+                data-testid="model-inference-link"
+                className="mt-4 inline-flex items-center rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20 transition-colors"
+              >
+                {t.inferenceBenchmarksLink(meta.title)}
+              </Link>
+            )}
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-3">
               <span>{meta.developer}</span>
               <span>&middot;</span>
@@ -128,6 +140,7 @@ export default async function ModelDetailContent({
                 </Link>
               </aside>
             )}
+            {hasMath && <KatexStyles />}
             <article
               data-testid="model-page-article"
               lang={locale === 'zh' ? (page.contentLocale ?? 'en') : undefined}

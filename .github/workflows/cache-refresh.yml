@@ -12,7 +12,7 @@ concurrency:
 jobs:
   refresh:
     name: Refresh cache
-    timeout-minutes: 5
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
       contents: read

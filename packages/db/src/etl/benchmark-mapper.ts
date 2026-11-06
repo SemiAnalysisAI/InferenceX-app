@@ -8,6 +8,7 @@ import {
   PRECISION_KEYS,
 } from '@semianalysisai/inferencex-constants';
 import { flattenAgenticAggRow } from './agentic-v3-flatten';
+import { hasRealPoolSplit, perPoolThroughputPatch } from './disagg-throughput';
 import { preferFullResponseMetrics } from './full-response-interactivity';
 import {
   resolveModelKey,
@@ -19,6 +20,7 @@ import {
   parseInt2,
 } from './normalizers';
 import { normalizeLegacyTpuRow } from './tpu-normalization';
+import { resolveRunFramework } from './run-framework-overrides';
 import { extractRuntimeMetadata } from './runtime-metadata';
 
 export { flattenAgenticAggRow };
@@ -63,6 +65,8 @@ const NON_METRIC_KEYS = new Set([
   'kv_offload_backend',
   'kv_p2p_transfer',
   'router',
+  'spec_algorithm',
+  'spec_draft_model',
   'request_metrics',
   'server_metrics',
   'dataset',
@@ -77,8 +81,6 @@ export type BenchmarkType = 'single_turn' | 'agentic_traces';
 function descriptorToOnOff(v: unknown): string | null {
   return typeof v === 'string' && v.length > 0 ? (v === 'none' ? 'off' : 'on') : null;
 }
-
-const _warnedMetricKeys = new Set<string>();
 
 export interface WorkerPower {
   role: string;
@@ -106,7 +108,12 @@ export interface PowerAudit {
   cpu?: PowerAuditCpu;
 }
 
-export const POWER_AUDIT_CPU_SENSOR_KINDS = ['module', 'grace_socket', 'dcgm_cpu_rail'] as const;
+export const POWER_AUDIT_CPU_SENSOR_KINDS = [
+  'module',
+  'grace_socket',
+  'dcgm_cpu_rail',
+  'rapl_package',
+] as const;
 
 export interface PowerAuditCpu {
   sensor_kind?: (typeof POWER_AUDIT_CPU_SENSOR_KINDS)[number];
@@ -189,10 +196,11 @@ export function mapBenchmarkRow(
       ? row.offload_mode
       : (descriptorToOnOff(row.kv_offloading) ?? descriptorToOnOff(row.offloading) ?? 'off');
 
-  const { framework, disagg: frameworkDisagg } = normalizeFramework(
+  const { framework: declaredFramework, disagg: frameworkDisagg } = normalizeFramework(
     String(row.framework ?? ''),
     row.disagg,
   );
+  const { framework } = resolveRunFramework(runId, declaredFramework);
   const precision = normalizePrecision(String(row.precision ?? ''));
   if (!PRECISION_KEYS.has(precision)) {
     tracker.unmappedPrecisions.add(precision);
@@ -200,9 +208,22 @@ export function mapBenchmarkRow(
   const specMethod = normalizeSpecMethod(row.spec_decoding);
 
   const topology = resolveConfigTopology(row, framework, frameworkDisagg);
-  let metrics = captureNumericMetrics(row);
+  let metrics = captureNumericMetrics(row, tracker);
   normalizePowerContractMetrics(row, metrics);
   if (isAgentic) metrics = preferFullResponseMetrics(metrics);
+  if (
+    isAgentic &&
+    hasRealPoolSplit({
+      disagg: topology.disagg,
+      num_prefill_gpu: topology.numPrefillGpu,
+      num_decode_gpu: topology.numDecodeGpu,
+      prefill_num_workers: topology.prefillNumWorkers,
+      decode_num_workers: topology.decodeNumWorkers,
+    })
+  ) {
+    const perPool = perPoolThroughputPatch(metrics, topology.numPrefillGpu, topology.numDecodeGpu);
+    if (perPool) Object.assign(metrics, perPool);
+  }
   if (!topology.disagg && (metrics.prefill_pp !== undefined || metrics.decode_pp !== undefined)) {
     const pp = Math.max(metrics.prefill_pp ?? 1, metrics.decode_pp ?? 1);
     metrics.prefill_pp = pp;
@@ -260,19 +281,17 @@ export function mapBenchmarkRow(
   };
 }
 
-function captureNumericMetrics(row: Record<string, any>): Record<string, number> {
+function captureNumericMetrics(
+  row: Record<string, any>,
+  tracker: SkipTracker,
+): Record<string, number> {
   const metrics: Record<string, number> = {};
   for (const [rawKey, val] of Object.entries(row)) {
     if (NON_METRIC_KEYS.has(rawKey)) continue;
     const n = parseNum(val);
     if (n === undefined) continue;
     metrics[rawKey] = n;
-    if (!METRIC_KEYS.has(rawKey) && !_warnedMetricKeys.has(rawKey)) {
-      _warnedMetricKeys.add(rawKey);
-      console.warn(
-        `  [WARN] auto-captured unexpected metric '${rawKey}' — add to METRIC_KEYS in constants/src/metric-keys.ts or NON_METRIC_KEYS in benchmark-mapper.ts`,
-      );
-    }
+    if (!METRIC_KEYS.has(rawKey)) tracker.unexpectedMetrics.add(rawKey);
   }
   return metrics;
 }

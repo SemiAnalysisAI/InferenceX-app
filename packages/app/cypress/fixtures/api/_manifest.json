@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-16T02:59:38.939Z",
+  "generatedAt": "2026-10-17T05:15:55.279Z",
   "fixtures": {
     "agentic-catalog": {
       "bytes": 10027,
@@ -10,9 +10,9 @@
       "topLevel": "array"
     },
     "availability": {
-      "bytes": 162038,
+      "bytes": 169803,
       "capturedAt": null,
-      "sha256": "ba61b059776227c21b798e442ae4bf84ef4e356ccab779063642cbcbccc42e07",
+      "sha256": "6709d1a7b6e8b1ad83980f8583c29c4b4f9d9af4567ca5340c1af9c440221987",
       "source": null,
       "topLevel": "array"
     },
@@ -98,6 +98,13 @@
       "capturedAt": null,
       "sha256": "f28d2220e5246ad70113e38e49394bc7a0bfe9afba8cedf08b90e39042e53357",
       "source": null,
+      "topLevel": "object"
+    },
+    "video-history": {
+      "bytes": 108159,
+      "capturedAt": "2026-10-17T05:15:55.279Z",
+      "sha256": "79593e777e5935e6f5807a5f0a78291f8860434f056601a0eaa8f1f93a3f2d77",
+      "source": "Retained public H3 metadata replay; fixture-only synthetic approval flags exercise chart layout and do not record an actual publication. No new benchmark or production publication.",
       "topLevel": "object"
     }
   }

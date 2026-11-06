@@ -33,7 +33,15 @@ describe('parseEmbedOptions', () => {
       theme: 'dark',
       sequence: undefined,
       yAxisMetric: 'y_tpPerGpu',
+      chipBasis: 'pool',
     });
+  });
+
+  it('reads the chip basis from chips or the dashboard g_chips param', () => {
+    expect(parseEmbedOptions({ chips: 'total' }).chipBasis).toBe('total');
+    expect(parseEmbedOptions({ g_chips: 'TOTAL' }).chipBasis).toBe('total');
+    expect(parseEmbedOptions({ chips: 'pool', g_chips: 'total' }).chipBasis).toBe('pool');
+    expect(parseEmbedOptions({ chips: 'decode' }).chipBasis).toBe('pool');
   });
 
   it('locks to the requested framework families and drops unknown ones', () => {
@@ -42,6 +50,7 @@ describe('parseEmbedOptions', () => {
     expect(parseEmbedOptions({ framework: 'vllm,vllm,nope' }).frameworks).toEqual(['vllm']);
     expect(parseEmbedOptions({ framework: 'nope' }).frameworks).toEqual([]);
     expect(parseEmbedOptions({ fw: 'trt' }).frameworks).toEqual(['trt']);
+    expect(parseEmbedOptions({ framework: 'TokenSpeed,nope' }).frameworks).toEqual(['tokenspeed']);
   });
 
   it('takes the first value of a repeated query key', () => {

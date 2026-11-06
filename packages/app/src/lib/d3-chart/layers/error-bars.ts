@@ -1,5 +1,7 @@
 import type * as d3 from 'd3';
 
+import { writeAttrs } from '../chart-update';
+
 export interface ErrorBarConfig<T> {
   getCx: (d: T) => number;
   getYMin: (d: T) => number;
@@ -38,29 +40,27 @@ export function renderErrorBars<T>(
 
   const merged = entered.merge(selection);
 
-  merged
-    .select('.eb-stem')
-    .attr('x1', (d) => config.getCx(d))
-    .attr('x2', (d) => config.getCx(d))
-    .attr('y1', (d) => config.getYMax(d))
-    .attr('y2', (d) => config.getYMin(d))
-    .attr('stroke', config.stroke);
-
-  merged
-    .select('.eb-cap-top')
-    .attr('x1', (d) => config.getCx(d) - config.capWidth / 2)
-    .attr('x2', (d) => config.getCx(d) + config.capWidth / 2)
-    .attr('y1', (d) => config.getYMax(d))
-    .attr('y2', (d) => config.getYMax(d))
-    .attr('stroke', config.stroke);
-
-  merged
-    .select('.eb-cap-bot')
-    .attr('x1', (d) => config.getCx(d) - config.capWidth / 2)
-    .attr('x2', (d) => config.getCx(d) + config.capWidth / 2)
-    .attr('y1', (d) => config.getYMin(d))
-    .attr('y2', (d) => config.getYMin(d))
-    .attr('stroke', config.stroke);
+  writeAttrs(merged.select<SVGLineElement>('.eb-stem'), {
+    x1: (d) => config.getCx(d),
+    x2: (d) => config.getCx(d),
+    y1: (d) => config.getYMax(d),
+    y2: (d) => config.getYMin(d),
+    stroke: config.stroke,
+  });
+  writeAttrs(merged.select<SVGLineElement>('.eb-cap-top'), {
+    x1: (d) => config.getCx(d) - config.capWidth / 2,
+    x2: (d) => config.getCx(d) + config.capWidth / 2,
+    y1: (d) => config.getYMax(d),
+    y2: (d) => config.getYMax(d),
+    stroke: config.stroke,
+  });
+  writeAttrs(merged.select<SVGLineElement>('.eb-cap-bot'), {
+    x1: (d) => config.getCx(d) - config.capWidth / 2,
+    x2: (d) => config.getCx(d) + config.capWidth / 2,
+    y1: (d) => config.getYMin(d),
+    y2: (d) => config.getYMin(d),
+    stroke: config.stroke,
+  });
 
   return merged;
 }
@@ -71,24 +71,22 @@ export function updateErrorBarsOnZoom<T>(
 ): void {
   const bars = group.selectAll<SVGGElement, T>('.error-bar');
 
-  bars
-    .select('.eb-stem')
-    .attr('x1', (d) => config.getCx(d))
-    .attr('x2', (d) => config.getCx(d))
-    .attr('y1', (d) => config.getYMax(d))
-    .attr('y2', (d) => config.getYMin(d));
-
-  bars
-    .select('.eb-cap-top')
-    .attr('x1', (d) => config.getCx(d) - config.capWidth / 2)
-    .attr('x2', (d) => config.getCx(d) + config.capWidth / 2)
-    .attr('y1', (d) => config.getYMax(d))
-    .attr('y2', (d) => config.getYMax(d));
-
-  bars
-    .select('.eb-cap-bot')
-    .attr('x1', (d) => config.getCx(d) - config.capWidth / 2)
-    .attr('x2', (d) => config.getCx(d) + config.capWidth / 2)
-    .attr('y1', (d) => config.getYMin(d))
-    .attr('y2', (d) => config.getYMin(d));
+  writeAttrs(bars.select<SVGLineElement>('.eb-stem'), {
+    x1: (d) => config.getCx(d),
+    x2: (d) => config.getCx(d),
+    y1: (d) => config.getYMax(d),
+    y2: (d) => config.getYMin(d),
+  });
+  writeAttrs(bars.select<SVGLineElement>('.eb-cap-top'), {
+    x1: (d) => config.getCx(d) - config.capWidth / 2,
+    x2: (d) => config.getCx(d) + config.capWidth / 2,
+    y1: (d) => config.getYMax(d),
+    y2: (d) => config.getYMax(d),
+  });
+  writeAttrs(bars.select<SVGLineElement>('.eb-cap-bot'), {
+    x1: (d) => config.getCx(d) - config.capWidth / 2,
+    x2: (d) => config.getCx(d) + config.capWidth / 2,
+    y1: (d) => config.getYMin(d),
+    y2: (d) => config.getYMin(d),
+  });
 }

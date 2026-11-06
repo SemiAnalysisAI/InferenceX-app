@@ -105,11 +105,14 @@ as permanent impact figures for the changing live dataset.
 The `/inference` page exposes infrastructure tokens-per-dollar and token revenue
 as separate Y-axis metric families. Revenue selects the total-throughput Pareto
 knots, interpolates throughput, token mix, and cache hit independently, and then
-applies the selected token sale prices. Total, output-only, and input-only
-infrastructure tokens-per-dollar trends spline their matching throughput and
-apply the constant `3600 / $/GPU-hr` multiplier. Reusing the matching frontier
-remains essential: total-throughput knots are not necessarily the output- or
-input-throughput Pareto knots.
+applies the selected token sale prices. When input and output sell at one price
+and cached input either costs the same or no knot has a cache hit, the mix cannot
+move the price (`tokenMixSetsPrice`), so neither a point nor a trend measures or
+interpolates it. The normalized default prices are such a case. Total,
+output-only, and input-only infrastructure tokens-per-dollar trends spline their
+matching throughput and apply the constant `3600 / $/GPU-hr` multiplier. Reusing
+the matching frontier remains essential: total-throughput knots are not
+necessarily the output- or input-throughput Pareto knots.
 
 The revenue axis defaults to normalized cache-aware pricing: uncached input and
 output are `$1/M tok`, while cached input is `$0.10/M tok`, matching Fleet
@@ -209,9 +212,10 @@ The history response is ~8.6 MB per model. `useHistoricalBest` gates the fetch
 on a facility power budget being set, and requests `view=calculator` to trim it
 to the calculator's metric allowlist (~24% smaller).
 
-**That trim must stay opt-in.** `CALCULATOR_METRIC_KEYS` excludes the
-measured-power metrics Historical Trends plots, so applying it to every history
-response would silently blank those charts.
+**That trim must stay opt-in.** The default response is the published contract,
+and `CALCULATOR_METRIC_KEYS` excludes measured-power metrics other readers use.
+Historical Trends reads its own compact form, `/api/v1/benchmarks/history/trends`,
+which keeps every key a trend reads.
 
 ### Lifecycle math (`lifecycle.ts`)
 

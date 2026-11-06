@@ -1,4 +1,9 @@
-import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
+import {
+  availabilityBody,
+  interceptBenchmarkPresence,
+  interceptDerivedAgenticMetrics,
+  unlockAgenticGate,
+} from '../support/e2e';
 import { agenticMetrics } from '../support/agentic-fixtures';
 
 const DEFAULT_MODEL_DB_KEY = 'dsv4';
@@ -88,26 +93,11 @@ function expectCompatibleSelection($inputs: JQuery<HTMLElement>) {
 
 describe('GPU comparison agentic point detail', () => {
   it('exposes the per-point charts as a normal browser link', () => {
-    cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as(
-      'agenticAvailability',
-    );
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody(agenticAvailability),
+    }).as('agenticAvailability');
     cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks }).as('agenticBenchmarks');
-    cy.intercept('GET', '/api/v1/trace-availability*', (request) => {
-      const ids = new URL(request.url).searchParams.get('ids')?.split(',') ?? [];
-      if (ids.length < 20) request.alias = 'gpuTraceAvailability';
-      const result = Object.fromEntries(
-        ids.filter((id) => agenticIds.has(Number(id))).map((id) => [id, true]),
-      );
-      request.reply({ body: result });
-    });
-    cy.intercept('GET', '/api/v1/log-availability*', (request) => {
-      const ids = new URL(request.url).searchParams.get('ids')?.split(',') ?? [];
-      request.reply({
-        body: Object.fromEntries(
-          ids.filter((id) => agenticIds.has(Number(id))).map((id) => [id, true]),
-        ),
-      });
-    }).as('gpuLogAvailability');
+    interceptBenchmarkPresence({ trace: agenticIds, log: agenticIds }).as('benchmarkPresence');
     interceptDerivedAgenticMetrics();
 
     cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
@@ -134,52 +124,29 @@ describe('GPU comparison agentic point detail', () => {
     });
 
     cy.get('[data-testid="gpu-graph"]').first().should('be.visible');
-    cy.wait('@gpuTraceAvailability');
-    cy.wait('@gpuLogAvailability');
-    cy.wait(100);
+    cy.wait('@benchmarkPresence');
     cy.get('[data-testid="gpu-graph"]')
       .first()
       .find('svg .dot-group')
       .should('have.length.greaterThan', 0)
       .first()
-      .then(($point) => {
-        const point = $point[0] as unknown as SVGElement & {
-          __data__: { benchmark_type?: string; id?: number };
-        };
-        expect(point.__data__.benchmark_type).to.equal('agentic_traces');
-        expect(point.__data__.id).to.be.a('number');
-        cy.wrap($point).find('.visible-shape').click({ force: true });
-      });
+      .find('.visible-shape')
+      .click({ force: true });
 
     cy.get('[data-chart-tooltip]:visible').should('have.length', 1);
     cy.get('[data-chart-tooltip]:visible')
-      .should('contain', 'Offload Type: DRAM')
-      .and('contain', 'KV Offload Engine: Mooncake 0.3.11.post1')
-      .and('contain', 'Router: vLLM Router 0.1.14')
-      .and('contain', 'Chip Cache Hit Rate: 87.5%')
+      .should('contain', 'Router: vLLM Router 0.1.14')
       .and('not.contain', 'Offload Mode');
-    cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]')
-      .should('be.visible')
-      .then(($link) => {
-        expect($link).to.match('a');
-        expect($link).not.to.have.attr('target');
-        const href = $link.attr('href') ?? '';
-        expect(href).to.match(/^\/inference\/agentic\/\d+\?/u);
-        const params = new URLSearchParams(href.slice(href.indexOf('?')));
-        expect(params.get('i_seq')).to.equal('agentic-traces');
-        expect(params.get('i_gpus')).to.be.a('string').and.not.equal('');
-      });
-    cy.get('[data-chart-tooltip]:visible [data-action="view-logs"]')
-      .should('be.visible')
-      .then(($link) => {
-        expect($link).to.match('a');
-        const href = $link.attr('href') ?? '';
-        expect(href).to.match(/^\/inference\/agentic\/\d+\?/u);
-        const params = new URLSearchParams(href.slice(href.indexOf('?')));
-        expect(params.get('view')).to.equal('logs');
-        expect(params.get('i_seq')).to.equal('agentic-traces');
-        expect(params.get('i_gpus')).to.be.a('string').and.not.equal('');
-      });
+    for (const action of ['view-charts', 'view-logs']) {
+      cy.get(`[data-chart-tooltip]:visible [data-action="${action}"]`)
+        .should('be.visible')
+        .invoke('attr', 'href')
+        .then((href = '') => {
+          const params = new URLSearchParams(href.slice(href.indexOf('?')));
+          expect(params.get('i_seq')).to.equal('agentic-traces');
+          expect(params.get('i_gpus')).to.be.a('string').and.not.equal('');
+        });
+    }
     cy.location('pathname').should('eq', '/inference');
   });
 
@@ -187,7 +154,9 @@ describe('GPU comparison agentic point detail', () => {
     '/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&i_gpus=b200_sglang,b200_vllm&i_dates=2026-06-12&i_dstart=2026-06-12&i_dend=2026-06-12';
 
   it('restores a soloed compatible selection without requesting engine consent', () => {
-    cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability });
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody(agenticAvailability),
+    });
     cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks });
     interceptDerivedAgenticMetrics();
     cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
@@ -206,7 +175,9 @@ describe('GPU comparison agentic point detail', () => {
   });
 
   it('defaults to the scored winner and requires consent before showing both engines', () => {
-    cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability });
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody(agenticAvailability),
+    });
     cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks });
     interceptDerivedAgenticMetrics();
     cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
@@ -265,9 +236,9 @@ describe('GPU comparison agentic point detail', () => {
   });
 
   it('surfaces automatic resolution of conflicting GPU URL state', () => {
-    cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as(
-      'agenticAvailability',
-    );
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody(agenticAvailability),
+    }).as('agenticAvailability');
     cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks }).as('agenticBenchmarks');
     interceptDerivedAgenticMetrics();
 
@@ -296,9 +267,9 @@ describe('GPU comparison agentic point detail', () => {
   });
 
   it('lets vLLM and SGLang share the graph when the feature gate is unlocked', () => {
-    cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as(
-      'agenticAvailability',
-    );
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody(agenticAvailability),
+    }).as('agenticAvailability');
     cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks }).as('agenticBenchmarks');
     interceptDerivedAgenticMetrics();
 

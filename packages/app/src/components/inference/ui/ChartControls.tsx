@@ -183,6 +183,7 @@ const METRIC_TITLE_ZH_MAP = new Map(
 );
 
 interface ChartControlsProps {
+  scenarioInFooter?: boolean;
   hideGpuComparison?: boolean;
   tcoSource?: 'inference' | 'historical';
   showXAxisMode?: boolean;
@@ -193,6 +194,7 @@ interface ChartControlsProps {
 }
 
 export default function ChartControls({
+  scenarioInFooter = false,
   hideGpuComparison = false,
   tcoSource = 'inference',
   showXAxisMode = false,
@@ -493,17 +495,19 @@ export default function ChartControls({
 
   const benchmarkSelectors = (
     <>
-      <div className="min-w-0">
-        <ScenarioSelector
-          value={selectedSequence}
-          onChange={handleSequenceChange}
-          open={openDropdown === 'sequence'}
-          onOpenChange={handleDropdownOpenChange('sequence')}
-          availableSequences={availableSequences}
-          model={selectedModel}
-          data-testid="scenario-selector"
-        />
-      </div>
+      {!scenarioInFooter && (
+        <div className="min-w-0">
+          <ScenarioSelector
+            value={selectedSequence}
+            onChange={handleSequenceChange}
+            open={openDropdown === 'sequence'}
+            onOpenChange={handleDropdownOpenChange('sequence')}
+            availableSequences={availableSequences}
+            model={selectedModel}
+            data-testid="scenario-selector"
+          />
+        </div>
+      )}
       <div className="min-w-0">
         <PrecisionSelector
           value={selectedPrecisions}
@@ -524,7 +528,9 @@ export default function ChartControls({
           legend={t.benchmarkControls}
           className={hideGpuComparison ? 'lg:col-span-2' : 'lg:col-span-3'}
         >
-          <div className="grid min-w-0 grid-cols-2 items-start gap-3 md:grid-cols-4">
+          <div
+            className={`grid min-w-0 grid-cols-2 items-start gap-3 ${scenarioInFooter ? 'md:grid-cols-3' : 'md:grid-cols-4'}`}
+          >
             <div className="min-w-0 col-span-2">
               <ModelSelector
                 value={selectedModel}

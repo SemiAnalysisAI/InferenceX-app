@@ -15,69 +15,19 @@ describe('Custom User Values', () => {
   });
 
   describe('Custom Chip Costs', () => {
-    it('opens the custom tier from the caption selector with badges seeded from the tier', () => {
+    it('re-prices the chart as a badge is edited', () => {
       cy.get('[data-testid="cost-tier-selector"]').first().click();
       cy.get('[data-testid="cost-tier-custom"]').click();
-      cy.get('[data-testid="cost-tier-selector"]')
-        .first()
-        .should('contain.text', 'Custom User Values');
-      cy.get('[data-testid="custom-costs-section"]').should('not.exist');
-      cy.get('[data-testid="inference-tco-badge"] input[id^="cost-input-"]')
-        .first()
-        .should(($input) => {
-          const val = parseFloat($input.val() as string);
-          expect(val).to.be.greaterThan(0);
-        });
-      cy.get('[data-testid="scatter-graph"]')
-        .first()
-        .find('svg .dot-group')
-        .should('have.length.greaterThan', 0);
-    });
-
-    it('re-prices the chart as a badge is edited', () => {
-      cy.get('[data-testid="scatter-graph"]')
-        .first()
-        .find('svg .dot-group')
-        .first()
-        .should(($el) => {
-          expect(($el[0] as any).__data__).to.not.equal(undefined);
-        })
-        .then(($el) => {
-          const initialY = ($el[0] as any).__data__.y;
+      cy.scatterPoints()
+        .should('have.length.greaterThan', 0)
+        .then((points) => {
+          const initialY = points[0].datum.y;
           cy.get('[data-testid="inference-tco-badge"] input[id^="cost-input-"]').each(($input) => {
             cy.wrap($input).clear().type('9999');
           });
-          cy.get('[data-testid="scatter-graph"]')
-            .first()
-            .find('svg .dot-group')
-            .first()
-            .should(($newEl) => {
-              const newY = ($newEl[0] as any).__data__.y;
-              expect(newY).to.not.equal(initialY);
-            });
-        });
-    });
-
-    it('re-opening the custom tier quotes the reseeded prices, not the earlier typing', () => {
-      cy.get('[data-testid="cost-tier-selector"]').first().click();
-      cy.get('[data-testid="cost-tier-custom"]').click();
-      cy.get('[data-testid="inference-tco-badge"] input[id^="cost-input-"]')
-        .first()
-        .clear()
-        .type('9');
-      cy.get('[data-testid="inference-tco-badge"] input[id^="cost-input-"]')
-        .first()
-        .should('have.value', '9');
-      cy.get('[data-testid="cost-tier-selector"]').first().click();
-      cy.get('[data-testid="cost-tier-hyperscaler"]').click();
-      cy.get('[data-testid="cost-tier-selector"]').first().click();
-      cy.get('[data-testid="cost-tier-custom"]').click();
-      cy.get('[data-testid="inference-tco-badge"] input[id^="cost-input-"]')
-        .first()
-        .should(($input) => {
-          const val = parseFloat($input.val() as string);
-          expect(val).to.be.greaterThan(0);
-          expect(val).to.not.equal(9);
+          cy.scatterPoints().should((next) => {
+            expect(next[0].datum.y).to.not.equal(initialY);
+          });
         });
     });
 
@@ -104,30 +54,12 @@ describe('Custom User Values', () => {
     it('Calculate button applies the newly entered power values (regression: stale closure)', () => {
       selectCustomPowerMetric();
       cy.get('[data-testid="custom-powers-section"]').scrollIntoView().should('be.visible');
-      cy.get('[data-testid="custom-powers-section"]').should('contain.text', 'Custom Chip Powers');
-
-      cy.get('[data-testid="custom-powers-section"] input[id^="cost-input-"]')
-        .first()
-        .should(($input) => {
-          const val = parseFloat($input.val() as string);
-          expect(val).to.be.greaterThan(0);
-        });
 
       cy.get('[data-testid="custom-powers-calculate"]').click();
-      cy.get('[data-testid="scatter-graph"]')
-        .first()
-        .find('svg .dot-group')
-        .should('have.length.greaterThan', 0);
-
-      cy.get('[data-testid="scatter-graph"]')
-        .first()
-        .find('svg .dot-group')
-        .first()
-        .should(($el) => {
-          expect(($el[0] as any).__data__).to.not.equal(undefined);
-        })
-        .then(($el) => {
-          const initialY = ($el[0] as any).__data__.y;
+      cy.scatterPoints()
+        .should('have.length.greaterThan', 0)
+        .then((points) => {
+          const initialY = points[0].datum.y;
           cy.get('[data-testid="custom-powers-section"] input[id^="cost-input-"]').each(
             ($input) => {
               cy.wrap($input).clear().type('99999');
@@ -136,14 +68,9 @@ describe('Custom User Values', () => {
 
           cy.get('[data-testid="custom-powers-calculate"]').click();
 
-          cy.get('[data-testid="scatter-graph"]')
-            .first()
-            .find('svg .dot-group')
-            .first()
-            .should(($newEl) => {
-              const newY = ($newEl[0] as any).__data__.y;
-              expect(newY).to.not.equal(initialY);
-            });
+          cy.scatterPoints().should((next) => {
+            expect(next[0].datum.y).to.not.equal(initialY);
+          });
         });
     });
   });

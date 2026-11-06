@@ -18,7 +18,7 @@ import {
   modeledItWattsPerGpu,
   POWER_COUNT_LABELS,
 } from '@/lib/power/power-basis';
-import { FACILITY_PUE_NOTE, formatPueRange } from '@/lib/power/system-power-model';
+import { FACILITY_PUE_NOTE, formatPueRange } from '@/lib/power/facility-pue';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import { Switch } from '@/components/ui/switch';
 import type { InferenceData } from '@/components/inference/types';

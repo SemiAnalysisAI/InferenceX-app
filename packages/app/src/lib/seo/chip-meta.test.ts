@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { getAllChipPages, getAllChipVsPages, getChipPage } from '@/lib/catalog/chip-pages';
+import {
+  getAllChipPages,
+  getAllChipVsPages,
+  getChipHw,
+  getChipPage,
+  getChipSpec,
+} from '@/lib/catalog/chip-pages';
 import { META_DESCRIPTION_MAX, META_TITLE_MAX } from '@/lib/seo/meta-text';
 
 import {
@@ -17,6 +23,9 @@ describe('chip meta descriptions', () => {
     for (const fact of ['HBM3e', 'TB/s bandwidth', 'W TDP', 'kW all-in power', '/hr cloud price']) {
       expect(description).toContain(fact);
     }
+    const b300 = getChipPage('b300')!;
+    expect(chipMetaDescription(b300, 'en')).toContain('1,100 W TDP');
+    expect(chipMetaDescription(b300, 'zh')).toContain('TDP 1,100 W');
   });
 
   it('fits every chip and versus page within the locale limit', () => {
@@ -48,6 +57,26 @@ describe('chip meta descriptions', () => {
         expect(title.startsWith(`${page.a.label} vs ${page.b.label}`)).toBe(true);
       }
     }
+  });
+
+  it('leads English chip titles with the registry hourly rate and memory', () => {
+    for (const entry of getAllChipPages()) {
+      const spec = getChipSpec(entry);
+      const hw = getChipHw(entry);
+      const title = chipMetaTitle(entry, 'en');
+      expect(title, entry.slug).toContain(`~$${hw.costh.toFixed(2)}/hr`);
+      expect(title, entry.slug).toContain(`${spec.memory} ${spec.memoryType}`);
+    }
+    const b300 = getChipPage('b300')!;
+    expect(chipMetaTitle(b300, 'en')).toBe(
+      `NVIDIA B300 Specs: ~$${getChipHw(b300).costh.toFixed(2)}/hr, ${getChipSpec(b300).memory} HBM3e`,
+    );
+    // Long chip names drop "Specs" before dropping a fact.
+    expect(chipMetaTitle(getChipPage('mi355x')!, 'en')).toMatch(/^AMD Instinct MI355X: ~\$/u);
+  });
+
+  it('keeps the Chinese chip title that already ranks for price queries', () => {
+    expect(chipMetaTitle(getChipPage('b300')!, 'zh')).toBe('NVIDIA B300 规格、价格与功耗');
   });
 
   it('keeps the full descriptor when it fits and drops it for long versus pairs', () => {

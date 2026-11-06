@@ -15,6 +15,7 @@ const URL_STATE_KEYS = [
   'g_rundate',
   'g_runid',
   'g_tco',
+  'g_chips',
   'i_seq',
   'i_prec',
   'i_metric',
@@ -107,6 +108,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   g_rundate: '',
   g_runid: '',
   g_tco: 'internal',
+  g_chips: 'pool',
   i_seq: '',
   i_prec: '',
   i_metric: '',
@@ -328,6 +330,18 @@ function collectTabParams(): URLSearchParams {
   }
 
   const liveParams = profitRouteSearch(window.location.pathname, window.location.search);
+  // The video dashboard keeps its `v_` state in the address bar, not in
+  // currentState, so routes that share that scope read it live.
+  if (prefixes.some((prefix) => prefix === 'v_')) {
+    for (const [key, value] of liveParams) {
+      if (key.startsWith('v_') && !filtered.has(key)) filtered.set(key, value);
+    }
+  }
+
+  // Carry over any unofficial-run IDs currently reflected in the address bar.
+  // Only the first match is forwarded and it's always emitted under the plural
+  // `unofficialruns` key — the canonical form the app writes on dismiss/load
+  // and the one we want shared links to use going forward.
   for (const [key, value] of liveParams) {
     if (UNOFFICIAL_RUN_PARAM_RE.test(key) && value) {
       filtered.set('unofficialruns', value);

@@ -2,19 +2,48 @@ import { type NextRequest, NextResponse } from 'next/server';
 
 import { getDb } from '@semianalysisai/inferencex-db/connection';
 
-import { getServerLog, getServerLogChunk } from '@semianalysisai/inferencex-db/queries/server-logs';
+import {
+  getBoundedServerLog,
+  getServerLogChunk,
+  type ServerLogChunk,
+} from '@semianalysisai/inferencex-db/queries/server-logs';
 
-import { cachedJson, cachedQuery } from '@/lib/cache/api-cache';
+import {
+  cachedJson,
+  cachedQuery,
+  cdnHeaders,
+  SERVER_LOG_CACHE_CONTROL,
+  serverLogCacheTag,
+} from '@/lib/cache/api-cache';
 import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/api/public-api-errors';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
 
-const getCachedServerLog = cachedQuery((id: number) => getServerLog(getDb(), id), 'server-log', {
-  blobOnly: true,
-});
-const getCachedNamedServerLog = cachedQuery(
-  (id: number, fileName: string) => getServerLog(getDb(), id, fileName),
-  'server-log-file',
+/** Largest file returned as one JSON string; larger files need chunks or download=1. */
+export const MAX_COMPLETE_SERVER_LOG_BYTES = 16 * 1024 * 1024;
+/**
+ * Largest file streamed by download=1. A read at character offset N makes
+ * PostgreSQL decompress the first N characters, so streaming costs grow with
+ * the square of the file size; 512 MiB finishes in about two minutes.
+ */
+export const MAX_DOWNLOAD_SERVER_LOG_BYTES = 512 * 1024 * 1024;
+/**
+ * Characters per database read while streaming a download. Worst-case JSON
+ * escaping is 6 bytes per character, so one read stays under Neon's 64 MB
+ * response cap, and a 512 MiB file needs about 64 reads instead of 2,000.
+ */
+export const DOWNLOAD_CHUNK_CHARACTERS = 8 * 1024 * 1024;
+
+export const DEFAULT_SERVER_LOG_CHUNK_SIZE = 64 * 1024;
+export const MAX_SERVER_LOG_CHUNK_SIZE = 256 * 1024;
+const MAX_SERVER_LOG_OFFSET = 2_000_000_000;
+const MAX_SERVER_LOG_FILE_NAME_LENGTH = 1024;
+
+const getCachedBoundedServerLog = cachedQuery(
+  (id: number, maxBytes: number, fileName: string | null) =>
+    getBoundedServerLog(getDb(), id, maxBytes, fileName ?? undefined),
+  'server-log-bounded',
   { blobOnly: true },
 );
 const getCachedServerLogChunk = cachedQuery(
@@ -23,10 +52,59 @@ const getCachedServerLogChunk = cachedQuery(
   'server-log-chunk',
 );
 
-export const DEFAULT_SERVER_LOG_CHUNK_SIZE = 64 * 1024;
-export const MAX_SERVER_LOG_CHUNK_SIZE = 256 * 1024;
-const MAX_SERVER_LOG_OFFSET = 2_000_000_000;
-const MAX_SERVER_LOG_FILE_NAME_LENGTH = 1024;
+function logCacheOptions() {
+  return { tag: serverLogCacheTag(), cacheControl: SERVER_LOG_CACHE_CONTROL };
+}
+
+function tooLargeResponse(bytes: number, maxBytes: number, hint: string): Response {
+  return Response.json(
+    {
+      error: `Log file is ${bytes} bytes, above the ${maxBytes}-byte limit for this mode. ${hint}`,
+      bytes,
+      maxBytes,
+    },
+    { status: 413, headers: cdnHeaders(serverLogCacheTag(), SERVER_LOG_CACHE_CONTROL) },
+  );
+}
+
+function downloadStream(
+  id: number,
+  fileName: string | null,
+  first: ServerLogChunk,
+): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  let nextOffset = first.nextOffset;
+  return new ReadableStream<Uint8Array>(
+    {
+      start(controller) {
+        if (first.serverLog.length > 0) controller.enqueue(encoder.encode(first.serverLog));
+        if (nextOffset === null) controller.close();
+      },
+      async pull(controller) {
+        if (nextOffset === null) return;
+        try {
+          const chunk = await getServerLogChunk(
+            getDb(),
+            id,
+            nextOffset,
+            DOWNLOAD_CHUNK_CHARACTERS,
+            fileName ?? undefined,
+          );
+          if (chunk === null) {
+            controller.error(new Error('Log file disappeared during download'));
+            return;
+          }
+          if (chunk.serverLog.length > 0) controller.enqueue(encoder.encode(chunk.serverLog));
+          nextOffset = chunk.nextOffset;
+          if (nextOffset === null) controller.close();
+        } catch (error) {
+          controller.error(error);
+        }
+      },
+    },
+    { highWaterMark: 0 },
+  );
+}
 
 function downloadFileName(fileName: string): string {
   const leafName = fileName.replaceAll('\\', '/').split('/').at(-1) || 'server.log';
@@ -86,48 +164,47 @@ export async function GET(request: NextRequest) {
     }
 
     if (download === '1') {
-      const firstChunk = await getCachedServerLogChunk(id, 0, MAX_SERVER_LOG_CHUNK_SIZE, fileName);
-      if (firstChunk === null) {
+      // One query sizes the file and, for most files, returns it whole.
+      const whole = await getBoundedServerLog(
+        getDb(),
+        id,
+        DOWNLOAD_CHUNK_CHARACTERS,
+        fileName ?? undefined,
+      );
+      if (whole === null) {
         return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
       }
-      const encoder = new TextEncoder();
-      let nextOffset = firstChunk.nextOffset;
-      const stream = new ReadableStream<Uint8Array>({
-        start(controller) {
-          if (firstChunk.serverLog.length > 0) {
-            controller.enqueue(encoder.encode(firstChunk.serverLog));
-          }
-          if (nextOffset === null) controller.close();
-        },
-        async pull(controller) {
-          if (nextOffset === null) return;
-          try {
-            const chunk = await getCachedServerLogChunk(
+      if (whole.bytes > MAX_DOWNLOAD_SERVER_LOG_BYTES) {
+        // Plain text, not JSON: the viewer's download link may save this body as a file.
+        return new Response(
+          `Log file is ${whole.bytes} bytes, above the ${MAX_DOWNLOAD_SERVER_LOG_BYTES}-byte download limit. Read it in ranges with /api/v1/server-log?offset=&limit=, or scroll through it in the log viewer.\n`,
+          {
+            status: 413,
+            headers: {
+              ...cdnHeaders(serverLogCacheTag(), SERVER_LOG_CACHE_CONTROL),
+              'Content-Type': 'text/plain; charset=utf-8',
+            },
+          },
+        );
+      }
+      const first: ServerLogChunk | null =
+        whole.serverLog === null
+          ? await getServerLogChunk(
+              getDb(),
               id,
-              nextOffset,
-              MAX_SERVER_LOG_CHUNK_SIZE,
-              fileName,
-            );
-            if (chunk === null) {
-              controller.error(new Error('Log file disappeared during download'));
-              return;
-            }
-            if (chunk.serverLog.length > 0) {
-              controller.enqueue(encoder.encode(chunk.serverLog));
-            }
-            nextOffset = chunk.nextOffset;
-            if (nextOffset === null) controller.close();
-          } catch (error) {
-            controller.error(error);
-          }
-        },
-      });
-      return new Response(stream, {
+              0,
+              DOWNLOAD_CHUNK_CHARACTERS,
+              fileName ?? undefined,
+            )
+          : { fileName: whole.fileName, serverLog: whole.serverLog, offset: 0, nextOffset: null };
+      if (first === null) {
+        return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
+      }
+      return new Response(downloadStream(id, fileName, first), {
         headers: {
-          'Cache-Control': 'private, no-cache, no-store, max-age=0',
-          'Content-Disposition': downloadFileName(fileName ?? 'server.log'),
+          ...cdnHeaders(serverLogCacheTag(), SERVER_LOG_CACHE_CONTROL),
+          'Content-Disposition': downloadFileName(fileName ?? whole.fileName),
           'Content-Type': 'text/plain; charset=utf-8',
-          'X-Content-Type-Options': 'nosniff',
         },
       });
     }
@@ -158,19 +235,28 @@ export async function GET(request: NextRequest) {
       if (chunk === null) {
         return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
       }
-      return cachedJson(request, { id, ...chunk });
+      return cachedJson(request, { id, ...chunk }, logCacheOptions());
     }
 
-    const serverLog =
-      fileName === null
-        ? await getCachedServerLog(id)
-        : await getCachedNamedServerLog(id, fileName);
-
-    if (serverLog === null) {
+    const log = await getCachedBoundedServerLog(id, MAX_COMPLETE_SERVER_LOG_BYTES, fileName);
+    if (log === null) {
       return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
     }
-
-    return cachedJson(request, fileName === null ? { id, serverLog } : { id, fileName, serverLog });
+    if (log.serverLog === null) {
+      return tooLargeResponse(
+        log.bytes,
+        MAX_COMPLETE_SERVER_LOG_BYTES,
+        log.bytes <= MAX_DOWNLOAD_SERVER_LOG_BYTES
+          ? 'Read it with offset and limit, or stream it with download=1.'
+          : 'Read it in ranges with offset and limit.',
+      );
+    }
+    const serverLog = log.serverLog;
+    return cachedJson(
+      request,
+      fileName === null ? { id, serverLog } : { id, fileName, serverLog },
+      logCacheOptions(),
+    );
   } catch (error) {
     console.error('Error fetching server log:', error);
     return publicApiError(PUBLIC_API_ERRORS.internal, 500);

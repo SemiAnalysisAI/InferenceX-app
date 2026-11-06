@@ -269,6 +269,7 @@ describe('compareModelSeoName', () => {
     'deepseek-v4': 'DeepSeek V4 Pro',
     'deepseek-v41-flash': 'DeepSeek V4.1 Flash',
     'deepseek-r1': 'DeepSeek R1',
+    'kimi-k31-pro': 'Kimi K3.1 Pro',
     'kimi-k3': 'Kimi K3',
     'kimi-k26': 'Kimi K2.6',
     'glm-5-1': 'GLM-5',
@@ -359,6 +360,14 @@ describe('getCompareModelBySlug', () => {
     expect(k3?.dbKeys).toEqual(['kimik3']);
     expect(k3?.displayName).toBe('Kimi-K3');
     expect(KIMI_K26.dbKeys).not.toContain('kimik3');
+  });
+
+  it('gives Kimi K3.1 Pro its own slug and dbKey, separate from K3', () => {
+    const k31 = getCompareModelBySlug('kimi-k31-pro');
+    expect(k31?.slug).toBe('kimi-k31-pro');
+    expect(k31?.dbKeys).toEqual(['kimik3.1']);
+    expect(k31?.displayName).toBe('Kimi-K3.1-Pro');
+    expect(getCompareModelBySlug('kimi-k3')?.dbKeys).toEqual(['kimik3']);
   });
 
   it('returns null for unknown slugs', () => {

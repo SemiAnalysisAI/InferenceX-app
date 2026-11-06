@@ -17,6 +17,7 @@ import {
   parseRunIdParam,
   parseSequenceParam,
   parseTcoBasisParam,
+  parseChipBasisParam,
   resolveModelParam,
 } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
@@ -211,6 +212,7 @@ export function GET(request: NextRequest): Promise<Response> {
     const runId = parseRunIdParam(search.get('runId'));
     const gpus = parseFreeListParam(search.get('gpus'));
     const tcoBasis = parseTcoBasisParam(search.get('tcoBasis'));
+    const chipBasis = parseChipBasisParam(search.get('chipBasis'));
     const hideSkuAboveConfigLimit = parseBoolParam(
       search.get('hideSkuAboveConfigLimit'),
       'hideSkuAboveConfigLimit',
@@ -235,6 +237,7 @@ export function GET(request: NextRequest): Promise<Response> {
         percentile,
         tokenType: costType,
         tcoBasis,
+        chipBasis,
         classify: (hwKey, row) => {
           const prefix = overlayRows.includes(row) ? `${row.run_url}|` : '';
           return multiPrecision
@@ -363,6 +366,7 @@ export function GET(request: NextRequest): Promise<Response> {
       costType,
       percentile,
       tcoBasis,
+      chipBasis,
       hideSkuAboveConfigLimit,
       ...(mw === undefined ? {} : { mw }),
       ...(costcap === undefined ? {} : { costcap }),

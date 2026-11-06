@@ -2,9 +2,8 @@ import { readTraceProfileLines } from '../lib/trace-profile-storage';
 
 import type { DbClient } from '../connection.js';
 import {
-  extractIslOsl,
-  fetchAggregateStatsRows,
   percentilesOf,
+  pushRecordIslOsl,
   readNum,
   sequenceLengthSketches,
   STATS_VERSION,
@@ -29,6 +28,15 @@ interface StoredAggregateStats {
   prefixCacheHitRate: MetricPercentiles | null;
   e2elPerOsl: MetricPercentiles | null;
   sequenceLengths: SequenceLengthSketches;
+}
+
+interface StoredDerivedRow {
+  benchmark_result_id: number;
+  version: unknown;
+  e2el_per_osl_p75: unknown;
+  e2el_per_osl_p90: unknown;
+  kv_cache_util: MetricPercentiles | null;
+  prefix_cache_hit_rate: MetricPercentiles | null;
 }
 
 const QUERY_CHUNK_SIZE = 6;
@@ -69,7 +77,7 @@ function extractTurn(rec: ProfileRecord): TurnFields | null {
   return { request_latency_ms: rl, ttft_ms: tt, isl, osl };
 }
 
-function invertRatio(v: number | null | undefined): number | null {
+function invertRatio(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) && v > 0 ? 1 / v : null;
 }
 
@@ -98,9 +106,6 @@ export async function computeStoredProfileDistributions(sql: DbClient, traceRepl
   const osl: number[] = [];
   const ratios: number[] = [];
   for await (const line of readTraceProfileLines(sql, traceReplayId)) {
-    const lengths = extractIslOsl(line);
-    isl.push(...lengths.isl);
-    osl.push(...lengths.osl);
     if (!line) continue;
     let record: ProfileRecord;
     try {
@@ -110,6 +115,7 @@ export async function computeStoredProfileDistributions(sql: DbClient, traceRepl
     }
     if (record.metadata?.benchmark_phase && record.metadata.benchmark_phase !== 'profiling')
       continue;
+    pushRecordIslOsl(record, isl, osl);
     const turn = extractTurn(record);
     if (turn) ratios.push(turn.request_latency_ms / 1000 / turn.osl);
   }
@@ -124,21 +130,34 @@ export async function getDerivedAgenticMetrics(
 
   const result: DerivedAgenticMetricMap = {};
 
-  const statsRows = await fetchAggregateStatsRows<StoredAggregateStats>(sql, benchmarkResultIds);
+  const statsRows = (await sql`
+    select
+      br.id as benchmark_result_id,
+      atr.aggregate_stats->'version' as version,
+      atr.aggregate_stats#>'{e2elPerOsl,p75}' as e2el_per_osl_p75,
+      atr.aggregate_stats#>'{e2elPerOsl,p90}' as e2el_per_osl_p90,
+      case when atr.aggregate_stats->'version' = to_jsonb(${STATS_VERSION}::int) then null
+        else atr.aggregate_stats->'kvCacheUtil' end as kv_cache_util,
+      case when atr.aggregate_stats->'version' = to_jsonb(${STATS_VERSION}::int) then null
+        else atr.aggregate_stats->'prefixCacheHitRate' end as prefix_cache_hit_rate
+    from benchmark_results br
+    join agentic_trace_replay atr on atr.id = br.trace_replay_id
+    where br.id = any(${benchmarkResultIds}::bigint[])
+  `) as unknown as StoredDerivedRow[];
 
   const idsNeedingBlob: number[] = [];
-  const staleStatsById = new Map<number, StoredAggregateStats | null>();
+  const staleRowsById = new Map<number, StoredDerivedRow>();
   for (const row of statsRows) {
     const id = Number(row.benchmark_result_id);
-    if (row.stats && Number(row.stats.version) === STATS_VERSION) {
+    if (Number(row.version) === STATS_VERSION) {
       result[id] = {
         id,
-        p75_e2e_norm_intvty: invertRatio(row.stats.e2elPerOsl?.p75),
-        p90_e2e_norm_intvty: invertRatio(row.stats.e2elPerOsl?.p90),
+        p75_e2e_norm_intvty: invertRatio(row.e2el_per_osl_p75),
+        p90_e2e_norm_intvty: invertRatio(row.e2el_per_osl_p90),
       };
     } else {
       idsNeedingBlob.push(id);
-      staleStatsById.set(id, row.stats ?? null);
+      staleRowsById.set(id, row);
     }
   }
 
@@ -147,18 +166,20 @@ export async function getDerivedAgenticMetrics(
   const rows: {
     benchmark_result_id: number;
     trace_replay_id: number;
+    has_server_metrics: boolean;
   }[] = [];
   for (let i = 0; i < idsNeedingBlob.length; i += QUERY_CHUNK_SIZE) {
     const chunk = idsNeedingBlob.slice(i, i + QUERY_CHUNK_SIZE);
     const chunkRows = (await sql`
       select
         br.id as benchmark_result_id,
-        atr.id as trace_replay_id
+        atr.id as trace_replay_id,
+        atr.server_metrics_json_gz is not null as has_server_metrics
       from benchmark_results br
       join agentic_trace_replay atr on atr.id = br.trace_replay_id
       where br.id = any(${chunk}::bigint[])
         and (atr.profile_export_jsonl_gz is not null or atr.profile_export_chunk_count > 0)
-    `) as { benchmark_result_id: number; trace_replay_id: number }[];
+    `) as { benchmark_result_id: number; trace_replay_id: number; has_server_metrics: boolean }[];
     rows.push(...chunkRows);
   }
 
@@ -175,15 +196,16 @@ export async function getDerivedAgenticMetrics(
         p90_e2e_norm_intvty: invertRatio(e2el_per_osl?.p90),
       };
 
-      const prior = staleStatsById.get(id) ?? null;
-      const canPreserveServerFields = Boolean(prior?.kvCacheUtil || prior?.prefixCacheHitRate);
-      if (canPreserveServerFields) {
+      const prior = staleRowsById.get(id);
+      const kvCacheUtil = prior?.kv_cache_util ?? null;
+      const prefixCacheHitRate = prior?.prefix_cache_hit_rate ?? null;
+      if (kvCacheUtil || prefixCacheHitRate || !row.has_server_metrics) {
         const merged: StoredAggregateStats = {
           version: STATS_VERSION,
           isl: percentilesOf(isl),
           osl: percentilesOf(osl),
-          kvCacheUtil: prior?.kvCacheUtil ?? null,
-          prefixCacheHitRate: prior?.prefixCacheHitRate ?? null,
+          kvCacheUtil,
+          prefixCacheHitRate,
           e2elPerOsl: e2el_per_osl,
           sequenceLengths: sequenceLengthSketches(isl, osl),
         };

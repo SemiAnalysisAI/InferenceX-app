@@ -5,6 +5,8 @@
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "jsx": "react-jsx",
+    "incremental": true,
+    "tsBuildInfoFile": "./node_modules/.cache/tsc/root.tsbuildinfo",
     "paths": {
       "@/*": ["./packages/app/src/*"]
     }

@@ -17,9 +17,24 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { collectiveXRunDasharray } from './data';
 import { formatSwapBytes, swapChartPoints, swapRooflines, type SwapChartPoint } from './swap-data';
 
+/**
+ * vLLM's function name, set as inline code: monospace on a gray chip. Light themes use the
+ * muted gray at half strength so the chip stays light; dark themes keep the full tone, which
+ * is already only a small step above their background.
+ */
+export function SwapBlocksName() {
+  return (
+    <code className="rounded bg-muted/50 px-1 py-0.5 font-mono dark:bg-muted">swap_blocks</code>
+  );
+}
+
 const STRINGS = {
   en: {
-    heading: 'vLLM swap_blocks',
+    heading: (
+      <>
+        vLLM <SwapBlocksName />
+      </>
+    ),
     metric: 'Swap-block metric',
     direction: 'Swap-block direction',
     layout: 'Swap-block layout',
@@ -47,7 +62,11 @@ const STRINGS = {
       'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
   },
   zh: {
-    heading: 'vLLM swap_blocks',
+    heading: (
+      <>
+        vLLM <SwapBlocksName />
+      </>
+    ),
     metric: '块交换指标',
     direction: '块交换方向',
     layout: '块交换布局',

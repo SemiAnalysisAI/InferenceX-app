@@ -14,6 +14,7 @@ const TRACKING_CALLS: Record<string, number> = {
   useDialogCloseTracking: 2,
   useSearchTracking: 2,
 };
+const TRACKING_CALL_NAMES = Object.keys(TRACKING_CALLS);
 
 /** Keys replaced by a canonical name (see "Analytics" in docs/architecture.md). */
 const LEGACY_KEYS: Record<string, string> = {
@@ -33,6 +34,7 @@ const LEGACY_KEYS: Record<string, string> = {
 
 function propertyKeys(file: string): { key: string; line: number }[] {
   const text = readFileSync(file, 'utf8');
+  if (!TRACKING_CALL_NAMES.some((name) => text.includes(name))) return [];
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const keys: { key: string; line: number }[] = [];
   const visit = (node: ts.Node) => {
@@ -56,9 +58,11 @@ function propertyKeys(file: string): { key: string; line: number }[] {
 describe('analytics event property keys', () => {
   it('uses canonical snake_case keys in every tracking call', () => {
     const offenders: string[] = [];
+    let checkedKeys = 0;
     for (const entry of readdirSync(SRC, { recursive: true, encoding: 'utf8' })) {
       if (!/\.tsx?$/u.test(entry) || /\.test\.tsx?$/u.test(entry)) continue;
       for (const { key, line } of propertyKeys(path.join(SRC, entry))) {
+        checkedKeys += 1;
         if (/[A-Z]/u.test(key)) offenders.push(`${entry}:${line} ${key} is not snake_case`);
         else if (key in LEGACY_KEYS) {
           offenders.push(`${entry}:${line} ${key} should be ${LEGACY_KEYS[key]}`);
@@ -66,5 +70,6 @@ describe('analytics event property keys', () => {
       }
     }
     expect(offenders).toEqual([]);
+    expect(checkedKeys).toBeGreaterThan(0);
   });
 });

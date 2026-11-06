@@ -20,14 +20,15 @@ const state = vi.hoisted(() => ({
   views: new Map<string | null, ComparisonView>(),
   models: [] as ComparisonModel[],
   detail: null as null | { view: ComparisonView; hardware: string[]; caseIndex: number | null },
+  loading: false,
 }));
 
 vi.mock('next/navigation', () => ({ usePathname: () => '/operatorx' }));
 vi.mock('@/hooks/api/use-operatorx', () => ({
   useOperatorXComparison: (_op: string, workload: string | null) => ({
-    data: state.views.get(workload),
+    data: state.loading ? undefined : state.views.get(workload),
     error: null,
-    isLoading: false,
+    isLoading: state.loading,
     isPlaceholderData: false,
     refetch: () => undefined,
   }),
@@ -125,18 +126,7 @@ const singleView = comparisonView(comparison, single.id);
 let root: Root;
 let container: HTMLDivElement;
 
-beforeEach(() => {
-  state.views = new Map([
-    [null, sharedView],
-    [shared.id, sharedView],
-    [single.id, singleView],
-  ]);
-  state.models = [];
-  state.detail = null;
-  window.history.replaceState(null, '', '/operatorx');
-  container = document.createElement('div');
-  document.body.append(container);
-  root = createRoot(container);
+function renderDashboard() {
   const client = new QueryClient();
   act(() =>
     root.render(
@@ -145,6 +135,22 @@ beforeEach(() => {
       </QueryClientProvider>,
     ),
   );
+}
+
+beforeEach(() => {
+  state.views = new Map([
+    [null, sharedView],
+    [shared.id, sharedView],
+    [single.id, singleView],
+  ]);
+  state.models = [];
+  state.detail = null;
+  state.loading = false;
+  window.history.replaceState(null, '', '/operatorx');
+  container = document.createElement('div');
+  document.body.append(container);
+  root = createRoot(container);
+  renderDashboard();
 });
 
 afterEach(() => {
@@ -203,5 +209,29 @@ describe('ComparisonDashboard live state', () => {
     expect(state.detail?.caseIndex).toBe(0);
     expect(state.detail?.view).toBe(clicked.view);
     expect(state.detail?.hardware).toEqual(clicked.hardware);
+  });
+});
+
+describe('ComparisonDashboard loading state', () => {
+  it('lays out the controls and every chart card the loaded dashboard shows', () => {
+    const loadedCard = container.querySelector('[data-testid="operatorx-viz-probe"]');
+    expect(loadedCard).not.toBeNull();
+
+    act(() => root.unmount());
+    root = createRoot(container);
+    state.loading = true;
+    renderDashboard();
+
+    const loading = container.querySelector('[data-testid="operatorx-loading"]');
+    expect(loading?.getAttribute('aria-busy')).toBe('true');
+    expect(loading?.textContent).toContain('Workload');
+    expect(loading?.textContent).toContain('Metric');
+    expect(loading?.textContent).toContain('Baseline');
+    const placeholder = container.querySelector('[data-testid="operatorx-viz-skeleton-probe"]');
+    expect(placeholder?.textContent).toBe('Probe');
+    // Same grid span as the loaded card, so the card does not change width or row.
+    expect(placeholder?.className).toBe(loadedCard?.className);
+    expect(placeholder?.querySelector('[aria-hidden="true"]')?.className).toContain('h-[420px]');
+    expect(container.querySelector('[data-testid="operatorx-controls"]')).toBeNull();
   });
 });

@@ -1,6 +1,26 @@
 import { type ConfigParams, configCacheKey } from './config-cache';
 import { QWEN35_P90_POWER_BACKFILLS } from './power-p90-backfills';
+import { SPEC_METHOD_BACKFILLS } from './spec-method-backfills';
 import { matchesExpectedBackfillMetrics } from '../lib/benchmark-point-backfill';
+import {
+  type RunFrameworkOverride,
+  RUN_FRAMEWORK_OVERRIDES,
+  validateRunFrameworkOverrides,
+} from './run-framework-overrides';
+
+/**
+ * Run framework reassignments live in a dependency-free sibling module because
+ * the benchmark and eval mappers (which the app's unofficial-run route bundles)
+ * read them at mapping time. They are re-exported here so the ledger stays the
+ * single entry point for audited corrections.
+ */
+export {
+  type RunFrameworkOverride,
+  RUN_FRAMEWORK_OVERRIDES,
+  applyRunFrameworkOverridesToChangelogs,
+  resolveRunFramework,
+  rewriteConfigKeyFramework,
+} from './run-framework-overrides';
 
 export const CONCLUSION_OVERRIDES: ReadonlyMap<number, string> = new Map([
   [22806827144, 'success'], // 2026-03-07 | dsr1 fp8 h200 SGLang 0.5.7→0.5.9 bump | Reason: database upload step failed
@@ -128,6 +148,7 @@ export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new
   [30231719317, new Set([1])], // 2026-07-27 | DeepSeek-V4 FP4 GB300 Dynamo-vLLM MTP agentic | Reason: Outdated AgentX harness
   [30391410523, new Set([1])], // 2026-07-30 | Qwen3.5 FP4 GB300 Dynamo-SGLang MTP agentic | Reason: Outdated AgentX harness; corrected by v1+ run 31042542308
   [30425131777, new Set([3])], // 2026-07-30 | Kimi K3 FP4 B300 vLLM MTP agentic | Reason: Outdated AgentX harness
+  [41296675142, new Set([1])], // 2026-11-01 | PowerX NVL72 CPU and per-host GPU power (PR #3296) | Reason: 1 run overwriting curve
 ]);
 
 export interface BenchmarkPointKey {
@@ -344,6 +365,7 @@ export interface BenchmarkPointBackfill extends AuditedBackfill {
   set: {
     offloadMode?: 'on' | 'off';
     recipeFingerprint?: string;
+    specMethod?: string;
     metricsMerge?: Readonly<Record<string, JsonValue>>;
     metricsRemove?: readonly string[];
   };
@@ -457,6 +479,7 @@ const GB300_CACHE_HIT_RATE_REASON =
 
 export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
   ...QWEN35_P90_POWER_BACKFILLS,
+  ...SPEC_METHOD_BACKFILLS,
   // Run 34744300699 remeasured these exact same-image TP16 points with valid
   // power. The earlier run predates recipe fingerprints, so backfill its ten
   // audited identities; the existing snapshot DISTINCT then selects the newer
@@ -812,11 +835,12 @@ function backfillPointIdentity(
   backfill: BenchmarkPointBackfill,
   offloadMode: string = backfill.offloadMode,
   recipeFingerprint: string | null = backfill.recipeFingerprint ?? null,
+  config: ConfigParams = backfill.config,
 ): string {
   return JSON.stringify([
     backfill.githubRunId,
     backfill.runAttempt,
-    configCacheKey(backfill.config),
+    configCacheKey(config),
     backfill.benchmarkType,
     backfill.isl,
     backfill.osl,
@@ -824,6 +848,12 @@ function backfillPointIdentity(
     offloadMode,
     recipeFingerprint,
   ]);
+}
+
+export function backfillDesiredConfig(backfill: BenchmarkPointBackfill): ConfigParams {
+  return backfill.set.specMethod === undefined
+    ? backfill.config
+    : { ...backfill.config, specMethod: backfill.set.specMethod };
 }
 
 function backfillProductionPointIdentity(
@@ -886,8 +916,10 @@ function validateBackfillConfig(config: ConfigParams, id: string): void {
 export function validateRunBackfills(
   changelogs: readonly ChangelogBackfill[] = CHANGELOG_BACKFILLS,
   points: readonly BenchmarkPointBackfill[] = BENCHMARK_POINT_BACKFILLS,
+  frameworks: readonly RunFrameworkOverride[] = RUN_FRAMEWORK_OVERRIDES,
 ): void {
   const ids = new Set<string>();
+  validateRunFrameworkOverrides(frameworks, ids, PURGED_RUNS);
   const changelogIdentities = new Set<string>();
   const pointSourceIdentities = new Map<string, string>();
   const pointDesiredIdentities = new Map<string, string>();
@@ -970,6 +1002,12 @@ export function validateRunBackfills(
     if (backfill.set.recipeFingerprint === '') {
       throw new Error(`${backfill.id}: set.recipeFingerprint must be non-empty`);
     }
+    if (
+      backfill.set.specMethod !== undefined &&
+      (backfill.set.specMethod === '' || backfill.set.specMethod === backfill.config.specMethod)
+    ) {
+      throw new Error(`${backfill.id}: set.specMethod must be non-empty and change the config`);
+    }
     const mergeKeys = Object.keys(backfill.set.metricsMerge ?? {});
     if (backfill.previousSet) {
       const previous = backfill.previousSet;
@@ -987,6 +1025,7 @@ export function validateRunBackfills(
     if (
       backfill.set.offloadMode === undefined &&
       backfill.set.recipeFingerprint === undefined &&
+      backfill.set.specMethod === undefined &&
       mergeKeys.length === 0 &&
       removeKeys.length === 0
     ) {
@@ -1014,6 +1053,7 @@ export function validateRunBackfills(
       backfill,
       desiredOffloadMode,
       desiredRecipeFingerprint,
+      backfillDesiredConfig(backfill),
     );
     if (pointDesiredIdentities.has(desiredIdentity)) {
       throw new Error(`${backfill.id}: desired point identity collides with another backfill`);
@@ -1153,7 +1193,7 @@ export function applyBenchmarkPointBackfill<T extends BackfillablePoint>(
   point: T,
 ): AppliedBenchmarkPointBackfill<T> {
   const sourceIdentity = JSON.stringify([
-    point.configId,
+    configCacheKey(point.config),
     point.benchmarkType,
     point.isl,
     point.osl,
@@ -1186,12 +1226,16 @@ export function applyBenchmarkPointBackfill<T extends BackfillablePoint>(
   if (backfill.set.offloadMode !== undefined) metrics.offload_mode = offloadMode;
   const patched = {
     ...point,
+    config:
+      backfill.set.specMethod === undefined
+        ? point.config
+        : { ...point.config, specMethod: backfill.set.specMethod },
     offloadMode,
     recipeFingerprint: backfill.set.recipeFingerprint ?? point.recipeFingerprint ?? null,
     metrics,
   };
   const desiredIdentity = JSON.stringify([
-    patched.configId,
+    configCacheKey(patched.config),
     patched.benchmarkType,
     patched.isl,
     patched.osl,
@@ -1253,6 +1297,17 @@ export function planBenchmarkPoint<T extends BackfillablePoint>(
   const applied = applyBenchmarkPointBackfill(run.githubRunId, run.runAttempt, point);
   recordBackfilledPointIdentity(seen, applied.sourceIdentity, applied.desiredIdentity);
   return { kind: 'planned', point: applied.point, backfillId: applied.backfillId };
+}
+
+export function backfilledPoints<T extends Omit<BackfillablePoint, 'configId'>>(
+  run: { githubRunId: number; runAttempt: number | null | undefined },
+  points: readonly T[],
+): T[] {
+  return points.map(
+    (point) =>
+      applyBenchmarkPointBackfill(run.githubRunId, run.runAttempt, { ...point, configId: -1 })
+        .point,
+  );
 }
 
 export function isRunAttemptPurged(githubRunId: number, runAttempt?: number): boolean {

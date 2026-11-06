@@ -223,7 +223,9 @@ Present what you inferred and ask about anything not visible in artifacts:
 - Add one entry to `FW_REGISTRY` with `{ label }` (the display name)
 - If the framework is a **rename/alias** of an existing one, add to `FRAMEWORK_ALIASES` instead
 
-**No other files need changes.** `normalizeFramework()` resolves raw names through `FRAMEWORK_ALIASES`, and display labels, `FRAMEWORK_KEYS`, and `FRAMEWORK_LABELS` are derived from `FW_REGISTRY` and `FRAMEWORK_ALIASES`.
+`normalizeFramework()` resolves raw names through `FRAMEWORK_ALIASES`, and display labels, `FRAMEWORK_KEYS`, and `FRAMEWORK_LABELS` are derived from `FW_REGISTRY` and `FRAMEWORK_ALIASES`.
+
+For a new engine family, also update `frameworkFamily()` in `packages/app/src/lib/catalog/framework-family.ts` and `FRAMEWORK_FAMILIES` in `packages/app/src/components/inference/utils/quickFilters.ts`. The dashboard, embeds, and read-only view filters share these definitions. Update the framework enums in the inference and historical API documentation and the `packages/skills` dashboard-view guide, and cover official and unofficial overlay filtering.
 
 ---
 

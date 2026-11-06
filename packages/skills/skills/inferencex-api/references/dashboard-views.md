@@ -6,23 +6,40 @@ these routes become available only after the corresponding app change deploys.
 Do not assume an installed skill proves server availability.
 
 The bare `/inference` and `/zh/inference` entry routes temporarily redirect to
-their `/kimi-k3` pages unless `g_model` explicitly selects a model. Other query
+their `/deepseek-v41-flash` pages unless `g_model` explicitly selects a model. Other query
 parameters are preserved. This is a navigation default, not an API default:
-`/api/v1/views/inference` still requires `model`; pass `model=Kimi-K3&sequence=agentic-traces` to match
+`/api/v1/views/inference` still requires `model`; pass `model=DeepSeek-V4.1-Flash&sequence=agentic-traces` to match
 the landing page. Existing model-specific links and historical results remain available.
 
 `/inference` 和 `/zh/inference` 在未通过 `g_model` 指定模型时，会临时重定向到
-各自的 `/kimi-k3` 页面，并保留其他查询参数。这只改变页面入口；
-`/api/v1/views/inference` 仍要求显式传入 `model`，使用 `model=Kimi-K3&sequence=agentic-traces`
+各自的 `/deepseek-v41-flash` 页面，并保留其他查询参数。这只改变页面入口；
+`/api/v1/views/inference` 仍要求显式传入 `model`，使用 `model=DeepSeek-V4.1-Flash&sequence=agentic-traces`
 可查询入口页面对应的模型。已有模型链接和历史结果不受影响。
 
-On mobile inference and PowerX charts, Scenario, Precision, and Run context (date,
-run selection and changelog) are inside More chart controls; Model stays visible.
-Desktop keeps Scenario and Precision beside Model and Run context below chart
-settings. Embedded charts keep their standalone run controls. This is
+Inference places Scenario beside Cost Tier and TCO Basis below the plot on desktop
+and mobile. An empty selection keeps Scenario below the empty chart for recovery.
+The shared Scenario control, including its label and help icon, is omitted when
+there is only one available scenario. Multiple scenarios remain selectable.
+This visibility rule is presentation-only: the selected sequence, API parameters,
+defaults, measurements, and unofficial overlay data are unchanged.
+PowerX keeps Scenario beside Model on desktop and inside More chart controls on
+mobile. Both surfaces put Precision and Run context (date, run selection and
+changelog) inside More chart controls on mobile; Model stays visible. Desktop keeps
+Precision beside Model and Run context below chart settings.
+Embedded charts keep their standalone run controls. This is
 presentation-only: scenario/precision/run/date parameters, defaults, returned
 measurements and unofficial overlays are unchanged; no API parameter represents
 the collapsed state.
+
+## Router-aware labels
+
+Inference series and table `label` values include `SMG SGLang` or `SMG vLLM`
+when runtime `router_name` is `smg`. If any point in a series uses SMG, the
+entire series label uses that SMG framework name, with no mixed-name suffix.
+Table labels use each point's own metadata. These labels match
+the chart legends and line labels, including unofficial overlays. Continue
+using canonical `framework` and `hwKey` values for filtering and identity;
+router labels do not change measurements or add filter parameters.
 
 ## PNG export aspect ratio
 
@@ -47,15 +64,57 @@ PNG 宽高比（自动 / 16:9 / 1:1）是下载菜单中仅用于图片导出的
 
 Use `tcoBasis=internal` (the default) or `tcoBasis=external` in cost-aware
 read-only views. Qwen3.5 and Kimi K3 expose the corresponding dashboard toggle
-on 8K/1K and Agentic Traces; inference charts show it for cost metrics when
-TPUv7 data is visible. The API accepts the pricing basis independently of
-control visibility. It changes configured ownership costs, not measured
-throughput; explicit custom costs remain user-controlled.
+on 8K/1K and Agentic Traces; Muse Spark Open, GLM-5.2 and GLM-5.3 Flash expose
+it on Agentic Traces. Inference charts show it for cost metrics when TPUv7 data
+is visible. The API accepts the pricing basis independently of control
+visibility. It changes configured ownership costs, not measured throughput;
+explicit custom costs remain user-controlled.
 
 Inference and historical charts place TCO Basis beside Cost Tier in the caption
 below the graph, including eligible unofficial overlays. PNG captions retain the
 selected basis as text. This placement is presentation-only; it adds no API
 parameter and changes no defaults, returned values or visibility rules.
+
+## Disaggregated chip basis
+
+`chipBasis` chooses which chips divide a disaggregated configuration's input and
+output throughput in the `inference`, `historical`, `calculator`, and
+`first-token` views. `pool` (the default, matching stored rows) divides input by
+prefill chips and output by decode chips; `total` divides both by every chip in
+the deployment, the basis aggregated configurations and `tput_per_gpu` always use.
+Every metric derived from those rates follows the basis: input/output tok/s/chip,
+input/output $/M tok and tokens per $1, input/output tok/s/MW, J/input and
+J/output token, and the calculator's Input and Output token types. Total
+throughput, total-token cost, measured and provisioned power boundaries, and
+aggregated rows are identical under both. Responses echo the resolved
+`params.chipBasis`; other views reject the parameter. The dashboard exposes the
+same choice as a toggle in the disaggregated-config note below the chart and
+stores it in the share URL as `g_chips=total`; on the total basis, chart titles and
+axis labels add "(All Chips)". It applies to unofficial-run overlays and to every
+page that embeds the inference chart (PowerX and the comparison pages). The
+`compare` view and comparison-page tables stay on the stored per-pool basis.
+Token revenue and the measured input/output token mix are identical under both
+bases.
+
+CSV exports whose columns depend on the basis (every inference chart export, which
+always carries input/output throughput columns; historical charts on those metrics;
+the throughput calculator; and First-Token Limits on Input or Output tokens) end with
+a `Chip basis:` note naming it. Embedded charts
+(`/embed/model/<slug>`) accept `chips=total` (or `g_chips=total`) and show the
+basis note, without the toggle, below metrics that depend on it.
+
+Legacy fixed-sequence Dynamo rows (2025-09-29 to 2025-12-05) are marked
+disaggregated but record no workers and the whole deployment in both
+`num_prefill_gpu` and `num_decode_gpu`. Most October 2025 rows store input and
+output per deployment chip; later ones store them per pool with unrecorded pool
+sizes. The total basis uses the former as stored and solves the prefill share of
+the latter exactly from `tput_per_gpu = input × p + output × (1 − p)`. Their chip
+count and provisioned power use the deployment once rather than once per pool.
+
+Stored raw rows (`/api/v1/benchmarks`) keep the per-pool basis for fixed-sequence
+and AgentX runs alike. The AgentX producer divides all three rates by every chip; ingest and a
+backfill move those rows to the per-pool basis and keep the producer's original
+rates as `input_tput_per_total_gpu` and `output_tput_per_total_gpu`.
 
 ## Historical editorial articles
 
@@ -72,17 +131,34 @@ results or treat its interpolated values as separately measured operating points
 
 ## Capture and select
 
+Qwen3.5 workload-retirement coverage:
+
+| Surface                                     | Read-only behavior                                                                                                                       |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Inference and historical sequence selectors | `options.models[].deprecatedSequences` includes Qwen3.5 `8k/1k`; explicit inference and historical requests still return stored results. |
+| Current-image dashboard                     | Its shared active-row filter excludes Qwen3.5 `8k/1k`, while AgentX stays active. Raw latest-image responses retain historical rows.     |
+| Unofficial overlays and exports             | Explicit Qwen3.5 `8k/1k` selections remain available; no calculation or export format changes.                                           |
+
 1. Resolve the view and missing selectors from the table below. Read `options`
    for static model, hardware, sequence and metric registries; use each specialized
    view's `options`, `configurations`, `workloads`, or raw run-list operation for
    data-dependent choices.
-   MiniMax M3 and DeepSeek V4 Pro have `category=deprecated` in `options.models`.
+   Kimi K3, MiniMax M3 and DeepSeek V4 Pro have `category=deprecated` in `options.models`.
    They remain selectable through explicit model parameters and overview
    `modelScope=all`. MiniMax M3.1 Flash and DeepSeek V4.1 Flash remain in the default
    model group. Historical data and unofficial-run overlays remain available;
-   current-image views exclude both retired models.
+   current-image views exclude these retired models. Kimi K3's existing links,
+   profit-estimator defaults, model metadata and raw API identities remain unchanged.
+   Qwen3.5 remains active for AgentX; only its 8K/1K workload is retired.
+   Read `options.models[].deprecatedSequences` for each model's deprecated
+   sequence keys, including global retirements. The global
+   `options.sequences[].deprecated` flag alone does not capture per-model
+   retirement. Qwen3.5 8K/1K stays selectable in the inference and historical
+   sequence selectors under Deprecated, including explicit links and unofficial
+   overlays, but is excluded from current-image views. The raw benchmark and
+   latest-image APIs keep historical rows; no data is deleted.
    Preserve `options.models` order within each category when rendering model
-   selectors. The default group is Kimi K3, DeepSeek V4.1 Flash, GLM5.2/GLM5.3,
+   selectors. The default group is DeepSeek V4.1 Flash, GLM5.2/GLM5.3,
    MiniMax M3.1 Flash, Muse Spark Open, Qwen3.5, then
    Qwen3.8 Flash Next. This presentation order does not change `defaults.model`
    or the overview's model order.
@@ -132,6 +208,11 @@ Best per SKU ranks only points in the selected precisions. For example,
 `precisions=fp8&best=true` selects the best FP8 configuration per SKU; a faster
 FP4 configuration cannot displace it. The dashboard applies the same scope to
 both official and unofficial-overlay selections.
+
+Within a SKU, each candidate is scored by the area its measured Pareto frontier
+dominates (hypervolume from the origin; lower-is-better axes are taken as
+reciprocals, so `$/M tok` and `tok/$` pick the same line). A curve earns nothing
+where it has no measurement.
 
 Qwen3.5 defaults to `xmode=e2e` and excludes MI300X, MI325X, H100, and H200
 when `gpus` is omitted. An explicit `xmode` or `gpus` overrides its model default;
@@ -265,12 +346,91 @@ which API selectors belong together.
 | `overview`                      | Models, model/hardware row limits, hardware tier, engine, comparison mode and reference. JSON or CSV.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `rankings`                      | Ranking kind (model or chip), selected model/scenario and format. Use the exact values in OpenAPI.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `compare`                       | GPU pairs, model/slug, scenario, tier selection and variant. JSON or CSV.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `operatorx`                     | Op family (gemm, moe, attention), workload or model, device split (`1` = one device, `tp8`, `dp8·ep8`), GPUs, status and zero-based 100-row page. One row per case and GPU with per-GPU FLOPs/bytes, latency, TFLOPS, TB/s and share of roofline. JSON or CSV.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `collectivex`                   | Ordered run selection and suite; EP size/phase/modes/precision/operation/percentile/axis/SKU/backend/series; KV page size/x/y/pull/push/overlap ISL/series; swap direction/layout/metric/percentile/series.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `submissions`                   | Search, table sort/direction/offset/limit, weekly/cumulative chart, on-change cutoff and NVIDIA/AMD/total lines. Table search does not filter the independent submission-volume chart.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `current-inferencex-image`      | Model, sequence, hardware, precision, speculation, node type, framework families, `asOf` for image age/release status, and `includeHistory` for daily age history.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `gpu-metrics`                   | Required run, file/host artifact, GPU indices, metric or correlation axes, statistics sorting, chart mode and interactive downsampling preference. One telemetry source per run; full-record statistics computed on read. Not a serving-window/role-pool projection. Responses are no-store.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `ubenchx`                       | Test selector (`test`: `mem-bw`, `sm-l2-distance`, `tpc-skyline`, `core-memory-profiles`, or `all`) plus GPU selector (`all` or one GPU). `mem-bw` returns static device-memory copy bandwidth rows with derived MBU and latency. The Huawei key is `Huawei 950PR` (measured SKU `Ascend950PR_9579`): FP16 rotating-pool graph timings, 360 observations per size, and explicit 1,638.4 GB/s derived-reference qualification in `peakBandwidthSource`. `metadata.protocol`, CANN/torch_npu versions, and absent sizes distinguish them from the GPU protocol. `timeMs` is amortized graph-copy time for these rows; optional row fields retain p10/p90 bandwidth, process medians, slots and working-set bytes. An explicit device filter leaves unavailable tests empty. `sm-l2-distance` returns SM-to-SM L2 latency difference matrix with GPC/die topology and summary statistics. `tpc-skyline` additionally returns `skuConfigurations`, separately from measured NVIDIA `gpus`: nine contributor-supplied Huawei 950PR configurations, not topology measurements. `gpu=all` (default) or `gpu=Huawei 950PR` includes all configurations; `gpu=Ascend 950PR_9579` selects one. Each row preserves core counts, clocks in MHz, memory in GiB, L2 in MiB, virtualisation options, raw DDR Rate values (`unit=null`) and screenshot provenance (`vendorSourceVerified=false`). The same filtered array appears under `tpcSkyline` for `test=all`; absent measurements stay empty. The table has no additional data filters; the profile link and horizontal scrolling are presentation-only. Source metadata remains in the API; the page omits the source footer. `tpc-skyline` returns measured TPCs per GPC (sorted descending) with GPC, TPC, and SM counts, defaulting to every GPU. `core-memory-profiles` combines B200 SXM and Ascend on `/ubenchx/core-memory-profiles`, defaulting to `gpu=all`; the hardware selector maps to `gpu=B200 SXM` or `gpu=Ascend 950PR_9579`. The old `/ubenchx/sm-l2-distance` page redirects here, but its API remains backward compatible. B200 retains the SM matrix, GPC/die metadata and statistics, with `unit=clock64 cycles` and its own `colorLimits`. The Ascend result returns all four Ascend 950PR_9579 scalar-controller matrices (Cube/Vector, isolated/concurrent), actual core IDs, color limits shared only across its four panels, per-die-group means and provenance. Values are mean absolute differences between matched-address profiles in raw `SYS_CNT ticks`, not core-to-core latency or calibrated cycles. No grid-wide barrier is used in concurrent launches. Cell hover, pinning and dismissal by outside click or Escape are presentation-only; all matrix cells remain available in the API. The idle instructions and Clear selection buttons are omitted in both locales; this presentation-only change does not alter the API contract. `all` (default) returns every test. Explicit device filters leave unavailable test sections empty. The Y-axis selector on `/ubenchx/mem-bw` is presentation-only. |
-| `video`                         | CI run/artifact discovery; only already-published artifact reads; source, serving cell, media/fidelity slot, power phase and GPU denominator; same-workload comparisons, axes, deployment costs and selected tradeoff point. No-store.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `video`                         | Default VideoGenX dashboard: shared workload, deployment, axes, cost tier, API-price reference, optimal and hidden-hardware filters. `view=compare` adds published matched-case selection. Legacy run/artifact discovery/results/tradeoff remain explicit. No-store.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+
+### VideoGenX selection and coverage
+
+With no `run`/`artifact`, `/api/v1/views/video` returns the current dashboard's
+approved-history projection, not CI discovery. Legacy stored sources remain in
+Performance history but cannot enter default charts without a matching immutable
+publication receipt. Authorization to publish is separate from benchmark qualification.
+All public video GET paths, including a `format=media` cache miss, are read-only;
+the miss returns 204. Copy its URL selectors directly:
+`v_x`, `v_y`, `v_tier`, `v_optimal`, `v_api`, `v_hidden`, `v_base`, `v_cand`, `v_case`.
+`v_view=chart|table` is presentation only. Read resolved `params`; malformed values
+use the same defaults as the UI. Unknown/repeated query names still return 400.
+
+- Defaults: P90 seconds vs videos/USD TCO, owning tier `h`, optimal deployments
+  only; `r` selects renting. `v_optimal=0` includes dominated deployments. Queued
+  client-concurrency cells stay in evidence, outside chart/table.
+- `v_hidden` is a comma-separated roster-key list (for example `h100,mi355x`),
+  default empty. It filters chart/table only; KPI/Compare/Evidence keep their
+  original scope. Unknown keys are ignored, remaining keys are sorted/deduplicated.
+- Allocated GPUs require retained scheduler allocation evidence; native power device counts
+  do not prove the reservation. Missing allocation and allocation-normalized metrics stay null.
+- Metrics use participating GPUs. API list price is USD/video-second multiplied
+  by clip duration, not TCO, revenue or measured power. `metricDefinitions`
+  declares units and optimization direction; missing values remain null.
+- The server reads the same first **five published history pages at most** as the
+  UI. `coverage.pagesRead`, `coverage.nextPage` and `coverage.truncated` describe
+  the inspected window; this is not all-history or date-range coverage. It applies
+  the UI's canonical workload selection, sample floor and newest-cell rules.
+- Evidence rows share one known workload and deployment layout. Hardware without
+  C1 keeps raw concurrency measurements only within that cohort, with null ratios.
+  Without any known C1 cohort, concurrency evidence is empty.
+- Default mode leaves `comparison.cases.status=not-requested`. `view=compare`
+  reads at most two already-published media artifacts and returns the matched
+  pair selected by `v_case` (zero-based), `resolvedCaseIndex`, pair count and
+  unmatched counts. `not-published`, `no-pair` and `unavailable` are explicit
+  alternatives to `ready`; `no-pair` means a missing baseline/candidate.
+  `ready` means both artifacts were read, not that a matched case exists: always
+  inspect `count` and `selected` (they can be 0 and null).
+  Returned media paths are relative; private asset URLs and raw bundles are omitted.
+- Use `view=discovery&page=1` for the CI listing, including standard `run-sweep` runs; follow `nextPage` even when a page contains no video runs. Runs may have no video artifacts. Per-run listings include all artifact pages and legacy or uniquely named native matrix artifacts. `run=…&artifact=…` retains
+  the legacy result/serving/fidelity contract; `view=results|tradeoff` is explicit.
+  Legacy selectors and `v_*` selectors cannot be mixed. Legacy missing artifacts
+  return 204; an unpublished `compare` ref is skipped and listed in
+  `unpublishedCompare`. Dashboard mode returns its empty/partial projection and coverage.
+
+Example (check deployed OpenAPI availability first; no authentication or write):
+
+```js
+const url = new URL('https://inferencex.semianalysis.com/api/v1/views/video');
+url.search = new URLSearchParams({
+  view: 'compare',
+  v_x: 'p50Latency',
+  v_y: 'videosPerGpuHour',
+  v_tier: 'r',
+  v_optimal: '0',
+  v_api: '0.08',
+  v_hidden: 'mi355x',
+  v_base: 'h200',
+  v_cand: 'b200',
+  v_case: '3',
+}).toString();
+const response = await fetch(url);
+if (!response.ok) throw new Error(`Video view HTTP ${response.status}`);
+const data = await response.json();
+console.log(
+  JSON.stringify({
+    params: data.params,
+    coverage: data.coverage,
+    rows: data.rows,
+    comparison: data.comparison,
+    provenance: data.provenance,
+  }),
+);
+```
+
+Measured ratios and uncalibrated media similarity do not qualify visual quality,
+energy claims or a causal compute/memory bottleneck. Preserve source IDs, seals,
+execution/publication times and coverage alongside exported values.
 
 ## Interpretation and maintenance
 
@@ -323,9 +483,11 @@ the date in the tag, else the build's earliest submission in the image catalog.
 Custom tags and engines without a release stream (TensorRT-LLM, ATOM) are never
 flagged.
 
-OperatorX is available in primary navigation without an unlock and has no published
-`/api/v1/views/operatorx` contract. Its `/api/v1/operatorx/*` routes belong to
-the page and are not part of this skill's read-only view API. The page-owned
+OperatorX is available in primary navigation without an unlock. Its read-only view
+is `/api/v1/views/operatorx`; OperatorX `flops` and `bytes` are useful work per GPU,
+so `tflops` compares across device splits; pick one `parallel` split per comparison.
+Its other `/api/v1/operatorx/*` routes belong to the page and are not part of this
+skill's read-only view API. The page-owned
 `/api/v1/operatorx/compare?op=gemm&workload=gemm:DeepSeek-V4-Pro` response includes
 optional `hardware[].reference` metadata for Ascend 950PR (28 Cube):
 `peakTflops.bf16=378`, `peakTflops.fp8=756`, `memoryBandwidthTBs=1.6384`, `memoryBandwidthAssumed=true`,
@@ -347,11 +509,11 @@ selection (` · hash routing`). Slices drop only the token count (MoE) or M (GEM
 slice never mixes split layouts or router kinds; treat each slice as one operation swept
 over size. Router gate bytes use `router.gate.dtype`.
 
-The Median and best throughput panel sits beside Head to head and replaces Distribution per GPU; Metric vs size is last. Precision, Normalized, and Shared cases only controls map to `rooflinePrecision=bf16|fp8|fp4`, `rooflineHardware=<comma-separated keys>`, `rooflineNormalized=true|false`, and `rooflineSharedOnly=true|false` on `/api/v1/operatorx/compare?op=gemm`. Supplying any adds `rooflineSummary`. Defaults: workload precision, all hardware, normalized=true, sharedOnly=true.
+The Median and best throughput panel spans its own row and replaces Distribution per GPU; Metric vs size is last. Precision, Normalized, and Shared cases only controls map to `rooflinePrecision=bf16|fp8|fp4`, `rooflineHardware=<comma-separated keys>`, `rooflineNormalized=true|false`, and `rooflineSharedOnly=true|false` on `/api/v1/operatorx/compare?op=gemm`. Supplying any adds `rooflineSummary`. Defaults: workload precision, all hardware, normalized=true, sharedOnly=true.
 
-By default (shared-only) every bar uses the same cases measured on every selected accelerator and above every ridge point; an empty intersection remains empty (for example, FP8 fp32-scale and ue8m0-scale cases never overlap). With `rooflineSharedOnly=false` each bar uses that hardware's successful positive finite measurements at or above its own ridge point; case sets and quantization formats can differ, so these are descriptive medians, not matched-shape speedups. Missing references omit only the affected hardware. `cohort` identifies `per-hardware-compute-bound` or `shared-compute-bound`. `matchedCases` counts shared cases before ridge filtering; top-level `caseIndices` is the union of displayed bar indices, and each bar's `caseIndices` and `n` identify its own cohort. Bars also contain median, best, medianTflops, bestTflops, bestCaseIndex and hardware. Normalized values are fractions. Invalid selectors return 400; no selectors leave the original response unchanged. Hover and click are presentation-only.
+By default (shared-only) every bar uses the same cases measured on every selected accelerator and compute-bound on every one (at or above each ridge point; for staged MoE and attention cases and split cases with collectives, compute at least half the roofline time); an empty intersection remains empty (for example, FP8 fp32-scale and ue8m0-scale cases never overlap). With `rooflineSharedOnly=false` each bar uses that hardware's successful positive finite measurements that are compute-bound on it by the same test; case sets and quantization formats can differ, so these are descriptive medians, not matched-shape speedups. Missing references omit only the affected hardware. `cohort` identifies `per-hardware-compute-bound` or `shared-compute-bound`. `matchedCases` counts shared cases before ridge filtering; top-level `caseIndices` is the union of displayed bar indices, and each bar's `caseIndices` and `n` identify its own cohort. Bars also contain median, best, medianTflops, bestTflops, bestCaseIndex and hardware. Normalized values are fractions. Invalid selectors return 400; no selectors leave the original response unchanged. Hover and click are presentation-only.
 
-Case `flops` and `bytes` are per device. A case with `parallel` runs on `tp × dp` devices; its args keep the full unsplit shape and each dp group's batch (MoE counts `tokens × dp` tokens), and the node totals are divided by `tp × dp` before TFLOPS, bandwidth, utilization, roofline points and median/best bars are derived. Arithmetic intensity is unaffected. Malformed `parallel` values return null counts. Do not multiply these counts by the device count to compare against a single GPU's peak. MoE weight bytes follow `routing.distribution`: `balanced` touches `min(E, T × k)` experts, `single_hot` expert 0 plus `k − 1` uniform picks, zipf uses Rosén's approximation (within 2%, errs high), and `natural` keeps the uniform-random estimate; malformed zipf values return null counts.
+Case `flops` and `bytes` are per device. A case with `parallel` runs on `tp × dp` devices; its args keep the full unsplit shape and each dp group's batch (MoE counts `tokens × dp` tokens). FLOPs are the node total divided by `tp × dp`. Bytes follow vLLM's sharding: routed-expert weights and activations spread over `tp × dp`; router and shared-expert weights are replicated per dp group and split over `tp`; a tensor-parallel GEMM reads `1/tp` of A and B and writes a full partial C. TFLOPS, bandwidth, utilization, roofline points and median/best bars derive from these. Malformed `parallel` values return null counts. Do not multiply these counts by the device count to compare against a single GPU's peak. MoE weight bytes follow `routing.distribution`: `balanced` touches `min(E, T × k)` experts, `single_hot` expert 0 plus `k − 1` uniform picks, zipf uses Rosén's approximation (within 2%, errs high), and `natural` keeps the uniform-random estimate; malformed zipf values return null counts.
 
 `/api/v1/operatorx/compare?op=moe` without a valid `workload` (including `workload=moe`) resolves to `moe:DeepSeek-V4.1-Flash` when present, otherwise the first listed workload; read the resolved id from the response's `workload` field. GEMM keeps its first listed workload.
 
@@ -642,6 +804,14 @@ views. Keep using `vllm-disagg` as the raw framework key and
 `mi355x_vllm-disagg` as its MI355X hardware selector; the label does not rename
 stored data or API selectors.
 
+`TokenSpeed` uses the canonical framework key and family `tokenspeed`. Select it
+with `frameworks=tokenspeed` in inference and historical views; dashboard engine
+filters and embeds use the same family. `/api/v1/views/options` lists its label
+and family. Official runs and unofficial overlays share this classification.
+Trace server metrics support TokenSpeed device KV utilization (a 0–1 fraction)
+and running/waiting request counts. Cache-hit, host-cache and token-throughput
+series remain empty when the engine does not export those measurements.
+
 For every new or changed non-sensitive public-facing data view, implement or
 update its read-only API in the same PR. Reuse the UI's pure transforms, test
 selector effects and source semantics, and update OpenAPI, the route catalog,
@@ -679,6 +849,19 @@ existing inference view API for its results.
 导航至现有 AgentX 模型页面，不改变数据筛选条件、默认值、计算逻辑或 API 契约；结果仍由
 现有推理视图 API 提供。
 
+### Landing-page Kimi K3.1 Pro link
+
+The English and Chinese landing pages list Kimi K3.1 Pro in place of Muse Spark
+Open, linking to `/inference/kimi-k31-pro` and `/zh/inference/kimi-k31-pro`.
+`/compare` lists both models. This is presentation-only navigation to an existing
+AgentX model view; use `model=Kimi-K3.1-Pro&sequence=agentic-traces` with the
+existing inference view API for its results.
+
+中文：英文和中文首页以 Kimi K3.1 Pro 替换 Muse Spark Open，分别链接至
+`/inference/kimi-k31-pro` 和 `/zh/inference/kimi-k31-pro`；`/compare` 仍同时列出这两个模型。
+这条入口仅用于导航至现有 AgentX 模型页面；如需查询结果，可向现有推理视图 API 传入
+`model=Kimi-K3.1-Pro&sequence=agentic-traces`。
+
 ### Cross-backend case alignment
 
 The comparison API and all charts align cases by the full serialized operation
@@ -688,18 +871,18 @@ successful finite positive latency across backends; ties keep the first result.
 If no backend succeeds, the first explicit status is retained without inventing a
 measurement. The newest-per-hardware/case/backend raw selection is unchanged.
 `measurements[hardware].backend` identifies the selected backend alongside its
-original run, revision, result index, kernel, and CUDA Graph flag. Head-to-head
-points and timeline inspection use these same selected measurements. Thus identical
+original run, revision, result index, kernel, and CUDA Graph flag. Chart points and
+timeline inspection use these same selected measurements. Thus identical
 BF16 cases measured by `torch_npu_linear` and `vllm` can be compared, while different
-precision or quantization arguments remain separate. No public OpenAPI operation
-is added: OperatorX remains a documented page-owned API.
+precision or quantization arguments remain separate. This adds no OpenAPI
+operation; the compare route stays page-owned.
 
 中文：对比 API 与所有图表按完整算子参数匹配测试用例，保留精度、量化、布局和形状差异，
 不再要求不同设备使用相同 backend。同一设备、同一用例有多个 backend 时，选择成功且延迟为
 有限正数的最快结果；延迟相同则保留首条结果。若没有成功结果，则保留首条明确状态，不补造测量值。
 原始数据仍按设备、用例和 backend 分别选取最新结果。`measurements[hardware].backend`
 记录所选 backend，并保留原始 run、revision、result index、kernel 和 CUDA Graph 标记；
-Head to head 与时间线使用同一条测量记录。OperatorX 仍使用页面专属 API，不新增公开 OpenAPI 接口。
+图表数据点与时间线使用同一条测量记录。OperatorX 仍使用页面专属 API，不新增公开 OpenAPI 接口。
 
 ### OperatorX compact reads
 
@@ -805,6 +988,11 @@ model-specific; retain the registry's accompanying features and source link.
 - `qwen-3-8-27b-eager`: read the model-specific architecture facts and source link with `model=qwen-3-8-27b-eager`.
 
 ### GPU specification networking
+
+For rated per-chip TDP, read `hardware[].tdpW` from
+`GET /api/v1/views/options`. B300 (`key=b300`) uses 1100 W, matching the
+English/Chinese chip tables and SEO descriptions. This is separate from its
+unchanged 1.9 kW all-in provisioned power reference.
 
 `GET /api/v1/views/gpu-specs` shares its hardware source with `/gpu-specs` and the
 English/Chinese chip pages. GB200 NVL72 includes ConnectX-7 400G InfiniBand NDR per

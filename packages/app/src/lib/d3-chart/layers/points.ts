@@ -1,5 +1,6 @@
 import type * as d3 from 'd3';
 
+import { writeAttrs } from '../chart-update';
 import { lttbDownsample } from '../downsample';
 import type { ContinuousScale } from '../types';
 
@@ -36,18 +37,20 @@ export function renderPoints<T>(
     }
   }
 
-  return group
+  const points = group
     .selectAll<SVGCircleElement, T>('.point')
     .data(renderData, config.keyFn)
-    .join('circle')
-    .attr('class', 'point')
-    .attr('cx', cx)
-    .attr('cy', cy)
-    .attr('r', (d) => config.getRadius?.(d) ?? 4)
-    .attr('fill', (d) => config.getColor(d))
-    .attr('stroke', config.stroke ?? 'none')
-    .attr('stroke-width', config.strokeWidth ?? 0)
-    .attr('cursor', 'pointer');
+    .join('circle');
+  return writeAttrs(points, {
+    class: 'point',
+    cx,
+    cy,
+    r: (d) => config.getRadius?.(d) ?? 4,
+    fill: (d) => config.getColor(d),
+    stroke: config.stroke ?? 'none',
+    'stroke-width': config.strokeWidth ?? 0,
+    cursor: 'pointer',
+  });
 }
 
 export function updatePointsOnZoom<T>(
@@ -55,8 +58,8 @@ export function updatePointsOnZoom<T>(
   getCx: (d: T) => number,
   getCy: (d: T) => number,
 ): void {
-  group
-    .selectAll<SVGCircleElement, T>('.point')
-    .attr('cx', (d) => getCx(d))
-    .attr('cy', (d) => getCy(d));
+  writeAttrs(group.selectAll<SVGCircleElement, T>('.point'), {
+    cx: (d) => getCx(d),
+    cy: (d) => getCy(d),
+  });
 }

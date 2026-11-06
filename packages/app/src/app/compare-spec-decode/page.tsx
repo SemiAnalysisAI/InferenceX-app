@@ -21,7 +21,7 @@ import {
   specMethodDisplayLabel,
 } from '@/lib/compare/compare-variant-slug';
 
-export const revalidate = 3600;
+export const revalidate = 86400;
 
 const DESCRIPTION =
   'Does speculative decoding (MTP, EAGLE) improve LLM inference throughput and cost? Each page compares one model and chip with the method on versus off.';

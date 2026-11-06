@@ -34,6 +34,7 @@ describe('model selector ordering', () => {
   it('keeps non-default models in their existing order and excludes hidden models', () => {
     expect(MODEL_OPTIONS.filter((model) => !isModelDefault(model))).toEqual([
       Model.DeepSeek_V4_Pro,
+      Model.Kimi_K3,
       Model.Kimi_K2_5,
       Model.MiniMax_M3,
       Model.DeepSeek_R1,
@@ -93,6 +94,18 @@ describe('getModelAndSequence', () => {
   it('parses artifact name with kimik2.5 model prefix', () => {
     const result = getModelAndSequence('results_kimik2.5_1k1k');
     expect(result).toEqual({ model: Model.Kimi_K2_5, sequence: Sequence.OneK_OneK });
+  });
+
+  it('keeps kimik3.1 artifacts out of the kimik3 bucket', () => {
+    expect(
+      getModelAndSequence(
+        'bmk_agentic_kimik3.1_tp8_conc16_kvdram-hicache_spec-draft_model_fp4_sglang',
+      ),
+    ).toEqual({ model: Model.Kimi_K3_1_Pro, sequence: Sequence.AgenticTraces });
+    expect(getModelAndSequence('bmk_agentic_kimik3_tp8_conc16_fp4_vllm')).toEqual({
+      model: Model.Kimi_K3,
+      sequence: Sequence.AgenticTraces,
+    });
   });
 
   it('prefers the specific glm5.2 prefix over the glm5 family prefix', () => {
@@ -227,8 +240,8 @@ describe('isModelDeprecated', () => {
     expect(isModelDeprecated(Model.Kimi_K2_5)).toBe(true);
   });
 
-  it('keeps Kimi K3 active', () => {
-    expect(isModelDeprecated(Model.Kimi_K3)).toBe(false);
+  it('marks Kimi K3 deprecated', () => {
+    expect(isModelDeprecated(Model.Kimi_K3)).toBe(true);
   });
 
   it('keeps GLM-5.2 active', () => {
@@ -279,9 +292,16 @@ describe('isSequenceDeprecatedForModel / getSequenceCategoryForModel', () => {
     );
   });
 
+  it('deprecates Qwen3.5 8K/1K without hiding history or retiring AgentX', () => {
+    expect(isSequenceDeprecatedForModel(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(true);
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.Qwen3_5)).toBe('deprecated');
+    expect(isSequenceHiddenForModel(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
+    expect(isModelDeprecated(Model.Qwen3_5)).toBe(false);
+    expect(getSequenceCategoryForModel(Sequence.AgenticTraces, Model.Qwen3_5)).toBe('default');
+  });
+
   it('keeps 8K/1K default for models still sweeping it', () => {
-    expect(isSequenceDeprecatedForModel(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
-    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.Qwen3_5)).toBe('default');
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.DeepSeek_R1)).toBe('default');
   });
 
   it('does not un-deprecate globally deprecated sequences', () => {
@@ -335,6 +355,15 @@ describe('showsTcoBasisSelector', () => {
         expect(showsTcoBasisSelector(model, sequence)).toBe(
           sequence === Sequence.EightK_OneK || sequence === Sequence.AgenticTraces,
         );
+      }
+    },
+  );
+
+  it.each([Model.Muse_Spark_Open, Model.GLM_5_2, Model.GLM_5_3_Flash])(
+    'shows the selector for %s only on AgentX',
+    (model) => {
+      for (const sequence of Object.values(Sequence)) {
+        expect(showsTcoBasisSelector(model, sequence)).toBe(sequence === Sequence.AgenticTraces);
       }
     },
   );

@@ -35,7 +35,7 @@
 import type postgres from 'postgres';
 
 import { hasNoSslFlag } from './cli-utils.js';
-import { createAdminSql, refreshLatestBenchmarks, type Sql } from './etl/db-utils.js';
+import { createAdminSql, type Sql } from './etl/db-utils.js';
 import { confirmProceed, parseLimitForceFlags, runBackfillMain } from './lib/backfill-runner.js';
 import {
   configKey,
@@ -352,6 +352,8 @@ const TRACE_REPLAY_PAYLOADS = [
   'server_metrics_csv',
   'server_metrics_json_gz',
   'request_timeline_gz',
+  'request_chart_data_gz',
+  'chart_series_summary_gz',
   'aggregate_stats',
   'chart_series',
   'request_timeline',
@@ -366,6 +368,8 @@ const BINARY_PAYLOADS: Record<string, true> = {
   server_metrics_csv: true,
   server_metrics_json_gz: true,
   request_timeline_gz: true,
+  request_chart_data_gz: true,
+  chart_series_summary_gz: true,
 };
 /** Matches `TRACE_REPLAY_UPLOAD_CHUNK_BYTES` and the 018 chunk-table check. */
 const PAYLOAD_CHUNK_BYTES = 4 * 1024 * 1024;
@@ -876,7 +880,6 @@ async function main(): Promise<void> {
     console.log('  availability skipped: rerun without --limit once every run syncs');
   }
   await syncDatasets();
-  if ((inserted.benchmark_results ?? 0) > 0) await refreshLatestBenchmarks(target);
 
   const totalSec = Math.round((Date.now() - t0) / 1000);
   console.log(`\n=== sync complete: ${ok} ok, ${failed} failed in ${totalSec}s ===`);
