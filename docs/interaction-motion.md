@@ -27,28 +27,28 @@ Paths above are relative to `packages/app/`.
 
 ## Applying the reference
 
-| Reference principle          | Implementation or boundary                                                                                                           |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Ease-out entrances           | Existing `--motion-ease-enter` reused for shared surfaces.                                                                           |
-| Dropdowns at 150–250ms       | Surface entrance 200ms, exit 160ms.                                                                                                  |
-| Stagger list rows by 30ms    | First five sibling option rows stagger by 0–120ms; remaining rows are immediate. Groups restart the short stagger.                   |
-| Scale to 0.97 on press       | Shared Button and code-copy button use `motion-press`, with disabled controls excluded.                                              |
-| Stretch moving knobs 12%     | User-toggled switch thumb briefly scales horizontally to 1.12 while its position transitions.                                        |
-| Stagger as details settle    | Existing Reveal delays retained; short option reveals follow the opening surface. No new page-wide delay.                            |
-| Arcs for object movement     | Not introduced. There is no object-transfer interaction in this patch; curving benchmark-point movement would misrepresent the data. |
-| Pulse to confirm success     | Check icon pulses only after clipboard success, including repeated successful copies.                                                |
-| Ease-in-out moves            | Switch travel and toast snap-back use `--motion-ease-move`.                                                                          |
-| Start popovers at 0.95       | Shared surfaces start and exit at scale 0.95.                                                                                        |
-| Enter from trigger           | Radix transform origins and resolved `data-side` choose direction; custom model/precision menus use their top edge.                  |
-| Exit to trigger              | Same origin and reverse offset; custom menus remain inert during exit.                                                               |
-| No bounce on everyday UI     | Control movement uses bounded cubic curves; only the success icon pulses.                                                            |
-| Don't tween while held       | Press scale applies immediately; an active toast drag has `transition: none`.                                                        |
-| Make exits 20% shorter       | Shared surfaces: 200ms → 160ms. Toasts: 300ms → 240ms.                                                                               |
-| Overlap old and new states   | Copy and check icons occupy the same fixed-size slot during crossfade. Old benchmark states are not blended.                         |
-| Masks for reveals and colour | Option rows use a small clip-path reveal; no chart recoloring or measurement animation.                                              |
-| Crossfade icons + blur       | Copy/check opacity and 2px blur crossfade in 160ms.                                                                                  |
-| Rubber band past bounds      | Toast tracking is direct to 80px, then approaches a 120px bound. Raw gesture distance still determines dismissal.                    |
-| Reuse the same layoutId      | Existing persistent navigation indicator retained. No `layoutId` library or duplicate indicator added.                               |
+| Reference principle          | Implementation or boundary                                                                                                                                     |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ease-out entrances           | Existing `--motion-ease-enter` reused for shared surfaces.                                                                                                     |
+| Dropdowns at 150–250ms       | Surface entrance 200ms, exit 160ms.                                                                                                                            |
+| Stagger list rows by 30ms    | First five logical option rows stagger by 0–120ms; remaining rows are immediate. Explicit indices handle help-grid wrappers. Groups restart the short stagger. |
+| Scale to 0.97 on press       | Shared Button and code-copy button use `motion-press`, with disabled controls excluded.                                                                        |
+| Stretch moving knobs 12%     | User-toggled switch thumb briefly scales horizontally to 1.12 while its position transitions.                                                                  |
+| Stagger as details settle    | Existing Reveal delays retained; short option reveals follow the opening surface. No new page-wide delay.                                                      |
+| Arcs for object movement     | Not introduced. There is no object-transfer interaction in this patch; curving benchmark-point movement would misrepresent the data.                           |
+| Pulse to confirm success     | Check icon pulses only after clipboard success, including repeated successful copies.                                                                          |
+| Ease-in-out moves            | Switch travel and toast snap-back use `--motion-ease-move`.                                                                                                    |
+| Start popovers at 0.95       | Shared surfaces start and exit at scale 0.95.                                                                                                                  |
+| Enter from trigger           | Radix transform origins and resolved `data-side` choose direction; custom model/precision menus use their top edge.                                            |
+| Exit to trigger              | Same origin and reverse offset; custom menus remain inert during exit.                                                                                         |
+| No bounce on everyday UI     | Control movement uses bounded cubic curves; only the success icon pulses.                                                                                      |
+| Don't tween while held       | Press scale applies immediately; an active toast drag has `transition: none`.                                                                                  |
+| Make exits 20% shorter       | Shared surfaces: 200ms → 160ms. Toasts: 300ms → 240ms.                                                                                                         |
+| Overlap old and new states   | Copy and check icons occupy the same fixed-size slot during crossfade. Old benchmark states are not blended.                                                   |
+| Masks for reveals and colour | Option rows use a small clip-path reveal; no chart recoloring or measurement animation.                                                                        |
+| Crossfade icons + blur       | Copy/check opacity and 2px blur crossfade in 160ms.                                                                                                            |
+| Rubber band past bounds      | Toast tracking is direct to 80px, then approaches a 120px bound. Raw gesture distance still determines dismissal.                                              |
+| Reuse the same layoutId      | Existing persistent navigation indicator retained. No `layoutId` library or duplicate indicator added.                                                         |
 
 ## Accessibility and interruption
 
@@ -60,6 +60,10 @@ Radix continues to own focus trapping, collision handling and focus restoration.
 The custom multi-select marks closing content `inert` and `aria-hidden`, waits
 for the actual CSS animation promises, and cancels stale completion work when
 reopened. No duration is duplicated in that lifecycle.
+
+Filtered results remain unchanged through the exit. Search resets after a
+custom menu unmounts or when a searchable select reopens. Closed surfaces and
+overlays retain their transparent final frame until their owners remove them.
 
 Dialog positioning uses Tailwind's independent `translate`; the entrance uses
 `transform`. Keeping them separate prevents a scale animation from shifting a

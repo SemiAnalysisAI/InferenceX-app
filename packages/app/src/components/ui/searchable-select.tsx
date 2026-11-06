@@ -125,16 +125,16 @@ export function SearchableSelect({
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (disabled) return;
-    if (nextOpen) escapeDismissedRef.current = false;
-    if (!nextOpen && isOpen) {
-      if (searchUsedRef.current && trackPrefix) {
-        track(`${trackPrefix}_searched`, {
-          query_length: search.length,
-          results: filteredGroups.reduce((count, group) => count + group.options.length, 0),
-        });
-        searchUsedRef.current = false;
-      }
+    if (nextOpen) {
+      escapeDismissedRef.current = false;
       setSearch('');
+    }
+    if (!nextOpen && isOpen && searchUsedRef.current && trackPrefix) {
+      track(`${trackPrefix}_searched`, {
+        query_length: search.length,
+        results: filteredGroups.reduce((count, group) => count + group.options.length, 0),
+      });
+      searchUsedRef.current = false;
     }
     setInternalOpen(nextOpen);
     onOpenChange?.(nextOpen);
@@ -406,13 +406,14 @@ export function SearchableSelect({
                     </div>
                   </div>
                 )}
-                {group.options.map((option) => {
+                {group.options.map((option, index) => {
                   const isSelected = option.value === value;
                   if (hasOptionHelp) {
                     return (
                       <div
                         key={option.value}
                         role="row"
+                        data-motion-row={index < 5 ? index : undefined}
                         aria-selected={isSelected}
                         className={cn(
                           'flex items-stretch rounded-sm',
@@ -476,6 +477,7 @@ export function SearchableSelect({
                       aria-selected={isSelected}
                       data-slot="select-item"
                       data-select-option
+                      data-motion-row={index < 5 ? index : undefined}
                       data-value={option.value}
                       data-testid={option.testId}
                       onClick={() => handleSelect(option.value)}

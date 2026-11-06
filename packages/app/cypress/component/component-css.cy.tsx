@@ -80,6 +80,72 @@ function SearchForm({ onSubmit }: { onSubmit: React.FormEventHandler<HTMLFormEle
 
 describe('component CSS harness', () => {
   describe('shared interaction motion', () => {
+    it('staggers logical help rows without animating every wrapped option', () => {
+      cy.mount(
+        <SearchableSelect
+          value="0"
+          onValueChange={cy.stub()}
+          placeholder="Choose a model"
+          groups={[
+            {
+              label: 'Models',
+              options: Array.from({ length: 7 }, (_, index) => ({
+                value: String(index),
+                label: `Model ${index}`,
+                help: `Help for model ${index}`,
+              })),
+            },
+          ]}
+        />,
+      );
+      cy.get('[role="combobox"]').click();
+      cy.get('[role="row"][aria-selected]')
+        .should('have.length', 7)
+        .each(($row, index) => {
+          const style = getComputedStyle($row[0]);
+          expect(style.animationName).to.equal(index < 5 ? 'motion-row-in' : 'none');
+          if (index < 5)
+            expect(parseFloat(style.animationDelay)).to.be.closeTo(index * 0.03, 0.001);
+          expect(getComputedStyle($row.find('[data-select-option]')[0]).animationName).to.equal(
+            'none',
+          );
+        });
+    });
+
+    it('holds a closed surface and overlay transparent until their owner unmounts', () => {
+      cy.mount(
+        <div>
+          <div data-testid="exit-surface" className="motion-surface" data-state="closed">
+            Menu
+          </div>
+          <div data-testid="exit-overlay" className="motion-overlay" data-state="closed">
+            Overlay
+          </div>
+        </div>,
+      );
+      cy.get('[data-testid^="exit-"]').each(($el) => {
+        $el[0].getAnimations().forEach((animation) => animation.finish());
+        expect(getComputedStyle($el[0]).opacity).to.equal('0');
+        expect(getComputedStyle($el[0]).animationFillMode).to.equal('forwards');
+      });
+    });
+
+    it('keeps searchable-select results stable through exit and clears search on reopen', () => {
+      cy.mount(<SearchForm onSubmit={(event) => event.preventDefault()} />);
+      cy.get('[data-testid="search-filter"]').click();
+      cy.get('[data-slot="select-content"] input').type('second');
+      cy.get('[data-select-option]').should('have.length', 1);
+      cy.get('[data-slot="select-content"] input').type('{esc}');
+      cy.get('[data-slot="select-content"][data-state="closed"]').should(($content) => {
+        expect($content.find('[data-select-option]')).to.have.length(1);
+        expect($content.text()).to.contain('Second model').and.not.contain('First model');
+      });
+      cy.get('[data-slot="select-content"]').should('not.exist');
+      cy.get('[data-testid="search-filter"]').click();
+      cy.get('[data-slot="select-content"] input').should('have.value', '');
+      cy.get('[data-select-option]').should('have.length', 2);
+    });
+
     afterEach(() => {
       if (Cypress.isBrowser({ family: 'chromium' })) {
         cy.then(() =>

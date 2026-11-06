@@ -41,7 +41,24 @@ function MultiSelectWrapper({
 }
 
 describe('MultiSelect', () => {
+  it('preserves filtered rows while closing and clears search after the exit', () => {
+    cy.mount(<MultiSelectWrapper />);
+    cy.get('[role="combobox"]').click();
+    cy.get('input').type('H100');
+    cy.get('[role="option"]').should('have.length', 1);
+    cy.get('input').type('{esc}');
+    cy.get('[data-slot="select-content"][data-state="closed"]').should(($content) => {
+      expect($content.find('[role="option"]')).to.have.length(1);
+      expect($content.text()).to.contain('NVIDIA H100 SXM').and.not.contain('NVIDIA H200 SXM');
+    });
+    cy.get('[data-slot="select-content"]').should('not.exist');
+    cy.get('[role="combobox"]').click();
+    cy.get('input').should('have.value', '');
+    cy.get('[role="option"]').should('have.length', OPTIONS.length);
+  });
+
   it('keeps closing options inert and survives reopening during the exit', () => {
+    let pausedExit: Animation[] = [];
     cy.mount(<MultiSelectWrapper />);
     cy.get('[role="combobox"]').click();
     cy.get('[data-slot="select-content"]').should('have.attr', 'data-state', 'open');
@@ -50,19 +67,19 @@ describe('MultiSelect', () => {
       expect($content.attr('data-state')).to.equal('closed');
       expect($content[0].inert).to.equal(true);
       expect($content.attr('aria-hidden')).to.equal('true');
-      $content[0].getAnimations().forEach((animation) => animation.pause());
+      pausedExit = $content[0].getAnimations();
+      pausedExit.forEach((animation) => animation.pause());
     });
     cy.get('[role="combobox"]').click();
     cy.get('[data-slot="select-content"]')
       .should('have.attr', 'data-state', 'open')
-      .then(($content) =>
-        Promise.allSettled(
-          $content[0].getAnimations().map((animation) => {
-            animation.play();
-            return animation.finished;
-          }),
-        ),
-      );
+      .then(($content) => {
+        // Do not replay an exit we manually detached from CSS by pausing it.
+        pausedExit.forEach((animation) => animation.cancel());
+        return Promise.allSettled(
+          $content[0].getAnimations().map((animation) => animation.finished),
+        );
+      });
     cy.get('[role="listbox"]').should('be.visible');
     cy.get('[data-slot="select-content"]').should(($content) => {
       expect($content[0].inert).to.equal(false);

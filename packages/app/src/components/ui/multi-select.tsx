@@ -141,13 +141,17 @@ function MultiSelect({
   React.useEffect(() => {
     if (isOpen) {
       setExitPresent(true);
+      setSearch('');
       return;
     }
     // Wait for the actual CSS exit, including reduced-motion's zero-animation path.
     let cancelled = false;
     const animations = contentRef.current?.getAnimations?.() ?? [];
     void Promise.allSettled(animations.map((animation) => animation.finished)).then(() => {
-      if (!cancelled) setExitPresent(false);
+      if (!cancelled) {
+        setExitPresent(false);
+        setSearch('');
+      }
     });
     return () => {
       cancelled = true;
@@ -155,12 +159,9 @@ function MultiSelect({
   }, [isOpen]);
   const setIsOpen = React.useCallback(
     (nextOpen: boolean) => {
-      if (!nextOpen && isOpen) {
-        if (searchUsedRef.current) {
-          track('multi_select_searched', { query_length: searchStateRef.current.length });
-          searchUsedRef.current = false;
-        }
-        setSearch('');
+      if (!nextOpen && isOpen && searchUsedRef.current) {
+        track('multi_select_searched', { query_length: searchStateRef.current.length });
+        searchUsedRef.current = false;
       }
       if (!isControlledOpen) {
         setInternalIsOpen(nextOpen);
@@ -337,7 +338,7 @@ function MultiSelect({
     enabled[index].focus();
   };
 
-  const renderOption = (option: MultiSelectOption) => {
+  const renderOption = (option: MultiSelectOption, index: number) => {
     const isSelected = value.includes(option.value);
     const isDisabledOption = Boolean(
       option.disabled ||
@@ -356,6 +357,7 @@ function MultiSelect({
         title={option.title}
         data-testid={option.testId}
         data-slot="select-item"
+        data-motion-row={index < 5 ? index : undefined}
         onClick={() => handleToggle(option.value)}
         onKeyDown={(event) => {
           const direction =
