@@ -16,6 +16,7 @@ import {
   type VideoHistoryPage,
 } from '@/components/video-benchmark/history';
 import { recordVideoHistory } from '@/lib/video/video-history-store';
+import { liveVideoRunPage } from '@/lib/video/video-live-run';
 import {
   approveVideoPublication,
   readStoredArtifact,
@@ -46,7 +47,11 @@ function limitedZip(response: Response) {
   );
 }
 
-function github(path: string, signal = AbortSignal.timeout(30000)) {
+function github(
+  path: string,
+  signal = AbortSignal.timeout(30000),
+  { redirect }: { redirect?: RequestRedirect } = {},
+) {
   const token = getGithubToken();
   return fetch(`${ROOT}${path}`, {
     headers: {
@@ -54,8 +59,31 @@ function github(path: string, signal = AbortSignal.timeout(30000)) {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     cache: 'no-store',
+    redirect,
     signal,
   });
+}
+
+const firstArtifactPage = (runId: string) =>
+  github(`/actions/runs/${runId}/artifacts?per_page=100`);
+
+/** Every H3 artifact of the run across all listing pages; null when GitHub cannot list them. */
+async function runArtifacts(runId: string, response: Response): Promise<CIArtifact[] | null> {
+  const artifacts: CIArtifact[] = [];
+  const seen = new Set<number>();
+  for (let artifactPage = 1; ; artifactPage++) {
+    if (!response.ok) return null;
+    const data: { artifacts: CIArtifact[] } = await response.json();
+    for (const artifact of data.artifacts ?? []) {
+      if (videoArtifactIdentity(artifact.name)?.run !== runId || seen.has(artifact.id)) continue;
+      seen.add(artifact.id);
+      artifacts.push(artifact);
+    }
+    if ((data.artifacts?.length ?? 0) < 100) return artifacts;
+    response = await github(
+      `/actions/runs/${runId}/artifacts?per_page=100&page=${artifactPage + 1}`,
+    );
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -65,6 +93,7 @@ export async function GET(request: NextRequest) {
   const page = query.get('page') ?? '1';
   const pages = query.get('pages') ?? '1';
   const history = query.get('format') === 'history';
+  const live = query.get('format') === 'live';
   const publishedOnly = query.get('format') === 'published';
   const media = query.get('format') === 'media' || publishedOnly;
   if (
@@ -73,6 +102,7 @@ export async function GET(request: NextRequest) {
     !id(page) ||
     !Number.isSafeInteger(Number(page)) ||
     (history && (runId || artifactId)) ||
+    (live && (!runId || artifactId)) ||
     !/^[1-9]$/u.test(pages) ||
     Number(pages) > VIDEO_HISTORY_MAX_PAGES ||
     (pages !== '1' && !history)
@@ -87,10 +117,13 @@ export async function GET(request: NextRequest) {
   if (
     process.env.NODE_ENV === 'development' &&
     process.env.E2E_FIXTURES === '1' &&
-    (history || media)
+    (history || media || live)
   ) {
     // The committed History fixture has metadata only; media needs an explicit local replay.
     if (media) return new Response(null, { status: 204, headers });
+    // Fixture runs stay hermetic: an unknown named run never reaches GitHub.
+    if (live)
+      return NextResponse.json({ schemaVersion: 1, entries: [], nextPage: null }, { headers });
     const fixture = loadFixture<VideoHistoryPage>('video-history');
     return NextResponse.json(
       Number(page) === 1 ? fixture : { schemaVersion: 1, entries: [], nextPage: null },
@@ -102,6 +135,7 @@ export async function GET(request: NextRequest) {
     if (
       process.env.NODE_ENV === 'development' &&
       !videoStorageEnabled() &&
+      !live &&
       (!artifactId || media)
     ) {
       // Read production's published results; a local read must never publish on a cache miss.
@@ -149,6 +183,14 @@ export async function GET(request: NextRequest) {
     }
     if (history)
       return NextResponse.json(await cachedVideoHistory(Number(page), Number(pages)), { headers });
+    if (live && runId) {
+      const artifacts = await runArtifacts(runId, await firstArtifactPage(runId));
+      if (!artifacts)
+        return NextResponse.json({ error: 'Cannot list CI artifacts' }, { status: 502, headers });
+      return NextResponse.json(await liveVideoRunPage(runId, artifacts, github, deadline), {
+        headers,
+      });
+    }
     if (artifactId) {
       if (media && !videoStorageEnabled()) return new Response(null, { status: 204, headers });
       if (media) {
@@ -190,9 +232,9 @@ export async function GET(request: NextRequest) {
       });
     }
     if (runId) {
-      const [runResponse, firstArtifactsResponse, saved] = await Promise.all([
+      const [runResponse, listing, saved] = await Promise.all([
         github(`/actions/runs/${runId}`),
-        github(`/actions/runs/${runId}/artifacts?per_page=100`),
+        firstArtifactPage(runId),
         storedArtifacts(runId).catch(() => []),
       ]);
       if (!runResponse.ok)
@@ -200,24 +242,9 @@ export async function GET(request: NextRequest) {
           { error: 'CI run unavailable' },
           { status: runResponse.status, headers },
         );
-      const artifacts: CIArtifact[] = [];
-      const seen = new Set<number>();
-      let artifactsResponse = firstArtifactsResponse;
-      for (let artifactPage = 1; ; artifactPage++) {
-        if (!artifactsResponse.ok)
-          return NextResponse.json({ error: 'Cannot list CI artifacts' }, { status: 502, headers });
-        const data: { artifacts: CIArtifact[] } = await artifactsResponse.json();
-        for (const artifact of data.artifacts ?? []) {
-          if (videoArtifactIdentity(artifact.name)?.run !== runId || seen.has(artifact.id))
-            continue;
-          seen.add(artifact.id);
-          artifacts.push(artifact);
-        }
-        if ((data.artifacts?.length ?? 0) < 100) break;
-        artifactsResponse = await github(
-          `/actions/runs/${runId}/artifacts?per_page=100&page=${artifactPage + 1}`,
-        );
-      }
+      const artifacts = await runArtifacts(runId, listing);
+      if (!artifacts)
+        return NextResponse.json({ error: 'Cannot list CI artifacts' }, { status: 502, headers });
       for (const stored of saved) {
         const index = artifacts.findIndex((a: { id: number }) => a.id === stored.id);
         if (index === -1) artifacts.push(stored);

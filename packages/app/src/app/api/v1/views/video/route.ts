@@ -59,11 +59,19 @@ async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'comp
       : nextPage - 1;
   if (view === 'overview') {
     const state = parseResultsState(request.nextUrl.search);
-    const projection = resultProjection(
-      videoPoints([history]),
-      state,
-      namedRunPoints([history], state.unofficialRun),
-    );
+    let named = namedRunPoints([history], state.unofficialRun);
+    if (named.length === 0 && state.unofficialRun) {
+      // Like the UI, an unstored run is read live from its artifacts; a failed read is no overlay.
+      const live = await videoRuns(
+        sourceRequest(request, '/api/video-runs', { run: state.unofficialRun, format: 'live' }),
+      );
+      if (live.ok)
+        named = namedRunPoints(
+          [history, await readResponse<VideoHistoryPage>(live)],
+          state.unofficialRun,
+        );
+    }
+    const projection = resultProjection(videoPoints([history]), state, named);
     if (request.nextUrl.searchParams.get('format') === 'csv')
       return new Response(toCsv(resultCsvRows(projection), RESULT_CSV_COLUMNS), {
         headers: {

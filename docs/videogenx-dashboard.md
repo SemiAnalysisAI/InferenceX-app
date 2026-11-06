@@ -37,16 +37,22 @@ cohort separately rather than averaging across resolutions, durations or modes.
 cost basis (`r_basis`), Optimal Only (`r_optimal`), the open deployment
 (`r_point`), deadline, cost tier, entered mode prices and utilization. `r_workload` uses a compact source point identifier;
 canonical workload JSON stays inside the projection. Share includes the `r_`
-registry scope. `?unofficialrun=<id>` reads only that stored run through
-`namedRunPoints`, retaining its actual approval status. While selected, that run
+registry scope. `?unofficialrun=<id>` reads only that run through
+`namedRunPoints`. A stored run keeps its actual approval status. A run absent from
+the History pages is read live from its GitHub artifacts through
+`/api/video-runs?run=<id>&format=live`: the newest attempt of each native
+`h3-results` configuration, JSON documents only, fetched by explicit byte ranges and
+verified against `SHA256SUMS` and the manifest identity. Its entries are unapproved,
+have no `publishedAt` and no media, so the clip panel shows nothing for them and the
+banner says the run is unpublished. While selected, that run
 appears only in `overlayCells` and `overlayDeploymentCells`, even if approved; it
 leaves official cells, deployment cells and workload mix. `overlayCells` uses the
 selected GPU count for the table and clips; `overlayDeploymentCells` retains all
 matching GPU counts for the chart and deployment detail. Clearing the selection cannot promote an
 unapproved source. Dismissal clears a workload selection absent from the approved
 choices and preserves valid approved selections. All comparison filters and sample requirements still apply.
-Unknown or unstored runs remain unavailable; the URL cannot trigger publication,
-storage writes or GPU work.
+Unknown runs and runs without readable native artifacts remain unavailable; the URL
+cannot trigger publication, storage writes or GPU work.
 
 Approved evidence determines the preferred cohort. A workload available only in
 the named run requires explicit selection, or becomes the fallback when no approved
@@ -282,7 +288,7 @@ official/unofficial source membership remain unchanged.
 | Control                                                                                 | Read-only API coverage                                                                 |
 | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | Model, workload, resolution, duration, mode, steps, GPU count, engine, date             | `r_*` selection fields                                                                 |
-| Hardware visibility, named stored run                                                   | `r_hidden`, `unofficialrun`, separate overlay cells preserving approval                |
+| Hardware visibility, named run (stored or read live)                                    | `r_hidden`, `unofficialrun`, separate overlay cells preserving approval                |
 | Deadline, cost tier, mode prices, utilization                                           | Same pure calculations in `resultProjection`                                           |
 | Chart axes, cost basis, Optimal Only, open deployment                                   | `r_x`, `r_y`, `r_basis`, `r_optimal`, `r_point`; every axis value is in each cell      |
 | Deployment labels, detail tab, pinned point                                             | Presentation only                                                                      |
@@ -325,8 +331,11 @@ Difference 是相对明确绑定的官方 Diffusers 参考视频的浏览器 RGB
 成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补；图表与结果表使用所选口径（`r_basis`），视频卡片和部署详情同时展示两种口径。每 GPU 小时生成视频数同样按所选口径的 GPU 数折算：作业分配 8 张、实际使用 4 张时，按分配口径计算的值减半。视频秒吞吐量、每视频秒成本及收入使用有效测量请求的实际解码视频时长，不包含 warmup；请求时长仅用于工作负载身份与筛选。
 任何有效测量请求缺少视频时长，或旧 History 投影没有 `videoSecondsPerHour` 时，上述指标及利润保持为空，不以请求时长代替。每条视频成本仍可在证据充分时计算。利润输入默认空白，属于用户
 场景假设；利用率只降低收入，不减少付费时长。模式未知时不套用 T2V/I2V/R2V 价格。
-页面与只读 API 以一次请求最多读取五页 History，共用选择和计算逻辑，`r_*` 参数可以分享，`?unofficialrun=` 只读取指定的已存储运行，
-保留其发布批准状态，并单独放入 overlayCells 和 overlayDeploymentCells；选中期间，即使已批准也不进入正式结果、部署或工作负载构成。overlayCells 按所选 GPU 数筛选结果表和视频；overlayDeploymentCells 保留所有匹配的 GPU 数，用于图表和部署详情。
+页面与只读 API 以一次请求最多读取五页 History，共用选择和计算逻辑，`r_*` 参数可以分享，`?unofficialrun=` 只读取指定运行。
+已存储的运行保留其发布批准状态；不在 History 中的运行，通过 `/api/video-runs?run=<id>&format=live` 从其 GitHub 产物实时读取：
+只取每个原生 `h3-results` 配置的最新一次尝试，按显式字节区间读取 JSON 文档，并用 `SHA256SUMS` 和 manifest 身份校验。
+这类条目未经批准，没有 `publishedAt`，也不附带媒体，因此视频面板不显示它们，横幅会注明该运行尚未发布。
+指定运行单独放入 overlayCells 和 overlayDeploymentCells；选中期间，即使已批准也不进入正式结果、部署或工作负载构成。overlayCells 按所选 GPU 数筛选结果表和视频；overlayDeploymentCells 保留所有匹配的 GPU 数，用于图表和部署详情。
 默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，
 或在没有匹配的已批准结果时作为回退。
 支持隐藏硬件及移除；清除叠加运行后不会将未批准数据转为正式结果。

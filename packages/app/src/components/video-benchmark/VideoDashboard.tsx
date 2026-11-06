@@ -122,6 +122,7 @@ const STRINGS = {
     overlay: 'Unofficial run',
     overlayMissing:
       'No matching stored observation for this run. Loading it does not publish or generate media.',
+    overlayLive: 'Unpublished run read live from its GitHub artifacts; media is not shown.',
     dismiss: 'Dismiss',
     sources: 'Read-only data',
     api: 'View API',
@@ -182,6 +183,7 @@ const STRINGS = {
     historyNote: '已存储的结果，包括尚无发布批准、样本不足及工作负载未匹配的运行。',
     overlay: '非官方运行',
     overlayMissing: '这个运行没有匹配的已存储观测；加载不会发布或生成媒体。',
+    overlayLive: '该运行尚未发布，数据直接从其 GitHub 产物实时读取；不显示媒体。',
     dismiss: '移除',
     sources: '只读数据',
     api: '视图 API',
@@ -209,7 +211,7 @@ export default function VideoDashboard({
     s = STRINGS[locale];
   const [state, setState] = useState<ResultsState>(initialData?.state ?? DEFAULT_RESULTS_STATE);
   const latest = useRef(state);
-  const { points, namedPoints, loading, error, replay, retry } = useVideoPoints(
+  const { points, namedPoints, namedSource, loading, error, replay, retry } = useVideoPoints(
     state.unofficialRun,
     initialData?.history,
     pending,
@@ -681,8 +683,14 @@ export default function VideoDashboard({
               <span style={{ color: overlayRunColor(0) }}>
                 {s.overlay}: {state.unofficialRun}
               </span>
-              {!allCells.some((c) => c.point.runId === state.unofficialRun) && (
-                <span>{s.overlayMissing}</span>
+              {namedSource === 'pending' ? (
+                <span>{s.loading}</span>
+              ) : namedSource === 'live' ? (
+                <span>{s.overlayLive}</span>
+              ) : (
+                !allCells.some((c) => c.point.runId === state.unofficialRun) && (
+                  <span>{s.overlayMissing}</span>
+                )
               )}
               <button
                 data-testid="results-overlay-dismiss"

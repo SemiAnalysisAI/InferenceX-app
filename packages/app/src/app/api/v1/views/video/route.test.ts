@@ -2,6 +2,7 @@ import { compareMetrics } from '@/components/video-benchmark/compare';
 import { resolveCompareSelection } from '@/components/video-benchmark/compare-url-state';
 import { concurrencyPlateau, powerUtilization } from '@/components/video-benchmark/evidence';
 import {
+  liveHistoryEntry,
   videoHistoryEntry,
   type VideoHistoryObservation,
   type VideoHistoryPage,
@@ -254,6 +255,39 @@ describe('published VideoGenX dashboard projection', () => {
     expect(cleared.clipQuality.groups[0].clips[0].quality.psnrDb).toBe(35);
   });
 
+  it('overlays an unstored named run from its live artifact read without approving it', async () => {
+    const official = referenceQualityFixture(20, '124', 8, '4'.repeat(64)).stored;
+    const history: VideoHistoryPage = {
+      schemaVersion: 1,
+      nextPage: null,
+      entries: [{ ...videoHistoryEntry(official, '2026-09-20T00:00:00Z'), approved: true }],
+    };
+    const live: VideoHistoryPage = {
+      schemaVersion: 1,
+      nextPage: null,
+      entries: [liveHistoryEntry(referenceQualityFixture(20).stored)],
+    };
+    source.mockImplementation((req: NextRequest) => {
+      const query = req.nextUrl.searchParams;
+      if (query.get('format') === 'history') return Response.json(history);
+      if (query.get('format') === 'live' && query.get('run') === '123') return Response.json(live);
+      return new Response(null, { status: 204 });
+    });
+    const response = await GET(request('view=overview&unofficialrun=123'));
+    const body = await response.json();
+    const overlay = body.overlayCells.map(
+      (cell: { point: { runId: string; approved: boolean } }) => [
+        cell.point.runId,
+        cell.point.approved,
+      ],
+    );
+    expect(overlay.length).toBeGreaterThan(0);
+    expect(overlay).toEqual(overlay.map(() => ['123', false]));
+    expect(body.cells.map((cell: { point: { runId: string } }) => cell.point.runId)).toEqual([
+      '124',
+    ]);
+  });
+
   it('returns the same results-page selection and economics with read-only stored media metadata', async () => {
     const history = structuredClone(retainedHistory) as unknown as VideoHistoryPage;
     history.nextPage = null;
@@ -270,7 +304,7 @@ describe('published VideoGenX dashboard projection', () => {
     expect(body.coverage.pagesRead).toBe(1);
     expect(
       source.mock.calls.every(([req]) =>
-        ['history', 'published'].includes(req.nextUrl.searchParams.get('format')),
+        ['history', 'live', 'published'].includes(req.nextUrl.searchParams.get('format')),
       ),
     ).toBe(true);
     const mixed = await GET(request('view=overview&v_api=0.08'));
