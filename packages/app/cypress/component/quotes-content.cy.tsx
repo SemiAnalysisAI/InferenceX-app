@@ -143,6 +143,7 @@ describe('QuotesContent supporter logo wall', () => {
       'Tensormesh',
       'Morph',
       'Doubleword',
+      'Wafer',
     ];
     for (const locale of ['en', 'zh'] as const) {
       cy.viewport(375, 812);
