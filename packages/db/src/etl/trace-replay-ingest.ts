@@ -96,11 +96,12 @@ export function cacheHitRatesFromPromptTokenTotals(
 ): PreparedTraceReplay['cacheHitRates'] {
   if (!totals || !(totals.prompt > 0)) return null;
   const sumPrompts = totals.prompt;
-
   const sumOf = (name: string): number => totals.bySource[name] ?? 0;
   const cpuHits = sumOf('cache hit (CPU offload)') + sumOf('external_kv_transfer');
   const hbmFromBreakdown = sumOf('cache hit (HBM)') + sumOf('cache hit') + sumOf('local_cache_hit');
   const gpuHits = hbmFromBreakdown > 0 ? hbmFromBreakdown : totals.prefixCacheHits;
+  // Counters disagreeing (hits > prompts) leave the run's own reported rate in place.
+  if (gpuHits + cpuHits > sumPrompts) return null;
 
   return {
     gpu: gpuHits / sumPrompts,

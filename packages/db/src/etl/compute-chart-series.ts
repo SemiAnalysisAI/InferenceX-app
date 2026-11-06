@@ -59,10 +59,7 @@ interface RawSlice {
   sum?: number;
 }
 
-/**
- * `total` and `sum` are per-slice counts (counter delta, histogram sum); the
- * others are per-slice levels or per-second rates used for charting.
- */
+/** `total` and `sum` are per-slice counts; the rest are levels or tok/s rates. */
 type RawSliceField = 'avg' | 'rate' | 'sumRate' | 'total' | 'sum';
 
 interface RawSeries {
@@ -138,10 +135,8 @@ function mergePhaseMetrics(profiling: MetricsMap, warmup: MetricsMap): MetricsMa
 }
 
 /**
- * Exact prompt-token counts over the exported window, using the same series
- * selection as the chart. Rates on the chart grid are sampled per tick, so a
- * short slice at a phase boundary would count its tok/s as a full tick; ratios
- * built from these totals cannot exceed what the counters recorded.
+ * Exact prompt-token counts with the chart's series selection. Summing grid
+ * rates instead counts a short phase-boundary slice's tok/s as a full tick.
  */
 export interface PromptTokenTotals {
   prompt: number;
@@ -190,14 +185,6 @@ export function computeChartDataFromMetricPhases(
   context: ServerMetricsContext = {},
 ): ChartData {
   return buildChartData(mergePhaseMetrics(profiling, warmup), context);
-}
-
-export function computeChartSeriesFromMetricPhases(
-  profiling: MetricsMap,
-  warmup: MetricsMap,
-  context: ServerMetricsContext = {},
-): ChartSeries {
-  return computeChartDataFromMetricPhases(profiling, warmup, context).series;
 }
 
 const INTRA_ENGINE_SHARD_LABELS = new Set(['tp_rank', 'pp_rank', 'ep_rank', 'moe_ep_rank']);
@@ -626,15 +613,6 @@ function scopeAtomPdToPrefill(metrics: MetricsMap): { metrics: MetricsMap; pd: b
   return { metrics: scoped, pd: true };
 }
 
-function buildSeriesFromMetrics(
-  rawMetrics: MetricsMap,
-  context: ServerMetricsContext,
-  includeMetricSources = true,
-  originStartNs?: number,
-): ChartSeries {
-  return buildChartData(rawMetrics, context, includeMetricSources, originStartNs).series;
-}
-
 function buildChartData(
   rawMetrics: MetricsMap,
   context: ServerMetricsContext,
@@ -938,12 +916,12 @@ function buildChartData(
       }
     }
     for (const { source, metrics: sourceMetrics } of grouped.values()) {
-      const sourceSeries = buildSeriesFromMetrics(
+      const sourceSeries = buildChartData(
         sourceMetrics,
         context,
         false,
         originStartNs ?? startNs,
-      );
+      ).series;
       metricSources.push({
         source,
         kvCacheUsage: sourceSeries.kvCacheUsage,

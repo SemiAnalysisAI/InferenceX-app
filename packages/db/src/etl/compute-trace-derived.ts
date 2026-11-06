@@ -80,14 +80,11 @@ export async function computeTraceDerivedPayloads(
       ? phases.warmupMetrics
       : selectMetrics(phases.warmupMetrics, CHART_METRIC_KEYS);
     try {
-      ({ series: chartSeries, promptTokenTotals } = computeChartDataFromMetricPhases(
-        profiling,
-        warmup,
-        metricsContext,
-      ));
+      const data = computeChartDataFromMetricPhases(profiling, warmup, metricsContext);
+      chartSeries = data.series;
+      promptTokenTotals = data.promptTokenTotals;
     } catch {
       chartSeries = null;
-      promptTokenTotals = null;
     }
   }
 

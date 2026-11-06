@@ -1315,21 +1315,3 @@ export function isRunAttemptPurged(githubRunId: number, runAttempt?: number): bo
   if (runAttempt === undefined) return false;
   return PURGED_RUN_ATTEMPTS.get(githubRunId)?.has(runAttempt) ?? false;
 }
-
-const CACHE_RATE_OVERRIDE_KEYS = [
-  'server_gpu_cache_hit_rate',
-  'server_cpu_cache_hit_rate',
-  'server_external_cache_hit_rate',
-];
-
-/** Runs whose cache rates come from an audited override rather than their own counters. */
-export function cacheRateOverrideRunIds(
-  backfills: readonly { githubRunId: number; set: { metricsMerge?: object } }[],
-): Set<number> {
-  const ids = new Set<number>();
-  for (const backfill of backfills) {
-    const merge = backfill.set.metricsMerge ?? {};
-    if (CACHE_RATE_OVERRIDE_KEYS.some((key) => key in merge)) ids.add(backfill.githubRunId);
-  }
-  return ids;
-}

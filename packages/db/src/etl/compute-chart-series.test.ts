@@ -2,11 +2,7 @@ import { gzipSync } from 'node:zlib';
 
 import { describe, expect, it } from 'vitest';
 
-import {
-  CHART_SERIES_VERSION,
-  computeChartData,
-  computeChartSeries,
-} from './compute-chart-series.js';
+import { CHART_SERIES_VERSION, computeChartSeries } from './compute-chart-series.js';
 
 function makeBlob(opts?: {
   prefixHits?: number;
@@ -168,15 +164,6 @@ const tokenSpeedGauge = (values: number[]) => ({
 describe('computeChartSeries', () => {
   it('returns null when the blob is null', async () => {
     expect(await computeChartSeries(null)).toBeNull();
-  });
-
-  it('integrates rate-only counter slices into prompt-token totals', async () => {
-    const data = await computeChartData(makeBlob({ prefixHits: 75, promptTokensRate: 1000 }));
-    expect(data?.promptTokenTotals).toEqual({
-      prompt: 1000,
-      prefixCacheHits: 75,
-      bySource: { local_cache_hit: 200, miss: 800 },
-    });
   });
 
   it('returns the current CHART_SERIES_VERSION in the bundle', async () => {

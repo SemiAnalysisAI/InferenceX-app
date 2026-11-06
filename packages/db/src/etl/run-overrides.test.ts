@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  cacheRateOverrideRunIds,
   type BenchmarkPointBackfill,
   type ChangelogBackfill,
   type PurgedBenchmarkPoint,
@@ -1070,22 +1069,5 @@ describe('RUN_FRAMEWORK_OVERRIDES', () => {
         [{ id: 'run-1-framework', reason: 'r', githubRunId: 1, from: 'vllm', to: 'llmd-vllm' }],
       ),
     ).toThrow('duplicate backfill id');
-  });
-});
-
-describe('cacheRateOverrideRunIds', () => {
-  it('lists runs whose overrides merge any cache hit rate', () => {
-    expect(
-      cacheRateOverrideRunIds([
-        { githubRunId: 1, set: { metricsMerge: { server_gpu_cache_hit_rate: 0.9 } } },
-        { githubRunId: 2, set: { metricsMerge: { server_cpu_cache_hit_rate: 0.1 } } },
-        { githubRunId: 3, set: { metricsMerge: { kv_offloading: 'dram' } } },
-        { githubRunId: 4, set: {} },
-      ]),
-    ).toEqual(new Set([1, 2]));
-  });
-
-  it('protects the GB300 dynamo-vllm runs that borrow GB200 rates', () => {
-    expect(cacheRateOverrideRunIds(BENCHMARK_POINT_BACKFILLS).has(31633154542)).toBe(true);
   });
 });

@@ -112,67 +112,94 @@ function mockSqlWithTransaction(
   return { sql, calls };
 }
 
-const NS_PER_S = 1e9;
-function slice(startS: number, endS: number, total: number) {
-  return {
-    start_ns: startS * NS_PER_S,
-    end_ns: endS * NS_PER_S,
-    total,
-    rate: total / (endS - startS),
-  };
+const slice = (startS: number, endS: number, total: number, withTotal = true) => ({
+  start_ns: startS * 1e9,
+  end_ns: endS * 1e9,
+  rate: total / (endS - startS),
+  ...(withTotal ? { total } : {}),
+});
+
+const series = (labels: object, timeslices: object[]) => ({ labels, timeslices });
+
+/** Rates for warmup (first two slices) + profiling (rest) SGLang counters. */
+async function rates(promptSlices: object[], deviceSlices: object[], hostSlices: object[] = []) {
+  const blob = gzipSync(
+    JSON.stringify({
+      warmup_metrics: {
+        'sglang:prompt_tokens': { series: [series({}, promptSlices.slice(0, 2))] },
+        'sglang:cached_tokens': {
+          series: [series({ cache_source: 'device' }, deviceSlices.slice(0, 2))],
+        },
+      },
+      metrics: {
+        'sglang:prompt_tokens': { series: [series({}, promptSlices.slice(2))] },
+        'sglang:cached_tokens': {
+          series: [
+            series({ cache_source: 'device' }, deviceSlices.slice(2)),
+            series({ cache_source: 'host' }, hostSlices),
+          ],
+        },
+      },
+    }),
+  );
+  const data = await computeChartData(blob, { framework: 'sglang' });
+  return cacheHitRatesFromPromptTokenTotals(data!.promptTokenTotals);
 }
 
-function series(labels: Record<string, string>, slices: ReturnType<typeof slice>[]) {
-  return { endpoint_url: 'localhost:8888', labels, timeslices: slices };
-}
+describe('cacheHitRatesFromPromptTokenTotals sanity', () => {
+  // Shape of TPU7x SGLang run 41384211546 c1: the last warmup cached_tokens slice
+  // is 0.1 s long, so its tok/s is 10x its tokens. Grid-summed rates gave 274%.
+  const prompts = [slice(0, 1, 1000), slice(1, 1.77, 1000), slice(2, 3, 1000), slice(3, 4, 1000)];
+  const boundaryHits = [slice(0, 1, 900), slice(1, 1.1, 900), slice(2, 3, 950), slice(3, 4, 950)];
 
-describe('cacheHitRatesFromPromptTokenTotals', () => {
-  // Shape of TPU7x SGLang run 41384211546 c1: the last warmup cached_tokens
-  // slice is 0.1 s long, so its tok/s is 10x the tokens it holds.
-  const blob = () =>
-    gzipSync(
-      JSON.stringify({
-        warmup_metrics: {
-          'sglang:prompt_tokens': {
-            series: [series({}, [slice(0, 1, 1000), slice(1, 1.77, 1000)])],
-          },
-          'sglang:cached_tokens': {
-            series: [series({ cache_source: 'device' }, [slice(0, 1, 900), slice(1, 1.1, 900)])],
-          },
-        },
-        metrics: {
-          'sglang:prompt_tokens': {
-            series: [series({}, [slice(2, 3, 1000), slice(3, 4, 1000)])],
-          },
-          'sglang:cached_tokens': {
-            series: [
-              series({ cache_source: 'device' }, [slice(2, 3, 950), slice(3, 4, 950)]),
-              series({ cache_source: 'host' }, [slice(2, 3, 30), slice(3, 4, 0)]),
-            ],
-          },
-        },
-      }),
-    );
-
-  it('divides counter totals, so a short phase-boundary slice cannot push the rate past 1', async () => {
-    const data = await computeChartData(blob(), { framework: 'sglang' });
-
-    expect(data?.promptTokenTotals).toEqual({
-      prompt: 4000,
-      prefixCacheHits: 3730,
-      bySource: { 'cache hit (HBM)': 3700, 'cache hit (CPU offload)': 30 },
-    });
-    expect(cacheHitRatesFromPromptTokenTotals(data!.promptTokenTotals)).toEqual({
-      gpu: 3700 / 4000,
-      cpu: 30 / 4000,
-    });
+  it('never exceeds 100% when a phase-boundary slice is shorter than a tick', async () => {
+    const result = await rates(prompts, boundaryHits, [slice(2, 3, 30)]);
+    expect(result).toEqual({ gpu: 3700 / 4000, cpu: 30 / 4000 });
+    expect(result!.gpu + result!.cpu!).toBeLessThanOrEqual(1);
   });
 
-  it('returns null without prompt tokens', () => {
-    expect(cacheHitRatesFromPromptTokenTotals(null)).toBeNull();
+  it('integrates rate-only slices by their duration', async () => {
+    const hits = [
+      [0, 1, 900],
+      [1, 1.1, 900],
+      [2, 3, 950],
+      [3, 4, 950],
+    ] as const;
+    const result = await rates(
+      prompts,
+      hits.map(([a, b, n]) => slice(a, b, n, false)),
+    );
+    expect(result?.gpu).toBeCloseTo(3700 / 4000, 12);
+  });
+
+  it('keeps every random phase-boundary split within [0, 1]', async () => {
+    let seed = 7;
+    const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let trial = 0; trial < 25; trial++) {
+      const cut = 1 + rand() * 0.99;
+      const hit = Math.floor(rand() * 1000);
+      const result = await rates(
+        [slice(0, 1, 1000), slice(1, cut, 1000), slice(2, 3, 1000)],
+        [slice(0, 1, hit), slice(1, 1 + (cut - 1) * rand(), hit), slice(2, 3, hit)],
+      );
+      expect(result!.gpu).toBeGreaterThanOrEqual(0);
+      expect(result!.gpu).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('refuses rates above 100% instead of writing them', () => {
+    const totals = { prompt: 100, prefixCacheHits: 0, bySource: {} };
     expect(
-      cacheHitRatesFromPromptTokenTotals({ prompt: 0, prefixCacheHits: 5, bySource: {} }),
+      cacheHitRatesFromPromptTokenTotals({ ...totals, bySource: { 'cache hit (HBM)': 101 } }),
     ).toBeNull();
+    expect(
+      cacheHitRatesFromPromptTokenTotals({
+        ...totals,
+        bySource: { 'cache hit (HBM)': 90, 'cache hit (CPU offload)': 11 },
+      }),
+    ).toBeNull();
+    expect(cacheHitRatesFromPromptTokenTotals({ ...totals, prompt: 0 })).toBeNull();
+    expect(cacheHitRatesFromPromptTokenTotals(null)).toBeNull();
   });
 });
 
