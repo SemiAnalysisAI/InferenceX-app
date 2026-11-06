@@ -56,7 +56,7 @@ export function BlogFeaturedPost({
           thumbnail={thumbnail}
           priority
           variant="card"
-          className="rounded-lg border border-border/30"
+          className="rounded-lg border border-border/30 lg:aspect-auto"
         />
       ) : (
         <BlogGridTexture variant="card" />

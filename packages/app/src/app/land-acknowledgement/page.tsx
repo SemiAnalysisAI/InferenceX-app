@@ -73,12 +73,12 @@ export default function LandAcknowledgementPage() {
             >
               <p className="text-xs font-medium text-muted-foreground">{entry.region}</p>
               <h2 className="mt-2 text-xl font-semibold text-foreground">{entry.peoples}</h2>
-              <p className="mt-4 leading-reading text-muted-foreground">{entry.acknowledgement}</p>
+              <p className="mt-4 leading-reading text-foreground">{entry.acknowledgement}</p>
             </article>
           ))}
         </section>
 
-        <p className="max-w-measure leading-reading text-muted-foreground">
+        <p className="max-w-measure leading-reading text-foreground">
           Acknowledgement is only a starting point. We share this statement with respect for Native
           sovereignty, history, and ongoing community presence, and we welcome corrections if our
           wording should be improved.

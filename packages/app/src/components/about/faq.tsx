@@ -9,6 +9,8 @@ import {
 
 import { CAROUSEL_LABELS, CAROUSEL_ORGS } from '@/components/quotes/quotes-data';
 import { isModelVisible } from '@/lib/catalog/data-mappings';
+import { ARTICLE_H2_CLASS, READING_SECTION_CLASS } from '@/components/ui/reading-layout';
+import { cn } from '@/lib/shared/utils';
 
 import { FaqQuestionLink } from './faq-question-link';
 
@@ -70,19 +72,19 @@ export function buildFaqJsonLd(items: readonly FaqItem[], inLanguage?: string) {
 
 export function FaqList({ title, items }: { title: string; items: readonly FaqItem[] }) {
   return (
-    <section className="border-t border-border/30 pt-10">
-      <h2 className="mb-6 text-xl font-semibold">{title}</h2>
-      <dl className="divide-y divide-border/30">
+    <section className={READING_SECTION_CLASS}>
+      <h2 className={cn(ARTICLE_H2_CLASS, 'mb-6')}>{title}</h2>
+      <dl className="max-w-measure divide-y divide-border/30">
         {items.map((item) => (
           <div
             id={item.id}
             key={item.id}
-            className="grid scroll-mt-24 gap-3 py-5 first:pt-0 last:pb-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:gap-8"
+            className="flex scroll-mt-24 flex-col gap-2 py-5 first:pt-0 last:pb-0"
           >
-            <dt className="min-w-0 font-medium">
+            <dt className="min-w-0 font-semibold">
               <FaqQuestionLink id={item.id} question={item.question} />
             </dt>
-            <dd className="min-w-0 max-w-measure leading-reading text-muted-foreground">
+            <dd className="min-w-0 leading-reading text-foreground">
               {item.answer && (
                 <p>
                   {item.answer}

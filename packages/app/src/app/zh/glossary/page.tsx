@@ -143,7 +143,7 @@ export default function ZhGlossaryPage() {
         <section className="grid gap-10 border-t border-border/30 pt-10 md:grid-cols-2">
           <div>
             <h2 className="text-xl font-semibold">完整曲线更能说明问题</h2>
-            <p className="mt-3 max-w-measure leading-reading text-muted-foreground">
+            <p className="mt-3 max-w-measure leading-reading text-foreground">
               LLM 服务需要在单用户速度与总吞吐量之间取舍。InferenceX 使用完整 Pareto
               曲线和等交互性比较，展示不同运行点上的真实权衡。单一最大吞吐点无法代表完整系统。
             </p>
@@ -165,7 +165,7 @@ export default function ZhGlossaryPage() {
 
           <div>
             <h2 className="text-xl font-semibold">每个定义都连接真实方案</h2>
-            <p className="mt-3 max-w-measure leading-reading text-muted-foreground">
+            <p className="mt-3 max-w-measure leading-reading text-foreground">
               每个术语页都会链接到该概念真正影响实测结果的 InferenceX 文章，包括 MTP 接受行为、NVL72
               Wide EP 扩展，以及硬件不变时的软件性能提升。
             </p>

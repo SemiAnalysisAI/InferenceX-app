@@ -19,6 +19,8 @@ import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 
 import { AgentXOptimizationsLink } from './agentx-optimizations-link';
 import { FactGrid } from './fact-grid';
+import { ARTICLE_H2_CLASS } from '@/components/ui/reading-layout';
+import { cn } from '@/lib/shared/utils';
 
 function localePrefix(locale: Locale): string {
   return locale === 'zh' ? '/zh' : '';
@@ -96,10 +98,10 @@ function SectionBlock({
       className={className}
       data-testid={`agentx-optimizations-section-${section.id}`}
     >
-      <h2 id={section.id} className="mb-4 scroll-mt-24 text-2xl font-semibold text-foreground">
+      <h2 id={section.id} className={cn(ARTICLE_H2_CLASS, 'mb-4')}>
         {section.heading}
       </h2>
-      <div className="max-w-measure space-y-4 text-base leading-reading text-muted-foreground">
+      <div className="max-w-measure space-y-4 text-base leading-reading text-foreground">
         {section.paragraphs.map((paragraph) => (
           <p key={paragraph}>
             <RichText text={paragraph} />
@@ -217,17 +219,17 @@ export function AgentXOptimizationsIndex({ locale }: { locale: Locale }) {
       </header>
 
       <div className="py-10">
-        <div className="max-w-measure space-y-4 text-base leading-reading text-muted-foreground">
+        <div className="max-w-measure space-y-4 text-base leading-reading text-foreground">
           {overview.intro.map((paragraph) => (
             <p key={paragraph}>{paragraph}</p>
           ))}
         </div>
 
         <section aria-labelledby="projects" className="mt-14">
-          <h2 id="projects" className="mb-3 scroll-mt-24 text-2xl font-semibold text-foreground">
+          <h2 id="projects" className={cn(ARTICLE_H2_CLASS, 'mb-4')}>
             {overview.frameworksTitle}
           </h2>
-          <p className="max-w-measure text-base leading-reading text-muted-foreground">
+          <p className="max-w-measure text-base leading-reading text-foreground">
             {overview.frameworksIntro}
           </p>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -314,7 +316,7 @@ export function AgentXOptimizationsArticle({ slug, locale }: { slug: string; loc
         ))}
 
         <section aria-labelledby="other-projects" className="mt-14 border-t border-border/20 pt-10">
-          <h2 id="other-projects" className="text-base font-semibold text-foreground">
+          <h2 id="other-projects" className={ARTICLE_H2_CLASS}>
             {overview.ui.allProjects}
           </h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

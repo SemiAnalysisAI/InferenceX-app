@@ -7,7 +7,11 @@ import { buildFaqJsonLd, FaqList } from '@/components/about/faq';
 import { PromoVideo } from '@/components/about/promo-video';
 import { JsonLd } from '@/components/seo/json-ld';
 import { buttonVariants } from '@/components/ui/button';
-import { READING_PAGE_CLASS } from '@/components/ui/reading-layout';
+import {
+  ARTICLE_H2_CLASS,
+  READING_PAGE_CLASS,
+  READING_SECTION_CLASS,
+} from '@/components/ui/reading-layout';
 import { enAlternates } from '@/lib/i18n/i18n';
 import { cn } from '@/lib/shared/utils';
 import { socialMetadata } from '@/lib/seo/social-metadata';
@@ -34,15 +38,13 @@ export default function AboutPage() {
   return (
     <main className="relative">
       <JsonLd data={faqJsonLd} />
-      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-10')}>
-        <PromoVideo />
-
+      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-12')}>
         <section>
-          <h1 className="max-w-4xl text-2xl font-semibold text-balance md:text-3xl">
+          <h1 className="max-w-4xl text-3xl font-semibold text-balance lg:text-4xl lg:tracking-heading">
             Open-source continuous agentic inference benchmark trusted by operators of
             trillion-dollar, gigawatt-scale token factories
           </h1>
-          <div className="mt-4 flex max-w-measure flex-col gap-4 leading-reading text-muted-foreground">
+          <div className="mt-4 flex max-w-measure flex-col gap-4 leading-reading text-foreground">
             <p>
               Software development and model releases move fast. Static benchmarks quickly become
               obsolete, and participants often submit software images purpose-built for the
@@ -76,16 +78,18 @@ export default function AboutPage() {
           </div>
         </section>
 
+        <PromoVideo />
+
         <AgentXFaq locale="en" />
 
-        <section id="reproducibility" className="scroll-mt-24 border-t border-border/30 pt-10">
-          <h2 className="text-xl font-semibold">Reproducibility</h2>
-          <p className="mt-3 max-w-measure leading-reading text-muted-foreground">
+        <section id="reproducibility" className={READING_SECTION_CLASS}>
+          <h2 className={ARTICLE_H2_CLASS}>Reproducibility</h2>
+          <p className="mt-3 max-w-measure leading-reading text-foreground">
             Every data point on the dashboard is the output of a public GitHub Actions workflow run.
             The recipe, logs, artifacts, and the resulting database row are all linked end to end,
             so anyone can audit, rerun, or fork a benchmark.
           </p>
-          <ol className="mt-6 flex max-w-measure flex-col gap-4 leading-reading text-muted-foreground">
+          <ol className="mt-6 flex max-w-measure flex-col gap-4 leading-reading text-foreground">
             <li className="flex gap-4">
               <span className="w-4 shrink-0 font-medium text-foreground tabular-nums">1</span>
               <div>

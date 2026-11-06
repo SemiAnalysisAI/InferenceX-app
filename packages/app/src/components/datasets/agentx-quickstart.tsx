@@ -3,8 +3,15 @@ import Link from 'next/link';
 
 import { buttonVariants } from '@/components/ui/button';
 import { CopyableCodeBlock } from '@/components/ui/copyable-code-block';
+import {
+  ARTICLE_H2_CLASS,
+  ARTICLE_H3_CLASS,
+  READING_SECTION_CLASS,
+  READING_TEXT_CLASS,
+} from '@/components/ui/reading-layout';
 import { AGENTX_COMMANDS, AGENTX_QUICKSTART, AGENTX_ROUTING } from '@/lib/agentx/quickstart';
 import { localePath, type Locale } from '@/lib/i18n/i18n';
+import { cn } from '@/lib/shared/utils';
 
 import { AgentXMethodologyLink } from './agentx-methodology-link';
 
@@ -17,10 +24,10 @@ export function AgentXQuickstartCallout({ locale }: { locale: Locale }) {
       data-testid="agentx-quickstart-callout"
       className="min-w-0 scroll-mt-24 space-y-4"
     >
-      <h2 id="benchmark-your-chips-title" className="text-lg font-semibold">
+      <h2 id="benchmark-your-chips-title" className={ARTICLE_H3_CLASS}>
         {t.title}
       </h2>
-      <p className="text-sm leading-6 text-muted-foreground">{t.summary}</p>
+      <p className={READING_TEXT_CLASS}>{t.summary}</p>
       <CopyableCodeBlock locale={locale} label={t.run}>
         {AGENTX_COMMANDS}
       </CopyableCodeBlock>
@@ -53,26 +60,26 @@ export function AgentXQuickstartArticle({ locale }: { locale: Locale }) {
         <h1 className="mt-2 text-3xl font-semibold text-balance md:text-4xl">{t.title}</h1>
         <p className="mt-4 max-w-measure leading-reading text-muted-foreground">{t.description}</p>
       </header>
-      <div className="space-y-8 py-8">
+      <div className="space-y-10 py-10">
         <section id="run" className="scroll-mt-24 space-y-3">
-          <h2 className="text-lg font-semibold">{t.run}</h2>
-          <p className="max-w-measure leading-reading text-muted-foreground">{t.runHelp}</p>
+          <h2 className={ARTICLE_H2_CLASS}>{t.run}</h2>
+          <p className={READING_TEXT_CLASS}>{t.runHelp}</p>
           <CopyableCodeBlock locale={locale} label={t.run}>
             {AGENTX_COMMANDS}
           </CopyableCodeBlock>
-          <p className="max-w-measure leading-reading text-muted-foreground">
+          <p className={READING_TEXT_CLASS}>
             {t.modelNote} {t.trust}
           </p>
         </section>
         <section id="routing" className="scroll-mt-24 space-y-3">
-          <h2 className="text-lg font-semibold">{t.routing}</h2>
-          <p className="max-w-measure leading-reading text-muted-foreground">{t.routingHelp}</p>
+          <h2 className={ARTICLE_H2_CLASS}>{t.routing}</h2>
+          <p className={READING_TEXT_CLASS}>{t.routingHelp}</p>
           <CopyableCodeBlock locale={locale} label={t.routing}>
             {AGENTX_ROUTING}
           </CopyableCodeBlock>
         </section>
-        <footer className="space-y-3 border-t border-border/20 pt-6">
-          <p className="max-w-measure leading-reading text-muted-foreground">{t.resultsHelp}</p>
+        <footer className={cn(READING_SECTION_CLASS, 'space-y-3')}>
+          <p className={READING_TEXT_CLASS}>{t.resultsHelp}</p>
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
             <Link
               href={localePath('/agentx/methodology', locale)}

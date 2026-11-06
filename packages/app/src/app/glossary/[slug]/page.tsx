@@ -4,7 +4,13 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { JsonLd } from '@/components/seo/json-ld';
-import { READING_PAGE_CLASS } from '@/components/ui/reading-layout';
+import { PagerCard } from '@/components/ui/pager-card';
+import {
+  ARTICLE_H2_CLASS,
+  READING_PAGE_CLASS,
+  READING_SECTION_CLASS,
+  READING_TEXT_CLASS,
+} from '@/components/ui/reading-layout';
 import { getPostBySlug } from '@/lib/blog/blog';
 import {
   getAdjacentGlossaryEntries,
@@ -155,11 +161,11 @@ export default async function GlossaryTermPage({ params }: Props) {
                 </p>
               </section>
 
-              <section aria-labelledby="technical-definition-heading" className="mt-10">
-                <h2 id="technical-definition-heading" className="text-xl font-semibold">
+              <section aria-labelledby="technical-definition-heading" className="mt-12">
+                <h2 id="technical-definition-heading" className={ARTICLE_H2_CLASS}>
                   Technical definition
                 </h2>
-                <p className="mt-3 leading-reading text-muted-foreground">{entry.definition}</p>
+                <p className={cn(READING_TEXT_CLASS, 'mt-4')}>{entry.definition}</p>
               </section>
 
               {entry.measurement && (
@@ -173,26 +179,24 @@ export default async function GlossaryTermPage({ params }: Props) {
                 </div>
               )}
 
-              <div className="mt-10 space-y-10 border-t border-border/30 pt-10">
+              <div className={cn(READING_SECTION_CLASS, 'mt-12 space-y-12')}>
                 <section aria-labelledby="engineering-details">
-                  <h2 id="engineering-details" className="text-xl font-semibold">
+                  <h2 id="engineering-details" className={ARTICLE_H2_CLASS}>
                     Engineering details
                   </h2>
-                  <p className="mt-3 leading-reading text-muted-foreground">{entry.explanation}</p>
+                  <p className={cn(READING_TEXT_CLASS, 'mt-4')}>{entry.explanation}</p>
                 </section>
                 <section aria-labelledby="why-it-matters">
-                  <h2 id="why-it-matters" className="text-xl font-semibold">
+                  <h2 id="why-it-matters" className={ARTICLE_H2_CLASS}>
                     Why it matters
                   </h2>
-                  <p className="mt-3 leading-reading text-muted-foreground">{entry.significance}</p>
+                  <p className={cn(READING_TEXT_CLASS, 'mt-4')}>{entry.significance}</p>
                 </section>
                 <section aria-labelledby="reading-inferencex">
-                  <h2 id="reading-inferencex" className="text-xl font-semibold">
+                  <h2 id="reading-inferencex" className={ARTICLE_H2_CLASS}>
                     How to read it in InferenceX
                   </h2>
-                  <p className="mt-3 leading-reading text-muted-foreground">
-                    {entry.benchmarkContext}
-                  </p>
+                  <p className={cn(READING_TEXT_CLASS, 'mt-4')}>{entry.benchmarkContext}</p>
                 </section>
               </div>
             </div>
@@ -218,9 +222,9 @@ export default async function GlossaryTermPage({ params }: Props) {
           </div>
 
           {relatedArticles.length > 0 && (
-            <section aria-labelledby="further-reading" className="border-t border-border/30 pt-10">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-                <h2 id="further-reading" className="text-xl font-semibold">
+            <section aria-labelledby="further-reading" className={READING_SECTION_CLASS}>
+              <div className="flex max-w-figure flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+                <h2 id="further-reading" className={ARTICLE_H2_CLASS}>
                   See the concept in real benchmarks
                 </h2>
                 <Link
@@ -231,7 +235,7 @@ export default async function GlossaryTermPage({ params }: Props) {
                   <ArrowRight aria-hidden="true" className="size-4" />
                 </Link>
               </div>
-              <div className="mt-4 divide-y divide-border/20">
+              <div className="mt-4 max-w-figure divide-y divide-border/20">
                 {relatedArticles.map((article) => (
                   <Link
                     key={article.slug}
@@ -258,30 +262,22 @@ export default async function GlossaryTermPage({ params }: Props) {
 
           <nav aria-label="Glossary pagination" className="grid gap-4 sm:grid-cols-2">
             {adjacent.previous ? (
-              <Link
+              <PagerCard
                 href={`/glossary/${adjacent.previous.slug}`}
-                className="rounded-xl border border-border/30 p-5 transition-colors hover:bg-muted/40 focus-visible:outline-none"
-              >
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                  <ArrowLeft aria-hidden="true" className="size-3.5" />
-                  Previous
-                </span>
-                <span className="mt-2 block font-medium">{adjacent.previous.term}</span>
-              </Link>
+                direction="prev"
+                label="Previous"
+                title={adjacent.previous.term}
+              />
             ) : (
-              <div />
+              <div aria-hidden="true" className="hidden sm:block" />
             )}
             {adjacent.next && (
-              <Link
+              <PagerCard
                 href={`/glossary/${adjacent.next.slug}`}
-                className="rounded-xl border border-border/30 p-5 text-right transition-colors hover:bg-muted/40 focus-visible:outline-none"
-              >
-                <span className="flex items-center justify-end gap-1 text-xs font-medium text-muted-foreground">
-                  Next
-                  <ArrowRight aria-hidden="true" className="size-3.5" />
-                </span>
-                <span className="mt-2 block font-medium">{adjacent.next.term}</span>
-              </Link>
+                direction="next"
+                label="Next"
+                title={adjacent.next.term}
+              />
             )}
           </nav>
         </article>

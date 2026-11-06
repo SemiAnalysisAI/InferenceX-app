@@ -14,6 +14,7 @@ import { cn } from '@/lib/shared/utils';
 
 import { AgentXTelemetryLink } from './agentx-telemetry-link';
 import { FactGrid } from './fact-grid';
+import { ARTICLE_H2_CLASS } from '@/components/ui/reading-layout';
 
 function localePrefix(locale: Locale): string {
   return locale === 'zh' ? '/zh' : '';
@@ -77,16 +78,16 @@ function SectionBlock({
       className={className}
       data-testid={`agentx-telemetry-section-${section.id}`}
     >
-      <h2 id={section.id} className="mb-4 scroll-mt-24 text-2xl font-semibold text-foreground">
+      <h2 id={section.id} className={cn(ARTICLE_H2_CLASS, 'mb-4')}>
         {section.heading}
       </h2>
-      <div className="max-w-measure space-y-4 text-base leading-reading text-muted-foreground">
+      <div className="max-w-measure space-y-4 text-base leading-reading text-foreground">
         {section.paragraphs.map((paragraph) => (
           <p key={paragraph}>{paragraph}</p>
         ))}
       </div>
       {section.bullets && section.bullets.length > 0 && (
-        <ul className="mt-4 max-w-measure space-y-2 border-l border-border/20 pl-4 text-base leading-reading text-muted-foreground">
+        <ul className="mt-4 max-w-measure space-y-2 border-l border-border/20 pl-4 text-base leading-reading text-foreground">
           {section.bullets.map((bullet) => (
             <li key={bullet}>{bullet}</li>
           ))}
@@ -155,7 +156,7 @@ export function AgentXTelemetryArticle({ locale }: { locale: Locale }) {
       </header>
 
       <div className="py-10">
-        <div className="max-w-measure space-y-4 text-base leading-reading text-muted-foreground">
+        <div className="max-w-measure space-y-4 text-base leading-reading text-foreground">
           {guide.intro.map((paragraph) => (
             <p key={paragraph}>{paragraph}</p>
           ))}

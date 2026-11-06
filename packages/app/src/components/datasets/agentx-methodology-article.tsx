@@ -5,6 +5,8 @@ import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 
 import { AgentXMethodologyLink } from './agentx-methodology-link';
 import { FactGrid } from './fact-grid';
+import { ARTICLE_H2_CLASS, ARTICLE_H3_CLASS } from '@/components/ui/reading-layout';
+import { cn } from '@/lib/shared/utils';
 
 type Locale = 'en' | 'zh';
 
@@ -487,7 +489,7 @@ function MethodFigure({
 
 function Paragraphs({ items }: { items: readonly string[] }) {
   return (
-    <div className="max-w-measure space-y-4 text-base leading-reading text-muted-foreground">
+    <div className="max-w-measure space-y-4 text-base leading-reading text-foreground">
       {items.map((item) => (
         <p key={item}>{item}</p>
       ))}
@@ -497,7 +499,7 @@ function Paragraphs({ items }: { items: readonly string[] }) {
 
 function SectionHeading({ id, children }: { id: string; children: React.ReactNode }) {
   return (
-    <h2 id={id} className="mb-4 scroll-mt-24 text-2xl font-semibold text-foreground">
+    <h2 id={id} className={cn(ARTICLE_H2_CLASS, 'mb-4')}>
       {children}
     </h2>
   );
@@ -610,10 +612,8 @@ export function AgentXMethodologyArticle({ locale }: { locale: Locale }) {
 
         <section aria-labelledby="scope" className="mt-14 border-t border-border/20 pt-10">
           <SectionHeading id="scope">{t.limitsTitle}</SectionHeading>
-          <p className="max-w-measure text-base leading-reading text-muted-foreground">
-            {t.limits}
-          </p>
-          <h3 className="mt-8 text-base font-semibold text-foreground">{t.sourcesTitle}</h3>
+          <p className="max-w-measure text-base leading-reading text-foreground">{t.limits}</p>
+          <h3 className={cn(ARTICLE_H3_CLASS, 'mt-8')}>{t.sourcesTitle}</h3>
           <ul className="mt-3 grid gap-x-8 gap-y-2 sm:grid-cols-2">
             {t.sources.map((source) => (
               <li key={source.target}>

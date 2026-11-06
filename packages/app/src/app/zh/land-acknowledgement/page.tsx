@@ -73,12 +73,12 @@ export default function LandAcknowledgementPageZh() {
             >
               <p className="text-xs font-medium text-muted-foreground">{entry.region}</p>
               <h2 className="mt-2 text-xl font-semibold text-foreground">{entry.peoples}</h2>
-              <p className="mt-4 leading-reading text-muted-foreground">{entry.acknowledgement}</p>
+              <p className="mt-4 leading-reading text-foreground">{entry.acknowledgement}</p>
             </article>
           ))}
         </section>
 
-        <p className="max-w-measure leading-reading text-muted-foreground">
+        <p className="max-w-measure leading-reading text-foreground">
           传统领地声明只是一个起点。我们发布本声明，以表达对原住民族主权、历史和当代社群的尊重。如有任何措辞需要改进，欢迎指正。
         </p>
       </div>

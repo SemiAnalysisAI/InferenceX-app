@@ -7,8 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Heading } from '@/components/ui/heading';
-import { READING_PAGE_CLASS } from '@/components/ui/reading-layout';
-import { ResultContext } from '@/components/ui/result-context';
+import { ARTICLE_H2_CLASS, READING_PAGE_CLASS } from '@/components/ui/reading-layout';
+import { ResultContext, sourceLinkClassName } from '@/components/ui/result-context';
 import { type Locale, localePath } from '@/lib/i18n/i18n';
 import {
   buildWhitepaperBreadcrumbJsonLd,
@@ -46,9 +46,9 @@ interface SectionProps {
 function Section({ id, title, children, className }: SectionProps) {
   return (
     <section className={cn('flex flex-col gap-5', className)} aria-labelledby={id}>
-      <Heading as="h2" level="section" id={id} className="scroll-mt-24 text-2xl">
+      <h2 id={id} className={ARTICLE_H2_CLASS}>
         {title}
-      </Heading>
+      </h2>
       {children}
     </section>
   );
@@ -265,18 +265,16 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
                     {t.tcoBadgesLabel} <Badge variant="outline">{figure.tcoBadge}</Badge>
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    <small>
-                      {t.sourceLabel}{' '}
-                      <a
-                        href={chart.tcoSourceHref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline hover:text-foreground"
-                      >
-                        {chart.tcoSourceTitle}
-                        <ExternalLinkIcon />
-                      </a>
-                    </small>
+                    {t.sourceLabel}{' '}
+                    <a
+                      href={chart.tcoSourceHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={sourceLinkClassName}
+                    >
+                      {chart.tcoSourceTitle}
+                      <ExternalLinkIcon />
+                    </a>
                   </p>
                   <p className="text-xs text-muted-foreground">
                     <span className="font-medium text-foreground">{t.sellingPriceLabel}:</span>{' '}

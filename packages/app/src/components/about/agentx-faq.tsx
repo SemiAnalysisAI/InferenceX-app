@@ -1,8 +1,15 @@
 import Link from 'next/link';
 
 import { CopyableCodeBlock } from '@/components/ui/copyable-code-block';
+import {
+  ARTICLE_H2_CLASS,
+  ARTICLE_H3_CLASS,
+  READING_SECTION_CLASS,
+  READING_TEXT_CLASS,
+} from '@/components/ui/reading-layout';
 import { AgentXQuickstartCallout } from '@/components/datasets/agentx-quickstart';
 import { AGENTX_QUICKSTART, AGENTX_ROUTING } from '@/lib/agentx/quickstart';
+import { cn } from '@/lib/shared/utils';
 
 type Locale = 'en' | 'zh';
 
@@ -287,54 +294,46 @@ export function AgentXFaq({ locale }: { locale: Locale }) {
   const content = CONTENT[locale];
 
   return (
-    <section id="agentx" className="scroll-mt-24 border-t border-border/30 pt-10">
-      <h2 className="text-xl font-semibold">{content.title}</h2>
-      <div className="mt-3 flex max-w-measure flex-col gap-4">
+    <section id="agentx" className={READING_SECTION_CLASS}>
+      <h2 className={ARTICLE_H2_CLASS}>{content.title}</h2>
+      <div className="mt-4 flex flex-col gap-4">
         {content.intro.map((paragraph) => (
-          <p key={paragraph} className="leading-reading text-muted-foreground">
+          <p key={paragraph} className={READING_TEXT_CLASS}>
             {paragraph}
           </p>
         ))}
       </div>
 
-      <div className="mt-6 max-w-measure">
+      <div className="mt-10">
         <AgentXQuickstartCallout locale={locale} />
       </div>
 
-      <div className="mt-6 divide-y divide-border/30">
-        {content.sections.map((section) => (
-          <div
-            key={section.title}
-            data-testid="agentx-faq-section"
-            className="grid gap-3 py-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:gap-8"
-          >
-            <h3 className="font-medium">{section.title}</h3>
-            <div className="min-w-0 max-w-measure space-y-4">
-              {section.paragraphs?.map((paragraph) => (
-                <p key={paragraph} className="leading-reading text-muted-foreground">
-                  {paragraph}
-                </p>
+      {content.sections.map((section) => (
+        <div key={section.title} data-testid="agentx-faq-section" className="mt-10 space-y-4">
+          <h3 className={ARTICLE_H3_CLASS}>{section.title}</h3>
+          {section.paragraphs?.map((paragraph) => (
+            <p key={paragraph} className={READING_TEXT_CLASS}>
+              {paragraph}
+            </p>
+          ))}
+          {section.bullets && (
+            <ul className={cn(READING_TEXT_CLASS, 'ml-5 list-disc space-y-2')}>
+              {section.bullets.map((bullet) => (
+                <li key={bullet}>{bullet}</li>
               ))}
-              {section.bullets && (
-                <ul className="ml-5 list-disc space-y-2 leading-reading text-muted-foreground">
-                  {section.bullets.map((bullet) => (
-                    <li key={bullet}>{bullet}</li>
-                  ))}
-                </ul>
-              )}
-              {section.code && (
-                <CopyableCodeBlock locale={locale} label={section.title}>
-                  {section.code}
-                </CopyableCodeBlock>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+            </ul>
+          )}
+          {section.code && (
+            <CopyableCodeBlock locale={locale} label={section.title}>
+              {section.code}
+            </CopyableCodeBlock>
+          )}
+        </div>
+      ))}
 
-      <div className="grid gap-3 border-t border-border/30 py-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:gap-8">
-        <h3 className="font-medium">{content.creditsTitle}</h3>
-        <div className="min-w-0 max-w-measure space-y-4 leading-reading text-muted-foreground">
+      <div className="mt-10 space-y-4">
+        <h3 className={ARTICLE_H3_CLASS}>{content.creditsTitle}</h3>
+        <div className={cn(READING_TEXT_CLASS, 'space-y-4')}>
           <p>{content.adapted}</p>
           <p>{content.authority}</p>
           <ul className="ml-5 list-disc space-y-2">

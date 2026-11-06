@@ -20,7 +20,8 @@ export interface BlogThumbnailProps {
 const TILE_SIZES = '(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw';
 const CARD_SIZES = '(min-width: 1024px) 50vw, 100vw';
 
-const IMG_CLASS = 'block h-full w-full object-cover';
+const IMG_CLASS =
+  'block h-full w-full rounded-md border border-border/30 bg-card object-cover object-top';
 
 const TILE_MASK =
   'linear-gradient(115deg, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.4) 55%, rgba(0, 0, 0, 0.08) 90%)';
@@ -106,7 +107,7 @@ export function BlogThumbnail({
   const single = thumbnail.dark ?? thumbnail.light;
   return (
     <div
-      className={cn('relative aspect-[1200/630] w-full overflow-hidden bg-background', className)}
+      className={cn('relative aspect-[1200/630] w-full overflow-hidden bg-muted/50 p-3', className)}
       data-testid="blog-thumbnail-figure"
     >
       {thumbnail.light && thumbnail.dark && thumbnail.light !== thumbnail.dark ? (

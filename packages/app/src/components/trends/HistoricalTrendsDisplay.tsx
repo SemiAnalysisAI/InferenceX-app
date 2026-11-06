@@ -41,6 +41,7 @@ import { TcoPriceTable, plottedChipBases } from '@/components/ui/editable-tco-ba
 import { ModelLogo } from '@/components/ui/model-logo';
 import { exportToCsv } from '@/lib/export/csv-export';
 import { historicalTrendToCsv } from '@/lib/export/csv-export-helpers';
+import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from '@/components/ui/atom-engine-footnote';
 import ChartLegend from '@/components/ui/chart-legend';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -544,6 +545,11 @@ export default function HistoricalTrendsDisplay() {
                         omitCostValues
                         chipBasis={readOnlyChipBasisControl}
                       />
+                      {Object.entries(hardwareConfig).some(
+                        ([key, hwConfig]) =>
+                          hwTypesWithData.has(key) &&
+                          getDisplayLabel(hwConfig).includes(ATOM_FOOTNOTE_MARKER),
+                      ) && <AtomEngineFootnote className="mt-2" />}
                     </div>
                   );
                 })()}
@@ -555,6 +561,7 @@ export default function HistoricalTrendsDisplay() {
                 legendElement={
                   <ChartLegend
                     variant="sidebar"
+                    hideAtomFootnote
                     collapsible={chartView === 'line'}
                     onItemRemove={removeHwType}
                     legendItems={Object.entries(hardwareConfig)

@@ -7,7 +7,11 @@ import { buildFaqJsonLd, FaqList } from '@/components/about/faq';
 import { PromoVideo } from '@/components/about/promo-video';
 import { JsonLd } from '@/components/seo/json-ld';
 import { buttonVariants } from '@/components/ui/button';
-import { READING_PAGE_CLASS } from '@/components/ui/reading-layout';
+import {
+  ARTICLE_H2_CLASS,
+  READING_PAGE_CLASS,
+  READING_SECTION_CLASS,
+} from '@/components/ui/reading-layout';
 import { zhAlternates, ZH_LANG_TAG } from '@/lib/i18n/i18n';
 import { cn } from '@/lib/shared/utils';
 import { socialMetadata } from '@/lib/seo/social-metadata';
@@ -34,14 +38,12 @@ export default function AboutPageZh() {
   return (
     <main className="relative">
       <JsonLd data={faqJsonLd} />
-      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-10')}>
-        <PromoVideo />
-
+      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-12')}>
         <section>
-          <h1 className="max-w-4xl text-2xl font-semibold text-balance md:text-3xl">
+          <h1 className="max-w-4xl text-3xl font-semibold text-balance lg:text-4xl lg:tracking-heading">
             持续运行的开源智能体推理基准测试，受到万亿美元级、吉瓦规模 Token 工厂运营方的信赖
           </h1>
-          <div className="mt-4 flex max-w-measure flex-col gap-4 leading-reading text-muted-foreground">
+          <div className="mt-4 flex max-w-measure flex-col gap-4 leading-reading text-foreground">
             <p>
               软件开发和模型发布的节奏极快。静态基准测试很快就会过时；参与者提交的软件镜像往往是为基准测试专门构建的，无法反映真实应用场景中的性能。
             </p>
@@ -73,15 +75,17 @@ export default function AboutPageZh() {
           </div>
         </section>
 
+        <PromoVideo />
+
         <AgentXFaq locale="zh" />
 
-        <section id="reproducibility" className="scroll-mt-24 border-t border-border/30 pt-10">
-          <h2 className="text-xl font-semibold">可复现性</h2>
-          <p className="mt-3 max-w-measure leading-reading text-muted-foreground">
+        <section id="reproducibility" className={READING_SECTION_CLASS}>
+          <h2 className={ARTICLE_H2_CLASS}>可复现性</h2>
+          <p className="mt-3 max-w-measure leading-reading text-foreground">
             仪表板上的每个数据点都由公开的 GitHub Actions
             工作流生成。测试配置、日志、产物及其对应的数据库记录彼此关联，任何人都可以核查结果来源、重新运行测试，或基于现有配置创建新的基准测试。
           </p>
-          <ol className="mt-6 flex max-w-measure flex-col gap-4 leading-reading text-muted-foreground">
+          <ol className="mt-6 flex max-w-measure flex-col gap-4 leading-reading text-foreground">
             <li className="flex gap-4">
               <span className="w-4 shrink-0 font-medium text-foreground tabular-nums">1</span>
               <div>

@@ -50,9 +50,9 @@ export function CopyableCodeBlock({
   return (
     <div
       data-testid="copyable-code-block"
-      className="min-w-0 overflow-hidden rounded-lg border border-border/60 bg-muted/30"
+      className="w-full min-w-0 max-w-figure overflow-hidden rounded-lg border border-border/60 bg-card"
     >
-      <div className="flex min-w-0 items-center justify-between gap-3 border-b border-border/50 px-3 py-1">
+      <div className="flex min-w-0 items-center justify-between gap-3 border-b border-border/50 bg-muted/50 px-3 py-1">
         <span className="min-w-0 break-words text-xs font-medium text-muted-foreground">
           {title}
         </span>

@@ -115,7 +115,7 @@ export default function GlossaryPage() {
         <section className="grid gap-10 border-t border-border/30 pt-10 md:grid-cols-2">
           <div>
             <h2 className="text-xl font-semibold">The full curve tells the story</h2>
-            <p className="mt-3 max-w-measure leading-reading text-muted-foreground">
+            <p className="mt-3 max-w-measure leading-reading text-foreground">
               LLM serving balances per-user speed against aggregate throughput. InferenceX uses full
               Pareto curves and matched-interactivity comparisons to show that tradeoff across
               operating points. One maximum-throughput point cannot rank the complete system.
@@ -138,7 +138,7 @@ export default function GlossaryPage() {
 
           <div>
             <h2 className="text-xl font-semibold">Definitions connected to real recipes</h2>
-            <p className="mt-3 max-w-measure leading-reading text-muted-foreground">
+            <p className="mt-3 max-w-measure leading-reading text-foreground">
               Every term page links to InferenceX articles where the concept changes a measured
               result, including MTP acceptance behavior, NVL72 wide-EP scaling, and software-only
               speedups on unchanged chips.
