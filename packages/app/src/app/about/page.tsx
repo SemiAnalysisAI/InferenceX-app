@@ -7,7 +7,9 @@ import { buildFaqJsonLd, FaqList } from '@/components/about/faq';
 import { PromoVideo } from '@/components/about/promo-video';
 import { JsonLd } from '@/components/seo/json-ld';
 import { buttonVariants } from '@/components/ui/button';
+import { READING_PAGE_CLASS } from '@/components/ui/reading-layout';
 import { enAlternates } from '@/lib/i18n/i18n';
+import { cn } from '@/lib/shared/utils';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 import { GITHUB_OWNER, GITHUB_REPO, SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -32,7 +34,7 @@ export default function AboutPage() {
   return (
     <main className="relative">
       <JsonLd data={faqJsonLd} />
-      <div className="container mx-auto flex flex-col gap-10 px-4 lg:px-8">
+      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-10')}>
         <PromoVideo />
 
         <section>
@@ -40,7 +42,7 @@ export default function AboutPage() {
             Open-source continuous agentic inference benchmark trusted by operators of
             trillion-dollar, gigawatt-scale token factories
           </h1>
-          <div className="mt-4 flex max-w-3xl flex-col gap-3 leading-7 text-muted-foreground">
+          <div className="mt-4 flex max-w-measure flex-col gap-4 leading-reading text-muted-foreground">
             <p>
               Software development and model releases move fast. Static benchmarks quickly become
               obsolete, and participants often submit software images purpose-built for the
@@ -78,12 +80,12 @@ export default function AboutPage() {
 
         <section id="reproducibility" className="scroll-mt-24 border-t border-border/30 pt-10">
           <h2 className="text-xl font-semibold">Reproducibility</h2>
-          <p className="mt-3 max-w-3xl leading-7 text-muted-foreground">
+          <p className="mt-3 max-w-measure leading-reading text-muted-foreground">
             Every data point on the dashboard is the output of a public GitHub Actions workflow run.
             The recipe, logs, artifacts, and the resulting database row are all linked end to end,
             so anyone can audit, rerun, or fork a benchmark.
           </p>
-          <ol className="mt-6 flex max-w-3xl flex-col gap-4 text-sm leading-6 text-muted-foreground">
+          <ol className="mt-6 flex max-w-measure flex-col gap-4 leading-reading text-muted-foreground">
             <li className="flex gap-4">
               <span className="w-4 shrink-0 font-medium text-foreground tabular-nums">1</span>
               <div>

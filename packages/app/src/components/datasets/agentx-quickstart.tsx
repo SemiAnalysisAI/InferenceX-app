@@ -51,28 +51,28 @@ export function AgentXQuickstartArticle({ locale }: { locale: Locale }) {
         </Link>
         <p className="mt-6 font-mono text-xs text-muted-foreground">agentx-harness · 1.0.7</p>
         <h1 className="mt-2 text-3xl font-semibold text-balance md:text-4xl">{t.title}</h1>
-        <p className="mt-4 max-w-prose leading-7 text-muted-foreground">{t.description}</p>
+        <p className="mt-4 max-w-measure leading-reading text-muted-foreground">{t.description}</p>
       </header>
       <div className="space-y-8 py-8">
         <section id="run" className="scroll-mt-24 space-y-3">
           <h2 className="text-lg font-semibold">{t.run}</h2>
-          <p className="text-sm leading-6 text-muted-foreground">{t.runHelp}</p>
+          <p className="max-w-measure leading-reading text-muted-foreground">{t.runHelp}</p>
           <CopyableCodeBlock locale={locale} label={t.run}>
             {AGENTX_COMMANDS}
           </CopyableCodeBlock>
-          <p className="text-sm leading-6 text-muted-foreground">
+          <p className="max-w-measure leading-reading text-muted-foreground">
             {t.modelNote} {t.trust}
           </p>
         </section>
         <section id="routing" className="scroll-mt-24 space-y-3">
           <h2 className="text-lg font-semibold">{t.routing}</h2>
-          <p className="text-sm leading-6 text-muted-foreground">{t.routingHelp}</p>
+          <p className="max-w-measure leading-reading text-muted-foreground">{t.routingHelp}</p>
           <CopyableCodeBlock locale={locale} label={t.routing}>
             {AGENTX_ROUTING}
           </CopyableCodeBlock>
         </section>
         <footer className="space-y-3 border-t border-border/20 pt-6">
-          <p className="text-sm leading-6 text-muted-foreground">{t.resultsHelp}</p>
+          <p className="max-w-measure leading-reading text-muted-foreground">{t.resultsHelp}</p>
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
             <Link
               href={localePath('/agentx/methodology', locale)}

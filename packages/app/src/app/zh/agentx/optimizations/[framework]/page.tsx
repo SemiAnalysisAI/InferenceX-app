@@ -3,12 +3,14 @@ import { notFound } from 'next/navigation';
 
 import { AgentXOptimizationsArticle } from '@/components/datasets/agentx-optimizations-article';
 import { JsonLd } from '@/components/seo/json-ld';
+import { ARTICLE_PAGE_CLASS } from '@/components/ui/reading-layout';
 import {
   AGENTX_OPTIMIZATION_FRAMEWORKS,
   getOptimizationFramework,
 } from '@/lib/agentx/agentx-optimizations';
 import { getLocalizedFramework } from '@/lib/agentx/agentx-optimizations-zh';
 import { zhAlternates, ZH_LANG_TAG } from '@/lib/i18n/i18n';
+import { cn } from '@/lib/shared/utils';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 
@@ -60,7 +62,7 @@ export default async function AgentXOptimizationsFrameworkPageZh({ params }: Pro
   return (
     <main className="relative">
       <JsonLd data={jsonLd} />
-      <div className="container mx-auto max-w-6xl px-4 pt-4 lg:px-8 lg:pt-8">
+      <div className={cn(ARTICLE_PAGE_CLASS, 'pt-4 lg:pt-8')}>
         <AgentXOptimizationsArticle slug={slug} locale="zh" />
       </div>
     </main>

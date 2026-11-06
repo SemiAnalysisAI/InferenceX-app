@@ -4,6 +4,7 @@ import { JsonLd } from '@/components/seo/json-ld';
 import { Badge } from '@/components/ui/badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
+import { READING_PAGE_CLASS } from '@/components/ui/reading-layout';
 import { Stat } from '@/components/ui/stat';
 import type { Locale } from '@/lib/i18n/i18n';
 import {
@@ -15,6 +16,7 @@ import {
   whitepaperDetailPath,
   whitepaperTagLabel,
 } from '@/lib/content/whitepapers';
+import { cn } from '@/lib/shared/utils';
 
 import { WhitepaperCard, WhitepaperPdfButton, WhitepaperReadLink } from './whitepaper-links';
 
@@ -25,12 +27,12 @@ export function WhitepaperIndexContent({ locale }: { locale: Locale }) {
   return (
     <main className="relative" data-testid="whitepaper-index-page">
       <JsonLd data={buildWhitepaperIndexJsonLd(locale)} />
-      <div className="container mx-auto flex flex-col gap-8 px-4 lg:gap-10 lg:px-8">
+      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-8 lg:gap-10')}>
         <header className="flex flex-col gap-3 pt-4 lg:pt-8">
           <Heading as="h1" level="page" className="text-balance">
             {t.indexTitle}
           </Heading>
-          <p className="max-w-prose text-base text-muted-foreground lg:text-lg">{t.indexIntro}</p>
+          <p className="max-w-measure text-base text-muted-foreground lg:text-lg">{t.indexIntro}</p>
         </header>
 
         {papers.length === 0 ? (

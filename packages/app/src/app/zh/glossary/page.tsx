@@ -9,6 +9,7 @@ import {
 } from '@/components/glossary/glossary-browser';
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
+import { READING_PAGE_CLASS } from '@/components/ui/reading-layout';
 import { Stat } from '@/components/ui/stat';
 import { getAllPosts } from '@/lib/blog/blog';
 import { GLOSSARY_CATEGORIES } from '@/lib/content/glossary';
@@ -21,6 +22,7 @@ import { ZH_LANG_TAG, zhAlternates } from '@/lib/i18n/i18n';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 import { analyticsPlacement } from '@/lib/analytics/placement';
+import { cn } from '@/lib/shared/utils';
 
 const MORE_LINK = 'inline-flex items-center gap-1 text-brand hover:underline';
 
@@ -111,11 +113,11 @@ export default function ZhGlossaryPage() {
   return (
     <main className="relative" {...analyticsPlacement('glossary')}>
       <JsonLd data={jsonLd} />
-      <div className="container mx-auto flex flex-col gap-10 px-4 pt-4 lg:px-8 lg:pt-8">
+      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-10 pt-4 lg:pt-8')}>
         <header className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div>
             <h1 className="text-3xl font-semibold text-balance md:text-4xl">AI 推理术语表</h1>
-            <p className="mt-4 max-w-3xl text-base leading-7 text-muted-foreground md:text-lg md:leading-8">
+            <p className="mt-4 max-w-measure text-base leading-reading text-muted-foreground md:text-lg md:leading-8">
               解释 InferenceX 使用的智能体推理、基准指标、服务技术、数值格式与分布式系统概念。
               各条目以实测行为和已发布的基准测试方案为依据。
             </p>
@@ -141,7 +143,7 @@ export default function ZhGlossaryPage() {
         <section className="grid gap-10 border-t border-border/30 pt-10 md:grid-cols-2">
           <div>
             <h2 className="text-xl font-semibold">完整曲线更能说明问题</h2>
-            <p className="mt-3 max-w-prose leading-7 text-muted-foreground">
+            <p className="mt-3 max-w-measure leading-reading text-muted-foreground">
               LLM 服务需要在单用户速度与总吞吐量之间取舍。InferenceX 使用完整 Pareto
               曲线和等交互性比较，展示不同运行点上的真实权衡。单一最大吞吐点无法代表完整系统。
             </p>
@@ -163,7 +165,7 @@ export default function ZhGlossaryPage() {
 
           <div>
             <h2 className="text-xl font-semibold">每个定义都连接真实方案</h2>
-            <p className="mt-3 max-w-prose leading-7 text-muted-foreground">
+            <p className="mt-3 max-w-measure leading-reading text-muted-foreground">
               每个术语页都会链接到该概念真正影响实测结果的 InferenceX 文章，包括 MTP 接受行为、NVL72
               Wide EP 扩展，以及硬件不变时的软件性能提升。
             </p>

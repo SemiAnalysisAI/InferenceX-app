@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
+import { READING_PAGE_CLASS } from '@/components/ui/reading-layout';
 import {
   type AdjacentPosts,
   getPostThumbnail,
@@ -13,6 +14,7 @@ import {
 } from '@/lib/blog/blog';
 import { type Locale, localePath } from '@/lib/i18n/i18n';
 import { analyticsPlacement } from '@/lib/analytics/placement';
+import { cn } from '@/lib/shared/utils';
 import { AUTHOR_NAME } from '@semianalysisai/inferencex-constants';
 
 import { BlogBackLink } from './blog-back-link';
@@ -61,7 +63,7 @@ export function BlogPostContent({
     <main className="relative" data-testid="blog-post-page">
       <HashScroll />
       <ReadingProgressBar slug={slug} />
-      <div className="container mx-auto flex flex-col gap-10 px-4 lg:gap-12 lg:px-8">
+      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-10 lg:gap-12')}>
         <section data-blog-section="true" className="flex flex-col gap-10 lg:gap-12">
           <header
             className="flex flex-col gap-5 border-b border-border/30 pb-8 pt-4 lg:pb-10 lg:pt-8"
@@ -77,7 +79,9 @@ export function BlogPostContent({
               >
                 {meta.title}
               </Heading>
-              <p className="max-w-prose text-lg leading-7 text-muted-foreground">{meta.subtitle}</p>
+              <p className="max-w-measure text-lg leading-7 text-muted-foreground">
+                {meta.subtitle}
+              </p>
             </div>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
               <span>{AUTHOR_NAME}</span>
@@ -135,7 +139,7 @@ export function BlogPostContent({
                 className={BLOG_PROSE_CLASS}
               >
                 {content}
-                <p className="mt-12 max-w-[72ch] border-t border-border/30 pt-6 text-xs leading-5 text-muted-foreground">
+                <p className="mt-12 max-w-measure border-t border-border/30 pt-6 text-xs leading-5 text-muted-foreground">
                   {t.copyright}
                 </p>
               </article>

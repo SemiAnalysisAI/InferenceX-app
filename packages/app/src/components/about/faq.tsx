@@ -82,7 +82,7 @@ export function FaqList({ title, items }: { title: string; items: readonly FaqIt
             <dt className="min-w-0 font-medium">
               <FaqQuestionLink id={item.id} question={item.question} />
             </dt>
-            <dd className="min-w-0 max-w-prose text-sm leading-relaxed text-muted-foreground">
+            <dd className="min-w-0 max-w-measure leading-reading text-muted-foreground">
               {item.answer && (
                 <p>
                   {item.answer}
@@ -102,7 +102,7 @@ export function FaqList({ title, items }: { title: string; items: readonly FaqIt
                 </p>
               )}
               {item.list && (
-                <ul className="mt-2 ml-5 list-disc space-y-1 first:mt-0">
+                <ul className="mt-3 ml-5 list-disc space-y-2 first:mt-0">
                   {item.list.map((listItem) => (
                     <li key={listItem}>{listItem}</li>
                   ))}

@@ -1,8 +1,10 @@
 import { Fragment } from 'react';
 
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
+import { READING_PAGE_CLASS } from '@/components/ui/reading-layout';
 
 import type { Locale } from '@/lib/i18n/i18n';
+import { cn } from '@/lib/shared/utils';
 
 import { CompanyLogo } from './quote-utils';
 import { QUOTES, orgAnchorId } from './quotes-data';
@@ -59,7 +61,7 @@ function QuoteCard({
 }) {
   const content = (
     <blockquote id={id} className="scroll-mt-24 space-y-5">
-      <p className="text-base leading-relaxed text-foreground lg:text-lg">
+      <p className="text-base leading-reading text-foreground lg:text-lg">
         &ldquo;{highlightBrand(text)}&rdquo;
       </p>
       <footer className="flex min-w-0 items-center gap-3">
@@ -92,16 +94,18 @@ export function QuotesContent({ locale = 'en' }: { locale?: Locale } = {}) {
   const t = STRINGS[locale];
   return (
     <main className="relative">
-      <div className="container mx-auto flex flex-col gap-10 px-4 pt-4 lg:px-8 lg:pt-8">
+      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-10 pt-4 lg:pt-8')}>
         <header className="max-w-4xl">
           <h1 className="text-3xl font-semibold text-balance md:text-4xl">{t.heading}</h1>
-          <p className="mt-3 text-base leading-7 text-muted-foreground lg:text-lg">{t.intro}</p>
+          <p className="mt-3 max-w-measure text-base leading-reading text-muted-foreground lg:text-lg">
+            {t.intro}
+          </p>
         </header>
         <div className="border-t border-border/30 pt-10">
           <SupporterLogoWall locale={locale} groups={SUPPORTER_GROUPS} />
         </div>
         <section className="border-t border-border/30 pt-10">
-          <div className="flex max-w-4xl flex-col gap-8 md:gap-10">
+          <div className="flex max-w-measure flex-col gap-8 md:gap-10">
             {QUOTES.map((quote, i) => (
               <Fragment key={`${quote.org}-${quote.name}`}>
                 {i > 0 && <hr className="border-t border-border/30" aria-hidden="true" />}

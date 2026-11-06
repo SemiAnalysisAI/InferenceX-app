@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
 
 import { AgentXQuickstartArticle } from '@/components/datasets/agentx-quickstart';
+import { ARTICLE_PAGE_CLASS } from '@/components/ui/reading-layout';
 import { AGENTX_QUICKSTART } from '@/lib/agentx/quickstart';
 import { zhAlternates } from '@/lib/i18n/i18n';
+import { cn } from '@/lib/shared/utils';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 
@@ -22,7 +24,7 @@ export const metadata: Metadata = {
 
 export default function AgentXQuickstartPageZh() {
   return (
-    <main className="container mx-auto max-w-4xl px-4 pt-4 lg:px-8 lg:pt-8">
+    <main className={cn(ARTICLE_PAGE_CLASS, 'pt-4 lg:pt-8')}>
       <AgentXQuickstartArticle locale="zh" />
     </main>
   );

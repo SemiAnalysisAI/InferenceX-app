@@ -46,7 +46,7 @@ function SectionFigure({
           alt={figure.alt}
           width={asset.width}
           height={asset.height}
-          sizes="(max-width: 768px) 100vw, 1152px"
+          sizes="(max-width: 768px) 100vw, 832px"
           quality={100}
           className="h-auto w-full"
         />
@@ -80,13 +80,13 @@ function SectionBlock({
       <h2 id={section.id} className="mb-4 scroll-mt-24 text-2xl font-semibold text-foreground">
         {section.heading}
       </h2>
-      <div className="max-w-3xl space-y-4 text-base leading-7 text-muted-foreground">
+      <div className="max-w-measure space-y-4 text-base leading-reading text-muted-foreground">
         {section.paragraphs.map((paragraph) => (
           <p key={paragraph}>{paragraph}</p>
         ))}
       </div>
       {section.bullets && section.bullets.length > 0 && (
-        <ul className="mt-5 max-w-3xl space-y-2 border-l border-border/20 pl-4 text-base leading-7 text-muted-foreground">
+        <ul className="mt-4 max-w-measure space-y-2 border-l border-border/20 pl-4 text-base leading-reading text-muted-foreground">
           {section.bullets.map((bullet) => (
             <li key={bullet}>{bullet}</li>
           ))}
@@ -140,7 +140,7 @@ export function AgentXTelemetryArticle({ locale }: { locale: Locale }) {
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
           {guide.title}
         </h1>
-        <p className="mt-5 max-w-3xl text-lg leading-8 text-muted-foreground">{guide.lead}</p>
+        <p className="mt-5 max-w-measure text-lg leading-8 text-muted-foreground">{guide.lead}</p>
         <FactGrid items={guide.highlights} />
         <AgentXTelemetryLink
           href={`${prefix}/inference?i_seq=agentic-traces`}
@@ -155,7 +155,7 @@ export function AgentXTelemetryArticle({ locale }: { locale: Locale }) {
       </header>
 
       <div className="py-10">
-        <div className="max-w-3xl space-y-4 text-base leading-7 text-muted-foreground">
+        <div className="max-w-measure space-y-4 text-base leading-reading text-muted-foreground">
           {guide.intro.map((paragraph) => (
             <p key={paragraph}>{paragraph}</p>
           ))}

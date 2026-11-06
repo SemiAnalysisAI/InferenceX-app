@@ -13,8 +13,7 @@ import { cn } from '@/lib/shared/utils';
 
 const FIGURE_DIMENSIONS: Record<string, readonly number[] | undefined> = figureDimensions;
 // Rendered width of the blog article column at each layout breakpoint (see blog-post-content).
-const FIGURE_SIZES =
-  '(min-width: 1536px) 1104px, (min-width: 1280px) 848px, (min-width: 1024px) 624px, calc(100vw - 2rem)';
+const FIGURE_SIZES = '(min-width: 1280px) 720px, (min-width: 1024px) 752px, calc(100vw - 2.5rem)';
 const FIGURE_CLASS = 'h-auto w-full rounded-xl';
 
 /** next/image props for a figure source, or null when the manifest has no size for it. */

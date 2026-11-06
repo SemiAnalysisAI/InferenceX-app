@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Heading } from '@/components/ui/heading';
+import { READING_PAGE_CLASS } from '@/components/ui/reading-layout';
 import { ResultContext } from '@/components/ui/result-context';
 import { type Locale, localePath } from '@/lib/i18n/i18n';
 import {
@@ -56,7 +57,7 @@ function Section({ id, title, children, className }: SectionProps) {
 function StepNumber({ children }: { children: ReactNode }) {
   return (
     <span
-      className="w-5 shrink-0 text-base leading-7 font-medium text-muted-foreground tabular-nums"
+      className="w-5 shrink-0 text-base leading-reading font-medium text-muted-foreground tabular-nums"
       aria-hidden="true"
     >
       {children}
@@ -116,12 +117,12 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
     <main className="relative" data-testid="whitepaper-detail-page">
       <JsonLd data={buildWhitepaperJsonLd(paper, locale)} />
       <JsonLd data={buildWhitepaperBreadcrumbJsonLd(paper, locale)} />
-      <div className="container mx-auto flex flex-col gap-10 px-4 pt-4 lg:gap-12 lg:px-8">
+      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-10 pt-4 lg:gap-12')}>
         <section
           className="dark relative isolate overflow-hidden rounded-xl border border-border/30 bg-[linear-gradient(135deg,#0b0c0e_0%,#131416_100%)] text-foreground lg:min-h-[420px]"
           data-testid="whitepaper-hero"
         >
-          <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(15rem,36%)] xl:grid-cols-[minmax(0,1fr)_30rem]">
+          <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(15rem,36%)]">
             <div className="flex flex-col gap-5 p-6 md:p-10 lg:gap-6 lg:py-12 lg:pl-12">
               <WhitepaperBackLink href={whitepaperIndexPath(locale)} label={t.backToIndex} />
               <header className="flex flex-col gap-4">
@@ -133,7 +134,7 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
                 >
                   {copy.title}
                 </Heading>
-                <p className="max-w-prose text-base text-muted-foreground lg:text-lg">
+                <p className="max-w-measure text-base text-muted-foreground lg:text-lg">
                   {copy.subtitle}
                 </p>
               </header>
@@ -174,7 +175,7 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
                 width={paper.chipImageWidth}
                 height={paper.chipImageHeight}
                 priority
-                sizes="(min-width: 1280px) 620px, (min-width: 768px) 42vw, 0px"
+                sizes="(min-width: 1152px) 470px, (min-width: 768px) 42vw, 0px"
                 className="absolute bottom-[-9%] right-[-8%] w-[118%] max-w-none"
                 style={CHIP_SHADOW_STYLE}
               />
@@ -304,7 +305,7 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
                 <p className="text-xs text-muted-foreground sm:hidden" aria-hidden="true">
                   {t.scrollHint}
                 </p>
-                <figcaption className="max-w-prose text-sm leading-6 text-muted-foreground">
+                <figcaption className="max-w-measure text-sm leading-6 text-muted-foreground">
                   {figureCopy.caption}
                 </figcaption>
               </figure>
@@ -315,26 +316,28 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-12 xl:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="flex min-w-0 flex-col gap-12">
             <Section id="whitepaper-summary" title={t.summary}>
-              <p className="max-w-prose text-base leading-7 text-foreground">{copy.abstract}</p>
+              <p className="max-w-measure text-base leading-reading text-foreground">
+                {copy.abstract}
+              </p>
             </Section>
 
             <Section id="whitepaper-key-findings" title={t.keyFindings}>
-              <ol className="flex max-w-prose flex-col gap-4">
+              <ol className="flex max-w-measure flex-col gap-4">
                 {copy.keyFindings.map((finding, index) => (
                   <li key={finding} className="flex items-start gap-3">
                     <StepNumber>{index + 1}</StepNumber>
-                    <p className="text-base leading-7 text-foreground">{finding}</p>
+                    <p className="text-base leading-reading text-foreground">{finding}</p>
                   </li>
                 ))}
               </ol>
             </Section>
 
             <Section id="whitepaper-method" title={t.method}>
-              <ol className="flex max-w-prose flex-col gap-4">
+              <ol className="flex max-w-measure flex-col gap-4">
                 {copy.methodSteps.map((step, index) => (
                   <li key={step} className="flex items-start gap-3">
                     <StepNumber>{index + 1}</StepNumber>
-                    <p className="text-base leading-7 text-foreground">{step}</p>
+                    <p className="text-base leading-reading text-foreground">{step}</p>
                   </li>
                 ))}
               </ol>
@@ -414,7 +417,7 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
             <Heading as="h2" level="section" id="whitepaper-closing">
               {t.closingHeading}
             </Heading>
-            <p className="max-w-prose text-sm leading-6 text-muted-foreground">{t.closingBody}</p>
+            <p className="max-w-measure text-sm leading-6 text-muted-foreground">{t.closingBody}</p>
           </div>
           <WhitepaperPdfButton
             href={paper.pdfPath}

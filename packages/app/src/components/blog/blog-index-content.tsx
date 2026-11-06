@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { Heading } from '@/components/ui/heading';
+import { READING_PAGE_CLASS } from '@/components/ui/reading-layout';
 import {
   getPostThumbnail,
   type BlogPostMeta,
@@ -9,6 +10,7 @@ import {
   getTopTags,
 } from '@/lib/blog/blog';
 import { type Locale, localePath } from '@/lib/i18n/i18n';
+import { cn } from '@/lib/shared/utils';
 
 import { BLOG_COPY, blogIndexPath } from './blog-copy';
 import { type BlogIndexCard, BlogIndexPostsWithUrlTag } from './blog-index-posts';
@@ -48,14 +50,14 @@ export function BlogIndexContent({ locale }: { locale: Locale }) {
 
   return (
     <div
-      className="container mx-auto flex flex-col gap-8 px-4 lg:gap-10 lg:px-8"
+      className={cn(READING_PAGE_CLASS, 'flex flex-col gap-8 lg:gap-10')}
       data-testid="blog-index-page"
     >
       <header className="flex flex-col gap-3 pt-4 lg:pt-8">
         <Heading as="h1" level="page" className="text-balance">
           {t.indexTitle}
         </Heading>
-        <p className="max-w-prose text-base text-muted-foreground lg:text-lg">{t.indexIntro}</p>
+        <p className="max-w-measure text-base text-muted-foreground lg:text-lg">{t.indexIntro}</p>
         <p className="text-sm text-muted-foreground">
           {t.glossaryLead}{' '}
           <Link

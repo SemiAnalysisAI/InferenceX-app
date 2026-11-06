@@ -289,15 +289,15 @@ export function AgentXFaq({ locale }: { locale: Locale }) {
   return (
     <section id="agentx" className="scroll-mt-24 border-t border-border/30 pt-10">
       <h2 className="text-xl font-semibold">{content.title}</h2>
-      <div className="mt-3 flex max-w-3xl flex-col gap-3">
+      <div className="mt-3 flex max-w-measure flex-col gap-4">
         {content.intro.map((paragraph) => (
-          <p key={paragraph} className="leading-7 text-muted-foreground">
+          <p key={paragraph} className="leading-reading text-muted-foreground">
             {paragraph}
           </p>
         ))}
       </div>
 
-      <div className="mt-6 max-w-3xl">
+      <div className="mt-6 max-w-measure">
         <AgentXQuickstartCallout locale={locale} />
       </div>
 
@@ -309,14 +309,14 @@ export function AgentXFaq({ locale }: { locale: Locale }) {
             className="grid gap-3 py-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:gap-8"
           >
             <h3 className="font-medium">{section.title}</h3>
-            <div className="min-w-0 max-w-prose space-y-3 text-sm">
+            <div className="min-w-0 max-w-measure space-y-4">
               {section.paragraphs?.map((paragraph) => (
-                <p key={paragraph} className="leading-relaxed text-muted-foreground">
+                <p key={paragraph} className="leading-reading text-muted-foreground">
                   {paragraph}
                 </p>
               ))}
               {section.bullets && (
-                <ul className="ml-5 list-disc space-y-2 leading-relaxed text-muted-foreground">
+                <ul className="ml-5 list-disc space-y-2 leading-reading text-muted-foreground">
                   {section.bullets.map((bullet) => (
                     <li key={bullet}>{bullet}</li>
                   ))}
@@ -334,7 +334,7 @@ export function AgentXFaq({ locale }: { locale: Locale }) {
 
       <div className="grid gap-3 border-t border-border/30 py-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:gap-8">
         <h3 className="font-medium">{content.creditsTitle}</h3>
-        <div className="min-w-0 max-w-prose space-y-3 text-sm leading-relaxed text-muted-foreground">
+        <div className="min-w-0 max-w-measure space-y-4 leading-reading text-muted-foreground">
           <p>{content.adapted}</p>
           <p>{content.authority}</p>
           <ul className="ml-5 list-disc space-y-2">

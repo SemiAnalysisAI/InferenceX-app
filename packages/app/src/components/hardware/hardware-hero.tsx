@@ -59,7 +59,7 @@ export function HardwareHero({ meta, locale }: { meta: HardwarePageMeta; locale:
           {meta.title}
         </Heading>
         <p
-          className="max-w-prose text-lg leading-7 text-muted-foreground"
+          className="max-w-measure text-lg leading-7 text-muted-foreground"
           data-testid="hardware-lede"
         >
           <HardwareLede lede={meta.lede} />

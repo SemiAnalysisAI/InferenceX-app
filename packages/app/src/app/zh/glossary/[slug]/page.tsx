@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { JsonLd } from '@/components/seo/json-ld';
+import { READING_PAGE_CLASS } from '@/components/ui/reading-layout';
 import { getPostBySlug } from '@/lib/blog/blog';
 import {
   GLOSSARY_CATEGORY_LABELS_ZH,
@@ -18,6 +19,7 @@ import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 import { clampMetaDescription } from '@/lib/seo/meta-text';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 import { analyticsPlacement } from '@/lib/analytics/placement';
+import { cn } from '@/lib/shared/utils';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -118,7 +120,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
   return (
     <main className="relative" {...analyticsPlacement('glossary')}>
       <JsonLd data={jsonLd} />
-      <div className="container mx-auto px-4 pt-4 lg:px-8 lg:pt-8">
+      <div className={cn(READING_PAGE_CLASS, 'pt-4 lg:pt-8')}>
         <article className="flex flex-col gap-10">
           <header className="border-b border-border/30 pb-8">
             <Link
@@ -143,7 +145,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
           </header>
 
           <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-16">
-            <div className="min-w-0 max-w-3xl">
+            <div className="min-w-0 max-w-measure">
               <section
                 aria-labelledby="plain-language-heading"
                 className="rounded-xl border border-border/30 bg-card p-5 md:p-6"
@@ -163,7 +165,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
                 <h2 id="technical-definition-heading" className="text-xl font-semibold">
                   技术定义
                 </h2>
-                <p className="mt-3 leading-7 text-muted-foreground">{entry.definition}</p>
+                <p className="mt-3 leading-reading text-muted-foreground">{entry.definition}</p>
               </section>
 
               {entry.measurement && (
@@ -182,19 +184,21 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
                   <h2 id="engineering-details" className="text-xl font-semibold">
                     工程细节
                   </h2>
-                  <p className="mt-3 leading-7 text-muted-foreground">{entry.explanation}</p>
+                  <p className="mt-3 leading-reading text-muted-foreground">{entry.explanation}</p>
                 </section>
                 <section aria-labelledby="why-it-matters">
                   <h2 id="why-it-matters" className="text-xl font-semibold">
                     为什么重要
                   </h2>
-                  <p className="mt-3 leading-7 text-muted-foreground">{entry.significance}</p>
+                  <p className="mt-3 leading-reading text-muted-foreground">{entry.significance}</p>
                 </section>
                 <section aria-labelledby="reading-inferencex">
                   <h2 id="reading-inferencex" className="text-xl font-semibold">
                     如何在 InferenceX 中解读
                   </h2>
-                  <p className="mt-3 leading-7 text-muted-foreground">{entry.benchmarkContext}</p>
+                  <p className="mt-3 leading-reading text-muted-foreground">
+                    {entry.benchmarkContext}
+                  </p>
                 </section>
               </div>
             </div>

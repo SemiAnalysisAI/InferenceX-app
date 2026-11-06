@@ -4,6 +4,7 @@ import { BLOG_COPY } from '@/components/blog/blog-copy';
 import { BLOG_PROSE_CLASS } from '@/components/blog/blog-prose';
 import { BlogToc } from '@/components/blog/blog-toc';
 import { HashScroll } from '@/components/blog/hash-scroll';
+import { READING_PAGE_CLASS } from '@/components/ui/reading-layout';
 import type { TocHeading } from '@/lib/blog/blog';
 import type { HardwarePageMeta } from '@/lib/hardware/hardware';
 import type { Locale } from '@/lib/i18n/i18n';
@@ -14,9 +15,7 @@ import { HardwareHero } from './hardware-hero';
 const HARDWARE_PROSE_CLASS = cn(
   BLOG_PROSE_CLASS,
   'hardware-prose',
-  'prose-p:my-4 prose-p:max-w-[76ch] prose-p:leading-relaxed',
-  'prose-ul:my-4 prose-ul:max-w-[76ch] prose-ol:my-4 prose-ol:max-w-[76ch] prose-li:my-1 prose-li:leading-relaxed',
-  'prose-headings:max-w-[76ch]',
+  'prose-li:my-1',
   'prose-h2:mt-10 prose-h2:mb-3 prose-h2:text-xl md:prose-h2:text-2xl',
   'prose-h3:mt-8 prose-h3:mb-2 prose-h3:text-lg',
   'prose-table:my-5 prose-td:tabular-nums [&_td:first-child]:whitespace-nowrap',
@@ -39,7 +38,7 @@ export function HardwarePageContent({ locale, meta, headings, content }: Hardwar
   return (
     <main className="relative" data-testid="hardware-page">
       <HashScroll />
-      <div className="container mx-auto flex flex-col gap-8 px-4 pb-16 lg:gap-10 lg:px-8">
+      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-8 pb-16 lg:gap-10')}>
         <HardwareHero meta={meta} locale={locale} />
 
         <div
@@ -57,7 +56,7 @@ export function HardwarePageContent({ locale, meta, headings, content }: Hardwar
               data-testid="hardware-article"
             >
               {content}
-              <p className="mt-10 max-w-[76ch] border-t border-border/40 pt-5 text-xs leading-5 text-muted-foreground">
+              <p className="mt-10 max-w-measure border-t border-border/40 pt-5 text-xs leading-5 text-muted-foreground">
                 {BLOG_COPY[locale].copyright}
               </p>
             </article>

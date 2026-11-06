@@ -12,6 +12,8 @@ Defined in the `@theme` block of `packages/app/src/app/globals.css`:
 | `--text-3xs`          | `text-3xs`          | 0.625rem (10px)                   | Densest labels: table meta, tooltips, log gutters |
 | `--text-dialog-title` | `text-dialog-title` | 1.375rem (22px), 30px line height | Centered announcement dialog headings             |
 | `--text-title`        | `text-title`        | 1.75rem (28px), 36px line height  | Desktop size of the dashboard page title          |
+| `--container-measure` | `max-w-measure`     | 36rem (576px)                     | Body text measure on reading pages                |
+| `--leading-reading`   | `leading-reading`   | 1.65 (1.8 under `:lang(zh)`)      | Body text line height on reading pages            |
 | `--tracking-eyebrow`  | `tracking-eyebrow`  | 0.16em                            | Easter-egg theme decorations only (no app UI)     |
 | `--tracking-heading`  | `tracking-heading`  | -0.04em                           | Display headings at `text-4xl` and larger only    |
 
@@ -35,7 +37,7 @@ Rules of thumb:
 
 Radii follow one ladder, so corners nest: page and section surfaces (Card, dialogs, the mobile menu) are `rounded-xl`, panels inside them (`ControlPanel`, legends, notices) are `rounded-lg`, controls (buttons, selects, inputs, segmented containers, badges) are `rounded-md`, and items inside a control or menu (segments via `SEGMENT_RADIUS_STYLE`, popover menu rows, select chips) are `rounded-sm`. Siblings of one kind share a radius, and a child is never rounder than its parent.
 
-Blog/article typography is owned by `@tailwindcss/typography` (`prose`) and is out of scope — don't migrate MDX content styles to these tokens.
+Blog/article typography is owned by `@tailwindcss/typography` (`prose`) via `BLOG_PROSE_CLASS`, and is out of scope for MDX content migration. Reading pages (blog, whitepapers, about, glossary, quotes, land acknowledgement, AgentX articles, hardware) share one layout. Wrap the page in `READING_PAGE_CLASS` (72rem frame) or `ARTICLE_PAGE_CLASS` (56rem frame, single-column articles) from `src/components/ui/reading-layout.ts`. Cap body text at `max-w-measure` with `leading-reading` at 16px (about 70 Latin or 36 CJK characters per line). Figures, tables and code blocks take the full column. `px-5` keeps 20px side margins on phones.
 
 ### Form controls and panels
 

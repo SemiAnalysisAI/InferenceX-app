@@ -63,7 +63,7 @@ function SectionFigure({
           alt={figure.alt}
           width={asset.width}
           height={asset.height}
-          sizes="(max-width: 768px) 100vw, 1152px"
+          sizes="(max-width: 768px) 100vw, 832px"
           quality={100}
           className="h-auto w-full bg-white"
         />
@@ -99,7 +99,7 @@ function SectionBlock({
       <h2 id={section.id} className="mb-4 scroll-mt-24 text-2xl font-semibold text-foreground">
         {section.heading}
       </h2>
-      <div className="max-w-3xl space-y-4 text-base leading-7 text-muted-foreground">
+      <div className="max-w-measure space-y-4 text-base leading-reading text-muted-foreground">
         {section.paragraphs.map((paragraph) => (
           <p key={paragraph}>
             <RichText text={paragraph} />
@@ -210,12 +210,14 @@ export function AgentXOptimizationsIndex({ locale }: { locale: Locale }) {
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
           {overview.title}
         </h1>
-        <p className="mt-5 max-w-3xl text-lg leading-8 text-muted-foreground">{overview.lead}</p>
+        <p className="mt-5 max-w-measure text-lg leading-8 text-muted-foreground">
+          {overview.lead}
+        </p>
         <FactGrid items={overview.highlights} />
       </header>
 
       <div className="py-10">
-        <div className="max-w-3xl space-y-4 text-base leading-7 text-muted-foreground">
+        <div className="max-w-measure space-y-4 text-base leading-reading text-muted-foreground">
           {overview.intro.map((paragraph) => (
             <p key={paragraph}>{paragraph}</p>
           ))}
@@ -225,7 +227,7 @@ export function AgentXOptimizationsIndex({ locale }: { locale: Locale }) {
           <h2 id="projects" className="mb-3 scroll-mt-24 text-2xl font-semibold text-foreground">
             {overview.frameworksTitle}
           </h2>
-          <p className="max-w-3xl text-base leading-7 text-muted-foreground">
+          <p className="max-w-measure text-base leading-reading text-muted-foreground">
             {overview.frameworksIntro}
           </p>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -279,7 +281,9 @@ export function AgentXOptimizationsArticle({ slug, locale }: { slug: string; loc
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
           {framework.name}
         </h1>
-        <p className="mt-5 max-w-3xl text-lg leading-8 text-muted-foreground">{framework.lead}</p>
+        <p className="mt-5 max-w-measure text-lg leading-8 text-muted-foreground">
+          {framework.lead}
+        </p>
         <FactGrid items={framework.highlights} />
       </header>
 

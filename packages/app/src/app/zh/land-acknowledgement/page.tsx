@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 
+import { READING_PAGE_CLASS } from '@/components/ui/reading-layout';
 import { zhAlternates } from '@/lib/i18n/i18n';
+import { cn } from '@/lib/shared/utils';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 
@@ -44,13 +46,13 @@ export const metadata: Metadata = {
 export default function LandAcknowledgementPageZh() {
   return (
     <main data-testid="land-acknowledgement-page" className="relative">
-      <div className="container mx-auto flex flex-col gap-10 px-4 pt-4 lg:px-8 lg:pt-8">
+      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-10 pt-4 lg:pt-8')}>
         <header className="max-w-3xl">
           <p className="mb-3 text-xs font-medium text-muted-foreground">原住民传统领地声明</p>
           <h1 className="text-3xl font-semibold text-balance text-foreground md:text-4xl">
             我们承认美国基础设施所在地的原住民传统领地
           </h1>
-          <p className="mt-4 text-sm leading-6 text-muted-foreground md:text-base">
+          <p className="mt-4 max-w-measure leading-reading text-muted-foreground">
             InferenceX 的基准测试集群为多个地区提供服务。本页聚焦 San Jose、Los Angeles 和 Chicago
             三个美国站点，并向世代守护这些土地、至今依然如此的原住民族致意。
           </p>
@@ -71,14 +73,12 @@ export default function LandAcknowledgementPageZh() {
             >
               <p className="text-xs font-medium text-muted-foreground">{entry.region}</p>
               <h2 className="mt-2 text-xl font-semibold text-foreground">{entry.peoples}</h2>
-              <p className="mt-4 text-sm leading-6 text-muted-foreground">
-                {entry.acknowledgement}
-              </p>
+              <p className="mt-4 leading-reading text-muted-foreground">{entry.acknowledgement}</p>
             </article>
           ))}
         </section>
 
-        <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+        <p className="max-w-measure leading-reading text-muted-foreground">
           传统领地声明只是一个起点。我们发布本声明，以表达对原住民族主权、历史和当代社群的尊重。如有任何措辞需要改进，欢迎指正。
         </p>
       </div>
