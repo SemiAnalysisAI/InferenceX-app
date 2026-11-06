@@ -6,9 +6,10 @@ import {
 } from './compute-aggregate-stats.js';
 import {
   CHART_METRIC_KEYS,
-  computeChartSeriesFromMetricPhases,
+  computeChartDataFromMetricPhases,
   type ChartSeries,
   type MetricsMap,
+  type PromptTokenTotals,
   type RawMetric,
 } from './compute-chart-series.js';
 import { computeRequestTimeline, type RequestTimeline } from './compute-request-timeline.js';
@@ -19,6 +20,7 @@ import type { ServerMetricsContext } from './server-metrics-adapters.js';
 export interface TraceDerivedPayloads {
   aggregateStats: AggregateStats;
   chartSeries: ChartSeries | null;
+  promptTokenTotals: PromptTokenTotals | null;
   requestTimeline: RequestTimeline | null;
   atomKvCacheBlocks: number | null;
 }
@@ -63,6 +65,7 @@ export async function computeTraceDerivedPayloads(
   ]);
   let aggregateStats = initialAggregateStats;
   let chartSeries: ChartSeries | null = null;
+  let promptTokenTotals: PromptTokenTotals | null = null;
 
   if (phases) {
     const aggregateMetrics = phases.complete
@@ -77,15 +80,21 @@ export async function computeTraceDerivedPayloads(
       ? phases.warmupMetrics
       : selectMetrics(phases.warmupMetrics, CHART_METRIC_KEYS);
     try {
-      chartSeries = computeChartSeriesFromMetricPhases(profiling, warmup, metricsContext);
+      ({ series: chartSeries, promptTokenTotals } = computeChartDataFromMetricPhases(
+        profiling,
+        warmup,
+        metricsContext,
+      ));
     } catch {
       chartSeries = null;
+      promptTokenTotals = null;
     }
   }
 
   return {
     aggregateStats,
     chartSeries,
+    promptTokenTotals,
     requestTimeline,
     atomKvCacheBlocks: phases
       ? atomKvCacheBlocksFromMetricPhases(phases.metrics, phases.warmupMetrics)

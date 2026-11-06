@@ -20,6 +20,7 @@ import {
   requestChartDataFromTimelineGz,
 } from '../queries/request-chart-data';
 import { CHART_SERIES_SUMMARY_VERSION } from './chart-series-summary';
+import { computeChartData } from './compute-chart-series';
 import { encodeRequestChartColumns } from './request-chart-columns';
 import {
   REQUEST_TIMELINE_VERSION,
@@ -29,6 +30,7 @@ import {
 import { gunzipRequestTimeline, gzipRequestTimeline } from './request-timeline-codec';
 import {
   TRACE_REPLAY_UPLOAD_CHUNK_BYTES,
+  cacheHitRatesFromPromptTokenTotals,
   gzipTraceReplayInput,
   persistPreparedTraceReplay,
   prepareTraceReplay,
@@ -109,6 +111,70 @@ function mockSqlWithTransaction(
   }) as unknown as Parameters<typeof persistPreparedTraceReplay>[0];
   return { sql, calls };
 }
+
+const NS_PER_S = 1e9;
+function slice(startS: number, endS: number, total: number) {
+  return {
+    start_ns: startS * NS_PER_S,
+    end_ns: endS * NS_PER_S,
+    total,
+    rate: total / (endS - startS),
+  };
+}
+
+function series(labels: Record<string, string>, slices: ReturnType<typeof slice>[]) {
+  return { endpoint_url: 'localhost:8888', labels, timeslices: slices };
+}
+
+describe('cacheHitRatesFromPromptTokenTotals', () => {
+  // Shape of TPU7x SGLang run 41384211546 c1: the last warmup cached_tokens
+  // slice is 0.1 s long, so its tok/s is 10x the tokens it holds.
+  const blob = () =>
+    gzipSync(
+      JSON.stringify({
+        warmup_metrics: {
+          'sglang:prompt_tokens': {
+            series: [series({}, [slice(0, 1, 1000), slice(1, 1.77, 1000)])],
+          },
+          'sglang:cached_tokens': {
+            series: [series({ cache_source: 'device' }, [slice(0, 1, 900), slice(1, 1.1, 900)])],
+          },
+        },
+        metrics: {
+          'sglang:prompt_tokens': {
+            series: [series({}, [slice(2, 3, 1000), slice(3, 4, 1000)])],
+          },
+          'sglang:cached_tokens': {
+            series: [
+              series({ cache_source: 'device' }, [slice(2, 3, 950), slice(3, 4, 950)]),
+              series({ cache_source: 'host' }, [slice(2, 3, 30), slice(3, 4, 0)]),
+            ],
+          },
+        },
+      }),
+    );
+
+  it('divides counter totals, so a short phase-boundary slice cannot push the rate past 1', async () => {
+    const data = await computeChartData(blob(), { framework: 'sglang' });
+
+    expect(data?.promptTokenTotals).toEqual({
+      prompt: 4000,
+      prefixCacheHits: 3730,
+      bySource: { 'cache hit (HBM)': 3700, 'cache hit (CPU offload)': 30 },
+    });
+    expect(cacheHitRatesFromPromptTokenTotals(data!.promptTokenTotals)).toEqual({
+      gpu: 3700 / 4000,
+      cpu: 30 / 4000,
+    });
+  });
+
+  it('returns null without prompt tokens', () => {
+    expect(cacheHitRatesFromPromptTokenTotals(null)).toBeNull();
+    expect(
+      cacheHitRatesFromPromptTokenTotals({ prompt: 0, prefixCacheHits: 5, bySource: {} }),
+    ).toBeNull();
+  });
+});
 
 describe('uploadTraceReplayPayloadChunks', () => {
   it('bounds every Bind payload for the measured 90 MiB staging row', async () => {

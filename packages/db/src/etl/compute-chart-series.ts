@@ -55,10 +55,15 @@ interface RawSlice {
   end_ns?: number;
   avg?: number;
   rate?: number;
+  total?: number;
   sum?: number;
 }
 
-type RawSliceField = 'avg' | 'rate' | 'sumRate';
+/**
+ * `total` and `sum` are per-slice counts (counter delta, histogram sum); the
+ * others are per-slice levels or per-second rates used for charting.
+ */
+type RawSliceField = 'avg' | 'rate' | 'sumRate' | 'total' | 'sum';
 
 interface RawSeries {
   endpoint_url?: string;
@@ -132,6 +137,23 @@ function mergePhaseMetrics(profiling: MetricsMap, warmup: MetricsMap): MetricsMa
   return out;
 }
 
+/**
+ * Exact prompt-token counts over the exported window, using the same series
+ * selection as the chart. Rates on the chart grid are sampled per tick, so a
+ * short slice at a phase boundary would count its tok/s as a full tick; ratios
+ * built from these totals cannot exceed what the counters recorded.
+ */
+export interface PromptTokenTotals {
+  prompt: number;
+  prefixCacheHits: number;
+  bySource: Record<string, number>;
+}
+
+export interface ChartData {
+  series: ChartSeries;
+  promptTokenTotals: PromptTokenTotals;
+}
+
 async function parseMetrics(buffer: Buffer): Promise<MetricsMap> {
   const { metrics, warmupMetrics } = await collectMetricPhases<RawMetric>(
     buffer,
@@ -140,10 +162,10 @@ async function parseMetrics(buffer: Buffer): Promise<MetricsMap> {
   return mergePhaseMetrics(metrics, warmupMetrics);
 }
 
-export async function computeChartSeries(
+export async function computeChartData(
   blob: Buffer | null,
   context: ServerMetricsContext = {},
-): Promise<ChartSeries | null> {
+): Promise<ChartData | null> {
   if (!blob) return null;
   let metrics: MetricsMap;
   try {
@@ -151,7 +173,23 @@ export async function computeChartSeries(
   } catch {
     return null;
   }
-  return buildSeriesFromMetrics(metrics, context);
+  return buildChartData(metrics, context);
+}
+
+export async function computeChartSeries(
+  blob: Buffer | null,
+  context: ServerMetricsContext = {},
+): Promise<ChartSeries | null> {
+  const data = await computeChartData(blob, context);
+  return data?.series ?? null;
+}
+
+export function computeChartDataFromMetricPhases(
+  profiling: MetricsMap,
+  warmup: MetricsMap,
+  context: ServerMetricsContext = {},
+): ChartData {
+  return buildChartData(mergePhaseMetrics(profiling, warmup), context);
 }
 
 export function computeChartSeriesFromMetricPhases(
@@ -159,7 +197,7 @@ export function computeChartSeriesFromMetricPhases(
   warmup: MetricsMap,
   context: ServerMetricsContext = {},
 ): ChartSeries {
-  return buildSeriesFromMetrics(mergePhaseMetrics(profiling, warmup), context);
+  return computeChartDataFromMetricPhases(profiling, warmup, context).series;
 }
 
 const INTRA_ENGINE_SHARD_LABELS = new Set(['tp_rank', 'pp_rank', 'ep_rank', 'moe_ep_rank']);
@@ -309,7 +347,10 @@ function resolveComponents(
           ? typeof ts.sum === 'number' && durationS > 0
             ? ts.sum / durationS
             : undefined
-          : ts[field];
+          : field === 'total'
+            ? (ts.total ??
+              (typeof ts.rate === 'number' && durationS > 0 ? ts.rate * durationS : undefined))
+            : ts[field];
       if (typeof value !== 'number' || !Number.isFinite(value)) continue;
       const at = scrapes.get(ts.start_ns);
       if (at) {
@@ -591,6 +632,15 @@ function buildSeriesFromMetrics(
   includeMetricSources = true,
   originStartNs?: number,
 ): ChartSeries {
+  return buildChartData(rawMetrics, context, includeMetricSources, originStartNs).series;
+}
+
+function buildChartData(
+  rawMetrics: MetricsMap,
+  context: ServerMetricsContext,
+  includeMetricSources = true,
+  originStartNs?: number,
+): ChartData {
   const { metrics, pd: atomPd } = scopeAtomPdToPrefill(rawMetrics);
   let startNs = Number.POSITIVE_INFINITY;
   let endNs = 0;
@@ -705,13 +755,29 @@ function buildSeriesFromMetrics(
 
   const counterRate = (...names: string[]): TimeSeriesPoint[] =>
     summedSeries(pickSeries(...names), tOf, 'rate', tickS);
-  const promptCounterTps = counterRate(
+  const countTotal = (
+    series: readonly RawSeries[] | undefined,
+    field: 'total' | 'sum' = 'total',
+  ): number =>
+    resolveComponents(series, tOf, field).reduce(
+      (sum, component) => sum + component.points.reduce((s, p) => s + p.value, 0),
+      0,
+    );
+  const promptCounters = [
     'vllm:prompt_tokens',
     'sglang:prompt_tokens',
     'atom:prompt_tokens',
     'trtllm_prompt_tokens',
     'trtllm_prompt_tokens_total',
-  );
+  ];
+  const prefixHitCounters = [
+    'vllm:prefix_cache_hits',
+    'sglang:cached_tokens',
+    'atom:prefix_cache_cached_tokens',
+    'trtllm_prompt_cached_tokens',
+    'trtllm_prompt_cached_tokens_total',
+  ];
+  const promptCounterTps = counterRate(...promptCounters);
   const decodeTps = counterRate(
     'vllm:generation_tokens',
     'sglang:generation_tokens',
@@ -719,13 +785,7 @@ function buildSeriesFromMetrics(
     'trtllm_generation_tokens',
     'trtllm_generation_tokens_total',
   );
-  const prefixCacheHitsTps = counterRate(
-    'vllm:prefix_cache_hits',
-    'sglang:cached_tokens',
-    'atom:prefix_cache_cached_tokens',
-    'trtllm_prompt_cached_tokens',
-    'trtllm_prompt_cached_tokens_total',
-  );
+  const prefixCacheHitsTps = counterRate(...prefixHitCounters);
   const trtllmComputedPromptTps = summedSeries(
     metrics['trtllm_prefill_batch_tokens']?.series,
     tOf,
@@ -806,7 +866,25 @@ function buildSeriesFromMetrics(
     const arr = summedSeries(seriesForSource, tOf, 'rate', tickS).filter((p) => p.value > 0);
     if (arr.length > 0) promptTokensBySource[source] = arr;
   }
+  const prefixCacheHitsTotal = countTotal(pickSeries(...prefixHitCounters));
+  const promptTokenTotals: PromptTokenTotals = {
+    prompt:
+      promptCounterTps.length > 0
+        ? countTotal(pickSeries(...promptCounters))
+        : countTotal(metrics['trtllm_prefill_batch_tokens']?.series, 'sum') + prefixCacheHitsTotal,
+    prefixCacheHits: prefixCacheHitsTotal,
+    bySource: {},
+  };
+  for (const source of Object.keys(promptTokensBySource)) {
+    promptTokenTotals.bySource[source] = countTotal(promptBySrc.get(source));
+  }
   if (Object.keys(promptTokensBySource).length === 0) {
+    promptTokenTotals.bySource['cache hit (HBM)'] = prefixCacheHitsTotal;
+    if (atomPd) {
+      promptTokenTotals.bySource['cache hit (CPU offload)'] = countTotal(
+        pickSeries('atom:prefix_cache_offload_tokens'),
+      );
+    }
     const cached = prefixCacheHitsTps.filter((point) => point.value > 0);
     const offloadTps = atomPd ? counterRate('atom:prefix_cache_offload_tokens') : [];
     const offloadByT = byT(offloadTps);
@@ -893,7 +971,7 @@ function buildSeriesFromMetrics(
         a.source.id.localeCompare(b.source.id),
     );
   }
-  return {
+  const series: ChartSeries = {
     version: CHART_SERIES_VERSION,
     startNs,
     endNs,
@@ -910,4 +988,5 @@ function buildSeriesFromMetrics(
     kvCacheUsageByEngine,
     metricSources,
   };
+  return { series, promptTokenTotals };
 }
