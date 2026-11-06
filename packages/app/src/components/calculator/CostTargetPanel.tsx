@@ -134,7 +134,11 @@ export default function CostTargetPanel({
   const { tcoBasis, chipBasis } = useGlobalFilterSelection();
   const { setChipBasis } = useGlobalFilterActions();
   const chipBasisControl = useMemo(
-    () => ({ value: chipBasis, onChange: setChipBasis, source: 'calculator_costcap' }),
+    () => ({
+      value: chipBasis,
+      onChange: setChipBasis,
+      source: 'calculator_costcap',
+    }),
     [chipBasis, setChipBasis],
   );
   const locale = useLocale();
@@ -145,7 +149,9 @@ export default function CostTargetPanel({
 
   const handleCostCapChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setCostCapInput(e.target.value);
-    writeUrlParams({ c_costcap: parsePositive(e.target.value) ? e.target.value : '' });
+    writeUrlParams({
+      c_costcap: parsePositive(e.target.value) ? e.target.value : '',
+    });
   }, []);
 
   const handleCostCapBlur = useCallback(() => {
@@ -263,6 +269,8 @@ export default function CostTargetPanel({
     return columns;
   }, [hardwareConfig, t, mw]);
 
+  const hasRows = costCap !== null && costCapRows.length > 0;
+
   return (
     <TooltipProvider delayDuration={0}>
       <section data-testid="calculator-costcap-section">
@@ -272,52 +280,64 @@ export default function CostTargetPanel({
             toggleLabel={t.toggleSection}
             testId="calculator-costcap-collapse"
             onToggle={(open) =>
-              track('calculator_section_toggled', { section: 'costcap', enabled: open })
+              track('calculator_section_toggled', {
+                section: 'costcap',
+                enabled: open,
+              })
             }
           >
             <div className="flex flex-col gap-4">
-              <p className="text-muted-foreground text-sm">{t.costCapDescription}</p>
-              <div className="flex flex-wrap gap-4">
-                <div className="flex flex-col space-y-1.5 max-w-48">
-                  <LabelWithTooltip
-                    htmlFor="calc-costcap"
-                    label={t.costCapLabel}
-                    tooltip={t.costCapTooltip}
-                  />
-                  <Input
-                    id="calc-costcap"
-                    data-testid="calc-costcap-input"
-                    type="number"
-                    min={0}
-                    step="any"
-                    placeholder={t.costCapPlaceholder}
-                    value={costCapInput}
-                    onChange={handleCostCapChange}
-                    onBlur={handleCostCapBlur}
-                    className="w-32"
-                  />
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-6">
+                <div className="min-w-0 text-sm text-muted-foreground lg:order-last lg:pb-2">
+                  <p>{t.costCapDescription}</p>
+                  {!hasRows && (
+                    <p className="mt-1" data-testid="calculator-costcap-empty">
+                      {costCap ? t.costCapNoGpus : t.costCapEmpty}
+                    </p>
+                  )}
                 </div>
-                <div className="flex flex-col space-y-1.5 max-w-48">
-                  <LabelWithTooltip
-                    htmlFor="calc-costcap-mw"
-                    label={t.mwLabel}
-                    tooltip={t.mwTooltip}
-                  />
-                  <Input
-                    id="calc-costcap-mw"
-                    data-testid="calc-costcap-mw-input"
-                    type="number"
-                    min={0}
-                    step="any"
-                    placeholder={t.mwPlaceholder}
-                    value={mwInput}
-                    onChange={(e) => onMwInputChange(e.target.value)}
-                    onBlur={() => track('calculator_costcap_mw_set', { mw: mwInput })}
-                    className="w-32"
-                  />
+                <div className="flex shrink-0 flex-wrap gap-4">
+                  <div className="flex flex-col space-y-1.5 max-w-48">
+                    <LabelWithTooltip
+                      htmlFor="calc-costcap"
+                      label={t.costCapLabel}
+                      tooltip={t.costCapTooltip}
+                    />
+                    <Input
+                      id="calc-costcap"
+                      data-testid="calc-costcap-input"
+                      type="number"
+                      min={0}
+                      step="any"
+                      placeholder={t.costCapPlaceholder}
+                      value={costCapInput}
+                      onChange={handleCostCapChange}
+                      onBlur={handleCostCapBlur}
+                      className="w-32"
+                    />
+                  </div>
+                  <div className="flex flex-col space-y-1.5 max-w-48">
+                    <LabelWithTooltip
+                      htmlFor="calc-costcap-mw"
+                      label={t.mwLabel}
+                      tooltip={t.mwTooltip}
+                    />
+                    <Input
+                      id="calc-costcap-mw"
+                      data-testid="calc-costcap-mw-input"
+                      type="number"
+                      min={0}
+                      step="any"
+                      placeholder={t.mwPlaceholder}
+                      value={mwInput}
+                      onChange={(e) => onMwInputChange(e.target.value)}
+                      onBlur={() => track('calculator_costcap_mw_set', { mw: mwInput })}
+                      className="w-32"
+                    />
+                  </div>
                 </div>
               </div>
-              {costCap && costCapRows.length > 0 ? (
+              {hasRows && (
                 <>
                   <DataTable
                     data={costCapRows}
@@ -359,10 +379,6 @@ export default function CostTargetPanel({
                     </p>
                   </div>
                 </>
-              ) : (
-                <p className="text-sm text-muted-foreground" data-testid="calculator-costcap-empty">
-                  {costCap ? t.costCapNoGpus : t.costCapEmpty}
-                </p>
               )}
             </div>
           </CollapsibleSection>

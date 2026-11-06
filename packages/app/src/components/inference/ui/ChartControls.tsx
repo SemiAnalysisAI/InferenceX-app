@@ -188,6 +188,7 @@ interface ChartControlsProps {
   tcoSource?: 'inference' | 'historical';
   showXAxisMode?: boolean;
   runContext?: ReactNode;
+  trailingPanel?: ReactNode;
   /** PowerX: the Count / Per / Show as controls that stand in for the Y-axis metric pick. */
   /** PowerX's Chart Config cells; receives the X-Axis Metric cell so it can place it. */
   powerXControls?: (slots: PowerXChartConfigSlots) => ReactNode;
@@ -199,6 +200,7 @@ export default function ChartControls({
   tcoSource = 'inference',
   showXAxisMode = false,
   runContext,
+  trailingPanel,
   powerXControls,
 }: ChartControlsProps) {
   const locale = useLocale();
@@ -354,7 +356,9 @@ export default function ChartControls({
           selectedConfig?.family === config.family
             ? selectedYAxisMetric
             : selectedConfig
-              ? changeMeasuredMetricConfig(selectedYAxisMetric, { family: config.family })
+              ? changeMeasuredMetricConfig(selectedYAxisMetric, {
+                  family: config.family,
+                })
               : MEASURED_METRIC_DEFAULTS[config.family];
         return [
           {
@@ -385,7 +389,9 @@ export default function ChartControls({
     const target = inferenceModelRouteForSelection(window.location.pathname, value);
     // Re-picking the shown model only canonicalizes a bare /inference path. That is not a new page.
     if (target !== null) {
-      replaceRouterPathname(target, ['g_model'], { pageview: value !== selectedModel });
+      replaceRouterPathname(target, ['g_model'], {
+        pageview: value !== selectedModel,
+      });
     }
     track('inference_model_selected', {
       ...analyticsContext,
@@ -462,7 +468,10 @@ export default function ChartControls({
     // PowerX picks the metric through its tabs; its Count, Per, Show as, Scope,
     // Power statistic and Rated boundaries controls count instead.
     (powerXSurface
-      ? powerXChangedCount({ metric: selectedYAxisMetric, compare: powerCompare })
+      ? powerXChangedCount({
+          metric: selectedYAxisMetric,
+          compare: powerCompare,
+        })
       : selectedYAxisMetric === DEFAULT_Y_AXIS_METRIC
         ? 0
         : 1) +
@@ -529,7 +538,11 @@ export default function ChartControls({
       }
     : {
         benchmark: 'lg:col-span-12',
-        chart: hideGpuComparison ? 'lg:col-span-12' : 'lg:col-span-8',
+        chart: trailingPanel
+          ? 'lg:col-span-5'
+          : hideGpuComparison
+            ? 'lg:col-span-12'
+            : 'lg:col-span-8',
         run: 'lg:order-last lg:col-span-12',
         history: 'lg:col-span-4',
       };
@@ -795,6 +808,7 @@ export default function ChartControls({
             </ControlPanel>
           )}
         </MobileControlSection>
+        {trailingPanel && <div className="min-w-0 lg:col-span-7">{trailingPanel}</div>}
       </div>
     </TooltipProvider>
   );

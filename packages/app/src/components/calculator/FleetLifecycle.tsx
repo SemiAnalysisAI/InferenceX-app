@@ -1381,7 +1381,7 @@ export default function FleetLifecycle({
     <TooltipProvider delayDuration={0}>
       <section data-testid="calculator-lifecycle-section">
         <Card className="gap-4">
-          <DashboardSectionHeader title={t.title} description={t.description} />
+          <DashboardSectionHeader level="card" title={t.title} description={t.description} />
           <div className="grid min-w-0 items-start gap-x-6 gap-y-4 lg:grid-cols-12">
             <ControlPanel legend={t.fleetSizingGroup} className="lg:col-span-3 xl:col-span-2">
               <div className="flex min-w-0 flex-col space-y-1.5">

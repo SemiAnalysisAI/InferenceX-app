@@ -63,7 +63,7 @@ export default function OperatorXView() {
     >
       <Card>
         <div className="flex items-baseline gap-2">
-          <Heading as="h1" level="card">
+          <Heading as="h1" level="title">
             OperatorX
           </Heading>
           <span className="text-xs text-muted-foreground" data-testid="operatorx-maturity">

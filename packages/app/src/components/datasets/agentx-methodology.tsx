@@ -2,6 +2,7 @@ import { ArrowRight } from 'lucide-react';
 
 import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
 import { Stat } from '@/components/ui/stat';
 import { cn } from '@/lib/shared/utils';
 
@@ -187,7 +188,9 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
     <Card className="overflow-hidden p-0 md:p-0" data-testid="agentx-methodology">
       <header className="border-b border-border/20 bg-muted/20 px-5 py-5 sm:px-6">
         <p className="mb-2 text-xs font-medium text-muted-foreground">{t.eyebrow}</p>
-        <h1 className="text-xl font-semibold text-foreground">{t.title}</h1>
+        <Heading as="h1" level="title">
+          {t.title}
+        </Heading>
         <p className="mt-3 max-w-4xl text-sm leading-6 text-muted-foreground">{t.intro}</p>
         <AgentXMethodologyLink
           href={locale === 'zh' ? '/zh/inference' : '/inference'}

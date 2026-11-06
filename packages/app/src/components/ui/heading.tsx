@@ -8,6 +8,7 @@ const headingVariants = cva('text-foreground', {
     level: {
       display: 'text-4xl font-semibold tracking-heading text-balance md:text-5xl',
       page: 'text-2xl font-semibold lg:text-4xl lg:tracking-heading',
+      title: 'text-xl font-semibold md:text-2xl lg:text-title',
       section: 'text-xl font-medium',
       card: 'text-base font-medium',
       label: 'text-sm font-medium',

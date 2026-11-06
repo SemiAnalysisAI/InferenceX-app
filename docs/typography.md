@@ -11,6 +11,7 @@ Defined in the `@theme` block of `packages/app/src/app/globals.css`:
 | `--text-2xs`          | `text-2xs`          | 0.6875rem (11px)                  | Micro labels one step below `text-xs`             |
 | `--text-3xs`          | `text-3xs`          | 0.625rem (10px)                   | Densest labels: table meta, tooltips, log gutters |
 | `--text-dialog-title` | `text-dialog-title` | 1.375rem (22px), 30px line height | Centered announcement dialog headings             |
+| `--text-title`        | `text-title`        | 1.75rem (28px), 36px line height  | Desktop size of the dashboard page title          |
 | `--tracking-eyebrow`  | `tracking-eyebrow`  | 0.16em                            | Easter-egg theme decorations only (no app UI)     |
 | `--tracking-heading`  | `tracking-heading`  | -0.04em                           | Display headings at `text-4xl` and larger only    |
 
@@ -25,7 +26,7 @@ Rules of thumb:
 
 ## Components
 
-- `<Heading>` (`src/components/ui/heading.tsx`) — cva-based visual heading levels (`display`, `page`, `section`, `card`, `label`) with the rendered tag chosen via `as`, so outline and visual size stay independent. `display` and `page` are `font-semibold`, `section` and `card` are `font-medium`. Negative `tracking-heading` applies only where the size reaches `text-4xl`.
+- `<Heading>` (`src/components/ui/heading.tsx`) — cva-based visual heading levels (`display`, `page`, `title`, `section`, `card`, `label`) with the rendered tag chosen via `as`, so outline and visual size stay independent. `display`, `page` and `title` are `font-semibold`, `section` and `card` are `font-medium`. `title` (20px, 24px from `md`, 28px from `lg`) is the one visible page title of a dashboard tab, set by `DashboardSectionHeader` in the tab's header card. Chart card titles stay at `card`, and the `TabIntro` explainer below the results is supporting text at `card` with `text-sm` body, even though it keeps the SEO `<h1>`. Negative `tracking-heading` applies only where the size reaches `text-4xl`.
 - `<Eyebrow>` (`src/components/ui/eyebrow.tsx`) — a small sentence-case label above a heading (`text-xs font-medium text-muted-foreground`). It does not uppercase, so pass sentence-case text. Delete eyebrows that only restate the heading.
 - `<Card>` (`src/components/ui/card.tsx`) — a solid surface: `bg-card`, `border-border/30` hairline, `rounded-xl`, no blur or translucency. Do not nest a bordered panel directly inside a Card just to group. Use spacing and a label instead. Charts sit on the page or on the Card they belong to, never in a Card that only adds a border.
 - `<Stat>` (`src/components/ui/stat.tsx`): a labelled figure (`dt` label, `dd` value, optional `detail` line) for stat rows. Wrap rows in a `<dl>`. `size` picks the value size (`sm` base, `md` lg, `lg` 2xl) and `boxed` puts each stat on its own card tile. `valueFirst` puts the figure above a `text-sm` label for facts like "11 / per-point telemetry charts". Values are `font-medium tabular-nums whitespace-nowrap`. Use it instead of a local `StatCard`.

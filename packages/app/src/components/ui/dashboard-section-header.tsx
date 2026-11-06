@@ -10,6 +10,7 @@ interface DashboardSectionHeaderProps {
   description?: ReactNode;
   actions?: ReactNode;
   headingAs?: HeadingTag;
+  level?: 'title' | 'card';
   className?: string;
   descriptionClassName?: string;
 }
@@ -19,6 +20,7 @@ export function DashboardSectionHeader({
   description,
   actions,
   headingAs = 'h2',
+  level = 'title',
   className,
   descriptionClassName,
 }: DashboardSectionHeaderProps) {
@@ -27,7 +29,7 @@ export function DashboardSectionHeader({
       className={cn('flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between', className)}
     >
       <div className="min-w-0">
-        <Heading as={headingAs} level="card" className="mb-1">
+        <Heading as={headingAs} level={level} className="mb-1">
           {title}
         </Heading>
         {description !== undefined && (

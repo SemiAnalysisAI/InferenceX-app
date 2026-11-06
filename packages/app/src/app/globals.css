@@ -236,6 +236,8 @@ html[data-inferencex-embed] .autumn-leaves {
   --text-3xs: 0.625rem;
   --text-dialog-title: 1.375rem;
   --text-dialog-title--line-height: 1.875rem;
+  --text-title: 1.75rem;
+  --text-title--line-height: 2.25rem;
 
   --tracking-eyebrow: 0.16em;
   --tracking-heading: -0.04em;

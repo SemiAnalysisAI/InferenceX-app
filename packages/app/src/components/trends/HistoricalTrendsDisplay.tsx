@@ -44,7 +44,6 @@ import { historicalTrendToCsv } from '@/lib/export/csv-export-helpers';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
-import { TooltipProvider } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getModelSortIndex } from '@/lib/catalog/constants';
 import {
@@ -312,11 +311,16 @@ export default function HistoricalTrendsDisplay() {
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader title={t.heading} description={t.description} />
-            <ChartControls tcoSource="historical" hideGpuComparison />
-            <div className="space-y-2">
-              <Skeleton className="h-5 w-56" />
-              <Skeleton className="h-9 w-full" />
-            </div>
+            <ChartControls
+              tcoSource="historical"
+              hideGpuComparison
+              trailingPanel={
+                <div className="space-y-2">
+                  <Skeleton className="h-5 w-56" />
+                  <Skeleton className="h-9 w-full" />
+                </div>
+              }
+            />
           </div>
         </Card>
         <Card className="mt-4">
@@ -363,70 +367,75 @@ export default function HistoricalTrendsDisplay() {
             description={t.description}
             actions={<ChartShareActions />}
           />
-          <ChartControls tcoSource="historical" hideGpuComparison />
-
-          {!loading && hasInteractivityChart && (
-            <TooltipProvider delayDuration={0}>
-              <ControlPanel legend={t.targetGroup} className="gap-2">
-                <LabelWithTooltip
-                  htmlFor="historical-target"
-                  label={targetLabel}
-                  tooltip={isAgentic ? t.agenticTargetTooltip : t.targetTooltip}
-                />
-                <p className="text-xs text-muted-foreground">{t.targetHint}</p>
-                <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-                  <div className="min-w-0 flex-1">
-                    <input
-                      type="range"
-                      min={interactivityRange.min}
-                      max={interactivityRange.max}
-                      step={1}
-                      value={targetInteractivity}
-                      aria-label={targetLabel}
-                      data-testid="historical-target-slider"
-                      onChange={handleSliderChange}
-                      onPointerUp={() =>
-                        track('historical_trend_target_set', { value: targetInteractivity })
-                      }
-                      className="range-slider h-4 w-full"
-                      style={rangeProgressStyle(
-                        targetInteractivity,
-                        interactivityRange.min,
-                        interactivityRange.max,
-                      )}
+          <ChartControls
+            tcoSource="historical"
+            hideGpuComparison
+            trailingPanel={
+              !loading &&
+              hasInteractivityChart && (
+                <ControlPanel legend={t.targetGroup} className="gap-1.5">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <LabelWithTooltip
+                      htmlFor="historical-target"
+                      label={targetLabel}
+                      tooltip={isAgentic ? t.agenticTargetTooltip : t.targetTooltip}
                     />
-                    <div
-                      className="relative h-4 text-xs tabular-nums text-muted-foreground"
-                      style={{ marginLeft: 8, marginRight: 8 }}
-                    >
-                      {Array.from({ length: 6 }, (_, i) => (
-                        <span
-                          key={i}
-                          className="absolute -translate-x-1/2"
-                          style={{ left: `${(i / 5) * 100}%` }}
-                        >
-                          {Math.round(
-                            interactivityRange.min +
-                              (interactivityRange.max - interactivityRange.min) * (i / 5),
-                          )}
-                        </span>
-                      ))}
-                    </div>
+                    <p className="text-xs text-muted-foreground">{t.targetHint}</p>
                   </div>
-                  <Input
-                    type="number"
-                    value={interactivityInput}
-                    onChange={handleInputChange}
-                    onBlur={handleInputBlur}
-                    className="w-24 shrink-0"
-                    min={0}
-                    aria-label={targetLabel}
-                    data-testid="historical-target-input"
-                  />
-                </div>
-              </ControlPanel>
-            </TooltipProvider>
-          )}
+                  <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                    <div className="min-w-0 flex-1">
+                      <input
+                        type="range"
+                        min={interactivityRange.min}
+                        max={interactivityRange.max}
+                        step={1}
+                        value={targetInteractivity}
+                        aria-label={targetLabel}
+                        data-testid="historical-target-slider"
+                        onChange={handleSliderChange}
+                        onPointerUp={() =>
+                          track('historical_trend_target_set', { value: targetInteractivity })
+                        }
+                        className="range-slider h-4 w-full"
+                        style={rangeProgressStyle(
+                          targetInteractivity,
+                          interactivityRange.min,
+                          interactivityRange.max,
+                        )}
+                      />
+                      <div
+                        className="relative h-4 text-xs tabular-nums text-muted-foreground"
+                        style={{ marginLeft: 8, marginRight: 8 }}
+                      >
+                        {Array.from({ length: 6 }, (_, i) => (
+                          <span
+                            key={i}
+                            className="absolute -translate-x-1/2"
+                            style={{ left: `${(i / 5) * 100}%` }}
+                          >
+                            {Math.round(
+                              interactivityRange.min +
+                                (interactivityRange.max - interactivityRange.min) * (i / 5),
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <Input
+                      type="number"
+                      value={interactivityInput}
+                      onChange={handleInputChange}
+                      onBlur={handleInputBlur}
+                      className="w-24 shrink-0"
+                      min={0}
+                      aria-label={targetLabel}
+                      data-testid="historical-target-input"
+                    />
+                  </div>
+                </ControlPanel>
+              )
+            }
+          />
         </div>
       </Card>
 

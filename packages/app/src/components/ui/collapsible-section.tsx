@@ -3,6 +3,7 @@
 import { ChevronDownIcon } from 'lucide-react';
 import React, { useId, useState } from 'react';
 
+import { Heading } from '@/components/ui/heading';
 import { cn } from '@/lib/shared/utils';
 
 export interface CollapsibleSectionProps {
@@ -50,7 +51,11 @@ export function CollapsibleSection({
             className={cn('size-5 transition-transform duration-200', open && 'rotate-180')}
           />
         </button>
-        {(open ? titleWhenOpen : true) && <h2 className="text-lg font-medium">{title}</h2>}
+        {(open ? titleWhenOpen : true) && (
+          <Heading as="h2" level="card">
+            {title}
+          </Heading>
+        )}
       </div>
       {open && <div id={bodyId}>{children}</div>}
     </div>

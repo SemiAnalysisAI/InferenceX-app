@@ -1102,7 +1102,10 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                 countLabel={t.changed}
                 testId="calculator-secondary-controls"
               >
-                <ControlPanel legend={t.comparisonGroup}>
+                <ControlPanel
+                  legend={t.comparisonGroup}
+                  className="md:grid-cols-[auto_minmax(0,1fr)] md:gap-x-6"
+                >
                   <div className="flex items-end gap-3">
                     <div className="flex flex-col space-y-1.5">
                       <LabelWithTooltip label={t.metricLabel} tooltip={t.metricTooltip} />

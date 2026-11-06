@@ -624,7 +624,7 @@ export default function CollectiveXDisplay() {
       <Card>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <Heading as="h1" level="card">
+            <Heading as="h1" level="title">
               CollectiveX
             </Heading>
             <p data-testid="collectivex-description" className="mt-1 text-sm text-muted-foreground">
