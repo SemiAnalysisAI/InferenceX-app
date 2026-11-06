@@ -16,13 +16,17 @@ import {
   type OverviewTier,
 } from '@/lib/overview/overview-data';
 import {
-  buildRankingRows,
   getAllRankingPageEntries,
   type RankingPageEntry,
   type RankingRow,
 } from '@/lib/live-seo/rankings';
 import { getAllRunPageEntries, type RunPageEntry } from '@/lib/live-seo/run-pages';
-import { selectRankingTier, unrankedHardwareLabels } from '@/lib/live-seo/ranking-tier';
+import {
+  rankingTierRows,
+  selectRankingTier,
+  unrankedHardwareLabels,
+  type RankingTier,
+} from '@/lib/live-seo/ranking-tier';
 
 async function loadAvailableRunEntries(): Promise<RunPageEntry[]> {
   const rows = await getCachedAvailability();
@@ -190,7 +194,7 @@ export const getRunPageData: (slug: string) => Promise<RunPageData | null> =
 
 export interface RankingPageData {
   scenario: OverviewScenario;
-  tier: OverviewTier;
+  tier: RankingTier;
   rows: RankingRow[];
   unranked: string[];
   oldest: string | null;
@@ -215,14 +219,14 @@ async function loadRankingPageData(slug: string): Promise<RankingPageData | null
   return {
     scenario: choice.summary.scenario,
     tier: choice.tier,
-    rows: buildRankingRows(choice.summary, entry.kind),
-    unranked: unrankedHardwareLabels(choice.summary),
+    rows: rankingTierRows(choice, entry.kind),
+    unranked: unrankedHardwareLabels(choice),
     oldest,
     newest,
   };
 }
 
-const getCachedRankingPageData = cachedDerivedData(loadRankingPageData, 'ranking-page-data-v3');
+const getCachedRankingPageData = cachedDerivedData(loadRankingPageData, 'ranking-page-data-v4');
 
 export const getRankingPageData: (slug: string) => Promise<RankingPageData | null> =
   cache(getCachedRankingPageData);

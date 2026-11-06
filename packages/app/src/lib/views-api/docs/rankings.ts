@@ -147,8 +147,8 @@ const responses: readonly ApiResponse[] = [
   {
     status: '200',
     description: text(
-      'Ranked hardware per model-scenario, community engine scope. Each entry reports the interactivity tier (tok/s/user) it is ranked at. That is the lowest tier from 50 upward that measures at least two chips and at least half of the chips measured at any of those tiers. When no tier qualifies, it is the tier with the most measured chips.',
-      '社区引擎范围下，每个「模型-场景」的硬件排名。每个条目都会给出排名所用的交互性档位（tok/s/user）：从 50 起向上，取第一个实测芯片不少于两款、且不少于这些档位中有实测值芯片总数一半的档位。若没有档位满足该条件，则取实测芯片最多的档位。',
+      'Ranked hardware per model-scenario, community engine scope. Each entry reports the interactivity tier (tok/s/user) it is ranked at. The default is 125. One of 50, 75, 100, 150, 175 and 200 replaces it only when that tier measures more chips than 125, taking the tier with the most chips and the lowest on a tie. When no tier measures at least two chips, the entry has no rows.',
+      '社区引擎范围下，每个「模型-场景」的硬件排名。每个条目都会给出排名所用的交互性档位（tok/s/user），默认为 125。只有当 50、75、100、150、175 或 200 中某一档的实测芯片比 125 档更多时才改用，此时取实测芯片最多的档位，数量相同时取较低档位。没有档位达到两款实测芯片时，该条目不含排名行。',
     ),
     schema: responseSchema,
     example: responseExample,

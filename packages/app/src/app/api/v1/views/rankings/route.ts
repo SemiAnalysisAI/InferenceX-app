@@ -89,7 +89,7 @@ async function loadRankingsView(
   return { generatedAt, entries: viewEntries };
 }
 
-const getCachedRankingsView = cachedDerivedData(loadRankingsView, 'views-rankings-v2');
+const getCachedRankingsView = cachedDerivedData(loadRankingsView, 'views-rankings-v3');
 
 export function GET(request: NextRequest) {
   return runViewsRoute('rankings', async () => {

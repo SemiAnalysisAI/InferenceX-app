@@ -1,16 +1,7 @@
 import type { BenchmarkRow } from '@/lib/api/api';
-import {
-  overviewScenariosForModel,
-  type OverviewScenario,
-  type OverviewTier,
-} from '@/lib/overview/overview-data';
-import {
-  buildRankingRows,
-  type RankingKind,
-  type RankingPageEntry,
-  type RankingRow,
-} from '@/lib/live-seo/rankings';
-import { selectRankingTier } from '@/lib/live-seo/ranking-tier';
+import { overviewScenariosForModel, type OverviewScenario } from '@/lib/overview/overview-data';
+import type { RankingKind, RankingPageEntry, RankingRow } from '@/lib/live-seo/rankings';
+import { rankingTierRows, selectRankingTier, type RankingTier } from '@/lib/live-seo/ranking-tier';
 
 export const RANKING_VALUE_UNITS: Readonly<Record<RankingKind, string>> = {
   'fastest-gpu': 'tokens_per_second_per_gpu',
@@ -34,7 +25,7 @@ export interface RankingsViewEntry {
   modelSlug: string;
   modelLabel: string;
   scenario: OverviewScenario;
-  tier: OverviewTier;
+  tier: RankingTier;
   rows: RankingsViewRow[];
 }
 
@@ -59,14 +50,14 @@ export function buildRankingsViewEntries(
 ): RankingsViewEntry[] {
   const scenarios = scenario ? [scenario] : overviewScenariosForModel(entry.model.model, rows);
   return scenarios.map((candidate) => {
-    const { tier, summary } = selectRankingTier(entry.model.model, rows, candidate);
+    const choice = selectRankingTier(entry.model.model, rows, candidate);
     return {
       model: entry.model.model,
       modelSlug: entry.model.slug,
       modelLabel: entry.model.label,
-      scenario: summary.scenario,
-      tier,
-      rows: buildRankingRows(summary, entry.kind).map((row) => projectRankingRow(row, entry.kind)),
+      scenario: choice.summary.scenario,
+      tier: choice.tier,
+      rows: rankingTierRows(choice, entry.kind).map((row) => projectRankingRow(row, entry.kind)),
     };
   });
 }

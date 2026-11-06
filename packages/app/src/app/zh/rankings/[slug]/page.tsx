@@ -20,6 +20,7 @@ import {
   rankingPageTitleZh,
 } from '@/lib/live-seo/rankings-zh';
 import { getRankingPageData, type RankingPageData } from '@/lib/live-seo/run-rankings-data.server';
+import { RANKING_STANDARD_TIER } from '@/lib/live-seo/ranking-tier';
 
 export const revalidate = 86400;
 
@@ -195,7 +196,7 @@ export default async function ZhRankingPage({ params }: Props) {
     methodologyHeading: '测试方法',
     methodologyBody: [
       `本页所有数字都来自实测，而非纸面规格估算。InferenceX 集群使用社区推理引擎在真实硬件上部署 ${entry.model.seoName}，通过扫描并发数绘制每个平台的吞吐与交互速度前沿曲线。`,
-      `各平台均在同一工作点（每用户每秒 ${data.tier} token）取值，确保在相同交互速度下进行比较。单用户速度低到无法正常使用时，即使吞吐量很高，也不能据此获得更高排名。每百万 token（输入加输出）的成本由实测吞吐量和 SemiAnalysis AI Cloud TCO 模型提供的 $/GPU/hr 费率换算得出。`,
+      `各平台均在同一工作点（每用户每秒 ${data.tier} token）取值，确保在相同交互速度下进行比较。单用户速度低到无法正常使用时，即使吞吐量很高，也不能据此获得更高排名。排行默认使用每用户每秒 ${RANKING_STANDARD_TIER} token，这是当前测试覆盖硬件最多的速度，只有其他速度能为该模型排入更多 GPU 时才会改用。每百万 token（输入加输出）的成本由实测吞吐量和 SemiAnalysis AI Cloud TCO 模型提供的 $/GPU/hr 费率换算得出。`,
       `推导逻辑与 InferenceX 总览排行榜共用，基准测试持续重跑，新引擎版本和新配置落地后排行会自动更新。`,
     ],
     faqHeading: '常见问题',

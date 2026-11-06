@@ -109,7 +109,7 @@ describe('GET /api/v1/views/rankings', () => {
       body.entries.map((entry: { scenario: string; tier: number }) => [entry.scenario, entry.tier]),
     ).toEqual([
       ['single_turn_8k1k', 50],
-      ['agentx', 50],
+      ['agentx', 125],
     ]);
     expect(body.entries[1].rows).toEqual([]);
 

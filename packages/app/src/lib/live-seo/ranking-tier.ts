@@ -2,19 +2,19 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import type { Model } from '@/lib/catalog/data-mappings';
 import {
   buildOverviewModelSummaries,
-  OVERVIEW_PRIMARY_TIER,
-  OVERVIEW_TIERS,
   type OverviewModelSummary,
   type OverviewScenario,
-  type OverviewTier,
 } from '@/lib/overview/overview-data';
+import { buildRankingRows, type RankingKind, type RankingRow } from '@/lib/live-seo/rankings';
 
-export const RANKING_TIERS: readonly OverviewTier[] = OVERVIEW_TIERS.filter(
-  (tier) => tier >= OVERVIEW_PRIMARY_TIER,
-);
+export const RANKING_TIERS = [50, 75, 100, 125, 150, 175, 200] as const;
+export type RankingTier = (typeof RANKING_TIERS)[number];
+export const RANKING_STANDARD_TIER: RankingTier = 125;
+
+const MIN_RANKED_CHIPS = 2;
 
 export interface RankingTierCandidate {
-  tier: OverviewTier;
+  tier: RankingTier;
   summary: OverviewModelSummary;
 }
 
@@ -39,11 +39,14 @@ export function pickRankingTier(
     ranked: rankedHardware(candidate.summary).length,
     eligible,
   }));
-  const threshold = Math.max(2, Math.ceil(eligible / 2));
-  return (
-    counted.find((candidate) => candidate.ranked >= threshold) ??
-    counted.reduce((best, candidate) => (candidate.ranked > best.ranked ? candidate : best))
+  const best = counted.reduce((top, candidate) =>
+    candidate.ranked > top.ranked || (candidate.ranked === top.ranked && candidate.tier < top.tier)
+      ? candidate
+      : top,
   );
+  const standard = counted.find((candidate) => candidate.tier === RANKING_STANDARD_TIER);
+  const choice = standard && standard.ranked >= best.ranked ? standard : best;
+  return choice.ranked >= MIN_RANKED_CHIPS ? choice : null;
 }
 
 export function selectRankingTier(
@@ -53,13 +56,24 @@ export function selectRankingTier(
 ): RankingTierChoice {
   const summaries = buildOverviewModelSummaries(model, rows, RANKING_TIERS, 'community', scenario);
   const candidates = RANKING_TIERS.map((tier, index) => ({ tier, summary: summaries[index] }));
-  return pickRankingTier(candidates) ?? { ...candidates[0], ranked: 0, eligible: 0 };
+  return (
+    pickRankingTier(candidates) ?? {
+      ...candidates[RANKING_TIERS.indexOf(RANKING_STANDARD_TIER)],
+      ranked: 0,
+      eligible: new Set(candidates.flatMap(({ summary }) => rankedHardware(summary))).size,
+    }
+  );
 }
 
-export function unrankedHardwareLabels(summary: OverviewModelSummary): string[] {
-  return summary.platforms
+export function rankingTierRows(choice: RankingTierChoice, kind: RankingKind): RankingRow[] {
+  return choice.ranked === 0 ? [] : buildRankingRows(choice.summary, kind);
+}
+
+export function unrankedHardwareLabels(choice: RankingTierChoice): string[] {
+  return choice.summary.platforms
     .filter(
       (platform) =>
+        (choice.ranked === 0 && platform.read.value !== null) ||
         platform.missingReason === 'cannot_reach_at_tier' ||
         platform.missingReason === 'no_exact_at_tier',
     )
