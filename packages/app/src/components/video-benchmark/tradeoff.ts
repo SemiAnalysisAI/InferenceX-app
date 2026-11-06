@@ -1,4 +1,14 @@
-import { at, entries, number, ROLES, rows, text, type Bundle, type Json } from './bundle';
+import {
+  at,
+  canonical,
+  entries,
+  number,
+  ROLES,
+  rows,
+  text,
+  type Bundle,
+  type Json,
+} from './bundle';
 import { isNativeH3, servingCells } from './serving';
 import { allocatedGpus } from './allocation';
 import { nativeHardware } from './hardware';
@@ -25,15 +35,6 @@ export interface DeploymentCost {
   date: string;
 }
 
-function canonical(value: Json): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (value !== null && typeof value === 'object')
-    return `{${Object.keys(value)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`)
-      .join(',')}}`;
-  return JSON.stringify(value);
-}
 const positive = (value: Json) => {
   const n = number(value);
   return n !== null && n > 0 ? n : null;

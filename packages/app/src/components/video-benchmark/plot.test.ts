@@ -4,7 +4,7 @@ import type { VideoHistoryPage } from './history';
 import { X_METRICS, Y_METRICS, type VideoPoint } from './metrics';
 import { listedVideoCells, plotVideoPoints } from './plot';
 import { videoPoints } from './points';
-import { DEFAULT_VIDEO_DASHBOARD_STATE, type VideoDashboardState } from './video-url-state';
+import { readVideoDashboardState, type VideoDashboardState } from './video-url-state';
 
 const base: VideoPoint = {
   id: 'h200-4g-c1',
@@ -78,7 +78,7 @@ const b200 = cell({
 });
 const colorFor = (key: string) => `color-${key}`;
 const state: VideoDashboardState = {
-  ...DEFAULT_VIDEO_DASHBOARD_STATE,
+  ...readVideoDashboardState(''),
   x: 'p90Latency',
   y: 'videosPerGpuHour',
 };
@@ -134,7 +134,7 @@ describe('plotVideoPoints', () => {
     // H100/H200/B200 C1/C2/C4 of 2026-09-09, n = 20 each, replicas unrecorded → one endpoint.
     const out = plot(
       videoPoints([history as unknown as VideoHistoryPage]),
-      DEFAULT_VIDEO_DASHBOARD_STATE,
+      readVideoDashboardState(''),
     );
     expect(out.plotted.map((p) => [p.hardwareKey, p.concurrency])).toEqual([
       ['b200', 1],
