@@ -17,14 +17,15 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: h3-media-publication
-  cancel-in-progress: false
-
 jobs:
   publish:
     name: 'Publish H3 media'
     if: github.repository == 'SemiAnalysisAI/InferenceX-app' && !inputs.backfill_renditions && (github.event_name == 'workflow_dispatch' || (github.event.client_payload.source_run_id && github.event.client_payload.merge_run_id))
+    # Only publication is serialized. A group keeps one pending run and cancels older ones, so
+    # encodes must stay outside it; immutable uploads make concurrent rendition jobs safe.
+    concurrency:
+      group: h3-media-publication
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
