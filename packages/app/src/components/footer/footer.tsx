@@ -20,15 +20,16 @@ const STRINGS = {
     mainSite: 'Main site',
     newsletter: 'Newsletter',
     about: 'About',
-    legal: 'Legal',
     landAcknowledgement: 'Land acknowledgement',
     privacyPolicy: 'Privacy policy',
     cookiePolicy: 'Cookie policy',
-    contribute: 'Contribute',
+    developers: 'Developers',
     benchmarks: 'Benchmarks',
     agentxHarness: 'AgentX harness',
     visualization: 'Visualization',
-    more: 'More',
+    tools: 'Tools',
+    data: 'Data',
+    learn: 'Learn',
     supporters: 'Supporters',
     agentx: 'AgentX',
     telemetry: 'Telemetry',
@@ -61,15 +62,16 @@ const STRINGS = {
     mainSite: 'SemiAnalysis 官网',
     newsletter: '订阅通讯',
     about: '关于 SemiAnalysis',
-    legal: '法律信息',
     landAcknowledgement: '原住民传统领地声明',
     privacyPolicy: '隐私政策',
     cookiePolicy: 'Cookie 政策',
-    contribute: '参与贡献',
+    developers: '开发者',
     benchmarks: '基准测试仓库',
     agentxHarness: 'AgentX 测试框架',
     visualization: '可视化工具',
-    more: '更多',
+    tools: '工具',
+    data: '数据',
+    learn: '学习资源',
     supporters: '业界评价',
     agentx: 'AgentX',
     telemetry: '遥测数据',
@@ -104,63 +106,68 @@ const LINK_CLASS =
 
 type FooterStringKey = keyof (typeof STRINGS)['en'];
 
-const SEMIANALYSIS_LINKS: readonly (readonly [string, string, FooterStringKey])[] = [
-  ['main-site', 'https://semianalysis.com', 'mainSite'],
-  ['newsletter', 'https://newsletter.semianalysis.com', 'newsletter'],
-  ['about', 'https://semianalysis.com/about/', 'about'],
-];
+type FooterLink = readonly [id: string, href: string, label: FooterStringKey, event?: string];
 
-const LEGAL_LINKS: readonly (readonly [string, string, FooterStringKey])[] = [
-  ['privacy', 'https://semianalysis.com/privacy-policy/', 'privacyPolicy'],
-  ['cookies', 'https://semianalysis.com/cookie-policy/', 'cookiePolicy'],
+const LINK_GROUPS: readonly {
+  heading: FooterStringKey;
+  links: readonly FooterLink[];
+}[] = [
+  {
+    heading: 'tools',
+    links: [
+      ['historical', '/historical', 'historicalTrends', 'footer_historical_clicked'],
+      ['calculator', '/calculator', 'tcoCalculator', 'footer_calculator_clicked'],
+      ['fleet', '/fleet', 'fleetLifecycle', 'footer_fleet_clicked'],
+      ['first-token', '/first-token', 'firstTokenLimits', 'footer_first_token_clicked'],
+      ['cache-reuse', '/cache-reuse', 'cacheReuse', 'footer_cache_reuse_clicked'],
+      ['reliability', '/reliability', 'gpuReliability'],
+      ['gpu-specs', '/gpu-specs', 'gpuSpecsDashboard'],
+    ],
+  },
+  {
+    heading: 'data',
+    links: [
+      ['compare', '/compare', 'comparisons', 'footer_compare_clicked'],
+      ['compare-per-dollar', '/compare-per-dollar', 'perfPerDollar'],
+      ['rankings', '/rankings', 'rankings'],
+      ['hardware', '/hardware', 'hardwareResults', 'footer_hardware_clicked'],
+      ['run', '/run', 'runPages'],
+      ['chips', '/chips', 'chipSpecs'],
+    ],
+  },
+  {
+    heading: 'learn',
+    links: [
+      ['agentx', '/agentx', 'agentx', 'footer_agentx_clicked'],
+      ['articles', '/blog', 'articles', 'footer_articles_clicked'],
+      ['whitepapers', '/whitepaper', 'whitepapers', 'footer_whitepapers_clicked'],
+      ['model-architectures', '/model', 'modelArchitectures'],
+      ['glossary', '/glossary', 'glossary'],
+    ],
+  },
+  {
+    heading: 'developers',
+    links: [
+      ['api', '/api', 'apiReference', 'footer_api_clicked'],
+      ['telemetry', '/inference/agentic', 'telemetry', 'footer_telemetry_clicked'],
+      ['benchmarks', 'https://github.com/SemiAnalysisAI/InferenceX', 'benchmarks'],
+      ['agentx-harness', 'https://github.com/SemiAnalysisAI/agentx-harness', 'agentxHarness'],
+      ['visualization', 'https://github.com/SemiAnalysisAI/InferenceX-app', 'visualization'],
+    ],
+  },
+  {
+    heading: 'semianalysis',
+    links: [
+      ['main-site', 'https://semianalysis.com', 'mainSite'],
+      ['newsletter', 'https://newsletter.semianalysis.com', 'newsletter'],
+      ['about', 'https://semianalysis.com/about/', 'about'],
+      ['supporters', '/quotes', 'supporters', 'footer_supporters_clicked'],
+      ['land-acknowledgement', '/land-acknowledgement', 'landAcknowledgement'],
+      ['privacy', 'https://semianalysis.com/privacy-policy/', 'privacyPolicy'],
+      ['cookies', 'https://semianalysis.com/cookie-policy/', 'cookiePolicy'],
+    ],
+  },
 ];
-
-const CONTRIBUTE_LINKS: readonly (readonly [string, string, FooterStringKey])[] = [
-  ['benchmarks', 'https://github.com/SemiAnalysisAI/InferenceX', 'benchmarks'],
-  ['agentx-harness', 'https://github.com/SemiAnalysisAI/agentx-harness', 'agentxHarness'],
-  ['visualization', 'https://github.com/SemiAnalysisAI/InferenceX-app', 'visualization'],
-];
-
-const MORE_LINKS: readonly (readonly [string, string, FooterStringKey, string?])[] = [
-  ['supporters', '/quotes', 'supporters', 'footer_supporters_clicked'],
-  ['agentx', '/agentx', 'agentx', 'footer_agentx_clicked'],
-  ['telemetry', '/inference/agentic', 'telemetry', 'footer_telemetry_clicked'],
-  ['compare', '/compare', 'comparisons', 'footer_compare_clicked'],
-  ['articles', '/blog', 'articles', 'footer_articles_clicked'],
-  ['hardware', '/hardware', 'hardwareResults', 'footer_hardware_clicked'],
-  ['whitepapers', '/whitepaper', 'whitepapers', 'footer_whitepapers_clicked'],
-  ['api', '/api', 'apiReference', 'footer_api_clicked'],
-  ['historical', '/historical', 'historicalTrends', 'footer_historical_clicked'],
-  ['calculator', '/calculator', 'tcoCalculator', 'footer_calculator_clicked'],
-  ['fleet', '/fleet', 'fleetLifecycle', 'footer_fleet_clicked'],
-  ['first-token', '/first-token', 'firstTokenLimits', 'footer_first_token_clicked'],
-  ['cache-reuse', '/cache-reuse', 'cacheReuse', 'footer_cache_reuse_clicked'],
-  ['reliability', '/reliability', 'gpuReliability'],
-  ['gpu-specs', '/gpu-specs', 'gpuSpecsDashboard'],
-  ['compare-per-dollar', '/compare-per-dollar', 'perfPerDollar'],
-  ['model-architectures', '/model', 'modelArchitectures'],
-  ['glossary', '/glossary', 'glossary'],
-  ['chips', '/chips', 'chipSpecs'],
-  ['rankings', '/rankings', 'rankings'],
-  ['run', '/run', 'runPages'],
-];
-
-const externalLinks = (
-  links: readonly (readonly [string, string, FooterStringKey])[],
-  t: (typeof STRINGS)[keyof typeof STRINGS],
-) =>
-  links.map(([id, href, label]) => (
-    <a
-      key={id}
-      data-testid={`footer-link-${id}`}
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={LINK_CLASS}
-    >
-      {t[label]}
-    </a>
-  ));
 
 export const Footer = () => {
   const locale = useLocale();
@@ -201,46 +208,41 @@ export const Footer = () => {
 
           <div
             data-testid="footer-links"
-            className="grid min-w-0 grid-cols-2 gap-x-6 gap-y-6 break-words sm:grid-cols-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,2fr)]"
+            className="grid min-w-0 grid-cols-2 gap-x-6 gap-y-6 break-words sm:grid-cols-3 xl:grid-cols-5"
           >
-            <div data-testid="footer-links-semianalysis" className="flex min-w-0 flex-col gap-1">
-              <h2 className="mb-1 text-sm font-semibold text-foreground">{t.semianalysis}</h2>
-              {externalLinks(SEMIANALYSIS_LINKS, t)}
-            </div>
-            <div data-testid="footer-links-legal" className="flex min-w-0 flex-col gap-1">
-              <h2 className="mb-1 text-sm font-semibold text-foreground">{t.legal}</h2>
-              <IntentPrefetchLink
-                data-testid="footer-link-land-acknowledgement"
-                href={`${prefix}/land-acknowledgement`}
-                className={LINK_CLASS}
+            {LINK_GROUPS.map((group) => (
+              <div
+                key={group.heading}
+                data-testid={`footer-links-${group.heading}`}
+                className="flex min-w-0 flex-col gap-1"
               >
-                {t.landAcknowledgement}
-              </IntentPrefetchLink>
-              {externalLinks(LEGAL_LINKS, t)}
-            </div>
-            <div data-testid="footer-links-contribute" className="flex min-w-0 flex-col gap-1">
-              <h2 className="mb-1 text-sm font-semibold text-foreground">{t.contribute}</h2>
-              {externalLinks(CONTRIBUTE_LINKS, t)}
-            </div>
-            <div
-              data-testid="footer-links-more"
-              className="col-span-full xl:col-span-1 flex min-w-0 flex-col gap-1"
-            >
-              <h2 className="mb-1 text-sm font-semibold text-foreground">{t.more}</h2>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-                {MORE_LINKS.map(([id, path, label, event]) => (
-                  <IntentPrefetchLink
-                    key={id}
-                    data-testid={`footer-link-${id}`}
-                    href={`${prefix}${path}`}
-                    onClick={event ? () => track(event, FOOTER_EVENT_PROPERTIES) : undefined}
-                    className={LINK_CLASS}
-                  >
-                    {t[label]}
-                  </IntentPrefetchLink>
-                ))}
+                <h2 className="mb-1 text-sm font-semibold text-foreground">{t[group.heading]}</h2>
+                {group.links.map(([id, href, label, event]) =>
+                  href.startsWith('https://') ? (
+                    <a
+                      key={id}
+                      data-testid={`footer-link-${id}`}
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={LINK_CLASS}
+                    >
+                      {t[label]}
+                    </a>
+                  ) : (
+                    <IntentPrefetchLink
+                      key={id}
+                      data-testid={`footer-link-${id}`}
+                      href={`${prefix}${href}`}
+                      onClick={event ? () => track(event, FOOTER_EVENT_PROPERTIES) : undefined}
+                      className={LINK_CLASS}
+                    >
+                      {t[label]}
+                    </IntentPrefetchLink>
+                  ),
+                )}
               </div>
-            </div>
+            ))}
           </div>
 
           <div

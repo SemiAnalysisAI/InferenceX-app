@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { act, useRef } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { centeredScrollTop, useCenterOnEnter } from './useCenterOnEnter';
@@ -107,5 +108,19 @@ describe('useCenterOnEnter', () => {
   it('does nothing when disabled', () => {
     act(() => root.render(<Harness ready enabled={false} />));
     expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it('leaves a freshly loaded page at the top', () => {
+    const hydrated = document.createElement('div');
+    hydrated.innerHTML = renderToString(<Harness ready />);
+    document.body.append(hydrated);
+    let hydratedRoot: Root | undefined;
+    act(() => {
+      hydratedRoot = hydrateRoot(hydrated, <Harness ready />);
+    });
+    act(() => hydratedRoot?.render(<Harness ready />));
+    expect(scrollTo).not.toHaveBeenCalled();
+    act(() => hydratedRoot?.unmount());
+    hydrated.remove();
   });
 });

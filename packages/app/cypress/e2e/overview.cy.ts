@@ -829,10 +829,7 @@ describe('Overview page', () => {
         .should('contain.text', '∞')
         .and('have.attr', 'data-cost-polarity', 'no-baseline');
       platform('gb300').then(([cell]) => {
-        const [r, g, b] = getComputedStyle(cell.closest('td')!)
-          .backgroundColor.match(/\d+/g)!
-          .map(Number);
-        expect(Math.max(r, g, b) - Math.min(r, g, b)).to.be.lessThan(60);
+        expect(cell.closest('td')!.getAttribute('style') ?? '').not.to.contain('background');
       });
     });
   });

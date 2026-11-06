@@ -25,10 +25,8 @@ export function DashboardSectionHeader({
   descriptionClassName,
 }: DashboardSectionHeaderProps) {
   return (
-    <div
-      className={cn('flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between', className)}
-    >
-      <div className="min-w-0">
+    <div className={cn('flex flex-wrap items-start justify-between gap-3', className)}>
+      <div className="min-w-0 flex-1 basis-60">
         <Heading as={headingAs} level={level} className="mb-1">
           {title}
         </Heading>
@@ -36,9 +34,7 @@ export function DashboardSectionHeader({
           <p className={cn('text-sm text-muted-foreground', descriptionClassName)}>{description}</p>
         )}
       </div>
-      {actions !== undefined && (
-        <div className="flex min-w-0 flex-wrap gap-2 sm:shrink-0">{actions}</div>
-      )}
+      {actions !== undefined && <div className="flex min-w-0 flex-wrap gap-2">{actions}</div>}
     </div>
   );
 }

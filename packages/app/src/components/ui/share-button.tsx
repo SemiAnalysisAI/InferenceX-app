@@ -12,6 +12,7 @@ import { track } from '@/lib/analytics/analytics';
 import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { buildShareUrl } from '@/lib/routing/url-state';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 import { GlobalFilterSelectionContext } from '@/providers/GlobalFilterContext';
 
 import { Button } from './button';
@@ -97,11 +98,11 @@ export function ShareButton({ className }: { className?: string } = {}) {
           data-testid="share-button"
           size="xs"
           variant="outline"
-          className={className}
+          className={cn('max-sm:w-11', className)}
           title={t.title}
         >
           <Share2 className="size-3.5" />
-          {t.trigger}
+          <span className="max-sm:sr-only">{t.trigger}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent

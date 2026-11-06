@@ -121,10 +121,10 @@ function Row({ row, frame, label }: { row: ReplayRow; frame: Frame; label: strin
   const shown = visibleTokens(row, frame);
   const active = row.step === frame.step;
   return (
-    <li className="flex items-center gap-2" data-testid="agentx-session-replay-row">
+    <li className="flex h-3 items-center gap-2" data-testid="agentx-session-replay-row">
       <span
         className={cn(
-          'min-w-12 shrink-0 whitespace-nowrap text-right font-mono text-3xs tabular-nums',
+          'min-w-12 shrink-0 whitespace-nowrap text-right font-mono text-3xs leading-3 tabular-nums',
           active ? 'font-semibold text-foreground' : 'text-muted-foreground',
           shown ? 'opacity-100' : 'opacity-0',
         )}
@@ -239,7 +239,10 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
       </div>
       <p className="mt-2 min-h-10 text-sm leading-5 text-foreground sm:min-h-5">{caption}</p>
 
-      <div className="relative mt-3" aria-hidden="true">
+      <p className="mt-3 ml-14 font-mono text-3xs text-muted-foreground" aria-hidden="true">
+        {t.axis}
+      </p>
+      <div className="relative mt-0.5" aria-hidden="true">
         <div className="pointer-events-none absolute inset-y-0 right-0 left-14">
           {TICKS.map((tick) => (
             <span
@@ -249,17 +252,7 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
             />
           ))}
         </div>
-        <ol className="relative space-y-1">
-          {REPLAY_ROWS.map((row, index) => (
-            <Row
-              key={index}
-              row={row}
-              frame={frame}
-              label={row.lane === null ? t.main : t.sub(row.lane + 1)}
-            />
-          ))}
-        </ol>
-        <div className="relative mt-1 ml-14 h-4 font-mono text-3xs text-muted-foreground tabular-nums">
+        <div className="relative mb-1 ml-14 h-4 font-mono text-3xs text-muted-foreground tabular-nums">
           {TICKS.map((tick) => (
             <span
               key={tick}
@@ -270,7 +263,16 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
             </span>
           ))}
         </div>
-        <p className="mt-0.5 ml-14 font-mono text-3xs text-muted-foreground">{t.axis}</p>
+        <ol className="relative">
+          {REPLAY_ROWS.map((row, index) => (
+            <Row
+              key={index}
+              row={row}
+              frame={frame}
+              label={row.lane === null ? t.main : t.sub(row.lane + 1)}
+            />
+          ))}
+        </ol>
       </div>
 
       <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 border-t border-border/20 pt-4 sm:grid-cols-4">

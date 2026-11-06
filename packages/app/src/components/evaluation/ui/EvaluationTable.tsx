@@ -145,7 +145,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
           const runIdx = isUnofficial ? overlayRunIndex(row.runUrl, runIndexByUrl) : 0;
           return (
             <span className="inline-flex items-center gap-1.5">
-              <span className="sm:w-max sm:max-w-64">
+              <span className="sm:whitespace-nowrap">
                 <span className="font-medium">{row.hwLabel}</span>
                 {row.engineLabel && (
                   <span className="text-muted-foreground"> {row.engineLabel}</span>
@@ -176,7 +176,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         header: t.precision,
         cell: (row) => row.precision.toUpperCase(),
         sortValue: (row) => row.precision,
-        className: 'whitespace-nowrap',
+        className: 'w-px whitespace-nowrap',
         importance: 'key',
       },
       {
@@ -184,6 +184,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         align: 'right',
         cell: (row) => row.score.toFixed(2),
         sortValue: (row) => row.score,
+        className: 'w-px whitespace-nowrap',
         importance: 'key',
       },
       {
@@ -191,6 +192,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         align: 'right',
         cell: (row) => row.minScore?.toFixed(2) ?? '-',
         sortValue: (row) => row.minScore ?? 0,
+        className: 'w-px whitespace-nowrap',
         importance: 'secondary',
       },
       {
@@ -198,6 +200,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         align: 'right',
         cell: (row) => row.maxScore?.toFixed(2) ?? '-',
         sortValue: (row) => row.maxScore ?? 0,
+        className: 'w-px whitespace-nowrap',
         importance: 'secondary',
       },
       {
@@ -205,6 +208,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         align: 'right',
         cell: (row) => row.conc,
         sortValue: (row) => row.conc,
+        className: 'w-px whitespace-nowrap',
         importance: 'key',
       },
       {
@@ -240,7 +244,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         align: 'right',
         cell: (row) => row.physicalChips ?? '—',
         sortValue: (row) => row.physicalChips ?? 0,
-        className: 'whitespace-nowrap',
+        className: 'w-px whitespace-nowrap',
         importance: 'secondary',
       },
       {
@@ -254,7 +258,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         header: t.date,
         cell: (row) => formatEvaluationDate(row.date, locale),
         sortValue: (row) => row.date,
-        className: 'whitespace-nowrap',
+        className: 'whitespace-nowrap tabular-nums',
         importance: 'secondary',
       },
       {
@@ -274,7 +278,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
             </Button>
           ) : null;
         },
-        className: 'w-full',
+        className: 'w-px',
         importance: 'key',
       },
     ];

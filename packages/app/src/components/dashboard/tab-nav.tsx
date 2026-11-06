@@ -165,7 +165,7 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
   };
 
   return (
-    <div className="mb-1 pt-3 lg:mb-2 lg:pt-0">
+    <div className="mb-1 lg:mb-2">
       <div className="vt-dashboard-tabs" data-slot="dashboard-navigation">
         <MobileTabStrip
           ariaLabel={locale === 'zh' ? '选择图表' : 'Select chart'}
@@ -361,13 +361,7 @@ function MobileTabStrip({
           }
           onSelect(route.key);
         }}
-        className={cn(
-          'inline-flex min-h-11 shrink-0 items-center rounded-md border px-3 text-sm font-medium whitespace-nowrap',
-          'transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-          active
-            ? 'border-border/40 bg-muted text-foreground'
-            : 'border-transparent text-muted-foreground active:bg-muted/60',
-        )}
+        className={cn(tabLinkClass, currentTabClass(active), 'min-h-11 shrink-0 py-0')}
       >
         {tabLabel(route)}
       </IntentPrefetchLink>
@@ -375,42 +369,29 @@ function MobileTabStrip({
   };
 
   return (
-    <div className="relative lg:hidden">
-      <nav
-        ref={scrollerRef}
-        id="chart-select"
-        aria-label={ariaLabel}
-        data-testid="mobile-chart-select"
-        onScroll={updateEdges}
-        className="no-scrollbar flex gap-2 overflow-x-auto overscroll-x-contain py-3"
-      >
-        {routes.map(renderPill)}
-        {gatedRoutes.length > 0 && (
-          <>
-            <span
-              aria-hidden
-              className="shrink-0 self-center px-1 text-xs font-medium text-muted-foreground"
-            >
-              {gatedLabel}
-            </span>
-            {gatedRoutes.map(renderPill)}
-          </>
-        )}
-      </nav>
-      <span
-        aria-hidden
-        className={cn(
-          'pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-background to-transparent transition-opacity',
-          edges.start ? 'opacity-100' : 'opacity-0',
-        )}
-      />
-      <span
-        aria-hidden
-        className={cn(
-          'pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent transition-opacity',
-          edges.end ? 'opacity-100' : 'opacity-0',
-        )}
-      />
-    </div>
+    <nav
+      ref={scrollerRef}
+      id="chart-select"
+      aria-label={ariaLabel}
+      data-testid="mobile-chart-select"
+      onScroll={updateEdges}
+      className="no-scrollbar relative flex gap-6 overflow-x-auto overscroll-x-contain border-b border-border/30 lg:hidden"
+      style={{
+        maskImage: `linear-gradient(to right, ${edges.start ? 'transparent' : 'black'}, black 2rem, black calc(100% - 2.5rem), ${edges.end ? 'transparent' : 'black'})`,
+      }}
+    >
+      {routes.map(renderPill)}
+      {gatedRoutes.length > 0 && (
+        <>
+          <span
+            aria-hidden
+            className="shrink-0 self-center text-xs font-medium text-muted-foreground"
+          >
+            {gatedLabel}
+          </span>
+          {gatedRoutes.map(renderPill)}
+        </>
+      )}
+    </nav>
   );
 }

@@ -67,9 +67,13 @@ const STRINGS = {
     huaweiReference:
       'Huawei MBU uses the 1,638.4 GB/s peak (8 HBM stacks × 256 bits × 6.4 Gbps), which Huawei rounds to 1.6 TB/s.',
     amortized: 'Amortized graph copy time',
-    source: 'Source',
+    sources: 'Sources: ',
+    device: 'Device',
+    hardware: 'Hardware',
     driver: 'Driver',
+    runtime: 'Runtime',
     container: 'Container',
+    peak: 'Peak bandwidth',
     instructions: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
     tooltipSize: 'Size',
     tooltipLatency: 'Latency',
@@ -100,9 +104,13 @@ const STRINGS = {
     huaweiReference:
       'Huawei 的 MBU 按峰值带宽 1,638.4 GB/s 计算（8 个 HBM stack × 256 位 × 6.4 Gbps），Huawei 将其取整为 1.6 TB/s。',
     amortized: '摊销后的图拷贝时间',
-    source: '数据来源',
+    sources: '数据来源：',
+    device: '设备',
+    hardware: '硬件',
     driver: '驱动',
+    runtime: '运行时',
     container: '容器',
+    peak: '峰值带宽',
     instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置',
     tooltipSize: '大小',
     tooltipLatency: '延迟',
@@ -442,6 +450,7 @@ export function UbenchxContent() {
   const gpuKeys = viewResults.map((r) => r.gpu);
 
   const sourceUrls = [...new Set(viewResults.map((r) => r.metadata.sourceUrl))];
+  const specHeaders = [t.device, t.hardware, t.driver, 'PyTorch', t.runtime, t.container, t.peak];
 
   return (
     <div className="flex flex-col gap-4" role="group" aria-label={t.aria}>
@@ -470,35 +479,82 @@ export function UbenchxContent() {
         footer={
           <div className="mt-3">
             <ResultContext locale={locale} layout="footer" source="SemiAnalysis InferenceX™" />
-            <p className="mt-2 text-xs leading-5 text-muted-foreground/70">{t.protocolNote}</p>
+            <div className="mt-3 max-w-[80ch] space-y-1.5 text-xs leading-5 text-muted-foreground">
+              <p>{t.protocolNote}</p>
+              <h3 className="pt-1.5 font-medium text-foreground">{t.methodology}</h3>
+              <p>{t.methodologyText}</p>
+              <p>{t.huaweiMethodology}</p>
+              <p>{t.huaweiReference}</p>
+            </div>
+            <div className="mt-3 overflow-x-auto" data-testid="ubenchx-device-specs">
+              <table className="w-full text-left text-xs text-muted-foreground tabular-nums">
+                <thead>
+                  <tr className="border-b border-border/60">
+                    {specHeaders.map((header, index) => (
+                      <th
+                        key={header}
+                        scope="col"
+                        className={
+                          index === specHeaders.length - 1
+                            ? 'py-1.5 text-right font-medium whitespace-nowrap'
+                            : 'py-1.5 pr-4 font-medium whitespace-nowrap'
+                        }
+                      >
+                        {header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {viewResults.map((r) => (
+                    <tr key={r.gpu} className="border-b border-border/30 last:border-b-0">
+                      <th
+                        scope="row"
+                        className="py-1.5 pr-4 font-medium whitespace-nowrap text-foreground"
+                      >
+                        {r.gpu}
+                      </th>
+                      <td className="py-1.5 pr-4 whitespace-nowrap">{r.metadata.gpu}</td>
+                      <td className="py-1.5 pr-4 whitespace-nowrap">{r.metadata.driver}</td>
+                      <td className="py-1.5 pr-4 whitespace-nowrap">{r.metadata.torch}</td>
+                      <td className="py-1.5 pr-4 whitespace-nowrap">
+                        {r.metadata.cann
+                          ? `CANN ${r.metadata.cann} · torch_npu ${r.metadata.torchNpu}`
+                          : `Triton ${r.metadata.triton}`}
+                      </td>
+                      <td className="min-w-64 py-1.5 pr-4 break-all">
+                        {r.metadata.cann ? '—' : r.metadata.container}
+                      </td>
+                      <td className="py-1.5 text-right whitespace-nowrap">
+                        {r.peakBandwidthGbps / 1000} TB/s
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              {t.sources}
+              {sourceUrls.map((url, index) => {
+                const name = url.slice(url.lastIndexOf('/') + 1);
+                return (
+                  <span key={url}>
+                    {index > 0 && ' · '}
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-foreground"
+                    >
+                      {url.includes('/pull/') ? `PR #${name}` : name}
+                    </a>
+                  </span>
+                );
+              })}
+            </p>
           </div>
         }
       />
-
-      <section className="space-y-1 text-xs text-muted-foreground wrap-break-word">
-        <h3 className="text-sm font-medium text-foreground">{t.methodology}</h3>
-        <p>{t.methodologyText}</p>
-        <p>{t.huaweiMethodology}</p>
-        <p>{t.huaweiReference}</p>
-        {viewResults.map((r) => (
-          <p key={r.gpu}>
-            <strong>{r.gpu}:</strong> {r.metadata.gpu} | {t.driver}: {r.metadata.driver} | PyTorch:{' '}
-            {r.metadata.torch} |{' '}
-            {r.metadata.cann
-              ? `CANN: ${r.metadata.cann} | torch_npu: ${r.metadata.torchNpu}`
-              : `Triton: ${r.metadata.triton} | ${t.container}: ${r.metadata.container}`}{' '}
-            | {r.peakBandwidthGbps / 1000} TB/s
-          </p>
-        ))}
-        {sourceUrls.map((url) => (
-          <p key={url}>
-            {t.source}:{' '}
-            <a href={url} target="_blank" rel="noopener noreferrer" className="break-all underline">
-              {url}
-            </a>
-          </p>
-        ))}
-      </section>
     </div>
   );
 }

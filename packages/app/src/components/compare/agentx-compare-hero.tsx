@@ -502,7 +502,9 @@ export function AgentXCompareHero({
     <section data-testid="compare-agentx-primary">
       <Card className="overflow-hidden p-0 md:p-0">
         <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(19rem,0.85fr)]">
-          <div className="flex flex-col justify-center p-6 md:p-8 lg:p-10">
+          <div
+            className={`flex flex-col p-6 md:p-8 lg:p-10 ${surface === 'landing' ? 'lg:pt-8' : 'justify-center'}`}
+          >
             <div className="relative">
               <Heading className="max-w-2xl text-3xl font-semibold text-foreground lg:text-4xl lg:tracking-heading">
                 {t.title}

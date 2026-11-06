@@ -101,12 +101,24 @@ function missingReasonCopy(platform: OverviewPlatformResult, strings: OverviewSt
 const RAW_SOURCE_LINK_CLASS =
   'inline-flex min-h-11 items-center rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none xl:min-h-0';
 
-function CellMissing({ hardware, reason }: { hardware: string; reason: string }) {
+function CellMissing({
+  hardware,
+  reason,
+  compact = false,
+}: {
+  hardware: string;
+  reason: string;
+  compact?: boolean;
+}) {
   return (
     <div
       data-testid="overview-pair-missing"
       data-hardware={hardware}
-      className="min-w-0 space-y-0.5 text-sm text-muted-foreground"
+      className={
+        compact
+          ? 'flex min-w-0 items-baseline gap-1.5 text-sm text-muted-foreground'
+          : 'min-w-0 space-y-0.5 text-sm text-muted-foreground'
+      }
     >
       <span>{'—'}</span>
       {reason === '' ? null : (
@@ -130,7 +142,6 @@ const COST_DELTA_TOKEN = {
   cheaper: '--success',
   pricier: '--destructive',
   even: '--muted-foreground',
-  'no-baseline': '--muted-foreground',
 } as const;
 const COST_DELTA_NEUTRAL_ALPHA = 0.1;
 
@@ -234,6 +245,7 @@ export function costDeltaCellStyle(
   if (comparison === null) return undefined;
   const { pct } = comparison;
   const polarity = comparisonPolarity(comparison);
+  if (polarity === 'no-baseline') return undefined;
   const alpha =
     pct === null || polarity === 'even' ? COST_DELTA_NEUTRAL_ALPHA : costDeltaAlpha(pct);
   const mix = Math.round(alpha * 100);
@@ -297,6 +309,7 @@ function CellValue({
   referenceCost,
   referenceLabel,
   phoneRow = false,
+  compact = false,
 }: {
   locale: OverviewLocale;
   model: OverviewModelSummary;
@@ -308,10 +321,17 @@ function CellValue({
   referenceCost: number | null;
   referenceLabel: string;
   phoneRow?: boolean;
+  compact?: boolean;
 }) {
   const { value, config, evidenceDate, evidenceTopologies } = member.read;
   if (member.missingReason !== null || value === null || member.costPerMtok === null) {
-    return <CellMissing hardware={member.hardware} reason={missingReasonCopy(member, strings)} />;
+    return (
+      <CellMissing
+        hardware={member.hardware}
+        reason={missingReasonCopy(member, strings)}
+        compact={compact}
+      />
+    );
   }
   const precisionLabel = config?.precision.toUpperCase() ?? member.precision?.toUpperCase() ?? null;
   const evidenceSpecLabel =
@@ -453,6 +473,7 @@ function PlatformCell(props: {
   referenceCost: number | null;
   referenceLabel: string;
   phoneRow?: boolean;
+  compact?: boolean;
 }) {
   return (
     <div data-testid="overview-platform" data-hardware={props.platform.hardware}>
@@ -467,17 +488,26 @@ function PlatformCell(props: {
         referenceCost={props.referenceCost}
         referenceLabel={props.referenceLabel}
         phoneRow={props.phoneRow}
+        compact={props.compact}
       />
     </div>
   );
 }
 
-function ModelName({ model, strings }: { model: OverviewModelSummary; strings: OverviewStrings }) {
+function ModelName({
+  model,
+  strings,
+  compact = false,
+}: {
+  model: OverviewModelSummary;
+  strings: OverviewStrings;
+  compact?: boolean;
+}) {
   const badge = strings.categoryBadges[model.category];
   const label = strings.scenarioLabels[model.scenario];
   const shortLabel = strings.scenarioLabelsShort[model.scenario];
   return (
-    <div>
+    <div className={compact ? 'flex min-w-0 flex-wrap items-baseline gap-x-2' : undefined}>
       <h2 className="text-sm font-semibold leading-snug">
         <ModelLogo model={model.model} className="mr-1.5" />
         {model.modelLabel}
@@ -496,7 +526,7 @@ function ModelName({ model, strings }: { model: OverviewModelSummary; strings: O
       <p
         data-testid="overview-model-scenario"
         title={label}
-        className="mt-0.5 text-2xs font-normal leading-tight text-muted-foreground"
+        className={`text-2xs font-normal leading-tight text-muted-foreground ${compact ? '' : 'mt-0.5'}`}
       >
         {shortLabel === label ? (
           label
@@ -546,15 +576,18 @@ export function DesktopOverviewMatrix({
           ))}
         </colgroup>
         <thead className="sticky top-14 z-10 bg-card">
-          <tr className="border-b border-border/50 text-xs text-muted-foreground">
-            <th scope="col" className="bg-card px-4 py-2 text-left font-medium lg:px-6">
+          <tr className="text-xs text-muted-foreground">
+            <th
+              scope="col"
+              className="h-10 bg-card px-4 text-left font-medium shadow-[inset_0_-1px_0_var(--border)] lg:px-6"
+            >
               {strings.modelHeader}
             </th>
             {platforms.map((platform) => (
               <th
                 key={platform.hardware}
                 scope="col"
-                className={`px-3 py-2 text-left font-medium ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted' : 'bg-card'}`}
+                className={`h-10 px-3 text-left font-medium shadow-[inset_0_-1px_0_var(--border)] ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted' : 'bg-card'}`}
               >
                 {comparisonMode === 'hardware' && platform.hardware === referenceHardware
                   ? `${platform.hardwareLabel} · ${strings.referenceHeader}`
@@ -568,29 +601,42 @@ export function DesktopOverviewMatrix({
             const referenceCost =
               model.platforms.find((platform) => platform.hardware === referenceHardware)
                 ?.costPerMtok ?? null;
+            const empty = model.platforms.every(
+              (platform) =>
+                platform.missingReason !== null ||
+                platform.read.value === null ||
+                platform.costPerMtok === null,
+            );
+            const cellPadding = empty ? 'py-1.5 align-middle' : 'py-2.5 align-top';
             return (
               <tr
                 key={`${model.model}-${model.scenario}`}
                 data-testid="overview-desktop-model"
                 data-model={model.model}
                 data-scenario={model.scenario}
-                className="border-b border-border/50 align-top last:border-b-0"
+                className="border-b border-border/50 last:border-b-0"
               >
-                <th scope="row" className="px-4 py-2.5 text-left align-top font-normal lg:px-6">
-                  <ModelName model={model} strings={strings} />
-                  {comparisonMode === 'hardware' && (
-                    <OverviewDetailLink
-                      href={detailHref(locale, model)}
-                      model={model.model}
-                      ariaLabel={strings.detailAria(
-                        model.modelLabel,
-                        strings.scenarioLabels[model.scenario],
-                      )}
-                      className="mt-1 text-xs"
-                    >
-                      {strings.detailLink}
-                    </OverviewDetailLink>
-                  )}
+                <th scope="row" className={`px-4 text-left font-normal lg:px-6 ${cellPadding}`}>
+                  <div
+                    className={
+                      empty ? 'flex flex-wrap items-center justify-between gap-x-3' : undefined
+                    }
+                  >
+                    <ModelName model={model} strings={strings} compact={empty} />
+                    {comparisonMode === 'hardware' && (
+                      <OverviewDetailLink
+                        href={detailHref(locale, model)}
+                        model={model.model}
+                        ariaLabel={strings.detailAria(
+                          model.modelLabel,
+                          strings.scenarioLabels[model.scenario],
+                        )}
+                        className={empty ? 'text-xs xl:min-h-6' : 'mt-1 text-xs xl:min-h-6'}
+                      >
+                        {strings.detailLink}
+                      </OverviewDetailLink>
+                    )}
+                  </div>
                 </th>
                 {model.platforms.map((platform) => (
                   <td
@@ -601,7 +647,7 @@ export function DesktopOverviewMatrix({
                       referenceHardware,
                       referenceCost,
                     )}
-                    className={`px-3 py-2.5 align-top ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted/30' : ''}`}
+                    className={`px-3 ${cellPadding} ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted/30' : ''}`}
                   >
                     <PlatformCell
                       locale={locale}
@@ -613,6 +659,7 @@ export function DesktopOverviewMatrix({
                       referenceHardware={referenceHardware}
                       referenceCost={referenceCost}
                       referenceLabel={referenceLabel}
+                      compact={empty}
                     />
                   </td>
                 ))}
