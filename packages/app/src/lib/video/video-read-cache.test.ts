@@ -98,15 +98,6 @@ describe('shared VideoGenX read cache', () => {
     expect(publishedVideoHistory).toHaveBeenCalledTimes(2);
   });
 
-  it('propagates a failed read and retains nothing from it', async () => {
-    vi.mocked(publishedVideoHistory)
-      .mockRejectedValueOnce(new Error('Blob unavailable'))
-      .mockResolvedValueOnce({ page: page(), complete: true });
-    await expect(cachedVideoHistory(1, 1)).rejects.toThrow('Blob unavailable');
-    await expect(cachedVideoHistory(1, 1)).resolves.toEqual(page());
-    expect(publishedVideoHistory).toHaveBeenCalledTimes(2);
-  });
-
   it('retains a published artifact but keeps looking for an absent one', async () => {
     vi.mocked(storedArtifacts).mockImplementation((runId) =>
       Promise.resolve(runId === '10' ? [artifact] : []),

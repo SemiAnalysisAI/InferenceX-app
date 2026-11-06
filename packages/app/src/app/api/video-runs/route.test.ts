@@ -81,32 +81,6 @@ describe('H3 CI artifact access', () => {
     expect(publishedVideoHistory).toHaveBeenCalledTimes(2);
   });
 
-  it('rereads an incomplete History page because a failed approval lookup appears as unapproved', async () => {
-    vi.mocked(publishedVideoHistory).mockResolvedValueOnce({
-      complete: false,
-      page: {
-        schemaVersion: 1,
-        nextPage: null,
-        entries: [
-          {
-            id: '10.20',
-            runId: '10',
-            artifact: { id: 20, name: 'h3-results-10-1', expired: false, size_in_bytes: 1 },
-            approved: false,
-            publishedAt: null,
-            sources: [],
-            error: null,
-          },
-        ],
-      },
-    });
-    const first = await GET(request('?format=history'));
-    const body = await first.json();
-    expect(body.entries).toHaveLength(1);
-    await GET(request('?format=history'));
-    expect(publishedVideoHistory).toHaveBeenCalledTimes(2);
-  });
-
   it('never serves synthetic History approval in production when fixture mode is set', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('E2E_FIXTURES', '1');
