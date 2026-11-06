@@ -126,8 +126,7 @@ function cachedArtifact(
 
 /**
  * History-shaped projection of an unstored run, read from the documents of its native
- * `h3-results-*` artifacts. Nothing is stored or approved and no media is exposed. Callers must
- * check repository visibility first, including before a cache hit.
+ * `h3-results-*` artifacts. Nothing is stored or approved and no media is exposed.
  */
 export async function liveVideoRunPage(
   runId: string,

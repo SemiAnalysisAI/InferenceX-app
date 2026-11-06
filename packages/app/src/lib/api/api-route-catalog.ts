@@ -1598,7 +1598,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/video/video-live-run.ts',
-    sourceSha256: 'ad134e6e8eea96164703f4caf8d6a81eaa0b0d7d36f82bb7da51a1f4887e5c9f',
+    sourceSha256: '97dc5178fa9097d9aafd31097fb0a4fb2e9765fb4129589463cf4de060714776',
     reviewArea: {
       en: 'VideoGenX live read of an unstored run: native result artifact selection, verified documents only, never stored, approved or given media.',
       zh: 'VideoGenX 实时读取未存储的运行：选择原生结果产物，只读取经校验的文档，不存储、不批准，也不附带媒体。',
