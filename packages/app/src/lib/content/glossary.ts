@@ -28,8 +28,19 @@ export interface GlossaryEntry {
     label: string;
     value: string;
   };
+  figure?: GlossaryFigure;
   relatedTerms: readonly string[];
   articleSlugs: readonly string[];
+}
+
+/** An image shown under the technical definition. `caption` accepts inline `[label](https://…)` links. */
+export interface GlossaryFigure {
+  /** Path under `public/`. */
+  src: string;
+  width: number;
+  height: number;
+  alt: string;
+  caption: string;
 }
 
 const INFERENCEMAX = 'inferencemax-open-source-inference-benchmarking';
@@ -2620,6 +2631,13 @@ const entries = [
     measurement: {
       label: 'Cost at 100 tok/s/user, FP8 8k1k',
       value: '$0.181 per million tokens vs $0.222 (B200) and $0.276 (B300)',
+    },
+    figure: {
+      src: '/images/glossary/tpuv7-ironwood-package.webp',
+      width: 2000,
+      height: 1279,
+      alt: 'Annotated photo of the TPUv7 Ironwood package: two compute dies split by the die-to-die boundary, four HBM3E stacks on each side, the ICI SerDes chiplet above the dies, and a dummy die at each top corner.',
+      caption: 'Source: SemiAnalysis, [Google](https://docs.cloud.google.com/tpu/docs/tpu7x)',
     },
     relatedTerms: ['tpu', 'mxu', 'sparsecore', 'ici', 'fp8', 'performance-per-dollar'],
     articleSlugs: [TPU_IRONWOOD],

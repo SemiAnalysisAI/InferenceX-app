@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { GlossaryFigure } from '@/components/glossary/glossary-figure';
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
 import { getPostBySlug } from '@/lib/blog/blog';
@@ -184,6 +185,8 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
                   </h2>
                   <p className="mt-3 leading-7 text-muted-foreground">{entry.definition}</p>
                 </section>
+
+                {entry.figure && <GlossaryFigure figure={entry.figure} />}
 
                 {entry.measurement && (
                   <div className="mt-8 border-l-2 border-brand bg-brand/6 px-5 py-4">

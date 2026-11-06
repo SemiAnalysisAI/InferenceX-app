@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { getAllPosts, getPostBySlug } from '../blog/blog';
@@ -202,6 +205,49 @@ describe('glossary navigation', () => {
         previous: sorted[index - 1] ?? null,
         next: sorted[index + 1] ?? null,
       });
+    }
+  });
+});
+
+/** Pixel size of a lossy (VP8) or extended (VP8X) WebP file. */
+function webpSize(file: Buffer): [number, number] {
+  expect(file.toString('ascii', 0, 4)).toBe('RIFF');
+  expect(file.toString('ascii', 8, 12)).toBe('WEBP');
+  const chunk = file.toString('ascii', 12, 16);
+  if (chunk === 'VP8X') return [file.readUIntLE(24, 3) + 1, file.readUIntLE(27, 3) + 1];
+  expect(chunk).toBe('VP8 ');
+  return [file.readUInt16LE(26) & 0x3FFF, file.readUInt16LE(28) & 0x3FFF];
+}
+
+describe('glossary figures', () => {
+  it('points at a WebP in public/ whose size matches the declared dimensions', () => {
+    const figures = getAllGlossaryEntries().flatMap((entry) =>
+      entry.figure ? [entry.figure] : [],
+    );
+    expect(figures.length).toBeGreaterThanOrEqual(1);
+    for (const figure of figures) {
+      expect(figure.src).toMatch(/^\/images\/glossary\/[a-z0-9-]+\.webp$/u);
+      const file = readFileSync(path.join(process.cwd(), 'public', figure.src));
+      expect(webpSize(file), figure.src).toEqual([figure.width, figure.height]);
+      expect(figure.alt.length, figure.src).toBeGreaterThan(40);
+    }
+  });
+
+  it('shows the same image on the Chinese page with translated alt text and caption', () => {
+    for (const entry of getAllGlossaryEntries()) {
+      const zh = getZhGlossaryEntry(entry.slug)?.figure;
+      if (!entry.figure) {
+        expect(zh, entry.slug).toBeUndefined();
+        continue;
+      }
+      expect(zh, entry.slug).toBeDefined();
+      expect([zh?.src, zh?.width, zh?.height]).toEqual([
+        entry.figure.src,
+        entry.figure.width,
+        entry.figure.height,
+      ]);
+      expect(zh?.alt).not.toBe(entry.figure.alt);
+      expect(zh?.caption).not.toBe(entry.figure.caption);
     }
   });
 });
