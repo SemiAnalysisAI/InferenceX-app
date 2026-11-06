@@ -38,6 +38,8 @@ const STRINGS = {
   },
 } as const;
 
+const SCROLL_FADE_MASK = 'linear-gradient(to bottom, black calc(100% - 24px), transparent)';
+
 export interface LegendSwitchConfig {
   id: string;
   label: string;
@@ -130,6 +132,7 @@ export default function ChartLegend({
   );
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
+  const [hasMoreBelow, setHasMoreBelow] = useState(false);
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
   const advancedControlsId = useId();
 
@@ -145,12 +148,18 @@ export default function ChartLegend({
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const observer = new ResizeObserver(() => {
+    const update = () => {
       setIsOverflowing(el.scrollHeight > el.clientHeight - 0.5);
-    });
+      setHasMoreBelow(el.scrollHeight - el.scrollTop - el.clientHeight > 1);
+    };
+    const observer = new ResizeObserver(update);
     observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+    el.addEventListener('scroll', update, { passive: true });
+    return () => {
+      observer.disconnect();
+      el.removeEventListener('scroll', update);
+    };
+  }, [items, isLegendExpanded]);
 
   const sortedItems = useMemo(() => {
     if (!isSidebar) return items;
@@ -210,17 +219,12 @@ export default function ChartLegend({
     [items, hideAtomFootnote],
   );
 
-  const hasSidebarControls =
-    isSidebar && (keyIndicators || (switches && switches.length > 0) || hasAtomFootnote);
   const headerButtons: (LegendActionConfig & { disabled?: boolean })[] = [
     ...(reset ? [{ ...reset, label: t.resetFilter }] : []),
     ...(actions ?? []),
   ];
   const scrollClasses = isSidebar
-    ? cn(
-        'relative overflow-y-auto flex-initial min-h-0 space-y-0.5',
-        hasSidebarControls && 'border-b border-border/50 pb-2',
-      )
+    ? 'relative overflow-y-auto flex-initial min-h-0 space-y-0.5 pb-2'
     : grouped
       ? 'flex gap-x-4 flex-wrap flex-row md:block md:overflow-y-auto md:flex-1 md:min-h-0'
       : 'flex flex-row flex-wrap gap-x-4 gap-y-2 md:block md:overflow-y-auto md:flex-1 md:min-h-0';
@@ -410,7 +414,10 @@ export default function ChartLegend({
   const bottomControls = hasBottomControls ? (
     <div
       data-testid="legend-display-controls"
-      className={cn('shrink-0 grow-0', isSidebar && 'min-w-0 [contain:inline-size]')}
+      className={cn(
+        'shrink-0 grow-0',
+        isSidebar && 'min-w-0 border-t border-border/50 [contain:inline-size]',
+      )}
     >
       {!isSidebar && actionElements}
       {switchElements}
@@ -419,13 +426,16 @@ export default function ChartLegend({
     </div>
   ) : null;
 
+  const scrollStyle: React.CSSProperties = {
+    ...(!isSidebar && isOverflowing ? { scrollbarGutter: 'stable' } : undefined),
+    ...(hasMoreBelow
+      ? { maskImage: SCROLL_FADE_MASK, WebkitMaskImage: SCROLL_FADE_MASK }
+      : undefined),
+  };
+
   const scrollContent =
     grouped && rows ? (
-      <div
-        ref={scrollRef}
-        style={!isSidebar && isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
-        className={cn(scrollClasses, 'custom-scrollbar')}
-      >
+      <div ref={scrollRef} style={scrollStyle} className={cn(scrollClasses, 'custom-scrollbar')}>
         {rows.map((row, i) => (
           <div key={i} className={cn('shrink-0', i > 0 && 'mt-2', !isSidebar && 'p-1')}>
             <div className="text-sm font-medium text-muted-foreground gpu-legend-title whitespace-nowrap overflow-ellipsis overflow-hidden">
@@ -445,7 +455,7 @@ export default function ChartLegend({
     ) : (
       <ul
         ref={scrollRef as unknown as React.RefObject<HTMLUListElement>}
-        style={!isSidebar && isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
+        style={scrollStyle}
         className={cn(scrollClasses, 'custom-scrollbar')}
       >
         {(isSidebar ? sortedItems : items)

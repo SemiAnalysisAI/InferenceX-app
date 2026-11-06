@@ -175,9 +175,7 @@ export function ChartButtons({
       )}
     >
       {leadingControls && (
-        <div className="flex min-w-fit flex-1 flex-wrap items-center gap-2 md:flex-none">
-          {leadingControls}
-        </div>
+        <div className="flex min-w-fit flex-wrap items-center gap-2">{leadingControls}</div>
       )}
       <div className="flex shrink-0 items-center gap-2">
         <Popover

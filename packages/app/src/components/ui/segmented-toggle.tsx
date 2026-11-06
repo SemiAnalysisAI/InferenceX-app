@@ -132,7 +132,7 @@ export function SegmentedToggle<TValue extends string>({
           title={option.title}
           disabled={option.disabled}
           className={cn(
-            'inline-flex min-h-11 min-w-0 max-w-full items-center justify-center gap-1.5 px-2 py-1 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-60 md:py-0.5',
+            'inline-flex min-h-11 min-w-0 max-w-full items-center justify-center gap-1.5 px-1.5 py-1 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-60 md:py-0.5',
             SEGMENT_RADIUS_STYLE,
             size === 'sm' ? 'md:min-h-6' : 'md:min-h-7',
             buttonClassName,

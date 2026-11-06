@@ -36,8 +36,7 @@ export const TABLE_HEAD_ROW_STYLE = 'border-b border-border';
 export const TABLE_HEAD_CELL_STYLE = 'whitespace-nowrap text-xs font-medium text-muted-foreground';
 
 export const SEGMENTED_CONTAINER_STYLE =
-  'inline-flex min-h-11 min-w-0 max-w-full flex-wrap items-stretch rounded-md border border-border dark:border-input gap-0.5 [--segmented-inset:1px] md:[--segmented-inset:3px] md:p-0.5 md:min-h-8';
+  'inline-flex min-h-11 min-w-0 max-w-full flex-wrap items-stretch rounded-md border border-border dark:border-input md:min-h-8';
 
-/** Segment inside `SEGMENTED_CONTAINER_STYLE`: the container's radius minus its inset. */
 export const SEGMENT_RADIUS_STYLE =
-  'rounded-[max(0px,calc(var(--radius)-2px-var(--segmented-inset)))]';
+  'rounded-[max(0px,calc(var(--radius)-3px))] border-2 border-transparent bg-clip-padding';

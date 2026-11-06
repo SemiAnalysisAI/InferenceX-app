@@ -377,7 +377,7 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap ${SEGMENT_RADIUS_STYLE} px-2 text-sm font-medium transition-colors md:min-h-6 ${
+                  className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap ${SEGMENT_RADIUS_STYLE} px-1.5 text-sm font-medium transition-colors md:min-h-6 ${
                     isActive
                       ? 'bg-muted text-foreground dark:bg-input'
                       : 'text-muted-foreground hover:text-foreground'

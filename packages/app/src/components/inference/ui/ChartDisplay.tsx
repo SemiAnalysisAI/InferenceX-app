@@ -1031,8 +1031,6 @@ export default function ChartDisplay({
             onValueChange={(v) => handleViewModeChange(graphIndex, v)}
             ariaLabel={t.viewMode}
             testId={`inference-view-toggle-${graphIndex}`}
-            className="max-md:flex-1"
-            buttonClassName="max-md:flex-1 max-md:justify-center"
           />
         }
         hideImageExport={getViewMode(graphIndex) === 'table'}

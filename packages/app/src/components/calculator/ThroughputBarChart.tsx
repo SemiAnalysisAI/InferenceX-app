@@ -400,6 +400,7 @@ function getColor(): string {
 
 const BAR_OPACITY = 0.85;
 const MIN_INSIDE_LABEL_CONTRAST = 5.5;
+const MIN_CLAMPED_LABEL_CONTRAST = 4.5;
 const TOP_AXIS_BAND_PX = 28;
 
 function renderTopAxis(
@@ -481,8 +482,10 @@ function positionLabelPairs(
       const barEnd = xScale(getMetricValue(d, barMetric, costType));
       const maxW = maxWidths.get(d.resultKey) ?? 0;
       const inside = insideText.get(d.resultKey);
-      const fitsInside = barEnd > maxW + 24 && (inside?.ratio ?? 0) >= MIN_INSIDE_LABEL_CONTRAST;
       const outsideX = Math.min(barEnd + 6, Math.max(0, chartWidth - maxW - 2));
+      const minRatio =
+        outsideX < barEnd + 6 ? MIN_CLAMPED_LABEL_CONTRAST : MIN_INSIDE_LABEL_CONTRAST;
+      const fitsInside = barEnd > maxW + 24 && (inside?.ratio ?? 0) >= minRatio;
       const clamped = !fitsInside && outsideX < barEnd + 6;
       const fill = fitsInside && inside ? inside.color : 'var(--foreground)';
       const label = d3
@@ -572,7 +575,7 @@ export default function ThroughputBarChart({
 
   const maxBarValue = useMemo(() => {
     const max = d3.max(sortedResults, (d) => getMetricValue(d, barMetric, costType)) || 1;
-    return max * 1.15;
+    return max * 1.02;
   }, [sortedResults, barMetric, costType]);
 
   const yDomain = useMemo(
