@@ -233,6 +233,11 @@ function lastDecodedEntryUnpacker<T>(): (args: unknown[], entry: CachedEntry<T>)
 
 let blobGeneration: (() => Promise<string>) | undefined;
 
+function currentBlobGeneration(): Promise<string> {
+  blobGeneration ??= cachedQuery(() => Promise.resolve(randomUUID()), 'blob-generation');
+  return blobGeneration();
+}
+
 /**
  * Cache a function's result using unstable_cache (fast, local).
  * Set `blobOnly: true` for payloads that should live in Blob storage instead.
@@ -269,8 +274,9 @@ export function cachedQuery<T, Args extends unknown[]>(
     return async (...args: Args): Promise<T> => {
       const blobKey = blobKeyForArgs(keyPrefix, args);
       if (!blobEnabled()) return fn(...args);
-      blobGeneration ??= cachedQuery(() => Promise.resolve(randomUUID()), 'blob-generation');
-      const path = options.revisioned ? blobKey : `generation/${await blobGeneration()}/${blobKey}`;
+      const path = options.revisioned
+        ? blobKey
+        : `generation/${await currentBlobGeneration()}/${blobKey}`;
       const pending = inflight.get(path);
       if (pending) {
         const { json } = await pending;
@@ -335,6 +341,9 @@ export function cachedDerivedData<T, Args extends unknown[]>(
   return cachedQuery(fn, `derived:${keyPrefix}`, options);
 }
 
+// Also absorbs clock skew between this function and Blob's upload timestamps.
+const STRAY_BLOB_MARGIN_MS = 60_000;
+
 /**
  * Purge the dashboard and CollectiveX caches and the configured Blob prefix.
  * OperatorX is excluded. Its data is independent of results ingests, and only
@@ -347,10 +356,16 @@ export function cachedDerivedData<T, Args extends unknown[]>(
  * layer at once, for corrections and retractions that must never be served again.
  *
  * Reads use generation-scoped Blob paths keyed by the `db` tag, so expiring the
- * tags is enough. Deleting the old blobs is garbage collection that runs after
- * the response and only logs failures.
+ * tags is enough. Blob deletion is garbage collection that runs after the
+ * response and only logs failures. It removes the generation that was current
+ * before the tags expired, then sweeps leftovers outside it (an interrupted
+ * purge, a late write to an old path, content-addressed blobs on an immediate
+ * purge) that are older than `STRAY_BLOB_MARGIN_MS`. The new generation, which
+ * warmup and visitors fill meanwhile, is never touched.
  */
-export function purgeAll({ immediate = false }: { immediate?: boolean } = {}): void {
+export async function purgeAll({ immediate = false }: { immediate?: boolean } = {}): Promise<void> {
+  const oldGeneration = blobEnabled() ? await currentBlobGeneration() : null;
+  const strayCutoff = new Date(Date.now() - STRAY_BLOB_MARGIN_MS);
   const stale = immediate ? { expire: 0 } : 'max';
   revalidateTag(cacheTag(), { expire: 0 });
   revalidateTag(pageCacheTag(), stale);
@@ -359,13 +374,16 @@ export function purgeAll({ immediate = false }: { immediate?: boolean } = {}): v
   // CollectiveX responses are cached only under their own tag (no blobs), so
   // a full purge must drop that tag explicitly.
   purgeCollectiveX({ immediate });
+  if (oldGeneration === null) return;
   after(async () => {
     try {
+      await blobPurge(`generation/${oldGeneration}/`);
       await blobPurge(
         '',
         immediate
           ? [`${OPERATORX_CACHE_SCOPE}/`]
           : [`${OPERATORX_CACHE_SCOPE}/`, CONTENT_BLOB_KEY_PREFIX],
+        strayCutoff,
       );
     } catch (error) {
       console.error('[api-cache] blob purge failed', error);
@@ -743,8 +761,7 @@ export function cachedJsonResponse<Args extends unknown[]>(
   };
   return async (request: Request, ...args: Args): Promise<Response> => {
     if (!blobEnabled()) return cachedJson(request, await load(...args), options);
-    blobGeneration ??= cachedQuery(() => Promise.resolve(randomUUID()), 'blob-generation');
-    const path = `generation/${await blobGeneration()}/${blobKeyForArgs(keyPrefix, args)}.${suffix}`;
+    const path = `generation/${await currentBlobGeneration()}/${blobKeyForArgs(keyPrefix, args)}.${suffix}`;
     let flight = inflight.get(path);
     if (!flight) {
       flight = fill(path, args).finally(() => inflight.delete(path));
