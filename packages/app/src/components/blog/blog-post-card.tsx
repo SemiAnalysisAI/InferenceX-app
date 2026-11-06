@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Heading } from '@/components/ui/heading';
 import { track } from '@/lib/analytics/analytics';
 import type { PostThumbnail } from '@/lib/blog/blog';
+import { blogTagLabel } from '@/lib/blog/blog-tag-label';
+import type { Locale } from '@/lib/i18n/i18n';
 import { cn } from '@/lib/shared/utils';
 
 export interface BlogPostCardProps {
@@ -17,6 +19,7 @@ export interface BlogPostCardProps {
   date: string;
   readingLabel: string;
   tags?: string[];
+  locale?: Locale;
   tagsLabel?: string;
   thumbnail: PostThumbnail | null;
   basePath?: string;
@@ -35,6 +38,7 @@ export function BlogPostCard({
   date,
   readingLabel,
   tags = [],
+  locale = 'en',
   tagsLabel = 'Tags',
   thumbnail,
   basePath = '/blog',
@@ -54,7 +58,7 @@ export function BlogPostCard({
     >
       <BlogThumbnail
         thumbnail={thumbnail}
-        tag={tags[0]}
+        tag={tags[0] && blogTagLabel(tags[0], locale)}
         readingLabel={readingLabel}
         priority={priority}
         className="border-b border-border/30"
@@ -83,12 +87,12 @@ export function BlogPostCard({
           <ul className="mt-auto flex flex-wrap gap-1.5 pt-1" aria-label={tagsLabel}>
             {shown.map((tag) => (
               <li key={tag}>
-                <Badge variant="outline">{tag}</Badge>
+                <Badge variant="secondary">{blogTagLabel(tag, locale)}</Badge>
               </li>
             ))}
             {hidden > 0 && (
               <li>
-                <Badge variant="outline" className="tabular-nums">
+                <Badge variant="secondary" className="tabular-nums">
                   +{hidden}
                 </Badge>
               </li>

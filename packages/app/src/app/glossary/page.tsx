@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { GlossaryBrowser, type GlossaryBrowserEntry } from '@/components/glossary/glossary-browser';
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
-import { READING_PAGE_CLASS } from '@/components/ui/reading-layout';
+import { Heading } from '@/components/ui/heading';
+import { READING_PAGE_CLASS, READING_TOP_CLASS } from '@/components/ui/reading-layout';
 import { Stat } from '@/components/ui/stat';
 import { getAllPosts } from '@/lib/blog/blog';
 import { GLOSSARY_CATEGORIES, getAllGlossaryEntries } from '@/lib/content/glossary';
@@ -89,12 +90,12 @@ export default function GlossaryPage() {
   return (
     <main className="relative" {...analyticsPlacement('glossary')}>
       <JsonLd data={jsonLd} />
-      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-10 pt-4 lg:pt-8')}>
+      <div className={cn(READING_PAGE_CLASS, READING_TOP_CLASS, 'flex flex-col gap-10')}>
         <header className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div>
-            <h1 className="text-3xl font-semibold text-balance md:text-4xl">
+            <Heading as="h1" level="reading">
               AI inference glossary
-            </h1>
+            </Heading>
             <p className="mt-4 max-w-measure text-base leading-reading text-muted-foreground md:text-lg md:leading-8">
               Definitions for agentic inference, benchmark metrics, serving techniques, numerical
               formats, and distributed systems concepts used across InferenceX. Entries describe

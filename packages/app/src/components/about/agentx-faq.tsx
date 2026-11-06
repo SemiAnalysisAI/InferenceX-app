@@ -4,6 +4,7 @@ import { CopyableCodeBlock } from '@/components/ui/copyable-code-block';
 import {
   ARTICLE_H2_CLASS,
   ARTICLE_H3_CLASS,
+  READING_LINK_CLASS,
   READING_SECTION_CLASS,
   READING_TEXT_CLASS,
 } from '@/components/ui/reading-layout';
@@ -344,7 +345,7 @@ export function AgentXFaq({ locale }: { locale: Locale }) {
             ].map(([href, label]) => (
               <li key={href}>
                 <Link
-                  className="text-brand hover:underline"
+                  className={READING_LINK_CLASS}
                   href={href}
                   target="_blank"
                   rel="noopener noreferrer"

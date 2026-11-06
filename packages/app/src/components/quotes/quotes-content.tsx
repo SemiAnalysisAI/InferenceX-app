@@ -1,7 +1,8 @@
 import { Fragment } from 'react';
 
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
-import { READING_PAGE_CLASS } from '@/components/ui/reading-layout';
+import { Heading } from '@/components/ui/heading';
+import { READING_PAGE_CLASS, READING_TOP_CLASS } from '@/components/ui/reading-layout';
 
 import type { Locale } from '@/lib/i18n/i18n';
 import { cn } from '@/lib/shared/utils';
@@ -94,9 +95,11 @@ export function QuotesContent({ locale = 'en' }: { locale?: Locale } = {}) {
   const t = STRINGS[locale];
   return (
     <main className="relative">
-      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-10 pt-4 lg:pt-8')}>
+      <div className={cn(READING_PAGE_CLASS, READING_TOP_CLASS, 'flex flex-col gap-10')}>
         <header className="max-w-4xl">
-          <h1 className="text-3xl font-semibold text-balance md:text-4xl">{t.heading}</h1>
+          <Heading as="h1" level="reading">
+            {t.heading}
+          </Heading>
           <p className="mt-3 max-w-measure text-base leading-reading text-muted-foreground lg:text-lg">
             {t.intro}
           </p>

@@ -4,12 +4,14 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { JsonLd } from '@/components/seo/json-ld';
+import { Heading } from '@/components/ui/heading';
 import { PagerCard } from '@/components/ui/pager-card';
 import {
   ARTICLE_H2_CLASS,
   READING_PAGE_CLASS,
   READING_SECTION_CLASS,
   READING_TEXT_CLASS,
+  READING_TOP_CLASS,
 } from '@/components/ui/reading-layout';
 import { getPostBySlug } from '@/lib/blog/blog';
 import {
@@ -126,7 +128,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
   return (
     <main className="relative" {...analyticsPlacement('glossary')}>
       <JsonLd data={jsonLd} />
-      <div className={cn(READING_PAGE_CLASS, 'pt-4 lg:pt-8')}>
+      <div className={cn(READING_PAGE_CLASS, READING_TOP_CLASS)}>
         <article className="flex flex-col gap-10">
           <header className="border-b border-border/30 pb-8">
             <Link
@@ -140,9 +142,9 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
               <span>{GLOSSARY_CATEGORY_LABELS_ZH[entry.category]}</span>
               {entry.abbreviation && <span className="font-mono">{entry.abbreviation}</span>}
             </p>
-            <h1 className="mt-3 max-w-4xl text-3xl font-semibold text-balance md:text-5xl">
+            <Heading as="h1" level="reading" className="mt-3 max-w-4xl">
               {entry.term}
-            </h1>
+            </Heading>
             {entry.aliases && entry.aliases.length > 0 && (
               <p className="mt-4 text-sm text-muted-foreground">
                 也称为 {entry.aliases.join('、')}
@@ -229,7 +231,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
 
           {relatedArticles.length > 0 && (
             <section aria-labelledby="further-reading" className={READING_SECTION_CLASS}>
-              <div className="flex max-w-figure flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+              <div className="flex max-w-measure flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
                 <h2 id="further-reading" className={ARTICLE_H2_CLASS}>
                   在真实基准中理解这一概念
                 </h2>
@@ -241,7 +243,7 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
                   <ArrowRight aria-hidden="true" className="size-4" />
                 </Link>
               </div>
-              <div className="mt-4 max-w-figure divide-y divide-border/20">
+              <div className="mt-4 max-w-measure divide-y divide-border/20">
                 {relatedArticles.map((article) => (
                   <Link
                     key={article.slug}

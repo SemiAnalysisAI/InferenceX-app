@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
-import { READING_PAGE_CLASS } from '@/components/ui/reading-layout';
+import { Heading } from '@/components/ui/heading';
+import { READING_PAGE_CLASS, READING_TOP_CLASS } from '@/components/ui/reading-layout';
 import { zhAlternates } from '@/lib/i18n/i18n';
 import { cn } from '@/lib/shared/utils';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
@@ -46,12 +47,12 @@ export const metadata: Metadata = {
 export default function LandAcknowledgementPageZh() {
   return (
     <main data-testid="land-acknowledgement-page" className="relative">
-      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-10 pt-4 lg:pt-8')}>
+      <div className={cn(READING_PAGE_CLASS, READING_TOP_CLASS, 'flex flex-col gap-10')}>
         <header className="max-w-3xl">
           <p className="mb-3 text-xs font-medium text-muted-foreground">原住民传统领地声明</p>
-          <h1 className="text-3xl font-semibold text-balance text-foreground md:text-4xl">
+          <Heading as="h1" level="reading">
             我们承认美国基础设施所在地的原住民传统领地
-          </h1>
+          </Heading>
           <p className="mt-4 max-w-measure leading-reading text-muted-foreground">
             InferenceX 的基准测试集群为多个地区提供服务。本页聚焦 San Jose、Los Angeles 和 Chicago
             三个美国站点，并向世代守护这些土地、至今依然如此的原住民族致意。

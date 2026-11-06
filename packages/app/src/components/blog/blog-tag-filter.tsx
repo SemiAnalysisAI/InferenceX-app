@@ -1,9 +1,13 @@
 import { ChevronDown } from 'lucide-react';
 
+import { blogTagLabel } from '@/lib/blog/blog-tag-label';
+import type { Locale } from '@/lib/i18n/i18n';
+
 import { tagChipClass } from './blog-tag-chip';
 import { BlogTagLink } from './blog-tag-link';
 
 interface BlogTagFilterProps {
+  locale: Locale;
   primary: string[];
   more: string[];
   activeTag?: string;
@@ -11,7 +15,14 @@ interface BlogTagFilterProps {
   labels: { all: string; more: string; filter: string };
 }
 
-export function BlogTagFilter({ primary, more, activeTag, basePath, labels }: BlogTagFilterProps) {
+export function BlogTagFilter({
+  locale,
+  primary,
+  more,
+  activeTag,
+  basePath,
+  labels,
+}: BlogTagFilterProps) {
   const inline = activeTag && more.includes(activeTag) ? [...primary, activeTag] : primary;
   const tail = more.filter((tag) => tag !== activeTag);
   return (
@@ -24,7 +35,9 @@ export function BlogTagFilter({ primary, more, activeTag, basePath, labels }: Bl
         {labels.all}
       </BlogTagLink>
       {inline.map((tag) => (
-        <BlogTagLink key={tag} tag={tag} active={activeTag === tag} basePath={basePath} />
+        <BlogTagLink key={tag} tag={tag} active={activeTag === tag} basePath={basePath}>
+          {blogTagLabel(tag, locale)}
+        </BlogTagLink>
       ))}
       {tail.length > 0 && (
         <details className="group">
@@ -42,7 +55,9 @@ export function BlogTagFilter({ primary, more, activeTag, basePath, labels }: Bl
           </summary>
           <div className="absolute inset-x-0 top-full z-20 mt-2 flex flex-wrap gap-2 rounded-xl border border-border/30 bg-popover p-4 shadow-lg">
             {tail.map((tag) => (
-              <BlogTagLink key={tag} tag={tag} basePath={basePath} />
+              <BlogTagLink key={tag} tag={tag} basePath={basePath}>
+                {blogTagLabel(tag, locale)}
+              </BlogTagLink>
             ))}
           </div>
         </details>

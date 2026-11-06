@@ -7,10 +7,14 @@ import { buildFaqJsonLd, FaqList } from '@/components/about/faq';
 import { PromoVideo } from '@/components/about/promo-video';
 import { JsonLd } from '@/components/seo/json-ld';
 import { buttonVariants } from '@/components/ui/button';
+import { Eyebrow } from '@/components/ui/eyebrow';
+import { Heading } from '@/components/ui/heading';
 import {
   ARTICLE_H2_CLASS,
+  READING_LINK_CLASS,
   READING_PAGE_CLASS,
   READING_SECTION_CLASS,
+  READING_TOP_CLASS,
 } from '@/components/ui/reading-layout';
 import { zhAlternates, ZH_LANG_TAG } from '@/lib/i18n/i18n';
 import { cn } from '@/lib/shared/utils';
@@ -38,11 +42,12 @@ export default function AboutPageZh() {
   return (
     <main className="relative">
       <JsonLd data={faqJsonLd} />
-      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-12')}>
+      <div className={cn(READING_PAGE_CLASS, READING_TOP_CLASS, 'flex flex-col gap-12')}>
         <section>
-          <h1 className="max-w-4xl text-3xl font-semibold text-balance lg:text-4xl lg:tracking-heading">
+          <Eyebrow as="p">关于 InferenceX</Eyebrow>
+          <Heading as="h1" level="reading" className="mt-3 max-w-4xl">
             持续运行的开源智能体推理基准测试，受到万亿美元级、吉瓦规模 Token 工厂运营方的信赖
-          </h1>
+          </Heading>
           <div className="mt-4 flex max-w-measure flex-col gap-4 leading-reading text-foreground">
             <p>
               软件开发和模型发布的节奏极快。静态基准测试很快就会过时；参与者提交的软件镜像往往是为基准测试专门构建的，无法反映真实应用场景中的性能。
@@ -59,14 +64,14 @@ export default function AboutPageZh() {
               NeoCloud。更多详情请参阅以下文章：{' '}
               <Link
                 href="/zh/blog/inferencemax-open-source-inference-benchmarking"
-                className="font-medium text-brand hover:underline"
+                className={READING_LINK_CLASS}
               >
                 InferenceX v1
               </Link>
               、{' '}
               <Link
                 href="/zh/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper"
-                className="font-medium text-brand hover:underline"
+                className={READING_LINK_CLASS}
               >
                 InferenceX v2
               </Link>

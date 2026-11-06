@@ -6,8 +6,12 @@ import { JsonLd } from '@/components/seo/json-ld';
 import { Badge } from '@/components/ui/badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
-import { Heading } from '@/components/ui/heading';
-import { ARTICLE_H2_CLASS, READING_PAGE_CLASS } from '@/components/ui/reading-layout';
+import { Heading, HeadingQualifier } from '@/components/ui/heading';
+import {
+  ARTICLE_H2_CLASS,
+  READING_PAGE_CLASS,
+  READING_TOP_CLASS,
+} from '@/components/ui/reading-layout';
 import { ResultContext, sourceLinkClassName } from '@/components/ui/result-context';
 import { type Locale, localePath } from '@/lib/i18n/i18n';
 import {
@@ -117,9 +121,9 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
     <main className="relative" data-testid="whitepaper-detail-page">
       <JsonLd data={buildWhitepaperJsonLd(paper, locale)} />
       <JsonLd data={buildWhitepaperBreadcrumbJsonLd(paper, locale)} />
-      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-10 pt-4 lg:gap-12')}>
+      <div className={cn(READING_PAGE_CLASS, READING_TOP_CLASS, 'flex flex-col gap-10 lg:gap-12')}>
         <section
-          className="dark relative isolate overflow-hidden rounded-xl border border-border/30 bg-[linear-gradient(135deg,#0b0c0e_0%,#131416_100%)] text-foreground lg:min-h-[420px]"
+          className="relative isolate overflow-hidden rounded-xl border border-border/30 bg-card text-foreground lg:min-h-[420px] dark:bg-[linear-gradient(135deg,#0b0c0e_0%,#131416_100%)]"
           data-testid="whitepaper-hero"
         >
           <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(15rem,36%)]">
@@ -127,11 +131,7 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
               <WhitepaperBackLink href={whitepaperIndexPath(locale)} label={t.backToIndex} />
               <header className="flex flex-col gap-4">
                 <Eyebrow as="p">{copy.typeLabel}</Eyebrow>
-                <Heading
-                  as="h1"
-                  level="display"
-                  className="text-3xl leading-tight md:text-4xl lg:text-5xl lg:leading-[1.08]"
-                >
+                <Heading as="h1" level="reading">
                   {copy.title}
                 </Heading>
                 <p className="max-w-measure text-base text-muted-foreground lg:text-lg">
@@ -150,7 +150,7 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
               <ul className="flex flex-wrap gap-2" aria-label={t.tags}>
                 {paper.tags.map((tag) => (
                   <li key={tag}>
-                    <Badge variant="outline">{whitepaperTagLabel(tag, locale)}</Badge>
+                    <Badge variant="secondary">{whitepaperTagLabel(tag, locale)}</Badge>
                   </li>
                 ))}
               </ul>
@@ -168,7 +168,10 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
                 />
               </div>
             </div>
-            <div className="relative hidden min-h-[18rem] md:block" aria-hidden="true">
+            <div
+              className="relative hidden min-h-[18rem] overflow-hidden md:m-3 md:block md:rounded-lg md:bg-[linear-gradient(135deg,#0b0c0e_0%,#131416_100%)] md:dark:m-0 md:dark:rounded-none md:dark:bg-none"
+              aria-hidden="true"
+            >
               <Image
                 src={paper.chipImagePath}
                 alt=""
@@ -241,7 +244,7 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
                 className="flex flex-col gap-4 rounded-xl border border-border/30 bg-card p-5 md:p-6"
                 data-testid="whitepaper-figure"
               >
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-3">
                   <Heading as="h3" level="card" className="text-balance">
                     <img
                       src={chart.modelLogoPath}
@@ -252,39 +255,49 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
                       className="mr-2 inline-block size-6 shrink-0 object-contain align-[-0.3em]"
                     />
                     {copy.figureTitle}
+                    <HeadingQualifier>{copy.figureQualifier}</HeadingQualifier>
                   </Heading>
                   <ResultContext
+                    layout="footer"
                     locale={locale}
                     costTier={figureCopy.costTier}
                     utilization={chart.utilization}
                     licenseFee={chart.licenseFee}
+                    tcoBasis={
+                      <>
+                        <div>
+                          <dt className="inline font-medium text-foreground">{t.tcoBadgesLabel}</dt>{' '}
+                          <dd className="inline">{figure.tcoBadge}</dd>
+                        </div>
+                        <div>
+                          <dt className="inline font-medium text-foreground">
+                            {t.sellingPriceLabel}
+                          </dt>{' '}
+                          <dd className="inline">
+                            {t.sellingPrices(
+                              chart.sellingPrices.input,
+                              chart.sellingPrices.cached,
+                              chart.sellingPrices.output,
+                              chart.sellingPrices.source,
+                            )}
+                          </dd>
+                        </div>
+                      </>
+                    }
                     date={paper.dataDate}
                     source={chart.source}
+                    markers={
+                      <a
+                        href={chart.tcoSourceHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={sourceLinkClassName}
+                      >
+                        {chart.tcoSourceTitle}
+                        <ExternalLinkIcon />
+                      </a>
+                    }
                   />
-                  <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    {t.tcoBadgesLabel} <Badge variant="outline">{figure.tcoBadge}</Badge>
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {t.sourceLabel}{' '}
-                    <a
-                      href={chart.tcoSourceHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={sourceLinkClassName}
-                    >
-                      {chart.tcoSourceTitle}
-                      <ExternalLinkIcon />
-                    </a>
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">{t.sellingPriceLabel}:</span>{' '}
-                    {t.sellingPrices(
-                      chart.sellingPrices.input,
-                      chart.sellingPrices.cached,
-                      chart.sellingPrices.output,
-                      chart.sellingPrices.source,
-                    )}
-                  </p>
                 </div>
                 <div className="-mx-1 overflow-x-auto px-1 pb-1">
                   <div

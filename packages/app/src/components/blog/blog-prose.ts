@@ -5,7 +5,7 @@ export const BLOG_PROSE_CLASS = [
   'prose-headings:scroll-mt-24 prose-headings:text-balance prose-headings:tracking-tight',
   'prose-h2:mt-12 prose-h2:mb-4 prose-h2:text-2xl md:prose-h2:text-title prose-h2:font-semibold',
   'prose-h3:mt-8 prose-h3:mb-3 prose-h3:text-lg prose-h3:font-semibold',
-  'prose-a:text-brand prose-a:decoration-brand/40 prose-a:underline-offset-2 hover:prose-a:decoration-brand',
+  'prose-a:text-brand prose-a:[font-weight:inherit] prose-a:decoration-brand/40 prose-a:decoration-1 prose-a:underline-offset-[3px] prose-a:[text-decoration-skip-ink:auto] prose-a:transition-colors hover:prose-a:decoration-brand',
   'prose-strong:text-foreground',
   'prose-blockquote:border-border prose-blockquote:font-normal prose-blockquote:not-italic prose-blockquote:text-muted-foreground',
   'prose-figcaption:mt-0 prose-figcaption:text-sm prose-figcaption:text-muted-foreground',

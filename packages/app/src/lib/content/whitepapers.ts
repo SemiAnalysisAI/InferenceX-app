@@ -80,6 +80,7 @@ export interface WhitepaperCopy {
   sources: readonly WhitepaperSource[];
   authors: string;
   figureTitle: string;
+  figureQualifier: string;
   figures: readonly WhitepaperFigureCopy[];
   coverAlt: string;
   chipAlt: string;
@@ -263,8 +264,8 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
         },
       ],
       authors: WHITEPAPER_AUTHORS,
-      figureTitle:
-        'Kimi K3 2.8T Agentic Revenue & Profit Estimates per GigaWatt Per Year at P90 45 tok/s/user Interactivity',
+      figureTitle: 'Kimi K3 2.8T Agentic Revenue & Profit Estimates per GigaWatt Per Year',
+      figureQualifier: 'At P90 45 tok/s/user interactivity',
       figures: [
         {
           costTier: 'Owning at large hyperscaler volume',
@@ -383,7 +384,8 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
         },
       ],
       authors: WHITEPAPER_AUTHORS_ZH,
-      figureTitle: 'Kimi K3 2.8T 智能体每吉瓦年收入与利润估算（P90 交互性 45 tok/s/user）',
+      figureTitle: 'Kimi K3 2.8T 智能体每吉瓦年收入与利润估算',
+      figureQualifier: 'P90 交互性 45 tok/s/user',
       figures: [
         {
           costTier: '自有 · 超大规模云厂商批量采购',
@@ -470,10 +472,9 @@ export const WHITEPAPER_COPY = {
     pdfCardTitle: 'Executive summary',
     pdfCardMeta: (count: number) => `Executive summary · ${count} pages · PDF`,
     tcoBadgesLabel: 'TCO $/chip/hr:',
-    sourceLabel: 'Source:',
-    sellingPriceLabel: 'Selling Price per Million Tokens',
+    sellingPriceLabel: 'Selling price per million tokens:',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
-      `Input $${input} · Cached Input $${cached} · Output $${output} (${source})`,
+      `Input $${input} · Cached input $${cached} · Output $${output} (${source})`,
   },
   zh: {
     indexTitle: '白皮书',
@@ -503,8 +504,7 @@ export const WHITEPAPER_COPY = {
     pdfCardTitle: '执行摘要',
     pdfCardMeta: (count: number) => `执行摘要 · 共 ${count} 页 · PDF`,
     tcoBadgesLabel: 'TCO $/chip/hr：',
-    sourceLabel: '来源：',
-    sellingPriceLabel: '每百万 token 售价',
+    sellingPriceLabel: '每百万 token 售价：',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
       `输入 $${input} · 缓存输入 $${cached} · 输出 $${output}（${source}）`,
   },

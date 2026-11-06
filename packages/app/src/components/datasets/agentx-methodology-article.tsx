@@ -5,7 +5,11 @@ import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 
 import { AgentXMethodologyLink } from './agentx-methodology-link';
 import { FactGrid } from './fact-grid';
-import { ARTICLE_H2_CLASS, ARTICLE_H3_CLASS } from '@/components/ui/reading-layout';
+import {
+  ARTICLE_H2_CLASS,
+  ARTICLE_H3_CLASS,
+  READING_LINK_CLASS,
+} from '@/components/ui/reading-layout';
 import { cn } from '@/lib/shared/utils';
 
 type Locale = 'en' | 'zh';
@@ -623,7 +627,7 @@ export function AgentXMethodologyArticle({ locale }: { locale: Locale }) {
                   analyticsTarget={source.target}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm leading-6 text-brand underline decoration-brand/40 underline-offset-4 hover:decoration-brand"
+                  className={cn(READING_LINK_CLASS, 'text-sm leading-6')}
                 >
                   {source.label}
                   <ExternalLinkIcon aria-hidden="true" />

@@ -4,7 +4,7 @@ import { JsonLd } from '@/components/seo/json-ld';
 import { Badge } from '@/components/ui/badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
-import { READING_PAGE_CLASS } from '@/components/ui/reading-layout';
+import { READING_PAGE_CLASS, READING_TOP_CLASS } from '@/components/ui/reading-layout';
 import { Stat } from '@/components/ui/stat';
 import type { Locale } from '@/lib/i18n/i18n';
 import {
@@ -27,9 +27,9 @@ export function WhitepaperIndexContent({ locale }: { locale: Locale }) {
   return (
     <main className="relative" data-testid="whitepaper-index-page">
       <JsonLd data={buildWhitepaperIndexJsonLd(locale)} />
-      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-8 lg:gap-10')}>
-        <header className="flex flex-col gap-3 pt-4 lg:pt-8">
-          <Heading as="h1" level="page" className="text-balance">
+      <div className={cn(READING_PAGE_CLASS, READING_TOP_CLASS, 'flex flex-col gap-8 lg:gap-10')}>
+        <header className="flex flex-col gap-3">
+          <Heading as="h1" level="reading">
             {t.indexTitle}
           </Heading>
           <p className="max-w-measure text-base text-muted-foreground lg:text-lg">{t.indexIntro}</p>
@@ -87,7 +87,7 @@ export function WhitepaperIndexContent({ locale }: { locale: Locale }) {
                     <ul className="flex flex-wrap gap-1.5" aria-label={t.tags}>
                       {paper.tags.map((tag) => (
                         <li key={tag}>
-                          <Badge variant="outline">{whitepaperTagLabel(tag, locale)}</Badge>
+                          <Badge variant="secondary">{whitepaperTagLabel(tag, locale)}</Badge>
                         </li>
                       ))}
                     </ul>

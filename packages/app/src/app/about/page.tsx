@@ -7,10 +7,14 @@ import { buildFaqJsonLd, FaqList } from '@/components/about/faq';
 import { PromoVideo } from '@/components/about/promo-video';
 import { JsonLd } from '@/components/seo/json-ld';
 import { buttonVariants } from '@/components/ui/button';
+import { Eyebrow } from '@/components/ui/eyebrow';
+import { Heading } from '@/components/ui/heading';
 import {
   ARTICLE_H2_CLASS,
+  READING_LINK_CLASS,
   READING_PAGE_CLASS,
   READING_SECTION_CLASS,
+  READING_TOP_CLASS,
 } from '@/components/ui/reading-layout';
 import { enAlternates } from '@/lib/i18n/i18n';
 import { cn } from '@/lib/shared/utils';
@@ -38,12 +42,13 @@ export default function AboutPage() {
   return (
     <main className="relative">
       <JsonLd data={faqJsonLd} />
-      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-12')}>
+      <div className={cn(READING_PAGE_CLASS, READING_TOP_CLASS, 'flex flex-col gap-12')}>
         <section>
-          <h1 className="max-w-4xl text-3xl font-semibold text-balance lg:text-4xl lg:tracking-heading">
+          <Eyebrow as="p">About InferenceX</Eyebrow>
+          <Heading as="h1" level="reading" className="mt-3 max-w-4xl">
             Open-source continuous agentic inference benchmark trusted by operators of
             trillion-dollar, gigawatt-scale token factories
-          </h1>
+          </Heading>
           <div className="mt-4 flex max-w-measure flex-col gap-4 leading-reading text-foreground">
             <p>
               Software development and model releases move fast. Static benchmarks quickly become
@@ -62,14 +67,14 @@ export default function AboutPage() {
               dollar NeoClouds. Learn more in our articles:{' '}
               <Link
                 href="/blog/inferencemax-open-source-inference-benchmarking"
-                className="font-medium text-brand hover:underline"
+                className={READING_LINK_CLASS}
               >
                 InferenceX v1
               </Link>
               ,{' '}
               <Link
                 href="/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper"
-                className="font-medium text-brand hover:underline"
+                className={READING_LINK_CLASS}
               >
                 InferenceX v2
               </Link>

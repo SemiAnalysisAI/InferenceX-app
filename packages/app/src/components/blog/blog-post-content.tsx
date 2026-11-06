@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
-import { READING_PAGE_CLASS } from '@/components/ui/reading-layout';
+import { READING_PAGE_CLASS, READING_TOP_CLASS } from '@/components/ui/reading-layout';
 import {
   type AdjacentPosts,
   getPostThumbnail,
@@ -12,6 +12,7 @@ import {
   formatBlogDate,
   type TocHeading,
 } from '@/lib/blog/blog';
+import { blogTagLabel } from '@/lib/blog/blog-tag-label';
 import { type Locale, localePath } from '@/lib/i18n/i18n';
 import { analyticsPlacement } from '@/lib/analytics/placement';
 import { cn } from '@/lib/shared/utils';
@@ -63,20 +64,16 @@ export function BlogPostContent({
     <main className="relative" data-testid="blog-post-page">
       <HashScroll />
       <ReadingProgressBar slug={slug} />
-      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-10 lg:gap-12')}>
+      <div className={cn(READING_PAGE_CLASS, READING_TOP_CLASS, 'flex flex-col gap-10 lg:gap-12')}>
         <section data-blog-section="true" className="flex flex-col gap-10 lg:gap-12">
           <header
-            className="flex flex-col gap-5 border-b border-border/30 pb-8 pt-4 lg:pb-10 lg:pt-8"
+            className="flex flex-col gap-5 border-b border-border/30 pb-8 lg:pb-10"
             data-testid="blog-post-hero"
           >
             <BlogBackLink href={basePath} label={t.backToIndex} />
             <div className="flex max-w-4xl flex-col gap-4">
-              {tags[0] && <Eyebrow as="p">{tags[0]}</Eyebrow>}
-              <Heading
-                as="h1"
-                level="display"
-                className="text-3xl leading-tight md:text-4xl lg:text-5xl lg:leading-[1.08]"
-              >
+              {tags[0] && <Eyebrow as="p">{blogTagLabel(tags[0], locale)}</Eyebrow>}
+              <Heading as="h1" level="reading">
                 {meta.title}
               </Heading>
               <p className="max-w-measure text-lg leading-7 text-muted-foreground">
@@ -108,8 +105,10 @@ export function BlogPostContent({
               <ul className="flex flex-wrap gap-1.5" aria-label={t.tags}>
                 {tags.map((tag) => (
                   <li key={tag}>
-                    <Badge asChild variant="outline">
-                      <Link href={`${basePath}?tag=${encodeURIComponent(tag)}`}>{tag}</Link>
+                    <Badge asChild variant="secondary">
+                      <Link href={`${basePath}?tag=${encodeURIComponent(tag)}`}>
+                        {blogTagLabel(tag, locale)}
+                      </Link>
                     </Badge>
                   </li>
                 ))}
@@ -182,6 +181,7 @@ export function BlogPostContent({
                   dateLabel={formatBlogDate(post.date, locale)}
                   readingLabel={t.readingTime(post.readingTime)}
                   tags={post.tags}
+                  locale={locale}
                   tagsLabel={t.tags}
                   thumbnail={getPostThumbnail(post.slug)}
                   basePath={basePath}

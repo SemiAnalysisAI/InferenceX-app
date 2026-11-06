@@ -9,7 +9,11 @@ import {
 
 import { CAROUSEL_LABELS, CAROUSEL_ORGS } from '@/components/quotes/quotes-data';
 import { isModelVisible } from '@/lib/catalog/data-mappings';
-import { ARTICLE_H2_CLASS, READING_SECTION_CLASS } from '@/components/ui/reading-layout';
+import {
+  ARTICLE_H2_CLASS,
+  READING_LINK_CLASS,
+  READING_SECTION_CLASS,
+} from '@/components/ui/reading-layout';
 import { cn } from '@/lib/shared/utils';
 
 import { FaqQuestionLink } from './faq-question-link';
@@ -95,7 +99,7 @@ export function FaqList({ title, items }: { title: string; items: readonly FaqIt
                         href={item.link.href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-brand hover:underline font-medium"
+                        className={READING_LINK_CLASS}
                       >
                         {item.link.text}
                       </a>

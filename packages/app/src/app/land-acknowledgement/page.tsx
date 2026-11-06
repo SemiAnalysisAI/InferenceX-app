@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
-import { READING_PAGE_CLASS } from '@/components/ui/reading-layout';
+import { Heading } from '@/components/ui/heading';
+import { READING_PAGE_CLASS, READING_TOP_CLASS } from '@/components/ui/reading-layout';
 import { enAlternates } from '@/lib/i18n/i18n';
 import { cn } from '@/lib/shared/utils';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
@@ -45,12 +46,12 @@ export const metadata: Metadata = {
 export default function LandAcknowledgementPage() {
   return (
     <main data-testid="land-acknowledgement-page" className="relative">
-      <div className={cn(READING_PAGE_CLASS, 'flex flex-col gap-10 pt-4 lg:pt-8')}>
+      <div className={cn(READING_PAGE_CLASS, READING_TOP_CLASS, 'flex flex-col gap-10')}>
         <header className="max-w-3xl">
           <p className="mb-3 text-xs font-medium text-muted-foreground">Land acknowledgement</p>
-          <h1 className="text-3xl font-semibold text-balance text-foreground md:text-4xl">
+          <Heading as="h1" level="reading">
             We recognize the Indigenous homelands connected to our US infrastructure
-          </h1>
+          </Heading>
           <p className="mt-4 max-w-measure leading-reading text-muted-foreground">
             InferenceX benchmark clusters serve traffic from several regions. This page focuses on
             our US sites in San Jose, Los Angeles, and Chicago, and acknowledges the Indigenous

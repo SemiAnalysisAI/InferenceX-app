@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { READING_LINK_CLASS } from '@/components/ui/reading-layout';
 import { track } from '@/lib/analytics/analytics';
 import { cn } from '@/lib/shared/utils';
 
@@ -14,7 +15,7 @@ interface WhitepaperPdfButtonProps {
   label: string;
   placement: 'hero' | 'closing' | 'card' | 'sidebar';
   size?: 'default' | 'lg' | 'sm';
-  variant?: 'default' | 'outline';
+  variant?: 'brand' | 'outline';
   className?: string;
 }
 
@@ -24,7 +25,7 @@ export function WhitepaperPdfButton({
   label,
   placement,
   size = 'lg',
-  variant = 'default',
+  variant = 'brand',
   className,
 }: WhitepaperPdfButtonProps) {
   return (
@@ -99,7 +100,7 @@ export function WhitepaperSourceLink({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="font-medium text-brand hover:underline break-words"
+      className={cn(READING_LINK_CLASS, 'break-words')}
       onClick={() => track('whitepaper_source_clicked', { slug, href })}
     >
       {children}

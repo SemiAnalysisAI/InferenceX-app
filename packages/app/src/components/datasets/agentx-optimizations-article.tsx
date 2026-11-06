@@ -19,7 +19,7 @@ import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 
 import { AgentXOptimizationsLink } from './agentx-optimizations-link';
 import { FactGrid } from './fact-grid';
-import { ARTICLE_H2_CLASS } from '@/components/ui/reading-layout';
+import { ARTICLE_H2_CLASS, READING_LINK_CLASS } from '@/components/ui/reading-layout';
 import { cn } from '@/lib/shared/utils';
 
 function localePrefix(locale: Locale): string {
@@ -146,7 +146,7 @@ function SectionBlock({
                   target="_blank"
                   rel="noopener noreferrer"
                   prefetch={false}
-                  className="text-sm leading-6 text-brand underline decoration-brand/40 underline-offset-4 hover:decoration-brand"
+                  className={cn(READING_LINK_CLASS, 'text-sm leading-6')}
                 >
                   {link.label}
                   <ExternalLinkIcon aria-hidden="true" />
