@@ -246,15 +246,17 @@ describe('QuotesContent supporter logo wall', () => {
               ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
               const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
               let opaquePixels = 0;
+              let incorrectPixels = 0;
               for (let i = 0; i < pixels.length; i += 4) {
                 if (pixels[i + 3] === 255) {
-                  expect(pixels[i]).to.equal(103);
-                  expect(pixels[i + 1]).to.equal(32);
-                  expect(pixels[i + 2]).to.equal(255);
                   opaquePixels++;
+                  if (pixels[i] !== 103 || pixels[i + 1] !== 32 || pixels[i + 2] !== 255) {
+                    incorrectPixels++;
+                  }
                 }
               }
               expect(opaquePixels).to.be.greaterThan(0);
+              expect(incorrectPixels).to.equal(0);
             });
           }
           cy.get('#quote-fireworks-ai').should('contain.text', 'Dmytro Dzhulgakov');
