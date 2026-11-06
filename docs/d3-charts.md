@@ -116,12 +116,27 @@ share this presentation; unofficial colors retain their per-run identity.
 This is presentation-only: benchmark values, API responses and `inferencex-skills`
 contracts are unchanged.
 
+Chip-history/date-comparison graphs use the same compact hover card as the main
+scatter chart. Hover preserves the comparison date/run label and any carried-forward
+source date; swatches and cache bars use the corresponding curve color. Clicking
+keeps the full pinned card. Unofficial history points use compact hover too, while
+retaining the unofficial warning, branch identity and per-run color. These are
+presentation-only changes with no API or `inferencex-skills` contract changes.
+
 Tooltips are built as HTML template literal strings, injected via D3's `.html()`. Using React elements would require:
 
 1. `ReactDOM.render()` inside a D3 event handler (breaks React's lifecycle)
 2. Or lifting tooltip state to React (causes re-render cascade on every mousemove)
 
 HTML strings bypass React entirely. D3 writes them into a tooltip div that is portaled to `document.body` and positioned with `position: fixed`. This keeps tooltip updates at <1ms per frame.
+
+Pinned detail cards close on clicks outside their tooltip and chart SVG, or on
+Escape, in desktop and mobile layouts. The shared wrapper listens in capture
+phase so outside controls that stop bubbling still dismiss the card without
+losing their own action. Point switching and empty-plot dismissal remain owned by
+the chart; links and controls inside the tooltip remain interactive. Mobile
+bottom sheets retain their backdrop and swipe dismissal. This applies to official
+and unofficial points without changing data, API, or `inferencex-skills` contracts.
 
 ## Pareto Front Direction
 
