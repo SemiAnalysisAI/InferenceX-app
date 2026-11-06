@@ -40,6 +40,7 @@ import ChartLegend from '@/components/ui/chart-legend';
 import { ChartShareActions, PricesSourceLink } from '@/components/ui/chart-display-helpers';
 import { ModelSelector } from '@/components/ui/chart-selectors';
 import { ControlPanel } from '@/components/ui/control-panel';
+import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
@@ -64,6 +65,7 @@ import { AIR_COOLED_SYSTEM_PUE, LIQUID_COOLED_RACK_PUE } from '@/lib/power/facil
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { useHeldHeight } from '@/hooks/useHeldHeight';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
@@ -200,6 +202,8 @@ const STRINGS = {
       'gw-year': 'Per gigawatt (Beta)',
     } satisfies Record<ProfitBasis, string>,
     benchmarkGroup: 'Benchmark config',
+    secondaryControls: 'More chart controls',
+    changed: 'changed',
     powerLabel: 'Power estimation',
     powerTooltip:
       'All in Measured uses the best power-valid curve at the selected target. Compare both uses that same curve for both bars when available. Pricing, utilization and unit costs stay the same.',
@@ -329,6 +333,8 @@ const STRINGS = {
       'gw-year': '每吉瓦（Beta）',
     } satisfies Record<ProfitBasis, string>,
     benchmarkGroup: '基准测试配置',
+    secondaryControls: '更多图表设置',
+    changed: '项已更改',
     powerLabel: '功耗估算方式',
     powerTooltip:
       '整体实测功耗在选定目标下采用功耗有效的最优曲线。对比两种估算方式时，若实测估算可用，两根柱子采用同一条曲线。价格、利用率和单位成本保持不变。',
@@ -619,6 +625,7 @@ function ProfitEstimatorInner({
     const value = getUrlParam('c_chmode');
     setCacheHitMode(value === 'actual' ? 'actual' : DEFAULT_CACHE_HIT_MODE);
   }, [getUrlParam]);
+  const isMobile = useIsMobileViewport();
   const utilization = usePercentField(DEFAULT_UTILIZATION_PCT, 'profit_utilization_set');
   const labCut = usePercentField(
     profitModelDefaults(selectedModel).labCutPct,
@@ -1489,6 +1496,84 @@ function ProfitEstimatorInner({
     return <EmptyState className="h-64">{t.errorLoading}</EmptyState>;
   }
 
+  const secondaryCount =
+    (cacheHitMode === DEFAULT_CACHE_HIT_MODE ? 0 : 1) +
+    (powerBasis === 'provisioned' ? 0 : 1) +
+    (priceSource === defaultPriceSource(selectedModel) ? 0 : 1) +
+    (selectedGPUs.length > 0 ? 1 : 0) +
+    (selectedDateRange.startDate && selectedDateRange.endDate ? 1 : 0);
+
+  const benchmarkExtras = (
+    <>
+      <div className="flex min-w-0 flex-col space-y-1.5">
+        <LabelWithTooltip
+          htmlFor="profit-cache-hit"
+          label={t.cacheHitLabel}
+          tooltip={t.cacheHitTooltip}
+        />
+        <div data-testid="profit-cache-hit-selector">
+          <MultiSelect
+            triggerId="profit-cache-hit"
+            options={Object.entries(t.cacheHitOptions).map(([value, label]) => ({
+              value,
+              label,
+            }))}
+            value={[cacheHitMode]}
+            onChange={(values) => {
+              const next = values[0];
+              if (next !== 'actual' && next !== 'theoretical') return;
+              setCacheHitMode(next);
+              setUrlParam('c_chmode', next === DEFAULT_CACHE_HIT_MODE ? '' : next);
+              track('profit_cache_hit_mode_changed', { mode: next });
+            }}
+            open={openDropdown === 'cacheHit'}
+            onOpenChange={handleDropdownOpenChange('cacheHit')}
+            minSelections={1}
+            maxSelections={1}
+            showClearAll={false}
+            searchable={false}
+            plainSelectedText
+            showSelectionSummary={false}
+          />
+        </div>
+      </div>
+      {powerControlsEnabled && (
+        <div className="flex min-w-0 flex-col space-y-1.5">
+          <LabelWithTooltip
+            htmlFor="profit-power"
+            label={t.powerLabel}
+            tooltip={`${t.powerTooltip} ${t.powerPreview} ${t.powerDetails}`}
+          />
+          <div data-testid="profit-power-selector">
+            <MultiSelect
+              triggerId="profit-power"
+              options={Object.entries(t.powerOptions).map(([value, label]) => ({
+                value,
+                label,
+              }))}
+              value={[powerBasis]}
+              onChange={(values) => {
+                const next = values[0];
+                if (next !== 'provisioned' && next !== 'modeled' && next !== 'compare') return;
+                setPowerBasis(next);
+                setUrlParam('c_power', next === 'provisioned' ? '' : next);
+                track('profit_power_basis_changed', { basis: next });
+              }}
+              open={openDropdown === 'power'}
+              onOpenChange={handleDropdownOpenChange('power')}
+              minSelections={1}
+              maxSelections={1}
+              showClearAll={false}
+              searchable={false}
+              plainSelectedText
+              showSelectionSummary={false}
+            />
+          </div>
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div ref={rootRef} className="flex flex-col gap-4">
       <section ref={controlsRef} data-testid="profit-controls">
@@ -1543,63 +1628,59 @@ function ProfitEstimatorInner({
                       onBlur={handleTargetBlur}
                     />
                   </div>
-                  <div className="flex min-w-0 flex-col space-y-1.5">
-                    <LabelWithTooltip
-                      htmlFor="profit-cache-hit"
-                      label={t.cacheHitLabel}
-                      tooltip={t.cacheHitTooltip}
-                    />
-                    <div data-testid="profit-cache-hit-selector">
-                      <MultiSelect
-                        triggerId="profit-cache-hit"
-                        options={Object.entries(t.cacheHitOptions).map(([value, label]) => ({
-                          value,
-                          label,
-                        }))}
-                        value={[cacheHitMode]}
-                        onChange={(values) => {
-                          const next = values[0];
-                          if (next !== 'actual' && next !== 'theoretical') return;
-                          setCacheHitMode(next);
-                          setUrlParam('c_chmode', next === DEFAULT_CACHE_HIT_MODE ? '' : next);
-                          track('profit_cache_hit_mode_changed', { mode: next });
-                        }}
-                        open={openDropdown === 'cacheHit'}
-                        onOpenChange={handleDropdownOpenChange('cacheHit')}
-                        minSelections={1}
-                        maxSelections={1}
-                        showClearAll={false}
-                        searchable={false}
-                        plainSelectedText
-                        showSelectionSummary={false}
-                      />
-                    </div>
-                  </div>
-                  {powerControlsEnabled && (
+                  {!isMobile && <div className="hidden md:contents">{benchmarkExtras}</div>}
+                </ControlPanel>
+                <MobileControlSection
+                  label={t.secondaryControls}
+                  count={secondaryCount}
+                  countLabel={t.changed}
+                  testId="profit-secondary-controls"
+                >
+                  {isMobile && (
+                    <div className="grid min-w-0 gap-3 md:hidden">{benchmarkExtras}</div>
+                  )}
+                  <ControlPanel
+                    legend={t.pricingGroup}
+                    data-testid="profit-pricing-panel"
+                    className={cn(
+                      'grid-cols-1 items-end',
+                      effectivePriceSource === 'custom'
+                        ? 'xl:col-span-12 xl:grid-cols-4'
+                        : cn('xl:col-span-4', showsTcoBasis && 'sm:grid-cols-2'),
+                    )}
+                  >
                     <div className="flex min-w-0 flex-col space-y-1.5">
                       <LabelWithTooltip
-                        htmlFor="profit-power"
-                        label={t.powerLabel}
-                        tooltip={`${t.powerTooltip} ${t.powerPreview} ${t.powerDetails}`}
+                        htmlFor="profit-price-source"
+                        label={t.priceSourceLabel}
+                        tooltip={t.priceSourceTooltip}
                       />
-                      <div data-testid="profit-power-selector">
+                      <div data-testid="profit-price-source-selector">
                         <MultiSelect
-                          triggerId="profit-power"
-                          options={Object.entries(t.powerOptions).map(([value, label]) => ({
-                            value,
-                            label,
-                          }))}
-                          value={[powerBasis]}
+                          triggerId="profit-price-source"
+                          options={priceSourceOptions(listPricing?.vendor ?? null).map(
+                            (option) => ({
+                              value: option.value,
+                              label: locale === 'zh' ? option.labelZh : option.label,
+                            }),
+                          )}
+                          value={[effectivePriceSource]}
                           onChange={(values) => {
                             const next = values[0];
-                            if (next !== 'provisioned' && next !== 'modeled' && next !== 'compare')
-                              return;
-                            setPowerBasis(next);
-                            setUrlParam('c_power', next === 'provisioned' ? '' : next);
-                            track('profit_power_basis_changed', { basis: next });
+                            if (!next) return;
+                            if (next === 'custom' && pricing) {
+                              setCustomInputPrice(formatTokenPrice(pricing.inputPerMillion));
+                              setCustomCachedPrice(
+                                formatTokenPrice(cachedInputPricePerMillion(pricing)),
+                              );
+                              setCustomOutputPrice(formatTokenPrice(pricing.outputPerMillion));
+                            }
+                            setPriceSource(next as PriceSource);
+                            track('profit_price_source_changed', { source: next });
                           }}
-                          open={openDropdown === 'power'}
-                          onOpenChange={handleDropdownOpenChange('power')}
+                          open={openDropdown === 'priceSource'}
+                          onOpenChange={handleDropdownOpenChange('priceSource')}
+                          placeholder={t.priceSourcePlaceholder}
                           minSelections={1}
                           maxSelections={1}
                           showClearAll={false}
@@ -1609,219 +1690,168 @@ function ProfitEstimatorInner({
                         />
                       </div>
                     </div>
-                  )}
-                </ControlPanel>
-                <ControlPanel
-                  legend={t.pricingGroup}
-                  data-testid="profit-pricing-panel"
-                  className={cn(
-                    'grid-cols-1 items-end',
-                    effectivePriceSource === 'custom'
-                      ? 'xl:col-span-12 xl:grid-cols-4'
-                      : cn('xl:col-span-4', showsTcoBasis && 'sm:grid-cols-2'),
-                  )}
-                >
-                  <div className="flex min-w-0 flex-col space-y-1.5">
-                    <LabelWithTooltip
-                      htmlFor="profit-price-source"
-                      label={t.priceSourceLabel}
-                      tooltip={t.priceSourceTooltip}
-                    />
-                    <div data-testid="profit-price-source-selector">
-                      <MultiSelect
-                        triggerId="profit-price-source"
-                        options={priceSourceOptions(listPricing?.vendor ?? null).map((option) => ({
-                          value: option.value,
-                          label: locale === 'zh' ? option.labelZh : option.label,
-                        }))}
-                        value={[effectivePriceSource]}
-                        onChange={(values) => {
-                          const next = values[0];
-                          if (!next) return;
-                          if (next === 'custom' && pricing) {
-                            setCustomInputPrice(formatTokenPrice(pricing.inputPerMillion));
-                            setCustomCachedPrice(
-                              formatTokenPrice(cachedInputPricePerMillion(pricing)),
-                            );
-                            setCustomOutputPrice(formatTokenPrice(pricing.outputPerMillion));
+                    {effectivePriceSource === 'custom' && (
+                      <div
+                        data-testid="profit-custom-prices"
+                        className="grid min-w-0 items-end gap-4 md:grid-cols-3 xl:col-span-3"
+                      >
+                        <div className="flex min-w-0 flex-col space-y-1.5">
+                          <Label htmlFor="profit-input-price">{t.inputPriceLabel}</Label>
+                          <Input
+                            id="profit-input-price"
+                            data-testid="profit-input-price"
+                            type="number"
+                            onWheel={blurOnWheel}
+                            inputMode="decimal"
+                            min={0}
+                            step={0.01}
+                            value={customInputPrice}
+                            onChange={(e) => setCustomInputPrice(e.target.value)}
+                            onBlur={() =>
+                              track('profit_custom_price_set', {
+                                stream: 'input',
+                                value: customInputPrice,
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="flex min-w-0 flex-col space-y-1.5">
+                          <Label htmlFor="profit-cached-price">{t.cachedPriceLabel}</Label>
+                          <Input
+                            id="profit-cached-price"
+                            data-testid="profit-cached-price"
+                            type="number"
+                            onWheel={blurOnWheel}
+                            inputMode="decimal"
+                            min={0}
+                            step={0.001}
+                            value={customCachedPrice}
+                            onChange={(e) => setCustomCachedPrice(e.target.value)}
+                            onBlur={() =>
+                              track('profit_custom_price_set', {
+                                stream: 'cached',
+                                value: customCachedPrice,
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="flex min-w-0 flex-col space-y-1.5">
+                          <Label htmlFor="profit-output-price">{t.outputPriceLabel}</Label>
+                          <Input
+                            id="profit-output-price"
+                            data-testid="profit-output-price"
+                            type="number"
+                            onWheel={blurOnWheel}
+                            inputMode="decimal"
+                            min={0}
+                            step={0.01}
+                            value={customOutputPrice}
+                            onChange={(e) => setCustomOutputPrice(e.target.value)}
+                            onBlur={() =>
+                              track('profit_custom_price_set', {
+                                stream: 'output',
+                                value: customOutputPrice,
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {showsTcoBasis && (
+                      <div className="flex min-w-0 max-w-48 flex-col space-y-1.5">
+                        <LabelWithTooltip
+                          label={locale === 'zh' ? 'TCO 口径' : 'TCO basis'}
+                          tooltip={
+                            locale === 'zh'
+                              ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'
+                              : 'External customer pricing or internal owner cost; currently affects only TPUv7.'
                           }
-                          setPriceSource(next as PriceSource);
-                          track('profit_price_source_changed', { source: next });
-                        }}
-                        open={openDropdown === 'priceSource'}
-                        onOpenChange={handleDropdownOpenChange('priceSource')}
-                        placeholder={t.priceSourcePlaceholder}
-                        minSelections={1}
-                        maxSelections={1}
-                        showClearAll={false}
-                        searchable={false}
-                        plainSelectedText
-                        showSelectionSummary={false}
-                      />
-                    </div>
-                  </div>
-                  {effectivePriceSource === 'custom' && (
-                    <div
-                      data-testid="profit-custom-prices"
-                      className="grid min-w-0 items-end gap-4 md:grid-cols-3 xl:col-span-3"
+                        />
+                        <TcoBasisToggle source="profit" className="md:h-9" />
+                      </div>
+                    )}
+                  </ControlPanel>
+                  <div className="grid min-w-0 items-start gap-x-6 gap-y-4 xl:col-span-12 xl:grid-cols-12">
+                    <ControlPanel
+                      legend={t.chartGroup}
+                      data-testid="profit-chart-panel"
+                      className="xl:col-span-4"
                     >
                       <div className="flex min-w-0 flex-col space-y-1.5">
-                        <Label htmlFor="profit-input-price">{t.inputPriceLabel}</Label>
-                        <Input
-                          id="profit-input-price"
-                          data-testid="profit-input-price"
-                          type="number"
-                          onWheel={blurOnWheel}
-                          inputMode="decimal"
-                          min={0}
-                          step={0.01}
-                          value={customInputPrice}
-                          onChange={(e) => setCustomInputPrice(e.target.value)}
-                          onBlur={() =>
-                            track('profit_custom_price_set', {
-                              stream: 'input',
-                              value: customInputPrice,
-                            })
-                          }
+                        <LabelWithTooltip label={t.basisLabel} tooltip={t.basisTooltip} />
+                        <SegmentedToggle<ProfitBasis>
+                          role="group"
+                          value={basis}
+                          options={(['chip-hour', 'gw-year'] as const).map((value) => ({
+                            value,
+                            label: t.basisOptions[value],
+                            testId: `profit-basis-${value}`,
+                          }))}
+                          onValueChange={handleBasisChange}
+                          ariaLabel={t.basisLabel}
+                          testId="profit-basis-toggle"
+                          className="w-fit self-start md:h-9"
                         />
                       </div>
-                      <div className="flex min-w-0 flex-col space-y-1.5">
-                        <Label htmlFor="profit-cached-price">{t.cachedPriceLabel}</Label>
-                        <Input
-                          id="profit-cached-price"
-                          data-testid="profit-cached-price"
-                          type="number"
-                          onWheel={blurOnWheel}
-                          inputMode="decimal"
-                          min={0}
-                          step={0.001}
-                          value={customCachedPrice}
-                          onChange={(e) => setCustomCachedPrice(e.target.value)}
-                          onBlur={() =>
-                            track('profit_custom_price_set', {
-                              stream: 'cached',
-                              value: customCachedPrice,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="flex min-w-0 flex-col space-y-1.5">
-                        <Label htmlFor="profit-output-price">{t.outputPriceLabel}</Label>
-                        <Input
-                          id="profit-output-price"
-                          data-testid="profit-output-price"
-                          type="number"
-                          onWheel={blurOnWheel}
-                          inputMode="decimal"
-                          min={0}
-                          step={0.01}
-                          value={customOutputPrice}
-                          onChange={(e) => setCustomOutputPrice(e.target.value)}
-                          onBlur={() =>
-                            track('profit_custom_price_set', {
-                              stream: 'output',
-                              value: customOutputPrice,
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {showsTcoBasis && (
-                    <div className="flex min-w-0 max-w-48 flex-col space-y-1.5">
-                      <LabelWithTooltip
-                        label={locale === 'zh' ? 'TCO 口径' : 'TCO basis'}
-                        tooltip={
-                          locale === 'zh'
-                            ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'
-                            : 'External customer pricing or internal owner cost; currently affects only TPUv7.'
-                        }
-                      />
-                      <TcoBasisToggle source="profit" className="md:h-9" />
-                    </div>
-                  )}
-                </ControlPanel>
-              </div>
-
-              <div className="grid min-w-0 items-start gap-x-6 gap-y-4 xl:grid-cols-12">
-                <ControlPanel
-                  legend={t.chartGroup}
-                  data-testid="profit-chart-panel"
-                  className="xl:col-span-4"
-                >
-                  <div className="flex min-w-0 flex-col space-y-1.5">
-                    <LabelWithTooltip label={t.basisLabel} tooltip={t.basisTooltip} />
-                    <SegmentedToggle<ProfitBasis>
-                      role="group"
-                      value={basis}
-                      options={(['chip-hour', 'gw-year'] as const).map((value) => ({
-                        value,
-                        label: t.basisOptions[value],
-                        testId: `profit-basis-${value}`,
-                      }))}
-                      onValueChange={handleBasisChange}
-                      ariaLabel={t.basisLabel}
-                      testId="profit-basis-toggle"
-                      className="w-fit self-start md:h-9"
-                    />
-                  </div>
-                </ControlPanel>
-                <ControlPanel
-                  legend={t.compareHistory}
-                  data-testid="profit-history-panel"
-                  className="xl:col-span-8"
-                >
-                  <div
-                    className={cn(
-                      'grid min-w-0 gap-3',
-                      selectedGPUs.length > 0 && 'md:grid-cols-2',
-                    )}
-                  >
-                    <div className="flex min-w-0 flex-col space-y-1.5">
-                      <LabelWithTooltip
-                        htmlFor="profit-history-gpu"
-                        label={t.gpuConfig}
-                        tooltip={t.gpuConfigTooltip}
-                      />
-                      <div data-testid="profit-history-gpu-multiselect" className="min-w-0">
-                        <MultiSelect
-                          triggerId="profit-history-gpu"
-                          options={historyChipOptions}
-                          value={selectedGPUs}
-                          onChange={handleHistoryGpuChange}
-                          open={openDropdown === 'history-gpu'}
-                          onOpenChange={handleDropdownOpenChange('history-gpu')}
-                          placeholder={t.gpuConfigPlaceholder}
-                          maxSelections={PROFIT_HISTORY_MAX_GPUS}
-                          searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
-                          noResultsLabel={locale === 'zh' ? '无结果' : undefined}
-                          clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
-                          selectedSuffix={locale === 'zh' ? ' 已选' : undefined}
-                        />
-                      </div>
-                    </div>
-
-                    {selectedGPUs.length > 0 && (
+                    </ControlPanel>
+                    <ControlPanel
+                      legend={t.compareHistory}
+                      data-testid="profit-history-panel"
+                      className="xl:col-span-8"
+                    >
                       <div
-                        className="flex min-w-0 flex-col space-y-1.5"
-                        data-testid="profit-history-date-range"
+                        className={cn(
+                          'grid min-w-0 gap-3',
+                          selectedGPUs.length > 0 && 'md:grid-cols-2',
+                        )}
                       >
-                        <LabelWithTooltip
-                          htmlFor="profit-history-dates"
-                          label={t.comparisonDateRange}
-                          tooltip={t.comparisonDateRangeTooltip}
-                        />
-                        <DateRangePicker
-                          dateRange={selectedDateRange}
-                          onChange={handleHistoryDateRangeChange}
-                          placeholder={t.dateRangePlaceholder}
-                          availableDates={historyAvailableDates}
-                        />
+                        <div className="flex min-w-0 flex-col space-y-1.5">
+                          <LabelWithTooltip
+                            htmlFor="profit-history-gpu"
+                            label={t.gpuConfig}
+                            tooltip={t.gpuConfigTooltip}
+                          />
+                          <div data-testid="profit-history-gpu-multiselect" className="min-w-0">
+                            <MultiSelect
+                              triggerId="profit-history-gpu"
+                              options={historyChipOptions}
+                              value={selectedGPUs}
+                              onChange={handleHistoryGpuChange}
+                              open={openDropdown === 'history-gpu'}
+                              onOpenChange={handleDropdownOpenChange('history-gpu')}
+                              placeholder={t.gpuConfigPlaceholder}
+                              maxSelections={PROFIT_HISTORY_MAX_GPUS}
+                              searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
+                              noResultsLabel={locale === 'zh' ? '无结果' : undefined}
+                              clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
+                              selectedSuffix={locale === 'zh' ? ' 已选' : undefined}
+                            />
+                          </div>
+                        </div>
+
+                        {selectedGPUs.length > 0 && (
+                          <div
+                            className="flex min-w-0 flex-col space-y-1.5"
+                            data-testid="profit-history-date-range"
+                          >
+                            <LabelWithTooltip
+                              htmlFor="profit-history-dates"
+                              label={t.comparisonDateRange}
+                              tooltip={t.comparisonDateRangeTooltip}
+                            />
+                            <DateRangePicker
+                              dateRange={selectedDateRange}
+                              onChange={handleHistoryDateRangeChange}
+                              placeholder={t.dateRangePlaceholder}
+                              availableDates={historyAvailableDates}
+                            />
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </ControlPanel>
                   </div>
-                </ControlPanel>
+                </MobileControlSection>
               </div>
             </TooltipProvider>
 

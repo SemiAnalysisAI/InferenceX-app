@@ -335,6 +335,7 @@ describe('Profit Estimator — responsive control panels', () => {
         cy.viewport(width, 1000);
         cy.visit(route, { onBeforeLoad: suppressNudges });
         chart().should('exist');
+        if (width < 768) cy.get('[data-testid="profit-secondary-controls"] > button').click();
         cy.get('[data-testid="profit-benchmark-panel"]').within(() => {
           cy.get('legend').should('have.text', 'Benchmark config');
           cy.get('#profit-model').should('contain.text', 'Kimi K3');

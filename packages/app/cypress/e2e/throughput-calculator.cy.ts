@@ -70,6 +70,20 @@ describe('TCO Calculator', () => {
       cy.get('input[type="range"]').should('be.visible');
     });
 
+    for (const width of [1280, 1440]) {
+      it(`shows every configuration value in full at ${width}px`, () => {
+        cy.viewport(width, 900);
+        cy.get('[data-testid="calculator-controls"] fieldset')
+          .first()
+          .find('button[role="combobox"] *')
+          .should(($nodes) => {
+            for (const node of $nodes) {
+              expect(node.scrollWidth, node.textContent ?? '').to.be.at.most(node.clientWidth + 1);
+            }
+          });
+      });
+    }
+
     it('places the config-range toggle beside its label above the slider', () => {
       cy.get('[data-testid="calculator-hide-over-limit-control"]').then(($control) => {
         const label = $control.children().first()[0].getBoundingClientRect();

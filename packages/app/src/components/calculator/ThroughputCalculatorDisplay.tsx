@@ -9,7 +9,7 @@ import Link from 'next/link';
 import { BarChart3, ChevronDownIcon, Table2 } from 'lucide-react';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { type CSSProperties, useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
@@ -63,6 +63,7 @@ import { ChipBasisNote } from '@/components/ui/chip-basis-note';
 import { ChipBasisCaption } from '@/components/ui/chip-basis-toggle';
 import { plottedChipBases, TcoPriceTable } from '@/components/ui/editable-tco-badges';
 import { ResultContext } from '@/components/ui/result-context';
+import { ModelLogo } from '@/components/ui/model-logo';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Percentile,
@@ -77,6 +78,7 @@ import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/catalog
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 
 import { exportToCsv } from '@/lib/export/csv-export';
 import { calculatorChartToCsv } from '@/lib/export/csv-export-helpers';
@@ -189,7 +191,7 @@ const STRINGS = {
     title: 'TCO calculator',
     benchmarkGroup: 'Configuration & economics',
     comparisonGroup: 'Comparison target',
-    secondaryControls: 'More comparison settings',
+    secondaryControls: 'More chart controls',
     changed: 'changed',
     description:
       'Set a target interactivity (tokens/sec/user) and compare the throughput and cost across all chips. Values are interpolated from real benchmark data.',
@@ -254,7 +256,7 @@ const STRINGS = {
     title: 'TCO 计算器',
     benchmarkGroup: '配置与经济性',
     comparisonGroup: '对比目标',
-    secondaryControls: '更多对比设置',
+    secondaryControls: '更多图表设置',
     changed: '项已更改',
     description:
       '设定目标交互性（tokens/sec/user），比较所有芯片的吞吐量和成本。数值基于真实基准测试数据插值计算。',
@@ -425,8 +427,12 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const [viewMode, setViewMode] = useState<CalculatorViewMode>('chart');
   const [chartOpen, setChartOpen] = useState(true);
   const [hideSkuAboveConfigLimit, setHideSkuAboveConfigLimit] = useState(true);
-  const comparisonSettingsCount =
-    (barMetric === 'throughput' ? 0 : 1) + (hideSkuAboveConfigLimit === true ? 0 : 1);
+  const secondaryCount =
+    (barMetric === 'throughput' ? 0 : 1) +
+    (hideSkuAboveConfigLimit === true ? 0 : 1) +
+    (costProvider === 'costh' ? 0 : 1) +
+    (costType === 'total' ? 0 : 1);
+  const isMobile = useIsMobileViewport();
 
   const costTypeLabels: Record<CostType, string> = useMemo(
     () => ({ total: t.totalTokens, input: t.inputTokens, output: t.outputTokens }),
@@ -938,6 +944,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         />
       </button>
       <Heading as="h2" level="card">
+        <ModelLogo model={selectedModel} className="mr-2 size-6 align-[-0.3em]" />
         {chartTitle}
       </Heading>
     </div>
@@ -957,6 +964,112 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const showsTcoBasis =
     scenarioShowsTcoBasis && barResults.some((r) => r.hwKey.split('_')[0] === 'tpuv7');
 
+  const secondaryConfig = (
+    <>
+      <ScenarioSelector
+        id="calc-sequence"
+        data-testid="calc-sequence-selector"
+        value={selectedSequence}
+        onChange={handleSequenceChange}
+        open={openDropdown === 'sequence'}
+        onOpenChange={handleDropdownOpenChange('sequence')}
+        availableSequences={availableSequences}
+        model={selectedModel}
+      />
+      {isAgenticSequence && featureGateUnlocked && (
+        <PercentileSelector
+          id="calc-percentile"
+          data-testid="calc-percentile-selector"
+          value={selectedPercentile}
+          onChange={handlePercentileChange}
+        />
+      )}
+      <PrecisionSelector
+        id="calc-precision"
+        data-testid="calc-precision-selector"
+        value={selectedPrecisions}
+        onChange={handlePrecisionChange}
+        open={openDropdown === 'precision'}
+        onOpenChange={handleDropdownOpenChange('precision')}
+        availablePrecisions={availablePrecisions}
+      />
+      <div className="contents lg:flex lg:gap-3">
+        <div className="flex flex-col space-y-1.5">
+          <LabelWithTooltip
+            htmlFor="calc-cost"
+            label={t.costProviderLabel}
+            tooltip={t.costProviderTooltip}
+          />
+          <div data-testid="calc-cost-selector">
+            <MultiSelect
+              triggerId="calc-cost"
+              options={[
+                ...COST_PROVIDER_OPTIONS.map((provider) => ({
+                  value: provider.value,
+                  label: locale === 'zh' ? provider.labelZh : provider.label,
+                })),
+                ...lockedCostProviderOptions(locale),
+              ]}
+              value={[costProvider]}
+              onChange={(values) => {
+                const next = values[0];
+                if (!next) return;
+                if (interceptLockedTier(next)) return;
+                handleCostProviderChange(next);
+              }}
+              open={openDropdown === 'costProvider'}
+              onOpenChange={handleDropdownOpenChange('costProvider')}
+              placeholder={t.costProviderPlaceholder}
+              minSelections={1}
+              maxSelections={1}
+              showClearAll={false}
+              searchable={false}
+              plainSelectedText
+              showSelectionSummary={false}
+            />
+          </div>
+        </div>
+        <div className="flex flex-col space-y-1.5">
+          <LabelWithTooltip
+            htmlFor="calc-cost-type"
+            label={t.tokenTypeLabel}
+            tooltip={t.tokenTypeTooltip}
+          />
+          <div data-testid="calc-cost-type-selector">
+            <MultiSelect
+              triggerId="calc-cost-type"
+              options={COST_TYPE_OPTIONS.map((ct) => ({
+                value: ct.value,
+                label: costTypeLabels[ct.value],
+              }))}
+              value={[costType]}
+              onChange={(values) => {
+                const next = values[0];
+                if (!next) return;
+                handleCostTypeChange(next);
+              }}
+              open={openDropdown === 'costType'}
+              onOpenChange={handleDropdownOpenChange('costType')}
+              placeholder={t.tokenTypePlaceholder}
+              minSelections={1}
+              maxSelections={1}
+              showClearAll={false}
+              searchable={false}
+              plainSelectedText
+              showSelectionSummary={false}
+            />
+          </div>
+        </div>
+        {showsTcoBasis && (
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <LabelWithTooltip label={t.tcoBasisLabel} tooltip={t.tcoBasisTooltip} />
+            <TcoBasisToggle source="calculator" className="md:h-9" />
+          </div>
+        )}
+      </div>
+    </>
+  );
+
   return (
     <div className="flex flex-col gap-4">
       <section data-testid="calculator-controls">
@@ -971,140 +1084,29 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
             <TooltipProvider delayDuration={0}>
               <ControlPanel
                 legend={t.benchmarkGroup}
-                className="md:grid-cols-2 lg:grid-cols-(--calc-cols)"
-                style={
-                  {
-                    '--calc-cols': [
-                      'minmax(0,1fr)',
-                      'minmax(0,1fr)',
-                      'minmax(0,1fr)',
-                      ...(isAgenticSequence && featureGateUnlocked ? ['minmax(0,1fr)'] : []),
-                      'minmax(0,0.9fr)',
-                      'minmax(0,1.5fr)',
-                      'minmax(0,0.7fr)',
-                      ...(showsTcoBasis ? ['minmax(0,1fr)'] : []),
-                    ].join(' '),
-                  } as CSSProperties
-                }
+                className="md:grid-cols-2 lg:flex lg:flex-wrap lg:items-start"
               >
-                <ModelSelector
-                  id="calc-model"
-                  data-testid="calc-model-selector"
-                  value={selectedModel}
-                  onChange={handleModelChange}
-                  open={openDropdown === 'model'}
-                  onOpenChange={handleDropdownOpenChange('model')}
-                  availableModels={availableModels}
-                />
-                <ScenarioSelector
-                  id="calc-sequence"
-                  data-testid="calc-sequence-selector"
-                  value={selectedSequence}
-                  onChange={handleSequenceChange}
-                  open={openDropdown === 'sequence'}
-                  onOpenChange={handleDropdownOpenChange('sequence')}
-                  availableSequences={availableSequences}
-                  model={selectedModel}
-                />
-                {isAgenticSequence && featureGateUnlocked && (
-                  <PercentileSelector
-                    id="calc-percentile"
-                    data-testid="calc-percentile-selector"
-                    value={selectedPercentile}
-                    onChange={handlePercentileChange}
+                <div className="min-w-0 lg:grow">
+                  <ModelSelector
+                    id="calc-model"
+                    data-testid="calc-model-selector"
+                    value={selectedModel}
+                    onChange={handleModelChange}
+                    open={openDropdown === 'model'}
+                    onOpenChange={handleDropdownOpenChange('model')}
+                    availableModels={availableModels}
                   />
-                )}
-                <PrecisionSelector
-                  id="calc-precision"
-                  data-testid="calc-precision-selector"
-                  value={selectedPrecisions}
-                  onChange={handlePrecisionChange}
-                  open={openDropdown === 'precision'}
-                  onOpenChange={handleDropdownOpenChange('precision')}
-                  availablePrecisions={availablePrecisions}
-                />
-
-                <div className="flex flex-col space-y-1.5 lg:col-span-1">
-                  <LabelWithTooltip
-                    htmlFor="calc-cost"
-                    label={t.costProviderLabel}
-                    tooltip={t.costProviderTooltip}
-                  />
-                  <div data-testid="calc-cost-selector">
-                    <MultiSelect
-                      triggerId="calc-cost"
-                      options={[
-                        ...COST_PROVIDER_OPTIONS.map((provider) => ({
-                          value: provider.value,
-                          label: locale === 'zh' ? provider.labelZh : provider.label,
-                        })),
-                        ...lockedCostProviderOptions(locale),
-                      ]}
-                      value={[costProvider]}
-                      onChange={(values) => {
-                        const next = values[0];
-                        if (!next) return;
-                        if (interceptLockedTier(next)) return;
-                        handleCostProviderChange(next);
-                      }}
-                      open={openDropdown === 'costProvider'}
-                      onOpenChange={handleDropdownOpenChange('costProvider')}
-                      placeholder={t.costProviderPlaceholder}
-                      minSelections={1}
-                      maxSelections={1}
-                      showClearAll={false}
-                      searchable={false}
-                      plainSelectedText
-                      showSelectionSummary={false}
-                    />
-                  </div>
                 </div>
-
-                <div className="flex flex-col space-y-1.5 lg:col-span-1">
-                  <LabelWithTooltip
-                    htmlFor="calc-cost-type"
-                    label={t.tokenTypeLabel}
-                    tooltip={t.tokenTypeTooltip}
-                  />
-                  <div data-testid="calc-cost-type-selector">
-                    <MultiSelect
-                      triggerId="calc-cost-type"
-                      options={COST_TYPE_OPTIONS.map((ct) => ({
-                        value: ct.value,
-                        label: costTypeLabels[ct.value],
-                      }))}
-                      value={[costType]}
-                      onChange={(values) => {
-                        const next = values[0];
-                        if (!next) return;
-                        handleCostTypeChange(next);
-                      }}
-                      open={openDropdown === 'costType'}
-                      onOpenChange={handleDropdownOpenChange('costType')}
-                      placeholder={t.tokenTypePlaceholder}
-                      minSelections={1}
-                      maxSelections={1}
-                      showClearAll={false}
-                      searchable={false}
-                      plainSelectedText
-                      showSelectionSummary={false}
-                    />
-                  </div>
-                </div>
-                {showsTcoBasis && (
-                  <div className="flex min-w-0 flex-col gap-1.5 lg:col-span-1">
-                    <LabelWithTooltip label={t.tcoBasisLabel} tooltip={t.tcoBasisTooltip} />
-                    <TcoBasisToggle source="calculator" className="md:h-9" />
-                  </div>
-                )}
+                {!isMobile && <div className="hidden md:contents">{secondaryConfig}</div>}
               </ControlPanel>
 
               <MobileControlSection
                 label={t.secondaryControls}
-                count={comparisonSettingsCount}
+                count={secondaryCount}
                 countLabel={t.changed}
                 testId="calculator-secondary-controls"
               >
+                {isMobile && <div className="grid min-w-0 gap-3 md:hidden">{secondaryConfig}</div>}
                 <ControlPanel
                   legend={t.comparisonGroup}
                   className="md:grid-cols-[auto_minmax(0,1fr)] md:gap-x-6"

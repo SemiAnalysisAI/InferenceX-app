@@ -315,6 +315,25 @@ describe('TabNav — Hidden popover for gated tabs', () => {
       .and('contain.text', 'AI 图表');
   });
 
+  it('gives the unlocked mobile strip the same Hidden dropdown as desktop', () => {
+    cy.viewport(390, 844);
+    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1'));
+    mountTabNav({ pathname: '/evaluation' });
+    cy.get('[data-testid="mobile-tab-hidden"]')
+      .should('contain.text', 'Hidden')
+      .and(($trigger) => {
+        const view = $trigger[0]!.ownerDocument.defaultView!;
+        const pill = $trigger.closest('nav').find('[data-testid="mobile-tab-evaluation"]')[0]!;
+        expect(view.getComputedStyle($trigger[0]!).fontSize).to.equal(
+          view.getComputedStyle(pill).fontSize,
+        );
+        expect($trigger.find('svg')).to.have.length(1);
+      })
+      .click();
+    cy.get('[data-testid="tab-hidden-popover"]').should('be.visible');
+    cy.get('[data-testid="tab-trigger-ai-chart"]').should('have.attr', 'href', '/ai-chart');
+  });
+
   it('renders the Hidden trigger when unlocked; popover reveals gated links', () => {
     cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1'));
     mountTabNav({});

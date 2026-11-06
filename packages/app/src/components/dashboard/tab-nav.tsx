@@ -175,8 +175,8 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
           ariaLabel={locale === 'zh' ? '选择图表' : 'Select chart'}
           current={current}
           routes={stripTabs}
-          gatedRoutes={featureGateUnlocked ? GATED_TABS : []}
-          gatedLabel={locale === 'zh' ? '隐藏' : 'Hidden'}
+          showHidden={featureGateUnlocked}
+          locale={locale}
           tabLabel={tabLabel}
           tabHref={(path) => tabHref(localePath(path, locale))}
           isCurrentPage={(route) => {
@@ -242,12 +242,16 @@ function HiddenTabsPopover({
   onSelect,
   tabLabel,
   locale,
+  testId = 'tab-trigger-hidden',
+  className,
 }: {
   current: DashboardRouteKey;
   tabHref: (path: string) => string;
   onSelect: (tab: DashboardRouteKey) => void;
   tabLabel: (route: DashboardRoute) => string;
   locale: 'en' | 'zh';
+  testId?: string;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const currentRoute = getDashboardRoute(current);
@@ -256,9 +260,10 @@ function HiddenTabsPopover({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
-        data-testid="tab-trigger-hidden"
+        data-testid={testId}
         data-ph-capture-attribute-tab="hidden"
-        className={cn(tabLinkClass, currentTabClass(active), 'gap-1 cursor-pointer')}
+        aria-current={active ? 'page' : undefined}
+        className={cn(tabLinkClass, currentTabClass(active), 'gap-1 cursor-pointer', className)}
       >
         {active ? tabLabel(currentRoute) : locale === 'zh' ? '隐藏' : 'Hidden'}
         <ChevronDown
@@ -303,8 +308,8 @@ function MobileTabStrip({
   ariaLabel,
   current,
   routes,
-  gatedRoutes,
-  gatedLabel,
+  showHidden,
+  locale,
   tabLabel,
   tabHref,
   isCurrentPage,
@@ -313,8 +318,8 @@ function MobileTabStrip({
   ariaLabel: string;
   current: DashboardRouteKey;
   routes: readonly DashboardRoute[];
-  gatedRoutes: readonly DashboardRoute[];
-  gatedLabel: string;
+  showHidden: boolean;
+  locale: 'en' | 'zh';
   tabLabel: (route: DashboardRoute) => string;
   tabHref: (path: string) => string;
   isCurrentPage: (route: DashboardRoute) => boolean;
@@ -340,7 +345,7 @@ function MobileTabStrip({
       el.scrollLeft = Math.max(0, target);
     }
     updateEdges();
-  }, [current, updateEdges, gatedRoutes.length]);
+  }, [current, updateEdges, showHidden]);
 
   useEffect(() => {
     const el = scrollerRef.current;
@@ -386,16 +391,16 @@ function MobileTabStrip({
       }}
     >
       {routes.map(renderPill)}
-      {gatedRoutes.length > 0 && (
-        <>
-          <span
-            aria-hidden
-            className="shrink-0 self-center text-xs font-medium text-muted-foreground"
-          >
-            {gatedLabel}
-          </span>
-          {gatedRoutes.map(renderPill)}
-        </>
+      {showHidden && (
+        <HiddenTabsPopover
+          current={current}
+          tabHref={tabHref}
+          onSelect={onSelect}
+          tabLabel={tabLabel}
+          locale={locale}
+          testId="mobile-tab-hidden"
+          className="min-h-11 shrink-0 py-0"
+        />
       )}
     </nav>
   );
