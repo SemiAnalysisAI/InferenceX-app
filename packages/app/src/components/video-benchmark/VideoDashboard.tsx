@@ -10,7 +10,7 @@ import { ChartSection } from '@/components/ui/chart-section';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Heading } from '@/components/ui/heading';
+import { Heading, HeadingQualifier } from '@/components/ui/heading';
 import { InfoHelp } from '@/components/ui/option-info';
 import { CaptionField, ResultContext } from '@/components/ui/result-context';
 import { PricesSourceLink } from '@/components/ui/chart-display-helpers';
@@ -432,8 +432,10 @@ export default function VideoDashboard() {
         <div className="space-y-3 px-4 md:px-6" data-testid="video-chart-card">
           <div className="min-w-0 pr-0 md:pr-56">
             <Heading level="card">
-              {modelLabel} · {metricLabel(state.y, locale, options)} {s.vs}{' '}
-              {metricLabel(state.x, locale, options)}
+              {modelLabel} · {metricLabel(state.y, locale, options)}
+              <HeadingQualifier>
+                {s.vs} {metricLabel(state.x, locale, options)}
+              </HeadingQualifier>
             </Heading>
             {idle.length > 0 && (
               <p className="mt-1 text-xs text-muted-foreground" data-testid="video-idle-note">

@@ -10,7 +10,7 @@ const headingVariants = cva('text-foreground', {
       page: 'text-2xl font-semibold lg:text-4xl lg:tracking-heading',
       title: 'text-xl font-semibold md:text-2xl lg:text-title',
       section: 'text-xl font-medium',
-      card: 'text-base font-medium max-sm:font-semibold max-sm:leading-snug',
+      card: 'text-base font-semibold leading-snug',
       label: 'text-sm font-medium',
     },
   },
@@ -41,9 +41,7 @@ function HeadingQualifier({ children }: { children: React.ReactNode }) {
   return (
     <>
       {opensWithFullwidthBracket ? null : ' '}
-      <span className="max-sm:mt-0.5 max-sm:block max-sm:text-sm max-sm:font-normal max-sm:text-muted-foreground">
-        {children}
-      </span>
+      <span className="mt-0.5 block text-sm font-normal text-muted-foreground">{children}</span>
     </>
   );
 }

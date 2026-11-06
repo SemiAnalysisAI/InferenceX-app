@@ -226,7 +226,7 @@ describe('getValueLabel', () => {
   it('formats total power metric value', () => {
     const result = makeResult({ tpPerMw: 1234 });
     expect(getValueLabel(result, 'power', 'interactivity_to_throughput', 'total')).toBe(
-      '1,234 tok/s/MW',
+      '1.23k tok/s/MW',
     );
   });
 
@@ -261,7 +261,7 @@ describe('getValueLabel', () => {
   it('formats total throughput value in interactivity_to_throughput mode', () => {
     const result = makeResult({ value: 456.7 });
     expect(getValueLabel(result, 'throughput', 'interactivity_to_throughput', 'total')).toBe(
-      '456.7 tok/s/chip',
+      '457 tok/s/chip',
     );
   });
 
@@ -275,7 +275,7 @@ describe('getValueLabel', () => {
   it('formats output throughput value when costType is output', () => {
     const result = makeResult({ outputTputValue: 401.2 });
     expect(getValueLabel(result, 'throughput', 'interactivity_to_throughput', 'output')).toBe(
-      '401.2 tok/s/chip',
+      '401 tok/s/chip',
     );
   });
 

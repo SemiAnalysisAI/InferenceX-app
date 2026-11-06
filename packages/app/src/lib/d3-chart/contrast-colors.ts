@@ -49,9 +49,21 @@ export function contrastColors(bgColor: string, opacity = 1, backdrop = 'var(--c
 
 const DARK_TEXT_LUMINANCE = relativeLuminance(0x13, 0x14, 0x16);
 
-export function readableTextColor(bgColor: string, opacity = 1, backdrop = 'var(--card)'): string {
+export function readableTextContrast(
+  bgColor: string,
+  opacity = 1,
+  backdrop = 'var(--card)',
+): { color: string; ratio: number } {
   const rgb = parseRgb(resolveCssColor(bgColor), opacity, backdrop);
-  if (!rgb) return 'white';
+  if (!rgb) return { color: 'white', ratio: 21 };
   const lum = relativeLuminance(...rgb);
-  return (lum + 0.05) / (DARK_TEXT_LUMINANCE + 0.05) > 1.05 / (lum + 0.05) ? '#131416' : 'white';
+  const darkRatio = (lum + 0.05) / (DARK_TEXT_LUMINANCE + 0.05);
+  const whiteRatio = 1.05 / (lum + 0.05);
+  return darkRatio > whiteRatio
+    ? { color: '#131416', ratio: darkRatio }
+    : { color: 'white', ratio: whiteRatio };
+}
+
+export function readableTextColor(bgColor: string, opacity = 1, backdrop = 'var(--card)'): string {
+  return readableTextContrast(bgColor, opacity, backdrop).color;
 }

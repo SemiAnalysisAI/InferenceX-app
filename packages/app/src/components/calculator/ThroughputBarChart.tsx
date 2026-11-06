@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/chart-point-details';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
-import { readableTextColor } from '@/lib/d3-chart/contrast-colors';
+import { readableTextContrast } from '@/lib/d3-chart/contrast-colors';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   CustomLayerConfig,
@@ -155,6 +155,10 @@ export function getMetricLabel(
 
 const fixed = (value: number, digits: number) =>
   value.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+const formatSig3 = d3.format('.3~r');
+const formatSig3Si = d3.format('.3~s');
+const compact = (value: number) =>
+  Math.abs(value) >= 1000 ? formatSig3Si(value) : formatSig3(value);
 
 export function getValueLabel(
   d: InterpolatedResult,
@@ -164,15 +168,15 @@ export function getValueLabel(
 ): string {
   switch (barMetric) {
     case 'power': {
-      return `${fixed(getTpPerMwForType(d, costType), 0)} tok/s/MW`;
+      return `${compact(getTpPerMwForType(d, costType))} tok/s/MW`;
     }
     case 'cost': {
       return `$${getCostForType(d, costType).toFixed(3)}${getCostTypeLabel(costType)}`;
     }
     default: {
       return mode === 'interactivity_to_throughput'
-        ? `${fixed(getThroughputForType(d, costType), 1)} tok/s/chip`
-        : `${fixed(getThroughputForType(d, costType), 1)} tok/s/user`;
+        ? `${compact(getThroughputForType(d, costType))} tok/s/chip`
+        : `${compact(getThroughputForType(d, costType))} tok/s/user`;
     }
   }
 }
@@ -395,6 +399,7 @@ function getColor(): string {
 }
 
 const BAR_OPACITY = 0.85;
+const MIN_INSIDE_LABEL_CONTRAST = 5.5;
 const TOP_AXIS_BAND_PX = 28;
 
 function renderTopAxis(
@@ -459,9 +464,11 @@ function positionLabelPairs(
   const overlayLabels = group.selectAll<SVGTextElement, InterpolatedResult>('.overlay-label');
 
   const maxWidths = new Map<string, number>();
+  const insideText = new Map<string, { color: string; ratio: number }>();
   valueLabels.each(function (d) {
     const text = d3.select(this).text();
     maxWidths.set(d.resultKey, measureTextWidth(text, '600 12px sans-serif'));
+    insideText.set(d.resultKey, readableTextContrast(getBarColor(d), BAR_OPACITY));
   });
   overlayLabels.each(function (d) {
     const text = d3.select(this).text();
@@ -473,12 +480,11 @@ function positionLabelPairs(
     sel.each(function (d) {
       const barEnd = xScale(getMetricValue(d, barMetric, costType));
       const maxW = maxWidths.get(d.resultKey) ?? 0;
-      const fitsInside = barEnd > maxW + 24;
+      const inside = insideText.get(d.resultKey);
+      const fitsInside = barEnd > maxW + 24 && (inside?.ratio ?? 0) >= MIN_INSIDE_LABEL_CONTRAST;
       const outsideX = Math.min(barEnd + 6, Math.max(0, chartWidth - maxW - 2));
       const clamped = !fitsInside && outsideX < barEnd + 6;
-      const fill = fitsInside
-        ? readableTextColor(getBarColor(d), BAR_OPACITY)
-        : 'var(--foreground)';
+      const fill = fitsInside && inside ? inside.color : 'var(--foreground)';
       const label = d3
         .select(this)
         .attr('x', fitsInside ? barEnd - 10 : outsideX)
@@ -691,8 +697,8 @@ export default function ThroughputBarChart({
           .text((d) => {
             if (barMetric === 'cost') {
               return mode === 'interactivity_to_throughput'
-                ? `${fixed(getThroughputForType(d, costType), 1)} tok/s/chip`
-                : `${fixed(getThroughputForType(d, costType), 1)} tok/s/user`;
+                ? `${compact(getThroughputForType(d, costType))} tok/s/chip`
+                : `${compact(getThroughputForType(d, costType))} tok/s/user`;
             }
             const costLbl = getCostTypeLabel(costType);
             return `$${getCostForType(d, costType).toFixed(3)}${costLbl}`;

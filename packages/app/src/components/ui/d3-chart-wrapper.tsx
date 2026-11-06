@@ -297,7 +297,7 @@ export function D3ChartWrapper({
             ref={hintRef}
             data-testid="chart-instructions"
             className={cn(
-              'no-export text-muted-foreground',
+              'no-export text-balance text-muted-foreground',
               hintWidth === null
                 ? 'mt-2 text-center text-xs'
                 : 'pointer-events-none relative ml-auto -mt-[21px] mb-1.5 pr-3 text-right text-2xs leading-4',

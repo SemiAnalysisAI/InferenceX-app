@@ -124,9 +124,9 @@ function Row({ row, frame, label }: { row: ReplayRow; frame: Frame; label: strin
     <li className="flex h-3.5 items-center gap-2" data-testid="agentx-session-replay-row">
       <span
         className={cn(
-          'min-w-12 shrink-0 whitespace-nowrap text-right text-3xs leading-3 tabular-nums',
+          'min-w-12 shrink-0 whitespace-nowrap text-right text-xs leading-3.5 tabular-nums',
           active ? 'font-semibold text-foreground' : 'text-muted-foreground',
-          shown ? 'opacity-100' : 'opacity-40',
+          shown ? 'opacity-100' : 'opacity-60',
         )}
       >
         {label}
@@ -243,7 +243,7 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
       </div>
       <p className="mt-2 min-h-10 text-sm leading-5 text-foreground sm:min-h-5">{caption}</p>
 
-      <p className="mt-3 ml-14 text-3xs text-muted-foreground" aria-hidden="true">
+      <p className="mt-3 ml-14 text-xs text-muted-foreground" aria-hidden="true">
         {t.axis}
       </p>
       <div className="relative mt-0.5" aria-hidden="true">
@@ -256,7 +256,7 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
             />
           ))}
         </div>
-        <div className="relative mb-1 ml-14 h-4 text-3xs text-muted-foreground tabular-nums">
+        <div className="relative mb-1 ml-14 h-4 text-xs text-muted-foreground tabular-nums">
           {TICKS.map((tick) => (
             <span
               key={tick}

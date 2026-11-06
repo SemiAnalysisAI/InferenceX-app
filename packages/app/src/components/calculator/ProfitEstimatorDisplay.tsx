@@ -1334,7 +1334,7 @@ function ProfitEstimatorInner({
   const caption = useMemo(() => {
     if (!pricing) return null;
     return (
-      <div className="mb-2 pr-12" data-testid="profit-caption">
+      <div className="mb-2 md:pr-12" data-testid="profit-caption">
         <Heading as="h2" level="card">
           <ModelLogo model={selectedModel} className="mr-2 size-6 align-[-0.3em]" />
           {t.chartTitle[basis](
@@ -1909,7 +1909,7 @@ function ProfitEstimatorInner({
                   precisions: selectedPrecisions,
                   gpuCount: selectedGPUs.length,
                 })}
-                className="absolute top-0 right-0 z-10 mb-0"
+                className="md:absolute md:top-0 md:right-0 md:z-10 md:mb-0"
                 hideZoomReset
                 onExportCsv={handleExportCsv}
                 exportFileName={exportFileName}

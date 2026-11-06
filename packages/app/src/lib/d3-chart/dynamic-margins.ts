@@ -82,8 +82,8 @@ export interface LeftMarginOptions {
 export function computeLeftMargin(labels: string[], options: LeftMarginOptions = {}): number {
   const {
     split = 'last-space',
-    primaryFont = '600 12px sans-serif',
-    secondaryFont = '10px sans-serif',
+    primaryFont = '500 12px sans-serif',
+    secondaryFont = '12px sans-serif',
     minMargin = 60,
     padding = 16,
   } = options;
