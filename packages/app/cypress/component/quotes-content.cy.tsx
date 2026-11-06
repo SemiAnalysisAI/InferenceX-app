@@ -232,6 +232,7 @@ describe('QuotesContent supporter logo wall', () => {
           ]) {
             cy.get(`${section} img[alt="Fireworks AI"]`).should(($images) => {
               const image = $images[0] as HTMLImageElement;
+              expect(image.currentSrc).to.match(/\/logos\/fireworks-purple\.svg$/);
               expect(image.naturalWidth).to.be.greaterThan(0);
               expect(getComputedStyle(image).filter).to.equal('none');
               expect(getComputedStyle(image).opacity).to.equal('1');
@@ -247,7 +248,9 @@ describe('QuotesContent supporter logo wall', () => {
               let opaquePixels = 0;
               for (let i = 0; i < pixels.length; i += 4) {
                 if (pixels[i + 3] === 255) {
-                  expect(pixels.slice(i, i + 3)).to.deep.equal([103, 32, 255]);
+                  expect(pixels[i]).to.equal(103);
+                  expect(pixels[i + 1]).to.equal(32);
+                  expect(pixels[i + 2]).to.equal(255);
                   opaquePixels++;
                 }
               }
