@@ -29,6 +29,11 @@ function set(value: Json, key: string, replacement: Json) {
     throw new Error('Expected object');
   value[key] = replacement;
 }
+/** Rewrite the fixture's NVIDIA UUID as an AMD board serial, as MI355X bundles record it. */
+const amd = (value: Json): Json =>
+  JSON.parse(
+    JSON.stringify(value).replaceAll('GPU-11111111-1111-1111-1111-111111111111', '692526018597'),
+  );
 const cellOf = (b: Bundle, concurrency: number) =>
   at(b.documents.get('serving-smoke.json') ?? null, 'cells', [1, 2, 4].indexOf(concurrency));
 
@@ -73,6 +78,12 @@ describe('native srt-slurm H3 bundle', () => {
       expect(at(cell.cell, 'verified')).toBe(true);
     }
     expect(isNativeH3(servingFixture().manifest)).toBe(false);
+  });
+
+  it('accepts AMD GPU serial identities', async () => {
+    const b = await bundle();
+    for (const [path, document] of b.documents) b.documents.set(path, amd(document));
+    expect(servingCells({ ...b, manifest: amd(b.manifest), ci: amd(b.ci) })).toHaveLength(3);
   });
 
   it('projects latency, throughput, GPU counts, power and energy per concurrency', async () => {
