@@ -1,10 +1,10 @@
 'use client';
 
 import * as d3 from 'd3';
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState, useSyncExternalStore } from 'react';
 import { useTheme } from 'next-themes';
 import { isDarkTheme } from '@/lib/themes/themes';
-import { generateVendorColors, getVendor } from '@/lib/charts/dynamic-colors';
+import { generateVendorColors } from '@/lib/charts/dynamic-colors';
 
 import ChartLegend from '@/components/ui/chart-legend';
 import { ChartSection } from '@/components/ui/chart-section';
@@ -33,16 +33,16 @@ import {
   type UbenchxDerivedRow,
 } from './ubenchx-transform';
 
-const GPU_COLORS: Record<string, string> = {
-  'B300 SXM': 'oklch(0.62 0.15 128)',
-  'GB200 NVL72': 'oklch(0.58 0.15 138)',
-  'B200 SXM': 'oklch(0.54 0.15 148)',
-  'H200 SXM': 'oklch(0.50 0.15 158)',
-  'H100 SXM': 'oklch(0.46 0.15 168)',
-  MI355X: 'oklch(0.62 0.20 18)',
-  MI325X: 'oklch(0.55 0.20 28)',
-  MI300X: 'oklch(0.48 0.20 38)',
-};
+const subscribeNoop = () => () => {};
+
+function ubenchxHwKey(key: string): string {
+  return key.startsWith('Huawei') ? key : key.split(' ')[0].toLowerCase();
+}
+
+function ubenchxColors(theme: 'light' | 'dark'): Record<string, string> {
+  const colors = generateVendorColors(UBENCHX_GPU_KEYS.map(ubenchxHwKey), theme);
+  return Object.fromEntries(UBENCHX_GPU_KEYS.map((key) => [key, colors[ubenchxHwKey(key)]]));
+}
 
 const STRINGS = {
   en: {
@@ -366,17 +366,14 @@ function UbenchxChart({
 }
 
 export function UbenchxContent() {
-  const theme = isDarkTheme(useTheme().resolvedTheme) ? 'dark' : 'light';
-  const colors = useMemo(
-    () => ({
-      ...GPU_COLORS,
-      ...generateVendorColors(
-        UBENCHX_GPU_KEYS.filter((key) => getVendor(key) === 'huawei'),
-        theme,
-      ),
-    }),
-    [theme],
+  const { resolvedTheme } = useTheme();
+  const hydrated = useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => false,
   );
+  const theme = hydrated && isDarkTheme(resolvedTheme) ? 'dark' : 'light';
+  const colors = useMemo(() => ubenchxColors(theme), [theme]);
   const locale = useLocale();
   const t = STRINGS[locale];
 

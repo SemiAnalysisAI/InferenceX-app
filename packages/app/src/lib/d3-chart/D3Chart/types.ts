@@ -1,5 +1,6 @@
 import type * as d3 from 'd3';
 
+import type { ChartHeight } from '@/hooks/useResponsiveChartDimensions';
 import type { ChartLayout, ChartMargin, ContinuousScale } from '../types';
 import type { AnyScale } from '../chart-update';
 import type { BuiltScale } from './scale-builders';
@@ -194,7 +195,7 @@ export interface D3ChartHandle {
 export interface D3ChartProps<T = any> {
   chartId: string;
   data: T[];
-  height?: number;
+  height?: ChartHeight;
   margin?: ChartMargin;
   watermark?: 'logo' | 'unofficial' | 'none';
   testId?: string;

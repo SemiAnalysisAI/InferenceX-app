@@ -1,6 +1,7 @@
 import * as d3 from 'd3';
 
 import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
+import { capOklchLightness } from '@/lib/charts/dynamic-colors';
 import { setAttrIfChanged, setStyleIfChanged } from '@/lib/d3-chart/chart-update';
 import { POINT_LABEL_ANCHOR_CLASS } from '@/lib/d3-chart/layers/canvas-point-registry';
 import { plotClipSize } from '@/lib/d3-chart/plot-bounds';
@@ -105,6 +106,10 @@ interface PillLayoutItem {
   label: LineLabelPlacement;
 }
 
+const NARROW_PLOT_WIDTH = 360;
+const NARROW_PILL_LIMIT = 3;
+const PILL_MAX_LIGHTNESS = 0.68;
+
 function layoutPills(
   items: readonly PillLayoutItem[],
   offsetX: number,
@@ -113,6 +118,9 @@ function layoutPills(
   obstacles: readonly RectBounds[],
 ): void {
   const placed: RectBounds[] = [...obstacles];
+  const limit =
+    bounds && bounds.right - bounds.left < NARROW_PLOT_WIDTH ? NARROW_PILL_LIMIT : Infinity;
+  let shown = 0;
 
   for (const { node, label } of items) {
     const tx0 = label.x + offsetX;
@@ -145,12 +153,26 @@ function layoutPills(
       return { tx, ty, box: pillBoxAt(local, tx, ty) };
     });
     const chosen =
-      clamped.find(
-        (candidate) => !placed.some((other) => rectsStrictlyOverlap(candidate.box, other)),
-      ) ?? clamped[0];
+      shown < limit
+        ? clamped.find(
+            (candidate) => !placed.some((other) => rectsStrictlyOverlap(candidate.box, other)),
+          )
+        : undefined;
+    if (!chosen) {
+      node.setAttribute('transform', `translate(${clamped[0].tx},${clamped[0].ty})`);
+      node.style.opacity = '0';
+      node.dataset.visible = '0';
+      node.setAttribute(PLACEMENT_HIDDEN_ATTR, '');
+      continue;
+    }
+    if (node.hasAttribute(PLACEMENT_HIDDEN_ATTR)) {
+      node.removeAttribute(PLACEMENT_HIDDEN_ATTR);
+      node.dataset.visible = '1';
+    }
 
     node.setAttribute('transform', `translate(${chosen.tx},${chosen.ty})`);
     placed.push(chosen.box);
+    shown++;
   }
 }
 
@@ -419,7 +441,7 @@ export function renderLineLabels(
       .attr('y', bbox.y - 3)
       .attr('width', bbox.width + space + 10)
       .attr('height', bbox.height + 6)
-      .attr('fill', label.color);
+      .attr('fill', capOklchLightness(label.color, PILL_MAX_LIGHTNESS));
 
     labelGroup
       .selectAll<SVGImageElement, LineLabelIconSpec>('.ll-logo')

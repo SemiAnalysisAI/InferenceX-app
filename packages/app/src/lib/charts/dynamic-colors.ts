@@ -22,8 +22,8 @@ export function getVendor(hwKey: string): Vendor {
 }
 
 const LIGHTNESS = {
-  light: { min: 0.42, max: 0.68 },
-  dark: { min: 0.5, max: 0.78 },
+  light: { min: 0.38, max: 0.74 },
+  dark: { min: 0.6, max: 0.88 },
 } as const;
 
 function pickLightness(index: number, count: number, theme: 'light' | 'dark'): number {
@@ -223,6 +223,8 @@ export function generateHighContrastGpuDateColors(
   return result;
 }
 
+const OKLCH_PATTERN = /^oklch\(\s*(?<l>[\d.]+)\s+(?<c>[\d.]+)\s+(?<h>[\d.]+)\s*\)$/u;
+
 /**
  * Lighter/darker variant of an `oklch(L C H)` color for the nth series that shares one
  * hardware color: 0 keeps the base, then alternates darker/lighter in widening steps.
@@ -230,9 +232,15 @@ export function generateHighContrastGpuDateColors(
  */
 export function shadeOklch(color: string, index: number): string {
   if (index <= 0) return color;
-  const groups = /^oklch\(\s*(?<l>[\d.]+)\s+(?<c>[\d.]+)\s+(?<h>[\d.]+)\s*\)$/u.exec(color)?.groups;
+  const groups = OKLCH_PATTERN.exec(color)?.groups;
   if (!groups) return color;
   const step = Math.ceil(index / 2) * 0.09 * (index % 2 === 1 ? -1 : 1);
   const lightness = Math.min(0.92, Math.max(0.3, Number(groups.l) + step));
   return `oklch(${lightness.toFixed(3)} ${groups.c} ${groups.h})`;
+}
+
+export function capOklchLightness(color: string, max: number): string {
+  const groups = OKLCH_PATTERN.exec(color)?.groups;
+  if (!groups || Number(groups.l) <= max) return color;
+  return `oklch(${max.toFixed(3)} ${groups.c} ${groups.h})`;
 }

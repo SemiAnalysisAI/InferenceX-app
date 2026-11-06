@@ -4,6 +4,7 @@ import { hsl, rgb } from 'd3';
 import { VENDOR_OKLCH_ZONES, VENDOR_HSL_ZONES } from '@semianalysisai/inferencex-constants';
 
 import {
+  capOklchLightness,
   generateHighContrastGpuDateColors,
   generateGpuDateColors,
   generateVendorColors,
@@ -59,6 +60,21 @@ describe('generateVendorColors', () => {
     expect(hueOf(colors['mystery_series'])).toBeGreaterThanOrEqual(unknown.start);
     expect(hueOf(colors['mystery_series'])).toBeLessThanOrEqual(unknown.end);
   });
+
+  it.each(['light', 'dark'] as const)(
+    'keeps same-vendor series at least 8 lightness points apart in %s mode',
+    (theme) => {
+      const keys = ['b300', 'b200', 'h200', 'h100', 'mi355x', 'mi325x', 'mi300x'];
+      const colors = generateVendorColors(keys, theme);
+      for (const family of [keys.slice(0, 4), keys.slice(4)]) {
+        const levels = family.map((key) => lightnessOf(colors[key])).toSorted((a, b) => a - b);
+        for (let i = 1; i < levels.length; i++) {
+          expect(levels[i] - levels[i - 1]).toBeGreaterThanOrEqual(0.08);
+        }
+        if (theme === 'dark') expect(levels[0]).toBeGreaterThanOrEqual(0.6);
+      }
+    },
+  );
 });
 
 function lightnessOf(color: string): number {
@@ -66,6 +82,14 @@ function lightnessOf(color: string): number {
   expect(match, `expected oklch color, got ${color}`).not.toBeNull();
   return Number(match!.groups!.l);
 }
+
+describe('capOklchLightness', () => {
+  it('darkens only oklch colors brighter than the cap', () => {
+    expect(capOklchLightness('oklch(0.880 0.15 124.2)', 0.68)).toBe('oklch(0.680 0.15 124.2)');
+    expect(capOklchLightness('oklch(0.500 0.15 124.2)', 0.68)).toBe('oklch(0.500 0.15 124.2)');
+    expect(capOklchLightness('#4285F4', 0.68)).toBe('#4285F4');
+  });
+});
 
 describe('generateHighContrastGpuDateColors', () => {
   const bases = { h200_sglang: '#1f77b4', mi355x_vllm: '#d62728' };

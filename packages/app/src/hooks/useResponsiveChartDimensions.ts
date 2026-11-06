@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+export type ChartHeight = number | ((width: number) => number);
+
 export interface UseResponsiveChartDimensionsOptions {
-  height?: number;
+  height?: ChartHeight;
+}
+
+function resolveHeight(height: ChartHeight, width: number): number {
+  return typeof height === 'function' ? height(width) : height;
 }
 
 export interface UseResponsiveChartDimensionsResult {
@@ -18,7 +24,10 @@ export function useResponsiveChartDimensions(
   const { height = 600 } = options;
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 0, height });
+  const [dimensions, setDimensions] = useState(() => ({
+    width: 0,
+    height: resolveHeight(height, 0),
+  }));
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const heightRef = useRef(height);
   heightRef.current = height;
@@ -28,7 +37,7 @@ export function useResponsiveChartDimensions(
 
   const updateDimensions = useCallback((width: number) => {
     appliedWidthRef.current = width;
-    const h = heightRef.current;
+    const h = resolveHeight(heightRef.current, width);
     setDimensions((prev) =>
       prev.width === width && prev.height === h ? prev : { width, height: h },
     );
@@ -97,7 +106,8 @@ export function useResponsiveChartDimensions(
   );
 
   useEffect(() => {
-    setDimensions((prev) => (prev.height === height ? prev : { ...prev, height }));
+    const h = resolveHeight(height, appliedWidthRef.current);
+    setDimensions((prev) => (prev.height === h ? prev : { ...prev, height: h }));
   }, [height]);
 
   return {

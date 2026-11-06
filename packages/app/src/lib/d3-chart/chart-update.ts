@@ -16,6 +16,12 @@ export interface AxisUpdateConfig {
   axes?: 'x' | 'y' | 'both';
 }
 
+const X_TICK_SPACING_PX = 80;
+
+function widthTickCount(width: number, requested = 10): number {
+  return Math.min(requested, Math.max(2, Math.floor(width / X_TICK_SPACING_PX)));
+}
+
 export function renderAxes(
   layout: ChartLayout,
   xScale: AnyScale,
@@ -41,7 +47,7 @@ export function renderAxes(
     const band = 'bandwidth' in xScale;
     renderAxis(layout.xAxisGroup, 'bottom', xScale, dur, {
       tickSize: 6,
-      tickArguments: !band && xTickCount ? [xTickCount] : [],
+      tickArguments: band ? [] : [widthTickCount(layout.width, xTickCount)],
       tickValues: !band && xTickValues ? visibleTickValues(xScale, xTickValues) : null,
       tickFormat: xTickFormat ?? null,
     });
@@ -250,7 +256,7 @@ export function renderGrid(
       const tickScale = xScale as { ticks: (count?: number) => number[]; (v: number): number };
       const xTicks = xTickValues
         ? (visibleTickValues(xScale, xTickValues) as number[])
-        : tickScale.ticks();
+        : tickScale.ticks(widthTickCount(width));
       const vJoin = vGroup
         .selectAll<SVGLineElement, number>('line')
         .data(xTicks)

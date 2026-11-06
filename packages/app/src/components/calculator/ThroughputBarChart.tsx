@@ -379,6 +379,8 @@ function getColor(): string {
   return 'var(--foreground)';
 }
 
+const BAR_OPACITY = 0.85;
+
 function positionLabelPairs(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   xScale: d3.ScaleLinear<number, number>,
@@ -408,7 +410,7 @@ function positionLabelPairs(
       const fitsInside = barEnd > maxW + 24;
       const outsideX = Math.min(barEnd + 6, Math.max(0, chartWidth - maxW - 2));
       const clamped = !fitsInside && outsideX < barEnd + 6;
-      const fill = fitsInside ? contrastColors(getBarColor(d)) : 'var(--foreground)';
+      const fill = fitsInside ? contrastColors(getBarColor(d), BAR_OPACITY) : 'var(--foreground)';
       const label = d3
         .select(this)
         .attr('x', fitsInside ? barEnd - 10 : outsideX)
@@ -566,7 +568,7 @@ export default function ThroughputBarChart({
         getX: (d) => getMetricValue(d, barMetric, costType),
         getColor: (d) => resolveBarColor(d),
         rx: 4,
-        opacity: 0.85,
+        opacity: BAR_OPACITY,
         keyFn: (d) => d.resultKey,
       },
     };

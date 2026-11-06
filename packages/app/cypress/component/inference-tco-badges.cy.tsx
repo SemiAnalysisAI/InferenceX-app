@@ -23,7 +23,7 @@ describe('InferenceTcoBadges', () => {
     cy.get('[data-testid="inference-tco-reset"]').should('not.exist');
     cy.get('[data-testid="inference-tco-badge"]').should('have.length', 2);
     cy.get('[data-testid="cost-input-gb300"]').should('have.value', '2.31');
-    cy.get('[data-testid="cost-input-mi355x"]').should('have.value', '1.5');
+    cy.get('[data-testid="cost-input-mi355x"]').should('have.value', '1.50');
     cy.get('@setUserCosts').should('not.have.been.called');
   });
 
@@ -65,7 +65,7 @@ describe('InferenceTcoBadges', () => {
       inference: { selectedYAxisMetric: 'y_costUser', userCosts: { gb300: 9, mi355x: 1.5 } },
       globalFilters: {},
     });
-    cy.get('[data-testid="cost-input-gb300"]').should('have.value', '9');
+    cy.get('[data-testid="cost-input-gb300"]').should('have.value', '9.00');
     cy.get('[data-testid="cost-input-gb300"]').clear();
     cy.get('@setUserCosts').should('have.been.calledWith', { gb300: undefined, mi355x: 1.5 });
     cy.get('[data-testid="cost-input-gb300"]').should('have.value', '').type('3');
@@ -85,7 +85,7 @@ describe('InferenceTcoBadges', () => {
       },
     );
     cy.get('[data-testid="cost-input-gb300"]').should('have.value', '');
-    cy.get('[data-testid="cost-input-mi355x"]').should('have.value', '1.5');
+    cy.get('[data-testid="cost-input-mi355x"]').should('have.value', '1.50');
     cy.get('[data-testid="cost-input-gb300"]').type('3');
     cy.get('@setUserCosts').should('have.been.calledWith', { gb300: 3, mi355x: 1.5 });
   });
@@ -117,9 +117,9 @@ describe('InferenceTcoBadges', () => {
     const b = () => cy.get(`[data-testid="figure-b"] ${GB300_INPUT}`);
     a().clear().type('2.50');
     a().should('have.value', '2.50');
-    b().should('have.value', '2.5');
+    b().should('have.value', '2.50');
     b().clear().type('3');
-    a().should('have.value', '3');
+    a().should('have.value', '3.00');
     b().should('have.value', '3');
     cy.contains('button', 'reseed').click();
     a().should('have.value', '2.31');

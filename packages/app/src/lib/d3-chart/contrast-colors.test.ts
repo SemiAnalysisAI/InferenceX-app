@@ -48,6 +48,25 @@ describe('contrastColors', () => {
     expect(contrastColors('#f0f0f0')).toBe('#131416');
   });
 
+  it('composites a translucent bar over the card before judging it', () => {
+    const fills: string[] = [];
+    const alphas: number[] = [];
+    Object.defineProperty(mockCtx, 'fillStyle', {
+      configurable: true,
+      set: (value: string) => fills.push(value),
+      get: () => '',
+    });
+    Object.defineProperty(mockCtx, 'globalAlpha', {
+      configurable: true,
+      set: (value: number) => alphas.push(value),
+      get: () => 1,
+    });
+    setProbeColor(240, 128, 140);
+    expect(contrastColors('#e05060', 0.85, 'var(--light-color)')).toBe('#131416');
+    expect(fills).toEqual(['#f0f0f0', '#e05060']);
+    expect(alphas).toEqual([0.85, 1]);
+  });
+
   it('returns white text for dark backgrounds', () => {
     setProbeColor(26, 26, 26);
     expect(contrastColors('#1a1a1a')).toBe('white');

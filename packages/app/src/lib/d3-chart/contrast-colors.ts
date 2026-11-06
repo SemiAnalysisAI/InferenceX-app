@@ -8,7 +8,18 @@ function relativeLuminance(r: number, g: number, b: number): number {
 
 let _probeCtx: CanvasRenderingContext2D | null = null;
 
-function parseRgb(color: string): [number, number, number] | null {
+function resolveCssColor(color: string): string {
+  if (!color.startsWith('var(')) return color;
+  return getComputedStyle(document.documentElement)
+    .getPropertyValue(color.slice(4, -1).trim())
+    .trim();
+}
+
+function parseRgb(
+  color: string,
+  opacity: number,
+  backdrop: string,
+): [number, number, number] | null {
   if (!_probeCtx) {
     const canvas = document.createElement('canvas');
     canvas.width = 1;
@@ -17,19 +28,20 @@ function parseRgb(color: string): [number, number, number] | null {
     if (!_probeCtx) return null;
   }
   _probeCtx.clearRect(0, 0, 1, 1);
+  if (opacity < 1) {
+    _probeCtx.fillStyle = resolveCssColor(backdrop);
+    _probeCtx.fillRect(0, 0, 1, 1);
+  }
+  _probeCtx.globalAlpha = opacity;
   _probeCtx.fillStyle = color;
   _probeCtx.fillRect(0, 0, 1, 1);
+  _probeCtx.globalAlpha = 1;
   const [r, g, b] = _probeCtx.getImageData(0, 0, 1, 1).data;
   return [r, g, b];
 }
 
-export function contrastColors(bgColor: string): string {
-  let resolved = bgColor;
-  if (bgColor.startsWith('var(')) {
-    const varName = bgColor.slice(4, -1).trim();
-    resolved = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
-  }
-  const rgb = parseRgb(resolved);
+export function contrastColors(bgColor: string, opacity = 1, backdrop = 'var(--card)'): string {
+  const rgb = parseRgb(resolveCssColor(bgColor), opacity, backdrop);
   if (!rgb) return 'white';
   const lum = relativeLuminance(...rgb);
   return lum > 0.3 ? '#131416' : 'white';

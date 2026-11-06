@@ -19,7 +19,7 @@ const CLIP_ID = 'clip-test-chart';
 const CHAR_WIDTH = 6;
 const TEXT_HEIGHT = 12;
 
-function renderChart(clip = true) {
+function renderChart(clip = true, plot = PLOT) {
   const svg = document.createElementNS(SVG_NS, 'svg');
   const defs = document.createElementNS(SVG_NS, 'defs');
   svg.append(defs);
@@ -27,8 +27,8 @@ function renderChart(clip = true) {
     const clipPath = document.createElementNS(SVG_NS, 'clipPath');
     clipPath.setAttribute('id', CLIP_ID);
     const rect = document.createElementNS(SVG_NS, 'rect');
-    rect.setAttribute('width', String(PLOT.width));
-    rect.setAttribute('height', String(PLOT.height));
+    rect.setAttribute('width', String(plot.width));
+    rect.setAttribute('height', String(plot.height));
     clipPath.append(rect);
     defs.append(clipPath);
   }
@@ -168,6 +168,44 @@ describe('clamped pills do not stack on their neighbours', () => {
       expectInsidePlot(box);
       for (const other of boxes.slice(index + 1)) expect(overlaps(box, other)).toBe(false);
     }
+  });
+
+  it('hides lower-priority pills that still collide after every nudge', () => {
+    const { zoomGroup } = renderChart();
+    const keys = Array.from({ length: 16 }, (_, index) => `s${index}`);
+    renderLineLabels(
+      zoomGroup,
+      keys.map((key) => placement(key, 200, 150, 'MI355X (SGLang)')),
+      { seriesAttribute: 'data-hw-key' },
+    );
+    const nodes = keys.map((key) =>
+      zoomGroup.select<SVGGElement>(`.line-label[data-line-key="${key}"]`).node()!,
+    );
+    const shown = keys.filter((_, index) => nodes[index].style.opacity !== '0');
+    expect(shown.length).toBeLessThan(keys.length);
+    expect(nodes[0].style.opacity).not.toBe('0');
+    expect(nodes.at(-1)!.dataset.visible).toBe('0');
+    const boxes = shown.map((key) => pillBox(zoomGroup, key));
+    for (const [index, box] of boxes.entries()) {
+      for (const other of boxes.slice(index + 1)) expect(overlaps(box, other)).toBe(false);
+    }
+  });
+
+  it('keeps only the top few pills on a narrow plot and all of them on a wider one', () => {
+    const labels = ['a', 'b', 'c', 'd', 'e'].map((key, index) =>
+      placement(key, 20, 20 + index * 70, 'B200'),
+    );
+    const visibleKeys = (plot: { width: number; height: number }) => {
+      const { zoomGroup } = renderChart(true, plot);
+      renderLineLabels(zoomGroup, labels, { seriesAttribute: 'data-hw-key' });
+      return zoomGroup
+        .selectAll<SVGGElement, unknown>('.line-label')
+        .nodes()
+        .filter((node) => node.style.opacity !== '0')
+        .map((node) => node.dataset.lineKey);
+    };
+    expect(visibleKeys({ width: 280, height: 400 })).toEqual(['a', 'b', 'c']);
+    expect(visibleKeys({ width: 400, height: 400 })).toEqual(['a', 'b', 'c', 'd', 'e']);
   });
 
   it('renders larger text and measures its pill before clamping on render and zoom', () => {

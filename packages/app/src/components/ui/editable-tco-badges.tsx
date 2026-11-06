@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 import { getModelSortIndex } from '@/lib/catalog/constants';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
@@ -11,12 +13,18 @@ export interface EditableTcoBadgeItem {
   overridden?: boolean;
 }
 
+function twoDecimalValue(value: string): string {
+  const parsed = Number(value);
+  return value.trim() !== '' && Number.isFinite(parsed) ? parsed.toFixed(2) : value;
+}
+
 function TcoCostInput({
   id,
   testId,
   ariaLabel,
   value,
   overridden = false,
+  twoDecimals = true,
   className,
   onChange,
   onCommit,
@@ -26,10 +34,13 @@ function TcoCostInput({
   ariaLabel: string;
   value: string;
   overridden?: boolean;
+  twoDecimals?: boolean;
   className?: string;
   onChange: (raw: string) => void;
   onCommit?: (raw: string) => void;
 }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const shown = draft ?? (twoDecimals ? twoDecimalValue(value) : value);
   return (
     <>
       <input
@@ -40,11 +51,18 @@ function TcoCostInput({
         min={0}
         step={0.01}
         aria-label={ariaLabel}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        onBlur={(event) => onCommit?.(event.target.value)}
+        value={shown}
+        onFocus={() => setDraft(shown)}
+        onChange={(event) => {
+          if (draft !== null) setDraft(event.target.value);
+          onChange(event.target.value);
+        }}
+        onBlur={(event) => {
+          setDraft(null);
+          onCommit?.(event.target.value);
+        }}
         onWheel={(event) => event.currentTarget.blur()}
-        style={{ width: `${Math.max(value.length, 1) + 1.5}ch` }}
+        style={{ width: `${Math.max(shown.length, 1) + 1.5}ch` }}
         className={cn(
           'no-export h-5 min-w-0 rounded-xs border-b border-dashed border-muted-foreground/50 bg-transparent px-0.5 text-xs font-medium tabular-nums outline-none transition-colors hover:border-foreground/60 focus-visible:border-solid focus-visible:border-ring [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
           overridden ? 'text-brand' : 'text-foreground',
@@ -57,7 +75,7 @@ function TcoCostInput({
           overridden ? 'text-brand' : 'text-foreground',
         )}
       >
-        {value}
+        {shown}
       </span>
     </>
   );
@@ -128,6 +146,8 @@ export function EditableTcoBadges({
 const TABLE_CELL =
   'whitespace-nowrap px-2.5 py-0.5 text-right [&+&]:border-l [&+&]:border-border/60';
 
+const CHIP_CELL = 'w-16';
+
 const TABLE_STRINGS = {
   en: {
     header: '$/chip/hr',
@@ -161,6 +181,7 @@ export function TcoPriceTable({
   rowLabel,
   items,
   editable = false,
+  twoDecimals = true,
   onChange,
   onCommit,
   inputLabel,
@@ -176,6 +197,7 @@ export function TcoPriceTable({
   rowLabel?: string;
   items: readonly EditableTcoBadgeItem[];
   editable?: boolean;
+  twoDecimals?: boolean;
   onChange?: (base: string, raw: string) => void;
   onCommit?: (base: string, raw: string) => void;
   inputLabel?: (chipLabel: string) => string;
@@ -207,7 +229,7 @@ export function TcoPriceTable({
                 <th
                   key={base}
                   scope="col"
-                  className={cn(TABLE_CELL, 'border-b border-border/60 font-normal')}
+                  className={cn(TABLE_CELL, CHIP_CELL, 'border-b border-border/60 font-normal')}
                 >
                   {editable ? (
                     <label htmlFor={`${inputIdPrefix}-${base}`} className="cursor-text">
@@ -230,7 +252,7 @@ export function TcoPriceTable({
                   key={base}
                   data-testid={cellTestId}
                   data-overridden={overridden ? '' : undefined}
-                  className={cn(TABLE_CELL, 'text-xs font-semibold')}
+                  className={cn(TABLE_CELL, CHIP_CELL, 'text-xs font-semibold')}
                 >
                   {editable ? (
                     <TcoCostInput
@@ -239,12 +261,15 @@ export function TcoPriceTable({
                       ariaLabel={(inputLabel ?? t.input)(label)}
                       value={value}
                       overridden={overridden}
+                      twoDecimals={twoDecimals}
                       className="text-right font-semibold"
                       onChange={(raw) => onChange?.(base, raw)}
                       onCommit={onCommit ? (raw) => onCommit(base, raw) : undefined}
                     />
                   ) : (
-                    <span className="text-foreground">{value}</span>
+                    <span className="text-foreground">
+                      {twoDecimals ? twoDecimalValue(value) : value}
+                    </span>
                   )}
                 </td>
               ))}

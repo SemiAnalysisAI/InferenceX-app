@@ -7,7 +7,7 @@ import { useChartTooltipHandlers } from '@/hooks/useChartTooltipHandlers';
 import { useChartZoom } from '@/hooks/useChartZoom';
 import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
 
-import { DEFAULT_CHART_MARGIN } from '../chart-setup';
+import { DEFAULT_CHART_MARGIN, defaultChartHeight } from '../chart-setup';
 import { clearPinRing } from '../pin-ring';
 
 import type { BuiltScale } from './scale-builders';
@@ -18,7 +18,7 @@ function D3ChartInner<T>(
   {
     chartId,
     data,
-    height = 600,
+    height = defaultChartHeight,
     margin = DEFAULT_CHART_MARGIN,
     watermark,
     testId,

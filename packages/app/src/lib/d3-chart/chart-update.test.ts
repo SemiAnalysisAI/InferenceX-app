@@ -58,6 +58,22 @@ describe('renderAxes', () => {
       expect(tickCount).toBeLessThanOrEqual(8);
     });
 
+    it('thins x ticks and grid lines to about one per 80px on a narrow plot', () => {
+      const layout = makeLayout({ containerWidth: 340 });
+      const xScale = d3.scaleLinear().domain([0, 700]).range([0, layout.width]);
+      const yScale = d3.scaleLinear().domain([0, 50]).range([layout.height, 0]);
+
+      renderAxes(layout, xScale, yScale, { xTickCount: 10 });
+      renderGrid(layout, xScale, yScale);
+
+      const labels = layout.xAxisGroup
+        .selectAll<SVGTextElement, unknown>('.tick text')
+        .nodes()
+        .map((node) => node.textContent);
+      expect(labels).toEqual(['0', '200', '400', '600']);
+      expect(layout.gridGroup.select('.grid-v').selectAll('line').size()).toBe(4);
+    });
+
     it('renders only explicit x tick values within the visible domain', () => {
       const layout = makeLayout();
       const xScale = d3.scaleLinear().domain([2, 10]).range([0, layout.width]);

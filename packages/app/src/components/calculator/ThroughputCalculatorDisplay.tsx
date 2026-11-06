@@ -1311,6 +1311,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                         <TcoPriceTable
                           header={barMetric === 'power' ? 'kW' : undefined}
                           rowLabel={barMetric === 'power' ? t.allInPower : undefined}
+                          twoDecimals={barMetric !== 'power'}
                           items={plottedBases.map((base) => {
                             const specs = HW_REGISTRY[base as keyof typeof HW_REGISTRY];
                             return {

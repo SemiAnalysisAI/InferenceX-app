@@ -379,7 +379,6 @@ const TrendChart = React.memo(
         <D3Chart<PreparedPoint>
           chartId={chartId}
           data={flatPointData}
-          height={600}
           margin={CHART_MARGIN}
           watermark={getChartWatermark()}
           testId="trend-chart-svg"
