@@ -97,7 +97,7 @@ describe('offline modeled PowerX comparisons', () => {
       integration_seconds: 64.67805051803589,
     });
     expect(result.rows[0].estimated_energy.it_j_per_output_token).toBeCloseTo(
-      27.167671327212812,
+      26.924263320736298,
       9,
     );
     expect(result.rows[0].measured_inputs?.gpu_j_per_output_token).toBe(12.736929);
