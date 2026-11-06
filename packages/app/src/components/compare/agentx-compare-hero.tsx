@@ -1,4 +1,4 @@
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ChevronRight } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { MinecraftSplash } from '@/components/minecraft/minecraft-splash';
@@ -629,12 +629,14 @@ export function AgentXCompareHero({
                           </svg>
                         )}
                         <span className="min-w-0">
-                          <span className="flex items-center gap-2 text-sm font-medium leading-tight text-foreground">
-                            <span className="min-w-0">
-                              {locale === 'zh' ? result.titleZh : result.title}
-                            </span>
+                          <span className="block text-sm font-medium leading-tight text-foreground">
+                            {locale === 'zh' ? result.titleZh : result.title}
                             {'isNew' in result && result.isNew && (
-                              <NewBadge data-new-badge={`landing-${result.id}`} flashing>
+                              <NewBadge
+                                data-new-badge={`landing-${result.id}`}
+                                flashing
+                                className="ml-2 align-[-0.125em]"
+                              >
                                 {t.newModel}
                               </NewBadge>
                             )}
@@ -646,12 +648,13 @@ export function AgentXCompareHero({
                           </span>
                         </span>
                       </span>
-                      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground">
-                        {t.modelAction}
+                      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-brand">
+                        <span className="max-sm:sr-only">{t.modelAction}</span>
                         <ArrowRight
                           aria-hidden="true"
-                          className="size-3.5 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5"
+                          className="size-3.5 max-sm:hidden motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5"
                         />
+                        <ChevronRight aria-hidden="true" className="size-5 sm:hidden" />
                       </span>
                     </CompareIndexTrackedLink>
                   );
@@ -683,10 +686,15 @@ export function AgentXCompareHero({
                       />
                     )}
                     <span className="min-w-0">
-                      <span className="flex items-center gap-2 text-sm font-medium leading-tight text-foreground">
-                        <span className="min-w-0">{ledgerTitle(model.label)}</span>
+                      <span className="block text-sm font-medium leading-tight text-foreground">
+                        {ledgerTitle(model.label)}
                         {isNewAgentxModel(model) && (
-                          <NewBadge data-new-badge="agentx-ledger">{t.newModel}</NewBadge>
+                          <NewBadge
+                            data-new-badge="agentx-ledger"
+                            className="ml-2 align-[-0.125em]"
+                          >
+                            {t.newModel}
+                          </NewBadge>
                         )}
                       </span>
                       <span className="mt-1 block text-xs text-muted-foreground">
@@ -694,12 +702,13 @@ export function AgentXCompareHero({
                       </span>
                     </span>
                   </span>
-                  <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground">
-                    {t.modelAction}
+                  <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-brand">
+                    <span className="max-sm:sr-only">{t.modelAction}</span>
                     <ArrowRight
                       aria-hidden="true"
-                      className="size-3.5 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5"
+                      className="size-3.5 max-sm:hidden motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5"
                     />
+                    <ChevronRight aria-hidden="true" className="size-5 sm:hidden" />
                   </span>
                 </CompareIndexTrackedLink>
               ))}

@@ -1779,7 +1779,7 @@ function ProfitEstimatorInner({
                     <ControlPanel
                       legend={t.chartGroup}
                       data-testid="profit-chart-panel"
-                      className="xl:col-span-4"
+                      className="xl:col-span-8"
                     >
                       <div className="flex min-w-0 flex-col space-y-1.5">
                         <LabelWithTooltip label={t.basisLabel} tooltip={t.basisTooltip} />
@@ -1801,12 +1801,12 @@ function ProfitEstimatorInner({
                     <ControlPanel
                       legend={t.compareHistory}
                       data-testid="profit-history-panel"
-                      className="xl:col-span-8"
+                      className="xl:col-span-4"
                     >
                       <div
                         className={cn(
                           'grid min-w-0 gap-3',
-                          selectedGPUs.length > 0 && 'md:grid-cols-2',
+                          selectedGPUs.length > 0 && 'md:grid-cols-2 xl:grid-cols-1',
                         )}
                       >
                         <div className="flex min-w-0 flex-col space-y-1.5">

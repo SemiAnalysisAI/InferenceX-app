@@ -44,10 +44,12 @@ const STRINGS = {
     costCapDescription:
       'Set a cost ceiling per million tokens and find the highest interactivity each chip can serve without exceeding it.',
     costCapLabel: 'Cost target ($/M tok)',
+    costCapShortLabel: 'Cost ($/M tok)',
     costCapTooltip:
       'Maximum acceptable cost per million tokens (at the selected pricing tier and token type). The answer is the highest interactivity whose interpolated cost stays at or below this ceiling.',
     costCapPlaceholder: 'e.g. 0.50',
     mwLabel: 'Facility power (MW)',
+    mwShortLabel: 'Power (MW)',
     mwTooltip:
       'Optional facility power budget in megawatts. When set, the answer is also expressed as concurrent users on a fleet sized to this budget, using all-in power per chip (host, networking, cooling) from the SemiAnalysis Datacenter Industry Model, not bare TDP.',
     mwPlaceholder: 'e.g. 10',
@@ -72,10 +74,12 @@ const STRINGS = {
     costCapDescription:
       '设定每百万 token 的成本上限，查看每款芯片在不超支前提下可提供的最高交互性。',
     costCapLabel: '成本上限 ($/M tok)',
+    costCapShortLabel: '成本 ($/M tok)',
     costCapTooltip:
       '每百万 token 的最高可接受成本（按所选定价层级和 token 类型）。结果为插值成本不超过该上限的最高交互性。',
     costCapPlaceholder: '如 0.50',
     mwLabel: '设施功率 (MW)',
+    mwShortLabel: '功率 (MW)',
     mwTooltip:
       '可选的设施功率预算（兆瓦）。设置后，结果会同时换算为按该预算确定规模的集群可服务的并发用户数；芯片数量按每芯片全含功率（主机、网络、散热）计算，数据来自 SemiAnalysis Datacenter Industry Model，而非裸 TDP。',
     mwPlaceholder: '如 10',
@@ -299,6 +303,7 @@ export default function CostTargetPanel({
                     <LabelWithTooltip
                       htmlFor="calc-costcap"
                       label={t.costCapLabel}
+                      shortLabel={t.costCapShortLabel}
                       tooltip={t.costCapTooltip}
                     />
                     <Input
@@ -318,6 +323,7 @@ export default function CostTargetPanel({
                     <LabelWithTooltip
                       htmlFor="calc-costcap-mw"
                       label={t.mwLabel}
+                      shortLabel={t.mwShortLabel}
                       tooltip={t.mwTooltip}
                     />
                     <Input

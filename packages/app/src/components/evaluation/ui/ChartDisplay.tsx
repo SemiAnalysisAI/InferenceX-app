@@ -20,7 +20,12 @@ import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/seg
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
-import { type Precision, getPrecisionLabel } from '@/lib/catalog/data-mappings';
+import {
+  type Model,
+  type Precision,
+  getModelLabel,
+  getPrecisionLabel,
+} from '@/lib/catalog/data-mappings';
 import { exportToCsv } from '@/lib/export/csv-export';
 import { evaluationChartToCsv } from '@/lib/export/csv-export-helpers';
 
@@ -140,7 +145,7 @@ export default function EvaluationChartDisplay() {
         </Heading>
         <ResultContext
           locale={locale}
-          model={selectedModel ?? '—'}
+          model={selectedModel ? getModelLabel(selectedModel as Model) : '—'}
           workload={selectedBenchmark?.toUpperCase() ?? '—'}
           precision={selectedPrecisions.map((p) => getPrecisionLabel(p as Precision)).join(', ')}
           metric={t.scoreMetric}

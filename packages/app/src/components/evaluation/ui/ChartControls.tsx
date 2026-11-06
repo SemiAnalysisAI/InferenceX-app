@@ -17,7 +17,7 @@ import { MobileControlSection } from '@/components/ui/mobile-control-section';
 
 const STRINGS = {
   en: {
-    benchmarkGroup: 'Configuration',
+    benchmarkGroup: 'Benchmark config',
     runGroup: 'Run context',
     benchmarkLabel: 'Benchmark',
     benchmarkTooltip:
@@ -30,7 +30,7 @@ const STRINGS = {
     changed: 'changed',
   },
   zh: {
-    benchmarkGroup: '配置',
+    benchmarkGroup: '基准测试配置',
     runGroup: '运行信息',
     benchmarkLabel: '基准测试',
     benchmarkTooltip:
