@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { useReducedMotion } from '@/components/inference/replay/useReducedMotion';
+import { rangeTickAnchorClass } from '@/components/ui/range-ticks';
 import { Stat } from '@/components/ui/stat';
 import { cn } from '@/lib/shared/utils';
 
@@ -254,11 +255,10 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
           ))}
         </div>
         <div className="relative mb-1 ml-14 h-4 text-xs text-muted-foreground tabular-nums">
-          <span className="absolute top-0 left-0 pl-1">0</span>
-          {TICKS.map((tick) => (
+          {[0, ...TICKS].map((tick, index) => (
             <span
               key={tick}
-              className="absolute top-0 -translate-x-full pr-1"
+              className={`absolute top-0 ${rangeTickAnchorClass(index, TICKS.length + 1)}`}
               style={{ left: pct(tick) }}
             >
               {tokens(tick)}

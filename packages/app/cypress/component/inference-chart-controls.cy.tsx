@@ -166,13 +166,16 @@ describe('Inference ChartControls', () => {
         expect(x.width).to.be.lessThan(y.width);
       });
     });
-    cy.get('#scenario-select').then(($scenario) => {
-      const scenario = $scenario[0].getBoundingClientRect();
-      cy.get('#precision-select').should(($precision) => {
-        const precision = $precision[0].getBoundingClientRect();
-        expect(precision.top).to.be.closeTo(scenario.top, 1);
-        expect(precision.left).to.be.greaterThan(scenario.right);
-      });
+    cy.get('#model-select').then(($model) => {
+      const model = $model[0].getBoundingClientRect();
+      cy.get('fieldset')
+        .first()
+        .find('#precision-select')
+        .should(($precision) => {
+          const precision = $precision[0].getBoundingClientRect();
+          expect(precision.top).to.be.greaterThan(model.bottom);
+          expect(precision.left).to.be.closeTo(model.left, 1);
+        });
     });
   });
 
@@ -207,7 +210,7 @@ describe('Inference ChartControls', () => {
 
     cy.get('#model-select').should('be.visible');
     cy.get('#scenario-select').should('have.length', 1).and('not.be.visible');
-    cy.get('#precision-select').should('have.length', 1).and('not.be.visible');
+    cy.get('#precision-select').should('have.length', 1).and('be.visible');
     cy.get('[data-testid="inference-secondary-controls"] > button')
       .should('have.attr', 'aria-expanded', 'false')
       .click()
@@ -215,7 +218,7 @@ describe('Inference ChartControls', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
     cy.get('[data-testid="inference-secondary-controls"]').within(() => {
       cy.get('#scenario-select').should('be.visible');
-      cy.get('#precision-select').should('be.visible');
+      cy.get('#precision-select').should('not.exist');
     });
 
     cy.get('[data-testid="inference-secondary-controls"] > button')
@@ -223,7 +226,7 @@ describe('Inference ChartControls', () => {
       .should('have.attr', 'aria-expanded', 'false');
     cy.get('[data-testid="yaxis-metric-selector"]').should('not.be.visible');
     cy.get('#scenario-select').should('not.be.visible');
-    cy.get('#precision-select').should('not.be.visible');
+    cy.get('#precision-select').should('be.visible');
     cy.get('#model-select').should('contain.text', 'DeepSeek R1 0528');
   });
 
@@ -770,7 +773,7 @@ describe('Workflow run dropdown', () => {
       cy.viewport(375, 812);
       cy.get('[data-testid="inference-run-context"]').should('not.be.visible');
       cy.get('#scenario-select').should('have.length', 1).and('not.be.visible');
-      cy.get('#precision-select').should('have.length', 1).and('not.be.visible');
+      cy.get('#precision-select').should('have.length', 1).and('be.visible');
     });
   }
 

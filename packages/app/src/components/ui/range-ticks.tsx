@@ -16,6 +16,11 @@ export function rangeTicks(min: number, max: number, count = RANGE_TICK_COUNT): 
   ];
 }
 
+export function rangeTickAnchorClass(index: number, count: number): string {
+  if (index === 0) return '';
+  return index === count - 1 ? '-translate-x-full' : '-translate-x-1/2';
+}
+
 export function RangeTicks({
   min,
   max,

@@ -472,7 +472,7 @@ export default function ChartLegend({
         style={{
           height: OVERFLOW_STRIP_PX,
           background: hasMoreBelow
-            ? 'linear-gradient(to bottom, var(--color-border), transparent)'
+            ? 'linear-gradient(to bottom, color-mix(in srgb, var(--background) 0%, transparent), var(--background))'
             : undefined,
         }}
       />

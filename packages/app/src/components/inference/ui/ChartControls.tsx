@@ -498,32 +498,18 @@ export default function ChartControls({
       : 'sm:grid-cols-[11rem_minmax(0,1fr)_minmax(0,1fr)]'
     : 'sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]';
 
-  const benchmarkSelectors = (
-    <>
-      {!scenarioInFooter && (
-        <div className="min-w-0">
-          <ScenarioSelector
-            value={selectedSequence}
-            onChange={handleSequenceChange}
-            open={openDropdown === 'sequence'}
-            onOpenChange={handleDropdownOpenChange('sequence')}
-            availableSequences={availableSequences}
-            model={selectedModel}
-            data-testid="scenario-selector"
-          />
-        </div>
-      )}
-      <div className="min-w-0">
-        <PrecisionSelector
-          value={selectedPrecisions}
-          onChange={handlePrecisionChange}
-          open={openDropdown === 'precision'}
-          onOpenChange={handleDropdownOpenChange('precision')}
-          availablePrecisions={availablePrecisions}
-          data-testid="precision-multiselect"
-        />
-      </div>
-    </>
+  const scenarioSelector = !scenarioInFooter && (
+    <div className="min-w-0">
+      <ScenarioSelector
+        value={selectedSequence}
+        onChange={handleSequenceChange}
+        open={openDropdown === 'sequence'}
+        onOpenChange={handleDropdownOpenChange('sequence')}
+        availableSequences={availableSequences}
+        model={selectedModel}
+        data-testid="scenario-selector"
+      />
+    </div>
   );
 
   // Benchmark config takes its own row. Chart config shares the next row with compare history
@@ -566,7 +552,17 @@ export default function ChartControls({
                 newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}
               />
             </div>
-            {!isMobile && <div className="hidden md:contents">{benchmarkSelectors}</div>}
+            {!isMobile && <div className="hidden md:contents">{scenarioSelector}</div>}
+            <div className="min-w-0 col-span-2 md:col-span-1">
+              <PrecisionSelector
+                value={selectedPrecisions}
+                onChange={handlePrecisionChange}
+                open={openDropdown === 'precision'}
+                onOpenChange={handleDropdownOpenChange('precision')}
+                availablePrecisions={availablePrecisions}
+                data-testid="precision-multiselect"
+              />
+            </div>
           </div>
         </ControlPanel>
 
@@ -576,9 +572,9 @@ export default function ChartControls({
           countLabel={t.changed}
           testId="inference-secondary-controls"
         >
-          {isMobile && (
+          {isMobile && scenarioSelector && (
             <div className="grid min-w-0 grid-cols-2 items-start gap-3 md:hidden">
-              {benchmarkSelectors}
+              {scenarioSelector}
             </div>
           )}
           <ControlPanel

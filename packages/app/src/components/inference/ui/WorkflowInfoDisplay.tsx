@@ -64,7 +64,7 @@ const WORKFLOW_STRINGS = {
 } as const;
 
 const RUN_CONTEXT_GRID =
-  'grid min-w-0 items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:max-w-4xl';
+  'grid min-w-0 items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,24rem)_minmax(0,24rem)_minmax(0,1fr)]';
 
 export function workflowRunCountLabel(index: number, total: number, locale: Locale): string {
   return locale === 'zh' ? `第 ${index} 次运行（共 ${total} 次）` : `Run ${index}/${total}`;
@@ -187,7 +187,7 @@ export default function WorkflowInfoDisplay() {
   })();
 
   const changelogPopover = (
-    <RunChangelog testId="run-changelog-trigger">
+    <RunChangelog testId="run-changelog-trigger" className="sm:justify-self-end">
       <div className="break-words">
         {changelog && changelog.entries.length > 0 ? (
           <>

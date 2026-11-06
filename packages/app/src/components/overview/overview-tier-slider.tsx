@@ -16,6 +16,7 @@ import {
 import { overviewTierHref } from '@/lib/overview/overview-links';
 import { rangeProgressStyle } from '@/components/ui/control-styles';
 import { Label } from '@/components/ui/label';
+import { rangeTickAnchorClass } from '@/components/ui/range-ticks';
 
 import { useOverviewNavigation, useOverviewNavigationError } from './overview-navigation';
 
@@ -168,7 +169,7 @@ export function OverviewTierSlider({
               key={option}
               data-tier-option={option}
               data-selected={option === selectedTier ? 'true' : undefined}
-              className={`absolute -translate-x-1/2 ${
+              className={`absolute ${rangeTickAnchorClass(index, OVERVIEW_TIERS.length)} ${
                 option === selectedTier ? 'font-semibold text-foreground' : 'text-muted-foreground'
               }`}
               style={{ left: `${(index / (OVERVIEW_TIERS.length - 1)) * 100}%` }}

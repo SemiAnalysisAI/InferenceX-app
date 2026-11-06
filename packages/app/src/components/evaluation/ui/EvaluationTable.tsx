@@ -172,7 +172,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
           );
         },
         sortValue: (row) => `${row.hwLabel} ${row.engineLabel}`,
-        className: 'whitespace-nowrap',
+        className: 'w-px whitespace-nowrap',
         importance: 'key',
         pinned: true,
       },

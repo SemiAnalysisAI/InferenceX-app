@@ -430,6 +430,11 @@ function renderTopAxis(
       .attr('class', 'x-axis-top-band')
       .attr('fill', 'var(--card)')
       .attr('opacity', 0);
+    axis
+      .append('line')
+      .attr('class', 'x-axis-top-edge')
+      .attr('stroke', 'var(--chart-grid)')
+      .attr('opacity', 0);
     axis.append('g').attr('class', 'x-axis-top-ticks');
   }
   const count = widthTickCount(layout.width, tickCount);
@@ -439,7 +444,13 @@ function renderTopAxis(
     .attr('x', -layout.margin.left)
     .attr('y', -TOP_AXIS_BAND_PX)
     .attr('width', layout.width + layout.margin.left + layout.margin.right)
-    .attr('height', TOP_AXIS_BAND_PX);
+    .attr('height', TOP_AXIS_BAND_PX + 4);
+  axis
+    .select('.x-axis-top-edge')
+    .attr('x1', -layout.margin.left)
+    .attr('x2', layout.width + layout.margin.right)
+    .attr('y1', 4.5)
+    .attr('y2', 4.5);
   axis
     .select<SVGGElement>('.x-axis-top-ticks')
     .call(d3.axisTop(xScale).ticks(count).tickFormat(xTickFormat).tickSize(0).tickPadding(8))
@@ -455,8 +466,9 @@ function stickTopAxis(svg: SVGSVGElement | null | undefined) {
   const maxOffset = Math.max(0, Number(axis.dataset.plotHeight) - TOP_AXIS_BAND_PX);
   const offset = Math.min(maxOffset, Math.max(0, headerBottom + TOP_AXIS_BAND_PX - plotTop));
   setAttrIfChanged(axis, 'transform', `translate(0,${offset})`);
-  const band = axis.querySelector('.x-axis-top-band');
-  if (band) setAttrIfChanged(band, 'opacity', offset > 0 ? '1' : '0');
+  const opacity = offset > 0 ? '1' : '0';
+  for (const el of axis.querySelectorAll('.x-axis-top-band, .x-axis-top-edge'))
+    setAttrIfChanged(el, 'opacity', opacity);
 }
 
 function positionLabelPairs(
@@ -878,7 +890,7 @@ export default function ThroughputBarChart({
     (ctx: RenderContext) => {
       renderDecorations(ctx);
       const topAxis = ctx.layout.g.select('.x-axis-top').attr('transform', null);
-      topAxis.select('.x-axis-top-band').attr('opacity', 0);
+      topAxis.selectAll('.x-axis-top-band, .x-axis-top-edge').attr('opacity', 0);
     },
     [renderDecorations],
   );

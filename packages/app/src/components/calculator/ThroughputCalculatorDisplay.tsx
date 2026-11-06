@@ -1131,7 +1131,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                   </ControlPanel>
                   <ControlPanel
                     legend={t.comparisonGroup}
-                    className="items-start md:grid-cols-[auto_minmax(0,1fr)] md:gap-x-6 lg:flex-1 lg:grid-cols-1"
+                    className="items-start md:grid-cols-[auto_minmax(0,1fr)] md:gap-x-6 lg:flex-1 lg:gap-x-4"
                   >
                     <div className="flex items-end gap-3">
                       <div className="flex flex-col space-y-1.5">
@@ -1158,7 +1158,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                     {loading && <div aria-hidden="true" className="h-17" />}
                     {!loading && hasAnyData && (
                       <div className="space-y-2">
-                        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
                           <LabelWithTooltip
                             htmlFor="calc-target"
                             label={
