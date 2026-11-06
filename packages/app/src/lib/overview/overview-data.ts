@@ -909,6 +909,17 @@ export function buildOverviewModelSummary(
   );
 }
 
+export function buildOverviewModelSummaries(
+  model: Model,
+  rows: BenchmarkRow[],
+  tiers: readonly OverviewTier[],
+  engineScope: OverviewEngineScope,
+  scenario: OverviewScenario,
+): OverviewModelSummary[] {
+  const row = buildOverviewCubeRow(model, rows, engineScope, scenario);
+  return tiers.map((tier) => sliceOverviewRow(row, tier, OVERVIEW_DEFAULT_REFERENCE_HARDWARE));
+}
+
 /**
  * Tier reads for one hardware SKU without the OVERVIEW_HARDWARE restriction.
  * Same config building and read selection as the overview matrix, so a /run

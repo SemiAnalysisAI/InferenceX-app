@@ -1,9 +1,8 @@
 import type { BenchmarkRow } from '@/lib/api/api';
 import {
-  buildOverviewModelSummary,
-  OVERVIEW_PRIMARY_TIER,
   overviewScenariosForModel,
   type OverviewScenario,
+  type OverviewTier,
 } from '@/lib/overview/overview-data';
 import {
   buildRankingRows,
@@ -11,6 +10,7 @@ import {
   type RankingPageEntry,
   type RankingRow,
 } from '@/lib/live-seo/rankings';
+import { selectRankingTier } from '@/lib/live-seo/ranking-tier';
 
 export const RANKING_VALUE_UNITS: Readonly<Record<RankingKind, string>> = {
   'fastest-gpu': 'tokens_per_second_per_gpu',
@@ -34,6 +34,7 @@ export interface RankingsViewEntry {
   modelSlug: string;
   modelLabel: string;
   scenario: OverviewScenario;
+  tier: OverviewTier;
   rows: RankingsViewRow[];
 }
 
@@ -58,18 +59,13 @@ export function buildRankingsViewEntries(
 ): RankingsViewEntry[] {
   const scenarios = scenario ? [scenario] : overviewScenariosForModel(entry.model.model, rows);
   return scenarios.map((candidate) => {
-    const summary = buildOverviewModelSummary(
-      entry.model.model,
-      rows,
-      OVERVIEW_PRIMARY_TIER,
-      'community',
-      candidate,
-    );
+    const { tier, summary } = selectRankingTier(entry.model.model, rows, candidate);
     return {
       model: entry.model.model,
       modelSlug: entry.model.slug,
       modelLabel: entry.model.label,
       scenario: summary.scenario,
+      tier,
       rows: buildRankingRows(summary, entry.kind).map((row) => projectRankingRow(row, entry.kind)),
     };
   });
@@ -88,7 +84,6 @@ export function newestRowDate(
 
 export function rankingsViewCsvRows(
   kind: RankingKind,
-  tier: number,
   entries: readonly RankingsViewEntry[],
 ): Record<string, unknown>[] {
   return entries.flatMap((entry) =>
@@ -97,7 +92,7 @@ export function rankingsViewCsvRows(
       model: entry.model,
       model_slug: entry.modelSlug,
       scenario: entry.scenario,
-      tier,
+      tier: entry.tier,
       rank: row.rank,
       hardware: row.hardware,
       hardware_label: row.hardwareLabel,

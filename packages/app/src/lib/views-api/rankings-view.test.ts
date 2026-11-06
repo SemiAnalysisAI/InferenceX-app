@@ -40,8 +40,12 @@ function row(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   } as BenchmarkRow;
 }
 
-function frontier(hardware: string, totals: [number, number, number, number]): BenchmarkRow[] {
-  return [30, 50, 75, 100].map((intvty, index) =>
+function frontier(
+  hardware: string,
+  totals: [number, number, number, number],
+  interactivity: [number, number, number, number] = [30, 50, 75, 100],
+): BenchmarkRow[] {
+  return interactivity.map((intvty, index) =>
     row({
       hardware,
       conc: index + 1,
@@ -72,11 +76,28 @@ describe('buildRankingsViewEntries', () => {
     );
     expect(entries).toHaveLength(1);
     expect(entries[0].scenario).toBe('single_turn_8k1k');
+    expect(entries[0].tier).toBe(50);
     expect(entries[0].rows.map((r) => [r.rank, r.hardware, r.value])).toEqual([
       [1, 'b200', 1000],
       [2, 'mi355x', 800],
     ]);
     expect(entries[0].rows[0].unit).toBe('tokens_per_second_per_gpu');
+  });
+
+  it('ranks at the first higher tier the latest runs reach', () => {
+    const entries = buildRankingsViewEntries(
+      entryFor('fastest-gpu', 'qwen-3-5'),
+      [
+        ...frontier('b200', [1400, 1000, 700, 500], [80, 100, 150, 200]),
+        ...frontier('mi355x', [1100, 800, 500, 300], [90, 100, 150, 200]),
+      ],
+      'single_turn_8k1k',
+    );
+    expect(entries[0].tier).toBe(100);
+    expect(entries[0].rows.map((r) => [r.rank, r.hardware, r.value])).toEqual([
+      [1, 'b200', 1000],
+      [2, 'mi355x', 800],
+    ]);
   });
 
   it('follows the curated overview scenarios when no scenario is given', () => {
@@ -104,7 +125,7 @@ describe('rankingsViewCsvRows', () => {
       ROWS,
       'single_turn_8k1k',
     );
-    const csvRows = rankingsViewCsvRows('cheapest-gpu', 50, entries);
+    const csvRows = rankingsViewCsvRows('cheapest-gpu', entries);
     expect(csvRows).toHaveLength(2);
     expect(csvRows[0]).toMatchObject({
       kind: 'cheapest-gpu',

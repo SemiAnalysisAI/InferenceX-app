@@ -9,7 +9,7 @@ import type { NextRequest } from 'next/server';
 
 import { cachedDerivedData, cachedJson } from '@/lib/cache/api-cache';
 import { getCachedBenchmarks } from '@/lib/benchmarks/benchmark-data.server';
-import { OVERVIEW_PRIMARY_TIER, type OverviewScenario } from '@/lib/overview/overview-data';
+import type { OverviewScenario } from '@/lib/overview/overview-data';
 import { getAllRankingPageEntries, RANKING_KINDS, type RankingKind } from '@/lib/live-seo/rankings';
 import { csvResponse } from '@/lib/views-api/csv';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
@@ -89,7 +89,7 @@ async function loadRankingsView(
   return { generatedAt, entries: viewEntries };
 }
 
-const getCachedRankingsView = cachedDerivedData(loadRankingsView, 'views-rankings-v1');
+const getCachedRankingsView = cachedDerivedData(loadRankingsView, 'views-rankings-v2');
 
 export function GET(request: NextRequest) {
   return runViewsRoute('rankings', async () => {
@@ -104,7 +104,7 @@ export function GET(request: NextRequest) {
     const view = await getCachedRankingsView(kind, model?.displayName ?? null, scenario);
 
     if (format === 'csv') {
-      return csvResponse(rankingsViewCsvRows(kind, OVERVIEW_PRIMARY_TIER, view.entries));
+      return csvResponse(rankingsViewCsvRows(kind, view.entries));
     }
 
     return cachedJson(request, {
@@ -115,12 +115,10 @@ export function GET(request: NextRequest) {
         kind,
         model: model?.displayName ?? 'all',
         scenario: scenario ?? 'all',
-        tier: OVERVIEW_PRIMARY_TIER,
         engine: 'community',
         format,
       },
       kind,
-      tier: OVERVIEW_PRIMARY_TIER,
       entries: view.entries,
     });
   });

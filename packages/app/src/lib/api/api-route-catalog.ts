@@ -187,7 +187,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-rankings-view',
-    sourceSha256: '02a664680767b1168e1ca32d250a6356f9a490ab56106e5cee1c5692d50f5a8c',
+    sourceSha256: '6919ce3d5ce941e21f79ac44157d1795b3ba6f48c9dc7a2826757263f4657fd9',
   },
   {
     source: 'src/app/api/v1/views/reliability/route.ts',
@@ -2025,7 +2025,9 @@ export const apiContractSourceDigests = [
     // GLM-5.3-Flash adds an AgentX-only row without changing the response shape.
     // Kimi-K3.1-Pro (InferenceX#4803) joins OVERVIEW_MODEL_SCENARIOS as
     // AgentX-only. No parameter or response shape change, so the docs stand.
-    sourceSha256: '75281dc574436f1dd84b76ffe115e395a1eb59ad1eda93f90f53a0138865086a',
+    // buildOverviewModelSummaries adds a multi-tier slice for /rankings. The
+    // Overview BFF parameters and response shape are unchanged.
+    sourceSha256: '2ce0e623cd65b50203b01200d7f053faa10ae0e14d2f575be68c46fc69ee8f46',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',

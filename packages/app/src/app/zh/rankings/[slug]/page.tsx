@@ -179,7 +179,14 @@ export default async function ZhRankingPage({ params }: Props) {
     colCost: '每百万 token 成本',
     colPrecision: '精度',
     colEngine: '推理引擎',
-    emptyState: `${entry.model.seoName} 在该工作点暂无实测数据。InferenceX 集群持续运行基准测试，新结果落地后本页会自动填充。`,
+    emptyState:
+      data.unranked.length > 0
+        ? `${entry.model.seoName} 的现有基准测试结果尚未在足够多的硬件上达到同一交互速度档位，暂时无法排名。InferenceX 集群持续运行基准测试，新结果落地后本页会自动填充。`
+        : `${entry.model.seoName} 在该工作点暂无实测数据。InferenceX 集群持续运行基准测试，新结果落地后本页会自动填充。`,
+    unrankedNote:
+      data.unranked.length > 0
+        ? `以下硬件在每用户每秒 ${data.tier} token 下暂无实测数据：${data.unranked.join('、')}。`
+        : null,
     siblingLead: entry.kind === 'fastest-gpu' ? '更关注成本而不是速度？' : '更关注速度而不是成本？',
     siblingLabel:
       entry.kind === 'fastest-gpu'

@@ -174,7 +174,14 @@ export default async function RankingPage({ params }: Props) {
     colCost: '$ / 1M tokens',
     colPrecision: 'Precision',
     colEngine: 'Engine',
-    emptyState: `No benchmark measurements are available for ${entry.model.seoName} at this operating point yet. The InferenceX fleet re-benchmarks continuously; this page fills in automatically as soon as runs land.`,
+    emptyState:
+      data.unranked.length > 0
+        ? `Current ${entry.model.seoName} benchmark runs don't reach a common interactivity target on enough hardware yet, so there is no ranking to show. The InferenceX fleet re-benchmarks continuously, and this page fills in automatically as new runs land.`
+        : `No benchmark measurements are available for ${entry.model.seoName} at this operating point yet. The InferenceX fleet re-benchmarks continuously; this page fills in automatically as soon as runs land.`,
+    unrankedNote:
+      data.unranked.length > 0
+        ? `Not measured at ${data.tier} tokens/s per user: ${data.unranked.join(', ')}.`
+        : null,
     siblingLead:
       entry.kind === 'fastest-gpu'
         ? 'Optimizing for cost instead of speed?'

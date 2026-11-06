@@ -91,18 +91,17 @@ const responseSchema: ApiSchema = objectSchema({
     kind: stringSchema,
     model: stringSchema,
     scenario: stringSchema,
-    tier: integerSchema,
     engine: stringSchema,
     format: { type: 'string', enum: ['json', 'csv'] },
   }),
   kind: { type: 'string', enum: ['fastest-gpu', 'cheapest-gpu'] },
-  tier: integerSchema,
   entries: arraySchema(
     objectSchema({
       model: stringSchema,
       modelSlug: stringSchema,
       modelLabel: stringSchema,
       scenario: { type: 'string', enum: ['single_turn_8k1k', 'agentx'] },
+      tier: integerSchema,
       rows: arraySchema(rowSchema),
     }),
   ),
@@ -116,18 +115,17 @@ const responseExample = {
     kind: 'cheapest-gpu',
     model: 'DeepSeek-V4-Pro',
     scenario: 'agentx',
-    tier: 50,
     engine: 'community',
     format: 'json',
   },
   kind: 'cheapest-gpu',
-  tier: 50,
   entries: [
     {
       model: 'DeepSeek-V4-Pro',
       modelSlug: 'deepseek-v4',
       modelLabel: 'DeepSeekv4 Pro 0813 1.6T',
       scenario: 'agentx',
+      tier: 50,
       rows: [
         {
           rank: 1,
@@ -149,8 +147,8 @@ const responses: readonly ApiResponse[] = [
   {
     status: '200',
     description: text(
-      'Ranked hardware per model-scenario at the primary tier (50 tok/s/user), community engine scope.',
-      '主档位（每用户 50 tok/s）、社区引擎范围下，每个「模型-场景」的硬件排名。',
+      'Ranked hardware per model-scenario, community engine scope. Each entry reports the interactivity tier (tok/s/user) it is ranked at. That is the lowest tier from 50 upward that measures at least two chips and at least half of the chips measured at any of those tiers. When no tier qualifies, it is the tier with the most measured chips.',
+      '社区引擎范围下，每个「模型-场景」的硬件排名。每个条目都会给出排名所用的交互性档位（tok/s/user）：从 50 起向上，取第一个实测芯片不少于两款、且不少于这些档位中有实测值芯片总数一半的档位。若没有档位满足该条件，则取实测芯片最多的档位。',
     ),
     schema: responseSchema,
     example: responseExample,
@@ -195,8 +193,8 @@ export const operations: ApiOperation[] = [
     path: '/api/v1/views/rankings',
     summary: text('Get GPU ranking views', '获取 GPU 排名视图'),
     description: text(
-      'Returns the /rankings pages as data: per model and scenario, hardware ordered by best community serving config at the primary interactivity tier — fastest-gpu by tok/s per GPU, cheapest-gpu by $/M total tokens. Rows carry the winning framework, precision, and disaggregation flag; chip links each hardware to its /chips registry slug.',
-      '以数据形式返回 /rankings 页面：按模型与场景，在主交互性档位下依最优社区推理配置对硬件排序 — fastest-gpu 按每 GPU tok/s，cheapest-gpu 按每百万 token 成本。每行包含胜出的框架、精度和 disagg 标志；芯片字段将各硬件对应到 /chips 注册表中的 slug。',
+      "Returns the /rankings pages as data. Per model and scenario, hardware is ordered by its best community serving config at the entry's interactivity tier. fastest-gpu orders by tok/s per GPU and cheapest-gpu by $/M total tokens. Rows carry the winning framework, precision, and disaggregation flag, and chip links each hardware to its /chips registry slug.",
+      '以数据形式返回 /rankings 页面。按模型与场景，在该条目的交互性档位下依最优社区推理配置对硬件排序。fastest-gpu 按每 GPU tok/s 排序，cheapest-gpu 按每百万 token 成本排序。每行包含胜出的框架、精度和 disagg 标志，芯片字段将各硬件对应到 /chips 注册表中的 slug。',
     ),
     audience: 'public',
     stability: 'beta',
