@@ -16,6 +16,7 @@ import {
 
 import { updateAtomKvCachePoolTokens } from './atom-kv-capacity.js';
 import { CHART_SERIES_SUMMARY_VERSION, encodeChartSeriesSummary } from './chart-series-summary.js';
+import type { PromptTokenTotals } from './compute-chart-series.js';
 import { REQUEST_TIMELINE_VERSION } from './compute-request-timeline.js';
 import { computeTraceDerivedPayloads } from './compute-trace-derived.js';
 import { fullResponseMetricsFromGzip } from './full-response-interactivity.js';
@@ -90,21 +91,17 @@ function jsonBuffer(value: unknown | null): Buffer | null {
   return Buffer.from(JSON.stringify(value), 'utf8');
 }
 
-export function cacheHitRatesFromChartSeries(
-  chartSeries: Awaited<ReturnType<typeof computeTraceDerivedPayloads>>['chartSeries'],
+export function cacheHitRatesFromPromptTokenTotals(
+  totals: PromptTokenTotals | null,
 ): PreparedTraceReplay['cacheHitRates'] {
-  if (!chartSeries || chartSeries.prefillTps.length === 0) return null;
-  const sumPrompts = chartSeries.prefillTps.reduce((sum, point) => sum + point.value, 0);
-  if (!(sumPrompts > 0)) return null;
-
-  const sumOf = (name: string): number =>
-    (chartSeries.promptTokensBySource[name] ?? []).reduce((sum, point) => sum + point.value, 0);
+  if (!totals || !(totals.prompt > 0)) return null;
+  const sumPrompts = totals.prompt;
+  const sumOf = (name: string): number => totals.bySource[name] ?? 0;
   const cpuHits = sumOf('cache hit (CPU offload)') + sumOf('external_kv_transfer');
   const hbmFromBreakdown = sumOf('cache hit (HBM)') + sumOf('cache hit') + sumOf('local_cache_hit');
-  const gpuHits =
-    hbmFromBreakdown > 0
-      ? hbmFromBreakdown
-      : chartSeries.prefixCacheHitsTps.reduce((sum, point) => sum + point.value, 0);
+  const gpuHits = hbmFromBreakdown > 0 ? hbmFromBreakdown : totals.prefixCacheHits;
+  // Counters disagreeing (hits > prompts) leave the run's own reported rate in place.
+  if (gpuHits + cpuHits > sumPrompts * (1 + 1e-9)) return null;
 
   return {
     gpu: gpuHits / sumPrompts,
@@ -185,7 +182,7 @@ export async function prepareTraceReplay(
   const compressionMs = Date.now() - compressionStart;
 
   const computeStart = Date.now();
-  const { aggregateStats, chartSeries, requestTimeline, atomKvCacheBlocks } =
+  const { aggregateStats, chartSeries, promptTokenTotals, requestTimeline, atomKvCacheBlocks } =
     await computeTraceDerivedPayloads(profile.data, metricsJson.data, metricsContext);
   const requestTimelineGz = requestTimeline ? await gzipRequestTimeline(requestTimeline) : null;
   const requestChartDataGz = requestTimelineGz
@@ -215,7 +212,7 @@ export async function prepareTraceReplay(
     timelineRequests: requestTimeline?.requests.length ?? 0,
     compressionMs,
     computeMs,
-    cacheHitRates: cacheHitRatesFromChartSeries(chartSeries),
+    cacheHitRates: cacheHitRatesFromPromptTokenTotals(promptTokenTotals),
     fullResponseMetrics,
     atomKvCacheBlocks,
   };

@@ -78,15 +78,6 @@ function PortalTooltip({
     };
   }, [sheet, tooltipRef]);
 
-  useEffect(() => {
-    if (!sheet) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onSheetDismissRef.current();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [sheet]);
-
   const node = (
     <div
       ref={tooltipRef}
@@ -180,6 +171,36 @@ export function D3ChartWrapper({
     locale,
     zoomEnabled && isTouchPrimary,
   );
+
+  useEffect(() => {
+    if (!pinnedPoint) return;
+
+    const dismiss = () => {
+      dismissTooltip();
+      hideTooltipElements(tooltipRef, svgRef);
+    };
+    const onOutsideClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      // Point switching and empty-plot clicks already belong to the chart.
+      if (svgRef.current?.contains(target) || tooltipRef.current?.contains(target)) return;
+      // The mobile backdrop owns its dismissal and stops the underlying click.
+      if (target instanceof Element && target.closest('[data-testid="chart-sheet-backdrop"]'))
+        return;
+      dismiss();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') dismiss();
+    };
+
+    // Capture outside clicks even when a page control stops propagation.
+    document.addEventListener('click', onOutsideClick, true);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('click', onOutsideClick, true);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [pinnedPoint, dismissTooltip, hideTooltipElements, tooltipRef, svgRef]);
 
   const plot = (
     <div

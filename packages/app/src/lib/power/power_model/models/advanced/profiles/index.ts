@@ -20,6 +20,24 @@ export function nic_power_baseline(
   });
 }
 
+export const POLLARA_NIC_BASELINE = new Provenance({
+  profile_id: 'pollara-state-power',
+  version: '2',
+  source: 'nicctl total_power_drawn calibration on an MI355X host',
+  kind: 'estimated',
+  input_boundary: 'One scale-out NIC; excludes separately modeled transceivers and switches',
+  assumptions: [
+    'Power is 34.5 W per card in both states: total_power_drawn averaged 38.65 W during a ' +
+      'DeepSeek-R1 InferenceX run, plus a 10% margin, minus the separately modeled 8 W ' +
+      'transceiver.',
+    'total_power_drawn includes the QSFP-400G-DR4 transceiver.',
+    'InferenceX prefill/decode runs on two MI355X nodes with KV cache over Pollara read the ' +
+      'same as idle: DeepSeek-R1 at about 1 Gbit/s per NIC, and AgentX Kimi-K3 at 3.5 Gbit/s ' +
+      'per NIC with 38.4-39.4 W per card.',
+    'Synthetic RDMA at full 400 Gbit/s line rate both ways reads 42.6 W, within the margin.',
+  ],
+});
+
 export function system_side_transceiver_baseline(
   bandwidth_gbps: number,
   power_w: number,

@@ -298,14 +298,6 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       },
       additionalActions: [
         {
-          label: 'Muse Spark',
-          labelZh: 'Muse Spark',
-          icon: <ModelLogo model={Model.Muse_Spark_Open} />,
-          onClick: () => {
-            window.location.href = localizedNudgeHref('/inference/muse-spark-open');
-          },
-        },
-        {
           label: 'GLM5.3',
           labelZh: 'GLM5.3',
           icon: <ModelLogo model={Model.GLM_5_2} />,
@@ -313,6 +305,14 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
             window.location.href = localizedNudgeHref(
               '/inference/glm-5-3?g_model=GLM-5.2&i_seq=agentic-traces&i_prec=fp8',
             );
+          },
+        },
+        {
+          label: 'Muse Spark',
+          labelZh: 'Muse Spark',
+          icon: <ModelLogo model={Model.Muse_Spark_Open} />,
+          onClick: () => {
+            window.location.href = localizedNudgeHref('/inference/muse-spark-open');
           },
         },
       ],

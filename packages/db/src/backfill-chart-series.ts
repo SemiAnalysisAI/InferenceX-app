@@ -5,11 +5,14 @@ import {
 } from './etl/chart-series-summary.js';
 import {
   CHART_SERIES_VERSION,
-  computeChartSeries,
+  computeChartData,
   type ChartSeries,
 } from './etl/compute-chart-series.js';
 import { createAdminSql } from './etl/db-utils.js';
-import { cacheHitRatesFromChartSeries, writeCacheHitMetrics } from './etl/trace-replay-ingest.js';
+import {
+  cacheHitRatesFromPromptTokenTotals,
+  writeCacheHitMetrics,
+} from './etl/trace-replay-ingest.js';
 import {
   parseLimitForceFlags,
   parseRunIdFlag,
@@ -104,8 +107,8 @@ async function main(): Promise<void> {
         return 'skipped';
       }
 
-      const series = requireBackfillPayload(
-        await computeChartSeries(row.server_metrics_json_gz, {
+      const { series, promptTokenTotals } = requireBackfillPayload(
+        await computeChartData(row.server_metrics_json_gz, {
           framework: row.framework,
           disagg: row.disagg ?? false,
         }),
@@ -133,7 +136,7 @@ async function main(): Promise<void> {
       // ATOM P/D row cache rates come from this chart series at ingest, so
       // refresh them with it. Other frameworks keep their ingested values.
       const atomPd = row.framework === 'mooncake-atom' || row.framework === 'atom-disagg';
-      const rates = atomPd ? cacheHitRatesFromChartSeries(series) : null;
+      const rates = atomPd ? cacheHitRatesFromPromptTokenTotals(promptTokenTotals) : null;
       if (rates) {
         const linked = await sql<{ id: number }[]>`
           select id from benchmark_results where trace_replay_id = ${id}

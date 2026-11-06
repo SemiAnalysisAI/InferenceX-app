@@ -69,7 +69,7 @@ const STRINGS = {
     difference: 'Difference',
     view: 'Clip view',
     differenceNote:
-      'Absolute RGB difference ×4 against the matched Diffusers reference at the same playback time. This browser preview is separate from the all-frame PSNR measurement.',
+      'Absolute RGB difference ×4 against the Diffusers reference for the same prompt and seed, at the same playback time. This browser preview is separate from the all-frame PSNR measurement.',
     differenceLabel: 'RGB difference ×4 · preview',
     noReference: 'No sealed reference pair for this clip.',
     differenceUnavailable:
@@ -80,7 +80,7 @@ const STRINGS = {
     exactMatch: 'Exact match',
     incompatible: 'Paired media are incompatible; PSNR is unavailable.',
     psnrMeasured: (frames: number) =>
-      `Decoded RGB24 · all ${frames} frames · full-stream MSE. Descriptive cross-engine comparison; no quality pass/fail threshold.`,
+      `Decoded RGB24 · all ${frames} frames · full-stream MSE. Descriptive cross-engine comparison; no quality pass/fail threshold. Different engines and parallel layouts produce different pixels from the same prompt and seed, so a low value alone does not indicate a defect.`,
     referenceNote:
       'Encoded reference MP4. PSNR compares every decoded RGB pixel and frame; it does not measure semantic quality.',
     wall: 'wall time',
@@ -136,7 +136,7 @@ const STRINGS = {
     difference: '差异',
     view: '视频视图',
     differenceNote:
-      '与匹配的 Diffusers 参考视频在相同播放时间的 RGB 绝对差异，放大 4 倍。浏览器预览与全帧 PSNR 测量分别展示。',
+      '当前视频与同一 prompt、同一 seed 的 Diffusers 参考视频在相同播放时刻的 RGB 绝对差异，放大 4 倍。此为浏览器预览，与全帧 PSNR 测量相互独立。',
     differenceLabel: 'RGB 差异 ×4 · 预览',
     noReference: '此视频暂无已封存的参考配对。',
     differenceUnavailable: '无法显示差异：帧尺寸必须一致，且视频需允许跨域像素读取。',
@@ -146,7 +146,7 @@ const STRINGS = {
     exactMatch: '完全一致',
     incompatible: '配对媒体不兼容，无法提供 PSNR。',
     psnrMeasured: (frames: number) =>
-      `解码后 RGB24 · 全部 ${frames} 帧 · 全流 MSE。仅作跨引擎数值对比，不设质量合格阈值。`,
+      `解码后 RGB24 · 全部 ${frames} 帧 · 全流 MSE。仅作跨引擎数值对比，不设质量合格阈值。不同引擎或并行配置即使使用相同的 prompt 和 seed，生成的像素也会不同，因此仅凭 PSNR 偏低不能说明输出有问题。`,
     referenceNote: '已编码的参考 MP4。PSNR 对比全部解码 RGB 像素和帧，不衡量语义质量。',
     wall: '出片时间',
     psnr: 'PSNR',
