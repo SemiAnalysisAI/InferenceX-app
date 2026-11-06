@@ -1,0 +1,59 @@
+name: Required Checks
+
+on:
+  pull_request:
+    branches: [main, master]
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+  merge_group:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: All checks passed
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read # list workflow runs for this commit
+    steps:
+      - name: Wait for lint, tests, and zizmor
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          # Path-filtered workflows that never start for this commit are treated as passing.
+          WORKFLOWS: >-
+            .github/workflows/lint.yml
+            .github/workflows/tests-unit.yml
+            .github/workflows/tests-e2e.yml
+            .github/workflows/tests-skills.yml
+            .github/workflows/zizmor.yml
+        run: |
+          set -euo pipefail
+          while true; do
+            runs=$(gh api --paginate "repos/$REPO/actions/runs?head_sha=$HEAD_SHA&event=$EVENT&per_page=100" \
+              --jq '.workflow_runs[]' | jq -s --arg wanted "$WORKFLOWS" '
+                ($wanted | split(" ")) as $paths
+                | map(select(.path | IN($paths[])))
+                | group_by(.path)
+                | map(max_by(.id))')
+            echo "$runs" | jq -r '.[] | "\(.path): \(.status) \(.conclusion // "")"'
+            if echo "$runs" | jq -e 'any(.status != "completed")' >/dev/null; then
+              sleep 20
+              continue
+            fi
+            failed=$(echo "$runs" | jq -r '.[]
+              | select(.conclusion | IN("success", "skipped", "neutral") | not)
+              | "\(.path) (\(.conclusion)): \(.html_url)"')
+            if [ -n "$failed" ]; then
+              echo "::error::Required workflows did not pass"
+              echo "$failed"
+              exit 1
+            fi
+            exit 0
+          done
