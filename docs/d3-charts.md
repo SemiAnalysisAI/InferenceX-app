@@ -48,8 +48,9 @@ do not add the disclaimer.
 The download popover offers Auto, 16:9, and 1:1 for PNG export only. Auto retains
 the existing image dimensions. Fixed ratios lay out an offscreen clone at a
 1280×720 or 1000×1000 CSS-pixel frame (captured at 2× resolution). The exporter
-measures caption and source-footer space, then gives the remaining height and
-width to the plot. Long captions can grow the complete frame proportionally.
+measures caption, legend and source-footer space, then gives the remaining height and
+width to the plot. The legend wraps in rows below the plot, so the plot keeps the
+full frame width. Long captions can grow the complete frame proportionally.
 The chart rebuilds axes, grids, points and curves using copied visible scales,
 without stretching a bitmap or adding letterbox bars. Text and mark sizes stay
 constant; official points and unofficial overlays use the new coordinates.

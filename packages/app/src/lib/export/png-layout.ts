@@ -67,26 +67,24 @@ export async function layoutPngExport(
     boxSizing: 'border-box',
   });
   const plotColumn = svg.parentElement?.parentElement;
-  if (plotColumn) Object.assign(plotColumn.style, { width: 'auto', flex: '1 1 0%' });
+  if (plotColumn) Object.assign(plotColumn.style, { width: '100%', flex: 'none' });
   const plotRow = plotColumn?.parentElement;
-  if (plotRow) plotRow.style.flexDirection = 'row';
+  if (plotRow) plotRow.style.flexDirection = 'column';
   for (const legend of clone.querySelectorAll<HTMLElement>('[data-slot="chart-legend-wrapper"]')) {
     Object.assign(legend.style, {
-      width: '240px',
+      width: '100%',
       minWidth: '0',
-      maxWidth: '240px',
-      flexShrink: '0',
+      maxWidth: 'none',
+      marginTop: '12px',
+      alignSelf: 'stretch',
     });
     const inner = legend.querySelector<HTMLElement>('.legend-container');
     if (inner) {
       inner.style.setProperty('min-width', '0', 'important');
       inner.style.setProperty('width', '100%', 'important');
       inner.style.setProperty('box-sizing', 'border-box', 'important');
-    }
-    for (const label of legend.querySelectorAll<HTMLElement>(
-      'label, label > span, .legend-label',
-    )) {
-      label.style.whiteSpace = 'normal';
+      const list = inner.querySelector<HTMLElement>('ul, [class*="overflow"]');
+      if (list) Object.assign(list.style, { display: 'flex', flexWrap: 'wrap', columnGap: '16px' });
     }
   }
   for (const heading of clone.querySelectorAll<HTMLElement>('figcaption h2')) {
@@ -94,22 +92,13 @@ export async function layoutPngExport(
   }
   let size = getPngLayoutSize(ratio);
   Object.assign(container.style, { boxSizing: 'border-box', padding: '16px', height: 'auto' });
-  // Measure header/footer chrome with a tall SVG so a sidebar cannot dominate the row height.
+  // Measure caption, legend and footer chrome with a tall SVG.
   for (let attempt = 0; attempt < 3; attempt++) {
     container.style.width = `${size.width}px`;
-    const legendHeight = Math.max(
-      0,
-      ...[...clone.querySelectorAll<HTMLElement>('[data-slot="chart-legend-wrapper"]')].map(
-        (legend) =>
-          legend.getBoundingClientRect().height +
-          Number.parseFloat(getComputedStyle(legend).marginTop),
-      ),
-    );
-    const probeHeight = Math.max(size.height, legendHeight + 1);
-    svg.setAttribute('height', `${probeHeight}`);
-    svg.style.height = `${probeHeight}px`;
-    const overhead = container.getBoundingClientRect().height - probeHeight;
-    const minHeight = overhead + PNG_FOOTER_HEIGHT + Math.max(360, legendHeight);
+    svg.setAttribute('height', `${size.height}`);
+    svg.style.height = `${size.height}px`;
+    const overhead = container.getBoundingClientRect().height - size.height;
+    const minHeight = overhead + PNG_FOOTER_HEIGHT + 360;
     const next = getPngLayoutSize(ratio, minHeight);
     if (next.height > size.height) {
       size = next;
