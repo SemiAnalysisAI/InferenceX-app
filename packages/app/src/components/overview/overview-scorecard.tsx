@@ -877,7 +877,7 @@ export function OverviewEngineScopeSwitcher({
       >
         <SelectTrigger
           aria-label={strings.engineScopeNavLabel}
-          className="w-full sm:hidden"
+          className="h-auto min-h-11 w-full whitespace-normal text-left sm:hidden"
           data-testid="overview-engine-scope-select"
         >
           <SelectValue>{strings.engineScopeShortOptions[engineScope]}</SelectValue>
