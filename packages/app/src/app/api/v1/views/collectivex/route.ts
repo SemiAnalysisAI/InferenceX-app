@@ -116,7 +116,10 @@ export function GET(request: NextRequest) {
       s.get('operation'),
       'operation',
       ['pair_period', 'roundtrip', 'dispatch', 'combine'],
-      'pair_period',
+      // Runs older than the chained family carry no pair period: default to the round trip there.
+      combined.some((item) => item.points.some((point) => point.components.pair_period !== null))
+        ? 'pair_period'
+        : 'roundtrip',
     );
     const percentile = parseEnumParam(
       s.get('percentile'),
