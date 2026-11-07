@@ -296,6 +296,7 @@ export const DASHBOARD_ROUTES = [
 ] as const satisfies readonly DashboardRouteDefinition[];
 
 export const AGENTX_ROUTE = { path: '/infx/agentx', legacyPath: '/agentx' } as const;
+export const UBENCHX_ROUTE = { path: '/ubx', legacyPath: '/ubenchx' } as const;
 
 export type DashboardRoute = (typeof DASHBOARD_ROUTES)[number];
 export type DashboardRouteKey = DashboardRoute['key'];

@@ -464,12 +464,12 @@ Do not replace measured latencies with synthetic values for manual verification.
 ### Landing-page Huawei link
 
 The English and Chinese landing pages link Huawei Ascend 950PR results to
-`/ubenchx/core-memory-profiles` and `/zh/ubenchx/core-memory-profiles`, respectively,
+`/ubx/core-memory-profiles` and `/zh/ubx/core-memory-profiles`, respectively,
 with a UbenchX subtitle. This entry no longer opens or prefetches OperatorX.
 OperatorX remains available through its own navigation and API.
 
 中文：英文和中文首页的华为 Ascend 950PR 入口显示 UbenchX 副标题，分别链接至
-`/ubenchx/core-memory-profiles` 和 `/zh/ubenchx/core-memory-profiles`，
+`/ubx/core-memory-profiles` 和 `/zh/ubx/core-memory-profiles`，
 不再打开或预取 OperatorX。OperatorX 仍可通过自身导航入口和 API 访问。
 
 ### Cross-backend case alignment

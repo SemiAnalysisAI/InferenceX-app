@@ -95,7 +95,7 @@ export function UbenchxHub({
                     onValueChange={(value) => {
                       if (value === current) return;
                       track('ubenchx_test_selected', { test: value });
-                      router.push(`${prefix}/ubenchx/${value}`);
+                      router.push(`${prefix}/ubx/${value}`);
                     }}
                   >
                     <SelectTrigger

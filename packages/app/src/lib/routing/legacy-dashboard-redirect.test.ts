@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { AGENTX_ROUTE, DASHBOARD_ROUTES } from './dashboard-routes';
+import { AGENTX_ROUTE, DASHBOARD_ROUTES, UBENCHX_ROUTE } from './dashboard-routes';
 import {
   LEGACY_DASHBOARD_PATHS,
   legacyDashboardPathname,
@@ -25,6 +25,7 @@ const EXPECTED: readonly (readonly [string, string])[] = [
   ['/agentic-workload-explorer', '/infx/agentic-workload-explorer'],
   ['/agentx', '/infx/agentx'],
   ['/operatorx', '/opx'],
+  ['/ubenchx', '/ubx'],
 ];
 
 describe('legacy dashboard redirect table', () => {
@@ -33,7 +34,7 @@ describe('legacy dashboard redirect table', () => {
       expect.arrayContaining(EXPECTED.map(([from, to]) => [from, to])),
     );
     expect(LEGACY_DASHBOARD_PATHS.size).toBe(EXPECTED.length);
-    for (const route of [...DASHBOARD_ROUTES, AGENTX_ROUTE]) {
+    for (const route of [...DASHBOARD_ROUTES, AGENTX_ROUTE, UBENCHX_ROUTE]) {
       if ('legacyPath' in route) {
         expect(LEGACY_DASHBOARD_PATHS.get(route.legacyPath.slice(1))).toBe(route.path);
       }
@@ -60,6 +61,8 @@ describe('legacy dashboard redirect table', () => {
       '/infx/agentic-workload-explorer/sessions/abc/costs',
     );
     expect(legacyDashboardPathname('/operatorx/model')).toBe('/opx/model');
+    expect(legacyDashboardPathname('/ubenchx/mem-bw')).toBe('/ubx/mem-bw');
+    expect(legacyDashboardPathname('/zh/ubenchx/sm-l2-distance')).toBe('/zh/ubx/sm-l2-distance');
   });
 
   it('sends the bare product root to the Inference tab', () => {
@@ -81,7 +84,8 @@ describe('legacy dashboard redirect table', () => {
     '/video',
     '/collectivex',
     '/feedback',
-    '/ubenchx/mem-bw',
+    '/ubx/mem-bw',
+    '/api/v1/views/ubenchx',
     '/overview',
     '/compare/deepseek-r1-b200-vs-mi355x',
     '/inferencex',
@@ -108,5 +112,10 @@ describe('legacy dashboard redirect table', () => {
         new URL('https://inferencex.semianalysis.com/api/v1/views/inference'),
       ),
     ).toBeNull();
+    expect(
+      legacyDashboardRedirectUrl(
+        new URL('https://inferencex.semianalysis.com/zh/ubenchx/mem-bw?x=1#sweep'),
+      )?.href,
+    ).toBe('https://inferencex.semianalysis.com/zh/ubx/mem-bw?x=1#sweep');
   });
 });

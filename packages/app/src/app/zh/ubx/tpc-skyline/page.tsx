@@ -1,31 +1,32 @@
 import type { Metadata } from 'next';
 
-import { UbenchxContent } from '@/components/ubenchx/UbenchxContent';
-import { enAlternates } from '@/lib/i18n/i18n';
+import { TpcSkylineContent } from '@/components/ubenchx/TpcSkylineContent';
+import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
-const TITLE = 'ubenchX: HBM bandwidth';
+const TITLE = 'ubenchX：TPC Skyline 与 SKU 配置';
 const DESCRIPTION =
-  'Device-memory copy bandwidth microbenchmark on NVIDIA and AMD GPUs: latency, bandwidth and utilization (MBU) across message sizes from 8 B to 16 GiB.';
+  '展示 NVIDIA GPU 实测 TPC per GPC 分组，以及 Huawei 950PR 各 SKU 的核心数、频率、内存和缓存配置。';
 
 export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
-  alternates: enAlternates('/ubenchx/mem-bw'),
+  alternates: zhAlternates('/ubx/tpc-skyline'),
   robots: { index: false, follow: false },
   openGraph: {
     title: `${TITLE} | InferenceX`,
     description: DESCRIPTION,
-    url: `${SITE_URL}/ubenchx/mem-bw`,
+    url: `${SITE_URL}/zh/ubx/tpc-skyline`,
+    locale: ZH_OG_LOCALE,
   },
   twitter: { title: `${TITLE} | InferenceX`, description: DESCRIPTION },
 };
 
-export default function UbenchxMemBwPage() {
+export default function UbenchxTpcSkylinePageZh() {
   return (
     <main className="relative">
       <div className="container mx-auto px-4 lg:px-8">
-        <UbenchxContent />
+        <TpcSkylineContent />
       </div>
     </main>
   );

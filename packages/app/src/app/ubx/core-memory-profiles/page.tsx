@@ -1,28 +1,27 @@
 import type { Metadata } from 'next';
 
 import { CoreMemoryProfilesContent } from '@/components/ubenchx/CoreMemoryProfilesContent';
-import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n/i18n';
+import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
-const TITLE = 'ubenchX：核心访存特征';
+const TITLE = 'ubenchX: Core memory-access profiles';
 const DESCRIPTION =
-  '对比 B200 SM 与 Huawei 950PR Cube/Vector 的访存特征，保留各设备原始计时单位和测试条件。';
+  'Compare B200 SM and Huawei 950PR Cube/Vector memory-access profiles, preserving each device’s native timer units and measurement conditions.';
 
 export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
-  alternates: zhAlternates('/ubenchx/core-memory-profiles'),
+  alternates: enAlternates('/ubx/core-memory-profiles'),
   robots: { index: false, follow: false },
   openGraph: {
     title: `${TITLE} | InferenceX`,
     description: DESCRIPTION,
-    url: `${SITE_URL}/zh/ubenchx/core-memory-profiles`,
-    locale: ZH_OG_LOCALE,
+    url: `${SITE_URL}/ubx/core-memory-profiles`,
   },
   twitter: { title: `${TITLE} | InferenceX`, description: DESCRIPTION },
 };
 
-export default function UbenchxCoreMemoryProfilesPageZh() {
+export default function UbenchxCoreMemoryProfilesPage() {
   return (
     <main className="relative">
       <div className="container mx-auto px-4 lg:px-8">

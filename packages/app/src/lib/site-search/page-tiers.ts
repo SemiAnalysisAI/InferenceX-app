@@ -9,11 +9,7 @@ const MAIN_PATHS = new Set<string>([
   '/about',
   ...DASHBOARD_ROUTES.map((route) => route.path),
 ]);
-const MAIN_PREFIXES = [
-  `${getDashboardRoute('inference').path}/`,
-  `${AGENTX_ROUTE.path}/`,
-  '/ubenchx',
-];
+const MAIN_PREFIXES = [`${getDashboardRoute('inference').path}/`, `${AGENTX_ROUTE.path}/`, '/ubx'];
 const ARTICLE_PREFIXES = ['/blog', '/whitepaper', '/hardware'];
 
 function matchesPrefix(path: string, prefix: string): boolean {

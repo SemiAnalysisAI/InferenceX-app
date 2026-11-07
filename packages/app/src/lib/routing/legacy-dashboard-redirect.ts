@@ -1,7 +1,12 @@
-import { AGENTX_ROUTE, DASHBOARD_ROUTES, getDashboardRoute } from './dashboard-routes';
+import {
+  AGENTX_ROUTE,
+  DASHBOARD_ROUTES,
+  UBENCHX_ROUTE,
+  getDashboardRoute,
+} from './dashboard-routes';
 
 export const LEGACY_DASHBOARD_PATHS: ReadonlyMap<string, string> = new Map(
-  [...DASHBOARD_ROUTES, AGENTX_ROUTE].flatMap((route) =>
+  [...DASHBOARD_ROUTES, AGENTX_ROUTE, UBENCHX_ROUTE].flatMap((route) =>
     'legacyPath' in route ? [[route.legacyPath.slice(1), route.path] as const] : [],
   ),
 );

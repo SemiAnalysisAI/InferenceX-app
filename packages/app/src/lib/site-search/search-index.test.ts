@@ -175,20 +175,20 @@ describe('buildSnippet', () => {
     const index = new SiteSearchIndex();
     index.replacePages([
       {
-        url: '/ubenchx',
+        url: '/ubx',
         pageTitle: 'uBenchX',
         section: 'MI355X bandwidth',
         text: 'MI355X',
         source: 'page',
       },
       {
-        url: '/ubenchx',
+        url: '/ubx',
         pageTitle: 'uBenchX',
         section: 'MI355X latency',
         text: 'MI355X',
         source: 'page',
       },
     ]);
-    expect(index.search('mi355x').map((r) => r.url)).toEqual(['/ubenchx']);
+    expect(index.search('mi355x').map((r) => r.url)).toEqual(['/ubx']);
   });
 });

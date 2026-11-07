@@ -227,11 +227,11 @@ describe('Huawei UBenchX launch banner', { testIsolation: true }, () => {
       },
     });
     cy.get('[data-testid="launch-banner"]:visible')
-      .should('have.attr', 'href', '/zh/ubenchx/core-memory-profiles')
+      .should('have.attr', 'href', '/zh/ubx/core-memory-profiles')
       .and('contain.text', 'Huawei Ascend 950PR 微基准测试')
       .and('contain.text', '周期级核心访存微基准测试（Beta）')
       .click();
-    cy.location('pathname').should('eq', '/zh/ubenchx/core-memory-profiles');
+    cy.location('pathname').should('eq', '/zh/ubx/core-memory-profiles');
     cy.get('[data-testid="ascend-core-profiles"]').should('be.visible');
   });
 });
@@ -282,11 +282,7 @@ describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
           .should('eq', variant);
         cy.get('[data-testid="launch-banner"]:visible')
           .should('have.length', 1)
-          .and(
-            'have.attr',
-            'href',
-            variant === 'operatorx' ? '/opx' : '/ubenchx/core-memory-profiles',
-          );
+          .and('have.attr', 'href', variant === 'operatorx' ? '/opx' : '/ubx/core-memory-profiles');
         cy.reload();
         cy.get('html').should('have.attr', 'data-landing-banner-variant', variant);
       });

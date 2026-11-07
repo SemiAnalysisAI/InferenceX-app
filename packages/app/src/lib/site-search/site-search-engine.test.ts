@@ -175,12 +175,12 @@ describe('SiteSearchEngine', () => {
   it('indexes redirected pages under their final path so anchors survive', async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const path = String(input);
-      if (path === '/ubenchx') {
+      if (path === '/ubx') {
         const res = response(
           html('Memory bandwidth', '<h2 id="sweep">Sweep</h2><p>Zebrafish bandwidth.</p>'),
         );
         Object.defineProperty(res, 'redirected', { value: true });
-        Object.defineProperty(res, 'url', { value: `${window.location.origin}/ubenchx/mem-bw` });
+        Object.defineProperty(res, 'url', { value: `${window.location.origin}/ubx/mem-bw` });
         return Promise.resolve(res);
       }
       return Promise.resolve(new Response('missing', { status: 404 }));
@@ -189,7 +189,7 @@ describe('SiteSearchEngine', () => {
     engine.start();
     await engine.seed();
     await settle(engine);
-    expect(engine.search('zebrafish')[0].url).toBe('/ubenchx/mem-bw#sweep');
+    expect(engine.search('zebrafish')[0].url).toBe('/ubx/mem-bw#sweep');
   });
 
   it('applies a query typed before the seed list loads to the seeded queue', async () => {
@@ -215,13 +215,13 @@ describe('SiteSearchEngine', () => {
     let calls = 0;
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const path = String(input);
-      if (path !== '/ubenchx') return Promise.resolve(new Response('missing', { status: 404 }));
+      if (path !== '/ubx') return Promise.resolve(new Response('missing', { status: 404 }));
       calls++;
       const res = response(
         html('Memory bandwidth', '<h2 id="sweep">Sweep</h2><p>Okapi bandwidth.</p>'),
       );
       Object.defineProperty(res, 'redirected', { value: true });
-      Object.defineProperty(res, 'url', { value: `${window.location.origin}/ubenchx/mem-bw` });
+      Object.defineProperty(res, 'url', { value: `${window.location.origin}/ubx/mem-bw` });
       if (calls === 1) setTimeout(() => engine.stop(), 5);
       return Promise.resolve(res);
     });
@@ -232,6 +232,6 @@ describe('SiteSearchEngine', () => {
     engine.start();
     await settle(engine);
     expect(calls).toBeGreaterThanOrEqual(2);
-    expect(engine.search('okapi')[0].url).toBe('/ubenchx/mem-bw#sweep');
+    expect(engine.search('okapi')[0].url).toBe('/ubx/mem-bw#sweep');
   });
 });

@@ -169,7 +169,7 @@ describe('Header', () => {
       cy.contains('a', 'Dashboard')
         .should('be.visible')
         .and('have.attr', 'href', '/infx/inference');
-      cy.contains('a', 'ubenchX').should('be.visible').and('have.attr', 'href', '/ubenchx/mem-bw');
+      cy.contains('a', 'ubenchX').should('be.visible').and('have.attr', 'href', '/ubx/mem-bw');
       cy.contains('a', 'AgentX').should('be.visible').and('have.attr', 'href', '/infx/agentx');
       cy.contains('a', 'Comparisons').should('not.exist');
       cy.contains('a', 'Articles').should('not.exist');

@@ -11,7 +11,7 @@ describe('pageTier', () => {
     expect(pageTier('/infx/inference')).toBe(PAGE_TIER.main);
     expect(pageTier('/zh/infx/inference/agentic')).toBe(PAGE_TIER.main);
     expect(pageTier('/infx/historical')).toBe(PAGE_TIER.main);
-    expect(pageTier('/ubenchx/mem-bw')).toBe(PAGE_TIER.main);
+    expect(pageTier('/ubx/mem-bw')).toBe(PAGE_TIER.main);
     expect(pageTier('/chips/b200')).toBe(PAGE_TIER.reference);
     expect(pageTier('/rankings/cheapest-gpu-for-deepseek-r1')).toBe(PAGE_TIER.reference);
     expect(pageTier('/overview')).toBe(PAGE_TIER.overview);

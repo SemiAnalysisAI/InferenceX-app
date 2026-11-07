@@ -393,7 +393,7 @@ const LANDING_HARDWARE_RESULTS = [
     titleZh: '华为 Ascend 950PR',
     subtitle: 'Core and memory profiles · ubenchX',
     subtitleZh: '核心与内存性能剖析 · ubenchX',
-    href: '/ubenchx/core-memory-profiles',
+    href: '/ubx/core-memory-profiles',
     model: 'ascend950pr',
     analyticsEvent: 'landing_huawei_results_clicked',
     isNew: true,

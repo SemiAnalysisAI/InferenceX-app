@@ -56,8 +56,8 @@ const NAV_LINKS: readonly NavLink[] = [
     event: 'header_agentx_clicked',
   },
   {
-    href: '/ubenchx',
-    path: '/ubenchx/mem-bw',
+    href: '/ubx',
+    path: '/ubx/mem-bw',
     label: 'ubenchX',
     testId: 'nav-link-ubenchx',
     event: 'header_ubenchx_clicked',

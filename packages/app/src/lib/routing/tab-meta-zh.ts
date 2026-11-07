@@ -188,14 +188,14 @@ export type HeaderNavHref =
   | typeof AGENTX_ROUTE.path
   | '/overview'
   | Extract<DashboardRoute, { key: 'inference' }>['path']
-  | '/ubenchx'
+  | '/ubx'
   | '/about';
 
 export const NAV_LABELS_ZH: Record<HeaderNavHref, string> = {
   '/': '首页',
   '/overview': '总览',
   [getDashboardRoute('inference').path]: '仪表板',
-  '/ubenchx': 'ubenchX',
+  '/ubx': 'ubenchX',
   [AGENTX_ROUTE.path]: 'AgentX',
   '/about': '关于',
 };

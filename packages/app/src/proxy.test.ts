@@ -195,6 +195,9 @@ describe('legacy dashboard paths', () => {
     ['/operatorx?op=bogus&model=x', '/opx?model=x'],
     ['/infx', '/infx/inference'],
     ['/zh/infx?utm_source=x', '/zh/infx/inference?utm_source=x'],
+    ['/ubenchx', '/ubx'],
+    ['/ubenchx/mem-bw?x=1', '/ubx/mem-bw?x=1'],
+    ['/zh/ubenchx/tpc-skyline', '/zh/ubx/tpc-skyline'],
   ])('sends %s to %s in one 308', (from, to) => {
     const response = redirect(from);
     expect(response.status).toBe(308);
@@ -227,7 +230,11 @@ describe('legacy dashboard paths', () => {
 
   it('never redirects API routes', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}')));
-    for (const path of ['/api/v1/views/inference', '/api/v1/operatorx/compare']) {
+    for (const path of [
+      '/api/v1/views/inference',
+      '/api/v1/operatorx/compare',
+      '/api/v1/views/ubenchx',
+    ]) {
       const response = redirect(path, { 'user-agent': 'inferencex-cli/1.0.0' });
       expect(response.headers.get('x-middleware-next')).toBe('1');
       expect(response.headers.has('location')).toBe(false);
@@ -327,6 +334,8 @@ describe('proxy matcher', () => {
     '/agentic-workload-explorer/sessions/abc',
     '/operatorx',
     '/zh/operatorx/gemm',
+    '/ubenchx/mem-bw',
+    '/zh/ubenchx',
     '/infx',
     '/zh/infx',
   ])('runs on %s', (url) => {

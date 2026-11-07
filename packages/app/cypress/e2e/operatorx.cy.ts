@@ -379,13 +379,13 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
       cy.visit(prefix || '/');
       const link = '[data-testid="landing-huawei-results-link"]';
       cy.get(link)
-        .should('have.attr', 'href', `${prefix}/ubenchx/core-memory-profiles`)
+        .should('have.attr', 'href', `${prefix}/ubx/core-memory-profiles`)
         .and('not.have.attr', 'data-prefetch-ready');
       cy.get('@operatorxIntent.all').should('have.length', 0);
       cy.get(link).focus();
       cy.location('pathname').should('eq', prefix || '/');
       cy.get(link).trigger('mouseover').focus().click();
-      cy.location('pathname').should('eq', `${prefix}/ubenchx/core-memory-profiles`);
+      cy.location('pathname').should('eq', `${prefix}/ubx/core-memory-profiles`);
       cy.get('[data-testid="ascend-core-profiles"] h2').should(
         'have.text',
         `Huawei 950PR Ascend 950PR_9579 · 128 MiB · ${prefix ? 'Cube 与 Vector 标量控制器' : 'Cube and Vector scalar controllers'}`,
@@ -489,7 +489,7 @@ it('uses shared Huawei colors in OperatorX and ubenchX across a live theme switc
     .first()
     .should('have.css', 'background-color', 'rgb(188, 104, 7)');
 
-  cy.visit('/ubenchx/mem-bw', visitOptions);
+  cy.visit('/ubx/mem-bw', visitOptions);
   bandwidthPoints().first().should('have.css', 'fill', 'rgb(166, 90, 0)');
   cy.get('[data-testid="theme-toggle"]').click();
   bandwidthPoints().first().should('have.css', 'fill', 'rgb(188, 104, 7)');

@@ -368,10 +368,10 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
 
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('have.attr', 'href', '/ubenchx/core-memory-profiles');
+      .and('have.attr', 'href', '/ubx/core-memory-profiles');
     cy.get('[data-testid="launch-banner"]:visible').click();
 
-    cy.location('pathname').should('eq', '/ubenchx/core-memory-profiles');
+    cy.location('pathname').should('eq', '/ubx/core-memory-profiles');
     cy.get('[data-testid="ascend-core-profiles"]').should('be.visible');
 
     cy.get('[data-testid="nav-link-home"]').click();

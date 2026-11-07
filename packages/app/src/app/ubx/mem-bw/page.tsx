@@ -1,28 +1,27 @@
 import type { Metadata } from 'next';
 
 import { UbenchxContent } from '@/components/ubenchx/UbenchxContent';
-import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n/i18n';
+import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
-const TITLE = 'ubenchX：HBM 带宽';
+const TITLE = 'ubenchX: HBM bandwidth';
 const DESCRIPTION =
-  '在 NVIDIA 和 AMD GPU 上测量显存拷贝带宽的微基准测试：展示从 8 B 到 16 GiB 各消息大小下的延迟、带宽和显存带宽利用率（MBU）。';
+  'Device-memory copy bandwidth microbenchmark on NVIDIA and AMD GPUs: latency, bandwidth and utilization (MBU) across message sizes from 8 B to 16 GiB.';
 
 export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
-  alternates: zhAlternates('/ubenchx/mem-bw'),
+  alternates: enAlternates('/ubx/mem-bw'),
   robots: { index: false, follow: false },
   openGraph: {
     title: `${TITLE} | InferenceX`,
     description: DESCRIPTION,
-    url: `${SITE_URL}/zh/ubenchx/mem-bw`,
-    locale: ZH_OG_LOCALE,
+    url: `${SITE_URL}/ubx/mem-bw`,
   },
   twitter: { title: `${TITLE} | InferenceX`, description: DESCRIPTION },
 };
 
-export default function UbenchxMemBwPageZh() {
+export default function UbenchxMemBwPage() {
   return (
     <main className="relative">
       <div className="container mx-auto px-4 lg:px-8">

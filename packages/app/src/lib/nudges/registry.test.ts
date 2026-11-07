@@ -107,7 +107,7 @@ describe('NUDGE_REGISTRY integrity', () => {
     );
     if (banner?.type !== 'banner') throw new Error('Missing launch banner');
     banner.content.onLinkClick?.();
-    expect(location.href).toBe('/zh/ubenchx/core-memory-profiles');
+    expect(location.href).toBe('/zh/ubx/core-memory-profiles');
 
     const operatorxBanner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'operatorx-banner');
     if (operatorxBanner?.type !== 'banner') throw new Error('Missing OperatorX banner');
@@ -126,7 +126,7 @@ describe('NUDGE_REGISTRY integrity', () => {
   it('splits the landing banner into comparable A/B arms', () => {
     const arms = NUDGE_REGISTRY.filter((nudge) => nudge.variant);
     expect(arms.map((arm) => [arm.variant, arm.content.href])).toEqual([
-      ['ubenchx', '/ubenchx/core-memory-profiles'],
+      ['ubenchx', '/ubx/core-memory-profiles'],
       ['operatorx', '/opx'],
     ]);
     for (const arm of arms) {

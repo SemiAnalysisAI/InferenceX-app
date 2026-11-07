@@ -2,7 +2,7 @@ import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export const LANDING_BANNER_STORAGE_KEY = 'inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed';
 export const LANDING_BANNER_DISMISSED_ATTRIBUTE = 'data-landing-banner-dismissed';
-export const HUAWEI_UBENCHX_URL = '/ubenchx/core-memory-profiles';
+export const HUAWEI_UBENCHX_URL = '/ubx/core-memory-profiles';
 export const OPERATORX_URL = getDashboardRoute('operatorx').path;
 export const TPUV7_QWEN_3_5_AGENTX_URL = `${getDashboardRoute('inference').path}/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8`;
 

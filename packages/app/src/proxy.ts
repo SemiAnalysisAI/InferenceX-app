@@ -19,7 +19,8 @@ const EMBED_CSP = 'frame-ancestors *';
 // proxy. That means CLI analytics on API routes (only the CLI and skill user agents are counted,
 // so browser API calls skip it), embed headers, legacy Inference power links that redirect to
 // PowerX, saved gated model selections, model-route aliases and retired profit percentiles,
-// legacy OperatorX `?op=` links, dashboard paths from before the `/infx` and `/opx` split, and
+// legacy OperatorX `?op=` links, dashboard paths from before the `/infx` and `/opx` split, old
+// `/ubenchx` paths, and
 // compare share links whose slug needs canonicalizing with
 // their query intact.
 // A `has` query condition needs a named key, and a shared compare link can carry any parameter
@@ -43,7 +44,7 @@ export const config: ProxyConfig = {
       has: [{ type: 'query', key: 'g_model', value: 'GLM-5\\.3-Flash' }],
     },
     { source: '/:locale(zh)?/opx/:category?', has: [{ type: 'query', key: 'op' }] },
-    '/:locale(zh)?/:tab(inference|profit-estimator|profit-estimator-per-gigawatt|evaluation|historical|calculator|fleet|first-token|cache-reuse|reliability|gpu-specs|submissions|ai-chart|current-inferencex-image|agentic-workload-explorer|agentx|operatorx)/:path*',
+    '/:locale(zh)?/:tab(inference|profit-estimator|profit-estimator-per-gigawatt|evaluation|historical|calculator|fleet|first-token|cache-reuse|reliability|gpu-specs|submissions|ai-chart|current-inferencex-image|agentic-workload-explorer|agentx|operatorx|ubenchx)/:path*',
     '/:locale(zh)?/infx',
     '/:locale(zh)?/infx/:tab(calculator|historical|profit-estimator|profit-estimator-per-gigawatt)/:slug(deepseek|kimi|kimi-k25|qwen|glm|glm-5|glm-5-2|minimax|minimax-m25|llama|gptoss|[^/]*[A-Z][^/]*)/:filters*',
     {

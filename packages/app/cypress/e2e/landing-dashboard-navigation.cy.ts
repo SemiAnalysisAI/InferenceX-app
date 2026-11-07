@@ -140,7 +140,7 @@ describe('landing model curation', () => {
         cy.get('[data-testid="compare-agentx-model-minimax-m3"]').should('not.exist');
         cy.get('[data-testid="landing-huawei-results-link"]')
           .should('match', ':first-child')
-          .and('have.attr', 'href', `${prefix}/ubenchx/core-memory-profiles`)
+          .and('have.attr', 'href', `${prefix}/ubx/core-memory-profiles`)
           .next()
           .should('have.attr', 'data-testid', 'landing-tpu-kimi-k3-results-link')
           .parent()

@@ -28,7 +28,7 @@ const SEO_REDIRECTS = [
   ...LOCALE_PREFIXES.flatMap((prefix) => [
     { source: `${prefix}/xvideo`, destination: `${prefix}/video` },
     { source: `${prefix}/xxvideo`, destination: `${prefix}/video` },
-    { source: `${prefix}/ubenchx`, destination: `${prefix}/ubenchx/mem-bw` },
+    { source: `${prefix}/ubx`, destination: `${prefix}/ubx/mem-bw` },
     { source: `${prefix}/run/glm-5-2-on-:chip`, destination: `${prefix}/run/glm-5-3-on-:chip` },
     {
       source: `${prefix}/rankings/fastest-gpu-for-glm-5-2`,

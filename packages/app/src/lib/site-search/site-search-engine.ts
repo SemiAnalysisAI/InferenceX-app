@@ -22,7 +22,7 @@ const CONCURRENCY = 2;
 const MAX_CRAWLED_PAGES = 160;
 const MAX_HTML_BYTES = 2_500_000;
 
-const CORE_PATHS = ['/', AGENTX_ROUTE.path, '/overview', '/about', '/blog', '/ubenchx'];
+const CORE_PATHS = ['/', AGENTX_ROUTE.path, '/overview', '/about', '/blog', '/ubx'];
 
 function zhCandidate(path: string, locale: Locale): string | null {
   if (locale !== 'zh' || !hasZhSibling(path)) return null;
