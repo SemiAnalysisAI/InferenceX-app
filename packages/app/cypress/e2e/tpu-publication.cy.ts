@@ -107,8 +107,13 @@ describe('TPU publication preview', () => {
       openChartControls();
       cy.contains('legend', 'Benchmark config').should('be.visible');
       cy.contains('legend', 'Chart config').should('be.visible');
-      cy.get('[data-testid="x-axis-mode-selector"]').should(($axis) => {
-        expect($axis[0].getBoundingClientRect().width).to.be.at.most(176);
+      cy.get('[data-testid="fixed-sequence-statistic-selector"]').then(($statistic) => {
+        cy.get('[data-testid="x-axis-mode-selector"]').should(($axis) => {
+          expect($axis[0].getBoundingClientRect().width).to.be.closeTo(
+            $statistic[0].getBoundingClientRect().width,
+            1,
+          );
+        });
       });
       cy.get('[data-testid="inference-chart-configuration"]').within(() => {
         cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
