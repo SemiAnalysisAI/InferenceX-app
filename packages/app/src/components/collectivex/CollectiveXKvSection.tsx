@@ -374,6 +374,8 @@ export function CollectiveXKvSection({
       track('collectivex_kv_range_toggled', { range: band.id });
     },
   }));
+  const removeLegendItem = (name: string) =>
+    [...legendItems, ...rangeLegendItems].find((item) => item.name === name)?.onClick();
   const legendReset = {
     id: 'collectivex-kv-reset-filter',
     disabled: rangeView ? hiddenRangeIds.size === 0 : activeCases.length >= measuredCases.length,
@@ -654,7 +656,7 @@ export function CollectiveXKvSection({
                     legendItems={legendItems}
                     switches={envelopeLegendSwitches}
                     reset={legendReset}
-                    disableActiveSort
+                    onItemRemove={removeLegendItem}
                     isLegendExpanded={legendExpanded}
                     onExpandedChange={onLegendExpanded}
                   />
@@ -683,7 +685,7 @@ export function CollectiveXKvSection({
                   <ChartLegend
                     variant="sidebar"
                     legendItems={legendItems}
-                    disableActiveSort
+                    onItemRemove={removeLegendItem}
                     reset={legendReset}
                     isLegendExpanded={legendExpanded}
                     onExpandedChange={onLegendExpanded}
@@ -716,7 +718,7 @@ export function CollectiveXKvSection({
                       legendItems={rangeView ? rangeLegendItems : legendItems}
                       switches={legendSwitches}
                       reset={legendReset}
-                      disableActiveSort
+                      onItemRemove={removeLegendItem}
                       isLegendExpanded={legendExpanded}
                       onExpandedChange={onLegendExpanded}
                     />

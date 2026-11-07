@@ -390,11 +390,12 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
       const before = win.scrollY;
       cy.get('[data-testid="operatorx-viz-metric-vs-size"] li label')
         .first()
-        .click({ scrollBehavior: false });
-      cy.get('[data-testid="operatorx-viz-metric-vs-size"] li input')
-        .first()
-        .should('not.be.checked')
-        .and('have.focus');
+        .then(($label) => {
+          cy.wrap($label).click({ scrollBehavior: false });
+          cy.get(`[id="${$label.attr('for')}"]`)
+            .should('not.be.checked')
+            .and('have.focus');
+        });
       cy.window().its('scrollY').should('eq', before);
     });
   });

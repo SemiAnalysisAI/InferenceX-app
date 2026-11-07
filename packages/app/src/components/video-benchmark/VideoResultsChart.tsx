@@ -374,6 +374,7 @@ export default function VideoResultsChart({
             hw: key,
             label: hardwareLabel(key),
             color: colorFor(key),
+            lineDasharray: 'none',
             isActive: !hidden.has(key),
             onClick: toggle,
           }
@@ -382,6 +383,7 @@ export default function VideoResultsChart({
             hw: key,
             label: `${hardwareLabel(key)} · ${s.noMatchedRun}`,
             color: 'var(--muted-foreground)',
+            lineDasharray: 'none',
             isActive: false,
             blockedReason: s.noMatchedRunHelp,
             onClick: () => {},
@@ -454,12 +456,12 @@ export default function VideoResultsChart({
         <ChartLegend
           variant="sidebar"
           legendItems={legendItems}
+          onItemRemove={toggle}
           isLegendExpanded={legendExpanded}
           onExpandedChange={(expanded) => {
             onLegendExpandedChange(expanded);
             track('video_results_legend_expanded', { enabled: expanded });
           }}
-          disableActiveSort
           reset={{
             id: 'video-results-legend-reset',
             disabled: state.hidden.length === 0,

@@ -987,6 +987,7 @@ const SlotDetail = memo(
             hardware: model.hardware.filter((hw) => measured.includes(hw)),
             available: measured,
             toggle: model.toggle,
+            reset: model.reset,
           },
           model.colors,
           null,
@@ -1171,12 +1172,16 @@ export function ModelView({
     [hardware],
   );
   const models = useMemo(() => {
+    const reset = () => {
+      track('operatorx_legend_filter_reset', { op: 'model' });
+      setPicked(null);
+    };
     const build = (view: ComparisonView | undefined) =>
       view
         ? buildModel(
             view,
             metric,
-            { hardware, available, toggle: (hw) => toggle(hw, 'chart') },
+            { hardware, available, toggle: (hw) => toggle(hw, 'chart'), reset },
             colors,
             null,
             {

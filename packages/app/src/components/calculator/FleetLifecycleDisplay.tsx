@@ -332,6 +332,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
           name: config.name,
           label: getDisplayLabel(config),
           color: resolveColor(key),
+          lineDasharray: 'none',
           title: config.gpu,
           hw: key,
           isActive: visibleHwKeys.has(key),

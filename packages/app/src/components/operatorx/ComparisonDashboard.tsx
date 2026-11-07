@@ -275,6 +275,10 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
       const next = toggleHardwareSelection(hardware, hw);
       if (next !== hardware) setPicked(next);
     };
+    const reset = () => {
+      track('operatorx_legend_filter_reset', { op });
+      setPicked(null);
+    };
     const inspect = (index: number) => {
       track('operatorx_case_opened', { op, metric: metric.id });
       setInspected(index);
@@ -285,7 +289,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
         op,
         caseRefs(view, hardware, i).map((r) => r.ref),
       );
-    return buildModel(view, metric, { hardware, available, toggle }, colors, baseline, {
+    return buildModel(view, metric, { hardware, available, toggle, reset }, colors, baseline, {
       inspect,
       preview,
     });

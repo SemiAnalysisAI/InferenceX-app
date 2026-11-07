@@ -2,15 +2,16 @@
 
 import * as d3 from 'd3';
 import { comparisonDefaults } from '@semianalysisai/inferencex-db/operatorx/visualization';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 
+import ChartLegend from '@/components/ui/chart-legend';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { track } from '@/lib/analytics/analytics';
 import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import { EmptyChart } from '../charts/empty';
-import { OpxChart, HardwareLegend } from '../charts/kit';
+import { OpxChart, hardwareLegend } from '../charts/kit';
 import { formatCompact, valueScale } from '../charts/scales';
 import { hardwareLabel } from '../compare/hardware';
 import type { ComparisonModel } from '../compare/model';
@@ -48,6 +49,8 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
     [view],
   );
   const [slice, setSlice] = useState<string | null>(null);
+  const [legendExpanded, setLegendExpanded] = useState(true);
+  const legendId = useId();
   const defaults = view.defaults ?? comparisonDefaults(view);
   const current =
     groups.find(([k]) => k === slice) ??
@@ -158,7 +161,14 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
           getRulerX: (p, s) => (s as d3.ScaleLogarithmic<number, number>)(p.x),
           getRulerY: (p, s) => s(p.y),
         }}
-        legendElement={<HardwareLegend model={model} />}
+        legendElement={
+          <ChartLegend
+            variant="sidebar"
+            isLegendExpanded={legendExpanded}
+            onExpandedChange={setLegendExpanded}
+            {...hardwareLegend(model, legendId, 'none')}
+          />
+        }
       />
     </div>
   );

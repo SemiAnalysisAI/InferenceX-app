@@ -1568,6 +1568,7 @@ export default function PowerTimeline({
                 name: `✕ unofficial-run-${info.id}`,
                 label: `✕ ${branch}`,
                 color: overlayRunColor(index),
+                lineDasharray: 'none',
                 title: comparison ? t.unofficialRun : `${t.unofficialRun}: ${branch}`,
                 isHighlighted: true,
                 hw: `overlay-run-${info.id}`,
@@ -1604,6 +1605,7 @@ export default function PowerTimeline({
           name: `${hwKey} ${comparisonEntryLabel(date, runNumbering)}`,
           label: comparisonEntryLabel(date, runNumbering),
           color,
+          lineDasharray: 'none',
           title: hardwareConfig[hwKey] ? getDisplayLabel(hardwareConfig[hwKey]) : hwKey,
           hw: id,
           isActive: activeDates.has(id),
@@ -1623,6 +1625,7 @@ export default function PowerTimeline({
           name: config.name,
           label: getDisplayLabel(config),
           color: resolveColor(key),
+          lineDasharray: 'none',
           title: config.gpu,
           hw: key,
           isActive: officialHwTypes.has(key),
@@ -1733,6 +1736,7 @@ export default function PowerTimeline({
       grouped={comparison}
       disableActiveSort={comparison}
       legendItems={legendItems}
+      onItemRemove={(hw) => legendItems.find((item) => item.hw === hw)?.onClick()}
       isLegendExpanded={isLegendExpanded}
       onExpandedChange={(expanded) => {
         setIsLegendExpanded(expanded);

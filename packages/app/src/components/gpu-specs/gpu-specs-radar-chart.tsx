@@ -121,6 +121,7 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
         name: spec.name,
         label: spec.name,
         color: getGpuColor(spec, idx),
+        lineDasharray: 'none',
         isActive: selectedGpus.has(spec.name),
         onClick: () => toggleGpu(spec.name),
       })),
@@ -214,7 +215,6 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
               setIsLegendExpanded(expanded);
               track('gpu_specs_radar_legend_expanded', { enabled: expanded });
             }}
-            grouped={false}
             reset={{
               id: 'radar-reset-filter',
               disabled: selectedGpus.size >= GPU_SPECS.length,
@@ -223,7 +223,6 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
                 track('gpu_specs_radar_reset_filter');
               },
             }}
-            disableActiveSort={true}
           />
         }
       />

@@ -360,7 +360,7 @@ export function CollectiveXSwapSection({
             variant="sidebar"
             isLegendExpanded={expanded}
             onExpandedChange={setExpanded}
-            disableActiveSort
+            onItemRemove={toggle}
             reset={{
               id: 'collectivex-swap-reset-filter',
               disabled: series.every((p) => !hidden.has(p.seriesId)),

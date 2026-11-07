@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 
+import ChartLegend from '@/components/ui/chart-legend';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics/analytics';
 import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import { EmptyChart } from '../charts/empty';
-import { HardwareLegend, OpxChart } from '../charts/kit';
+import { hardwareLegend, OpxChart } from '../charts/kit';
 import { originBarsLayer } from '../charts/layers';
 import { formatRatio, ratioScale } from '../charts/scales';
 import { hardwareLabel } from '../compare/hardware';
@@ -69,6 +70,8 @@ function SpeedupVsBaseline({ model }: { model: ComparisonModel }) {
   const strings = STRINGS[useLocale()];
   const { baseline, view } = model;
   const [grouping, setGrouping] = useState<Grouping>('none');
+  const [legendExpanded, setLegendExpanded] = useState(true);
+  const legendId = useId();
   if (!baseline) return <EmptyChart>{strings.pick}</EmptyChart>;
   const grouped = grouping !== 'none';
   const series = grouped ? model.hardware.filter((hw) => hw !== baseline) : model.hardware;
@@ -148,7 +151,21 @@ function SpeedupVsBaseline({ model }: { model: ComparisonModel }) {
                 summary: strings.shared(b.cases),
               }),
           }}
-          legendElement={grouped ? <HardwareLegend model={model} hardware={series} /> : undefined}
+          legendElement={
+            grouped ? (
+              <ChartLegend
+                variant="sidebar"
+                isLegendExpanded={legendExpanded}
+                onExpandedChange={setLegendExpanded}
+                {...hardwareLegend(
+                  model,
+                  legendId,
+                  undefined,
+                  model.available.filter((hw) => hw !== baseline),
+                )}
+              />
+            ) : undefined
+          }
         />
       )}
     </div>

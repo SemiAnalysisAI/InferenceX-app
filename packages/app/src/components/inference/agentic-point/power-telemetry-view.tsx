@@ -406,6 +406,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
                 hw: String(gpuIndex),
                 label: `${t.chip} ${gpuIndex}`,
                 color: GPU_COLORS[gpuIndex % GPU_COLORS.length],
+                lineDasharray: 'none',
                 isActive: visibleGpus.has(gpuIndex),
                 onClick: () => toggleGpu(gpuIndex),
               }))}

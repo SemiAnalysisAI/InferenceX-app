@@ -19,6 +19,19 @@ breakpoint, the legend stays below the chart with its existing 12px gap.
 Official and unofficial series share this layout. This is presentation-only;
 API responses, filters, and `inferencex-skills` contracts are unchanged.
 
+## Sidebar legend
+
+Every chart sidebar uses `ChartLegend` with `variant="sidebar"` and the same
+configuration as `/historical`. Line charts pass each series' stroke dash as
+`lineDasharray` (`'none'` for solid lines), so the swatch is a line even when
+the chart also draws markers. Toggleable items get `onClick`, `onItemRemove`
+and a `reset` whose button is disabled while nothing is hidden. Hidden items
+sort to the bottom. Swatches stay dots only where a series has no line: bar
+charts, scatter points without a connecting line (the normalized OperatorX
+roofline) and static category keys. Grouped GPU legends (`GPUGraph`, PowerX
+run comparison) keep their row order with `disableActiveSort`, and embedded
+charts with minimal chrome pass `readOnly`.
+
 ## PNG export aspect ratio
 
 Inference charts keep the title above the plot and place cost controls, pricing

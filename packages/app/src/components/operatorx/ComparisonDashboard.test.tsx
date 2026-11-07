@@ -201,6 +201,16 @@ describe('ComparisonDashboard live state', () => {
     expect(state.models.at(-1)!.hardware).toEqual([first, second]);
   });
 
+  it('resets the legend filter to every GPU the charts show', () => {
+    const [first, second] = state.models.at(-1)!.available;
+
+    act(() => state.models.at(-1)!.toggle(first));
+    expect(state.models.at(-1)!.hardware).toEqual([second]);
+
+    act(() => state.models.at(-1)!.reset());
+    expect(state.models.at(-1)!.hardware).toEqual([first, second]);
+  });
+
   it('opens case detail with the view and GPUs of the clicked chart', () => {
     act(() => replaceClientSearch(new URLSearchParams({ workload: single.id })));
     const clicked = state.models.at(-1)!;

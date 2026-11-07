@@ -2,9 +2,10 @@
 
 import { curveLinear } from 'd3';
 import { comparisonDefaults } from '@semianalysisai/inferencex-db/operatorx/visualization';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 
 import type { ComputePrecision } from '@semianalysisai/inferencex-db/operatorx/compare';
+import ChartLegend from '@/components/ui/chart-legend';
 import { Label } from '@/components/ui/label';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Switch } from '@/components/ui/switch';
@@ -14,7 +15,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { rooflineSummary } from '@/lib/operatorx/roofline-summary';
 
 import { EmptyChart } from '../charts/empty';
-import { OpxChart, HardwareLegend } from '../charts/kit';
+import { OpxChart, hardwareLegend } from '../charts/kit';
 import { formatCompact } from '../charts/scales';
 import { hardwareLabel, peakBandwidthTBs, peakTflops } from '../compare/hardware';
 import { type RooflineBound, rooflineBound, ridgeShare } from '../compare/roofline-bound';
@@ -24,6 +25,7 @@ import type { VizDefinition } from './types';
 import { RooflineBars } from './roofline-bars';
 
 const ORDER: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
+const ROOF_DASH = '6 4';
 
 const STRINGS = {
   en: {
@@ -110,6 +112,8 @@ export function Roofline({
   const [picked, setPicked] = useState<ComputePrecision | null>(null);
   const [sharedOnly, setSharedOnly] = useState(true);
   const [normalized, setNormalized] = useState(defaults.rooflineNormalized);
+  const [legendExpanded, setLegendExpanded] = useState(true);
+  const legendId = useId();
   const precision = picked && precisions.includes(picked) ? picked : defaults.rooflinePrecision;
   // Each stage hits its own roof, so a case sits at its effective intensity: where the
   // device's roofline reaches the case's bound, F / t_roof (plain FLOP/byte for one stage).
@@ -266,7 +270,7 @@ export function Roofline({
                       ? 'var(--muted-foreground)'
                       : (model.colors[hw] ?? 'var(--muted-foreground)'),
                   strokeWidth: 2,
-                  strokeDasharray: '6 4',
+                  strokeDasharray: ROOF_DASH,
                   curve: curveLinear,
                 },
               },
@@ -313,7 +317,14 @@ export function Roofline({
                 });
               },
             }}
-            legendElement={<HardwareLegend model={model} />}
+            legendElement={
+              <ChartLegend
+                variant="sidebar"
+                isLegendExpanded={legendExpanded}
+                onExpandedChange={setLegendExpanded}
+                {...hardwareLegend(model, legendId, normalized ? undefined : ROOF_DASH)}
+              />
+            }
           />
         </div>
       )}

@@ -157,6 +157,7 @@ export default function SubmissionsChart({ volume, mode, caption, footer }: Subm
         name: key,
         label: key === 'total' ? legendT.total : VENDOR_LABELS[key as Vendor],
         color: lineColor(key),
+        lineDasharray: 'none',
         isActive: !hiddenLines.has(key),
         onClick: toggleLine,
       })),
@@ -335,6 +336,7 @@ export default function SubmissionsChart({ volume, mode, caption, footer }: Subm
           <ChartLegend
             variant="sidebar"
             legendItems={legendItems}
+            onItemRemove={toggleLine}
             isLegendExpanded={isLegendExpanded}
             onExpandedChange={(expanded) => {
               setIsLegendExpanded(expanded);

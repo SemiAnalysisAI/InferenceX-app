@@ -896,7 +896,6 @@ export default function CollectiveXDisplay() {
                     <ChartLegend
                       variant="sidebar"
                       legendItems={rangeView ? rangeLegendItems : legendItems}
-                      disableActiveSort
                       onItemRemove={(id) => {
                         if (rangeView) {
                           setHiddenRangeIds((previous) => new Set([...previous, id]));

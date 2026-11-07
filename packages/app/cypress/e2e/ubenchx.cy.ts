@@ -281,7 +281,7 @@ it('keeps bandwidth hover guides on the rendered point in every metric and after
     .first()
     .then(($point) => {
       const previousX = $point.attr('cx');
-      cy.get('#ubenchx-latency svg').then(($svg) => {
+      cy.get('#ubenchx-latency [data-testid="d3-chart-svg"]').then(($svg) => {
         const rect = $svg[0].getBoundingClientRect();
         cy.wrap($svg).trigger('wheel', {
           eventConstructor: 'WheelEvent',

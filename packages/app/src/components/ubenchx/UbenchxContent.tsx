@@ -206,6 +206,8 @@ function UbenchxChart({
   chartId,
   allPoints,
   gpuKeys,
+  hidden,
+  setHidden,
   yLabel,
   yScaleType,
   locale,
@@ -218,6 +220,8 @@ function UbenchxChart({
   chartId: string;
   allPoints: ChartPoint[];
   gpuKeys: readonly string[];
+  hidden: ReadonlySet<string>;
+  setHidden: (hidden: ReadonlySet<string>) => void;
   yLabel: string;
   yScaleType: 'log' | 'linear';
   locale: Locale;
@@ -229,7 +233,6 @@ function UbenchxChart({
 }) {
   const t = STRINGS[locale];
   const [legendExpanded, setLegendExpanded] = useState(true);
-  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
   const visiblePoints = useMemo(
     () => allPoints.filter((p) => !hidden.has(p.gpuKey)),
     [allPoints, hidden],
@@ -253,9 +256,9 @@ function UbenchxChart({
   }, [allPoints]);
 
   const yDomain = useMemo<[number, number]>(() => {
-    const ys = allPoints.map((p) => p.y);
+    const ys = visiblePoints.map((p) => p.y);
     return percent ? [0, Math.max(100, d3.max(ys) ?? 0)] : paddedDomain(ys);
-  }, [allPoints, percent]);
+  }, [visiblePoints, percent]);
 
   const yTickValues = useMemo(() => {
     if (yScaleType !== 'log') return undefined;
@@ -271,6 +274,13 @@ function UbenchxChart({
     () => sizeAxisTicks(...xDomain, isMobile ? 4 : 7),
     [xDomain, isMobile],
   );
+
+  const toggleGpu = (key: string) => {
+    const next = new Set(hidden);
+    if (!next.delete(key)) next.add(key);
+    setHidden(next);
+    track('ubenchx_gpu_toggled', { gpu: key });
+  };
 
   return (
     <ChartSection
@@ -358,22 +368,25 @@ function UbenchxChart({
         legendElement={
           <ChartLegend
             variant="sidebar"
-            readOnly
-            disableActiveSort
             isLegendExpanded={legendExpanded}
             onExpandedChange={setLegendExpanded}
             legendItems={gpuKeys.map((key) => ({
               name: key,
               label: key,
               color: colors[key] ?? '#888',
+              lineDasharray: 'none',
               isActive: !hidden.has(key),
-              onClick: () =>
-                setHidden((prev) => {
-                  const next = new Set(prev);
-                  if (!next.delete(key)) next.add(key);
-                  return next;
-                }),
+              onClick: toggleGpu,
             }))}
+            onItemRemove={toggleGpu}
+            reset={{
+              id: 'ubenchx-reset-filter',
+              disabled: hidden.size === 0,
+              onClick: () => {
+                setHidden(new Set());
+                track('ubenchx_legend_filter_reset');
+              },
+            }}
           />
         }
       />
@@ -403,6 +416,7 @@ export function UbenchxContent() {
 
   const [metricKey, setMetricKey] = useState<ChartType>('mbu');
   const metric = Y_METRICS.find((m) => m.key === metricKey) ?? Y_METRICS[0];
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
 
   const points = useMemo(
     () => viewResults.flatMap((r) => makePoints(r.rows, metric.key, r.gpu, r.peakBandwidthGbps)),
@@ -469,6 +483,8 @@ export function UbenchxContent() {
         chartId={`ubenchx-${metric.key}`}
         allPoints={points}
         gpuKeys={gpuKeys}
+        hidden={hidden}
+        setHidden={setHidden}
         yLabel={t[metric.label]}
         yScaleType={metric.scale}
         locale={locale}
