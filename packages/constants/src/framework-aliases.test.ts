@@ -25,6 +25,10 @@ describe('FRAMEWORK_LABELS', () => {
   it('labels the canonical tilert framework "TileRT"', () => {
     expect(FRAMEWORK_LABELS['tilert']).toBe('TileRT');
   });
+
+  it('labels the canonical infera-sglang framework "Infera SGLang"', () => {
+    expect(FRAMEWORK_LABELS['infera-sglang']).toBe('Infera SGLang');
+  });
 });
 
 describe('MODEL_SPEC_METHOD_LABELS', () => {
