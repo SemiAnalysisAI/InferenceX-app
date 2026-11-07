@@ -301,8 +301,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '精度键；CollectiveX 有 fp8 时默认使用 fp8。镜像视图去除首尾空白、不区分大小写，默认 all。',
   ],
   operation: [
-    'EP operation: roundtrip (default), dispatch or combine.',
-    'EP 操作：roundtrip（默认）、dispatch 或 combine。',
+    'EP operation: pair_period (default when the run carries it, else roundtrip; the chained steady-state period), roundtrip (fresh entry), dispatch or combine.',
+    'EP 操作：pair_period（运行包含该指标时为默认，否则为 roundtrip；连续成对的稳态周期）、roundtrip（单次）、dispatch 或 combine。',
   ],
   yAxis: [
     'CollectiveX: latency, tokens-per-second, activation-rate or payload-rate. Video: dollar, clipsGpu, secondsGpu, clipsAllocatedGpu, secondsAllocatedGpu or energy.',

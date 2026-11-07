@@ -47,7 +47,8 @@ const STRINGS = {
       dispatch: 'Dispatch',
       stage: 'Stage',
       combine: 'Combine',
-      roundtrip: 'Round trip (measured)',
+      roundtrip: 'Round trip (fresh entry)',
+      pair_period: 'Pair period (chained)',
     },
     yAxis: {
       latency: 'Latency (µs)',
@@ -78,7 +79,8 @@ const STRINGS = {
       dispatch: '分发',
       stage: '中间处理',
       combine: '合并',
-      roundtrip: '往返（实测）',
+      roundtrip: '往返（单次）',
+      pair_period: '成对周期（连续）',
     },
     yAxis: {
       latency: '延迟（µs）',
@@ -369,6 +371,7 @@ export function CollectiveXChart({
       date: `${summary} · ${t.latencyRanks}`,
       metrics: [{ value: formatMetric(point.y, yAxis), label: op }],
       rows: [
+        { label: t.operation.pair_period, value: ranks(measurement.components.pair_period) },
         { label: t.operation.dispatch, value: ranks(measurement.components.dispatch) },
         { label: t.operation.stage, value: ranks(measurement.components.stage) },
         { label: t.operation.combine, value: ranks(measurement.components.combine) },

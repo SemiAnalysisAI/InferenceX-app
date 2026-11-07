@@ -156,6 +156,11 @@ case instead, upload its corrected result: the new run replaces that case and ke
 - **Vendor scope is explicit**: the shared reader accepts only `amd` and `nvidia` results
   (case-insensitive). Other vendor values are omitted from chart series, coverage, and SKU
   summaries; runs with no supported-vendor cases stay hidden.
+- **Headline is the pair period**: the reader maps each result's `components.pair_period` (the
+  chained steady-state period the methodology ranks on) into `series[].points[].components`
+  beside `dispatch`, `stage`, `combine` and `roundtrip`, with the round trip's payload bytes. The
+  EP chart and the views API default to `pair_period` at p50. A run whose results carry no pair
+  period shows the fresh-entry round trip instead.
 - **Withheld tails**: an EP result may publish p90/p95/p99 as `null` when too many of a
   series' samples were misaligned or host-stalled (p50 is always present). The reader keeps
   the derived rates `null` there, the alpha-beta fit skips them, and the tooltip shows them

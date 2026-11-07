@@ -83,13 +83,15 @@ const STRINGS = {
       dispatch: 'Dispatch',
       stage: 'Stage',
       combine: 'Combine',
-      roundtrip: 'Round trip',
+      roundtrip: 'Round trip (fresh entry)',
+      pair_period: 'Pair period (headline)',
     },
     operationHeading: {
       dispatch: 'Dispatch',
       stage: 'Stage',
       combine: 'Combine',
-      roundtrip: 'Round trip (measured)',
+      roundtrip: 'Round trip (fresh entry)',
+      pair_period: 'Pair period (chained)',
     },
     phase: { decode: 'Decode', prefill: 'Prefill' },
     phaseValue: { decode: 'decode', prefill: 'prefill' },
@@ -153,6 +155,8 @@ const STRINGS = {
     activationRateOption: 'Activation rate',
     payloadRateOption: 'Payload BW / chip',
     noSeries: 'No measured series match these filters',
+    candidateNote:
+      '† Candidate: the library supports this configuration, but no serving engine can select it today.',
     payloadNote:
       'Activation-data rate is derived at the selected latency percentile and is not physical link bandwidth.',
     payloadBandwidthNote:
@@ -165,13 +169,15 @@ const STRINGS = {
       dispatch: '分发',
       stage: '中间处理',
       combine: '合并',
-      roundtrip: '往返',
+      roundtrip: '往返（单次）',
+      pair_period: '成对周期（主指标）',
     },
     operationHeading: {
       dispatch: '分发',
       stage: '中间处理',
       combine: '合并',
-      roundtrip: '往返（实测）',
+      roundtrip: '往返（单次）',
+      pair_period: '成对周期（连续）',
     },
     phase: { decode: '解码', prefill: '预填充' },
     phaseValue: { decode: '解码', prefill: '预填充' },
@@ -233,6 +239,7 @@ const STRINGS = {
     activationRateOption: '激活数据速率',
     payloadRateOption: '每芯片载荷带宽',
     noSeries: '没有实测序列符合当前筛选条件',
+    candidateNote: '† 候选：集合通信库支持该配置，但目前没有推理引擎可以选用。',
     payloadNote: '逻辑载荷速率按所选延迟分位点派生，不代表物理链路带宽。',
     payloadBandwidthNote:
       '载荷带宽为完整逻辑载荷（含 FP8 缩放字节）÷ 延迟（每芯片），是基于逻辑字节的派生速率，不代表物理链路带宽。工具提示中的 β/α 根据各 token 档位下的字节数与延迟做最小二乘拟合（β = 每芯片带宽项，α = 固定开销）。',
@@ -314,19 +321,34 @@ export default function CollectiveXDisplay() {
   const selectedRunErrors = runQueries.filter((query) => query.error).length;
   const isFetching = runsQuery.isFetching || runQueries.some((query) => query.isFetching);
   const [epSize, setEpSize] = useState(8);
-  const [operation, setOperation] = useState<CollectiveXOperation>('roundtrip');
+  const [selectedOperation, setOperation] = useState<CollectiveXOperation>('pair_period');
   const [phase, setPhase] = useState<CollectiveXPhase>('decode');
   const [modes, setModes] = useState<CollectiveXMode[]>(['normal', 'low-latency']);
   const [precision, setPrecision] = useState<CollectiveXPrecision>('fp8');
-  const [percentile, setPercentile] = useState<CollectiveXPercentile>('p99');
-  const [yAxis, setYAxis] = useState<CollectiveXYAxis>('latency');
+  const [percentile, setPercentile] = useState<CollectiveXPercentile>('p50');
+  const [selectedYAxis, setYAxis] = useState<CollectiveXYAxis>('latency');
   const [sku, setSku] = useState('all');
   const [backend, setBackend] = useState('all');
   const [view, setView] = useState<'series' | 'range' | 'best'>('range');
   const [hiddenRangeIds, setHiddenRangeIds] = useState<Set<string>>(new Set());
   const [activeSeriesIds, setActiveSeriesIds] = useState<Set<string>>(new Set());
   const [legendExpanded, setLegendExpanded] = useState(true);
+  // Results older than the chained family carry no pair period: fall back to the round trip.
+  const hasPairPeriod = useMemo(
+    () =>
+      combinedSeries.some((item) =>
+        item.points.some((point) => point.components.pair_period !== null),
+      ),
+    [combinedSeries],
+  );
+  // Derived, not an effect: a run without a pair period never renders the empty headline.
+  const operation: CollectiveXOperation =
+    selectedOperation === 'pair_period' && !hasPairPeriod ? 'roundtrip' : selectedOperation;
+  // Token rate exists for the round trip only, whichever way the operation was reached.
+  const yAxis: CollectiveXYAxis =
+    selectedYAxis === 'tokens-per-second' && operation !== 'roundtrip' ? 'latency' : selectedYAxis;
   const operationOptions: SelectOption<CollectiveXOperation>[] = [
+    ...(hasPairPeriod ? [{ value: 'pair_period' as const, label: t.operation.pair_period }] : []),
     { value: 'dispatch', label: t.operation.dispatch },
     { value: 'stage', label: t.operation.stage },
     { value: 'combine', label: t.operation.combine },
@@ -933,6 +955,14 @@ export default function CollectiveXDisplay() {
                     data-testid="collectivex-range-note"
                   >
                     {view === 'best' ? t.bestNote : t.rangeNote}
+                  </p>
+                )}
+                {phaseSeries.some((item) => item.maturity === 'candidate') && (
+                  <p
+                    className="mt-2 text-xs text-muted-foreground"
+                    data-testid="collectivex-candidate-note"
+                  >
+                    {t.candidateNote}
                   </p>
                 )}
                 {yAxis === 'activation-rate' && (

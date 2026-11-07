@@ -92,10 +92,15 @@ export function collectiveXTopologyLabel(
   return `${system.nodes}x${system.gpus_per_node} · ${domain} · ${transports} · ${system.topology_class}`;
 }
 
+/** A dagger on series no engine can select today; the chart carries the footnote. */
+export function collectiveXCandidateMark(series: Pick<CollectiveXSeries, 'maturity'>): string {
+  return series.maturity === 'candidate' ? ' †' : '';
+}
+
 export function collectiveXLegendLabel(series: CollectiveXSeries, locale: Locale = 'en'): string {
   const mode = locale === 'zh' ? COLLECTIVEX_MODE_LABELS_ZH[series.mode] : series.mode;
   const phase = locale === 'zh' ? COLLECTIVEX_PHASE_LABELS_ZH[series.phase] : series.phase;
-  return `${collectiveXSkuLabel(series.system.sku)} · ${collectiveXBackendLabel(series.backend)} · EP${series.system.ep_size} · ${mode} · ${phase} · ${series.precision}`;
+  return `${collectiveXSkuLabel(series.system.sku)} · ${collectiveXBackendLabel(series.backend)} · EP${series.system.ep_size} · ${mode} · ${phase} · ${series.precision}${collectiveXCandidateMark(series)}`;
 }
 
 export function collectiveXSeriesLabel(
@@ -280,7 +285,7 @@ export function collectiveXRangeColorKey(series: CollectiveXSeries | CollectiveX
 
 function rangeMemberLabel(series: CollectiveXSeries, locale: Locale): string {
   const mode = locale === 'zh' ? COLLECTIVEX_MODE_LABELS_ZH[series.mode] : series.mode;
-  return `${collectiveXBackendLabel(series.backend)} · ${mode}`;
+  return `${collectiveXBackendLabel(series.backend)} · ${mode}${collectiveXCandidateMark(series)}`;
 }
 
 /**
