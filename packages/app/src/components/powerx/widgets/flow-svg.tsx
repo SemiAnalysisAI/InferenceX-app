@@ -1,5 +1,6 @@
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import type { Locale } from '@/lib/i18n/i18n';
+import { AIR_COOLED_SYSTEM_PUE, LIQUID_COOLED_RACK_PUE } from '@/lib/power/facility-pue';
 
 export const FLOW_NODES = [
   'exporter',
@@ -34,7 +35,7 @@ export const FLOW_STRINGS = {
       gpu: ['Measured GPU W', 'avg · P75 · P90'],
       model: ['Power model', 'operating state'],
       it: ['IT power', 'no PUE'],
-      pue: ['× PUE', '1.3 air · 1.1 liquid'],
+      pue: ['× PUE', `${AIR_COOLED_SYSTEM_PUE} air · ${LIQUID_COOLED_RACK_PUE} liquid`],
       facility: ['Facility power', 'per GPU'],
       energy: ['Energy per token', '∫ W dt ÷ tokens'],
     },
@@ -47,7 +48,7 @@ export const FLOW_STRINGS = {
       model:
         'The open-source power_model takes the measured watts and an operating state (fixed sequence, agentic, agentic with KV offload) and adds the parts the cluster cannot measure.',
       it: 'IT power is the measured GPU plus modeled CPUs, memory, NICs, switches, storage, fans and PSU loss: the number capacity teams size racks with, before PUE.',
-      pue: 'PUE is a fixed input per cooling type, 1.3 for an air-cooled chassis and 1.1 for a liquid-cooled NVL72 rack. It is not measured at the benchmark site.',
+      pue: `PUE is a fixed input per cooling type, ${AIR_COOLED_SYSTEM_PUE} for an air-cooled chassis and ${LIQUID_COOLED_RACK_PUE} for a liquid-cooled NVL72 rack. It is not measured at the benchmark site.`,
       facility: 'Facility power is IT × PUE: what the utility has to deliver for the deployment.',
       energy:
         'Energy is the trapezoid integral of each GPU’s samples over the window; dividing the deployment’s energy by the tokens the client counted gives joules per token.',
@@ -61,7 +62,7 @@ export const FLOW_STRINGS = {
       gpu: ['实测 GPU 功耗', '平均 · P75 · P90'],
       model: ['功耗模型', '按工作状态'],
       it: ['IT 功率', '不含 PUE'],
-      pue: ['× PUE', '风冷 1.3 · 液冷 1.1'],
+      pue: ['× PUE', `风冷 ${AIR_COOLED_SYSTEM_PUE} · 液冷 ${LIQUID_COOLED_RACK_PUE}`],
       facility: ['数据中心功率', '每 GPU'],
       energy: ['每 token 能量', '∫ W dt ÷ token 数'],
     },
@@ -74,7 +75,7 @@ export const FLOW_STRINGS = {
       model:
         '开源的 power_model 接收实测瓦特数和一个工作状态（固定序列、智能体、带 KV offload 的智能体），补上集群无法实测的部件。',
       it: 'IT 功率 = 实测 GPU + 建模的 CPU、内存、NIC、交换芯片、存储、风扇和 PSU 损耗，是容量团队规划机柜时用的数字，不含 PUE。',
-      pue: 'PUE 是按散热方式固定的输入：风冷机箱 1.3，液冷 NVL72 机柜 1.1，并非在基准测试站点测得。',
+      pue: `PUE 是按散热方式固定的输入：风冷机箱 ${AIR_COOLED_SYSTEM_PUE}，液冷 NVL72 机柜 ${LIQUID_COOLED_RACK_PUE}，并非在基准测试站点测得。`,
       facility: '数据中心功率 = IT × PUE，即市电需要为这套部署供给的功率。',
       energy:
         '能量是每颗 GPU 的样本在窗口内的梯形积分；用整个部署的能量除以客户端统计的 token 数，就得到每 token 焦耳数。',
