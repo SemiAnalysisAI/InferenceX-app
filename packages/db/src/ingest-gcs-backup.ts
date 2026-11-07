@@ -15,7 +15,11 @@ import { printIngestSummaryFooter } from './etl/ingest-summary';
 import { GPU_KEYS, parseIslOsl } from './etl/normalizers';
 import { createConfigCache } from './etl/config-cache';
 import { createWorkflowRunServices, type GithubRunInfo } from './etl/workflow-run';
-import { mapBenchmarkRow, type BenchmarkParams } from './etl/benchmark-mapper';
+import {
+  mapBenchmarkRow,
+  requiredPowerFailure,
+  type BenchmarkParams,
+} from './etl/benchmark-mapper';
 import {
   bulkIngestBenchmarkRows,
   bulkIngestRunStats,
@@ -239,7 +243,12 @@ async function mapWorkflowDir(
         continue;
       }
       const mapped = mapBenchmarkRow(row, local, islOslFallback, githubRunId);
-      if (mapped) rows.push(mapped);
+      const withheld = mapped && requiredPowerFailure(row, mapped);
+      if (withheld)
+        warnings.push(
+          `  [WARN] ${dateDir}/${zipFile}: required-power point not published: ${withheld}`,
+        );
+      else if (mapped) rows.push(mapped);
     }
     const d = local.diff(snap);
     if (d.droppedModel + d.droppedHw + d.droppedIslOsl > 0) {

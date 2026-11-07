@@ -1,7 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { mapBenchmarkRow, type BenchmarkParams } from '../etl/benchmark-mapper.js';
+import {
+  mapBenchmarkRow,
+  requiredPowerFailure,
+  type BenchmarkParams,
+} from '../etl/benchmark-mapper.js';
 import { createSkipTracker } from '../etl/skip-tracker.js';
 import type { Sql } from '../etl/db-utils.js';
 import { configCacheKey, loadConfigIds } from '../etl/config-cache.js';
@@ -114,8 +118,9 @@ export function readMappedBenchmarkRows(
       }
       const failedRuns = tracker.skips.failedRun;
       const mapped = mapBenchmarkRow(raw as Record<string, unknown>, tracker, undefined, runId);
-      if (mapped) rows.push(mapped);
-      else if (tracker.skips.failedRun === failedRuns) onUnmapped(error);
+      if (!mapped) {
+        if (tracker.skips.failedRun === failedRuns) onUnmapped(error);
+      } else if (!requiredPowerFailure(raw as Record<string, unknown>, mapped)) rows.push(mapped);
     }
   }
   return rows;
