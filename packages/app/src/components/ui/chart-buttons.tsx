@@ -69,6 +69,7 @@ interface ChartButtonsProps {
   /** Called after a PNG export starts, so the caller can fire its own event. */
   onExportPng?: (aspectRatio: PngAspectRatio) => void;
   setIsLegendExpanded?: (expanded: boolean) => void;
+  hideLegendOnExport?: boolean;
   hideZoomReset?: boolean;
   hideImageExport?: boolean;
   onExportCsv?: () => void;
@@ -89,6 +90,7 @@ export function ChartButtons({
   zoomResetEvent,
   onExportPng,
   setIsLegendExpanded,
+  hideLegendOnExport,
   hideZoomReset,
   hideImageExport,
   onExportCsv,
@@ -126,6 +128,7 @@ export function ChartButtons({
   const { isExporting, exportToImage } = useChartExport({
     chartId,
     setIsLegendExpanded,
+    hideLegend: hideLegendOnExport,
     exportFileName,
   });
   const [popoverOpen, setPopoverOpen] = useState(false);

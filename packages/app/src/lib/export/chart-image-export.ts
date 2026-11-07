@@ -16,6 +16,7 @@ import {
 export interface ChartImageExportOptions {
   chartId: string;
   setIsLegendExpanded?: (expanded: boolean) => void;
+  hideLegend?: boolean;
   exportFileName?: string;
 }
 
@@ -220,12 +221,12 @@ export async function addWatermark(
 }
 
 export async function exportChartImage(
-  { chartId, setIsLegendExpanded, exportFileName }: ChartImageExportOptions,
+  { chartId, setIsLegendExpanded, hideLegend = false, exportFileName }: ChartImageExportOptions,
   ratio: PngAspectRatio,
   failureMessage: string,
 ) {
   let wasClosed = false;
-  if (setIsLegendExpanded) {
+  if (setIsLegendExpanded && !hideLegend) {
     const el = document.querySelector(`#${chartId}`);
     wasClosed = Boolean(el?.querySelector('[data-testid="legend-open-button"]'));
     if (wasClosed) {
@@ -251,6 +252,13 @@ export async function exportChartImage(
     clone.removeAttribute('id');
     const nestedExport = clone.querySelector(`[id="${chartId}-export"]`);
     if (nestedExport) nestedExport.remove();
+    if (hideLegend) {
+      for (const legend of clone.querySelectorAll(
+        '[data-slot="chart-legend-wrapper"], .legend-container',
+      )) {
+        legend.remove();
+      }
+    }
     for (const legend of clone.querySelectorAll<HTMLElement>(
       '[data-slot="chart-legend-wrapper"]',
     )) {
