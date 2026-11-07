@@ -299,7 +299,7 @@ export default function VideoDeploymentDetail({
                   key={resultsPointKey(sibling)}
                   type="button"
                   size="sm"
-                  variant={selected ? 'default' : 'outline'}
+                  variant="outline"
                   aria-pressed={selected}
                   className="text-xs"
                   onClick={() => {
