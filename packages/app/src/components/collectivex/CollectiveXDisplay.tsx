@@ -326,7 +326,7 @@ export default function CollectiveXDisplay() {
   const [modes, setModes] = useState<CollectiveXMode[]>(['normal', 'low-latency']);
   const [precision, setPrecision] = useState<CollectiveXPrecision>('fp8');
   const [percentile, setPercentile] = useState<CollectiveXPercentile>('p50');
-  const [yAxis, setYAxis] = useState<CollectiveXYAxis>('latency');
+  const [selectedYAxis, setYAxis] = useState<CollectiveXYAxis>('latency');
   const [sku, setSku] = useState('all');
   const [backend, setBackend] = useState('all');
   const [view, setView] = useState<'series' | 'range' | 'best'>('range');
@@ -344,6 +344,9 @@ export default function CollectiveXDisplay() {
   // Derived, not an effect: a run without a pair period never renders the empty headline.
   const operation: CollectiveXOperation =
     selectedOperation === 'pair_period' && !hasPairPeriod ? 'roundtrip' : selectedOperation;
+  // Token rate exists for the round trip only, whichever way the operation was reached.
+  const yAxis: CollectiveXYAxis =
+    selectedYAxis === 'tokens-per-second' && operation !== 'roundtrip' ? 'latency' : selectedYAxis;
   const operationOptions: SelectOption<CollectiveXOperation>[] = [
     ...(hasPairPeriod ? [{ value: 'pair_period' as const, label: t.operation.pair_period }] : []),
     { value: 'dispatch', label: t.operation.dispatch },
