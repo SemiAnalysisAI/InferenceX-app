@@ -273,9 +273,13 @@ export function modelSystemPower(row: BenchmarkRow): SystemPowerEstimate {
     }
     topologyBasis = 'worker-hosts';
   }
+  const extrapolated = chassis.some((c) => c.measuredGpus !== unitGpuCount);
+  // A host's RAPL packages also serve GPUs, and possibly jobs, a partial
+  // allocation did not measure, so only a whole x86 chassis takes them.
   measuredSockets &&=
     cpuAudit?.observed_sockets ===
-    chassis.length * (rack ? TRAY_GRACE_SOCKETS : CHASSIS_CPU_SOCKETS);
+      chassis.length * (rack ? TRAY_GRACE_SOCKETS : CHASSIS_CPU_SOCKETS) &&
+    (rack || !extrapolated);
   const socketInput = measuredSockets ? socketWatts! : null;
 
   let models: (SystemUnitPower | null)[];
@@ -309,7 +313,6 @@ export function modelSystemPower(row: BenchmarkRow): SystemPowerEstimate {
   if (models.some((model) => model === null)) return unavailable('model-domain');
   const results = chassis.map((c, i) => ({ ...c, model: models[i]! }));
   const modeledGpuCount = chassis.length * unitGpuCount;
-  const extrapolated = chassis.some((c) => c.measuredGpus !== unitGpuCount);
   const itWatts = results.reduce((sum, r) => sum + r.model.itWatts, 0);
   const facilityWatts = results.reduce((sum, r) => sum + r.model.facilityWatts, 0);
   const share = (watts: (r: (typeof results)[number]) => number) =>

@@ -118,6 +118,9 @@ when the same validated window also passes a CPU-side check:
 - Positive `avg_total_cpu_power_w` that equals `avg_cpu_socket_power_w` ×
   sockets within producer rounding.
 - The socket count equals chassis × 2.
+- Every chassis is fully measured (`chassisBasis: 'full'`). A partial allocation
+  keeps the modeled CPU: the host's packages also serve GPUs, and possibly jobs,
+  it did not measure, so the reading cannot be attributed to it.
 
 RAPL package power has no DRAM domain, so it replaces only the modeled `X86CPU`;
 the DDR5 DIMMs stay modeled, and fans and PSU loss respond to the measured CPU

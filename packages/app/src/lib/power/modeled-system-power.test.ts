@@ -661,6 +661,19 @@ describe('x86 RAPL CPU telemetry gate', () => {
     expect(total(result.deploymentBreakdownWatts)).toBeCloseTo(result.deploymentFacilityWatts, 6);
   });
 
+  it('keeps the modeled CPU when the point owns only part of the chassis', () => {
+    // A whole-host RAPL reading may include GPUs, or a job, the point did not measure.
+    const partial = mi355xRow(
+      { avg_total_gpu_power_w: 1399.436 },
+      { prefill_tp: 4, decode_tp: 4, num_prefill_gpu: 4, num_decode_gpu: 4 },
+    );
+    expect(modelSystemPower(partial)).toMatchObject({
+      chassisBasis: 'extrapolated',
+      cpuBasis: 'modeled',
+      measuredCpuSocketWatts: null,
+    });
+  });
+
   it.each([
     ['a legacy row without a CPU verdict', mi355xRow({ cpu_power_valid: undefined })],
     ['a missing CPU audit', mi355xRow({}, { power_audit: undefined })],
