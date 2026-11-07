@@ -495,6 +495,16 @@ describe('Historical frontier views', () => {
       .closest('section')
       .should('contain.text', 'the ground of its first run');
     cy.get('[data-testid="frontier-software-bars"] rect').should('have.length.greaterThan', 0);
+    cy.get('[data-testid="frontier-software-table"]').within(() => {
+      cy.contains('th', 'Average').should('exist');
+      cy.get('tbody tr').should('have.length.greaterThan', 0);
+      cy.get('tbody tr')
+        .first()
+        .find('td')
+        .last()
+        .invoke('text')
+        .should('match', /x$|—/);
+    });
   });
 
   it('scrubs the chapter timeline and lists the points behind the curve', () => {

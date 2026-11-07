@@ -265,6 +265,11 @@ const responseSchema = objectSchema(
                 description:
                   'On the latest date, the series frontier over its first-snapshot frontier at the 12 comparison buckets, read off the drawn monotone curves; null where either curve does not reach.',
               },
+              softwareGainAverage: {
+                type: ['number', 'null'],
+                description:
+                  'Average of softwareGainByInteractivity: the geometric mean of the non-null ratios, so a 2x gain and a 0.5x loss cancel; null when no bucket is reached on both dates. The Software gains table shows it as the Average column.',
+              },
               areas: {
                 ...arraySchema(numberSchema),
                 description:

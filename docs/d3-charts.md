@@ -257,7 +257,9 @@ headers aligned through a CSS subgrid, so their x axes line up.
 - **Software gains** holds the hardware constant: it always groups by chip and plots
   `softwareGains` (each chip's area over its own first-run area) over time, and
   `softwareGainByInteractivity` (current over first-run frontier at the 12 buckets)
-  as grouped bars.
+  as grouped bars. A table under the panels lists the same ratios per selected chip,
+  one column per bucket, with an Average column (`averageSoftwareGain`, the geometric
+  mean of the ratios the chip reaches); it follows the playback date.
 
 The optional **Memes** switch is an easter egg: once per playback run, the first time
 another vendor takes part of the curve from NVIDIA, a small meme card appears in the

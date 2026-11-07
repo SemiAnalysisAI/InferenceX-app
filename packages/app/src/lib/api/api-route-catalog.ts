@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-historical-view',
-    sourceSha256: 'b81564a792978b4e5b49c6d0e1b904d22c5ca409e466992b3525814d2981a3f3',
+    sourceSha256: '4229ea02ed894d23a024ed9cc929709610d3c5beebc2574793f616ba10655540',
   },
   {
     source: 'src/app/api/v1/views/inference/route.ts',

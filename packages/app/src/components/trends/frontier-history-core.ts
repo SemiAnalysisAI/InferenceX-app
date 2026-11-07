@@ -637,6 +637,21 @@ export function softwareGainByInteractivity(
   });
 }
 
+/**
+ * Average of a chip's software gain across the interactivity levels both curves reach: the
+ * geometric mean of the ratios, since a 2x gain and a 0.5x loss should cancel. Null when no
+ * level is reached on both dates.
+ */
+export function averageSoftwareGain(
+  gains: readonly { x: number; ratio: number | null }[],
+): number | null {
+  const ratios = gains.flatMap((gain) =>
+    gain.ratio !== null && gain.ratio > 0 ? [gain.ratio] : [],
+  );
+  if (ratios.length === 0) return null;
+  return Math.exp(ratios.reduce((sum, ratio) => sum + Math.log(ratio), 0) / ratios.length);
+}
+
 /** Largest software-gain bar magnitude across playback, in log2 units. */
 export function softwareGainBarMaxLog(
   history: FrontierHistory,
