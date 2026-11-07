@@ -53,20 +53,20 @@ function tooltipConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
 describe('tooltip parallelism — old data (no ep field)', () => {
   it('shows GPU count when ep and prefill_ep are absent', () => {
     const html = detailsText(tooltipConfig({ data: pt({ tp: 4 }) }));
-    expect(html).toContain('4 Chip');
+    expect(html).toContain('Single-node aggregate · 4 chips · conc 64');
     expect(html).not.toContain('Tensor parallelism');
     expect(html).not.toContain('Expert parallelism');
   });
 
-  it('pluralizes "GPUs" for tp > 1', () => {
+  it('pluralizes chips for tp > 1', () => {
     const html = detailsText(tooltipConfig({ data: pt({ tp: 8 }) }));
-    expect(html).toContain('8 Chips');
+    expect(html).toContain('8 chips');
   });
 
-  it('uses singular "GPU" for tp = 1', () => {
+  it('uses singular chip for tp = 1', () => {
     const html = detailsText(tooltipConfig({ data: pt({ tp: 1 }) }));
-    expect(html).toContain('1 Chip');
-    expect(html).not.toContain('1 Chips');
+    expect(html).toContain('1 chip ·');
+    expect(html).not.toContain('1 chips');
   });
 });
 
@@ -111,17 +111,14 @@ describe('tooltip parallelism — standard (ep field present)', () => {
       }),
     );
 
-    expect(html).toContain('Multi-node aggregate');
-    expect(html).toContain('Parallelism strategy');
-    expect(html).toContain('TP8PP2');
+    expect(html).toContain('Multi-node aggregate · 16 chips · TP8PP2 · conc 64');
     expect(html).not.toContain('Prefill');
     expect(html).not.toContain('Decode');
   });
 
   it('shows TP, EP and DP attention for non-multinode data', () => {
     const html = detailsText(tooltipConfig({ data: pt({ tp: 4, ep: 8, dp_attention: false }) }));
-    expect(html).toContain('Single-node aggregate');
-    expect(html).toContain('Parallelism strategyEP8');
+    expect(html).toContain('Single-node aggregate · 4 chips · EP8 · conc 64');
     expect(html).not.toContain('DPA');
   });
 
@@ -142,7 +139,7 @@ describe('tooltip parallelism — standard (ep field present)', () => {
       const html = detailsText(
         tooltipConfig({ data: pt({ tp: 8, ep: 1, pp, dp_attention: false }) }),
       );
-      expect(html).toContain('Parallelism strategyTP8');
+      expect(html).toContain('8 chips · TP8 · conc 64');
       expect(html).not.toContain('PP');
     }
   });
@@ -188,7 +185,7 @@ describe('tooltip parallelism — standard (ep field present)', () => {
     (d as any).ep = null;
     (d as any).prefill_ep = 2;
     const html = detailsText(tooltipConfig({ data: d }));
-    expect(html).toContain('Parallelism strategyTP4');
+    expect(html).toContain('4 chips · TP4 · conc 64');
     expect(html).not.toContain('EP');
   });
 });
@@ -336,9 +333,7 @@ describe('tooltip parallelism — zh locale', () => {
       locale: 'zh',
     });
     const text = detailsText(config);
-    expect(text).toContain('单节点聚合');
-    expect(text).toContain('并行策略');
-    expect(text).toContain('TP8PP2');
+    expect(text).toContain('单节点聚合 · 16 芯片 · TP8PP2 · 并发 64');
     expect(text).not.toContain('配置详情');
     expect(text).not.toContain('Parallelism strategy');
   });
@@ -351,14 +346,12 @@ describe('tooltip parallelism — zh locale', () => {
       }),
     );
 
-    expect(text).toContain('并行策略');
-    expect(text).toContain('TP8/DCP8/PCP4');
+    expect(text).toContain('8 芯片 · TP8/DCP8/PCP4 · 并发 64');
   });
 
   it('localizes the old-data parallelism strategy line', () => {
     const html = detailsText(tooltipConfig({ data: pt({ tp: 4 }), locale: 'zh' }));
-    expect(html).toContain('并行策略');
-    expect(html).toContain('4 个芯片');
+    expect(html).toContain('单节点聚合 · 4 芯片 · 并发 64');
   });
 
   it('localizes the multinode disagg role rows', () => {
@@ -382,16 +375,14 @@ describe('tooltip parallelism — zh locale', () => {
   });
 });
 
-describe('tooltip — Total GPUs line', () => {
-  it('always shows Total GPUs in standard tooltip', () => {
+describe('tooltip — chip count', () => {
+  it('always shows the chip count in the standard tooltip', () => {
     const html = detailsText(tooltipConfig({ data: pt({ tp: 16 }) }));
-    expect(html).toContain('Total chips');
-    expect(html).toContain('16');
+    expect(html).toContain('16 chips');
   });
 
-  it('always shows Total GPUs in GPU graph tooltip', () => {
+  it('always shows the chip count in the GPU graph tooltip', () => {
     const html = comparisonDetailsText(tooltipConfig({ data: pt({ tp: 32 }) }));
-    expect(html).toContain('Total chips');
-    expect(html).toContain('32');
+    expect(html).toContain('32 chips');
   });
 });

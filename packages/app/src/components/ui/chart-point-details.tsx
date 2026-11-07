@@ -13,9 +13,6 @@ const STRINGS = {
   zh: { title: '数据点详情', close: '关闭数据点详情' },
 } as const;
 
-const LINK_CLASS =
-  'cursor-pointer font-medium text-foreground underline decoration-muted-foreground/50 underline-offset-4 hover:decoration-foreground';
-
 const STRIP_VALUE_MAX = 8;
 const STRIP_LABEL_MAX = 14;
 
@@ -90,7 +87,7 @@ export function ChartPointDetails<A extends string = string>({
       ref={ref}
       data-testid="point-details-panel"
       aria-label={t.title}
-      className="flex w-full scroll-mt-20 flex-col rounded-lg border border-border/30 bg-background p-3 text-xs leading-5"
+      className="flex w-full scroll-mt-20 flex-col rounded-lg border border-border/30 bg-background p-2 text-xs leading-5"
     >
       {warning && <p className="mb-1 font-semibold text-destructive">{warning}</p>}
       <div className="flex items-start gap-1.5">
@@ -101,7 +98,7 @@ export function ChartPointDetails<A extends string = string>({
             style={{ backgroundColor: color }}
           />
         )}
-        <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
           <p className="text-sm font-semibold text-foreground">
             {title}
             {subtitle && (
@@ -119,7 +116,7 @@ export function ChartPointDetails<A extends string = string>({
           size="icon-2xs"
           data-testid="point-details-close"
           aria-label={t.close}
-          className="-mr-1.5 -mt-1 shrink-0 text-muted-foreground"
+          className="-mr-1 -mt-1 shrink-0 text-muted-foreground"
           onClick={onClose}
         >
           <X />
@@ -129,11 +126,8 @@ export function ChartPointDetails<A extends string = string>({
         <div className="inferencex-pinned-tooltip">
           {metrics.length > 0 && (
             <dl className="pinned-metrics">
-              {metrics.map((metric, index) => (
-                <div
-                  key={metric.label}
-                  className={metrics.length % 2 === 1 && index === 0 ? 'col-span-2' : undefined}
-                >
+              {metrics.map((metric) => (
+                <div key={metric.label}>
                   <dt className="pinned-metric-label">{metric.label}</dt>
                   <dd className="pinned-metric-value">{metric.value}</dd>
                   {metric.exact && metric.exact !== metric.value && (
@@ -175,42 +169,33 @@ export function ChartPointDetails<A extends string = string>({
       )}
       {children}
       {links.length > 0 && (
-        <div className="mt-3 flex flex-col gap-2 border-t border-border/50 pt-2.5">
-          {externalLinks.length > 0 && (
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {externalLinks.map((link) => (
-                <a
-                  key={link.action}
-                  data-action={link.action}
-                  href={link.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={LINK_CLASS}
-                  onClick={(event) => onAction?.(link.action, event)}
-                >
-                  {link.label} ↗
-                </a>
-              ))}
-            </div>
-          )}
-          {actions.length > 0 && (
-            <div className="grid grid-cols-2 gap-1.5">
-              {actions.map((link) => (
-                <Button
-                  key={link.action}
-                  asChild={Boolean(link.href)}
-                  type={link.href ? undefined : 'button'}
-                  variant="outline"
-                  size="xs"
-                  data-action={link.action}
-                  className="w-full"
-                  onClick={(event: React.MouseEvent<HTMLElement>) => onAction?.(link.action, event)}
-                >
-                  {link.href ? <a href={link.href}>{link.label} →</a> : <>{link.label} →</>}
-                </Button>
-              ))}
-            </div>
-          )}
+        <div className="mt-1.5 flex flex-wrap gap-1 border-t border-border/50 pt-1.5">
+          {[...externalLinks, ...actions].map((link) => {
+            const external = externalLinks.includes(link);
+            return (
+              <Button
+                key={link.action}
+                asChild={Boolean(link.href)}
+                type={link.href ? undefined : 'button'}
+                variant="outline"
+                size="2xs"
+                data-action={link.action}
+                onClick={(event: React.MouseEvent<HTMLElement>) => onAction?.(link.action, event)}
+              >
+                {link.href ? (
+                  <a
+                    href={link.href}
+                    target={external ? '_blank' : undefined}
+                    rel={external ? 'noopener noreferrer' : undefined}
+                  >
+                    {link.label} {external ? '↗' : '→'}
+                  </a>
+                ) : (
+                  <>{link.label} →</>
+                )}
+              </Button>
+            );
+          })}
         </div>
       )}
     </section>

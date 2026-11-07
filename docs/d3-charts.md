@@ -117,13 +117,16 @@ This keeps zoom at 60fps while deferring expensive work. Effect cleanup cancels 
 ## HTML Strings for Tooltips
 
 Pinned point details reuse the compact hover card's KV cache bar, including the
-chip/CPU split and theoretical marker. TRT-LLM's combined rate stays a single
+chip/CPU split and theoretical marker, as one thin bar with its label and total on the
+same row. TRT-LLM's combined rate stays a single
 segment; disabled offload does not contribute CPU hits. Missing chip measurements
-retain the available textual rates instead of inventing a bar. Concurrency and
-precision use explicit labels, and parallelism groups Prefill/Decode configurations by
-role with compact labels such as DEP4. There is no raw configuration table.
-Prompt/generated token counts use a proportional bar with
-exact counts underneath; partial or invalid counts do not produce a split.
+retain the available textual rates instead of inventing a bar. Precision joins the
+engine in the header, and deployment, chip count, parallelism and concurrency share one
+line (`Single-node aggregate · 8 chips · DEP8 · conc 64`). Disaggregated points group
+Prefill/Decode configurations by role with compact labels such as DEP4. There is no raw
+configuration table.
+Prompt/generated token counts use a thin proportional bar with
+exact counts in one legend line; partial or invalid counts do not produce a split.
 Official, unofficial and historical points
 share this presentation; unofficial colors retain their per-run identity.
 This is presentation-only: benchmark values, API responses and `inferencex-skills`

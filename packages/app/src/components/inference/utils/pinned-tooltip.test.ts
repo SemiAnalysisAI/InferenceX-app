@@ -64,11 +64,11 @@ describe.each([
   ['historical', historical],
   ['unofficial', overlay],
 ] as const)('%s pinned details', (_name, render) => {
-  it('groups role topology and explicit concurrency/precision without losing full values', () => {
+  it('merges deployment, chips and concurrency into one line without losing full values', () => {
     const html = render(config());
     const content = text(html);
-    expect(content).toContain('Concurrency: 10,888');
-    expect(content).toContain('Precision: FP4');
+    expect(content).toContain('Disaggregated · 64 chips · conc 10,888');
+    expect(buildPointDetails(config()).subtitle).toBe('FP4');
     expect(content).toContain('Chips Configuration Workers');
     expect(content).toContain('Prefill 32 DEP2 16');
     expect(content).toContain('Decode 32 DEP32 1');
@@ -149,8 +149,7 @@ describe.each([
 
   it('uses the existing Chinese labels', () => {
     const content = text(render(config({ locale: 'zh' })));
-    expect(content).toContain('并发数： 10,888');
-    expect(content).toContain('精度： FP4');
+    expect(content).toContain('分离式 · 64 芯片 · 并发 10,888');
     expect(content).toContain('个芯片 配置 worker 数');
     expect(content).toContain('预填充 32 DEP2 16');
     expect(content).toContain('KV cache 命中率');
@@ -232,7 +231,7 @@ describe.each([
         }),
       }),
     );
-    expect(text(html)).toContain('Parallelism strategy: 8 Chips');
+    expect(text(html)).toContain('Multi-node aggregate · 8 chips · conc 10,888');
     expect(text(html)).toContain('Decode context parallelism (DCP): 4');
     expect(html).not.toContain('>TP8<');
   });

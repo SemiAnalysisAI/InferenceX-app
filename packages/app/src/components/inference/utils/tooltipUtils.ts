@@ -105,7 +105,7 @@ export const getPointLabel = (d: InferenceData): string => {
 const labelColon = (label: string) => (/[\u4E00-\u9FFF]/u.test(label) ? '：' : ':');
 
 const tooltipLine = (label: string, value: string | number) =>
-  `<div class="tooltip-line" style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${label}${labelColon(label)}</strong> ${value}</div>`;
+  `<div class="tooltip-line"><strong>${label}${labelColon(label)}</strong> ${value}</div>`;
 
 const formatPct = (v: number | undefined): string | null =>
   v === undefined || v === null || !Number.isFinite(v) ? null : `${(v * 100).toFixed(1)}%`;
@@ -130,9 +130,6 @@ const TOOLTIP_STRINGS = {
     dataFrom: (d: string) => `(data from ${d})`,
     date: 'Date',
     branch: 'Branch',
-    totalChips: 'Total chips',
-    concurrency: 'Concurrency',
-    precision: 'Precision',
     image: 'Image',
     inputTputPerChip: 'Input Token Throughput per Chip',
     outputTputPerChip: 'Output Token Throughput per Chip',
@@ -149,9 +146,6 @@ const TOOLTIP_STRINGS = {
     dataFrom: (d: string) => `（数据来自 ${d}）`,
     date: '日期',
     branch: '分支',
-    totalChips: '芯片总数',
-    concurrency: '并发数',
-    precision: '精度',
     image: '镜像',
     inputTputPerChip: '每芯片输入 token 吞吐量',
     outputTputPerChip: '每芯片输出 token 吞吐量',
@@ -392,7 +386,7 @@ const modeledSystemPowerHTML = (
   const u = t.units[estimate.unit];
   const reading = (watts: number, basis: 'gpu' | 'it' | 'facility') =>
     `<span data-power-reading>${fmtWatts(watts)} W/GPU${powerBasisPillHtml(basis, locale)}</span>`;
-  return `<div data-testid="tooltip-modeled-system-power" style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; font-size: 11px;">
+  return `<div data-testid="tooltip-modeled-system-power" class="pinned-subsection">
     <strong>${t.heading}</strong>
     ${tooltipLine(t.measuredGpu, reading(estimate.measuredGpuWattsPerGpu, 'gpu'))}
     ${estimate.unit === 'nvl72-tray' && estimate.measuredGraceSocketWatts !== null ? tooltipLine(t.graceSocket, `${fmtWatts(estimate.measuredGraceSocketWatts)} W/socket`) : ''}
@@ -443,13 +437,13 @@ const workerPowerHTML = (d: InferenceData, locale: Locale): string => {
     if (typeof w.avg_util_pct === 'number') parts.push(`${fmt(w.avg_util_pct)}%`);
     if (typeof w.avg_mem_used_mb === 'number') parts.push(`${fmt(w.avg_mem_used_mb / 1024)} GiB`);
     if (Array.isArray(w.hosts) && w.hosts.length > 0) parts.push(escapeHtml(w.hosts.join(',')));
-    return `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px; overflow-wrap: anywhere;">${parts.join(' · ')}</div>`;
+    return `<div style="color: var(--muted-foreground); overflow-wrap: anywhere;">${parts.join(' · ')}</div>`;
   });
   const overflow = d.workers.length - WORKER_ROWS_LIMIT;
-  return `<div data-testid="tooltip-worker-power" style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px;">
-      <div style="color: var(--foreground); font-size: 11px; font-weight: 600; margin-bottom: 4px;">${t.heading}</div>
+  return `<div data-testid="tooltip-worker-power" class="pinned-subsection">
+      <div style="color: var(--foreground); font-weight: 600;">${t.heading}</div>
       ${rows.join('')}
-      ${overflow > 0 ? `<div style="color: var(--muted-foreground); font-size: 11px;">${t.more(overflow)}</div>` : ''}
+      ${overflow > 0 ? `<div style="color: var(--muted-foreground);">${t.more(overflow)}</div>` : ''}
     </div>`;
 };
 
@@ -517,7 +511,8 @@ const cacheHTML = (d: InferenceData, locale: Locale, color: string): string => {
 
   const cache = pointCacheHit(d, locale);
   if (cache) {
-    return `<div data-pinned-cache style="margin-bottom: 12px;">${hoverCacheHTML(cache, color)}</div>${rowsHTML(rows)}`;
+    return `<div data-pinned-cache class="pinned-bar"><div class="pinned-bar-row"><span>${escapeHtml(cache.label)}</span>${cacheBarHTML(cache, color, 4)}<strong>${cache.total}</strong></div>
+      <div class="pinned-bar-legend">${cacheLegendHTML(cache, color)}</div></div>${rowsHTML(rows)}`;
   }
   const gpuHit = formatPct(d.server_gpu_cache_hit_rate);
   const cpuHit = formatPct(d.server_cpu_cache_hit_rate);
@@ -628,15 +623,14 @@ const tokenBreakdownHTML = (d: InferenceData, locale: Locale): string => {
   const total = prompt + generated;
   const promptWidth = total === 0 ? 0 : (prompt / total) * 100;
   const generatedWidth = total === 0 ? 0 : 100 - promptWidth;
-  return `<div data-pinned-tokens class="pinned-token-breakdown">
-    <div class="pinned-bar-heading"><span>${t.tokens}</span><strong>${formatHoverValue(total)}</strong></div>
-    <div class="pinned-token-track" role="img" aria-label="${t.promptTokens}: ${formatNumber(prompt)}; ${t.generatedTokens}: ${formatNumber(generated)}">
+  return `<div data-pinned-tokens class="pinned-bar">
+    <div class="pinned-bar-row"><span>${t.tokens}</span><div class="pinned-token-track" role="img" aria-label="${t.promptTokens}: ${formatNumber(prompt)}; ${t.generatedTokens}: ${formatNumber(generated)}">
       <span data-token-prompt style="width: ${promptWidth}%;"></span>
       <span data-token-generated style="width: ${generatedWidth}%;"></span>
-    </div>
-    <div class="pinned-token-legend">
-      <div><span class="pinned-token-label"><i class="token-prompt-dot"></i>${t.promptTokens}</span><span class="pinned-token-count">${formatNumber(prompt)}</span></div>
-      <div><span class="pinned-token-label"><i class="token-generated-dot"></i>${t.generatedTokens}</span><span class="pinned-token-count">${formatNumber(generated)}</span></div>
+    </div><strong>${formatHoverValue(total)}</strong></div>
+    <div class="pinned-bar-legend">
+      <span class="pinned-token-label"><i class="token-prompt-dot"></i>${t.promptTokens} <span class="pinned-token-count">${formatNumber(prompt)}</span></span>
+      <span class="pinned-token-label"><i class="token-generated-dot"></i>${t.generatedTokens} <span class="pinned-token-count">${formatNumber(generated)}</span></span>
     </div>
   </div>`;
 };
@@ -761,12 +755,9 @@ const pointLinks = ({
 
 const PARALLELISM_STRINGS = {
   en: {
-    strategy: 'Parallelism strategy',
-    deployment: 'Deployment',
     singleNode: 'Single-node aggregate',
     multiNode: 'Multi-node aggregate',
     disaggregated: 'Disaggregated',
-    gpuCount: (n: number) => `${n} Chip${n > 1 ? 's' : ''}`,
     prefill: 'Prefill',
     decode: 'Decode',
     gpusUnit: 'Chips',
@@ -783,12 +774,9 @@ const PARALLELISM_STRINGS = {
     configuration: 'Configuration',
   },
   zh: {
-    strategy: '并行策略',
-    deployment: '部署模式',
     singleNode: '单节点聚合',
     multiNode: '多节点聚合',
     disaggregated: '分离式',
-    gpuCount: (n: number) => `${n} 个芯片`,
     prefill: '预填充',
     decode: '解码',
     gpusUnit: '个芯片',
@@ -810,25 +798,33 @@ const legacyParallelismRows = (d: InferenceData, locale: Locale): PointDetailRow
   const t = PARALLELISM_STRINGS[locale];
   const aggregateDcp = meaningfulParallelismSize(d.prefill_dcp_size, d.decode_dcp_size);
   const aggregatePcp = meaningfulParallelismSize(d.prefill_pcp_size, d.decode_pcp_size);
-  const rows = [
-    row(t.deployment, d.is_multinode ? t.multiNode : t.singleNode),
-    row(t.strategy, t.gpuCount(d.physicalChips ?? d.tp)),
-  ];
+  const rows: PointDetailRow[] = [];
   if (aggregateDcp) rows.push(row(t.decodeContextParallelism, aggregateDcp));
   if (aggregatePcp) rows.push(row(t.prefillContextParallelism, aggregatePcp));
   return rows;
 };
 
+const pinnedFactsHTML = (d: InferenceData, locale: Locale, deployment: string, config = '') => {
+  const t = HOVER_STRINGS[locale];
+  const facts = [
+    deployment,
+    t.chips(d.physicalChips ?? d.tp),
+    config,
+    t.conc(d.conc.toLocaleString('en-US')),
+  ];
+  return `<div data-pinned-config class="pinned-facts">${facts.filter(Boolean).join(' · ')}</div>`;
+};
+
 const topologyHTML = (d: InferenceData, locale: Locale): string => {
+  const t = PARALLELISM_STRINGS[locale];
   if (
     !d.disagg &&
     (d.ep === null || d.ep === undefined) &&
     (d.prefill_ep === null || d.prefill_ep === undefined) &&
     !(d.prefill_dwdp_size && d.prefill_dwdp_size > 1)
   ) {
-    return `<div data-pinned-parallelism class="pinned-section">${rowsHTML(legacyParallelismRows(d, locale))}</div>`;
+    return `<div data-pinned-parallelism>${pinnedFactsHTML(d, locale, d.is_multinode ? t.multiNode : t.singleNode)}${rowsHTML(legacyParallelismRows(d, locale))}</div>`;
   }
-  const t = PARALLELISM_STRINGS[locale];
   const bool = (v: boolean | string | undefined) =>
     v === undefined ? '?' : asBool(v) ? t.yes : t.no;
   type Cell = string | number | undefined;
@@ -875,15 +871,14 @@ const topologyHTML = (d: InferenceData, locale: Locale): string => {
     );
   };
 
-  return `<div data-pinned-parallelism class="pinned-section">
-    <div class="pinned-metric-label" style="margin-bottom: 10px;">${deployment}</div>
+  return `<div data-pinned-parallelism>
     ${
       d.disagg
-        ? `<div class="pinned-table-scroll"><table class="pinned-topology pinned-compact-topology" aria-label="${t.configuration}">
+        ? `${pinnedFactsHTML(d, locale, deployment)}<div class="pinned-table-scroll"><table class="pinned-topology pinned-compact-topology" aria-label="${t.configuration}">
       <thead><tr><th></th><th>${t.gpusUnit}</th><th>${t.configuration}</th><th>${t.workers}</th></tr></thead>
       <tbody>${rows.map((r) => `<tr><td>${r.role}</td><td>${r.chips ?? '?'}</td><td><strong>${compact(r)}</strong></td><td>${r.workers ?? '?'}</td></tr>`).join(' ')}</tbody>
     </table></div>`
-        : `<div class="pinned-config-summary"><span>${t.strategy}</span><strong>${compact(rows[0])}</strong></div>`
+        : pinnedFactsHTML(d, locale, deployment, `<strong>${compact(rows[0])}</strong>`)
     }
   </div>`;
 };
@@ -923,9 +918,6 @@ const pinnedMetricHTML = (label: string, value: number, metricKey?: string) => `
   <div class="pinned-exact">${metricKey ? fmtY(value, metricKey) : fmt(value)}</div>
 </div>`;
 
-const pinnedStatHTML = (label: string, value: string | number) =>
-  `<div><span>${label}${labelColon(label)}</span> <strong>${escapeHtml(String(value))}</strong></div>`;
-
 const pinnedSectionHTML = (html: string) =>
   html ? `<div class="pinned-section">${html}</div>` : '';
 
@@ -964,17 +956,15 @@ export const buildPointDetails = (config: TooltipConfig): PointDetails => {
   const comparisonDate = config.comparisonLabel ?? formatTooltipDate(entryDate, locale);
   return {
     title: hw?.label ?? String(d.hwKey),
-    subtitle: engines ?? '',
+    subtitle: [engines, d.precision.toUpperCase()].filter(Boolean).join(' · '),
     unofficial: overlayData ? t.unofficialRun : undefined,
     date: config.comparisonDate
       ? `${comparisonDate}${d.actualDate && d.actualDate !== entryDate ? ` ${t.dataFrom(ownDate)}` : ''}`
       : (config.comparisonLabel ?? ownDate),
     html: `<div class="pinned-metrics">${pinnedMetricHTML(yLabel, d.y, selectedYAxisMetric)}${pinnedMetricHTML(xLabel, d.x)}</div>
-    <div data-pinned-config class="pinned-strip">${pinnedStatHTML(t.concurrency, d.conc.toLocaleString('en-US'))}${pinnedStatHTML(t.precision, d.precision.toUpperCase())}${pinnedStatHTML(t.totalChips, d.physicalChips ?? d.tp)}</div>
-    ${rowsHTML(tputRows)}
     ${topologyHTML(d, locale)}
-    ${pinnedSectionHTML(cacheHTML(d, locale, config.color ?? 'var(--foreground)'))}
-    ${pinnedSectionHTML(runtimeHTML(d, locale))}
+    ${rowsHTML(tputRows)}
+    ${pinnedSectionHTML(cacheHTML(d, locale, config.color ?? 'var(--foreground)') + runtimeHTML(d, locale))}
     ${pinnedSectionHTML(power)}
     ${pinnedSectionHTML(footer)}`,
     links: pointLinks({
@@ -991,12 +981,12 @@ export const buildPointDetails = (config: TooltipConfig): PointDetails => {
 
 const HOVER_STRINGS = {
   en: {
-    conc: (n: number) => `conc ${n}`,
+    conc: (n: number | string) => `conc ${n}`,
     chips: (n: number) => `${n} ${n === 1 ? 'chip' : 'chips'}`,
     details: 'Click for full details',
   },
   zh: {
-    conc: (n: number) => `并发 ${n}`,
+    conc: (n: number | string) => `并发 ${n}`,
     chips: (n: number) => `${n} 芯片`,
     details: '点击查看完整信息',
   },
@@ -1017,18 +1007,22 @@ export const formatHoverValue = (value: number, metric?: string): string => {
 const hoverSwatch = (color: string, size: number, opacity = 1) =>
   `<span style="display: inline-block; flex: none; width: ${size}px; height: ${size}px; border-radius: 50%; background: ${color}; opacity: ${opacity}; margin-right: 5px;"></span>`;
 
+const cacheBarHTML = (cache: PointCacheHit, color: string, height: number): string => `
+      <div data-hover-cache-bar style="position: relative; display: flex; height: ${height}px; border-radius: ${height / 2}px; overflow: hidden; background: var(--border);">
+        ${cache.segments.map((s) => `<div style="width: ${s.share}%; background: ${color}; opacity: ${s.opacity};"></div>`).join('')}
+        ${cache.theoretical ? `<div style="position: absolute; top: 0; bottom: 0; left: calc(${cache.theoretical.share}% - 1px); width: 2px; background: var(--foreground); opacity: 0.6;"></div>` : ''}
+      </div>`;
+
+const cacheLegendHTML = (cache: PointCacheHit, color: string): string => `
+        ${cache.segments.map((s) => `<span style="display: inline-flex; align-items: center;">${hoverSwatch(color, 6, s.opacity)}${escapeHtml(s.label)}</span>`).join('')}
+        ${cache.theoretical ? `<span style="opacity: 0.8;">${escapeHtml(cache.theoretical.label)}</span>` : ''}`;
+
 const hoverCacheHTML = (cache: PointCacheHit, color: string): string => `
       <div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; margin-bottom: 4px; font-size: 11px;">
         <span style="color: var(--muted-foreground);">${escapeHtml(cache.label)}</span>
         <span style="color: var(--foreground); font-weight: 600;">${cache.total}</span>
-      </div>
-      <div data-hover-cache-bar style="position: relative; display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--border);">
-        ${cache.segments.map((s) => `<div style="width: ${s.share}%; background: ${color}; opacity: ${s.opacity};"></div>`).join('')}
-        ${cache.theoretical ? `<div style="position: absolute; top: 0; bottom: 0; left: calc(${cache.theoretical.share}% - 1px); width: 2px; background: var(--foreground); opacity: 0.6;"></div>` : ''}
-      </div>
-      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 5px; font-size: 11px; color: var(--muted-foreground);">
-        ${cache.segments.map((s) => `<span style="display: inline-flex; align-items: center;">${hoverSwatch(color, 6, s.opacity)}${escapeHtml(s.label)}</span>`).join('')}
-        ${cache.theoretical ? `<span style="opacity: 0.8;">${escapeHtml(cache.theoretical.label)}</span>` : ''}
+      </div>${cacheBarHTML(cache, color, 6)}
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 5px; font-size: 11px; color: var(--muted-foreground);">${cacheLegendHTML(cache, color)}
       </div>`;
 
 export interface HoverTooltipConfig extends Pick<

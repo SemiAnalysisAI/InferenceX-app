@@ -117,7 +117,7 @@ describe('ScatterGraph', () => {
         cy.get('#outside-dismissal [data-testid="point-details-panel"]')
           .should('be.visible')
           .find('[data-pinned-config]')
-          .should('contain.text', `Concurrency: ${overlay ? 32 : 16}`);
+          .should('contain.text', `conc ${overlay ? 32 : 16}`);
       };
       pin();
       cy.get('[data-pinned-config]').click();
@@ -191,9 +191,9 @@ describe('ScatterGraph', () => {
         cy.get('[data-pinned-config]').should('not.exist');
         clickScatterPoint(point);
       });
+    cy.get('[data-testid="point-details-panel"] p').first().should('contain.text', 'FP4');
     cy.get('[data-pinned-config]')
-      .should('contain.text', 'Concurrency: 10,888')
-      .and('contain.text', 'Precision: FP4')
+      .should('contain.text', 'Disaggregated · 64 chips · conc 10,888')
       .and('not.have.css', 'font-family', 'monospace');
     cy.get('[data-pinned-parallelism]')
       .should('contain.text', 'Prefill')

@@ -140,7 +140,7 @@ describe('run-specific framework tooltip labels', () => {
       ];
       for (const html of outputs) {
         expect(html).toContain(
-          point === target ? 'MI355X\nMoRI UMBP SGLang\n' : 'MI355X\nMoRI SGLang\n',
+          point === target ? 'MI355X\nMoRI UMBP SGLang · FP8\n' : 'MI355X\nMoRI SGLang · FP8\n',
         );
         expect(html).not.toContain('MoRI SGLang / MoRI UMBP SGLang');
         if (point === historical) expect(html).not.toContain('MoRI UMBP SGLang');
@@ -202,7 +202,7 @@ describe('modeled system-power tooltip', () => {
     expect(html).toContain('3,600 W');
     expect(html).not.toContain('6000 W');
     expect(html).not.toContain('7200 W');
-    expect(html).toContain('Total chips: 4');
+    expect(html).toContain('4 chips');
 
     const zh = detailsText(config({ data, locale: 'zh' }));
     expect(zh).toContain('1 个八卡机箱 · 实测 4/8 张 GPU，按满机箱外推');
@@ -270,7 +270,7 @@ describe('modeled system-power tooltip', () => {
     expect(html).not.toContain('0 W/GPU');
   });
 
-  it('sets every system-power line in the 11px tooltip text size', () => {
+  it('leaves every system-power line to the pinned panel text size', () => {
     const host = document.createElement('div');
     host.innerHTML = detailsHtml(config());
     const section = host.querySelector('[data-testid="tooltip-modeled-system-power"]')!;
@@ -282,7 +282,7 @@ describe('modeled system-power tooltip', () => {
       while (el && el !== host && !el.style.fontSize) el = el.parentElement;
       sizes.add(el && el !== host ? el.style.fontSize : 'inherited');
     }
-    expect([...sizes]).toEqual(['11px']);
+    expect([...sizes]).toEqual(['inherited']);
   });
 
   it('keeps each power reading and its basis pill in the same grid cell', () => {
@@ -531,8 +531,8 @@ describe('buildPointDetails', () => {
 
     expect(html).toContain('请求： 9 / 10 (90%)');
     expect(html).toContain('Token 数');
-    expect(html).toContain('提示 token12,345');
-    expect(html).toContain('生成 token678');
+    expect(html).toContain('提示 token 12,345');
+    expect(html).toContain('生成 token 678');
     expect(html).toContain('GitHub Actions 运行记录');
     expect(html).not.toContain('Requests:');
     expect(html).not.toContain('GitHub Actions run');
@@ -895,8 +895,7 @@ describe('buildPointDetails for unofficial overlays', () => {
 
   it('includes concurrency info', () => {
     const html = detailsText(overlayConfig());
-    expect(html).toContain('Concurrency');
-    expect(html).toContain('64');
+    expect(html).toContain('conc 64');
   });
 
   it('shows cache metadata for unofficial agentic overlays', () => {
