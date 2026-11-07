@@ -6,7 +6,6 @@ import {
   GPU_VENDORS,
   VENDOR_OKLCH_ZONES,
 } from '@semianalysisai/inferencex-constants';
-import { DARK_TEXT_LUMINANCE } from '@/lib/d3-chart/contrast-colors';
 import { getModelSortIndex } from '@/lib/catalog/constants';
 
 export type Vendor = 'nvidia' | 'amd' | 'openai' | 'google' | 'huawei' | 'unknown';
@@ -25,8 +24,8 @@ export function getVendor(hwKey: string): Vendor {
 }
 
 const LIGHTNESS = {
-  light: { min: 0.38, max: 0.74 },
-  dark: { min: 0.6, max: 0.88 },
+  light: { min: 0.42, max: 0.68 },
+  dark: { min: 0.5, max: 0.78 },
 } as const;
 
 function pickLightness(index: number, count: number, theme: 'light' | 'dark'): number {
@@ -35,29 +34,21 @@ function pickLightness(index: number, count: number, theme: 'light' | 'dark'): n
   return max - (index / (count - 1)) * (max - min);
 }
 
-const DARK_YELLOW_GREEN = { fullHue: 125, clearHue: 150, min: 0.72, max: 0.93 } as const;
-
-function liftDarkYellowGreen(lightness: number, hue: number): number {
-  const { min, max } = LIGHTNESS.dark;
-  const band = DARK_YELLOW_GREEN;
-  const weight = Math.min(1, Math.max(0, (band.clearHue - hue) / (band.clearHue - band.fullHue)));
-  const floor = min + weight * (band.min - min);
-  const ceiling = max + weight * (band.max - max);
-  return floor + ((lightness - min) * (ceiling - floor)) / (max - min);
+function chipPair(key: string): string {
+  return key.split('_')[0].replace(/^gb/u, 'b');
 }
 
-const GOLDEN_RATIO_FRACTION = 0.618_033_988_7;
-const LIGHTNESS_SEQUENCE_OFFSET = 0.6;
-
-function lightnessRanks(count: number): number[] {
-  const position = (i: number) => (i * GOLDEN_RATIO_FRACTION + LIGHTNESS_SEQUENCE_OFFSET) % 1;
-  const ranks: number[] = [];
-  Array.from({ length: count }, (_, i) => i)
-    .toSorted((a, b) => position(a) - position(b))
-    .forEach((index, rank) => {
-      ranks[index] = rank;
-    });
-  return ranks;
+function sortPairedByChip(keys: string[]): void {
+  keys.sort((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b));
+  const pairRank = new Map<string, number>();
+  for (const key of keys)
+    if (!pairRank.has(chipPair(key))) pairRank.set(chipPair(key), pairRank.size);
+  keys.sort(
+    (a, b) =>
+      pairRank.get(chipPair(a))! - pairRank.get(chipPair(b))! ||
+      getModelSortIndex(a) - getModelSortIndex(b) ||
+      a.localeCompare(b),
+  );
 }
 
 export function generateVendorColors(
@@ -78,7 +69,7 @@ export function generateVendorColors(
   }
 
   for (const [vendor, keys] of groups) {
-    keys.sort((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b));
+    sortPairedByChip(keys);
 
     const zone = VENDOR_OKLCH_ZONES[vendor];
     const chroma = zone.chroma[theme];
@@ -91,16 +82,14 @@ export function generateVendorColors(
       result[keys[0]] = GOOGLE_BLUE;
       continue;
     }
-    const ranks = lightnessRanks(count);
+
     for (let i = 0; i < count; i++) {
       const hue =
         count <= 1
           ? (zone.start + zone.end) / 2
           : zone.start + ((i + 0.5) / count) * (zone.end - zone.start);
 
-      const picked = pickLightness(ranks[i], count, theme);
-      const lightness =
-        theme === 'dark' && vendor === 'nvidia' ? liftDarkYellowGreen(picked, hue) : picked;
+      const lightness = pickLightness(i, count, theme);
       result[keys[i]] = `oklch(${lightness.toFixed(3)} ${chroma} ${hue.toFixed(1)})`;
     }
   }
@@ -147,7 +136,7 @@ export function generateGpuDateColors(
   const { min: lMin, max: lMax } = LIGHTNESS[theme];
 
   for (const [vendor, keys] of groups) {
-    keys.sort((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b));
+    sortPairedByChip(keys);
 
     const zone = VENDOR_OKLCH_ZONES[vendor];
     const chroma = zone.chroma[theme];
@@ -286,20 +275,6 @@ function gammaDecode(channel: number): number {
   return channel <= 0.040_45 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
 }
 
-function gammaEncode(channel: number): number {
-  const v = Math.min(1, Math.max(0, channel));
-  return v <= 0.003_130_8 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055;
-}
-
-function srgbChannels(color: string): number[] | null {
-  const groups = OKLCH_PATTERN.exec(color)?.groups;
-  if (groups) {
-    return oklchToLinearSrgb(Number(groups.l), Number(groups.c), Number(groups.h)).map(gammaEncode);
-  }
-  const parsed = rgb(color);
-  return Number.isNaN(parsed.r) ? null : [parsed.r / 255, parsed.g / 255, parsed.b / 255];
-}
-
 function srgbToOklch(color: string): [number, number, number] | null {
   const parsed = rgb(color);
   if (Number.isNaN(parsed.r)) return null;
@@ -331,20 +306,8 @@ function gamutChroma(l: number, c: number, h: number): number {
   return lo;
 }
 
-function oklchLuminance(
-  l: number,
-  c: number,
-  h: number,
-  opacity = 1,
-  backdrop: number[] | null = null,
-): number {
-  const linear = oklchToLinearSrgb(l, c, h).map((channel) => Math.min(1, Math.max(0, channel)));
-  const [r, g, b] =
-    backdrop && opacity < 1
-      ? linear.map((channel, i) =>
-          gammaDecode(opacity * gammaEncode(channel) + (1 - opacity) * backdrop[i]),
-        )
-      : linear;
+function oklchLuminance(l: number, c: number, h: number): number {
+  const [r, g, b] = oklchToLinearSrgb(l, c, h).map((channel) => Math.min(1, Math.max(0, channel)));
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
@@ -388,34 +351,5 @@ export function whiteTextFill(color: string): string {
     }
   }
   whiteTextFills.set(color, fill);
-  return fill;
-}
-
-const insideLabelFills = new Map<string, string>();
-
-export function insideLabelFill(
-  color: string,
-  minContrast: number,
-  opacity: number,
-  backdrop: string,
-): string {
-  const key = `${color}|${minContrast}|${opacity}|${backdrop}`;
-  const cached = insideLabelFills.get(key);
-  if (cached) return cached;
-  const lch = parseOklch(color);
-  const backdropChannels = srgbChannels(backdrop);
-  let fill = color;
-  if (lch) {
-    const [, c, h] = lch;
-    const luminanceAt = (lightness: number) =>
-      oklchLuminance(lightness, gamutChroma(lightness, c, h), h, opacity, backdropChannels);
-    const luminance = luminanceAt(lch[0]);
-    const maxLuminance = 1.05 / minContrast - 0.05;
-    const darkTextContrast = (luminance + 0.05) / (DARK_TEXT_LUMINANCE + 0.05);
-    if (luminance > maxLuminance && darkTextContrast < minContrast) {
-      fill = darkenToLuminance(lch, maxLuminance, luminanceAt);
-    }
-  }
-  insideLabelFills.set(key, fill);
   return fill;
 }

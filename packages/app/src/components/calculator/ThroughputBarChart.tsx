@@ -31,7 +31,6 @@ import type { ChartLayout, ContinuousScale } from '@/lib/d3-chart/types';
 import { getChartWatermark } from '@/lib/catalog/data-mappings';
 import type { Locale } from '@/lib/i18n/i18n';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
-import { insideLabelFill } from '@/lib/charts/dynamic-colors';
 import { getDisplayLabel } from '@/lib/shared/utils';
 
 import type {
@@ -434,16 +433,7 @@ function getColor(): string {
 const BAR_OPACITY = 0.85;
 const MIN_INSIDE_LABEL_CONTRAST = 5.5;
 const MIN_CLAMPED_LABEL_CONTRAST = 4.5;
-const BAR_FILL_CONTRAST = MIN_INSIDE_LABEL_CONTRAST + 0.1;
 const TOP_AXIS_BAND_PX = 28;
-
-export function calculatorBarFill(color: string, backdrop: string): string {
-  return insideLabelFill(color, BAR_FILL_CONTRAST, BAR_OPACITY, backdrop);
-}
-
-export function calculatorBarSwatch(fill: string, backdrop: string): string {
-  return backdrop ? `color-mix(in srgb, ${fill} ${BAR_OPACITY * 100}%, ${backdrop})` : fill;
-}
 
 function renderTopAxis(
   layout: ChartLayout,
