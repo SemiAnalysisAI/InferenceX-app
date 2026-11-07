@@ -23,6 +23,11 @@ const EXCLUDED = [
   /^packages\/app\/src\/lib\/power\/power_model\//u,
   // Hand-curated corrections record the hardware of specific historical runs.
   /^packages\/db\/src\/etl\/[\w-]+-(?:overrides|backfills)\.ts$/u,
+  // Per-chip content: pages, presets, glossary and the CollectiveX support matrix.
+  /^packages\/app\/src\/lib\/catalog\/chip-pages(?:-zh)?\.ts$/u,
+  /^packages\/app\/src\/lib\/content\/glossary(?:-zh)?\.ts$/u,
+  /^packages\/app\/src\/components\/favorites\/favorite-presets\.ts$/u,
+  /^packages\/app\/src\/components\/collectivex\/known-support\.ts$/u,
   /\.(?:test|fixture|test-harness)\.tsx?$|test-fixture\.ts$|\/src\/test\/|\/lib\/testing\//u,
   /\/lib\/views-api\/docs\/|\/api-documentation\.ts$/u,
 ];
@@ -88,11 +93,12 @@ if (grown.length > 0) {
 }
 
 if (shrunk.length > 0) {
-  console.log('check-hardware-literals: counts dropped; lower the baseline with:');
-  console.log('  bun run check:hardware-literals --update');
+  console.error('check-hardware-literals: counts dropped; lower the baseline with:');
+  console.error('  bun run check:hardware-literals --update');
   for (const file of shrunk) {
-    console.log(`  ${file}: ${counts[file] ?? 0} (baseline ${baseline[file]})`);
+    console.error(`  ${file}: ${counts[file] ?? 0} (baseline ${baseline[file]})`);
   }
+  process.exit(1);
 }
 
 console.log(`check-hardware-literals: OK, ${summary}.`);
