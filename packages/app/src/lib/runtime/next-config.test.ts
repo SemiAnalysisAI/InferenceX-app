@@ -17,7 +17,7 @@ const respond = (path: string) =>
   });
 
 describe('next.config custom routes', () => {
-  it.each(['/inference', '/zh/inference'])(
+  it.each(['/infx/inference', '/zh/infx/inference'])(
     'temporarily redirects %s to DeepSeek V4.1 Flash and preserves query filters',
     async (path) => {
       for (const query of [
@@ -33,7 +33,7 @@ describe('next.config custom routes', () => {
     },
   );
 
-  it.each(['/inference', '/zh/inference'])(
+  it.each(['/infx/inference', '/zh/infx/inference'])(
     'preserves explicit model selections on %s',
     async (path) => {
       for (const suffix of [
@@ -51,8 +51,8 @@ describe('next.config custom routes', () => {
   it.each([
     ['/about/', '/about'],
     ['/zh/blog/some-post/', '/zh/blog/some-post'],
-    ['/datasets', '/agentx'],
-    ['/zh/datasets', '/zh/agentx'],
+    ['/datasets', '/infx/agentx'],
+    ['/zh/datasets', '/zh/infx/agentx'],
     ['/xvideo', '/video'],
     ['/zh/xxvideo', '/zh/video'],
     ['/ubenchx', '/ubenchx/mem-bw'],
@@ -129,7 +129,7 @@ describe('next.config custom routes', () => {
   it('leaves pages and API responses on their own cache headers', async () => {
     for (const path of [
       '/',
-      '/inference',
+      '/infx/inference',
       '/api/v1/availability',
       '/whitepaper',
       '/whitepaper/amd-mi355x-32b-revenue-per-gigawatt-kimi-k3',

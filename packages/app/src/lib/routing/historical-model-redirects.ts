@@ -1,4 +1,5 @@
 import { COMPARE_MODEL_ALIASES } from '../compare/compare-slug';
+import { getDashboardRoute } from './dashboard-routes';
 
 interface HistoricalModelAliasRedirect {
   source: string;
@@ -6,17 +7,19 @@ interface HistoricalModelAliasRedirect {
   permanent: true;
 }
 
-const HISTORICAL_ROUTE_PREFIXES = ['/historical', '/zh/historical'] as const;
+const { path, legacyPath } = getDashboardRoute('historical');
 
 /**
- * `/historical/[model]` is prerendered, so its page cannot read `searchParams` when an alias
+ * `/infx/historical/[model]` is prerendered, so its page cannot read `searchParams` when an alias
  * renders on demand. Config redirects run first and carry the query string across.
  */
 export const HISTORICAL_MODEL_ALIAS_REDIRECTS: readonly HistoricalModelAliasRedirect[] =
   Object.entries(COMPARE_MODEL_ALIASES).flatMap(([alias, canonical]) =>
-    HISTORICAL_ROUTE_PREFIXES.map((prefix) => ({
-      source: `${prefix}/${alias}`,
-      destination: `${prefix}/${canonical}`,
-      permanent: true as const,
-    })),
+    ['', '/zh'].flatMap((locale) =>
+      [path, legacyPath].map((source) => ({
+        source: `${locale}${source}/${alias}`,
+        destination: `${locale}${path}/${canonical}`,
+        permanent: true as const,
+      })),
+    ),
   );

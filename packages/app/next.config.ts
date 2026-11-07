@@ -1,6 +1,7 @@
 import { withPostHogConfig } from '@posthog/nextjs-config';
 import type { NextConfig } from 'next';
 import { allowedDevOriginsFromEnv } from './src/lib/runtime/allowed-dev-origins';
+import { getDashboardRoute } from './src/lib/routing/dashboard-routes';
 import { HISTORICAL_MODEL_ALIAS_REDIRECTS } from './src/lib/routing/historical-model-redirects';
 import { INFERENCE_MODEL_ALIAS_REDIRECTS } from './src/lib/routing/inference-model-redirects';
 import { VIDEO_ALIAS_REDIRECTS } from './src/lib/video/video-alias-redirects';
@@ -19,10 +20,11 @@ const PUBLIC_ASSET_SOURCES = [
 ];
 
 const LOCALE_PREFIXES = ['', '/zh'] as const;
+const INFERENCE_PATH = getDashboardRoute('inference').path;
 
 const SEO_REDIRECTS = [
-  { source: '/datasets', destination: '/agentx' },
-  { source: '/zh/datasets', destination: '/zh/agentx' },
+  { source: '/datasets', destination: '/infx/agentx' },
+  { source: '/zh/datasets', destination: '/zh/infx/agentx' },
   ...LOCALE_PREFIXES.flatMap((prefix) => [
     { source: `${prefix}/xvideo`, destination: `${prefix}/video` },
     { source: `${prefix}/xxvideo`, destination: `${prefix}/video` },
@@ -77,8 +79,8 @@ const nextConfig: NextConfig = {
       ...SEO_REDIRECTS,
       // The featured model can change; do not permanently cache this default.
       ...LOCALE_PREFIXES.map((prefix) => ({
-        source: `${prefix}/inference`,
-        destination: `${prefix}/inference/deepseek-v41-flash`,
+        source: `${prefix}${INFERENCE_PATH}`,
+        destination: `${prefix}${INFERENCE_PATH}/deepseek-v41-flash`,
         permanent: false,
         missing: [{ type: 'query' as const, key: 'g_model' }],
       })),
@@ -87,16 +89,16 @@ const nextConfig: NextConfig = {
       ...VIDEO_ALIAS_REDIRECTS,
       {
         source: '/datasets/:path*',
-        destination: '/agentx/:path*',
+        destination: '/infx/agentx/:path*',
         permanent: true,
       },
       {
         source: '/zh/datasets/:path*',
-        destination: '/zh/agentx/:path*',
+        destination: '/zh/infx/agentx/:path*',
         permanent: true,
       },
-      { source: '/gpu-metrics', destination: '/inference', permanent: true },
-      { source: '/zh/gpu-metrics', destination: '/zh/inference', permanent: true },
+      { source: '/gpu-metrics', destination: INFERENCE_PATH, permanent: true },
+      { source: '/zh/gpu-metrics', destination: `/zh${INFERENCE_PATH}`, permanent: true },
     ]);
   },
   rewrites() {

@@ -11,6 +11,7 @@ import {
   inferenceModelRouteForSelection,
 } from '@/lib/routing/inference-model-slug';
 import { operatorXCategoryRedirectUrl } from '@/lib/routing/operatorx-category';
+import { legacyDashboardRedirectUrl } from '@/lib/routing/legacy-dashboard-redirect';
 
 const EMBED_CSP = 'frame-ancestors *';
 
@@ -18,7 +19,8 @@ const EMBED_CSP = 'frame-ancestors *';
 // proxy. That means CLI analytics on API routes (only the CLI and skill user agents are counted,
 // so browser API calls skip it), embed headers, legacy Inference power links that redirect to
 // PowerX, saved gated model selections, model-route aliases and retired profit percentiles,
-// legacy OperatorX `?op=` links, and compare share links whose slug needs canonicalizing with
+// legacy OperatorX `?op=` links, dashboard paths from before the `/infx` and `/opx` split, and
+// compare share links whose slug needs canonicalizing with
 // their query intact.
 // A `has` query condition needs a named key, and a shared compare link can carry any parameter
 // (`i_metric`, `g_rundate`, `utm_*`), so compare detail document requests always match and the
@@ -34,23 +36,27 @@ export const config: ProxyConfig = {
     },
     '/embed/:path*',
     '/zh/embed/:path*',
-    { source: '/:locale(zh)?/inference/:slug?', has: [{ type: 'query', key: 'i_metric' }] },
-    { source: '/:locale(zh)?/inference/:slug?', has: [{ type: 'query', key: 'i_power' }] },
+    { source: '/:locale(zh)?/infx/inference/:slug?', has: [{ type: 'query', key: 'i_metric' }] },
+    { source: '/:locale(zh)?/infx/inference/:slug?', has: [{ type: 'query', key: 'i_power' }] },
     {
-      source: '/:locale(zh)?/inference/:slug?',
+      source: '/:locale(zh)?/infx/inference/:slug?',
       has: [{ type: 'query', key: 'g_model', value: 'GLM-5\\.3-Flash' }],
     },
-    { source: '/:locale(zh)?/operatorx/:category?', has: [{ type: 'query', key: 'op' }] },
-    '/:locale(zh)?/:tab(calculator|historical|profit-estimator|profit-estimator-per-gigawatt)/:slug(deepseek|kimi|kimi-k25|qwen|glm|glm-5|glm-5-2|minimax|minimax-m25|llama|gptoss|[^/]*[A-Z][^/]*)/:filters*',
+    { source: '/:locale(zh)?/opx/:category?', has: [{ type: 'query', key: 'op' }] },
+    '/:locale(zh)?/:tab(inference|profit-estimator|profit-estimator-per-gigawatt|evaluation|historical|calculator|fleet|first-token|cache-reuse|reliability|gpu-specs|submissions|ai-chart|current-inferencex-image|agentic-workload-explorer|agentx|operatorx)/:path*',
+    '/:locale(zh)?/infx',
+    '/:locale(zh)?/infx/:tab(calculator|historical|profit-estimator|profit-estimator-per-gigawatt)/:slug(deepseek|kimi|kimi-k25|qwen|glm|glm-5|glm-5-2|minimax|minimax-m25|llama|gptoss|[^/]*[A-Z][^/]*)/:filters*',
     {
-      source: '/:locale(zh)?/:tab(profit-estimator|profit-estimator-per-gigawatt)/:slug/:filters*',
+      source:
+        '/:locale(zh)?/infx/:tab(profit-estimator|profit-estimator-per-gigawatt)/:slug/:filters*',
       has: [{ type: 'query', key: 'i_pctl' }],
     },
     {
-      source: '/:locale(zh)?/:tab(profit-estimator|profit-estimator-per-gigawatt)/:slug/:filters*',
+      source:
+        '/:locale(zh)?/infx/:tab(profit-estimator|profit-estimator-per-gigawatt)/:slug/:filters*',
       has: [{ type: 'query', key: 'percentile' }],
     },
-    '/:locale(zh)?/:tab(profit-estimator|profit-estimator-per-gigawatt)/:slug/:filters*/percentile/:rest+',
+    '/:locale(zh)?/infx/:tab(profit-estimator|profit-estimator-per-gigawatt)/:slug/:filters*/percentile/:rest+',
     {
       source:
         '/:locale(zh)?/:family(compare|compare-per-dollar|compare-precision|compare-spec-decode)/:slug/:scenario([aA][gG][eE][nN][tT][iI][cC]|[18][kK]-[18][kK])?',
@@ -62,30 +68,32 @@ export const config: ProxyConfig = {
 export function proxy(request: NextRequest, event: Pick<NextFetchEvent, 'waitUntil'>) {
   const capture = captureClientRequest(request);
   if (capture) event.waitUntil(capture);
-  const powerX = powerXRedirectUrl(request.nextUrl);
+  const legacy = legacyDashboardRedirectUrl(request.nextUrl);
+  const url = legacy ?? request.nextUrl;
+  const powerX = powerXRedirectUrl(url);
   if (powerX) return NextResponse.redirect(powerX);
-  const compare = compareCanonicalRedirectUrl(request.nextUrl);
+  const compare = compareCanonicalRedirectUrl(url);
   if (compare) return NextResponse.redirect(compare, 308);
-  const operatorX = operatorXCategoryRedirectUrl(request.nextUrl);
+  const operatorX = operatorXCategoryRedirectUrl(url);
   if (operatorX) return NextResponse.redirect(operatorX, 308);
-  const modelRoute = modelRouteRedirectUrl(request.nextUrl);
+  const modelRoute = modelRouteRedirectUrl(url);
   if (modelRoute) return NextResponse.redirect(modelRoute, 308);
   // A saved gated selection must be known from the pathname during SSR,
   // before a fresh client provider can mount consumers on the default model.
   // This only canonicalizes presentation routes; it is not authorization.
   const gatedModel = INFERENCE_MODEL_SLUGS.find(
     (entry) =>
-      entry.model === request.nextUrl.searchParams.get('g_model') &&
-      modelRequiresFeatureGate(entry.model),
+      entry.model === url.searchParams.get('g_model') && modelRequiresFeatureGate(entry.model),
   );
   if (gatedModel) {
-    const pathname = inferenceModelRouteForSelection(request.nextUrl.pathname, gatedModel.model);
-    if (pathname && pathname !== request.nextUrl.pathname) {
-      const destination = request.nextUrl.clone();
+    const pathname = inferenceModelRouteForSelection(url.pathname, gatedModel.model);
+    if (pathname && pathname !== url.pathname) {
+      const destination = new URL(url);
       destination.pathname = pathname;
       return NextResponse.redirect(destination);
     }
   }
+  if (legacy) return NextResponse.redirect(legacy, 308);
   const isEmbedRoute = isEmbedPathname(request.nextUrl.pathname);
   const requestHeaders = new Headers(request.headers);
   if (isEmbedRoute) {

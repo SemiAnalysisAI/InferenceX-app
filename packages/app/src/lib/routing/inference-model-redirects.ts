@@ -1,3 +1,4 @@
+import { getDashboardRoute } from './dashboard-routes';
 import { INFERENCE_MODEL_ALIASES } from './inference-model-slug';
 
 interface InferenceModelAliasRedirect {
@@ -6,13 +7,15 @@ interface InferenceModelAliasRedirect {
   permanent: true;
 }
 
-const INFERENCE_ROUTE_PREFIXES = ['/inference', '/zh/inference'] as const;
+const { path, legacyPath } = getDashboardRoute('inference');
 
 export const INFERENCE_MODEL_ALIAS_REDIRECTS: readonly InferenceModelAliasRedirect[] =
   Object.entries(INFERENCE_MODEL_ALIASES).flatMap(([alias, canonical]) =>
-    INFERENCE_ROUTE_PREFIXES.map((prefix) => ({
-      source: `${prefix}/${alias}`,
-      destination: `${prefix}/${canonical}`,
-      permanent: true as const,
-    })),
+    ['', '/zh'].flatMap((locale) =>
+      [path, legacyPath].map((source) => ({
+        source: `${locale}${source}/${alias}`,
+        destination: `${locale}${path}/${canonical}`,
+        permanent: true as const,
+      })),
+    ),
   );
