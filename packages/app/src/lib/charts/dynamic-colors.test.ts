@@ -60,6 +60,19 @@ describe('generateVendorColors', () => {
     expect(hueOf(colors['mystery_series'])).toBeGreaterThanOrEqual(unknown.start);
     expect(hueOf(colors['mystery_series'])).toBeLessThanOrEqual(unknown.end);
   });
+
+  it('places each B and GB chip of a generation next to each other on the ramp', () => {
+    const keys = ['gb300_dynamo-vllm', 'gb200_vllm', 'b300_sglang', 'b200_vllm', 'h200_vllm'];
+    const colors = generateVendorColors(keys, 'dark');
+    const order = [...keys].sort((a, b) => lightnessOf(colors[b]) - lightnessOf(colors[a]));
+    expect(order).toEqual([
+      'gb300_dynamo-vllm',
+      'b300_sglang',
+      'gb200_vllm',
+      'b200_vllm',
+      'h200_vllm',
+    ]);
+  });
 });
 
 function lightnessOf(color: string): number {

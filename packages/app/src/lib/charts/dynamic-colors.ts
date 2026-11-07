@@ -34,6 +34,23 @@ function pickLightness(index: number, count: number, theme: 'light' | 'dark'): n
   return max - (index / (count - 1)) * (max - min);
 }
 
+function chipPair(key: string): string {
+  return key.split('_')[0].replace(/^gb/u, 'b');
+}
+
+function sortPairedByChip(keys: string[]): void {
+  keys.sort((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b));
+  const pairRank = new Map<string, number>();
+  for (const key of keys)
+    if (!pairRank.has(chipPair(key))) pairRank.set(chipPair(key), pairRank.size);
+  keys.sort(
+    (a, b) =>
+      pairRank.get(chipPair(a))! - pairRank.get(chipPair(b))! ||
+      getModelSortIndex(a) - getModelSortIndex(b) ||
+      a.localeCompare(b),
+  );
+}
+
 export function generateVendorColors(
   activeKeys: string[],
   theme: 'light' | 'dark',
@@ -52,7 +69,7 @@ export function generateVendorColors(
   }
 
   for (const [vendor, keys] of groups) {
-    keys.sort((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b));
+    sortPairedByChip(keys);
 
     const zone = VENDOR_OKLCH_ZONES[vendor];
     const chroma = zone.chroma[theme];
@@ -119,7 +136,7 @@ export function generateGpuDateColors(
   const { min: lMin, max: lMax } = LIGHTNESS[theme];
 
   for (const [vendor, keys] of groups) {
-    keys.sort((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b));
+    sortPairedByChip(keys);
 
     const zone = VENDOR_OKLCH_ZONES[vendor];
     const chroma = zone.chroma[theme];
