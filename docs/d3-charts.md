@@ -51,6 +51,11 @@ the existing image dimensions. Fixed ratios lay out an offscreen clone at a
 measures caption, legend and source-footer space, then gives the remaining height and
 width to the plot. The legend wraps in rows below the plot, so the plot keeps the
 full frame width. Long captions can grow the complete frame proportionally.
+Tall bar charts keep the frame width instead. When row labels would overlap at
+the ratio height, the frame grows taller so rows keep their live height. The
+canvas stays within 10,000 px tall and 4096×4096 px of area (the Mobile Safari
+limit), so the capture scale drops from 2× to as low as 0.5× first. Rows squeeze
+only past that cap. Charts that fit stay at the exact ratio.
 The chart rebuilds axes, grids, points and curves using copied visible scales,
 without stretching a bitmap or adding letterbox bars. Text and mark sizes stay
 constant; official points and unofficial overlays use the new coordinates.

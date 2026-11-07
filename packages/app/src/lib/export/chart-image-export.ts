@@ -187,13 +187,14 @@ export async function addWatermark(
   chartDataUrl: string,
   bgColor: string,
   footerStyle: ExportFooterStyle = getExportFooterStyle(document.body),
+  pixelRatio = PNG_PIXEL_RATIO,
 ): Promise<string> {
   const img = await loadImage(chartDataUrl);
   if (!img) throw new Error('Could not decode the chart PNG');
 
   const isDark = hasDarkTheme(document.documentElement) || bgColor.includes('0 0%');
 
-  const WATERMARK_HEIGHT = PNG_FOOTER_HEIGHT * PNG_PIXEL_RATIO;
+  const WATERMARK_HEIGHT = Math.round(PNG_FOOTER_HEIGHT * pixelRatio);
   const canvas = document.createElement('canvas');
   canvas.width = img.width;
   canvas.height = img.height + WATERMARK_HEIGHT;
@@ -206,7 +207,14 @@ export async function addWatermark(
 
   ctx.drawImage(img, 0, 0);
 
-  drawExportFooter(ctx, footerStyle, canvas.width, contentHeight, WATERMARK_HEIGHT, 40);
+  drawExportFooter(
+    ctx,
+    footerStyle,
+    canvas.width,
+    contentHeight,
+    WATERMARK_HEIGHT,
+    20 * pixelRatio,
+  );
 
   return canvas.toDataURL('image/png');
 }
@@ -438,9 +446,9 @@ export async function exportChartImage(
     }
     const rerendered =
       ratio !== 'auto' || (await renderCanvasChartsForExport(element, clone, exportElement));
-    const captureDimensions =
+    const { pixelRatio, ...captureDimensions } =
       ratio === 'auto'
-        ? getExportCaptureDimensions(exportElement)
+        ? { ...getExportCaptureDimensions(exportElement), pixelRatio: PNG_PIXEL_RATIO }
         : await layoutPngExport(element, clone, exportElement, ratio);
     if (rerendered) {
       // New D3 nodes need the same export styling as the original clone.
@@ -456,7 +464,7 @@ export async function exportChartImage(
     const chartDataUrl = await toPng(exportElement, {
       ...captureDimensions,
       quality: 1,
-      pixelRatio: PNG_PIXEL_RATIO,
+      pixelRatio,
       cacheBust: true,
       skipFonts: false,
       fontEmbedCSS,
@@ -468,7 +476,7 @@ export async function exportChartImage(
       },
     });
 
-    const dataUrl = await addWatermark(chartDataUrl, bgColor, footerStyle);
+    const dataUrl = await addWatermark(chartDataUrl, bgColor, footerStyle, pixelRatio);
 
     const link = document.createElement('a');
     link.download = `${exportFileName || chartId}-${Date.now()}.png`;
