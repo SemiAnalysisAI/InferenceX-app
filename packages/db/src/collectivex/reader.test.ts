@@ -261,6 +261,23 @@ describe('CollectiveX artifact assembly', () => {
     expect(built()).toBeNull();
   });
 
+  it('carries a result maturity onto its series, null when the result names none', () => {
+    const series = (maturity?: string) =>
+      buildDatasetFromNeutral(
+        makeRawMatrix([requestedOf(makeRawShard({}))]),
+        [
+          (() => {
+            const shard = makeRawShard({});
+            if (maturity) (shard.implementation as Record<string, unknown>).maturity = maturity;
+            return shard;
+          })(),
+        ],
+        makeRunMeta(),
+      ).series[0];
+    expect(series('candidate').maturity).toBe('candidate');
+    expect(series().maturity).toBeNull();
+  });
+
   it('keeps a withheld tail null through the derived rates', () => {
     const shard = makeRawShard({ rows: [{}] });
     const row = (shard.measurement as { rows: Record<string, any>[] }).rows[0];

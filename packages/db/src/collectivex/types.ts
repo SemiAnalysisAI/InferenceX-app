@@ -88,6 +88,8 @@ export interface CollectiveXSeries {
     vendor: 'nvidia' | 'amd';
   };
   points: CollectiveXPoint[];
+  /** `candidate`: no engine can select this configuration today. Absent on older results. */
+  maturity?: 'production' | 'candidate' | null;
 }
 
 export interface CollectiveXCoveragePoint {

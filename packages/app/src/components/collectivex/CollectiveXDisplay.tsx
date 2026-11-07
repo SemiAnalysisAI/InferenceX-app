@@ -153,6 +153,8 @@ const STRINGS = {
     activationRateOption: 'Activation rate',
     payloadRateOption: 'Payload BW / chip',
     noSeries: 'No measured series match these filters.',
+    candidateNote:
+      '† Candidate: the library supports this configuration, but no serving engine can select it today.',
     resetFilter: 'Reset filter',
     payloadNote:
       'Activation-data rate is derived at the selected latency percentile and is not physical link bandwidth.',
@@ -238,6 +240,7 @@ const STRINGS = {
     activationRateOption: '激活数据速率',
     payloadRateOption: '每芯片载荷带宽',
     noSeries: '没有实测序列符合当前筛选条件。',
+    candidateNote: '† 候选：集合通信库支持该配置，但目前没有推理引擎可以选用。',
     resetFilter: '重置筛选',
     payloadNote: '逻辑载荷速率按所选延迟分位点派生，不代表物理链路带宽。',
     payloadBandwidthNote:
@@ -982,6 +985,14 @@ export default function CollectiveXDisplay() {
                     data-testid="collectivex-range-note"
                   >
                     {view === 'best' ? t.bestNote : t.rangeNote}
+                  </p>
+                )}
+                {phaseSeries.some((item) => item.maturity === 'candidate') && (
+                  <p
+                    className="mt-2 text-xs text-muted-foreground"
+                    data-testid="collectivex-candidate-note"
+                  >
+                    {t.candidateNote}
                   </p>
                 )}
                 {yAxis === 'activation-rate' && (

@@ -227,6 +227,7 @@ function libraryVersionOf(shard: RawShard): string | null {
 
 function buildSeries({ shard, vendor }: SupportedShard): CollectiveXSeries {
   const kase = shard.identity.case_factors.case;
+  const maturity = shard.implementation.maturity;
   return {
     series_id: shard.identity.case_id,
     phase: kase.phase === 'prefill' ? 'prefill' : 'decode',
@@ -240,6 +241,7 @@ function buildSeries({ shard, vendor }: SupportedShard): CollectiveXSeries {
       vendor,
     },
     points: shard.measurement.rows.map((row) => mapPoint(row, kase.ep)),
+    maturity: maturity === 'production' || maturity === 'candidate' ? maturity : null,
   };
 }
 
