@@ -62,11 +62,7 @@ export function UnplottedPowerNote({
     .map((basis) => powerBasisLabel(basis, locale, labelStyle))
     .join(t.or);
   return (
-    <div
-      data-testid="unplotted-power-note"
-      data-missing={summary.missing}
-      className="text-xs leading-5 text-muted-foreground"
-    >
+    <div data-testid="unplotted-power-note" className="text-xs leading-5 text-muted-foreground">
       <p>
         {t.heading[summary.missing](points, boundary)}
         {onShowTable && (

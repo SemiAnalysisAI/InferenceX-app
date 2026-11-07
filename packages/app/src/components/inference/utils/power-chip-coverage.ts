@@ -76,9 +76,10 @@ export interface UnplottedPowerReason {
 
 export interface UnplottedModeledPower {
   /**
-   * `points` when the chart's own metric is modeled, so the points are not drawn at all;
-   * `lines` when they are drawn on the measured GPU line and only their Count: All IT and
-   * facility lines are missing.
+   * `points` when the chart's own metric is modeled: the chart drops a point without its own
+   * value before it adds compare lines (`useChartData`, `processOverlayChartDataWithClipping`),
+   * so even its GPU line is not drawn. `lines` when the own metric is GPU-measured: the points
+   * are drawn on that line and only their Count: All IT and facility lines are missing.
    */
   missing: 'points' | 'lines';
   /** The modeled boundaries the chart draws, in draw order. */
