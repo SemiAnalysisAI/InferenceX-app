@@ -18,6 +18,7 @@ import FrontierChart, {
 } from './FrontierChart';
 import { FrontierAreaTimeline, FrontierLeadBars } from './FrontierComparePanels';
 import FrontierDataTable from './FrontierDataTable';
+import { FrontierGainRate } from './FrontierGainRatePanels';
 import {
   FrontierSoftwareGain,
   FrontierSoftwareGainBars,
@@ -38,12 +39,17 @@ const FrontierMemeOverlay = dynamic(() => import('./frontier-memes/FrontierMemeO
   ssr: false,
 });
 
-/** The three Historical views built on the frontier history. */
-export type FrontierSection = 'frontier' | 'compare' | 'software';
+/** The Historical views built on the frontier history. */
+export type FrontierSection = 'frontier' | 'compare' | 'software' | 'gainRate';
 /** What a series is in Frontier and Compare: one chip, or every chip of a vendor. */
 export type FrontierGrouping = 'gpu' | 'vendor';
 
-export const FRONTIER_SECTIONS: readonly FrontierSection[] = ['frontier', 'compare', 'software'];
+export const FRONTIER_SECTIONS: readonly FrontierSection[] = [
+  'frontier',
+  'compare',
+  'software',
+  'gainRate',
+];
 
 export const isFrontierSection = (view: string): view is FrontierSection =>
   (FRONTIER_SECTIONS as readonly string[]).includes(view);
@@ -88,6 +94,8 @@ const STRINGS = {
       `Each ${grouping === 'gpu' ? "chip's" : "vendor's"} own frontier side by side, with who leads and by how much.`,
     softwareHint:
       'The hardware is held constant: each chip against its own first run, so every gain is software, serving configuration or precision.',
+    gainRateHint:
+      'The slope of Software gains: how fast each chip is still improving on the same hardware. Rates falling toward zero show where software gains saturate.',
     pick: (grouping: FrontierGrouping) => (grouping === 'gpu' ? 'Chips shown' : 'Vendors shown'),
     hidden: (vendor: string, chips: string, precision: string) =>
       `${vendor} (${chips}) only has ${precision} data for this model and scenario.`,
@@ -124,6 +132,8 @@ const STRINGS = {
       `并排展示各${grouping === 'gpu' ? '芯片' : '厂商'}自身的前沿，以及谁领先、领先多少。`,
     softwareHint:
       '硬件保持不变：每款芯片都与自身的首次测试对比，因此各项提升都来自软件、部署配置或精度。',
+    gainRateHint:
+      '软件提升的斜率：每款芯片在同一硬件上仍在以多快的速度提升。速度向零回落，说明软件提升趋于饱和。',
     pick: (grouping: FrontierGrouping) => (grouping === 'gpu' ? '显示的芯片' : '显示的厂商'),
     hidden: (vendor: string, chips: string, precision: string) =>
       `${vendor}（${chips}）在该模型与场景下仅有 ${precision} 数据。`,
@@ -165,7 +175,7 @@ type FrontierViewProps = Omit<FrontierChartProps, 'dateIndex' | 'variant'> & {
 
 /**
  * Series selected when a view opens: every vendor, the two chips covering the most ground
- * today, or the three biggest chips for software gains.
+ * today, or the three biggest chips for software gains and their rate.
  */
 function defaultSelection(
   history: FrontierHistory,
@@ -178,7 +188,7 @@ function defaultSelection(
     .filter(([key, areas]) => candidates.has(key) && (areas[last] ?? 0) > 0)
     .toSorted((a, b) => b[1][last] - a[1][last])
     .map(([key]) => key);
-  if (section === 'software') return ranked.slice(0, 3);
+  if (section === 'software' || section === 'gainRate') return ranked.slice(0, 3);
   return grouping === 'vendor' ? ranked : ranked.slice(0, 2);
 }
 
@@ -466,7 +476,9 @@ export default function FrontierView({
           ? t.frontierHint(vendor)
           : section === 'compare'
             ? t.compareHint(grouping)
-            : t.softwareHint}
+            : section === 'software'
+              ? t.softwareHint
+              : t.gainRateHint}
       </p>
       {perSeries && (
         <div role="group" aria-label={t.pick(grouping)} className="flex flex-wrap gap-1.5">
@@ -619,6 +631,19 @@ export default function FrontierView({
             styles={styles}
             xLabel={chartProps.xLabel}
             formatDate={formatDate}
+          />
+        </div>
+      )}
+
+      {section === 'gainRate' && (
+        <div className="grid gap-x-6 gap-y-2 px-1 pt-6 lg:grid-cols-2">
+          <FrontierGainRate
+            history={history}
+            dateIndex={dateIndex}
+            keys={selected}
+            styles={styles}
+            formatDate={formatDate}
+            onSeek={seekFromPanel}
           />
         </div>
       )}

@@ -487,6 +487,19 @@ describe('Historical frontier views', () => {
     cy.get('[data-testid="frontier-series-b200"]').should('exist');
   });
 
+  it('plots the rate of software gain by date and by chip age', () => {
+    cy.get('[data-testid="historical-view-gainRate"]').click();
+    cy.get('[data-testid="frontier-gain-rate"] svg path').should('have.length.greaterThan', 0);
+    cy.get('[data-testid="frontier-gain-rate-table"]').within(() => {
+      cy.contains('th', 'Current rate').should('exist');
+      cy.get('tbody tr').should('have.length.greaterThan', 0);
+    });
+    cy.get('[data-testid="frontier-gain-rate-window-30"]').click();
+    cy.get('[data-testid="frontier-gain-rate-axis-age"]').click();
+    cy.get('[data-testid="frontier-gain-rate"]').should('contain.text', 'Days since first run');
+    cy.get('[data-testid="frontier-gain-rate-common"]').should('not.exist');
+  });
+
   it('shows same-chip software gains without a vendor option', () => {
     cy.get('[data-testid="historical-view-software"]').click();
     cy.get('[data-testid="frontier-grouping"]').should('not.exist');

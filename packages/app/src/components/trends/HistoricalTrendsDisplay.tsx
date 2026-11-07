@@ -102,6 +102,7 @@ const STRINGS = {
     frontier: 'Frontier',
     compare: 'Compare',
     software: 'Software gains',
+    gainRate: 'Gain rate',
     frontierTitle: (yTitle: string, isAgentic: boolean) =>
       `${yTitle} vs. ${isAgentic ? 'P90 ' : ''}Interactivity Over Time`,
     interactivityAxis: (isAgentic: boolean) =>
@@ -139,6 +140,7 @@ const STRINGS = {
     frontier: '前沿',
     compare: '对比',
     software: '软件提升',
+    gainRate: '提升速度',
     frontierTitle: (yTitle: string, isAgentic: boolean) =>
       `${yTitle} 与${isAgentic ? ' P90 ' : ''}交互性的前沿随时间变化`,
     interactivityAxis: (isAgentic: boolean) => `${isAgentic ? 'P90 ' : ''}交互性 (tok/s/user)`,
