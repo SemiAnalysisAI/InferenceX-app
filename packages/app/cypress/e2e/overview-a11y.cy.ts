@@ -7,13 +7,15 @@ const OVERVIEW_ROUTES = [
     name: 'English hardware comparison',
     path: '/overview?tier=50&compare=hardware',
     comparison: 'hardware',
+    tier: '50',
   },
   {
     name: 'Chinese hardware comparison',
     path: '/zh/overview?tier=50&compare=hardware',
     comparison: 'hardware',
+    tier: '50',
   },
-  { name: 'historical comparison', path: '/overview?tier=50', comparison: '30d' },
+  { name: 'historical comparison', path: '/overview', comparison: '30d', tier: '100' },
 ] as const;
 
 const OVERVIEW_THEMES = ['light', 'dark'] as const;
@@ -36,7 +38,7 @@ function reportViolations(violations: Result[]): void {
 }
 
 describe('Overview accessibility', () => {
-  for (const { name, path, comparison } of OVERVIEW_ROUTES) {
+  for (const { name, path, comparison, tier } of OVERVIEW_ROUTES) {
     for (const theme of OVERVIEW_THEMES) {
       it(`has no WCAG 2.0/2.1 A or AA violations in the ${name} view using the ${theme} theme`, () => {
         cy.visit(path, {
@@ -51,6 +53,7 @@ describe('Overview accessibility', () => {
         cy.get(
           `[data-testid="overview-comparison-switcher"] [data-overview-comparison="${comparison}"]`,
         ).should('have.attr', 'aria-current', 'true');
+        cy.get('[data-testid="overview-tier-slider"]').should('have.attr', 'data-tier', tier);
         cy.get(`${OVERVIEW_SURFACE} [aria-busy]`)
           .should('have.attr', 'aria-busy', 'false')
           .and('have.css', 'opacity', '1');
