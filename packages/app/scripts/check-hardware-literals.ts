@@ -4,9 +4,9 @@ import path from 'node:path';
 
 import { GPU_RUNNER_ALIASES, HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
+import { collectSourceFiles } from '../src/lib/testing/source-files';
 import {
   compareToBaseline,
-  hardwareKeyPattern,
   scanHardwareLiterals,
   type HardwareLiteral,
   type HardwareLiteralCounts,
@@ -23,29 +23,19 @@ const EXCLUDED = [
   /^packages\/app\/src\/lib\/power\/power_model\//u,
   // Hand-curated corrections record the hardware of specific historical runs.
   /^packages\/db\/src\/etl\/[\w-]+-(?:overrides|backfills)\.ts$/u,
-  // Per-chip content: pages, presets, glossary and the CollectiveX support matrix.
+  // Per-chip content: pages, presets, glossary, articles, quotes and support matrices.
   /^packages\/app\/src\/lib\/catalog\/chip-pages(?:-zh)?\.ts$/u,
-  /^packages\/app\/src\/lib\/content\/glossary(?:-zh)?\.ts$/u,
+  /^packages\/app\/src\/lib\/content\/(?:glossary|glossary-zh|whitepapers)\.ts$/u,
+  /^packages\/app\/src\/lib\/agentx\/agentx-optimizations(?:-zh)?\.ts$/u,
   /^packages\/app\/src\/components\/favorites\/favorite-presets\.ts$/u,
   /^packages\/app\/src\/components\/collectivex\/known-support\.ts$/u,
+  /^packages\/app\/src\/components\/quotes\/quotes-data\.ts$/u,
+  /^packages\/app\/src\/components\/ubenchx\/ubenchx-data\.ts$/u,
   /\.(?:test|fixture|test-harness)\.tsx?$|test-fixture\.ts$|\/src\/test\/|\/lib\/testing\//u,
   /\/lib\/views-api\/docs\/|\/api-documentation\.ts$/u,
 ];
 
-function collectSourceFiles(dir: string, out: string[] = []): string[] {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      collectSourceFiles(full, out);
-    } else if (/\.tsx?$/u.test(entry.name) && !entry.name.endsWith('.d.ts')) {
-      out.push(full);
-    }
-  }
-  return out;
-}
-
 const keys = new Set([...Object.keys(HW_REGISTRY), ...Object.keys(GPU_RUNNER_ALIASES)]);
-const pattern = hardwareKeyPattern(keys);
 const packagesDir = path.join(REPO_ROOT, 'packages');
 
 const found: Record<string, HardwareLiteral[]> = {};
@@ -55,7 +45,7 @@ for (const pkg of readdirSync(packagesDir).sort()) {
   for (const absPath of collectSourceFiles(srcDir)) {
     const relPath = path.relative(REPO_ROOT, absPath).replaceAll(path.sep, '/');
     if (EXCLUDED.some((excluded) => excluded.test(relPath))) continue;
-    const hits = scanHardwareLiterals(relPath, readFileSync(absPath, 'utf8'), keys, pattern);
+    const hits = scanHardwareLiterals(relPath, readFileSync(absPath, 'utf8'), keys);
     if (hits.length > 0) found[relPath] = hits;
   }
 }

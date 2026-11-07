@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { collectSourceFiles } from '../src/lib/testing/source-files';
 import {
   compareToAllowlist,
   countViolations,
@@ -12,18 +13,6 @@ import {
 const APP_ROOT = path.resolve(import.meta.dirname, '..');
 const ALLOWLIST_PATH = path.join(import.meta.dirname, 'typography-allowlist.json');
 const UPDATE = process.argv.includes('--update');
-
-function collectSourceFiles(dir: string, out: string[] = []): string[] {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      collectSourceFiles(full, out);
-    } else if (/\.tsx?$/u.test(entry.name)) {
-      out.push(full);
-    }
-  }
-  return out;
-}
 
 const files = collectSourceFiles(path.join(APP_ROOT, 'src'))
   .map((absPath) => ({

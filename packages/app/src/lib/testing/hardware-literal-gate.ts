@@ -5,13 +5,13 @@ export interface HardwareLiteral {
   text: string;
 }
 
-/** Matches a key not preceded or followed by a letter or digit, so `b200` misses `gb200`. */
-export function hardwareKeyPattern(keys: Iterable<string>): RegExp {
+/** Matches a key in any case, not next to a letter or digit, so `b200` misses `gb200`. */
+function hardwareKeyPattern(keys: Iterable<string>): RegExp {
   const alternatives = [...keys]
     .sort((a, b) => b.length - a.length)
     .map((key) => key.replaceAll(/[$()*+.?[\\\]^{|}]/gu, String.raw`\$&`))
     .join('|');
-  return new RegExp(`(?<![A-Za-z0-9])(?:${alternatives})(?![A-Za-z0-9])`, 'gu');
+  return new RegExp(`(?<![A-Za-z0-9])(?:${alternatives})(?![A-Za-z0-9])`, 'giu');
 }
 
 function isModuleSpecifier(node: ts.Node): boolean {
@@ -38,15 +38,15 @@ function isPropertyName(node: ts.Identifier): boolean {
 }
 
 /**
- * Hardware keys inside string literals, template text and property names. Comments, JSX text
- * and import paths are not code that selects hardware.
+ * Registry keys, in any case, inside string literals, template text and property names.
+ * Comments, JSX text and import paths are not code that selects hardware.
  */
 export function scanHardwareLiterals(
   fileName: string,
   source: string,
   keys: ReadonlySet<string>,
-  pattern: RegExp,
 ): HardwareLiteral[] {
+  const pattern = hardwareKeyPattern(keys);
   const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true);
   const found: HardwareLiteral[] = [];
   const record = (node: ts.Node, text: string, count: number) => {
@@ -62,7 +62,7 @@ export function scanHardwareLiterals(
       ts.isTemplateTail(node)
     ) {
       record(node, node.text, [...node.text.matchAll(pattern)].length);
-    } else if (ts.isIdentifier(node) && keys.has(node.text) && isPropertyName(node)) {
+    } else if (ts.isIdentifier(node) && keys.has(node.text.toLowerCase()) && isPropertyName(node)) {
       record(node, node.text, 1);
     }
     ts.forEachChild(node, visit);
