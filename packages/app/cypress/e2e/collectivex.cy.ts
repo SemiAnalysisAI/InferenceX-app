@@ -172,7 +172,7 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-routing-select"]').should('not.exist');
 
     cy.get('[data-testid="collectivex-main-chart"]')
-      .should('contain.text', 'Round trip (fresh entry) · decode · p50')
+      .should('contain.text', 'Pair period (chained) · decode · p50')
       .and('contain.text', 'deepep-v2');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
 
@@ -457,7 +457,7 @@ describe('CollectiveX neutral run view', () => {
       .and('not.contain.text', '运行记录')
       .and('not.contain.text', '已显示运行');
     cy.get('[data-testid="collectivex-main-chart"]')
-      .should('contain.text', '往返（实测）')
+      .should('contain.text', '成对周期（连续）')
       .and('contain.text', '常规')
       .and('contain.text', '解码')
       .and('contain.text', '延迟（µs）');
