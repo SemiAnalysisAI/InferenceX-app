@@ -8,6 +8,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { computeGpuMetricStats } from './gpu-metrics-csv';
 import {
   gpuMetricsArtifactHoldsTelemetry,
+  ingestCpuPowerSamples,
   ingestGpuMetricsArtifact,
   prepareGpuMetricsArtifact,
   type GpuMetricsIngestResult,
@@ -129,6 +130,13 @@ function writePowerAuditArtifact(
   return { artifactName, artifactDir };
 }
 
+function addCpuSamples(artifact: { artifactDir: string }, csv = CPU_POWER_CSV): string {
+  const file = path.join(artifact.artifactDir, 'LOGS', 'power', 'cpu', 'samples.csv');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, csv);
+  return file;
+}
+
 describe('gpuMetricsArtifactHoldsTelemetry', () => {
   function sidecarOnlyArtifact() {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-metrics-ingest-'));
@@ -144,6 +152,13 @@ describe('gpuMetricsArtifactHoldsTelemetry', () => {
 
   it('is false when the artifact holds only sidecars', () => {
     expect(gpuMetricsArtifactHoldsTelemetry(sidecarOnlyArtifact())).toBe(false);
+  });
+
+  it('is false for CPU samples alone, which are still stored', async () => {
+    const artifact = sidecarOnlyArtifact();
+    addCpuSamples(artifact);
+    expect(gpuMetricsArtifactHoldsTelemetry(artifact)).toBe(false);
+    expect(await ingestCpuPowerSamples(sql, { workflowRunId: 1, artifact })).toEqual({ hosts: 2 });
   });
 
   it('is true for a GPU metrics CSV, even an unparseable one', () => {
@@ -547,16 +562,15 @@ describe('ingestGpuMetricsArtifact', () => {
     };
 
     const withoutCpu = await ingestGpuMetricsArtifact(sql, input);
-    expect(await cpuSeries()).toEqual([]);
-
-    const cpuCsv = path.join(artifact.artifactDir, 'LOGS', 'power', 'cpu', 'samples.csv');
-    fs.mkdirSync(path.dirname(cpuCsv));
-    fs.writeFileSync(cpuCsv, CPU_POWER_CSV);
+    expect(await ingestCpuPowerSamples(sql, input)).toEqual({ hosts: 0 });
+    const cpuCsv = addCpuSamples(artifact);
     expect(await ingestGpuMetricsArtifact(sql, input)).toEqual({
       seriesIds: withoutCpu.seriesIds,
       samplesInserted: 0,
       seriesSkipped: 2,
     });
+
+    expect(await ingestCpuPowerSamples(sql, input)).toEqual({ hosts: 2 });
     const stored = await cpuSeries();
     expect(stored).toMatchObject([
       {
@@ -575,10 +589,10 @@ describe('ingestGpuMetricsArtifact', () => {
     ];
     expect(await cpuSamples()).toEqual(expectedSamples);
 
-    await ingestGpuMetricsArtifact(sql, input);
+    await ingestCpuPowerSamples(sql, input);
     expect(await cpuSeries()).toEqual(stored);
     await sql`update cpu_power_samples set power_w = 7`;
-    await ingestGpuMetricsArtifact(sql, { ...input, replace: true });
+    await ingestCpuPowerSamples(sql, { ...input, replace: true });
     expect(await cpuSamples()).toEqual(expectedSamples);
 
     fs.writeFileSync(
@@ -587,10 +601,23 @@ describe('ingestGpuMetricsArtifact', () => {
         .filter((line) => !line.includes('host-b'))
         .join('\n'),
     );
-    await ingestGpuMetricsArtifact(sql, input);
+    await ingestCpuPowerSamples(sql, input);
     const remaining = await cpuSeries();
     expect(remaining.map(({ hostname }) => hostname)).toEqual(['host-a']);
     expect(await cpuSamples()).toEqual(expectedSamples.slice(0, 3));
+  });
+
+  it('returns a CPU storage failure instead of throwing, as before migration 030', async () => {
+    const artifact = writePowerAuditArtifact();
+    addCpuSamples(artifact);
+    await sql`alter table cpu_power_series rename to cpu_power_series_unmigrated`;
+    try {
+      expect(await ingestCpuPowerSamples(sql, { workflowRunId: 1, artifact })).toEqual({
+        error: expect.stringContaining('cpu_power_series'),
+      });
+    } finally {
+      await sql`alter table cpu_power_series_unmigrated rename to cpu_power_series`;
+    }
   });
 
   it.each([

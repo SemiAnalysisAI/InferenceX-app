@@ -72,7 +72,7 @@ describe('ingest receipt routing', () => {
     ]);
   });
 
-  it('reports telemetry artifacts without telemetry as a separate warning line', () => {
+  it('reports artifacts without telemetry or stored CPU samples as warnings, not errors', () => {
     const tracker = createSkipTracker();
     tracker.recordTelemetryError('gpu_metrics for x', new Error('bad digest'));
     const manifest = buildPowerPublicationManifest({
@@ -82,11 +82,13 @@ describe('ingest receipt routing', () => {
       publicationErrors: [],
       tracker,
       telemetryNotCollectedArtifacts: 2,
+      cpuPowerSamplesNotStored: 1,
     });
     expect(manifest.ingestErrors).toEqual([]);
     expect(manifest.telemetryWarnings).toEqual([
       '1 telemetry errors (gpu_metrics digest or AgentX window)',
       '2 telemetry artifact(s) held no telemetry',
+      '1 artifact(s) with CPU power samples not stored',
     ]);
   });
 

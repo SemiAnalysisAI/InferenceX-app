@@ -89,6 +89,7 @@ import {
 } from './etl/power-audit-recovery';
 import {
   gpuMetricsArtifactHoldsTelemetry,
+  ingestCpuPowerSamples,
   ingestGpuMetricsArtifact,
 } from './etl/gpu-metrics-ingest';
 import { readTelemetryReceipt, type TelemetryObservation } from './etl/telemetry-receipt';
@@ -110,6 +111,7 @@ const powerPublicationErrors: string[] = [];
 const powerPublicationWarnings: string[] = [];
 const telemetryObservations = new Map<string, TelemetryObservation>();
 const telemetryNotCollectedArtifacts = new Set<string>();
+const cpuPowerSamplesNotStored = new Set<string>();
 let telemetryExpectationsUnknown = false;
 let checkTelemetry = false;
 const tracker = createSkipTracker();
@@ -789,6 +791,20 @@ async function main(): Promise<void> {
                 }
               }
             }
+            if (gpuMetricsArtifact) {
+              const cpu = await ingestCpuPowerSamples(sql, {
+                workflowRunId,
+                artifact: gpuMetricsArtifact,
+              });
+              if ('error' in cpu) {
+                cpuPowerSamplesNotStored.add(gpuMetricsArtifact.artifactName);
+                console.warn(
+                  `    [WARN] CPU power samples of ${gpuMetricsArtifact.artifactName} not stored: ${cpu.error}`,
+                );
+              } else if (cpu.hosts > 0) {
+                console.log(`    cpu power ${cpu.hosts} host series`);
+              }
+            }
             const logArtifact =
               serverLogArtifacts.get(configKey) ??
               serverLogArtifacts.get(stripBmkAndAgenticPrefix(parentDir));
@@ -1253,6 +1269,7 @@ main()
       publicationWarnings: powerPublicationWarnings,
       tracker,
       telemetryNotCollectedArtifacts: telemetryNotCollectedArtifacts.size,
+      cpuPowerSamplesNotStored: cpuPowerSamplesNotStored.size,
     };
     if (writeReceiptPath) {
       fs.writeFileSync(

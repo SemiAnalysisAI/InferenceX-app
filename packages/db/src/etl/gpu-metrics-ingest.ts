@@ -4,6 +4,7 @@ import type postgres from 'postgres';
 
 import { storeGpuSampleBlob } from '../queries/gpu-sample-blobs.js';
 import { sha256Hex } from './benchmark-artifacts.js';
+import { withTransientDbRetry } from './db-retry.js';
 import type { Sql } from './db-utils.js';
 
 type TxLike = Sql | postgres.TransactionSql;
@@ -370,43 +371,53 @@ function upsertCpuPowerSeries(
 
 /**
  * Store the bundle's `cpu/samples.csv` series and drop hosts a re-ingest no longer has.
- * A bundle without a parseable CPU file issues no query, so older bundles ingest as before.
+ * Best-effort, like the upstream CPU leg: a failure (for example, migration 030 not yet
+ * applied) is returned as `error` and never thrown, so it cannot fail the bundle's GPU
+ * telemetry. A bundle without a parseable CPU file issues no query.
  */
-async function ingestCpuPowerSamples(
+export async function ingestCpuPowerSamples(
   sql: Sql,
-  input: { workflowRunId: number; artifact: GpuMetricsArtifact; replace: boolean },
-): Promise<void> {
+  input: { workflowRunId: number; artifact: GpuMetricsArtifact; replace?: boolean },
+): Promise<{ hosts: number } | { error: string }> {
   const artifactName = input.artifact.artifactName;
-  const kept: { fileName: string; hostname: string }[] = [];
-  for (const file of walkFiles(input.artifact.artifactDir, isCpuPowerSamplesPath)) {
-    const csvText = fs.readFileSync(file.path, 'utf8');
-    const csvSha256 = sha256Hex(csvText);
-    for (const host of parseCpuPowerSamples(csvText) ?? []) {
-      await upsertCpuPowerSeries(sql, {
-        workflowRunId: input.workflowRunId,
-        artifactName,
+  try {
+    const parsed = walkFiles(input.artifact.artifactDir, isCpuPowerSamplesPath).flatMap((file) => {
+      const csvText = fs.readFileSync(file.path, 'utf8');
+      const csvSha256 = sha256Hex(csvText);
+      return (parseCpuPowerSamples(csvText) ?? []).map((host) => ({
         fileName: file.fileName,
         csvSha256,
         host,
-        replace: input.replace,
-      });
-      kept.push({ fileName: file.fileName, hostname: host.hostname });
-    }
+      }));
+    });
+    if (parsed.length === 0) return { hosts: 0 };
+    await withTransientDbRetry(`cpu power samples for ${artifactName}`, async () => {
+      for (const entry of parsed) {
+        await upsertCpuPowerSeries(sql, {
+          workflowRunId: input.workflowRunId,
+          artifactName,
+          ...entry,
+          replace: input.replace ?? false,
+        });
+      }
+      await sql`
+        delete from cpu_power_series s
+        where s.workflow_run_id = ${input.workflowRunId}
+          and s.artifact_name = ${artifactName}
+          and not exists (
+            select 1
+            from unnest(
+              ${sql.array(parsed.map((entry) => entry.fileName))}::text[],
+              ${sql.array(parsed.map((entry) => entry.host.hostname))}::text[]
+            ) as k(file_name, hostname)
+            where k.file_name = s.file_name and k.hostname = s.hostname
+          )
+      `;
+    });
+    return { hosts: parsed.length };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
   }
-  if (kept.length === 0) return;
-  await sql`
-    delete from cpu_power_series s
-    where s.workflow_run_id = ${input.workflowRunId}
-      and s.artifact_name = ${artifactName}
-      and not exists (
-        select 1
-        from unnest(
-          ${sql.array(kept.map((key) => key.fileName))}::text[],
-          ${sql.array(kept.map((key) => key.hostname))}::text[]
-        ) as k(file_name, hostname)
-        where k.file_name = s.file_name and k.hostname = s.hostname
-      )
-  `;
 }
 
 export async function ingestGpuMetricsArtifact(
@@ -474,10 +485,5 @@ export async function ingestGpuMetricsArtifact(
       `;
     }
   }
-  await ingestCpuPowerSamples(sql, {
-    workflowRunId: input.workflowRunId,
-    artifact: input.artifact,
-    replace: input.replace ?? false,
-  });
   return result;
 }

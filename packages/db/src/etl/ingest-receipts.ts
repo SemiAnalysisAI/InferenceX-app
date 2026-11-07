@@ -22,6 +22,7 @@ export interface IngestReceiptInput {
   publicationWarnings?: readonly string[];
   tracker: Pick<SkipTracker, 'skips' | 'dbWriteErrors' | 'dbWriteWarnings'>;
   telemetryNotCollectedArtifacts?: number;
+  cpuPowerSamplesNotStored?: number;
   telemetry?: TelemetryReceipt;
 }
 
@@ -40,6 +41,9 @@ export function buildPowerPublicationManifest(input: IngestReceiptInput): PowerP
         : []),
       ...(input.telemetryNotCollectedArtifacts
         ? [`${input.telemetryNotCollectedArtifacts} telemetry artifact(s) held no telemetry`]
+        : []),
+      ...(input.cpuPowerSamplesNotStored
+        ? [`${input.cpuPowerSamplesNotStored} artifact(s) with CPU power samples not stored`]
         : []),
     ],
     ...(input.telemetry ? { telemetry: input.telemetry } : {}),

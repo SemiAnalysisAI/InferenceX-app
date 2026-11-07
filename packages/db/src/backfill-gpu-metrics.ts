@@ -6,7 +6,7 @@ import { parseArgs } from 'node:util';
 import { hasNoSslFlag, requireIngestRepo } from './cli-utils.js';
 import { AsyncSemaphore } from './etl/async-semaphore.js';
 import { createAdminSql } from './etl/db-utils.js';
-import { ingestGpuMetricsArtifact } from './etl/gpu-metrics-ingest.js';
+import { ingestCpuPowerSamples, ingestGpuMetricsArtifact } from './etl/gpu-metrics-ingest.js';
 import { readPowerAuditValidations } from './etl/gpu-metrics-artifacts.js';
 import type { RecoveredPowerAudit } from './etl/power-audit-validations.js';
 import {
@@ -289,9 +289,14 @@ async function processPair(
     const audits: AgentxAuditWrite[] = attached.points.flatMap((point) =>
       point.powerAudit ? [{ benchmarkResultId: point.id, powerAudit: point.powerAudit }] : [],
     );
+    const artifact = { artifactName: pair.gpuMetrics.name, artifactDir: gpuMetricsDir };
+    const cpu = await ingestCpuPowerSamples(sql, { workflowRunId: run.id, artifact, replace });
+    if ('error' in cpu) {
+      console.warn(`  [WARN] ${pair.gpuMetrics.name}: CPU power samples not stored: ${cpu.error}`);
+    }
     const ingested = await ingestGpuMetricsArtifact(sql, {
       workflowRunId: run.id,
-      artifact: { artifactName: pair.gpuMetrics.name, artifactDir: gpuMetricsDir },
+      artifact,
       benchmarkResultIds: resultIds,
       replace,
       expectedRunArtifacts,

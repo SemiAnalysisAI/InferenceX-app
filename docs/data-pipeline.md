@@ -858,21 +858,24 @@ UTC samples, and `benchmark_result_gpu_metrics` links points to their series.
 Each file/host remains separate; multiple benchmark points can share a series.
 Ingest prefers paired `gpu_metrics_` artifacts and otherwise reads telemetry from
 `power_audit_` bundles. Unchanged inputs only refresh links; changed inputs replace
-samples transactionally. A paired artifact that holds no telemetry file (no
-`gpu_metrics*.csv` series and no `LOGS/**/samples.csv`), such as a sweep run with
-power collection off, marks its points `telemetry_not_collected` rather than
+samples transactionally. A paired artifact that holds no GPU telemetry file (no
+`gpu_metrics*.csv` series and no `LOGS/**/samples.csv` other than `cpu/samples.csv`),
+such as a sweep run with power collection off or a bundle whose GPU exporter wrote
+nothing beside its CPU samples, marks its points `telemetry_not_collected` rather than
 `ingest_failed`. The telemetry API check skips those points, and the PowerX manifest
 reports them as one `N telemetry artifact(s) held no telemetry` warning. Telemetry
 files that are present but unparseable remain `ingest_failed`.
 
 CPU exporter samples (`LOGS/power/cpu/samples.csv`, one row per scrape, host and
 socket) go to `cpu_power_series` and `cpu_power_samples` (migration 030), one series per
-artifact, file and host, with the socket meter and its rails. They live apart from the
+artifact, file and host, with the socket reading and its rails. They live apart from the
 GPU tables so GPU readers never count a socket as a GPU, and nothing reads them yet.
-They are stored while a `power_audit_` bundle's GPU telemetry is ingested; the GPU path
-excludes the CPU file. An unchanged CSV (same sha and sample count) is skipped, and a
-bundle without one issues no CPU query. Apply migration 030 before deploying this
-ingest, or bundles with CPU samples fail telemetry ingest.
+Ingest and the GPU metrics backfill store them for every paired bundle, including one
+without GPU samples; the GPU path excludes the CPU file. Like the upstream CPU leg, this
+is best-effort: a failure, such as migration 030 not yet applied, is a
+`N artifact(s) with CPU power samples not stored` warning and never fails the points'
+GPU telemetry. An unchanged CSV (same sha and sample count) is skipped, and a bundle
+without one issues no CPU query.
 
 Native `samples.csv` v2 adds optional `gpu_util_pct`, and v3 adds `temperature_c`.
 Ingest stores these readings in the existing GPU sample fields; missing or invalid
