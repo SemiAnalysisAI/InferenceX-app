@@ -1,0 +1,54 @@
+name: 'Power model parity'
+
+on:
+  pull_request:
+    branches: [main, master]
+    types: [opened, synchronize, ready_for_review]
+    paths:
+      - '.github/workflows/power-model-parity.yml'
+      - 'packages/app/scripts/generate-power-model-parity.py'
+      - 'packages/app/src/lib/power/power-model.manifest.json'
+      - 'packages/app/src/lib/power/power-model.parity.json'
+      - 'packages/app/src/lib/power/power_model/**'
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fixture:
+    name: Fixture matches pinned power_model
+    if: ${{ !github.event.pull_request.draft }}
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read pinned InferenceX revision
+        id: pin
+        run: |
+          revision=$(sed -n 's/^REVISION = "\([0-9a-f]\{40\}\)"$/\1/p' packages/app/scripts/generate-power-model-parity.py)
+          if [ -z "$revision" ]; then
+            echo "::error::No REVISION in generate-power-model-parity.py"
+            exit 1
+          fi
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+      - name: Checkout pinned InferenceX
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: SemiAnalysisAI/InferenceX
+          ref: ${{ steps.pin.outputs.revision }}
+          path: inferencex
+          sparse-checkout: power_model
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - name: Compare fixture and manifest with the pinned revision
+        run: >-
+          uv run --no-project --python 3.12 --with ./inferencex/power_model
+          python packages/app/scripts/generate-power-model-parity.py --inferencex inferencex --check

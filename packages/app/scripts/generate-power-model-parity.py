@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Regenerate the TypeScript power-model port's manifest and parity fixture.
 
-Usage: python3 packages/app/scripts/generate-power-model-parity.py [--inferencex PATH]
+Usage: python3 packages/app/scripts/generate-power-model-parity.py [--inferencex PATH] [--check]
 
 PATH is a local SemiAnalysisAI/InferenceX clone that contains REVISION (default:
 $INFERENCEX_REPO, else an InferenceX checkout next to this repository). The script
@@ -15,13 +15,16 @@ It writes two files next to the port (packages/app/src/lib/power/power_model):
   system, workload, scale-out state, measured Grace-socket or x86 CPU input, and a
   sweep of GPU watts (including out-of-domain inputs and their errors), plus seeded
   random GPU and socket watts for every system.
-Output is byte-stable across reruns.
+Output is byte-stable across reruns on one platform. Across C libraries a float can differ
+in its last bit (upstream `x**3` rounds through libm pow), so --check, which CI runs,
+compares the committed files with numbers at the parity test's relative tolerance.
 """
 
 import argparse
 import io
 import itertools
 import json
+import math
 import os
 from pathlib import Path
 import subprocess
@@ -60,6 +63,8 @@ RACK_SOCKET_WATTS = (None, 0.0, 98.066, 250.0, 500.0)
 CHASSIS_CPU_WATTS = (None, 0.0, 180.0, 400.0)
 # Full component trees (with provenance and configuration) for these GPU watts.
 DETAIL_WATTS = (0.0, 612.375)
+# power-model-parity.test.ts compares the port with the fixture at this relative tolerance.
+REL_TOL = 1e-12
 SUMMARY_KEYS = ("it_power_w", "facility_overhead_w", "facility_power_w", "AllInPower_per_gpu")
 # Seeded random inputs beyond the grid, drawn like the 2026-10 differential fuzz.
 FUZZ_SEED = 20261012
@@ -336,6 +341,32 @@ def catalog():
     }
 
 
+def differences(committed, generated, path):
+    """Where regenerated output departs from the committed file, numbers within REL_TOL."""
+    if type(committed) in (int, float) and type(generated) in (int, float):
+        if math.isclose(committed, generated, rel_tol=REL_TOL):
+            return []
+    elif isinstance(committed, list) and isinstance(generated, list):
+        if len(committed) != len(generated):
+            return [f"{path}: {len(generated)} items, committed {len(committed)}"]
+        return [
+            found
+            for index, pair in enumerate(zip(committed, generated))
+            for found in differences(*pair, f"{path}[{index}]")
+        ]
+    elif isinstance(committed, dict) and isinstance(generated, dict):
+        if committed.keys() != generated.keys():
+            return [f"{path}: keys {sorted(generated)}, committed {sorted(committed)}"]
+        return [
+            found
+            for key in committed
+            for found in differences(committed[key], generated[key], f"{path}.{key}")
+        ]
+    elif type(committed) is type(generated) and committed == generated:
+        return []
+    return [f"{path}: generated {generated!r:.80}, committed {committed!r:.80}"]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
@@ -344,6 +375,11 @@ def main():
         default=Path(os.environ.get("INFERENCEX_REPO", REPO_ROOT.parent / "InferenceX")),
     )
     parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="compare with the files in --output-dir instead of writing them",
+    )
     args = parser.parse_args()
     provenance, configuration = Interner(), Interner()
     with tempfile.TemporaryDirectory() as workdir:
@@ -372,19 +408,30 @@ def main():
             "reports": parity_reports,
         },
     }
-    args.output_dir.mkdir(parents=True, exist_ok=True)
+    found = []
+    if not args.check:
+        args.output_dir.mkdir(parents=True, exist_ok=True)
     for filename, payload in outputs.items():
         # The small manifest is reviewed by hand; the fixture is stored minified
         # (and excluded from formatting in .prettierignore).
         indent = 2 if filename.endswith("manifest.json") else None
         separators = None if indent else (",", ":")
-        (args.output_dir / filename).write_text(
-            json.dumps(payload, indent=indent, separators=separators, allow_nan=False) + "\n"
+        text = json.dumps(payload, indent=indent, separators=separators, allow_nan=False) + "\n"
+        path = args.output_dir / filename
+        if args.check:
+            found += differences(json.loads(path.read_text()), json.loads(text), filename)
+        else:
+            path.write_text(text)
+    if found:
+        print("\n".join(found[:20]), file=sys.stderr)
+        raise SystemExit(
+            f"{len(found)} differences from {REVISION[:12]}; rerun without --check to regenerate"
         )
     errors = sum("error" in case for case in parity_cases)
     print(
-        f"Wrote {len(files)} upstream modules ({len(SKIPPED)} skipped) and {len(parity_cases)} "
-        f"parity cases ({errors} rejected) at {REVISION[:12]} (tree {tree[:12]})"
+        f"{'Checked' if args.check else 'Wrote'} {len(files)} upstream modules "
+        f"({len(SKIPPED)} skipped) and {len(parity_cases)} parity cases ({errors} rejected) "
+        f"at {REVISION[:12]} (tree {tree[:12]})"
     )
 
 
