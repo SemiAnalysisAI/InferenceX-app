@@ -29,10 +29,10 @@ const SOURCE_NOTE = `Source: InferenceX & ${TCO_SOURCE_TITLE}`;
 const SOURCE_NOTE_ZH = `来源：InferenceX 与 ${TCO_SOURCE_TITLE}`;
 const SCOPE_METRIC = 'Hyperscaler cost';
 const SCOPE_DIRECTION = '↓ Lower is better';
-const SCOPE_LINE = `${SCOPE_METRIC} · ${SCOPE_DIRECTION} · ${SOURCE_NOTE}`;
+const SCOPE_LINE = `${SCOPE_METRIC} · ${SCOPE_DIRECTION}`;
 const SCOPE_METRIC_ZH = '超大规模云厂商成本';
 const SCOPE_DIRECTION_ZH = '↓ 越低越好';
-const SCOPE_LINE_ZH = `${SCOPE_METRIC_ZH} · ${SCOPE_DIRECTION_ZH} · ${SOURCE_NOTE_ZH}`;
+const SCOPE_LINE_ZH = `${SCOPE_METRIC_ZH} · ${SCOPE_DIRECTION_ZH}`;
 const OVERVIEW_TIERS = [30, 50, 75, 100, 150, 200] as const;
 
 function selectOverviewTier(tier: (typeof OVERVIEW_TIERS)[number]) {
@@ -53,6 +53,11 @@ function selectOverviewTier(tier: (typeof OVERVIEW_TIERS)[number]) {
     slider.dispatchEvent(new view.Event('input', { bubbles: true }));
     expect(slider.dataset.tier, 'slider committed tier').to.eq(String(tier));
   });
+}
+
+function expectScope(line: string, sourceNote: string) {
+  cy.get('[data-testid="overview-scope"]').should('have.text', line);
+  cy.get('[data-testid="overview-source-link"]').parent().should('have.text', sourceNote);
 }
 
 function expectNoHorizontalOverflow() {
@@ -112,9 +117,23 @@ function mobileModel(model: string, scenario?: string) {
   return cy.get(`[data-testid="overview-mobile-model"][data-model="${model}"]${row}`);
 }
 
-function expectCellTint(hardware: string, expected: string) {
+function expectCellTint(hardware: string, token: '--success' | '--destructive', alpha: number) {
   platform(hardware).then(([cell]) => {
-    expect(getComputedStyle(cell.closest('td')!).backgroundColor).to.contain(expected);
+    const probe = cell.ownerDocument.createElement('span');
+    probe.style.backgroundColor = `oklch(from var(${token}) l c h)`;
+    cell.ownerDocument.body.append(probe);
+    const tokenColor = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    const background = getComputedStyle(cell.closest('td')!).backgroundColor;
+    expect(tokenColor).to.match(/^oklch\(/);
+    expect(background).to.match(/^oklch\(/);
+    const [tokenChannels, cellChannels] = [tokenColor, background].map((color) =>
+      color.match(/[\d.]+/g)!.map(Number),
+    );
+    tokenChannels.forEach((channel, index) => {
+      expect(cellChannels[index]).to.be.closeTo(channel, 0.01);
+    });
+    expect(cellChannels[3]).to.eq(alpha);
   });
 }
 
@@ -810,7 +829,7 @@ describe('Overview page', () => {
         .then(($badge) => {
           expect($badge.attr('style') ?? '').not.to.contain('background');
         });
-      expectCellTint('mi355x', 'rgba(16, 185, 129,');
+      expectCellTint('mi355x', '--success', 0.15);
     });
 
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
@@ -818,7 +837,7 @@ describe('Overview page', () => {
         .find('[data-testid="overview-cost-delta"]')
         .should('contain.text', '+71%')
         .and('have.attr', 'data-cost-polarity', 'pricier');
-      expectCellTint('gb200', 'rgba(239, 68, 68, 0.4)');
+      expectCellTint('gb200', '--destructive', 0.32);
       platform('gb300').find('[data-testid="overview-cost-delta"]').should('not.exist');
       platform('gb300').then(([cell]) => {
         expect(getComputedStyle(cell.closest('td')!).backgroundColor).to.match(
@@ -831,7 +850,7 @@ describe('Overview page', () => {
       platform('b200').then(([cell]) => {
         const td = cell.closest('td')!;
         expect(td.getAttribute('style') ?? '').not.to.contain('background');
-        expect(td.className).to.contain('bg-muted/30');
+        expect(td.className).to.contain('bg-muted/15');
       });
     });
 
@@ -1098,7 +1117,7 @@ describe('Overview page', () => {
     selectOverviewTier(100);
 
     cy.location('search').should('eq', '?tier=100');
-    cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE);
+    expectScope(SCOPE_LINE, SOURCE_NOTE);
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
       cy.get('[data-tier-option="100"]').should('have.attr', 'data-selected', 'true');
       cy.get('[data-tier-ridge="75"]').should('have.attr', 'data-state', 'filled');
@@ -1132,17 +1151,17 @@ describe('Overview page', () => {
 
     cy.visit('/overview?tier=30&models=all');
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
-      platform('b300').within(() => {
-        cy.get('[data-testid="overview-pair-missing"][data-hardware="b300"]')
-          .should('contain.text', '—')
-          .and('contain.text', 'no exact @30 result');
-      });
+      cy.get('[data-testid="overview-platform"]').should('not.exist');
+      cy.get('[data-testid="overview-row-no-results"]').should(
+        'have.text',
+        'No results at this SLO',
+      );
+    });
+    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('b200')
         .find('[data-testid="overview-pair-missing"]')
         .should('contain.text', '—')
         .and('contain.text', 'no exact @30 result');
-    });
-    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('b300').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="b300"]').should(
           'contain.text',
@@ -1158,13 +1177,13 @@ describe('Overview page', () => {
       .should('not.match', /∞\s*%/);
 
     cy.visit('/overview?tier=100');
-    cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE);
+    expectScope(SCOPE_LINE, SOURCE_NOTE);
     cy.get('[data-testid="language-toggle"]')
       .should('have.attr', 'href', '/zh/overview?tier=100')
       .click();
     cy.location('pathname').should('eq', '/zh/overview');
     cy.location('search').should('eq', '?tier=100');
-    cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE_ZH);
+    expectScope(SCOPE_LINE_ZH, SOURCE_NOTE_ZH);
   });
 
   it('uses the same cell semantics on mobile and fits both 390px and 320px widths', () => {
