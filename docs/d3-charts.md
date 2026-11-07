@@ -32,6 +32,23 @@ roofline) and static category keys. Grouped GPU legends (`GPUGraph`, PowerX
 run comparison) keep their row order with `disableActiveSort`, and embedded
 charts with minimal chrome pass `readOnly`.
 
+Line swatches are behind `SERIES_LINE_PATTERNS` in
+`lib/charts/framework-dash.ts`, which is currently `false`. While it is off,
+`ChartLegendItem` ignores `lineDasharray` and every legend shows dot swatches.
+Only the swatch shape changes, so reset, toggling, hover ✕, hidden sorting and
+collapse behave the same.
+
+## Framework line patterns
+
+`frameworkDasharray(hwKey)` gives each serving framework its own dash pattern
+(vLLM solid, SGLang dashed, TRT-LLM dotted, Dynamo long-dash variants) on the
+inference scatter, chip comparison and historical trend lines. The canvas
+paint and PNG export copy the SVG dash. Bar charts and uBenchX use colour only.
+
+The patterns follow the same `SERIES_LINE_PATTERNS` switch. It is off by
+default, so the helper returns no dash and every series line is solid. Set it
+to `true` to restore both the framework patterns and the line swatches.
+
 ## PNG export aspect ratio
 
 Inference charts keep the title above the plot and place cost controls, pricing

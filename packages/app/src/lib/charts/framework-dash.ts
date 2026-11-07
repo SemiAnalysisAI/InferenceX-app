@@ -27,7 +27,20 @@ const FRAMEWORK_DASH: Record<string, string> = {
   'llmd-vllm': LONG_DOT_DOT,
 };
 
-export function frameworkDasharray(hwKey: string): string | undefined {
+export const SERIES_LINE_PATTERNS = false;
+
+export function legendSwatchDasharray(
+  dasharray: string | undefined,
+  enabled = SERIES_LINE_PATTERNS,
+): string | undefined {
+  return enabled ? dasharray : undefined;
+}
+
+export function frameworkDasharray(
+  hwKey: string,
+  enabled = SERIES_LINE_PATTERNS,
+): string | undefined {
+  if (!enabled) return undefined;
   for (const part of hwKey.split('_').slice(1)) {
     const framework = resolveFrameworkAlias(part);
     if (Object.hasOwn(FRAMEWORK_DASH, framework)) return FRAMEWORK_DASH[framework];
