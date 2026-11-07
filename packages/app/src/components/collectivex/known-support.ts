@@ -123,10 +123,6 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     en: "FlashInfer's one-sided workspace needs every rank inside one NVLink domain, so on single-node NVLink pools it runs EP8 only.",
     zh: 'FlashInfer 的单边工作区要求所有 rank 位于同一 NVLink 域内，因此在单节点 NVLink 集群上只能运行 EP8。',
   },
-  'flashinfer-not-brought-up': {
-    en: 'FlashInfer EP has not been brought up on this pool yet.',
-    zh: 'FlashInfer EP 尚未在该集群上启用。',
-  },
   'no-ll-kernels': {
     en: 'The library has no low-latency kernels.',
     zh: '该库没有低延迟 Kernel。',
@@ -181,7 +177,7 @@ const NORMAL: KnownMatrix = {
     mori: off('amd-only'),
     'uccl-ep': off('uccl-not-brought-up'),
     'nccl-ep': cell(works, worksWith('nccl-v02-gin')),
-    'flashinfer-ep': off('flashinfer-not-brought-up'),
+    'flashinfer-ep': cell(works, na('flashinfer-one-nvlink-domain')),
   },
   gb200: {
     'deepep-v2': bothWork,
