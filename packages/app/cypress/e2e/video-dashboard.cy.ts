@@ -78,7 +78,9 @@ describe('VideoGenX results routes', () => {
       })
       .click();
     cy.location('search').should('not.contain', 'r_point=');
-    row('h200').should('be.visible');
+    row('h200')
+      .scrollIntoView({ offset: { top: -200, left: 0 } })
+      .should('be.visible');
     cy.go('forward');
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
   });
