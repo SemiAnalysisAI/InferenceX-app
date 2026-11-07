@@ -24,7 +24,7 @@
     "scripts/charts.mjs": "f736eb4438919f0aa1eed9a7402255c0e958cb34a561eeac3c09547af0bd44df",
     "scripts/cli-contract.mjs": "cff8dcec2c554c8ed71784ef5781b026623436816720acedbd49ed5764a421d4",
     "scripts/commands.mjs": "82d0bed2376cd9debfb00409e83099e895498c615877a90973d25aef5f392020",
-    "scripts/compare-collectivex.mjs": "c5fe8dfc9a9fb00d88a85c109d2b50ca15a8b0e08bd4251e3c97ce12dc9805c3",
+    "scripts/compare-collectivex.mjs": "ed7ec7c84de3e15f80703fa3b5a9ba21c6a19ce9322c79b6984df0d7987150a1",
     "scripts/compare-releases.mjs": "e76dc5b5b47c58954f1c3fa9861bbe65cea9f846fcc1ef967ba7d399a035c0c7",
     "scripts/compare-tco.mjs": "d8c08d71de2e6b68c88c13bba8ad0344c9b283e36882d016382cdd22d5d13384",
     "scripts/coverage-policy.mjs": "8f4bcb87b25b7e1c1d6065e3abdd04efe4e744bba35874c055d54df4b7e0337c",
