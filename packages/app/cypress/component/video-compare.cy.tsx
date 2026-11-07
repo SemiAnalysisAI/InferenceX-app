@@ -23,9 +23,19 @@ const colorFor = (key: string) => COLORS[key] ?? 'rgb(0, 0, 0)';
 
 const mediaUrl = (point: VideoPoint) =>
   `/api/video-runs?run=${point.runId}&artifact=${point.artifactId}&format=published`;
+const waitForSelectEntrance = () =>
+  cy
+    .get('[data-slot="select-content"][data-state="open"]')
+    .then(($menu) =>
+      Promise.allSettled(
+        $menu[0].getAnimations({ subtree: true }).map((animation) => animation.finished),
+      ),
+    );
 const pick = (label: string, option: string) => {
-  cy.get(`[role="combobox"][aria-label="${label}"]`).click();
+  cy.get(`[role="combobox"][aria-label="${label}"]`).click({ scrollBehavior: 'center' });
+  waitForSelectEntrance();
   cy.contains('[role="option"]', option).click();
+  cy.get('[data-slot="select-content"]').should('not.exist');
 };
 const tileVideo = (key: string) => cy.get(`[data-hardware="${key}"] video`);
 const scrub = (time: number) => {
@@ -196,6 +206,8 @@ function mountResultsClips(
   }
   cy.mount(<Clips />);
   cy.wait(keys.map((key) => `@results-${key}` as const));
+  // Responses can arrive before React replaces the provisional clip group.
+  cy.get('[data-testid="video-results-clips"] > [role="status"]').should('not.exist');
 }
 
 describe('Video results synchronized clips', () => {
@@ -210,7 +222,9 @@ describe('Video results synchronized clips', () => {
         'Listen to H100',
       ]);
     });
+    waitForSelectEntrance();
     cy.contains('[role="option"]', 'Listen to B200').click();
+    cy.get('[data-slot="select-content"]').should('not.exist');
     expectAudio('b200');
     cy.get<HTMLVideoElement>('video').then(($videos) => {
       for (const video of $videos) video.playbackRate = 0.1;

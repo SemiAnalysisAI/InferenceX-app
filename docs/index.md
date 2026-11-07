@@ -27,6 +27,7 @@ Design rationale and non-obvious conventions. Repo-wide rules are in [AGENTS.md]
 - [Testing](./testing.md) covers test requirements, quality standards, and the pre-commit checklist.
 - [Site Search](./site-search.md) covers how header search indexes and ranks pages, plus its performance and SEO guarantees.
 - [Typography](./typography.md) covers type tokens, heading components, chart font sizes, and the `check:typography` gate.
+- [Shared Interaction Motion](./interaction-motion.md) maps control animation rules to shared components, accessibility behavior, and browser checks.
 - [Data Transforms](./data-transforms.md) covers power boundaries, prefix-cache tier shares, and hardware-key gotchas in the chart data pipeline.
 - [State Ownership](./state-ownership.md) explains where shared chart state lives and how URL state is restored across navigation.
 - [Blog](./blog.md) covers MDX content, frontmatter and scheduled publishing, captions, heading IDs, and math.

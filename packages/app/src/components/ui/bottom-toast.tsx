@@ -91,24 +91,34 @@ export function BottomToast({
   const onDismissRef = useRef(onDismiss);
   onDismissRef.current = onDismiss;
   const toastRef = useRef<HTMLDivElement>(null);
+  const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useReserveBottomSpace(toastRef, visible);
 
   const dismiss = useCallback(() => {
+    if (dismissTimer.current !== null) return;
     setAnimate(false);
     track('toast_dismissed', { title });
-    setTimeout(() => {
-      setVisible(false);
-      if (!actionClickedRef.current) onDismissRef.current?.();
-    }, 300);
+    dismissTimer.current = setTimeout(
+      () => {
+        setVisible(false);
+        if (!actionClickedRef.current) onDismissRef.current?.();
+      },
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 240,
+    );
   }, [title]);
 
   useEffect(() => {
     window.dispatchEvent(new CustomEvent(DISMISS_EVENT));
-    requestAnimationFrame(() => setAnimate(true));
+    const frame = requestAnimationFrame(() => setAnimate(true));
 
     const handleDismiss = () => dismiss();
     window.addEventListener(DISMISS_EVENT, handleDismiss);
-    return () => window.removeEventListener(DISMISS_EVENT, handleDismiss);
+    return () => {
+      window.removeEventListener(DISMISS_EVENT, handleDismiss);
+      cancelAnimationFrame(frame);
+      if (dismissTimer.current !== null) clearTimeout(dismissTimer.current);
+      dismissTimer.current = null;
+    };
   }, [dismiss]);
 
   const handleAction = useCallback(() => {
@@ -120,12 +130,20 @@ export function BottomToast({
 
   if (!visible) return null;
 
-  const dragOffset = drag ? drag.dx : 0;
+  const distance = drag ? Math.abs(drag.dx) : 0;
+  // Direct tracking up to dismissal, then resistance approaching a 120px bound.
+  const dragOffset = drag
+    ? Math.sign(drag.dx) *
+      (distance <= SWIPE_DISMISS_PX
+        ? distance
+        : SWIPE_DISMISS_PX + 40 * (1 - Math.exp(-(distance - SWIPE_DISMISS_PX) / 80)))
+    : 0;
 
   return (
     <div
       ref={toastRef}
       data-testid={testId}
+      data-motion-state={animate ? 'open' : 'closed'}
       role="status"
       aria-live="polite"
       onTouchStart={(event) => {
@@ -137,7 +155,9 @@ export function BottomToast({
         const start = touchStartRef.current;
         const touch = event.touches[0];
         if (!start || !touch) return;
-        setDrag({ dx: touch.clientX - start.x, dy: touch.clientY - start.y });
+        const dx = touch.clientX - start.x;
+        const dy = touch.clientY - start.y;
+        if (Math.abs(dx) > Math.abs(dy)) setDrag({ dx, dy });
       }}
       onTouchEnd={(event) => {
         const start = touchStartRef.current;
@@ -164,7 +184,7 @@ export function BottomToast({
             }
           : undefined
       }
-      className={`fixed inset-x-0 bottom-0 z-50 touch-pan-y transition-all duration-300 ease-out sm:inset-x-auto sm:right-6 sm:bottom-6 sm:max-w-sm ${
+      className={`motion-toast fixed inset-x-0 bottom-0 z-50 touch-pan-y sm:inset-x-auto sm:right-6 sm:bottom-6 sm:max-w-sm ${
         animate ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
       }`}
     >

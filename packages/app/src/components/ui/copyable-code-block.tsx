@@ -34,6 +34,7 @@ export function CopyableCodeBlock({
 }) {
   const t = STRINGS[locale];
   const [status, setStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [copyCount, setCopyCount] = useState(0);
   const title = label ?? t.code;
   const tall = children.split('\n').length > 12;
 
@@ -41,6 +42,7 @@ export function CopyableCodeBlock({
     try {
       await navigator.clipboard.writeText(children);
       setStatus('copied');
+      setCopyCount((count) => count + 1);
       track('code_example_copied', { label: title });
     } catch {
       setStatus('failed');
@@ -60,13 +62,23 @@ export function CopyableCodeBlock({
           type="button"
           onClick={copy}
           aria-label={`${t.copy}: ${title}`}
-          className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none sm:min-h-8"
+          className="motion-press inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none sm:min-h-8"
         >
-          {status === 'copied' ? (
-            <Check aria-hidden="true" className="size-3.5" />
-          ) : (
-            <Copy aria-hidden="true" className="size-3.5" />
-          )}
+          <span aria-hidden="true" className="relative size-3.5 shrink-0">
+            <Copy
+              className="motion-feedback-icon absolute inset-0 size-3.5"
+              data-visible={status !== 'copied'}
+            />
+            <span
+              className="motion-feedback-icon absolute inset-0"
+              data-visible={status === 'copied'}
+            >
+              <Check
+                key={copyCount}
+                className={status === 'copied' ? 'motion-success size-3.5' : 'size-3.5'}
+              />
+            </span>
+          </span>
           <span aria-live="polite">{status === 'copied' ? t.copied : t.copy}</span>
         </button>
       </div>

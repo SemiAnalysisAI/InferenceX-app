@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 import { MultiSelect, type MultiSelectOption } from '@/components/ui/multi-select';
@@ -41,6 +41,97 @@ function MultiSelectWrapper({
 }
 
 describe('MultiSelect', () => {
+  it('clears a preserved filter before the first frame of a controlled reopen', () => {
+    const onOpenFrame = cy.stub().as('openFrame');
+    function ControlledSelect() {
+      const [open, setOpen] = useState(false);
+      const root = useRef<HTMLDivElement>(null);
+      useLayoutEffect(() => {
+        const win = root.current?.ownerDocument.defaultView;
+        if (!open || !win) return;
+        const frame = win.requestAnimationFrame(() => {
+          const menu = root.current?.querySelector('[data-slot="select-content"]');
+          onOpenFrame(
+            menu?.querySelector('input')?.value,
+            menu?.querySelectorAll('[role="option"]').length,
+          );
+        });
+        return () => win.cancelAnimationFrame(frame);
+      }, [open]);
+      return (
+        <div ref={root}>
+          <button onClick={() => setOpen(true)}>Open externally</button>
+          <MultiSelect
+            options={OPTIONS}
+            value={[]}
+            onChange={() => {}}
+            open={open}
+            onOpenChange={setOpen}
+          />
+        </div>
+      );
+    }
+    cy.mount(<ControlledSelect />);
+    cy.contains('button', 'Open externally').click();
+    cy.get('@openFrame').should('have.been.calledWith', '', OPTIONS.length);
+    cy.get('input').type('H100{esc}');
+    cy.get('[data-slot="select-content"][data-state="closed"]').should(($menu) => {
+      expect($menu.find('input')).to.have.value('H100');
+      $menu[0].getAnimations().forEach((animation) => animation.pause());
+    });
+    cy.get('@openFrame').invoke('resetHistory');
+    cy.contains('button', 'Open externally').click();
+    cy.get('@openFrame').should('have.been.calledWith', '', OPTIONS.length);
+  });
+
+  it('preserves filtered rows while closing and clears search after the exit', () => {
+    cy.mount(<MultiSelectWrapper />);
+    cy.get('[role="combobox"]').click();
+    cy.get('input').type('H100');
+    cy.get('[role="option"]').should('have.length', 1);
+    cy.get('input').type('{esc}');
+    cy.get('[data-slot="select-content"][data-state="closed"]').should(($content) => {
+      expect($content.find('[role="option"]')).to.have.length(1);
+      expect($content.text()).to.contain('NVIDIA H100 SXM').and.not.contain('NVIDIA H200 SXM');
+    });
+    cy.get('[data-slot="select-content"]').should('not.exist');
+    cy.get('[role="combobox"]').click();
+    cy.get('input').should('have.value', '');
+    cy.get('[role="option"]').should('have.length', OPTIONS.length);
+  });
+
+  it('keeps closing options inert and survives reopening during the exit', () => {
+    let pausedExit: Animation[] = [];
+    cy.mount(<MultiSelectWrapper />);
+    cy.get('[role="combobox"]').click();
+    cy.get('[data-slot="select-content"]').should('have.attr', 'data-state', 'open');
+    cy.get('input').type('{esc}');
+    cy.get('[data-slot="select-content"]').should(($content) => {
+      expect($content.attr('data-state')).to.equal('closed');
+      expect($content[0].inert).to.equal(true);
+      expect($content.attr('aria-hidden')).to.equal('true');
+      pausedExit = $content[0].getAnimations();
+      pausedExit.forEach((animation) => animation.pause());
+    });
+    cy.get('[role="combobox"]').click();
+    cy.get('[data-slot="select-content"]')
+      .should('have.attr', 'data-state', 'open')
+      .then(($content) => {
+        // Do not replay an exit we manually detached from CSS by pausing it.
+        pausedExit.forEach((animation) => animation.cancel());
+        return Promise.allSettled(
+          $content[0].getAnimations().map((animation) => animation.finished),
+        );
+      });
+    cy.get('[role="listbox"]').should('be.visible');
+    cy.get('[data-slot="select-content"]').should(($content) => {
+      expect($content[0].inert).to.equal(false);
+    });
+    cy.contains('[role="option"]', 'NVIDIA H100 SXM').click();
+    cy.get('[role="combobox"]').should('contain.text', 'NVIDIA H100 SXM');
+    cy.get('[role="listbox"]').should('not.exist');
+  });
+
   it('selects with the keyboard, skips unavailable values, and restores trigger focus', () => {
     cy.mount(
       <MultiSelectWrapper
