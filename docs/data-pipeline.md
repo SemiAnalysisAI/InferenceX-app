@@ -155,17 +155,22 @@ must use the append-only contract below.
 
 ### Required Power
 
-InferenceX enforces required power per benchmark job: a matrix row with
-`require-power: true` runs with `REQUIRE_POWER=1`, and an invalid measurement window
-fails that job. Without the flag the row records `power_valid=0`. Each result row
-also carries `require_power`. Fixed-sequence results upload only from a passing job,
-but AgentX results upload even from a failed one, so ingest treats a row with
-`require_power: true` and `power_valid` other than 1 as a failed point. It publishes
-nothing for that row, and lists it with its config, concurrency, and
-`power_invalid_reasons` or `power_missing` under "Required-power points not published"
-in the ingest summary. The receipt carries it as a known-failed publication warning,
-which is not fatal, so the run's other points still publish. Rows without
-`require_power` (older artifacts) are unaffected.
+InferenceX enforces required power per benchmark job. A point is required when the
+producer marks it so, for example a matrix row with `require-power: true` (run with
+`REQUIRE_POWER=1`) or a multinode search-space entry with `power: true`. An invalid
+measurement window fails a required point's job; any other point records
+`power_valid=0` and still publishes. Every result row carries the producer's
+`require_power` verdict.
+
+Fixed-sequence results upload only from a passing job, but AgentX results upload even
+from a failed one. `requiredPowerFailure` (`etl/benchmark-mapper.ts`) therefore treats
+a row with `require_power: true` and `power_valid` other than 1 as a failed point.
+CI ingest, GCS backup ingest and the `?unofficialrun=` overlay all leave it out. CI
+ingest logs each withheld point with its config, concurrency and
+`power_invalid_reasons` or `power_missing`, lists it under "Required-power points not
+published" in the step-summary report, and records it as a publication warning in the
+receipt. A withheld point is not fatal, so the run's other points still publish.
+Rows without `require_power` (older artifacts) are unaffected.
 
 ### Retried Attempts
 
@@ -173,7 +178,8 @@ GitHub keeps artifacts from every attempt, so a point that passed on several att
 arrives as several job copies with unrelated hashed names. Preparation keeps the copy
 whose benchmark artifact is newest, which is the latest attempt that produced the
 point, and removes every sibling artifact of older copies (power audit, telemetry,
-traces, server logs). Ingest skips `results_*` aggregate rows for points that a
+traces, server logs). A withheld required-power row still counts as producing its
+point, so a rerun replaces the older copy as a whole. Ingest skips `results_*` aggregate rows for points that a
 per-job file already holds, and replaces a point's telemetry links instead of adding
 to them, so the row, its power series and the publication receipt share one copy.
 
