@@ -18,7 +18,11 @@ import FrontierChart, {
 } from './FrontierChart';
 import { FrontierAreaTimeline, FrontierLeadBars } from './FrontierComparePanels';
 import FrontierDataTable from './FrontierDataTable';
-import { FrontierSoftwareGain, FrontierSoftwareGainBars } from './FrontierSoftwarePanels';
+import {
+  FrontierSoftwareGain,
+  FrontierSoftwareGainBars,
+  FrontierSoftwareGainTable,
+} from './FrontierSoftwarePanels';
 import {
   frontierAreas,
   frontierChapters,
@@ -615,6 +619,14 @@ export default function FrontierView({
             keys={selected}
             styles={styles}
             xLabel={chartProps.xLabel}
+          />
+          <FrontierSoftwareGainTable
+            history={history}
+            dateIndex={dateIndex}
+            keys={selected}
+            styles={styles}
+            xLabel={chartProps.xLabel}
+            formatDate={formatDate}
           />
         </div>
       )}

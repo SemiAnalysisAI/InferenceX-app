@@ -13,6 +13,7 @@ import {
   frontierRegressions,
   frontierValueAt,
   historyFromFirstData,
+  averageSoftwareGain,
   softwareGainByInteractivity,
   softwareGainBarMaxLog,
   softwareGains,
@@ -428,6 +429,28 @@ describe('software gains', () => {
     expect(slow.ratio).toBeCloseTo(2);
     expect(mid.ratio).toBeCloseTo(2);
     expect(beyond.ratio).toBeNull();
+  });
+
+  it('averages the gain across reached interactivity levels as a geometric mean', () => {
+    const history = buildFrontierHistory(rows, { ...OPTIONS, groupBy: 'gpu' });
+    const last = history.dates.length - 1;
+    const gains = softwareGainByInteractivity(history, 'h200', last, [10, 20, 40]);
+    expect(averageSoftwareGain(gains)).toBeCloseTo(2);
+    expect(
+      averageSoftwareGain([
+        { x: 10, ratio: 2 },
+        { x: 20, ratio: 0.5 },
+        { x: 40, ratio: null },
+      ]),
+    ).toBeCloseTo(1);
+    expect(
+      averageSoftwareGain([
+        { x: 10, ratio: 8 },
+        { x: 20, ratio: 2 },
+      ]),
+    ).toBeCloseTo(4);
+    expect(averageSoftwareGain([{ x: 10, ratio: null }])).toBeNull();
+    expect(averageSoftwareGain([])).toBeNull();
   });
 
   it('keeps the bar scale large enough for a peak before the final snapshot', () => {

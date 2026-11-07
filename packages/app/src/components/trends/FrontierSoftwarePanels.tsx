@@ -3,6 +3,7 @@
 import * as d3 from 'd3';
 import React, { useMemo } from 'react';
 
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -17,6 +18,7 @@ import {
 } from './frontier-panel-layout';
 import type { FrontierSeriesStyle } from './FrontierChart';
 import {
+  averageSoftwareGain,
   comparisonBuckets,
   FRONTIER_COMPARISON_BUCKETS,
   softwareGainBarMaxLog,
@@ -37,6 +39,13 @@ const STRINGS = {
     na: 'NA',
     noData: (name: string) => `${name} does not reach this interactivity on both dates`,
     pick: 'Pick at least one chip.',
+    tableTitle: 'Gain by interactivity',
+    tableHelp:
+      'Each selected chip now against its first run, at each interactivity. Average is the geometric mean of the levels both curves reach.',
+    columns: (unit: string) => `Columns are interactivity in ${unit}.`,
+    chip: 'Chip',
+    since: 'First run',
+    average: 'Average',
   },
   zh: {
     gainTitle: '同一芯片上的软件提升',
@@ -49,6 +58,13 @@ const STRINGS = {
     na: '无数据',
     noData: (name: string) => `${name} 在两个日期中未同时覆盖该交互性`,
     pick: '请至少选择一款芯片。',
+    tableTitle: '各交互性水平上的提升',
+    tableHelp:
+      '每款所选芯片当前相对其首次测试在各交互性水平上的倍数。平均值为两条曲线均覆盖的各水平的几何平均。',
+    columns: (unit: string) => `各列为交互性（${unit}）。`,
+    chip: '芯片',
+    since: '首次测试',
+    average: '平均',
   },
 } as const;
 
@@ -249,6 +265,95 @@ export function FrontierSoftwareGainBars({
           </svg>
         )}
       </div>
+    </section>
+  );
+}
+
+interface GainTableRow {
+  key: string;
+  gains: { x: number; ratio: number | null }[];
+  average: number | null;
+}
+
+/** The bars as a table: one row per selected chip, one column per interactivity bucket. */
+export function FrontierSoftwareGainTable({
+  history,
+  dateIndex,
+  keys,
+  styles,
+  xLabel,
+  formatDate,
+}: Omit<SoftwareProps, 'onSeek'>) {
+  const t = STRINGS[useLocale()];
+  const buckets = useMemo(() => comparisonBuckets(history, FRONTIER_COMPARISON_BUCKETS), [history]);
+  const rows = useMemo(
+    (): GainTableRow[] =>
+      keys.map((key) => {
+        const gains = softwareGainByInteractivity(history, key, dateIndex, buckets);
+        return { key, gains, average: averageSoftwareGain(gains) };
+      }),
+    [history, dateIndex, keys, buckets],
+  );
+  const columns = useMemo((): DataTableColumn<GainTableRow>[] => {
+    const label = (key: string) => styles.get(key)?.label ?? key;
+    const firstDate = (key: string) =>
+      history.series.find((series) => series.key === key)?.firstDate ?? history.dates[0];
+    const ratioCell = (ratio: number | null) => (ratio === null ? '—' : formatRatio(ratio));
+    return [
+      {
+        header: t.chip,
+        importance: 'key',
+        pinned: true,
+        sortValue: (row) => label(row.key),
+        cell: (row) => (
+          <span className="flex items-center gap-1.5 whitespace-nowrap">
+            <span
+              aria-hidden
+              className="size-2.5 shrink-0 rounded-full"
+              style={{ background: styles.get(row.key)?.color ?? 'var(--muted-foreground)' }}
+            />
+            {label(row.key)}
+          </span>
+        ),
+      },
+      {
+        header: t.since,
+        importance: 'secondary',
+        sortValue: (row) => firstDate(row.key),
+        cell: (row) => <span className="whitespace-nowrap">{formatDate(firstDate(row.key))}</span>,
+      },
+      ...buckets.map((bucket, index): DataTableColumn<GainTableRow> => ({
+        header: `${Math.round(bucket)}`,
+        align: 'right',
+        importance: 'key',
+        sortValue: (row) => row.gains[index]?.ratio ?? -1,
+        cell: (row) => ratioCell(row.gains[index]?.ratio ?? null),
+      })),
+      {
+        header: t.average,
+        align: 'right',
+        importance: 'key',
+        sortValue: (row) => row.average ?? -1,
+        cell: (row) => <span className="font-semibold">{ratioCell(row.average)}</span>,
+      },
+    ];
+  }, [t, styles, history, buckets, formatDate]);
+
+  if (keys.length === 0) return null;
+  return (
+    <section className={`${PANEL_SECTION_CLASS} lg:col-span-2`}>
+      <div className={PANEL_HEADER_CLASS}>
+        <h3 className="text-sm font-semibold">{t.tableTitle}</h3>
+        <p className="text-xs text-muted-foreground">
+          {t.tableHelp} {t.columns(xLabel)}
+        </p>
+      </div>
+      <DataTable
+        data={rows}
+        columns={columns}
+        testId="frontier-software-table"
+        analyticsPrefix="historical_frontier_software_table"
+      />
     </section>
   );
 }

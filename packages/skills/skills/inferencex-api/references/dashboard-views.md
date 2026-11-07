@@ -383,7 +383,8 @@ empty. The data is in `frontier`:
   by its area on its first snapshot; with `groupBy=gpu` the chip is fixed, so this
   is the same-hardware improvement from software, serving configuration and
   precision. `softwareGainByInteractivity` gives the latest frontier over the
-  first-snapshot frontier at the 12 comparison buckets.
+  first-snapshot frontier at the 12 comparison buckets, and `softwareGainAverage`
+  is the geometric mean of its non-null ratios (the table's Average column).
 - **Chapters.** `chapters` lists the dates where the pooled frontier stepped by at
   least 10% of its area: the series that moved it (`driver`), the area `change`,
   the largest single-interactivity move (`peak`) and the `cause` (`new-series`,

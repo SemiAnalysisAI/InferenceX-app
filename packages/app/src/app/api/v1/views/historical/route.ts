@@ -68,6 +68,7 @@ import {
   frontierRegressions,
   FRONTIER_COMPARISON_BUCKETS,
   leadMargins,
+  averageSoftwareGain,
   softwareGainByInteractivity,
   softwareGains,
   territoryShares,
@@ -297,18 +298,22 @@ export function GET(request: NextRequest) {
           dates: history.dates,
           levels: history.levels,
           higherIsBetter: history.higherIsBetter,
-          series: history.series.map((series) => ({
-            ...series,
-            label: labelOf(series.key),
-            areas: areas.get(series.key) ?? [],
-            softwareGain: gains.get(series.key) ?? [],
-            softwareGainByInteractivity: softwareGainByInteractivity(
+          series: history.series.map((series) => {
+            const byInteractivity = softwareGainByInteractivity(
               history,
               series.key,
               history.dates.length - 1,
               buckets,
-            ),
-          })),
+            );
+            return {
+              ...series,
+              label: labelOf(series.key),
+              areas: areas.get(series.key) ?? [],
+              softwareGain: gains.get(series.key) ?? [],
+              softwareGainByInteractivity: byInteractivity,
+              softwareGainAverage: averageSoftwareGain(byInteractivity),
+            };
+          }),
           overtakes: history.overtakes,
           territory: history.dates.map((date, index) => ({
             date,
