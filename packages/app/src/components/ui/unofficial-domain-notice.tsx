@@ -3,8 +3,6 @@
 import { ArrowUpRight, TriangleAlert } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
-import { useUnofficialDomain } from '@/hooks/useUnofficialDomain';
-
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 import { isEmbedPathname } from '@/lib/embed/embed-route';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -24,14 +22,16 @@ const STRINGS = {
 } as const;
 
 export function UnofficialDomainNotice() {
-  const isUnofficial = useUnofficialDomain();
   const t = STRINGS[useLocale()];
   const pathname = usePathname();
 
-  if (!isUnofficial || isEmbedPathname(pathname)) return null;
+  if (isEmbedPathname(pathname)) return null;
 
   return (
-    <div data-testid="unofficial-domain-notice" className="container mx-auto px-4 lg:px-8 mb-4">
+    <div
+      data-testid="unofficial-domain-notice"
+      className="container mx-auto px-4 lg:px-8 mb-4 hidden in-data-unofficial-domain:block"
+    >
       <div
         role="note"
         className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-destructive/60 bg-destructive/15 px-4 py-3"

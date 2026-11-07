@@ -31,6 +31,7 @@ import {
   landingBannerPrepaintScript as buildLandingBannerPrepaintScript,
   landingBannerPrepaintStyle as buildLandingBannerPrepaintStyle,
 } from '@/lib/nudges/landing-banner';
+import { unofficialDomainPrepaintScript as buildUnofficialDomainPrepaintScript } from '@/lib/runtime/unofficial-domain';
 
 const dm_sans = DM_Sans({
   subsets: ['latin'],
@@ -168,6 +169,7 @@ const jsonLd = {
 
 const landingBannerPrepaintScript = buildLandingBannerPrepaintScript();
 const landingBannerPrepaintStyle = buildLandingBannerPrepaintStyle();
+const unofficialDomainPrepaintScript = buildUnofficialDomainPrepaintScript();
 
 export default function RootLayout({
   children,
@@ -185,6 +187,11 @@ export default function RootLayout({
           id="landing-banner-prepaint"
           suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: landingBannerPrepaintScript }}
+        />
+        <script
+          id="unofficial-domain-prepaint"
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: unofficialDomainPrepaintScript }}
         />
         <AutumnLeaves />
         <PostHogProvider>
