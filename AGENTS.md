@@ -77,6 +77,8 @@ bun --env-file=../../.env vitest run src/lib/api/api-route-catalog.test.ts
 
 `bun run check:typography` runs in CI and pre-commit and blocks new arbitrary font sizes and letter-spacing. See [Typography](./docs/typography.md).
 
+`bun run check:hardware-literals` runs in CI and fails when a file under `packages/*/src` names more `HW_REGISTRY` keys (`h100`, `gb300`, `b200-nscale`, ...) in strings or property names than `packages/app/scripts/hardware-literals-baseline.json` allows. Derive hardware from the registry instead. Run it with `--update` after removing literals, adding a registry key, or accepting a literal on purpose. Exclusions are listed in the script.
+
 ## Environment Variables
 
 See `.env.example`. Key vars: `GITHUB_TOKEN`, `DATABASE_READONLY_URL`, `DATABASE_WRITE_URL` (admin only).

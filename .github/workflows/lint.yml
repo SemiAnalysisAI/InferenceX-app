@@ -49,3 +49,5 @@ jobs:
         run: bun run fmt
       - name: Typography gate
         run: bun run check:typography
+      - name: Hardware literal gate
+        run: bun run check:hardware-literals
