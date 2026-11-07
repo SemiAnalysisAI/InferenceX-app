@@ -154,6 +154,10 @@ import { useFirstChartRenderTiming } from './use-first-chart-render-timing';
 import { useCenterOnEnter } from '@/hooks/useCenterOnEnter';
 
 const chartViewSkeleton = () => <Skeleton className="h-[600px] w-full" />;
+
+/** The table's rows: all-in metrics keep the points the chart cannot draw. */
+const tableRows = (source: Pick<OverlayData, 'data' | 'clippedData' | 'tableData'>) =>
+  source.tableData ?? [...source.data, ...(source.clippedData ?? []).map((entry) => entry.point)];
 const InferenceTable = dynamic(() => import('@/components/inference/ui/InferenceTable'), {
   loading: chartViewSkeleton,
 });
@@ -823,6 +827,18 @@ export default function ChartDisplay({
     }),
     [selectedPrecisions, quickFilters, activeDates, visibleComparisonRows],
   );
+  const visibleTableRows = useCallback(
+    (
+      graph: Pick<OverlayData, 'data' | 'clippedData' | 'tableData'>,
+      overlay: OverlayData | null | undefined,
+      dateComparison: boolean,
+    ) =>
+      (dateComparison ? visibleDateComparisonRows : visibleComparisonRows)(
+        tableRows(graph),
+        overlay && { ...overlay, data: tableRows(overlay) },
+      ),
+    [visibleComparisonRows, visibleDateComparisonRows],
+  );
 
   if (!loading && error) {
     console.error(error);
@@ -1057,27 +1073,12 @@ export default function ChartDisplay({
         }
         onExportCsv={() => {
           const overlay = overlayDataByChartType[graph.chartDefinition.chartType];
-          const tableMode = getViewMode(graphIndex) === 'table';
-          const exportData = tableMode
-            ? (graph.tableData ?? [
-                ...graph.data,
-                ...(graph.clippedData ?? []).map((entry) => entry.point),
-              ])
-            : graph.data;
-          const exportOverlay =
-            tableMode && overlay
-              ? {
-                  ...overlay,
-                  data: overlay.tableData ?? [
-                    ...overlay.data,
-                    ...(overlay.clippedData ?? []).map((entry) => entry.point),
-                  ],
-                }
-              : overlay;
           const { officialRows: visibleData, overlayRows: visibleOverlayRowsForExport } =
-            isGpuComparison
-              ? visibleDateComparisonRows(exportData, exportOverlay)
-              : visibleComparisonRows(exportData, exportOverlay);
+            getViewMode(graphIndex) === 'table'
+              ? visibleTableRows(graph, overlay, Boolean(isGpuComparison))
+              : isGpuComparison
+                ? visibleDateComparisonRows(graph.data, overlay)
+                : visibleComparisonRows(graph.data, overlay);
           const { headers, rows } = inferenceChartToCsv(
             visibleData,
             graph.model,
@@ -1201,16 +1202,10 @@ export default function ChartDisplay({
                 point.framework !== undefined &&
                 getFrameworkLabel(point.framework).includes(ATOM_FOOTNOTE_MARKER),
             );
-            // Table rows keep the points a modeled IT or facility series cannot draw.
             const modeledSeries = modeledPowerSeries(selectedYAxisMetric, powerCompare);
             const unplottedRows =
               modeledSeries.length > 0 && getViewMode(graphIndex) === 'chart'
-                ? (isGpuComparison ? visibleDateComparisonRows : visibleComparisonRows)(
-                    graph.tableData ?? footerOfficialRows,
-                    footerOverlay?.tableData
-                      ? { ...footerOverlay, data: footerOverlay.tableData }
-                      : footerOverlayRows,
-                  )
+                ? visibleTableRows(graph, footerOverlay, Boolean(isGpuComparison))
                 : null;
             const unplottedPower = unplottedRows
               ? unplottedModeledPower(
@@ -1495,23 +1490,11 @@ export default function ChartDisplay({
                       );
 
                       if (getViewMode(graphIndex) === 'table') {
-                        const overlay = overlayDataByChartType[graph.chartDefinition.chartType];
-                        const tableOfficialData = graph.tableData ?? [
-                          ...graph.data,
-                          ...(graph.clippedData ?? []).map((entry) => entry.point),
-                        ];
-                        const tableOverlay = overlay
-                          ? {
-                              ...overlay,
-                              data: overlay.tableData ?? [
-                                ...overlay.data,
-                                ...(overlay.clippedData ?? []).map((entry) => entry.point),
-                              ],
-                            }
-                          : overlay;
-                        const { officialRows, overlayRows } = isGpuComparison
-                          ? visibleDateComparisonRows(tableOfficialData, tableOverlay)
-                          : visibleComparisonRows(tableOfficialData, tableOverlay);
+                        const { officialRows, overlayRows } = visibleTableRows(
+                          graph,
+                          overlayDataByChartType[graph.chartDefinition.chartType],
+                          Boolean(isGpuComparison),
+                        );
                         return (
                           <>
                             {chartCaption}

@@ -74,7 +74,7 @@ export function modeledPowerSeries(
   return [...own, ...lines];
 }
 
-export interface UnplottedPowerChip {
+interface UnplottedPowerChip {
   label: string;
   points: number;
   /** Set on unofficial-run lines so the note can use the run's legend color. */

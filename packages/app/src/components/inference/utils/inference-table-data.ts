@@ -74,5 +74,9 @@ export function allInMeasuredStatusLabel(
   locale: Locale,
 ): string {
   const reason = allInMeasuredUnavailableReason(point, metricKey);
-  return reason === null ? (locale === 'zh' ? '可用' : 'Available') : REASONS[reason][locale];
+  return reason === null
+    ? locale === 'zh'
+      ? '可用'
+      : 'Available'
+    : allInMeasuredReasonLabel(reason, locale);
 }
