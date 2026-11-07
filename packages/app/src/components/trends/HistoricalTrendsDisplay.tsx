@@ -366,7 +366,6 @@ export default function HistoricalTrendsDisplay() {
             tcoSource="historical"
             hideGpuComparison
             trailingPanel={
-              !loading &&
               hasInteractivityChart && (
                 <ControlPanel legend={t.targetGroup} className="gap-1.5">
                   <LabelWithTooltip
