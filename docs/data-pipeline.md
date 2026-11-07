@@ -865,6 +865,15 @@ power collection off, marks its points `telemetry_not_collected` rather than
 reports them as one `N telemetry artifact(s) held no telemetry` warning. Telemetry
 files that are present but unparseable remain `ingest_failed`.
 
+CPU exporter samples (`LOGS/power/cpu/samples.csv`, one row per scrape, host and
+socket) go to `cpu_power_series` and `cpu_power_samples` (migration 030), one series per
+artifact, file and host, with the socket meter and its rails. They live apart from the
+GPU tables so GPU readers never count a socket as a GPU, and nothing reads them yet.
+They are stored while a `power_audit_` bundle's GPU telemetry is ingested; the GPU path
+excludes the CPU file. An unchanged CSV (same sha and sample count) is skipped, and a
+bundle without one issues no CPU query. Apply migration 030 before deploying this
+ingest, or bundles with CPU samples fail telemetry ingest.
+
 Native `samples.csv` v2 adds optional `gpu_util_pct`, and v3 adds `temperature_c`.
 Ingest stores these readings in the existing GPU sample fields; missing or invalid
 readings stay absent. `sm_active` is a distinct measurement with no stored field and

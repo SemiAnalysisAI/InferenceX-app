@@ -102,6 +102,15 @@ const MULTINODE_MANIFEST = {
   sample_interval_seconds: 1,
 };
 
+const CPU_POWER_CSV = [
+  'schema_version,timestamp_unix,hostname,source,sensor,socket_id,power_w,cpu_rail_w,soc_w,dram_w,module_w,total_power_w',
+  '3,1789194365.292,host-a,acpi,CPU0:cpuSidePowerUsageW,0,97.5,40.25,15.5,,1450,195',
+  '3,1789194365.292,host-a,acpi,CPU1:cpuSidePowerUsageW,1,97.5,41,14,,1460,195',
+  '3,1789194366.292,host-a,acpi,CPU0:cpuSidePowerUsageW,0,101,44,16,,1700,101',
+  '3,1789194366.292,host-a,acpi,CPU0:cpuSidePowerUsageW,0,999,1,1,,1,999',
+  '3,1789194365.292,host-b,rapl,CPU0:packagePowerUsageW,0,180,,,,,180',
+].join('\n');
+
 function writePowerAuditArtifact(
   csv = MULTINODE_POWER_CSV,
   manifest: Record<string, unknown> = MULTINODE_MANIFEST,
@@ -513,6 +522,78 @@ describe('ingestGpuMetricsArtifact', () => {
       'LOGS/power/samples.csv#host-a',
     ]);
     expect(storedSibling.samples).toHaveLength(4);
+  });
+
+  it('stores cpu/samples.csv as socket series without changing the GPU series', async () => {
+    const artifact = writePowerAuditArtifact();
+    const input = { workflowRunId: 1, artifact, benchmarkResultIds: [10] };
+    const cpuSeries = () => sql`select * from cpu_power_series order by hostname`;
+    const cpuSamples = async () => {
+      const rows = await sql`
+        select s.hostname, p.socket_id, p.sampled_at, p.power_w, p.cpu_rail_w, p.soc_w,
+          p.dram_w, p.module_w
+        from cpu_power_samples p join cpu_power_series s on s.id = p.series_id
+        order by s.hostname, p.sampled_at, p.socket_id`;
+      return rows.map((row) => [
+        row.hostname,
+        row.socket_id,
+        new Date(row.sampled_at).getTime(),
+        row.power_w,
+        row.cpu_rail_w,
+        row.soc_w,
+        row.dram_w,
+        row.module_w,
+      ]);
+    };
+
+    const withoutCpu = await ingestGpuMetricsArtifact(sql, input);
+    expect(await cpuSeries()).toEqual([]);
+
+    const cpuCsv = path.join(artifact.artifactDir, 'LOGS', 'power', 'cpu', 'samples.csv');
+    fs.mkdirSync(path.dirname(cpuCsv));
+    fs.writeFileSync(cpuCsv, CPU_POWER_CSV);
+    expect(await ingestGpuMetricsArtifact(sql, input)).toEqual({
+      seriesIds: withoutCpu.seriesIds,
+      samplesInserted: 0,
+      seriesSkipped: 2,
+    });
+    const stored = await cpuSeries();
+    expect(stored).toMatchObject([
+      {
+        hostname: 'host-a',
+        source: 'acpi',
+        file_name: 'LOGS/power/cpu/samples.csv',
+        sample_count: 3,
+        socket_count: 2,
+      },
+      { hostname: 'host-b', source: 'rapl', sample_count: 1, socket_count: 1 },
+    ]);
+    expect(new Date(stored[0]!.started_at).getTime()).toBe(1789194365292);
+    expect(new Date(stored[0]!.ended_at).getTime()).toBe(1789194366292);
+    const expectedSamples = [
+      ['host-a', 0, 1789194365292, 97.5, 40.25, 15.5, null, 1450],
+      ['host-a', 1, 1789194365292, 97.5, 41, 14, null, 1460],
+      ['host-a', 0, 1789194366292, 101, 44, 16, null, 1700],
+      ['host-b', 0, 1789194365292, 180, null, null, null, null],
+    ];
+    expect(await cpuSamples()).toEqual(expectedSamples);
+
+    await ingestGpuMetricsArtifact(sql, input);
+    expect(await cpuSeries()).toEqual(stored);
+    await sql`update cpu_power_samples set power_w = 7`;
+    await ingestGpuMetricsArtifact(sql, { ...input, replace: true });
+    expect(await cpuSamples()).toEqual(expectedSamples);
+
+    fs.writeFileSync(
+      cpuCsv,
+      CPU_POWER_CSV.split('\n')
+        .filter((line) => !line.includes('host-b'))
+        .join('\n'),
+    );
+    await ingestGpuMetricsArtifact(sql, input);
+    const remaining = await cpuSeries();
+    expect(remaining.map(({ hostname }) => hostname)).toEqual(['host-a']);
+    expect(await cpuSamples()).toEqual(expectedSamples.slice(0, 3));
   });
 
   it.each([

@@ -25,9 +25,12 @@ import {
   type GpuMetricsSidecars,
 } from './gpu-metrics-artifacts.js';
 import {
+  isCpuPowerSamplesPath,
   isMultinodePowerSamplesPath,
   multinodePowerVendor,
+  parseCpuPowerSamples,
   parseMultinodePowerSamples,
+  type CpuPowerHost,
 } from './multinode-power-samples.js';
 
 const SAMPLE_BATCH_SIZE = 5000;
@@ -308,6 +311,117 @@ export function upsertGpuMetricSeries(
   });
 }
 
+/**
+ * Store one host's CPU socket samples. An unchanged CSV (same sha and sample count)
+ * is left as is unless `replace` forces a rewrite.
+ */
+function upsertCpuPowerSeries(
+  sql: Sql,
+  input: {
+    workflowRunId: number;
+    artifactName: string;
+    fileName: string;
+    csvSha256: string;
+    host: CpuPowerHost;
+    replace: boolean;
+  },
+): Promise<void> {
+  const { samples } = input.host;
+  let startedAtMs = Infinity;
+  let endedAtMs = -Infinity;
+  for (const { timestampMs } of samples) {
+    startedAtMs = Math.min(startedAtMs, timestampMs);
+    endedAtMs = Math.max(endedAtMs, timestampMs);
+  }
+  return sql.begin(async (tx) => {
+    const [changed] = await tx<{ id: number }[]>`
+      insert into cpu_power_series (
+        workflow_run_id, artifact_name, file_name, hostname, source, csv_sha256,
+        sample_count, socket_count, started_at, ended_at
+      ) values (
+        ${input.workflowRunId}, ${input.artifactName}, ${input.fileName}, ${input.host.hostname},
+        ${input.host.source}, ${input.csvSha256}, ${samples.length},
+        ${new Set(samples.map((sample) => sample.socketId)).size},
+        to_timestamp(${startedAtMs / 1000}::double precision),
+        to_timestamp(${endedAtMs / 1000}::double precision)
+      )
+      on conflict (workflow_run_id, artifact_name, file_name, hostname) do update set
+        source = excluded.source,
+        csv_sha256 = excluded.csv_sha256,
+        sample_count = excluded.sample_count,
+        socket_count = excluded.socket_count,
+        started_at = excluded.started_at,
+        ended_at = excluded.ended_at,
+        ingested_at = now()
+      where ${input.replace}::boolean
+        or cpu_power_series.csv_sha256 <> excluded.csv_sha256
+        or cpu_power_series.sample_count <> excluded.sample_count
+      returning id
+    `;
+    if (!changed) return;
+    const seriesId = Number(changed.id);
+    await tx`delete from cpu_power_samples where series_id = ${seriesId}`;
+    for (let offset = 0; offset < samples.length; offset += SAMPLE_BATCH_SIZE) {
+      const batch = samples.slice(offset, offset + SAMPLE_BATCH_SIZE);
+      await tx`
+        insert into cpu_power_samples (
+          series_id, socket_id, sampled_at, power_w, cpu_rail_w, soc_w, dram_w, module_w
+        )
+        select
+          ${seriesId},
+          unnest(${tx.array(batch.map((s) => s.socketId))}::smallint[]),
+          to_timestamp(unnest(${tx.array(batch.map((s) => s.timestampMs / 1000))}::double precision[])),
+          unnest(${tx.array(batch.map((s) => s.powerW))}::real[]),
+          unnest(${tx.array(batch.map((s) => s.cpuRailW))}::real[]),
+          unnest(${tx.array(batch.map((s) => s.socW))}::real[]),
+          unnest(${tx.array(batch.map((s) => s.dramW))}::real[]),
+          unnest(${tx.array(batch.map((s) => s.moduleW))}::real[])
+      `;
+    }
+  });
+}
+
+/**
+ * Store the bundle's `cpu/samples.csv` series and drop hosts a re-ingest no longer has.
+ * A bundle without a parseable CPU file issues no query, so older bundles ingest as before.
+ */
+async function ingestCpuPowerSamples(
+  sql: Sql,
+  input: { workflowRunId: number; artifact: GpuMetricsArtifact; replace: boolean },
+): Promise<void> {
+  const artifactName = input.artifact.artifactName;
+  const kept: { fileName: string; hostname: string }[] = [];
+  for (const file of walkFiles(input.artifact.artifactDir, isCpuPowerSamplesPath)) {
+    const csvText = fs.readFileSync(file.path, 'utf8');
+    const csvSha256 = sha256Hex(csvText);
+    for (const host of parseCpuPowerSamples(csvText) ?? []) {
+      await upsertCpuPowerSeries(sql, {
+        workflowRunId: input.workflowRunId,
+        artifactName,
+        fileName: file.fileName,
+        csvSha256,
+        host,
+        replace: input.replace,
+      });
+      kept.push({ fileName: file.fileName, hostname: host.hostname });
+    }
+  }
+  if (kept.length === 0) return;
+  await sql`
+    delete from cpu_power_series s
+    where s.workflow_run_id = ${input.workflowRunId}
+      and s.artifact_name = ${artifactName}
+      and not exists (
+        select 1
+        from unnest(
+          ${sql.array(kept.map((key) => key.fileName))}::text[],
+          ${sql.array(kept.map((key) => key.hostname))}::text[]
+        ) as k(file_name, hostname)
+        where k.file_name = s.file_name and k.hostname = s.hostname
+      )
+  `;
+}
+
 export async function ingestGpuMetricsArtifact(
   sql: Sql,
   input: {
@@ -373,5 +487,10 @@ export async function ingestGpuMetricsArtifact(
       `;
     }
   }
+  await ingestCpuPowerSamples(sql, {
+    workflowRunId: input.workflowRunId,
+    artifact: input.artifact,
+    replace: input.replace ?? false,
+  });
   return result;
 }
