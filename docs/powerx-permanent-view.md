@@ -339,8 +339,8 @@ a sweep's points bunched at low interactivity stay readable. Each point gets a
 stacked bar, or a point on a stacked area, of its All in Measured W/GPU split by
 `deploymentBreakdownWatts` (see [system power](./powerx-system-power.md#per-point-breakdown)).
 The plot draws six layers, not twelve parts (`POWER_BANDS` and `powerBandsOf` in
-`utils/power-breakdown.ts`, in stack order): Measured GPU (`gpu`), Measured Grace CPU
-(`measuredCpu`, NVL72 with socket telemetry only), Server parts (`cpu`, `memory`, `nic`,
+`utils/power-breakdown.ts`, in stack order): Measured GPU (`gpu`), Measured CPU
+(`measuredCpu`, NVL72 Grace sockets or x86 RAPL packages with socket telemetry only), Server parts (`cpu`, `memory`, `nic`,
 `nvswitch`, `storage`, `other`), Fans + PSU loss (`fans`, `psuLoss`), Network share (`network`)
 and Facility overhead (`facility`, only when the facility is counted); an empty layer is left
 out. Layers step down in opacity of the hardware color like the Profit Estimator's stacked

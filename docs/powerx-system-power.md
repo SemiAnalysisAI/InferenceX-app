@@ -74,14 +74,15 @@ original GPU measurements or require a per-run database backfill.
 A supported estimate also carries `deploymentBreakdownWatts`, the same deployment watts split
 by component class, in the stack order PowerX draws them. `breakdownPowerEstimate` in
 `system-power-model.ts` sums the pinned model's leaf components by name
-(`systemPowerLeafCategory`): `GPUs` is `gpu` (measured), `Grace socket (measured)` is
-`measuredCpu`, `X86CPU` / `GraceCPU` are `cpu`, `DDR5DIMM` / `LPDDR5XMemory` are `memory`, NIC
+(`systemPowerLeafCategory`): `GPUs` is `gpu` (measured), `Grace socket (measured)` and the
+measured x86 socket input `CPU` are `measuredCpu`, `X86CPU` / `GraceCPU` are `cpu`, `DDR5DIMM` / `LPDDR5XMemory` are `memory`, NIC
 cards and system-side transceivers are `nic`, NVSwitch ASICs plus the NVL72 switch tray's
 embedded EPYC are `nvswitch`, `NVMeDrive` is `storage`, PCIe switches, retimers and the shelf
 controller are `other`, fan components are `fans`, AC/DC, DC/DC and generic conversion losses are
 `psuLoss`, and everything under `Scale-out networking` is `network`. `facility` is the model's
 PUE overhead. A measured Grace socket covers CPU + LPDDR, so NVL72 rows with socket telemetry
-carry no `cpu` or `memory` part; AMD chassis carry no `nvswitch` part and the B300 chassis no
+carry no `cpu` or `memory` part; a measured RAPL package covers the CPU only, so x86 rows with
+RAPL telemetry carry no `cpu` part but keep the modeled `memory`; AMD chassis carry no `nvswitch` part and the B300 chassis no
 `other` part. Extrapolated chassis
 attribute each part by the same measured-GPU share as `deploymentFacilityWatts`, so the parts
 always sum to it, and divided by allocated GPUs they sum to All in Measured W/GPU. The leaf
@@ -105,6 +106,27 @@ The chassis profiles describe a complete eight-GPU chassis. GB200 and GB300 are
 rack-scale systems upstream and use their own rack profiles; their topology is
 never substituted with B200 or B300.
 
+### x86 chassis CPUs
+
+AMD MI300X, MI325X and MI355X rows can carry RAPL package power for the host
+EPYC sockets. The chassis model takes it as `cpu_measured_power_per_socket`
+when the same validated window also passes a CPU-side check:
+
+- `cpu_power_valid=1`.
+- `power_audit.cpu.sensor_kind: 'rapl_package'` with matching `expected_sockets`
+  and `observed_sockets`.
+- Positive `avg_total_cpu_power_w` that equals `avg_cpu_socket_power_w` ×
+  sockets within producer rounding.
+- The socket count equals chassis × 2.
+
+RAPL package power has no DRAM domain, so it replaces only the modeled `X86CPU`;
+the DDR5 DIMMs stay modeled, and fans and PSU loss respond to the measured CPU
+load. It never feeds `cpu_and_dram_measured_power_per_socket`. Rows without the
+check, including every row stored before the CPU leg existed, keep the modeled
+CPU for the operating state. The estimate records which with the same `cpuBasis`
+and `measuredCpuSocketWatts` as NVL72 trays, and a measured row's CPU draws in
+the measured `measuredCpu` layer.
+
 ### NVL72 racks
 
 GB200 and GB300 NVL72 rows pass the same GPU contract. Their Grace sockets are
@@ -119,7 +141,7 @@ measured when the same validated window also passes a Grace-side check:
 
 Otherwise the rack model's own Grace CPU and LPDDR5X profile for the operating
 state stands in for the sockets. The estimate records which with `cpuBasis:
-'measured' | 'modeled'` (`measuredGraceSocketWatts` is null when modeled); the
+'measured' | 'modeled'` (`measuredCpuSocketWatts` is null when modeled); the
 tooltip, Profit Estimator and export label it, and the Profit Estimator never
 interpolates between a measured-Grace and a modeled-Grace knot. The CPU rail
 alone (`dcgm_cpu_rail`) omits SysIO and LPDDR5X. A `module` audit names only
