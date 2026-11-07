@@ -59,18 +59,18 @@ describe('getExportFooterText', () => {
     expect(
       getExportFooterText({
         hostname: 'inferencex.semianalysis.com',
-        pathname: '/inference/kimi-k3',
+        pathname: '/infx/inference/kimi-k3',
       }),
-    ).toBe('inferencex.semianalysis.com/inference/kimi-k3');
+    ).toBe('inferencex.semianalysis.com/infx/inference/kimi-k3');
   });
 
   it('keeps nested estimator routes intact', () => {
     expect(
       getExportFooterText({
         hostname: 'inferencex.semianalysis.com',
-        pathname: '/profit-estimator-per-gigawatt/minimax-m3',
+        pathname: '/infx/profit-estimator-per-gigawatt/minimax-m3',
       }),
-    ).toBe('inferencex.semianalysis.com/profit-estimator-per-gigawatt/minimax-m3');
+    ).toBe('inferencex.semianalysis.com/infx/profit-estimator-per-gigawatt/minimax-m3');
   });
 
   it('drops the trailing slash on the root route', () => {
@@ -81,13 +81,16 @@ describe('getExportFooterText', () => {
 
   it('strips trailing slashes on nested routes', () => {
     expect(
-      getExportFooterText({ hostname: 'inferencex.semianalysis.com', pathname: '/zh/inference/' }),
-    ).toBe('inferencex.semianalysis.com/zh/inference');
+      getExportFooterText({
+        hostname: 'inferencex.semianalysis.com',
+        pathname: '/zh/infx/inference/',
+      }),
+    ).toBe('inferencex.semianalysis.com/zh/infx/inference');
   });
 
   it('preserves preview and alternate hostnames', () => {
-    expect(getExportFooterText({ hostname: 'inferencex.com', pathname: '/inference' })).toBe(
-      'inferencex.com/inference',
+    expect(getExportFooterText({ hostname: 'inferencex.com', pathname: '/infx/inference' })).toBe(
+      'inferencex.com/infx/inference',
     );
     expect(
       getExportFooterText({
@@ -98,17 +101,17 @@ describe('getExportFooterText', () => {
   });
 
   it('falls back to the production host for local development', () => {
-    expect(getExportFooterText({ hostname: 'localhost', pathname: '/inference/kimi-k3' })).toBe(
-      `${EXPORT_FOOTER_FALLBACK_HOST}/inference/kimi-k3`,
-    );
+    expect(
+      getExportFooterText({ hostname: 'localhost', pathname: '/infx/inference/kimi-k3' }),
+    ).toBe(`${EXPORT_FOOTER_FALLBACK_HOST}/infx/inference/kimi-k3`);
     expect(getExportFooterText({ hostname: '127.0.0.1', pathname: '/model/glm-5.3' })).toBe(
       `${EXPORT_FOOTER_FALLBACK_HOST}/model/glm-5.3`,
     );
   });
 
   it('falls back to the production host when no location is available', () => {
-    expect(getExportFooterText({ hostname: '', pathname: '/inference' })).toBe(
-      `${EXPORT_FOOTER_FALLBACK_HOST}/inference`,
+    expect(getExportFooterText({ hostname: '', pathname: '/infx/inference' })).toBe(
+      `${EXPORT_FOOTER_FALLBACK_HOST}/infx/inference`,
     );
   });
 

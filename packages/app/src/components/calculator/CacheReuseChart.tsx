@@ -4,16 +4,21 @@ import * as d3 from 'd3';
 import React, { useMemo, useRef } from 'react';
 
 import type { HardwareConfig } from '@/components/inference/types';
+import {
+  ChartPointDetails,
+  type ChartPointDetailsProps,
+} from '@/components/ui/chart-point-details';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import type { CustomLayerConfig, D3ChartHandle, RenderContext } from '@/lib/d3-chart/D3Chart/types';
 import { getChartWatermark } from '@/lib/catalog/data-mappings';
 import type { Locale } from '@/lib/i18n/i18n';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { escapeHtml, getDisplayLabel } from '@/lib/shared/utils';
+import { getDisplayLabel } from '@/lib/shared/utils';
 
 import {
   CACHE_TIER_COLORS,
@@ -42,18 +47,16 @@ export const CACHE_REUSE_STRINGS = {
     unreused: 'Not reused',
     ceiling: 'Theoretical ceiling',
     noTiers: 'No cache tiers reported',
-    instructions: 'Hover a bar for the breakdown · Click to pin its tooltip',
-    unofficialRun: 'UNOFFICIAL RUN',
-    branch: 'Branch:',
-    dismiss: 'Click elsewhere to dismiss',
-    concurrency: 'Concurrency:',
-    hostSource: 'Host tier from:',
+    instructions: 'Hover a bar for the breakdown',
+    unofficialRun: 'Unofficial run',
+    concurrency: 'Concurrency',
+    hostSource: 'Host tier from',
     external: 'router / external cache',
     cpu: 'CPU offload',
-    reportedTotal: 'Reported total:',
+    reportedTotal: 'Reported total',
     overReported: 'above 100%, clamped',
-    precision: 'Precision:',
-    recipe: 'Recipe:',
+    precision: 'Precision',
+    recipe: 'Recipe',
     viewRun: 'View workflow run',
     viewOfficial: 'View raw result on GitHub',
   },
@@ -66,18 +69,16 @@ export const CACHE_REUSE_STRINGS = {
     unreused: '未复用',
     ceiling: '理论上限',
     noTiers: '未上报缓存层级',
-    instructions: '悬停柱形查看拆分 · 点击固定提示框',
+    instructions: '悬停柱形查看拆分',
     unofficialRun: '非官方运行',
-    branch: '分支：',
-    dismiss: '点击其他区域关闭',
-    concurrency: '并发数：',
-    hostSource: '主机层来源：',
+    concurrency: '并发数',
+    hostSource: '主机层来源',
     external: 'router / 外部缓存',
     cpu: 'CPU offload',
-    reportedTotal: '上报合计：',
+    reportedTotal: '上报合计',
     overReported: '超过 100%，已截断',
-    precision: '精度：',
-    recipe: '方案：',
+    precision: '精度',
+    recipe: '方案',
     viewRun: '查看工作流运行',
     viewOfficial: '在 GitHub 查看原始结果',
   },
@@ -113,74 +114,67 @@ function segmentsOf(bars: readonly CacheReuseBar[]): Segment[] {
   return out;
 }
 
-function row(html: string): string {
-  return `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">${html}</div>`;
-}
-
-function swatchRow(color: string, label: string, value: string): string {
-  return row(
-    `<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${color};margin-right:6px;vertical-align:middle;"></span><strong>${label}</strong> ${value}`,
-  );
-}
-
-export function generateCacheReuseTooltipHTML(
+export function cacheReusePointDetails(
   bar: CacheReuseBar,
   options: {
     hardwareConfig: HardwareConfig;
     runInfoByIndex: Record<number, { branch: string; url: string }>;
     locale: Locale;
-    isPinned: boolean;
   },
-): string {
+): Omit<ChartPointDetailsProps<'run'>, 'onClose'> & { summary: string } {
   const { hardwareConfig, runInfoByIndex, locale } = options;
   const t = CACHE_REUSE_STRINGS[locale];
   const { share, point } = bar;
   const isOverlay = bar.runIndex !== undefined;
   const runInfo = isOverlay ? runInfoByIndex[bar.runIndex!] : undefined;
-  const label = escapeHtml(configLabel(point.hwKey, hardwareConfig));
   const runUrl = isOverlay ? runInfo?.url : point.sourceRow?.run_url;
-  const runLink = runUrl
-    ? `<div style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;"><a href="${escapeHtml(
-        runUrl,
-      )}" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-size: 11px; text-decoration: underline; cursor: pointer;">${
-        isOverlay ? t.viewRun : t.viewOfficial
-      } &#8599;</a></div>`
-    : '';
-  const overlayHeader = isOverlay
-    ? `<div style="color: var(--destructive, #ef4444); font-size: 11px; font-weight: 600; margin-bottom: 4px;">${t.unofficialRun}</div>${
-        runInfo?.branch ? row(`<strong>${t.branch}</strong> ${escapeHtml(runInfo.branch)}`) : ''
-      }`
-    : '';
-  const hostSource =
-    share.hostSource === null ? '' : row(`<strong>${t.hostSource}</strong> ${t[share.hostSource]}`);
-  const ceiling =
-    share.theoretical === null
-      ? ''
-      : row(`<strong>${t.ceiling}:</strong> ${formatShare(share.theoretical)}`);
-  const overReported =
-    share.reportedTotal > 1.005
-      ? row(
-          `<strong>${t.reportedTotal}</strong> ${formatShare(share.reportedTotal)} (${t.overReported})`,
-        )
-      : '';
-
-  return `
-    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); max-width: 320px; pointer-events: auto; user-select: ${options.isPinned ? 'text' : 'none'};">
-      ${options.isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
-      ${overlayHeader}
-      <div style="color: var(--foreground); font-size: 13px; font-weight: 600; margin-bottom: 8px;">${label}</div>
-      ${row(`<strong>${t.concurrency}</strong> ${point.concurrency}`)}
-      ${swatchRow(CACHE_TIER_COLORS.hbm, `${tierLabel('hbm', share.combined, locale)}:`, formatShare(share.hbm))}
-      ${share.combined ? '' : swatchRow(CACHE_TIER_COLORS.host, `${t.host}:`, formatShare(share.host))}
-      ${swatchRow(CACHE_TIER_COLORS.unreused, `${t.unreused}:`, formatShare(share.unreused))}
-      ${hostSource}
-      ${ceiling}
-      ${overReported}
-      ${row(`<strong>${t.precision}</strong> ${escapeHtml(point.precision.toUpperCase())}`)}
-      ${row(`<strong>${t.recipe}</strong> ${escapeHtml(recipeLabelOf(point))}`)}
-      ${runLink}
-    </div>
-  `;
+  const config = hardwareConfig[point.hwKey] ?? getHardwareConfig(point.hwKey);
+  const recipe = recipeLabelOf(point);
+  return {
+    title: config?.label ?? point.hwKey,
+    subtitle: [
+      config?.suffix?.replace(/^\((?<inner>.*)\)$/u, '$<inner>'),
+      point.precision.toUpperCase(),
+    ]
+      .filter(Boolean)
+      .join(' · '),
+    warning: isOverlay ? `✕ ${runInfo?.branch || t.unofficialRun}` : undefined,
+    date: point.date,
+    metrics: [
+      { value: formatShare(share.hbm), label: tierLabel('hbm', share.combined, locale) },
+      ...(share.combined ? [] : [{ value: formatShare(share.host), label: t.host }]),
+      { value: formatShare(share.unreused), label: t.unreused },
+    ],
+    summary: [`${t.concurrency} ${point.concurrency}`, recipe].join(' · '),
+    rows: [
+      { label: t.concurrency, value: String(point.concurrency) },
+      ...(share.hostSource === null ? [] : [{ label: t.hostSource, value: t[share.hostSource] }]),
+      ...(share.theoretical === null
+        ? []
+        : [{ label: t.ceiling, value: formatShare(share.theoretical) }]),
+      ...(share.reportedTotal > 1.005
+        ? [
+            {
+              label: t.reportedTotal,
+              value: `${formatShare(share.reportedTotal)} (${t.overReported})`,
+              wide: true,
+            },
+          ]
+        : []),
+      { label: t.precision, value: point.precision.toUpperCase() },
+      { label: t.recipe, value: recipe },
+    ],
+    links: runUrl
+      ? [
+          {
+            action: 'run',
+            label: isOverlay ? t.viewRun : t.viewOfficial,
+            href: runUrl,
+            external: true,
+          },
+        ]
+      : [],
+  };
 }
 
 interface CacheReuseChartProps {
@@ -190,6 +184,7 @@ interface CacheReuseChartProps {
   runInfoByIndex: Record<number, { branch: string; url: string }>;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
+  footer?: React.ReactNode;
 }
 
 const MARGIN = { top: 16, right: 20, bottom: 64, left: 64 };
@@ -212,6 +207,7 @@ const CacheReuseChart = React.memo(
     runInfoByIndex,
     legendElement,
     caption,
+    footer,
   }: CacheReuseChartProps) => {
     const locale = useLocale();
     const t = CACHE_REUSE_STRINGS[locale];
@@ -426,15 +422,43 @@ const CacheReuseChart = React.memo(
     const tooltipStateRef = useRef({ hardwareConfig, runInfoByIndex, locale });
     tooltipStateRef.current = { hardwareConfig, runInfoByIndex, locale };
 
+    const hoveredBarRef = useRef({ x: 0, y: 0 });
     const tooltip = useMemo(
       () => ({
         rulerType: 'none' as const,
-        content: (bar: CacheReuseBar, isPinned: boolean) =>
-          generateCacheReuseTooltipHTML(bar, { ...tooltipStateRef.current, isPinned }),
-        getRulerX: () => 0,
+        content: (bar: CacheReuseBar) => {
+          const { title, subtitle, warning, metrics, summary } = cacheReusePointDetails(
+            bar,
+            tooltipStateRef.current,
+          );
+          return chartHoverCard({ title, subtitle, warning, metrics: [...metrics], summary });
+        },
+        details: (bar: CacheReuseBar, _isOverlay: boolean, close: () => void) => {
+          const { summary: _summary, ...details } = cacheReusePointDetails(
+            bar,
+            tooltipStateRef.current,
+          );
+          return (
+            <ChartPointDetails
+              {...details}
+              onClose={close}
+              onAction={(_action, event) => event.stopPropagation()}
+            />
+          );
+        },
+        getRulerX: () => hoveredBarRef.current.x,
+        getRulerY: () => hoveredBarRef.current.y,
         onHoverStart: (
           selection: d3.Selection<SVGRectElement, CacheReuseBar, SVGGElement, unknown>,
         ) => {
+          const x = Number(selection.attr('x'));
+          const y = Number(selection.attr('y'));
+          const barWidth = Number(selection.attr('width'));
+          const barHeight = Number(selection.attr('height'));
+          hoveredBarRef.current =
+            barWidth > barHeight
+              ? { x: x + barWidth, y: y + barHeight / 2 }
+              : { x: x + barWidth / 2, y };
           selection.attr('stroke', 'var(--foreground)').attr('stroke-width', 1.5);
         },
         onHoverEnd: (
@@ -473,6 +497,7 @@ const CacheReuseChart = React.memo(
         tooltip={tooltip}
         legendElement={legendElement}
         caption={caption}
+        footer={footer}
       />
     );
   },

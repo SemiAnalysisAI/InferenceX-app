@@ -32,7 +32,7 @@ Engram 在标准 token embedding 之上增加了可学习的多 token 查表。�
 
 我们的 DeepSeek-V4.1-Flash 配置中，Engram 约占用 189 GiB 内存。我们将其替换为内存映射（mmap）文件，测量 offload 到 SSD 后的服务性能。
 
-本文后面将展示 Engram offload 实验，以及 [InferenceX 对 DeepSeekv4.1 Flash 等 Engram 模型在全部 6 款 NVIDIA GPU SKU 和 MI355X 上的官方智能体推理服务结果。](https://inferencex.semianalysis.com/inference/deepseek-v41-flash) 不出所料，在极受欢迎的 DeepSeekV4.1 Flash 上，CUDA 护城河仍让 MI355X 明显落后。
+本文后面将展示 Engram offload 实验，以及 [InferenceX 对 DeepSeekv4.1 Flash 等 Engram 模型在全部 6 款 NVIDIA GPU SKU 和 MI355X 上的官方智能体推理服务结果。](https://inferencex.semianalysis.com/infx/inference/deepseek-v41-flash) 不出所料，在极受欢迎的 DeepSeekV4.1 Flash 上，CUDA 护城河仍让 MI355X 明显落后。
 
 **我们还会展示，即使 GPU 的 HBM 容量很高，把 Engram offload 到 DRAM，也可能在 Pareto 曲线的大部分区间获得比保留在 HBM 中更好的性能。**
 
@@ -135,7 +135,7 @@ Engram 表虽然很大，但每次查表很小。DeepSeek-V4.1-Flash 在两个 E
 <Figure
   src="/images/engrams-embedding-entendre-codesign/figure-11.png"
   alt="DeepSeek-V4.1-Flash AgentX 每美元性能"
-  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference/deepseek-v41-flash)"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/infx/inference/deepseek-v41-flash)"
 />
 
 截至模型发布第 7 天，即使按 MI355X 更低的 TCO 归一化，其每美元性能仍比 B200 差 2–4 倍。[完整总拥有成本拆分来自我们的 AI Cloud TCO Model，以及每月对 100 多家 GPU 云厂商和 GPU 云客户的市场调查。](https://semianalysis.com/ai-cloud-tco-model/)
@@ -143,7 +143,7 @@ Engram 表虽然很大，但每次查表很小。DeepSeek-V4.1-Flash 在两个 E
 <Figure
   src="/images/engrams-embedding-entendre-codesign/figure-12.png"
   alt="DeepSeek-V4.1-Flash 跨厂商服务结果"
-  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference/deepseek-v41-flash)"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/infx/inference/deepseek-v41-flash)"
 />
 
 DeepSeekv4.1 Flash 发布当天，NVIDIA vLLM 在 H100、H200、B200、B300、GB200、GB300 全部 6 款 SKU 上开箱即用，没有遇到问题！这要归功于 NVIDIA 和 Interact 团队的出色工作！相比之下，AMD vLLM 在发布当天无法运行 DeepSeekv4.1 Flash。
@@ -151,7 +151,7 @@ DeepSeekv4.1 Flash 发布当天，NVIDIA vLLM 在 H100、H200、B200、B300、GB
 <Figure
   src="/images/engrams-embedding-entendre-codesign/figure-13.png"
   alt="发布当天 NVIDIA 与 AMD 服务对比"
-  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference/deepseek-v41-flash)"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/infx/inference/deepseek-v41-flash)"
 />
 
 AMD 的 vLLM 文档建议使用 vllm/vllm-openai-rocm:deepseekv41-flash-0909，但从模型发布第 0 小时到第 23 小时，AMD 都没有公开该镜像。AMD 宣称“SPEED IS THE MOAT”，却直到第 23 小时仍未发布。我们希望 AMD 团队今后改善模型发布首小时的支持流程。
@@ -175,7 +175,7 @@ CUDA 护城河的力量来自 NVIDIA 与庞大的 600 万开发者社区生态�
 <Figure
   src="/images/engrams-embedding-entendre-codesign/figure-16.png"
   alt="发布当天各硬件的每美元性能"
-  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference/deepseek-v41-flash)"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/infx/inference/deepseek-v41-flash)"
 />
 
 总体而言，AMD 确实取得了明显进展，但每美元性能仍比 B200 差 2–4 倍。
@@ -183,7 +183,7 @@ CUDA 护城河的力量来自 NVIDIA 与庞大的 600 万开发者社区生态�
 <Figure
   src="/images/engrams-embedding-entendre-codesign/figure-17.png"
   alt="AMD 相对 B200 的性能进展"
-  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference/deepseek-v41-flash)"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/infx/inference/deepseek-v41-flash)"
 />
 
 ## AgentX 中 Engram DRAM offload 带来的性能提升

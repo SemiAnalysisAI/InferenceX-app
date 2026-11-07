@@ -186,7 +186,7 @@ describe('video metrics', () => {
   });
   it('labels tiered metrics with the cost tier and formats by metric', () => {
     expect(metricLabel('videosPerDollar', 'en', opts)).toBe(
-      'Videos per $1 TCO (Owning at Large Hyperscaler Volume)',
+      'Videos per $1 TCO (Owning at large hyperscaler volume)',
     );
     expect(metricLabel('videosPerDollar', 'zh', { tier: 'r' })).toBe(
       '每 1 美元 TCO 生成视频数（租赁 - 3 年承诺）',

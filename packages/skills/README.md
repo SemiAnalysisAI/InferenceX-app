@@ -57,7 +57,7 @@ a tested raw-data helper and instructions for checking deployed API metadata.
 Single-turn median calculations and the formal TCO workflow are unchanged.
 
 Profit-estimator dashboard links encode share state in named route segments,
-for example `/profit-estimator/deepseek-v4/target/24`.
+for example `/infx/profit-estimator/deepseek-v4/target/24`.
 The per-gigawatt page and `/zh` pages use the same format. These dashboards
 are P90-only and remove legacy percentile parameters. Other legacy query links
 remain readable; the separate read-only API and CLI contracts have not changed.

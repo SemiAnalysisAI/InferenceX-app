@@ -41,9 +41,9 @@ const VALID = {
   links: [
     {
       label: 'Open the AgentX dashboard',
-      href: 'https://inferencex.semianalysis.com/inference?i_seq=agentic-traces',
+      href: 'https://inferencex.semianalysis.com/infx/inference?i_seq=agentic-traces',
     },
-    { label: 'Read the methodology', href: '/agentx/methodology' },
+    { label: 'Read the methodology', href: '/infx/agentx/methodology' },
   ],
 };
 
@@ -125,7 +125,7 @@ describe('hardwareFrontmatterErrors', () => {
     ],
     [
       'a markdown link',
-      'Serves 1.8x, see [the method](/agentx/methodology).',
+      'Serves 1.8x, see [the method](/infx/agentx/methodology).',
       'lede supports **bold** only; move links and code into the body',
     ],
     [
@@ -147,7 +147,10 @@ describe('hardwareFrontmatterErrors', () => {
     expect(
       hardwareFrontmatterErrors(
         withChanges({
-          links: [{ label: 'Email', href: 'mailto:team@semianalysis.com' }, { href: '/agentx' }],
+          links: [
+            { label: 'Email', href: 'mailto:team@semianalysis.com' },
+            { href: '/infx/agentx' },
+          ],
         }),
       ),
     ).toEqual([

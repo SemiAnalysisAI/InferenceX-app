@@ -1,6 +1,6 @@
 describe('Gradient Labels Toggle', () => {
   before(() => {
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro', {
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -12,7 +12,7 @@ describe('Gradient Labels Toggle', () => {
   });
 
   it('URL param i_gradlabel=1 enables gradient labels on load', () => {
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_gradlabel=1', {
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro&i_gradlabel=1', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -35,7 +35,7 @@ const selectMetricAndEnableGradient = (metricLabel: string | RegExp) => {
 
 describe('Gradient Labels with non-default Y-axis metrics', () => {
   before(() => {
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro', {
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },

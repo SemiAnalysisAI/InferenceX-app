@@ -83,9 +83,9 @@ const STRINGS = {
     xAriaLabel: 'CollectiveX KV X axis',
     opAriaLabel: 'CollectiveX KV direction',
     islAriaLabel: 'CollectiveX KV overlap ISL',
-    xLogScale: 'X-axis Log Scale',
-    yLogScale: 'Y-axis Log Scale',
-    bulkBaseline: 'Contiguous Baseline',
+    xLogScale: 'X-axis log scale',
+    yLogScale: 'Y-axis log scale',
+    bulkBaseline: 'Contiguous baseline',
     summary: (cases: number, measured: number) => `${cases} cases · ${measured} measured · `,
     headers: {
       library: 'Library',
@@ -185,18 +185,14 @@ const STRINGS = {
   },
 } as const;
 
+/** Status color only where the outcome needs attention; success and neutral states stay quiet. */
 const OUTCOME_CLASS: Record<CollectiveXOutcome, string> = {
-  success: 'border-emerald-600/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-  unsupported: 'border-zinc-500/40 bg-zinc-500/10 text-zinc-700 dark:text-zinc-300',
-  failed: 'border-red-700/50 bg-red-700/10 text-red-800 dark:text-red-300',
-  invalid: 'border-red-600/40 bg-red-500/10 text-red-700 dark:text-red-300',
-  diagnostic: 'border-amber-600/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
-  pending: 'border-zinc-500/40 bg-zinc-500/5 text-muted-foreground',
-};
-
-const MATURITY_CLASS: Record<'production' | 'candidate', string> = {
-  production: 'border-sky-600/40 bg-sky-500/10 text-sky-700 dark:text-sky-300',
-  candidate: 'border-amber-600/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+  success: 'border-border/30 text-success',
+  unsupported: 'border-border/30 text-muted-foreground',
+  failed: 'border-destructive/30 bg-destructive/10 text-destructive',
+  invalid: 'border-destructive/30 bg-destructive/10 text-destructive',
+  diagnostic: 'border-warning/30 bg-warning/10 text-warning',
+  pending: 'border-border/30 text-muted-foreground',
 };
 
 function formatGbps(value: number | null | undefined): string {
@@ -378,6 +374,17 @@ export function CollectiveXKvSection({
       track('collectivex_kv_range_toggled', { range: band.id });
     },
   }));
+  const removeLegendItem = (name: string) =>
+    [...legendItems, ...rangeLegendItems].find((item) => item.name === name)?.onClick();
+  const legendReset = {
+    id: 'collectivex-kv-reset-filter',
+    disabled: rangeView ? hiddenRangeIds.size === 0 : activeCases.length >= measuredCases.length,
+    onClick: () => {
+      if (rangeView) setHiddenRanges(null);
+      else setSeriesSelection(null);
+      track('collectivex_kv_filter_reset');
+    },
+  };
 
   const columns = useMemo<DataTableColumn<CollectiveXKvRunCase>[]>(
     () => [
@@ -389,9 +396,9 @@ export function CollectiveXKvSection({
             <div className="flex items-center gap-1.5 whitespace-nowrap">
               {collectiveXBackendLabel(row.backend)}
               {row.maturity && (
-                <Badge variant="outline" className={MATURITY_CLASS[row.maturity]}>
+                <span className="text-xs text-muted-foreground">
                   {strings.maturity[row.maturity]}
-                </Badge>
+                </span>
               )}
             </div>
             {row.library_version && (
@@ -648,7 +655,8 @@ export function CollectiveXKvSection({
                     variant="sidebar"
                     legendItems={legendItems}
                     switches={envelopeLegendSwitches}
-                    disableActiveSort
+                    reset={legendReset}
+                    onItemRemove={removeLegendItem}
                     isLegendExpanded={legendExpanded}
                     onExpandedChange={onLegendExpanded}
                   />
@@ -677,7 +685,8 @@ export function CollectiveXKvSection({
                   <ChartLegend
                     variant="sidebar"
                     legendItems={legendItems}
-                    disableActiveSort
+                    onItemRemove={removeLegendItem}
+                    reset={legendReset}
                     isLegendExpanded={legendExpanded}
                     onExpandedChange={onLegendExpanded}
                   />
@@ -708,7 +717,8 @@ export function CollectiveXKvSection({
                       variant="sidebar"
                       legendItems={rangeView ? rangeLegendItems : legendItems}
                       switches={legendSwitches}
-                      disableActiveSort
+                      reset={legendReset}
+                      onItemRemove={removeLegendItem}
                       isLegendExpanded={legendExpanded}
                       onExpandedChange={onLegendExpanded}
                     />

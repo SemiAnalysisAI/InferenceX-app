@@ -1,14 +1,22 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { enAlternates } from '@/lib/i18n/i18n';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 
+import {
+  CompareCatalogLink,
+  CompareCatalogLinks,
+  CompareModelSection,
+  ComparePairGrid,
+} from '@/components/compare/compare-catalog';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
+import { ModelLogo } from '@/components/ui/model-logo';
+import { type Model } from '@/lib/catalog/data-mappings';
 import { PUBLIC_COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
 import { formatModelList } from '@/lib/compare/compare-ssr';
 import { getPrecisionPairsByModelSlug } from '@/lib/compare/compare-variant-availability';
@@ -58,35 +66,21 @@ export default async function ComparePrecisionIndexPage() {
       <JsonLd data={jsonLd} />
       <section>
         <Card>
-          <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">
-            Chip Precision Comparisons
-          </h1>
-          <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
+          <Heading as="h1" level="page">
+            Chip precision comparisons
+          </Heading>
+          <p className="mt-4 max-w-3xl text-base text-muted-foreground">
             {totalUrls.toLocaleString()} head-to-head precision comparisons across{' '}
-            {formatModelList(modelsWithPairs)}. See how FP4, FP8, BF16, INT4, and more quantization
-            levels affect throughput, cost, and interactivity on the same chip — each page renders
-            the inference chart and an interpolated comparison table.
+            {formatModelList(modelsWithPairs)}. See how FP4, FP8, BF16, INT4 and other quantization
+            levels affect throughput, cost and interactivity on the same chip. Each page renders the
+            inference chart and an interpolated comparison table.
           </p>
-          <div className="mt-6 flex flex-wrap gap-3" data-testid="compare-precision-index-links">
-            <Link
-              href="/compare"
-              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
-            >
-              Chip vs Chip comparisons
-              <span aria-hidden="true" className="text-lg lg:text-xl">
-                →
-              </span>
-            </Link>
-            <Link
-              href="/compare-per-dollar"
-              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
-            >
+          <CompareCatalogLinks testId="compare-precision-index-links">
+            <CompareCatalogLink href="/compare">Chip vs chip comparisons</CompareCatalogLink>
+            <CompareCatalogLink href="/compare-per-dollar">
               Performance per dollar
-              <span aria-hidden="true" className="text-lg lg:text-xl">
-                →
-              </span>
-            </Link>
-          </div>
+            </CompareCatalogLink>
+          </CompareCatalogLinks>
         </Card>
       </section>
 
@@ -103,45 +97,38 @@ export default async function ComparePrecisionIndexPage() {
         }
 
         return (
-          <section key={model.slug} id={model.slug}>
-            <Card className="flex flex-col gap-4">
-              <div>
-                <h2 className="text-xl lg:text-2xl font-bold tracking-tight">{model.label}</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {pairs.length} precision comparison{pairs.length === 1 ? '' : 's'} with benchmark
-                  data on {model.label}.
-                </p>
-              </div>
-              {[...gpuGroups.entries()].map(([gpu, gpuPairs]) => {
+          <CompareModelSection
+            key={model.slug}
+            id={model.slug}
+            title={
+              <>
+                <ModelLogo model={model.displayName as Model} className="size-6" />
+                {model.label}
+              </>
+            }
+            summary={`${pairs.length} precision comparison${pairs.length === 1 ? '' : 's'} with benchmark data on ${model.label}`}
+          >
+            <ComparePairGrid>
+              {[...gpuGroups.entries()].flatMap(([gpu, gpuPairs]) => {
                 const meta = HW_REGISTRY[gpu];
                 const gpuLabel = meta?.label ?? gpu.toUpperCase();
                 const archLine = `${meta?.vendor ?? ''} · ${meta?.arch ?? ''}`;
-                return (
-                  <div key={`${model.slug}__${gpu}`} className="flex flex-col gap-3">
-                    <div>
-                      <h3 className="text-base font-semibold">{gpuLabel}</h3>
-                      <p className="text-xs text-muted-foreground mt-1">{archLine}</p>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {gpuPairs.map(({ gpu: g, precA, precB }) => {
-                        const slug = canonicalPrecisionCompareSlug(model.slug, g, precA, precB);
-                        const label = `${gpuLabel} — ${precisionDisplayLabel(precA)} vs ${precisionDisplayLabel(precB)}`;
-                        return (
-                          <ComparePairCardLink
-                            key={slug}
-                            href={`/compare-precision/${slug}`}
-                            slug={slug}
-                            label={label}
-                            archLine={archLine}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
+                return gpuPairs.map(({ gpu: g, precA, precB }) => {
+                  const slug = canonicalPrecisionCompareSlug(model.slug, g, precA, precB);
+                  const label = `${gpuLabel} — ${precisionDisplayLabel(precA)} vs ${precisionDisplayLabel(precB)}`;
+                  return (
+                    <ComparePairCardLink
+                      key={slug}
+                      href={`/compare-precision/${slug}`}
+                      slug={slug}
+                      label={label}
+                      archLine={archLine}
+                    />
+                  );
+                });
               })}
-            </Card>
-          </section>
+            </ComparePairGrid>
+          </CompareModelSection>
         );
       })}
     </>

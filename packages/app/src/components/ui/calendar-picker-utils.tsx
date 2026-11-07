@@ -3,22 +3,9 @@
 import { useReducer, type Dispatch, type SetStateAction } from 'react';
 
 import { Button } from '@/components/ui/button';
-import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { parseCalendarDate } from '@/lib/shared/display-date';
 import { cn } from '@/lib/shared/utils';
-
-const DISPLAY_DATE_FORMATTERS: Record<Locale, Intl.DateTimeFormat> = {
-  en: new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }),
-  zh: new Intl.DateTimeFormat('zh-CN', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }),
-};
 
 export interface CalendarDateBounds {
   minAllowedDate: Date;
@@ -74,26 +61,11 @@ function calendarMonthReducer(
   };
 }
 
-export function parseCalendarDate(dateStr: string): Date {
-  if (dateStr.includes('-') && !dateStr.includes(',')) {
-    const [year, month, day] = dateStr.split('-');
-    return new Date(Number(year), Number(month) - 1, Number(day));
-  }
-
-  const [datePart] = dateStr.split(', ');
-  const [month, day, year] = datePart.split('/');
-  return new Date(Number(year), Number(month) - 1, Number(day));
-}
-
 export function formatCalendarDate(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-}
-
-export function formatDisplayDate(dateStr: string, locale: Locale = 'en'): string {
-  return DISPLAY_DATE_FORMATTERS[locale].format(parseCalendarDate(dateStr));
 }
 
 export function getLatestSelectableDate(availableDates?: string[], maxDate?: string): string {

@@ -19,7 +19,7 @@ describe('profit route input', () => {
 
       it(`seeds the path model and target over the query for ${locale || 'en'} ${tab}`, () => {
         const seed = calculatorUrlSeed(
-          `${locale}/${tab}/deepseek-v4/target/24`,
+          `${locale}/infx/${tab}/deepseek-v4/target/24`,
           '?g_model=Kimi-K3&c_ivtarget=99&i_pctl=p75',
           undefined,
         );
@@ -37,7 +37,7 @@ describe('profit route input', () => {
               filters: ['target', '24', 'percentile', 'p75'],
             }),
           ),
-        ).rejects.toThrow(`308 ${locale}/${tab}/deepseek-v4/target/24`);
+        ).rejects.toThrow(`308 ${locale}/infx/${tab}/deepseek-v4/target/24`);
       });
     }
   }
@@ -49,7 +49,7 @@ describe('profit route input', () => {
         true,
         Promise.resolve({ model: 'DeepSeek-V4', filters: ['target', '24'] }),
       ),
-    ).rejects.toThrow('308 /zh/profit-estimator/deepseek-v4/target/24');
+    ).rejects.toThrow('308 /zh/infx/profit-estimator/deepseek-v4/target/24');
   });
 
   it('rejects unsupported models and malformed filters', async () => {

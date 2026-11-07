@@ -18,7 +18,7 @@ B200 running SGLang 0.5.6 on DeepSeek R1 NVFP4 reaches 907 tok/s/GPU at concurre
 
 SGLang 0.5.6 shipped on 2025-12-03 and the InferenceX benchmark caught the full effect 28 days later, on 2025-12-31, the same day the image bump landed. This is the reason we built InferenceX's automated benchmark loop, to catch software-driven performance changes on the same hardware as soon as they land.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 
@@ -60,7 +60,7 @@ The bolded row is the headline: 907 tok/s/GPU on 0.5.6 at concurrency 4 vs 508 o
   caption="B200 DeepSeek R1 NVFP4 8k/1k, SGLang 0.5.5 (2025-12-15) vs SGLang 0.5.6 (2025-12-31) throughput per GPU across concurrency."
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_rundate=2025-12-31&g_runid=20621824084&i_prec=fp4%2Cfp8&i_gpus=b200_sglang&i_dstart=2025-12-15&i_dend=2025-12-31), pre-filtered to B200 SGLang DeepSeek R1 across the 0.5.5 and 0.5.6 runs.
+[Live chart](https://inferencex.semianalysis.com/infx/inference?g_rundate=2025-12-31&g_runid=20621824084&i_prec=fp4%2Cfp8&i_gpus=b200_sglang&i_dstart=2025-12-15&i_dend=2025-12-31), pre-filtered to B200 SGLang DeepSeek R1 across the 0.5.5 and 0.5.6 runs.
 
 ## Where Each Improvement Lands on the Curve
 
@@ -68,7 +68,7 @@ Decode on a TP 4 / EP 4 DeepSeek R1 NVFP4 deployment has a fixed per-step cost. 
 
 At concurrency 128 the KV cache is large and attention is the dominant cost per step. The refactored MHA and MLA KV caches for FP4 and the re-enabled FlashInfer TRTLLM GEN MHA path produce a 1.16x ratio at conc 128 even though the scheduler-overhead reduction has flattened at that point. At middle concurrencies (16, 32, 64) neither effect is dominant and the throughput gain is smaller and less stable (1.02x, 1.33x, 1.03x).
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 

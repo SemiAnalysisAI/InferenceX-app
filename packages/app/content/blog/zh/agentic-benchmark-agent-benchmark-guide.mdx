@@ -19,7 +19,9 @@ tags:
 
 AgentX 是 InferenceX 面向这类 workload 的开放基准测试。它把自愿提供的编码 agent trace 转换为保护隐私的请求形状，再通过 AIPerf 进行确定性回放，并在多个并发 agent 客户端下比较完整的软硬件推理配置。
 
-<DashboardCTA href="/zh/inference?i_seq=agentic-traces">对比实时 AgentX 推理结果 →</DashboardCTA>
+<DashboardCTA href="/zh/infx/inference?i_seq=agentic-traces">
+  对比实时 AgentX 推理结果 →
+</DashboardCTA>
 
 ## 什么是 Agentic Inference Benchmark？
 
@@ -110,7 +112,7 @@ AgentX v1.0 从自愿提供的 Claude Code trace 中筛选出 393 个公开会�
   caption="AgentX v1.0 请求分布。单请求 input token 中位数为 142,016，output token 中位数为 444。"
 />
 
-Full 变体保留最高 1M token 的上下文。256K 变体会移除超过上限的请求，同时保留其余请求的时间关系与 subagent 重叠。[AgentX 方法论](/zh/agentx/methodology)公开了数据集规则、图表与来源链接。
+Full 变体保留最高 1M token 的上下文。256K 变体会移除超过上限的请求，同时保留其余请求的时间关系与 subagent 重叠。[AgentX 方法论](/zh/infx/agentx/methodology)公开了数据集规则、图表与来源链接。
 
 ## 保证比较有效的 Benchmark 控制
 
@@ -177,7 +179,7 @@ Agentic 推理会暴露固定 prompt batch 容易低估的瓶颈。
 - **长上下文 kernel：**Attention、sparse attention、normalization 与 graph capture 路径可能随 sequence length 变化而表现不同。
 - **Speculative decoding：**Acceptance 控制与 scheduler 生命周期会同时影响吞吐量和交互性。
 
-[AgentX 优化追踪页](/zh/agentx/optimizations)记录了 vLLM、SGLang、TensorRT-LLM、ATOM、Dynamo 与 KV-cache 系统中由该 workload 暴露的具体改进。
+[AgentX 优化追踪页](/zh/infx/agentx/optimizations)记录了 vLLM、SGLang、TensorRT-LLM、ATOM、Dynamo 与 KV-cache 系统中由该 workload 暴露的具体改进。
 
 ## 如何比较 AgentX 结果？
 
@@ -201,7 +203,7 @@ AgentX 可以测量 trace 衍生 agent workload 下的推理容量、响应速�
 
 AgentX 无法判断模型是否写出了正确代码、选择了正确工具、遵守了业务规则，或完成了原始任务。合成 payload 会有意移除这些语义。Agent 质量应使用任务评估，推理性能则使用 AgentX。两类分数描述不同的系统问题，不应混为一个总分。
 
-<DashboardCTA href="/zh/inference?i_seq=agentic-traces">
+<DashboardCTA href="/zh/infx/inference?i_seq=agentic-traces">
   查看 AgentX 吞吐量与交互性 frontier →
 </DashboardCTA>
 

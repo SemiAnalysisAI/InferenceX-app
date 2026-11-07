@@ -1,5 +1,8 @@
 import { COMPARE_MODEL_ALIASES, COMPARE_MODEL_SLUGS } from '../compare/compare-slug';
 import { getModelCategory, isModelVisible, Model } from '../catalog/data-mappings';
+import { getDashboardRoute } from './dashboard-routes';
+
+const INFERENCE_PATH = getDashboardRoute('inference').path;
 
 export interface InferenceModelSlug {
   slug: string;
@@ -55,7 +58,7 @@ export function inferenceModelSlugForModel(model: Model): string | null {
 }
 
 export function inferenceModelPath(slug: string): string {
-  return `/inference/${slug}`;
+  return `${INFERENCE_PATH}/${slug}`;
 }
 
 export const ACTIVE_INFERENCE_MODEL_SLUGS: readonly InferenceModelSlug[] =
@@ -65,11 +68,12 @@ export function inferenceModelForPathname(pathname: string | null | undefined): 
   if (!pathname) return null;
   const barePath = pathname.split(/[?#]/u, 1)[0] || '/';
   const enPath = barePath === '/zh' ? '/' : barePath.replace(/^\/zh(?=\/)/u, '');
-  const match = /^\/inference\/(?<slug>[^/]+)\/?$/u.exec(enPath);
-  if (!match?.groups?.slug) return null;
+  if (!enPath.startsWith(`${INFERENCE_PATH}/`)) return null;
+  const slug = enPath.slice(INFERENCE_PATH.length + 1).replace(/\/$/u, '');
+  if (!slug || slug.includes('/')) return null;
   let segment: string;
   try {
-    segment = decodeURIComponent(match.groups.slug);
+    segment = decodeURIComponent(slug);
   } catch {
     return null;
   }
@@ -85,11 +89,11 @@ export function inferenceModelRouteForSelection(
   const isZh = barePath === '/zh' || barePath.startsWith('/zh/');
   const enPath = isZh ? barePath.replace(/^\/zh(?=\/|$)/u, '') || '/' : barePath;
   const onInferenceTab =
-    enPath === '/inference' ||
-    enPath === '/inference/' ||
+    enPath === INFERENCE_PATH ||
+    enPath === `${INFERENCE_PATH}/` ||
     inferenceModelForPathname(pathname) !== null;
   if (!onInferenceTab) return null;
   const slug = inferenceModelSlugForModel(model);
-  const target = slug ? inferenceModelPath(slug) : '/inference';
+  const target = slug ? inferenceModelPath(slug) : INFERENCE_PATH;
   return isZh ? `/zh${target}` : target;
 }

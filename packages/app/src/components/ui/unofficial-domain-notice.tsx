@@ -1,44 +1,57 @@
 'use client';
 
-import { useUnofficialDomain } from '@/hooks/useUnofficialDomain';
+import { ArrowUpRight, TriangleAlert } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { isEmbedPathname } from '@/lib/embed/embed-route';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { OFFICIAL_HOSTNAME } from '@/lib/runtime/unofficial-domain';
 
 const STRINGS = {
   en: {
-    note: 'Note:',
-    text: 'and is not affiliated with or endorsed by SemiAnalysis. Data shown here may be unofficial, modified, or out of date — visit the official site for authoritative InferenceX™ results.',
-    notHosted: 'This deployment is not hosted at',
+    title: 'Unofficial deployment',
+    text: 'This copy of InferenceX™ is not affiliated with or endorsed by SemiAnalysis. Its data may be modified or out of date.',
+    link: 'Official results',
   },
   zh: {
-    note: '注意：',
-    text: '上，且与 SemiAnalysis 无关联，也未获其背书。此处显示的数据可能为非官方、已修改或过期数据——请访问官方网站获取权威的 InferenceX™ 结果。',
-    notHosted: '此部署未托管在',
+    title: '非官方部署',
+    text: '此 InferenceX™ 副本与 SemiAnalysis 无关联，也未获其背书，其数据可能已被修改或已过期。',
+    link: '官方结果',
   },
 } as const;
 
 export function UnofficialDomainNotice() {
-  const isUnofficial = useUnofficialDomain();
-  const locale = useLocale();
-  const t = STRINGS[locale];
+  const t = STRINGS[useLocale()];
+  const pathname = usePathname();
 
-  if (!isUnofficial) return null;
+  if (isEmbedPathname(pathname)) return null;
 
   return (
-    <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
-      <strong>{t.note}</strong> {t.notHosted}{' '}
-      <a
-        href={SITE_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="underline hover:text-foreground"
+    <div
+      data-testid="unofficial-domain-notice"
+      className="container mx-auto px-4 lg:px-8 mb-4 hidden in-data-unofficial-domain:block"
+    >
+      <div
+        role="note"
+        className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-destructive/60 bg-destructive/15 px-4 py-3"
       >
-        {OFFICIAL_HOSTNAME}
-      </a>
-      {locale === 'zh' ? '' : ' '}
-      {t.text}
-    </p>
+        <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-red-600 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+          <TriangleAlert aria-hidden className="size-3.5 shrink-0" />
+          {t.title}
+        </span>
+        <p className="w-full min-w-0 text-sm text-foreground sm:w-auto sm:flex-1">{t.text}</p>
+        <a
+          href={SITE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={OFFICIAL_HOSTNAME}
+          className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-foreground underline underline-offset-2 hover:text-destructive"
+        >
+          {t.link}
+          <ArrowUpRight aria-hidden className="size-3.5" />
+        </a>
+      </div>
+    </div>
   );
 }

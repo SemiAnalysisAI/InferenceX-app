@@ -25,18 +25,16 @@ describe('Evaluation ChartControls', () => {
       expect(rects[1].left).to.be.greaterThan(rects[0].right);
       expect(rects[1].top).to.be.closeTo(rects[0].top, 2);
     });
-    cy.contains('Run Date:')
-      .closest('button')
-      .then(($date) => {
-        cy.contains('Changelog')
-          .closest('button')
-          .then(($changelog) => {
-            expect($changelog[0].getBoundingClientRect().height).to.be.closeTo(
-              $date[0].getBoundingClientRect().height,
-              2,
-            );
-          });
-      });
+    cy.get('[data-slot="date-field"] button[aria-labelledby]').then(($date) => {
+      cy.contains('Changelog')
+        .closest('button')
+        .then(($changelog) => {
+          expect($changelog[0].getBoundingClientRect().height).to.be.closeTo(
+            $date[0].getBoundingClientRect().height,
+            2,
+          );
+        });
+    });
   });
 
   it('stacks the control groups on a narrow viewport and keeps precision selectable', () => {
@@ -82,13 +80,13 @@ describe('Evaluation ChartControls', () => {
       .should('have.attr', 'aria-expanded', 'false')
       .click()
       .should('have.attr', 'aria-expanded', 'true');
-    cy.contains('Run Date:').should('be.visible');
+    cy.contains('label', 'Run date').should('be.visible');
 
     cy.get('[data-testid="evaluation-secondary-controls"] button')
       .first()
       .click()
       .should('have.attr', 'aria-expanded', 'false');
-    cy.contains('Run Date:').should('not.be.visible');
+    cy.contains('label', 'Run date').should('not.be.visible');
     cy.get('#model-select').should('contain.text', 'DeepSeek R1 0528');
   });
 
@@ -97,13 +95,13 @@ describe('Evaluation ChartControls', () => {
     mountWithProviders(<EvaluationChartControls />, { evaluation: {} });
 
     cy.get('[data-testid="evaluation-secondary-controls"] > button').should('not.be.visible');
-    cy.contains('Run Date:').should('be.visible');
+    cy.contains('label', 'Run date').should('be.visible');
   });
 
   it('localizes the mobile secondary changed-count label', () => {
     cy.viewport(390, 844);
     mountWithProviders(
-      <PathnameContext.Provider value="/zh/evaluation">
+      <PathnameContext.Provider value="/zh/infx/evaluation">
         <EvaluationChartControls />
       </PathnameContext.Provider>,
       {

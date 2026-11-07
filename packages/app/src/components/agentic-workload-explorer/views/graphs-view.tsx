@@ -1,9 +1,11 @@
 'use client';
 
-import { Suspense, useMemo, useRef, useState } from 'react';
+import { Suspense, useMemo, useState, type ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
 import {
   useGraphDataset,
@@ -11,12 +13,16 @@ import {
 } from '@/hooks/agentic-workload-explorer/use-graph-dataset';
 import {
   formatDuration,
+  formatExplorerDateTime,
   formatNumber,
   formatPrefillSpeed,
 } from '@/lib/agentic-workload-explorer/format';
-import { ExpandableChart } from '@/components/agentic-workload-explorer/expandable-chart';
-import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
+import {
+  ChartActions,
+  ExpandableChart,
+} from '@/components/agentic-workload-explorer/expandable-chart';
 import { track } from '@/lib/analytics/analytics';
+import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { useModelFilter } from '@/hooks/agentic-workload-explorer/use-model-filter';
 import { ModelFilter } from '@/components/agentic-workload-explorer/model-filter';
@@ -24,15 +30,14 @@ import {
   useTraceVersion,
   appendTraceVersion,
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
-import {
-  HARNESS_LABELS,
-  HARNESSES,
-  type Harness,
-} from '@semianalysisai/inferencex-db/proxytrace/shared/harness';
+import { HARNESSES, type Harness } from '@semianalysisai/inferencex-db/proxytrace/shared/harness';
+import { harnessLabel } from '@/lib/agentic-workload-explorer/harness-label';
 import { CURRENT_TRACE_VERSION } from '@semianalysisai/inferencex-db/proxytrace/shared/trace';
 import { SUBAGENT_STATS_WINDOW_DAYS } from '@semianalysisai/inferencex-db/proxytrace/shared/subagent';
 import { IDLE_GAP_CUTOFF_MS } from '@semianalysisai/inferencex-db/proxytrace/shared/wall-clock';
 import { snapshotNow } from '@/lib/agentic-workload-explorer/snapshot';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 
 const STRINGS = {
   en: {
@@ -44,28 +49,30 @@ const STRINGS = {
     sessions: 'Sessions',
     usd: 'USD',
     total: 'Total',
-    tokenVolumePerHour: 'Token Volume per Hour',
+    tokenVolumePerHour: 'Token volume per hour',
     final48h: '(final 48h)',
-    hourlyTokenVolume: 'Hourly Token Volume',
+    hourlyTokenVolume: 'Hourly token volume',
     input: 'Input',
-    cacheRead: 'Cache Read',
-    cacheWrite: 'Cache Write',
+    cacheRead: 'Cache read',
+    cacheWrite: 'Cache write',
     output: 'Output',
-    weeklySessionsByHarness: 'Weekly Sessions by Harness',
+    weeklySessionsByHarness: 'Weekly sessions by harness',
     noSessionsInSnapshot: (v: number) =>
       `No sessions with > 20 requests at trace v${v} in this snapshot`,
     weekOf: (label: string) => `Week of ${label}`,
-    estimatedCostPerHour: 'Estimated Cost per Hour',
-    hourlyCost: 'Hourly Cost',
-    estCost: 'Est. Cost',
-    p50CpuGpuTime: 'P50 CPU vs GPU Time',
+    estimatedCostPerHour: 'Estimated cost per hour',
+    hourlyCost: 'Hourly cost',
+    estCost: 'Est. cost',
+    p50CpuGpuTime: 'P50 CPU vs GPU time',
     cpuTimeBetweenTurns: 'CPU (time between turns)',
     gpuE2eLatency: 'GPU (E2E latency)',
     p50Cpu: 'P50 CPU',
     p50Gpu: 'P50 GPU',
-    maxConcurrentSubagentsPerSession: 'Max Concurrent Subagents per Session',
+    maxConcurrentSubagentsPerSession: 'Max concurrent subagents per session',
     noEligibleSessions: 'No eligible sessions in this snapshot',
-    requestsPerSecond: 'Requests per Second',
+    requestsPerSecond: 'Requests per second',
+    timeRangeLabel: 'Time range',
+    agentLabel: 'Agent',
     finalOfSnapshot: (label: string) => `(final ${label} of snapshot)`,
     requestsPerSecondYAxis: 'Requests / second',
     rpsBucketLabel: (label: string) => `RPS (${label})`,
@@ -73,14 +80,14 @@ const STRINGS = {
     rollingAvgLegend: (window: number) => `Rolling avg (window=${window})`,
     meanRps: 'Mean RPS',
     peakRps: 'Peak RPS',
-    totalRequests: 'Total Requests',
+    totalRequests: 'Total requests',
     bucketMinutes: (min: number) => `${min}m buckets`,
     bucketHours: (h: number) => `${h}h buckets`,
-    wallClockTitle: 'Wall Clock: Tool/CPU vs LLM/GPU vs Idle',
+    wallClockTitle: 'Wall clock: tool/CPU vs LLM/GPU vs idle',
     wallClockFinal: (days: number) => `(final ${days}d, UTC)`,
-    wallClockComposition: 'Wall Clock Composition',
-    shareOfWallClock: 'Share of Wall Clock',
-    wallClockHoursYAxis: 'Wall Clock Hours',
+    wallClockComposition: 'Wall clock composition',
+    shareOfWallClock: 'Share of wall clock',
+    wallClockHoursYAxis: 'Wall clock hours',
     llmGpuLegend: 'LLM / GPU (E2E latency)',
     toolCpuLegend: 'Tool / CPU (client-side)',
     userIdleLegend: 'User idle (between turns)',
@@ -88,65 +95,65 @@ const STRINGS = {
     modeHours: 'Hours',
     modeShare: 'Share',
     traffic: 'Traffic',
-    hourlyActivity: 'Hourly Activity',
-    weeklySessions: 'Weekly Sessions',
-    wallClock: 'Wall Clock',
-    islTotalDist: 'ISL Total Distribution',
-    islTotalAxis: 'ISL Total Tokens (Cache Read + Cache Write + Input)',
-    cacheReadDist: 'Cache Read Distribution',
-    cacheReadAxis: 'Cache Read Tokens',
-    cacheWriteDist: 'Cache Write Distribution',
-    cacheWriteAxis: 'Cache Write Tokens',
-    outputDist: 'Output Distribution',
-    outputAxis: 'Output Tokens',
-    timeBetweenTurns: 'Time Between Turns',
+    hourlyActivity: 'Hourly activity',
+    weeklySessions: 'Weekly sessions',
+    wallClock: 'Wall clock',
+    islTotalDist: 'ISL total distribution',
+    islTotalAxis: 'ISL total tokens (cache read + cache write + input)',
+    cacheReadDist: 'Cache read distribution',
+    cacheReadAxis: 'Cache read tokens',
+    cacheWriteDist: 'Cache write distribution',
+    cacheWriteAxis: 'Cache write tokens',
+    outputDist: 'Output distribution',
+    outputAxis: 'Output tokens',
+    timeBetweenTurns: 'Time between turns',
     seconds: 'Seconds',
-    userIdleTimeBetweenTurns: (min: number) => `User Idle Time Between Turns (< ${min} min)`,
-    userIdleAxis: 'User Idle (seconds)',
-    cpuGpuRatioTitle: 'CPU Tool-Use Time : GPU Time Ratio',
+    userIdleTimeBetweenTurns: (min: number) => `User idle time between turns (< ${min} min)`,
+    userIdleAxis: 'User idle (seconds)',
+    cpuGpuRatioTitle: 'CPU tool-use time : GPU time ratio',
     cpuGpuRatioAxis: 'Ratio (time between turns / E2E latency)',
-    cacheReadOutputRatioReq: 'Cache Read : Output Ratio (per request)',
+    cacheReadOutputRatioReq: 'Cache read : output ratio (per request)',
     ratioAxis: 'Ratio',
-    cacheReadWriteRatio: 'Cache Read : Write Ratio (per request)',
-    cacheReadOutputRatioSess: 'Cache Read : Output Ratio (per session)',
-    turnsPerSession: 'Turns per Session',
+    cacheReadWriteRatio: 'Cache read : write ratio (per request)',
+    cacheReadOutputRatioSess: 'Cache read : output ratio (per session)',
+    turnsPerSession: 'Turns per session',
     turnsAxis: 'Turns',
-    ttftDist: 'TTFT Distribution',
-    ttftAxis: 'Time to First Token',
-    tpotDist: 'TPOT Distribution',
-    tpotAxis: 'Time per Output Token',
-    prefillSpeedDist: 'Prefill Speed Distribution',
-    prefillSpeedAxis: 'Prefill Speed (input tok/s/query)',
-    tokensPerChunkDist: 'Tokens per SSE Chunk Distribution',
-    tokensPerChunkAxis: 'Output Tokens / SSE Event (tok/chunk)',
-    prefillShareTitle: 'Prefill Share of E2E Latency (TTFT / E2E)',
+    ttftDist: 'TTFT distribution',
+    ttftAxis: 'Time to first token',
+    tpotDist: 'TPOT distribution',
+    tpotAxis: 'Time per output token',
+    prefillSpeedDist: 'Prefill speed distribution',
+    prefillSpeedAxis: 'Prefill speed (input tok/s/query)',
+    tokensPerChunkDist: 'Tokens per SSE chunk distribution',
+    tokensPerChunkAxis: 'Output tokens / SSE event (tok/chunk)',
+    prefillShareTitle: 'Prefill share of E2E latency (TTFT / E2E)',
     prefillShareAxis: 'TTFT / E2E (% of latency spent in prefill)',
-    interactivityDist: 'Interactivity Distribution',
+    interactivityDist: 'Interactivity distribution',
     interactivityAxis: 'Interactivity (output tok/s/user)',
-    sessionDurationTitle: (v: number) => `Session Duration (> 20 reqs, trace v${v})`,
-    sessionDurationAxis: 'Session Duration (hours)',
+    sessionDurationTitle: (v: number) => `Session duration (> 20 reqs, trace v${v})`,
+    sessionDurationAxis: 'Session duration (hours)',
     subagentCountTitle: (days: number, v: number) =>
-      `Subagents per Session — Final ${days}d (> 20 reqs, trace v${v})`,
-    subagentCountAxis: 'Subagents per Session',
+      `Subagents per session — final ${days}d (> 20 reqs, trace v${v})`,
+    subagentCountAxis: 'Subagents per session',
     maxConcurrentHistTitle: (days: number, v: number) =>
-      `Max Concurrent Subagents per Session — Final ${days}d (> 20 reqs, trace v${v})`,
-    maxConcurrentAxis: 'Peak Concurrent Subagents',
+      `Max concurrent subagents per session — final ${days}d (> 20 reqs, trace v${v})`,
+    maxConcurrentAxis: 'Peak concurrent subagents',
     bins: (n: number) => `${n} bins`,
-    p50PrefillDecodeTime: 'P50 Prefill vs Decode Time',
+    p50PrefillDecodeTime: 'P50 prefill vs decode time',
     prefillTtft: 'Prefill (TTFT)',
     decodeE2eMinusTtft: 'Decode (E2E − TTFT)',
-    p50Prefill: 'P50 Prefill',
-    p50Decode: 'P50 Decode',
-    cpuGpuOpus47Fast: 'P50 CPU vs GPU Time — Opus 4.7 (fast mode)',
-    cpuGpuOpus47NonFast: 'P50 CPU vs GPU Time — Opus 4.7 (non-fast)',
-    cpuGpuOpus48Fast: 'P50 CPU vs GPU Time — Opus 4.8 (fast mode)',
-    cpuGpuOpus48NonFast: 'P50 CPU vs GPU Time — Opus 4.8 (non-fast)',
-    prefillDecodeOpus47Fast: 'P50 Prefill vs Decode Time — Opus 4.7 (fast mode)',
-    prefillDecodeOpus47NonFast: 'P50 Prefill vs Decode Time — Opus 4.7 (non-fast)',
-    prefillDecodeOpus48Fast: 'P50 Prefill vs Decode Time — Opus 4.8 (fast mode)',
-    prefillDecodeOpus48NonFast: 'P50 Prefill vs Decode Time — Opus 4.8 (non-fast)',
-    maxConcSubLazy: (days: number) => `Max Concurrent Subagents per Session — Final ${days}d`,
-    costPerHour: 'Cost per Hour',
+    p50Prefill: 'P50 prefill',
+    p50Decode: 'P50 decode',
+    cpuGpuOpus47Fast: 'P50 CPU vs GPU time — Opus 4.7 (fast mode)',
+    cpuGpuOpus47NonFast: 'P50 CPU vs GPU time — Opus 4.7 (non-fast)',
+    cpuGpuOpus48Fast: 'P50 CPU vs GPU time — Opus 4.8 (fast mode)',
+    cpuGpuOpus48NonFast: 'P50 CPU vs GPU time — Opus 4.8 (non-fast)',
+    prefillDecodeOpus47Fast: 'P50 prefill vs decode time — Opus 4.7 (fast mode)',
+    prefillDecodeOpus47NonFast: 'P50 prefill vs decode time — Opus 4.7 (non-fast)',
+    prefillDecodeOpus48Fast: 'P50 prefill vs decode time — Opus 4.8 (fast mode)',
+    prefillDecodeOpus48NonFast: 'P50 prefill vs decode time — Opus 4.8 (non-fast)',
+    maxConcSubLazy: (days: number) => `Max concurrent subagents per session — final ${days}d`,
+    costPerHour: 'Cost per hour',
     gt20ReqsTrace: (v: number) => `(> 20 reqs, trace v${v})`,
   },
   zh: {
@@ -179,6 +186,8 @@ const STRINGS = {
     maxConcurrentSubagentsPerSession: '每会话最大并发 Subagent 数',
     noEligibleSessions: '当前快照中无符合条件的会话',
     requestsPerSecond: '每秒请求数',
+    timeRangeLabel: '时间范围',
+    agentLabel: '智能体',
     finalOfSnapshot: (label: string) => `（快照最后 ${label}）`,
     requestsPerSecondYAxis: '请求数 / 秒',
     rpsBucketLabel: (label: string) => `RPS（${label}）`,
@@ -204,12 +213,12 @@ const STRINGS = {
     hourlyActivity: '每小时活跃度',
     weeklySessions: '每周会话',
     wallClock: '墙钟时间',
-    islTotalDist: 'ISL Total 分布',
-    islTotalAxis: 'ISL 总 Token（Cache Read + Cache Write + Input）',
-    cacheReadDist: 'Cache Read 分布',
-    cacheReadAxis: 'Cache Read Token 数',
-    cacheWriteDist: 'Cache Write 分布',
-    cacheWriteAxis: 'Cache Write Token 数',
+    islTotalDist: 'ISL 总量分布',
+    islTotalAxis: 'ISL 总 token（缓存读取 + 缓存写入 + 输入）',
+    cacheReadDist: '缓存读取分布',
+    cacheReadAxis: '缓存读取 token 数',
+    cacheWriteDist: '缓存写入分布',
+    cacheWriteAxis: '缓存写入 token 数',
     outputDist: '输出分布',
     outputAxis: '输出 Token 数',
     timeBetweenTurns: '对话间隔时间',
@@ -218,16 +227,16 @@ const STRINGS = {
     userIdleAxis: '用户空闲（秒）',
     cpuGpuRatioTitle: 'CPU 工具调用时间 : GPU 时间比值',
     cpuGpuRatioAxis: '比值（对话间隔 / E2E 延迟）',
-    cacheReadOutputRatioReq: 'Cache Read : Output 比（按请求）',
+    cacheReadOutputRatioReq: '缓存读取 : 输出比（按请求）',
     ratioAxis: '比值',
-    cacheReadWriteRatio: 'Cache Read : Write 比（按请求）',
-    cacheReadOutputRatioSess: 'Cache Read : Output 比（按会话）',
+    cacheReadWriteRatio: '缓存读取 : 写入比（按请求）',
+    cacheReadOutputRatioSess: '缓存读取 : 输出比（按会话）',
     turnsPerSession: '每会话对话轮数',
     turnsAxis: '轮数',
     ttftDist: 'TTFT 分布',
-    ttftAxis: 'Time to First Token',
+    ttftAxis: '首 token 延迟',
     tpotDist: 'TPOT 分布',
-    tpotAxis: 'Time per Output Token',
+    tpotAxis: '每输出 token 耗时',
     prefillSpeedDist: 'Prefill 速度分布',
     prefillSpeedAxis: 'Prefill 速度（input tok/s/query）',
     tokensPerChunkDist: '每 SSE Chunk Token 数分布',
@@ -235,7 +244,7 @@ const STRINGS = {
     prefillShareTitle: 'Prefill 占 E2E 延迟比例（TTFT / E2E）',
     prefillShareAxis: 'TTFT / E2E（prefill 占延迟比例）',
     interactivityDist: '交互性分布',
-    interactivityAxis: 'Interactivity（output tok/s/user）',
+    interactivityAxis: '交互性（output tok/s/user）',
     sessionDurationTitle: (v: number) => `会话时长（> 20 次请求，trace v${v}）`,
     sessionDurationAxis: '会话时长（小时）',
     subagentCountTitle: (days: number, v: number) =>
@@ -250,73 +259,65 @@ const STRINGS = {
     decodeE2eMinusTtft: 'Decode (E2E − TTFT)',
     p50Prefill: 'P50 Prefill',
     p50Decode: 'P50 Decode',
-    cpuGpuOpus47Fast: 'P50 CPU vs GPU 耗时 — Opus 4.7（fast mode）',
-    cpuGpuOpus47NonFast: 'P50 CPU vs GPU 耗时 — Opus 4.7（non-fast）',
-    cpuGpuOpus48Fast: 'P50 CPU vs GPU 耗时 — Opus 4.8（fast mode）',
-    cpuGpuOpus48NonFast: 'P50 CPU vs GPU 耗时 — Opus 4.8（non-fast）',
-    prefillDecodeOpus47Fast: 'P50 Prefill vs Decode 耗时 — Opus 4.7（fast mode）',
-    prefillDecodeOpus47NonFast: 'P50 Prefill vs Decode 耗时 — Opus 4.7（non-fast）',
-    prefillDecodeOpus48Fast: 'P50 Prefill vs Decode 耗时 — Opus 4.8（fast mode）',
-    prefillDecodeOpus48NonFast: 'P50 Prefill vs Decode 耗时 — Opus 4.8（non-fast）',
+    cpuGpuOpus47Fast: 'P50 CPU vs GPU 耗时 — Opus 4.7（Fast Mode）',
+    cpuGpuOpus47NonFast: 'P50 CPU vs GPU 耗时 — Opus 4.7（非 Fast Mode）',
+    cpuGpuOpus48Fast: 'P50 CPU vs GPU 耗时 — Opus 4.8（Fast Mode）',
+    cpuGpuOpus48NonFast: 'P50 CPU vs GPU 耗时 — Opus 4.8（非 Fast Mode）',
+    prefillDecodeOpus47Fast: 'P50 Prefill vs Decode 耗时 — Opus 4.7（Fast Mode）',
+    prefillDecodeOpus47NonFast: 'P50 Prefill vs Decode 耗时 — Opus 4.7（非 Fast Mode）',
+    prefillDecodeOpus48Fast: 'P50 Prefill vs Decode 耗时 — Opus 4.8（Fast Mode）',
+    prefillDecodeOpus48NonFast: 'P50 Prefill vs Decode 耗时 — Opus 4.8（非 Fast Mode）',
     maxConcSubLazy: (days: number) => `每会话最大并发 Subagent 数 — 最后 ${days} 天`,
     costPerHour: '每小时成本',
     gt20ReqsTrace: (v: number) => `（> 20 次请求，trace v${v}）`,
   },
 };
 
-function ChartSkeletonCard({ title }: { title?: string }) {
-  const t = STRINGS[useLocale()];
+function ChartStateCard({
+  title,
+  pending = false,
+  children,
+}: {
+  title?: string;
+  pending?: boolean;
+  children: ReactNode;
+}) {
   return (
     <Card>
       <CardHeader className="pb-2">
         {title ? (
           <CardTitle className="text-sm">{title}</CardTitle>
         ) : (
-          <Skeleton className="h-4 w-32" />
+          pending && <Skeleton className="h-4 w-32" />
         )}
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col items-center justify-center gap-2 h-40">
-          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-          <span className="text-3xs font-mono uppercase tracking-eyebrow-wide text-muted-foreground">
-            {t.loading}
-          </span>
-        </div>
+        <EmptyState bare className="h-40">
+          {children}
+        </EmptyState>
       </CardContent>
     </Card>
+  );
+}
+
+function ChartSkeletonCard({ title }: { title?: string }) {
+  const t = STRINGS[useLocale()];
+  return (
+    <ChartStateCard title={title} pending>
+      <span className="flex flex-col items-center gap-2">
+        <Loader2 className="size-6 animate-spin" />
+        {t.loading}
+      </span>
+    </ChartStateCard>
   );
 }
 
 function ChartErrorCard({ title }: { title?: string }) {
-  const t = STRINGS[useLocale()];
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        {title && <CardTitle className="text-sm">{title}</CardTitle>}
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-          {t.failedToLoad}
-        </div>
-      </CardContent>
-    </Card>
-  );
+  return <ChartStateCard title={title}>{STRINGS[useLocale()].failedToLoad}</ChartStateCard>;
 }
 
 function EmptyDataCard({ title }: { title: string }) {
-  const t = STRINGS[useLocale()];
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-          {t.noData}
-        </div>
-      </CardContent>
-    </Card>
-  );
+  return <ChartStateCard title={title}>{STRINGS[useLocale()].noData}</ChartStateCard>;
 }
 
 function LazyDatasetCard<T>({
@@ -493,7 +494,6 @@ function Histogram({
   title?: string;
   exportFilename?: string;
 }) {
-  const svgRef = useRef<SVGSVGElement>(null);
   const locale = useLocale();
   const t = STRINGS[locale];
 
@@ -515,24 +515,17 @@ function Histogram({
     <div>
       {title && (
         <div className="flex justify-end mb-1">
-          <ExportPngButton
-            locale={locale}
-            analyticsChart={exportFilename?.replace(/\.png$/u, '') || 'histogram'}
-            onClick={() => {
-              if (svgRef.current) {
-                exportSvgToPng(svgRef.current, {
-                  title,
-                  filename: exportFilename || 'histogram.png',
-                  svgWidth: CHART_WIDTH,
-                  svgHeight: CHART_HEIGHT,
-                });
-              }
-            }}
+          <ChartActions
+            fileName={(exportFilename || 'histogram.png').replace(/\.png$/u, '')}
+            onExportPng={() =>
+              track('agentic_workload_export_png', {
+                chart: exportFilename?.replace(/\.png$/u, '') || 'histogram',
+              })
+            }
           />
         </div>
       )}
       <svg
-        ref={svgRef}
         viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
         className="w-full"
         style={{ maxHeight: 220 }}
@@ -702,16 +695,11 @@ function Histogram({
         </text>
       </svg>
 
-      <div className="grid grid-cols-5 gap-1.5 mt-3 pt-3 border-t border-border">
+      <div className="grid grid-cols-5 gap-1.5 mt-3 pt-3 border-t border-border/20">
         {percentiles.map((p) => (
-          <div
-            key={p.label}
-            className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center"
-          >
-            <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-              {p.label}
-            </div>
-            <div className="text-sm font-mono font-bold tracking-tight mt-0.5">{fmt(p.value)}</div>
+          <div key={p.label} className="rounded-md bg-muted/40 px-2 py-1.5 text-center">
+            <div className="text-xs font-medium text-muted-foreground">{p.label}</div>
+            <div className="text-sm font-mono font-medium mt-0.5">{fmt(p.value)}</div>
           </div>
         ))}
       </div>
@@ -727,7 +715,6 @@ const HOURLY_COLORS = {
 };
 
 function HourlyTokenChart({ data }: { data: HourlyToken[] }) {
-  const svgRef = useRef<SVGSVGElement>(null);
   const locale = useLocale();
   const t = STRINGS[locale];
   const [tooltip, setTooltip] = useState<{
@@ -784,24 +771,14 @@ function HourlyTokenChart({ data }: { data: HourlyToken[] }) {
         </>
       }
       subtitle={legendEl}
-    >
-      <div className="flex justify-end mb-1">
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current) {
-              track('agentic_workload_export_png', { chart: 'hourly-token-volume' });
-              exportSvgToPng(svgRef.current, {
-                title: 'Hourly Token Volume',
-                filename: 'hourly-token-volume.png',
-                svgWidth: CW,
-                svgHeight: CH,
-              });
-            }
-          }}
+      actions={
+        <ChartActions
+          fileName="hourly-token-volume"
+          onExportPng={() => track('agentic_workload_export_png', { chart: 'hourly-token-volume' })}
         />
-      </div>
-      <svg ref={svgRef} viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 240 }}>
+      }
+    >
+      <svg viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 240 }}>
         {yTicks.map((tv) => (
           <g key={`y-${tv}`}>
             {tv > 0 && (
@@ -911,7 +888,7 @@ function HourlyTokenChart({ data }: { data: HourlyToken[] }) {
           const hour = date.getUTCHours();
           if (hour % 6 !== 0) return null;
           const x = M.left + (i / data.length) * PW + barWidth / 2;
-          const dayStr = date.toLocaleDateString('en-US', {
+          const dayStr = formatExplorerDateTime(date, locale, {
             month: 'short',
             day: 'numeric',
             timeZone: 'UTC',
@@ -957,54 +934,45 @@ function HourlyTokenChart({ data }: { data: HourlyToken[] }) {
       </svg>
 
       {tooltip && (
-        <div
-          className="fixed z-50 pointer-events-none rounded-md border border-border bg-surface p-2.5 shadow-lg"
-          style={{ left: tooltip.x + 12, top: tooltip.y - 10 }}
-        >
-          <div className="space-y-1 text-2xs font-mono">
-            <div className="font-bold text-foreground">
-              {new Date(tooltip.item.hour).toLocaleString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZoneName: 'short',
-              })}
-            </div>
-            <div className="h-px bg-border" />
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">{t.requests}</span>
-              <span>{Number(tooltip.item.requestCount)}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span style={{ color: HOURLY_COLORS.input }}>{t.input}</span>
-              <span>{formatNumber(Number(tooltip.item.input))}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span style={{ color: HOURLY_COLORS.cacheRead }}>{t.cacheRead}</span>
-              <span>{formatNumber(Number(tooltip.item.cacheRead))}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span style={{ color: HOURLY_COLORS.cacheWrite }}>{t.cacheWrite}</span>
-              <span>{formatNumber(Number(tooltip.item.cacheWrite))}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span style={{ color: HOURLY_COLORS.output }}>{t.output}</span>
-              <span>{formatNumber(Number(tooltip.item.output))}</span>
-            </div>
-            <div className="flex justify-between gap-4 font-bold">
-              <span className="text-foreground">{t.total}</span>
-              <span>
-                {formatNumber(
-                  Number(tooltip.item.input) +
-                    Number(tooltip.item.cacheRead) +
-                    Number(tooltip.item.cacheWrite) +
-                    Number(tooltip.item.output),
-                )}
-              </span>
-            </div>
-          </div>
-        </div>
+        <FloatingTooltip x={tooltip.x} y={tooltip.y}>
+          <ChartHoverCardBody
+            title={formatExplorerDateTime(tooltip.item.hour, locale, {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZoneName: 'short',
+            })}
+            metrics={[
+              {
+                value: formatNumber(Number(tooltip.item.input)),
+                label: t.input,
+                color: HOURLY_COLORS.input,
+              },
+              {
+                value: formatNumber(Number(tooltip.item.cacheRead)),
+                label: t.cacheRead,
+                color: HOURLY_COLORS.cacheRead,
+              },
+              {
+                value: formatNumber(Number(tooltip.item.cacheWrite)),
+                label: t.cacheWrite,
+                color: HOURLY_COLORS.cacheWrite,
+              },
+              {
+                value: formatNumber(Number(tooltip.item.output)),
+                label: t.output,
+                color: HOURLY_COLORS.output,
+              },
+            ]}
+            summary={`${t.total} ${formatNumber(
+              Number(tooltip.item.input) +
+                Number(tooltip.item.cacheRead) +
+                Number(tooltip.item.cacheWrite) +
+                Number(tooltip.item.output),
+            )} · ${t.requests} ${Number(tooltip.item.requestCount)}`}
+          />
+        </FloatingTooltip>
       )}
     </ExpandableChart>
   );
@@ -1017,8 +985,6 @@ const HARNESS_COLORS: Record<Harness, string> = {
   omp: '#0ea5e9',
   other: '#a1a1aa',
 };
-
-const HARNESS_LEGEND = HARNESSES.map((key) => ({ key, label: HARNESS_LABELS[key] }));
 
 function pivotWeeklySessions(rows: WeeklySessionRow[]): WeeklySessionPoint[] {
   const byWeek = new Map<string, WeeklySessionPoint>();
@@ -1034,9 +1000,9 @@ function pivotWeeklySessions(rows: WeeklySessionRow[]): WeeklySessionPoint[] {
   return [...byWeek.values()].toSorted((a, b) => a.week.localeCompare(b.week));
 }
 
-function formatWeekLabel(week: string): string {
+function formatWeekLabel(week: string, locale: Locale): string {
   const d = new Date(`${week}T00:00:00Z`);
-  return d.toLocaleDateString('en-US', {
+  return formatExplorerDateTime(d, locale, {
     month: 'short',
     day: 'numeric',
     timeZone: 'UTC',
@@ -1044,9 +1010,9 @@ function formatWeekLabel(week: string): string {
 }
 
 function WeeklySessionsByHarnessChart({ data }: { data: WeeklySessionPoint[] }) {
-  const svgRef = useRef<SVGSVGElement>(null);
   const locale = useLocale();
   const t = STRINGS[locale];
+  const harnessLegend = HARNESSES.map((key) => ({ key, label: harnessLabel(key, locale) }));
   const [tooltip, setTooltip] = useState<{
     x: number;
     y: number;
@@ -1070,7 +1036,7 @@ function WeeklySessionsByHarnessChart({ data }: { data: WeeklySessionPoint[] }) 
 
   const legendEl = (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
-      {HARNESS_LEGEND.map((item) => (
+      {harnessLegend.map((item) => (
         <div key={item.key} className="flex items-center gap-1.5">
           <span
             className="inline-block w-2.5 h-2.5 rounded-sm"
@@ -1095,29 +1061,21 @@ function WeeklySessionsByHarnessChart({ data }: { data: WeeklySessionPoint[] }) 
         </>
       }
       subtitle={legendEl}
-    >
-      <div className="flex justify-end mb-1">
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current) {
-              track('agentic_workload_export_png', { chart: 'weekly-sessions-by-harness' });
-              exportSvgToPng(svgRef.current, {
-                title: 'Weekly Sessions by Harness',
-                filename: 'weekly-sessions-by-harness.png',
-                svgWidth: CW,
-                svgHeight: CH,
-              });
-            }
-          }}
+      actions={
+        <ChartActions
+          fileName="weekly-sessions-by-harness"
+          onExportPng={() =>
+            track('agentic_workload_export_png', { chart: 'weekly-sessions-by-harness' })
+          }
         />
-      </div>
+      }
+    >
       {data.length === 0 ? (
-        <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+        <EmptyState bare className="h-40">
           {t.noSessionsInSnapshot(CURRENT_TRACE_VERSION)}
-        </div>
+        </EmptyState>
       ) : (
-        <svg ref={svgRef} viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 280 }}>
+        <svg viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 280 }}>
           {yTicks.map((tv) => (
             <g key={`y-${tv}`}>
               {tv > 0 && (
@@ -1237,7 +1195,7 @@ function WeeklySessionsByHarnessChart({ data }: { data: WeeklySessionPoint[] }) 
                     fontFamily: 'var(--font-mono, ui-monospace, monospace)',
                   }}
                 >
-                  {formatWeekLabel(d.week)}
+                  {formatWeekLabel(d.week, locale)}
                 </text>
               </g>
             );
@@ -1246,34 +1204,23 @@ function WeeklySessionsByHarnessChart({ data }: { data: WeeklySessionPoint[] }) 
       )}
 
       {tooltip && (
-        <div
-          className="fixed z-50 pointer-events-none rounded-md border border-border bg-surface p-2.5 shadow-lg"
-          style={{ left: tooltip.x + 12, top: tooltip.y - 10 }}
-        >
-          <div className="space-y-1 text-2xs font-mono">
-            <div className="font-bold text-foreground">
-              {t.weekOf(formatWeekLabel(tooltip.item.week))}
-            </div>
-            <div className="h-px bg-border" />
-            {HARNESS_LEGEND.map((item) => (
-              <div key={item.key} className="flex justify-between gap-4">
-                <span style={{ color: HARNESS_COLORS[item.key] }}>{item.label}</span>
-                <span>{formatNumber(tooltip.item[item.key])}</span>
-              </div>
-            ))}
-            <div className="flex justify-between gap-4 font-bold">
-              <span className="text-foreground">{t.total}</span>
-              <span>{formatNumber(tooltip.item.total)}</span>
-            </div>
-          </div>
-        </div>
+        <FloatingTooltip x={tooltip.x} y={tooltip.y}>
+          <ChartHoverCardBody
+            title={t.weekOf(formatWeekLabel(tooltip.item.week, locale))}
+            metrics={harnessLegend.map((item) => ({
+              value: formatNumber(tooltip.item[item.key]),
+              label: item.label,
+              color: HARNESS_COLORS[item.key],
+            }))}
+            summary={`${t.total} ${formatNumber(tooltip.item.total)}`}
+          />
+        </FloatingTooltip>
       )}
     </ExpandableChart>
   );
 }
 
 function HourlyCostChart({ data }: { data: HourlyToken[] }) {
-  const svgRef = useRef<SVGSVGElement>(null);
   const locale = useLocale();
   const t = STRINGS[locale];
   const [tooltip, setTooltip] = useState<{
@@ -1304,24 +1251,14 @@ function HourlyCostChart({ data }: { data: HourlyToken[] }) {
           <span className="text-muted-foreground font-normal">{t.final48h}</span>
         </>
       }
-    >
-      <div className="flex justify-end mb-1">
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current) {
-              track('agentic_workload_export_png', { chart: 'hourly-cost' });
-              exportSvgToPng(svgRef.current, {
-                title: 'Hourly Cost',
-                filename: 'hourly-cost.png',
-                svgWidth: CW,
-                svgHeight: CH,
-              });
-            }
-          }}
+      actions={
+        <ChartActions
+          fileName="hourly-cost"
+          onExportPng={() => track('agentic_workload_export_png', { chart: 'hourly-cost' })}
         />
-      </div>
-      <svg ref={svgRef} viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 200 }}>
+      }
+    >
+      <svg viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 200 }}>
         {yTicks.map((tv) => (
           <g key={`y-${tv}`}>
             {tv > 0 && (
@@ -1411,7 +1348,7 @@ function HourlyCostChart({ data }: { data: HourlyToken[] }) {
           const hour = date.getUTCHours();
           if (hour % 6 !== 0) return null;
           const x = M.left + (i / data.length) * PW + barWidth / 2;
-          const dayStr = date.toLocaleDateString('en-US', {
+          const dayStr = formatExplorerDateTime(date, locale, {
             month: 'short',
             day: 'numeric',
             timeZone: 'UTC',
@@ -1457,31 +1394,19 @@ function HourlyCostChart({ data }: { data: HourlyToken[] }) {
       </svg>
 
       {tooltip && (
-        <div
-          className="fixed z-50 pointer-events-none rounded-md border border-border bg-surface p-2.5 shadow-lg"
-          style={{ left: tooltip.x + 12, top: tooltip.y - 10 }}
-        >
-          <div className="space-y-1 text-2xs font-mono">
-            <div className="font-bold text-foreground">
-              {new Date(tooltip.item.hour).toLocaleString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZoneName: 'short',
-              })}
-            </div>
-            <div className="h-px bg-border" />
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">{t.requests}</span>
-              <span>{Number(tooltip.item.requestCount)}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-emerald-500">{t.estCost}</span>
-              <span>${Number(tooltip.item.cost).toFixed(4)}</span>
-            </div>
-          </div>
-        </div>
+        <FloatingTooltip x={tooltip.x} y={tooltip.y}>
+          <ChartHoverCardBody
+            title={formatExplorerDateTime(tooltip.item.hour, locale, {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZoneName: 'short',
+            })}
+            metrics={[{ value: `$${Number(tooltip.item.cost).toFixed(4)}`, label: t.estCost }]}
+            summary={`${t.requests} ${Number(tooltip.item.requestCount)}`}
+          />
+        </FloatingTooltip>
       )}
     </ExpandableChart>
   );
@@ -1512,7 +1437,6 @@ function CpuGpuPieChart({
   aColor?: string;
   bColor?: string;
 }) {
-  const svgRef = useRef<SVGSVGElement>(null);
   const locale = useLocale();
   const t = STRINGS[locale];
   const resolvedTitle = title ?? t.p50CpuGpuTime;
@@ -1583,35 +1507,20 @@ function CpuGpuPieChart({
         </>
       }
       subtitle={subtitle}
-    >
-      <div className="flex justify-end mb-1">
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current) {
-              track('agentic_workload_export_png', { chart: exportFilename });
-              exportSvgToPng(svgRef.current, {
-                title: resolvedTitle,
-                filename: exportFilename,
-                svgWidth: CW,
-                svgHeight: CH,
-              });
-            }
-          }}
+      actions={
+        <ChartActions
+          fileName={exportFilename.replace(/\.png$/u, '')}
+          onExportPng={() => track('agentic_workload_export_png', { chart: exportFilename })}
         />
-      </div>
+      }
+    >
       {total === 0 ? (
-        <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+        <EmptyState bare className="h-40">
           {t.noData}
-        </div>
+        </EmptyState>
       ) : (
         <>
-          <svg
-            ref={svgRef}
-            viewBox={`0 0 ${CW} ${CH}`}
-            className="w-full"
-            style={{ maxHeight: 240 }}
-          >
+          <svg viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 240 }}>
             {cpuFrac > 0 && (
               <path
                 d={cpuPath}
@@ -1655,36 +1564,22 @@ function CpuGpuPieChart({
               </text>
             )}
           </svg>
-          <div className="grid grid-cols-3 gap-1.5 mt-3 pt-3 border-t border-border">
-            <div className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center">
-              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-                {resolvedAStatLabel}
-              </div>
-              <div
-                className="text-sm font-mono font-bold tracking-tight mt-0.5"
-                style={{ color: cpuColor }}
-              >
+          <div className="grid grid-cols-3 gap-1.5 mt-3 pt-3 border-t border-border/20">
+            <div className="rounded-md bg-muted/40 px-2 py-1.5 text-center">
+              <div className="text-xs font-medium text-muted-foreground">{resolvedAStatLabel}</div>
+              <div className="text-sm font-mono font-medium mt-0.5" style={{ color: cpuColor }}>
                 {`${p50Cpu.toFixed(2)}s`}
               </div>
             </div>
-            <div className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center">
-              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-                {resolvedBStatLabel}
-              </div>
-              <div
-                className="text-sm font-mono font-bold tracking-tight mt-0.5"
-                style={{ color: gpuColor }}
-              >
+            <div className="rounded-md bg-muted/40 px-2 py-1.5 text-center">
+              <div className="text-xs font-medium text-muted-foreground">{resolvedBStatLabel}</div>
+              <div className="text-sm font-mono font-medium mt-0.5" style={{ color: gpuColor }}>
                 {`${p50Gpu.toFixed(2)}s`}
               </div>
             </div>
-            <div className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center">
-              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-                {t.total}
-              </div>
-              <div className="text-sm font-mono font-bold tracking-tight mt-0.5">
-                {`${total.toFixed(2)}s`}
-              </div>
+            <div className="rounded-md bg-muted/40 px-2 py-1.5 text-center">
+              <div className="text-xs font-medium text-muted-foreground">{t.total}</div>
+              <div className="text-sm font-mono font-medium mt-0.5">{`${total.toFixed(2)}s`}</div>
             </div>
           </div>
         </>
@@ -1718,7 +1613,6 @@ function concurrencySlices(buckets: ConcurrencyBucket[]): PieSlice[] {
 }
 
 function MaxConcurrentSubagentsPieChart({ slices }: { slices: PieSlice[] }) {
-  const svgRef = useRef<SVGSVGElement>(null);
   const locale = useLocale();
   const t = STRINGS[locale];
   const total = slices.reduce((acc, s) => acc + s.value, 0);
@@ -1787,35 +1681,22 @@ function MaxConcurrentSubagentsPieChart({ slices }: { slices: PieSlice[] }) {
         </>
       }
       subtitle={legend}
-    >
-      <div className="flex justify-end mb-1">
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current) {
-              track('agentic_workload_export_png', { chart: 'max-concurrent-subagents-pie' });
-              exportSvgToPng(svgRef.current, {
-                title: 'Max Concurrent Subagents per Session',
-                filename: 'max-concurrent-subagents-pie.png',
-                svgWidth: CW,
-                svgHeight: CH,
-              });
-            }
-          }}
+      actions={
+        <ChartActions
+          fileName="max-concurrent-subagents-pie"
+          onExportPng={() =>
+            track('agentic_workload_export_png', { chart: 'max-concurrent-subagents-pie' })
+          }
         />
-      </div>
+      }
+    >
       {total === 0 ? (
-        <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+        <EmptyState bare className="h-40">
           {t.noEligibleSessions}
-        </div>
+        </EmptyState>
       ) : (
         <>
-          <svg
-            ref={svgRef}
-            viewBox={`0 0 ${CW} ${CH}`}
-            className="w-full"
-            style={{ maxHeight: 260 }}
-          >
+          <svg viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 260 }}>
             {arcs.map((arc) => (
               <path
                 key={arc.slice.label}
@@ -1842,19 +1723,11 @@ function MaxConcurrentSubagentsPieChart({ slices }: { slices: PieSlice[] }) {
                 </text>
               ))}
           </svg>
-          <div className="grid grid-cols-7 gap-1 mt-3 pt-3 border-t border-border">
+          <div className="grid grid-cols-7 gap-1 mt-3 pt-3 border-t border-border/20">
             {slices.map((s) => (
-              <div
-                key={s.label}
-                className="rounded-md border border-border bg-surface-hover px-1.5 py-1.5 text-center"
-              >
-                <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-                  {s.label}
-                </div>
-                <div
-                  className="text-xs font-mono font-bold tracking-tight mt-0.5"
-                  style={{ color: s.color }}
-                >
+              <div key={s.label} className="rounded-md bg-muted/40 px-1.5 py-1.5 text-center">
+                <div className="text-xs font-medium text-muted-foreground">{s.label}</div>
+                <div className="text-xs font-mono font-medium mt-0.5" style={{ color: s.color }}>
                   {s.value.toLocaleString()}
                 </div>
                 <div className="text-3xs font-mono text-muted-foreground mt-0.5">
@@ -1908,7 +1781,6 @@ function RpsTimeseriesChart({
   onRangeChange: (range: RpsRangeKey) => void;
   loading: boolean;
 }) {
-  const svgRef = useRef<SVGSVGElement>(null);
   const locale = useLocale();
   const t = STRINGS[locale];
   const [tooltip, setTooltip] = useState<{
@@ -1992,58 +1864,31 @@ function RpsTimeseriesChart({
       subtitle={subtitle}
     >
       <div className="flex items-center justify-between mb-2 gap-2">
-        <div className="flex items-center gap-1" role="group" aria-label="Time range">
-          {RPS_RANGES.map((r) => {
-            const active = r.key === range;
-            return (
-              <button
-                key={r.key}
-                onClick={() => {
-                  track('agentic_workload_rps_range_changed', { range: r.key });
-                  onRangeChange(r.key);
-                }}
-                className={`px-2 py-1 text-3xs font-mono font-bold uppercase tracking-eyebrow rounded-md border transition-colors ${
-                  active
-                    ? 'bg-foreground text-background border-foreground'
-                    : 'bg-surface text-muted-foreground border-border hover:bg-surface-hover hover:text-foreground'
-                }`}
-                aria-pressed={active}
-              >
-                {r.label}
-              </button>
-            );
-          })}
-        </div>
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current) {
-              track('agentic_workload_export_png', { chart: `rps-${range}` });
-              exportSvgToPng(svgRef.current, {
-                title: `Requests per Second (final ${rangeLabel} of snapshot)`,
-                filename: `rps-${range}.png`,
-                svgWidth: CW,
-                svgHeight: CH,
-              });
-            }
+        <SegmentedToggle
+          role="group"
+          ariaLabel={t.timeRangeLabel}
+          value={range}
+          onValueChange={(next) => {
+            track('agentic_workload_rps_range_changed', { range: next });
+            onRangeChange(next);
           }}
+          options={RPS_RANGES.map((r) => ({ value: r.key, label: r.label }))}
+        />
+        <ChartActions
+          fileName={`rps-${range}`}
+          onExportPng={() => track('agentic_workload_export_png', { chart: `rps-${range}` })}
         />
       </div>
 
       {loading && !data ? (
         <Skeleton className="h-[200px] w-full" />
       ) : points.length === 0 ? (
-        <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+        <EmptyState bare className="h-40">
           {t.noData}
-        </div>
+        </EmptyState>
       ) : (
         <>
-          <svg
-            ref={svgRef}
-            viewBox={`0 0 ${CW} ${CH}`}
-            className="w-full"
-            style={{ maxHeight: 260 }}
-          >
+          <svg viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 260 }}>
             {yTicks.map((tv) => (
               <g key={`y-${tv}`}>
                 {tv > 0 && (
@@ -2162,7 +2007,7 @@ function RpsTimeseriesChart({
                 minute: '2-digit',
                 hour12: false,
               });
-              const dayStr = date.toLocaleDateString('en-US', {
+              const dayStr = formatExplorerDateTime(date, locale, {
                 month: 'short',
                 day: 'numeric',
               });
@@ -2208,28 +2053,18 @@ function RpsTimeseriesChart({
             })}
           </svg>
 
-          <div className="grid grid-cols-3 gap-1.5 mt-3 pt-3 border-t border-border">
-            <div className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center">
-              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-                {t.meanRps}
-              </div>
-              <div className="text-sm font-mono font-bold tracking-tight mt-0.5">
-                {formatRpsValue(meanRps)}
-              </div>
+          <div className="grid grid-cols-3 gap-1.5 mt-3 pt-3 border-t border-border/20">
+            <div className="rounded-md bg-muted/40 px-2 py-1.5 text-center">
+              <div className="text-xs font-medium text-muted-foreground">{t.meanRps}</div>
+              <div className="text-sm font-mono font-medium mt-0.5">{formatRpsValue(meanRps)}</div>
             </div>
-            <div className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center">
-              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-                {t.peakRps}
-              </div>
-              <div className="text-sm font-mono font-bold tracking-tight mt-0.5">
-                {formatRpsValue(peakRps)}
-              </div>
+            <div className="rounded-md bg-muted/40 px-2 py-1.5 text-center">
+              <div className="text-xs font-medium text-muted-foreground">{t.peakRps}</div>
+              <div className="text-sm font-mono font-medium mt-0.5">{formatRpsValue(peakRps)}</div>
             </div>
-            <div className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center">
-              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-                {t.totalRequests}
-              </div>
-              <div className="text-sm font-mono font-bold tracking-tight mt-0.5">
+            <div className="rounded-md bg-muted/40 px-2 py-1.5 text-center">
+              <div className="text-xs font-medium text-muted-foreground">{t.totalRequests}</div>
+              <div className="text-sm font-mono font-medium mt-0.5">
                 {formatNumber(totalRequests)}
               </div>
             </div>
@@ -2238,35 +2073,22 @@ function RpsTimeseriesChart({
       )}
 
       {tooltip && (
-        <div
-          className="fixed z-50 pointer-events-none rounded-md border border-border bg-surface p-2.5 shadow-lg"
-          style={{ left: tooltip.x + 12, top: tooltip.y - 10 }}
-        >
-          <div className="space-y-1 text-2xs font-mono">
-            <div className="font-bold text-foreground">
-              {new Date(tooltip.item.bucket).toLocaleString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZoneName: 'short',
-              })}
-            </div>
-            <div className="h-px bg-border" />
-            <div className="flex justify-between gap-4">
-              <span style={{ color: barColor }}>RPS</span>
-              <span>{formatRpsValue(tooltip.item.rps)}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span style={{ color: avgColor }}>{t.rollingAvg}</span>
-              <span>{formatRpsValue(tooltip.avg)}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">{t.requests}</span>
-              <span>{formatNumber(tooltip.item.requestCount)}</span>
-            </div>
-          </div>
-        </div>
+        <FloatingTooltip x={tooltip.x} y={tooltip.y}>
+          <ChartHoverCardBody
+            title={formatExplorerDateTime(tooltip.item.bucket, locale, {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZoneName: 'short',
+            })}
+            metrics={[
+              { value: formatRpsValue(tooltip.item.rps), label: 'RPS', color: barColor },
+              { value: formatRpsValue(tooltip.avg), label: t.rollingAvg, color: avgColor },
+            ]}
+            summary={`${t.requests} ${formatNumber(tooltip.item.requestCount)}`}
+          />
+        </FloatingTooltip>
       )}
     </ExpandableChart>
   );
@@ -2297,7 +2119,6 @@ const pct = (ms: number, total: number) =>
   total > 0 ? `${((ms / total) * 100).toFixed(1)}%` : '—';
 
 function WallClockStackedBarChart({ data }: { data: WallClockDay[] }) {
-  const svgRef = useRef<SVGSVGElement>(null);
   const locale = useLocale();
   const t = STRINGS[locale];
   const [share, setShare] = useState(false);
@@ -2389,97 +2210,56 @@ function WallClockStackedBarChart({ data }: { data: WallClockDay[] }) {
       }
       subtitle={legendEl}
     >
-      <div className="flex items-center justify-end gap-2 mb-1">
-        <div
-          className="flex rounded-md border border-border overflow-hidden"
+      <div className="flex flex-wrap items-center gap-2 mb-2">
+        <SegmentedToggle
           role="group"
-          aria-label="Agent"
-        >
-          {[
-            { key: 'both' as const, label: t.agentBoth },
-            { key: 'claude' as const, label: 'Claude' },
-            { key: 'codex' as const, label: 'Codex' },
-          ].map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              onClick={() => {
-                track('agentic_workload_wallclock_agent_changed', { agent: option.key });
-                setAgent(option.key);
-              }}
-              className={`px-2 py-0.5 text-3xs font-mono uppercase tracking-eyebrow transition-colors ${
-                agent === option.key
-                  ? 'bg-surface-hover text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <div
-          className="flex rounded-md border border-border overflow-hidden"
-          role="group"
-          aria-label="Time range"
-        >
-          {WALL_CLOCK_RANGES.map((range) => (
-            <button
-              key={range.days}
-              type="button"
-              onClick={() => {
-                track('agentic_workload_wallclock_range_changed', { days: range.days });
-                setRangeDays(range.days);
-              }}
-              className={`px-2 py-0.5 text-3xs font-mono uppercase tracking-eyebrow transition-colors ${
-                rangeDays === range.days
-                  ? 'bg-surface-hover text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {range.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex rounded-md border border-border overflow-hidden">
-          {[
-            { key: false, label: t.modeHours },
-            { key: true, label: t.modeShare },
-          ].map((mode) => (
-            <button
-              key={String(mode.key)}
-              type="button"
-              onClick={() => {
-                track('agentic_workload_wallclock_mode_changed', {
-                  mode: mode.key ? 'share' : 'hours',
-                });
-                setShare(mode.key);
-              }}
-              className={`px-2 py-0.5 text-3xs font-mono uppercase tracking-eyebrow transition-colors ${
-                share === mode.key
-                  ? 'bg-surface-hover text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {mode.label}
-            </button>
-          ))}
-        </div>
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current) {
-              track('agentic_workload_export_png', { chart: 'wall-clock-composition' });
-              exportSvgToPng(svgRef.current, {
-                title: 'Wall Clock Composition',
-                filename: 'wall-clock-composition.png',
-                svgWidth: CW,
-                svgHeight: CH,
-              });
-            }
+          ariaLabel={t.agentLabel}
+          value={agent}
+          onValueChange={(next) => {
+            track('agentic_workload_wallclock_agent_changed', { agent: next });
+            setAgent(next);
           }}
+          options={[
+            { value: 'both' as const, label: t.agentBoth },
+            { value: 'claude' as const, label: 'Claude' },
+            { value: 'codex' as const, label: 'Codex' },
+          ]}
+        />
+        <SegmentedToggle
+          role="group"
+          ariaLabel={t.timeRangeLabel}
+          value={String(rangeDays)}
+          onValueChange={(next) => {
+            const days = Number(next);
+            track('agentic_workload_wallclock_range_changed', { days });
+            setRangeDays(days);
+          }}
+          options={WALL_CLOCK_RANGES.map((range) => ({
+            value: String(range.days),
+            label: range.label,
+          }))}
+        />
+        <SegmentedToggle
+          role="group"
+          ariaLabel={`${t.modeHours} / ${t.modeShare}`}
+          value={share ? 'share' : 'hours'}
+          onValueChange={(next) => {
+            track('agentic_workload_wallclock_mode_changed', { mode: next });
+            setShare(next === 'share');
+          }}
+          options={[
+            { value: 'hours', label: t.modeHours },
+            { value: 'share', label: t.modeShare },
+          ]}
+        />
+        <ChartActions
+          fileName="wall-clock-composition"
+          onExportPng={() =>
+            track('agentic_workload_export_png', { chart: 'wall-clock-composition' })
+          }
         />
       </div>
-      <svg ref={svgRef} viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 260 }}>
+      <svg viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 260 }}>
         {yTicks.map((tv) => (
           <g key={`y-${tv}`}>
             {tv > 0 && (
@@ -2599,39 +2379,25 @@ function WallClockStackedBarChart({ data }: { data: WallClockDay[] }) {
       </svg>
 
       {tooltip && (
-        <div
-          className="fixed z-50 pointer-events-none rounded-md border border-border bg-surface p-2.5 shadow-lg"
-          style={{ left: tooltip.x + 12, top: tooltip.y - 10 }}
-        >
-          <div className="space-y-1 text-2xs font-mono">
-            <div className="font-bold text-foreground">{tooltip.item.day}</div>
-            <div className="h-px bg-border" />
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">{t.requests}</span>
-              <span>{formatNumber(tooltip.item.requests)}</span>
-            </div>
-            {wallClockLegendItems.map((seg) => {
+        <FloatingTooltip x={tooltip.x} y={tooltip.y}>
+          <ChartHoverCardBody
+            title={tooltip.item.day}
+            metrics={wallClockLegendItems.map((seg) => {
               const ms =
                 seg.key === 'llm'
                   ? tooltip.item.llmMs
                   : seg.key === 'tool'
                     ? tooltip.item.toolMs
                     : tooltip.item.idleMs;
-              return (
-                <div key={seg.key} className="flex justify-between gap-4">
-                  <span style={{ color: seg.color }}>{seg.label}</span>
-                  <span>
-                    {fmtHours(ms)} · {pct(ms, totalOf(tooltip.item))}
-                  </span>
-                </div>
-              );
+              return {
+                value: fmtHours(ms),
+                label: `${seg.label} · ${pct(ms, totalOf(tooltip.item))}`,
+                color: seg.color,
+              };
             })}
-            <div className="flex justify-between gap-4 font-bold">
-              <span className="text-foreground">{t.total}</span>
-              <span>{fmtHours(totalOf(tooltip.item))}</span>
-            </div>
-          </div>
-        </div>
+            summary={`${t.total} ${fmtHours(totalOf(tooltip.item))} · ${t.requests} ${formatNumber(tooltip.item.requests)}`}
+          />
+        </FloatingTooltip>
       )}
     </ExpandableChart>
   );
@@ -2972,10 +2738,8 @@ function GraphsPageContent() {
         </div>
       )}
       <div className="flex items-center gap-2">
-        <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-          {t.traffic}
-        </span>
-        <span className="flex-1 h-px bg-border" />
+        <span className="text-xs font-medium text-muted-foreground">{t.traffic}</span>
+        <span className="flex-1 h-px bg-border/30" />
       </div>
       <RpsTimeseriesChart
         data={rpsData}
@@ -2984,10 +2748,8 @@ function GraphsPageContent() {
         loading={rpsLoading}
       />
       <div className="flex items-center gap-2">
-        <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-          {t.hourlyActivity}
-        </span>
-        <span className="flex-1 h-px bg-border" />
+        <span className="text-xs font-medium text-muted-foreground">{t.hourlyActivity}</span>
+        <span className="flex-1 h-px bg-border/30" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <LazyDatasetCard<
@@ -3037,10 +2799,8 @@ function GraphsPageContent() {
       </div>
 
       <div className="flex items-center gap-2">
-        <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-          {t.weeklySessions}
-        </span>
-        <span className="flex-1 h-px bg-border" />
+        <span className="text-xs font-medium text-muted-foreground">{t.weeklySessions}</span>
+        <span className="flex-1 h-px bg-border/30" />
       </div>
       <div className="grid grid-cols-1 gap-4">
         <LazyDatasetCard<WeeklySessionRow[]>
@@ -3052,10 +2812,8 @@ function GraphsPageContent() {
       </div>
 
       <div className="flex items-center gap-2">
-        <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-          {t.wallClock}
-        </span>
-        <span className="flex-1 h-px bg-border" />
+        <span className="text-xs font-medium text-muted-foreground">{t.wallClock}</span>
+        <span className="flex-1 h-px bg-border/30" />
       </div>
       <div className="grid grid-cols-1 gap-4">
         <LazyDatasetCard<WallClockPayload>

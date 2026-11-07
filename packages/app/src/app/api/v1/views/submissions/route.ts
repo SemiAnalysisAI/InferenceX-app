@@ -7,9 +7,12 @@ import {
   getVendor,
   groupVolumeByWeek,
   selectVolumeRows,
+  SUBMISSION_VENDORS,
   submissionRowKey,
+  volumeVendors,
 } from '@/components/submissions/submissions-utils';
 import { cachedJson } from '@/lib/cache/api-cache';
+import type { Vendor } from '@/lib/charts/dynamic-colors';
 import type { SubmissionsResponse } from '@/lib/submissions/submissions-types';
 import { runViewsRoute } from '@/lib/views-api/errors';
 import {
@@ -44,9 +47,9 @@ export function GET(request: NextRequest) {
     const offset = parseNumberParam(s.get('offset'), 'offset', 0, { min: 0, integer: true });
     const mode = parseEnumParam(s.get('mode'), 'mode', ['weekly', 'cumulative'], 'weekly');
     const onChangeOnly = parseBoolParam(s.get('onChangeOnly'), 'onChangeOnly', true);
-    const lines = s.has('lines')
-      ? parseListParam(s.get('lines'), 'lines', ['nvidia', 'amd', 'total'])
-      : ['nvidia', 'amd', 'total'];
+    const requestedLines = s.has('lines')
+      ? parseListParam(s.get('lines'), 'lines', [...SUBMISSION_VENDORS, 'total'])
+      : null;
     const { summary, volume } = await readResponse<SubmissionsResponse>(
       await submissions(sourceRequest(request, '/api/v1/submissions')),
     );
@@ -73,10 +76,8 @@ export function GET(request: NextRequest) {
             : String(a[sort]).localeCompare(String(b[sort]))) * (direction === 'asc' ? 1 : -1),
       );
     const selectedVolume = selectVolumeRows(volume, mode, onChangeOnly);
-    const chart =
-      mode === 'weekly'
-        ? groupVolumeByWeek(selectedVolume).map((row) => ({ date: row.week, ...row }))
-        : computeCumulative(selectedVolume);
+    const chart = (mode === 'weekly' ? groupVolumeByWeek : computeCumulative)(selectedVolume);
+    const lines = requestedLines ?? [...volumeVendors(volume), 'total'];
     return cachedJson(request, {
       apiVersion: 'v1',
       view: 'submissions',
@@ -92,7 +93,7 @@ export function GET(request: NextRequest) {
         key,
         points: chart.map((row) => ({
           date: row.date,
-          value: key === 'amd' ? row.nonNvidia : row[key as 'nvidia' | 'total'],
+          value: key === 'total' ? row.total : (row.vendors[key as Vendor] ?? 0),
         })),
       })),
     });

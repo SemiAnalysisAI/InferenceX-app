@@ -35,8 +35,8 @@ describe('PowerXTutorialCta', () => {
 
   it('links to the locale tutorial and labels it as new', () => {
     for (const [locale, href] of [
-      ['en', '/powerx/tutorial'],
-      ['zh', '/zh/powerx/tutorial'],
+      ['en', '/pwx/tutorial'],
+      ['zh', '/zh/pwx/tutorial'],
     ] as const) {
       const { host, root } = mount(locale);
       const link = host.querySelector<HTMLAnchorElement>('[data-testid="powerx-tutorial-link"]');

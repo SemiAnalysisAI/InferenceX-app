@@ -1,27 +1,25 @@
 'use client';
 
 import { curveLinear } from 'd3';
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, type ReactNode } from 'react';
+import { FRAMEWORK_LABELS } from '@semianalysisai/inferencex-constants';
+import { Button } from '@/components/ui/button';
 import ChartLegend, { type CommonLegendItemProps } from '@/components/ui/chart-legend';
+import { ChartPointDetails } from '@/components/ui/chart-point-details';
+import { EmptyState } from '@/components/ui/empty-state';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import type { D3ChartHandle, LayerConfig, TooltipConfig } from '@/lib/d3-chart/D3Chart/types';
+import type { LayerConfig, TooltipConfig } from '@/lib/d3-chart/D3Chart/types';
+import { axisLabelUnit, chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
-import { escapeHtml } from '@/lib/shared/utils';
-import { FRAMEWORK_LABELS } from '@semianalysisai/inferencex-constants';
-import {
-  hoverCardHTML,
-  runLinkHTML,
-  shortAxisLabel,
-  tooltipLine,
-} from '@/components/inference/utils/tooltipUtils';
 import { zeroAnchoredDomain } from './chart-domain';
 import { hardwareLabel, hardwareSort } from './hardware';
 import type { ResultCell, ResultsState } from './results';
 import {
   RESULTS_X_METRIC_KEYS,
   RESULTS_X_METRICS,
+  RESULTS_Y_METRIC_KEYS,
   RESULTS_Y_METRICS,
   resultsChartSeries,
   resultsClip,
@@ -38,27 +36,33 @@ const STRINGS = {
     gpus: (count: number | null) => (count === null ? 'GPU count not recorded' : `${count} GPU`),
     noMatchedRun: 'no matched run',
     noMatchedRunHelp: 'No qualifying run for this workload on this hardware.',
-    optimal: 'Optimal Only',
+    optimal: 'Optimal only',
     optimalHelp:
       "On: each hardware's Pareto-optimal deployments only. Off: dominated deployments are shown faded.",
     labels: 'Deployment labels',
-    resetFilter: 'Reset filter',
     singleDeployment:
       'Each hardware has one measured deployment for this workload so far. Frontier curves appear once more GPU counts are measured.',
     noData:
       'No visible hardware has both selected metrics for this workload. Choose another axis metric or show more hardware.',
-    dismiss: 'Click elsewhere to dismiss',
+    controls: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
     unofficial: 'Unofficial run',
-    conc: (count: number) => `conc ${count}`,
+    conc: (count: number) => `Conc ${count}`,
     gpuSplit: 'GPUs (part. / alloc.)',
     deployment: 'Deployment',
     replicas: (count: number) => `${count} ${count === 1 ? 'replica' : 'replicas'}`,
+    replicasUnknown: 'replicas not recorded',
+    attention: (backend: string) => `${backend} attention`,
     concurrency: 'Concurrency',
     perVideo: 'Cost per video',
     energy: 'Energy per clip',
     power: 'Avg board power',
     valid: 'Valid clips',
+    completedFailed: 'Completed / failed',
+    meets: (seconds: string) => `Meets ${seconds} s deadline`,
+    videoSecondsPerHour: 'Video-seconds per hour',
+    powerLimit: 'Enforced power limit',
     runtime: 'Runtime',
+    runLink: 'GitHub Actions run',
     viewTelemetry: 'View telemetry',
   },
   zh: {
@@ -68,22 +72,28 @@ const STRINGS = {
     optimal: '仅最优',
     optimalHelp: '开启时只显示各硬件的 Pareto 最优部署；关闭时以淡色显示被支配的部署。',
     labels: '部署标签',
-    resetFilter: '重置筛选',
     singleDeployment:
       '目前该工作负载在每种硬件上只测得一种部署。测得更多 GPU 数量的部署后，将显示前沿曲线。',
     noData: '当前工作负载下，没有可见硬件同时具备所选的两项指标。请更换坐标轴指标或显示更多硬件。',
-    dismiss: '点击其他位置关闭',
+    controls: 'Shift+滚轮缩放 · 拖动平移 · 双击重置',
     unofficial: '非官方运行',
     conc: (count: number) => `并发 ${count}`,
     gpuSplit: 'GPU（参与 / 分配）',
     deployment: '部署',
     replicas: (count: number) => `${count} 个副本`,
+    replicasUnknown: '未记录副本数',
+    attention: (backend: string) => `${backend} 注意力`,
     concurrency: '并发数',
     perVideo: '每条视频成本',
     energy: '每条视频能耗',
     power: '板卡平均功率',
     valid: '有效视频',
+    completedFailed: '完成 / 失败',
+    meets: (seconds: string) => `${seconds} s 内完成`,
+    videoSecondsPerHour: '每小时视频秒数',
+    powerLimit: '强制功率上限',
     runtime: 'Runtime',
+    runLink: 'GitHub Actions 运行记录',
     viewTelemetry: '查看遥测',
   },
 };
@@ -104,25 +114,33 @@ export default function VideoResultsChart({
   colorFor,
   labels,
   onLabelsChange,
+  legendExpanded,
+  onLegendExpandedChange,
   onUpdate,
   onOpen,
+  heading,
+  footer,
 }: {
   /** Official and named-run deployment cells across every GPU count, hidden hardware included. */
   cells: ResultCell[];
-  /** Chip Config runs to compare over time; null plots the selected run's deployments. */
+  /** Chip config runs to compare over time; null plots the selected run's deployments. */
   history: ResultCell[] | null;
   roster: readonly string[];
   state: ResultsState;
   colorFor: (hardwareKey: string) => string;
   labels: boolean;
   onLabelsChange: (labels: boolean) => void;
+  legendExpanded: boolean;
+  onLegendExpandedChange: (expanded: boolean) => void;
   onUpdate: (patch: Partial<ResultsState>) => void;
   onOpen: (pointKey: string, source: 'popover') => void;
+  /** Chart title; it sits in the chart caption so image exports carry it. */
+  heading?: ReactNode;
+  /** Result context under the chart. */
+  footer?: ReactNode;
 }) {
   const locale = useLocale();
   const s = STRINGS[locale];
-  const chartRef = useRef<D3ChartHandle>(null);
-  const [legendExpanded, setLegendExpanded] = useState(true);
   const x = RESULTS_X_METRICS[state.xMetric],
     y = RESULTS_Y_METRICS[state.yMetric];
   const clip = useMemo(() => resultsClip(history ?? cells), [history, cells]);
@@ -217,67 +235,152 @@ export default function VideoResultsChart({
     [lines, lineColors, plotted, labels, s, history],
   );
   const tooltip = useMemo<TooltipConfig<PlotPoint>>(() => {
-    const line = (label: string, value: string) => tooltipLine(escapeHtml(label), value);
-    const colon = locale === 'zh' ? '：' : ':';
-    const stat = (label: string, value: string) =>
-      `<div><span>${escapeHtml(label)}${colon}</span> <strong>${escapeHtml(value)}</strong></div>`;
-    const metric = (label: string, value: string) =>
-      `<div><div class="pinned-metric-label">${escapeHtml(label)}</div><div class="pinned-metric-value">${value}</div></div>`;
     const otherX = RESULTS_X_METRICS[RESULTS_X_METRIC_KEYS.find((key) => key !== state.xMetric)!];
     const selection = { basis: state.costBasis, tier: state.costTier };
+    const describe = ({ cell, overlay, x: xValue, y: yValue }: PlotPoint) => {
+      const { point } = cell;
+      const engine = cell.metadata.engine;
+      const tp = point.server?.tp ?? null,
+        ulysses = point.server?.ulysses ?? null;
+      return {
+        title: hardwareLabel(point.hardwareKey ?? ''),
+        subtitle: engine ? (FRAMEWORK_LABELS[engine] ?? engine) : undefined,
+        date: point.observedAt?.slice(0, 10) ?? '—',
+        strategy: tp !== null && ulysses !== null ? `TP${tp} × Ulysses ${ulysses}` : null,
+        replicas: point.replicas === null ? null : s.replicas(point.replicas),
+        warning: overlay ? `✕ #${point.runId}` : undefined,
+        yValue: n(yValue, y.digits),
+        xValue: n(xValue, x.digits),
+      };
+    };
     return {
       rulerType: 'none',
       attachToLayer: 1,
-      content: ({ cell, overlay, color, x: xValue, y: yValue }, pinned) => {
+      content: (plot) => {
+        const { point } = plot.cell;
+        const d = describe(plot);
+        return chartHoverCard({
+          title: d.title,
+          subtitle: [d.subtitle, history ? d.date : null].filter(Boolean).join(' · ') || undefined,
+          color: plot.color,
+          warning: d.warning,
+          metrics: [
+            { value: d.yValue, label: axisLabelUnit(yLabel) },
+            { value: d.xValue, label: axisLabelUnit(xLabel) },
+          ],
+          summary: [
+            s.gpus(point.participating),
+            d.strategy,
+            d.replicas,
+            point.concurrency === null ? null : s.conc(point.concurrency),
+          ]
+            .filter(Boolean)
+            .join(' · '),
+        });
+      },
+      details: (plot, _isOverlay, close) => {
+        const { cell } = plot;
         const { point } = cell;
-        const engine = cell.metadata.engine;
-        const title = `${hardwareLabel(point.hardwareKey ?? '')}${engine ? ` (${FRAMEWORK_LABELS[engine] ?? engine})` : ''}`;
-        const date = point.observedAt?.slice(0, 10) ?? '—';
-        const tp = point.server?.tp ?? null,
-          ulysses = point.server?.ulysses ?? null;
-        const strategy = tp !== null && ulysses !== null ? `TP${tp} × Ulysses ${ulysses}` : null;
-        const replicas = point.replicas === null ? null : s.replicas(point.replicas);
-        const unofficial = overlay
-          ? `<div style="color: #dc2626; font-size: 11px; font-weight: 600; margin: 6px 0;">${escapeHtml(`${s.unofficial} #${point.runId}`)}</div>`
-          : '';
-        if (!pinned)
-          return hoverCardHTML({
-            color,
-            title,
-            aside: [
-              history ? date : null,
-              point.concurrency === null ? null : s.conc(point.concurrency),
-            ]
-              .filter(Boolean)
-              .join(' · '),
-            values: [
-              { value: n(yValue, y.digits), label: shortAxisLabel(yLabel) },
-              { value: n(xValue, x.digits), label: `${state.xMetric.toUpperCase()} ${x.unit}` },
-            ],
-            detail: [s.gpus(point.participating), strategy, replicas].filter(Boolean).join(' · '),
-            extraHTML: unofficial,
-            locale,
-          });
+        const d = describe(plot);
         const cost = cell.cost[state.costBasis];
         const other = otherX.value(cell, selection);
-        return `<div class="inferencex-pinned-tooltip">
-          ${unofficial}
-          <div class="pinned-title"><span aria-hidden="true" style="width: 9px; height: 9px; flex: 0 0 auto; border-radius: 50%; background: ${color};"></span>${escapeHtml(title)}</div>
-          <div class="pinned-date">${escapeHtml(date)}</div>
-          <div class="pinned-metrics">${metric(yLabel, n(yValue, y.digits))}${metric(xLabel, n(xValue, x.digits))}</div>
-          <div data-pinned-config>${stat(s.concurrency, point.concurrency === null ? '—' : String(point.concurrency))}${stat(s.gpuSplit, `${n(point.participating, 0)} / ${n(point.allocated, 0)}`)}${stat(s.valid, `${n(point.valid, 0)} / ${n(point.scheduled, 0)}`)}</div>
-          ${strategy ? `<div class="pinned-section"><div class="pinned-config-summary"><span>${s.deployment}</span><strong>${escapeHtml([strategy, replicas].filter(Boolean).join(' · '))}</strong></div></div>` : ''}
-          <div class="pinned-section">
-            ${line(resultsMetricLabel(otherX, locale, clip), n(other, otherX.digits))}
-            ${line(s.perVideo, cost ? `$${n(cost.perVideo, 4)}` : '—')}
-            ${line(s.energy, cell.joulesPerClip === null ? '—' : `${n(cell.joulesPerClip / 1000, 1)} kJ`)}
-            ${line(s.power, point.avgPowerW === null ? '—' : `${n(point.avgPowerW, 0)} W`)}
-            ${point.runtime ? line(s.runtime, `<span class="font-mono">${escapeHtml(point.runtime.slice(0, 12))}</span>`) : ''}
-            ${runLinkHTML(`https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${encodeURIComponent(point.runId)}`, locale, point.hardwareKey ?? '')}
-            <div class="pinned-actions"><div style="display: grid; gap: 6px; margin-top: 8px;"><button type="button" data-action="view-telemetry" class="w-full rounded-md border border-border bg-accent px-2 py-1 text-xs font-medium text-accent-foreground cursor-pointer">${s.viewTelemetry} &rarr;</button></div></div>
-          </div>
-          <div class="pinned-dismiss">${s.dismiss}</div>
-        </div>`;
+        return (
+          <ChartPointDetails
+            title={d.title}
+            subtitle={d.subtitle}
+            color={plot.color}
+            date={d.date}
+            warning={d.warning}
+            metrics={[
+              { value: d.yValue, label: yLabel },
+              { value: d.xValue, label: xLabel },
+            ]}
+            rows={[
+              {
+                label: s.concurrency,
+                value: point.concurrency === null ? '—' : String(point.concurrency),
+              },
+              {
+                label: s.gpuSplit,
+                value: `${n(point.participating, 0)} / ${n(point.allocated, 0)}`,
+              },
+              { label: s.valid, value: `${n(point.valid, 0)} / ${n(point.scheduled, 0)}` },
+              {
+                label: s.completedFailed,
+                value: `${n(point.completed, 0)} / ${n(point.failed, 0)}`,
+              },
+              {
+                label: s.deployment,
+                value: [
+                  `TP${point.server?.tp ?? '?'} × Ulysses ${point.server?.ulysses ?? '?'}`,
+                  d.replicas ?? s.replicasUnknown,
+                  s.attention(point.server?.attention ?? '?'),
+                ].join(' · '),
+                wide: true,
+              },
+              {
+                label: resultsMetricLabel(otherX, locale, clip),
+                value: n(other, otherX.digits),
+              },
+              {
+                label: s.meets(n(state.deadlineSeconds)),
+                value:
+                  cell.deadlineAttainment === null
+                    ? '—'
+                    : `${n(cell.deadlineAttainment * 100, 0)}%`,
+              },
+              { label: s.videoSecondsPerHour, value: n(point.videoSecondsPerHour, 0) },
+              ...RESULTS_Y_METRIC_KEYS.filter(
+                (key) => key !== state.yMetric && key !== 'kjPerClip',
+              ).map((key) => ({
+                label: resultsMetricLabel(RESULTS_Y_METRICS[key], locale),
+                value: n(
+                  RESULTS_Y_METRICS[key].value(cell, selection),
+                  RESULTS_Y_METRICS[key].digits,
+                ),
+              })),
+              { label: s.perVideo, value: cost ? `$${n(cost.perVideo, 4)}` : '—' },
+              {
+                label: s.energy,
+                value: cell.joulesPerClip === null ? '—' : `${n(cell.joulesPerClip / 1000, 1)} kJ`,
+              },
+              {
+                label: s.power,
+                value: point.avgPowerW === null ? '—' : `${n(point.avgPowerW, 0)} W`,
+              },
+              {
+                label: s.powerLimit,
+                value: point.enforcedLimitW === null ? '—' : `${n(point.enforcedLimitW, 0)} W`,
+              },
+              ...(point.runtime ? [{ label: s.runtime, value: point.runtime, wide: true }] : []),
+            ]}
+            links={[
+              {
+                action: 'run',
+                label: s.runLink,
+                href: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${encodeURIComponent(point.runId)}`,
+                external: true,
+              },
+            ]}
+            onClose={close}
+            onAction={(_action, event) => event.stopPropagation()}
+          >
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              data-action="view-telemetry"
+              className="mt-3 w-full"
+              onClick={(event) => {
+                event.stopPropagation();
+                close();
+                onOpen(plot.key, 'popover');
+              }}
+            >
+              {s.viewTelemetry} →
+            </Button>
+          </ChartPointDetails>
+        );
       },
       onPointClick: (point) => {
         track('video_results_point_pinned', {
@@ -285,14 +388,6 @@ export default function VideoResultsChart({
           overlay: point.overlay,
           optimal: point.optimal,
         });
-        chartRef.current
-          ?.getTooltipElement()
-          ?.querySelector('[data-action="view-telemetry"]')
-          ?.addEventListener('click', (event) => {
-            event.stopPropagation();
-            chartRef.current?.dismissTooltip(true);
-            onOpen(point.key, 'popover');
-          });
       },
     };
   }, [locale, s, state, x, y, xLabel, yLabel, clip, history, onOpen]);
@@ -315,6 +410,7 @@ export default function VideoResultsChart({
             hw: key,
             label: hardwareLabel(key),
             color: colorFor(key),
+            lineDasharray: 'none',
             isActive: !hidden.has(key),
             onClick: toggle,
           }
@@ -323,6 +419,7 @@ export default function VideoResultsChart({
             hw: key,
             label: `${hardwareLabel(key)} · ${s.noMatchedRun}`,
             color: 'var(--muted-foreground)',
+            lineDasharray: 'none',
             isActive: false,
             blockedReason: s.noMatchedRunHelp,
             onClick: () => {},
@@ -332,12 +429,13 @@ export default function VideoResultsChart({
 
   return (
     <D3Chart<PlotPoint>
-      ref={chartRef}
       chartId={VIDEO_RESULTS_CHART_ID}
       testId="video-results-chart"
       data={plotted}
       height={440}
-      margin={{ top: 24, right: 28, bottom: 64, left: 80 }}
+      // The x title centres on the plot, so a wide left margin pushes the zh title past the
+      // right edge at 320 px in DM Sans.
+      margin={{ top: 24, right: 28, bottom: 64, left: 72 }}
       watermark="logo"
       transitionDuration={0}
       xScale={{
@@ -366,48 +464,48 @@ export default function VideoResultsChart({
         scaleExtent: [1, 20],
         resetEventName: `video_results_zoom_reset_${VIDEO_RESULTS_CHART_ID}`,
       }}
+      instructions={s.controls}
       noDataOverlay={
         plotted.length === 0 ? (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <p className="text-sm text-muted-foreground" role="status">
-              {s.noData}
-            </p>
-          </div>
+          <EmptyState bare role="status" className="pointer-events-none absolute inset-0 p-8">
+            {s.noData}
+          </EmptyState>
         ) : undefined
       }
+      caption={heading}
       footer={
-        single ? (
-          <p
-            className="mt-2 rounded-md border bg-muted/20 px-3 py-2 text-xs text-muted-foreground"
-            data-testid="video-results-single-note"
-          >
-            {s.singleDeployment}
-          </p>
+        single || footer ? (
+          <>
+            {single && (
+              <p
+                className="mb-3 text-xs text-muted-foreground"
+                data-testid="video-results-single-note"
+              >
+                {s.singleDeployment}
+              </p>
+            )}
+            {footer}
+          </>
         ) : undefined
       }
       legendElement={
         <ChartLegend
           variant="sidebar"
           legendItems={legendItems}
+          onItemRemove={toggle}
           isLegendExpanded={legendExpanded}
           onExpandedChange={(expanded) => {
-            setLegendExpanded(expanded);
+            onLegendExpandedChange(expanded);
             track('video_results_legend_expanded', { enabled: expanded });
           }}
-          actions={
-            state.hidden.length > 0
-              ? [
-                  {
-                    id: 'video-results-legend-reset',
-                    label: s.resetFilter,
-                    onClick: () => {
-                      onUpdate({ hidden: [] });
-                      track('video_results_legend_reset');
-                    },
-                  },
-                ]
-              : undefined
-          }
+          reset={{
+            id: 'video-results-legend-reset',
+            disabled: state.hidden.length === 0,
+            onClick: () => {
+              onUpdate({ hidden: [] });
+              track('video_results_legend_reset');
+            },
+          }}
           switches={[
             {
               id: 'video-results-optimal',
@@ -430,17 +528,15 @@ export default function VideoResultsChart({
             },
           ]}
           keyIndicators={
-            <div className="mt-3 flex min-w-0 flex-col gap-3">
-              {state.unofficialRun && (
-                <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span
-                    className="inline-block size-3 shrink-0 rounded-full"
-                    style={{ background: overlayRunColor(0) }}
-                  />
-                  {s.unofficial} #{state.unofficialRun}
-                </p>
-              )}
-            </div>
+            state.unofficialRun ? (
+              <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                <span
+                  className="inline-block size-3 shrink-0 rounded-full"
+                  style={{ background: overlayRunColor(0) }}
+                />
+                {s.unofficial} #{state.unofficialRun}
+              </p>
+            ) : undefined
           }
         />
       }

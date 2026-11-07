@@ -1,7 +1,12 @@
+import { ArrowRight } from 'lucide-react';
+
+import { buttonVariants } from '@/components/ui/button';
 import { getTelemetryGuide } from '@/lib/agentx/agentx-telemetry-zh';
 import type { Locale } from '@/lib/i18n/i18n';
+import { cn } from '@/lib/shared/utils';
 
 import { AgentXTelemetryLink } from './agentx-telemetry-link';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 const STRINGS = {
   en: {
@@ -20,28 +25,23 @@ export function AgentXTelemetryCallout({ locale }: { locale: Locale }) {
   const prefix = locale === 'zh' ? '/zh' : '';
 
   return (
-    <section
-      aria-labelledby="agentx-telemetry-title"
-      data-testid="agentx-telemetry-callout"
-      className="rounded-lg border border-border bg-muted/20"
-    >
-      <div className="px-4 py-4 sm:px-5 sm:py-5">
-        <p className="mb-2 font-mono text-2xs font-medium tracking-eyebrow text-brand uppercase">
-          {guide.eyebrow}
-        </p>
+    <section aria-labelledby="agentx-telemetry-title" data-testid="agentx-telemetry-callout">
+      <div>
+        <p className="mb-2 text-xs font-medium text-muted-foreground">{guide.eyebrow}</p>
         <h2 id="agentx-telemetry-title" className="text-lg font-semibold text-foreground">
           {guide.title}
         </h2>
         <p className="mt-3 max-w-4xl text-sm leading-6 text-muted-foreground">{t.blurb}</p>
 
         <AgentXTelemetryLink
-          href={`${prefix}/agentx/telemetry`}
+          href={`${prefix}${AGENTX_ROUTE.path}/telemetry`}
           analyticsEvent="agentx_telemetry_opened"
           analyticsTarget="agentx-callout"
           data-testid="agentx-telemetry-cta"
-          className="mt-4 inline-flex min-h-11 items-center rounded-md border border-primary/40 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
+          className={cn(buttonVariants({ variant: 'outline' }), 'mt-4')}
         >
-          {guide.ui.readMore} →
+          {guide.ui.readMore}
+          <ArrowRight aria-hidden="true" />
         </AgentXTelemetryLink>
       </div>
     </section>

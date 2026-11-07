@@ -8,52 +8,61 @@ const dismissModal = {
   },
 };
 
-describe('ubenchX hub and test routes', () => {
-  it('opens /ubenchx on the mem-bw view with the Beta title and test selector', () => {
-    cy.visit('/ubenchx', dismissModal);
-    cy.url().should('include', '/ubenchx/mem-bw');
-    cy.contains('h1', 'ubenchX Microbenchmarks (Beta)').should('be.visible');
-    cy.get('[data-testid="nav-link-ubenchx"]').should('have.attr', 'href', '/ubenchx/mem-bw');
-    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'HBM Bandwidth');
-    cy.contains('h2', 'HBM Bandwidth').should('be.visible');
+describe('uBenchX hub and test routes', () => {
+  it('opens /ubx on the mem-bw view with the Beta title badge and test selector', () => {
+    cy.visit('/ubx', dismissModal);
+    cy.url().should('include', '/ubx/mem-bw');
+    cy.contains('h1', 'uBenchX microbenchmarks').should('be.visible');
+    cy.get('h1 [data-slot="badge"]').should('have.text', 'Beta');
+    cy.get('[data-testid="nav-link-ubenchx"]').should('have.attr', 'href', '/ubx/mem-bw');
+    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'HBM bandwidth');
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
     cy.contains('H100 SXM').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').should('contain', 'MBU');
-    cy.contains('h2', 'Memory Bandwidth Utilization').should('be.visible');
+    cy.contains('h2', 'Memory bandwidth utilization').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').click();
     cy.contains('[role="option"]', 'Bandwidth (TB/s)').click();
-    cy.contains('h2', 'Bandwidth vs Message Size').should('be.visible');
+    cy.contains('h2', 'Bandwidth vs message size').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').should('contain', 'TB/s');
   });
 
+  it('moves old /ubenchx links to /ubx with the query intact', () => {
+    cy.visit('/ubenchx/mem-bw?x=1', dismissModal);
+    cy.location().should((location) => {
+      expect(location.pathname).to.eq('/ubx/mem-bw');
+      expect(location.search).to.eq('?x=1');
+    });
+    cy.get('[data-testid="nav-link-ubenchx"]').should('have.attr', 'aria-current', 'page');
+  });
+
   it('switches to the combined core profiles with the test selector', () => {
-    cy.visit('/ubenchx/mem-bw', dismissModal);
-    cy.contains('ubenchX').should('be.visible');
+    cy.visit('/ubx/mem-bw', dismissModal);
+    cy.contains('uBenchX').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').should('be.visible');
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
     cy.get('link[rel="alternate"][hreflang="zh-CN"]')
       .invoke('attr', 'href')
-      .should('include', '/zh/ubenchx/mem-bw');
+      .should('include', '/zh/ubx/mem-bw');
 
     cy.get('[data-testid="ubenchx-test-select"]').click();
     cy.contains('[role="option"]', 'Core memory-access profiles').click();
-    cy.url().should('include', '/ubenchx/core-memory-profiles');
+    cy.url().should('include', '/ubx/core-memory-profiles');
     cy.get('[data-testid="sm-l2-heatmap"]').should('be.visible');
     cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'Core memory-access profiles');
   });
 
   it('switches to the TPC Skyline table with the test selector', () => {
-    cy.visit('/ubenchx/mem-bw', dismissModal);
+    cy.visit('/ubx/mem-bw', dismissModal);
     cy.get('[data-testid="ubenchx-test-select"]').click();
     cy.contains('[role="option"]', 'TPC Skyline').click();
-    cy.url().should('include', '/ubenchx/tpc-skyline');
-    cy.contains('h2', 'TPC Skyline').should('be.visible');
+    cy.url().should('include', '/ubx/tpc-skyline');
+    cy.contains('h2', 'NVIDIA measured TPC groupings').should('be.visible');
     cy.get('[data-testid="tpc-skyline-table"] th').then(($th) => {
       expect([...$th].map((th) => th.textContent)).to.deep.equal([
         'Product',
         'Measured # of GPCs',
         'Measured # of SMs',
-        'Measured TPC Groupings',
+        'Measured TPC groupings',
       ]);
     });
     cy.get('[data-testid="tpc-skyline-table"] tbody tr').should(
@@ -75,21 +84,23 @@ describe('ubenchX hub and test routes', () => {
   });
 
   it('keeps a pinned sm-l2-distance tooltip on its cell while the pointer moves', () => {
-    cy.visit('/ubenchx/sm-l2-distance', dismissModal);
+    cy.visit('/ubx/sm-l2-distance', dismissModal);
     cy.get('[data-testid="sm-l2-heatmap"]').should('be.visible');
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
     cy.get('link[rel="alternate"][hreflang="zh-CN"]')
       .invoke('attr', 'href')
-      .should('include', '/zh/ubenchx/core-memory-profiles');
+      .should('include', '/zh/ubx/core-memory-profiles');
 
     cy.get('[data-testid="sm-l2-heatmap"] svg rect').last().as('overlay');
     cy.get('@overlay').click(520, 120, { force: true });
     cy.get('[data-testid="sm-l2-tooltip"]')
-      .should('be.visible')
+      .should('have.css', 'display', 'block')
       .invoke('text')
       .then((pinned) => {
         cy.get('@overlay').trigger('mousemove', 60, 60, { force: true });
-        cy.get('[data-testid="sm-l2-tooltip"]').should('be.visible').and('have.text', pinned);
+        cy.get('[data-testid="sm-l2-tooltip"]')
+          .should('have.css', 'display', 'block')
+          .and('have.text', pinned);
       });
   });
 });
@@ -113,7 +124,7 @@ function assertProfileOrder() {
 
 describe('Ascend core memory-access profiles', () => {
   it('shows Huawei before B200 by default and after restoring all hardware at /', () => {
-    cy.visit('/ubenchx/core-memory-profiles', dismiss);
+    cy.visit('/ubx/core-memory-profiles', dismiss);
     cy.get('[data-testid="core-profile-hardware"]').should('contain.text', 'All hardware');
     assertProfileOrder();
     cy.get('[data-testid="core-profile-hardware"]').click();
@@ -134,10 +145,10 @@ describe('Ascend core memory-access profiles', () => {
   });
 
   it('navigates to all four profiles and inspects actual core IDs by keyboard', () => {
-    cy.visit('/ubenchx/mem-bw', dismiss);
+    cy.visit('/ubx/mem-bw', dismiss);
     cy.get('[data-testid="ubenchx-test-select"]').click();
     cy.contains('[role="option"]', 'Core memory-access profiles').click();
-    cy.url().should('include', '/ubenchx/core-memory-profiles');
+    cy.url().should('include', '/ubx/core-memory-profiles');
     cy.contains('SYS_CNT ticks are not clock64 cycles').should('be.visible');
     cy.get('[data-testid="profile-scalar_128MiB_cube_isolated"] svg')
       .focus()
@@ -151,7 +162,7 @@ describe('Ascend core memory-access profiles', () => {
 });
 
 it('omits idle selection controls from all core-profile panels on /', () => {
-  cy.visit('/ubenchx/core-memory-profiles', dismiss);
+  cy.visit('/ubx/core-memory-profiles', dismiss);
   cy.get('[data-testid="ascend-core-profiles"] output')
     .should('have.length', 4)
     .each(($output) => {
@@ -162,7 +173,7 @@ it('omits idle selection controls from all core-profile panels on /', () => {
 });
 
 it('unpins core-profile cells by repeated click or Enter and clears them outside or with Escape', () => {
-  cy.visit('/ubenchx/core-memory-profiles', dismiss);
+  cy.visit('/ubx/core-memory-profiles', dismiss);
   const panel = '[data-testid="profile-scalar_128MiB_cube_isolated"]';
   const value = '[data-testid="profile-scalar_128MiB_cube_isolated-value"]';
   cy.get(`${panel} svg rect`).eq(1).click();
@@ -178,7 +189,7 @@ it('unpins core-profile cells by repeated click or Enter and clears them outside
   cy.get(`${panel} svg`).trigger('keydown', { key: 'Enter' });
   cy.get(value).should('be.empty').and('not.be.visible');
   cy.get(`${panel} svg rect`).eq(1).click();
-  cy.contains('h2', 'Core memory-access profiles').click();
+  cy.contains('h1', 'uBenchX microbenchmarks').click();
   cy.get(value).should('be.empty').and('not.be.visible');
   cy.get(`${panel} svg rect`).eq(1).click();
   cy.get(`${panel} svg`).trigger('keydown', { key: 'Escape' });
@@ -186,7 +197,7 @@ it('unpins core-profile cells by repeated click or Enter and clears them outside
 });
 
 it('filters both devices on one page and preserves their API values and units', () => {
-  cy.visit('/ubenchx/core-memory-profiles', dismiss);
+  cy.visit('/ubx/core-memory-profiles', dismiss);
   cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
   cy.get('[data-testid="ascend-core-profiles"]').should('exist');
   cy.get('[data-testid="core-profile-hardware"]').should('contain', 'All hardware').click();
@@ -212,8 +223,8 @@ it('filters both devices on one page and preserves their API values and units', 
   cy.contains('[role="option"]', 'All hardware').click();
   cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
   cy.get('[data-testid="ascend-core-profiles"]').should('exist');
-  cy.visit('/zh/ubenchx/sm-l2-distance', dismiss);
-  cy.location('pathname').should('equal', '/zh/ubenchx/core-memory-profiles');
+  cy.visit('/zh/ubx/sm-l2-distance', dismiss);
+  cy.location('pathname').should('equal', '/zh/ubx/core-memory-profiles');
   cy.viewport(390, 844);
   cy.get('[data-testid="core-profile-hardware"]').should('contain', '全部硬件');
   cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
@@ -222,7 +233,7 @@ it('filters both devices on one page and preserves their API values and units', 
 
 describe('Huawei copy-bandwidth evidence', () => {
   it('renders Huawei 950PR and qualifies the graph timing in English and Chinese', () => {
-    cy.visit('/ubenchx/mem-bw', dismiss);
+    cy.visit('/ubx/mem-bw', dismiss);
     cy.contains('Huawei 950PR').should('be.visible');
     cy.contains('910B3').should('not.exist');
     cy.get('circle.point')
@@ -233,8 +244,8 @@ describe('Huawei copy-bandwidth evidence', () => {
       .should('have.length', 9);
     cy.get('[data-testid="ubenchx-metric-select"]').click();
     cy.contains('[role="option"]', 'Bandwidth (TB/s)').click();
-    cy.contains('h2', 'Bandwidth vs Message Size').should('be.visible');
-    cy.visit('/zh/ubenchx/mem-bw', dismiss);
+    cy.contains('h2', 'Bandwidth vs message size').should('be.visible');
+    cy.visit('/zh/ubx/mem-bw', dismiss);
     cy.contains('Huawei 950PR').should('be.visible');
     cy.contains('910B3').should('not.exist');
   });
@@ -265,7 +276,7 @@ function assertBandwidthRuler(chart: string) {
 }
 
 it('keeps bandwidth hover guides on the rendered point in every metric and after zoom', () => {
-  cy.visit('/ubenchx/mem-bw', dismiss);
+  cy.visit('/ubx/mem-bw', dismiss);
   assertBandwidthRuler('#ubenchx-mbu');
   for (const [label, chart] of [
     ['Bandwidth (TB/s)', '#ubenchx-bandwidth'],
@@ -279,7 +290,7 @@ it('keeps bandwidth hover guides on the rendered point in every metric and after
     .first()
     .then(($point) => {
       const previousX = $point.attr('cx');
-      cy.get('#ubenchx-latency svg').then(($svg) => {
+      cy.get('#ubenchx-latency [data-testid="d3-chart-svg"]').then(($svg) => {
         const rect = $svg[0].getBoundingClientRect();
         cy.wrap($svg).trigger('wheel', {
           eventConstructor: 'WheelEvent',
@@ -301,7 +312,7 @@ it('keeps bandwidth hover guides on the rendered point in every metric and after
 
 describe('Huawei SKU configurations alongside measured TPC groups', () => {
   it('preserves source values and matches the read-only API', () => {
-    cy.visit('/ubenchx/tpc-skyline', dismissModal);
+    cy.visit('/ubx/tpc-skyline', dismissModal);
     cy.get('[data-testid="huawei-sku-table"] tbody tr').should('have.length', 9);
     cy.request('/api/v1/views/ubenchx?test=tpc-skyline').then(({ body }) => {
       for (const row of body.skuConfigurations) {
@@ -328,16 +339,16 @@ describe('Huawei SKU configurations alongside measured TPC groups', () => {
       'not measured TPC or GPC',
     );
     cy.contains('a', 'View measured PR_9579 core profiles').click();
-    cy.url().should('include', '/ubenchx/core-memory-profiles');
+    cy.url().should('include', '/ubx/core-memory-profiles');
     cy.get('[data-testid="ascend-core-profiles"]').should('be.visible');
   });
 
   it('keeps Chinese mobile configuration columns accessible by scrolling', () => {
     cy.viewport(390, 844);
-    cy.visit('/zh/ubenchx/tpc-skyline', dismissModal);
+    cy.visit('/zh/ubx/tpc-skyline', dismissModal);
     cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'TPC Skyline 与 SKU 配置');
     cy.get('[data-testid="huawei-sku-configurations"]').scrollIntoView();
-    cy.contains('h3', 'Huawei 950PR SKU 配置').should('be.visible');
+    cy.contains('h2', 'Huawei 950PR SKU 配置').should('be.visible');
     cy.get('[data-sku="PR_957c"]').should('contain', '84').and('contain', '112');
     cy.get('[data-testid="huawei-sku-configurations"] [role="region"]').as('tableRegion');
     cy.get('@tableRegion').then(($region) => {
@@ -349,7 +360,7 @@ describe('Huawei SKU configurations alongside measured TPC groups', () => {
     cy.contains('a', '查看 PR_9579 实测核心访存特征').should(
       'have.attr',
       'href',
-      '/zh/ubenchx/core-memory-profiles',
+      '/zh/ubx/core-memory-profiles',
     );
     cy.viewport(1280, 720);
   });

@@ -13,7 +13,6 @@ const STRINGS = {
 export function useChartExport({
   chartId,
   setIsLegendExpanded,
-  hideLegend = false,
   exportFileName,
 }: ChartImageExportOptions) {
   const locale = useLocale();
@@ -26,7 +25,7 @@ export function useChartExport({
       try {
         const { exportChartImage } = await import('@/lib/export/chart-image-export');
         await exportChartImage(
-          { chartId, setIsLegendExpanded, hideLegend, exportFileName },
+          { chartId, setIsLegendExpanded, exportFileName },
           ratio,
           t.exportFailed,
         );
@@ -37,7 +36,7 @@ export function useChartExport({
         setIsExporting(false);
       }
     },
-    [chartId, setIsLegendExpanded, hideLegend, exportFileName, t],
+    [chartId, setIsLegendExpanded, exportFileName, t],
   );
 
   return { isExporting, exportToImage };

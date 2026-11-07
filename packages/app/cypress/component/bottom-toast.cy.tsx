@@ -9,7 +9,7 @@ function mountToast() {
       <BottomToast
         icon={<Star />}
         title="Finding us useful?"
-        description="Help the project grow so we can add more benchmarks! Star us on GitHub."
+        description="Help the project grow so we can add more benchmarks. Star us on GitHub."
         action={{ label: 'Star on GitHub', onClick: cy.stub().as('starAction') }}
         testId="star-toast"
       />

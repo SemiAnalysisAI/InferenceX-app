@@ -1,7 +1,7 @@
 import { snapTo } from './widget-hash';
 
 /**
- * Pure generator behind the run-config widget on /powerx/tutorial. The YAML mirrors the matrix
+ * Pure generator behind the run-config widget on /pwx/tutorial. The YAML mirrors the matrix
  * entries in InferenceX at `INFERENCEX_CONFIG_REVISION`; readers see the config, not the
  * launcher code behind it.
  */

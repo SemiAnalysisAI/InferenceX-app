@@ -98,7 +98,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     logo: 'deepseek-color.svg',
   },
   [Model.Kimi_K3_1_Pro]: {
-    label: 'Kimi K3.1 Pro',
+    label: 'Kimi K3.1 Pro 2.8T',
     prefix: 'kimik3.1',
     category: 'default',
     openRouterModelId: 'moonshotai/kimi-k3.1-pro',

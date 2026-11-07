@@ -38,9 +38,9 @@ describe('parseFeedbackBody', () => {
   });
 
   it('passes pagePath through when valid', () => {
-    expect(expectOk(parseFeedbackBody({ doingWell: 'x', pagePath: '/inference' })).pagePath).toBe(
-      '/inference',
-    );
+    expect(
+      expectOk(parseFeedbackBody({ doingWell: 'x', pagePath: '/infx/inference' })).pagePath,
+    ).toBe('/infx/inference');
   });
 
   it('rejects pagePath that does not start with /', () => {
@@ -57,7 +57,7 @@ describe('parseFeedbackBody', () => {
 
   it('rejects pagePath with control chars (CRLF)', () => {
     expect(
-      expectOk(parseFeedbackBody({ doingWell: 'x', pagePath: '/inference\r\nX-Inject: 1' }))
+      expectOk(parseFeedbackBody({ doingWell: 'x', pagePath: '/infx/inference\r\nX-Inject: 1' }))
         .pagePath,
     ).toBeNull();
   });

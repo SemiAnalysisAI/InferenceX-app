@@ -10,7 +10,7 @@ import { track } from '@/lib/analytics/analytics';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-import { CHART_SIZES, ChartEmpty, ChartSkeleton } from './chart-shared';
+import { ChartEmpty, ChartSkeleton } from './chart-shared';
 import { ExpandableChart } from './expandable-chart';
 import { metricSourceLabel } from './metric-source-toolbar';
 import type { PhaseSlicedSeries, ServerSeriesLike } from './phase-slice';
@@ -146,8 +146,7 @@ export function KvCacheUtilizationCard({ sliced }: { sliced: SlicedServerSeries 
   return (
     <ExpandableChart
       title={t.kvTitle}
-      render={(expanded) => {
-        const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
+      render={(size) => {
         if (!sliced) return <ChartSkeleton />;
         const serverSeries = sliced.series;
         const hasHost = serverSeries.hostKvCacheUsage.length > 0;
@@ -240,8 +239,7 @@ export function RequestActivityCard({
           buttonClassName="px-2 py-1 text-xs"
         />
       }
-      render={(expanded) => {
-        const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
+      render={(size) => {
         if (view === 'completed') {
           if (!phaseTimeline) {
             if (timelineLoading) return <ChartSkeleton />;
@@ -333,8 +331,7 @@ export function PrefixCacheHitRateCard({ sliced }: { sliced: SlicedServerSeries 
   return (
     <ExpandableChart
       title={t.prefixTitle}
-      render={(expanded) => {
-        const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
+      render={(size) => {
         if (!sliced) return <ChartSkeleton />;
         return (
           <TimeSeriesChart
@@ -381,6 +378,7 @@ export function ThroughputCard({
       controls={
         <MultiSelect
           triggerTestId="throughput-series-select"
+          size="sm"
           ariaLabel={t.throughputSeriesAria}
           options={[
             {
@@ -417,8 +415,7 @@ export function ThroughputCard({
           searchable={false}
         />
       }
-      render={(expanded) => {
-        const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
+      render={(size) => {
         if (!sliced) return <ChartSkeleton />;
         const serverSeries = sliced.series;
         return (
@@ -446,8 +443,7 @@ export function PromptTokenSourceCard({ sliced }: { sliced: SlicedServerSeries }
   return (
     <ExpandableChart
       title={t.promptTitle}
-      render={(expanded) => {
-        const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
+      render={(size) => {
         if (!sliced) return <ChartSkeleton />;
         return (
           <StackedAreaChart
@@ -466,8 +462,7 @@ export function CumulativeUniqueInputTokensCard({ sliced }: { sliced: SlicedServ
   return (
     <ExpandableChart
       title={t.uniqueTitle}
-      render={(expanded) => {
-        const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
+      render={(size) => {
         if (!sliced) return <ChartSkeleton />;
         const serverSeries = sliced.series;
         const uniqueFromBreakdown = cumulativeUniqueInputTokens(serverSeries.promptTokensBySource);
@@ -521,8 +516,7 @@ export function InflightUniqueTokensCard({
     <ExpandableChart
       title={t.inflightTitle}
       testId="unique-input-inflight-chart"
-      render={(expanded) => {
-        const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
+      render={(size) => {
         if (!phaseTimeline) {
           return timelineLoading ? <ChartSkeleton /> : <ChartEmpty />;
         }

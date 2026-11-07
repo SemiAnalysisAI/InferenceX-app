@@ -19,6 +19,36 @@ breakpoint, the legend stays below the chart with its existing 12px gap.
 Official and unofficial series share this layout. This is presentation-only;
 API responses, filters, and `inferencex-skills` contracts are unchanged.
 
+## Sidebar legend
+
+Every chart sidebar uses `ChartLegend` with `variant="sidebar"` and the same
+configuration as `/infx/historical`. Line charts pass each series' stroke dash as
+`lineDasharray` (`'none'` for solid lines), so the swatch is a line even when
+the chart also draws markers. Toggleable items get `onClick`, `onItemRemove`
+and a `reset` whose button is disabled while nothing is hidden. Hidden items
+sort to the bottom. Swatches stay dots only where a series has no line: bar
+charts, scatter points without a connecting line (the normalized OperatorX
+roofline) and static category keys. Grouped GPU legends (`GPUGraph`, PowerX
+run comparison) keep their row order with `disableActiveSort`, and embedded
+charts with minimal chrome pass `readOnly`.
+
+Line swatches are behind `SERIES_LINE_PATTERNS` in
+`lib/charts/framework-dash.ts`, which is currently `false`. While it is off,
+`ChartLegendItem` ignores `lineDasharray` and every legend shows dot swatches.
+Only the swatch shape changes, so reset, toggling, hover ✕, hidden sorting and
+collapse behave the same.
+
+## Framework line patterns
+
+`frameworkDasharray(hwKey)` gives each serving framework its own dash pattern
+(vLLM solid, SGLang dashed, TRT-LLM dotted, Dynamo long-dash variants) on the
+inference scatter, chip comparison and historical trend lines. The canvas
+paint and PNG export copy the SVG dash. Bar charts and uBenchX use colour only.
+
+The patterns follow the same `SERIES_LINE_PATTERNS` switch. It is off by
+default, so the helper returns no dash and every series line is solid. Set it
+to `true` to restore both the framework patterns and the line swatches.
+
 ## PNG export aspect ratio
 
 Inference charts keep the title above the plot and place cost controls, pricing
@@ -35,8 +65,14 @@ do not add the disclaimer.
 The download popover offers Auto, 16:9, and 1:1 for PNG export only. Auto retains
 the existing image dimensions. Fixed ratios lay out an offscreen clone at a
 1280×720 or 1000×1000 CSS-pixel frame (captured at 2× resolution). The exporter
-measures caption and source-footer space, then gives the remaining height and
-width to the plot. Long captions can grow the complete frame proportionally.
+measures caption, legend and source-footer space, then gives the remaining height and
+width to the plot. The legend wraps in rows below the plot, so the plot keeps the
+full frame width. Long captions can grow the complete frame proportionally.
+Tall bar charts keep the frame width instead. When row labels would overlap at
+the ratio height, the frame grows taller so rows keep their live height. The
+canvas stays within 10,000 px tall and 4096×4096 px of area (the Mobile Safari
+limit), so the capture scale drops from 2× to as low as 0.5× first. Rows squeeze
+only past that cap. Charts that fit stay at the exact ratio.
 The chart rebuilds axes, grids, points and curves using copied visible scales,
 without stretching a bitmap or adding letterbox bars. Text and mark sizes stay
 constant; official points and unofficial overlays use the new coordinates.
@@ -104,13 +140,16 @@ This keeps zoom at 60fps while deferring expensive work. Effect cleanup cancels 
 ## HTML Strings for Tooltips
 
 Pinned point details reuse the compact hover card's KV cache bar, including the
-chip/CPU split and theoretical marker. TRT-LLM's combined rate stays a single
+chip/CPU split and theoretical marker, as one thin bar with its label and total on the
+same row. TRT-LLM's combined rate stays a single
 segment; disabled offload does not contribute CPU hits. Missing chip measurements
-retain the available textual rates instead of inventing a bar. Concurrency and
-precision use explicit labels, and parallelism groups Prefill/Decode configurations by
-role with compact labels such as DEP4. The raw fields remain in an expandable
-configuration table. Prompt/generated token counts use a proportional bar with
-exact counts underneath; partial or invalid counts do not produce a split.
+retain the available textual rates instead of inventing a bar. Precision joins the
+engine in the header, and deployment, chip count, parallelism and concurrency share one
+line (`Single-node aggregate · 8 chips · DEP8 · conc 64`). Disaggregated points group
+Prefill/Decode configurations by role with compact labels such as DEP4. There is no raw
+configuration table.
+Prompt/generated token counts use a thin proportional bar with
+exact counts in one legend line; partial or invalid counts do not produce a split.
 Official, unofficial and historical points
 share this presentation; unofficial colors retain their per-run identity.
 This is presentation-only: benchmark values, API responses and `inferencex-skills`
@@ -119,7 +158,7 @@ contracts are unchanged.
 Chip-history/date-comparison graphs use the same compact hover card as the main
 scatter chart. Hover preserves the comparison date/run label and any carried-forward
 source date; swatches and cache bars use the corresponding curve color. Clicking
-keeps the full pinned card. Unofficial history points use compact hover too, while
+opens the full point details panel. Unofficial history points use compact hover too, while
 retaining the unofficial warning, branch identity and per-run color. These are
 presentation-only changes with no API or `inferencex-skills` contract changes.
 
@@ -130,13 +169,16 @@ Tooltips are built as HTML template literal strings, injected via D3's `.html()`
 
 HTML strings bypass React entirely. D3 writes them into a tooltip div that is portaled to `document.body` and positioned with `position: fixed`. This keeps tooltip updates at <1ms per frame.
 
-Pinned detail cards close on clicks outside their tooltip and chart SVG, or on
-Escape, in desktop and mobile layouts. The shared wrapper listens in capture
-phase so outside controls that stop bubbling still dismiss the card without
-losing their own action. Point switching and empty-plot dismissal remain owned by
-the chart; links and controls inside the tooltip remain interactive. Mobile
-bottom sheets retain their backdrop and swipe dismissal. This applies to official
-and unofficial points without changing data, API, or `inferencex-skills` contracts.
+Wrap tooltip HTML with `chartTooltipShell(body, options)` from `src/lib/d3-chart/tooltip-shell.ts` (or put `chartTooltipShellStyle(options)` on your own wrapper) instead of writing the popover background, border, radius, padding and shadow inline. Options cover pinned text selection, a custom border, min and max width, pointer events for links, and scrolling for long content. `chartTooltipTitle(label, color?)` renders the heading with a series dot, and `chartTooltipDismiss(text)` renders the pinned hint.
+
+Pinned details close on clicks outside the chart SVG, the tooltip and the
+details panel, or on Escape, in desktop and mobile layouts. The shared wrapper
+listens in capture phase so outside controls that stop bubbling still dismiss the
+details without losing their own action. Clicks and Escape inside a Radix popover
+leave them open. Point switching and empty-plot dismissal remain owned by the
+chart; links and controls inside the details remain interactive. Mobile bottom
+sheets retain their backdrop and swipe dismissal. This applies to official and
+unofficial points without changing data, API, or `inferencex-skills` contracts.
 
 ## Pareto Front Direction
 
@@ -249,6 +291,8 @@ Other passes skip work that cannot change anything. A point without an offload h
 
 A width change re-runs the data phase. `useResponsiveChartDimensions` applies the first change of a resize at once and collapses later changes into one per `RESIZE_COALESCE_MS` (100 ms), ending on the final width. A window or panel drag therefore renders about ten times a second instead of once per frame.
 
+`D3Chart` without a `height` sizes itself from the container width (`defaultChartHeight`): 600 px from 640 px wide, and 1.2× the width, clamped to 380–600 px, below that. A `height` prop may be a number or a function of width. The x axis and vertical grid request at most one tick per 80 px of plot width, so a phone shows four labels where a desktop shows ten. Line-label pills are laid out in priority order. A pill that still collides after its vertical and mirrored nudges is hidden (`data-visible="0"`), and a plot narrower than 360 px keeps only the first three pills. Pill backgrounds cap OKLCH lightness at 0.68 so the white label text stays readable when the series colour itself is lighter.
+
 ## Canvas Point Layer
 
 `ScatterGraph` draws its official points on one canvas instead of one SVG group per point (`canvas: ensureCanvasPointLayer` on the scatter layer, `lib/d3-chart/layers/canvas-points.ts`). Thousands of `.dot-group` subtrees were most of the chart's DOM, and every data, zoom and legend pass walked them. The layer keeps per-point state in typed arrays (positions, target and shown opacity, fade, shape, palette slot, halo slot) and repaints in one `requestAnimationFrame` after any change. Other charts, unofficial overlays, rooflines and line labels stay SVG. The scatter layer passes the factory in, and shared code (`layer-renderer.ts`, the tooltip hooks, export) finds a live layer through `canvas-point-registry.ts`, so charts that never draw canvas points do not ship the layer.
@@ -256,6 +300,8 @@ A width change re-runs the data phase. `useResponsiveChartDimensions` applies th
 Everything a user sees matches the SVG it replaced. Points are drawn in the order a keyed d3 join would have left the DOM (`canvas-point-order.ts`, duplicates included), so overlapping points stack the same way. Opacity changes animate with the CSS `ease` curve over the same 150 ms, and coordinate transitions use the shared 300 ms cubic tween. The Pareto fade multiplies opacity by 0.2 like the `opacity(0.2)` filter. Offload halos are dashed strokes with the halo legend's radius and dash. Theme colours given as `var(--name)` resolve against the canvas's computed style, and a theme class change repaints every live layer.
 
 Pointer input goes through one transparent `.dot-hit-area` path, the union of the interactive points' hit circles, so the cursor and event targets still follow the points. A uniform grid (`canvas-point-hit.ts`) answers which point is under the pointer. The last drawn interactive point within the hit radius wins, as the topmost SVG circle did, and hidden points never match. Point labels remain SVG text in `.point-label-anchor` groups, built only for visible points, so collision placement and label CSS are unchanged.
+
+`raiseInOrder` keeps unofficial overlay markers (`.unofficial-overlay-pt`, `.unofficial-eval-point`) after the official hit targets (`.dot-group`, the canvas layer, `.point`). An overlay point drawn on or near an official point therefore takes the hover and click. The official point stays reachable wherever the two hit circles don't overlap. The canvas paint order is unchanged, since the SVG overlay markers already sat above the canvas points. In the SVG-dot charts (GPU comparison, evaluation) the overlay X now also paints above the official dot, the same as in the scatter chart.
 
 PNG and SVG export still render real `.dot-group` elements through the SVG scatter path, in the live draw order. The old export cloned the live groups, so their child order and style order carried the chart's history. `restoreExportOrder` reproduces that history from what the layer tracked. A point whose shape type changed while it lived has its shape after its label, and a point that was faded before its first transition write keeps `filter` ahead of `transition`. A repeated key stays the fresh group the SVG join would have re-created.
 
@@ -265,6 +311,6 @@ Tests and Cypress read points from the layer element rather than the DOM. `.canv
 
 Huawei uses a shared amber/gold identity, separate from NVIDIA green, AMD red, Google blue and OpenAI purple. `HUAWEI_CHART_PALETTE` (including the `HUAWEI_CHART_COLORS` tokens) in `packages/constants/src/gpu-keys.ts` defines a darker amber for light canvases and a brighter gold for dark canvases. Both base colors exceed 4.5:1 contrast against the tested white and `#111214` reference backgrounds.
 
-`getVendor` recognizes canonical Ascend keys, framework-suffixed keys and Huawei/Ascend display names. The shared normal, date and high-contrast generators retain this identity; multiple Huawei chips/configurations use related amber shades. High-contrast palettes reserve the amber band from other vendors when Huawei is present. OperatorX delegates to the shared generator instead of maintaining a local crimson override. ubenchX uses the same generator for Huawei marks, legend swatches and tooltips while retaining its existing GPU palette. Theme changes update display decoration without changing measurement coordinates.
+`getVendor` recognizes canonical Ascend keys, framework-suffixed keys and Huawei/Ascend display names. The shared normal, date and high-contrast generators retain this identity; multiple Huawei chips/configurations use related amber shades. High-contrast palettes reserve the amber band from other vendors when Huawei is present. OperatorX delegates to the shared generator instead of maintaining a local crimson override. uBenchX uses the same generator for Huawei marks, legend swatches and tooltips while retaining its existing GPU palette. Theme changes update display decoration without changing measurement coordinates.
 
 These colors encode vendor identity, not a measurement. Sequential heatmap scales encode values and are independent of categorical vendor colors; official logo artwork is also separate. This is presentation-only: no API values, filters, hardware specifications or normalization references change.

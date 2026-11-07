@@ -2,6 +2,8 @@
 
 import { useId, useState, type ReactNode } from 'react';
 
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
+
 export interface HoverItem {
   color: string;
   label: string;
@@ -191,17 +193,17 @@ function HoverTooltip({
     <div
       id={id}
       role="tooltip"
-      className="pointer-events-none absolute top-2 z-10 rounded-md border border-border bg-popover px-2 py-1.5 text-xs shadow-md"
+      className="pointer-events-none absolute top-2 z-10 rounded-md border border-border bg-popover p-3 text-popover-foreground shadow-md"
       style={{ left, right, marginLeft: onRight ? 8 : 0, marginRight: onRight ? 0 : 8 }}
     >
-      {title && <div className="font-medium text-foreground mb-1">{title}</div>}
-      {items.map((it, i) => (
-        <div key={i} className="flex items-center gap-1.5 leading-tight">
-          <span className="inline-block w-2 h-2 rounded-sm" style={{ backgroundColor: it.color }} />
-          <span className="text-muted-foreground">{it.label}</span>
-          <span className="ml-auto font-medium text-foreground tabular-nums">{it.value}</span>
-        </div>
-      ))}
+      <ChartHoverCardBody
+        title={title}
+        metrics={items.map((it) => ({
+          value: it.value,
+          label: it.hint ? `${it.label} · ${it.hint}` : it.label,
+          color: it.color,
+        }))}
+      />
     </div>
   );
 }

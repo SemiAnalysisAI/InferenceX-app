@@ -25,7 +25,7 @@ export default function VideoSelect({
   const id = useId();
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <label htmlFor={id} className="text-xs font-medium text-muted-foreground">
+      <label htmlFor={id} className="text-sm font-medium">
         {label}
       </label>
       <Select value={value} onValueChange={onValueChange} disabled={options.length === 0}>

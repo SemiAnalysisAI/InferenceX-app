@@ -16,6 +16,12 @@ export interface AxisUpdateConfig {
   axes?: 'x' | 'y' | 'both';
 }
 
+const X_TICK_SPACING_PX = 80;
+
+export function widthTickCount(width: number, requested = 10): number {
+  return Math.min(requested, Math.max(2, Math.floor(width / X_TICK_SPACING_PX)));
+}
+
 export function renderAxes(
   layout: ChartLayout,
   xScale: AnyScale,
@@ -41,7 +47,7 @@ export function renderAxes(
     const band = 'bandwidth' in xScale;
     renderAxis(layout.xAxisGroup, 'bottom', xScale, dur, {
       tickSize: 6,
-      tickArguments: !band && xTickCount ? [xTickCount] : [],
+      tickArguments: band ? [] : [widthTickCount(layout.width, xTickCount)],
       tickValues: !band && xTickValues ? visibleTickValues(xScale, xTickValues) : null,
       tickFormat: xTickFormat ?? null,
     });
@@ -201,6 +207,25 @@ function drawAxis(
     .attr('font-size', 10)
     .attr('font-family', 'sans-serif')
     .attr('text-anchor', orient === 'left' ? 'end' : 'middle');
+  if (orient === 'bottom' && !positionScale.bandwidth) {
+    const plotEnd = Math.max(range0, range1);
+    const boxes = texts
+      .nodes()
+      .map((node) => {
+        const width = node.getComputedTextLength?.() ?? 0;
+        const center = position(d3.select(node).datum()) + offset;
+        const overhang = center + width / 2 - plotEnd;
+        return { node, overhang, left: center - width / 2, right: center + width / 2 };
+      })
+      .toSorted((a, b) => a.left - b.left);
+    boxes.forEach((box, index) => {
+      const clamped = boxes[index + 1];
+      const collides =
+        clamped && clamped.overhang > 0 && clamped.left - clamped.overhang - box.right < 8;
+      setAttrIfChanged(box.node, 'dx', box.overhang > 0 ? String(-box.overhang) : null);
+      setAttrIfChanged(box.node, 'visibility', collides ? 'hidden' : null);
+    });
+  }
   group.each(function () {
     Reflect.set(this, '__axis', position);
   });
@@ -250,7 +275,7 @@ export function renderGrid(
       const tickScale = xScale as { ticks: (count?: number) => number[]; (v: number): number };
       const xTicks = xTickValues
         ? (visibleTickValues(xScale, xTickValues) as number[])
-        : tickScale.ticks();
+        : tickScale.ticks(widthTickCount(width));
       const vJoin = vGroup
         .selectAll<SVGLineElement, number>('line')
         .data(xTicks)
@@ -346,8 +371,10 @@ function visibleTickValues(
   });
 }
 
-export function setAttrIfChanged(element: Element, name: string, value: string): void {
-  if (element.getAttribute(name) !== value) element.setAttribute(name, value);
+export function setAttrIfChanged(element: Element, name: string, value: string | null): void {
+  if (element.getAttribute(name) === value) return;
+  if (value === null) element.removeAttribute(name);
+  else element.setAttribute(name, value);
 }
 
 export function setStyleIfChanged(

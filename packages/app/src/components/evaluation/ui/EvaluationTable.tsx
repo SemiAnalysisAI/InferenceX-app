@@ -1,11 +1,15 @@
 'use client';
 
 import { MessageSquareText } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 import EvalSamplesDrawer from '@/components/evaluation/ui/EvalSamplesDrawer';
 import type { EvaluationChartData } from '@/components/evaluation/types';
+import { type ParallelismPill, parallelismPills } from '@/components/evaluation/chart-data';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
+import { Button } from '@/components/ui/button';
+import { ConfigPill } from '@/components/ui/config-pill';
+import { TABLE_ACTION_STYLE } from '@/components/ui/control-styles';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { track } from '@/lib/analytics/analytics';
 import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
@@ -16,7 +20,6 @@ import { formatEvaluationDate } from './BarChartD3';
 
 export const EVALUATION_TABLE_STRINGS = {
   en: {
-    prompts: 'Prompts',
     promptsTitle: 'View per-sample prompts and responses',
     promptsAriaLabel: (configLabel: string) =>
       `View per-sample prompts and responses for ${configLabel}`,
@@ -29,15 +32,14 @@ export const EVALUATION_TABLE_STRINGS = {
     date: 'Date',
     unofficial: 'Unofficial',
     unofficialTitle: 'Data from an unofficial / un-ingested workflow run',
-    prefill: 'prefill',
-    decode: 'decode',
+    prefill: 'Prefill',
+    decode: 'Decode',
+    aggregated: 'aggregated',
+    workers: (n: number) => `${n} ${n === 1 ? 'worker' : 'workers'}`,
     chip: 'Chip',
-    physicalChips: 'Physical Chips',
-    slots: 'slots',
-    dpaValues: 'DPA true/false',
+    physicalChips: 'Physical chips',
   },
   zh: {
-    prompts: '提示词',
     promptsTitle: '查看逐样本提示词与模型响应',
     promptsAriaLabel: (configLabel: string) => `查看 ${configLabel} 的逐样本提示词与模型响应`,
     precision: '精度',
@@ -51,10 +53,10 @@ export const EVALUATION_TABLE_STRINGS = {
     unofficialTitle: '数据来自尚未入库的非官方工作流运行',
     prefill: '预填充',
     decode: '解码',
+    aggregated: '聚合',
+    workers: (n: number) => `${n} 个 worker`,
     chip: '芯片',
     physicalChips: '物理芯片数',
-    slots: '字段顺序',
-    dpaValues: 'DPA 是/否',
   },
 } as const;
 
@@ -67,7 +69,6 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
   const locale = useLocale();
   const t = EVALUATION_TABLE_STRINGS[locale];
   const sorted = useMemo(() => [...data].toSorted((a, b) => b.score - a.score), [data]);
-  const hasDisaggConfigs = useMemo(() => data.some((d) => d.disagg), [data]);
   const [drawerRow, setDrawerRow] = useState<EvaluationChartData | null>(null);
   const searchParams = useClientSearchParams();
   const sharedTarget = useMemo(() => {
@@ -123,39 +124,40 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
     });
   }, [sharedRow, sharedTarget?.evalResultId]);
 
-  const columns = useMemo<DataTableColumn<EvaluationChartData>[]>(
-    () => [
-      {
-        header: '',
-        cell: (row) => {
-          const canOpen = row.evalResultId > 0 || (row.evalResultId <= 0 && Boolean(row.runUrl));
-          return canOpen ? (
-            <button
-              type="button"
-              onClick={() => openDrawer(row)}
-              className="inline-flex items-center gap-1 rounded-md border border-brand/30 bg-brand/10 px-2 py-1 text-xs font-medium text-brand hover:border-brand/50 hover:bg-brand/20 transition-colors whitespace-nowrap"
-              aria-label={t.promptsAriaLabel(row.configLabel)}
-              title={t.promptsTitle}
-            >
-              <MessageSquareText className="size-3.5" />
-              <span className="hidden sm:inline">{t.prompts}</span>
-            </button>
-          ) : null;
-        },
-        className: 'whitespace-nowrap',
-        importance: 'key',
-      },
+  const columns = useMemo<DataTableColumn<EvaluationChartData>[]>(() => {
+    const parallelism = (pills: ParallelismPill[], suffix: ReactNode) => (
+      <span className="inline-flex items-center gap-1">
+        {pills.map((pill) => (
+          <ConfigPill key={pill.label} {...pill} />
+        ))}
+        {suffix}
+      </span>
+    );
+    const workers = (n: number) => (
+      <span className="text-muted-foreground" title={t.workers(n)}>
+        ×{n}
+      </span>
+    );
+    return [
       {
         header: t.chip,
         cell: (row) => {
           const isUnofficial = row.evalResultId <= 0;
           const runIdx = isUnofficial ? overlayRunIndex(row.runUrl, runIndexByUrl) : 0;
           return (
-            <span className="inline-flex items-center gap-1.5">
-              {row.configLabel}
+            <span className="flex max-w-80 items-center gap-1.5 sm:w-max">
+              <span
+                className="min-w-0 sm:truncate"
+                title={row.engineLabel ? `${row.hwLabel} ${row.engineLabel}` : undefined}
+              >
+                <span className="font-medium">{row.hwLabel}</span>
+                {row.engineLabel && (
+                  <span className="text-muted-foreground"> {row.engineLabel}</span>
+                )}
+              </span>
               {isUnofficial && (
                 <span
-                  className="inline-flex items-center gap-1 rounded-sm border border-red-600/50 bg-red-600/10 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-red-700 dark:text-red-400"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-md border border-destructive/30 bg-destructive/10 px-1 py-0.5 text-2xs font-medium text-destructive"
                   title={t.unofficialTitle}
                 >
                   <span
@@ -169,8 +171,8 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
             </span>
           );
         },
-        sortValue: (row) => row.configLabel,
-        className: 'font-medium whitespace-nowrap',
+        sortValue: (row) => `${row.hwLabel} ${row.engineLabel}`,
+        className: 'w-px whitespace-nowrap',
         importance: 'key',
         pinned: true,
       },
@@ -178,7 +180,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         header: t.precision,
         cell: (row) => row.precision.toUpperCase(),
         sortValue: (row) => row.precision,
-        className: 'whitespace-nowrap',
+        className: 'w-px whitespace-nowrap',
         importance: 'key',
       },
       {
@@ -186,7 +188,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         align: 'right',
         cell: (row) => row.score.toFixed(2),
         sortValue: (row) => row.score,
-        className: 'tabular-nums',
+        className: 'w-px whitespace-nowrap',
         importance: 'key',
       },
       {
@@ -194,7 +196,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         align: 'right',
         cell: (row) => row.minScore?.toFixed(2) ?? '-',
         sortValue: (row) => row.minScore ?? 0,
-        className: 'tabular-nums',
+        className: 'w-px whitespace-nowrap',
         importance: 'secondary',
       },
       {
@@ -202,23 +204,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         align: 'right',
         cell: (row) => row.maxScore?.toFixed(2) ?? '-',
         sortValue: (row) => row.maxScore ?? 0,
-        className: 'tabular-nums',
-        importance: 'secondary',
-      },
-      {
-        header: 'TP',
-        align: 'right',
-        cell: (row) => (row.dp && row.dp > 1 ? `${row.tp} / DP${row.dp}` : row.tp),
-        sortValue: (row) => row.tp,
-        className: 'tabular-nums',
-        importance: 'key',
-      },
-      {
-        header: t.physicalChips,
-        align: 'right',
-        cell: (row) => row.physicalChips ?? '—',
-        sortValue: (row) => row.physicalChips ?? 0,
-        className: 'tabular-nums',
+        className: 'w-px whitespace-nowrap',
         importance: 'secondary',
       },
       {
@@ -226,44 +212,85 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         align: 'right',
         cell: (row) => row.conc,
         sortValue: (row) => row.conc,
-        className: 'tabular-nums',
+        className: 'w-px whitespace-nowrap',
         importance: 'key',
+      },
+      {
+        header: t.prefill,
+        cell: (row) =>
+          row.disagg
+            ? parallelism(
+                parallelismPills(row.prefillTp, row.prefillEp, row.prefillDpAttention),
+                workers(row.prefillNumWorkers || 1),
+              )
+            : parallelism(
+                parallelismPills(row.tp, row.ep, row.dp_attention, row.dp),
+                <span className="ml-1 text-muted-foreground">{t.aggregated}</span>,
+              ),
+        sortValue: (row) => (row.disagg ? row.prefillTp * (row.prefillNumWorkers || 1) : row.tp),
+        colSpan: (row) => (row.disagg ? 1 : 2),
+        className: 'w-px whitespace-nowrap',
+        importance: 'key',
+      },
+      {
+        header: t.decode,
+        cell: (row) =>
+          parallelism(
+            parallelismPills(row.tp, row.ep, row.dp_attention),
+            workers(row.decodeNumWorkers || 1),
+          ),
+        sortValue: (row) => (row.disagg ? row.tp * (row.decodeNumWorkers || 1) : row.tp),
+        className: 'w-px whitespace-nowrap',
+        importance: 'key',
+      },
+      {
+        header: t.physicalChips,
+        align: 'right',
+        cell: (row) => row.physicalChips ?? '—',
+        sortValue: (row) => row.physicalChips ?? 0,
+        className: 'w-px whitespace-nowrap',
+        importance: 'secondary',
       },
       {
         header: t.benchmark,
         cell: (row) => row.benchmark,
         sortValue: (row) => row.benchmark,
-        className: 'whitespace-nowrap',
+        className: 'w-px whitespace-nowrap',
         importance: 'secondary',
       },
       {
         header: t.date,
         cell: (row) => formatEvaluationDate(row.date, locale),
         sortValue: (row) => row.date,
-        className: 'whitespace-nowrap',
+        className: 'w-px whitespace-nowrap tabular-nums',
         importance: 'secondary',
       },
-    ],
-    [locale, runIndexByUrl],
-  );
+      {
+        header: '',
+        cell: (row) => {
+          const canOpen = row.evalResultId > 0 || (row.evalResultId <= 0 && Boolean(row.runUrl));
+          return canOpen ? (
+            <Button
+              type="button"
+              variant="ghost"
+              className={TABLE_ACTION_STYLE}
+              size="icon-2xs"
+              onClick={() => openDrawer(row)}
+              aria-label={t.promptsAriaLabel(row.configLabel)}
+              title={t.promptsTitle}
+            >
+              <MessageSquareText />
+            </Button>
+          ) : null;
+        },
+        className: 'w-px',
+        importance: 'key',
+      },
+    ];
+  }, [locale, runIndexByUrl]);
 
   return (
     <>
-      {hasDisaggConfigs && (
-        <div className="mt-2 mb-2 text-2xs text-muted-foreground/80 leading-tight">
-          <div>
-            <span className="font-mono">P(·/·/·/·)</span> {t.prefill}
-            <span className="mx-1">·</span>
-            <span className="font-mono">D(·/·/·/·)</span> {t.decode}
-          </div>
-          <div>
-            {t.slots}: <span className="font-mono">tp/ep/dpa/nw</span>
-            <span className="mx-1">·</span>
-            <span className="font-mono">T</span>/<span className="font-mono">F</span> ={' '}
-            {t.dpaValues}
-          </div>
-        </div>
-      )}
       <DataTable
         data={sorted}
         columns={columns}

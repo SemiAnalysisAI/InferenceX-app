@@ -1,42 +1,47 @@
 'use client';
 
-import { Suspense, useRef, useMemo } from 'react';
+import { Suspense, useMemo } from 'react';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Stat } from '@/components/ui/stat';
 import { formatNumber } from '@/lib/agentic-workload-explorer/format';
+import { formatSnapshotDate } from '@/lib/agentic-workload-explorer/snapshot';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
-import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
 import {
   useTraceVersion,
   appendTraceVersion,
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
 import { getFastModeMultiplier } from '@semianalysisai/inferencex-db/proxytrace/shared/pricing';
-import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { ChartActions, Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { track } from '@/lib/analytics/analytics';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {
     summary: 'Summary',
-    dailyFastModePct: 'Daily Fast Mode %',
-    modelBreakdown: 'Model Breakdown',
+    dailyFastModePct: 'Daily fast mode %',
+    modelBreakdown: 'Model breakdown',
     finalDays: (n: number) => `final ${n} days`,
     models: (n: number) => `${n} models`,
-    fastModePct: 'Fast Mode %',
-    fastModeCost: 'Fast Mode Cost',
-    costPremium: 'Cost Premium',
-    avgE2eLatencyGain: 'Avg E2E Latency Gain',
+    fastModePct: 'Fast mode %',
+    fastModeCost: 'Fast mode cost',
+    costPremium: 'Cost premium',
+    avgE2eLatencyGain: 'Avg E2E latency gain',
     fastOfTotal: (fast: string, total: string) => `${fast} of ${total} requests`,
     regularDetail: (cost: string) => `Regular: ${cost}`,
     markupDetail: '6x markup over regular rates',
-    fastVsRegular: (fast: string, regular: string) => `Fast: ${fast} vs Regular: ${regular}`,
-    errorLoading: 'Failed to load fast mode data.',
+    fastVsRegular: (fast: string, regular: string) => `Fast: ${fast} vs regular: ${regular}`,
+    errorLoading: 'Failed to load fast mode data',
     noDailyData: 'No daily data available',
     noModelData: 'No model data available',
-    exportTitle: 'Daily Fast Mode %',
+    exportTitle: 'Daily fast mode %',
     thModel: 'Model',
-    thFastCount: 'Fast Count',
-    thRegularCount: 'Regular Count',
-    thFastCost: 'Fast Cost',
-    thRegularCost: 'Regular Cost',
+    thFastCount: 'Fast count',
+    thRegularCount: 'Regular count',
+    thFastCost: 'Fast cost',
+    thRegularCost: 'Regular cost',
     thFastE2e: 'Fast E2E',
     thRegularE2e: 'Regular E2E',
     thDiff: 'Diff',
@@ -57,7 +62,7 @@ const STRINGS = {
     regularDetail: (cost: string) => `常规：${cost}`,
     markupDetail: '按常规成本 6 倍加价',
     fastVsRegular: (fast: string, regular: string) => `Fast：${fast} vs 常规：${regular}`,
-    errorLoading: '无法加载 Fast Mode 数据。',
+    errorLoading: '无法加载 Fast Mode 数据',
     noDailyData: '暂无每日数据',
     noModelData: '暂无模型数据',
     exportTitle: '每日 Fast Mode 占比',
@@ -70,7 +75,7 @@ const STRINGS = {
     thRegularE2e: '常规 E2E',
     thDiff: '差异',
     tooltipFast: (day: string, pct: string, fast: number, total: number, cost: string) =>
-      `${day}：${pct}% fast（${fast}/${total} 请求，${cost} fast 成本）`,
+      `${day}：${pct}% 为 Fast Mode（${fast}/${total} 个请求，Fast 成本 ${cost}）`,
   },
 } as const;
 
@@ -138,40 +143,15 @@ function truncateModel(model: string, maxLen = 32): string {
   return `${model.slice(0, maxLen - 1)}...`;
 }
 
-function SectionHeader({ label, detail }: { label: string; detail?: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="flex-1 h-px bg-border" />
-      {detail && <span className="text-3xs font-mono text-subtle">{detail}</span>}
-    </div>
-  );
-}
-
-function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
-  return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-        {label}
-      </div>
-      <div className="text-lg font-mono font-bold mt-0.5">{value}</div>
-      {detail && <div className="text-3xs font-mono text-muted-foreground mt-0.5">{detail}</div>}
-    </div>
-  );
-}
-
 function DailyFastModeChart({ daily, t }: { daily: FastModeDaily[]; t: Strings }) {
   const locale = useLocale();
-  const svgRef = useRef<SVGSVGElement>(null);
   const data = daily.slice(-30);
 
   if (data.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
+      <EmptyState bare className="py-8">
         {t.noDailyData}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -185,28 +165,14 @@ function DailyFastModeChart({ daily, t }: { daily: FastModeDaily[]; t: Strings }
 
   return (
     <Expandable title={t.exportTitle}>
-      <div className="rounded-md border border-border bg-surface p-3">
+      <Card>
         <div className="flex items-center justify-end mb-2">
-          <ExportPngButton
-            locale={locale}
-            analyticsChart="daily-fast-mode"
-            onClick={() => {
-              if (svgRef.current)
-                exportSvgToPng(svgRef.current, {
-                  title: t.exportTitle,
-                  filename: 'daily-fast-mode.png',
-                  svgWidth: CHART_W,
-                  svgHeight: CHART_H,
-                });
-            }}
+          <ChartActions
+            fileName="daily-fast-mode"
+            onExportPng={() => track('agentic_workload_export_png', { chart: 'daily-fast-mode' })}
           />
         </div>
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-          className="w-full"
-          style={{ maxHeight: 240 }}
-        >
+        <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ maxHeight: 240 }}>
           {yTicks.map((tv) => (
             <g key={`y-${tv}`}>
               {tv > 0 && (
@@ -275,18 +241,14 @@ function DailyFastModeChart({ daily, t }: { daily: FastModeDaily[]; t: Strings }
                     className="fill-muted-foreground"
                     style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
                   >
-                    {new Date(d.day).toLocaleDateString('en-US', {
-                      timeZone: 'UTC',
-                      month: 'short',
-                      day: 'numeric',
-                    })}
+                    {formatSnapshotDate(d.day, locale)}
                   </text>
                 )}
               </g>
             );
           })}
         </svg>
-      </div>
+      </Card>
     </Expandable>
   );
 }
@@ -335,9 +297,9 @@ function ModelBreakdownTable({ byModel, t }: { byModel: FastModeModelRow[]; t: S
 
   if (models.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
+      <EmptyState bare className="py-8">
         {t.noModelData}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -345,31 +307,15 @@ function ModelBreakdownTable({ byModel, t }: { byModel: FastModeModelRow[]; t: S
     <div className="overflow-x-auto">
       <table className="w-full font-mono text-2xs">
         <thead>
-          <tr className="text-muted-foreground text-left border-b border-border">
-            <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow">
-              {t.thModel}
-            </th>
-            <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-              {t.thFastCount}
-            </th>
-            <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-              {t.thRegularCount}
-            </th>
-            <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-              {t.thFastCost}
-            </th>
-            <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-              {t.thRegularCost}
-            </th>
-            <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-              {t.thFastE2e}
-            </th>
-            <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-              {t.thRegularE2e}
-            </th>
-            <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-              {t.thDiff}
-            </th>
+          <tr className="text-muted-foreground text-left border-b border-border/20">
+            <th className="py-1.5 px-2 font-medium text-xs">{t.thModel}</th>
+            <th className="py-1.5 px-2 font-medium text-xs text-right">{t.thFastCount}</th>
+            <th className="py-1.5 px-2 font-medium text-xs text-right">{t.thRegularCount}</th>
+            <th className="py-1.5 px-2 font-medium text-xs text-right">{t.thFastCost}</th>
+            <th className="py-1.5 px-2 font-medium text-xs text-right">{t.thRegularCost}</th>
+            <th className="py-1.5 px-2 font-medium text-xs text-right">{t.thFastE2e}</th>
+            <th className="py-1.5 px-2 font-medium text-xs text-right">{t.thRegularE2e}</th>
+            <th className="py-1.5 px-2 font-medium text-xs text-right">{t.thDiff}</th>
           </tr>
         </thead>
         <tbody>
@@ -379,30 +325,30 @@ function ModelBreakdownTable({ byModel, t }: { byModel: FastModeModelRow[]; t: S
                 ? m.fastAvgDuration - m.regularAvgDuration
                 : null;
             return (
-              <tr key={m.model} className="border-b border-border/50 hover:bg-surface-hover">
+              <tr key={m.model} className="border-b border-border/20 hover:bg-surface-hover">
                 <td className="py-1.5 px-2" title={m.model}>
                   {truncateModel(m.model)}
                 </td>
-                <td className="py-1.5 px-2 text-right text-amber-500">
+                <td className="py-1.5 px-2 text-right text-foreground">
                   {formatNumber(m.fastCount)}
                 </td>
                 <td className="py-1.5 px-2 text-right text-muted-foreground">
                   {formatNumber(m.regularCount)}
                 </td>
-                <td className="py-1.5 px-2 text-right font-bold text-amber-500">
+                <td className="py-1.5 px-2 text-right font-medium text-foreground">
                   {formatDollars(m.fastCost)}
                 </td>
                 <td className="py-1.5 px-2 text-right text-muted-foreground">
                   {formatDollars(m.regularCost)}
                 </td>
-                <td className="py-1.5 px-2 text-right text-amber-500">
+                <td className="py-1.5 px-2 text-right text-foreground">
                   {m.fastAvgDuration > 0 ? formatMs(m.fastAvgDuration) : '---'}
                 </td>
                 <td className="py-1.5 px-2 text-right text-muted-foreground">
                   {m.regularAvgDuration > 0 ? formatMs(m.regularAvgDuration) : '---'}
                 </td>
                 <td
-                  className={`py-1.5 px-2 text-right ${latencyDiff !== null && latencyDiff < 0 ? 'text-emerald-500' : latencyDiff !== null && latencyDiff > 0 ? 'text-rose-500' : 'text-muted-foreground'}`}
+                  className={`py-1.5 px-2 text-right ${latencyDiff !== null && latencyDiff < 0 ? 'text-success' : latencyDiff !== null && latencyDiff > 0 ? 'text-destructive' : 'text-muted-foreground'}`}
                 >
                   {latencyDiff === null
                     ? '---'
@@ -493,34 +439,36 @@ function FastModePageContent() {
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-md border border-border bg-surface p-3">
+              <div key={i} className="rounded-xl border border-border/30 bg-card p-3">
                 <Skeleton className="h-3 w-20 mb-2" />
                 <Skeleton className="h-6 w-16" />
               </div>
             ))}
           </div>
         ) : error || !data || !stats ? (
-          <div className="text-sm font-mono text-muted-foreground text-center py-8">
-            {t.errorLoading}
-          </div>
+          <EmptyState>{t.errorLoading}</EmptyState>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <StatCard
+          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <Stat
+              boxed
               label={t.fastModePct}
               value={formatPct(stats.fastPct)}
               detail={t.fastOfTotal(formatNumber(stats.fastCount), formatNumber(stats.totalCount))}
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.fastModeCost}
               value={formatDollars(stats.fastCost)}
               detail={t.regularDetail(formatDollars(stats.regularCost))}
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.costPremium}
               value={formatDollars(stats.costPremium)}
               detail={t.markupDetail}
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.avgE2eLatencyGain}
               value={
                 stats.latencyGain > 0
@@ -538,7 +486,7 @@ function FastModePageContent() {
                   : undefined
               }
             />
-          </div>
+          </dl>
         )}
       </div>
 
@@ -557,9 +505,9 @@ function FastModePageContent() {
               label={t.modelBreakdown}
               detail={t.models(new Set(data.byModel.map((r) => r.model)).size)}
             />
-            <div className="rounded-md border border-border bg-surface p-3">
+            <Card>
               <ModelBreakdownTable byModel={data.byModel} t={t} />
-            </div>
+            </Card>
           </div>
         </>
       )}

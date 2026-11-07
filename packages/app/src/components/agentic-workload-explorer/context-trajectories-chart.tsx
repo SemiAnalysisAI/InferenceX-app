@@ -10,15 +10,19 @@ import { formatNumber } from '@/lib/agentic-workload-explorer/format';
 import { BrushBar, useBrush } from '@/components/agentic-workload-explorer/brush-bar';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 
 const STRINGS = {
   en: {
-    sectionTitle: 'Trace of Context Growth Over Time',
+    sectionTitle: 'Trace of context growth over time',
     noData: 'No request data available',
     totalRequests: (total: number, subagent: number, invocations: number, main: number) =>
       `${total} total requests split up into ${subagent} sub-agent${invocations > 0 ? ` (${invocations} invocation${invocations === 1 ? '' : 's'})` : ''} and ${main} main-agent requests`,
-    mainAgent: 'Main Agent',
-    resetZoom: 'Reset Zoom',
+    mainAgent: 'Main agent',
+    resetZoom: 'Reset zoom',
     inputTokens: 'input tokens',
     subagentFallback: 'sub-agent',
   },
@@ -174,23 +178,17 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
   }
 
   if (trajectories.counts.total === 0) {
-    return (
-      <div className="rounded-md border border-border bg-surface p-12 text-center font-mono text-xs text-muted-foreground">
-        {t.noData}
-      </div>
-    );
+    return <EmptyState className="py-12">{t.noData}</EmptyState>;
   }
 
   const { main, subagent, invocations, total } = trajectories.counts;
 
   return (
     <div className="space-y-4">
-      <div className="sticky -top-5 z-20 -mx-2 space-y-2 border-b border-border bg-background/95 px-2 pb-2 pt-5 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div className="sticky -top-5 z-20 -mx-2 space-y-2 border-b border-border/20 bg-background/95 px-2 pb-2 pt-5 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="flex items-center gap-3">
-          <span className="font-mono text-3xs font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-            {t.sectionTitle}
-          </span>
-          <div className="h-px flex-1 bg-border" />
+          <span className="text-xs font-medium text-muted-foreground">{t.sectionTitle}</span>
+          <div className="h-px flex-1 bg-border/30" />
         </div>
         <div className="space-y-1.5">
           <span className="font-mono text-3xs text-muted-foreground">
@@ -211,19 +209,20 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
         </div>
       </div>
 
-      <div ref={containerRef} className="relative rounded-md border border-border bg-surface p-4">
+      <div ref={containerRef} className="relative rounded-xl border border-border/30 bg-card p-4">
         <div className="mb-1 flex items-center justify-end">
           {brush.isActive && (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="2xs"
               onClick={() => {
                 brush.reset();
                 track('agentic_workload_trajectories_zoom_reset');
               }}
-              className="rounded-md border border-border bg-surface px-2 py-0.5 font-mono text-3xs uppercase tracking-wider text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground"
             >
               {t.resetZoom}
-            </button>
+            </Button>
           )}
         </div>
         <svg
@@ -396,21 +395,13 @@ type Strings = (typeof STRINGS)[keyof typeof STRINGS];
 function ChartTooltip({ data, t }: { data: TooltipState; t: Strings }) {
   const { point, agentLabel, agentColor } = data;
   return (
-    <div
-      className="pointer-events-none fixed z-50 rounded-md border border-border bg-surface p-2.5 shadow-lg"
-      style={{ left: data.x + 12, top: data.y - 10 }}
-    >
-      <div className="space-y-1 font-mono text-2xs">
-        <div className="flex items-center gap-1.5 font-bold text-foreground">
-          <div className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: agentColor }} />
-          <span>{agentLabel}</span>
-        </div>
-        <div className="text-muted-foreground">@ {formatElapsedMMSS(point.elapsedMs)}</div>
-        <div className="flex items-center gap-2 border-t border-border pt-1 text-foreground">
-          <span className="text-muted-foreground">{t.inputTokens}</span>
-          <span className="ml-auto font-bold tabular-nums">{formatNumber(point.total)}</span>
-        </div>
-      </div>
-    </div>
+    <FloatingTooltip x={data.x} y={data.y}>
+      <ChartHoverCardBody
+        title={agentLabel}
+        subtitle={`@ ${formatElapsedMMSS(point.elapsedMs)}`}
+        color={agentColor}
+        metrics={[{ value: formatNumber(point.total), label: t.inputTokens }]}
+      />
+    </FloatingTooltip>
   );
 }

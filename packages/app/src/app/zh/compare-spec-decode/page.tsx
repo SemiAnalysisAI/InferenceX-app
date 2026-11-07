@@ -1,11 +1,19 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
+import {
+  CompareCatalogLink,
+  CompareCatalogLinks,
+  CompareModelSection,
+  ComparePairGrid,
+} from '@/components/compare/compare-catalog';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
+import { ModelLogo } from '@/components/ui/model-logo';
+import { type Model } from '@/lib/catalog/data-mappings';
 import {
   getSpecDecodePairsByModelSlug,
   type SpecDecodePair,
@@ -79,33 +87,19 @@ export default async function CompareSpecDecodeIndexPageZh() {
       <JsonLd data={jsonLd} />
       <section>
         <Card>
-          <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">芯片投机解码对比</h1>
-          <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
+          <Heading as="h1" level="page">
+            芯片投机解码对比
+          </Heading>
+          <p className="mt-4 max-w-3xl text-base text-muted-foreground">
             共 {totalUrls.toLocaleString()} 组投机解码对比，涵盖{' '}
             {formatModelListZh(modelsWithPairs)}
             。每个页面都会在同一模型和芯片上，对比启用某种投机解码方法（MTP、EAGLE
             等）与关闭投机解码时的推理表现，并在相同交互性水平下比较吞吐量和成本。
           </p>
-          <div className="mt-6 flex flex-wrap gap-3" data-testid="compare-spec-decode-index-links">
-            <Link
-              href="/zh/compare"
-              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
-            >
-              芯片对比
-              <span aria-hidden="true" className="text-lg lg:text-xl">
-                →
-              </span>
-            </Link>
-            <Link
-              href="/zh/compare-per-dollar"
-              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
-            >
-              每美元性能
-              <span aria-hidden="true" className="text-lg lg:text-xl">
-                →
-              </span>
-            </Link>
-          </div>
+          <CompareCatalogLinks testId="compare-spec-decode-index-links">
+            <CompareCatalogLink href="/zh/compare">芯片对比</CompareCatalogLink>
+            <CompareCatalogLink href="/zh/compare-per-dollar">每美元性能</CompareCatalogLink>
+          </CompareCatalogLinks>
         </Card>
       </section>
 
@@ -113,28 +107,30 @@ export default async function CompareSpecDecodeIndexPageZh() {
         const pairs = pairsByModel.get(model.slug) ?? [];
         const cards = buildCards(model, pairs);
         return (
-          <section key={model.slug} id={model.slug}>
-            <Card className="flex flex-col gap-4">
-              <div>
-                <h2 className="text-xl lg:text-2xl font-bold tracking-tight">{model.label}</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  在 {model.label} 上共有 {pairs.length} 组投机解码对比，均有基准测试数据。
-                </p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {cards.map(({ slug, label, archLine }) => (
-                  <ComparePairCardLink
-                    key={slug}
-                    href={`/zh/compare-spec-decode/${slug}`}
-                    slug={slug}
-                    label={label}
-                    archLine={archLine}
-                    locale="zh"
-                  />
-                ))}
-              </div>
-            </Card>
-          </section>
+          <CompareModelSection
+            key={model.slug}
+            id={model.slug}
+            title={
+              <>
+                <ModelLogo model={model.displayName as Model} className="size-6" />
+                {model.label}
+              </>
+            }
+            summary={`在 ${model.label} 上共有 ${pairs.length} 组投机解码对比，均有基准测试数据`}
+          >
+            <ComparePairGrid>
+              {cards.map(({ slug, label, archLine }) => (
+                <ComparePairCardLink
+                  key={slug}
+                  href={`/zh/compare-spec-decode/${slug}`}
+                  slug={slug}
+                  label={label}
+                  archLine={archLine}
+                  locale="zh"
+                />
+              ))}
+            </ComparePairGrid>
+          </CompareModelSection>
         );
       })}
     </>

@@ -52,7 +52,7 @@ describe('BlogPostContent', () => {
     expect(html).toContain('data-testid="blog-sidebar-cta"');
     expect(html).toContain('data-testid="blog-nav-prev"');
     expect(html).toContain('data-testid="blog-nav-next"');
-    expect(html).toContain('href="/agentx"');
+    expect(html).toContain('href="/infx/agentx"');
   });
 
   it('renders the hero meta, tag links, and related strip in English', () => {
@@ -76,7 +76,7 @@ describe('BlogPostContent', () => {
     expect(html).toContain('href="/zh/blog"');
     expect(html).toContain('href="/zh/blog?tag=benchmark"');
     expect(html).toContain('href="/zh/blog/older"');
-    expect(html).toContain('href="/zh/agentx"');
+    expect(html).toContain('href="/zh/infx/agentx"');
     expect(html).toContain('href="/blog/current"');
     expect(html).toContain('hrefLang="en"');
     expect(html).toContain('2026年8月19日');

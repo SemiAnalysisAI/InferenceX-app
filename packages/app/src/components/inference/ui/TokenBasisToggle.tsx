@@ -9,7 +9,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {
-    label: 'Horace He Metric',
+    label: 'Horace He metric',
     help: "Uncached suffix + output token basis. Counts only each turn's new input plus output, excluding the prompt prefix that earlier turns of the same conversation already sent. The excluded share is the trace's theoretical (infinite-cache) cacheable prefix, not the server's observed cache hits, so it doesn't depend on how well a system caches. This is an approximation, not an exact per-request count: the theoretical hit rate is measured in KV blocks and applied to the run's measured input throughput.",
   },
   zh: {

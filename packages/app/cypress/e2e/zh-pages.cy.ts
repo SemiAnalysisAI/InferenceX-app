@@ -16,7 +16,7 @@ describe('Chinese (/zh) pages', () => {
         .and('have.attr', 'href', '/zh/quotes');
       cy.get('[data-testid="footer-link-agentx"]')
         .should('contain.text', 'AgentX')
-        .and('have.attr', 'href', '/zh/agentx');
+        .and('have.attr', 'href', '/zh/infx/agentx');
       cy.get('[data-testid="footer-link-about"]')
         .should('have.text', '关于 SemiAnalysis')
         .and('have.attr', 'href', 'https://semianalysis.com/about/');
@@ -37,11 +37,11 @@ describe('Chinese (/zh) pages', () => {
 
   describe('zh dashboard tab page', () => {
     before(() => {
-      cy.visit('/zh/inference');
+      cy.visit('/zh/infx/inference');
     });
 
     it('renders the Chinese h1 without an intro box', () => {
-      cy.location('pathname').should('eq', '/zh/inference/deepseek-v41-flash');
+      cy.location('pathname').should('eq', '/zh/infx/inference/deepseek-v41-flash');
       cy.get('[data-testid="inference-page-heading"]').should(
         'have.text',
         'DeepSeek V4.1 Flash 推理基准测试',
@@ -51,7 +51,7 @@ describe('Chinese (/zh) pages', () => {
       cy.get('[data-testid="tab-trigger-evaluation"]')
         .should('contain.text', '准确率评估')
         .and('have.attr', 'href')
-        .and('match', /^\/zh\/evaluation/u);
+        .and('match', /^\/zh\/infx\/evaluation/u);
     });
   });
 
@@ -155,7 +155,7 @@ describe('Chinese (/zh) pages', () => {
         const homeLinks = [...document.querySelectorAll<HTMLAnchorElement>('a[href="/"]')];
 
         expect(status).to.eq(404);
-        expect(document.querySelector('h1')?.textContent).to.eq('404 - Page Not Found');
+        expect(document.querySelector('h1')?.textContent).to.eq('Page not found');
         expect(homeLinks.some((link) => link.textContent === 'Go back home')).to.eq(true);
         expect(document.querySelector('meta[name="robots"]')?.getAttribute('content')).to.include(
           'noindex',
@@ -176,8 +176,8 @@ describe('Chinese (/zh) pages', () => {
         },
       });
 
-      cy.contains('h1', '404 - 页面不存在').should('be.visible');
-      cy.contains('找不到该页面。').should('be.visible');
+      cy.contains('h1', '页面不存在').should('be.visible');
+      cy.contains('找不到该页面').should('be.visible');
       cy.contains('a[href="/zh"]', '返回首页').should('be.visible');
       cy.get('meta[name="robots"]').should('have.attr', 'content').and('include', 'noindex');
       cy.get('link[rel="canonical"]').should('not.exist');
@@ -204,7 +204,7 @@ describe('Chinese (/zh) pages', () => {
 
   describe('zh submissions workflow', () => {
     beforeEach(() => {
-      cy.visit('/zh/submissions');
+      cy.visit('/zh/infx/submissions');
       cy.get('[data-testid="submissions-display"]').should('be.visible');
     });
 
@@ -221,9 +221,11 @@ describe('Chinese (/zh) pages', () => {
       cy.get('[data-testid="submissions-chart-svg"] .proximity-overlay').click('center', {
         force: true,
       });
-      cy.get('[data-chart-tooltip]:visible')
-        .should('contain.text', '点击其他区域关闭')
-        .and('contain.text', '合计');
+      cy.get('[data-testid="point-details-panel"]:visible')
+        .should('have.attr', 'aria-label', '数据点详情')
+        .and('contain.text', '合计')
+        .find('[data-testid="point-details-close"]')
+        .should('have.attr', 'aria-label', '关闭数据点详情');
       cy.contains('th button', '投机解码').should('be.visible');
       cy.contains('th button', '数据点').click().parent('th').should('have.attr', 'aria-sort');
       cy.get('button[aria-label="展开配置详情"]').first().click();
@@ -231,7 +233,7 @@ describe('Chinese (/zh) pages', () => {
         .should('contain.text', '投机解码方法：')
         .and('contain.text', '分离式部署：')
         .and('contain.text', '聚合推理芯片数：');
-      cy.get('input[placeholder="搜索配置……"]').type('atom-disagg');
+      cy.get('input[placeholder="搜索配置"]').type('atom-disagg');
       cy.contains('tr', 'Mooncake ATOMesh')
         .first()
         .find('button[aria-label="展开配置详情"]')
@@ -241,14 +243,61 @@ describe('Chinese (/zh) pages', () => {
         .and('contain.text', '解码芯片数：');
     });
 
+    it('gives every vendor with submissions its own series, legend entry and dot', () => {
+      const row = {
+        model: 'dsr1',
+        framework: 'teacup',
+        precision: 'fp4',
+        spec_method: 'none',
+        disagg: false,
+        is_multinode: false,
+        num_prefill_gpu: 8,
+        num_decode_gpu: 8,
+        prefill_tp: 8,
+        prefill_ep: 1,
+        decode_tp: 8,
+        decode_ep: 1,
+        date: '2026-08-22',
+        total_datapoints: 8,
+        distinct_sequences: 1,
+        distinct_concurrencies: 8,
+        max_concurrency: 512,
+        image: null,
+      };
+      cy.intercept('GET', '**/api/v1/submissions', {
+        body: {
+          summary: ['h200', 'mi355x', 'jalapeno', 'tpuv7'].map((hardware) => ({
+            ...row,
+            hardware,
+          })),
+          volume: [
+            { date: '2026-08-17', hardware: 'h200', datapoints: 40 },
+            { date: '2026-08-17', hardware: 'mi355x', datapoints: 30 },
+            { date: '2026-08-22', hardware: 'jalapeno', datapoints: 28 },
+            { date: '2026-08-26', hardware: 'tpuv7', datapoints: 7 },
+          ],
+        },
+      }).as('vendorSubmissions');
+      cy.reload();
+      cy.wait('@vendorSubmissions');
+      cy.get('[role="group"][aria-label="基准测试提交活动图表"]').within(() => {
+        for (const label of ['NVIDIA', 'AMD', 'OpenAI', 'Google', '合计']) {
+          cy.contains('button, li', label).should('be.visible');
+        }
+      });
+      for (const vendor of ['NVIDIA', 'AMD', 'OpenAI', 'Google']) {
+        cy.get(`tbody span[role="img"][aria-label="${vendor}"]`).should('be.visible');
+      }
+    });
+
     it('separates localized empty chart and table states', () => {
       cy.intercept('GET', '**/api/v1/submissions', { body: { summary: [], volume: [] } }).as(
         'emptySubmissions',
       );
       cy.reload();
       cy.wait('@emptySubmissions');
-      cy.contains('暂无提交活动数据。').should('be.visible');
-      cy.contains('暂无提交记录。').should('be.visible');
+      cy.contains('暂无提交活动数据').should('be.visible');
+      cy.contains('暂无提交记录').should('be.visible');
     });
 
     it('shows a safe error and retries through a real button click', () => {
@@ -262,14 +311,14 @@ describe('Chinese (/zh) pages', () => {
       }).as('retrySubmissions');
       cy.reload();
       cy.wait('@retrySubmissions');
-      cy.contains('加载提交数据失败。').should('be.visible');
+      cy.contains('加载提交数据失败').should('be.visible');
       cy.contains('submissions-database-internal-detail').should('not.exist');
       cy.contains('button', '重试')
         .then(() => {
           failRequests = false;
         })
         .click();
-      cy.contains('暂无提交记录。').should('be.visible');
+      cy.contains('暂无提交记录').should('be.visible');
     });
 
     it('keeps the chart labels readable and the table scrollable at 375px', () => {
@@ -308,7 +357,7 @@ describe('Chinese (/zh) pages', () => {
 
     it('localizes the empty state, key validation, and accessibility label', () => {
       cy.viewport(1440, 900);
-      cy.get('[data-testid="feedback-viewer"]').should('contain.text', '暂无反馈记录。');
+      cy.get('[data-testid="feedback-viewer"]').should('contain.text', '暂无反馈记录');
       cy.get('button[aria-label="显示密钥"]').should('be.visible');
       cy.get('[data-testid="feedback-key-input"]').type('invalid-key');
       cy.get('[data-testid="feedback-key-submit"]').click();
@@ -332,7 +381,7 @@ describe('Chinese (/zh) pages', () => {
       cy.reload();
       cy.wait('@retryFeedbackList');
       cy.wait('@retryFeedbackList');
-      cy.contains('无法加载反馈数据。').should('be.visible');
+      cy.contains('无法加载反馈数据').should('be.visible');
       cy.contains('feedback-database-internal-detail').should('not.exist');
       cy.contains('button', '重试')
         .then(() => {
@@ -340,7 +389,7 @@ describe('Chinese (/zh) pages', () => {
         })
         .click();
       cy.wait('@retryFeedbackList');
-      cy.contains('暂无反馈记录。').should('be.visible');
+      cy.contains('暂无反馈记录').should('be.visible');
     });
 
     it('keeps the key controls and content within 375px', () => {

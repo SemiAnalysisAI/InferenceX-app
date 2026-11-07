@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  generateTooltipContent,
-  generateGPUGraphTooltipContent,
-  generateOverlayTooltipContent,
-} from '@/components/inference/utils/tooltipUtils';
+  comparisonDetailsText,
+  detailsText,
+} from '@/components/inference/utils/point-details-test-helpers';
 import { transformBenchmarkRows } from './benchmark-transform';
 import type { BenchmarkRow } from '@/lib/api/api';
 import previewSnapshots from '../../../cypress/fixtures/preview-snapshots.json';
@@ -24,30 +23,22 @@ describe('explicit deployment chip counts', () => {
     const config = {
       data: point,
       hardwareConfig,
-      isPinned: false,
       xLabel: 'Interactivity',
       yLabel: 'Throughput',
       selectedYAxisMetric: 'y_tpPerGpu',
       locale,
     };
     const htmls = [
-      generateTooltipContent(config),
-      generateGPUGraphTooltipContent(config),
-      generateOverlayTooltipContent({
+      detailsText(config),
+      comparisonDetailsText(config),
+      detailsText({
         ...config,
         overlayData: { data: chartData[0], hardwareConfig, label: 'test-run' },
       }),
     ];
     for (const html of htmls) {
-      expect(html).toContain(
-        `${locale === 'en' ? 'Total Chips' : '芯片总数'}${locale === 'en' ? ':' : '：'}</strong> 8`,
-      );
-      expect(html).toContain(
-        `${locale === 'en' ? 'Tensor Parallelism' : '张量并行 (TP)'}${locale === 'en' ? ':' : '：'}</strong> 1`,
-      );
-      expect(html).toContain(
-        `${locale === 'en' ? 'Expert Parallelism' : '专家并行 (EP)'}${locale === 'en' ? ':' : '：'}</strong> 8`,
-      );
+      expect(html).toContain(locale === 'en' ? '8 chips · EP8' : '8 芯片 · EP8');
+      expect(html).toContain('TP 1 · EP 8');
     }
   });
 

@@ -26,9 +26,9 @@ import { useLocale } from '@/lib/i18n/use-locale';
 const STRINGS = {
   en: {
     expandHint: 'Click to expand',
-    previous: 'Previous Chip',
-    next: 'Next Chip',
-    title: 'Scale-Out Topology',
+    previous: 'Previous chip',
+    next: 'Next chip',
+    title: 'Scale-out topology',
     diagram: 'scale-out topology diagram',
     leafSwitch: 'Leaf switch:',
     spineSwitch: 'Spine switch:',
@@ -36,7 +36,7 @@ const STRINGS = {
     servers: 'servers',
     chip: 'Chip',
     pod: 'Pod',
-    railPod: 'Rail Pod',
+    railPod: 'Rail pod',
     spine: 'Spine',
     leaf: 'Leaf',
   },
@@ -128,7 +128,7 @@ export const TopologyDiagram = forwardRef<
   return (
     <div className="flex flex-col">
       <div className="flex items-center gap-2 mb-2">
-        <h4 className="text-sm font-semibold">{spec.name}</h4>
+        <h4 className="text-sm font-medium">{spec.name}</h4>
         <span className="text-xs text-muted-foreground">
           {formatScaleOutTopology(spec.scaleOutTopology!, locale)} &middot;{' '}
           {compactConfig.networkTech}
@@ -159,7 +159,7 @@ export const TopologyDiagram = forwardRef<
               aria-label={t.previous}
               data-testid="topology-nav-prev"
             >
-              <ChevronLeft className="size-5" />
+              <ChevronLeft className="size-4" />
             </Button>
             <DialogHeader className="flex-1">
               <DialogTitle>
@@ -180,7 +180,7 @@ export const TopologyDiagram = forwardRef<
               aria-label={t.next}
               data-testid="topology-nav-next"
             >
-              <ChevronRight className="size-5" />
+              <ChevronRight className="size-4" />
             </Button>
           </div>
           {displayedConfig && (
@@ -532,13 +532,13 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
         .attr('width', spineBoxW)
         .attr('height', spineBoxH)
         .attr('rx', 4)
-        .attr('class', 'fill-purple-500/10 stroke-purple-500/50')
+        .attr('class', 'fill-muted stroke-muted-foreground/40')
         .attr('stroke-width', 1);
       g.append('text')
         .attr('x', pos.cx)
         .attr('y', spineY + spineBoxH / 2 + (compact ? 3 : 4))
         .attr('text-anchor', 'middle')
-        .attr('class', 'fill-purple-400 font-medium')
+        .attr('class', 'fill-foreground font-medium')
         .style('font-size', fontSize)
         .text(`S${i}`);
     }
@@ -550,14 +550,14 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
       .attr('width', pod1W)
       .attr('height', pod1H)
       .attr('rx', 8)
-      .attr('class', 'fill-green-500/5 stroke-green-500/30')
+      .attr('class', 'fill-none stroke-muted-foreground/30')
       .attr('stroke-width', 1)
       .attr('stroke-dasharray', '4 2');
     svg
       .append('text')
       .attr('x', pod1X + podPad)
       .attr('y', podY + podLabelH - 2)
-      .attr('class', 'fill-green-500/70')
+      .attr('class', 'fill-muted-foreground')
       .style('font-size', labelFontSize)
       .style('font-weight', '500')
       .text(`${podCount > 1 ? `${t.pod} 1` : t.railPod} (${serversPerPod} ${t.servers})`);
@@ -572,13 +572,13 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
         .attr('width', leafBoxW)
         .attr('height', leafBoxH)
         .attr('rx', 4)
-        .attr('class', 'fill-amber-500/10 stroke-amber-500/50')
+        .attr('class', 'fill-muted stroke-muted-foreground/40')
         .attr('stroke-width', 1);
       g.append('text')
         .attr('x', pos.cx)
         .attr('y', leafY + leafBoxH / 2 + (compact ? 3 : 4))
         .attr('text-anchor', 'middle')
-        .attr('class', 'fill-amber-400 font-medium')
+        .attr('class', 'fill-foreground font-medium')
         .style('font-size', fontSize)
         .text(`L${i}`);
     }
@@ -611,20 +611,20 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
         .attr('width', nicBoxW)
         .attr('height', nicBoxH)
         .attr('rx', 3)
-        .attr('class', 'fill-blue-500/10 stroke-blue-500/50')
+        .attr('class', 'fill-muted/50 stroke-muted-foreground/30')
         .attr('stroke-width', 1);
       g.append('text')
         .attr('x', pos.cx)
         .attr('y', nicY + nicBoxH / 2 - (compact ? 2 : 3))
         .attr('text-anchor', 'middle')
-        .attr('class', 'fill-blue-400')
+        .attr('class', 'fill-muted-foreground')
         .style('font-size', smallFontSize)
         .text(nicLine1);
       g.append('text')
         .attr('x', pos.cx)
         .attr('y', nicY + nicBoxH / 2 + (compact ? 6 : 8))
         .attr('text-anchor', 'middle')
-        .attr('class', 'fill-blue-400')
+        .attr('class', 'fill-muted-foreground')
         .style('font-size', smallFontSize)
         .text(nicLine2);
     }
@@ -695,7 +695,7 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
         .attr('width', absPodW)
         .attr('height', absPodH)
         .attr('rx', 8)
-        .attr('class', 'fill-green-500/5 stroke-green-500/30')
+        .attr('class', 'fill-none stroke-muted-foreground/30')
         .attr('stroke-width', 1)
         .attr('stroke-dasharray', '4 2');
       g.append('text')
@@ -703,7 +703,7 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
         .attr('y', podY + absPodH / 2)
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'middle')
-        .attr('class', 'fill-green-500/50')
+        .attr('class', 'fill-muted-foreground')
         .style('font-size', smallFontSize)
         .style('font-weight', '500')
         .text(`${t.pod} ${i + 2}`);

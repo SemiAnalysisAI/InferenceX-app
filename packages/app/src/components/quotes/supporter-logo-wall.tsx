@@ -12,11 +12,11 @@ import { SupporterLogoImage } from './supporter-logo-image';
 
 const STRINGS = {
   en: {
-    heading: 'Backed by every lab, cloud and OSS project',
+    heading: 'Labs, clouds and open-source projects',
     jumpTo: (org: string) => `Jump to ${org}’s quote`,
   },
   zh: {
-    heading: '获得各大实验室、云平台与开源项目的支持',
+    heading: '实验室、云平台与开源项目',
     jumpTo: (org: string) => `查看 ${org} 的评价`,
   },
 } as const;
@@ -91,7 +91,7 @@ export function SupporterLogoWall({
   const t = STRINGS[locale];
   return (
     <section aria-labelledby="supporter-wall-heading" data-testid="supporter-logo-wall">
-      <h2 id="supporter-wall-heading" className="text-lg font-semibold text-balance break-keep">
+      <h2 id="supporter-wall-heading" className="text-xl font-semibold text-balance break-keep">
         {t.heading}
       </h2>
       <div className="mt-6 flex flex-col gap-6 lg:gap-5">

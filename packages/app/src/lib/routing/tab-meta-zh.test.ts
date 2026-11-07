@@ -36,23 +36,23 @@ describe('isZhTab', () => {
 describe('tabMetadataZh', () => {
   it('canonicalizes the inference tab to its own zh URL, not the zh landing page', () => {
     const meta = tabMetadataZh('inference');
-    expect(meta.alternates?.canonical).toBe(`${SITE_URL}/zh/inference`);
+    expect(meta.alternates?.canonical).toBe(`${SITE_URL}/zh/infx/inference`);
   });
 
   it('canonicalizes other tabs to their own zh URL with bidirectional hreflang', () => {
     const meta = tabMetadataZh('evaluation');
-    expect(meta.alternates?.canonical).toBe(`${SITE_URL}/zh/evaluation`);
+    expect(meta.alternates?.canonical).toBe(`${SITE_URL}/zh/infx/evaluation`);
     expect(meta.alternates?.languages).toEqual({
-      en: `${SITE_URL}/evaluation`,
-      'zh-CN': `${SITE_URL}/zh/evaluation`,
-      'x-default': `${SITE_URL}/evaluation`,
+      en: `${SITE_URL}/infx/evaluation`,
+      'zh-CN': `${SITE_URL}/zh/infx/evaluation`,
+      'x-default': `${SITE_URL}/infx/evaluation`,
     });
   });
 
   it('sets the zh Open Graph locale and URL', () => {
     const meta = tabMetadataZh('gpu-specs');
     expect(meta.openGraph?.locale).toBe('zh_CN');
-    expect(meta.openGraph?.url).toBe(`${SITE_URL}/zh/gpu-specs`);
+    expect(meta.openGraph?.url).toBe(`${SITE_URL}/zh/infx/gpu-specs`);
   });
 });
 

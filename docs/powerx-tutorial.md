@@ -1,6 +1,6 @@
 # PowerX Tutorial
 
-`/powerx/tutorial` and `/zh/powerx/tutorial` render `packages/app/content/powerx/tutorial.mdx` and
+`/pwx/tutorial` and `/zh/pwx/tutorial` render `packages/app/content/powerx/tutorial.mdx` and
 `zh/tutorial.mdx` through `compileBlogMdx(raw, locale, createPowerXTutorialComponents(locale))`.
 The pages are the only rendering target; the files are not written for GitHub.
 

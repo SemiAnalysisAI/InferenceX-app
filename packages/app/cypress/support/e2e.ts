@@ -110,12 +110,15 @@ export function expectNoPageOverflow(): void {
 }
 
 export function openXAxisMenu(): void {
+  cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value');
   cy.get('[data-testid="inference-secondary-controls"] > button').then(($toggle) => {
     if ($toggle.is(':visible') && $toggle.attr('aria-expanded') !== 'true') {
       cy.wrap($toggle).click();
     }
   });
-  cy.get('[data-testid="x-axis-mode-selector"]').click();
+  // Centered so the sticky header cannot cover it, and on the chevron so the selected option's
+  // help icon does not take the click.
+  cy.get('[data-testid="x-axis-mode-selector"]').click('right', { scrollBehavior: 'center' });
 }
 
 export function selectXAxisMode(

@@ -33,9 +33,20 @@ const THEME_ICONS: Record<string, LucideIcon> = {
   excalidraw: PencilLine,
 };
 
+const ZH_THEME_NAMES: Record<string, string> = { light: '浅色', dark: '深色' };
+
 const STRINGS = {
-  en: { orangeChicken: 'Switch theme (currently orange chicken mode)' },
-  zh: { orangeChicken: '切换主题（当前为陈皮鸡主题）' },
+  en: {
+    orangeChicken: 'Switch theme (currently orange chicken mode)',
+    switchTheme: 'Switch theme',
+    currentTheme: (theme: string) => `Switch theme (currently ${theme} mode)`,
+  },
+  zh: {
+    orangeChicken: '切换主题（当前为陈皮鸡主题）',
+    switchTheme: '切换主题',
+    currentTheme: (theme: string) =>
+      `切换主题（当前为${ZH_THEME_NAMES[theme] ?? ` ${theme} `}主题）`,
+  },
 };
 
 function PendingIcon() {
@@ -74,9 +85,9 @@ export function ModeToggle() {
       aria-label={
         current === 'orange-chicken'
           ? strings.orangeChicken
-          : mounted
-            ? `Switch theme (currently ${theme} mode)`
-            : 'Switch theme'
+          : mounted && theme
+            ? strings.currentTheme(theme)
+            : strings.switchTheme
       }
       onClick={toggleTheme}
     >

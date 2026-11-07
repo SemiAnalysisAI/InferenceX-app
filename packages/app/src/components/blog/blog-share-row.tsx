@@ -47,8 +47,8 @@ export function BlogShareRow({ title, slug, labels, className }: BlogShareRowPro
       <ShareLinkedInButton />
       <Button
         variant="outline"
-        size="icon"
-        className={cn('size-7', copied && 'text-brand')}
+        size="icon-xs"
+        className={cn(copied && 'text-brand')}
         title={copied ? labels.copied : labels.copyLink}
         aria-label={copied ? labels.copied : labels.copyLink}
         data-testid="blog-copy-link"

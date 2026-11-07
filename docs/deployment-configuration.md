@@ -73,9 +73,14 @@ and the repository root `.vercelignore` assumes that layout. It defines no cron 
 deploys, so they are not marked immutable. Optimized images (`/_next/image`) are served as
 WebP with a one-day `minimumCacheTTL`. `src/proxy.ts` runs only for API requests from the
 `inferencex-cli` and `inferencex-skill` user agents, embed pages, legacy Inference power links,
-gated saved model selections, model-route aliases and retired profit percentiles, and compare
-share links with query state. Its `config.matcher` must stay a static literal, so its list of model
-aliases has to change whenever `COMPARE_MODEL_ALIASES` does (`proxy.test.ts` checks this).
+gated saved model selections, model-route aliases and retired profit percentiles, compare
+share links with query state, and dashboard paths from before the `/infx` and `/opx` split. Those
+old paths (`/inference`, `/agentx`, `/operatorx`, and the rest) get one 308 to the path in
+`dashboard-routes.ts`, keeping the `/zh` prefix, subpath and query. The table lives in
+`lib/routing/legacy-dashboard-redirect.ts` and is built from each route's `legacyPath`. Bare `/infx`
+goes to the Inference tab. Its `config.matcher` must stay a static literal, so its list of model
+aliases has to change whenever `COMPARE_MODEL_ALIASES` does, and its list of old first segments
+whenever a `legacyPath` does (`proxy.test.ts` checks both).
 
 `patches/next@16.3.3.patch` (root `patchedDependencies`) fixes the self-hosted image optimizer
 used by `next start`, including CI. Unpatched, Next reads a local source image through a mocked

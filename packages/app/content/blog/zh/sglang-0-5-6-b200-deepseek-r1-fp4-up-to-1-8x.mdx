@@ -18,7 +18,7 @@ B200 运行 SGLang 0.5.6 处理 DeepSeek R1 NVFP4 在 8k/1k 工作负载并发�
 
 SGLang 0.5.6 于 2025-12-03 发布，InferenceX 基准测试在 28 天后的 2025-12-31（镜像更新当天）捕捉到了完整的性能提升效果。这正是我们构建 InferenceX 自动化基准测试循环的原因 — 在硬件不变的情况下，第一时间捕捉软件驱动的性能变化。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference">
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 
@@ -60,7 +60,7 @@ B200 SGLang，DeepSeek R1 NVFP4，TP 4 / EP 4 解码，16 GPU 非分离式资源
   caption="B200 DeepSeek R1 NVFP4 8k/1k，SGLang 0.5.5（2025-12-15）vs SGLang 0.5.6（2025-12-31）跨并发数的每 GPU 吞吐量。"
 />
 
-[实时图表](https://inferencex.semianalysis.com/inference?g_rundate=2025-12-31&g_runid=20621824084&i_prec=fp4%2Cfp8&i_gpus=b200_sglang&i_dstart=2025-12-15&i_dend=2025-12-31)，预筛选为 0.5.5 和 0.5.6 两次测试中 B200 SGLang 上的 DeepSeek R1。
+[实时图表](https://inferencex.semianalysis.com/infx/inference?g_rundate=2025-12-31&g_runid=20621824084&i_prec=fp4%2Cfp8&i_gpus=b200_sglang&i_dstart=2025-12-15&i_dend=2025-12-31)，预筛选为 0.5.5 和 0.5.6 两次测试中 B200 SGLang 上的 DeepSeek R1。
 
 ## 各项优化在曲线上的作用位置
 
@@ -68,7 +68,7 @@ TP 4 / EP 4 配置下 DeepSeek R1 NVFP4 的解码有固定的每步开销。kern
 
 在并发数 128 时，KV 缓存较大，注意力计算是每步的主要开销。重构后的 MHA 和 MLA KV 缓存对 FP4 的支持以及重新启用的 FlashInfer TRTLLM GEN MHA 路径在并发数 128 下产生了 1.16 倍的提升，尽管调度器开销的减少在此并发量级已趋于平坦。在中等并发数（16、32、64）下，两种效果均不占主导，吞吐量提升较小且不太稳定（1.02 倍、1.33 倍、1.03 倍）。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference">
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 

@@ -2,13 +2,16 @@
 
 import * as d3 from 'd3';
 import { Pin } from 'lucide-react';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useInferenceAnalyticsContext } from '@/components/inference/InferenceContext';
 import { track } from '@/lib/analytics/analytics';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
+import { rangeProgressStyle } from '@/components/ui/control-styles';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
@@ -59,6 +62,7 @@ const STRINGS = {
     comparedAt: (x: string, slider: string) =>
       `Compared at ${x} tok/s/user · slider at ${slider} tok/s/user`,
     legend: 'Power layers',
+    ofTotal: 'of total',
     bands: {
       gpu: 'GPU',
       measuredCpu: 'Grace CPU',
@@ -70,7 +74,7 @@ const STRINGS = {
     perGpu: 'W per GPU, all-in',
     perGpuIt: 'W per GPU, IT (no PUE)',
     itSubtotal: (watts: string) => `IT ${watts} W`,
-    empty: 'No chip has a benchmark point near this interactivity.',
+    empty: 'No chip has a benchmark point near this interactivity',
     noModel: (labels: string) =>
       `Not shown: ${labels}. Its GPU power is measured, but there is no whole-system model for this setup yet.`,
     categories: {
@@ -101,6 +105,7 @@ const STRINGS = {
     comparedAt: (x: string, slider: string) =>
       `对比点 ${x} tok/s/user · 滑块位于 ${slider} tok/s/user`,
     legend: '功耗分层',
+    ofTotal: '占总功耗',
     bands: {
       gpu: 'GPU',
       measuredCpu: 'Grace CPU',
@@ -112,7 +117,7 @@ const STRINGS = {
     perGpu: '每 GPU 整体功耗（W）',
     perGpuIt: '每 GPU IT 功耗（W，不含 PUE）',
     itSubtotal: (watts: string) => `IT ${watts} W`,
-    empty: '没有芯片在该交互性附近有基准测试点。',
+    empty: '没有芯片在该交互性附近有基准测试点',
     noModel: (labels: string) => `未显示：${labels}。其 GPU 功耗为实测，但该配置暂无整机功耗模型。`,
     categories: {
       gpu: 'GPU',
@@ -257,23 +262,22 @@ export default function PowerChipCompare({
   const bands = POWER_BANDS.filter((band) =>
     rows.some((row) => bandWattsPerGpu(row.entry, band) > 0),
   );
-  /** A segment's hover text: the layer, its watts and, when it folds several parts, each part. */
-  const segmentTitle = (entry: (typeof rows)[number]['entry'], band: PowerBand) => {
-    const parts = bandPartsAt(entry, band);
-    const head = `${t.bands[band]}: ${watts(bandWattsPerGpu(entry, band))} W`;
-    if (parts.length <= 1) return head;
-    return `${head} · ${parts.map((part) => `${t.categories[part.category]} ${watts(part.watts)} W`).join(' · ')}`;
-  };
+  const [segmentHover, setSegmentHover] = useState<{
+    x: number;
+    y: number;
+    label: string;
+    color: string;
+    band: PowerBand;
+    point: (typeof rows)[number]['entry'];
+  } | null>(null);
+  const hoveredParts = segmentHover ? bandPartsAt(segmentHover.point, segmentHover.band) : [];
   // No chip in this selection has a whole-system model: say so instead of leaving a gap.
   if (series.length === 0 || value === null) {
     return (
       <section className="min-w-0 space-y-3" data-testid="power-chip-compare">
         <p className="py-4 text-sm text-muted-foreground">{t.empty}</p>
         {unmodeled.length > 0 && (
-          <p
-            className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground"
-            data-testid="power-chip-compare-unmodeled"
-          >
+          <p className="text-xs text-muted-foreground" data-testid="power-chip-compare-unmodeled">
             {t.noModel(unmodeled.join(', '))}
           </p>
         )}
@@ -300,10 +304,8 @@ export default function PowerChipCompare({
               onTargetChange?.();
             }}
             onPointerUp={() => track('inference_power_compare_target_changed')}
-            className={cn(
-              'min-w-0 flex-1 accent-secondary dark:accent-primary',
-              powerX && 'powerx-range text-secondary dark:text-primary',
-            )}
+            className={cn('range-slider h-4 min-w-0 flex-1', powerX && 'powerx-range text-brand')}
+            style={rangeProgressStyle(toStep(value), 0, SLIDER_STEPS)}
             data-testid="power-chip-compare-target"
             aria-valuetext={`${rate(value)} ${t.unit}`}
           />
@@ -430,12 +432,29 @@ export default function PowerChipCompare({
                 return (
                   <span
                     key={band}
-                    title={segmentTitle(point, band)}
                     data-testid="power-chip-compare-segment"
                     data-band={band}
                     data-emphasis={powerLayerEmphasis(band, layers.highlight)}
-                    onMouseEnter={() => layers.hover(bandTarget(band))}
-                    onMouseLeave={() => layers.hover(null)}
+                    onMouseEnter={(event) => {
+                      layers.hover(bandTarget(band));
+                      setSegmentHover({
+                        x: event.clientX,
+                        y: event.clientY,
+                        label: entry.label,
+                        color,
+                        band,
+                        point,
+                      });
+                    }}
+                    onMouseMove={(event) =>
+                      setSegmentHover(
+                        (prev) => prev && { ...prev, x: event.clientX, y: event.clientY },
+                      )
+                    }
+                    onMouseLeave={() => {
+                      layers.hover(null);
+                      setSegmentHover(null);
+                    }}
                     className="flex h-full items-center justify-center border-r border-background/70 text-2xs font-medium tabular-nums text-foreground last:border-r-0"
                     style={{
                       width: `${(w / point.totalWattsPerGpu) * 100}%`,
@@ -531,7 +550,7 @@ export default function PowerChipCompare({
                 </button>
                 {expanded && (
                   <div
-                    className="mt-1.5 mb-3 rounded-md border border-border/60 p-3"
+                    className="mt-1.5 mb-3 rounded-lg border border-border/30 p-3"
                     data-testid="power-chip-compare-drilldown"
                   >
                     {renderExpanded(entry.key)}
@@ -542,11 +561,47 @@ export default function PowerChipCompare({
           })}
         </ol>
       )}
+      {segmentHover && (
+        <FloatingTooltip
+          x={segmentHover.x}
+          y={segmentHover.y}
+          data-testid="power-chip-compare-hover-card"
+        >
+          <ChartHoverCardBody
+            title={segmentHover.label}
+            subtitle={`${t.bands[segmentHover.band]} · ${
+              MEASURED_POWER_BANDS.has(segmentHover.band) ? t.measured : t.modeled
+            }`}
+            color={segmentHover.color}
+            metrics={[
+              {
+                value: watts(bandWattsPerGpu(segmentHover.point, segmentHover.band)),
+                label: 'W/GPU',
+              },
+              {
+                value: pct(
+                  bandWattsPerGpu(segmentHover.point, segmentHover.band) /
+                    segmentHover.point.totalWattsPerGpu,
+                ),
+                label: t.ofTotal,
+              },
+            ]}
+            summary={[
+              ...(hoveredParts.length > 1
+                ? hoveredParts.map(
+                    (part) => `${t.categories[part.category]} ${watts(part.watts)} W`,
+                  )
+                : []),
+              t.at(segmentHover.point.concurrency, rate(segmentHover.point.interactivity)),
+            ].join(' · ')}
+          />
+        </FloatingTooltip>
+      )}
       {/* A chip picked in the drill-down's Hardware select may have no bar near this
           interactivity; its drill-down then follows the list instead of vanishing. */}
       {expandedKey !== null && !rows.some((row) => row.series.key === expandedKey) && (
         <div
-          className="rounded-md border border-border/60 p-3"
+          className="rounded-lg border border-border/30 p-3"
           data-testid="power-chip-compare-drilldown"
         >
           {renderExpanded(expandedKey)}
@@ -561,10 +616,7 @@ export default function PowerChipCompare({
         {FACILITY_PUE_NOTE[locale]}
       </p>
       {unmodeled.length > 0 && (
-        <p
-          className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground"
-          data-testid="power-chip-compare-unmodeled"
-        >
+        <p className="text-xs text-muted-foreground" data-testid="power-chip-compare-unmodeled">
           {t.noModel(unmodeled.join(', '))}
         </p>
       )}

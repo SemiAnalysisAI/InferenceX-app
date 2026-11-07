@@ -16,6 +16,15 @@ describe('VideoGenX results routes', () => {
     });
   });
 
+  it('moves old /video links to /vgx with the query intact', () => {
+    cy.visit('/zh/video?r_hidden=b200');
+    cy.location().should((location) => {
+      expect(location.pathname).to.eq('/zh/vgx');
+      expect(location.search).to.eq('?r_hidden=b200');
+    });
+    cy.get('#checkbox-b200').should('not.be.checked');
+  });
+
   it('keeps the shared fixture projection across reload, language changes and detail history', () => {
     const search = 'r_hidden=b200&r_tier=r';
     resultHistory().then((page) => {
@@ -26,11 +35,13 @@ describe('VideoGenX results routes', () => {
         'h100',
         'h200',
       ]);
-      cy.visit(`/video?${search}`);
+      cy.visit(`/vgx?${search}`);
       cy.wait('@history');
       row('h200')
+        .closest('tr')
         .find('td')
         .eq(6)
+        .find('[data-value]')
         .invoke('attr', 'data-value')
         .then((value) => {
           expect(
@@ -42,14 +53,14 @@ describe('VideoGenX results routes', () => {
     cy.get('#checkbox-b200').should('not.be.checked');
     cy.reload();
     cy.get('#checkbox-b200').should('not.be.checked');
-    cy.location('search').then((sharedSearch) => cy.visit(`/zh/video${sharedSearch}`));
+    cy.location('search').then((sharedSearch) => cy.visit(`/zh/vgx${sharedSearch}`));
     cy.get('#checkbox-b200').should('not.be.checked');
     cy.get('#video-results-chart-title').should('contain', '每 1 美元 TCO 生成的视频秒数');
     row('h200').should('exist');
     cy.get('label[for="checkbox-b200"]').click();
     row('b200').should('exist');
     cy.location('search').should('not.contain', 'r_hidden=');
-    row('h200').find('button').click();
+    row('h200').click();
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
     cy.location('search').should('contain', 'r_point=');
     cy.go('back');
@@ -67,13 +78,15 @@ describe('VideoGenX results routes', () => {
       })
       .click();
     cy.location('search').should('not.contain', 'r_point=');
-    row('h200').should('be.visible');
+    row('h200')
+      .scrollIntoView({ offset: { top: -200, left: 0 } })
+      .should('be.visible');
     cy.go('forward');
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
   });
 
   it('preserves the selected published overlay through filtering and dismisses it explicitly', () => {
-    cy.visit('/video?unofficialrun=34342452354&other=1&r_y=videosPerGpuHour');
+    cy.visit('/vgx?unofficialrun=34342452354&other=1&r_y=videosPerGpuHour');
     cy.get('[data-testid="results-overlay"]').should('contain', '34342452354');
     cy.get('[data-testid="results-overlay-dismiss"]').should('be.visible');
     row('h200').should('exist');

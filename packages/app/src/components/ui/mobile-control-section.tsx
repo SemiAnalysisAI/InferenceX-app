@@ -35,7 +35,7 @@ export function MobileControlSection({
           setMobileOpen((open) => !open);
           track('selector_secondary_controls_toggled', { section: testId, enabled: !mobileOpen });
         }}
-        className="mb-3 flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-md border border-border/70 bg-muted/10 px-3 text-left text-sm font-medium text-foreground md:hidden"
+        className="mb-3 flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-lg border border-border/70 bg-muted/10 px-3 text-left text-sm font-medium text-foreground md:hidden"
       >
         <span>{label}</span>
         <span className="flex shrink-0 items-center gap-2 text-xs font-normal text-muted-foreground">

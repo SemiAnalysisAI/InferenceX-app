@@ -4,7 +4,7 @@ import { getDataset, type DatasetDetail } from '@semianalysisai/inferencex-db/qu
 import { cachedQuery } from '@/lib/cache/api-cache';
 
 /**
- * One dataset by slug, shared by `/api/v1/datasets/[slug]` and the `/agentx/[slug]` pages so both
+ * One dataset by slug, shared by `/api/v1/datasets/[slug]` and the `/infx/agentx/[slug]` pages so both
  * read the same cache entry. Keyed per slug, so a newly ingested dataset resolves on its first
  * request instead of waiting for a purge of a cached whole-catalog list.
  */

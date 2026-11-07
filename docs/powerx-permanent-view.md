@@ -1,6 +1,6 @@
 # PowerX Permanent View
 
-How the PowerX article's power-boundary figures live inside `/inference` instead of a
+How the PowerX article's power-boundary figures live inside `/infx/inference` instead of a
 separate page. The measured-power UI, the four power boundaries, and their share links all
 sit in the existing ↑↑↓↓←→←→BA-gated **Measured Energy** metric group.
 
@@ -77,8 +77,8 @@ the selection has no measured GPU power (`noMeasuredDataHint`) instead of the ge
 
 ## PowerX layout
 
-`/powerx` and `/zh/powerx` render the shared `ChartDisplay` data pipeline and the same page
-chrome as `/inference`, so the two tabs read as one dashboard. Nothing in the data layer
+`/pwx` and `/zh/pwx` render the shared `ChartDisplay` data pipeline and the same page
+chrome as `/infx/inference`, so the two tabs read as one dashboard. Nothing in the data layer
 changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share links,
 `?unofficialrun=` overlays and the views API are untouched.
 
@@ -86,16 +86,16 @@ PowerX sits behind the ↑↑↓↓←→←→BA feature gate (uppercase `B` an
 the letters are case-sensitive; use Caps Lock or Shift. Previously saved four-arrow
 unlocks are invalid when the updated app loads, so those visitors must enter the full
 code again. This is a client-side visibility flag, not authentication.
-`/powerx` is a `feature-gated` route, so it is
+`/pwx` is a `feature-gated` route, so it is
 listed under **Hidden** only once the gate is unlocked, and the AgentX point detail offers its
-PowerX view on the same condition. It is a soft flag: `PowerXFeatureGate` wraps `/powerx`,
-`/zh/powerx` and both tutorial pages, renders nothing until it reads the gate on the client,
+PowerX view on the same condition. It is a soft flag: `PowerXFeatureGate` wraps `/pwx`,
+`/zh/pwx` and both tutorial pages, renders nothing until it reads the gate on the client,
 and replaces a locked visitor onto the landing page (`/` or `/zh`), including after a relock.
 The gate lives in localStorage, so the server still sends the page and the read-only API is
 unchanged; the flag hides PowerX, it does not secure its data. An AgentX `?view=power` share
 link still opens that view for locked visitors.
 
-- Header card (`DashboardSectionHeader` + `ChartControls`, as on `/inference`): title and
+- Header card (`DashboardSectionHeader` + `ChartControls`, as on `/infx/inference`): title and
   description, then the four views as a tab strip (`PowerXViewTabs`: Energy per token, Power
   draw, Where the power goes, Over time; `powerx-views.ts` maps each tab onto a metric +
   compare pair, see `selectPowerXView`), then the **Benchmark Config** fieldset (Model,
@@ -107,14 +107,14 @@ link still opens that view for locked visitors.
   boundaries, `ENERGY_METRICS` in `powerx-views.ts`), and the Rated boundaries toggle where rated lines exist, all as
   plain labelled controls with no expander) in place of the Y-axis metric pick, the
   **Compare history** fieldset, and the run date / run / changelog row. On phones the Chart Config and
-  Compare history fieldsets fold into "More chart controls" exactly as on `/inference`. Under `md`
+  Compare history fieldsets fold into "More chart controls" exactly as on `/infx/inference`. Under `md`
   the view tabs become a 2×2 grid of 48 px buttons, Count and Per (or Show as) render as native
   selects (`SegmentedToggle` `variant="select"`, each option carrying the segment's hover hint),
   and the X-Axis Metric, Scope, Power statistic and Rated boundaries sit behind one "More" row
   (`powerx-more`, "More · N changed" via `powerXSecondaryChangedCount`); dashboard toasts stay
   off there and the pinned point sheet says Tap. From `md` up nothing changes.
 - The Chart/Table toggle and the export menu sit above the chart card, right-aligned, like
-  `/inference`; the chart card keeps the h2 caption (model logo + title), the Updated / Source
+  `/infx/inference`; the chart card keeps the h2 caption (model logo + title), the Updated / Source
   line, the readout badge row, the Quick Filters legend (no PowerX controls in the rail) and
   the footer notes. On phones the plot height is capped at 55 % of the viewport.
 - Where the power goes (`i_pcompare=breakdown`): the caption stays at the top of the card and
@@ -169,7 +169,7 @@ link still opens that view for locked visitors.
   260 px high instead of 380 (`PHONE_PLOT_HEIGHT`). From `md` up nothing changes.
 - A pinned point's "View power trace" action opens the Over time view focused on that trace.
 - The footer carries no PowerX-specific note: the former collapsed "How we measure" details
-  is gone, and only the shared /inference footer notes remain. The meaning of the GPU /
+  is gone, and only the shared /infx/inference footer notes remain. The meaning of the GPU /
   IT / Facility tags lives in each pill's `title` (`POWER_BASIS_TAG_TITLES`), not in prose.
 
 ### P0 additions (IT basis, headroom, load swings, labels)
@@ -234,9 +234,9 @@ link still opens that view for locked visitors.
 
 ## Article figure → share link
 
-Base: `/powerx?g_model=<model>&i_seq=8k/1k&i_prec=<precision>` plus the hardware legend
-selection. Old `/inference` links that carry a measured `i_metric`, or a power-tier filter (`i_power`)
-with no metric, are redirected to `/powerx` with the same query by `src/proxy.ts`
+Base: `/pwx?g_model=<model>&i_seq=8k/1k&i_prec=<precision>` plus the hardware legend
+selection. Old `/infx/inference` links that carry a measured `i_metric`, or a power-tier filter (`i_power`)
+with no metric, are redirected to `/pwx` with the same query by `src/proxy.ts`
 (`lib/routing/powerx-redirect.ts`; the no-metric case lands on the Power draw scatter,
 `i_metric=y_measuredAvgPower`, as such links used to chart power); Inference Performance
 no longer offers power metrics. Append:

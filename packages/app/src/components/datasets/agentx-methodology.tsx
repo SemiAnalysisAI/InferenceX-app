@@ -1,17 +1,24 @@
+import { ArrowRight } from 'lucide-react';
+
+import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
+import { Stat } from '@/components/ui/stat';
+import { cn } from '@/lib/shared/utils';
 
 import { AgentXMethodologyLink } from './agentx-methodology-link';
 import { AgentXSessionReplay } from './agentx-session-replay';
 import { AgentXOptimizationsCallout } from './agentx-optimizations-callout';
 import { AgentXTelemetryCallout } from './agentx-telemetry-callout';
 import { AgentXQuickstartCallout } from './agentx-quickstart';
+import { AGENTX_ROUTE, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 type Locale = 'en' | 'zh';
 
 const CONTENT = {
   en: {
     eyebrow: 'AgentX v1.0 methodology',
-    title: 'AgentX Benchmark Datasets',
+    title: 'AgentX benchmark datasets',
     intro:
       'AgentX derives replay workloads from opt-in Claude Code sessions. The published traces remove prompt, code, and tool payloads while retaining request lengths, prefix reuse, subagent branches, and timing.',
     processTitle: 'How an AgentX run is built',
@@ -90,7 +97,7 @@ const CONTENT = {
       },
     ],
     methodologyCta: 'Read the full methodology',
-    resultsCta: 'View AgentX Performance Results',
+    resultsCta: 'View AgentX performance results',
   },
   zh: {
     eyebrow: 'AgentX v1.0 测试方法',
@@ -179,28 +186,33 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
   const t = CONTENT[locale];
 
   return (
-    <Card className="overflow-hidden p-0" data-testid="agentx-methodology">
-      <header className="border-b border-border/60 bg-muted/20 px-5 py-5 sm:px-6">
-        <p className="mb-2 font-mono text-2xs font-medium uppercase tracking-eyebrow text-primary">
-          {t.eyebrow}
-        </p>
-        <h1 className="text-xl font-semibold text-foreground">{t.title}</h1>
+    <Card className="overflow-hidden p-0 md:p-0" data-testid="agentx-methodology">
+      <header className="border-b border-border/20 px-5 py-5 sm:px-6">
+        <p className="mb-2 text-xs font-medium text-muted-foreground">{t.eyebrow}</p>
+        <Heading as="h1" level="title">
+          {t.title}
+        </Heading>
         <p className="mt-3 max-w-4xl text-sm leading-6 text-muted-foreground">{t.intro}</p>
         <AgentXMethodologyLink
-          href={locale === 'zh' ? '/zh/inference' : '/inference'}
+          href={
+            locale === 'zh'
+              ? `/zh${getDashboardRoute('inference').path}`
+              : getDashboardRoute('inference').path
+          }
           analyticsEvent="agentx_results_opened"
           analyticsTarget="methodology-header"
           data-testid="agentx-results-cta"
-          className="mt-4 inline-flex min-h-11 items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          className={cn(buttonVariants({ variant: 'brand' }), 'mt-4')}
         >
-          {t.resultsCta} →
+          {t.resultsCta}
+          <ArrowRight aria-hidden="true" />
         </AgentXMethodologyLink>
       </header>
 
       <AgentXSessionReplay locale={locale} />
 
       <div className="space-y-8 px-5 py-6 sm:px-6">
-        <AgentXQuickstartCallout locale={locale} />
+        <AgentXQuickstartCallout locale={locale} wide />
 
         <AgentXOptimizationsCallout locale={locale} />
 
@@ -210,11 +222,11 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
           <h2 id="agentx-process-title" className="mb-3 text-base font-semibold text-foreground">
             {t.processTitle}
           </h2>
-          <ol className="grid gap-px overflow-hidden rounded-lg border border-border/70 bg-border/70 sm:grid-cols-2">
+          <ol className="grid gap-px overflow-hidden rounded-lg border border-border/30 bg-border/70 sm:grid-cols-2">
             {t.steps.map((step, index) => (
               <li key={step.title} className="bg-card p-4" data-testid="agentx-methodology-step">
                 <div className="mb-2 flex items-baseline gap-2">
-                  <span className="font-mono text-2xs text-primary">
+                  <span className="font-mono text-2xs text-muted-foreground">
                     {String(index + 1).padStart(2, '0')}
                   </span>
                   <h3 className="text-sm font-semibold text-foreground">{step.title}</h3>
@@ -230,20 +242,11 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
             {t.datasetTitle}
           </h2>
           <p className="text-sm leading-6 text-muted-foreground">{t.datasetIntro}</p>
-          <div className="mt-4 border-y border-border/70 py-4">
-            <p className="mb-3 font-mono text-xs font-semibold tracking-eyebrow-wide text-brand uppercase">
-              {t.profileLabel}
-            </p>
+          <div className="mt-4 border-y border-border/20 py-4">
+            <p className="mb-3 text-xs font-medium text-muted-foreground">{t.profileLabel}</p>
             <dl className="grid grid-cols-2 gap-x-5 gap-y-4 lg:grid-cols-4">
               {t.stats.map((stat) => (
-                <div key={stat.label} className="flex flex-col">
-                  <dt className="order-2 mt-0.5 text-xs leading-5 text-muted-foreground">
-                    {stat.label}
-                  </dt>
-                  <dd className="order-1 font-mono text-lg font-semibold tabular-nums text-foreground">
-                    {stat.value}
-                  </dd>
-                </div>
+                <Stat key={stat.label} valueFirst label={stat.label} value={stat.value} />
               ))}
             </dl>
           </div>
@@ -266,7 +269,7 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
           </h2>
           <dl className="grid gap-x-8 gap-y-4 md:grid-cols-2">
             {t.controls.map((control) => (
-              <div key={control.title} className="border-l border-border pl-3">
+              <div key={control.title}>
                 <dt className="text-sm font-semibold text-foreground">{control.title}</dt>
                 <dd className="mt-1 text-sm leading-6 text-muted-foreground">
                   {control.description}
@@ -281,18 +284,23 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
             {t.readingTitle}
           </h2>
           <p className="text-sm leading-6 text-muted-foreground">{t.reading}</p>
-          <p className="mt-3 border-l-2 border-primary bg-primary/5 px-4 py-3 text-sm font-medium leading-6 text-foreground">
+          <p className="mt-3 border-l-2 border-border px-4 py-1 text-sm font-medium leading-6 text-foreground">
             {t.qualityNote}
           </p>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">{t.limits}</p>
           <AgentXMethodologyLink
-            href={locale === 'zh' ? '/zh/agentx/methodology' : '/agentx/methodology'}
+            href={
+              locale === 'zh'
+                ? `/zh${AGENTX_ROUTE.path}/methodology`
+                : `${AGENTX_ROUTE.path}/methodology`
+            }
             analyticsEvent="agentx_methodology_opened"
             analyticsTarget="compact-overview"
             data-testid="agentx-methodology-cta"
-            className="mt-4 inline-flex min-h-11 items-center rounded-md border border-primary/40 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
+            className={cn(buttonVariants({ variant: 'outline' }), 'mt-4')}
           >
-            {t.methodologyCta} →
+            {t.methodologyCta}
+            <ArrowRight aria-hidden="true" />
           </AgentXMethodologyLink>
         </section>
       </div>

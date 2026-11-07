@@ -12,7 +12,7 @@ describe('Compare scenario routes', () => {
 
     cy.get('[data-testid="compare-agentic-intro"]')
       .find('[data-testid="compare-agentic-intro-link"]')
-      .should('have.attr', 'href', '/agentx');
+      .should('have.attr', 'href', '/infx/agentx');
   });
 
   it('lets the path segment override the pair default', () => {
@@ -81,6 +81,6 @@ describe('Compare scenario routes', () => {
 
     cy.get('[data-testid="compare-agentic-intro"]')
       .find('[data-testid="compare-agentic-intro-link"]')
-      .should('have.attr', 'href', '/zh/agentx');
+      .should('have.attr', 'href', '/zh/infx/agentx');
   });
 });

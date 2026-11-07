@@ -1,4 +1,6 @@
-import { useEffect, useRef, type RefObject } from 'react';
+import { useEffect, useRef, useSyncExternalStore, type RefObject } from 'react';
+
+const subscribeNoop = () => () => {};
 
 export function centeredScrollTop({
   elementTop,
@@ -24,7 +26,12 @@ export function useCenterOnEnter(
   selector: string,
   { enabled, ready }: { enabled: boolean; ready: boolean },
 ): void {
-  const done = useRef(false);
+  const hydrating = useSyncExternalStore(
+    subscribeNoop,
+    () => false,
+    () => true,
+  );
+  const done = useRef(hydrating);
   useEffect(() => {
     if (!enabled || done.current) return;
     // A hash link or a user who already scrolled chose their own position.

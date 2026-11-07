@@ -11,13 +11,13 @@ Qwen3.8-27B 是稠密视觉语言模型，与采用 MoE 的 Qwen3.8-Flash-Next �
 
 ## 架构
 
-- **主干：**64 层，隐藏维度 5120，词表大小 248320。
-- **重复单元：**每组先执行 3 层 Gated DeltaNet，再执行 1 层 Gated Attention，共重复 16 组，即 48 层线性注意力和 16 层全局注意力。
-- **线性注意力：**48 个 value head、16 个 QK head，head 维度 128，卷积核宽度 4。
-- **全局注意力：**24 个 query head、4 个 KV head，head 维度 256；使用输出门控与 64 维旋转位置编码。
-- **FFN：**中间维度 17408 的稠密 SwiGLU，没有 MoE router 或 expert 选择。
-- **投机解码：**配置 1 层 MTP，训练时采用多步预测。
-- **精度与许可证：**BF16 参考 checkpoint，以 Apache 2.0 许可证发布。
+- **主干**：64 层，隐藏维度 5120，词表大小 248320。
+- **重复单元**：每组先执行 3 层 Gated DeltaNet，再执行 1 层 Gated Attention，共重复 16 组，即 48 层线性注意力和 16 层全局注意力。
+- **线性注意力**：48 个 value head、16 个 QK head，head 维度 128，卷积核宽度 4。
+- **全局注意力**：24 个 query head、4 个 KV head，head 维度 256；使用输出门控与 64 维旋转位置编码。
+- **FFN**：中间维度 17408 的稠密 SwiGLU，没有 MoE router 或 expert 选择。
+- **投机解码**：配置 1 层 MTP，训练时采用多步预测。
+- **精度与许可证**：BF16 参考 checkpoint，以 Apache 2.0 许可证发布。
 
 各项维度与完整层顺序可在[公开配置](https://huggingface.co/Qwen/Qwen3.8-27B/raw/main/config.json)中核对。
 

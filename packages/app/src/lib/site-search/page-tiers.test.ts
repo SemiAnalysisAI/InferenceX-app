@@ -7,11 +7,11 @@ describe('pageTier', () => {
   it('classifies main, reference, overview and article pages in both locales', () => {
     expect(pageTier('/')).toBe(PAGE_TIER.main);
     expect(pageTier('/zh')).toBe(PAGE_TIER.main);
-    expect(pageTier('/agentx#methodology')).toBe(PAGE_TIER.main);
-    expect(pageTier('/inference')).toBe(PAGE_TIER.main);
-    expect(pageTier('/zh/inference/agentic')).toBe(PAGE_TIER.main);
-    expect(pageTier('/historical')).toBe(PAGE_TIER.main);
-    expect(pageTier('/ubenchx/mem-bw')).toBe(PAGE_TIER.main);
+    expect(pageTier('/infx/agentx#methodology')).toBe(PAGE_TIER.main);
+    expect(pageTier('/infx/inference')).toBe(PAGE_TIER.main);
+    expect(pageTier('/zh/infx/inference/agentic')).toBe(PAGE_TIER.main);
+    expect(pageTier('/infx/historical')).toBe(PAGE_TIER.main);
+    expect(pageTier('/ubx/mem-bw')).toBe(PAGE_TIER.main);
     expect(pageTier('/chips/b200')).toBe(PAGE_TIER.reference);
     expect(pageTier('/rankings/cheapest-gpu-for-deepseek-r1')).toBe(PAGE_TIER.reference);
     expect(pageTier('/overview')).toBe(PAGE_TIER.overview);
@@ -33,7 +33,7 @@ describe('tier ordering in search', () => {
     { url: '/blog/power-deep-dive', pageTitle: 'Power deep dive', text: 'GPU power per token' },
     { url: '/overview', pageTitle: 'Power overview', text: 'GPU power summary' },
     { url: '/chips/b200', pageTitle: 'B200 power', text: 'GPU power draw' },
-    { url: '/inference', pageTitle: 'Inference power', text: 'GPU power charts' },
+    { url: '/infx/inference', pageTitle: 'Inference power', text: 'GPU power charts' },
   ];
 
   function build(): SiteSearchIndex {
@@ -47,7 +47,7 @@ describe('tier ordering in search', () => {
       build()
         .search('power')
         .map((r) => r.url),
-    ).toEqual(['/inference', '/chips/b200', '/overview', '/blog/power-deep-dive']);
+    ).toEqual(['/infx/inference', '/chips/b200', '/overview', '/blog/power-deep-dive']);
   });
 
   it('keeps a barely relevant main page below strong matches', () => {
@@ -61,7 +61,7 @@ describe('tier ordering in search', () => {
         source: 'page',
       },
       {
-        url: '/calculator',
+        url: '/infx/calculator',
         pageTitle: 'Throughput calculator',
         text: `${'throughput latency cost interactivity '.repeat(60)} ironwood`,
         source: 'page',

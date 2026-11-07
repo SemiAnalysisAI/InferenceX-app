@@ -5,10 +5,10 @@ import type { HardwareConfig, InferenceData, OverlayData } from '@/components/in
 import {
   formatHoverValue,
   generateHoverTooltipContent,
-  generateTooltipContent,
-  shortAxisLabel,
-  type HoverTooltipConfig,
+  type TooltipConfig,
 } from '@/components/inference/utils/tooltipUtils';
+import { detailsText } from '@/components/inference/utils/point-details-test-helpers';
+import { axisLabelUnit } from '@/lib/d3-chart/tooltip-shell';
 
 const hardwareConfig: HardwareConfig = {
   b300_sglang: {
@@ -55,35 +55,28 @@ function agenticPoint(overrides: Partial<InferenceData> = {}): InferenceData {
   } as InferenceData;
 }
 
-const config = (
-  data: InferenceData,
-  overrides: Partial<HoverTooltipConfig> = {},
-): HoverTooltipConfig => ({
+const config = (data: InferenceData, overrides: Partial<TooltipConfig> = {}): TooltipConfig => ({
   data,
   xLabel: 'P90 Interactivity (tok/s/user)',
   yLabel: 'Total Tokens per $1 TCO (tok/$)',
   selectedYAxisMetric: 'y_costh',
   hardwareConfig,
-  color: 'rgb(156, 204, 101)',
   ...overrides,
 });
 
-// Read the generated markup as plain text without handing it to an HTML parser.
-const ENTITIES: Record<string, string> = {
-  '&amp;': '&',
-  '&lt;': '<',
-  '&gt;': '>',
-  '&quot;': '"',
-  '&#39;': "'",
+const textOf = (html: string) => {
+  const host = document.createElement('div');
+  host.innerHTML = html;
+  return (host.textContent ?? '').replaceAll(/\s+/g, ' ');
 };
-const render = (html: string) => ({
-  // Text between tags only; the result is asserted on, never rendered.
-  textContent: html
-    .split(/<[^>]*>/)
-    .join('')
-    .replaceAll(/&(?:amp|lt|gt|quot|#39);/g, (entity) => ENTITIES[entity] ?? entity),
-  hasCacheBar: html.includes('data-hover-cache-bar'),
-});
+
+const hover = (c: TooltipConfig) => {
+  const html = generateHoverTooltipContent({ ...c, color: 'rgb(156, 204, 101)' });
+  return {
+    text: textOf(html),
+    hasCacheBar: html.includes('data-hover-cache-bar'),
+  };
+};
 
 describe('formatHoverValue', () => {
   it('abbreviates large values and trims small ones', () => {
@@ -100,25 +93,24 @@ describe('formatHoverValue', () => {
   });
 });
 
-describe('shortAxisLabel', () => {
+describe('axisLabelUnit', () => {
   it('keeps the unit and a leading percentile qualifier', () => {
-    expect(shortAxisLabel('P90 Interactivity (tok/s/user)')).toBe('P90 tok/s/user');
-    expect(shortAxisLabel('Total Tokens per $1 TCO (tok/$)')).toBe('tok/$');
-    expect(shortAxisLabel('Median TTFT (s)')).toBe('Median s');
-    expect(shortAxisLabel('P99.9 TTFT (s)')).toBe('P99.9 s');
-    expect(shortAxisLabel('p99.9 E2E Latency (s)')).toBe('p99.9 s');
+    expect(axisLabelUnit('P90 Interactivity (tok/s/user)')).toBe('P90 tok/s/user');
+    expect(axisLabelUnit('Total Tokens per $1 TCO (tok/$)')).toBe('tok/$');
+    expect(axisLabelUnit('Median TTFT (s)')).toBe('Median s');
+    expect(axisLabelUnit('P99.9 TTFT (s)')).toBe('P99.9 s');
+    expect(axisLabelUnit('p99.9 E2E Latency (s)')).toBe('p99.9 s');
   });
 
   it('handles full-width parentheses and labels without a unit', () => {
-    expect(shortAxisLabel('P90 交互性（tok/s/user）')).toBe('P90 tok/s/user');
-    expect(shortAxisLabel('Concurrency')).toBe('Concurrency');
+    expect(axisLabelUnit('P90 交互性（tok/s/user）')).toBe('P90 tok/s/user');
+    expect(axisLabelUnit('Concurrency')).toBe('Concurrency');
   });
 });
 
 describe('generateHoverTooltipContent', () => {
   it('shows the headline values, compact config and cache bar', () => {
-    const el = render(generateHoverTooltipContent(config(agenticPoint())));
-    const text = el.textContent.replaceAll(/\s+/g, ' ');
+    const { text, hasCacheBar } = hover(config(agenticPoint()));
     expect(text).toContain('B300 (SGLang)');
     expect(text).toContain('FP4 · conc 40');
     expect(text).toContain('31.26M tok/$');
@@ -131,142 +123,142 @@ describe('generateHoverTooltipContent', () => {
     expect(text).toContain('CPU 24.2%');
     expect(text).toContain('theoretical 97.3%');
     expect(text).toContain('Click for full details');
-    expect(el.hasCacheBar).toBe(true);
+    expect(hasCacheBar).toBe(true);
   });
 
   it('leaves pinned-only details out of the hover card', () => {
-    const text = render(generateHoverTooltipContent(config(agenticPoint()))).textContent;
+    const { text } = hover(config(agenticPoint()));
     expect(text).not.toContain('sha256');
-    expect(text).not.toContain('566,443,844');
+    expect(text).not.toContain('566');
     expect(text).not.toContain('RadixArk');
     expect(text).not.toContain('GitHub Actions');
   });
 
-  it('keeps comparison dates and carried-forward source dates in compact hover', () => {
-    const html = generateHoverTooltipContent(
-      config(agenticPoint({ date: '2026-11-04', actualDate: '2026-11-02' }), {
-        comparisonLabel: '2026-11-04',
-        color: '#123456',
-      }),
+  it('keeps every field in the details panel', () => {
+    const details = detailsText(config(agenticPoint()));
+    expect(details).toContain('Prompt tokens');
+    expect(details).toContain('theoretical 97.3%');
+    expect(details).toContain('DFlash (RadixArk/Kimi-K3.1-Dflash2-Preview)');
+  });
+
+  it('shows the speculative row in the details panel for non-agentic points that use it', () => {
+    const details = detailsText(config(agenticPoint({ benchmark_type: 'single_turn' })));
+    expect(details).toContain('Speculative decoding: DFlash (RadixArk/Kimi-K3.1-Dflash2-Preview)');
+    const off = detailsText(
+      config(agenticPoint({ benchmark_type: 'single_turn', spec_decoding: 'none' })),
     );
-    expect(render(html).textContent).toContain('Date: 2026-11-04 (data from 2026-11-02)');
+    expect(off).not.toContain('Speculative decoding');
+  });
+
+  it('keeps comparison dates and carried-forward source dates in compact hover', () => {
+    const html = generateHoverTooltipContent({
+      ...config(agenticPoint({ date: '2026-11-04', actualDate: '2026-11-02' }), {
+        comparisonLabel: '2026-11-04',
+      }),
+      color: '#123456',
+    });
+    expect(textOf(html)).toContain('Date: 2026-11-04 (data from 2026-11-02)');
     expect(html).toContain('background: #123456');
     expect(html).toContain('data-hover-cache-bar');
     expect(html).not.toContain('sha256');
   });
 
   it('preserves same-day run numbering without a misleading source-date note', () => {
-    const text = render(
-      generateHoverTooltipContent(
-        config(agenticPoint({ date: '2026-11-04~r123', actualDate: '2026-11-04' }), {
-          comparisonLabel: '2026-11-04 #2',
-        }),
-      ),
-    ).textContent;
+    const { text } = hover(
+      config(agenticPoint({ date: '2026-11-04~r123', actualDate: '2026-11-04' }), {
+        comparisonLabel: '2026-11-04 #2',
+      }),
+    );
     expect(text).toContain('Date: 2026-11-04 #2');
     expect(text).not.toContain('~r123');
     expect(text).not.toContain('data from');
   });
 
   it('localizes comparison context and preserves unofficial provenance safely', () => {
-    const html = generateHoverTooltipContent(
-      config(agenticPoint({ date: '2026-11-04', actualDate: '2026-11-02' }), {
+    const html = generateHoverTooltipContent({
+      ...config(agenticPoint({ date: '2026-11-04', actualDate: '2026-11-02' }), {
         locale: 'zh',
         comparisonLabel: '2026-11-04',
-        overlayData: { label: 'feat/<script>test</script>' } as OverlayData,
+        overlayData: { label: 'feat/<script>test</script>', hardwareConfig } as OverlayData,
       }),
-    );
-    expect(render(html).textContent).toContain('日期： 2026-11-04');
-    expect(render(html).textContent).toContain('2026年11月2日');
+      color: 'red',
+    });
+    expect(textOf(html)).toContain('日期： 2026-11-04');
+    expect(textOf(html)).toContain('2026年11月2日');
     expect(html).toContain('data-hover-notice');
     expect(html).toContain('feat/&lt;script&gt;test&lt;/script&gt;');
     expect(html).not.toContain('<script>');
   });
 
-  it('keeps every field in the pinned tooltip', () => {
-    const text = render(
-      generateTooltipContent({
-        data: agenticPoint(),
-        isPinned: true,
-        xLabel: 'P90 Interactivity (tok/s/user)',
-        yLabel: 'Total Tokens per $1 TCO (tok/$)',
-        selectedYAxisMetric: 'y_costh',
-        hardwareConfig,
-      }),
-    ).textContent;
-    expect(text).toContain('Prompt Tokens');
-    expect(text).toContain('theoretical 97.3%');
-    expect(text).toContain('RadixArk/Kimi-K3.1-Dflash2-Preview');
-  });
-
   it('omits the cache section when no hit rate was recorded', () => {
-    const el = render(
-      generateHoverTooltipContent(
-        config(
-          agenticPoint({
-            benchmark_type: 'single_turn',
-            server_gpu_cache_hit_rate: undefined,
-            server_cpu_cache_hit_rate: undefined,
-            theoretical_cache_hit_rate: undefined,
-            kv_offloading: undefined,
-            kv_offload_backend: undefined,
-            offload_mode: undefined,
-            spec_decoding: 'none',
-            spec_algorithm: undefined,
-          }),
-        ),
+    const { text, hasCacheBar } = hover(
+      config(
+        agenticPoint({
+          benchmark_type: 'single_turn',
+          server_gpu_cache_hit_rate: undefined,
+          server_cpu_cache_hit_rate: undefined,
+          theoretical_cache_hit_rate: undefined,
+          kv_offloading: undefined,
+          kv_offload_backend: undefined,
+          offload_mode: undefined,
+          spec_decoding: 'none',
+          spec_algorithm: undefined,
+        }),
       ),
     );
-    expect(el.hasCacheBar).toBe(false);
-    expect(el.textContent).not.toContain('KV cache hit');
+    expect(hasCacheBar).toBe(false);
+    expect(text).not.toContain('KV cache hit');
+    expect(text).not.toContain('DFlash');
   });
 
   it('drops the CPU segment when offload is off', () => {
-    const text = render(
-      generateHoverTooltipContent(
-        config(
-          agenticPoint({
-            kv_offloading: 'none',
-            kv_offload_backend: undefined,
-            offload_mode: 'off',
-          }),
-        ),
+    const { text } = hover(
+      config(
+        agenticPoint({ kv_offloading: 'none', kv_offload_backend: undefined, offload_mode: 'off' }),
       ),
-    ).textContent.replaceAll(/\s+/g, ' ');
+    );
     expect(text).toContain('Chip 70.7%');
     expect(text).not.toContain('CPU 24.2%');
-    expect(text).toContain('70.7%');
   });
 
   it('labels the TRT-LLM combined chip + CPU rate as one segment', () => {
-    const text = render(
-      generateHoverTooltipContent(config(agenticPoint({ framework: 'trt' }))),
-    ).textContent.replaceAll(/\s+/g, ' ');
+    const { text } = hover(config(agenticPoint({ framework: 'trt' })));
     expect(text).toContain('Chip + CPU 70.7%');
     expect(text).not.toContain('CPU 24.2%');
   });
 
+  it('marks unofficial runs with the notice on the official card shell', () => {
+    const html = generateHoverTooltipContent({
+      ...config(agenticPoint()),
+      overlayData: { label: 'feature-branch', hardwareConfig, data: [] } as never,
+      color: 'red',
+    });
+    expect(html).toContain('border: 1px solid var(--border)');
+    expect(html).toContain('data-hover-notice');
+    expect(html).toContain('✕ feature-branch');
+  });
+
   it('renders Chinese copy', () => {
-    const text = render(
-      generateHoverTooltipContent(
-        config(agenticPoint(), {
-          locale: 'zh',
-          xLabel: 'P90 交互性（tok/s/user）',
-          yLabel: '每 $1 TCO 总 token 数（tok/$）',
-        }),
-      ),
-    ).textContent.replaceAll(/\s+/g, ' ');
+    const { text } = hover(
+      config(agenticPoint(), {
+        locale: 'zh',
+        xLabel: 'P90 交互性（tok/s/user）',
+        yLabel: '每 $1 TCO 总 token 数（tok/$）',
+      }),
+    );
     expect(text).toContain('并发 40');
     expect(text).toContain('8 芯片');
+    expect(text).toContain('P90 tok/s/user');
     expect(text).toContain('KV cache 命中率');
     expect(text).toContain('理论 97.3%');
     expect(text).toContain('点击查看完整信息');
   });
 
   it('escapes the hardware key when no config entry exists', () => {
-    const html = generateHoverTooltipContent(
-      config(agenticPoint({ hwKey: '<img src=x>' as never }), { hardwareConfig: {} }),
-    );
+    const html = generateHoverTooltipContent({
+      ...config(agenticPoint({ hwKey: '<img src=x>' as never }), { hardwareConfig: {} }),
+      color: 'red',
+    });
     expect(html).not.toContain('<img src=x>');
   });
 });

@@ -42,7 +42,7 @@ The reason is mechanical. GPU-to-CPU transfers for CPU KV cache offloading are h
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/2b40624a-223c-44db-a403-0be563b2af82_2048x1298.png"
-  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_hc=1&i_active=mi355x_vllm)"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_hc=1&i_active=mi355x_vllm)"
 />
 
 A missing batched-copy API is not the kind of thing that shows up in a specification sheet, and on a fixed-sequence benchmark it would never be exercised at all. On long agentic sessions it decides whether an entire tier of memory is usable.

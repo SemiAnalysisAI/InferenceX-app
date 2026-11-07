@@ -1,16 +1,13 @@
 'use client';
 
 import { useId, useState, type ReactNode } from 'react';
-import { Maximize2 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartButtons } from '@/components/ui/chart-buttons';
+import { Card } from '@/components/ui/card';
+import { ChartButtons, ExpandChartButton } from '@/components/ui/chart-buttons';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { D3Chart, type D3ChartProps } from '@/lib/d3-chart/D3Chart';
 import { track } from '@/lib/analytics/analytics';
 import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
-import { useLocale } from '@/lib/i18n/use-locale';
 
 interface D3ChartCardProps<T> {
   title: string;
@@ -32,10 +29,8 @@ export function D3ChartCard<T>({
   const id = useId().replaceAll(/[^a-zA-Z0-9_-]/g, '');
   const [expanded, setExpanded] = useState(false);
   useDialogCloseTracking(expanded, `${analyticsPrefix}_chart_closed`, { title });
-  const locale = useLocale();
   const inlineId = `${analyticsPrefix}-${id}`;
   const expandedId = `${inlineId}-expanded`;
-  const expandLabel = locale === 'zh' ? '展开图表' : 'Expand chart';
   const renderChart = (chartId: string, height?: number) => (
     <D3Chart
       {...chart}
@@ -56,34 +51,29 @@ export function D3ChartCard<T>({
       hideZoomReset={!chart.zoom?.enabled}
       leadingControls={
         canExpand ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label={`${expandLabel}: ${title}`}
+          <ExpandChartButton
+            chartTitle={title}
             onClick={() => {
               track(`${analyticsPrefix}_chart_expanded`, { title });
               setExpanded(true);
             }}
-          >
-            <Maximize2 className="size-4" />
-          </Button>
+          />
         ) : undefined
       }
     />
   );
 
   return (
-    <Card className="min-w-0 gap-3">
-      <CardHeader className="gap-2">
+    <Card className="gap-3">
+      <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="text-sm">{title}</CardTitle>
+          <h3 className="text-sm font-medium text-foreground">{title}</h3>
           {actions(inlineId, true)}
         </div>
         {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
         {controls}
-      </CardHeader>
-      <CardContent className="min-w-0 px-3">{renderChart(inlineId)}</CardContent>
+      </div>
+      <div className="min-w-0">{renderChart(inlineId)}</div>
       <Dialog open={expanded} onOpenChange={setExpanded}>
         <DialogContent className="w-[calc(100%-2rem)] sm:max-w-6xl max-h-[90vh] overflow-auto">
           <DialogTitle className="pr-8">{title}</DialogTitle>

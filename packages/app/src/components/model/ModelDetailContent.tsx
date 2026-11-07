@@ -1,7 +1,9 @@
+import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 import { KatexStyles } from '@/components/blog/katex-styles';
 import { JsonLd } from '@/components/seo/json-ld';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
 import { compileBlogMdx } from '@/lib/blog/blog-mdx';
@@ -20,6 +22,7 @@ import {
   modelIndexHref,
   modelInferenceHref,
 } from './model-page-copy';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export default async function ModelDetailContent({
   slug,
@@ -31,7 +34,7 @@ export default async function ModelDetailContent({
   locale: Locale;
 }) {
   const { meta, entry, raw } = page;
-  const { content, hasMath } = await compileBlogMdx(raw);
+  const { content, hasMath } = await compileBlogMdx(raw, locale);
   const scenario = comparisonScenarioForModel(entry);
   const dashboardQuery = new URLSearchParams({
     g_model: entry.displayName,
@@ -75,9 +78,9 @@ export default async function ModelDetailContent({
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
         <Card>
           <header>
-            <p className="text-sm text-muted-foreground mb-2">
+            <p className="mb-2 text-sm text-muted-foreground">
               <Link
-                href={`${localePrefix}/inference`}
+                href={`${localePrefix}${getDashboardRoute('inference').path}`}
                 className="hover:text-foreground transition-colors"
               >
                 {t.inferenceDashboard}
@@ -96,21 +99,24 @@ export default async function ModelDetailContent({
                 locale={locale}
                 className="size-8 lg:size-10"
               />
-              <Heading as="h1" level="page">
+              <Heading as="h1" level="page" className="text-balance">
                 {meta.title}
               </Heading>
             </div>
-            <p className="mt-3 text-base lg:text-lg text-muted-foreground">{meta.description}</p>
+            <p className="mt-3 max-w-3xl text-base text-muted-foreground">{meta.description}</p>
             {inferenceHref && (
-              <Link
-                href={inferenceHref}
-                data-testid="model-inference-link"
-                className="mt-4 inline-flex items-center rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20 transition-colors"
+              <Button
+                asChild
+                variant="outline"
+                className="mt-4 h-auto min-h-11 whitespace-normal py-2 text-left md:min-h-9"
               >
-                {t.inferenceBenchmarksLink(meta.title)}
-              </Link>
+                <Link href={inferenceHref} data-testid="model-inference-link">
+                  {t.inferenceBenchmarksLink(meta.title)}
+                  <ArrowRight aria-hidden="true" />
+                </Link>
+              </Button>
             )}
-            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-3">
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               <span>{meta.developer}</span>
               <span>&middot;</span>
               <span>
@@ -118,23 +124,20 @@ export default async function ModelDetailContent({
               </span>
             </div>
           </header>
-          <div
-            className="mt-6 overflow-x-auto rounded-xl border border-border/40 bg-muted/10 p-3 md:p-5"
-            data-testid="model-architecture-diagram"
-          >
+          <div className="mt-8 overflow-x-auto" data-testid="model-architecture-diagram">
             <ModelArchitectureInline displayName={entry.displayName} />
           </div>
-          <div className="mt-6 pt-6 border-t border-border/40">
+          <div className="mt-8 border-t border-border/30 pt-8">
             {locale === 'zh' && page.contentLocale !== 'zh' && (
               <aside
                 role="note"
                 data-testid="model-english-article-notice"
-                className="mb-6 rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm text-muted-foreground"
+                className="mb-6 rounded-lg bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
               >
                 <p>{t.englishArticleNotice}</p>
                 <Link
                   href={modelEnglishArticleHref(slug)}
-                  className="mt-2 inline-flex text-primary hover:underline"
+                  className="mt-2 inline-flex font-medium text-foreground underline-offset-4 hover:underline"
                 >
                   {t.englishArticleLink}
                 </Link>
@@ -144,27 +147,28 @@ export default async function ModelDetailContent({
             <article
               data-testid="model-page-article"
               lang={locale === 'zh' ? (page.contentLocale ?? 'en') : undefined}
-              className="prose prose-neutral dark:prose-invert max-w-none blog-prose"
+              className="prose prose-neutral dark:prose-invert max-w-4xl blog-prose"
             >
               {content}
             </article>
           </div>
         </Card>
         <Card data-testid="model-page-dashboard">
-          <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
             <div>
-              <h2 className="text-lg font-semibold mb-1">
+              <h2 className="mb-1 text-lg font-semibold">
                 {t.dashboardHeading(meta.title, scenario.label)}
               </h2>
-              <p className="text-muted-foreground text-sm">
+              <p className="text-sm text-muted-foreground">
                 {t.dashboardDescription(entry.label, scenario.label)}
               </p>
             </div>
             <Link
               href={modelDashboardHref(dashboardQuery.toString(), locale)}
-              className="text-sm text-primary hover:underline whitespace-nowrap"
+              className="inline-flex items-center gap-1 whitespace-nowrap text-sm font-medium text-foreground underline-offset-4 hover:underline"
             >
               {t.openDashboard}
+              <ArrowRight aria-hidden="true" className="size-4" />
             </Link>
           </div>
           <EmbeddedModelDashboard displayName={entry.displayName} sequence={scenario.sequence} />

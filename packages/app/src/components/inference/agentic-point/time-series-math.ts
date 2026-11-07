@@ -1,3 +1,5 @@
+import { ticks as d3Ticks } from 'd3';
+
 import type { RequestChartRecord } from '@/hooks/api/use-request-chart-data';
 import type { TimeSeriesPoint } from '@/hooks/api/use-trace-server-metrics';
 
@@ -20,6 +22,19 @@ export function maxTimeSeriesValue(
     for (const point of chartSeries.data) maximum = Math.max(maximum, point.value);
   }
   return maximum;
+}
+
+export function niceAxis(
+  max: number,
+  { count = 4, integer = false }: { count?: number; integer?: boolean } = {},
+): { top: number; ticks: number[] } {
+  const span = Number.isFinite(max) && max > 0 ? max : 1;
+  let values = d3Ticks(0, span, count);
+  if (integer && span >= 1) values = values.filter(Number.isInteger);
+  const step = values.length > 1 ? values[1]! - values[0]! : span;
+  const last = values.at(-1) ?? 0;
+  if (last >= span) return { top: last, ticks: values };
+  return { top: last + step, ticks: [...values, last + step] };
 }
 
 export type RequestMetric = 'interactivity' | 'ttft' | 'e2e';

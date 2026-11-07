@@ -114,7 +114,7 @@ afterEach(() => {
   dismissLatest = null;
   latestContextValue = null;
   rerenderProvider = null;
-  window.history.replaceState({}, '', '/inference');
+  window.history.replaceState({}, '', '/infx/inference');
   vi.restoreAllMocks();
 });
 
@@ -131,7 +131,7 @@ describe('UnofficialRunProvider query lifecycle', () => {
 
   it('aborts the old key and ignores its response after a URL race', async () => {
     installPendingFetch();
-    window.history.replaceState({}, '', '/inference?unofficialrun=1');
+    window.history.replaceState({}, '', '/infx/inference?unofficialrun=1');
     const root = mountProvider();
     await flush();
     expect(requests[0].url).toContain('runId=1');
@@ -139,7 +139,7 @@ describe('UnofficialRunProvider query lifecycle', () => {
     expect(requests[0].cache).toBeUndefined();
 
     act(() => {
-      window.history.pushState({}, '', '/inference?unofficialruns=2');
+      window.history.pushState({}, '', '/infx/inference?unofficialruns=2');
       window.dispatchEvent(new CustomEvent(CLIENT_SEARCH_CHANGE_EVENT));
     });
     await flush();
@@ -162,7 +162,7 @@ describe('UnofficialRunProvider query lifecycle', () => {
 
   it('dismisses one run with pushState while retaining the other run data', async () => {
     installPendingFetch();
-    window.history.replaceState({}, '', '/inference?unofficialruns=1,2');
+    window.history.replaceState({}, '', '/infx/inference?unofficialruns=1,2');
     const root = mountProvider();
     await flush();
     requests[0].resolve({

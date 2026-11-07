@@ -82,7 +82,7 @@ const powerBenchmarks = powerConfigs.flatMap((config) =>
 function visitCertifiedPowerChart(
   extraParams = '',
   benchmarks = powerBenchmarks,
-  page: '/inference' | '/powerx' = '/powerx',
+  page: '/infx/inference' | '/pwx' = '/pwx',
 ) {
   cy.intercept('GET', '/api/v1/availability/compact', {
     body: availabilityBody(powerAvailability),
@@ -171,10 +171,10 @@ describe('Validated vs historical measured power', () => {
     visitCertifiedPowerChart(
       '&i_metric=y_tokensPerDollarH&i_power=certified',
       powerBenchmarks,
-      '/inference',
+      '/infx/inference',
     );
 
-    cy.location('pathname').should('eq', '/inference');
+    cy.location('pathname').should('eq', '/infx/inference');
     cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', TOKENS_PER_DOLLAR_TITLE);
     assertChartTitle(TOKENS_PER_DOLLAR_TITLE);
     assertShareLinkParams({ i_metric: null, i_power: 'certified' });

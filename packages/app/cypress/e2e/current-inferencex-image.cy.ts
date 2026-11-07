@@ -1,5 +1,5 @@
 function visitCurrentImage() {
-  cy.visit('/zh/current-inferencex-image', {
+  cy.visit('/zh/infx/current-inferencex-image', {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     },
@@ -48,7 +48,7 @@ describe('Current image P90 age history', () => {
   });
 
   it('shows p90 and a dated chart, inspects by keyboard, and refetches after model filtering', () => {
-    cy.visit('/current-inferencex-image');
+    cy.visit('/infx/current-inferencex-image');
     cy.wait('@ageHistory').its('request.query').should('include', {
       includeHistory: 'true',
       asOf,
@@ -78,7 +78,7 @@ describe('Current image P90 age history', () => {
       statusCode: 503,
       body: {},
     });
-    cy.visit('/current-inferencex-image');
+    cy.visit('/infx/current-inferencex-image');
     cy.get('[data-testid="image-age-error"]').should('be.visible');
     cy.get('[data-testid="image-age-p90"]').should('have.text', '12d');
     cy.get('tbody tr').should('have.length', 2);
@@ -97,7 +97,7 @@ describe('Current image P90 age history', () => {
       },
     });
     cy.viewport(375, 812);
-    cy.visit('/current-inferencex-image');
+    cy.visit('/infx/current-inferencex-image');
     cy.get('[data-testid="image-age-panel"]').should('contain', 'No historical observations');
     cy.get('[data-testid="image-age-panel"] svg').should('not.exist');
     cy.document().then((doc) => expect(doc.documentElement.scrollWidth).to.be.at.most(375));
@@ -244,7 +244,7 @@ describe('Current InferenceX Image localized routes', () => {
     cy.wait('@latestImagesRetry');
     cy.wait('@latestImagesRetry');
     cy.get('[data-testid="current-image-error"]')
-      .should('contain.text', '无法加载镜像数据。')
+      .should('contain.text', '无法加载镜像数据')
       .and('not.contain.text', 'sensitive database detail')
       .contains('button', '重试')
       .then(($button) => {
@@ -266,7 +266,7 @@ describe('Current InferenceX Image localized routes', () => {
   it('labels agentic rows as Agentic (never null/null) and flags stale AgentX submissions', () => {
     cy.intercept('GET', '**/api/v1/latest-images', imageRows);
     cy.intercept('GET', '**/api/v1/framework-releases', releases);
-    cy.visit('/current-inferencex-image');
+    cy.visit('/infx/current-inferencex-image');
     cy.get('#image-sequence-select').click();
     cy.get('[data-slot="select-item"]').should('not.contain.text', 'null/null');
     cy.get('[data-slot="select-item"]').contains('Agentic').click();
@@ -318,7 +318,7 @@ describe('Current InferenceX Image localized routes', () => {
       { ...imageRows[1], isl: 1024, osl: 1024, image: 'vllm/vllm-openai:v0.8.0-1k1k' },
     ]);
     cy.intercept('GET', '**/api/v1/framework-releases', releases);
-    cy.visit('/current-inferencex-image');
+    cy.visit('/infx/current-inferencex-image');
 
     cy.get('#image-sequence-select').should('contain.text', 'Agentic');
     cy.get('#image-node-type-select').should('contain.text', 'All');
@@ -369,7 +369,7 @@ describe('Current InferenceX Image localized routes', () => {
       imageRows[1],
     ]);
     cy.intercept('GET', '**/api/v1/framework-releases', releases);
-    cy.visit('/current-inferencex-image');
+    cy.visit('/infx/current-inferencex-image');
     cy.get('[data-testid="current-image-result-count"]').should('contain.text', '2 configurations');
     cy.get('tbody tr')
       .first()
@@ -377,7 +377,7 @@ describe('Current InferenceX Image localized routes', () => {
         cy.get('th[scope="row"]')
           .should('contain.text', 'DeepSeek-R1')
           .and('contain.text', 'H200')
-          .and('contain.text', 'fp8');
+          .and('contain.text', 'FP8');
         cy.get('code')
           .first()
           .should('have.text', longImage)

@@ -54,8 +54,8 @@ afterEach(() => {
 
 describe('OverviewPageContent failure states', () => {
   it.each([
-    ['en', 'No overview results match this selection.'],
-    ['zh', '没有符合当前筛选条件的总览结果。'],
+    ['en', 'No overview results match this selection'],
+    ['zh', '没有符合当前筛选条件的总览结果'],
   ] as const)('renders the localized empty state for %s', (locale, message) => {
     renderPage(locale);
 

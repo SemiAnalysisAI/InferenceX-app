@@ -141,23 +141,23 @@ describe('metric registry', () => {
     expect(metricChartTitle('tokensPerDollarH', 'en')).toBe('Total Tokens per $1 TCO');
     expect(metricChartTitle('tokensPerDollarH', 'zh')).toBe('每 1 美元 TCO 对应的总 token 数');
     expect(metricOptionTitle('tokensPerDollarH', 'en')).toBe(
-      'Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
+      'Total Tokens per $1 TCO (Owning at large hyperscaler volume)',
     );
     expect(metricOptionTitle('costr', 'en')).toBe(
-      'Cost per Million Total Tokens (Rent - 3 Year Commit)',
+      'Cost per Million Total Tokens (Rent – 3-year commit)',
     );
     expect(metricOptionTitle('costh', 'zh')).toBe(
       '每百万总 token 成本（自有 · 超大规模云厂商批量采购）',
     );
     expect(metricOptionTitle('tpPerGpu', 'en')).toBe('Token Throughput per Chip');
 
-    expect(costTierLabel('hyperscaler', 'en')).toBe('Owning at Large Hyperscaler Volume');
-    expect(costTierLabel('rental', 'en')).toBe('Rent - 3 Year Commit');
+    expect(costTierLabel('hyperscaler', 'en')).toBe('Owning at large hyperscaler volume');
+    expect(costTierLabel('rental', 'en')).toBe('Rent – 3-year commit');
     expect(costTierLabel('hyperscaler', 'zh')).toBe('自有 · 超大规模云厂商批量采购');
 
     const [interactivity] = chartDefinitions;
     expect(interactivity.y_tokensPerDollarH_title).toBe(
-      'Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
+      'Total Tokens per $1 TCO (Owning at large hyperscaler volume)',
     );
     expect(interactivity.y_tokensPerDollarH_chartTitle).toBe('Total Tokens per $1 TCO');
     expect(interactivity.y_tokensPerDollarH_costTier).toBe('hyperscaler');

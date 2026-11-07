@@ -1,11 +1,11 @@
 'use client';
 
-import { Check, ChevronLeft, ChevronRight, Search, Share2 } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Search, Share2, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { EvaluationChartData } from '@/components/evaluation/types';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { useEvalSamples } from '@/hooks/api/use-eval-samples';
 import { track } from '@/lib/analytics/analytics';
 import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
@@ -24,17 +24,17 @@ const STRINGS = {
     filterAll: 'All',
     filterPassed: 'Passed',
     filterFailed: 'Failed',
-    searchPlaceholder: 'Search prompt / response...',
+    searchPlaceholder: 'Search prompt or response',
     searchAriaLabel: 'Search samples on this page',
     liveUnavailable:
-      "Per-sample data isn't available for this unofficial run — the workflow URL is missing or malformed.",
+      "Per-sample data isn't available for this unofficial run. The workflow URL is missing or malformed.",
     unofficialNotice:
-      'Unofficial run — samples are streamed live from the workflow artifact. Loads may take a few seconds.',
+      'Unofficial run. Samples stream live from the workflow artifact and may take a few seconds to load.',
     loading: 'Loading samples…',
     loadError: (err: string) => `Failed to load samples: ${err}`,
     noData:
       'No per-sample data available for this run yet. (Older runs may not have been re-ingested with samples enabled.)',
-    noMatch: (query: string) => `No samples on this page match “${query}”.`,
+    noMatch: (query: string) => `No samples on this page match “${query}”`,
     noPrompt: '(no prompt)',
     prompt: 'Prompt',
     fullModelOutput: 'Full model output',
@@ -60,14 +60,14 @@ const STRINGS = {
     filterAll: '全部',
     filterPassed: '通过',
     filterFailed: '未通过',
-    searchPlaceholder: '搜索提示词/响应…',
+    searchPlaceholder: '搜索提示词或响应',
     searchAriaLabel: '在当前页面中搜索样本',
-    liveUnavailable: '此非官方运行的逐样本数据不可用——工作流 URL 缺失或格式错误。',
-    unofficialNotice: '非官方运行——样本从工作流产物实时加载，可能需要几秒钟。',
+    liveUnavailable: '此非官方运行的逐样本数据不可用。工作流 URL 缺失或格式错误。',
+    unofficialNotice: '非官方运行。样本从工作流产物实时加载，可能需要几秒钟。',
     loading: '正在加载样本…',
     loadError: (err: string) => `加载样本失败：${err}`,
     noData: '此次运行暂无逐样本数据。（较早的运行可能未在启用样本功能后重新入库。）',
-    noMatch: (query: string) => `当前页面无匹配“${query}”的样本。`,
+    noMatch: (query: string) => `当前页面无匹配“${query}”的样本`,
     noPrompt: '（无提示词）',
     prompt: '提示词',
     fullModelOutput: '完整模型输出',
@@ -242,7 +242,7 @@ export default function EvalSamplesDrawer({
         className="
           inset-x-0 bottom-0 top-auto left-auto translate-x-0 translate-y-0
           w-auto max-w-none h-auto max-h-[85vh]
-          rounded-none rounded-t-lg border-t border-l-0 p-0
+          rounded-none rounded-t-xl border-t border-l-0 p-0
           grid-rows-[auto_auto_1fr_auto] gap-0
           data-[state=open]:zoom-in-100! data-[state=closed]:zoom-out-100!
           data-[state=open]:slide-in-from-left-0! data-[state=open]:slide-in-from-bottom!
@@ -255,8 +255,8 @@ export default function EvalSamplesDrawer({
         "
         aria-describedby={undefined}
       >
-        <div className="flex items-start gap-3 border-b border-border px-4 py-4 pr-12 sm:px-6 sm:pr-12">
-          <div className="min-w-0 flex-1">
+        <div className="flex items-start gap-3 border-b border-border px-4 pt-3 pb-4 pr-12 sm:px-6 sm:pr-12">
+          <div className="min-w-0 flex-1 pt-1">
             <DialogTitle className="text-base leading-snug">{t.title}</DialogTitle>
             {row && (
               <p className="mt-2 break-words font-mono text-xs leading-relaxed text-muted-foreground">
@@ -277,9 +277,9 @@ export default function EvalSamplesDrawer({
             <Button
               type="button"
               variant="outline"
-              size="sm"
+              size="xs"
               onClick={() => handleShare()}
-              className="h-11 shrink-0 md:h-8"
+              className="-mt-1.5 shrink-0 md:mt-0"
               aria-label={t.shareSample}
               title={t.shareSample}
               data-testid="eval-drawer-share-button"
@@ -294,7 +294,7 @@ export default function EvalSamplesDrawer({
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/20 px-4 py-3 sm:px-6">
+        <div className="flex flex-wrap items-start gap-2 border-b border-border bg-muted/20 px-4 py-3 sm:px-6">
           <FilterChip
             label={t.filterAll}
             count={passedTotal + failedTotal}
@@ -336,14 +336,12 @@ export default function EvalSamplesDrawer({
 
         <div ref={bodyRef} className="min-h-0 overflow-auto px-4 py-4 sm:px-6">
           {liveUnavailable && (
-            <p className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+            <p className="rounded-md bg-warning/10 px-3 py-2 text-xs text-foreground">
               {t.liveUnavailable}
             </p>
           )}
           {!liveUnavailable && isUnofficial && (
-            <p className="mb-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-1.5 text-2xs text-primary">
-              {t.unofficialNotice}
-            </p>
+            <p className="mb-2 text-xs text-muted-foreground">{t.unofficialNotice}</p>
           )}
           {!liveUnavailable && isLoading && (
             <p className="py-8 text-center text-sm text-muted-foreground">{t.loading}</p>
@@ -376,7 +374,10 @@ export default function EvalSamplesDrawer({
                   className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-3 text-left focus-visible:outline-none"
                   aria-expanded={expanded.has(s.docId)}
                 >
-                  <PassFailBadge passed={s.passed} />
+                  <PassFailBadge
+                    passed={s.passed}
+                    label={s.passed ? t.filterPassed : t.filterFailed}
+                  />
                   <span className="font-mono text-xs text-muted-foreground tabular-nums">
                     #{s.docId}
                   </span>
@@ -427,9 +428,8 @@ export default function EvalSamplesDrawer({
                       <Button
                         type="button"
                         variant="outline"
-                        size="sm"
+                        size="xs"
                         onClick={() => handleShare(s.docId)}
-                        className="h-11 md:h-8"
                         aria-label={t.shareSample}
                         title={t.shareSample}
                         data-testid={`eval-sample-share-${s.docId}`}
@@ -504,45 +504,46 @@ function FilterChip({ label, count, active, onClick, tone }: FilterChipProps) {
   const toneClass =
     tone === 'passed'
       ? active
-        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-400'
-        : 'hover:border-emerald-500/40 hover:text-emerald-700 dark:hover:text-emerald-400'
+        ? 'border-success/30 text-success aria-pressed:bg-success/10 aria-pressed:text-success dark:aria-pressed:bg-success/10'
+        : 'hover:border-success/30 hover:text-success'
       : tone === 'failed'
         ? active
-          ? 'bg-rose-500/15 border-rose-500/40 text-rose-700 dark:text-rose-400'
-          : 'hover:border-rose-500/40 hover:text-rose-700 dark:hover:text-rose-400'
-        : active
-          ? 'bg-muted border-foreground/30 text-foreground'
-          : 'hover:bg-muted/60';
+          ? 'border-destructive/30 text-destructive aria-pressed:bg-destructive/10 aria-pressed:text-destructive dark:aria-pressed:bg-destructive/10'
+          : 'hover:border-destructive/30 hover:text-destructive'
+        : '';
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-11 rounded-full border border-border px-3 py-1.5 text-xs transition-colors focus-visible:outline-none md:min-h-8 ${toneClass}`}
+      className={buttonVariants({ variant: 'outline', size: 'xs', className: toneClass })}
       aria-pressed={active}
     >
       {label}
-      <span className="ml-1.5 text-3xs tabular-nums opacity-70">{count}</span>
+      <span className="tabular-nums text-muted-foreground">{count}</span>
     </button>
   );
 }
 
-function PassFailBadge({ passed }: { passed: boolean | null }) {
+function PassFailBadge({ passed, label }: { passed: boolean | null; label: string }) {
   if (passed === null) {
     return (
-      <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-muted-foreground/30 text-3xs text-muted-foreground">
+      <span className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-muted-foreground/30 text-3xs text-muted-foreground">
         ?
       </span>
     );
   }
+  const Icon = passed ? Check : X;
   return (
     <span
-      className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-3xs font-bold ${
+      role="img"
+      aria-label={label}
+      className={`inline-flex size-4 shrink-0 items-center justify-center rounded-full border ${
         passed
-          ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-          : 'border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-400'
+          ? 'border-success/30 bg-success/10 text-success'
+          : 'border-destructive/30 bg-destructive/10 text-destructive'
       }`}
     >
-      {passed ? '✓' : '✗'}
+      <Icon className="size-2.5" strokeWidth={3} aria-hidden="true" />
     </span>
   );
 }
@@ -559,11 +560,11 @@ function FewShotBlock({
   const demos = demonstrations;
   const t = STRINGS[locale];
   return (
-    <div className="rounded-md border border-primary/40 bg-primary/5 p-2">
+    <div className="rounded-sm border border-border/30 p-2">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary hover:opacity-80"
+        className="flex w-full items-center gap-1.5 text-xs font-medium text-foreground transition-colors hover:text-muted-foreground"
         aria-expanded={open}
       >
         <ChevronRight
@@ -578,15 +579,15 @@ function FewShotBlock({
             <div
               // eslint-disable-next-line react/no-array-index-key -- demo order is the only stable identifier
               key={i}
-              className="rounded border border-border/40 bg-muted/30 p-2"
+              className="border-t border-border/20 pt-2"
             >
-              <div className="mb-1 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="mb-1 text-xs font-medium text-muted-foreground">
                 {t.exampleQuestion(i + 1)}
               </div>
               <pre className="mb-2 whitespace-pre-wrap font-mono text-2xs leading-snug wrap-break-word">
                 {d.question}
               </pre>
-              <div className="mb-1 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="mb-1 text-xs font-medium text-muted-foreground">
                 {t.exampleAnswer(i + 1)}
               </div>
               <pre className="whitespace-pre-wrap font-mono text-2xs leading-snug wrap-break-word">
@@ -611,9 +612,9 @@ function Block({
 }) {
   return (
     <div className="min-w-0">
-      <div className="mb-2 text-xs font-semibold text-muted-foreground">{label}</div>
-      <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-md border border-border/50 bg-muted/30 p-3 font-mono text-xs leading-relaxed wrap-break-word">
-        {value ?? <span className="italic text-muted-foreground">{emptyText}</span>}
+      <div className="mb-2 text-xs font-medium text-muted-foreground">{label}</div>
+      <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-sm border border-border/50 bg-muted/30 p-3 font-mono text-xs leading-relaxed wrap-break-word">
+        {value ?? <span className="text-muted-foreground">{emptyText}</span>}
       </pre>
     </div>
   );

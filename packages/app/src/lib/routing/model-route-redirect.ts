@@ -25,11 +25,7 @@ export function modelRouteRedirectUrl(url: URL): URL | null {
   if (isProfitRouteTab(parsed.tab)) {
     let filters: string[];
     try {
-      filters = url.pathname
-        .split('/')
-        .filter(Boolean)
-        .slice(parsed.zh ? 3 : 2)
-        .map(decodeURIComponent);
+      filters = parsed.filters.map(decodeURIComponent);
     } catch {
       return null;
     }

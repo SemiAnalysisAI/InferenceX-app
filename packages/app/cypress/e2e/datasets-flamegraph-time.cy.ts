@@ -95,7 +95,7 @@ describe('Dataset conversation flamegraph timing', () => {
         },
       },
     });
-    cy.visit('/agentx/test-dataset/conversations/conversation-1', {
+    cy.visit('/infx/agentx/test-dataset/conversations/conversation-1', {
       onBeforeLoad: unlockAgenticGate,
     });
   });
@@ -128,7 +128,7 @@ describe('Dataset conversation flamegraph timing', () => {
 
   it('keeps the flamegraph reachable through internal scrolling at 375px', () => {
     cy.viewport(375, 812);
-    cy.visit('/zh/agentx/test-dataset/conversations/conversation-1', {
+    cy.visit('/zh/infx/agentx/test-dataset/conversations/conversation-1', {
       onBeforeLoad: unlockAgenticGate,
     });
 

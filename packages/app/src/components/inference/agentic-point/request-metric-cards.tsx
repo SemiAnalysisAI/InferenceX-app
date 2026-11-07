@@ -7,7 +7,7 @@ import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/seg
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-import { CHART_SIZES, ChartEmpty, ChartSkeleton } from './chart-shared';
+import { ChartEmpty, ChartSkeleton } from './chart-shared';
 import { Distribution } from './distribution';
 import { ExpandableChart } from './expandable-chart';
 import { TimeSeriesChart } from './time-series-chart';
@@ -151,8 +151,7 @@ export function RequestMetricOverTime({
       title={latencySelector ? t.overTime(metricLabel) : title}
       controls={controls}
       testId={`${metric}-over-time-chart`}
-      render={(expanded) => {
-        const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
+      render={(size) => {
         if (!timeline) return isLoading ? <ChartSkeleton /> : <ChartEmpty />;
         return (
           <TimeSeriesChart
@@ -176,8 +175,8 @@ export function RequestMetricOverTime({
             durationS={timeline.durationS}
             yFmt={
               isLatency
-                ? (value) => `${value < 10 ? value.toFixed(1) : value.toFixed(0)}s`
-                : (value) => `${value.toFixed(0)}`
+                ? (value) => `${Number(value.toFixed(1))}s`
+                : (value) => `${Number(value.toFixed(1))}`
             }
             yAxisLabel={isLatency ? `${metricLabel} (s)` : `${t.interactivity} (tok/s/user)`}
             {...size}
@@ -240,8 +239,7 @@ export function SequenceMetricCard({
           buttonClassName="px-2 py-1 text-xs"
         />
       }
-      render={(expanded) => {
-        const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
+      render={(size) => {
         if (view === 'distribution') {
           if (values && values.length > 0)
             return (

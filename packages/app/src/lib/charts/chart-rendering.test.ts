@@ -11,6 +11,7 @@ import {
   getShapeKeyForPrecision,
   applyNormalState,
   applyHoverState,
+  compactAxisTickFormat,
   formatLargeNumber,
   logTickFormat,
 } from '@/lib/charts/chart-rendering';
@@ -204,6 +205,26 @@ describe('formatLargeNumber', () => {
 
   it('handles exactly 1_000_000 (boundary)', () => {
     expect(formatLargeNumber(1_000_000)).toBe('1M');
+  });
+
+  it('formats billions instead of four-digit millions', () => {
+    expect(formatLargeNumber(1_800_000_000)).toBe('1.8B');
+  });
+});
+
+describe('compactAxisTickFormat', () => {
+  it('keeps one billion unit across an axis that reaches billions', () => {
+    const format = compactAxisTickFormat([0, 1_750_000_000]);
+    expect([0, 200_000_000, 1_000_000_000, 1_800_000_000].map(format)).toEqual([
+      '0',
+      '0.2B',
+      '1B',
+      '1.8B',
+    ]);
+  });
+
+  it('falls back to the per-value formatter below a billion', () => {
+    expect(compactAxisTickFormat([0, 900_000])(500_000)).toBe('500k');
   });
 });
 

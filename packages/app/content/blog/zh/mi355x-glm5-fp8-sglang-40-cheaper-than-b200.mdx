@@ -22,7 +22,7 @@ GLM-5 发布 14 周后，在 8k/1k 工作负载下，AMD MI355X SGLang FP8 在�
 
 这正是关键的节奏。GLM-5 发布后，一个季度内 AMD 就完成了上游 SGLang kernel 的合入（[sgl-project/sglang PR #21511](https://github.com/sgl-project/sglang/pull/21511)）及其他优化，并提交了配套的 InferenceX 方案（[InferenceX PR #1440](https://github.com/SemiAnalysisAI/InferenceX/pull/1440)），将该模型的 FP8 单节点成本曲线翻转为 AMD 占优。速度就是护城河。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=GLM-5&i_prec=fp8&g_rundate=2026-05-20&i_active=b200_sglang%2Cb200_sglang_mtp%2Cmi355x_sglang%2Cmi355x_sglang_mtp&i_metric=y_costh&i_linelabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_model=GLM-5&i_prec=fp8&g_rundate=2026-05-20&i_active=b200_sglang%2Cb200_sglang_mtp%2Cmi355x_sglang%2Cmi355x_sglang_mtp&i_metric=y_costh&i_linelabel=1">
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 
@@ -140,7 +140,7 @@ TileLang 依赖版本已更新以在 AMD 上启用 FP8 GEMM，并新增了 `spar
   caption="GLM-5 FP8 8k/1k。每百万总 token 成本与交互性。B200 SGLang 和 MI355X SGLang，含和不含 MTP。标签标注每个配置的 GPU 数量。"
 />
 
-[实时图表](https://inferencex.semianalysis.com/inference?g_model=GLM-5&i_prec=fp8&g_rundate=2026-05-20&i_active=b200_sglang%2Cb200_sglang_mtp%2Cmi355x_sglang%2Cmi355x_sglang_mtp&i_metric=y_costh&i_linelabel=1)，预筛选为截至 2026-05-20 快照中 B200 和 MI355X SGLang 上的 GLM-5 FP8。
+[实时图表](https://inferencex.semianalysis.com/infx/inference?g_model=GLM-5&i_prec=fp8&g_rundate=2026-05-20&i_active=b200_sglang%2Cb200_sglang_mtp%2Cmi355x_sglang%2Cmi355x_sglang_mtp&i_metric=y_costh&i_linelabel=1)，预筛选为截至 2026-05-20 快照中 B200 和 MI355X SGLang 上的 GLM-5 FP8。
 
 ## MI355X 在 GLM-5 上的后续展望
 
@@ -153,7 +153,7 @@ TileLang 依赖版本已更新以在 AMD 上启用 FP8 GEMM，并新增了 `spar
 
 该方案的快速落地得益于 [Anush Elangovan](https://x.com/AnushElangovan)、[HaiShaw](https://github.com/HaiShaw) 及更广泛的 AMD AI 团队在 GLM-5 发布后 14 周内完成了上游 SGLang TileLang 融合 MLA + FP8 KV kernel 的提交。SGLang 维护者在提交后数天内即完成了审查与合入。从上游到基准测试的闭环速度就是护城河。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=GLM-5&i_prec=fp8&g_rundate=2026-05-20&i_active=b200_sglang%2Cb200_sglang_mtp%2Cmi355x_sglang%2Cmi355x_sglang_mtp&i_metric=y_costh&i_linelabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_model=GLM-5&i_prec=fp8&g_rundate=2026-05-20&i_active=b200_sglang%2Cb200_sglang_mtp%2Cmi355x_sglang%2Cmi355x_sglang_mtp&i_metric=y_costh&i_linelabel=1">
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 

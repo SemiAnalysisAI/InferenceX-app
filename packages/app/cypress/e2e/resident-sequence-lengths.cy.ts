@@ -4,7 +4,7 @@ import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2
 import { interceptOverlayRun, OVERLAY_RUN_ID } from '../support/overlay-fixtures';
 
 function visitAgenticChart(extraQuery = '') {
-  cy.visit(`/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4${extraQuery}`, {
+  cy.visit(`/infx/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4${extraQuery}`, {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       unlockAgenticGate(win);

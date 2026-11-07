@@ -19,7 +19,7 @@ tags:
 
 这完全是软件优化——全程使用相同的 MI355X CDNA4 硅片，TCO 始终为 $1.48/GPU/hr。相关记录：[sgl-project/sglang#20736](https://github.com/sgl-project/sglang/pull/20736)、[sgl-project/sglang#21188](https://github.com/sgl-project/sglang/pull/21188) 和 [sgl-project/sglang#21421](https://github.com/sgl-project/sglang/pull/21421)，均在 3–4 月合入，且均通过 `SGLANG_USE_AITER=1` 开关控制。上游到基准测试的闭环速度本身就是护城河。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-05-19&i_gpus=mi355x_sglang&i_dstart=2026-02-20&i_dend=2026-05-19&i_prec=fp8">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-05-19&i_gpus=mi355x_sglang&i_dstart=2026-02-20&i_dend=2026-05-19&i_prec=fp8">
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 
@@ -118,7 +118,7 @@ Qwen3.5-397B-A17B 是阿里巴巴的 MoE 旗舰模型，于 2026-02-16 发布，
   caption="Qwen3.5-397B-A17B FP8 8k/1k 在 MI355X SGLang 上的表现。三个月内三次运行：v0.5.8.post1（2 月 20 日，TP=8）、v0.5.10rc0（4 月 16 日，TP=2/4）、v0.5.12（5 月 19 日，TP=2/4）。点标签表示该配置所使用的 TP 值。"
 />
 
-[在线图表](https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-05-19&i_gpus=mi355x_sglang&i_dstart=2026-02-20&i_dend=2026-05-19&i_prec=fp8)，已预筛选为 MI355X SGLang Qwen3.5 FP8 三次运行的数据。
+[在线图表](https://inferencex.semianalysis.com/infx/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-05-19&i_gpus=mi355x_sglang&i_dstart=2026-02-20&i_dend=2026-05-19&i_prec=fp8)，已预筛选为 MI355X SGLang Qwen3.5 FP8 三次运行的数据。
 
 ## MI355X 上 Qwen3.5 的下一步
 
@@ -128,7 +128,7 @@ Qwen3.5-397B-A17B 是阿里巴巴的 MoE 旗舰模型，于 2026-02-16 发布，
 
 这条三个月的性能提升曲线来自 AMD 的 [zhentaocc](https://github.com/zhentaocc)（Todd Chen）和 [yichiche](https://github.com/yichiche)（Jacky Cheng），他们编写了全部三个上游 SGLang PR，由 [HaiShaw](https://github.com/HaiShaw) 审核并合入。上游到基准测试的闭环速度本身就是护城河。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-05-19&i_gpus=mi355x_sglang&i_dstart=2026-02-20&i_dend=2026-05-19&i_prec=fp8">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-05-19&i_gpus=mi355x_sglang&i_dstart=2026-02-20&i_dend=2026-05-19&i_prec=fp8">
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 

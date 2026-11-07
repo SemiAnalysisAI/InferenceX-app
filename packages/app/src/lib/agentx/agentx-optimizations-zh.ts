@@ -91,8 +91,8 @@ const OVERVIEW_ZH = {
     transfer: '传输引擎',
   } as Readonly<Record<OptimizationLayer, string>>,
   ui: {
-    backToAgentX: '← 返回 AgentX',
-    backToOverview: '← 全部 AgentX 优化',
+    backToAgentX: '返回 AgentX',
+    backToOverview: '全部 AgentX 优化',
     prsLabel: '上游 PR',
     referencesLabel: '参考链接',
     readMore: '查看优化详情',

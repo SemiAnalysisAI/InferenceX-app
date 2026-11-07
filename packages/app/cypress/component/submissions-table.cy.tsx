@@ -38,17 +38,17 @@ describe('SubmissionsTable — Spec Method column', () => {
 
   it('sorts by spec_method when the header is clicked', () => {
     cy.mount(<SubmissionsTable data={rows} />);
-    cy.contains('th', 'Spec Method').click();
+    cy.contains('th', 'Spec method').find('button').click();
     cy.get('tbody tr').first().should('contain.text', 'MI355X');
     cy.get('tbody tr').last().should('contain.text', 'B300');
-    cy.contains('th', 'Spec Method').click();
+    cy.contains('th', 'Spec method').find('button').click();
     cy.get('tbody tr').first().should('contain.text', 'B300');
     cy.get('tbody tr').last().should('contain.text', 'MI355X');
   });
 
   it('filters rows when the search query matches a spec_method', () => {
     cy.mount(<SubmissionsTable data={rows} />);
-    cy.get('input[placeholder="Search configs..."]').type('eagle');
+    cy.get('input[placeholder="Search configs"]').type('eagle');
     cy.get('tbody tr').should('have.length', 1).first().should('contain.text', 'B300');
   });
 });

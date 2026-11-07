@@ -1,7 +1,11 @@
 import Link from 'next/link';
 
-import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
+import {
+  READING_LINK_CLASS,
+  READING_PAGE_CLASS,
+  READING_TOP_CLASS,
+} from '@/components/ui/reading-layout';
 import {
   getPostThumbnail,
   type BlogPostMeta,
@@ -10,6 +14,7 @@ import {
   getTopTags,
 } from '@/lib/blog/blog';
 import { type Locale, localePath } from '@/lib/i18n/i18n';
+import { cn } from '@/lib/shared/utils';
 
 import { BLOG_COPY, blogIndexPath } from './blog-copy';
 import { type BlogIndexCard, BlogIndexPostsWithUrlTag } from './blog-index-posts';
@@ -49,23 +54,17 @@ export function BlogIndexContent({ locale }: { locale: Locale }) {
 
   return (
     <div
-      className="container mx-auto flex flex-col gap-8 px-4 pb-16 lg:gap-10 lg:px-8"
+      className={cn(READING_PAGE_CLASS, READING_TOP_CLASS, 'flex flex-col gap-8 lg:gap-10')}
       data-testid="blog-index-page"
     >
-      <header className="flex flex-col gap-3 pt-4 lg:pt-8">
-        <Eyebrow as="p" wide>
-          {t.indexEyebrow}
-        </Eyebrow>
-        <Heading as="h1" level="page" className="text-balance">
+      <header className="flex flex-col gap-3">
+        <Heading as="h1" level="reading">
           {t.indexTitle}
         </Heading>
-        <p className="max-w-prose text-base text-muted-foreground lg:text-lg">{t.indexIntro}</p>
+        <p className="max-w-measure text-base text-muted-foreground lg:text-lg">{t.indexIntro}</p>
         <p className="text-sm text-muted-foreground">
           {t.glossaryLead}{' '}
-          <Link
-            href={localePath('/glossary', locale)}
-            className="font-medium text-brand hover:underline"
-          >
+          <Link href={localePath('/glossary', locale)} className={READING_LINK_CLASS}>
             {t.glossaryLink}
           </Link>
           {locale === 'zh' ? '。' : '.'}

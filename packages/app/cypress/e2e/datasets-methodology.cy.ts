@@ -32,7 +32,7 @@ describe('AgentX dataset methodology', () => {
   });
 
   it('publishes the full English methodology with sourced figures and locale pairing', () => {
-    cy.visit('/agentx/methodology', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/infx/agentx/methodology', { onBeforeLoad: unlockAgenticGate });
 
     cy.get('[data-testid="agentx-methodology-article"]').within(() => {
       cy.get('[data-testid="agentx-methodology-figure-corpus"]')
@@ -59,24 +59,24 @@ describe('AgentX dataset methodology', () => {
     for (const viewport of ROUTE_VIEWPORTS) {
       for (const locale of ['', '/zh']) {
         cy.viewport(viewport.width, viewport.height);
-        cy.visit(`${locale}/agentx`, { onBeforeLoad: unlockAgenticGate });
+        cy.visit(`${locale}/infx/agentx`, { onBeforeLoad: unlockAgenticGate });
         cy.get('[data-testid="agentx-methodology"]').should('be.visible');
         cy.get('[data-testid="agentx-methodology-cta"]').should(
           'have.attr',
           'href',
-          `${locale}/agentx/methodology`,
+          `${locale}/infx/agentx/methodology`,
         );
         cy.get('[data-testid="agentx-telemetry-callout"]').should('exist');
         cy.get('[data-testid="agentx-optimizations-callout"]').should('exist');
         expectNoPageOverflow();
 
-        cy.visit(`${locale}/agentx/methodology`, { onBeforeLoad: unlockAgenticGate });
+        cy.visit(`${locale}/infx/agentx/methodology`, { onBeforeLoad: unlockAgenticGate });
         cy.get('[data-testid="agentx-methodology-article"]').should('be.visible');
         cy.get('figure[data-testid^="agentx-methodology-figure-"]').should('have.length', 21);
         cy.get('[data-testid="language-toggle"]').should(
           'have.attr',
           'href',
-          locale === '/zh' ? '/agentx/methodology' : '/zh/agentx/methodology',
+          locale === '/zh' ? '/infx/agentx/methodology' : '/zh/infx/agentx/methodology',
         );
         expectNoPageOverflow();
       }
@@ -89,12 +89,12 @@ describe('AgentX dataset methodology', () => {
       followRedirect: false,
     }).then((response) => {
       expect(response.status).to.eq(308);
-      expect(response.headers.location).to.eq('/agentx/test-set/conversations/abc?turn=3');
+      expect(response.headers.location).to.eq('/infx/agentx/test-set/conversations/abc?turn=3');
     });
 
     cy.request({ url: '/zh/datasets', followRedirect: false }).then((response) => {
       expect(response.status).to.eq(308);
-      expect(response.headers.location).to.eq('/zh/agentx');
+      expect(response.headers.location).to.eq('/zh/infx/agentx');
     });
   });
 });
@@ -102,14 +102,14 @@ describe('AgentX dataset methodology', () => {
 describe('AgentX quickstart', () => {
   for (const prefix of ['', '/zh']) {
     it(`opens the guide from AgentX and the About FAQ (${prefix || 'en'})`, () => {
-      for (const entry of ['/agentx', '/about']) {
+      for (const entry of ['/infx/agentx', '/about']) {
         cy.visit(`${prefix}${entry}`);
         cy.get('[data-testid="agentx-quickstart-callout"]').within(() => {
           cy.get('[data-testid="copyable-code-block"]').should('have.length', 1);
           cy.contains('code', "pip install 'agentx-harness==1.0.7'").should('exist');
-          cy.get(`a[href="${prefix}/agentx/quickstart"]`).click();
+          cy.get(`a[href="${prefix}/infx/agentx/quickstart"]`).click();
         });
-        cy.location('pathname').should('eq', `${prefix}/agentx/quickstart`);
+        cy.location('pathname').should('eq', `${prefix}/infx/agentx/quickstart`);
         cy.get('[data-testid="agentx-quickstart-article"]').should('be.visible');
       }
     });
@@ -117,7 +117,7 @@ describe('AgentX quickstart', () => {
 
   it('copies the complete command and optional headers on mobile (en)', () => {
     cy.viewport(375, 812);
-    cy.visit('/agentx/quickstart', {
+    cy.visit('/infx/agentx/quickstart', {
       onBeforeLoad(win) {
         Object.defineProperty(win.navigator, 'clipboard', {
           configurable: true,
@@ -149,12 +149,12 @@ describe('AgentX quickstart', () => {
     cy.get('link[rel="canonical"]').should(
       'have.attr',
       'href',
-      'https://inferencex.semianalysis.com/agentx/quickstart',
+      'https://inferencex.semianalysis.com/infx/agentx/quickstart',
     );
     cy.get('link[hreflang="zh-CN"]').should(
       'have.attr',
       'href',
-      'https://inferencex.semianalysis.com/zh/agentx/quickstart',
+      'https://inferencex.semianalysis.com/zh/infx/agentx/quickstart',
     );
     expectNoPageOverflow();
   });

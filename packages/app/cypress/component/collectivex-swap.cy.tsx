@@ -42,7 +42,7 @@ it('keeps comparison runs independently toggleable and distinguishes their lines
   cy.get('[data-testid="chart-legend"] input[type="checkbox"]').eq(0).uncheck({ force: true });
   cy.get('[data-testid="collectivex-swap-chart"] .point').should('have.length', 0);
   cy.get('[data-testid="swap-roofline-legend"]').should('not.exist');
-  cy.contains('No measured swap-block points match this selection.').should('be.visible');
+  cy.contains('No measured swap-block points match this selection').should('be.visible');
   cy.get('[data-testid="chart-legend"] input[type="checkbox"]').eq(1).check({ force: true });
   cy.get('[data-testid="collectivex-swap-chart"] .point').should('have.length', 2);
 });

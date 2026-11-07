@@ -3,9 +3,9 @@ type FixtureRow = Record<string, any> & { metrics: Record<string, number> };
 describe('AI chart workspace', () => {
   it('explains setup, prefills an editable example, and retains each provider key separately', () => {
     cy.viewport(1280, 720);
-    cy.visit('/ai-chart');
+    cy.visit('/infx/ai-chart');
     cy.get('#ai-chart-prompt').should('have.attr', 'aria-describedby', 'ai-chart-prompt-hint');
-    cy.contains('button', 'Generate Chart').should('be.disabled');
+    cy.contains('button', 'Generate chart').should('be.disabled');
     cy.get('[data-testid="ai-chart-examples"] button')
       .first()
       .then(($example) => {
@@ -16,7 +16,7 @@ describe('AI chart workspace', () => {
     cy.get('#ai-chart-key')
       .type('test-openai-key', { log: false })
       .should('have.attr', 'type', 'password');
-    cy.contains('button', 'Generate Chart').should('be.enabled');
+    cy.contains('button', 'Generate chart').should('be.enabled');
     cy.get('#ai-chart-provider').click();
     cy.contains('[role="option"]', 'Anthropic').click();
     cy.get('#ai-chart-key').should('have.value', '').type('test-anthropic-key', { log: false });
@@ -32,7 +32,7 @@ describe('AI chart workspace', () => {
   for (const locale of ['en', 'zh']) {
     it(`keeps the ${locale} workspace labeled and contained on mobile`, () => {
       cy.viewport(390, 844);
-      cy.visit(locale === 'zh' ? '/zh/ai-chart' : '/ai-chart');
+      cy.visit(locale === 'zh' ? '/zh/infx/ai-chart' : '/infx/ai-chart');
       cy.get(
         '#ai-chart-provider, #ai-chart-key, button[aria-label="Show API key"], button[aria-label="显示 API 密钥"]',
       ).each(($control) => {
@@ -96,9 +96,9 @@ function interceptGeneration(spec: Record<string, unknown>, rows: FixtureRow[]):
 }
 
 function generateChart(): void {
-  cy.get('input[placeholder="OpenAI API Key"]').type('test-api-key', { log: false });
+  cy.get('input[placeholder="OpenAI API key"]').type('test-api-key', { log: false });
   cy.get('textarea').type('Generate the requested chart');
-  cy.contains('button', 'Generate Chart').click();
+  cy.contains('button', 'Generate chart').click();
   cy.wait('@benchmarks');
 }
 
@@ -127,7 +127,7 @@ function benchmarkSpec(overrides: Record<string, unknown>): Record<string, unkno
 
 describe('AI chart metric semantics', () => {
   beforeEach(() => {
-    cy.visit('/ai-chart');
+    cy.visit('/infx/ai-chart');
   });
 
   it('excludes unavailable zero cost when selecting the top configuration', () => {
@@ -249,9 +249,9 @@ describe('AI chart Chinese workflow', () => {
         });
       });
 
-      cy.visit('/zh/ai-chart');
-      cy.get('input[placeholder="OpenAI API Key"]').type('test-api-key', { log: false });
-      cy.get('textarea[placeholder="描述想查看的图表……"]').type('生成散点图和折线图');
+      cy.visit('/zh/infx/ai-chart');
+      cy.get('input[placeholder="OpenAI API 密钥"]').type('test-api-key', { log: false });
+      cy.get('textarea[placeholder="描述想查看的图表"]').type('生成散点图和折线图');
       cy.contains('button', '生成图表').click();
       cy.wait('@interactiveBenchmarks');
 
@@ -296,23 +296,23 @@ describe('AI chart Chinese workflow', () => {
         });
       });
 
-      cy.visit('/zh/ai-chart');
-      cy.get('input[placeholder="OpenAI API Key"]').type('test-api-key', { log: false });
+      cy.visit('/zh/infx/ai-chart');
+      cy.get('input[placeholder="OpenAI API 密钥"]').type('test-api-key', { log: false });
       cy.get('textarea').type('生成两张吞吐量图表');
       cy.contains('button', '生成图表').click();
 
       cy.wait('@multiChartBenchmarks');
       cy.contains('H100 吞吐量')
         .closest('[data-slot="card"]')
-        .should('contain.text', '当前图表配置没有匹配的数据。');
+        .should('contain.text', '当前图表配置没有匹配的数据');
     });
   });
 
   it('does not expose a provider error body or API key on the Chinese route', () => {
     cy.viewport(375, 844);
-    cy.visit('/zh/ai-chart');
-    cy.get('input[placeholder="OpenAI API Key"]').should('be.visible');
-    cy.get('textarea[placeholder="描述想查看的图表……"]').should('be.visible');
+    cy.visit('/zh/infx/ai-chart');
+    cy.get('input[placeholder="OpenAI API 密钥"]').should('be.visible');
+    cy.get('textarea[placeholder="描述想查看的图表"]').should('be.visible');
     cy.contains('提示词示例').should('be.visible');
     cy.contains(`${Cypress.platform === 'darwin' ? '⌘' : 'Ctrl'}+Enter 生成图表`).should(
       'be.visible',
@@ -325,8 +325,8 @@ describe('AI chart Chinese workflow', () => {
       statusCode: 401,
       body: { error: { message: 'provider-internal-error sk-sensitive-example-key' } },
     }).as('failedProvider');
-    cy.visit('/zh/ai-chart');
-    cy.get('input[placeholder="OpenAI API Key"]').type('sk-sensitive-example-key', { log: false });
+    cy.visit('/zh/infx/ai-chart');
+    cy.get('input[placeholder="OpenAI API 密钥"]').type('sk-sensitive-example-key', { log: false });
     cy.get('textarea').type('对比吞吐量');
     cy.contains('button', '生成图表').click();
     cy.wait('@failedProvider');
@@ -336,7 +336,7 @@ describe('AI chart Chinese workflow', () => {
     cy.get('[data-testid="ai-chart-error"]').should('not.contain.text', 'sk-sensitive-example-key');
     cy.contains('button', '返回修改').click();
     cy.get('[data-testid="ai-chart-error"]').should('not.exist');
-    cy.get('input[placeholder="OpenAI API Key"]').should('have.value', 'sk-sensitive-example-key');
+    cy.get('input[placeholder="OpenAI API 密钥"]').should('have.value', 'sk-sensitive-example-key');
     cy.get('textarea').should('have.value', '对比吞吐量');
   });
 });

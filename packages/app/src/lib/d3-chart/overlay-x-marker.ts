@@ -1,10 +1,13 @@
 import * as d3 from 'd3';
 import { invalidateTooltipGeometry } from '@/lib/d3-chart/layers/scatter-points';
 import { installTouchInputTracking, isTouchCompatMouseEvent } from '@/lib/d3-chart/touch-input';
+import { pinMark, showPinRing } from '@/lib/d3-chart/pin-ring';
 
 export interface OverlayTooltipHandle<T> {
   isPinned: () => boolean;
   pinTooltip: (data: T, isOverlay: boolean) => void;
+  getPinnedPoint?: () => unknown;
+  dismissTooltip?: () => void;
 }
 
 export interface OverlayRulerLifecycle<T> {
@@ -24,6 +27,7 @@ export interface OverlayXMarkerOptions<T> {
   position: (event: PointerEvent | MouseEvent) => { left: number; top: number };
   rulers?: OverlayRulerLifecycle<T>;
   onClick?: (data: T) => void;
+  panel?: boolean;
 }
 
 export function xMarkerPath(size: number, armScale = 1): string {
@@ -45,6 +49,12 @@ export function attachOverlayXMarkerHandlers<T>(
 ): void {
   const normalStrokeWidth = options.normalStrokeWidth ?? 2.5;
   const hoverStrokeWidth = options.hoverStrokeWidth ?? 3.5;
+  const setMarkerPath = (point: SVGGElement, hovered: boolean) =>
+    d3
+      .select(point)
+      .select(options.markerSelector)
+      .attr('d', hovered ? options.hoverPath : options.normalPath)
+      .attr('stroke-width', hovered ? hoverStrokeWidth : normalStrokeWidth);
   const positionTooltip = (event: PointerEvent | MouseEvent) => {
     const position = options.position(event);
     options.tooltip.style('left', `${position.left}px`).style('top', `${position.top}px`);
@@ -54,36 +64,51 @@ export function attachOverlayXMarkerHandlers<T>(
 
   points
     .on('mouseenter', function (event, data) {
-      if (options.handle?.isPinned()) return;
+      if (options.handle?.isPinned() && !options.panel) return;
       if (isTouchCompatMouseEvent(event)) return;
-      d3.select(this)
-        .select(options.markerSelector)
-        .attr('d', options.hoverPath)
-        .attr('stroke-width', hoverStrokeWidth);
+      setMarkerPath(this, true);
       options.tooltip
         .style('opacity', 1)
         .style('display', 'block')
         .style('pointer-events', 'none')
         .html(options.content(data, false));
       invalidateTooltipGeometry(options.tooltip.node());
-      options.rulers?.show(data, this);
+      if (!options.handle?.isPinned()) options.rulers?.show(data, this);
     })
     .on('mousemove', (event) => {
-      if (options.handle?.isPinned()) return;
+      if (options.handle?.isPinned() && !options.panel) return;
       if (isTouchCompatMouseEvent(event)) return;
       positionTooltip(event);
     })
-    .on('mouseleave', function () {
-      if (options.handle?.isPinned()) return;
-      d3.select(this)
-        .select(options.markerSelector)
-        .attr('d', options.normalPath)
-        .attr('stroke-width', normalStrokeWidth);
+    .on('mouseleave', function (_event, data) {
+      if (options.handle?.isPinned() && !options.panel) return;
+      setMarkerPath(this, options.handle?.getPinnedPoint?.() === data);
       options.tooltip.style('opacity', 0).style('display', 'none');
-      options.rulers?.hide();
+      if (!options.handle?.isPinned()) options.rulers?.hide();
     })
     .on('click', function (event, data) {
       event.stopPropagation();
+      if (options.panel) {
+        options.tooltip.style('opacity', 0).style('display', 'none');
+        options.rulers?.hide();
+        if (options.handle?.getPinnedPoint?.() === data) {
+          options.handle.dismissTooltip?.();
+          return;
+        }
+        const position = overlayMarkerPosition(this);
+        const host = this.ownerSVGElement?.querySelector('.ruler-group')?.parentElement;
+        if (host) {
+          showPinRing(host, position?.x, position?.y);
+          pinMark(
+            host,
+            () => setMarkerPath(this, true),
+            () => setMarkerPath(this, false),
+          );
+        }
+        options.handle?.pinTooltip(data, true);
+        options.onClick?.(data);
+        return;
+      }
       options.tooltip
         .html(options.content(data, true))
         .style('opacity', 1)

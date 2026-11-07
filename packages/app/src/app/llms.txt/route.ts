@@ -6,6 +6,7 @@ import { inferenceModelMeta } from '@/lib/routing/inference-model-meta';
 import { PUBLIC_INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
 import { getAllWhitepapers } from '@/lib/content/whitepapers';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import { AGENTX_ROUTE, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 // oxlint-disable-next-line require-await
 export async function GET() {
@@ -19,9 +20,9 @@ export async function GET() {
     `## Links`,
     '',
     `- [Dashboard](${SITE_URL})`,
-    `- [AgentX](${SITE_URL}/agentx)`,
-    `- [Benchmark your own chips with AgentX](${SITE_URL}/agentx/quickstart): agentx-harness 1.0.7 installation, public trace replay, and optional session-routing headers`,
-    `- [AgentX Methodology](${SITE_URL}/agentx/methodology)`,
+    `- [AgentX](${SITE_URL}${AGENTX_ROUTE.path})`,
+    `- [Benchmark your own chips with AgentX](${SITE_URL}${AGENTX_ROUTE.path}/quickstart): agentx-harness 1.0.7 installation, public trace replay, and optional session-routing headers`,
+    `- [AgentX Methodology](${SITE_URL}${AGENTX_ROUTE.path}/methodology)`,
     `- [Articles](${SITE_URL}/blog)`,
     `- [Hardware Results](${SITE_URL}/hardware)`,
     `- [Whitepapers](${SITE_URL}/whitepaper)`,
@@ -35,7 +36,7 @@ export async function GET() {
     '',
     ...PUBLIC_INFERENCE_MODEL_SLUGS.map(
       (entry) =>
-        `- [${inferenceModelMeta(entry).title}](${SITE_URL}/inference/${entry.slug}): ${entry.label}`,
+        `- [${inferenceModelMeta(entry).title}](${SITE_URL}${getDashboardRoute('inference').path}/${entry.slug}): ${entry.label}`,
     ),
     '',
     `## Chip Pages`,

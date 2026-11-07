@@ -24,7 +24,7 @@ export function OverviewDetailLink({
       href={href}
       aria-label={ariaLabel}
       className={cn(
-        'group inline-flex min-h-11 items-center gap-1 whitespace-nowrap rounded-sm font-medium text-foreground underline decoration-brand/50 underline-offset-4 transition-colors hover:decoration-brand focus-visible:outline-none motion-reduce:transition-none',
+        'group inline-flex min-h-11 items-center gap-1 whitespace-nowrap rounded-sm font-medium text-foreground underline decoration-foreground/30 underline-offset-4 transition-colors hover:text-brand hover:decoration-brand focus-visible:outline-none motion-reduce:transition-none',
         className,
       )}
       onClick={() => track('overview_model_detail_clicked', { model })}
