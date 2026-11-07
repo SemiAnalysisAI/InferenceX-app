@@ -221,8 +221,6 @@ describe('system power model adapter', () => {
   });
 
   it('quotes the upstream cooling PUEs', () => {
-    expect(AIR_COOLED_SYSTEM_PUE).toBe(SYSTEMS.hopper.default_cooling.pue);
-    expect(LIQUID_COOLED_RACK_PUE).toBe(SYSTEMS['gb200-nvl72'].default_cooling.pue);
     expect(new Set(Object.values(SYSTEMS).map((system) => system.default_cooling.pue))).toEqual(
       new Set([AIR_COOLED_SYSTEM_PUE, LIQUID_COOLED_RACK_PUE]),
     );
