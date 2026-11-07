@@ -69,6 +69,9 @@ import {
   FRONTIER_COMPARISON_BUCKETS,
   leadMargins,
   averageSoftwareGain,
+  commonSoftwareGainRate,
+  GAIN_RATE_WINDOWS,
+  softwareGainRates,
   softwareGainByInteractivity,
   softwareGains,
   territoryShares,
@@ -266,6 +269,9 @@ export function GET(request: NextRequest) {
       };
       const areas = frontierAreas(history);
       const gains = softwareGains(history);
+      const gainRates = GAIN_RATE_WINDOWS.map(
+        (days) => [days, softwareGainRates(history, days)] as const,
+      );
       const keyByLowercase = new Map(
         history.series.map((series) => [series.key.toLowerCase(), series.key]),
       );
@@ -312,8 +318,17 @@ export function GET(request: NextRequest) {
               softwareGain: gains.get(series.key) ?? [],
               softwareGainByInteractivity: byInteractivity,
               softwareGainAverage: averageSoftwareGain(byInteractivity),
+              softwareGainRate: Object.fromEntries(
+                gainRates.map(([days, rates]) => [days, rates.get(series.key) ?? []]),
+              ),
             };
           }),
+          commonSoftwareGainRate: Object.fromEntries(
+            gainRates.map(([days, rates]) => [
+              days,
+              commonSoftwareGainRate(rates, history.dates.length),
+            ]),
+          ),
           overtakes: history.overtakes,
           territory: history.dates.map((date, index) => ({
             date,

@@ -14,6 +14,10 @@ import {
   frontierValueAt,
   historyFromFirstData,
   averageSoftwareGain,
+  commonSoftwareGainRate,
+  daysSinceFirstRun,
+  monthlyRate,
+  softwareGainRates,
   softwareGainByInteractivity,
   softwareGainBarMaxLog,
   softwareGains,
@@ -429,6 +433,52 @@ describe('software gains', () => {
     expect(slow.ratio).toBeCloseTo(2);
     expect(mid.ratio).toBeCloseTo(2);
     expect(beyond.ratio).toBeNull();
+  });
+
+  it('turns the software gain into a compounded monthly rate over a trailing window', () => {
+    const history = buildFrontierHistory(rows, { ...OPTIONS, groupBy: 'gpu' });
+    const gains = softwareGains(history);
+    const days = history.dates.map((date) => Date.parse(`${date}T00:00:00Z`) / 86_400_000);
+    for (const windowDays of [30, 60, 90]) {
+      const rates = softwareGainRates(history, windowDays);
+      for (const [key, list] of rates) {
+        const gain = gains.get(key)!;
+        list.forEach((rate, index) => {
+          if (rate === null) return;
+          let start = index;
+          for (let j = index - 1; j >= 0 && days[j] >= days[index] - windowDays; j--)
+            if ((gain[j] ?? 0) > 0) start = j;
+          const span = days[index] - days[start];
+          expect(span).toBeGreaterThanOrEqual(windowDays / 2);
+          expect(rate).toBeCloseTo((gain[index]! / gain[start]!) ** (365.25 / 12 / span) - 1);
+        });
+        // A first run has no history behind it.
+        const first = gain.findIndex((value) => value !== null);
+        expect(list[first]).toBeNull();
+      }
+    }
+  });
+
+  it('takes the median rate across series as the common part', () => {
+    const rates = new Map<string, (number | null)[]>([
+      ['a', [null, 0.1, 0.4, 0.2]],
+      ['b', [null, 0.3, null, 0]],
+      ['c', [0.5, null, null, 0.6]],
+    ]);
+    expect(commonSoftwareGainRate(rates, 4)).toEqual([null, 0.2, null, 0.2]);
+  });
+
+  it('counts days from each series first run and converts a total gain to a monthly rate', () => {
+    const history = buildFrontierHistory(rows, { ...OPTIONS, groupBy: 'gpu' });
+    const series = history.series[0];
+    const ages = daysSinceFirstRun(history, series.key);
+    expect(ages[history.dates.indexOf(series.firstDate)]).toBe(0);
+    expect(ages.filter((age) => age !== null).every((age) => age! >= 0)).toBe(true);
+    expect(daysSinceFirstRun(history, 'missing').every((age) => age === null)).toBe(true);
+    expect(monthlyRate(2, 365.25 / 12)).toBeCloseTo(1);
+    expect(monthlyRate(4, (2 * 365.25) / 12)).toBeCloseTo(1);
+    expect(monthlyRate(null, 30)).toBeNull();
+    expect(monthlyRate(2, 0)).toBeNull();
   });
 
   it('averages the gain across reached interactivity levels as a geometric mean', () => {

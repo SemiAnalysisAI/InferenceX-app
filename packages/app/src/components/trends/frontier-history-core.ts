@@ -610,6 +610,81 @@ export function softwareGains(history: FrontierHistory): Map<string, (number | n
   );
 }
 
+/** Trailing windows, in days, the gain-rate view offers. */
+export const GAIN_RATE_WINDOWS = [30, 60, 90] as const;
+export type GainRateWindow = (typeof GAIN_RATE_WINDOWS)[number];
+export const DEFAULT_GAIN_RATE_WINDOW: GainRateWindow = 60;
+/** Days in an average month, so rates read as compounded growth per month. */
+const DAYS_PER_MONTH = 365.25 / 12;
+
+/**
+ * The slope of the software gain: each series' compounded growth per month over the trailing
+ * `windowDays`, on every date (0.25 = +25%/month). The window is clipped to the series' first
+ * run and a rate needs at least half the window of history, so a chip's first weeks do not
+ * read as infinite growth. Null before then and wherever the series has no frontier.
+ */
+export function softwareGainRates(
+  history: FrontierHistory,
+  windowDays: number,
+): Map<string, (number | null)[]> {
+  const days = history.dates.map(dayNumber);
+  return new Map(
+    [...softwareGains(history)].map(([key, gains]) => [
+      key,
+      gains.map((gain, index) => {
+        if (gain === null || gain <= 0) return null;
+        const from = days[index] - windowDays;
+        let start = index;
+        for (let j = index - 1; j >= 0 && days[j] >= from; j--) {
+          const earlier = gains[j];
+          if (earlier !== null && earlier > 0) start = j;
+        }
+        const span = days[index] - days[start];
+        const base = gains[start];
+        if (start === index || base === null || span < windowDays / 2) return null;
+        return (gain / base) ** (DAYS_PER_MONTH / span) - 1;
+      }),
+    ]),
+  );
+}
+
+/**
+ * The shared part of the gain rate: on each date, the median rate across every series that
+ * has one, null with fewer than two. Optimisations that land for every chip at once (a
+ * framework release, a new kernel) move it; a chip's distance from it is its own.
+ */
+export function commonSoftwareGainRate(
+  rates: ReadonlyMap<string, readonly (number | null)[]>,
+  length: number,
+): (number | null)[] {
+  return Array.from({ length }, (_, index) => {
+    const values = [...rates.values()]
+      .map((list) => list[index])
+      .filter((value): value is number => value !== null && value !== undefined)
+      .toSorted((a, b) => a - b);
+    if (values.length < 2) return null;
+    const mid = Math.floor(values.length / 2);
+    return values.length % 2 === 1 ? values[mid] : (values[mid - 1] + values[mid]) / 2;
+  });
+}
+
+/** Days since a series' first run on each snapshot date; null before that run. */
+export function daysSinceFirstRun(history: FrontierHistory, key: string): (number | null)[] {
+  const first = history.series.find((entry) => entry.key === key)?.firstDate;
+  if (!first) return history.dates.map(() => null);
+  const start = dayNumber(first);
+  return history.dates.map((date) => {
+    const age = dayNumber(date) - start;
+    return age >= 0 ? age : null;
+  });
+}
+
+/** Compounded monthly growth implied by a total gain over a number of days; null under a day. */
+export function monthlyRate(gain: number | null, days: number | null): number | null {
+  if (gain === null || gain <= 0 || days === null || days < 1) return null;
+  return gain ** (DAYS_PER_MONTH / days) - 1;
+}
+
 /**
  * How much better a series' frontier is on one date than on its first snapshot, at each
  * interactivity bucket, read off the drawn curves; null where either curve does not reach.

@@ -341,6 +341,14 @@ headers aligned through a CSS subgrid, so their x axes line up.
   as grouped bars. A table under the panels lists the same ratios per selected chip,
   one column per bucket, with an Average column (`averageSoftwareGain`, the geometric
   mean of the ratios the chip reaches); it follows the playback date.
+- **Gain rate** is the derivative of Software gains, also grouped by chip.
+  `softwareGainRates` turns each chip's gain into compounded growth per month over a
+  trailing 30, 60 or 90 day window (needing half a window of history), plotted on
+  log(1 + rate) so spikes and slow months share an axis. The x axis is the calendar
+  date, with `commonSoftwareGainRate` (the all-chip median) dashed, or days since
+  each chip's first run (`daysSinceFirstRun`), which lines chips up by age to show
+  where gains saturate. A table gives gain so far, lifetime rate (`monthlyRate`),
+  current rate, the median, chip-specific (rate minus median) and the peak rate.
 
 The optional **Memes** switch is an easter egg: once per playback run, the first time
 another vendor takes part of the curve from NVIDIA, a small meme card appears in the

@@ -115,6 +115,7 @@ const STRINGS = {
     frontier: 'Frontier',
     compare: 'Compare',
     software: 'Software gains',
+    gainRate: 'Gain rate',
     frontierTitle: (yTitle: string) => `${yTitle} vs. interactivity over time`,
     interactivityAxis: (isAgentic: boolean) =>
       `${isAgentic ? 'P90 ' : ''}Interactivity (tok/s/user)`,
@@ -152,6 +153,7 @@ const STRINGS = {
     frontier: '前沿',
     compare: '对比',
     software: '软件提升',
+    gainRate: '提升速度',
     frontierTitle: (yTitle: string) => `${yTitle} 与交互性的前沿随时间变化`,
     interactivityAxis: (isAgentic: boolean) => `${isAgentic ? 'P90 ' : ''}交互性 (tok/s/user)`,
     frontierLoadError: '前沿历史数据加载失败',

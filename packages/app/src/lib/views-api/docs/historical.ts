@@ -270,6 +270,18 @@ const responseSchema = objectSchema(
                 description:
                   'Average of softwareGainByInteractivity: the geometric mean of the non-null ratios, so a 2x gain and a 0.5x loss cancel; null when no bucket is reached on both dates. The Software gains table shows it as the Average column.',
               },
+              softwareGainRate: {
+                type: 'object',
+                description:
+                  'The slope of softwareGain, keyed by trailing window in days (30, 60, 90): on each date, the compounded growth per month of the gain over that window (0.25 = +25%/month). The window is clipped to the first snapshot and needs at least half its length of history; null before that and where the series has no frontier. The Gain rate view plots one window at a time.',
+                properties: {
+                  '30': arraySchema({ type: ['number', 'null'] }),
+                  '60': arraySchema({ type: ['number', 'null'] }),
+                  '90': arraySchema({ type: ['number', 'null'] }),
+                },
+                required: ['30', '60', '90'],
+                additionalProperties: false,
+              },
               areas: {
                 ...arraySchema(numberSchema),
                 description:
@@ -315,6 +327,18 @@ const responseSchema = objectSchema(
             brief: booleanSchema,
           }),
         ),
+        commonSoftwareGainRate: {
+          type: 'object',
+          description:
+            'The all-chip median of softwareGainRate per date, keyed by window in days; null with fewer than two series. Shared optimisations move it; a series distance from it is the chip-specific part. The Gain rate view draws it dashed.',
+          properties: {
+            '30': arraySchema({ type: ['number', 'null'] }),
+            '60': arraySchema({ type: ['number', 'null'] }),
+            '90': arraySchema({ type: ['number', 'null'] }),
+          },
+          required: ['30', '60', '90'],
+          additionalProperties: false,
+        },
         territory: arraySchema(
           objectSchema({
             date: { type: 'string', format: 'date' },

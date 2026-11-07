@@ -385,6 +385,12 @@ empty. The data is in `frontier`:
   precision. `softwareGainByInteractivity` gives the latest frontier over the
   first-snapshot frontier at the 12 comparison buckets, and `softwareGainAverage`
   is the geometric mean of its non-null ratios (the table's Average column).
+- **Gain rate.** `softwareGainRate` is the slope of `softwareGain`, keyed by a
+  trailing window of 30, 60 or 90 days: the compounded growth per month over that
+  window on each date (`0.25` is +25%/month), null until a series has half a
+  window of history. `frontier.commonSoftwareGainRate` is the median across series
+  per date; a series' rate minus it is the chip-specific part. Rates falling
+  toward zero mark where software gains saturate.
 - **Chapters.** `chapters` lists the dates where the pooled frontier stepped by at
   least 10% of its area: the series that moved it (`driver`), the area `change`,
   the largest single-interactivity move (`peak`) and the `cause` (`new-series`,

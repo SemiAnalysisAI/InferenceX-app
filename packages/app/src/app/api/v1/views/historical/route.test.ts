@@ -40,6 +40,8 @@ import {
   frontierRegressions,
   leadMargins,
   averageSoftwareGain,
+  commonSoftwareGainRate,
+  softwareGainRates,
   softwareGainByInteractivity,
   softwareGains,
   territoryShares,
@@ -476,12 +478,20 @@ describe('GET /api/v1/views/historical?chart=frontier', () => {
       expect(series.softwareGainByInteractivity).toEqual(
         softwareGainByInteractivity(expected, series.key, expected.dates.length - 1, buckets),
       );
+      for (const days of [30, 60, 90])
+        expect(series.softwareGainRate[days]).toEqual(
+          softwareGainRates(expected, days).get(series.key),
+        );
       expect(series.softwareGainAverage).toEqual(
         averageSoftwareGain(
           softwareGainByInteractivity(expected, series.key, expected.dates.length - 1, buckets),
         ),
       );
     }
+    for (const days of [30, 60, 90])
+      expect(body.frontier.commonSoftwareGainRate[days]).toEqual(
+        commonSoftwareGainRate(softwareGainRates(expected, days), expected.dates.length),
+      );
     expect(body.frontier.comparison).toBeNull();
     expect(body.frontier.otherPrecisionVendors).toEqual(
       vendorsAtOtherPrecisions(rows, {
