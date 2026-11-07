@@ -8,9 +8,11 @@ $INFERENCEX_REPO, else an InferenceX checkout next to this repository). The scri
 extracts power_model at REVISION into a temporary directory and imports it, so it
 needs Python >= 3.12 with pydantic 2, the upstream package's only dependency.
 
-It writes two files next to the port (packages/app/src/lib/power/power_model):
+It writes three files next to the port (packages/app/src/lib/power/power_model):
 - power-model.manifest.json: the revision, its source tree, and every upstream
   Python module, which power-model-parity.test.ts maps one-to-one onto the port.
+- power-validity-thresholds.json: the power validators' exported thresholds at the
+  same revision, which the PowerX validity rules quote.
 - power-model.parity.json: the upstream model's own output for every catalog
   system, workload, scale-out state, measured Grace-socket or x86 CPU input, and a
   sweep of GPU watts (including out-of-domain inputs and their errors), plus seeded
@@ -34,6 +36,7 @@ REVISION = "873aaddc5c0b6604017fac503d3671d63d72b043"
 SOURCE_PATH = "power_model"
 PACKAGE_PATH = "power_model/src/power_model"
 SOURCE_URL = f"https://github.com/SemiAnalysisAI/InferenceX/tree/{REVISION}/{SOURCE_PATH}"
+THRESHOLDS_PATH = "inferencex-e2e/infx/results/power/thresholds.json"
 REPO_ROOT = Path(__file__).resolve().parents[3]
 OUTPUT_DIR = REPO_ROOT / "packages/app/src/lib/power"
 # Upstream modules the port deliberately omits, with the reason recorded in the manifest.
@@ -346,8 +349,9 @@ def main():
     parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
     args = parser.parse_args()
     provenance, configuration = Interner(), Interner()
+    repo = args.inferencex.resolve()
     with tempfile.TemporaryDirectory() as workdir:
-        tree, files = load_upstream(args.inferencex.resolve(), workdir)
+        tree, files = load_upstream(repo, workdir)
         missing = sorted(set(SKIPPED) - set(files))
         if missing:
             raise SystemExit(f"Skipped modules are not upstream: {missing}")
@@ -371,12 +375,17 @@ def main():
             "cases": parity_cases,
             "reports": parity_reports,
         },
+        "power-validity-thresholds.json": {
+            "revision": REVISION,
+            "sourcePath": THRESHOLDS_PATH,
+            "thresholds": json.loads(git(repo, "show", f"{REVISION}:{THRESHOLDS_PATH}")),
+        },
     }
     args.output_dir.mkdir(parents=True, exist_ok=True)
     for filename, payload in outputs.items():
-        # The small manifest is reviewed by hand; the fixture is stored minified
+        # The small files are reviewed by hand; the fixture is stored minified
         # (and excluded from formatting in .prettierignore).
-        indent = 2 if filename.endswith("manifest.json") else None
+        indent = None if filename.endswith("parity.json") else 2
         separators = None if indent else (",", ":")
         (args.output_dir / filename).write_text(
             json.dumps(payload, indent=indent, separators=separators, allow_nan=False) + "\n"

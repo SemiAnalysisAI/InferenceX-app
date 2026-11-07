@@ -1,0 +1,9 @@
+{
+  "revision": "873aaddc5c0b6604017fac503d3671d63d72b043",
+  "sourcePath": "inferencex-e2e/infx/results/power/thresholds.json",
+  "thresholds": {
+    "max_sample_gap_seconds": 3.0,
+    "clock_tolerance_seconds": 0.5,
+    "clock_tolerance_fraction": 0.01
+  }
+}

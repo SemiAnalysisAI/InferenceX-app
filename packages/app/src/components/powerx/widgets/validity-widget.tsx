@@ -2,6 +2,8 @@
 
 import { track } from '@/lib/analytics/analytics';
 import {
+  CLOCK_TOLERANCE_PERCENT,
+  CLOCK_TOLERANCE_SECONDS,
   MAX_SAMPLE_GAP_SECONDS,
   VALIDITY_CHECKS,
   type ValidityCheckId,
@@ -23,9 +25,8 @@ const STRINGS = {
           'A stalled exporter leaves holes the trapezoid integral would paper over, so the largest per-GPU gap is checked against the limit.',
       },
       clock: {
-        title: 'Telemetry window matches the client window within 0.5 s or 1 %',
-        detail:
-          'The head node writes the window from its own clock; the benchmark client reports its own start and end. The two must agree within max(0.5 s, 1 % of the window).',
+        title: `Telemetry window matches the client window within ${CLOCK_TOLERANCE_SECONDS} s or ${CLOCK_TOLERANCE_PERCENT} %`,
+        detail: `The head node writes the window from its own clock; the benchmark client reports its own start and end. The two must agree within max(${CLOCK_TOLERANCE_SECONDS} s, ${CLOCK_TOLERANCE_PERCENT} % of the window).`,
       },
       producer: {
         title: 'Producer commit matches the pinned version, exporter image recorded',
@@ -55,9 +56,8 @@ const STRINGS = {
           'exporter 卡住会留下空洞，梯形积分会把它抹平，所以要用每颗 GPU 的最大间隔与上限比较。',
       },
       clock: {
-        title: '遥测窗口与客户端窗口相差不超过 0.5 s 或 1 %',
-        detail:
-          '头节点按自己的时钟写窗口，基准测试客户端上报自己的起止时间，两者必须在 max(0.5 s, 窗口的 1 %) 内一致。',
+        title: `遥测窗口与客户端窗口相差不超过 ${CLOCK_TOLERANCE_SECONDS} s 或 ${CLOCK_TOLERANCE_PERCENT} %`,
+        detail: `头节点按自己的时钟写窗口，基准测试客户端上报自己的起止时间，两者必须在 max(${CLOCK_TOLERANCE_SECONDS} s, 窗口的 ${CLOCK_TOLERANCE_PERCENT} %) 内一致。`,
       },
       producer: {
         title: '采集端 commit 与固定版本一致，并记录 exporter 镜像',
