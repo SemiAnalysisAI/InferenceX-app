@@ -27,13 +27,29 @@ function Heading({
   className,
   level,
   as: Tag = 'h2',
+  logo,
+  children,
   ...props
 }: React.ComponentProps<'h2'> &
   VariantProps<typeof headingVariants> & {
     as?: HeadingTag;
+    logo?: React.ReactNode;
   }) {
   return (
-    <Tag data-slot="heading" className={cn(headingVariants({ level, className }))} {...props} />
+    <Tag
+      data-slot="heading"
+      className={cn(headingVariants({ level, className }), logo && 'flex items-start gap-2')}
+      {...props}
+    >
+      {logo ? (
+        <>
+          <span className="flex h-lh shrink-0 items-center empty:hidden">{logo}</span>
+          <span className="min-w-0">{children}</span>
+        </>
+      ) : (
+        children
+      )}
+    </Tag>
   );
 }
 

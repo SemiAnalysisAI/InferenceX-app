@@ -1344,8 +1344,7 @@ function ProfitEstimatorInner({
     if (!pricing) return null;
     return (
       <div className="mb-2 md:pr-12" data-testid="profit-caption">
-        <Heading as="h2" level="card">
-          <ModelLogo model={selectedModel} className="mr-2 size-6 align-[-0.3em]" />
+        <Heading as="h2" level="card" logo={<ModelLogo model={selectedModel} className="size-6" />}>
           {profitChartTitle(
             locale,
             basis,

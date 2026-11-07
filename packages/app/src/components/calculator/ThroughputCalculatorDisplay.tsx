@@ -936,8 +936,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
 
   const chartHeading = (
     <div className="flex min-w-0 items-start md:pr-64">
-      <Heading as="h2" level="card">
-        <ModelLogo model={selectedModel} className="mr-2 size-6 align-[-0.3em]" />
+      <Heading as="h2" level="card" logo={<ModelLogo model={selectedModel} className="size-6" />}>
         {chartTitle}
         <HeadingQualifier>{baseChartTitle.qualifier}</HeadingQualifier>
       </Heading>

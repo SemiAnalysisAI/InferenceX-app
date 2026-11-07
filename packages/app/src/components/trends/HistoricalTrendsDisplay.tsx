@@ -461,11 +461,11 @@ export default function HistoricalTrendsDisplay() {
                 caption={
                   <>
                     <div className="md:pr-96">
-                      <Heading as="h2" level="card">
-                        <ModelLogo
-                          model={selectedModel as Model}
-                          className="mr-2 size-6 align-[-0.3em]"
-                        />
+                      <Heading
+                        as="h2"
+                        level="card"
+                        logo={<ModelLogo model={selectedModel as Model} className="size-6" />}
+                      >
                         {getModelLabel(selectedModel as Model)}{' '}
                         {getSequenceLabel(selectedSequence as Sequence, locale)}{' '}
                         {t.captionTitle(currentYTitle)}

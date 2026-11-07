@@ -1225,11 +1225,11 @@ export default function ChartDisplay({
                           <div
                             className={`flex items-start gap-1 ${minimalChrome ? '' : 'md:pr-64'}`}
                           >
-                            <Heading as="h2" level="card">
-                              <ModelLogo
-                                model={graph.model as Model}
-                                className="mr-2 size-6 align-[-0.3em]"
-                              />
+                            <Heading
+                              as="h2"
+                              level="card"
+                              logo={<ModelLogo model={graph.model as Model} className="size-6" />}
+                            >
                               {getModelLabel(graph.model as Model)}{' '}
                               {getSequenceLabel(graph.sequence as Sequence, locale)}{' '}
                               {metricChartTitle(graph.chartDefinition, selectedYAxisMetric, locale)}

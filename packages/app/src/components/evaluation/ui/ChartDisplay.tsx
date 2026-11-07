@@ -143,10 +143,15 @@ export default function EvaluationChartDisplay() {
   const caption = (
     <>
       <div className="md:pr-72">
-        <Heading as="h3" level="card">
-          {selectedModel ? (
-            <ModelLogo model={selectedModel as Model} className="mr-2 size-6 align-[-0.3em]" />
-          ) : null}
+        <Heading
+          as="h3"
+          level="card"
+          logo={
+            selectedModel ? (
+              <ModelLogo model={selectedModel as Model} className="size-6" />
+            ) : undefined
+          }
+        >
           {selectedModel ? `${getModelLabel(selectedModel as Model)} ` : ''}
           {selectedBenchmark ? `${selectedBenchmark.toUpperCase()} ` : ''}
           {t.captionTitle}
