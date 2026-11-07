@@ -13,6 +13,10 @@ export const LEGACY_DASHBOARD_PATHS: ReadonlyMap<string, string> = new Map(
 
 const INFERENCEX_DEFAULT_PATH = getDashboardRoute('inference').path;
 const INFERENCEX_ROOT = INFERENCEX_DEFAULT_PATH.split('/')[1];
+const LEGACY_LANDING_PATHS: ReadonlyMap<string, string> = new Map([
+  [UBENCHX_ROUTE.path, `${UBENCHX_ROUTE.path}/mem-bw`],
+  [`${UBENCHX_ROUTE.path}/sm-l2-distance`, `${UBENCHX_ROUTE.path}/core-memory-profiles`],
+]);
 
 export function legacyDashboardPathname(pathname: string): string | null {
   const zh = pathname === '/zh' || pathname.startsWith('/zh/');
@@ -24,7 +28,8 @@ export function legacyDashboardPathname(pathname: string): string | null {
     LEGACY_DASHBOARD_PATHS.get(first) ??
     (first === INFERENCEX_ROOT && !rest ? INFERENCEX_DEFAULT_PATH : undefined);
   if (!target) return null;
-  return `${zh ? '/zh' : ''}${target}${rest}`;
+  const path = `${target}${rest}`;
+  return `${zh ? '/zh' : ''}${LEGACY_LANDING_PATHS.get(path) ?? path}`;
 }
 
 export function legacyDashboardRedirectUrl(url: URL): URL | null {

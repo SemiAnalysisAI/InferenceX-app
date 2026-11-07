@@ -195,7 +195,8 @@ describe('legacy dashboard paths', () => {
     ['/operatorx?op=bogus&model=x', '/opx?model=x'],
     ['/infx', '/infx/inference'],
     ['/zh/infx?utm_source=x', '/zh/infx/inference?utm_source=x'],
-    ['/ubenchx', '/ubx'],
+    ['/ubenchx?x=1', '/ubx/mem-bw?x=1'],
+    ['/zh/ubenchx/sm-l2-distance?gpu=all', '/zh/ubx/core-memory-profiles?gpu=all'],
     ['/ubenchx/mem-bw?x=1', '/ubx/mem-bw?x=1'],
     ['/zh/ubenchx/tpc-skyline', '/zh/ubx/tpc-skyline'],
   ])('sends %s to %s in one 308', (from, to) => {

@@ -41,12 +41,15 @@ describe('legacy dashboard redirect table', () => {
     }
   });
 
-  it.each(EXPECTED)('moves %s to %s in both locales', (from, to) => {
-    expect(legacyDashboardPathname(from)).toBe(to);
-    expect(legacyDashboardPathname(`${from}/`)).toBe(to);
-    expect(legacyDashboardPathname(`/zh${from}`)).toBe(`/zh${to}`);
-    expect(legacyDashboardPathname(`/zh${from}/a/b`)).toBe(`/zh${to}/a/b`);
-  });
+  it.each(EXPECTED.filter(([from]) => from !== '/ubenchx'))(
+    'moves %s to %s in both locales',
+    (from, to) => {
+      expect(legacyDashboardPathname(from)).toBe(to);
+      expect(legacyDashboardPathname(`${from}/`)).toBe(to);
+      expect(legacyDashboardPathname(`/zh${from}`)).toBe(`/zh${to}`);
+      expect(legacyDashboardPathname(`/zh${from}/a/b`)).toBe(`/zh${to}/a/b`);
+    },
+  );
 
   it('keeps every subpath segment', () => {
     expect(legacyDashboardPathname('/inference/deepseek-r1')).toBe('/infx/inference/deepseek-r1');
@@ -62,13 +65,30 @@ describe('legacy dashboard redirect table', () => {
     );
     expect(legacyDashboardPathname('/operatorx/model')).toBe('/opx/model');
     expect(legacyDashboardPathname('/ubenchx/mem-bw')).toBe('/ubx/mem-bw');
-    expect(legacyDashboardPathname('/zh/ubenchx/sm-l2-distance')).toBe('/zh/ubx/sm-l2-distance');
+    expect(legacyDashboardPathname('/zh/ubenchx/tpc-skyline/')).toBe('/zh/ubx/tpc-skyline');
   });
 
   it('sends the bare product root to the Inference tab', () => {
     expect(legacyDashboardPathname('/infx')).toBe('/infx/inference');
     expect(legacyDashboardPathname('/infx/')).toBe('/infx/inference');
     expect(legacyDashboardPathname('/zh/infx')).toBe('/zh/infx/inference');
+  });
+
+  it('sends old uBenchX landing paths straight to their current page', () => {
+    expect(legacyDashboardPathname('/ubenchx')).toBe('/ubx/mem-bw');
+    expect(legacyDashboardPathname('/ubenchx/')).toBe('/ubx/mem-bw');
+    expect(legacyDashboardPathname('/zh/ubenchx')).toBe('/zh/ubx/mem-bw');
+    expect(legacyDashboardPathname('/ubenchx/sm-l2-distance')).toBe('/ubx/core-memory-profiles');
+    expect(legacyDashboardPathname('/zh/ubenchx/sm-l2-distance/')).toBe(
+      '/zh/ubx/core-memory-profiles',
+    );
+    expect(legacyDashboardPathname('/ubx')).toBeNull();
+    expect(legacyDashboardPathname('/ubx/sm-l2-distance')).toBeNull();
+    expect(
+      legacyDashboardRedirectUrl(
+        new URL('https://inferencex.semianalysis.com/zh/ubenchx/sm-l2-distance?gpu=all'),
+      )?.href,
+    ).toBe('https://inferencex.semianalysis.com/zh/ubx/core-memory-profiles?gpu=all');
   });
 
   it.each([
