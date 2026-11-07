@@ -10,8 +10,14 @@ import { useStickyTooltip } from './useStickyTooltip';
 
 import { overlayMarkerPosition } from '@/lib/d3-chart/overlay-x-marker';
 import { canvasPointLayerOf } from '@/lib/d3-chart/layers/canvas-point-registry';
-import { showPinRing } from '@/lib/d3-chart/pin-ring';
+import type { ScatterDatum } from '@/lib/d3-chart/layers/canvas-points';
+import { pinMark, setDotHovered, showPinRing } from '@/lib/d3-chart/pin-ring';
 export type RulerType = 'vertical' | 'horizontal' | 'crosshair' | 'none';
+
+export type RulerScale =
+  | d3.ScaleBand<string>
+  | d3.ScaleLinear<number, number, never>
+  | d3.ScaleLogarithmic<number, number, never>;
 
 export interface ChartTooltipConfig<TData> {
   rulerType: RulerType;
@@ -77,16 +83,7 @@ export interface ChartTooltipHandlers<TData> {
       verticalRuler: d3.Selection<SVGLineElement, unknown, null, undefined>;
       horizontalRuler?: d3.Selection<SVGLineElement, unknown, null, undefined>;
     },
-    xScale:
-      | d3.ScaleBand<string>
-      | d3.ScaleLinear<number, number, never>
-      | d3.ScaleLogarithmic<number, number, never>,
-    yScale?:
-      | d3.ScaleBand<string>
-      | d3.ScaleLinear<number, number, never>
-      | d3.ScaleLogarithmic<number, number, never>,
-    svgRef?: React.RefObject<SVGSVGElement | null>,
-    zoomAxes?: 'x' | 'y' | 'both',
+    zoomedScales: () => { xScale: RulerScale; yScale?: RulerScale },
   ) => void;
 }
 
@@ -163,43 +160,15 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
         verticalRuler?: d3.Selection<SVGLineElement, unknown, null, undefined>;
         horizontalRuler?: d3.Selection<SVGLineElement, unknown, null, undefined>;
       },
-      xScale:
-        | d3.ScaleBand<string>
-        | d3.ScaleLinear<number, number, never>
-        | d3.ScaleLogarithmic<number, number, never>,
-      yScale?:
-        | d3.ScaleBand<string>
-        | d3.ScaleLinear<number, number, never>
-        | d3.ScaleLogarithmic<number, number, never>,
-      svgRef?: React.RefObject<SVGSVGElement | null>,
-      zoomAxes: 'x' | 'y' | 'both' = 'both',
+      zoomedScales: () => { xScale: RulerScale; yScale?: RulerScale },
     ) => {
       const { rulerGroup, verticalRuler, horizontalRuler } = rulers;
-      const effectiveZoomAxes = zoomAxes;
-
-      const getZoomedScales = () => {
-        let curX = xScale;
-        let curY = yScale;
-        if (svgRef?.current) {
-          const transform = d3.zoomTransform(svgRef.current);
-          if ((effectiveZoomAxes === 'x' || effectiveZoomAxes === 'both') && 'invert' in xScale) {
-            curX = transform.rescaleX(xScale as any);
-          }
-          if (
-            (effectiveZoomAxes === 'y' || effectiveZoomAxes === 'both') &&
-            yScale &&
-            'invert' in yScale
-          ) {
-            curY = transform.rescaleY(yScale as any);
-          }
-        }
-        return { curX, curY };
-      };
 
       installTouchInputTracking();
 
       const showRulers = (datum: TData, markerPosition: { x: number; y: number } | null) => {
-        const { curX: currentXScale, curY: currentYScale } = getZoomedScales();
+        const { xScale: currentXScale, yScale: currentYScale } = zoomedScales();
+
         if (verticalRuler || horizontalRuler) {
           rulerGroup.style('display', 'block');
         }
@@ -212,6 +181,8 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
           horizontalRuler.attr('y1', y).attr('y2', y);
         }
       };
+
+      const canvasPoints = canvasPointLayerOf(selection.node());
 
       const hoverStart = (
         event: MouseEvent,
@@ -232,7 +203,7 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
           .style('pointer-events', 'none')
           .html(config.generateTooltipContent(d, false));
         invalidateTooltipGeometry(tooltipElement.node());
-        showRulers(d, markerPosition);
+        if (!isPinned()) showRulers(d, markerPosition);
         return true;
       };
 
@@ -254,7 +225,8 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
           target.attr('opacity', 1);
         }
         tooltipElement.style('opacity', 0).style('display', 'none');
-        rulerGroup.style('display', 'none');
+        if (pinnedPointRef.current === d) setDotHovered(target.node(), true);
+        if (!isPinned()) rulerGroup.style('display', 'none');
         return true;
       };
 
@@ -262,6 +234,7 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
         event: MouseEvent,
         d: TData,
         markerPosition: { x: number; y: number } | null,
+        target: Element | null,
       ) => {
         event.stopPropagation();
 
@@ -272,12 +245,20 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
             dismissTooltip();
             return;
           }
-          const { curX, curY } = getZoomedScales();
+          const { xScale: curX, yScale: curY } = zoomedScales();
           const x = markerPosition?.x ?? config.getRulerX?.(d, curX);
           const y = markerPosition?.y ?? (curY ? config.getRulerY?.(d, curY) : undefined);
           const host = rulerGroup.node()?.parentNode;
-          if (host instanceof Element && x !== undefined && y !== undefined) {
+          if (host instanceof Element) {
             showPinRing(host, x, y);
+            pinMark(
+              host,
+              () =>
+                canvasPoints
+                  ? canvasPoints.pin(d as unknown as ScatterDatum)
+                  : setDotHovered(target, true),
+              () => (canvasPoints ? canvasPoints.pin(null) : setDotHovered(target, false)),
+            );
           }
           pinTooltip(d);
           config.onPointClick?.(d);
@@ -301,14 +282,14 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
         config.onPointClick?.(d);
       };
 
-      const canvasPoints = canvasPointLayerOf(selection.node());
       if (canvasPoints) {
         canvasPoints.listen({
           enter: (event, datum, position) =>
             hoverStart(event, selection, datum as unknown as TData, position),
           move: hoverMove,
           leave: (_event, datum) => hoverEnd(selection, datum as unknown as TData),
-          click: (event, datum, position) => pointClick(event, datum as unknown as TData, position),
+          click: (event, datum, position) =>
+            pointClick(event, datum as unknown as TData, position, null),
         });
         return;
       }
@@ -323,7 +304,7 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
           hoverEnd(d3.select(this), d);
         })
         .on('click', function (event, d) {
-          pointClick(event, d, this instanceof Element ? overlayMarkerPosition(this) : null);
+          pointClick(event, d, this instanceof Element ? overlayMarkerPosition(this) : null, this);
         });
     },
     [isPinned, pinTooltip, pinnedPointRef, dismissTooltip],

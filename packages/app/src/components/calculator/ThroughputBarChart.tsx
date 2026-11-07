@@ -595,7 +595,6 @@ export default function ThroughputBarChart({
     [colorResolver],
   );
 
-  const hoveredBarXRef = useRef(0);
   const selectedBarsRef = useRef(selectedBars);
   selectedBarsRef.current = selectedBars;
 
@@ -840,7 +839,11 @@ export default function ThroughputBarChart({
           />
         );
       },
-      getRulerX: () => hoveredBarXRef.current,
+      getRulerX: (datum: InterpolatedResult, xScale: unknown) => {
+        const state = tooltipStateRef.current;
+        const value = getMetricValue(datum, state.barMetric, state.costType);
+        return Math.max(0, (xScale as d3.ScaleLinear<number, number>)(value));
+      },
       getRulerY: (datum: InterpolatedResult, yScale: unknown) => {
         const band = yScale as d3.ScaleBand<string>;
         return (band(datum.resultKey) ?? 0) + band.bandwidth() / 2;
@@ -848,7 +851,6 @@ export default function ThroughputBarChart({
       onHoverStart: (
         selection: d3.Selection<SVGRectElement, InterpolatedResult, SVGGElement, unknown>,
       ) => {
-        hoveredBarXRef.current = Number.parseFloat(selection.attr('width') || '0');
         const hasSelection = selectedBarsRef.current.size > 0;
         if (!hasSelection) {
           selection

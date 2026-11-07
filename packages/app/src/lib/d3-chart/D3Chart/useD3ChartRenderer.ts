@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from 'react';
 import * as d3 from 'd3';
+import type { RulerScale } from '@/hooks/useChartTooltipHandlers';
 import { getDomainAwareChartWatermark } from '@/lib/runtime/unofficial-domain';
 import { registerChartExportRenderer } from '../export-registry';
 
@@ -23,7 +24,7 @@ import type { ChartLayout, ContinuousScale } from '../types';
 import { buildScale, isBandScale, type BuiltScale } from './scale-builders';
 import { isTouchCompatMouseEvent } from '../touch-input';
 import { overlayMarkerPosition } from '../overlay-x-marker';
-import { showPinRing } from '../pin-ring';
+import { setDotHovered, showPinRing } from '../pin-ring';
 import {
   renderLayer,
   updateLayerDecorationOnZoom,
@@ -77,10 +78,7 @@ interface RendererDeps {
     containerElement: HTMLDivElement,
     tooltipElement: d3.Selection<any, unknown, any, any>,
     rulers: any,
-    xScale: any,
-    yScale?: any,
-    svgRef?: React.RefObject<SVGSVGElement | null>,
-    zoomAxes?: 'x' | 'y' | 'both',
+    zoomedScales: () => { xScale: RulerScale; yScale: RulerScale },
   ) => void;
 }
 
@@ -384,6 +382,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
         zoomConfig?.enabled
           ? rescaleForZoom(scales.xScale, scales.yScale, zoomConfig, d3.zoomTransform(source))
           : scales,
+        props.tooltip?.details ? pinnedPointRef.current : null,
       );
     });
   });
@@ -605,6 +604,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
               const pos = computeTooltipPosition(cmx, cmy, tooltip, containerEl, 10, geometry);
               tooltip.style('left', `${pos.left}px`).style('top', `${pos.top}px`);
 
+              if (isPinned()) return;
               rulerGroup.style('display', 'block');
               if (verticalRuler && tooltipConfig.getRulerX) {
                 const rx = tooltipConfig.getRulerX(d, currentXScale as any);
@@ -618,7 +618,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
             .on('mouseleave', () => {
               if (isPinned() && !panel) return;
               tooltip.style('opacity', 0).style('display', 'none');
-              rulerGroup.style('display', 'none');
+              if (!isPinned()) rulerGroup.style('display', 'none');
             })
             .on('click', (event: MouseEvent) => {
               const [mx] = d3.pointer(event);
@@ -655,9 +655,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
                 const px = tooltipConfig.getRulerX?.(d, currentXScale as any);
                 const py = tooltipConfig.getRulerY?.(d, currentYScale as any);
                 const host = rulerGroup.node()?.parentNode;
-                if (host instanceof Element && px !== undefined && py !== undefined) {
-                  showPinRing(host, px, py);
-                }
+                if (host instanceof Element) showPinRing(host, px, py);
                 pinTooltip(d);
                 tooltipConfig.onPointClick?.(d);
                 return;
@@ -707,16 +705,17 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
               svgRef.current!.parentElement as HTMLDivElement,
               tooltip,
               rulers,
-              xScale as any,
-              yScale as any,
-              svgRef,
-              zoomConfig?.axes,
+              () =>
+                rescaleForZoom(xScale, yScale, zoomConfig, d3.zoomTransform(svgRef.current!)) as {
+                  xScale: RulerScale;
+                  yScale: RulerScale;
+                },
             );
           }
         }
       }
 
-      let replayingKeptPin = keepPin;
+      let replaying = true;
       if (zoomConfig?.enabled) {
         const zoomAxes = zoomConfig.axes ?? 'both';
 
@@ -751,11 +750,6 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
               const zoomRenderGroup = clipContent ? zoomLayout.zoomGroup : zoomLayout.g;
               const zoomBaseContext = currentCtx;
 
-              if (isPinned() && !replayingKeptPin) {
-                dismissTooltip(true);
-                hideTooltipElements(tooltipRef, svgRef);
-              }
-
               const { xScale: newXScale, yScale: newYScale } = rescaleForZoom(
                 zoomXScale,
                 zoomYScale,
@@ -779,6 +773,20 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
                   newYScale,
                   zoomLayout,
                 );
+              }
+
+              const pinHost = zoomRenderGroup.node();
+              const pinX = tooltipConfig?.details ? tooltipConfig.getRulerX : undefined;
+              if (isPinned() && !replaying && pinHost && pinX) {
+                const pinned = pinnedPointRef.current as T;
+                showPinRing(
+                  pinHost,
+                  pinX(pinned, newXScale as ContinuousScale),
+                  tooltipConfig?.getRulerY?.(pinned, newYScale as ContinuousScale),
+                );
+              } else if (isPinned() && !(replaying && keepPin)) {
+                dismissTooltip(true);
+                hideTooltipElements(tooltipRef, svgRef);
               }
 
               zoomFrameBatcherRef.current?.schedule(() => {
@@ -833,7 +841,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           },
         );
 
-        replayingKeptPin = false;
+        replaying = false;
         const restored = zoomTransformRef.current;
         if (restored.k === 1 && restored.x === 0 && restored.y === 0 && isPinned() && !keepPin) {
           dismissTooltip(true);
@@ -850,6 +858,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           .filter((d) => d === pinned)
           .node();
         let position = marker ? overlayMarkerPosition(marker) : null;
+        setDotHovered(marker, true);
         if (!position && tooltipConfig.getRulerX && tooltipConfig.getRulerY && svgRef.current) {
           const zoomed = rescaleForZoom(
             xScale,
@@ -1040,10 +1049,11 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           svgRef.current.parentElement as HTMLDivElement,
           d3.select(tooltipRef.current),
           rulers,
-          xScale,
-          yScale,
-          svgRef,
-          zoomConfig?.axes,
+          () =>
+            rescaleForZoom(xScale, yScale, zoomConfig, d3.zoomTransform(svgRef.current!)) as {
+              xScale: RulerScale;
+              yScale: RulerScale;
+            },
         );
       }
     }

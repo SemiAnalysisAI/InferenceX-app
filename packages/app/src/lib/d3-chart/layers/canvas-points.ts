@@ -259,6 +259,7 @@ export class CanvasPointLayer<T extends ScatterDatum> {
   private gridDirty = true;
   private hitPathDirty = false;
   private hoveredSlot = NO_SLOT;
+  private pinnedSlot = NO_SLOT;
   private pointerSlot = NO_SLOT;
   private handlers: PointPointerHandlers<T> | null = null;
 
@@ -753,6 +754,14 @@ export class CanvasPointLayer<T extends ScatterDatum> {
     this.setHoveredSlot(NO_SLOT);
   }
 
+  pin(datum: T | null): void {
+    const index = datum === null ? -1 : this.data.indexOf(datum);
+    const slot = index >= 0 ? this.slots[index] : NO_SLOT;
+    if (this.pinnedSlot === slot) return;
+    this.pinnedSlot = slot;
+    this.invalidate();
+  }
+
   private setHoveredSlot(slot: number): void {
     if (this.hoveredSlot === slot) return;
     this.hoveredSlot = slot;
@@ -1089,6 +1098,7 @@ export class CanvasPointLayer<T extends ScatterDatum> {
     this.hideUnderlay(frame.painted);
     const marker = this.marker?.complete ? this.marker : null;
     const hovered = this.indexBySlot.get(this.hoveredSlot) ?? -1;
+    const pinned = this.indexBySlot.get(this.pinnedSlot) ?? -1;
     for (let index = 0; index < this.count; index++) {
       const opacity = this.visibleOpacity(index);
       if (opacity <= 0) continue;
@@ -1101,12 +1111,13 @@ export class CanvasPointLayer<T extends ScatterDatum> {
         this.drawYs[index] * ratio,
       );
       context.globalAlpha = opacity;
+      const enlarged = index === hovered || index === pinned;
       if (marker) {
-        const size = MARKER_SIZE * (index === hovered ? MARKER_HOVER_SCALE : 1);
+        const size = MARKER_SIZE * (enlarged ? MARKER_HOVER_SCALE : 1);
         context.drawImage(marker, -size / 2, -size / 2, size, size);
       } else {
         context.fillStyle = colors[this.colorIndex[index]];
-        context.fill(this.shapePath(SHAPE_ORDER[this.shape[index]], index === hovered));
+        context.fill(this.shapePath(SHAPE_ORDER[this.shape[index]], enlarged));
       }
     }
     context.setTransform(1, 0, 0, 1, 0, 0);
