@@ -127,12 +127,17 @@ export function GET(request: NextRequest) {
       ['p50', 'p95', 'p99'],
       'p50',
     );
-    const yAxis = parseEnumParam(
+    const requestedYAxis = parseEnumParam(
       s.get('yAxis'),
       'yAxis',
       ['latency', 'tokens-per-second', 'activation-rate', 'payload-rate'],
       'latency',
     );
+    // Token rate exists for the round trip only; fold to latency as the EP chart does.
+    const yAxis =
+      requestedYAxis === 'tokens-per-second' && operation !== 'roundtrip'
+        ? 'latency'
+        : requestedYAxis;
     const sku = s.get('sku') ?? 'all',
       backend = s.get('backend') ?? 'all';
     const active = (key: string, id: string) => !s.has(key) || s.get(key)!.split(',').includes(id);

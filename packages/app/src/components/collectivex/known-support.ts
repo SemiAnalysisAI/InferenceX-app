@@ -47,10 +47,6 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     en: 'ROCm-only library; no CUDA path exists.',
     zh: '仅支持 ROCm 的库，不存在 CUDA 路径。',
   },
-  'gb-only': {
-    en: 'Requires an MNNVL one-sided NVLink domain; only the GB rack-scale SKUs have one.',
-    zh: '需要 MNNVL 单边 NVLink 域，仅 GB 机柜级 SKU 具备。',
-  },
   'uccl-pollara-degraded': {
     en: "UCCL's CPU-proxy RDMA is functional on the Pollara fabric but ~13x under its upstream-documented bandwidth (~6 GB/s vs 82 GB/s), invariant to GPU-memory registration mode and traffic class — an ionic-driver-level suspect. Numbers at that deficit would misrepresent the SKU.",
     zh: 'UCCL 的 CPU 代理 RDMA 在 Pollara 网络上可运行，但带宽仅为上游文档值的约 1/13（约 6 GB/s 对 82 GB/s），与 GPU 内存注册方式和流量类别无关，疑似 ionic 驱动层问题。该水平的数据无法公正代表此 SKU。',
@@ -198,21 +194,21 @@ const NORMAL: KnownMatrix = {
     mori: bothWork,
     'uccl-ep': bothWork,
     'nccl-ep': off('nvidia-only'),
-    'flashinfer-ep': off('gb-only'),
+    'flashinfer-ep': off('nvidia-only'),
   },
   mi325x: {
     'deepep-v2': off('nvidia-only'),
     mori: bothWork,
     'uccl-ep': bothWork,
     'nccl-ep': off('nvidia-only'),
-    'flashinfer-ep': off('gb-only'),
+    'flashinfer-ep': off('nvidia-only'),
   },
   mi355x: {
     'deepep-v2': off('nvidia-only'),
     mori: cell(works, broken('mi355x-ainic-a77')),
     'uccl-ep': cell(works, broken('uccl-pollara-degraded')),
     'nccl-ep': off('nvidia-only'),
-    'flashinfer-ep': off('gb-only'),
+    'flashinfer-ep': off('nvidia-only'),
   },
 };
 

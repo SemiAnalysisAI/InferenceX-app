@@ -581,7 +581,7 @@ def _collective_source(bodies, requests, references, run_id):
     for raw_key in pointer.split('/')[1:]:
         key = raw_key.replace('~1', '/').replace('~0', '~')
         value = value[int(key)] if isinstance(value, list) else value.get(key, MISSING)
-    ep = re.fullmatch(r'/series/(\d+)/points/(\d+)/components/(dispatch|stage|combine|roundtrip)', pointer)
+    ep = re.fullmatch(r'/series/(\d+)/points/(\d+)/components/(pair_period|dispatch|stage|combine|roundtrip)', pointer)
     kv = re.fullmatch(r'/kv/(\d+)/rows/(\d+)', pointer)
     require(ep is not None or kv is not None, 'CollectiveX source identity pointer differs')
     if ep:
@@ -699,7 +699,7 @@ def _collective_expected(manifest, requests, bodies, result):
         pointers = [f'/series/{series_index}/points/{point_index}/components/{operation}'
                     for series_index, series in enumerate(dataset['series'])
                     for point_index in range(len(series['points']))
-                    for operation in ('dispatch', 'stage', 'combine', 'roundtrip')]
+                    for operation in ('pair_period', 'dispatch', 'stage', 'combine', 'roundtrip')]
         pointers += [f'/kv/{case_index}/rows/{row_index}'
                      for case_index, case in enumerate(dataset.get('kv', []))
                      for row_index in range(len(case['rows']))]

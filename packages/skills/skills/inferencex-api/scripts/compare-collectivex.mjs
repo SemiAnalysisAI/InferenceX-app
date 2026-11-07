@@ -112,7 +112,7 @@ function epRows(dataset, responseIndex) {
         roundtrip_token_rate_at_latency_percentile: _rate,
         ...pointConfiguration
       } = point;
-      for (const operation of ['dispatch', 'stage', 'combine', 'roundtrip']) {
+      for (const operation of ['pair_period', 'dispatch', 'stage', 'combine', 'roundtrip']) {
         const component = point.components[operation];
         if (component !== undefined && component !== null && !object(component)) {
           throw new Error('Invalid EP component');
