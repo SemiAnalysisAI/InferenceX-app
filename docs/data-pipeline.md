@@ -155,12 +155,12 @@ must use the append-only contract below.
 
 ### Required Power
 
-InferenceX enforces required power per benchmark job. A point is required when the
-producer marks it so, for example a matrix row with `require-power: true` (run with
-`REQUIRE_POWER=1`) or a multinode search-space entry with `power: true`. An invalid
-measurement window fails a required point's job; any other point records
-`power_valid=0` and still publishes. Every result row carries the producer's
-`require_power` verdict.
+InferenceX enforces required power per benchmark job. Every result row carries
+`require_power`, which is `true` only when the job ran with the workflow's
+`REQUIRE_POWER` input on (a matrix row with `require-power: true`). An invalid
+measurement window fails that job. A multinode AgentX entry with `power: true` also
+fails its job on invalid power, but its rows carry `require_power: false`, so they
+publish with power marked invalid, like any other point with `power_valid=0`.
 
 Fixed-sequence results upload only from a passing job, but AgentX results upload even
 from a failed one. `requiredPowerFailure` (`etl/benchmark-mapper.ts`) therefore treats
