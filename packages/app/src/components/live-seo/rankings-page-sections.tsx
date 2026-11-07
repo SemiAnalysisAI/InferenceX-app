@@ -17,6 +17,7 @@ export interface RankingsStrings {
   colPrecision: string;
   colEngine: string;
   emptyState: string;
+  unrankedNote: string | null;
   siblingLead: string;
   siblingLabel: string;
   methodologyHeading: string;
@@ -166,6 +167,9 @@ export function RankingsDetailContent({
                   </tbody>
                 </table>
               </div>
+            )}
+            {data.rows.length > 0 && t.unrankedNote && (
+              <p className="mt-3 text-xs text-muted-foreground">{t.unrankedNote}</p>
             )}
             <p className="mt-4 text-sm text-muted-foreground">
               {t.siblingLead}{' '}
