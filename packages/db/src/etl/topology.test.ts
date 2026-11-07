@@ -190,6 +190,36 @@ describe('shared benchmark and eval topology', () => {
       },
       expected: { disagg: true, numPrefillGpu: 8, numDecodeGpu: 16 },
     },
+    {
+      name: 'power placement workers override disaggregated role counts',
+      input: {
+        framework: 'dynamo-sglang',
+        is_multinode: true,
+        prefill_tp: 4,
+        prefill_ep: 1,
+        prefill_num_workers: 1,
+        num_prefill_gpu: 4,
+        decode_tp: 8,
+        decode_ep: 1,
+        decode_num_workers: 1,
+        num_decode_gpu: 8,
+        workers: [
+          { role: 'prefill', worker_idx: 0, hosts: ['p0'], num_gpus: 8, avg_power_w: 500 },
+          { role: 'decode', worker_idx: 0, hosts: ['d0'], num_gpus: 4, avg_power_w: 600 },
+          { role: 'decode', worker_idx: 0, hosts: ['d1'], num_gpus: 4, avg_power_w: 600 },
+        ],
+      },
+      expected: { disagg: true, prefillNumWorkers: 1, numPrefillGpu: 8, numDecodeGpu: 8 },
+    },
+    {
+      name: 'power placement workers override the aggregate count',
+      input: {
+        ...aggregate,
+        num_gpus: 8,
+        workers: [{ role: 'agg', worker_idx: 0, hosts: ['n0'], num_gpus: 4, avg_power_w: 500 }],
+      },
+      expected: { disagg: false, numPrefillGpu: 4, numDecodeGpu: 4 },
+    },
   ])('$name', ({ input, expected }) => {
     const { benchmark, collected, individual } = mapAllFormats(input);
     for (const result of [benchmark, collected, individual]) {
