@@ -7,23 +7,6 @@ export type ConfigTopology = Omit<
   'hardware' | 'framework' | 'model' | 'precision' | 'specMethod'
 >;
 
-type EngineRole = 'prefill' | 'decode' | 'agg';
-
-/** GPUs per engine role from the power manifest's placement (`workers[]`), when the row carries it. */
-function placedRoleGpus(workers: unknown): Partial<Record<EngineRole, number>> | undefined {
-  if (!Array.isArray(workers) || workers.length === 0) return undefined;
-  const gpus: Partial<Record<EngineRole, number>> = {};
-  for (const worker of workers) {
-    const role: unknown = worker?.role;
-    const count = physicalChipCount(worker?.num_gpus);
-    if ((role !== 'prefill' && role !== 'decode' && role !== 'agg') || count === undefined) {
-      return undefined;
-    }
-    gpus[role] = (gpus[role] ?? 0) + count;
-  }
-  return gpus;
-}
-
 export function resolveConfigTopology(
   src: Record<string, any>,
   framework: string,
@@ -152,16 +135,6 @@ export function resolveConfigTopology(
     decodeNumWorkers = aggregate.numWorkers;
     numPrefillGpu = aggregate.numGpu;
     numDecodeGpu = aggregate.numGpu;
-  }
-
-  // The producer's placement is the GPU count truth; the heuristics above serve rows without it.
-  const placed = placedRoleGpus(src.workers);
-  if (placed && disagg && placed.agg === undefined) {
-    numPrefillGpu = placed.prefill ?? 0;
-    numDecodeGpu = placed.decode ?? 0;
-  } else if (placed?.agg !== undefined && !disagg && Object.keys(placed).length === 1) {
-    numPrefillGpu = placed.agg;
-    numDecodeGpu = placed.agg;
   }
 
   return {
