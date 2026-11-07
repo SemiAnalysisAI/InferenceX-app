@@ -47,7 +47,7 @@ export function contrastColors(bgColor: string, opacity = 1, backdrop = 'var(--c
   return lum > 0.3 ? '#131416' : 'white';
 }
 
-export const DARK_TEXT_LUMINANCE = relativeLuminance(0x13, 0x14, 0x16);
+const DARK_TEXT_LUMINANCE = relativeLuminance(0x13, 0x14, 0x16);
 
 export function readableTextContrast(
   bgColor: string,

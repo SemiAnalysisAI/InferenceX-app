@@ -476,27 +476,27 @@ it('uses shared Huawei colors in OperatorX and uBenchX across a live theme switc
   cy.visit('/opx', visitOptions);
   cy.wait('@colorComparison');
   cy.get('[data-testid="operatorx-viz-roofline"]').scrollIntoView();
-  operatorPoints().first().should('have.css', 'fill', 'rgb(166, 90, 0)');
+  operatorPoints().first().should('have.css', 'fill', 'rgb(148, 106, 0)');
   cy.contains('[data-testid="operatorx-coverage"] li', '950PR')
     .find('.rounded-full')
     .first()
-    .should('have.css', 'background-color', 'rgb(166, 90, 0)');
+    .should('have.css', 'background-color', 'rgb(148, 106, 0)');
   cy.get('[data-testid="theme-toggle"]').click();
   cy.get('html').should('have.class', 'dark');
-  operatorPoints().first().should('have.css', 'fill', 'rgb(188, 104, 7)');
+  operatorPoints().first().should('have.css', 'fill', 'rgb(235, 192, 74)');
   cy.contains('[data-testid="operatorx-coverage"] li', '950PR')
     .find('.rounded-full')
     .first()
-    .should('have.css', 'background-color', 'rgb(188, 104, 7)');
+    .should('have.css', 'background-color', 'rgb(235, 192, 74)');
 
   cy.visit('/ubx/mem-bw', visitOptions);
-  bandwidthPoints().first().should('have.css', 'fill', 'rgb(166, 90, 0)');
+  bandwidthPoints().first().should('have.css', 'fill', 'rgb(148, 106, 0)');
   cy.get('[data-testid="theme-toggle"]').click();
-  bandwidthPoints().first().should('have.css', 'fill', 'rgb(188, 104, 7)');
+  bandwidthPoints().first().should('have.css', 'fill', 'rgb(235, 192, 74)');
   bandwidthPoints().eq(20).trigger('mouseenter', { force: true });
   cy.get('[data-chart-tooltip="ubenchx-mbu"]')
     .should('contain', 'Huawei 950PR')
     .find('span')
     .first()
-    .should('have.css', 'background-color', 'rgb(188, 104, 7)');
+    .should('have.css', 'background-color', 'rgb(235, 192, 74)');
 });

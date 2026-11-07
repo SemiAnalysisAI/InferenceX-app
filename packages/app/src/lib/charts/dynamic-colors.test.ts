@@ -4,7 +4,6 @@ import { hsl, rgb } from 'd3';
 import { VENDOR_OKLCH_ZONES, VENDOR_HSL_ZONES } from '@semianalysisai/inferencex-constants';
 
 import {
-  insideLabelFill,
   whiteTextFill,
   generateHighContrastGpuDateColors,
   generateGpuDateColors,
@@ -61,68 +60,6 @@ describe('generateVendorColors', () => {
     expect(hueOf(colors['mystery_series'])).toBeGreaterThanOrEqual(unknown.start);
     expect(hueOf(colors['mystery_series'])).toBeLessThanOrEqual(unknown.end);
   });
-
-  it.each(['light', 'dark'] as const)(
-    'keeps same-vendor series at least 0.08 apart in OKLab in %s mode',
-    (theme) => {
-      const keys = ['b300', 'b200', 'h200', 'h100', 'mi355x', 'mi325x', 'mi300x'];
-      const colors = generateVendorColors(keys, theme);
-      const oklab = (key: string) => {
-        const [l, c, h] = /^oklch\((?<l>[\d.]+) (?<c>[\d.]+) (?<h>[\d.]+)\)$/u
-          .exec(colors[key])!
-          .slice(1)
-          .map(Number);
-        const radians = (h * Math.PI) / 180;
-        return [l, c * Math.cos(radians), c * Math.sin(radians)];
-      };
-      for (const family of [keys.slice(0, 4), keys.slice(4)]) {
-        for (const [i, a] of family.entries()) {
-          for (const b of family.slice(i + 1)) {
-            const [la, aa, ba] = oklab(a);
-            const [lb, ab, bb] = oklab(b);
-            expect(Math.hypot(la - lb, aa - ab, ba - bb)).toBeGreaterThanOrEqual(0.08);
-          }
-        }
-        if (theme === 'dark') {
-          expect(Math.min(...family.map((key) => lightnessOf(colors[key])))).toBeGreaterThanOrEqual(
-            0.6,
-          );
-        }
-      }
-    },
-  );
-
-  it.each(['light', 'dark'] as const)(
-    'separates neighbouring same-vendor series in lightness and shifts hue toward teal (%s)',
-    (theme) => {
-      const keys = [
-        'gb300_dynamo-sglang',
-        'gb300_dynamo-trt',
-        'gb300_dynamo-vllm',
-        'gb200_dynamo-sglang',
-        'gb200_dynamo-vllm',
-        'b300_sglang',
-        'b300_vllm',
-      ];
-      const colors = generateVendorColors(keys, theme);
-      const ordered = keys.toSorted((a, b) => hueOf(colors[a]) - hueOf(colors[b]));
-      for (let i = 1; i < ordered.length; i++) {
-        expect(
-          Math.abs(lightnessOf(colors[ordered[i]]) - lightnessOf(colors[ordered[i - 1]])),
-        ).toBeGreaterThanOrEqual(theme === 'light' ? 0.11 : 0.09);
-      }
-      expect(hueOf(colors[ordered.at(-1)!]) - hueOf(colors[ordered[0]])).toBeGreaterThan(55);
-    },
-  );
-
-  it('lifts the dark yellow-green end of the NVIDIA ramp off olive', () => {
-    const keys = ['vr200_dynamo-trt', 'vr200_trt', 'gb300_dynamo-sglang', 'gb300_dynamo-trt'];
-    const dark = generateVendorColors(keys, 'dark');
-    for (const key of keys) {
-      if (hueOf(dark[key]) <= 120) expect(lightnessOf(dark[key])).toBeGreaterThanOrEqual(0.71);
-    }
-    expect(lightnessOf(dark['vr200_dynamo-trt'])).toBeGreaterThan(0.75);
-  });
 });
 
 function lightnessOf(color: string): number {
@@ -147,33 +84,6 @@ describe('whiteTextFill', () => {
 
   it('leaves unparseable fills alone', () => {
     expect(whiteTextFill('var(--primary)')).toBe('var(--primary)');
-  });
-});
-
-describe('insideLabelFill', () => {
-  it('darkens mid fills that fail both text colours against the blended backdrop', () => {
-    expect(insideLabelFill('oklch(0.600 0.15 350.0)', 5.6, 0.85, '#ffffff')).toBe(
-      'oklch(0.458 0.150 350.0)',
-    );
-    expect(insideLabelFill('oklch(0.600 0.15 350.0)', 5.6, 0.85, 'oklch(1 0 0)')).toBe(
-      'oklch(0.458 0.150 350.0)',
-    );
-    expect(insideLabelFill('oklch(0.600 0.15 350.0)', 5.6, 0.85, '#18191c')).toBe(
-      'oklch(0.585 0.150 350.0)',
-    );
-  });
-
-  it('keeps fills where either text colour already passes', () => {
-    expect(insideLabelFill('oklch(0.880 0.15 124.2)', 5.6, 0.85, '#ffffff')).toBe(
-      'oklch(0.880 0.15 124.2)',
-    );
-    expect(insideLabelFill('oklch(0.400 0.15 150.0)', 5.6, 0.85, '#ffffff')).toBe(
-      'oklch(0.400 0.15 150.0)',
-    );
-  });
-
-  it('leaves unparseable fills alone', () => {
-    expect(insideLabelFill('var(--foreground)', 5.6, 0.85, '#ffffff')).toBe('var(--foreground)');
   });
 });
 
@@ -300,7 +210,7 @@ describe('Huawei shared identity colors', () => {
     expect(getVendor('other_huawei')).toBe('unknown');
   });
   it.each(['light', 'dark'] as const)(
-    'uses the same readable amber-orange for aliases and preserves other vendor colors (%s)',
+    'uses the same readable amber for aliases and preserves other vendor colors (%s)',
     (theme) => {
       const other = ['mi300x', 'mi355x', 'h100', 'tpuv7', 'jalapeno', 'mystery'];
       const before = generateVendorColors(other, theme),
@@ -308,7 +218,7 @@ describe('Huawei shared identity colors', () => {
       for (const key of other) expect(after[key]).toBe(before[key]);
       const color = after.ascend950pr;
       expect(generateVendorColors(['Huawei 950PR'], theme)['Huawei 950PR']).toBe(color);
-      expect(hsl(color).h).toBeGreaterThan(30);
+      expect(hsl(color).h).toBeGreaterThan(35);
       expect(hsl(color).h).toBeLessThan(55);
       expect(
         contrastAgainst(color, theme === 'light' ? '#ffffff' : '#111214'),

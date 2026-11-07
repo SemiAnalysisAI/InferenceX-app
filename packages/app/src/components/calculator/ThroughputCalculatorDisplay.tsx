@@ -84,8 +84,6 @@ import { calculatorChartToCsv } from '@/lib/export/csv-export-helpers';
 
 import ThroughputBarChart, {
   type ChartTitleParts,
-  calculatorBarFill,
-  calculatorBarSwatch,
   getChartTitle,
   getCostProviderLabel,
   getResultLabel,
@@ -518,15 +516,10 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     [visibilityIntent, selectionKey, legendHwKeys],
   );
   const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
-  const { resolveColor, themeColors } = useThemeColors({
+  const { resolveColor } = useThemeColors({
     highContrast,
     activeKeys: visibleKeysArray,
   });
-  const backdrop = themeColors.rootStyles?.getPropertyValue('--card').trim() ?? '';
-  const resolveBarColor = useMemo(
-    () => (hwKey: string) => calculatorBarFill(resolveColor(hwKey), backdrop),
-    [resolveColor, backdrop],
-  );
 
   const hasAnyData = hasData || hasOverlayData;
   const targetValue = useMemo(
@@ -893,7 +886,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         .map(([key, config]) => ({
           name: config.name,
           label: getDisplayLabel(config),
-          color: calculatorBarSwatch(resolveBarColor(key), backdrop),
+          color: resolveColor(key),
           title: config.gpu,
           hw: key,
           isActive: visibleHwKeys.has(key),
@@ -906,8 +899,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     hardwareConfig,
     visibleHwKeys,
     toggleGpuVisibility,
-    resolveBarColor,
-    backdrop,
+    resolveColor,
   ]);
 
   // Input/Output values follow the chip basis; name the denominator on the total basis.
@@ -1371,7 +1363,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                       runUrl={runUrl}
                       selectedBars={selectedBars}
                       onBarSelect={handleBarSelect}
-                      colorResolver={resolveBarColor}
+                      colorResolver={resolveColor}
                       legendElement={
                         legendHwKeys.length > 0 ? (
                           <ChartLegend
