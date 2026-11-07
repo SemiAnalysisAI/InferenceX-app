@@ -2,19 +2,21 @@ import { track } from '@/lib/analytics/analytics';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
-import {
-  powerBasisLabel,
-  type PowerBasis,
-  type PowerBasisLabelStyle,
-} from '@/lib/power/power-basis';
+import { powerBasisLabel, type PowerBasisLabelStyle } from '@/lib/power/power-basis';
 
 import { allInMeasuredReasonLabel } from '../utils/inference-table-data';
-import type { UnplottedPowerReason } from '../utils/power-chip-coverage';
+import type { UnplottedModeledPower } from '../utils/power-chip-coverage';
+
+const latinGap = (text: string) => (/^[A-Za-z]/u.test(text) ? ' ' : '');
 
 const STRINGS = {
   en: {
-    heading: (points: number, boundary: string) =>
-      `Not drawn: ${points} ${points === 1 ? 'point has' : 'points have'} measured GPU power but no ${boundary} estimate.`,
+    heading: {
+      points: (points: number, boundary: string) =>
+        `Not drawn: ${points} ${points === 1 ? 'point has' : 'points have'} measured GPU power but no ${boundary} estimate.`,
+      lines: (points: number, boundary: string) =>
+        `No ${boundary} line for ${points} ${points === 1 ? 'point' : 'points'}: drawn on the measured GPU line only.`,
+    },
     or: ' or ',
     colon: ': ',
     separator: ', ',
@@ -23,8 +25,12 @@ const STRINGS = {
     showTable: 'Show in table',
   },
   zh: {
-    heading: (points: number, boundary: string) =>
-      `图中未绘制 ${points} 个点：已有 GPU 实测功耗，但缺少${/^[A-Za-z]/u.test(boundary) ? ' ' : ''}${boundary}估算值。`,
+    heading: {
+      points: (points: number, boundary: string) =>
+        `图中未绘制 ${points} 个点：已有 GPU 实测功耗，但缺少${latinGap(boundary)}${boundary}估算值。`,
+      lines: (points: number, boundary: string) =>
+        `${points} 个点只绘制在 GPU 实测功耗曲线上，没有${latinGap(boundary)}${boundary}曲线。`,
+    },
     or: '或',
     colon: '：',
     separator: '、',
@@ -35,44 +41,52 @@ const STRINGS = {
 } satisfies Record<Locale, unknown>;
 
 /**
- * Names the points a modeled IT or facility chart leaves out and why, so a missing point
- * reads differently from a missing benchmark. The table carries the reason per row.
+ * Names the points a modeled IT or facility series leaves out and why, so a missing point
+ * reads differently from a missing benchmark. `onShowTable` links to a table whose status
+ * column gives the reason per row; omit it where that table or the way back is missing.
  */
 export function UnplottedPowerNote({
-  groups,
-  bases,
+  summary,
   labelStyle,
   onShowTable,
 }: {
-  groups: readonly UnplottedPowerReason[];
-  bases: readonly PowerBasis[];
+  summary: UnplottedModeledPower;
   labelStyle: PowerBasisLabelStyle;
-  onShowTable: () => void;
+  onShowTable?: () => void;
 }) {
   const locale = useLocale();
-  if (groups.length === 0) return null;
   const t = STRINGS[locale];
+  const groups = summary.reasons;
   const points = groups.reduce((sum, group) => sum + group.points, 0);
-  const boundary = [...new Set(bases)]
+  const boundary = summary.bases
     .map((basis) => powerBasisLabel(basis, locale, labelStyle))
     .join(t.or);
   return (
-    <div data-testid="unplotted-power-note" className="text-xs leading-5 text-muted-foreground">
+    <div
+      data-testid="unplotted-power-note"
+      data-missing={summary.missing}
+      className="text-xs leading-5 text-muted-foreground"
+    >
       <p>
-        {t.heading(points, boundary)}{' '}
-        <button
-          type="button"
-          className="underline underline-offset-2 hover:text-foreground"
-          onClick={() => {
-            track('inference_unplotted_power_table_opened', {
-              points,
-              reasons: groups.map((group) => group.reason).join(','),
-            });
-            onShowTable();
-          }}
-        >
-          {t.showTable}
-        </button>
+        {t.heading[summary.missing](points, boundary)}
+        {onShowTable && (
+          <>
+            {' '}
+            <button
+              type="button"
+              className="underline underline-offset-2 hover:text-foreground"
+              onClick={() => {
+                track('inference_unplotted_power_table_opened', {
+                  points,
+                  reasons: groups.map((group) => group.reason).join(','),
+                });
+                onShowTable();
+              }}
+            >
+              {t.showTable}
+            </button>
+          </>
+        )}
       </p>
       <ul>
         {groups.map((group) => (

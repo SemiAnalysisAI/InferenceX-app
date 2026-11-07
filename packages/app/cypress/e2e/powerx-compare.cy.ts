@@ -235,6 +235,19 @@ describe('AgentX All in Measured chart and table', () => {
         }
       });
       cy.document().then((doc) => expect(doc.documentElement.scrollWidth).to.be.at.most(width));
+      // Count: All draws GB200 on its GPU line; only its IT and Facility lines are missing.
+      cy.visit(chartUrl({ i_metric: 'y_measuredAvgPower', i_pcompare: 'boundaries' }));
+      cy.get('[data-testid="unplotted-power-note"]')
+        .first()
+        .should(
+          'contain.text',
+          locale === 'en'
+            ? 'No IT (no PUE) or Facility line for 2 points'
+            : '2 个点只绘制在 GPU 实测功耗曲线上',
+        )
+        .and('not.contain.text', locale === 'en' ? 'Not drawn' : '未绘制')
+        .find('button')
+        .should('not.exist');
       cy.intercept('GET', '/api/v1/benchmarks*', { body: [agenticRows[2]] }).as('missingOnly');
       cy.intercept('GET', '/api/unofficial-run*', {
         body: {

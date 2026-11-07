@@ -168,19 +168,25 @@ link still opens that view for locked visitors.
   among the visible rows (`foldPowerPartRows`). The CSV export keeps every part. With the touch readout above the plot the drill-down plot is
   260 px high instead of 380 (`PHONE_PLOT_HEIGHT`). From `md` up nothing changes.
 - A pinned point's "View power trace" action opens the Over time view focused on that trace.
-- The footer carries no PowerX-specific note: the former collapsed "How we measure" details
-  is gone, and only the shared /inference footer notes remain. The meaning of the GPU /
-  IT / Facility tags lives in each pill's `title` (`POWER_BASIS_TAG_TITLES`), not in prose.
-- Points the chart cannot draw on a modeled boundary (IT, Facility, or the Count: All lines) are
-  named, not dropped silently. Every unavailable reason (`modelSystemPower` returning
-  `unsupported`, including `model-domain`) leaves no modeled watt figure, so there is no honest
-  y position for a hollow marker. Instead the shared chart notices under the plot carry
-  `UnplottedPowerNote`: the count of points with measured GPU power but no estimate, then one
-  line per reason (the table's Estimate status labels) listing each chip with its point count;
-  `?unofficialrun=` chips carry their run's legend color. "Show in table" opens the table,
-  whose status column gives the reason per row. `unplottedModeledPower` in
-  `power-chip-coverage.ts` builds the groups from the table rows, scoped by the same chip,
-  precision, quick-filter and overlay-visibility rules as the table.
+- The footer carries no "How we measure" details any more; the meaning of the GPU / IT /
+  Facility tags lives in each pill's `title` (`POWER_BASIS_TAG_TITLES`), not in prose. The
+  shared /inference chart notices under the plot remain, including the modeled-power note below.
+- Points with measured GPU power but no modeled IT or Facility value are named, not dropped
+  silently. Every unavailable reason (`modelSystemPower` returning `unsupported`, including
+  `model-domain`) leaves no modeled watt figure, so there is no honest y position for a hollow
+  marker. Instead the chart notices carry `UnplottedPowerNote`, built by `unplottedModeledPower`
+  in `power-chip-coverage.ts` from the table's rows (same chip, precision, quick-filter and
+  overlay-visibility scope): a count, then one line per reason (the table's Estimate status
+  labels) naming each chip with its point count; `?unofficialrun=` chips carry their run's
+  legend color. The wording follows what is on the plot:
+  - On the IT or Facility boundary (Count: IT or Facility) the points are not drawn at all
+    ("Not drawn: N points …"), and "Show in table" opens the table, whose Estimate status
+    column gives the reason per row.
+  - Under Count: All the points are drawn on the GPU line and only their IT and Facility lines
+    are missing ("No IT (no PUE) or Facility line for N points …"). That table lists GPU rows
+    without the status column, so the note has no table link.
+  - Embeds (`minimalChrome`) hide the Chart/Table toggle, so the note has no table link there
+    either. The Where view draws no scatter and keeps only `PowerChipCompare`'s own note.
 
 ### P0 additions (IT basis, headroom, load swings, labels)
 

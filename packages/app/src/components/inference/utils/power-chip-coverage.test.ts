@@ -4,7 +4,6 @@ import type { InferenceData } from '../types';
 import {
   chipsWithoutSystemModel,
   hasRoleTelemetry,
-  modeledPowerSeries,
   unplottedModeledPower,
 } from './power-chip-coverage';
 
@@ -55,8 +54,6 @@ describe('hasRoleTelemetry', () => {
 const unsupported = (reason: 'hardware' | 'model-domain') => ({
   modeledSystemPower: { status: 'unsupported', reason, modelRevision: 'test' } as const,
 });
-const fields = (yMetric: string, compare: 'none' | 'boundaries') =>
-  modeledPowerSeries(yMetric, compare).map((series) => series.field);
 
 describe('unplottedModeledPower', () => {
   it('groups points without a facility value by reason, keeping unofficial-run chips apart', () => {
@@ -72,12 +69,9 @@ describe('unplottedModeledPower', () => {
       point('h200_sglang', unsupported('model-domain')),
     ];
     const overlay = [point('rtx6000pro_vllm', { run_url: 'run-2', ...unsupported('hardware') })];
-    const groups = unplottedModeledPower(
-      official,
-      overlay,
-      fields('y_utilityModeledWatts', 'none'),
-      (p) => (p.run_url === 'run-2' ? 1 : 0),
-    );
+    const groups = unplottedModeledPower(official, overlay, 'y_utilityModeledWatts', 'none', (p) =>
+      p.run_url === 'run-2' ? 1 : 0,
+    )!.reasons;
     expect(groups.map((g) => [g.reason, g.points])).toEqual([
       ['hardware', 3],
       ['model-domain', 1],
@@ -88,13 +82,20 @@ describe('unplottedModeledPower', () => {
     ]);
   });
 
-  it('flags a drawn GPU point whose IT and facility lines are missing under Count: All', () => {
-    const gpuOnly = [point('rtx6000pro_vllm', unsupported('hardware'))];
-    expect(
-      unplottedModeledPower(gpuOnly, [], fields('y_measuredAvgPower', 'none'), () => 0),
-    ).toEqual([]);
-    expect(
-      unplottedModeledPower(gpuOnly, [], fields('y_measuredAvgPower', 'boundaries'), () => 0),
-    ).toMatchObject([{ reason: 'hardware', points: 1 }]);
+  it('reports a GPU point drawn under Count: All as missing lines, not as an undrawn point', () => {
+    const rows = [point('rtx6000pro_vllm', unsupported('hardware'))];
+    const note = (yMetric: string, compare: 'none' | 'boundaries') =>
+      unplottedModeledPower(rows, [], yMetric, compare, () => 0);
+    expect(note('y_measuredAvgPower', 'none')).toBeNull();
+    expect(note('y_measuredAvgPower', 'boundaries')).toMatchObject({
+      missing: 'lines',
+      bases: ['it-modeled', 'utility-modeled'],
+      reasons: [{ reason: 'hardware', points: 1 }],
+    });
+    // On its own boundary the same point is not drawn at all.
+    expect(note('y_itModeledWatts', 'none')).toMatchObject({
+      missing: 'points',
+      bases: ['it-modeled'],
+    });
   });
 });

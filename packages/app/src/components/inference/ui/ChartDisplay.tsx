@@ -128,10 +128,7 @@ import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from '@/components/ui/atom-e
 import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
 import { UnplottedPowerNote } from '@/components/inference/ui/UnplottedPowerNote';
 import { overlayRunIndex } from '@/lib/charts/overlay-run-style';
-import {
-  modeledPowerSeries,
-  unplottedModeledPower,
-} from '@/components/inference/utils/power-chip-coverage';
+import { unplottedModeledPower } from '@/components/inference/utils/power-chip-coverage';
 import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
 import { ResultContext } from '@/components/ui/result-context';
 import { InferenceScenarioSelector } from './InferenceScenarioSelector';
@@ -1202,21 +1199,22 @@ export default function ChartDisplay({
                 point.framework !== undefined &&
                 getFrameworkLabel(point.framework).includes(ATOM_FOOTNOTE_MARKER),
             );
-            const modeledSeries = modeledPowerSeries(selectedYAxisMetric, powerCompare);
+            // Only a drawn scatter can leave points out; the Where panels carry their own note.
             const unplottedRows =
-              modeledSeries.length > 0 && getViewMode(graphIndex) === 'chart'
+              getViewMode(graphIndex) === 'chart' && !powerXWherePanelsOnly
                 ? visibleTableRows(graph, footerOverlay, Boolean(isGpuComparison))
                 : null;
-            const unplottedPower = unplottedRows
-              ? unplottedModeledPower(
-                  unplottedRows.officialRows,
-                  unplottedRows.overlayRows,
-                  modeledSeries.map((series) => series.field),
-                  (point) => overlayRunIndex(point.run_url ?? null, runIndexByUrl),
-                )
-              : [];
+            const unplottedPower =
+              unplottedRows &&
+              unplottedModeledPower(
+                unplottedRows.officialRows,
+                unplottedRows.overlayRows,
+                selectedYAxisMetric,
+                powerCompare,
+                (point) => overlayRunIndex(point.run_url ?? null, runIndexByUrl),
+              );
             const footerNotices =
-              hasOffloadHalo || residentSequenceLengths || unplottedPower.length > 0 ? (
+              hasOffloadHalo || residentSequenceLengths || unplottedPower ? (
                 <>
                   <div
                     data-testid="chart-status-notes"
@@ -1224,12 +1222,19 @@ export default function ChartDisplay({
                   >
                     {hasOffloadHalo && <OffloadHaloLegendKey />}
                   </div>
-                  <UnplottedPowerNote
-                    groups={unplottedPower}
-                    bases={modeledSeries.map((series) => series.basis)}
-                    labelStyle={powerXSurface ? 'count' : 'basis'}
-                    onShowTable={() => handleViewModeChange(graphIndex, 'table')}
-                  />
+                  {unplottedPower && (
+                    <UnplottedPowerNote
+                      summary={unplottedPower}
+                      labelStyle={powerXSurface ? 'count' : 'basis'}
+                      // The table shows the status column only for an all-in metric, and an
+                      // embed hides the Chart/Table toggle that leads back.
+                      onShowTable={
+                        unplottedPower.missing === 'points' && !minimalChrome
+                          ? () => handleViewModeChange(graphIndex, 'table')
+                          : undefined
+                      }
+                    />
+                  )}
                   {residentSequenceLengths && !minimalChrome && !powerXSurface && (
                     <p
                       className="text-3xs leading-tight text-muted-foreground/70"

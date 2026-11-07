@@ -61,19 +61,6 @@ export function hasRoleTelemetry(
 
 const isModeled = (basis: PowerBasis) => basis === 'it-modeled' || basis === 'utility-modeled';
 
-/** The modeled IT and facility series the chart draws: its own metric and any Count: All lines. */
-export function modeledPowerSeries(
-  metric: string,
-  compare: PowerCompare,
-): { basis: PowerBasis; field: string }[] {
-  const basis = getMeasuredMetricConfig(metric)?.basis;
-  const own = basis && isModeled(basis) ? [{ basis, field: metric.slice(2) }] : [];
-  const lines = powerCompareVariants(metric, compare).flatMap(({ variant, field }) =>
-    variant.kind === 'basis' && isModeled(variant.id) ? [{ basis: variant.id, field }] : [],
-  );
-  return [...own, ...lines];
-}
-
 interface UnplottedPowerChip {
   label: string;
   points: number;
@@ -87,22 +74,43 @@ export interface UnplottedPowerReason {
   chips: UnplottedPowerChip[];
 }
 
+export interface UnplottedModeledPower {
+  /**
+   * `points` when the chart's own metric is modeled, so the points are not drawn at all;
+   * `lines` when they are drawn on the measured GPU line and only their Count: All IT and
+   * facility lines are missing.
+   */
+  missing: 'points' | 'lines';
+  /** The modeled boundaries the chart draws, in draw order. */
+  bases: PowerBasis[];
+  reasons: UnplottedPowerReason[];
+}
+
 /**
- * Points with measured GPU power that have no value on a modeled series the chart draws,
- * grouped by why. No unavailable reason yields a modeled watt figure, so these points have
- * no honest position on an IT or facility axis: the chart names them instead of drawing them.
+ * Points with measured GPU power that have no value on a modeled IT or facility series the
+ * chart draws, grouped by why. No unavailable reason yields a modeled watt figure, so these
+ * points have no honest position on an IT or facility axis: the chart names them instead.
  */
 export function unplottedModeledPower(
   official: readonly InferenceData[],
   overlay: readonly InferenceData[],
-  fields: readonly string[],
+  metric: string,
+  compare: PowerCompare,
   runIndex: (point: InferenceData) => number,
-): UnplottedPowerReason[] {
+): UnplottedModeledPower | null {
+  const basis = getMeasuredMetricConfig(metric)?.basis;
+  const own = basis && isModeled(basis) ? [{ basis, field: metric.slice(2) }] : [];
+  const series = [
+    ...own,
+    ...powerCompareVariants(metric, compare).flatMap(({ variant, field }) =>
+      variant.kind === 'basis' && isModeled(variant.id) ? [{ basis: variant.id, field }] : [],
+    ),
+  ];
   const groups = new Map<AllInUnavailableReason, Map<string, UnplottedPowerChip>>();
   const add = (point: InferenceData, run: number | undefined) => {
     if (point.powerVariant || !isPositive(point.measuredAvgPower?.y)) return;
-    const reason = fields
-      .map((field) => allInMeasuredUnavailableReason(point, field))
+    const reason = series
+      .map(({ field }) => allInMeasuredUnavailableReason(point, field))
       .find((r) => r !== null);
     if (!reason) return;
     const chips = groups.get(reason) ?? new Map<string, UnplottedPowerChip>();
@@ -112,10 +120,17 @@ export function unplottedModeledPower(
     chip.points++;
     chips.set(key, chip);
   };
-  for (const point of official) add(point, undefined);
-  for (const point of overlay) add(point, runIndex(point));
-  return [...groups].map(([reason, chips]) => {
-    const list = [...chips.values()];
-    return { reason, points: list.reduce((sum, chip) => sum + chip.points, 0), chips: list };
-  });
+  if (series.length > 0) {
+    for (const point of official) add(point, undefined);
+    for (const point of overlay) add(point, runIndex(point));
+  }
+  if (groups.size === 0) return null;
+  return {
+    missing: own.length > 0 ? 'points' : 'lines',
+    bases: [...new Set(series.map((entry) => entry.basis))],
+    reasons: [...groups].map(([reason, chips]) => {
+      const list = [...chips.values()];
+      return { reason, points: list.reduce((sum, chip) => sum + chip.points, 0), chips: list };
+    }),
+  };
 }
