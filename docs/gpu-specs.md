@@ -20,6 +20,8 @@ not mean the NICs are absent.
 - B300's shared `HW_REGISTRY` TDP is 1100 W. `/chips/b300`, `/zh/chips/b300`,
   their SEO/social descriptions, and `/api/v1/views/options` (`hardware[].tdpW`)
   consume that value. Its 1.9 kW all-in provisioned power reference is unchanged.
+  The power model port sizes B300 cooling from the same 1100 W;
+  `system-power-model.test.ts` fails when any modeled SKU's registry TDP and model TDP differ.
 
 - `/chips/*`, `/zh/chips/*`, `/gpu-specs`, and `/zh/gpu-specs` share `GPU_SPECS` with
   `/api/v1/views/gpu-specs` (JSON and CSV). NIC, network technology, bandwidth and

@@ -1,7 +1,9 @@
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { describe, expect, it } from 'vitest';
 
 import { create_power_model, type PowerEstimate, ValueError } from './power_model';
 import { SYSTEMS } from './power_model/models/advanced/systems/catalog';
+import { RackScaleSystem } from './power_model/models/advanced/systems/rack_scale/rack_scale';
 import {
   AIR_COOLED_SYSTEM_PUE,
   FACILITY_PUE_NOTE,
@@ -24,6 +26,19 @@ import {
 import type { PowerComponentBreakdown } from './power_model/base';
 
 const STATE = { workload: 'agentic', scaleOut: true } as const;
+const CHASSIS_HARDWARE = [
+  ['h100', 'hopper'],
+  ['h200', 'hopper'],
+  ['b200', 'b200'],
+  ['b300', 'b300'],
+  ['mi300x', 'mi300'],
+  ['mi325x', 'mi325'],
+  ['mi355x', 'mi355'],
+] as const;
+const RACK_HARDWARE = [
+  ['gb200', 'gb200-nvl72'],
+  ['gb300', 'gb300-nvl72'],
+] as const;
 
 function upstream(system: string, gpuWattsPerGpu: number, socketWatts: number | null = null) {
   const estimate = create_power_model({
@@ -81,15 +96,7 @@ describe('system power model adapter', () => {
     expect(SYSTEM_POWER_MODEL_SOURCE_URL).toContain(SYSTEM_POWER_MODEL_REVISION);
   });
 
-  it.each([
-    ['h100', 'hopper'],
-    ['h200', 'hopper'],
-    ['b200', 'b200'],
-    ['b300', 'b300'],
-    ['mi300x', 'mi300'],
-    ['mi325x', 'mi325'],
-    ['mi355x', 'mi355'],
-  ] as const)(
+  it.each(CHASSIS_HARDWARE)(
     'models %s as the upstream %s chassis at chassis GPU watts / 8',
     (hardware, system) => {
       expect(isSystemPowerHardware(hardware)).toBe(true);
@@ -99,10 +106,7 @@ describe('system power model adapter', () => {
     },
   );
 
-  it.each([
-    ['gb200', 'gb200-nvl72'],
-    ['gb300', 'gb300-nvl72'],
-  ] as const)(
+  it.each(RACK_HARDWARE)(
     'models %s as the upstream %s rack, measured or modeled Grace',
     (hardware, system) => {
       expect(isRackPowerHardware(hardware)).toBe(true);
@@ -114,6 +118,20 @@ describe('system power model adapter', () => {
       expect(rackComputeTrayCount(hardware)).toBe(18);
     },
   );
+
+  it('sizes every modeled SKU with the hardware registry TDP', () => {
+    const systems = new Map<string, keyof typeof SYSTEMS>([...CHASSIS_HARDWARE, ...RACK_HARDWARE]);
+    const modeled = Object.keys(HW_REGISTRY).filter(
+      (hardware) => isSystemPowerHardware(hardware) || isRackPowerHardware(hardware),
+    );
+    expect(modeled.toSorted()).toEqual([...systems.keys()].toSorted());
+    for (const hardware of modeled) {
+      const unit = new SYSTEMS[systems.get(hardware)!]();
+      const tdp =
+        unit instanceof RackScaleSystem ? unit.compute_tray.board.gpu_tdp_w : unit.ubb.gpu_tdp_w;
+      expect(tdp, hardware).toBe(HW_REGISTRY[hardware].tdp);
+    }
+  });
 
   /** Every leaf the pinned port produces, across every supported system and state. */
   const PINNED_LEAVES: Record<string, SystemPowerCategory> = {

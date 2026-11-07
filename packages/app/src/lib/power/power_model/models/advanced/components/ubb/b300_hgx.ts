@@ -23,13 +23,13 @@ export class B300HGXBoard extends NVIDIA8WayHGXBoard {
   readonly nic: ConnectX8NICCard;
 
   constructor({
-    gpu_tdp_w = 1200,
+    gpu_tdp_w = 1100,
     nic = new ConnectX8NICCard({ state: 'idle' }),
     non_gpu_power_w,
     provenance = B300_BOARD_BASELINE,
     ...fields
   }: B300HGXBoardFields = {}) {
-    if (gpu_tdp_w !== 1200) throw new ValidationError('Input should be 1200');
+    if (gpu_tdp_w !== 1100) throw new ValidationError('Input should be 1100');
     validate_instance(nic, ConnectX8NICCard);
     super({
       gpu_tdp_w,
