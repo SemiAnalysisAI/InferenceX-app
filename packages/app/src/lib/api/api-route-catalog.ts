@@ -155,8 +155,6 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-view-options',
-    // Kimi K3.1 Pro leads MODEL_OPTIONS and the inference landing route;
-    // explicit-model API requirements and defaults.model remain unchanged.
     sourceSha256: '79f8765d704cef43d9c976fe2a40e1a4dd23a3de0b30c411dacbf8144a345327',
   },
   {
@@ -1560,7 +1558,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results.ts',
-    sourceSha256: 'a0db46f5da963486e5e43036c72c9975c64cdf072999e29d6eb1c86c8c1a7897',
+    sourceSha256: 'd3cf1910e8285a6d39ac44b19ba70a06e347e28dd7c892b8f4c37c1e25c41c70',
     reviewArea: {
       en: 'Shared VideoGenX results selectors, sample admission, dual GPU cost bases and modelled profit.',
       zh: 'VideoGenX 结果页共用的筛选、样本准入、两种 GPU 成本口径及估算利润。',
@@ -1568,7 +1566,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-chart.ts',
-    sourceSha256: 'fb395468324b5bd9d96263adeade0f8f7ce0efff0df27eb29c08b2e91c515b47',
+    sourceSha256: '98ea067ac095a02c7f1f127c0b3864765b3a817deec3ee3d418e49e08d8286a8',
     reviewArea: {
       en: 'VideoGenX results chart axes, accepted r_x/r_y metric keys, GPU basis and deployment detail key.',
       zh: 'VideoGenX 结果图表的坐标轴、r_x/r_y 可接受的指标键、GPU 口径及部署详情键。',
@@ -1696,7 +1694,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/points.ts',
-    sourceSha256: '8da72ff2ed3faa556891878c7929f5945b194d6dd64741d80ba94c037872b638',
+    sourceSha256: 'a474b53447a64e4b4b3f5d31c397d4023800b2e11f62a3749852e53b15ede0be',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1704,7 +1702,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/plot.ts',
-    sourceSha256: '2b96b5e2913ed65c802e4981da467a9a86d250fc30b561770467463b706f8649',
+    sourceSha256: '4596a907e3a85afe6fd35d39e5add67e0654c54623c780ef3d3010d0bb90e352',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1712,7 +1710,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/deployment.ts',
-    sourceSha256: '6e74b6d1d5b6e8908b3fefe2adff99fd6b21a283e76aa91956f8114e0d89cc86',
+    sourceSha256: 'e2c61ead0053527445ec7a3d110a31c2a2d88926a5cdc3b2b0d5aa7b83023570',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -2029,8 +2027,7 @@ export const apiContractSourceDigests = [
     // AgentX-only. No parameter or response shape change, so the docs stand.
     // buildOverviewModelSummaries reads /rankings tiers, including ones outside
     // OVERVIEW_TIERS. The Overview BFF parameters and response shape are unchanged.
-    // Default controls are 100 tok/s/user and 30d; API docs and skills match.
-    sourceSha256: '66eb3d889e6d87beaee34051205a000628d607eca820eb0f765a3c88a4397c6d',
+    sourceSha256: '84b79e95a0d924845ce724ff9c945f057b480538430afa385badbbbdff58c013',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',

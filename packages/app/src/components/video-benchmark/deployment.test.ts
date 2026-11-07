@@ -39,15 +39,15 @@ const options = { tier: 'h' } as const;
 describe('deployment', () => {
   it('keys a deployment by boards and model split, not by concurrency', () => {
     const c4: VideoPoint = { ...base, concurrency: 4 };
-    expect(deploymentKey(base)).toBe('4g:tp2:u2');
-    expect(deploymentKey(c4)).toBe('4g:tp2:u2');
+    expect(deploymentKey(base)).toBe('na:4g:tp2:u2');
+    expect(deploymentKey(c4)).toBe('na:4g:tp2:u2');
     expect(
       deploymentKey({
         ...base,
         server: { tp: 1, ulysses: 4, attention: null },
       }),
-    ).toBe('4g:tp1:u4');
-    expect(deploymentKey({ ...base, participating: null, server: null })).toBe('nag:tpna:una');
+    ).toBe('na:4g:tp1:u4');
+    expect(deploymentKey({ ...base, participating: null, server: null })).toBe('na:nag:tpna:una');
   });
   it('treats concurrency above the replica count as queueing, with one replica when unknown', () => {
     expect(isQueueing(base)).toBe(false);

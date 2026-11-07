@@ -394,6 +394,23 @@ describe('VideoGenX results contract', () => {
       allocated: null,
     });
   });
+  it('offers each engine as its own chip config and ignores a key from before engines', () => {
+    const b200 = (id: string, engine: string) => ({
+      ...eligible,
+      id,
+      hardwareKey: 'b200',
+      results: evidence({ engine }),
+    });
+    const input = [b200('vllm:c1', 'vllm-omni'), b200('sglang:c1', 'sglang')];
+    const offered = resultProjection(input, state()).chipConfigs;
+    expect(offered.map(({ point }) => point.id)).toEqual(['sglang:c1', 'vllm:c1']);
+    // A share link from before engines named the same B200 4-GPU TP2 × Ulysses 2 deployment.
+    const stale = resultProjection(input, { ...state(), configs: ['b200:4g:tp2:u2'] });
+    expect(stale.state.configs).toEqual([]);
+    expect(stale.history).toEqual([]);
+    const chosen = resultProjection(input, { ...state(), configs: [offered[1].key] });
+    expect(ids(chosen.history)).toEqual(['vllm:c1']);
+  });
   it.each([
     ['recorded results without an engine', evidence({ engine: null })],
     ['legacy results without engine metadata', undefined],

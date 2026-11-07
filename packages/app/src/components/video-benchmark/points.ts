@@ -113,13 +113,14 @@ function toPoint(
 }
 
 /**
- * Newest published observation per (hardware, deployment, concurrency) cell.
- * Points arrive newest publication first, so the first occurrence wins; hardware
- * without a registry key is kept as-is because nothing can be compared against
- * it. Two server layouts of one hardware are different cells, so a GPUs-per-video
- * sweep adds points instead of replacing the existing one. A cell published before
- * layouts were recorded cannot be told apart from a newer layout at the same GPU
- * count, so that newer cell supersedes it.
+ * Newest published observation per (hardware, deployment, concurrency) cell,
+ * where the deployment names the engine and server layout. Points arrive newest
+ * publication first, so the first occurrence wins; hardware without a registry
+ * key is kept as-is because nothing can be compared against it. Two engines or
+ * two server layouts of one hardware are different cells, so a second engine or
+ * a GPUs-per-video sweep adds points instead of replacing the existing one. A
+ * cell published before layouts were recorded cannot be told apart from a newer
+ * layout of the same engine at the same GPU count, so that newer cell supersedes it.
  */
 export function latestVideoCells(points: VideoPoint[]): VideoPoint[] {
   const seen = new Set<string>();
@@ -128,7 +129,7 @@ export function latestVideoCells(points: VideoPoint[]): VideoPoint[] {
     if (point.hardwareKey === null) return true;
     const concurrency = point.concurrency ?? 'na';
     const key = `${point.hardwareKey}:${deploymentKey(point)}:${concurrency}`;
-    const gpuCount = `${point.hardwareKey}:${point.participating ?? 'na'}:${concurrency}`;
+    const gpuCount = `${point.hardwareKey}:${point.results?.engine ?? 'na'}:${point.participating ?? 'na'}:${concurrency}`;
     const layoutUnknown =
       typeof point.server?.tp !== 'number' || typeof point.server.ulysses !== 'number';
     if (seen.has(key) || (layoutUnknown && seenGpuCounts.has(gpuCount))) return false;
@@ -156,8 +157,8 @@ export function workloadGroup(point: Pick<VideoPoint, 'workloadKey' | 'id'>): st
  * clips of a shorter plan) and superseded exports, while the chart, cards,
  * Compare and Evidence must all describe one frozen workload: drop cells under
  * the sample floor, keep the workload measured on the most hardware (ties: more
- * cells, then the newer publication), then the newest cell per deployment and
- * concurrency. Everything else stays visible in the Performance history list.
+ * cells, then the newer publication), then the newest cell per hardware,
+ * deployment (engine and layout) and concurrency. Everything else stays visible in the Performance history list.
  */
 export function dashboardCells(points: VideoPoint[]): {
   cells: VideoPoint[];

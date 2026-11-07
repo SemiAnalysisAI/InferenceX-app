@@ -10,22 +10,26 @@ interface PlottedVideoPoint extends VideoPoint {
   y: number;
   color: string;
   label: string;
-  /** On its hardware's Pareto frontier over deployments. */
+  /** On its hardware and engine's Pareto frontier over deployments. */
   optimal: boolean;
 }
 
 export interface VideoPlot {
   /** Deployment cells to draw: the frontier cells, plus the dominated ones when Optimal Only is off. */
   plotted: PlottedVideoPoint[];
-  /** Per-hardware Pareto frontier over its deployment cells, ascending x; lines need two or more. */
+  /**
+   * Pareto frontier over the deployment cells of each hardware and engine, keyed
+   * `<hardware>:<engine>` (`na` when no engine was recorded), ascending x; lines need two or more.
+   */
   frontiers: Record<string, PlottedVideoPoint[]>;
-  /** True once any hardware has more than one measured deployment. */
+  /** True once any hardware and engine has more than one measured deployment. */
   multiLayout: boolean;
 }
 
 /**
- * The chart's data model. A hardware's curve is the Pareto frontier over its
- * measured deployments (GPUs per video and how they split the model). Client
+ * The chart's data model. Each hardware and engine's curve is the Pareto frontier
+ * over its measured deployments (GPUs per video and how they split the model), so
+ * one engine's frontier never dominates another's points away. Client
  * concurrency above one request per replica only queues on the batch-one
  * server, so those cells stay in the evidence panel and never reach the chart.
  */
@@ -52,17 +56,12 @@ export function plotVideoPoints(
       },
     ];
   });
-  const byHardware = new Map<string, PlottedVideoPoint[]>();
-  for (const p of plotted) {
-    const list = byHardware.get(p.hardwareKey!) ?? [];
-    list.push(p);
-    byHardware.set(p.hardwareKey!, list);
-  }
+  const byEngine = Map.groupBy(plotted, (p) => `${p.hardwareKey}:${p.results?.engine ?? 'na'}`);
   const xBetter = VIDEO_METRICS[state.x].polarity;
   const yBetter = VIDEO_METRICS[state.y].polarity;
   const frontiers: Record<string, PlottedVideoPoint[]> = {};
   let multiLayout = false;
-  for (const [key, list] of byHardware) {
+  for (const [key, list] of byEngine) {
     frontiers[key] = paretoFrontier(list, xBetter, yBetter);
     for (const p of frontiers[key]) p.optimal = true;
     if (new Set(list.map(deploymentKey)).size > 1) multiLayout = true;
@@ -76,7 +75,7 @@ export function plotVideoPoints(
 
 /**
  * Cells the table and CSV list: what the chart draws. With Optimal Only on,
- * each hardware's frontier deployments for the selected axes; off, every
+ * each hardware and engine's frontier deployments for the selected axes; off, every
  * non-queued deployment, including cells without a value on an axis.
  */
 export function listedVideoCells(

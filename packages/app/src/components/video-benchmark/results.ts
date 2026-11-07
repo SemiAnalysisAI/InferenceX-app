@@ -1,7 +1,8 @@
 import { at, number, rows, text, type Json } from './bundle';
-import { costPerGpuHour, hardwareSort, type CostTier } from './hardware';
+import { costPerGpuHour, type CostTier } from './hardware';
 import { metricValue, type VideoPoint } from './metrics';
-import { chipConfigKey } from './deployment';
+import { chipConfigKey, compareDeployments } from './deployment';
+import { engineSort } from './engines';
 import { DASHBOARD_SAMPLE_FLOOR, latestVideoCells } from './points';
 import type { ResultsEvidence } from './results-evidence';
 import {
@@ -353,14 +354,9 @@ function resultCell(point: VideoPoint, state: ResultsState): ResultCell {
 const values = <T extends string | number>(items: (T | null)[]) => [
   ...new Set(items.filter((x): x is T => x !== null)),
 ];
-const latest = (input: VideoPoint[]) => {
-  const groups = new Map<string, VideoPoint[]>();
-  for (const point of input) {
-    const key = JSON.stringify([point.workloadKey, point.results?.engine ?? null]);
-    groups.set(key, [...(groups.get(key) ?? []), point]);
-  }
-  return [...groups.values()].flatMap(latestVideoCells);
-};
+/** Newest cell per workload, hardware, deployment and concurrency; engines never replace each other. */
+const latest = (input: VideoPoint[]) =>
+  [...Map.groupBy(input, (point) => point.workloadKey).values()].flatMap(latestVideoCells);
 
 /** One published official run of the selected workload, in measurement order. */
 export interface ResultsRun {
@@ -452,17 +448,14 @@ export function resultProjection(
   const runs = workloadRuns(official);
   const chipConfigs = [...new Map(official.map((p) => [chipConfigKey(p), p]))]
     .map(([key, point]) => ({ key, point }))
-    .toSorted(
-      (a, b) =>
-        hardwareSort(a.point.hardwareKey ?? '') - hardwareSort(b.point.hardwareKey ?? '') ||
-        (a.point.participating ?? 0) - (b.point.participating ?? 0) ||
-        a.key.localeCompare(b.key),
-    );
+    .toSorted((a, b) => compareDeployments(a.point, b.point) || a.key.localeCompare(b.key));
+  // A key this workload does not offer (an old share link) compares nothing, so the run shows.
+  const configs = state.configs.filter((key) => chipConfigs.some((config) => config.key === key));
   const comparedRuns = Map.groupBy(
     official.filter((p) => {
       const date = p.observedAt?.slice(0, 10) ?? '';
       return (
-        state.configs.includes(chipConfigKey(p)) &&
+        configs.includes(chipConfigKey(p)) &&
         (state.compareFrom === null || date >= state.compareFrom) &&
         (state.compareTo === null || date <= state.compareTo)
       );
@@ -473,7 +466,7 @@ export function resultProjection(
     ...[...comparedRuns.values()].flatMap(latest),
     ...latest(
       namedMatches.filter(
-        (p) => p.workloadKey === workloadKey && state.configs.includes(chipConfigKey(p)),
+        (p) => p.workloadKey === workloadKey && configs.includes(chipConfigKey(p)),
       ),
     ),
   ].map((p) => resultCell(p, state));
@@ -528,6 +521,7 @@ export function resultProjection(
     state: {
       ...state,
       workload: workloadKey === null ? state.workload : workloads.get(workloadKey)!.key,
+      configs,
     },
     cells,
     overlayCells,
@@ -547,7 +541,9 @@ export function resultProjection(
       modes: values(metadata.map((m) => m.mode)),
       steps: values(metadata.map((m) => m.steps)),
       gpuCounts: values(available.map((p) => p.participating)),
-      engines: values(metadata.map((m) => m.engine)),
+      engines: values(metadata.map((m) => m.engine)).toSorted(
+        (a, b) => engineSort(a) - engineSort(b),
+      ),
       dates: values(runs.map((r) => r.date)),
       workloads: [...workloads.values()]
         .filter((w) => !state.model || w.model === state.model)

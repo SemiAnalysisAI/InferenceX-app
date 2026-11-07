@@ -397,7 +397,7 @@ describe('VideoGenX results', () => {
     points().should('have.length', 3);
     cy.get('[data-testid="results-chip-config"]').click();
     cy.contains('[role="option"]', 'B200 · 4 GPU · TP2 × Ulysses 2').click();
-    searchParam('r_configs').should('equal', 'b200:4g:tp2:u2');
+    searchParam('r_configs').should('equal', 'b200:na:4g:tp2:u2');
     points().should('have.length', 1);
     points('[data-hardware="b200"]').should('contain', '2026-09-09');
     cy.get('[data-testid="results-compare-history"]').should('contain', 'Comparison date range');

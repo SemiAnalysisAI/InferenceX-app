@@ -4,6 +4,7 @@ import type { VideoHistoryPage } from './history';
 import type { VideoPoint } from './metrics';
 import { videoPoints } from './points';
 import { DEFAULT_RESULTS_STATE, resultProjection, type ResultsState } from './results';
+import type { ResultsEvidence } from './results-evidence';
 import {
   RESULTS_X_METRICS,
   resultsChartSeries,
@@ -118,14 +119,37 @@ describe('resultsChartSeries', () => {
     const named = deployment('named', 2, 20, 50, 400, { runId: '200', approved: false });
     const deployments = cells([fast, mid, b200], { unofficialRun: '200' }, [named]);
     const series = resultsChartSeries(deployments, selection({ optimal: true }));
-    expect(series.map((s) => s.key)).toEqual(['b200', 'h200', 'h200-overlay']);
+    expect(series.map((s) => s.key)).toEqual(['b200:na', 'h200:na', 'h200:na-overlay']);
     const [, official, overlay] = series;
     expect(overlay.hardwareKey).toBe('h200');
     expect(ids(overlay.points)).toEqual(['named:c1']);
     expect(ids(official.points)).toEqual(['fast:c1', 'mid:c1']);
     expect(overlay.points[0].key).toBe('200:named:c1');
     const hidden = resultsChartSeries(deployments, selection({ hidden: ['h200'] }));
-    expect(hidden.map((s) => s.key)).toEqual(['b200']);
+    expect(hidden.map((s) => s.key)).toEqual(['b200:na']);
+  });
+
+  it('gives each engine on one hardware its own series and frontier, named run included', () => {
+    const b200 = (name: string, engine: string, p50: number, change: Partial<VideoPoint> = {}) =>
+      deployment(name, 4, p50, 400 - p50, 200, {
+        hardwareKey: 'b200',
+        results: { engine } as ResultsEvidence,
+        ...change,
+      });
+    // The slower, costlier vLLM-Omni cell would sit off an SGLang frontier.
+    const series = resultsChartSeries(
+      cells(
+        [b200('sglang', 'sglang', 30), b200('vllm', 'vllm-omni', 40)],
+        { unofficialRun: '200' },
+        [b200('named', 'vllm-omni', 50, { runId: '200', approved: false })],
+      ),
+      selection({ optimal: true }),
+    );
+    expect(series.map((s) => [s.engine, s.overlay, ids(s.points)])).toEqual([
+      ['sglang', false, ['sglang:c1']],
+      ['vllm-omni', false, ['vllm:c1']],
+      ['vllm-omni', true, ['named:c1']],
+    ]);
   });
 });
 

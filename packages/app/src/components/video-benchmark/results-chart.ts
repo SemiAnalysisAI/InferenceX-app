@@ -1,4 +1,5 @@
 import { chipConfigKey } from './deployment';
+import { engineSort } from './engines';
 import { paretoFrontier } from './frontier';
 import { hardwareSort, type CostTier } from './hardware';
 import type { ResultCell } from './results';
@@ -133,9 +134,11 @@ export interface ResultsChartPoint {
 }
 
 export interface ResultsChartSeries {
-  /** Hardware key, suffixed `-overlay` for the named run. */
+  /** Unique per hardware, engine and run channel. */
   key: string;
   hardwareKey: string;
+  /** Serving engine; null when the cells did not record one. */
+  engine: string | null;
   overlay: boolean;
   /** Plotted points: the frontier only when Optimal Only is on. */
   points: ResultsChartPoint[];
@@ -151,6 +154,12 @@ export interface ResultsChartSelection extends ResultsMetricContext {
   optimal: boolean;
   hidden: readonly string[];
 }
+
+/** Series order: hardware, then engine, the named run after the official one. */
+const seriesOrder = (a: ResultsChartSeries, b: ResultsChartSeries) =>
+  hardwareSort(a.hardwareKey) - hardwareSort(b.hardwareKey) ||
+  engineSort(a.engine) - engineSort(b.engine) ||
+  Number(a.overlay) - Number(b.overlay);
 
 /** Points the chart can place: visible hardware with finite values on both axes. */
 function plottedPoints(
@@ -197,52 +206,45 @@ export function resultsHistorySeries(
       return {
         key,
         hardwareKey: ordered[0].cell.point.hardwareKey!,
+        engine: ordered[0].cell.metadata.engine,
         overlay: ordered[0].cell.overlay,
         points: ordered,
         frontier: ordered,
         measured: ordered.length,
       };
     })
-    .toSorted(
-      (a, b) =>
-        hardwareSort(a.hardwareKey) - hardwareSort(b.hardwareKey) ||
-        Number(a.overlay) - Number(b.overlay),
-    );
+    .toSorted(seriesOrder);
 }
 
-/** One series per hardware and per named run, each with its own deployment frontier. */
+/**
+ * One series per hardware, engine and run channel, each with its own deployment
+ * frontier, so Optimal Only never lets one engine's frontier hide another's.
+ */
 export function resultsChartSeries(
   cells: readonly ResultCell[],
   selection: ResultsChartSelection,
 ): ResultsChartSeries[] {
   const x = RESULTS_X_METRICS[selection.x],
     y = RESULTS_Y_METRICS[selection.y];
-  const groups = new Map<
-    string,
-    { hardwareKey: string; overlay: boolean; points: ResultsChartPoint[] }
-  >();
-  for (const { hardwareKey, point } of plottedPoints(cells, selection)) {
-    const key = point.cell.overlay ? `${hardwareKey}-overlay` : hardwareKey;
-    const group = groups.get(key) ?? { hardwareKey, overlay: point.cell.overlay, points: [] };
-    group.points.push(point);
-    groups.set(key, group);
-  }
+  const groups = Map.groupBy(
+    plottedPoints(cells, selection),
+    ({ hardwareKey, point: { cell } }) =>
+      `${hardwareKey}:${cell.metadata.engine ?? 'na'}${cell.overlay ? '-overlay' : ''}`,
+  );
   return [...groups]
-    .map(([key, { hardwareKey, overlay, points }]) => {
+    .map(([key, plotted]): ResultsChartSeries => {
+      const points = plotted.map(({ point }) => point);
       const frontier = paretoFrontier(points, x.better, y.better);
       for (const point of frontier) point.optimal = true;
       return {
         key,
-        hardwareKey,
-        overlay,
+        hardwareKey: plotted[0].hardwareKey,
+        engine: points[0].cell.metadata.engine,
+        overlay: points[0].cell.overlay,
         points: selection.optimal ? frontier : points,
         frontier,
         measured: points.length,
       };
     })
-    .toSorted(
-      (a, b) =>
-        hardwareSort(a.hardwareKey) - hardwareSort(b.hardwareKey) ||
-        Number(a.overlay) - Number(b.overlay),
-    );
+    .toSorted(seriesOrder);
 }

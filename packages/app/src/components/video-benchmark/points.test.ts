@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { VideoHistoryObservation, VideoHistoryPage } from './history';
 import { dashboardCells, latestVideoCells, namedRunPoints, videoPoints } from './points';
+import type { ResultsEvidence } from './results-evidence';
 
 const observation: VideoHistoryObservation = {
   id: 'sha:c1',
@@ -332,6 +333,31 @@ describe('dashboardCells', () => {
     const result = dashboardCells(videoPoints([newer, older]));
     expect(result.cells.map((p) => p.id)).toEqual(['new:c1']);
     expect(result.otherWorkloads).toBe(1);
+  });
+
+  it('never lets one engine replace another engine at the same hardware, GPUs and concurrency', () => {
+    const served = (
+      id: string,
+      hardware: string,
+      engine: string,
+      server: typeof observation.server,
+    ) => cell({ id, hardware, server, results: { engine } as ResultsEvidence });
+    const split = { tp: 1, ulysses: 4, attention: null };
+    const result = dashboardCells(
+      videoPoints([
+        pageOf('4', 'B200', [served('b200-vllm:c1', 'B200', 'vllm-omni', split)]),
+        pageOf('3', 'B200', [served('b200-sglang:c1', 'B200', 'sglang', split)]),
+        // An SGLang cell from before layouts were recorded is no older layout of vLLM-Omni.
+        pageOf('2', 'H200', [served('h200-vllm:c1', 'H200', 'vllm-omni', split)]),
+        pageOf('1', 'H200', [served('h200-sglang:c1', 'H200', 'sglang', null)]),
+      ]),
+    );
+    expect(result.cells.map((p) => p.id).toSorted()).toEqual([
+      'b200-sglang:c1',
+      'b200-vllm:c1',
+      'h200-sglang:c1',
+      'h200-vllm:c1',
+    ]);
   });
 
   it('keeps legacy cells together only inside their sealed source, never by label', () => {
