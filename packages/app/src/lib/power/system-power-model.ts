@@ -210,8 +210,6 @@ function estimateSystem(
   measuredSocket: EstimateOptions,
   state: SystemPowerOperatingState,
 ): SystemUnitPower | null {
-  const inputs = [gpuWattsPerGpu, ...Object.values(measuredSocket).map((watts) => watts ?? 0)];
-  if (!inputs.every(Number.isFinite)) return null;
   let estimate: PowerEstimate;
   try {
     estimate = powerModel(system, state).estimate_breakdown(gpuWattsPerGpu, measuredSocket);

@@ -171,10 +171,6 @@ describe('PowerAnalysisPanels', () => {
       );
       // Only the MI355X rows carry a system model, so they are the breakdown's one series.
       cy.get('[data-testid="power-breakdown-source"]').should('contain.text', 'MI355X');
-      cy.get('[data-testid="power-breakdown-panel"]').then(($panel) => {
-        const toggle = $panel.find('[data-testid="power-parts-toggle"]');
-        if (toggle.length > 0) cy.wrap(toggle).click();
-      });
       cy.get('[data-testid="power-part-row"][data-category="measuredCpu"]').should(
         'contain.text',
         'Measured CPU',

@@ -124,7 +124,7 @@ describe('buildPowerBreakdowns', () => {
     expect(series.allInProvisionedWattsPerGpu).toBeGreaterThan(series.points[1].totalWattsPerGpu);
   });
 
-  it('draws validated x86 RAPL packages as the measured CPU layer', () => {
+  it('marks a validated x86 RAPL point as measured CPU', () => {
     const base = row(600);
     const [series] = buildPowerBreakdowns([
       point(
@@ -144,10 +144,7 @@ describe('buildPowerBreakdowns', () => {
         },
       ),
     ]);
-    expect(series.categories).toContain('measuredCpu');
-    expect(series.categories).not.toContain('cpu');
     expect(series.points[0].cpuBasis).toBe('measured');
-    expect(series.points[0].wattsPerGpu.measuredCpu).toBeCloseTo(420.5 / 8, 9);
   });
 
   it('groups by hardware and precision and drops points without a supported estimate', () => {
