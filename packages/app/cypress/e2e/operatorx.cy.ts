@@ -359,7 +359,10 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
       cy.location('pathname').should('eq', prefix || '/');
       cy.get(link).trigger('mouseover').focus().click();
       cy.location('pathname').should('eq', `${prefix}/ubenchx/core-memory-profiles`);
-      cy.get('[data-testid="ascend-core-profiles"] h2').should('have.text', 'Huawei 950PR');
+      cy.get('[data-testid="ascend-core-profiles"] h2').should(
+        'have.text',
+        `Huawei 950PR Ascend 950PR_9579 · 128 MiB · ${prefix ? 'Cube 与 Vector 标量控制器' : 'Cube and Vector scalar controllers'}`,
+      );
       cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
       cy.get('@operatorxIntent.all').should('have.length', 0);
     });
@@ -446,27 +449,27 @@ it('uses shared Huawei colors in OperatorX and ubenchX across a live theme switc
   cy.visit('/operatorx', visitOptions);
   cy.wait('@colorComparison');
   cy.get('[data-testid="operatorx-viz-roofline"]').scrollIntoView();
-  operatorPoints().first().should('have.css', 'fill', 'rgb(148, 106, 0)');
+  operatorPoints().first().should('have.css', 'fill', 'rgb(166, 90, 0)');
   cy.contains('[data-testid="operatorx-coverage"] li', '950PR')
     .find('.rounded-full')
     .first()
-    .should('have.css', 'background-color', 'rgb(148, 106, 0)');
+    .should('have.css', 'background-color', 'rgb(166, 90, 0)');
   cy.get('[data-testid="theme-toggle"]').click();
   cy.get('html').should('have.class', 'dark');
-  operatorPoints().first().should('have.css', 'fill', 'rgb(235, 192, 74)');
+  operatorPoints().first().should('have.css', 'fill', 'rgb(188, 104, 7)');
   cy.contains('[data-testid="operatorx-coverage"] li', '950PR')
     .find('.rounded-full')
     .first()
-    .should('have.css', 'background-color', 'rgb(235, 192, 74)');
+    .should('have.css', 'background-color', 'rgb(188, 104, 7)');
 
   cy.visit('/ubenchx/mem-bw', visitOptions);
-  bandwidthPoints().first().should('have.css', 'fill', 'rgb(148, 106, 0)');
+  bandwidthPoints().first().should('have.css', 'fill', 'rgb(166, 90, 0)');
   cy.get('[data-testid="theme-toggle"]').click();
-  bandwidthPoints().first().should('have.css', 'fill', 'rgb(235, 192, 74)');
+  bandwidthPoints().first().should('have.css', 'fill', 'rgb(188, 104, 7)');
   bandwidthPoints().eq(20).trigger('mouseenter', { force: true });
   cy.get('[data-chart-tooltip="ubenchx-mbu"]')
     .should('contain', 'Huawei 950PR')
     .find('span')
     .first()
-    .should('have.css', 'background-color', 'rgb(235, 192, 74)');
+    .should('have.css', 'background-color', 'rgb(188, 104, 7)');
 });

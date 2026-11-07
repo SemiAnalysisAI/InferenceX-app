@@ -163,7 +163,7 @@ export default function InferenceTable({
                 allInMeasuredStatusLabel(row, selectedYAxisMetric.slice(2), locale),
               sortValue: (row: InferenceData) =>
                 allInMeasuredStatusLabel(row, selectedYAxisMetric.slice(2), locale),
-              className: 'w-32 min-w-32 sm:w-auto sm:min-w-48',
+              className: 'w-28 min-w-28 sm:w-auto sm:min-w-48',
               importance: 'key' as const,
             },
           ]
