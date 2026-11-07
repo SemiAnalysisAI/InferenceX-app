@@ -33,6 +33,15 @@ describe('next.config custom routes', () => {
     },
   );
 
+  it.each([
+    '/infx/inference?i_metric=y_measuredAvgPower',
+    '/zh/infx/inference?i_power=none,certified',
+  ])('leaves the PowerX redirect on %s to the proxy', async (path) => {
+    const response = await respond(path);
+    expect(response.status).toBe(200);
+    expect(getRedirectUrl(response)).toBeNull();
+  });
+
   it.each(['/infx/inference', '/zh/infx/inference'])(
     'preserves explicit model selections on %s',
     async (path) => {

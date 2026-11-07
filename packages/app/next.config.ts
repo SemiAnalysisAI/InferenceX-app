@@ -82,7 +82,11 @@ const nextConfig: NextConfig = {
         source: `${prefix}${INFERENCE_PATH}`,
         destination: `${prefix}${INFERENCE_PATH}/deepseek-v41-flash`,
         permanent: false,
-        missing: [{ type: 'query' as const, key: 'g_model' }],
+        missing: [
+          { type: 'query' as const, key: 'g_model' },
+          { type: 'query' as const, key: 'i_metric', value: 'y_measured[A-Za-z]+' },
+          { type: 'query' as const, key: 'i_power', value: '(?:.*,)?(?:certified|legacy)(?:,.*)?' },
+        ],
       })),
       ...INFERENCE_MODEL_ALIAS_REDIRECTS,
       ...HISTORICAL_MODEL_ALIAS_REDIRECTS,

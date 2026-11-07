@@ -213,6 +213,12 @@ describe('legacy dashboard paths', () => {
 
   it('applies the new-path redirects in the same hop', () => {
     for (const [from, to, status] of [
+      ['/infx/inference?i_metric=y_measuredAvgPower', '/pwx?i_metric=y_measuredAvgPower', 307],
+      [
+        '/zh/inference?i_power=certified',
+        '/zh/pwx?i_power=certified&i_metric=y_measuredAvgPower',
+        307,
+      ],
       [
         '/inference?g_model=DeepSeek-R1-0528&i_metric=y_measuredAvgPower',
         '/pwx?g_model=DeepSeek-R1-0528&i_metric=y_measuredAvgPower',
