@@ -153,22 +153,14 @@ contract; the app does not infer completion from a missing config or workflow
 conclusion. A normal partial sweep still replaces its curve, so intentional deltas
 must use the append-only contract below.
 
-### Required Power Publication
+### Required Power
 
-Required sweeps publish a versioned
-`required-power-sweep-manifest/sweep_manifest.json` binding the required matrix to
-source run/head/attempt, point identities, topology, measurement windows and hashed
-evidence. Required intent also travels in the dispatch payload so a missing manifest
-cannot silently downgrade the gate. Unversioned required manifests fail closed;
-optional legacy bundles retain their existing behavior.
+InferenceX enforces required power per benchmark job: a matrix row with
+`require-power: true` runs with `REQUIRE_POWER=1`, and an invalid measurement window
+fails that job. Without the flag the row records `power_valid=0`. Ingest has no
+separate required-power gate; it publishes the rows the sweep uploaded.
 
-Artifact preparation validates evidence before workflow migrations. Ingestion checks
-it again before upserts and rejects unexplained loss of existing recipes or concurrency
-points under the normal curve-replacement rules. Destructive replacement requires
-explicit old-snapshot and lost-point identities; the ordinary producer grants none.
-Required energy must be finite and positive, with physical evidence for both roles
-in disaggregated deployments. Successful earlier attempts of the same run/head may
-supply retained evidence when failed jobs are rerun.
+### Retried Attempts
 
 GitHub keeps artifacts from every attempt, so a point that passed on several attempts
 arrives as several job copies with unrelated hashed names. Preparation keeps the copy
@@ -178,9 +170,8 @@ traces, server logs). Ingest skips `results_*` aggregate rows for points that a
 per-job file already holds, and replaces a point's telemetry links instead of adding
 to them, so the row, its power series and the publication receipt share one copy.
 
-These checks are preflight, not atomic publication: concurrent writers and partial
-import failures remain possible. The publication receipt verifies DB and exact-run
-API values after ingest; it does not prove latest-curve visibility or browser rendering.
+The publication receipt verifies DB and exact-run API values after ingest; it does
+not prove latest-curve visibility or browser rendering.
 
 ### Append-Only Curve Extensions
 
