@@ -14,6 +14,7 @@ import { localePath, type Locale } from '@/lib/i18n/i18n';
 import { cn } from '@/lib/shared/utils';
 
 import { AgentXMethodologyLink } from './agentx-methodology-link';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 export function AgentXQuickstartCallout({ locale, wide }: { locale: Locale; wide?: boolean }) {
   const t = AGENTX_QUICKSTART[locale];
@@ -32,7 +33,7 @@ export function AgentXQuickstartCallout({ locale, wide }: { locale: Locale; wide
         {AGENTX_COMMANDS}
       </CopyableCodeBlock>
       <AgentXMethodologyLink
-        href={localePath('/agentx/quickstart', locale)}
+        href={localePath(`${AGENTX_ROUTE.path}/quickstart`, locale)}
         analyticsEvent="agentx_quickstart_opened"
         analyticsTarget="quickstart-callout"
         className={buttonVariants({ variant: 'outline' })}
@@ -50,7 +51,7 @@ export function AgentXQuickstartArticle({ locale }: { locale: Locale }) {
     <article data-testid="agentx-quickstart-article" className="min-w-0">
       <header className="border-b border-border/20 pb-6">
         <Link
-          href={localePath('/agentx', locale)}
+          href={localePath(AGENTX_ROUTE.path, locale)}
           className="inline-flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
@@ -82,7 +83,7 @@ export function AgentXQuickstartArticle({ locale }: { locale: Locale }) {
           <p className={READING_TEXT_CLASS}>{t.resultsHelp}</p>
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
             <Link
-              href={localePath('/agentx/methodology', locale)}
+              href={localePath(`${AGENTX_ROUTE.path}/methodology`, locale)}
               className="inline-flex items-center gap-1 font-medium text-brand hover:underline"
             >
               {t.methodology}

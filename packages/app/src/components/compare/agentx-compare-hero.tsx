@@ -10,6 +10,7 @@ import {
 } from '@/lib/compare/compare-agentx';
 
 import { CompareIndexTrackedLink } from './compare-index-tracked-link';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 const MODEL_LOGOS: Record<string, string> = {
   'muse-spark-open': '/logos/muse-mascot.webp',
@@ -404,7 +405,7 @@ const LANDING_HARDWARE_RESULTS = [
     titleZh: 'Google TPU',
     subtitle: 'Kimi K3 · 2.8T parameters · AgentX',
     subtitleZh: 'Kimi K3 · 2.8 万亿参数 · AgentX',
-    href: '/inference/kimi-k3',
+    href: `${getDashboardRoute('inference').path}/kimi-k3`,
     model: 'kimi-k3',
     analyticsEvent: 'landing_tpu_results_clicked',
     isNew: true,
@@ -416,7 +417,7 @@ const LANDING_HARDWARE_RESULTS = [
     titleZh: 'Vera Rubin NVL72',
     subtitle: 'GLM 5.3 · 744B parameters · AgentX',
     subtitleZh: 'GLM 5.3 · 7440 亿参数 · AgentX',
-    href: '/inference/glm-5-3',
+    href: `${getDashboardRoute('inference').path}/glm-5-3`,
     model: 'glm-5-3',
     analyticsEvent: 'landing_rubin_results_clicked',
   },
@@ -426,7 +427,7 @@ const LANDING_HARDWARE_RESULTS = [
     title: 'OpenAI Jalapeño',
     titleZh: 'OpenAI Jalapeño',
     subtitle: 'DeepSeek R1 · 8K/1K · FP4',
-    href: '/inference/deepseek-r1?i_seq=8k%2F1k&i_prec=fp4&i_xmode=e2e',
+    href: `${getDashboardRoute('inference').path}/deepseek-r1?i_seq=8k%2F1k&i_prec=fp4&i_xmode=e2e`,
     model: 'deepseek-r1',
     analyticsEvent: 'landing_jalapeno_results_clicked',
   },
@@ -437,7 +438,7 @@ const LANDING_HARDWARE_RESULTS = [
     titleZh: 'MiniMax M3.1 Flash',
     subtitle: '428B parameters · AgentX',
     subtitleZh: '4280 亿参数 · AgentX',
-    href: '/inference/minimax-m31-flash',
+    href: `${getDashboardRoute('inference').path}/minimax-m31-flash`,
     model: 'minimax-m31-flash',
     analyticsEvent: 'landing_minimax_m31_flash_results_clicked',
   },
@@ -555,7 +556,7 @@ export function AgentXCompareHero({
             <div className="mt-6 flex flex-wrap gap-3">
               <CompareIndexTrackedLink
                 data-testid="compare-agentx-revenue-calculator-link"
-                href={`${prefix}/profit-estimator-per-gigawatt`}
+                href={`${prefix}${getDashboardRoute('profit-estimator-per-gigawatt').path}`}
                 analyticsEvent="compare_agentx_revenue_calculator_clicked"
                 analyticsSurface={surface}
                 appNavigation

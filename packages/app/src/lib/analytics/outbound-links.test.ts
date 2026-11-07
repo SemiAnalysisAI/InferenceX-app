@@ -6,7 +6,9 @@ const HOST = 'inferencex.semianalysis.com';
 
 describe('classifyOutboundLink', () => {
   it('ignores same-host and non-http links', () => {
-    expect(classifyOutboundLink('https://inferencex.semianalysis.com/inference', HOST)).toBeNull();
+    expect(
+      classifyOutboundLink('https://inferencex.semianalysis.com/infx/inference', HOST),
+    ).toBeNull();
     expect(classifyOutboundLink('https://InferenceX.SemiAnalysis.com/about', HOST)).toBeNull();
     expect(classifyOutboundLink('mailto:hi@semianalysis.com', HOST)).toBeNull();
     expect(classifyOutboundLink(['javascript', 'void(0)'].join(':'), HOST)).toBeNull();

@@ -209,7 +209,7 @@ export function usePowerXStrings() {
 }
 
 /**
- * The four views as a tab strip under the section header, where /inference has no
+ * The four views as a tab strip under the section header, where /infx/inference has no
  * equivalent. Under md the strip is a 2×2 grid of 48 px buttons, so Over time is
  * on screen without a sideways scroll; from md up it is the underlined row.
  */
@@ -261,7 +261,7 @@ export function PowerXViewTabs({
 
 /**
  * One Chart Config cell: the same wrapper, label and (i) help as the X-Axis
- * Metric select, so the PowerX controls sit in the /inference grid as peers.
+ * Metric select, so the PowerX controls sit in the /infx/inference grid as peers.
  */
 function Field({
   label,
@@ -406,7 +406,7 @@ export interface PowerXChartConfigSlots {
 
 /**
  * The PowerX part of the Chart Config fieldset. It renders as `contents`, so
- * every control is a cell of the same grid /inference lays its Chart Config
+ * every control is a cell of the same grid /infx/inference lays its Chart Config
  * out in (X-Axis Metric first; see ChartControls): row one is X-Axis Metric
  * and Count, row two Per or Show as, then Scope, Power statistic and Rated
  * boundaries on the views they apply to, flowing left to right with no gaps.

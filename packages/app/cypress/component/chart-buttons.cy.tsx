@@ -252,7 +252,7 @@ describe('ChartButtons', () => {
   it('renders localized accessible actions on mobile by default', () => {
     cy.viewport(375, 700);
     cy.mount(
-      <PathnameContext.Provider value="/zh/inference">
+      <PathnameContext.Provider value="/zh/infx/inference">
         <div style={{ position: 'relative', width: 360, height: 200 }}>
           <div id="test-chart">Chart content</div>
           <ChartButtons chartId="test-chart" analyticsPrefix="test" onExportCsv={cy.stub()} />

@@ -2,6 +2,7 @@ import type { AgenticCatalogModelGroup } from '@/lib/agentx/agentic-catalog';
 import type { Locale } from '@/lib/i18n/i18n';
 
 import { AgenticCatalogCardLink } from './agentic-catalog-link';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 const STRINGS = {
   en: {
@@ -64,7 +65,7 @@ export function AgenticCatalogList({
             {group.cards.map((card) => (
               <AgenticCatalogCardLink
                 key={card.id}
-                href={`${prefix}/inference/agentic/${card.id}`}
+                href={`${prefix}${getDashboardRoute('inference').path}/agentic/${card.id}`}
                 label={card.label}
                 archLine={`${card.vendor} · ${card.arch}`}
                 precisionLabel={card.precisionLabel}

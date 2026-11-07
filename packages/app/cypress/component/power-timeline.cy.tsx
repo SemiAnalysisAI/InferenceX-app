@@ -121,7 +121,7 @@ function mountTimeline(
     </div>
   );
   mountWithProviders(
-    <PathnameContext.Provider value={options.powerx ? '/powerx' : '/inference'}>
+    <PathnameContext.Provider value={options.powerx ? '/powerx' : '/infx/inference'}>
       {options.powerx ? <PowerXSurfaceProvider>{timeline}</PowerXSurfaceProvider> : timeline}
     </PathnameContext.Provider>,
     providerOverrides(options.unofficial, options.activeHwTypes),
@@ -131,7 +131,7 @@ function mountTimeline(
 function GrowingTimeline() {
   const [data, setData] = useState(() => [measuredPoint('b200', 16, 700)]);
   return (
-    <PathnameContext.Provider value="/inference">
+    <PathnameContext.Provider value="/infx/inference">
       <button
         type="button"
         data-testid="add-run"
@@ -343,7 +343,7 @@ describe('PowerTimeline', () => {
       );
     }
     mountWithProviders(
-      <PathnameContext.Provider value="/inference">
+      <PathnameContext.Provider value="/infx/inference">
         <DateComparison />
       </PathnameContext.Provider>,
       { unofficial: {} },
@@ -422,7 +422,7 @@ describe('PowerTimeline', () => {
       );
     }
     mountWithProviders(
-      <PathnameContext.Provider value="/inference">
+      <PathnameContext.Provider value="/infx/inference">
         <DatesOnlyRange />
       </PathnameContext.Provider>,
       { unofficial: {} },

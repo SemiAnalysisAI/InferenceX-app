@@ -80,18 +80,18 @@ describe('sitemap locale parity', () => {
       expect(entries.some((entry) => isFeatureGatedModelPath(new URL(entry.url).pathname))).toBe(
         false,
       );
-      expect(entries.some((entry) => entry.url.includes('/inference/glm-5-3'))).toBe(true);
+      expect(entries.some((entry) => entry.url.includes('/infx/inference/glm-5-3'))).toBe(true);
     } finally {
       mocks.availability.pop();
     }
   });
   it('includes the shareable AgentX quickstart in both languages', async () => {
     const entries = await sitemap();
-    for (const path of ['/agentx/quickstart', '/zh/agentx/quickstart']) {
+    for (const path of ['/infx/agentx/quickstart', '/zh/infx/agentx/quickstart']) {
       const entry = entries.find((item) => item.url === `${SITE_URL}${path}`);
       expect(entry?.alternates?.languages).toMatchObject({
-        en: `${SITE_URL}/agentx/quickstart`,
-        'zh-CN': `${SITE_URL}/zh/agentx/quickstart`,
+        en: `${SITE_URL}/infx/agentx/quickstart`,
+        'zh-CN': `${SITE_URL}/zh/infx/agentx/quickstart`,
       });
     }
   });
@@ -114,14 +114,14 @@ describe('sitemap locale parity', () => {
     }
   });
 
-  it('lists the landing page and the self-canonical /inference dashboard as separate URLs', async () => {
+  it('lists the landing page and the self-canonical /infx/inference dashboard as separate URLs', async () => {
     const entries = await sitemap();
     const urls = new Set(entries.map((entry) => entry.url));
     for (const url of [
       SITE_URL,
       `${SITE_URL}/zh`,
-      `${SITE_URL}/inference`,
-      `${SITE_URL}/zh/inference`,
+      `${SITE_URL}/infx/inference`,
+      `${SITE_URL}/zh/infx/inference`,
     ]) {
       expect(urls.has(url)).toBe(true);
     }
@@ -133,8 +133,8 @@ describe('sitemap locale parity', () => {
     const sections = Object.keys(EXPLORER_SECTION_META);
     expect(sections).toContain('/harnesses');
     for (const section of sections) {
-      expect(urls.has(`${SITE_URL}/agentic-workload-explorer${section}`)).toBe(true);
-      expect(urls.has(`${SITE_URL}/zh/agentic-workload-explorer${section}`)).toBe(true);
+      expect(urls.has(`${SITE_URL}/infx/agentic-workload-explorer${section}`)).toBe(true);
+      expect(urls.has(`${SITE_URL}/zh/infx/agentic-workload-explorer${section}`)).toBe(true);
     }
   });
 
@@ -142,13 +142,13 @@ describe('sitemap locale parity', () => {
     const entries = await sitemap();
     const byUrl = new Map(entries.map((entry) => [entry.url, entry]));
     // newest row overall, including models without a page
-    expect(byUrl.get(`${SITE_URL}/inference`)?.lastModified).toBe('2026-10-25T00:00:00.000Z');
+    expect(byUrl.get(`${SITE_URL}/infx/inference`)?.lastModified).toBe('2026-10-25T00:00:00.000Z');
     // newest row for that model across chips
     expect(byUrl.get(`${SITE_URL}/model/qwen-3-5`)?.lastModified).toBe('2026-10-20T00:00:00.000Z');
     expect(byUrl.get(`${SITE_URL}/zh/model/qwen-3-5`)?.lastModified).toBe(
       '2026-10-20T00:00:00.000Z',
     );
-    expect(byUrl.get(`${SITE_URL}/agentx/agentx-fixture`)?.lastModified).toBe(
+    expect(byUrl.get(`${SITE_URL}/infx/agentx/agentx-fixture`)?.lastModified).toBe(
       '2026-09-02T00:00:00.000Z',
     );
     expect(byUrl.get(`${SITE_URL}/hardware`)?.lastModified).toBe('2026-10-19T00:00:00.000Z');
@@ -156,22 +156,22 @@ describe('sitemap locale parity', () => {
     expect(byUrl.get(`${SITE_URL}/about`)?.lastModified).toBeUndefined();
   });
 
-  it('emits both locales for every /inference/<model> page', async () => {
+  it('emits both locales for every /infx/inference/<model> page', async () => {
     const entries = await sitemap();
     const urls = new Set(entries.map((entry) => entry.url));
     expect(INFERENCE_MODEL_SLUGS.length).toBeGreaterThan(0);
     for (const entry of INFERENCE_MODEL_SLUGS) {
-      expect(urls.has(`${SITE_URL}/inference/${entry.slug}`)).toBe(true);
-      expect(urls.has(`${SITE_URL}${zhPath(`/inference/${entry.slug}`)}`)).toBe(true);
+      expect(urls.has(`${SITE_URL}/infx/inference/${entry.slug}`)).toBe(true);
+      expect(urls.has(`${SITE_URL}${zhPath(`/infx/inference/${entry.slug}`)}`)).toBe(true);
     }
   });
 
-  it('emits both locales for every /operatorx/<category> page', async () => {
+  it('emits both locales for every /opx/<category> page', async () => {
     const entries = await sitemap();
     const urls = new Set(entries.map((entry) => entry.url));
     for (const entry of OPERATORX_CATEGORIES) {
-      expect(urls.has(`${SITE_URL}/operatorx/${entry.slug}`)).toBe(true);
-      expect(urls.has(`${SITE_URL}${zhPath(`/operatorx/${entry.slug}`)}`)).toBe(true);
+      expect(urls.has(`${SITE_URL}/opx/${entry.slug}`)).toBe(true);
+      expect(urls.has(`${SITE_URL}${zhPath(`/opx/${entry.slug}`)}`)).toBe(true);
     }
   });
 
@@ -241,8 +241,8 @@ describe('sitemap locale parity', () => {
   it('emits both locales for indexable AgentX dataset pages', async () => {
     const entries = await sitemap();
     const urls = new Set(entries.map((entry) => entry.url));
-    expect(urls.has(`${SITE_URL}/agentx/agentx-fixture`)).toBe(true);
-    expect(urls.has(`${SITE_URL}/zh/agentx/agentx-fixture`)).toBe(true);
+    expect(urls.has(`${SITE_URL}/infx/agentx/agentx-fixture`)).toBe(true);
+    expect(urls.has(`${SITE_URL}/zh/infx/agentx/agentx-fixture`)).toBe(true);
   });
 
   it('emits both locales for the whitepaper index and every whitepaper with its hero image', async () => {
@@ -295,6 +295,6 @@ describe('sitemap locale parity', () => {
 
     expect(mocks.getDb).not.toHaveBeenCalled();
     expect(mocks.listDatasets).not.toHaveBeenCalled();
-    expect(urls.has(`${SITE_URL}/agentx/agentx-fixture`)).toBe(false);
+    expect(urls.has(`${SITE_URL}/infx/agentx/agentx-fixture`)).toBe(false);
   });
 });

@@ -442,7 +442,7 @@ describe('buildPointDetails', () => {
       }),
     );
     expect(html).toContain('data-action="view-charts"');
-    expect(html).toContain('href="/inference/agentic/1"');
+    expect(html).toContain('href="/infx/inference/agentic/1"');
     expect(html).not.toContain('data-action="view-charts" target=');
   });
 
@@ -454,7 +454,7 @@ describe('buildPointDetails', () => {
       }),
     );
     expect(html).toContain('data-action="view-logs"');
-    expect(html).toContain('href="/inference/agentic/7?view=logs"');
+    expect(html).toContain('href="/infx/inference/agentic/7?view=logs"');
     expect(
       detailsText(
         tooltipConfig({
@@ -495,8 +495,8 @@ describe('buildPointDetails', () => {
       }),
     );
     expect(html).toContain('data-action="view-logs"');
-    expect(html).toContain('href="/inference/logs/96255"');
-    expect(html).not.toContain('/inference/agentic/96255');
+    expect(html).toContain('href="/infx/inference/logs/96255"');
+    expect(html).not.toContain('/infx/inference/agentic/96255');
   });
 
   it('localizes point-detail actions and their /zh routes', () => {
@@ -509,9 +509,9 @@ describe('buildPointDetails', () => {
       }),
     );
     expect(html).toContain('查看图表');
-    expect(html).toContain('href="/zh/inference/agentic/7"');
+    expect(html).toContain('href="/zh/infx/inference/agentic/7"');
     expect(html).toContain('查看日志');
-    expect(html).toContain('href="/zh/inference/agentic/7?view=logs"');
+    expect(html).toContain('href="/zh/infx/inference/agentic/7?view=logs"');
   });
 
   it('localizes agentic request counters and workflow link chrome for Chinese tooltips', () => {
@@ -572,7 +572,7 @@ describe('buildPointDetails', () => {
 
   it('omits View charts when the point id is non-persisted (0 / NaN), even if pinned + hasTrace', () => {
     // Overlay agentic points arrive with id 0 / NaN — the button would otherwise
-    // link to /inference/agentic/0, a doomed lookup.
+    // link to /infx/inference/agentic/0, a doomed lookup.
     for (const badId of [0, Number.NaN]) {
       const html = detailsText(
         tooltipConfig({
@@ -1055,7 +1055,7 @@ describe('buildPointDetails for comparison dates', () => {
       }),
     );
     expect(html).toContain('data-action="view-charts"');
-    expect(html).toContain('href="/inference/agentic/1"');
+    expect(html).toContain('href="/infx/inference/agentic/1"');
     expect(
       comparisonDetailsText(
         tooltipConfig({

@@ -2,8 +2,8 @@
 
 ## Benchmark your own hardware
 
-Share [the AgentX quickstart](https://inferencex.semianalysis.com/agentx/quickstart)
-([简体中文](https://inferencex.semianalysis.com/zh/agentx/quickstart)).
+Share [the AgentX quickstart](https://inferencex.semianalysis.com/infx/agentx/quickstart)
+([简体中文](https://inferencex.semianalysis.com/zh/infx/agentx/quickstart)).
 Use Python 3.11–3.13. Start an OpenAI-compatible streaming
 chat-completions server, then set `HUGGINGFACE_MODEL_NAME` and `CONC_SESSIONS`
 for your deployment:
@@ -48,7 +48,7 @@ operation.
 ## Read published benchmark results
 
 GLM-5.3-Flash uses display model `GLM-5.3-Flash`, raw DB key `glm5.3flash`,
-and dashboard route `/inference/glm-5-3-flash` (also under `/zh`). Use
+and dashboard route `/infx/inference/glm-5-3-flash` (also under `/zh`). Use
 `model=GLM-5.3-Flash&sequence=agentic-traces` for the inference view. Native
 `zai-org/GLM-5.3-Flash` and `nvidia/GLM-5.3-Flash-NVFP4` observations share
 this model bucket; precision remains a separate field. Registration does not
@@ -69,7 +69,7 @@ For interactivity comparisons and performance-over-time charts, first read
 uses reciprocal P90 full-response ITL, not the median or P90 of token rates.
 
 Muse Spark Open uses display model `Muse-Spark-Open`, raw DB key
-`musespark`, and dashboard route `/inference/muse-spark-open` (also under `/zh`).
+`musespark`, and dashboard route `/infx/inference/muse-spark-open` (also under `/zh`).
 Use `model=Muse-Spark-Open` for benchmark reads and the inference view API,
 with `sequence=agentic-traces` for the latter. Comparison results links open the
 canonical dashboard without an `unofficialRun` parameter.
@@ -78,7 +78,7 @@ do not populate the published benchmark API. Preserve empty API responses as no
 published data; do not substitute another model.
 
 MiniMax M3.1 Flash uses display model `MiniMax-M3.1-Flash`, raw DB key
-`minimaxm31flash`, and dashboard route `/inference/minimax-m31-flash` (also under
+`minimaxm31flash`, and dashboard route `/infx/inference/minimax-m31-flash` (also under
 `/zh`). It is benchmarked on AgentX only, with the checkpoint's built-in DSpark
 drafter, which the API reports as spec method `mtp`. Use
 `model=MiniMax-M3.1-Flash` for benchmark reads and the inference view API, with

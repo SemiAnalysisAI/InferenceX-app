@@ -99,7 +99,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-evaluation-view',
-    sourceSha256: '38166deb4a4763f54d43e755f075b236765b554d2c11e767ce8366458f1fc05b',
+    sourceSha256: 'd9feffd423087fdb16341ff74db8bc2354d60e3b72c58502849717cd1b797409',
   },
   {
     source: 'src/app/api/v1/views/first-token/route.ts',
@@ -131,7 +131,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-gpu-specs-view',
-    sourceSha256: '65fd28d72582f2b97d79ddd8dc2b809136f867c9c6537f7080b08295fe8249ac',
+    sourceSha256: 'afebf0b12a371d9e13a3ac3b22886f8311366b6e69795384889b5c829ad11c3c',
   },
   {
     source: 'src/app/api/v1/views/historical/route.ts',
@@ -147,7 +147,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: 'e61587be769b322f974fc275534e2abab57b4a936725379bda4da1cf5dea068f',
+    sourceSha256: '67e21ed1cf1c3bf7a022c32292593cd4a40a9050a23bd02e981ce00ab479d74e',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -195,7 +195,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-reliability-view',
-    sourceSha256: 'f97eb40d65e999b80d8738aa24718da9a7e733555da6e6bea231c0a31cf63a0c',
+    sourceSha256: 'a3d490d9221e20a0df5fa54cde084eac9c1153d376494e94ebba2130cc5f2c28',
   },
   {
     source: 'src/app/api/v1/views/submissions/route.ts',
@@ -1502,7 +1502,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-transform.ts',
-    sourceSha256: '7ade60009996367fbd6bfcbcfd7ba155fd96e1676dcb0d320ca26821f948ba7a',
+    sourceSha256: '3b23eece1e21f423fd3e60f3e6d6a1b8214c120407b2b8fb935320b1b8570440',
     reviewArea: {
       en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
       zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',
@@ -1542,7 +1542,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/calculator/profit-estimator.ts',
-    sourceSha256: 'eb0c310344460b42b0d8a790138b99f374fea8381c997f477098c94d185acf76',
+    sourceSha256: 'c55de32de8d96e3d086975f06b717c5799a7faacecc27c7396a49038451322b5',
     reviewArea: {
       en: 'Shared profit-estimator defaults and calculation parity, including model-specific target assumptions.',
       zh: '利润估算器的共享默认值与计算一致性，包括各模型的目标假设。',
@@ -1778,7 +1778,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/evaluation/date-resolution.ts',
-    sourceSha256: 'f1a3d397939d94a17e624c89a9f167c0109e37c8cbc32f902f426bada87529e1',
+    sourceSha256: '1490c0d5148487bcce2f940fcc3337ec79df3e4e82ad416f404cb207a4be1f4a',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1787,7 +1787,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/reliability/aggregate.ts',
-    sourceSha256: 'a885ffc19a600c94d640116b04c53c62b03a8b186c59da8b07fcb34939c00cc8',
+    sourceSha256: '2a44701069e3deaaca1c1cb31977c26cd3577ae0cd6edad3dc516fe7f4a093e8',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1983,7 +1983,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-id.ts',
-    sourceSha256: '36f9adf8a92cf5830abc01d0a389aa21eca9f429f31a9231b5d77e108c985d35',
+    sourceSha256: '3b536955cbcbcc2e57c4893c8ef5b3f298f4c1a5ead24b0981ce41ed5008b0a3',
     reviewArea: {
       en: 'Client-side persisted benchmark identifier recognition.',
       zh: '客户端持久化基准标识符识别。',

@@ -24,6 +24,7 @@ import {
   type RunPageEntry,
 } from '@/lib/live-seo/run-pages';
 import { getRunPageData, type RunPageData } from '@/lib/live-seo/run-rankings-data.server';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export const revalidate = 86400;
 
@@ -209,7 +210,7 @@ export default async function RunPage({ params }: Props) {
         label: `${entry.model.seoName} deep dive: architecture, evals, and performance`,
       },
       { href: `/chips/${entry.chip.slug}`, label: `${entry.chip.title} specs and pricing` },
-      { href: '/inference', label: 'Interactive inference dashboard' },
+      { href: getDashboardRoute('inference').path, label: 'Interactive inference dashboard' },
     ],
   };
 

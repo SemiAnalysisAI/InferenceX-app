@@ -12,7 +12,7 @@ describe('TCO Calculator', () => {
       cy.window().then((win) => {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       });
-      cy.visit('/inference');
+      cy.visit('/infx/inference');
     });
 
     it('switches back to inference tab and then returns to calculator', () => {
@@ -23,11 +23,11 @@ describe('TCO Calculator', () => {
         .and('contain.text', 'TCO calculator');
 
       cy.get('[data-testid="footer-link-calculator"]').scrollIntoView().click();
-      cy.url().should('include', '/calculator');
+      cy.url().should('include', '/infx/calculator');
       cy.get('[data-testid="tab-trigger-inference"]').click();
-      cy.url().should('include', '/inference');
+      cy.url().should('include', '/infx/inference');
       cy.get('[data-testid="footer-link-calculator"]').scrollIntoView().click();
-      cy.url().should('include', '/calculator');
+      cy.url().should('include', '/infx/calculator');
       cy.get('[data-testid="calculator-controls"]').should('be.visible');
     });
   });
@@ -37,7 +37,7 @@ describe('TCO Calculator', () => {
       cy.window().then((win) => {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       });
-      cy.visit('/calculator');
+      cy.visit('/infx/calculator');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
     });
 
@@ -345,7 +345,7 @@ describe('TCO Calculator', () => {
     });
 
     it('clicking one bar shows a comparison banner with "selected" text', () => {
-      cy.visit('/calculator');
+      cy.visit('/infx/calculator');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 1);
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').first().click();
       cy.get('[data-testid="calculator-comparison-banner"]').should('be.visible');
@@ -375,7 +375,7 @@ describe('TCO Calculator', () => {
     });
 
     it('shows the disaggregated cost disclaimer only for per-token-type cost', () => {
-      cy.visit('/calculator');
+      cy.visit('/infx/calculator');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
       cy.get('[data-testid="calculator-metric-cost"]').click();
 
@@ -397,7 +397,7 @@ describe('TCO Calculator', () => {
 
   describe('direct URL navigation', () => {
     it('?g_model= seeds the model selector before client hydration', () => {
-      cy.request('/calculator?g_model=DeepSeek-V4-Pro').then((response) => {
+      cy.request('/infx/calculator?g_model=DeepSeek-V4-Pro').then((response) => {
         expect(response.body).to.contain('DeepSeek V4 Pro 0813 1.6T');
         expect(response.body).not.to.contain('DeepSeek R1 0528 671B');
       });
@@ -407,7 +407,7 @@ describe('TCO Calculator', () => {
       cy.window().then((win) => {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       });
-      cy.visit('/calculator?g_model=DeepSeek-V4-Pro');
+      cy.visit('/infx/calculator?g_model=DeepSeek-V4-Pro');
       cy.get('[data-testid="calc-model-selector"]').should(
         'contain.text',
         'DeepSeek V4 Pro 0813 1.6T',
@@ -422,7 +422,7 @@ describe('TCO Calculator', () => {
         body: { error: 'temporarily unavailable' },
       }).as('availabilityFailure');
 
-      cy.visit('/calculator');
+      cy.visit('/infx/calculator');
       cy.wait('@availabilityFailure');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
       cy.get('[data-testid="calculator-controls"]').should('be.visible');
@@ -446,7 +446,7 @@ describe('TCO Calculator', () => {
       cy.intercept('GET', '/api/v1/benchmarks*', { body: [...b300Rows, ...b200Rows] }).as(
         'agenticBenchmarks',
       );
-      cy.visit('/calculator?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
+      cy.visit('/infx/calculator?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
           unlockAgenticGate(win);
@@ -505,7 +505,7 @@ describe('TCO Calculator', () => {
     });
 
     it('hides the percentile selector behind the feature gate and defaults to P90', () => {
-      cy.visit('/calculator?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
+      cy.visit('/infx/calculator?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
           win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
@@ -533,7 +533,7 @@ describe('TCO Calculator', () => {
       cy.window().then((win) => {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       });
-      cy.visit('/calculator');
+      cy.visit('/infx/calculator');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
     });
 
@@ -556,14 +556,14 @@ describe('TCO Calculator', () => {
       });
     });
 
-    it('owns the MW budget input now that the lifecycle section moved to /fleet', () => {
+    it('owns the MW budget input now that the lifecycle section moved to /infx/fleet', () => {
       cy.get('[data-testid="calculator-costcap-section"]')
         .find('[data-testid="calc-costcap-mw-input"]')
         .should('have.value', '10');
       cy.get('[data-testid="calculator-lifecycle-section"]').should('not.exist');
       cy.get('[data-testid="calculator-fleet-pointer-link"]')
         .should('have.attr', 'href')
-        .and('match', /\/fleet$/);
+        .and('match', /\/infx\/fleet$/);
     });
 
     it('entering a generous cost target renders reachable interactivity per GPU', () => {
@@ -609,7 +609,7 @@ describe('TCO Calculator', () => {
 describe('TCO Calculator Chinese route', () => {
   beforeEach(() => {
     cy.viewport(390, 844);
-    cy.visit('/zh/calculator', {
+    cy.visit('/zh/infx/calculator', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -639,9 +639,9 @@ describe('TCO Calculator Chinese route', () => {
   it('emits bidirectional hreflang metadata', () => {
     cy.get('link[rel="alternate"][hreflang="en"]')
       .invoke('attr', 'href')
-      .should('include', '/calculator');
+      .should('include', '/infx/calculator');
     cy.get('link[rel="alternate"][hreflang="zh-CN"]')
       .invoke('attr', 'href')
-      .should('include', '/zh/calculator');
+      .should('include', '/zh/infx/calculator');
   });
 });

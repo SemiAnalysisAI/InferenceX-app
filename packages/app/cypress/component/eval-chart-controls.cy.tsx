@@ -101,7 +101,7 @@ describe('Evaluation ChartControls', () => {
   it('localizes the mobile secondary changed-count label', () => {
     cy.viewport(390, 844);
     mountWithProviders(
-      <PathnameContext.Provider value="/zh/evaluation">
+      <PathnameContext.Provider value="/zh/infx/evaluation">
         <EvaluationChartControls />
       </PathnameContext.Provider>,
       {

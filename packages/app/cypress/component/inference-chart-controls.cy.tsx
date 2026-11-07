@@ -241,7 +241,7 @@ describe('Inference ChartControls', () => {
   it('localizes the mobile secondary changed-count label', () => {
     cy.viewport(390, 844);
     mountWithProviders(
-      <PathnameContext.Provider value="/zh/inference">
+      <PathnameContext.Provider value="/zh/infx/inference">
         <InferenceChartControls showXAxisMode />
       </PathnameContext.Provider>,
       { inference: {}, unofficial: {} },
@@ -473,7 +473,7 @@ describe('Inference axis selector — Chinese Agentic controls', () => {
   it('keeps every full option name and a localized FAQ link on phones', () => {
     cy.viewport(390, 844);
     mountWithProviders(
-      <PathnameContext.Provider value="/zh/inference">
+      <PathnameContext.Provider value="/zh/infx/inference">
         <InferenceChartControls showXAxisMode />
       </PathnameContext.Provider>,
       {
@@ -729,7 +729,9 @@ describe('Workflow run dropdown', () => {
     it(`folds run context into mobile controls without duplicating desktop controls (${locale})`, () => {
       cy.viewport(375, 812);
       mountWithProviders(
-        <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+        <PathnameContext.Provider
+          value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+        >
           <InferenceChartControls showXAxisMode runContext={<WorkflowInfoDisplay />} />
         </PathnameContext.Provider>,
         { inference: { availableRuns }, globalFilters: {}, unofficial: {} },
@@ -808,7 +810,9 @@ describe('Workflow run dropdown', () => {
     it(`lays the run context out as aligned, equal-height stepper rows on a 361px phone (${locale})`, () => {
       cy.viewport(361, 780);
       mountWithProviders(
-        <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+        <PathnameContext.Provider
+          value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+        >
           <WorkflowInfoDisplay />
         </PathnameContext.Provider>,
         { inference: { availableRuns }, globalFilters: {} },

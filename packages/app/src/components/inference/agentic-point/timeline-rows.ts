@@ -1,5 +1,6 @@
 import type { RequestRecord } from '@/hooks/api/use-request-timeline';
 import { localePath, type Locale } from '@/lib/i18n/i18n';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 export type RowMode = 'conversation' | 'worker';
 
@@ -32,7 +33,7 @@ export function conversationHref(
   const sa = subagentIdOf(req.cid);
   if (sa && !params.has('inner')) params.set('sa', sa);
   return localePath(
-    `/agentx/${datasetSlug}/conversations/${encodeURIComponent(convId)}?${params.toString()}`,
+    `${AGENTX_ROUTE.path}/${datasetSlug}/conversations/${encodeURIComponent(convId)}?${params.toString()}`,
     locale,
   );
 }

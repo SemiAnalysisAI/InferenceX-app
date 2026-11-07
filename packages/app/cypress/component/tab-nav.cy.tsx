@@ -21,7 +21,7 @@ function mountTabNav(opts: {
   search?: string;
   runs?: UnofficialRunContextType['unofficialRunInfos'];
 }) {
-  const { pathname = '/inference', search = '' } = opts;
+  const { pathname = '/infx/inference', search = '' } = opts;
   cy.window().then((win) => {
     win.history.replaceState(null, '', `${pathname}${search}`);
   });
@@ -58,18 +58,22 @@ describe('TabNav retained inference model', () => {
     setInferenceNavigationModel(undefined);
   });
 
-  it('preserves the selected model and unofficial run from /zh/evaluation at 375px', () => {
+  it('preserves the selected model and unofficial run from /zh/infx/evaluation at 375px', () => {
     cy.viewport(375, 900);
     setInferenceNavigationModel('Qwen-3.5-397B-A17B');
-    mountTabNav({ pathname: '/zh/evaluation', search: '?unofficialruns=12345' });
+    mountTabNav({ pathname: '/zh/infx/evaluation', search: '?unofficialruns=12345' });
     cy.get('[data-testid="mobile-tab-inference"]')
       .filter(':visible')
-      .should('have.attr', 'href', '/zh/inference?unofficialruns=12345&g_model=Qwen-3.5-397B-A17B');
+      .should(
+        'have.attr',
+        'href',
+        '/zh/infx/inference?unofficialruns=12345&g_model=Qwen-3.5-397B-A17B',
+      );
     cy.then(() => setInferenceNavigationModel('DeepSeek-V4-Pro'));
     cy.get('[data-testid="mobile-tab-inference"]').should(
       'have.attr',
       'href',
-      '/zh/inference?unofficialruns=12345&g_model=DeepSeek-V4-Pro',
+      '/zh/infx/inference?unofficialruns=12345&g_model=DeepSeek-V4-Pro',
     );
   });
 });
@@ -81,7 +85,7 @@ describe('TabNav — attached unofficial-run banner', () => {
       const longBranch = `experiment/${'very-long-branch-name-'.repeat(8)}`;
       const zh = width === 768;
       mountTabNav({
-        pathname: zh ? '/zh/inference' : '/inference',
+        pathname: zh ? '/zh/infx/inference' : '/infx/inference',
         runs: [bannerRun, { ...bannerRun, id: 2, branch: longBranch }],
       });
 
@@ -149,11 +153,15 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
   it('renders bare hrefs when the URL has no unofficialrun param', () => {
     mountTabNav({});
     cy.get('[data-testid="tab-trigger-overview"]').should('not.exist');
-    cy.get('[data-testid="tab-trigger-evaluation"]').should('have.attr', 'href', '/evaluation');
+    cy.get('[data-testid="tab-trigger-evaluation"]').should(
+      'have.attr',
+      'href',
+      '/infx/evaluation',
+    );
     cy.get('[data-testid="tab-trigger-profit-estimator"]').should(
       'have.attr',
       'href',
-      '/profit-estimator',
+      '/infx/profit-estimator',
     );
     cy.get('[data-testid="tab-trigger-calculator"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-fleet"]').should('not.exist');
@@ -166,44 +174,44 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
     cy.get('[data-testid="tab-trigger-evaluation"]').should(
       'have.attr',
       'href',
-      '/evaluation?unofficialruns=12345',
+      '/infx/evaluation?unofficialruns=12345',
     );
     cy.get('[data-testid="tab-trigger-inference"]').should(
       'have.attr',
       'href',
-      '/inference?unofficialruns=12345',
+      '/infx/inference?unofficialruns=12345',
     );
     cy.get('[data-testid="tab-trigger-submissions"]').should(
       'have.attr',
       'href',
-      '/submissions?unofficialruns=12345',
+      '/infx/submissions?unofficialruns=12345',
     );
     cy.get('[data-testid="tab-trigger-profit-estimator"]').should(
       'have.attr',
       'href',
-      '/profit-estimator/kimi-k3/unofficial-runs/12345',
+      '/infx/profit-estimator/kimi-k3/unofficial-runs/12345',
     );
     cy.get('[data-testid="tab-trigger-profit-estimator-per-gigawatt"]').should('not.exist');
   });
 
-  it('carries route-owned runs from /zh/profit-estimator to desktop and mobile tabs', () => {
-    const base = '/zh/profit-estimator/deepseek-v4/target/24';
+  it('carries route-owned runs from /zh/infx/profit-estimator to desktop and mobile tabs', () => {
+    const base = '/zh/infx/profit-estimator/deepseek-v4/target/24';
     mountTabNav({ pathname: `${base}/unofficial-runs/111%2C222` });
     for (const selector of ['tab-trigger', 'mobile-tab']) {
       cy.get(`[data-testid="${selector}-inference"]`).should(
         'have.attr',
         'href',
-        '/zh/inference?unofficialruns=111,222',
+        '/zh/infx/inference?unofficialruns=111,222',
       );
       cy.get(`[data-testid="${selector}-evaluation"]`).should(
         'have.attr',
         'href',
-        '/zh/evaluation?unofficialruns=111,222',
+        '/zh/infx/evaluation?unofficialruns=111,222',
       );
       cy.get(`[data-testid="${selector}-profit-estimator"]`).should(
         'have.attr',
         'href',
-        '/zh/profit-estimator/kimi-k3/unofficial-runs/111%2C222',
+        '/zh/infx/profit-estimator/kimi-k3/unofficial-runs/111%2C222',
       );
       cy.get(`[data-testid="${selector}-profit-estimator-per-gigawatt"]`).should('not.exist');
     }
@@ -211,19 +219,23 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
       win.history.replaceState(null, '', base);
       win.dispatchEvent(new CustomEvent(CLIENT_PATHNAME_CHANGE_EVENT));
     });
-    cy.get('[data-testid="tab-trigger-inference"]').should('have.attr', 'href', '/zh/inference');
+    cy.get('[data-testid="tab-trigger-inference"]').should(
+      'have.attr',
+      'href',
+      '/zh/infx/inference',
+    );
     cy.get('[data-testid="tab-trigger-profit-estimator"]').should(
       'have.attr',
       'href',
-      '/zh/profit-estimator',
+      '/zh/infx/profit-estimator',
     );
   });
 
   it('marks the one profit estimator tab active on the per-gigawatt page', () => {
-    mountTabNav({ pathname: '/zh/profit-estimator-per-gigawatt/kimi-k3/target/45' });
+    mountTabNav({ pathname: '/zh/infx/profit-estimator-per-gigawatt/kimi-k3/target/45' });
     cy.get('[data-testid="tab-trigger-profit-estimator"]')
       .should('have.attr', 'data-tab-active', 'true')
-      .and('have.attr', 'href', '/zh/profit-estimator');
+      .and('have.attr', 'href', '/zh/infx/profit-estimator');
     cy.get('[data-testid="mobile-tab-profit-estimator"]').should(
       'have.attr',
       'aria-current',
@@ -234,10 +246,10 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
   });
 
   it('surfaces a footer-only page as the active tab on desktop and mobile', () => {
-    mountTabNav({ pathname: '/zh/historical' });
+    mountTabNav({ pathname: '/zh/infx/historical' });
     cy.get('[data-testid="tab-trigger-historical"]')
       .should('have.attr', 'data-tab-active', 'true')
-      .and('have.attr', 'href', '/zh/historical')
+      .and('have.attr', 'href', '/zh/infx/historical')
       .and('contain.text', '历史趋势');
     cy.get('[data-testid="mobile-tab-historical"]').should('have.attr', 'aria-current', 'page');
     cy.get('[data-testid="tab-trigger-calculator"]').should('not.exist');
@@ -248,7 +260,7 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
     cy.get('[data-testid="tab-trigger-evaluation"]').should(
       'have.attr',
       'href',
-      '/evaluation?unofficialruns=111,222,333',
+      '/infx/evaluation?unofficialruns=111,222,333',
     );
   });
 
@@ -257,7 +269,7 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
     cy.get('[data-testid="tab-trigger-evaluation"]').should(
       'have.attr',
       'href',
-      '/evaluation?unofficialruns=999',
+      '/infx/evaluation?unofficialruns=999',
     );
   });
 });
@@ -286,14 +298,14 @@ describe('TabNav — Hidden popover for gated tabs', () => {
   it('shows every primary chart as a one-tap mobile pill with the current one marked', () => {
     cy.viewport(390, 844);
     cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate-konami-v1'));
-    mountTabNav({ pathname: '/evaluation' });
+    mountTabNav({ pathname: '/infx/evaluation' });
     cy.get('[data-testid="mobile-chart-select"]').should('be.visible');
     for (const key of ['inference', 'profit-estimator', 'evaluation', 'submissions']) {
       cy.get(`[data-testid="mobile-tab-${key}"]`).should('exist');
     }
     cy.get('[data-testid="mobile-tab-evaluation"]')
       .should('have.attr', 'aria-current', 'page')
-      .and('have.attr', 'href', '/evaluation');
+      .and('have.attr', 'href', '/infx/evaluation');
     cy.get('[data-testid="mobile-tab-inference"]').should('not.have.attr', 'aria-current');
     cy.get('[data-testid="mobile-tab-powerx"]').should('not.exist');
     cy.get('[data-testid="mobile-tab-profit-estimator-per-gigawatt"]').should('not.exist');
@@ -309,7 +321,7 @@ describe('TabNav — Hidden popover for gated tabs', () => {
   it('still names the current gated page in the locked mobile selector', () => {
     cy.viewport(390, 844);
     cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate-konami-v1'));
-    mountTabNav({ pathname: '/zh/ai-chart' });
+    mountTabNav({ pathname: '/zh/infx/ai-chart' });
     cy.get('[data-testid="mobile-chart-select"]')
       .should('be.visible')
       .and('contain.text', 'AI 图表');
@@ -318,7 +330,7 @@ describe('TabNav — Hidden popover for gated tabs', () => {
   it('gives the unlocked mobile strip the same Hidden dropdown as desktop', () => {
     cy.viewport(390, 844);
     cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1'));
-    mountTabNav({ pathname: '/evaluation' });
+    mountTabNav({ pathname: '/infx/evaluation' });
     cy.get('[data-testid="mobile-tab-hidden"]')
       .should('contain.text', 'Hidden')
       .and(($trigger) => {
@@ -331,7 +343,7 @@ describe('TabNav — Hidden popover for gated tabs', () => {
       })
       .click();
     cy.get('[data-testid="tab-hidden-popover"]').should('be.visible');
-    cy.get('[data-testid="tab-trigger-ai-chart"]').should('have.attr', 'href', '/ai-chart');
+    cy.get('[data-testid="tab-trigger-ai-chart"]').should('have.attr', 'href', '/infx/ai-chart');
   });
 
   it('renders the Hidden trigger when unlocked; popover reveals gated links', () => {
@@ -340,11 +352,15 @@ describe('TabNav — Hidden popover for gated tabs', () => {
     cy.get('[data-testid="tab-trigger-hidden"]').should('be.visible').and('contain.text', 'Hidden');
     cy.get('[data-testid="tab-trigger-ai-chart"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-collectivex"]').should('not.exist');
-    cy.get('[data-testid="tab-trigger-submissions"]').should('have.attr', 'href', '/submissions');
+    cy.get('[data-testid="tab-trigger-submissions"]').should(
+      'have.attr',
+      'href',
+      '/infx/submissions',
+    );
     cy.get('[data-testid="tab-trigger-hidden"]').click();
     cy.get('[data-testid="tab-hidden-popover"]').should('be.visible');
     cy.get('[data-testid="tab-trigger-collectivex"]').should('have.attr', 'href', '/collectivex');
-    cy.get('[data-testid="tab-trigger-ai-chart"]').should('have.attr', 'href', '/ai-chart');
+    cy.get('[data-testid="tab-trigger-ai-chart"]').should('have.attr', 'href', '/infx/ai-chart');
     cy.get('[data-testid="tab-hidden-popover"]')
       .find('[data-testid="tab-trigger-powerx"]')
       .should('have.attr', 'href', '/powerx');
@@ -378,7 +394,7 @@ describe('TabNav — Hidden popover for gated tabs', () => {
 
   it('does NOT highlight the Hidden trigger on a non-gated path', () => {
     cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1'));
-    mountTabNav({ pathname: '/inference' });
+    mountTabNav({ pathname: '/infx/inference' });
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.have.class', 'border-brand');
   });
 });

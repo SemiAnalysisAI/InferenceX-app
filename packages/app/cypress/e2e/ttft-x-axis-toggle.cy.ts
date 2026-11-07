@@ -112,7 +112,7 @@ describe('Parallelism labels in standard controls', () => {
       cy.viewport(width, 900);
       interceptAgenticData();
       interceptDerivedAgenticMetrics();
-      cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces', {
+      cy.visit('/infx/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces', {
         onBeforeLoad(win) {
           unlockAgenticGate(win);
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -165,7 +165,7 @@ describe('Parallelism labels in standard controls', () => {
       interceptAgenticData();
       interceptDerivedAgenticMetrics();
       cy.visit(
-        `/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces&i_label=1&i_advlabel=${Number(parallelism)}`,
+        `/infx/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces&i_label=1&i_advlabel=${Number(parallelism)}`,
         {
           onBeforeLoad(win) {
             unlockAgenticGate(win);
@@ -187,7 +187,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
   before(() => {
     interceptAgenticData();
     interceptDerivedAgenticMetrics();
-    cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces', {
+    cy.visit('/infx/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         unlockAgenticGate(win);
@@ -329,7 +329,7 @@ describe('X-axis mode URL param', () => {
   it('keeps a URL-restored mode through the agentic sequence resolving', () => {
     interceptAgenticData();
     interceptDerivedAgenticMetrics();
-    cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces&i_xmode=ttft', {
+    cy.visit('/infx/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces&i_xmode=ttft', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         unlockAgenticGate(win);
@@ -348,7 +348,7 @@ describe('Default scenario', () => {
     it(`keeps the labeled scenario field discoverable at ${width}px and recovers from empty data`, () => {
       interceptAgenticData();
       interceptDerivedAgenticMetrics();
-      cy.visit('/inference', {
+      cy.visit('/infx/inference', {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         },
@@ -361,7 +361,7 @@ describe('Default scenario', () => {
       cy.viewport(width, 800);
       interceptAgenticData();
       interceptDerivedAgenticMetrics();
-      cy.visit('/inference');
+      cy.visit('/infx/inference');
       cy.get('fieldset [data-testid="scenario-selector"]').should('not.exist');
       cy.get('#chart-0').should(($chart) => {
         const plot = $chart[0]!.querySelector('[data-testid="d3-chart-svg"]')!;
@@ -404,13 +404,13 @@ describe('Default scenario', () => {
 
   it('keeps 8K / 1K when the link asks for it explicitly', () => {
     interceptAgenticData();
-    cy.visit('/zh/inference');
+    cy.visit('/zh/infx/inference');
     cy.get('label[for="scenario-select"]').should('have.class', 'sr-only').and('have.text', '场景');
     cy.get('[data-testid="result-context"] [data-testid="scenario-selector"]').should('be.visible');
     cy.get('h2 [data-testid="scenario-selector"]').should('not.exist');
 
     interceptFixedSequenceData();
-    cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=8k%2F1k', {
+    cy.visit('/infx/inference?g_model=deepseek-v4-pro&i_seq=8k%2F1k', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -422,7 +422,7 @@ describe('Default scenario', () => {
     cy.get('[data-testid="chart-figure"] svg').should('not.contain.text', 'P90 Interactivity');
 
     interceptFixedSequenceData();
-    cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=8k%2F1k', {
+    cy.visit('/infx/inference?g_model=deepseek-v4-pro&i_seq=8k%2F1k', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -439,7 +439,7 @@ describe('Default scenario', () => {
       body: availabilityBody(otherModelAvailability),
     }).as('availability');
     cy.intercept('GET', '/api/v1/benchmarks*', { body: otherModelBenchmarks }).as('benchmarks');
-    cy.visit('/inference?g_model=DeepSeek-R1-0528', {
+    cy.visit('/infx/inference?g_model=DeepSeek-R1-0528', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -452,7 +452,7 @@ describe('Default scenario', () => {
 describe('Label defaults for fixed-sequence scenarios', () => {
   it('offers only the three supported axes for fixed sequences', () => {
     interceptFixedSequenceData();
-    cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=8k%2F1k');
+    cy.visit('/infx/inference?g_model=deepseek-v4-pro&i_seq=8k%2F1k');
     openXAxisMenu();
     cy.get('[role="grid"] [data-select-option]').should('have.length', 3);
     cy.get('[data-testid="x-axis-mode-interactivity"]').should('be.visible');
@@ -657,7 +657,7 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
   before(() => {
     interceptAgenticDataWithOverlay();
     interceptDerivedAgenticMetrics();
-    cy.visit(`/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces`, {
+    cy.visit(`/infx/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces`, {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         unlockAgenticGate(win);

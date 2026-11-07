@@ -29,6 +29,7 @@ import { ModelLogo } from '@/components/ui/model-logo';
 import { Model } from '@/lib/catalog/data-mappings';
 import { STARRED_EVENT, STARRED_KEY } from '@/lib/github/star-storage';
 import type { NudgeDefinition } from './types';
+import { AGENTX_ROUTE, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
 
@@ -66,7 +67,7 @@ export const TPUV7_LAUNCH_MODAL_STORAGE_KEY =
 export const TELEMETRY_TUTORIAL_STORAGE_KEY = 'inferencex-agentx-telemetry-tutorial-dismissed';
 
 function telemetryTutorialHref(): string {
-  return localizedNudgeHref('/agentx/telemetry');
+  return localizedNudgeHref(`${AGENTX_ROUTE.path}/telemetry`);
 }
 
 export const NUDGE_REGISTRY: NudgeDefinition[] = [
@@ -289,7 +290,9 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
         labelZh: 'Kimi K3',
         icon: <ModelLogo model={Model.Kimi_K3} />,
         onClick: () => {
-          window.location.href = localizedNudgeHref('/inference/kimi-k3');
+          window.location.href = localizedNudgeHref(
+            `${getDashboardRoute('inference').path}/kimi-k3`,
+          );
         },
       },
       additionalActions: [
@@ -299,7 +302,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
           icon: <ModelLogo model={Model.GLM_5_2} />,
           onClick: () => {
             window.location.href = localizedNudgeHref(
-              '/inference/glm-5-3?g_model=GLM-5.2&i_seq=agentic-traces&i_prec=fp8',
+              `${getDashboardRoute('inference').path}/glm-5-3?g_model=GLM-5.2&i_seq=agentic-traces&i_prec=fp8`,
             );
           },
         },
@@ -308,7 +311,9 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
           labelZh: 'Muse Spark',
           icon: <ModelLogo model={Model.Muse_Spark_Open} />,
           onClick: () => {
-            window.location.href = localizedNudgeHref('/inference/muse-spark-open');
+            window.location.href = localizedNudgeHref(
+              `${getDashboardRoute('inference').path}/muse-spark-open`,
+            );
           },
         },
       ],

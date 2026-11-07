@@ -273,13 +273,13 @@ describe('buildInferenceCompareUrl', () => {
     max_concurrency: 64,
   };
 
-  it('builds an /inference URL with the expected params', () => {
+  it('builds an /infx/inference URL with the expected params', () => {
     const previous: SubmissionSummaryRow = { ...base, date: '2026-05-10', image: 'img-a' };
     const current: SubmissionSummaryRow = { ...base, date: '2026-05-12', image: 'img-b' };
     const url = buildInferenceCompareUrl(current, previous);
     expect(url).not.toBeNull();
     const parsed = new URL(`https://example.com${url}`);
-    expect(parsed.pathname).toBe('/inference');
+    expect(parsed.pathname).toBe('/infx/inference');
     expect(parsed.searchParams.get('g_model')).toBe('DeepSeek-R1-0528');
     expect(parsed.searchParams.get('g_rundate')).toBe('2026-05-12');
     expect(parsed.searchParams.get('i_dstart')).toBe('2026-05-10');

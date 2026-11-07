@@ -24,7 +24,7 @@ describe('Overlay points follow Optimal Only on the selected axes', () => {
     interceptOverlayRun({ overlayConfigs: OVERLAY_CONFIGS });
     interceptDerivedAgenticMetrics();
     cy.visit(
-      `/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tpPerGpu`,
+      `/infx/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tpPerGpu`,
       {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));

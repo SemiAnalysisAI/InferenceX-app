@@ -33,6 +33,7 @@ import {
   sequenceKind,
 } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 const STRINGS = {
   en: {
@@ -363,7 +364,7 @@ export function ScenarioSelector({
         <p>
           {t.agenticScenarioTooltip}{' '}
           <a
-            href={locale === 'zh' ? '/zh/agentx' : '/agentx'}
+            href={locale === 'zh' ? `/zh${AGENTX_ROUTE.path}` : AGENTX_ROUTE.path}
             className="underline underline-offset-2"
             data-testid="scenario-agentic-info-link"
             onClick={() => track('selector_scenario_agentx_link')}

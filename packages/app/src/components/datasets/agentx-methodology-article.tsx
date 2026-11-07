@@ -11,6 +11,7 @@ import {
   READING_LINK_CLASS,
 } from '@/components/ui/reading-layout';
 import { cn } from '@/lib/shared/utils';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 type Locale = 'en' | 'zh';
 
@@ -517,7 +518,7 @@ export function AgentXMethodologyArticle({ locale }: { locale: Locale }) {
     <article data-testid="agentx-methodology-article">
       <header className="border-b border-border/20 pb-8">
         <AgentXMethodologyLink
-          href={`${prefix}/agentx`}
+          href={`${prefix}${AGENTX_ROUTE.path}`}
           analyticsEvent="agentx_methodology_returned"
           analyticsTarget="overview"
           className="inline-flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"

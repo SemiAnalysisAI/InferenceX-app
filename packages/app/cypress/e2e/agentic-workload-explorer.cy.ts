@@ -54,7 +54,7 @@ describe('Agentic Workload Explorer', () => {
   beforeEach(stubExplorerApi);
 
   it('renders the overview inside the dashboard shell and navigates to sessions', () => {
-    cy.visit('/agentic-workload-explorer');
+    cy.visit('/infx/agentic-workload-explorer');
     cy.wait('@overview');
     cy.get('[data-testid="agentic-workload-explorer"]').should(
       'contain.text',
@@ -69,21 +69,27 @@ describe('Agentic Workload Explorer', () => {
     cy.get('nav[aria-label="Agentic Workload Explorer sections"]')
       .contains('a', 'Sessions')
       .click();
-    cy.location('pathname').should('eq', '/agentic-workload-explorer/sessions');
+    cy.location('pathname').should('eq', '/infx/agentic-workload-explorer/sessions');
     cy.wait('@sessions');
-    cy.get('a[href^="/agentic-workload-explorer/sessions/"]').should('have.length.at.least', 1);
+    cy.get('a[href^="/infx/agentic-workload-explorer/sessions/"]').should(
+      'have.length.at.least',
+      1,
+    );
 
-    cy.visit('/zh/agentic-workload-explorer/sessions');
+    cy.visit('/zh/infx/agentic-workload-explorer/sessions');
     cy.wait('@sessions');
     cy.get('nav[aria-label="Agentic Workload Explorer 分区"]')
       .contains('a', '会话')
       .should('have.attr', 'aria-current', 'page');
-    cy.get('a[href^="/zh/agentic-workload-explorer/sessions/"]').should('have.length.at.least', 1);
+    cy.get('a[href^="/zh/infx/agentic-workload-explorer/sessions/"]').should(
+      'have.length.at.least',
+      1,
+    );
   });
 
   it('renders shared D3 layers and supports shared zoom, reset and expansion', () => {
     stubTrends();
-    cy.visit('/agentic-workload-explorer/trends');
+    cy.visit('/infx/agentic-workload-explorer/trends');
     cy.wait('@trends');
     cy.get('[data-testid="d3-chart-svg"]').should('have.length', 6);
     cy.get('.stacked-segment').should('have.length', 6);
@@ -121,7 +127,7 @@ describe('Agentic Workload Explorer', () => {
   it('keeps the shared version selector keyboard-accessible on Chinese mobile pages', () => {
     stubTrends();
     cy.viewport(375, 900);
-    cy.visit('/zh/agentic-workload-explorer/trends');
+    cy.visit('/zh/infx/agentic-workload-explorer/trends');
     cy.wait('@trends');
     cy.get('[role="combobox"]').first().focus().type('{enter}');
     cy.get('[role="option"]').should('have.length.at.least', 2);

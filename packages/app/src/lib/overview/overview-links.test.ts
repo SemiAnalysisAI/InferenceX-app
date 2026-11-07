@@ -68,7 +68,7 @@ function summary(overrides: Partial<OverviewModelSummary> = {}): OverviewModelSu
 describe('buildOverviewDashboardHref', () => {
   it('pins model, run, workload and exact configuration on the English route', () => {
     expect(buildOverviewDashboardHref('en', summary(), config())).toBe(
-      `/inference?${PINNED_QUERY}`,
+      `/infx/inference?${PINNED_QUERY}`,
     );
   });
 
@@ -80,7 +80,7 @@ describe('buildOverviewDashboardHref', () => {
     );
 
     expect(href).toBe(
-      '/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-07-18&g_runid=26714221123' +
+      '/infx/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-07-18&g_runid=26714221123' +
         '&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_costh' +
         '&i_gpus=gb200_dynamo-trt-disagg_mtp&i_spec=mtp&i_disagg=disagg' +
         '&i_optimal=1&i_advlabel=1',
@@ -174,7 +174,7 @@ describe('buildOverviewHistoryDashboardHref', () => {
       'https://inferencex.local',
     );
 
-    expect(href.pathname).toBe('/inference');
+    expect(href.pathname).toBe('/infx/inference');
     expect(Object.fromEntries(href.searchParams)).toMatchObject({
       g_model: Model.Qwen3_5,
       g_rundate: '2026-07-18',
@@ -205,7 +205,7 @@ describe('buildOverviewHistoryDashboardHref', () => {
       'https://inferencex.local',
     );
 
-    expect(href.pathname).toBe('/zh/inference');
+    expect(href.pathname).toBe('/zh/infx/inference');
     expect(href.searchParams.get('i_gpus')).toBe('b200_sglang_mtp');
     expect(href.searchParams.get('i_prec')).toBe('fp4');
     expect(href.searchParams.get('i_dates')).toBe('2026-07-18,2026-06-10');
@@ -215,13 +215,13 @@ describe('buildOverviewHistoryDashboardHref', () => {
 describe('detailHref', () => {
   it('keeps the model drilldown precision-neutral because headline pairs may differ', () => {
     expect(detailHref('en', summary())).toBe(
-      '/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k%2F1k&i_metric=y_costh&i_optimal=1',
+      '/infx/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k%2F1k&i_metric=y_costh&i_optimal=1',
     );
   });
 
   it('opens AgentX rows in the Agentic Traces dashboard scenario', () => {
     expect(detailHref('en', summary({ model: Model.GLM_5_2, scenario: 'agentx' }))).toBe(
-      '/inference?g_model=GLM-5.2&i_seq=agentic-traces&i_metric=y_costh&i_optimal=1',
+      '/infx/inference?g_model=GLM-5.2&i_seq=agentic-traces&i_metric=y_costh&i_optimal=1',
     );
   });
 });

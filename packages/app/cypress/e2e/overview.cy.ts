@@ -228,7 +228,7 @@ describe('Overview page', () => {
 
   it('keeps one history entry when the overview request fails', () => {
     cy.viewport(1280, 900);
-    cy.visit('/inference');
+    cy.visit('/infx/inference');
     cy.visit('/overview');
     cy.intercept('GET', '**/api/v1/overview*', { statusCode: 500 }).as('overviewJsonFailure');
 
@@ -251,7 +251,7 @@ describe('Overview page', () => {
     cy.go('back');
     cy.location('search').should('eq', '');
     cy.go('back');
-    cy.location('pathname').should('eq', '/inference/deepseek-v41-flash');
+    cy.location('pathname').should('eq', '/infx/inference/deepseek-v41-flash');
   });
 
   it('reveals deprecated and maintenance models via the toolbar toggle', () => {
@@ -481,7 +481,7 @@ describe('Overview page', () => {
         .and('have.attr', 'href')
         .then((href) => {
           const url = new URL(String(href), 'https://inferencex.local');
-          expect(url.pathname).to.equal('/inference');
+          expect(url.pathname).to.equal('/infx/inference');
           expect(url.searchParams.get('g_model')).to.equal('Qwen-3.5-397B-A17B');
           expect(url.searchParams.get('i_metric')).to.equal('y_costh');
           expect(url.searchParams.get('i_xmode')).to.equal('interactivity');
@@ -994,7 +994,7 @@ describe('Overview page', () => {
             '$0.062. Open raw source dashboard for Jul 18: Qwen3.5 397B · MI355X · SGLang · FP8 · MTP',
           )
           .should('have.attr', 'href')
-          .and('include', '/inference?')
+          .and('include', '/infx/inference?')
           .and('include', 'g_model=Qwen-3.5-397B-A17B')
           .and('include', 'g_rundate=2026-07-18')
           .and('include', 'i_prec=fp8')

@@ -12,7 +12,7 @@ import { HEADER_ACTION_STYLE } from '@/components/ui/control-styles';
 import { HaloTogglesLazy } from '@/components/halo/halo-toggles-lazy';
 import { MinecraftTogglesLazy } from '@/components/minecraft/minecraft-toggles-lazy';
 import { navigateInApp } from '@/lib/routing/client-navigation';
-import { DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
+import { AGENTX_ROUTE, DASHBOARD_ROUTES, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 import { useClientPathname } from '@/hooks/useClientPathname';
 import { useClientSearch } from '@/hooks/useClientSearch';
 import { isEmbedPathname } from '@/lib/embed/embed-route';
@@ -44,13 +44,13 @@ const NAV_LINKS: readonly NavLink[] = [
     event: 'header_overview_clicked',
   },
   {
-    href: '/inference',
+    href: getDashboardRoute('inference').path,
     label: 'Dashboard',
     testId: 'nav-link-dashboard',
     event: 'header_dashboard_clicked',
   },
   {
-    href: '/agentx',
+    href: AGENTX_ROUTE.path,
     label: 'AgentX',
     testId: 'nav-link-agentx',
     event: 'header_agentx_clicked',
@@ -72,7 +72,7 @@ function isActive(pathname: string, href: string): boolean {
       : pathname.slice(ZH_PREFIX.length)
     : pathname;
   if (href === '/') return enPathname === '/';
-  if (href === '/inference') {
+  if (href === getDashboardRoute('inference').path) {
     return DASHBOARD_TABS.some((tab) => enPathname.startsWith(tab));
   }
   return enPathname === href || enPathname.startsWith(`${href}/`);
@@ -212,7 +212,7 @@ export const Header = () => {
                     e.preventDefault();
                     return;
                   }
-                  if (href === '/overview' || href === '/inference') {
+                  if (href === '/overview' || href === getDashboardRoute('inference').path) {
                     navigateInApp(e, router, displayHref);
                   }
                 }}
@@ -335,7 +335,7 @@ export const Header = () => {
                           e.preventDefault();
                           return;
                         }
-                        if (href === '/overview' || href === '/inference') {
+                        if (href === '/overview' || href === getDashboardRoute('inference').path) {
                           navigateInApp(e, router, displayHref);
                         }
                       }}

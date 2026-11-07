@@ -23,7 +23,7 @@ const state = vi.hoisted(() => ({
   loading: false,
 }));
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/operatorx' }));
+vi.mock('next/navigation', () => ({ usePathname: () => '/opx' }));
 vi.mock('@/hooks/api/use-operatorx', () => ({
   useOperatorXComparison: (_op: string, workload: string | null) => ({
     data: state.loading ? undefined : state.views.get(workload),
@@ -146,7 +146,7 @@ beforeEach(() => {
   state.models = [];
   state.detail = null;
   state.loading = false;
-  window.history.replaceState(null, '', '/operatorx');
+  window.history.replaceState(null, '', '/opx');
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);

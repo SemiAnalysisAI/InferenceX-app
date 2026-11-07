@@ -28,12 +28,12 @@ describe('requestEndpoint', () => {
 describe('describeDataQueryFailure', () => {
   it('reads endpoint and status from ApiRequestError', () => {
     const error = new ApiRequestError('API error: 503', 503, '/api/v1/benchmarks?model=dsr1');
-    expect(describeDataQueryFailure(error, request, 'query', '/zh/inference/dsr1')).toEqual({
+    expect(describeDataQueryFailure(error, request, 'query', '/zh/infx/inference/dsr1')).toEqual({
       kind: 'query',
       query_key: 'benchmarks',
       endpoint: '/api/v1/benchmarks',
       status: 503,
-      route_template: '/inference/[model]',
+      route_template: '/infx/inference/[model]',
     });
   });
 
@@ -66,7 +66,7 @@ describe('describeDataQueryFailure', () => {
 describe('reportDataQueryFailure', () => {
   beforeEach(() => {
     vi.stubGlobal('window', {
-      location: new URL('https://inferencex.semianalysis.com/evaluation'),
+      location: new URL('https://inferencex.semianalysis.com/infx/evaluation'),
     });
   });
 
@@ -79,7 +79,7 @@ describe('reportDataQueryFailure', () => {
     reportDataQueryFailure(new ApiRequestError('x', 500, '/api/v1/evaluations'), request);
     expect(trackOncePerPageview).toHaveBeenCalledWith(
       'data_query_failed',
-      expect.objectContaining({ status: 500, route_template: '/evaluation' }),
+      expect.objectContaining({ status: 500, route_template: '/infx/evaluation' }),
       'query:["benchmarks","dsr1"]',
     );
   });
@@ -100,7 +100,7 @@ describe('reportDataQueryFailure', () => {
         query_key: 'evaluations',
         endpoint: '/api/v1/evaluations',
         status: 502,
-        route_template: '/evaluation',
+        route_template: '/infx/evaluation',
       },
       'query:["evaluations"]',
     );

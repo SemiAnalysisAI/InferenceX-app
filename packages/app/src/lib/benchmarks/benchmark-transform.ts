@@ -262,7 +262,7 @@ export function rowToAggDataEntry(
   // rows (transformed live from raw artifacts) carry no id, so `Number(undefined)`
   // is NaN — collapse any non-persisted value to undefined so downstream link /
   // fetch sites (guarded by isPersistedBenchmarkId) skip it cleanly rather than
-  // emitting `?ids=NaN` or an `/inference/agentic/NaN` link.
+  // emitting `?ids=NaN` or an `/infx/inference/agentic/NaN` link.
   const numericId = typeof row.id === 'number' ? row.id : Number(row.id);
   const entry: AggDataEntry = {
     rawMetricKeys: Object.keys(m),

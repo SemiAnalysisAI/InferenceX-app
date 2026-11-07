@@ -1706,7 +1706,9 @@ describe('ChartDisplay modeled power disclosures', () => {
         utilityModeledWatts: { y: 1000, roof: false },
       });
       mountWithProviders(
-        <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+        <PathnameContext.Provider
+          value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+        >
           <div className="p-4">
             <ChartDisplay />
           </div>
@@ -1824,7 +1826,9 @@ describe('ChartDisplay responsive status notes', () => {
         cy.viewport(width, 900);
         const point = createMockInferenceData({ framework: 'atom', offload_mode: 'on' });
         mountWithProviders(
-          <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+          <PathnameContext.Provider
+            value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+          >
             <div className="p-4">
               <ChartDisplay />
             </div>

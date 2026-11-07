@@ -36,7 +36,7 @@ describe('Earlier agentic models on profit estimators', () => {
 describe('Profit Estimator per GW — per-model route', () => {
   it("keeps the Kimi K3 whitepaper's historical target at 45 (English)", () => {
     stubOpenRouter();
-    const path = '/profit-estimator-per-gigawatt/kimi-k3/target/45';
+    const path = '/infx/profit-estimator-per-gigawatt/kimi-k3/target/45';
     cy.visit('/whitepaper/amd-mi355x-32b-revenue-per-gigawatt-kimi-k3', {
       onBeforeLoad: suppressNudges,
     });
@@ -45,33 +45,35 @@ describe('Profit Estimator per GW — per-model route', () => {
     cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
   });
 
-  it('serves /profit-estimator-per-gigawatt/kimi-k3 and 308s aliases to the canonical slug', () => {
+  it('serves /infx/profit-estimator-per-gigawatt/kimi-k3 and 308s aliases to the canonical slug', () => {
     stubOpenRouter();
-    cy.visit('/profit-estimator-per-gigawatt/kimi-k3', { onBeforeLoad: suppressNudges });
+    cy.visit('/infx/profit-estimator-per-gigawatt/kimi-k3', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'Kimi K3');
-    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/kimi-k3');
+    cy.location('pathname').should('eq', '/infx/profit-estimator-per-gigawatt/kimi-k3');
 
-    cy.request({ url: '/profit-estimator-per-gigawatt/Kimi-K3', followRedirect: false }).then(
+    cy.request({ url: '/infx/profit-estimator-per-gigawatt/Kimi-K3', followRedirect: false }).then(
       (response) => {
         expect(response.status).to.eq(308);
-        expect(response.headers.location).to.match(/\/profit-estimator-per-gigawatt\/kimi-k3$/u);
+        expect(response.headers.location).to.match(
+          /\/infx\/profit-estimator-per-gigawatt\/kimi-k3$/u,
+        );
       },
     );
   });
 
   it('404s models the estimator does not serve yet', () => {
-    cy.request({ url: '/profit-estimator-per-gigawatt/deepseek-r1', failOnStatusCode: false })
+    cy.request({ url: '/infx/profit-estimator-per-gigawatt/deepseek-r1', failOnStatusCode: false })
       .its('status')
       .should('eq', 404);
-    cy.request({ url: '/profit-estimator-per-gigawatt/not-a-model', failOnStatusCode: false })
+    cy.request({ url: '/infx/profit-estimator-per-gigawatt/not-a-model', failOnStatusCode: false })
       .its('status')
       .should('eq', 404);
   });
 
   it('keeps AgentX estimates when an old 8k/1k query opens English profit', () => {
     stubOpenRouter();
-    const route = '/profit-estimator-per-gigawatt/kimi-k3';
+    const route = '/infx/profit-estimator-per-gigawatt/kimi-k3';
     cy.visit(route, { onBeforeLoad: suppressNudges });
     revenueLabels().should('have.length.greaterThan', 0);
     revenueLabels().then(($labels) => {
@@ -97,7 +99,7 @@ describe('Profit Estimator per GW — per-model route', () => {
       cy.get('[data-testid="profit-fixed-workload-note"]').should('not.exist');
     });
     cy.request({
-      url: '/profit-estimator-per-gigawatt/qwen-3-5',
+      url: '/infx/profit-estimator-per-gigawatt/qwen-3-5',
       failOnStatusCode: false,
     })
       .its('status')
@@ -112,21 +114,21 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
   });
 
   it('308s the older glm-5-2 slug to glm-5-3', () => {
-    cy.request({ url: '/profit-estimator/glm-5-2', followRedirect: false }).then((res) => {
+    cy.request({ url: '/infx/profit-estimator/glm-5-2', followRedirect: false }).then((res) => {
       expect(res.status).to.eq(308);
-      expect(res.headers['location']).to.match(/\/profit-estimator\/glm-5-3$/);
+      expect(res.headers['location']).to.match(/\/infx\/profit-estimator\/glm-5-3$/);
     });
   });
 
   it('re-seeds the operating point and price source on a model switch', () => {
-    cy.visit('/profit-estimator-per-gigawatt/glm-5-3', { onBeforeLoad: suppressNudges });
+    cy.visit('/infx/profit-estimator-per-gigawatt/glm-5-3', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '135');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '20');
 
     cy.get('[data-testid="profit-model-selector"]').click();
     cy.contains('[role="option"]', 'Kimi K3').click();
-    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/kimi-k3');
+    cy.location('pathname').should('eq', '/infx/profit-estimator-per-gigawatt/kimi-k3');
     cy.get('[data-testid="profit-caption"] h2')
       .should('contain.text', 'Kimi K3')
       .and('contain.text', '60 tok/s/user');
@@ -138,7 +140,7 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
 
     cy.get('[data-testid="profit-model-selector"]').click();
     cy.contains('[role="option"]', 'GLM5.2/GLM5.3').click();
-    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/glm-5-3');
+    cy.location('pathname').should('eq', '/infx/profit-estimator-per-gigawatt/glm-5-3');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '135');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '20');
     cy.get('[data-testid="profit-selling-prices"]')

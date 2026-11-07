@@ -1,4 +1,5 @@
 import { isZhPathname, localePath } from '@/lib/i18n/i18n';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export const OPERATORX_CATEGORIES = [
   { slug: 'gemm', label: { en: 'GEMM', zh: 'GEMM' } },
@@ -9,6 +10,8 @@ export const OPERATORX_CATEGORIES = [
 
 export type OperatorXCategory = (typeof OPERATORX_CATEGORIES)[number]['slug'];
 
+const OPERATORX_PATH = getDashboardRoute('operatorx').path;
+
 export const DEFAULT_OPERATORX_CATEGORY: OperatorXCategory = 'gemm';
 
 export function isOperatorXCategory(value: string | null | undefined): value is OperatorXCategory {
@@ -16,16 +19,19 @@ export function isOperatorXCategory(value: string | null | undefined): value is 
 }
 
 export function operatorXCategoryPath(category: OperatorXCategory): string {
-  return `/operatorx/${category}`;
+  return `${OPERATORX_PATH}/${category}`;
 }
 
-const OPERATORX_PATH = /^(?<locale>\/zh)?\/operatorx(?:\/(?<category>[^/]+))?\/?$/u;
+const OPERATORX_PATTERN = new RegExp(
+  `^(?<locale>/zh)?${OPERATORX_PATH}(?:/(?<category>[^/]+))?/?$`,
+  'u',
+);
 
 export function operatorXCategoryForPathname(
   pathname: string | null | undefined,
 ): OperatorXCategory | null {
   if (!pathname) return null;
-  const category = OPERATORX_PATH.exec(pathname.split(/[?#]/u, 1)[0])?.groups?.category;
+  const category = OPERATORX_PATTERN.exec(pathname.split(/[?#]/u, 1)[0])?.groups?.category;
   return isOperatorXCategory(category) ? category : null;
 }
 
@@ -37,7 +43,7 @@ export function operatorXCategoryRouteForSelection(
 }
 
 export function operatorXCategoryRedirectUrl(url: URL): URL | null {
-  const match = OPERATORX_PATH.exec(url.pathname);
+  const match = OPERATORX_PATTERN.exec(url.pathname);
   const op = url.searchParams.get('op');
   if (!match || op === null) return null;
   const target = new URL(url);

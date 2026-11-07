@@ -151,10 +151,10 @@ describe('whitepaper registry', () => {
     expect(paper?.zh.abstract).toContain('本白皮书采用的 P90 交互性 45 tok/s/user');
     expect(paper?.en.assumptions.find((row) => row.item === 'Data date')?.value).toBe('2026-09-04');
     expect(paper?.en.sources[0]?.href).toBe(
-      'https://inferencex.semianalysis.com/profit-estimator-per-gigawatt/kimi-k3/target/45',
+      'https://inferencex.semianalysis.com/infx/profit-estimator-per-gigawatt/kimi-k3/target/45',
     );
     expect(paper?.zh.sources[0]?.href).toBe(
-      'https://inferencex.semianalysis.com/zh/profit-estimator-per-gigawatt/kimi-k3/target/45',
+      'https://inferencex.semianalysis.com/zh/infx/profit-estimator-per-gigawatt/kimi-k3/target/45',
     );
     expect(getWhitepaper('missing-paper')).toBeUndefined();
   });

@@ -249,11 +249,11 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
       sources: [
         {
           label: 'InferenceX profit estimator per gigawatt',
-          href: 'https://inferencex.semianalysis.com/profit-estimator-per-gigawatt/kimi-k3/target/45',
+          href: 'https://inferencex.semianalysis.com/infx/profit-estimator-per-gigawatt/kimi-k3/target/45',
         },
         {
           label: 'InferenceX AgentX dashboard',
-          href: 'https://inferencex.semianalysis.com/agentx',
+          href: 'https://inferencex.semianalysis.com/infx/agentx',
         },
         {
           label: 'OpenRouter Kimi K3 pricing',
@@ -369,11 +369,11 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
       sources: [
         {
           label: 'InferenceX 每 GW 利润估算器',
-          href: 'https://inferencex.semianalysis.com/zh/profit-estimator-per-gigawatt/kimi-k3/target/45',
+          href: 'https://inferencex.semianalysis.com/zh/infx/profit-estimator-per-gigawatt/kimi-k3/target/45',
         },
         {
           label: 'InferenceX AgentX 仪表板',
-          href: 'https://inferencex.semianalysis.com/zh/agentx',
+          href: 'https://inferencex.semianalysis.com/zh/infx/agentx',
         },
         {
           label: 'OpenRouter Kimi K3 定价',

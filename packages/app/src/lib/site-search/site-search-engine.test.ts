@@ -137,7 +137,7 @@ describe('SiteSearchEngine', () => {
     await settle(engine);
     const paths = fetchMock.mock.calls.map(([input]) => String(input));
     expect(paths).toContain('/zh/chips/b200');
-    expect(paths).toContain('/zh/agentx');
+    expect(paths).toContain('/zh/infx/agentx');
   });
 
   it('links untranslated /zh family members to the English page instead of a 404', async () => {

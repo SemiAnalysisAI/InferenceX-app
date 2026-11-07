@@ -97,12 +97,12 @@ The direction and size of the difference depend on frontier density and can
 change as benchmark runs land. Re-deriving the metric preserves its definition
 at every interpolated point.
 
-`/inference` plots these metrics only at measured points (`lib/charts/chart-utils.ts`,
+`/infx/inference` plots these metrics only at measured points (`lib/charts/chart-utils.ts`,
 `roof: false`), where both methods agree exactly. Leave-one-out measurements can
 compare interpolation models on a fixed snapshot, but they must not be presented
 as permanent impact figures for the changing live dataset.
 
-The `/inference` page exposes infrastructure tokens-per-dollar and token revenue
+The `/infx/inference` page exposes infrastructure tokens-per-dollar and token revenue
 as separate Y-axis metric families. Revenue selects the total-throughput Pareto
 knots, interpolates throughput, token mix, and cache hit independently, and then
 applies the selected token sale prices. When input and output sell at one price
@@ -172,7 +172,7 @@ Agreement at every knot and one-sided divergence between them identifies this
 as interpolation bias, not a modelling disagreement.
 
 Scored against the oracle, the splined read is simply **less accurate**.
-`/inference` plots cost only at measured points, as `specs.costh / millionTokensPerHour`
+`/infx/inference` plots cost only at measured points, as `specs.costh / millionTokensPerHour`
 (`buildDerivedChartFields` in `lib/charts/chart-utils.ts`, `roof: false`). Holding out each interior frontier
 knot in turn, rebuilding the frontier from the rest and predicting the held-out
 point's real cost:
@@ -189,7 +189,7 @@ up to 2026%, i.e. it reported an operating point no real config could occupy.
 Deriving cost from the interpolated throughput satisfies the identity by
 construction.
 
-## Fleet Lifecycle (`/fleet`)
+## Fleet Lifecycle (`/infx/fleet`)
 
 Everything above answers "which chip is cheapest at this interactivity, right
 now?". This section answers "what has a fleet of it earned and cost since the
@@ -453,7 +453,7 @@ the notes now carry the correction instead: which figures are affected (Input an
 never Total), in which direction (flattering), by how much, and that the Fleet Lifecycle
 page is deliberately on a different basis.
 
-## Profit Estimator (`/profit-estimator`, `/profit-estimator-per-gigawatt`)
+## Profit Estimator (`/infx/profit-estimator`, `/infx/profit-estimator-per-gigawatt`)
 
 Fleet Lifecycle answers "what did a fixed fleet earn over its life". This tab
 answers a narrower, present-tense question: at one interactivity operating point, what
@@ -506,7 +506,7 @@ that historical target.
   drawn and not offered in the legend. This matches the fleet page, which drops
   those points rather than showing an edge value that was never measured.
 
-## First-Token Limits (`/first-token`)
+## First-Token Limits (`/infx/first-token`)
 
 The calculator answers "what does each chip cost at this interactivity". This tab adds
 the constraint an interactivity target leaves out: how long the user waits for the first

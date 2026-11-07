@@ -10,7 +10,7 @@ describe('Historical improvement waterfall', () => {
         body: compactTrendHistory(rows),
       }).as('waterfallHistory');
     });
-    cy.visit('/historical?g_model=DeepSeek-R1-0528');
+    cy.visit('/infx/historical?g_model=DeepSeek-R1-0528');
     cy.wait('@waterfallHistory');
     cy.get('[data-testid="historical-trend-figure"] svg').should('be.visible');
   });
@@ -105,7 +105,7 @@ describe('Historical improvement waterfall', () => {
 });
 
 const visitHistoricalWithSetup = () => {
-  cy.visit('/historical', {
+  cy.visit('/infx/historical', {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     },
@@ -161,7 +161,7 @@ describe('Historical Trends AgentX P90 operating point', () => {
     });
     for (const prefix of ['', '/zh']) {
       cy.visit(
-        `${prefix}/historical?g_model=DeepSeek-R1-0528&i_seq=agentic-traces&i_prec=fp8&i_metric=y_tpPerGpu&g_rundate=${date}`,
+        `${prefix}/infx/historical?g_model=DeepSeek-R1-0528&i_seq=agentic-traces&i_prec=fp8&i_metric=y_tpPerGpu&g_rundate=${date}`,
       );
       cy.wait('@p90Benchmarks');
       cy.wait('@p90History');
@@ -188,7 +188,9 @@ describe('Historical Trends — Content & Interactions', () => {
       }));
       cy.intercept('GET', '**/api/v1/benchmarks?*', withoutRoleEnergy).as('benchmarks');
       cy.intercept('GET', '**/api/v1/benchmarks/history/trends?*').as('history');
-      cy.visit('/historical?g_model=DeepSeek-R1-0528&i_metric=y_measuredPrefillJPerInputToken');
+      cy.visit(
+        '/infx/historical?g_model=DeepSeek-R1-0528&i_metric=y_measuredPrefillJPerInputToken',
+      );
       cy.wait('@benchmarks');
       cy.wait('@history');
       cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', 'Measured energy');
@@ -217,7 +219,7 @@ describe('Historical Trends — Content & Interactions', () => {
       .should('be.visible')
       .and('have.text', 'FP4')
       .and('be.disabled');
-    cy.visit('/historical?g_model=DeepSeek-R1-0528');
+    cy.visit('/infx/historical?g_model=DeepSeek-R1-0528');
     cy.get('[data-testid="historical-trends-display"]').should('be.visible');
     cy.get('[data-testid="precision-multiselect"][role="combobox"]')
       .should('be.visible')
@@ -265,7 +267,7 @@ describe('Historical Trends — Content & Interactions', () => {
 
 describe('Historical Trends — Chinese route', () => {
   beforeEach(() => {
-    cy.visit('/zh/historical', {
+    cy.visit('/zh/infx/historical', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -299,7 +301,7 @@ describe('Historical Trends — Chinese route', () => {
     });
 
     cy.visit(
-      `/zh/historical?g_model=DeepSeek-R1-0528&i_seq=agentic-traces&i_prec=fp4&g_rundate=${runDate}`,
+      `/zh/infx/historical?g_model=DeepSeek-R1-0528&i_seq=agentic-traces&i_prec=fp4&g_rundate=${runDate}`,
     );
     cy.wait('@agenticAvailability');
     cy.wait('@agenticBenchmarks');

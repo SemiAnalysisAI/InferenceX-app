@@ -170,8 +170,8 @@ export const DEFAULT_CACHE_HIT_MODE: CacheHitMode = 'theoretical';
 export const DEFAULT_UTILIZATION_PCT = 60;
 
 /**
- * Denominator every figure is expressed in. `/profit-estimator` is per chip-hour;
- * `/profit-estimator-per-gigawatt` scales by the GPU-hours one GW-year buys.
+ * Denominator every figure is expressed in. `/infx/profit-estimator` is per chip-hour;
+ * `/infx/profit-estimator-per-gigawatt` scales by the GPU-hours one GW-year buys.
  */
 export type ProfitBasis = 'chip-hour' | 'gw-year';
 

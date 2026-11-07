@@ -23,6 +23,7 @@ import {
 } from '@/lib/compare/compare-ssr';
 import { datasetJsonLd } from '@/lib/seo/dataset-jsonld';
 import { clampMetaDescription, fitMetaTitle, META_DESCRIPTION_MAX } from '@/lib/seo/meta-text';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 export function formatModelListZh(models: CompareModelSlug[]): string {
   const labels = models.map((model) => model.label);
@@ -138,7 +139,7 @@ export const AGENTIC_SCENARIO_INTRO_ZH: AgenticScenarioIntro = {
   paragraph:
     'AgentX 回放真实的 coding agent 会话，而非定长 prompt。随着会话轮次增加，上下文不断增长；每个请求的大部分内容都可直接从 cache 读取，无需重新计算。因此，这项对比不仅取决于芯片本身的吞吐量，还会受到跨节点 KV 传输、prefix-aware routing 和 cache 容量等系统因素影响。定长序列工作负载仍是衡量 kernel 与芯片性能的清晰基线；两种场景从不同角度回答同一硬件的性能问题。',
   linkLabel: '进一步了解 AgentX',
-  href: '/zh/agentx',
+  href: `/zh${AGENTX_ROUTE.path}`,
 };
 
 export function compareTableNarrativeZh(

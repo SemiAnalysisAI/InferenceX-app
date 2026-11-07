@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 interface DecryptedRow {
   id: string;
@@ -194,7 +195,11 @@ export default function FeedbackViewer() {
               onClick={() => {
                 relockFeatureGate();
                 track('feedback_viewer_relocked');
-                router.push(locale === 'zh' ? '/zh/inference' : '/inference');
+                router.push(
+                  locale === 'zh'
+                    ? `/zh${getDashboardRoute('inference').path}`
+                    : getDashboardRoute('inference').path,
+                );
               }}
               title={t.relock}
             >

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SearchableSelect, type SearchableSelectGroup } from '@/components/ui/searchable-select';
 
-const route = vi.hoisted(() => ({ pathname: '/inference' }));
+const route = vi.hoisted(() => ({ pathname: '/infx/inference' }));
 vi.mock('next/navigation', () => ({ usePathname: () => route.pathname }));
 const trackMock = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/analytics/analytics', () => ({ track: trackMock }));
@@ -28,7 +28,7 @@ const GROUPS: SearchableSelectGroup[] = [
 ];
 
 beforeEach(() => {
-  route.pathname = '/inference';
+  route.pathname = '/infx/inference';
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -72,7 +72,7 @@ function setSearchValue(value: string) {
 
 describe('SearchableSelect', () => {
   it('uses Chinese defaults for search, clear, empty and placeholder without overriding caller copy', () => {
-    route.pathname = '/zh/inference';
+    route.pathname = '/zh/infx/inference';
     render({ value: 'unknown' });
     expect(container.textContent).toContain('请选择...');
     openMenu();

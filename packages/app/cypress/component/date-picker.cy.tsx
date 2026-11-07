@@ -80,7 +80,9 @@ describe('DatePicker', () => {
     it(`keeps the full date readable and adjacent actions touch-sized in a narrow ${locale} panel`, () => {
       cy.viewport(375, 812);
       cy.mount(
-        <PathnameContext.Provider value={locale === 'zh' ? '/zh/evaluation' : '/evaluation'}>
+        <PathnameContext.Provider
+          value={locale === 'zh' ? '/zh/infx/evaluation' : '/infx/evaluation'}
+        >
           <div style={{ width: 285 }}>
             <DatePickerWrapper initialDate="2025-11-15" useDefaults />
           </div>

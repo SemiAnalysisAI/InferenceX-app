@@ -157,7 +157,7 @@ describe('DatasetDetail conversation search', () => {
       container.querySelector<HTMLElement>('[data-testid="dataset-detail-error"]')?.dataset.locale,
     ).toBe('zh');
     expect(container.querySelector('[data-testid="dataset-detail-not-found"]')).toBeNull();
-    expect(container.querySelector('a')?.getAttribute('href')).toBe('/zh/agentx');
+    expect(container.querySelector('a')?.getAttribute('href')).toBe('/zh/infx/agentx');
     const retry = [...container.querySelectorAll('button')].find(
       (button) => button.textContent === '重试',
     );

@@ -108,7 +108,7 @@ describe('Dataset distribution percentiles', () => {
     cy.intercept('GET', '/api/v1/datasets/test-dataset/conversations*', {
       body: { total: 0, items: [] },
     });
-    cy.visit('/agentx/test-dataset', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/infx/agentx/test-dataset', { onBeforeLoad: unlockAgenticGate });
   });
 
   it('shows P50/P75/P90/P95 for ISL, OSL, and uncached input', () => {
@@ -150,7 +150,7 @@ describe('Dataset distribution percentiles', () => {
 
   it('keeps the conversation table reachable through internal scrolling on mobile', () => {
     cy.viewport(390, 844);
-    cy.visit('/zh/agentx/test-dataset', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/zh/infx/agentx/test-dataset', { onBeforeLoad: unlockAgenticGate });
 
     cy.get('[data-testid="dataset-conversations-table-scroll"]').should(($scroll) => {
       const element = $scroll[0];
@@ -162,7 +162,7 @@ describe('Dataset distribution percentiles', () => {
 });
 
 describe('Dataset detail loading stability', () => {
-  it('keeps the footer below the viewport while /agentx/layout-dataset loads', () => {
+  it('keeps the footer below the viewport while /infx/agentx/layout-dataset loads', () => {
     cy.intercept('GET', '/api/v1/datasets/layout-dataset', {
       delay: 1500,
       body: LAYOUT_DATASET,
@@ -171,7 +171,7 @@ describe('Dataset detail loading stability', () => {
       body: { total: 0, items: [] },
     });
 
-    cy.visit('/agentx/layout-dataset', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/infx/agentx/layout-dataset', { onBeforeLoad: unlockAgenticGate });
     cy.get('[data-testid="dataset-detail-loading"]').should('be.visible');
     cy.get('[data-testid="footer"]').then(($footer) => {
       cy.window().then((win) => {
@@ -200,12 +200,12 @@ describe('Dataset detail loading stability', () => {
     });
 
     cy.viewport(390, 844);
-    cy.visit('/zh/agentx/layout-dataset', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/zh/infx/agentx/layout-dataset', { onBeforeLoad: unlockAgenticGate });
     cy.get('[data-testid="dataset-detail-error"]')
       .should('have.attr', 'data-locale', 'zh')
       .and('have.attr', 'role', 'alert');
     cy.get('[data-testid="dataset-detail-not-found"]').should('not.exist');
-    cy.get('[data-testid="dataset-detail-error"] a').should('have.attr', 'href', '/zh/agentx');
+    cy.get('[data-testid="dataset-detail-error"] a').should('have.attr', 'href', '/zh/infx/agentx');
     cy.contains('[data-testid="dataset-detail-error"] button', '重试').click();
     cy.wait('@datasetRetryRequest').its('response.statusCode').should('eq', 200);
     cy.contains('h1', 'Layout dataset').should('be.visible');
@@ -217,7 +217,7 @@ describe('Dataset detail loading stability', () => {
     cy.intercept('GET', '/api/v1/datasets/missing-dataset/conversations*', { statusCode: 404 });
 
     cy.viewport(1280, 800);
-    cy.visit('/agentx/missing-dataset', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/infx/agentx/missing-dataset', { onBeforeLoad: unlockAgenticGate });
     cy.get('[data-testid="dataset-detail-not-found"]')
       .should('have.attr', 'data-locale', 'en')
       .and('be.visible');

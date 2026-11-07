@@ -11,6 +11,7 @@ import { isEmbedPathname } from '@/lib/embed/embed-route';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import { StarButton } from './footer-star-cta';
+import { AGENTX_ROUTE, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 const STRINGS = {
   en: {
@@ -115,13 +116,33 @@ const LINK_GROUPS: readonly {
   {
     heading: 'tools',
     links: [
-      ['historical', '/historical', 'historicalTrends', 'footer_historical_clicked'],
-      ['calculator', '/calculator', 'tcoCalculator', 'footer_calculator_clicked'],
-      ['fleet', '/fleet', 'fleetLifecycle', 'footer_fleet_clicked'],
-      ['first-token', '/first-token', 'firstTokenLimits', 'footer_first_token_clicked'],
-      ['cache-reuse', '/cache-reuse', 'cacheReuse', 'footer_cache_reuse_clicked'],
-      ['reliability', '/reliability', 'gpuReliability'],
-      ['gpu-specs', '/gpu-specs', 'gpuSpecsDashboard'],
+      [
+        'historical',
+        getDashboardRoute('historical').path,
+        'historicalTrends',
+        'footer_historical_clicked',
+      ],
+      [
+        'calculator',
+        getDashboardRoute('calculator').path,
+        'tcoCalculator',
+        'footer_calculator_clicked',
+      ],
+      ['fleet', getDashboardRoute('fleet').path, 'fleetLifecycle', 'footer_fleet_clicked'],
+      [
+        'first-token',
+        getDashboardRoute('first-token').path,
+        'firstTokenLimits',
+        'footer_first_token_clicked',
+      ],
+      [
+        'cache-reuse',
+        getDashboardRoute('cache-reuse').path,
+        'cacheReuse',
+        'footer_cache_reuse_clicked',
+      ],
+      ['reliability', getDashboardRoute('reliability').path, 'gpuReliability'],
+      ['gpu-specs', getDashboardRoute('gpu-specs').path, 'gpuSpecsDashboard'],
     ],
   },
   {
@@ -138,7 +159,7 @@ const LINK_GROUPS: readonly {
   {
     heading: 'learn',
     links: [
-      ['agentx', '/agentx', 'agentx', 'footer_agentx_clicked'],
+      ['agentx', AGENTX_ROUTE.path, 'agentx', 'footer_agentx_clicked'],
       ['articles', '/blog', 'articles', 'footer_articles_clicked'],
       ['whitepapers', '/whitepaper', 'whitepapers', 'footer_whitepapers_clicked'],
       ['model-architectures', '/model', 'modelArchitectures'],
@@ -149,7 +170,12 @@ const LINK_GROUPS: readonly {
     heading: 'developers',
     links: [
       ['api', '/api', 'apiReference', 'footer_api_clicked'],
-      ['telemetry', '/inference/agentic', 'telemetry', 'footer_telemetry_clicked'],
+      [
+        'telemetry',
+        `${getDashboardRoute('inference').path}/agentic`,
+        'telemetry',
+        'footer_telemetry_clicked',
+      ],
       ['benchmarks', 'https://github.com/SemiAnalysisAI/InferenceX', 'benchmarks'],
       ['agentx-harness', 'https://github.com/SemiAnalysisAI/agentx-harness', 'agentxHarness'],
       ['visualization', 'https://github.com/SemiAnalysisAI/InferenceX-app', 'visualization'],

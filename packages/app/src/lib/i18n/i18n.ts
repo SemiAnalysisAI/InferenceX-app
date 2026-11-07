@@ -1,5 +1,5 @@
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
-import { DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
+import { AGENTX_ROUTE, DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
 
 export type Locale = 'en' | 'zh';
 
@@ -47,7 +47,7 @@ export const ZH_MIRRORED_ROUTES: readonly { path: string; exact?: boolean }[] = 
   { path: '/chips' },
   { path: '/model' },
   { path: '/embed' },
-  { path: '/agentx' },
+  { path: AGENTX_ROUTE.path },
   { path: '/powerx/tutorial', exact: true },
   { path: '/ubenchx' },
   { path: '/rankings' },

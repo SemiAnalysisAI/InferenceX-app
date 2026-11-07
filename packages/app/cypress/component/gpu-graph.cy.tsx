@@ -286,7 +286,7 @@ describe('GPUGraph', () => {
 
   it('localizes the Chinese comparison empty state', () => {
     mountGpuGraph(
-      <PathnameContext.Provider value="/zh/inference">
+      <PathnameContext.Provider value="/zh/infx/inference">
         <div style={{ width: 390, height: 600 }}>
           <GPUGraph
             chartId="test-gpu-empty-zh"
@@ -794,7 +794,7 @@ describe('GPU comparison power envelopes', () => {
 
   it('uses the same boundary toggle for percent TDP and fleet percentiles while preserving energy Pareto', () => {
     mountGpuGraph(
-      <PathnameContext.Provider value="/zh/inference">
+      <PathnameContext.Provider value="/zh/infx/inference">
         <PowerComparison />
       </PathnameContext.Provider>,
     );

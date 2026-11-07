@@ -6,6 +6,7 @@ import type {
   SubmissionSummaryRow,
   SubmissionVolumeRow,
 } from '@/lib/submissions/submissions-types';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export function getVendor(hardware: string): string {
   return GPU_VENDORS[hardware] ?? 'Unknown';
@@ -70,7 +71,7 @@ export function buildInferenceCompareUrl(
     i_dend: currentRow.date,
     i_prec: currentRow.precision,
   });
-  return `/inference?${params.toString()}`;
+  return `${getDashboardRoute('inference').path}?${params.toString()}`;
 }
 
 export const SUBMISSION_VENDORS: readonly Vendor[] = [

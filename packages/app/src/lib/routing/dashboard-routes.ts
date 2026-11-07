@@ -16,6 +16,7 @@ interface DashboardRouteDefinition {
   readonly key: string;
   readonly path: `/${string}`;
   readonly canonicalPath: '/' | `/${string}`;
+  readonly legacyPath?: `/${string}`;
   readonly navGroup: DashboardNavGroup;
   readonly indexable: boolean;
   readonly localeMirrored: boolean;
@@ -52,7 +53,7 @@ export const DASHBOARD_SHELL_CAPABILITY_ROUTES = [
     tabNav: true,
   },
   {
-    path: '/inference/agentic',
+    path: '/infx/inference/agentic',
     includeChildren: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     dashboardNudge: false,
@@ -66,7 +67,7 @@ export const DASHBOARD_SHELL_CAPABILITY_ROUTES = [
     tabNav: true,
   },
   {
-    path: '/agentic-workload-explorer',
+    path: '/infx/agentic-workload-explorer',
     includeChildren: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     dashboardNudge: false,
@@ -87,8 +88,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'inference',
-    path: '/inference',
-    canonicalPath: '/inference',
+    path: '/infx/inference',
+    canonicalPath: '/infx/inference',
+    legacyPath: '/inference',
     navGroup: 'primary',
     indexable: true,
     localeMirrored: true,
@@ -107,8 +109,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'profit-estimator-per-gigawatt',
-    path: '/profit-estimator-per-gigawatt',
-    canonicalPath: '/profit-estimator-per-gigawatt',
+    path: '/infx/profit-estimator-per-gigawatt',
+    canonicalPath: '/infx/profit-estimator-per-gigawatt',
+    legacyPath: '/profit-estimator-per-gigawatt',
     navGroup: 'merged',
     indexable: true,
     localeMirrored: true,
@@ -117,8 +120,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'profit-estimator',
-    path: '/profit-estimator',
-    canonicalPath: '/profit-estimator',
+    path: '/infx/profit-estimator',
+    canonicalPath: '/infx/profit-estimator',
+    legacyPath: '/profit-estimator',
     navGroup: 'primary',
     indexable: true,
     localeMirrored: true,
@@ -127,8 +131,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'evaluation',
-    path: '/evaluation',
-    canonicalPath: '/evaluation',
+    path: '/infx/evaluation',
+    canonicalPath: '/infx/evaluation',
+    legacyPath: '/evaluation',
     navGroup: 'primary',
     indexable: true,
     localeMirrored: true,
@@ -137,8 +142,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'historical',
-    path: '/historical',
-    canonicalPath: '/historical',
+    path: '/infx/historical',
+    canonicalPath: '/infx/historical',
+    legacyPath: '/historical',
     navGroup: 'footer-only',
     indexable: true,
     localeMirrored: true,
@@ -147,8 +153,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'calculator',
-    path: '/calculator',
-    canonicalPath: '/calculator',
+    path: '/infx/calculator',
+    canonicalPath: '/infx/calculator',
+    legacyPath: '/calculator',
     navGroup: 'footer-only',
     indexable: true,
     localeMirrored: true,
@@ -157,8 +164,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'fleet',
-    path: '/fleet',
-    canonicalPath: '/fleet',
+    path: '/infx/fleet',
+    canonicalPath: '/infx/fleet',
+    legacyPath: '/fleet',
     navGroup: 'footer-only',
     indexable: true,
     localeMirrored: true,
@@ -167,8 +175,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'first-token',
-    path: '/first-token',
-    canonicalPath: '/first-token',
+    path: '/infx/first-token',
+    canonicalPath: '/infx/first-token',
+    legacyPath: '/first-token',
     navGroup: 'footer-only',
     indexable: true,
     localeMirrored: true,
@@ -177,8 +186,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'cache-reuse',
-    path: '/cache-reuse',
-    canonicalPath: '/cache-reuse',
+    path: '/infx/cache-reuse',
+    canonicalPath: '/infx/cache-reuse',
+    legacyPath: '/cache-reuse',
     navGroup: 'footer-only',
     indexable: true,
     localeMirrored: true,
@@ -187,8 +197,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'reliability',
-    path: '/reliability',
-    canonicalPath: '/reliability',
+    path: '/infx/reliability',
+    canonicalPath: '/infx/reliability',
+    legacyPath: '/reliability',
     navGroup: 'footer-only',
     indexable: true,
     localeMirrored: true,
@@ -197,8 +208,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'gpu-specs',
-    path: '/gpu-specs',
-    canonicalPath: '/gpu-specs',
+    path: '/infx/gpu-specs',
+    canonicalPath: '/infx/gpu-specs',
+    legacyPath: '/gpu-specs',
     navGroup: 'footer-only',
     indexable: true,
     localeMirrored: true,
@@ -207,8 +219,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'submissions',
-    path: '/submissions',
-    canonicalPath: '/submissions',
+    path: '/infx/submissions',
+    canonicalPath: '/infx/submissions',
+    legacyPath: '/submissions',
     navGroup: 'primary',
     indexable: true,
     localeMirrored: true,
@@ -217,8 +230,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'operatorx',
-    path: '/operatorx',
-    canonicalPath: '/operatorx',
+    path: '/opx',
+    canonicalPath: '/opx',
+    legacyPath: '/operatorx',
     navGroup: 'primary',
     indexable: true,
     localeMirrored: true,
@@ -238,8 +252,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'agentic-workload-explorer',
-    path: '/agentic-workload-explorer',
-    canonicalPath: '/agentic-workload-explorer',
+    path: '/infx/agentic-workload-explorer',
+    canonicalPath: '/infx/agentic-workload-explorer',
+    legacyPath: '/agentic-workload-explorer',
     navGroup: 'feature-gated',
     indexable: true,
     localeMirrored: true,
@@ -248,8 +263,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'ai-chart',
-    path: '/ai-chart',
-    canonicalPath: '/ai-chart',
+    path: '/infx/ai-chart',
+    canonicalPath: '/infx/ai-chart',
+    legacyPath: '/ai-chart',
     navGroup: 'feature-gated',
     indexable: true,
     localeMirrored: true,
@@ -258,8 +274,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'current-inferencex-image',
-    path: '/current-inferencex-image',
-    canonicalPath: '/current-inferencex-image',
+    path: '/infx/current-inferencex-image',
+    canonicalPath: '/infx/current-inferencex-image',
+    legacyPath: '/current-inferencex-image',
     navGroup: 'feature-gated',
     indexable: true,
     localeMirrored: true,
@@ -278,6 +295,8 @@ export const DASHBOARD_ROUTES = [
   },
 ] as const satisfies readonly DashboardRouteDefinition[];
 
+export const AGENTX_ROUTE = { path: '/infx/agentx', legacyPath: '/agentx' } as const;
+
 export type DashboardRoute = (typeof DASHBOARD_ROUTES)[number];
 export type DashboardRouteKey = DashboardRoute['key'];
 
@@ -289,8 +308,12 @@ export function isDashboardRouteKey(value: string): value is DashboardRouteKey {
   return DASHBOARD_ROUTE_KEYS.includes(value as DashboardRouteKey);
 }
 
-export function getDashboardRoute(key: DashboardRouteKey): DashboardRoute {
-  return DASHBOARD_ROUTES.find((route) => route.key === key)!;
+export function getDashboardRoute<K extends DashboardRouteKey>(
+  key: K,
+): Extract<DashboardRoute, { key: K }> {
+  return DASHBOARD_ROUTES.find(
+    (route): route is Extract<DashboardRoute, { key: K }> => route.key === key,
+  )!;
 }
 
 export function dashboardRouteForPathname(pathname: string): DashboardRoute | undefined {

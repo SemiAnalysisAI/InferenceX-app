@@ -45,7 +45,7 @@ describe('TPU publication preview', () => {
   beforeEach(interceptTpuPreview);
 
   it('recalculates overlay prices, preserves chips/DP, and hides the control after all TPU data is hidden', () => {
-    cy.visit(`/inference?${query}&g_tco=external`);
+    cy.visit(`/infx/inference?${query}&g_tco=external`);
     cy.wait('@tpuPreview');
     openChartControls();
     cy.get(overlayPoints).should('have.length', 6);
@@ -84,7 +84,7 @@ describe('TPU publication preview', () => {
       body: compactTrendHistory([...preview.benchmarks, ...tpuSnapshotRows]),
     });
     cy.visit(
-      '/historical?g_model=Qwen-3.5-397B-A17B&i_seq=8k%2F1k&i_prec=fp8&i_metric=y_tokensPerDollarH&g_tco=external',
+      '/infx/historical?g_model=Qwen-3.5-397B-A17B&i_seq=8k%2F1k&i_prec=fp8&i_metric=y_tokensPerDollarH&g_tco=external',
     );
     cy.get('[data-testid="historical-trend-figure"] [data-testid="result-context"]').within(() => {
       cy.get('[data-testid="cost-tier-selector"]').should('be.visible');
@@ -102,7 +102,7 @@ describe('TPU publication preview', () => {
   for (const width of [375, 768, 1440]) {
     it(`keeps TCO beside Cost Tier below the plot without clipping at ${width}px`, () => {
       cy.viewport(width, 900);
-      cy.visit(`/inference?${query}`);
+      cy.visit(`/infx/inference?${query}`);
       cy.wait('@tpuPreview');
       openChartControls();
       cy.contains('legend', 'Benchmark config').should('be.visible');

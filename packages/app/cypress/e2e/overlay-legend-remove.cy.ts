@@ -13,7 +13,7 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
   before(() => {
     interceptOverlayRun({ overlayHardware: 'h100' });
     interceptDerivedAgenticMetrics();
-    cy.visit(`/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90`, {
+    cy.visit(`/infx/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90`, {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         unlockAgenticGate(win);

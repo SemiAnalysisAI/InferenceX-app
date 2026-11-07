@@ -12,6 +12,7 @@ import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants'
 import { analyticsPlacement } from '@/lib/analytics/placement';
 import type { Locale } from '@/lib/i18n/i18n';
 import { cn } from '@/lib/shared/utils';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 const STRINGS = {
   en: {
@@ -99,7 +100,7 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
             </dl>
             <div className="mt-6 flex flex-wrap items-center gap-3">
               <LandingTrackedLink
-                href={`${prefix}/submissions`}
+                href={`${prefix}${getDashboardRoute('submissions').path}`}
                 data-testid="landing-submissions-link"
                 analyticsEvent="landing_submissions_clicked"
                 appNavigation

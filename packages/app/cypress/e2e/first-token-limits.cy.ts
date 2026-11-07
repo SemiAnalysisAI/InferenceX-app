@@ -27,7 +27,7 @@ describe('First-Token Limits', () => {
   describe('official rows only', () => {
     before(() => {
       interceptCalculatorOverlayRun();
-      cy.visit(`/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ttft=0.1,2`, {
+      cy.visit(`/infx/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ttft=0.1,2`, {
         onBeforeLoad: dismissNudges,
       });
       cy.wait('@benchmarks');
@@ -124,7 +124,7 @@ describe('First-Token Limits', () => {
   describe('empty states', () => {
     it('blames the cap ladder, not the floor, when rows qualify but none clears a cap', () => {
       interceptCalculatorOverlayRun();
-      cy.visit(`/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ttft=0.01`, {
+      cy.visit(`/infx/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ttft=0.01`, {
         onBeforeLoad: dismissNudges,
       });
       cy.wait('@benchmarks');
@@ -136,7 +136,7 @@ describe('First-Token Limits', () => {
 
     it('blames the floor when nothing reaches the requested interactivity', () => {
       interceptCalculatorOverlayRun();
-      cy.visit(`/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ivmin=100000`, {
+      cy.visit(`/infx/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ivmin=100000`, {
         onBeforeLoad: dismissNudges,
       });
       cy.wait('@benchmarks');
@@ -147,7 +147,7 @@ describe('First-Token Limits', () => {
   describe('share-link seeding', () => {
     it('reads the interactivity floor and cap ladder from the URL', () => {
       interceptCalculatorOverlayRun();
-      cy.visit(`/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ivmin=120&c_ttft=1`, {
+      cy.visit(`/infx/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ivmin=120&c_ttft=1`, {
         onBeforeLoad: dismissNudges,
       });
       cy.wait('@benchmarks');
@@ -162,7 +162,7 @@ describe('First-Token Limits', () => {
     before(() => {
       interceptCalculatorOverlayRun();
       cy.visit(
-        `/first-token?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}&c_ttft=0.1,2`,
+        `/infx/first-token?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}&c_ttft=0.1,2`,
         { onBeforeLoad: dismissNudges },
       );
       cy.wait('@unofficialRun');

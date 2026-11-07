@@ -30,7 +30,7 @@ describe('GPU Specs Tab', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/gpu-specs');
+    cy.visit('/infx/gpu-specs');
     cy.get('h2').contains('Chip specifications').should('exist');
   });
 
@@ -99,7 +99,7 @@ describe('GPU Specs Bar Chart View', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/gpu-specs');
+    cy.visit('/infx/gpu-specs');
     cy.get('h2').contains('Chip specifications').should('exist');
     cy.get('body').then(($body) => {
       if ($body.attr('data-scroll-locked')) {
@@ -146,7 +146,7 @@ describe('GPU Specs Radar Chart View', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/gpu-specs');
+    cy.visit('/infx/gpu-specs');
     cy.get('h2').contains('Chip specifications').should('exist');
     cy.get('body').then(($body) => {
       if ($body.attr('data-scroll-locked')) {
@@ -195,14 +195,14 @@ describe('GPU Specs Navigation', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/inference');
+    cy.visit('/infx/inference');
     cy.get('[data-testid="chart-section-tabs"]').should('be.visible');
   });
 
   it('footer link opens GPU Specs and the tab strip shows no active tab', () => {
     cy.get('[data-testid="tab-trigger-gpu-specs"]').should('not.exist');
     cy.get('[data-testid="footer-link-gpu-specs"]').scrollIntoView().click();
-    cy.url().should('include', '/gpu-specs');
+    cy.url().should('include', '/infx/gpu-specs');
     cy.get('h2').should('contain.text', 'Chip specifications');
     cy.get('[data-testid="chart-section-tabs"] [data-tab-active="true"]').should('not.exist');
   });
@@ -213,7 +213,7 @@ describe('Topology Dialog Navigation', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/gpu-specs');
+    cy.visit('/infx/gpu-specs');
     cy.get('h2').contains('Chip specifications').should('exist');
   });
 
@@ -299,7 +299,7 @@ const waitForZhHydration = () =>
 describe('GPU Specs Chinese route', () => {
   beforeEach(() => {
     cy.viewport(375, 812);
-    cy.visit('/zh/gpu-specs', {
+    cy.visit('/zh/infx/gpu-specs', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -361,9 +361,9 @@ describe('GPU Specs Chinese route', () => {
     });
     cy.get('link[rel="alternate"][hreflang="en"]')
       .invoke('attr', 'href')
-      .should('include', '/gpu-specs');
+      .should('include', '/infx/gpu-specs');
     cy.get('link[rel="alternate"][hreflang="zh-CN"]')
       .invoke('attr', 'href')
-      .should('include', '/zh/gpu-specs');
+      .should('include', '/zh/infx/gpu-specs');
   });
 });

@@ -10,6 +10,7 @@ import type { Locale } from '@/lib/i18n/i18n';
 import { cn } from '@/lib/shared/utils';
 
 import { AgentXOptimizationsLink } from './agentx-optimizations-link';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 export function AgentXOptimizationsCallout({ locale }: { locale: Locale }) {
   const overview = getOptimizationsOverview(locale);
@@ -29,7 +30,7 @@ export function AgentXOptimizationsCallout({ locale }: { locale: Locale }) {
         <p className="mt-3 max-w-4xl text-sm leading-6 text-muted-foreground">{overview.lead}</p>
 
         <AgentXOptimizationsLink
-          href={`${prefix}/agentx/optimizations`}
+          href={`${prefix}${AGENTX_ROUTE.path}/optimizations`}
           analyticsEvent="agentx_optimizations_opened"
           analyticsTarget="agentx-callout"
           data-testid="agentx-optimizations-cta"
@@ -43,7 +44,7 @@ export function AgentXOptimizationsCallout({ locale }: { locale: Locale }) {
           {frameworks.map((framework) => (
             <li key={framework.slug}>
               <AgentXOptimizationsLink
-                href={`${prefix}/agentx/optimizations/${framework.slug}`}
+                href={`${prefix}${AGENTX_ROUTE.path}/optimizations/${framework.slug}`}
                 analyticsEvent="agentx_optimizations_framework_opened"
                 analyticsTarget={framework.slug}
                 data-testid="agentx-optimizations-framework-link"

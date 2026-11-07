@@ -346,7 +346,7 @@ describe('Model Architecture Diagram', () => {
         cy.get('[data-testid="model-page-article"]').should('have.attr', 'lang', 'en');
         cy.get('[data-testid="model-page-dashboard"]')
           .should('contain.text', 'DeepSeek R1 0528 推理性能')
-          .find('a[href^="/zh/inference?"]')
+          .find('a[href^="/zh/infx/inference?"]')
           .should('contain.text', '在完整仪表板中查看');
         cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/model/deepseek-r1');
 
@@ -373,7 +373,7 @@ describe('Model Architecture Diagram', () => {
 
     it('keeps the dashboard architecture link inside the Chinese route tree', () => {
       cy.viewport(1440, 900);
-      cy.visit('/zh/inference?g_model=DeepSeek-R1-0528', {
+      cy.visit('/zh/infx/inference?g_model=DeepSeek-R1-0528', {
         onBeforeLoad: dismissStarModal,
       });
       cy.get('[data-testid="inference-chart-display"]').should('be.visible');
@@ -427,7 +427,7 @@ describe('Model Architecture Diagram', () => {
   describe('Dashboard architecture icon link (replaces the banner row)', () => {
     before(() => {
       cy.viewport(1280, 800);
-      cy.visit('/inference?g_model=DeepSeek-R1-0528', {
+      cy.visit('/infx/inference?g_model=DeepSeek-R1-0528', {
         onBeforeLoad(win) {
           dismissStarModal(win);
         },

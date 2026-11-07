@@ -44,7 +44,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       }),
     });
     let csv: Blob | undefined;
-    cy.visit('/profit-estimator-per-gigawatt/deepseek-v41-flash?c_power=modeled', {
+    cy.visit('/infx/profit-estimator-per-gigawatt/deepseek-v41-flash?c_power=modeled', {
       onBeforeLoad: (win) => {
         unlockPowerGate(win);
         win.URL.createObjectURL = (blob) => {
@@ -108,7 +108,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         })),
       });
     });
-    cy.visit('/profit-estimator-per-gigawatt?c_power=compare', {
+    cy.visit('/infx/profit-estimator-per-gigawatt?c_power=compare', {
       onBeforeLoad: (win) => {
         suppressNudges(win);
         win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
@@ -155,7 +155,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         });
       });
       cy.visit(
-        `/profit-estimator-per-gigawatt?c_power=compare&i_gpus=b200_sglang,b300_vllm&i_dstart=${PROFIT_HISTORY_DATE}&i_dend=${PROFIT_HISTORY_DATE}`,
+        `/infx/profit-estimator-per-gigawatt?c_power=compare&i_gpus=b200_sglang,b300_vllm&i_dstart=${PROFIT_HISTORY_DATE}&i_dend=${PROFIT_HISTORY_DATE}`,
         { onBeforeLoad: unlockPowerGate },
       );
       chart()
@@ -186,7 +186,9 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         });
       }
     });
-    cy.visit('/profit-estimator-per-gigawatt?c_power=compare', { onBeforeLoad: unlockPowerGate });
+    cy.visit('/infx/profit-estimator-per-gigawatt?c_power=compare', {
+      onBeforeLoad: unlockPowerGate,
+    });
     cy.wait('@power-rows').its('request.query').should('not.have.property', 'view');
     cy.get('#profit-power').should('contain', 'Compare both');
     cy.get('#profit-target').should('have.value', '60');
@@ -213,7 +215,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         ...profitNvl72Rows(),
       ],
     });
-    cy.visit('/profit-estimator-per-gigawatt?c_power=compare', {
+    cy.visit('/infx/profit-estimator-per-gigawatt?c_power=compare', {
       onBeforeLoad: unlockPowerGate,
     });
     chart().find('text.revenue-label').should('have.length', 9);
@@ -279,7 +281,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
 
   it('keeps the benchmark settings and restores the original chart after unavailable power', () => {
     stubOpenRouter();
-    cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: unlockPowerGate });
+    cy.visit('/infx/profit-estimator-per-gigawatt', { onBeforeLoad: unlockPowerGate });
     bars().its('length').should('be.greaterThan', 0);
     chart()
       .invoke('text')
@@ -302,7 +304,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
 describe('Profit Estimator — responsive control panels', () => {
   beforeEach(stubOpenRouter);
 
-  for (const route of ['/profit-estimator']) {
+  for (const route of ['/infx/profit-estimator']) {
     for (const width of [375, 768, 1280]) {
       it(`keeps benchmark and pricing controls grouped on ${route} at ${width}px`, () => {
         cy.viewport(width, 1000);

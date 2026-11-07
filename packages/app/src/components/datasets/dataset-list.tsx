@@ -11,6 +11,7 @@ import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { getDatasetDescription } from './dataset-description';
 import { compact, formatPct, localeNumber, perConversation } from './format';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 const STRINGS = {
   en: {
@@ -55,7 +56,7 @@ function DatasetCard({ d, locale }: { d: DatasetRecord; locale: 'en' | 'zh' }) {
   const prefix = locale === 'zh' ? '/zh' : '';
   return (
     <Link
-      href={`${prefix}/agentx/${d.slug}`}
+      href={`${prefix}${AGENTX_ROUTE.path}/${d.slug}`}
       onClick={() => track('datasets_card_clicked', { slug: d.slug })}
       className="group block"
     >

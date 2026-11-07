@@ -1,15 +1,19 @@
-import { DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
+import { AGENTX_ROUTE, DASHBOARD_ROUTES, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export const PAGE_TIER = { main: 0, reference: 1, overview: 2, article: 3 } as const;
 export type PageTier = (typeof PAGE_TIER)[keyof typeof PAGE_TIER];
 
 const MAIN_PATHS = new Set<string>([
   '/',
-  '/agentx',
+  AGENTX_ROUTE.path,
   '/about',
   ...DASHBOARD_ROUTES.map((route) => route.path),
 ]);
-const MAIN_PREFIXES = ['/inference/', '/agentx/', '/ubenchx'];
+const MAIN_PREFIXES = [
+  `${getDashboardRoute('inference').path}/`,
+  `${AGENTX_ROUTE.path}/`,
+  '/ubenchx',
+];
 const ARTICLE_PREFIXES = ['/blog', '/whitepaper', '/hardware'];
 
 function matchesPrefix(path: string, prefix: string): boolean {

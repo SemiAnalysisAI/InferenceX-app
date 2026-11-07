@@ -143,7 +143,7 @@ describe('Fleet — Fleet Lifecycle', () => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');
     });
-    cy.visit('/fleet');
+    cy.visit('/infx/fleet');
     cy.get('[data-testid="calculator-lifecycle-section"]').should('exist');
   });
 
@@ -568,13 +568,16 @@ describe('Fleet — self-contained lifecycle regressions', () => {
     });
     cy.intercept('GET', '/api/v1/benchmarks/history*', { body: rows }).as('legacyPriceHistory');
     cy.intercept('GET', '/api/v1/benchmarks*', { body: rows }).as('legacyPriceBenchmarks');
-    cy.visit('/fleet?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&c_mw=10&c_price=7', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');
-        unlockAgenticGate(win);
+    cy.visit(
+      '/infx/fleet?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&c_mw=10&c_price=7',
+      {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');
+          unlockAgenticGate(win);
+        },
       },
-    });
+    );
     cy.wait('@legacyPriceBenchmarks');
     cy.wait('@legacyPriceHistory');
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
@@ -650,7 +653,7 @@ describe('Fleet — Fleet Lifecycle with agentic traces', () => {
     cy.intercept('GET', '/api/v1/benchmarks*', { body: [...b300Rows, ...b200Rows] }).as(
       'agenticBenchmarks',
     );
-    cy.visit('/fleet?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
+    cy.visit('/infx/fleet?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         unlockAgenticGate(win);
@@ -713,7 +716,7 @@ describe('Fleet — Fleet Lifecycle with agentic traces', () => {
 
 describe('Fleet — Fleet Lifecycle in Chinese', () => {
   before(() => {
-    cy.visit('/zh/fleet', {
+    cy.visit('/zh/infx/fleet', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');

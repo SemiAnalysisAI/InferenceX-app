@@ -16,7 +16,7 @@ describe('Chinese (/zh) pages', () => {
         .and('have.attr', 'href', '/zh/quotes');
       cy.get('[data-testid="footer-link-agentx"]')
         .should('contain.text', 'AgentX')
-        .and('have.attr', 'href', '/zh/agentx');
+        .and('have.attr', 'href', '/zh/infx/agentx');
       cy.get('[data-testid="footer-link-about"]')
         .should('have.text', '关于 SemiAnalysis')
         .and('have.attr', 'href', 'https://semianalysis.com/about/');
@@ -37,11 +37,11 @@ describe('Chinese (/zh) pages', () => {
 
   describe('zh dashboard tab page', () => {
     before(() => {
-      cy.visit('/zh/inference');
+      cy.visit('/zh/infx/inference');
     });
 
     it('renders the Chinese h1 without an intro box', () => {
-      cy.location('pathname').should('eq', '/zh/inference/deepseek-v41-flash');
+      cy.location('pathname').should('eq', '/zh/infx/inference/deepseek-v41-flash');
       cy.get('[data-testid="inference-page-heading"]').should(
         'have.text',
         'DeepSeek V4.1 Flash 推理基准测试',
@@ -51,7 +51,7 @@ describe('Chinese (/zh) pages', () => {
       cy.get('[data-testid="tab-trigger-evaluation"]')
         .should('contain.text', '准确率评估')
         .and('have.attr', 'href')
-        .and('match', /^\/zh\/evaluation/u);
+        .and('match', /^\/zh\/infx\/evaluation/u);
     });
   });
 
@@ -204,7 +204,7 @@ describe('Chinese (/zh) pages', () => {
 
   describe('zh submissions workflow', () => {
     beforeEach(() => {
-      cy.visit('/zh/submissions');
+      cy.visit('/zh/infx/submissions');
       cy.get('[data-testid="submissions-display"]').should('be.visible');
     });
 

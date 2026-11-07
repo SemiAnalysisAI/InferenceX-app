@@ -142,7 +142,7 @@ describe('Inference Chart', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro');
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro');
     cy.wait(['@chartAvailability', '@chartBenchmarks']);
   });
 
@@ -202,7 +202,7 @@ describe('Inference Chart', () => {
     }).as('openRouterPricing');
     interceptOverlayRun();
     cy.visit(
-      `/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tokenRevenuePerGpuHour&i_revenue=openrouter`,
+      `/infx/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tokenRevenuePerGpuHour&i_revenue=openrouter`,
       {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -259,7 +259,7 @@ describe('Inference Chart', () => {
 
   it('keeps cost controls below the plot when changing tiers on mobile', () => {
     cy.viewport(375, 900);
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_metric=tokensPerDollarH');
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro&i_metric=tokensPerDollarH');
     cy.scatterPoints('#chart-0').should('have.length.greaterThan', 0);
     cy.get('#chart-0').should(($chart) => assertContextBelowPlot($chart[0]!));
     cy.get('#chart-0 [data-testid="cost-tier-selector"]').click();
@@ -276,7 +276,7 @@ describe('Inference Chart', () => {
   it('plots infrastructure total tokens per dollar for official and unofficial runs', () => {
     interceptOverlayRun();
     cy.visit(
-      `/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tokensPerDollarH`,
+      `/infx/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tokensPerDollarH`,
       {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -320,7 +320,7 @@ describe('Inference Chart', () => {
     cy.intercept('GET', '/api/v1/availability/compact', { statusCode: 500, body: {} }).as(
       'availabilityFailure',
     );
-    cy.visit('/inference');
+    cy.visit('/infx/inference');
     cy.wait('@availabilityFailure');
     cy.contains('h2', 'Something went wrong').should('be.visible');
   });
@@ -343,7 +343,7 @@ describe('Deprecated model source attribution', () => {
         body: availabilityBody(rows.map(({ metrics: _metrics, ...row }) => row)),
       });
       cy.intercept('GET', '/api/v1/benchmarks*', { body: rows });
-      cy.visit(`/inference?g_model=${display}&i_seq=agentic-traces`, {
+      cy.visit(`/infx/inference?g_model=${display}&i_seq=agentic-traces`, {
         onBeforeLoad: unlockAgenticGate,
       });
       cy.get('#chart-0 svg[data-testid="d3-chart-svg"]').should('be.visible');
@@ -382,7 +382,7 @@ describe('Deprecated model source attribution', () => {
       },
     }).as('historicalM3Overlay');
 
-    cy.visit('/inference/minimax-m3?i_seq=agentic-traces', {
+    cy.visit('/infx/inference/minimax-m3?i_seq=agentic-traces', {
       onBeforeLoad: unlockAgenticGate,
     });
     cy.get('#chart-0 [data-testid="result-context"]').should(
@@ -412,7 +412,7 @@ describe('Deprecated model source attribution', () => {
       expect(exportedCaption).to.contain('Source: SemiAnalysis InferenceX™ (Deprecated)');
     });
 
-    cy.visit(`/inference/minimax-m3?i_seq=agentic-traces&unofficialrun=${OVERLAY_RUN_ID}`, {
+    cy.visit(`/infx/inference/minimax-m3?i_seq=agentic-traces&unofficialrun=${OVERLAY_RUN_ID}`, {
       onBeforeLoad: unlockAgenticGate,
     });
     cy.wait('@historicalM3Overlay');
@@ -432,7 +432,7 @@ describe('Deprecated model source attribution', () => {
     );
 
     cy.viewport(375, 900);
-    cy.visit(`/zh/inference/minimax-m3?i_seq=agentic-traces&unofficialrun=${OVERLAY_RUN_ID}`, {
+    cy.visit(`/zh/infx/inference/minimax-m3?i_seq=agentic-traces&unofficialrun=${OVERLAY_RUN_ID}`, {
       onBeforeLoad: unlockAgenticGate,
     });
     cy.wait('@historicalM3Overlay');
@@ -449,7 +449,7 @@ describe('Deprecated model source attribution', () => {
 describe('Inference Chart — Simplified Chinese mobile path', () => {
   beforeEach(() => {
     cy.viewport(375, 900);
-    cy.visit('/zh/inference?g_model=DeepSeek-R1-0528', {
+    cy.visit('/zh/infx/inference?g_model=DeepSeek-R1-0528', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -565,7 +565,7 @@ describe('AgentX replaces a complete curve while preserving an unofficial compar
     interceptDerivedAgenticMetrics();
     cy.viewport(1440, 900);
     cy.visit(
-      `/inference?g_model=GLM-5.2&unofficialrun=${runId}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tpPerGpu`,
+      `/infx/inference?g_model=GLM-5.2&unofficialrun=${runId}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tpPerGpu`,
       {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -595,7 +595,7 @@ it('opens an old Inference power link on PowerX with the same metric', () => {
   cy.intercept('GET', '/api/v1/availability/compact').as('powerLinkAvailability');
   cy.intercept('GET', '/api/v1/benchmarks*').as('powerLinkBenchmarks');
   cy.viewport(1440, 900);
-  cy.visit('/inference/qwen-3-5?i_seq=8k%2F1k&i_prec=fp8&i_metric=y_measuredPowerPercentTdp', {
+  cy.visit('/infx/inference/qwen-3-5?i_seq=8k%2F1k&i_prec=fp8&i_metric=y_measuredPowerPercentTdp', {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       unlockAgenticGate(win);
@@ -657,7 +657,7 @@ it('says when chosen chip configs report no measured power, and plots them on ot
     .should('have.attr', 'data-reason', 'selection')
     .and('contain', 'No measured GPU power is reported for this selection.');
   cy.visit(
-    '/inference?g_model=DeepSeek-V4-Pro&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_tpPerGpu&i_gpus=b300_sglang',
+    '/infx/inference?g_model=DeepSeek-V4-Pro&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_tpPerGpu&i_gpus=b300_sglang',
     { onBeforeLoad: unlockAgenticGate },
   );
   cy.get('[data-testid="scatter-empty-state"]').should('not.exist');
@@ -667,7 +667,7 @@ it('says when chosen chip configs report no measured power, and plots them on ot
 describe('VR publication data compatibility', () => {
   it('renders September TRTLLM data and cache metrics under /en', () => {
     interceptVrPublicationData();
-    cy.visit('/inference/deepseek-v4?i_metric=y_tpPerGpu');
+    cy.visit('/infx/inference/deepseek-v4?i_metric=y_tpPerGpu');
     cy.scatterPoints(CHART_DISPLAY).should((scatter) => {
       const points = scatter.map((point) => point.datum);
       const vr = points.filter((point) => point.hwKey.startsWith('vr200_'));
@@ -711,7 +711,7 @@ describe('VR default date preference', () => {
       pathname: '/api/v1/benchmarks',
       query: { date: VR_FIXTURE_DATE, exact: 'true' },
     }).as('preferredSnapshot');
-    cy.visit('/inference/deepseek-v4?i_metric=y_tpPerGpu');
+    cy.visit('/infx/inference/deepseek-v4?i_metric=y_tpPerGpu');
     cy.wait('@preferredSnapshot');
     assertVrDate(VR_FIXTURE_DATE);
   });
@@ -719,14 +719,14 @@ describe('VR default date preference', () => {
   for (const query of [`g_rundate=${VR_LATEST_FIXTURE_DATE}`, `g_runid=${VR_LATEST_FIXTURE_RUN}`]) {
     it(`honors explicit ${query} under /en`, () => {
       interceptVrPublicationData(true);
-      cy.visit(`/inference/deepseek-v4?i_metric=y_tpPerGpu&${query}`);
+      cy.visit(`/infx/inference/deepseek-v4?i_metric=y_tpPerGpu&${query}`);
       assertVrDate(VR_LATEST_FIXTURE_DATE);
     });
   }
 
   it('honors a manual selection of the latest date after opening the default', () => {
     interceptVrPublicationData(true);
-    cy.visit('/inference/deepseek-v4?i_metric=y_tpPerGpu');
+    cy.visit('/infx/inference/deepseek-v4?i_metric=y_tpPerGpu');
     assertVrDate(VR_FIXTURE_DATE);
     cy.contains('[data-slot="date-field"]', 'Run date').find('button[aria-labelledby]').click();
     cy.get('[role="dialog"]').contains('button', 'Apply').click();
@@ -736,7 +736,7 @@ describe('VR default date preference', () => {
   it('keeps the latest official snapshot beside an unofficial comparison', () => {
     interceptOverlayRun();
     interceptVrPublicationData(true);
-    cy.visit(`/inference/deepseek-v4?i_metric=y_tpPerGpu&unofficialrun=${OVERLAY_RUN_ID}`);
+    cy.visit(`/infx/inference/deepseek-v4?i_metric=y_tpPerGpu&unofficialrun=${OVERLAY_RUN_ID}`);
     cy.wait('@unofficialRun');
     assertVrDate(VR_LATEST_FIXTURE_DATE);
   });
@@ -747,7 +747,7 @@ describe('VR default date preference', () => {
       { pathname: '/api/v1/benchmarks', query: { date: VR_FIXTURE_DATE, exact: 'true' } },
       { body: [] },
     );
-    cy.visit('/inference/deepseek-v4?i_metric=y_tpPerGpu');
+    cy.visit('/infx/inference/deepseek-v4?i_metric=y_tpPerGpu');
     assertVrDate(VR_LATEST_FIXTURE_DATE);
   });
 });
@@ -941,7 +941,7 @@ describe('Qwen3.5 chart defaults', () => {
   });
 
   it('uses E2EL and newer GPUs, while preserving explicit hardware and axis in shared links', () => {
-    cy.visit('/inference/qwen-3-5?i_prec=fp8', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/infx/inference/qwen-3-5?i_prec=fp8', { onBeforeLoad: unlockAgenticGate });
     cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
     expectGpuSelection(olderGpus, false);
     expectGpuSelection(newerGpus, true);
@@ -968,7 +968,7 @@ describe('Qwen3.5 chart defaults', () => {
   });
 
   it('switches to E2EL when entering Qwen after a URL axis selection', () => {
-    cy.visit('/inference?g_model=DeepSeek-R1-0528&i_prec=fp8&i_xmode=ttft', {
+    cy.visit('/infx/inference?g_model=DeepSeek-R1-0528&i_prec=fp8&i_xmode=ttft', {
       onBeforeLoad: unlockAgenticGate,
     });
     cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'ttft');
@@ -981,8 +981,12 @@ describe('Qwen3.5 chart defaults', () => {
   });
 
   for (const { chart, path, expectedAxis } of [
-    { chart: 'Qwen inference', path: '/inference/qwen-3-5', expectedAxis: 'e2e' },
-    { chart: 'another model', path: '/inference?g_model=DeepSeek-R1-0528', expectedAxis: 'ttft' },
+    { chart: 'Qwen inference', path: '/infx/inference/qwen-3-5', expectedAxis: 'e2e' },
+    {
+      chart: 'another model',
+      path: '/infx/inference?g_model=DeepSeek-R1-0528',
+      expectedAxis: 'ttft',
+    },
     { chart: 'Qwen comparison', path: '/compare/qwen-3-5-b200-vs-h200', expectedAxis: 'ttft' },
   ]) {
     it(`applies the correct axis when adding and removing precisions on ${chart}`, () => {
@@ -1029,7 +1033,7 @@ describe('Qwen3.5 chart defaults', () => {
 
   it('does not count the default E2EL axis as a changed control on mobile', () => {
     cy.viewport(375, 900);
-    cy.visit('/inference/qwen-3-5?i_prec=fp8', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/infx/inference/qwen-3-5?i_prec=fp8', { onBeforeLoad: unlockAgenticGate });
     cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
     cy.contains('button', 'More chart controls').should('not.contain.text', 'changed');
     expectGpuSelection(olderGpus, false);

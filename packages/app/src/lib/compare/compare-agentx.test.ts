@@ -48,16 +48,18 @@ describe('AgentX comparison links', () => {
 
   it('opens the bare model subroute — Agentic + Optimal Only are already the defaults', () => {
     expect(agentxDashboardHref('en', FEATURED_AGENTX_MODELS[0])).toBe(
-      '/inference/deepseek-v41-flash',
+      '/infx/inference/deepseek-v41-flash',
     );
-    expect(agentxDashboardHref('zh', FEATURED_AGENTX_MODELS[4])).toBe('/zh/inference/deepseek-v4');
+    expect(agentxDashboardHref('zh', FEATURED_AGENTX_MODELS[4])).toBe(
+      '/zh/infx/inference/deepseek-v4',
+    );
   });
 
   it('routes every featured model to its registered page without query parameters', () => {
     for (const model of FEATURED_AGENTX_MODELS) {
       for (const locale of ['en', 'zh'] as const) {
         const url = new URL(agentxDashboardHref(locale, model), 'https://example.com');
-        expect(url.pathname).toBe(`${locale === 'zh' ? '/zh' : ''}/inference/${model.slug}`);
+        expect(url.pathname).toBe(`${locale === 'zh' ? '/zh' : ''}/infx/inference/${model.slug}`);
         expect(url.search).toBe('');
       }
     }
@@ -76,13 +78,13 @@ describe('AgentX comparison links', () => {
       '/zh/compare-per-dollar/deepseek-v41-flash-gb300-vs-b200',
     );
     expect(FEATURED_AGENTX_MODELS[0]).toBe(flash);
-    expect(agentxDashboardHref('en', flash)).toBe('/inference/deepseek-v41-flash');
+    expect(agentxDashboardHref('en', flash)).toBe('/infx/inference/deepseek-v41-flash');
   });
 
   it('routes Muse results to the canonical AgentX dashboard in both locales', () => {
     const muse = COMPARE_MODEL_SLUGS.find((model) => model.slug === 'muse-spark-open')!;
-    expect(agentxDashboardHref('en', muse)).toBe('/inference/muse-spark-open');
-    expect(agentxDashboardHref('zh', muse)).toBe('/zh/inference/muse-spark-open');
+    expect(agentxDashboardHref('en', muse)).toBe('/infx/inference/muse-spark-open');
+    expect(agentxDashboardHref('zh', muse)).toBe('/zh/infx/inference/muse-spark-open');
     expect(comparisonScenarioForModel(muse)).toEqual({
       label: 'AgentX',
       sequence: 'agentic-traces',
@@ -112,8 +114,8 @@ describe('AgentX comparison links', () => {
       label: 'AgentX',
       sequence: 'agentic-traces',
     });
-    expect(agentxDashboardHref('en', k31)).toBe('/inference/kimi-k31-pro');
-    expect(agentxDashboardHref('zh', k31)).toBe('/zh/inference/kimi-k31-pro');
+    expect(agentxDashboardHref('en', k31)).toBe('/infx/inference/kimi-k31-pro');
+    expect(agentxDashboardHref('zh', k31)).toBe('/zh/infx/inference/kimi-k31-pro');
     expect(FEATURED_AGENTX_MODELS[1]).toBe(k31);
     expect(overviewScenariosForModel(Model.Kimi_K3_1_Pro)).toEqual(['agentx']);
   });
@@ -124,8 +126,8 @@ describe('AgentX comparison links', () => {
       label: 'AgentX',
       sequence: 'agentic-traces',
     });
-    expect(agentxDashboardHref('en', flash)).toBe('/inference/glm-5-3-flash');
-    expect(agentxDashboardHref('zh', flash)).toBe('/zh/inference/glm-5-3-flash');
+    expect(agentxDashboardHref('en', flash)).toBe('/infx/inference/glm-5-3-flash');
+    expect(agentxDashboardHref('zh', flash)).toBe('/zh/infx/inference/glm-5-3-flash');
     expect(FEATURED_AGENTX_MODELS).not.toContain(flash);
     expect(overviewScenariosForModel(Model.GLM_5_3_Flash)).toEqual(['agentx']);
   });

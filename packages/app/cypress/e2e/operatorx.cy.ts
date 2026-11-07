@@ -62,7 +62,7 @@ it('shows measured and missing GPU coverage, then switches the path to MoE', () 
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('gemm');
   cy.intercept('GET', '/api/v1/operatorx/compare?op=moe*', moe).as('moe');
 
-  cy.visit('/operatorx/gemm?model=DeepSeek-V4-Pro');
+  cy.visit('/opx/gemm?model=DeepSeek-V4-Pro');
   cy.wait('@gemm');
   cy.get('[data-testid="operatorx-page"] h1')
     .should('contain.text', 'OperatorX')
@@ -76,17 +76,27 @@ it('shows measured and missing GPU coverage, then switches the path to MoE', () 
 
   cy.get('[data-testid="operatorx-page"]').contains('button', 'MoE').click();
   cy.wait('@moe');
-  cy.location('pathname').should('eq', '/operatorx/moe');
+  cy.location('pathname').should('eq', '/opx/moe');
   cy.location('search').should('eq', '?model=DeepSeek-V4-Pro');
   cy.contains('No results yet').should('be.visible');
 });
 
-it('redirects a legacy ?op= link to the category path', () => {
-  cy.request({ url: '/operatorx?op=model&model=DeepSeek-V4-Pro', followRedirect: false })
-    .its('headers.location')
-    .should('match', /\/operatorx\/model\?model=DeepSeek-V4-Pro$/u);
+it('moves a pre-split /operatorx?op= link to its /opx category in one 308', () => {
+  cy.request({ url: '/operatorx?op=model', followRedirect: false }).then((response) => {
+    expect(response.status).to.eq(308);
+    expect(new URL(response.headers.location as string, 'http://x').pathname).to.eq('/opx/model');
+  });
   cy.visit('/operatorx?op=model');
-  cy.location('pathname').should('eq', '/operatorx/model');
+  cy.location('pathname').should('eq', '/opx/model');
+  cy.location('search').should('eq', '');
+});
+
+it('redirects a legacy ?op= link to the category path', () => {
+  cy.request({ url: '/opx?op=model&model=DeepSeek-V4-Pro', followRedirect: false })
+    .its('headers.location')
+    .should('match', /\/opx\/model\?model=DeepSeek-V4-Pro$/u);
+  cy.visit('/opx?op=model');
+  cy.location('pathname').should('eq', '/opx/model');
   cy.location('search').should('eq', '');
   cy.contains('[data-testid="operatorx-page"] [role="tab"]', 'Model view').should(
     'have.attr',
@@ -112,7 +122,7 @@ it('defaults to a measured 950PR shape and normalized BF16, while honoring preci
     null,
   );
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('ascend');
-  cy.visit('/operatorx');
+  cy.visit('/opx');
   cy.wait('@ascend');
   cy.get('[data-testid="operatorx-viz-metric-vs-size"]').scrollIntoView();
   cy.get('[data-testid="operatorx-viz-metric-vs-size"] [data-testid="chart-legend"]').should(
@@ -154,7 +164,7 @@ it('defaults to shared cases and shows disjoint FP8 measurements per accelerator
   });
   const view = comparisonView(buildComparison('gemm', datasets), null);
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view);
-  cy.visit('/operatorx');
+  cy.visit('/opx');
   cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
   // Shared cases only is on by default, and disjoint FP8 formats share no case.
   cy.get('#opx-summary-shared').should('have.attr', 'aria-checked', 'true');
@@ -199,7 +209,7 @@ it('shows median and best bars across the row above metric vs size at /', () => 
   });
   const view = comparisonView(buildComparison('gemm', datasets), null);
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('summary');
-  cy.visit('/operatorx');
+  cy.visit('/opx');
   cy.wait('@summary');
   cy.get('[data-testid^="operatorx-viz-"]')
     .last()
@@ -286,7 +296,7 @@ it('keeps a median label that does not fit its bar on the same row at /', () => 
   });
   const view = comparisonView(buildComparison('gemm', datasets), null);
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('short');
-  cy.visit('/operatorx');
+  cy.visit('/opx');
   cy.wait('@short');
   cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
   cy.get('#opx-summary-normalized').click().should('have.attr', 'aria-checked', 'false');
@@ -319,7 +329,7 @@ it('keeps 950PR FP8 points visible when normalized at /', () => {
     null,
   );
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('fp8');
-  cy.visit('/operatorx');
+  cy.visit('/opx');
   cy.wait('@fp8');
   cy.get('[data-testid="operatorx-viz-roofline"]')
     .scrollIntoView()
@@ -345,7 +355,7 @@ it('keeps 950PR FP8 points visible when normalized at /', () => {
 describe('OperatorX progressive rendering', { testIsolation: true }, () => {
   it('mounts lower charts near the viewport and preserves their controls at /', () => {
     cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('comparison');
-    cy.visit('/operatorx');
+    cy.visit('/opx');
     cy.wait('@comparison');
     cy.get('[data-testid^="operatorx-viz-"]')
       .first()
@@ -387,7 +397,7 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
 
   it('renders every chart when viewport observation is unavailable', () => {
     cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('comparison');
-    cy.visit('/operatorx', {
+    cy.visit('/opx', {
       onBeforeLoad(win) {
         Object.defineProperty(win, 'IntersectionObserver', { value: undefined });
       },
@@ -401,7 +411,7 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
 
   it('toggles a GPU from a lower legend without scrolling the page', () => {
     cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('comparison');
-    cy.visit('/operatorx');
+    cy.visit('/opx');
     cy.wait('@comparison');
     cy.get('[data-testid="operatorx-viz-metric-vs-size"]')
       .scrollIntoView()
@@ -463,7 +473,7 @@ it('uses shared Huawei colors in OperatorX and ubenchX across a live theme switc
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     },
   };
-  cy.visit('/operatorx', visitOptions);
+  cy.visit('/opx', visitOptions);
   cy.wait('@colorComparison');
   cy.get('[data-testid="operatorx-viz-roofline"]').scrollIntoView();
   operatorPoints().first().should('have.css', 'fill', 'rgb(166, 90, 0)');

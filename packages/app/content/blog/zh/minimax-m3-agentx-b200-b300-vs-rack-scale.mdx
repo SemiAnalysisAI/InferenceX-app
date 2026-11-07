@@ -42,7 +42,7 @@ NVIDIA 所有 Pareto 最优点在并发 20 以上都启用了 [KV offload](/zh/g
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/2b40624a-223c-44db-a403-0be563b2af82_2048x1298.png"
-  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_hc=1&i_active=mi355x_vllm)"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_hc=1&i_active=mi355x_vllm)"
 />
 
 缺少一个批量拷贝 API，这种事不会出现在规格书上，在定长基准测试中也根本不会被触发。但在长时间的 agentic 会话中，它决定了整整一层内存是否可用。

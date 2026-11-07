@@ -56,7 +56,7 @@ function mountCompare(
   { locale = 'en', width = 1000 }: { locale?: 'en' | 'zh'; width?: number } = {},
 ) {
   mountWithProviders(
-    <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+    <PathnameContext.Provider value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}>
       <div style={{ width, height: 640 }}>
         <ScatterGraph
           chartId="power-compare-test"

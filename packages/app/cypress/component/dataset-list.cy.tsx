@@ -49,7 +49,7 @@ function mountList(locale: 'en' | 'zh' = 'en') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   cy.mount(
     <AppRouterContext.Provider value={createMockRouter()}>
-      <PathnameContext.Provider value={locale === 'zh' ? '/zh/agentx' : '/agentx'}>
+      <PathnameContext.Provider value={locale === 'zh' ? '/zh/infx/agentx' : '/infx/agentx'}>
         <QueryClientProvider client={queryClient}>
           <DatasetList />
         </QueryClientProvider>
@@ -71,13 +71,13 @@ describe('DatasetList', () => {
         mountList(locale);
         cy.wait('@list');
         const prefix = locale === 'zh' ? '/zh' : '';
-        cy.get(`a[href="${prefix}/agentx/${slug}"]`)
+        cy.get(`a[href="${prefix}/infx/agentx/${slug}"]`)
           .find('[data-testid="dataset-description"]')
           .should('be.visible')
           .and('contain.text', '256,000')
           .and('contain.text', locale === 'zh' ? 'input 与 output 合计' : 'input + output')
           .and('contain.text', locale === 'zh' ? '相对时间' : 'relative timing');
-        cy.get(`a[href="${prefix}/agentx/cc-traces-weka-full"]`)
+        cy.get(`a[href="${prefix}/infx/agentx/cc-traces-weka-full"]`)
           .find('[data-testid="dataset-description"]')
           .should('have.text', datasets[0].description);
         if (width === 1280) {
@@ -105,10 +105,10 @@ describe('DatasetList', () => {
     cy.contains('82%').should('be.visible');
     cy.contains('Request shape').should('be.visible');
     cy.contains('Token volume').should('be.visible');
-    cy.get('a[href="/agentx/cc-traces-weka-full"]')
+    cy.get('a[href="/infx/agentx/cc-traces-weka-full"]')
       .find('section[aria-labelledby="cc-traces-weka-full-request-shape"]')
       .should('exist');
-    cy.get('a[href="/agentx/cc-traces-weka-full"]').should('exist');
+    cy.get('a[href="/infx/agentx/cc-traces-weka-full"]').should('exist');
   });
 
   it('shows the empty state when no datasets are ingested', () => {

@@ -45,6 +45,7 @@ import {
   offloadTypeLabel,
   versionedComponentLabel,
 } from '@/components/inference/utils/runtime-metadata-labels';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export interface TooltipConfig {
   data: InferenceData;
@@ -738,7 +739,7 @@ const pointLinks = ({
     if (hasLogData) {
       const logHref = isAgentic
         ? `${agenticHref}${agenticHref.includes('?') ? '&' : '?'}view=logs`
-        : `${prefix}/inference/logs/${pointId}`;
+        : `${prefix}${getDashboardRoute('inference').path}/logs/${pointId}`;
       links.push({ action: 'view-logs', label: t.logs, href: logHref });
     }
   }

@@ -33,8 +33,9 @@ import {
   WhitepaperPdfButton,
   WhitepaperSourceLink,
 } from './whitepaper-links';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
-const ESTIMATOR_PATH = '/profit-estimator-per-gigawatt/kimi-k3/target/45';
+const ESTIMATOR_PATH = `${getDashboardRoute('profit-estimator-per-gigawatt').path}/kimi-k3/target/45`;
 
 const CHIP_SHADOW_STYLE: CSSProperties = {
   filter:

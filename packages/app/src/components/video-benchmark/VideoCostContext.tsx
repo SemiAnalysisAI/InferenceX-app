@@ -39,7 +39,7 @@ const STRINGS = {
   },
 } as const;
 
-/** The chart footer: cost tier, GPU basis and the $/GPU/hr rates behind the chart, as on /inference. */
+/** The chart footer: cost tier, GPU basis and the $/GPU/hr rates behind the chart, as on /infx/inference. */
 export default function VideoCostContext({
   state,
   onUpdate,

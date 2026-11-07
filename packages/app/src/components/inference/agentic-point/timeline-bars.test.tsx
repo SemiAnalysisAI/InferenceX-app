@@ -58,10 +58,10 @@ const renderBars = (locale: 'en' | 'zh') =>
 describe('TimelineBars dataset anchors', () => {
   it('preserves the English href and prefixes the native Chinese href', () => {
     expect(renderBars('en')).toContain(
-      'href="/agentx/fixture-dataset/conversations/conversation-1?turn=3"',
+      'href="/infx/agentx/fixture-dataset/conversations/conversation-1?turn=3"',
     );
     expect(renderBars('zh')).toContain(
-      'href="/zh/agentx/fixture-dataset/conversations/conversation-1?turn=3"',
+      'href="/zh/infx/agentx/fixture-dataset/conversations/conversation-1?turn=3"',
     );
   });
 });

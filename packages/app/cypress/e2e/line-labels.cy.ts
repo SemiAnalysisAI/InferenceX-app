@@ -5,7 +5,7 @@ import { POINT_LABELS } from '../support/scatter-points';
 
 describe('Line Labels Toggle', () => {
   before(() => {
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro', {
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -117,7 +117,7 @@ describe('Line Labels Toggle', () => {
   });
 
   it('URL param i_linelabel=0 disables line labels on load', () => {
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_linelabel=0', {
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro&i_linelabel=0', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -128,7 +128,7 @@ describe('Line Labels Toggle', () => {
 
     cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length', 0);
 
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_linelabel=1', {
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro&i_linelabel=1', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -141,7 +141,7 @@ describe('Line Labels Toggle', () => {
   });
 
   it('URL param i_advlabel=1 renders parallelism without enabling GPU-count labels', () => {
-    cy.visit('/inference?g_model=deepseek-v4-pro&i_advlabel=1', {
+    cy.visit('/infx/inference?g_model=deepseek-v4-pro&i_advlabel=1', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },

@@ -8,6 +8,7 @@ import { getTelemetryGuide } from '@/lib/agentx/agentx-telemetry-zh';
 import type { Locale } from '@/lib/i18n/i18n';
 
 import { AgenticCatalogLink } from './agentic-catalog-link';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 const STRINGS = {
   en: {
@@ -55,7 +56,7 @@ export function AgenticCatalogHero({ locale }: { locale: Locale }) {
           <Button asChild variant="brand" size="lg">
             <AgenticCatalogLink
               data-testid="agentic-catalog-tutorial-link"
-              href={`${prefix}/agentx/telemetry`}
+              href={`${prefix}${AGENTX_ROUTE.path}/telemetry`}
               analyticsEvent="agentic_catalog_tutorial_clicked"
             >
               {t.readTutorial}

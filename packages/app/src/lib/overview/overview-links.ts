@@ -72,13 +72,16 @@ export function mergeOverviewControlHref(
   return `${current.pathname}${search === '' ? '' : `?${search}`}${hash}`;
 }
 import type { UrlStateParams } from '../routing/url-state';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 function overviewSequence(model: OverviewModelSummary): '8k/1k' | 'agentic-traces' {
   return model.scenario === 'agentx' ? 'agentic-traces' : '8k/1k';
 }
 
 function inferenceRoute(locale: 'en' | 'zh'): string {
-  return locale === 'zh' ? '/zh/inference' : '/inference';
+  return locale === 'zh'
+    ? `/zh${getDashboardRoute('inference').path}`
+    : getDashboardRoute('inference').path;
 }
 
 function dashboardSpecMode(specMethod: string): 'mtp' | 'stp' | undefined {

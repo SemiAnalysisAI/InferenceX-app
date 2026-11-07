@@ -4,7 +4,7 @@ import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
 import { listDatasets } from '@semianalysisai/inferencex-db/queries/datasets';
 
 import { AGENTX_OPTIMIZATION_SLUGS } from '@/lib/agentx/agentx-optimizations';
-import { DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
+import { AGENTX_ROUTE, DASHBOARD_ROUTES, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 import { getAllPosts } from '@/lib/blog/blog';
 import { getAllHardwarePages } from '@/lib/hardware/hardware';
 import { getModelPageSlugs } from '@/lib/catalog/model-pages';
@@ -130,13 +130,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...localizedPair('/about', { changeFrequency: 'monthly', priority: 0.6 }),
     ...localizedPair('/land-acknowledgement', { changeFrequency: 'yearly', priority: 0.4 }),
     ...INFERENCE_MODEL_SLUGS.flatMap((entry) =>
-      localizedPair(`/inference/${entry.slug}`, {
+      localizedPair(`${getDashboardRoute('inference').path}/${entry.slug}`, {
         lastModified: modelData(entry.slug),
         changeFrequency: 'daily' as const,
         priority: ACTIVE_INFERENCE_MODEL_SLUGS.includes(entry) ? 0.8 : 0.5,
       }),
     ),
-    ...localizedPair('/inference/agentic', {
+    ...localizedPair(`${getDashboardRoute('inference').path}/agentic`, {
       lastModified: latestData,
       changeFrequency: 'daily',
       priority: 0.7,
@@ -168,36 +168,36 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'daily',
       priority: 0.8,
     }),
-    ...localizedPair('/agentx', {
+    ...localizedPair(AGENTX_ROUTE.path, {
       lastModified: newestDate(datasets.map((dataset) => dataset.ingested_at)),
       changeFrequency: 'weekly',
       priority: 0.6,
     }),
     ...datasets.flatMap((dataset) =>
-      localizedPair(`/agentx/${dataset.slug}`, {
+      localizedPair(`${AGENTX_ROUTE.path}/${dataset.slug}`, {
         lastModified: dayIso(dataset.ingested_at),
         changeFrequency: 'monthly' as const,
         priority: 0.5,
       }),
     ),
-    ...localizedPair('/agentx/quickstart', {
+    ...localizedPair(`${AGENTX_ROUTE.path}/quickstart`, {
       changeFrequency: 'monthly',
       priority: 0.7,
     }),
-    ...localizedPair('/agentx/methodology', {
+    ...localizedPair(`${AGENTX_ROUTE.path}/methodology`, {
       changeFrequency: 'monthly',
       priority: 0.6,
     }),
-    ...localizedPair('/agentx/telemetry', {
+    ...localizedPair(`${AGENTX_ROUTE.path}/telemetry`, {
       changeFrequency: 'monthly',
       priority: 0.6,
     }),
-    ...localizedPair('/agentx/optimizations', {
+    ...localizedPair(`${AGENTX_ROUTE.path}/optimizations`, {
       changeFrequency: 'monthly',
       priority: 0.7,
     }),
     ...AGENTX_OPTIMIZATION_SLUGS.flatMap((slug) =>
-      localizedPair(`/agentx/optimizations/${slug}`, {
+      localizedPair(`${AGENTX_ROUTE.path}/optimizations/${slug}`, {
         changeFrequency: 'monthly' as const,
         priority: 0.6,
       }),

@@ -25,54 +25,52 @@ describe('OperatorX categories', () => {
     expect(isOperatorXCategory('model')).toBe(true);
     expect(isOperatorXCategory('Model')).toBe(false);
     expect(isOperatorXCategory(null)).toBe(false);
-    expect(operatorXCategoryPath('moe')).toBe('/operatorx/moe');
+    expect(operatorXCategoryPath('moe')).toBe('/opx/moe');
   });
 });
 
 describe('operatorXCategoryForPathname', () => {
   it('reads the category from English and /zh paths', () => {
-    expect(operatorXCategoryForPathname('/operatorx/model')).toBe('model');
-    expect(operatorXCategoryForPathname('/zh/operatorx/attention/')).toBe('attention');
-    expect(operatorXCategoryForPathname('/operatorx/moe?model=x#top')).toBe('moe');
+    expect(operatorXCategoryForPathname('/opx/model')).toBe('model');
+    expect(operatorXCategoryForPathname('/zh/opx/attention/')).toBe('attention');
+    expect(operatorXCategoryForPathname('/opx/moe?model=x#top')).toBe('moe');
   });
 
   it('returns null off the category pages', () => {
-    expect(operatorXCategoryForPathname('/operatorx')).toBeNull();
-    expect(operatorXCategoryForPathname('/zh/operatorx')).toBeNull();
-    expect(operatorXCategoryForPathname('/operatorx/bogus')).toBeNull();
-    expect(operatorXCategoryForPathname('/operatorx/gemm/extra')).toBeNull();
-    expect(operatorXCategoryForPathname('/inference/gemm')).toBeNull();
+    expect(operatorXCategoryForPathname('/opx')).toBeNull();
+    expect(operatorXCategoryForPathname('/zh/opx')).toBeNull();
+    expect(operatorXCategoryForPathname('/opx/bogus')).toBeNull();
+    expect(operatorXCategoryForPathname('/opx/gemm/extra')).toBeNull();
+    expect(operatorXCategoryForPathname('/infx/inference/gemm')).toBeNull();
     expect(operatorXCategoryForPathname(null)).toBeNull();
   });
 });
 
 describe('operatorXCategoryRouteForSelection', () => {
   it('keeps the locale of the current path', () => {
-    expect(operatorXCategoryRouteForSelection('/operatorx', 'moe')).toBe('/operatorx/moe');
-    expect(operatorXCategoryRouteForSelection('/zh/operatorx/gemm', 'model')).toBe(
-      '/zh/operatorx/model',
-    );
+    expect(operatorXCategoryRouteForSelection('/opx', 'moe')).toBe('/opx/moe');
+    expect(operatorXCategoryRouteForSelection('/zh/opx/gemm', 'model')).toBe('/zh/opx/model');
   });
 });
 
 describe('operatorXCategoryRedirectUrl', () => {
   it('moves a legacy op value into the path and keeps the other parameters', () => {
-    expect(redirect('/operatorx?op=model')).toBe('/operatorx/model');
-    expect(redirect('/zh/operatorx?model=DeepSeek-V4-Pro&op=model&parallel=tp8')).toBe(
-      '/zh/operatorx/model?model=DeepSeek-V4-Pro&parallel=tp8',
+    expect(redirect('/opx?op=model')).toBe('/opx/model');
+    expect(redirect('/zh/opx?model=DeepSeek-V4-Pro&op=model&parallel=tp8')).toBe(
+      '/zh/opx/model?model=DeepSeek-V4-Pro&parallel=tp8',
     );
-    expect(redirect('/operatorx/gemm?op=moe&utm_source=x')).toBe('/operatorx/moe?utm_source=x');
+    expect(redirect('/opx/gemm?op=moe&utm_source=x')).toBe('/opx/moe?utm_source=x');
   });
 
   it('drops an unknown op value and keeps the path', () => {
-    expect(redirect('/operatorx?op=bogus&workload=gemm')).toBe('/operatorx?workload=gemm');
-    expect(redirect('/zh/operatorx/attention?op=')).toBe('/zh/operatorx/attention');
+    expect(redirect('/opx?op=bogus&workload=gemm')).toBe('/opx?workload=gemm');
+    expect(redirect('/zh/opx/attention?op=')).toBe('/zh/opx/attention');
   });
 
   it('leaves links without op and other pages alone', () => {
-    expect(redirect('/operatorx')).toBeNull();
-    expect(redirect('/operatorx/model?model=x')).toBeNull();
+    expect(redirect('/opx')).toBeNull();
+    expect(redirect('/opx/model?model=x')).toBeNull();
     expect(redirect('/api/v1/operatorx/compare?op=gemm')).toBeNull();
-    expect(redirect('/operatorx/model/extra?op=gemm')).toBeNull();
+    expect(redirect('/opx/model/extra?op=gemm')).toBeNull();
   });
 });

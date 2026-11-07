@@ -162,7 +162,11 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
       ? (profitRoutePathname(path, new URLSearchParams({ unofficialruns: unofficialIds })) ??
         `${path}?unofficialruns=${unofficialIds}`)
       : path;
-    if (retainedModel && (path === '/inference' || path === '/zh/inference')) {
+    if (
+      retainedModel &&
+      (path === getDashboardRoute('inference').path ||
+        path === `/zh${getDashboardRoute('inference').path}`)
+    ) {
       return `${href}${unofficialIds ? '&' : '?'}g_model=${encodeURIComponent(retainedModel)}`;
     }
     return href;

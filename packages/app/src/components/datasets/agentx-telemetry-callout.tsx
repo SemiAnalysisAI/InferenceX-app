@@ -6,6 +6,7 @@ import type { Locale } from '@/lib/i18n/i18n';
 import { cn } from '@/lib/shared/utils';
 
 import { AgentXTelemetryLink } from './agentx-telemetry-link';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 const STRINGS = {
   en: {
@@ -33,7 +34,7 @@ export function AgentXTelemetryCallout({ locale }: { locale: Locale }) {
         <p className="mt-3 max-w-4xl text-sm leading-6 text-muted-foreground">{t.blurb}</p>
 
         <AgentXTelemetryLink
-          href={`${prefix}/agentx/telemetry`}
+          href={`${prefix}${AGENTX_ROUTE.path}/telemetry`}
           analyticsEvent="agentx_telemetry_opened"
           analyticsTarget="agentx-callout"
           data-testid="agentx-telemetry-cta"

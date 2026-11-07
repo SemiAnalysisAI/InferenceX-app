@@ -15,6 +15,7 @@ import { cn } from '@/lib/shared/utils';
 import { AgentXTelemetryLink } from './agentx-telemetry-link';
 import { FactGrid } from './fact-grid';
 import { ARTICLE_H2_CLASS } from '@/components/ui/reading-layout';
+import { AGENTX_ROUTE, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 function localePrefix(locale: Locale): string {
   return locale === 'zh' ? '/zh' : '';
@@ -129,7 +130,7 @@ export function AgentXTelemetryArticle({ locale }: { locale: Locale }) {
     <article data-testid="agentx-telemetry-article">
       <header className="border-b border-border/20 pb-8">
         <AgentXTelemetryLink
-          href={`${prefix}/agentx`}
+          href={`${prefix}${AGENTX_ROUTE.path}`}
           analyticsEvent="agentx_telemetry_returned"
           analyticsTarget="agentx"
           className="inline-flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -144,7 +145,7 @@ export function AgentXTelemetryArticle({ locale }: { locale: Locale }) {
         <p className="mt-5 text-lg leading-8 text-muted-foreground">{guide.lead}</p>
         <FactGrid items={guide.highlights} />
         <AgentXTelemetryLink
-          href={`${prefix}/inference?i_seq=agentic-traces`}
+          href={`${prefix}${getDashboardRoute('inference').path}?i_seq=agentic-traces`}
           analyticsEvent="agentx_telemetry_results_opened"
           analyticsTarget="telemetry-header"
           data-testid="agentx-telemetry-results-cta"

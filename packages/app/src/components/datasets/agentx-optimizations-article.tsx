@@ -21,6 +21,7 @@ import { AgentXOptimizationsLink } from './agentx-optimizations-link';
 import { FactGrid } from './fact-grid';
 import { ARTICLE_H2_CLASS, READING_LINK_CLASS } from '@/components/ui/reading-layout';
 import { cn } from '@/lib/shared/utils';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 function localePrefix(locale: Locale): string {
   return locale === 'zh' ? '/zh' : '';
@@ -171,7 +172,7 @@ function FrameworkCard({
 }) {
   return (
     <AgentXOptimizationsLink
-      href={`${localePrefix(locale)}/agentx/optimizations/${framework.slug}`}
+      href={`${localePrefix(locale)}${AGENTX_ROUTE.path}/optimizations/${framework.slug}`}
       analyticsEvent="agentx_optimizations_framework_opened"
       analyticsTarget={framework.slug}
       data-testid="agentx-optimizations-card"
@@ -200,7 +201,7 @@ export function AgentXOptimizationsIndex({ locale }: { locale: Locale }) {
     <article data-testid="agentx-optimizations-index">
       <header className="border-b border-border/20 pb-8">
         <AgentXOptimizationsLink
-          href={`${localePrefix(locale)}/agentx`}
+          href={`${localePrefix(locale)}${AGENTX_ROUTE.path}`}
           analyticsEvent="agentx_optimizations_returned"
           analyticsTarget="overview"
           className="inline-flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -265,7 +266,7 @@ export function AgentXOptimizationsArticle({ slug, locale }: { slug: string; loc
     <article data-testid="agentx-optimizations-article" data-framework={framework.slug}>
       <header className="border-b border-border/20 pb-8">
         <AgentXOptimizationsLink
-          href={`${localePrefix(locale)}/agentx/optimizations`}
+          href={`${localePrefix(locale)}${AGENTX_ROUTE.path}/optimizations`}
           analyticsEvent="agentx_optimizations_returned"
           analyticsTarget="index"
           className="inline-flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"

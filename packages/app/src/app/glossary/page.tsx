@@ -15,6 +15,7 @@ import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 import { socialMetadata } from '@/lib/seo/social-metadata';
 import { analyticsPlacement } from '@/lib/analytics/placement';
 import { cn } from '@/lib/shared/utils';
+import { AGENTX_ROUTE, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 const MORE_LINK = 'inline-flex items-center gap-1 text-brand hover:underline';
 
@@ -145,7 +146,7 @@ export default function GlossaryPage() {
               speedups on unchanged chips.
             </p>
             <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm font-medium">
-              <Link href="/agentx/methodology" className={MORE_LINK}>
+              <Link href={`${AGENTX_ROUTE.path}/methodology`} className={MORE_LINK}>
                 AgentX methodology
                 <ArrowRight aria-hidden="true" className="size-4" />
               </Link>
@@ -153,7 +154,7 @@ export default function GlossaryPage() {
                 Browse technical articles
                 <ArrowRight aria-hidden="true" className="size-4" />
               </Link>
-              <Link href="/inference" className={MORE_LINK}>
+              <Link href={getDashboardRoute('inference').path} className={MORE_LINK}>
                 Explore live benchmark data
                 <ArrowRight aria-hidden="true" className="size-4" />
               </Link>

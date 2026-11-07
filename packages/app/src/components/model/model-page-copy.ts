@@ -3,6 +3,7 @@ import {
   inferenceModelPath,
   PUBLIC_INFERENCE_MODEL_SLUGS,
 } from '@/lib/routing/inference-model-slug';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 const INDEX_DESCRIPTION_EN =
   'Architecture deep-dives for every model benchmarked on InferenceX: MoE and attention design, vendor eval scores, and live inference performance data.';
@@ -60,7 +61,7 @@ export function modelAliasDestination(canonicalSlug: string, locale: Locale): st
 }
 
 export function modelDashboardHref(query: string, locale: Locale): string {
-  return `${localePath('/inference', locale)}?${query}`;
+  return `${localePath(getDashboardRoute('inference').path, locale)}?${query}`;
 }
 
 /** The model's dedicated inference benchmark page, or null when it has no public one. */

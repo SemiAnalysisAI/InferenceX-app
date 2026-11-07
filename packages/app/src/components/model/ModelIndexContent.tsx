@@ -14,6 +14,7 @@ import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 import ModelDeveloperLogo from './ModelDeveloperLogo';
 import { ModelIndexLink } from './ModelIndexLink';
 import { MODEL_PAGE_COPY, modelDetailHref } from './model-page-copy';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export default function ModelIndexContent({ locale }: { locale: Locale }) {
   const t = MODEL_PAGE_COPY[locale];
@@ -50,7 +51,7 @@ export default function ModelIndexContent({ locale }: { locale: Locale }) {
           <header>
             <p className="mb-2 text-sm text-muted-foreground">
               <Link
-                href={`${localePrefix}/inference`}
+                href={`${localePrefix}${getDashboardRoute('inference').path}`}
                 className="hover:text-foreground transition-colors"
               >
                 {t.inferenceDashboard}

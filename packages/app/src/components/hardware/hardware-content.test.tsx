@@ -22,9 +22,9 @@ const { VR, TPU, META, PAGES } = vi.hoisted(() => {
     links: [
       {
         label: 'Open the AgentX dashboard',
-        href: 'https://inferencex.semianalysis.com/inference?i_seq=agentic-traces',
+        href: 'https://inferencex.semianalysis.com/infx/inference?i_seq=agentic-traces',
       },
-      { label: 'Read the methodology', href: '/agentx/methodology' },
+      { label: 'Read the methodology', href: '/infx/agentx/methodology' },
     ],
   };
   const pages: HardwarePageMeta[] = [
@@ -98,13 +98,13 @@ describe('HardwarePageContent', () => {
     expect(links).toHaveLength(2);
     expect(links[0]).toContain('bg-brand');
     expect(links[0]).toContain(
-      'href="https://inferencex.semianalysis.com/inference?i_seq=agentic-traces"',
+      'href="https://inferencex.semianalysis.com/infx/inference?i_seq=agentic-traces"',
     );
     expect(links[0]).toContain('target="_blank"');
     expect(links[1]).not.toContain('bg-brand');
     expect(links[1]).not.toContain('data-slot="button"');
     expect(links[1]).toContain('text-brand');
-    expect(links[1]).toContain('href="/agentx/methodology"');
+    expect(links[1]).toContain('href="/infx/agentx/methodology"');
     expect(links[1]).not.toContain('target=');
   });
 

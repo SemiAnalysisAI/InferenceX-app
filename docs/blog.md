@@ -60,8 +60,8 @@ publishDate: YYYY-MM-DD # quoted; same scheduled-publishing rule as posts
 tags: string[]
 lede: string # header paragraph; **bold** is the only markup
 links: # 1 or 2; root-relative path or https URL
-  - { label: Open the AgentX dashboard, href: 'https://inferencex.semianalysis.com/inference' } # primary button
-  - { label: Read the methodology, href: /agentx/methodology } # text link beside it
+  - { label: Open the AgentX dashboard, href: 'https://inferencex.semianalysis.com/infx/inference' } # primary button
+  - { label: Read the methodology, href: /infx/agentx/methodology } # text link beside it
 ```
 
 Unknown fields are rejected and an invalid file fails the build with a list of problems. Chinese files keep `date`, `publishDate`, `tags`, and link targets identical, and point internal links at `/zh` routes. `hardware-content.test.ts` enforces this.

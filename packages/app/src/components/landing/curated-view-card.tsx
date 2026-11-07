@@ -8,6 +8,7 @@ import { track } from '@/lib/analytics/analytics';
 import { placementFor } from '@/lib/analytics/placement';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { FavoritePreset } from '@/components/favorites/favorite-presets';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export function CuratedViewCard({ preset }: { preset: FavoritePreset }) {
   const locale = useLocale();
@@ -16,7 +17,7 @@ export function CuratedViewCard({ preset }: { preset: FavoritePreset }) {
   const visibleTags = preset.tags.filter((t) => t.toLowerCase() !== 'new');
   const title = (isZh && preset.titleZh) || preset.title;
   const description = (isZh && preset.descriptionZh) || preset.description;
-  const href = `${isZh ? '/zh' : ''}/inference?preset=${preset.id}`;
+  const href = `${isZh ? '/zh' : ''}${getDashboardRoute('inference').path}?preset=${preset.id}`;
   const onClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
     e.preventDefault();

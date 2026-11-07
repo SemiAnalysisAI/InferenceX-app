@@ -18,7 +18,7 @@ tags:
 
 Qwen3.5 397B uses GatedDeltaNet instead of vanilla attention for every couple of layers. GatedDeltaNet was invented at MIT and NVIDIA Research and has a theoretically constant state storage requirement instead of vanilla attention's linear storage requirement, which means lower storage than an equivalent dense attention model. Unlike end to end model training research such as the Nemotron disaster, NVIDIA Research is great at fundamental research like GDN and LatentMoE, both of which are used in frontier models.
 
-One methodology note before the results. This model's native max context length is 262k tokens, so AgentX replays the [truncated 256k dataset](https://inferencex.semianalysis.com/agentx/cc-traces-weka-062126-256k) against it. That simulates a workload on a smaller model where the max context length would be frequently reached with many compactions, which is how users would actually use this model.
+One methodology note before the results. This model's native max context length is 262k tokens, so AgentX replays the [truncated 256k dataset](https://inferencex.semianalysis.com/infx/agentx/cc-traces-weka-062126-256k) against it. That simulates a workload on a smaller model where the max context length would be frequently reached with many compactions, which is how users would actually use this model.
 
 ## The gap
 
@@ -26,7 +26,7 @@ Qwen3.5 397B is a strong hold for NVIDIA on SGLang versus SGLang, with over 20x 
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/519a7cd0-ac51-4a5c-9c45-ba7c41f6d058_2048x1300.png"
-  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_hc=1)"
+  caption="Source: [SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_hc=1)"
 />
 
 Holding the engine constant is what makes this comparison worth stating. A cross-engine result can always be argued about, since the software stacks differ in maturity and in who is paid to optimize them. Here both sides are SGLang, and the gap is still 20x.

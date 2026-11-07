@@ -68,7 +68,7 @@ describe('useCenterOnEnter', () => {
     scrollTo.mockReset();
     window.scrollTo = scrollTo as typeof window.scrollTo;
     window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as typeof window.matchMedia;
-    window.history.replaceState(null, '', '/inference');
+    window.history.replaceState(null, '', '/infx/inference');
     Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
       top: 900,
@@ -93,7 +93,7 @@ describe('useCenterOnEnter', () => {
   });
 
   it('leaves the page alone when the URL has a hash', () => {
-    window.history.replaceState(null, '', '/inference#benchmark');
+    window.history.replaceState(null, '', '/infx/inference#benchmark');
     act(() => root.render(<Harness ready />));
     expect(scrollTo).not.toHaveBeenCalled();
   });

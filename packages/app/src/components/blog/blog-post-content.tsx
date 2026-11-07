@@ -32,8 +32,9 @@ import { BlogSidebarCta } from './blog-sidebar-cta';
 import { BlogToc } from './blog-toc';
 import { HashScroll } from './hash-scroll';
 import { ReadingProgressBar } from './reading-progress-bar';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
-const CTA_PATH = '/agentx';
+const CTA_PATH = AGENTX_ROUTE.path;
 
 export interface BlogPostContentProps {
   locale: Locale;

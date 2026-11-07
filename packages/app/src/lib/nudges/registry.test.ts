@@ -94,7 +94,7 @@ describe('NUDGE_REGISTRY integrity', () => {
   });
 
   it('keeps internal action destinations in the active Chinese route tree', () => {
-    const location = { pathname: '/zh/inference', href: '' };
+    const location = { pathname: '/zh/infx/inference', href: '' };
     vi.stubGlobal('window', { location });
 
     const reproducibility = NUDGE_REGISTRY.find((nudge) => nudge.id === 'reproducibility');
@@ -112,14 +112,14 @@ describe('NUDGE_REGISTRY integrity', () => {
     const operatorxBanner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'operatorx-banner');
     if (operatorxBanner?.type !== 'banner') throw new Error('Missing OperatorX banner');
     operatorxBanner.content.onLinkClick?.();
-    expect(location.href).toBe('/zh/operatorx');
+    expect(location.href).toBe('/zh/opx');
 
     location.href = '';
     const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
     if (modal?.type !== 'modal') throw new Error('Missing TPUv7 launch modal');
     modal.content.primaryAction?.onClick();
     expect(location.href).toBe(
-      '/zh/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8',
+      '/zh/infx/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8',
     );
   });
 
@@ -127,7 +127,7 @@ describe('NUDGE_REGISTRY integrity', () => {
     const arms = NUDGE_REGISTRY.filter((nudge) => nudge.variant);
     expect(arms.map((arm) => [arm.variant, arm.content.href])).toEqual([
       ['ubenchx', '/ubenchx/core-memory-profiles'],
-      ['operatorx', '/operatorx'],
+      ['operatorx', '/opx'],
     ]);
     for (const arm of arms) {
       // Same slot, same dismissal, same event names: only the destination differs.
@@ -158,21 +158,21 @@ describe('NUDGE_REGISTRY integrity', () => {
     expect(modal?.content.primaryAction?.label).toBe('Qwen3.5');
     modal?.content.primaryAction?.onClick();
     expect(location.href).toBe(
-      `${prefix}/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8`,
+      `${prefix}/infx/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8`,
     );
     expect(modal?.content.secondaryAction?.label).toBe('Kimi K3');
     modal?.content.secondaryAction?.onClick();
-    expect(location.href).toBe(`${prefix}/inference/kimi-k3`);
+    expect(location.href).toBe(`${prefix}/infx/inference/kimi-k3`);
     expect(modal?.content.additionalActions?.map((action) => action.label)).toEqual([
       'GLM5.3',
       'Muse Spark',
     ]);
     modal?.content.additionalActions?.[0].onClick();
     expect(location.href).toBe(
-      `${prefix}/inference/glm-5-3?g_model=GLM-5.2&i_seq=agentic-traces&i_prec=fp8`,
+      `${prefix}/infx/inference/glm-5-3?g_model=GLM-5.2&i_seq=agentic-traces&i_prec=fp8`,
     );
     modal?.content.additionalActions?.[1].onClick();
-    expect(location.href).toBe(`${prefix}/inference/muse-spark-open`);
+    expect(location.href).toBe(`${prefix}/infx/inference/muse-spark-open`);
   });
 
   it('centers the TPUv7 launch modal on the landing page', () => {

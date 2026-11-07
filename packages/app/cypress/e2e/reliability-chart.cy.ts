@@ -8,7 +8,7 @@ describe('Reliability Chart — Content & Interactions', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    visitReliability('/reliability');
+    visitReliability('/infx/reliability');
     cy.get('[data-testid="reliability-chart-display"]').should('be.visible');
   });
 
@@ -33,7 +33,7 @@ describe('Reliability Chart — Content & Interactions', () => {
 describe('Reliability Chart — Chinese route and settled states', () => {
   it('shows a Chinese empty state only after an empty response settles', () => {
     cy.intercept('GET', '**/api/v1/reliability/daily', []).as('emptyReliability');
-    visitReliability('/zh/reliability');
+    visitReliability('/zh/infx/reliability');
     cy.wait('@emptyReliability');
     cy.contains('所选时间范围内暂无可靠性数据').should('be.visible');
     cy.contains('正在加载可靠性数据……').should('not.exist');
@@ -50,7 +50,7 @@ describe('Reliability Chart — Chinese route and settled states', () => {
         );
       }).as('retryReliability');
     });
-    visitReliability('/zh/reliability');
+    visitReliability('/zh/infx/reliability');
     cy.wait('@retryReliability');
     cy.wait('@retryReliability');
     cy.get('[data-testid="reliability-error"]')
@@ -68,7 +68,7 @@ describe('Reliability Chart — Chinese route and settled states', () => {
 
   it('keeps controls reachable without body overflow at 375px', () => {
     cy.viewport(375, 844);
-    visitReliability('/zh/reliability');
+    visitReliability('/zh/infx/reliability');
     cy.get('[data-testid="reliability-date-range"]').should('be.visible').click();
     cy.contains('[role="option"]', '全部时间').should('be.visible');
     cy.document().then((doc) => {

@@ -30,6 +30,7 @@ import {
 import { getHardwareConfig, getGpuSpecs } from '@/lib/catalog/constants';
 import { datasetJsonLd } from '@/lib/seo/dataset-jsonld';
 import { clampMetaDescription, META_DESCRIPTION_MAX } from '@/lib/seo/meta-text';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 export { getCachedBenchmarks };
 
@@ -45,7 +46,7 @@ export const AGENTIC_SCENARIO_INTRO: AgenticScenarioIntro = {
   paragraph:
     'AgentX replays real coding-agent sessions rather than fixed-length prompts, so context grows turn over turn and most of each request is served from cache instead of being recomputed. That turns the comparison into a systems question: KV transfer between nodes, prefix-aware routing, and cache capacity all move the curve alongside raw chip throughput. Fixed-sequence workloads stay the clean baseline for kernel and silicon performance, so the two scenarios answer different questions about the same hardware.',
   linkLabel: 'Learn more about AgentX',
-  href: '/agentx',
+  href: AGENTX_ROUTE.path,
 };
 
 export interface PairSummary {

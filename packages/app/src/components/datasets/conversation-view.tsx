@@ -10,6 +10,7 @@ import { useDatasetConversation } from '@/hooks/api/use-datasets';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { compact, formatShare } from './format';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 const STRINGS = {
   en: {
@@ -89,7 +90,7 @@ export function ConversationView({ slug, convId }: { slug: string; convId: strin
         >
           {t.retry}
         </button>
-        <Link href={`${prefix}/agentx/${slug}`} className="text-brand underline">
+        <Link href={`${prefix}${AGENTX_ROUTE.path}/${slug}`} className="text-brand underline">
           {t.backToDataset}
         </Link>
       </div>
@@ -103,7 +104,7 @@ export function ConversationView({ slug, convId }: { slug: string; convId: strin
         data-locale={locale}
       >
         {t.notFound}{' '}
-        <Link href={`${prefix}/agentx/${slug}`} className="text-brand underline">
+        <Link href={`${prefix}${AGENTX_ROUTE.path}/${slug}`} className="text-brand underline">
           {t.backToDataset}
         </Link>
       </div>
@@ -116,11 +117,11 @@ export function ConversationView({ slug, convId }: { slug: string; convId: strin
     <div className="flex flex-col gap-6">
       <div>
         <div className="mb-1 flex min-h-8 flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          <Link href={`${prefix}/agentx`} className="hover:text-foreground">
+          <Link href={`${prefix}${AGENTX_ROUTE.path}`} className="hover:text-foreground">
             {t.breadcrumbDatasets}
           </Link>
           <span>/</span>
-          <Link href={`${prefix}/agentx/${slug}`} className="hover:text-foreground">
+          <Link href={`${prefix}${AGENTX_ROUTE.path}/${slug}`} className="hover:text-foreground">
             {slug}
           </Link>
           <span>/</span>

@@ -100,6 +100,7 @@ import type {
   InterpolatedResult,
 } from './types';
 import { useThroughputData } from './useThroughputData';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 const COST_PROVIDER_OPTIONS: {
   value: CostProvider;
@@ -1468,7 +1469,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
           <p className="text-sm text-muted-foreground">
             {t.fleetMoved}{' '}
             <Link
-              href={localePath('/fleet', locale)}
+              href={localePath(getDashboardRoute('fleet').path, locale)}
               className="underline hover:text-foreground"
               data-testid="calculator-fleet-pointer-link"
             >

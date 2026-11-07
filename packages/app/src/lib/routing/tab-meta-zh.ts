@@ -4,8 +4,10 @@ import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 import { zhAlternates, zhPath } from '@/lib/i18n/i18n';
 import type { ModelRoute, ModelRouteTab } from '@/lib/routing/model-routes';
 import {
+  AGENTX_ROUTE,
   getDashboardRoute,
   isDashboardRouteKey,
+  type DashboardRoute,
   type DashboardRouteKey,
 } from '@/lib/routing/dashboard-routes';
 import { socialMetadata } from '@/lib/seo/social-metadata';
@@ -181,14 +183,20 @@ export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   feedback: '反馈',
 };
 
-export type HeaderNavHref = '/' | '/agentx' | '/overview' | '/inference' | '/ubenchx' | '/about';
+export type HeaderNavHref =
+  | '/'
+  | typeof AGENTX_ROUTE.path
+  | '/overview'
+  | Extract<DashboardRoute, { key: 'inference' }>['path']
+  | '/ubenchx'
+  | '/about';
 
 export const NAV_LABELS_ZH: Record<HeaderNavHref, string> = {
   '/': '首页',
   '/overview': '总览',
-  '/inference': '仪表板',
+  [getDashboardRoute('inference').path]: '仪表板',
   '/ubenchx': 'ubenchX',
-  '/agentx': 'AgentX',
+  [AGENTX_ROUTE.path]: 'AgentX',
   '/about': '关于',
 };
 

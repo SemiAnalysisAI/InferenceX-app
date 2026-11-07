@@ -11,19 +11,19 @@ describe('Chart Section Tabs — E2E', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/inference');
+    cy.visit('/infx/inference');
   });
 
   it('updates the URL path when switching tabs', () => {
     cy.get('[data-testid="tab-trigger-evaluation"]').click();
-    cy.url().should('include', '/evaluation');
+    cy.url().should('include', '/infx/evaluation');
 
     cy.get('[data-testid="tab-trigger-profit-estimator-per-gigawatt"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-profit-estimator"]').click();
-    cy.location('pathname').should('match', /^\/profit-estimator(?:\/|$)/u);
+    cy.location('pathname').should('match', /^\/infx\/profit-estimator(?:\/|$)/u);
 
     cy.get('[data-testid="profit-basis-gw-year"]').click();
-    cy.location('pathname').should('match', /^\/profit-estimator-per-gigawatt(?:\/|$)/u);
+    cy.location('pathname').should('match', /^\/infx\/profit-estimator-per-gigawatt(?:\/|$)/u);
     cy.get('[data-testid="tab-trigger-profit-estimator"]').should(
       'have.attr',
       'data-tab-active',
@@ -31,17 +31,17 @@ describe('Chart Section Tabs — E2E', () => {
     );
 
     cy.get('[data-testid="tab-trigger-submissions"]').click();
-    cy.url().should('include', '/submissions');
+    cy.url().should('include', '/infx/submissions');
 
     cy.get('[data-testid="tab-trigger-inference"]').click();
-    cy.url().should('include', '/inference');
+    cy.url().should('include', '/infx/inference');
   });
 
   it('opens Historical Trends from the footer link', () => {
     cy.get('[data-testid="tab-trigger-historical"]').should('not.exist');
 
     cy.get('[data-testid="footer-link-historical"]').scrollIntoView().click();
-    cy.url().should('include', '/historical');
+    cy.url().should('include', '/infx/historical');
     cy.get('[data-testid="historical-trends-display"]').should('exist');
   });
 
@@ -50,18 +50,18 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="tab-trigger-fleet"]').should('not.exist');
 
     cy.get('[data-testid="footer-link-calculator"]').scrollIntoView().click();
-    cy.url().should('include', '/calculator');
+    cy.url().should('include', '/infx/calculator');
     cy.get('[data-testid="calculator-controls"]').should('exist');
 
     cy.get('[data-testid="footer-link-fleet"]').scrollIntoView().click();
-    cy.url().should('include', '/fleet');
+    cy.url().should('include', '/infx/fleet');
   });
 
   it('opens First-Token Limits from the footer link', () => {
     cy.get('[data-testid="tab-trigger-first-token"]').should('not.exist');
 
     cy.get('[data-testid="footer-link-first-token"]').scrollIntoView().click();
-    cy.url().should('include', '/first-token');
+    cy.url().should('include', '/infx/first-token');
     cy.get('[data-testid="first-token-controls"]').should('exist');
   });
 
@@ -69,7 +69,7 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="tab-trigger-cache-reuse"]').should('not.exist');
 
     cy.get('[data-testid="footer-link-cache-reuse"]').scrollIntoView().click();
-    cy.url().should('include', '/cache-reuse');
+    cy.url().should('include', '/infx/cache-reuse');
     cy.get('[data-testid="cache-reuse-controls"]').should('exist');
   });
 
@@ -77,7 +77,7 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="tab-trigger-reliability"]').should('not.exist');
 
     cy.get('[data-testid="footer-link-reliability"]').scrollIntoView().click();
-    cy.url().should('include', '/reliability');
+    cy.url().should('include', '/infx/reliability');
     cy.get('[data-testid="reliability-chart-display"]').should('exist');
   });
 
@@ -85,12 +85,12 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="tab-trigger-gpu-specs"]').should('not.exist');
 
     cy.get('[data-testid="footer-link-gpu-specs"]').scrollIntoView().click();
-    cy.url().should('include', '/gpu-specs');
+    cy.url().should('include', '/infx/gpu-specs');
     cy.get('[data-testid="gpu-specs-content"]').should('exist');
   });
 
   it('keeps the sliding indicator aligned after the Konami code unlock inserts the Hidden trigger', () => {
-    cy.visit('/inference', {
+    cy.visit('/infx/inference', {
       onBeforeLoad(win) {
         win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
         win.localStorage.setItem('inferencex-feature-gate', '1');
@@ -154,11 +154,11 @@ describe('Chart Section Tabs — E2E', () => {
   it('permanently redirects the retired PowerX page to the inference dashboard', () => {
     cy.request({ url: '/gpu-metrics?gm_runId=12345', followRedirect: false }).then((response) => {
       expect(response.status).to.eq(308);
-      expect(response.headers.location).to.eq('/inference?gm_runId=12345');
+      expect(response.headers.location).to.eq('/infx/inference?gm_runId=12345');
     });
     cy.request({ url: '/zh/gpu-metrics', followRedirect: false }).then((response) => {
       expect(response.status).to.eq(308);
-      expect(response.headers.location).to.eq('/zh/inference');
+      expect(response.headers.location).to.eq('/zh/infx/inference');
     });
   });
 });
@@ -189,7 +189,7 @@ describe('First-load navigation', () => {
 
   it('navigates to dashboard from the header with one click', () => {
     cy.get('[data-testid="nav-link-dashboard"]').click();
-    cy.location('pathname').should('eq', '/inference/deepseek-v41-flash');
+    cy.location('pathname').should('eq', '/infx/inference/deepseek-v41-flash');
     cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4.1 Flash');
   });
 
@@ -199,19 +199,19 @@ describe('First-load navigation', () => {
   });
 
   it('navigates to AgentX from the header with one click', () => {
-    cy.get('[data-testid="nav-link-agentx"]').should('have.attr', 'href', '/agentx');
+    cy.get('[data-testid="nav-link-agentx"]').should('have.attr', 'href', '/infx/agentx');
     cy.get('[data-testid="nav-link-agentx"]').click();
-    cy.location('pathname').should('eq', '/agentx');
+    cy.location('pathname').should('eq', '/infx/agentx');
   });
 
   it('leads the landing page with the AgentX hero and its two CTAs', () => {
     cy.get('[data-testid="compare-agentx-revenue-calculator-link"]').click();
-    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt');
+    cy.location('pathname').should('eq', '/infx/profit-estimator-per-gigawatt');
   });
 
   it('navigates to submissions from the landing CTA', () => {
     cy.get('[data-testid="landing-submissions-link"]').click();
-    cy.location('pathname').should('eq', '/submissions');
+    cy.location('pathname').should('eq', '/infx/submissions');
   });
 });
 
@@ -248,7 +248,7 @@ describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
       });
       cy.get('[data-testid="launch-banner"]:visible')
         .should('have.length', 1)
-        .and('have.attr', 'href', `${locale}/operatorx`)
+        .and('have.attr', 'href', `${locale}/opx`)
         .and(
           'contain.text',
           locale ? 'Huawei Ascend 950PR 微基准测试' : 'Huawei Ascend 950PR microbenchmarks',
@@ -260,7 +260,7 @@ describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
             : '950PR GEMM FLOPs and max FLOPS utilization',
         )
         .click();
-      cy.location('pathname').should('eq', `${locale}/operatorx`);
+      cy.location('pathname').should('eq', `${locale}/opx`);
       cy.get('[data-testid="operatorx-page"]').should('be.visible');
     });
   }
@@ -285,7 +285,7 @@ describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
           .and(
             'have.attr',
             'href',
-            variant === 'operatorx' ? '/operatorx' : '/ubenchx/core-memory-profiles',
+            variant === 'operatorx' ? '/opx' : '/ubenchx/core-memory-profiles',
           );
         cy.reload();
         cy.get('html').should('have.attr', 'data-landing-banner-variant', variant);
@@ -312,8 +312,8 @@ describe('TPUv7 results', { testIsolation: true }, () => {
 
   for (const locale of ['', '/zh']) {
     it(`preserves TPUv7 FP8 cost basis in ${locale || '/'} share URLs`, () => {
-      cy.visit(`${locale}/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8`);
-      cy.location('pathname').should('eq', `${locale}/inference`);
+      cy.visit(`${locale}/infx/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8`);
+      cy.location('pathname').should('eq', `${locale}/infx/inference`);
       cy.get('[data-testid="inference-chart-display"]').should('be.visible');
       expectHwKeyPoints('tpuv7', true);
       cy.location('href').then((href) => {
@@ -353,7 +353,7 @@ describe('TPUv7 results', { testIsolation: true }, () => {
     });
   }
   it('hides the TCO basis selector outside Qwen3.5 8K/1K', () => {
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_metric=y_costh', {
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_metric=y_costh', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -444,4 +444,20 @@ describe('H3 video performance history', () => {
     cy.contains('a', 'Video').should('have.attr', 'href', '/video');
     cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
   });
+});
+
+describe('pre-split dashboard URLs', () => {
+  for (const [from, to] of [
+    ['/inference/deepseek-r1?i_seq=8k%2F1k', '/infx/inference/deepseek-r1?i_seq=8k%2F1k'],
+    ['/agentx/methodology', '/infx/agentx/methodology'],
+    ['/agentic-workload-explorer/methodology', '/infx/agentic-workload-explorer/methodology'],
+  ]) {
+    it(`sends ${from} to ${to} in one 308`, () => {
+      cy.request({ url: from, followRedirect: false }).then((response) => {
+        expect(response.status).to.eq(308);
+        const location = new URL(response.headers.location as string, 'http://x');
+        expect(`${location.pathname}${location.search}`).to.eq(to);
+      });
+    });
+  }
 });

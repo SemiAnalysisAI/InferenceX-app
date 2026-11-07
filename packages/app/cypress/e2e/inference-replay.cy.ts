@@ -33,7 +33,7 @@ const replayAxisExtentFrom = (svg: Element) => {
 
 const visitChineseReplay = () => {
   cy.viewport(390, 900);
-  cy.visit('/zh/inference?g_model=DeepSeek-R1-0528', {
+  cy.visit('/zh/infx/inference?g_model=DeepSeek-R1-0528', {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     },
@@ -46,7 +46,7 @@ describe('Inference Replay', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/inference?g_model=DeepSeek-R1-0528');
+    cy.visit('/infx/inference?g_model=DeepSeek-R1-0528');
     cy.get('[data-testid="inference-chart-display"]').should('exist');
     openReplayDialog();
     cy.get('[data-testid="replay-panel-chart-0"]').should('exist');

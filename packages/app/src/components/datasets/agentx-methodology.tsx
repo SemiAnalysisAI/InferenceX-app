@@ -11,6 +11,7 @@ import { AgentXSessionReplay } from './agentx-session-replay';
 import { AgentXOptimizationsCallout } from './agentx-optimizations-callout';
 import { AgentXTelemetryCallout } from './agentx-telemetry-callout';
 import { AgentXQuickstartCallout } from './agentx-quickstart';
+import { AGENTX_ROUTE, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 type Locale = 'en' | 'zh';
 
@@ -193,7 +194,11 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
         </Heading>
         <p className="mt-3 max-w-4xl text-sm leading-6 text-muted-foreground">{t.intro}</p>
         <AgentXMethodologyLink
-          href={locale === 'zh' ? '/zh/inference' : '/inference'}
+          href={
+            locale === 'zh'
+              ? `/zh${getDashboardRoute('inference').path}`
+              : getDashboardRoute('inference').path
+          }
           analyticsEvent="agentx_results_opened"
           analyticsTarget="methodology-header"
           data-testid="agentx-results-cta"
@@ -284,7 +289,11 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
           </p>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">{t.limits}</p>
           <AgentXMethodologyLink
-            href={locale === 'zh' ? '/zh/agentx/methodology' : '/agentx/methodology'}
+            href={
+              locale === 'zh'
+                ? `/zh${AGENTX_ROUTE.path}/methodology`
+                : `${AGENTX_ROUTE.path}/methodology`
+            }
             analyticsEvent="agentx_methodology_opened"
             analyticsTarget="compact-overview"
             data-testid="agentx-methodology-cta"

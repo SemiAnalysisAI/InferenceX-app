@@ -21,6 +21,7 @@ import { cn } from '@/lib/shared/utils';
 import { track } from '@/lib/analytics/analytics';
 import { isZhPathname, ZH_PREFIX } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 const HW_LABELS: Record<string, string> = {
   b200: 'B200',
@@ -214,8 +215,8 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
   const t = SIBLING_STRINGS[locale];
   const sortOptions = SORT_VALUES.map((value) => ({ value, label: t.sortOptions[value] }));
   const agenticBase = isZhPathname(pathname)
-    ? `${ZH_PREFIX}/inference/agentic`
-    : '/inference/agentic';
+    ? `${ZH_PREFIX}${getDashboardRoute('inference').path}/agentic`
+    : `${getDashboardRoute('inference').path}/agentic`;
   const [sortMode, setSortMode] = useState<SortMode>(() => {
     if (typeof window === 'undefined') return 'default';
     const v = new URLSearchParams(window.location.search).get('sort');

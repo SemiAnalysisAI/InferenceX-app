@@ -48,6 +48,7 @@ import {
 import { SiblingNav } from './sibling-nav';
 import type { ThroughputSeriesKey } from './time-series-math';
 import { useDetailView, type DetailView } from './use-detail-view';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export const AGENTIC_POINT_DETAIL_STRINGS = {
   en: {
@@ -186,7 +187,9 @@ export function AgenticPointDetail({ id }: Props) {
   const t = AGENTIC_POINT_DETAIL_STRINGS[locale];
   const withId = (template: string) => template.replace('{id}', String(id));
   const isZh = isZhPathname(pathname);
-  const inferenceBaseHref = isZh ? `${ZH_PREFIX}/inference` : '/inference';
+  const inferenceBaseHref = isZh
+    ? `${ZH_PREFIX}${getDashboardRoute('inference').path}`
+    : getDashboardRoute('inference').path;
   const [inferenceHref, setInferenceHref] = useState(inferenceBaseHref);
   useEffect(() => {
     setInferenceHref(withChartState(inferenceBaseHref));

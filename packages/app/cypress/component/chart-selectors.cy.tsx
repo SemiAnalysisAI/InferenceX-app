@@ -27,7 +27,9 @@ describe('Consistent informational help', () => {
       const explanation =
         locale === 'zh' ? '查看当前模型的配置说明。' : 'Inspect the current model configuration.';
       cy.mount(
-        <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+        <PathnameContext.Provider
+          value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+        >
           <div className="space-y-6 p-4" style={{ minHeight: 1200 }}>
             <LabelWithTooltip htmlFor="test-label" label={label} tooltip={explanation} />
             <input id="test-label" data-testid="unrelated-input" defaultValue="unchanged" />
@@ -309,7 +311,7 @@ describe('Chart Selectors', () => {
   it('keeps single-value benchmark context readable on Chinese phones', () => {
     cy.viewport(390, 720);
     cy.mount(
-      <PathnameContext.Provider value="/zh/inference">
+      <PathnameContext.Provider value="/zh/infx/inference">
         <TooltipProvider delayDuration={0}>
           <div className="grid gap-3 p-4">
             <ScenarioSelector
@@ -341,7 +343,7 @@ describe('Chart Selectors', () => {
     it('keeps default models in the requested selector order (en)', () => {
       cy.viewport(1280, 720);
       cy.mount(
-        <PathnameContext.Provider value="/inference">
+        <PathnameContext.Provider value="/infx/inference">
           <TooltipProvider>
             <ModelSelector
               value={Model.Muse_Spark_Open}
@@ -375,7 +377,9 @@ describe('Chart Selectors', () => {
       it(`searches across model groups, recovers from no results, and selects by keyboard (${locale})`, () => {
         cy.viewport(locale === 'zh' ? 390 : 1280, 720);
         cy.mount(
-          <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+          <PathnameContext.Provider
+            value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+          >
             <ModelSelectorHarness />
           </PathnameContext.Provider>,
         );
@@ -428,7 +432,7 @@ describe('Chart Selectors', () => {
 
     it('localizes model category labels and reasons on Chinese routes', () => {
       cy.mount(
-        <PathnameContext.Provider value="/zh/inference">
+        <PathnameContext.Provider value="/zh/infx/inference">
           <ModelSelectorHarness />
         </PathnameContext.Provider>,
       );
@@ -444,7 +448,7 @@ describe('Chart Selectors', () => {
   });
 
   describe('ScenarioSelector', () => {
-    it('explains the agentic workload in its menu option, linking to /agentx', () => {
+    it('explains the agentic workload in its menu option, linking to /infx/agentx', () => {
       cy.mount(<ScenarioSelectorHarness />);
       assertClosedScenarioHasNoHelp(36);
       cy.get('[data-testid="scenario-selector"]').click('right');
@@ -457,7 +461,7 @@ describe('Chart Selectors', () => {
       );
       cy.get('[data-testid="scenario-agentic-info-link"]')
         .should('be.visible')
-        .and('have.attr', 'href', '/agentx')
+        .and('have.attr', 'href', '/infx/agentx')
         .then(($link) => {
           const followLink = cy.spy().as('followAgenticLink');
           $link[0].addEventListener('click', (event) => {
@@ -528,7 +532,7 @@ describe('Chart Selectors', () => {
       it(`${fixed ? 'omits the sole scenario' : 'keeps the Agentic explainer in the menu'} on Chinese phones`, () => {
         cy.viewport(390, 720);
         cy.mount(
-          <PathnameContext.Provider value="/zh/inference">
+          <PathnameContext.Provider value="/zh/infx/inference">
             <TooltipProvider delayDuration={0}>
               <div className="w-40 p-3">
                 <ScenarioSelector
@@ -560,7 +564,7 @@ describe('Chart Selectors', () => {
         );
         cy.get('[data-testid="scenario-agentic-info-link"]')
           .should('be.visible')
-          .and('have.attr', 'href', '/zh/agentx');
+          .and('have.attr', 'href', '/zh/infx/agentx');
       });
     }
 
@@ -591,7 +595,9 @@ describe('Chart Selectors', () => {
       it(`keeps retired choices selectable in one fixed-length group with inline status (${locale})`, () => {
         cy.viewport(390, 720);
         cy.mount(
-          <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+          <PathnameContext.Provider
+            value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+          >
             <TooltipProvider delayDuration={0}>
               <div className="w-44 p-3">
                 <ScenarioSelector
@@ -710,7 +716,9 @@ describe('Chart Selectors', () => {
       it(`separates the compact selection count from the minimum and keeps it accurate (${locale})`, () => {
         cy.viewport(locale === 'zh' ? 390 : 1280, 720);
         cy.mount(
-          <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+          <PathnameContext.Provider
+            value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+          >
             <div className="w-44">
               <PrecisionSelectorHarness />
             </div>

@@ -4312,7 +4312,7 @@ const ScatterGraph = React.memo(
       >
         <D3Chart<InferenceData>
           ref={chartRef}
-          // PowerX drops the interaction hint under its charts; /inference keeps it.
+          // PowerX drops the interaction hint under its charts; /infx/inference keeps it.
           instructions={minimalChrome || powerXSurface ? '' : undefined}
           chartId={chartId}
           height={plotHeight}

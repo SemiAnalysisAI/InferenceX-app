@@ -22,6 +22,7 @@ import {
   modelIndexHref,
   modelInferenceHref,
 } from './model-page-copy';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export default async function ModelDetailContent({
   slug,
@@ -79,7 +80,7 @@ export default async function ModelDetailContent({
           <header>
             <p className="mb-2 text-sm text-muted-foreground">
               <Link
-                href={`${localePrefix}/inference`}
+                href={`${localePrefix}${getDashboardRoute('inference').path}`}
                 className="hover:text-foreground transition-colors"
               >
                 {t.inferenceDashboard}

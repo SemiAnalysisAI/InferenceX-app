@@ -22,7 +22,7 @@ API responses, filters, and `inferencex-skills` contracts are unchanged.
 ## Sidebar legend
 
 Every chart sidebar uses `ChartLegend` with `variant="sidebar"` and the same
-configuration as `/historical`. Line charts pass each series' stroke dash as
+configuration as `/infx/historical`. Line charts pass each series' stroke dash as
 `lineDasharray` (`'none'` for solid lines), so the swatch is a line even when
 the chart also draws markers. Toggleable items get `onClick`, `onItemRemove`
 and a `reset` whose button is disabled while nothing is hidden. Hidden items

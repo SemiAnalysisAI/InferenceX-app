@@ -175,7 +175,7 @@ describe('ScatterGraph toggle decoration', () => {
     for (let click = 0; click < 2; click++) dispatchAtPoint(container, 'click', target);
 
     expect(document.querySelector('[data-action="view-charts"]')?.getAttribute('href')).toBe(
-      '/inference/agentic/42',
+      '/infx/inference/agentic/42',
     );
     unmount();
   });

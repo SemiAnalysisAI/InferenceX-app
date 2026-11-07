@@ -649,7 +649,7 @@ describe('ChartLegend points-table icon + dialog', () => {
     cy.get('[data-testid="legend-points-row"]').should('have.length', 2);
     cy.get('a[data-testid="legend-points-row"]')
       .first()
-      .should('have.attr', 'href', '/inference/agentic/206860');
+      .should('have.attr', 'href', '/infx/inference/agentic/206860');
     cy.get('a[data-testid="legend-points-row"]').first().should('contain.text', '4');
     cy.get('[data-testid="legend-points-dialog"]').should('contain.text', 'Offload');
   });

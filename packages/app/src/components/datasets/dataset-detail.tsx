@@ -28,6 +28,7 @@ import { useSearchTracking } from '@/lib/analytics/use-search-tracking';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { getDatasetDescription } from './dataset-description';
 import { compact, formatPct, formatShare, localeNumber, perConversation } from './format';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 const PAGE = 50;
 const SEARCH_DEBOUNCE_MS = 250;
@@ -215,7 +216,7 @@ export function DatasetDetail({
         >
           {t.retry}
         </button>
-        <Link href={`${prefix}/agentx`} className="text-brand underline">
+        <Link href={`${prefix}${AGENTX_ROUTE.path}`} className="text-brand underline">
           {t.backToDatasets}
         </Link>
       </div>
@@ -229,7 +230,7 @@ export function DatasetDetail({
         data-locale={locale}
       >
         {t.notFound}{' '}
-        <Link href={`${prefix}/agentx`} className="text-brand underline">
+        <Link href={`${prefix}${AGENTX_ROUTE.path}`} className="text-brand underline">
           {t.backToDatasets}
         </Link>
       </div>
@@ -246,7 +247,7 @@ export function DatasetDetail({
     <div className="min-h-svh flex flex-col gap-6">
       <div>
         <Link
-          href={`${prefix}/agentx`}
+          href={`${prefix}${AGENTX_ROUTE.path}`}
           className="inline-flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
@@ -457,7 +458,7 @@ export function DatasetDetail({
                     >
                       <td className="px-3 py-2">
                         <Link
-                          href={`${prefix}/agentx/${slug}/conversations/${encodeURIComponent(c.conv_id)}`}
+                          href={`${prefix}${AGENTX_ROUTE.path}/${slug}/conversations/${encodeURIComponent(c.conv_id)}`}
                           onClick={() => track('datasets_conversation_clicked', { slug })}
                           className="font-mono text-xs text-brand hover:underline"
                         >

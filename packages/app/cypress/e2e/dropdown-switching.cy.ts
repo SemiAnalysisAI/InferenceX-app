@@ -3,7 +3,7 @@ describe('Dropdown one-click switching', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro');
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro');
     cy.get('[data-testid="inference-chart-display"]').should('exist');
     cy.get('#chart-0 [data-testid="scenario-selector"]').should('be.visible');
   });
@@ -21,7 +21,7 @@ describe('Dropdown one-click switching', () => {
   });
 
   it('only one MultiSelect content panel is open at a time when switching dropdowns', () => {
-    cy.visit('/inference?g_model=DeepSeek-R1-0528');
+    cy.visit('/infx/inference?g_model=DeepSeek-R1-0528');
     cy.get('[data-testid="inference-chart-display"]').should('exist');
 
     cy.get('[data-testid="precision-multiselect"][role="combobox"]:enabled')

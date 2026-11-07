@@ -4,7 +4,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const exportMocks = vi.hoisted(() => ({ pathname: '/inference', toPng: vi.fn() }));
+const exportMocks = vi.hoisted(() => ({ pathname: '/infx/inference', toPng: vi.fn() }));
 vi.mock('next/navigation', () => ({ usePathname: () => exportMocks.pathname }));
 vi.mock('@jpinsonneau/html-to-image', () => ({
   toPng: exportMocks.toPng,
@@ -39,7 +39,7 @@ describe('useChartExport failure messages', () => {
   }
 
   beforeEach(() => {
-    exportMocks.pathname = '/inference';
+    exportMocks.pathname = '/infx/inference';
     exportMocks.toPng.mockReset();
     setIsLegendExpanded.mockReset();
     originalFonts = Object.getOwnPropertyDescriptor(document, 'fonts');
@@ -69,8 +69,8 @@ describe('useChartExport failure messages', () => {
   });
 
   it.each([
-    ['/inference', 'Failed to export image. Please try again.'],
-    ['/zh/inference', '图片导出失败，请重试。'],
+    ['/infx/inference', 'Failed to export image. Please try again.'],
+    ['/zh/infx/inference', '图片导出失败，请重试。'],
   ])('reports a PNG capture failure in the current locale on %s', async (pathname, message) => {
     exportMocks.pathname = pathname;
     act(() => root.render(createElement(HookProbe)));

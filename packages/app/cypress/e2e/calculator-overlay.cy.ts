@@ -27,11 +27,14 @@ const selectSequence = (label: string) => {
 
 const visitCalculatorWithOverlay = () => {
   interceptCalculatorOverlayRun();
-  cy.visit(`/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}`, {
-    onBeforeLoad(win) {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+  cy.visit(
+    `/infx/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}`,
+    {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
     },
-  });
+  );
   cy.wait('@unofficialRun');
   cy.get(BARS).should('have.length.at.least', 1);
 };
@@ -41,7 +44,7 @@ describe('TCO calculator — unofficial run overlay', () => {
     it('renders official and unofficial DeepSeek V4 agentic calculations separately', () => {
       interceptOverlayRun();
       cy.visit(
-        `/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(
+        `/infx/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(
           'agentic-traces',
         )}&i_prec=fp4`,
         {
@@ -102,7 +105,7 @@ describe('TCO calculator — unofficial run overlay', () => {
     it('keeps a GPU filter the user set before the run landed', () => {
       const releaseRun = interceptCalculatorOverlayRun({ holdRun: true });
       cy.visit(
-        `/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}`,
+        `/infx/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}`,
         {
           onBeforeLoad(win) {
             win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -140,7 +143,7 @@ describe('TCO calculator — unofficial run overlay', () => {
     it('keeps the surviving run visible instead of blanking the chart', () => {
       interceptCalculatorMultiRunOverlay();
       cy.visit(
-        `/calculator?unofficialruns=${OVERLAY_RUN_ID},${SECOND_OVERLAY_RUN_ID}` +
+        `/infx/calculator?unofficialruns=${OVERLAY_RUN_ID},${SECOND_OVERLAY_RUN_ID}` +
           `&i_seq=${encodeURIComponent('1k/8k')}`,
         {
           onBeforeLoad(win) {
@@ -177,7 +180,7 @@ describe('TCO calculator — unofficial run overlay', () => {
     before(() => {
       interceptCalculatorOverlayRun();
       cy.visit(
-        `/zh/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}`,
+        `/zh/infx/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}`,
         {
           onBeforeLoad(win) {
             win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));

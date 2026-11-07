@@ -21,8 +21,8 @@ describe('dashboard route registry', () => {
   });
 
   it.each(DASHBOARD_ROUTES)('has English and Chinese page parity for "$key"', (route) => {
-    const englishPage = new URL(`../../app/(dashboard)/${route.key}/page.tsx`, import.meta.url);
-    const chinesePage = new URL(`../../app/zh/(dashboard)/${route.key}/page.tsx`, import.meta.url);
+    const englishPage = new URL(`../../app/(dashboard)${route.path}/page.tsx`, import.meta.url);
+    const chinesePage = new URL(`../../app/zh/(dashboard)${route.path}/page.tsx`, import.meta.url);
 
     expect(existsSync(englishPage)).toBe(true);
     expect(existsSync(chinesePage)).toBe(route.localeMirrored);
@@ -47,7 +47,7 @@ describe('dashboard route registry', () => {
     expect(getDashboardRoute('historical').navGroup).toBe('footer-only');
     expect(getDashboardRoute('historical').indexable).toBe(true);
     expect(getDashboardRoute('historical').localeMirrored).toBe(true);
-    expect(dashboardRouteForPathname('/historical/kimi-k3')?.key).toBe('historical');
+    expect(dashboardRouteForPathname('/infx/historical/kimi-k3')?.key).toBe('historical');
   });
 
   it('puts one profit estimator tab between Inference Performance and Accuracy Evals', () => {
@@ -59,10 +59,12 @@ describe('dashboard route registry', () => {
     expect(primary).not.toContain('calculator');
     expect(primary).not.toContain('fleet');
     expect(primary).not.toContain('historical');
-    expect(dashboardRouteForPathname('/profit-estimator-per-gigawatt/kimi-k3')?.key).toBe(
+    expect(dashboardRouteForPathname('/infx/profit-estimator-per-gigawatt/kimi-k3')?.key).toBe(
       'profit-estimator-per-gigawatt',
     );
-    expect(dashboardRouteForPathname('/profit-estimator/kimi-k3')?.key).toBe('profit-estimator');
+    expect(dashboardRouteForPathname('/infx/profit-estimator/kimi-k3')?.key).toBe(
+      'profit-estimator',
+    );
   });
 
   it('keeps the per-gigawatt page indexed and marks the profit estimator tab active on it', () => {
@@ -71,13 +73,13 @@ describe('dashboard route registry', () => {
     expect(perGw.indexable).toBe(true);
     expect(perGw.localeMirrored).toBe(true);
     for (const pathname of [
-      '/profit-estimator',
-      '/profit-estimator-per-gigawatt',
-      '/zh/profit-estimator-per-gigawatt/kimi-k3/target/45',
+      '/infx/profit-estimator',
+      '/infx/profit-estimator-per-gigawatt',
+      '/zh/infx/profit-estimator-per-gigawatt/kimi-k3/target/45',
     ]) {
       expect(dashboardNavTabForPathname(pathname)).toBe('profit-estimator');
     }
-    expect(dashboardNavTabForPathname('/zh/evaluation')).toBe('evaluation');
+    expect(dashboardNavTabForPathname('/zh/infx/evaluation')).toBe('evaluation');
     expect(dashboardNavTabForPathname('/compare/foo-vs-bar')).toBeUndefined();
   });
 
@@ -92,8 +94,8 @@ describe('dashboard route registry', () => {
 
   it('exposes OperatorX in primary navigation for both locales', () => {
     expect(getDashboardRoute('operatorx').navGroup).toBe('primary');
-    expect(dashboardRouteForPathname('/operatorx')?.key).toBe('operatorx');
-    expect(dashboardRouteForPathname('/zh/operatorx')?.key).toBe('operatorx');
+    expect(dashboardRouteForPathname('/opx')?.key).toBe('operatorx');
+    expect(dashboardRouteForPathname('/zh/opx')?.key).toBe('operatorx');
   });
 
   it('declares the standalone and self-seeded provider capabilities', () => {
@@ -107,7 +109,7 @@ describe('dashboard route registry', () => {
     });
   });
 
-  it.each(['/inference/agentic', '/zh/inference/agentic'])(
+  it.each(['/infx/inference/agentic', '/zh/infx/inference/agentic'])(
     'keeps the agentic catalog standalone at %s',
     (pathname) => {
       expect(dashboardShellCapabilitiesForPathname(pathname)).toEqual({
@@ -118,7 +120,7 @@ describe('dashboard route registry', () => {
     },
   );
 
-  it.each(['/inference/agentic/42', '/zh/inference/agentic/42'])(
+  it.each(['/infx/inference/agentic/42', '/zh/infx/inference/agentic/42'])(
     'preserves standalone agentic detail behavior at %s',
     (pathname) => {
       expect(dashboardShellCapabilitiesForPathname(pathname)).toEqual({
@@ -141,10 +143,10 @@ describe('dashboard route registry', () => {
   );
 
   it.each([
-    '/agentic-workload-explorer',
-    '/zh/agentic-workload-explorer',
-    '/agentic-workload-explorer/sessions/abc/timeline',
-    '/zh/agentic-workload-explorer/tool-analytics',
+    '/infx/agentic-workload-explorer',
+    '/zh/infx/agentic-workload-explorer',
+    '/infx/agentic-workload-explorer/sessions/abc/timeline',
+    '/zh/infx/agentic-workload-explorer/tool-analytics',
   ])('hides the dashboard tab strip on the explorer, which has its own nav, at %s', (pathname) => {
     expect(dashboardShellCapabilitiesForPathname(pathname)).toEqual({
       providers: { globalFilters: false, unofficialRuns: false },
@@ -153,7 +155,7 @@ describe('dashboard route registry', () => {
     });
   });
 
-  it.each(['/reliability', '/gpu-specs', '/submissions', '/feedback'])(
+  it.each(['/infx/reliability', '/infx/gpu-specs', '/infx/submissions', '/feedback'])(
     'keeps dashboard nudges active on provider-free route %s',
     (pathname) => {
       expect(dashboardShellCapabilitiesForPathname(pathname).dashboardNudge).toBe(true);
@@ -161,13 +163,13 @@ describe('dashboard route registry', () => {
   );
 
   it('resolves English, Chinese, canonical, and dashboard child paths', () => {
-    expect(dashboardRouteForPathname('/evaluation')?.key).toBe('evaluation');
-    expect(dashboardRouteForPathname('/zh/evaluation')?.key).toBe('evaluation');
-    expect(dashboardRouteForPathname('/inference')?.key).toBe('inference');
+    expect(dashboardRouteForPathname('/infx/evaluation')?.key).toBe('evaluation');
+    expect(dashboardRouteForPathname('/zh/infx/evaluation')?.key).toBe('evaluation');
+    expect(dashboardRouteForPathname('/infx/inference')?.key).toBe('inference');
     expect(dashboardRouteForPathname('/')).toBeUndefined();
-    expect(dashboardRouteForPathname('/zh/inference/agentic/42')?.key).toBe('inference');
-    expect(dashboardNavTabForPathname('/operatorx/model')).toBe('operatorx');
-    expect(dashboardNavTabForPathname('/zh/operatorx/moe')).toBe('operatorx');
+    expect(dashboardRouteForPathname('/zh/infx/inference/agentic/42')?.key).toBe('inference');
+    expect(dashboardNavTabForPathname('/opx/model')).toBe('operatorx');
+    expect(dashboardNavTabForPathname('/zh/opx/moe')).toBe('operatorx');
     expect(dashboardRouteForPathname('/compare/foo-vs-bar')).toBeUndefined();
     expect(isDashboardRouteKey('not-a-tab')).toBe(false);
   });
