@@ -564,12 +564,9 @@ describe('ingestGpuMetricsArtifact', () => {
         source: 'acpi',
         file_name: 'LOGS/power/cpu/samples.csv',
         sample_count: 3,
-        socket_count: 2,
       },
-      { hostname: 'host-b', source: 'rapl', sample_count: 1, socket_count: 1 },
+      { hostname: 'host-b', source: 'rapl', sample_count: 1 },
     ]);
-    expect(new Date(stored[0]!.started_at).getTime()).toBe(1789194365292);
-    expect(new Date(stored[0]!.ended_at).getTime()).toBe(1789194366292);
     const expectedSamples = [
       ['host-a', 0, 1789194365292, 97.5, 40.25, 15.5, null, 1450],
       ['host-a', 1, 1789194365292, 97.5, 41, 14, null, 1460],

@@ -327,31 +327,18 @@ function upsertCpuPowerSeries(
   },
 ): Promise<void> {
   const { samples } = input.host;
-  let startedAtMs = Infinity;
-  let endedAtMs = -Infinity;
-  for (const { timestampMs } of samples) {
-    startedAtMs = Math.min(startedAtMs, timestampMs);
-    endedAtMs = Math.max(endedAtMs, timestampMs);
-  }
   return sql.begin(async (tx) => {
     const [changed] = await tx<{ id: number }[]>`
       insert into cpu_power_series (
-        workflow_run_id, artifact_name, file_name, hostname, source, csv_sha256,
-        sample_count, socket_count, started_at, ended_at
+        workflow_run_id, artifact_name, file_name, hostname, source, csv_sha256, sample_count
       ) values (
         ${input.workflowRunId}, ${input.artifactName}, ${input.fileName}, ${input.host.hostname},
-        ${input.host.source}, ${input.csvSha256}, ${samples.length},
-        ${new Set(samples.map((sample) => sample.socketId)).size},
-        to_timestamp(${startedAtMs / 1000}::double precision),
-        to_timestamp(${endedAtMs / 1000}::double precision)
+        ${input.host.source}, ${input.csvSha256}, ${samples.length}
       )
       on conflict (workflow_run_id, artifact_name, file_name, hostname) do update set
         source = excluded.source,
         csv_sha256 = excluded.csv_sha256,
         sample_count = excluded.sample_count,
-        socket_count = excluded.socket_count,
-        started_at = excluded.started_at,
-        ended_at = excluded.ended_at,
         ingested_at = now()
       where ${input.replace}::boolean
         or cpu_power_series.csv_sha256 <> excluded.csv_sha256

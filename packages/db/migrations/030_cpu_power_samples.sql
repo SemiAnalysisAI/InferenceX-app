@@ -25,16 +25,12 @@ create table if not exists cpu_power_series (
   -- CSV path relative to the artifact root.
   file_name       text        not null,
   hostname        text        not null,
-  -- Exporter source of the socket meter, e.g. acpi (Grace) or rapl (AMD EPYC).
+  -- Exporter source of `power_w`: acpi (Grace), rapl (AMD EPYC) or dcgm.
   source          text        not null,
   csv_sha256      text        not null,
   sample_count    integer     not null,
-  socket_count    smallint    not null,
-  started_at      timestamptz not null,
-  ended_at        timestamptz not null,
   ingested_at     timestamptz not null default now(),
 
-  constraint cpu_power_series_window_ordered check (ended_at >= started_at),
   constraint cpu_power_series_unique unique (workflow_run_id, artifact_name, file_name, hostname)
 );
 
@@ -43,7 +39,8 @@ create table if not exists cpu_power_samples (
   series_id  bigint      not null references cpu_power_series(id) on delete cascade,
   socket_id  smallint    not null,
   sampled_at timestamptz not null,
-  -- The socket meter: the whole Grace socket (acpi) or the AMD package (rapl).
+  -- What the source reports for the socket: the whole Grace socket (acpi), the
+  -- AMD package (rapl), or the CPU rail only (dcgm field 1130).
   power_w    real        not null,
   -- Rails inside the socket; null when the source does not report them.
   cpu_rail_w real,
