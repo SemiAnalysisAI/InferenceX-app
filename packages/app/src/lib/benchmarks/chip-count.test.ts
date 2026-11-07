@@ -37,10 +37,8 @@ describe('explicit deployment chip counts', () => {
       }),
     ];
     for (const html of htmls) {
-      expect(html).toContain(
-        `${locale === 'en' ? 'Total chips' : '芯片总数'}${locale === 'en' ? ':' : '：'} 8`,
-      );
-      expect(html).toContain(`${locale === 'en' ? 'Parallelism strategy' : '并行策略'}EP8`);
+      expect(html).toContain(locale === 'en' ? '8 chips · EP8' : '8 芯片 · EP8');
+      expect(html).toContain('TP 1 · EP 8');
     }
   });
 
