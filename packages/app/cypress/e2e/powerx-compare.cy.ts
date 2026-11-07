@@ -167,7 +167,18 @@ describe('AgentX All in Measured chart and table', () => {
         .first()
         .find('.unofficial-overlay-pt')
         .should('have.length', 1);
-      cy.get('[data-testid="inference-table-view-btn"]').first().click();
+      // The GB200 rows, official and unofficial, have no facility estimate: named, not drawn.
+      cy.get('[data-testid="unplotted-power-note"]')
+        .first()
+        .should('contain.text', locale === 'en' ? 'Not drawn: 2 points' : '图中未绘制 2 个点')
+        .find('[data-reason="topology"]')
+        .should('contain.text', locale === 'en' ? 'Unsupported topology' : '不支持此拓扑')
+        .and('contain.text', 'GB200')
+        .find('[data-testid="unplotted-power-run-swatch"]')
+        .should('have.length', 1)
+        .and('have.attr', 'style')
+        .and('contain', 'var(--overlay-run-0)');
+      cy.get('[data-testid="unplotted-power-note"] button').first().click();
       cy.get('[data-testid="chart-figure"]')
         .first()
         .find('tbody tr')

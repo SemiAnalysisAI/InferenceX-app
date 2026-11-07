@@ -29,7 +29,7 @@ export function inferenceTableYValue(point: InferenceData, yPath?: string): numb
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
-type UnavailableReason = SystemPowerUnsupportedReason | 'energy' | 'model-unavailable';
+export type AllInUnavailableReason = SystemPowerUnsupportedReason | 'energy' | 'model-unavailable';
 
 const ALL_IN_MEASURED_ENERGY_FIELDS: ReadonlySet<string> = new Set<PowerBasisFieldKey>([
   'itModeledJPerOutputToken',
@@ -41,7 +41,7 @@ const ALL_IN_MEASURED_ENERGY_FIELDS: ReadonlySet<string> = new Set<PowerBasisFie
 export function allInMeasuredUnavailableReason(
   point: InferenceData,
   metricKey: string,
-): UnavailableReason | null {
+): AllInUnavailableReason | null {
   if (Number.isFinite(point[metricKey as YAxisMetricKey]?.y)) return null;
   if (point.modeledSystemPower?.status === 'unsupported') return point.modeledSystemPower.reason;
   if (
@@ -52,7 +52,7 @@ export function allInMeasuredUnavailableReason(
   return 'model-unavailable';
 }
 
-const REASONS: Record<UnavailableReason, Record<Locale, string>> = {
+const REASONS: Record<AllInUnavailableReason, Record<Locale, string>> = {
   workload: { en: 'Unsupported workload', zh: '不支持此工作负载' },
   hardware: { en: 'Unsupported hardware', zh: '不支持此硬件' },
   telemetry: { en: 'GPU telemetry missing or invalid', zh: 'GPU 遥测缺失或无效' },
@@ -63,6 +63,10 @@ const REASONS: Record<UnavailableReason, Record<Locale, string>> = {
   energy: { en: 'Measured energy unavailable', zh: '缺少实测能耗' },
   'model-unavailable': { en: 'All-in estimate unavailable', zh: '整体功耗估算不可用' },
 };
+
+export function allInMeasuredReasonLabel(reason: AllInUnavailableReason, locale: Locale): string {
+  return REASONS[reason][locale];
+}
 
 export function allInMeasuredStatusLabel(
   point: InferenceData,

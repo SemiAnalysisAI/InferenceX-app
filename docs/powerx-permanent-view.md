@@ -171,6 +171,16 @@ link still opens that view for locked visitors.
 - The footer carries no PowerX-specific note: the former collapsed "How we measure" details
   is gone, and only the shared /inference footer notes remain. The meaning of the GPU /
   IT / Facility tags lives in each pill's `title` (`POWER_BASIS_TAG_TITLES`), not in prose.
+- Points the chart cannot draw on a modeled boundary (IT, Facility, or the Count: All lines) are
+  named, not dropped silently. Every unavailable reason (`modelSystemPower` returning
+  `unsupported`, including `model-domain`) leaves no modeled watt figure, so there is no honest
+  y position for a hollow marker. Instead the shared chart notices under the plot carry
+  `UnplottedPowerNote`: the count of points with measured GPU power but no estimate, then one
+  line per reason (the table's Estimate status labels) listing each chip with its point count;
+  `?unofficialrun=` chips carry their run's legend color. "Show in table" opens the table,
+  whose status column gives the reason per row. `unplottedModeledPower` in
+  `power-chip-coverage.ts` builds the groups from the table rows, scoped by the same chip,
+  precision, quick-filter and overlay-visibility rules as the table.
 
 ### P0 additions (IT basis, headroom, load swings, labels)
 

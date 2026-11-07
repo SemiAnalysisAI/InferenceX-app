@@ -126,6 +126,12 @@ import { PowerXTutorialCta } from '@/components/powerx/powerx-tutorial-cta';
 
 import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from '@/components/ui/atom-engine-footnote';
 import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
+import { UnplottedPowerNote } from '@/components/inference/ui/UnplottedPowerNote';
+import { overlayRunIndex } from '@/lib/charts/overlay-run-style';
+import {
+  modeledPowerSeries,
+  unplottedModeledPower,
+} from '@/components/inference/utils/power-chip-coverage';
 import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
 import { ResultContext } from '@/components/ui/result-context';
 import { InferenceScenarioSelector } from './InferenceScenarioSelector';
@@ -1195,8 +1201,27 @@ export default function ChartDisplay({
                 point.framework !== undefined &&
                 getFrameworkLabel(point.framework).includes(ATOM_FOOTNOTE_MARKER),
             );
+            // Table rows keep the points a modeled IT or facility series cannot draw.
+            const modeledSeries = modeledPowerSeries(selectedYAxisMetric, powerCompare);
+            const unplottedRows =
+              modeledSeries.length > 0 && getViewMode(graphIndex) === 'chart'
+                ? (isGpuComparison ? visibleDateComparisonRows : visibleComparisonRows)(
+                    graph.tableData ?? footerOfficialRows,
+                    footerOverlay?.tableData
+                      ? { ...footerOverlay, data: footerOverlay.tableData }
+                      : footerOverlayRows,
+                  )
+                : null;
+            const unplottedPower = unplottedRows
+              ? unplottedModeledPower(
+                  unplottedRows.officialRows,
+                  unplottedRows.overlayRows,
+                  modeledSeries.map((series) => series.field),
+                  (point) => overlayRunIndex(point.run_url ?? null, runIndexByUrl),
+                )
+              : [];
             const footerNotices =
-              hasOffloadHalo || residentSequenceLengths ? (
+              hasOffloadHalo || residentSequenceLengths || unplottedPower.length > 0 ? (
                 <>
                   <div
                     data-testid="chart-status-notes"
@@ -1204,6 +1229,12 @@ export default function ChartDisplay({
                   >
                     {hasOffloadHalo && <OffloadHaloLegendKey />}
                   </div>
+                  <UnplottedPowerNote
+                    groups={unplottedPower}
+                    bases={modeledSeries.map((series) => series.basis)}
+                    labelStyle={powerXSurface ? 'count' : 'basis'}
+                    onShowTable={() => handleViewModeChange(graphIndex, 'table')}
+                  />
                   {residentSequenceLengths && !minimalChrome && !powerXSurface && (
                     <p
                       className="text-3xs leading-tight text-muted-foreground/70"
