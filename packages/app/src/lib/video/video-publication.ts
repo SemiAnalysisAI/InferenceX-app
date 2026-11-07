@@ -1,4 +1,4 @@
-import { at, rows, text, type Json } from '@/components/video-benchmark/bundle';
+import { at, number, rows, text, type Json } from '@/components/video-benchmark/bundle';
 
 export async function publishVideoResults({
   get,
@@ -11,7 +11,13 @@ export async function publishVideoResults({
   post: (body: { runId: string; artifactId: string; mergeRunId: string | null }) => Promise<Json>;
   runId: string;
   mergeRunId: string | null;
-  onStored: (run: string, artifact: string, sources: number) => void;
+  /** `quality` counts the attached reference pairs; null when no trusted quality exists yet. */
+  onStored: (
+    run: string,
+    artifact: string,
+    sources: number,
+    quality: number | 'failed' | null,
+  ) => void;
 }) {
   if (!/^[1-9]\d*$/u.test(runId) || !Number.isSafeInteger(Number(runId)))
     throw new Error('Invalid H3_RUN_ID');
@@ -37,12 +43,18 @@ export async function publishVideoResults({
         text(at(receipt, 'runId')) !== runId ||
         at(receipt, 'artifactId') !== Number(artifactId) ||
         text(at(receipt, 'artifactName')) !== text(at(artifact, 'name')) ||
-        at(receipt, 'mergeRunId') !== mergeRunId ||
+        // A manual republish names no merge run and gets the recorded approval back.
+        (mergeRunId !== null && at(receipt, 'mergeRunId') !== mergeRunId) ||
         !Array.isArray(at(receipt, 'sources')) ||
         rows(at(receipt, 'sources')).length === 0
       )
         throw new Error('Unexpected video publication receipt');
-      onStored(runId, artifactId, rows(at(receipt, 'sources')).length);
+      onStored(
+        runId,
+        artifactId,
+        rows(at(receipt, 'sources')).length,
+        at(receipt, 'quality') === 'failed' ? 'failed' : number(at(receipt, 'quality')),
+      );
     } catch (error) {
       failures.push(error);
     }

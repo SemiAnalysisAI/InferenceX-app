@@ -91,13 +91,18 @@ async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'comp
           stored.set(
             key,
             (async () => {
-              const response = await videoRuns(
-                sourceRequest(request, '/api/video-runs', {
-                  run: point.runId,
-                  artifact: String(point.artifactId),
-                  format: 'published',
-                }),
-              );
+              const read = (format: 'published' | 'live') =>
+                videoRuns(
+                  sourceRequest(request, '/api/video-runs', {
+                    run: point.runId,
+                    artifact: String(point.artifactId),
+                    format,
+                  }),
+                );
+              let response = await read('published');
+              // Like the UI, an unstored named run carries PSNR without media.
+              if (response.status === 204 && point.runId === state.unofficialRun)
+                response = await read('live');
               return response.status === 204 ? null : readResponse<StoredArtifact>(response);
             })(),
           );

@@ -14,7 +14,9 @@ import { loadFidelityBundle, type FidelityBundle } from '@/components/video-benc
 import {
   storedBundle,
   storedFidelityBundle,
+  withQuality,
   type StoredArtifact,
+  type StoredQuality,
   type StoredSource,
 } from '@/components/video-benchmark/stored';
 import { servingCells } from '@/components/video-benchmark/serving';
@@ -25,6 +27,8 @@ export const videoStorageEnabled = () => Boolean(process.env.BLOB_READ_WRITE_TOK
 const runPrefix = (runId: string) => `${PREFIX}/runs/${runId}/`;
 export const approvalPath = (runId: string, artifact: CIArtifact) =>
   `${PREFIX}/approvals/${runId}/${artifact.name}_${artifact.id}.json`;
+const qualityPath = (runId: string, artifact: CIArtifact) =>
+  `${PREFIX}/quality/${runId}/${artifact.name}_${artifact.id}.json`;
 const renditionsPrefix = `${PREFIX}/renditions/`;
 export const renditionMediaPath = (outputSha256: string) =>
   `${PREFIX}/objects/${outputSha256}/${RENDITION_PROFILE}.mp4`;
@@ -151,6 +155,80 @@ export async function readStoredArtifact(
     if (error instanceof BlobNotFoundError) return null;
     throw error;
   }
+}
+/** The artifact's separately stored quality attachment, or null before one is published. */
+export async function readStoredQuality(
+  runId: string,
+  artifact: CIArtifact,
+): Promise<StoredQuality | null> {
+  if (!videoStorageEnabled()) return null;
+  let metadata: Awaited<ReturnType<typeof head>>;
+  try {
+    metadata = await head(qualityPath(runId, artifact));
+  } catch (error) {
+    if (error instanceof BlobNotFoundError) return null;
+    throw error;
+  }
+  const response = await fetch(metadata.url, { signal: AbortSignal.timeout(30000) });
+  if (!response.ok) throw new Error('Stored quality unavailable');
+  const quality: StoredQuality = await response.json();
+  if (quality.version !== 1 || quality.runId !== runId || quality.artifactId !== artifact.id)
+    throw new Error('Stored quality identity mismatch');
+  return quality;
+}
+
+/**
+ * The stored index with its quality attachment, which is stored apart from the immutable index.
+ * Quality is optional, so a failed quality read still returns the index, marked incomplete so
+ * callers neither cache it nor hide the published media.
+ */
+export async function readPublishedArtifact(
+  runId: string,
+  artifact: CIArtifact,
+): Promise<{ saved: StoredArtifact | null; complete: boolean }> {
+  const [saved, quality] = await Promise.all([
+    readStoredArtifact(runId, artifact),
+    readStoredQuality(runId, artifact).catch(() => undefined),
+  ]);
+  return {
+    saved: saved && quality ? withQuality(saved, quality) : saved,
+    complete: quality !== undefined,
+  };
+}
+
+/** First write wins; a later attachment for the same artifact reads back the stored one. */
+export async function storeVideoQuality(
+  artifact: CIArtifact,
+  quality: StoredQuality,
+  signal: AbortSignal,
+): Promise<StoredQuality> {
+  await immutable(
+    qualityPath(quality.runId, artifact),
+    JSON.stringify(quality),
+    'application/json',
+    signal,
+  );
+  const written = await readStoredQuality(quality.runId, artifact);
+  if (!written) throw new Error('Stored quality readback failed');
+  return written;
+}
+
+/** Content-addressed like candidate media; downloads only when the object is not stored yet. */
+export async function storeReferenceMedia(
+  mediaSha256: string,
+  filename: string,
+  download: () => Promise<Blob>,
+  signal: AbortSignal,
+): Promise<string> {
+  const path = `${PREFIX}/objects/${mediaSha256}/${filename}`;
+  try {
+    const stored = await head(path);
+    return stored.url;
+  } catch (error) {
+    if (!(error instanceof BlobNotFoundError)) throw error;
+  }
+  const uploaded = await immutable(path, await download(), 'video/mp4', signal);
+  return uploaded.url;
 }
 export async function immutable(
   path: string,
@@ -291,7 +369,8 @@ export async function approveVideoPublication(
   const expected = expectedReceipt(runId, artifact, saved, mergeRunId);
   const existing = await readVideoPublication(runId, artifact, saved);
   if (existing) {
-    if (JSON.stringify(existing) !== JSON.stringify(expected))
+    // A manual republish names no merge run; it reuses the approval instead of asserting a new one.
+    if (mergeRunId !== null && JSON.stringify(existing) !== JSON.stringify(expected))
       throw new Error('Video publication already has a different merge identity');
     return existing;
   }

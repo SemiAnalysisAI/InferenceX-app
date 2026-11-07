@@ -5,6 +5,7 @@ import { BlobNotFoundError, head, put, list } from '@vercel/blob';
 import type * as BlobSdk from '@vercel/blob';
 import {
   approveVideoPublication,
+  readPublishedArtifact,
   readVideoPublication,
   readStoredArtifact,
   renditionPreviews,
@@ -115,6 +116,10 @@ describe('persistent H3 media', () => {
     await expect(
       approveVideoPublication('10', withDigest, saved, '100', new AbortController().signal),
     ).rejects.toThrow('different merge identity');
+    // A manual republish names no merge run and reuses the approval.
+    expect(
+      await approveVideoPublication('10', withDigest, saved, null, new AbortController().signal),
+    ).toEqual(approved);
     expect(vi.mocked(put).mock.calls).toHaveLength(before + 1);
     vi.mocked(list).mockResolvedValue({
       blobs: [
@@ -290,6 +295,21 @@ describe('persistent H3 media', () => {
     expect(fetcher).toHaveBeenCalledWith(indexUrl, { signal: expect.any(AbortSignal) });
   });
 
+  it('serves the stored index when its quality attachment cannot be read', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    const indexUrl =
+      'https://test.public.blob.vercel-storage.com/h3-video-media/v1/runs/10/h3-video-10-1_20.json';
+    const saved = { storageVersion: 1, runId: '10', artifact, sources: [] };
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url) =>
+      Promise.resolve(
+        url === indexUrl ? Response.json(saved) : new Response('unavailable', { status: 500 }),
+      ),
+    );
+    expect(await readPublishedArtifact('10', { ...artifact, indexUrl })).toEqual({
+      saved,
+      complete: false,
+    });
+  });
   it('publishes verified files before the index and restores metadata without media bytes', async () => {
     const result = await storeVideoArtifact(
       '10',

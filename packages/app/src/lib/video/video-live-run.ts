@@ -64,12 +64,13 @@ async function rangeRead(url: string, start: number, end: number, signal: AbortS
   return bytes;
 }
 
-async function readArtifact(
-  runId: string,
+/** Range-reads only the ZIP members `include` selects, never the whole archive. */
+export async function artifactFiles(
   artifact: CIArtifact,
   github: GithubRead,
   signal: AbortSignal,
-): Promise<StoredArtifact> {
+  include: (path: string) => boolean,
+) {
   const redirect = await github(`/actions/artifacts/${artifact.id}/zip`, signal, {
     redirect: 'manual',
   });
@@ -77,11 +78,20 @@ async function readArtifact(
   const location = redirect.headers.get('location');
   if (redirect.status < 300 || redirect.status >= 400 || !location?.startsWith('https://'))
     throw new Error('Artifact download unavailable');
-  const files = await readZipEntries(
+  return readZipEntries(
     (start, end) => rangeRead(location, start, end, signal),
     artifact.size_in_bytes,
-    isDocument,
+    include,
   );
+}
+
+async function readArtifact(
+  runId: string,
+  artifact: CIArtifact,
+  github: GithubRead,
+  signal: AbortSignal,
+): Promise<StoredArtifact> {
+  const files = await artifactFiles(artifact, github, signal, isDocument);
   if (files.has('index.json')) throw new Error('Exported archives are not read live');
   const bundle = await loadBundle((path) => {
     const bytes = files.get(path);
@@ -159,4 +169,16 @@ export async function liveVideoRunPage(
     }),
   );
   return { schemaVersion: 1, entries, nextPage: null };
+}
+
+/** The documents of one unstored result artifact, or null when it is not a current result of the run. */
+export function liveVideoArtifact(
+  runId: string,
+  artifactId: number,
+  artifacts: CIArtifact[],
+  github: GithubRead,
+  signal: AbortSignal,
+): Promise<StoredArtifact | null> {
+  const artifact = latestResults(runId, artifacts).find((item) => item.id === artifactId);
+  return artifact ? cachedArtifact(runId, artifact, github, signal) : Promise.resolve(null);
 }

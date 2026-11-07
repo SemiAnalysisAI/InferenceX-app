@@ -13,13 +13,13 @@ import { dashboardCells, namedRunPoints, videoPoints } from '@/components/video-
 import { parseResultsState, resultProjection } from '@/components/video-benchmark/results';
 import { servingFixture } from '@/components/video-benchmark/serving.fixture';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
-import { verifiedReferencePairs } from '@/components/video-benchmark/reference-quality';
+import { verifiedQuality } from '@/components/video-benchmark/reference-quality';
 import {
   publishedResultsSide,
   resultsClipEvidence,
   resultsClipPoints,
 } from '@/components/video-benchmark/results-clips';
-import type { StoredArtifact } from '@/components/video-benchmark/stored';
+import { withQuality, type StoredArtifact } from '@/components/video-benchmark/stored';
 import {
   metricOptions,
   readVideoDashboardState,
@@ -195,12 +195,12 @@ describe('published VideoGenX dashboard projection', () => {
     const official = referenceQualityFixture(20, '124', 8, '4'.repeat(64));
     official.attachment.pairs[0].comparison.metrics.video_psnr_db = 35;
     for (const f of [named, official]) {
-      f.stored.quality = verifiedReferencePairs(
+      f.stored.quality = verifiedQuality(
         f.attachment,
-        f.receipts,
-        [f.stored],
+        f.descriptor,
+        f.stored,
         '9'.repeat(64),
-      );
+      ).pairs;
       const mediaPath = f.attachment.pairs[0].candidate.media_path;
       f.stored.sources[0].assets = [
         [mediaPath, { url: `/${f.stored.runId}.mp4`, downloadUrl: `/${f.stored.runId}.mp4` }],
@@ -262,15 +262,21 @@ describe('published VideoGenX dashboard projection', () => {
       nextPage: null,
       entries: [{ ...videoHistoryEntry(official, '2026-09-20T00:00:00Z'), approved: true }],
     };
+    const named = referenceQualityFixture(20);
     const live: VideoHistoryPage = {
       schemaVersion: 1,
       nextPage: null,
-      entries: [liveHistoryEntry(referenceQualityFixture(20).stored)],
+      entries: [liveHistoryEntry(named.stored)],
     };
+    const liveArtifact = withQuality(
+      named.stored,
+      verifiedQuality(named.attachment, named.descriptor, named.stored, '9'.repeat(64)),
+    );
     source.mockImplementation((req: NextRequest) => {
       const query = req.nextUrl.searchParams;
       if (query.get('format') === 'history') return Response.json(history);
-      if (query.get('format') === 'live' && query.get('run') === '123') return Response.json(live);
+      if (query.get('format') === 'live' && query.get('run') === '123')
+        return Response.json(query.get('artifact') === '7' ? liveArtifact : live);
       return new Response(null, { status: 204 });
     });
     const response = await GET(request('view=overview&unofficialrun=123'));
@@ -286,6 +292,12 @@ describe('published VideoGenX dashboard projection', () => {
     expect(body.cells.map((cell: { point: { runId: string } }) => cell.point.runId)).toEqual([
       '124',
     ]);
+    const [clip] = body.clipQuality.groups[0].clips;
+    expect([
+      clip.quality.candidate.run_id,
+      clip.quality.psnrDb,
+      clip.quality.reference.url,
+    ]).toEqual(['123', 25, '']);
   });
 
   it('returns the same results-page selection and economics with read-only stored media metadata', async () => {

@@ -12,7 +12,7 @@ import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import {
   immutable,
-  readStoredArtifact,
+  readPublishedArtifact,
   renditionMediaPath,
   renditionPreviews,
   renditionReceiptPath,
@@ -82,13 +82,23 @@ const indexes = run
 let unreadable = 0;
 const saved = await Promise.all(
   indexes.map(({ runId, artifact }) =>
-    readStoredArtifact(runId, artifact).catch((error: unknown) => {
-      unreadable++;
-      console.error(
-        `unreadable run ${runId} artifact ${artifact.id}: ${error instanceof Error ? error.message : error}`,
-      );
-      return null;
-    }),
+    readPublishedArtifact(runId, artifact).then(
+      (published) => {
+        // Its candidate clips still encode; the reference clips wait for a readable attachment.
+        if (!published.complete) {
+          unreadable++;
+          console.error(`unreadable quality for run ${runId} artifact ${artifact.id}`);
+        }
+        return published.saved;
+      },
+      (error: unknown) => {
+        unreadable++;
+        console.error(
+          `unreadable run ${runId} artifact ${artifact.id}: ${error instanceof Error ? error.message : error}`,
+        );
+        return null;
+      },
+    ),
   ),
 );
 const artifacts = saved.flatMap((item) => (item ? [item] : []));
