@@ -75,7 +75,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-collectivex-view',
-    sourceSha256: '5726230a6ba1d4892c70250e947d3e088f610b5b69e76b1f76dd0704bc75e985',
+    sourceSha256: '2371540feb4d625bddc9a8dbd1a89fd4d187e011c5afde0eae05479778d02e57',
   },
   {
     source: 'src/app/api/v1/views/compare/route.ts',
