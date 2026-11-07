@@ -297,6 +297,7 @@ describe('landing model curation', () => {
       cy.reload();
       cy.location('pathname').should('eq', `${prefix}/infx/inference/glm-5-3`);
       cy.get('[data-testid="model-selector"]').should('contain.text', 'GLM5.3');
+      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
       cy.go('back');
       cy.location('pathname').should('eq', prefix || '/');
     });
