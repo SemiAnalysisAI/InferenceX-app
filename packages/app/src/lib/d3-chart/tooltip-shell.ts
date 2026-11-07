@@ -3,8 +3,6 @@ import { escapeHtml } from '@/lib/shared/utils';
 export interface ChartTooltipShellOptions {
   /** Pinned tooltips allow text selection. Omit for tooltips that never pin. */
   pinned?: boolean;
-  /** CSS border shorthand. Defaults to the theme hairline. */
-  border?: string;
   minWidth?: number;
   /** Caps the width, and never wider than the viewport minus a gutter. */
   maxWidth?: number;
@@ -20,18 +18,11 @@ export interface ChartTooltipShellOptions {
  * strips it.
  */
 export function chartTooltipShellStyle(options: ChartTooltipShellOptions = {}): string {
-  const {
-    pinned,
-    border = '1px solid var(--border)',
-    minWidth,
-    maxWidth,
-    interactive,
-    scrollable,
-  } = options;
+  const { pinned, minWidth, maxWidth, interactive, scrollable } = options;
   const styles = [
     'background: var(--popover)',
     'color: var(--popover-foreground)',
-    `border: ${border}`,
+    'border: 1px solid var(--border)',
     'border-radius: 8px',
     'padding: 12px',
     'box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1)',
@@ -103,7 +94,7 @@ export function chartHoverCard(
     ? `<span style="min-width: 0;">${escapeHtml(title)} <span style="font-weight: 400; color: var(--muted-foreground);">${escapeHtml(subtitle)}</span></span>`
     : escapeHtml(title);
   return chartTooltipShell(
-    `${warning ? `<div style="color: #dc2626; font-size: 11px; font-weight: 600; margin-bottom: 4px;">${escapeHtml(warning)}</div>` : ''}${chartTooltipTitle(heading, color)}${values ? `<div style="display: flex; flex-wrap: wrap; gap: 4px 20px;">${values}</div>` : ''}${body ? `<div style="margin-top: 6px;">${body}</div>` : ''}${summary ? `<div style="margin-top: 6px; font-size: 11px; line-height: 14px; color: var(--muted-foreground); font-variant-numeric: tabular-nums;">${escapeHtml(summary)}</div>` : ''}`,
+    `${warning ? `<div data-hover-notice style="color: #dc2626; font-size: 11px; font-weight: 600; margin-bottom: 4px;">${escapeHtml(warning)}</div>` : ''}${chartTooltipTitle(heading, color)}${values ? `<div style="display: flex; flex-wrap: wrap; gap: 4px 20px;">${values}</div>` : ''}${body ? `<div style="margin-top: 6px;">${body}</div>` : ''}${summary ? `<div style="margin-top: 6px; font-size: 11px; line-height: 14px; color: var(--muted-foreground); font-variant-numeric: tabular-nums;">${escapeHtml(summary)}</div>` : ''}`,
     { maxWidth: 280, ...options },
   );
 }

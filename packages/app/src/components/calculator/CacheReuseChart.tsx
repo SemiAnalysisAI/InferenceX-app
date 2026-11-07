@@ -434,10 +434,7 @@ const CacheReuseChart = React.memo(
             bar,
             tooltipStateRef.current,
           );
-          return chartHoverCard(
-            { title, subtitle, warning, metrics: [...metrics], summary },
-            { border: warning ? '2px solid #dc2626' : undefined },
-          );
+          return chartHoverCard({ title, subtitle, warning, metrics: [...metrics], summary });
         },
         details: (bar: CacheReuseBar, _isOverlay: boolean, close: () => void) => {
           const { summary: _summary, ...details } = cacheReusePointDetails(

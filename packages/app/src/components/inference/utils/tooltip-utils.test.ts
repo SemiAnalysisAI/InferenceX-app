@@ -873,9 +873,28 @@ describe('buildPointDetails for unofficial overlays', () => {
     };
   }
 
-  it('includes red border style on the hover card', () => {
-    const html = generateHoverTooltipContent({ ...overlayConfig(), color: 'red' });
-    expect(html).toContain('border: 2px solid #dc2626');
+  it('builds the overlay hover card and details from the official builders plus the notice', () => {
+    const official = generateHoverTooltipContent({ ...tooltipConfig(), color: 'red' });
+    const overlay = generateHoverTooltipContent({ ...overlayConfig(), color: 'red' });
+    const notice = /<div data-hover-notice[^>]*>(?<text>[^<]*)<\/div>/u.exec(overlay);
+    expect(notice?.groups?.text).toBe('✕ Unofficial run · feature-branch');
+    expect(official).not.toContain('data-hover-notice');
+    expect(overlay.replace(notice![0], '')).toBe(official);
+
+    const {
+      html: officialHtml,
+      unofficial: officialNotice,
+      ...officialFields
+    } = buildPointDetails(tooltipConfig());
+    const { html: overlayHtml, unofficial, ...overlayFields } = buildPointDetails(overlayConfig());
+    expect(officialNotice).toBeUndefined();
+    expect(unofficial).toBe('✕ Unofficial run');
+    expect(overlayFields).toEqual(officialFields);
+    const branchLine = '<div class="tooltip-line"><strong>Branch:</strong> feature-branch</div>';
+    expect(overlayHtml).toContain(branchLine);
+    expect(
+      overlayHtml.replace(branchLine, '').replace('<div class="pinned-section"></div>', ''),
+    ).toBe(officialHtml);
   });
 
   it('includes "UNOFFICIAL RUN" label', () => {

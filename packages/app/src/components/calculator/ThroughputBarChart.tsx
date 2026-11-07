@@ -418,17 +418,14 @@ export function getThroughputPointDetails(
 }
 
 export function generateTooltipHTML(details: ThroughputPointDetails, color: string): string {
-  return chartHoverCard(
-    {
-      title: details.title,
-      subtitle: details.subtitle,
-      color,
-      metrics: details.metrics,
-      summary: details.note ? `${details.summary} · ${details.note}` : details.summary,
-      warning: details.warning,
-    },
-    { border: details.warning ? '2px solid #dc2626' : undefined },
-  );
+  return chartHoverCard({
+    title: details.title,
+    subtitle: details.subtitle,
+    color,
+    metrics: details.metrics,
+    summary: details.note ? `${details.summary} · ${details.note}` : details.summary,
+    warning: details.warning,
+  });
 }
 
 const getLabel = getResultLabel;

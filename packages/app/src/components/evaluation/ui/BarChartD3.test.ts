@@ -110,6 +110,26 @@ describe('evaluation chart locale presentation', () => {
     expect(html).not.toContain('Click elsewhere');
   });
 
+  it('builds the overlay hover card and details from the official builders plus the notice', () => {
+    const datum = makeDatum('B200 SGLang', 0.9);
+    const official = generateEvaluationTooltipContent(datum, '#000');
+    const overlay = generateEvaluationTooltipContent(datum, '#000', 'feat/x');
+    const notice =
+      '<div data-hover-notice style="color: #dc2626; font-size: 11px; font-weight: 600; margin-bottom: 4px;">✕ Unofficial run · feat/x</div>';
+    expect(overlay.replace(notice, '')).toBe(official);
+
+    const { warning, rows, ...overlayFields } = evaluationPointDetails(datum, 'feat/x');
+    const {
+      warning: officialWarning,
+      rows: officialRows,
+      ...officialFields
+    } = evaluationPointDetails(datum);
+    expect(officialWarning).toBeUndefined();
+    expect(warning).toBe('✕ Unofficial run');
+    expect(overlayFields).toEqual(officialFields);
+    expect(rows).toEqual([{ label: 'Branch', value: 'feat/x', wide: true }, ...officialRows]);
+  });
+
   it('preserves the raw English date while formatting the Chinese date', () => {
     expect(formatEvaluationDate('2026-01-02', 'en')).toBe('2026-01-02');
     expect(formatEvaluationDate('2026-01-02', 'zh')).toBe('2026年1月2日');

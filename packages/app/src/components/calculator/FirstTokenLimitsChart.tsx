@@ -404,17 +404,14 @@ const FirstTokenLimitsChart = React.memo(
             bar,
             tooltipStateRef.current,
           );
-          return chartHoverCard(
-            {
-              title,
-              subtitle,
-              warning,
-              metrics: [...metrics],
-              summary,
-              color: barColorRef.current(bar),
-            },
-            { border: warning ? '2px solid #dc2626' : undefined },
-          );
+          return chartHoverCard({
+            title,
+            subtitle,
+            warning,
+            metrics: [...metrics],
+            summary,
+            color: barColorRef.current(bar),
+          });
         },
         details: (bar: FirstTokenBar, _isOverlay: boolean, close: () => void) => {
           const { summary: _summary, ...details } = firstTokenPointDetails(

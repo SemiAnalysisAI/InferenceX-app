@@ -200,17 +200,14 @@ export const generateEvaluationTooltipContent = (
   locale: Locale = 'en',
 ): string => {
   const details = evaluationPointDetails(data, unofficialBranch, locale);
-  return chartHoverCard(
-    {
-      title: details.title,
-      subtitle: details.subtitle,
-      color,
-      metrics: [details.metrics[0]],
-      summary: unofficialBranch ? `${unofficialBranch} · ${details.summary}` : details.summary,
-      warning: details.warning,
-    },
-    { border: unofficialBranch ? '2px solid #dc2626' : undefined },
-  );
+  return chartHoverCard({
+    title: details.title,
+    subtitle: details.subtitle,
+    color,
+    metrics: [details.metrics[0]],
+    summary: details.summary,
+    warning: details.warning && `${details.warning} · ${unofficialBranch}`,
+  });
 };
 
 function formatYAxisLabels(axisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) {

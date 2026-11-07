@@ -1117,7 +1117,7 @@ const GPUGraph = React.memo(
           selectedYAxisMetric,
           hardwareConfig,
           overlayData: isOverlay ? (overlayData ?? undefined) : undefined,
-          comparisonDate: !isOverlay,
+          comparisonDate: true,
           comparisonLabel: comparisonEntryLabel(d.date, runNumbering),
           showPowerTelemetry: showPowerTelemetryRef.current,
           runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
@@ -1244,7 +1244,7 @@ const GPUGraph = React.memo(
             tooltip,
             handle: chartRef.current,
             panel: true,
-            content: (point) => (overlayData ? hoverCard(point, true) : ''),
+            content: (point) => hoverCard(point, true),
             position: (event) => {
               const [mouseX, mouseY] = d3.pointer(event, container);
               return computeTooltipPosition(mouseX, mouseY, tooltip, container);
@@ -1296,7 +1296,6 @@ const GPUGraph = React.memo(
       visibleOverlayPoints,
       showOffloadingLabel,
       overlayRunOf,
-      overlayData,
       showPointLabels,
       pointLabelsVisible,
       useAdvancedLabels,

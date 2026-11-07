@@ -1169,7 +1169,6 @@ export const generateHoverTooltipContent = (config: HoverTooltipConfig): string 
     `<span style="white-space: nowrap;"><span style="color: var(--foreground); font-weight: 600;">${v}</span> <span style="color: var(--muted-foreground);">${escapeHtml(axisLabelUnit(label))}</span></span>`;
   const shell = chartTooltipShellStyle({
     pinned: false,
-    border: overlayData ? '2px solid #dc2626' : undefined,
     minWidth: 240,
     maxWidth: 320,
   });

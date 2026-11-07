@@ -1475,10 +1475,10 @@ export default function PowerTimeline({
       const tdpShare = tdp > 0 ? (sample.y / (tdp * (pool ? pool.gpuCount : 1))) * 100 : null;
       return {
         title: seriesLabel(point),
-        subtitle: `${traceConfigLabel(point)}${
-          overlayInfo ? ` · ✕ ${overlayInfo.branch || `run ${overlayInfo.id}`}` : ''
-        }`,
-        warning: overlayInfo ? `✕ ${t.unofficialRun}` : undefined,
+        subtitle: traceConfigLabel(point),
+        warning: overlayInfo
+          ? `✕ ${t.unofficialRun} · ${overlayInfo.branch || `run ${overlayInfo.id}`}`
+          : undefined,
         time:
           xMode === 'serving'
             ? `${sample.x.toFixed(1)} s · ${t.serving} · ${clock}`

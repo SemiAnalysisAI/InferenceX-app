@@ -227,13 +227,14 @@ describe('generateHoverTooltipContent', () => {
     expect(text).not.toContain('CPU 24.2%');
   });
 
-  it('marks unofficial runs with a red border and label', () => {
+  it('marks unofficial runs with the notice on the official card shell', () => {
     const html = generateHoverTooltipContent({
       ...config(agenticPoint()),
       overlayData: { label: 'feature-branch', hardwareConfig, data: [] } as never,
       color: 'red',
     });
-    expect(html).toContain('border: 2px solid #dc2626');
+    expect(html).toContain('border: 1px solid var(--border)');
+    expect(html).toContain('data-hover-notice');
     expect(html).toContain('Unofficial run');
   });
 
