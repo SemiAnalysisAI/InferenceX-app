@@ -188,10 +188,10 @@ export function ChartPointDetails<A extends string = string>({
                     target={external ? '_blank' : undefined}
                     rel={external ? 'noopener noreferrer' : undefined}
                   >
-                    {link.label} {external ? '↗' : '→'}
+                    {link.label}
                   </a>
                 ) : (
-                  <>{link.label} →</>
+                  link.label
                 )}
               </Button>
             );
