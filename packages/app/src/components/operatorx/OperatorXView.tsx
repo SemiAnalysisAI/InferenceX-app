@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 
 import { Card } from '@/components/ui/card';
-import { Heading } from '@/components/ui/heading';
+import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useOperatorXModel } from '@/hooks/api/use-operatorx';
 import { useClientSearch } from '@/hooks/useClientSearch';
@@ -62,14 +62,11 @@ export default function OperatorXView() {
       data-testid="operatorx-page"
     >
       <Card>
-        <div className="flex items-baseline gap-2">
-          <Heading as="h1" level="title">
-            OperatorX
-          </Heading>
-          <span className="text-xs text-muted-foreground" data-testid="operatorx-maturity">
-            {locale === 'zh' ? '实验性' : 'Experimental'}
-          </span>
-        </div>
+        <DashboardSectionHeader
+          headingAs="h1"
+          title="OperatorX"
+          qualifier={locale === 'zh' ? '实验性' : 'Experimental'}
+        />
         <TabsList className="mt-4">
           {CATEGORIES.map((c) => (
             <TabsTrigger key={c.value} value={c.value}>

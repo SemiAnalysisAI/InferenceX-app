@@ -64,8 +64,10 @@ it('shows measured and missing GPU coverage, then switches the URL to MoE', () =
 
   cy.visit('/operatorx');
   cy.wait('@gemm');
-  cy.get('[data-testid="operatorx-page"] h1').should('have.text', 'OperatorX');
-  cy.get('[data-testid="operatorx-maturity"]').should('have.text', 'Experimental');
+  cy.get('[data-testid="operatorx-page"] h1')
+    .should('contain.text', 'OperatorX')
+    .find('[data-slot="badge"]')
+    .should('have.text', 'Experimental');
   cy.get('[data-testid="operatorx-coverage"]')
     .should('contain.text', 'Coverage of 2 cases')
     .and('contain.text', '2/2')
