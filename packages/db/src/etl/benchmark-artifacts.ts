@@ -28,6 +28,19 @@ export interface BenchmarkArtifactFile {
   unreadable?: string;
 }
 
+function requiredPowerSkip(
+  file: string,
+  point: BenchmarkParams,
+  raw: Record<string, unknown>,
+): string {
+  const { model, hardware, framework, precision } = point.config;
+  const why =
+    point.metrics.power_valid === undefined
+      ? `power_missing ${String(raw.power_missing ?? 'unspecified')}`
+      : `power_invalid_reasons ${(point.powerInvalidReasons ?? []).join(',') || 'none recorded'}`;
+  return `${file}: ${model} ${hardware} ${framework} ${precision} ${point.benchmarkType} conc ${point.conc}: ${why}`;
+}
+
 export function readBenchmarkArtifacts(
   root: string,
   options: { runId: number | string | null; tracker: SkipTracker },
@@ -62,6 +75,12 @@ export function readBenchmarkArtifacts(
         const raw = value as Record<string, unknown>;
         const failedBefore = options.tracker.skips.failedRun;
         const mapped = mapBenchmarkRow(raw, options.tracker, undefined, options.runId);
+        // REQUIRE_POWER failed this point; AgentX results upload even from a failed job.
+        if (mapped && raw.require_power === true && mapped.metrics.power_valid !== 1) {
+          options.tracker.requiredPowerSkips.push(requiredPowerSkip(file.path, mapped, raw));
+          file.rows.push({ raw, mapped: null, failed: true });
+          continue;
+        }
         file.rows.push({ raw, mapped, failed: options.tracker.skips.failedRun !== failedBefore });
       }
     }

@@ -157,8 +157,15 @@ must use the append-only contract below.
 
 InferenceX enforces required power per benchmark job: a matrix row with
 `require-power: true` runs with `REQUIRE_POWER=1`, and an invalid measurement window
-fails that job. Without the flag the row records `power_valid=0`. Ingest has no
-separate required-power gate; it publishes the rows the sweep uploaded.
+fails that job. Without the flag the row records `power_valid=0`. Each result row
+also carries `require_power`. Fixed-sequence results upload only from a passing job,
+but AgentX results upload even from a failed one, so ingest treats a row with
+`require_power: true` and `power_valid` other than 1 as a failed point. It publishes
+nothing for that row, and lists it with its config, concurrency, and
+`power_invalid_reasons` or `power_missing` under "Required-power points not published"
+in the ingest summary. The receipt carries it as a known-failed publication warning,
+which is not fatal, so the run's other points still publish. Rows without
+`require_power` (older artifacts) are unaffected.
 
 ### Retried Attempts
 

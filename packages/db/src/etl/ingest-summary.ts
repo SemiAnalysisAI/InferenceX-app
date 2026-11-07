@@ -29,7 +29,14 @@ export function printIngestSummaryFooter(
     console.log(`    changelog_entries ${totals.changelogEntries}`);
   }
 
-  const { skips, unmappedModels, unmappedHws, unmappedPrecisions, unexpectedMetrics } = tracker;
+  const {
+    skips,
+    unmappedModels,
+    unmappedHws,
+    unmappedPrecisions,
+    unexpectedMetrics,
+    requiredPowerSkips,
+  } = tracker;
   const skipLines: [string, number][] = [['no isl/osl (old format)', skips.noIslOsl]];
   if (options?.includeFailedRuns) {
     skipLines.push(['failed run (0 successful)', skips.failedRun]);
@@ -37,6 +44,7 @@ export function printIngestSummaryFooter(
   skipLines.push(
     ['unmapped model', skips.unmappedModel],
     ['unmapped hw', skips.unmappedHw],
+    ['required power invalid', requiredPowerSkips.length],
     ['bad/empty zip', skips.badZip],
     ['DB errors', skips.dbError],
     ['telemetry errors (non-fatal)', skips.telemetryError],
@@ -50,6 +58,11 @@ export function printIngestSummaryFooter(
     for (const [label, count] of nonzeroSkipLines) {
       console.log(`    ${label.padEnd(pad)}: ${count}`);
     }
+  }
+
+  if (requiredPowerSkips.length > 0) {
+    console.log(`\n  Required-power points not published (require_power without valid power):`);
+    for (const line of requiredPowerSkips) console.log(`    ${line}`);
   }
 
   if (unmappedModels.size > 0) {

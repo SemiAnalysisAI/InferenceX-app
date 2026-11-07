@@ -74,6 +74,7 @@ const NON_METRIC_KEYS = new Set([
   'power_invalid_reasons',
   'power_audit',
   'benchmark_outcome',
+  'require_power',
 ]);
 
 export type BenchmarkType = 'single_turn' | 'agentic_traces';
