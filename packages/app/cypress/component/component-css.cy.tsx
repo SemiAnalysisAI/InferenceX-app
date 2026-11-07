@@ -523,8 +523,8 @@ describe('component CSS harness', () => {
           const action = button.getBoundingClientRect();
           expect(action.right, 'action remains inside the card').to.be.at.most(bounds.right);
           if (width < 640) {
-            expect(action.top, 'mobile actions follow the description').to.be.greaterThan(
-              description.bottom,
+            expect(action.bottom, 'mobile actions stay above the description').to.be.at.most(
+              description.top,
             );
           } else {
             expect(action.left, 'desktop actions do not overlap the description').to.be.greaterThan(
@@ -554,7 +554,7 @@ describe('component CSS harness', () => {
         const direct = card
           .querySelector('[data-testid="direct-content"]')!
           .getBoundingClientRect();
-        const padding = width < 640 ? 12 : width < 768 ? 16 : 24;
+        const padding = width < 768 ? 16 : 24;
         expect(getComputedStyle(card).paddingLeft).to.equal(`${padding}px`);
         for (const slot of ['card-header', 'card-content', 'card-footer']) {
           const bounds = card.querySelector(`[data-slot="${slot}"]`)!.getBoundingClientRect();

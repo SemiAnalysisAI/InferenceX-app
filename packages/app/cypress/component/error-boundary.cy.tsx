@@ -12,7 +12,7 @@ describe('App error boundary localization', () => {
     cy.stub(console, 'error');
 
     cy.mount(
-      <PathnameContext.Provider value="/inference">
+      <PathnameContext.Provider value="/infx/inference">
         <AppError
           error={Object.assign(new Error('fixture failure'), { digest: 'en-1' })}
           reset={reset}
@@ -40,7 +40,7 @@ describe('App error boundary localization', () => {
     cy.viewport(375, 812);
 
     cy.mount(
-      <PathnameContext.Provider value="/zh/inference">
+      <PathnameContext.Provider value="/zh/infx/inference">
         <AppError error={Object.assign(new Error(message), { digest: 'zh-1' })} reset={reset} />
       </PathnameContext.Provider>,
     );
@@ -68,6 +68,7 @@ describe('Not-found recovery analytics', () => {
   it('tracks the locale when returning from a Chinese 404', () => {
     const capture = cy.stub().as('capture');
     registerAnalyticsClient({ capture });
+    cy.viewport(375, 812);
 
     cy.mount(<NotFoundContent locale="zh" />);
     cy.contains('a[href="/zh"]', '返回首页')

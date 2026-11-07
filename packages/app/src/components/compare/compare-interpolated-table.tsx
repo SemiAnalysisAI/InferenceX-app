@@ -29,7 +29,7 @@ const STRINGS = {
 const METRIC_LABELS_ZH: Record<string, string> = {
   'Throughput (tok/s/chip)': '吞吐量（tok/s/chip）',
   'Cost ($/M tok)': '成本（$/M tok）',
-  'Dollar per Million Tokens': '每百万 token 成本（美元）',
+  'Dollars per million tokens': '每百万 token 成本（美元）',
   Concurrency: '并发数',
 };
 
@@ -82,7 +82,8 @@ const METRICS: MetricRow[] = [
   {
     label: 'Throughput (tok/s/chip)',
     extract: (r) => r.value,
-    format: (v) => v.toFixed(1),
+    format: (v) =>
+      v.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
     direction: 'higher',
   },
   {
@@ -94,7 +95,7 @@ const METRICS: MetricRow[] = [
   {
     label: 'tok/s/MW',
     extract: (r) => r.tpPerMw,
-    format: (v) => v.toFixed(0),
+    format: (v) => Math.round(v).toLocaleString('en-US'),
     direction: 'higher',
   },
   {
@@ -238,30 +239,31 @@ export function CompareInterpolatedTable({
     [commitColumnTarget],
   );
 
-  const winnerClass = 'text-primary font-semibold';
+  const winnerClass = 'font-semibold text-foreground';
 
   if (columns.length === 0) return null;
 
   return (
-    <div className="overflow-hidden rounded-md border border-border/50">
-      <div className="border-b border-border/50 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-        {t.hint}
-      </div>
+    <div className="mt-3 flex flex-col gap-2">
+      <p className="text-xs text-muted-foreground">{t.hint}</p>
       <div
         tabIndex={0}
         role="region"
         aria-label={t.table}
-        className="overflow-x-auto focus-visible:outline-none"
+        className="overflow-x-auto rounded-lg border border-border/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <table className="w-full text-sm" data-testid="compare-interpolated-table">
-          <thead className="bg-muted/30">
-            <tr className="border-b border-border/40">
-              <th className="sticky left-0 z-10 min-w-36 max-w-44 border-r border-border/40 bg-card px-3 py-2 text-left font-medium text-muted-foreground backdrop-blur-sm">
+          <thead>
+            <tr className="border-b border-border/30">
+              <th className="sticky left-0 z-10 min-w-36 max-w-44 border-r border-border/30 bg-card px-3 py-2 text-left align-bottom text-xs font-medium text-muted-foreground">
                 {t.metric}
               </th>
               {columns.map((col, ci) => (
-                <th key={ci} className="px-3 py-2 text-center font-medium min-w-[180px]">
-                  <div className="flex flex-col items-center gap-1">
+                <th
+                  key={ci}
+                  className="min-w-45 border-r border-border/30 px-3 py-2 text-right font-medium last:border-r-0"
+                >
+                  <div className="flex flex-col items-end gap-1.5">
                     <span className="text-xs text-muted-foreground">{t.interactivity}</span>
                     <Input
                       type="text"
@@ -273,12 +275,12 @@ export function CompareInterpolatedTable({
                       onBlur={() => handleInputBlur(ci)}
                       onKeyDown={(e) => handleKeyDown(ci, e)}
                       className={cn(
-                        'w-20 text-center tabular-nums',
+                        'w-20 text-right tabular-nums',
                         isInteractivityInputOutOfRange(
                           col.inputValue,
                           interactivityRange.min,
                           interactivityRange.max,
-                        ) && 'border-red-500 ring-4 ring-red-500/40 animate-pulse',
+                        ) && 'border-destructive ring-2 ring-destructive/30',
                       )}
                       data-testid={`compare-table-target-${ci}`}
                       {...(isInteractivityInputOutOfRange(
@@ -347,23 +349,29 @@ function MetricTableRow({
   );
 
   return (
-    <tr className="border-t border-border/40 odd:bg-muted/8">
-      <td className="sticky left-0 z-1 min-w-36 max-w-44 whitespace-normal border-r border-border/40 bg-card px-3 py-2 text-muted-foreground backdrop-blur-sm">
+    <tr className="border-t border-border/30">
+      <td className="sticky left-0 z-1 min-w-36 max-w-44 whitespace-normal border-r border-border/30 bg-card px-3 py-2 text-muted-foreground">
         {metric.label}
       </td>
       {cells.map((cell, ci) => (
-        <td key={ci} className="px-3 py-2 border-r border-border/40 last:border-r-0">
-          <div className="flex flex-col items-center gap-0.5">
+        <td key={ci} className="border-r border-border/30 px-3 py-2 last:border-r-0">
+          <div className="ml-auto grid w-fit grid-cols-[auto_auto] gap-x-3 gap-y-0.5 whitespace-nowrap text-xs tabular-nums">
+            <span className="text-muted-foreground">{aLabel}</span>
             <span
-              className={`tabular-nums text-xs ${cell.aWins ? winnerClass : 'text-foreground'}`}
+              className={cn(
+                'text-right',
+                cell.aWins ? winnerClass : cell.bWins ? 'text-muted-foreground' : 'text-foreground',
+              )}
             >
-              <span className="text-muted-foreground mr-1">{aLabel}:</span>
               {cell.aVal === null ? '—' : metric.format(cell.aVal)}
             </span>
+            <span className="text-muted-foreground">{bLabel}</span>
             <span
-              className={`tabular-nums text-xs ${cell.bWins ? winnerClass : 'text-foreground'}`}
+              className={cn(
+                'text-right',
+                cell.bWins ? winnerClass : cell.aWins ? 'text-muted-foreground' : 'text-foreground',
+              )}
             >
-              <span className="text-muted-foreground mr-1">{bLabel}:</span>
               {cell.bVal === null ? '—' : metric.format(cell.bVal)}
             </span>
           </div>

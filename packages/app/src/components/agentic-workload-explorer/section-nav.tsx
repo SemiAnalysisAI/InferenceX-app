@@ -26,22 +26,22 @@ export const PRIMARY_SECTIONS: readonly ExplorerNavLink[] = [
   { path: '/trends', label: { en: 'Trends', zh: '趋势' } },
   { path: '/latency', label: { en: 'Latency', zh: '延迟' } },
   { path: '/graphs', label: { en: 'Graphs', zh: '图表' } },
-  { path: '/session-reuse', label: { en: 'Session Reuse', zh: '会话复用' } },
+  { path: '/session-reuse', label: { en: 'Session reuse', zh: '会话复用' } },
   { path: '/tool-analytics', label: { en: 'Tools', zh: '工具' } },
   { path: '/costs', label: { en: 'Costs', zh: '成本' } },
-  { path: '/fast-mode', label: { en: 'Fast Mode', zh: 'Fast Mode' } },
+  { path: '/fast-mode', label: { en: 'Fast mode', zh: 'Fast Mode' } },
   { path: '/harnesses', label: { en: 'Harnesses', zh: 'Harness' } },
 ];
 
 export const MORE_SECTIONS: readonly ExplorerNavLink[] = [
   { path: '/models', label: { en: 'Models', zh: '模型' } },
   { path: '/traffic', label: { en: 'Traffic', zh: '流量' } },
-  { path: '/session-insights', label: { en: 'Session Insights', zh: '会话洞察' } },
+  { path: '/session-insights', label: { en: 'Session insights', zh: '会话洞察' } },
   { path: '/errors', label: { en: 'Errors', zh: '错误' } },
   { path: '/platform', label: { en: 'Platform', zh: '平台' } },
   { path: '/cache', label: { en: 'Cache', zh: '缓存' } },
   { path: '/streaming', label: { en: 'Streaming', zh: '流式输出' } },
-  { path: '/web-search', label: { en: 'Web Search', zh: 'Web 搜索' } },
+  { path: '/web-search', label: { en: 'Web search', zh: 'Web 搜索' } },
   { path: '/proxy-health', label: { en: 'Endpoints', zh: '端点' } },
 ];
 
@@ -83,10 +83,10 @@ function useSectionHotkeys(locale: Locale, query: string) {
 
 const tabClass = (active: boolean) =>
   cn(
-    'inline-flex items-center gap-1 border-b-2 py-1 text-sm font-medium whitespace-nowrap transition-colors duration-200 focus-visible:outline-none',
+    '-mb-px inline-flex items-center gap-1 border-b-2 pt-1 pb-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-200 focus-visible:outline-none',
     active
       ? 'border-secondary text-secondary dark:border-primary dark:text-primary'
-      : 'border-transparent text-muted-foreground hover:border-muted-foreground/30',
+      : 'border-transparent text-muted-foreground hover:text-foreground',
   );
 
 function MoreMenu({
@@ -135,14 +135,14 @@ function MoreMenu({
         <ChevronDown className={cn('size-4 transition-transform', open && 'rotate-180')} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 flex w-48 flex-col rounded-md border border-border bg-popover p-1 shadow-md">
+        <div className="absolute right-0 top-full z-50 mt-2 flex w-48 flex-col rounded-lg border border-border/30 bg-popover p-1 shadow-md">
           {MORE_SECTIONS.map((link) => (
             <Link
               key={link.path}
               href={explorerHref(link.path, locale) + query}
               onClick={() => track('agentic_workload_section_clicked', { section: link.path })}
               className={cn(
-                'rounded-sm px-2.5 py-1.5 text-sm transition-colors',
+                'rounded-md px-2.5 py-1.5 text-sm transition-colors',
                 isActiveSection(relativePath, link.path)
                   ? 'bg-brand/10 text-brand'
                   : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground',
@@ -193,7 +193,7 @@ function SectionNavInner({ query }: { query: string }) {
             track('agentic_workload_section_selected', { section: e.target.value });
             router.push(explorerHref(e.target.value, locale) + query);
           }}
-          className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-sm"
+          className="h-9 min-w-0 flex-1 rounded-md border border-border/30 bg-background px-2 text-sm"
         >
           {activePath === '' && <option value="" disabled />}
           {ALL_SECTIONS.map((link) => (
@@ -205,9 +205,9 @@ function SectionNavInner({ query }: { query: string }) {
       </label>
       <nav
         aria-label={strings.navLabel}
-        className="relative z-40 hidden rounded-xl border border-border/40 bg-surface px-6 py-4 backdrop-blur-[2px] lg:block"
+        className="relative z-40 hidden border-b border-border/30 lg:block"
       >
-        <div className="flex items-center justify-evenly gap-4">
+        <div className="flex items-end gap-6">
           {PRIMARY_SECTIONS.map((link, index) => {
             const active = isActiveSection(relativePath, link.path);
             return (

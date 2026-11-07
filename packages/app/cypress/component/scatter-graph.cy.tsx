@@ -12,7 +12,12 @@ import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface'
 import chartDefinitions from '@/components/inference/metric-registry';
 import { mountWithProviders } from '../support/test-utils';
 import { expandLegendAdvanced } from '../support/legend-advanced';
-import { clickScatterPoint, visiblePoints } from '../support/scatter-points';
+import {
+  clickScatterPoint,
+  hoverTopmostAt,
+  hoverTopmostOver,
+  visiblePoints,
+} from '../support/scatter-points';
 import {
   createMockInferenceData,
   createMockChartDefinition,
@@ -114,21 +119,82 @@ describe('ScatterGraph', () => {
             .should('have.length', 1)
             .then(([point]) => clickScatterPoint(point));
         }
-        cy.get('[data-chart-tooltip="outside-dismissal"]')
+        cy.get('#outside-dismissal [data-testid="point-details-panel"]')
           .should('be.visible')
           .find('[data-pinned-config]')
-          .should('contain.text', `Concurrency: ${overlay ? 32 : 16}`);
+          .should('contain.text', `conc ${overlay ? 32 : 16}`);
       };
       pin();
       cy.get('[data-pinned-config]').click();
-      cy.get('[data-chart-tooltip="outside-dismissal"]').should('be.visible');
+      cy.get('#outside-dismissal [data-testid="point-details-panel"]').should('be.visible');
       cy.get('[data-testid="outside-chart"]').click().should('have.text', 'Outside clicks: 1');
-      cy.get('[data-pinned-config]').should('not.be.visible');
+      cy.get('[data-testid="point-details-panel"]').should('not.exist');
       pin();
       cy.get('body').trigger('keydown', { key: 'Escape' });
-      cy.get('[data-pinned-config]').should('not.be.visible');
+      cy.get('[data-testid="point-details-panel"]').should('not.exist');
     });
   }
+
+  it('shows the unofficial card for an overlay point drawn on an official point', () => {
+    const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123';
+    const shared = { precision: Precision.FP4, x: 20, y: 80 };
+    mountWithProviders(
+      <div style={{ width: 1000 }}>
+        <ScatterGraph
+          chartId="overlap-hover"
+          modelLabel="DeepSeek R1"
+          data={[
+            createMockInferenceData({ hwKey: 'b200_sglang', conc: 16, ...shared }),
+            createMockInferenceData({
+              hwKey: 'b200_sglang',
+              precision: Precision.FP4,
+              x: 60,
+              y: 30,
+              conc: 64,
+            }),
+          ]}
+          xLabel="Interactivity"
+          yLabel="Throughput"
+          chartDefinition={defaultChartDef}
+          transitionDuration={0}
+          overlayData={{
+            data: [
+              createMockInferenceData({ hwKey: 'h100_vllm', conc: 32, run_url: runUrl, ...shared }),
+            ],
+            hardwareConfig: hwConfig,
+            label: 'Preview',
+            runUrl,
+          }}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_sglang']),
+          hwTypesWithData: new Set(['b200_sglang']),
+          selectedPrecisions: [Precision.FP4],
+        },
+        unofficial: {
+          isUnofficialRun: true,
+          activeOverlayHwTypes: new Set(['h100_vllm']),
+          allOverlayHwTypes: new Set(['h100_vllm']),
+        },
+      },
+    );
+    const tooltip = '[data-chart-tooltip="overlap-hover"]';
+    cy.scatterPoints('#overlap-hover').should('have.length', 2);
+    cy.get('#overlap-hover .unofficial-overlay-pt > circle').then(([hit]) => hoverTopmostOver(hit));
+    cy.get(`${tooltip} [data-hover-notice]`).should('have.text', '✕ Preview');
+    cy.get(tooltip).should('contain.text', 'conc 32');
+    cy.scatterPoints('#overlap-hover').then((points) => {
+      const lone = points.find((point) => point.datum.conc === 64)!;
+      hoverTopmostAt(lone.hitArea.ownerDocument, lone.clientX, lone.clientY);
+    });
+    cy.get(tooltip)
+      .should('contain.text', 'conc 64')
+      .find('[data-hover-notice]')
+      .should('not.exist');
+  });
 
   it('keeps compact hover and pins full cache and role details in the UI font', () => {
     const data = [
@@ -191,9 +257,9 @@ describe('ScatterGraph', () => {
         cy.get('[data-pinned-config]').should('not.exist');
         clickScatterPoint(point);
       });
+    cy.get('[data-testid="point-details-panel"] p').first().should('contain.text', 'FP4');
     cy.get('[data-pinned-config]')
-      .should('contain.text', 'Concurrency: 10,888')
-      .and('contain.text', 'Precision: FP4')
+      .should('contain.text', 'Multi-node disaggregated · 64 chips · conc 10,888')
       .and('not.have.css', 'font-family', 'monospace');
     cy.get('[data-pinned-parallelism]')
       .should('contain.text', 'Prefill')
@@ -216,14 +282,11 @@ describe('ScatterGraph', () => {
     cy.get('[data-pinned-tokens]')
       .should('contain.text', '566,443,844')
       .and('contain.text', '4,180,360');
-    cy.viewport(375, 700);
     cy.get('.inferencex-pinned-tooltip').should(($card) => {
-      expect($card[0].clientWidth).to.be.at.most(375);
-      expect($card[0].clientHeight).to.be.at.most(700);
       expect($card[0].scrollWidth).to.equal($card[0].clientWidth);
     });
-    cy.get('body').click(5, 5);
-    cy.get('[data-pinned-config]').should('not.be.visible');
+    cy.get('[data-testid="point-details-close"]').click();
+    cy.get('[data-pinned-config]').should('not.exist');
   });
 
   it('keeps the frontier modes and overlay winners without exposing the retired hinterland', () => {
@@ -861,7 +924,7 @@ describe('ScatterGraph', () => {
     ).should('have.css', 'opacity', '1');
   });
 
-  it('keeps the desktop legend below the top guideline without changing the mobile gap', () => {
+  it('aligns the desktop legend with the top guideline without changing the mobile gap', () => {
     cy.viewport(1440, 900);
     const chartId = 'test-scatter-legend';
     const data = [
@@ -898,7 +961,7 @@ describe('ScatterGraph', () => {
       cy.get(`#${chartId}`).should(($chart) => {
         const legend = $chart[0].querySelector('.sidebar-legend')!.getBoundingClientRect();
         const guideline = $chart[0].querySelector('.border-top')!.getBoundingClientRect();
-        expect(legend.top - guideline.top, 'legend below top guideline').to.be.closeTo(8, 0.1);
+        expect(legend.top - guideline.top, 'legend level with top guideline').to.be.closeTo(0, 0.1);
       });
     };
     assertDesktopAlignment();
@@ -1266,7 +1329,8 @@ describe('ScatterGraph', () => {
       '#test-scatter-ingested-singleton-label svg .line-label[data-hw-key="b200_tilert_mtp"] .ll-engine',
     )
       .should('have.text', ' (TileRT, MTP)')
-      .and('have.attr', 'fill', '#d1d5db');
+      .and('have.attr', 'fill', 'white')
+      .and('have.attr', 'font-weight', '400');
 
     expandLegendAdvanced();
     cy.get('#scatter-line-labels').click();
@@ -1708,7 +1772,9 @@ describe('ChartDisplay modeled power disclosures', () => {
         utilityModeledWatts: { y: 1000, roof: false },
       });
       mountWithProviders(
-        <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+        <PathnameContext.Provider
+          value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+        >
           <div className="p-4">
             <ChartDisplay />
           </div>
@@ -1826,7 +1892,9 @@ describe('ChartDisplay responsive status notes', () => {
         cy.viewport(width, 900);
         const point = createMockInferenceData({ framework: 'atom', offload_mode: 'on' });
         mountWithProviders(
-          <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+          <PathnameContext.Provider
+            value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+          >
             <div className="p-4">
               <ChartDisplay />
             </div>
@@ -1850,7 +1918,7 @@ describe('ChartDisplay responsive status notes', () => {
             unofficial: {},
           },
         );
-        cy.get('[data-testid="chart-status-notes"]').should(($notes) => {
+        cy.get('[data-testid="result-context-markers"]').should(($notes) => {
           const notes = $notes[0];
           const bounds = notes.getBoundingClientRect();
           const offload = notes
@@ -1862,7 +1930,7 @@ describe('ChartDisplay responsive status notes', () => {
         });
         cy.get('[data-testid="offload-halo-key"]').should(
           'contain.text',
-          locale === 'zh' ? 'KV offload 已开启' : 'KV offload ON',
+          locale === 'zh' ? 'KV offload 已开启' : 'KV offload on',
         );
         cy.get('#chart-0 [data-slot="chart-footer"] [data-testid="atom-engine-footnote"]').should(
           'have.text',
@@ -1910,9 +1978,9 @@ describe('ChartDisplay responsive status notes', () => {
         allOverlayHwTypes: new Set(['b200_trt']),
       },
     });
-    cy.get('[data-testid="chart-status-notes"] [data-testid="offload-halo-key"]').should(
+    cy.get('[data-testid="result-context-markers"] [data-testid="offload-halo-key"]').should(
       'contain.text',
-      'KV offload ON',
+      'KV offload on',
     );
     cy.get('#chart-0 [data-testid="atom-engine-footnote"]').should(
       'contain.text',
@@ -2423,7 +2491,7 @@ describe('ChartDisplay engine comparison guard', () => {
     });
 
     cy.get('[data-testid="inference-table-view-btn"]').click();
-    cy.contains('No data available for the current filters.').should('be.visible');
+    cy.contains('No data available for the current filters').should('be.visible');
     cy.get('[data-testid="inference-results-table"]').should('not.exist');
   });
 

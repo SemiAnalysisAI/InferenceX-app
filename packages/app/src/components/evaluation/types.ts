@@ -5,6 +5,8 @@ export interface EvaluationChartData {
   configId: number;
   hwKey: string;
   hardware: string;
+  hwLabel: string;
+  engineLabel: string;
   configLabel: string;
   score: number;
   scoreError?: number;

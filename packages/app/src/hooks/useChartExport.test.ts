@@ -1,15 +1,21 @@
 // @vitest-environment jsdom
+import * as d3 from 'd3';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const exportMocks = vi.hoisted(() => ({ pathname: '/inference', toPng: vi.fn() }));
+const exportMocks = vi.hoisted(() => ({ pathname: '/infx/inference', toPng: vi.fn() }));
 vi.mock('next/navigation', () => ({ usePathname: () => exportMocks.pathname }));
 vi.mock('@jpinsonneau/html-to-image', () => ({
   toPng: exportMocks.toPng,
   getFontEmbedCSS: undefined,
 }));
 
+import { setupChartStructure } from '@/lib/d3-chart/chart-setup';
+import { renderLayer } from '@/lib/d3-chart/D3Chart/layer-renderer';
+import type { D3ChartProps, RenderContext } from '@/lib/d3-chart/D3Chart/types';
+import { registerChartExportRenderer } from '@/lib/d3-chart/export-registry';
+import { ensureCanvasPointLayer } from '@/lib/d3-chart/layers/canvas-points';
 import {
   getExportCaptureDimensions,
   getExportFontFamily,
@@ -25,18 +31,16 @@ describe('useChartExport failure messages', () => {
   let exportContainer: HTMLDivElement;
   let current: ReturnType<typeof useChartExport>;
   let originalFonts: PropertyDescriptor | undefined;
-  let hideLegend: boolean | undefined;
   const setIsLegendExpanded = vi.fn();
 
   function HookProbe() {
-    current = useChartExport({ chartId: 'inference-chart', hideLegend, setIsLegendExpanded });
+    current = useChartExport({ chartId: 'inference-chart', setIsLegendExpanded });
     return null;
   }
 
   beforeEach(() => {
-    exportMocks.pathname = '/inference';
+    exportMocks.pathname = '/infx/inference';
     exportMocks.toPng.mockReset();
-    hideLegend = undefined;
     setIsLegendExpanded.mockReset();
     originalFonts = Object.getOwnPropertyDescriptor(document, 'fonts');
     Object.defineProperty(document, 'fonts', {
@@ -65,8 +69,8 @@ describe('useChartExport failure messages', () => {
   });
 
   it.each([
-    ['/inference', 'Failed to export image. Please try again.'],
-    ['/zh/inference', '图片导出失败，请重试。'],
+    ['/infx/inference', 'Failed to export image. Please try again.'],
+    ['/zh/infx/inference', '图片导出失败，请重试。'],
   ])('reports a PNG capture failure in the current locale on %s', async (pathname, message) => {
     exportMocks.pathname = pathname;
     act(() => root.render(createElement(HookProbe)));
@@ -108,46 +112,99 @@ describe('useChartExport failure messages', () => {
     expect(current.isExporting).toBe(false);
   });
 
-  it.each([true, false])(
-    'omits the legend column and keeps official/overlay labels when the sidebar is open=%s',
-    async (open) => {
-      chart.innerHTML = `
-        <div class="flex">
-          <div class="relative"><div class="relative">
-            <svg data-testid="d3-chart-svg">
-              <text class="line-label">B200</text>
-              <text class="line-label">Unofficial MI355X</text>
-            </svg>
-          </div></div>
-          <div data-slot="chart-legend-wrapper">
-            ${open ? '<div class="legend-container">Legend hardware</div>' : '<button data-testid="legend-open-button">Show legend</button>'}
-          </div>
-        </div>`;
-      const original = chart.innerHTML;
-      hideLegend = true;
-      act(() => root.render(createElement(HookProbe)));
-      const captured = new Error('stop after capture assertions');
-      let snapshot: HTMLElement;
-      exportMocks.toPng.mockImplementationOnce((element: HTMLElement) => {
-        snapshot = element.cloneNode(true) as HTMLElement;
-        throw captured;
-      });
-      vi.spyOn(window, 'alert').mockImplementation(() => {});
-      vi.spyOn(console, 'error').mockImplementation(() => {});
-      await act(() => current.exportToImage());
-      expect(exportMocks.toPng).toHaveBeenCalledOnce();
-      expect(snapshot!.querySelector('[data-slot="chart-legend-wrapper"]')).toBeNull();
-      expect(snapshot!.querySelector('.legend-container')).toBeNull();
-      expect(snapshot!.querySelector('[data-testid="legend-open-button"]')).toBeNull();
-      expect(
-        [...snapshot!.querySelectorAll('.line-label')].map((label) => label.textContent),
-      ).toEqual(['B200', 'Unofficial MI355X']);
-      expect(setIsLegendExpanded).not.toHaveBeenCalled();
-      expect(chart.innerHTML).toBe(original);
-      expect(exportContainer.childElementCount).toBe(0);
-      expect(current.isExporting).toBe(false);
-    },
-  );
+  it('keeps the legend column and line labels in the PNG', async () => {
+    chart.innerHTML = `
+      <div class="flex">
+        <div class="relative"><div class="relative">
+          <svg data-testid="d3-chart-svg">
+            <text class="line-label">B200</text>
+            <text class="line-label">Unofficial MI355X</text>
+          </svg>
+        </div></div>
+        <div data-slot="chart-legend-wrapper">
+          <div class="legend-container">Legend hardware</div>
+        </div>
+      </div>`;
+    const original = chart.innerHTML;
+    let snapshot: HTMLElement;
+    exportMocks.toPng.mockImplementationOnce((element: HTMLElement) => {
+      snapshot = element.cloneNode(true) as HTMLElement;
+      throw new Error('stop after capture assertions');
+    });
+    vi.spyOn(window, 'alert').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await act(() => current.exportToImage());
+    expect(exportMocks.toPng).toHaveBeenCalledOnce();
+    expect(snapshot!.querySelector('.legend-container')?.textContent).toBe('Legend hardware');
+    expect(
+      [...snapshot!.querySelectorAll('.line-label')].map((label) => label.textContent),
+    ).toEqual(['B200', 'Unofficial MI355X']);
+    expect(setIsLegendExpanded).not.toHaveBeenCalled();
+    expect(chart.innerHTML).toBe(original);
+  });
+
+  it('draws the points of a canvas scatter chart into the PNG', async () => {
+    chart.innerHTML =
+      '<div class="relative"><div class="relative"><svg data-testid="d3-chart-svg"></svg></div></div>';
+    const svg = chart.querySelector<SVGSVGElement>('svg')!;
+    const margin = { top: 10, right: 10, bottom: 30, left: 40 };
+    const layout = setupChartStructure(svg, {
+      chartId: 'canvas-export',
+      containerWidth: 400,
+      containerHeight: 300,
+      margin,
+      watermark: 'none',
+    });
+    const data = [
+      { id: 'a', x: 1, y: 1, precision: 'fp8' },
+      { id: 'b', x: 3, y: 2, precision: 'fp8' },
+    ];
+    const scales = {
+      xScale: d3.scaleLinear().domain([0, 4]).range([0, layout.width]),
+      yScale: d3.scaleLinear().domain([0, 4]).range([layout.height, 0]),
+    };
+    const props: D3ChartProps<(typeof data)[number]> = {
+      data,
+      chartId: 'canvas-export',
+      margin,
+      watermark: 'none',
+      xScale: { type: 'linear', domain: [0, 4] },
+      yScale: { type: 'linear', domain: [0, 4] },
+      layers: [
+        {
+          type: 'scatter',
+          data,
+          keyFn: (d) => d.id,
+          config: { getColor: () => '#f00' },
+          canvas: ensureCanvasPointLayer,
+        },
+      ],
+    };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+    renderLayer(props.layers[0], layout.zoomGroup, scales.xScale, scales.yScale, layout, {
+      layout,
+      ...scales,
+      width: layout.width,
+      height: layout.height,
+      transitionDuration: 0,
+      tooltipElement: document.createElement('div'),
+    } as RenderContext);
+    const unregister = registerChartExportRenderer(svg, (draw) => draw(props, scales));
+    let snapshot: HTMLElement;
+    exportMocks.toPng.mockImplementationOnce((element: HTMLElement) => {
+      snapshot = element.cloneNode(true) as HTMLElement;
+      throw new Error('stop after capture assertions');
+    });
+    vi.spyOn(window, 'alert').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await act(() => current.exportToImage());
+    unregister();
+    expect(exportMocks.toPng).toHaveBeenCalledOnce();
+    expect(svg.querySelector('.dot-group')).toBeNull();
+    expect(
+      [...snapshot!.querySelectorAll('svg .dot-group')].map((dot) => dot.getAttribute('transform')),
+    ).toEqual(data.map((d) => `translate(${scales.xScale(d.x)},${scales.yScale(d.y)})`));
+  });
 
   it.each([false, true])(
     'exports the whole plot with scrolling=%s without moving the live chart',
@@ -200,26 +257,6 @@ describe('useChartExport failure messages', () => {
     expect(exportMocks.toPng).toHaveBeenCalledOnce();
     expect(exportedValue).toBe('4');
     expect(live.value).toBe('4');
-  });
-
-  it('includes the legend again after line labels are toggled off', async () => {
-    chart.innerHTML =
-      '<div data-slot="chart-legend-wrapper"><div class="legend-container">B200</div></div>';
-    hideLegend = true;
-    act(() => root.render(createElement(HookProbe)));
-    hideLegend = false;
-    act(() => root.render(createElement(HookProbe)));
-    let snapshot: HTMLElement;
-    exportMocks.toPng.mockImplementationOnce((element: HTMLElement) => {
-      snapshot = element.cloneNode(true) as HTMLElement;
-      throw new Error('stop after capture assertions');
-    });
-    vi.spyOn(window, 'alert').mockImplementation(() => {});
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    await act(() => current.exportToImage());
-    expect(exportMocks.toPng).toHaveBeenCalledOnce();
-    expect(snapshot!.querySelector('.legend-container')?.textContent).toBe('B200');
-    expect(chart.querySelector('.legend-container')?.textContent).toBe('B200');
   });
 });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, Activity } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
@@ -18,18 +18,13 @@ interface BlogSidebarCtaProps {
 export function BlogSidebarCta({ href, slug, labels }: BlogSidebarCtaProps) {
   return (
     <div
-      className="flex flex-col gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-5"
+      className="flex flex-col gap-3 rounded-xl border border-border/30 bg-card p-5"
       data-testid="blog-sidebar-cta"
     >
-      <div className="flex items-center gap-2">
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-primary/30 bg-primary/10 text-primary">
-          <Activity aria-hidden="true" className="size-3.5" />
-        </span>
-        <Eyebrow as="p">{labels.eyebrow}</Eyebrow>
-      </div>
+      <Eyebrow as="p">{labels.eyebrow}</Eyebrow>
       <p className={cn(headingVariants({ level: 'card' }), 'text-balance')}>{labels.title}</p>
       <p className="text-sm leading-6 text-muted-foreground">{labels.body}</p>
-      <Button asChild size="sm" className="w-fit">
+      <Button asChild variant="brand" size="sm" className="w-fit">
         <Link href={href} onClick={() => track('blog_sidebar_cta_clicked', { slug, href })}>
           {labels.button}
           <ArrowRight aria-hidden="true" />

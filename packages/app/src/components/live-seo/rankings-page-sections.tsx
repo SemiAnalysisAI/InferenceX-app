@@ -1,6 +1,8 @@
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 import { fmtCostPerMtok, fmtThroughput, pctCheaper, pctFaster } from '@/components/live-seo/format';
+import { EmptyState } from '@/components/ui/empty-state';
 import type { RankingPageData } from '@/lib/live-seo/run-rankings-data.server';
 import type { RankingPageEntry, RankingRow } from '@/lib/live-seo/rankings';
 import { getRunPageEntry } from '@/lib/live-seo/run-pages';
@@ -75,22 +77,13 @@ export function RankingsDetailContent({
           <header className="pt-8 md:pt-12">
             <Link
               href={`${prefix}/rankings`}
-              className="group inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-brand"
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
-              <span
-                aria-hidden="true"
-                className="transition-transform group-hover:-translate-x-0.5"
-              >
-                ←
-              </span>
+              <ArrowLeft aria-hidden="true" className="size-4" />
               {t.backLabel}
             </Link>
-            <div className="mt-6 flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-brand/25 bg-brand/8 px-3 py-1 text-xs font-semibold tracking-eyebrow text-brand uppercase">
-                {entry.model.label}
-              </span>
-            </div>
-            <h1 className="mt-4 max-w-4xl text-4xl font-bold tracking-heading text-balance md:text-5xl">
+            <p className="mt-6 text-xs font-medium text-muted-foreground">{entry.model.label}</p>
+            <h1 className="mt-3 max-w-4xl text-3xl font-semibold text-balance md:text-5xl md:tracking-heading">
               {t.heading}
             </h1>
             {lead && <p className="mt-4 max-w-3xl text-lg leading-relaxed">{lead}</p>}
@@ -99,25 +92,23 @@ export function RankingsDetailContent({
 
           <section className="mt-10">
             {data.rows.length === 0 ? (
-              <p className="rounded-xl border border-border/50 p-6 leading-7 text-muted-foreground">
-                {t.emptyState}
-              </p>
+              <EmptyState>{t.emptyState}</EmptyState>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-border/50">
+              <div className="overflow-x-auto rounded-xl border border-border/30">
                 <table className="w-full min-w-[40rem] text-sm">
                   <caption className="sr-only">{t.tableCaption}</caption>
                   <thead>
-                    <tr className="border-b border-border/50 text-left text-xs tracking-widest text-muted-foreground uppercase">
-                      <th scope="col" className="px-4 py-3">
+                    <tr className="border-b border-border/30 text-left text-xs font-medium text-muted-foreground">
+                      <th scope="col" className="px-4 py-3 text-right">
                         {t.colRank}
                       </th>
                       <th scope="col" className="px-4 py-3">
                         {t.colGpu}
                       </th>
-                      <th scope="col" className="px-4 py-3">
+                      <th scope="col" className="px-4 py-3 text-right">
                         {t.colThroughput}
                       </th>
-                      <th scope="col" className="px-4 py-3">
+                      <th scope="col" className="px-4 py-3 text-right">
                         {t.colCost}
                       </th>
                       <th scope="col" className="px-4 py-3">
@@ -136,9 +127,9 @@ export function RankingsDetailContent({
                       return (
                         <tr
                           key={row.hardware}
-                          className="border-b border-border/30 last:border-b-0"
+                          className="border-b border-border/20 last:border-b-0"
                         >
-                          <td className="px-4 py-3 font-mono">{row.rank}</td>
+                          <td className="w-16 px-4 py-3 text-right tabular-nums">{row.rank}</td>
                           <td className="px-4 py-3 font-medium">
                             {runEntry ? (
                               <Link
@@ -151,12 +142,12 @@ export function RankingsDetailContent({
                               row.hardwareLabel
                             )}
                           </td>
-                          <td className="px-4 py-3 font-mono">
+                          <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums">
                             {row.throughputPerGpu === null
                               ? '-'
                               : fmtThroughput(row.throughputPerGpu)}
                           </td>
-                          <td className="px-4 py-3 font-mono">
+                          <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums">
                             {row.costPerMtok === null ? '-' : fmtCostPerMtok(row.costPerMtok)}
                           </td>
                           <td className="px-4 py-3 uppercase">{row.precision ?? '-'}</td>
@@ -184,9 +175,9 @@ export function RankingsDetailContent({
 
           <section
             aria-labelledby="ranking-methodology"
-            className="mt-10 border-t border-border/50 pt-10"
+            className="mt-10 border-t border-border/30 pt-10"
           >
-            <h2 id="ranking-methodology" className="text-xl font-semibold tracking-tight">
+            <h2 id="ranking-methodology" className="text-xl font-semibold">
               {t.methodologyHeading}
             </h2>
             {t.methodologyBody.map((paragraph) => (
@@ -196,8 +187,8 @@ export function RankingsDetailContent({
             ))}
           </section>
 
-          <section aria-labelledby="ranking-faq" className="mt-10 border-t border-border/50 pt-10">
-            <h2 id="ranking-faq" className="text-xl font-semibold tracking-tight">
+          <section aria-labelledby="ranking-faq" className="mt-10 border-t border-border/30 pt-10">
+            <h2 id="ranking-faq" className="text-xl font-semibold">
               {t.faqHeading}
             </h2>
             <dl className="mt-4 space-y-6">
@@ -212,12 +203,12 @@ export function RankingsDetailContent({
 
           <section
             aria-labelledby="ranking-explore"
-            className="mt-10 mb-16 rounded-xl border border-brand/20 bg-brand/6 p-5 md:p-6"
+            className="mt-10 mb-16 border-t border-border/30 pt-10"
           >
-            <h2 id="ranking-explore" className="text-xl font-semibold tracking-tight">
+            <h2 id="ranking-explore" className="text-xl font-semibold">
               {t.exploreHeading}
             </h2>
-            <ul className="mt-3 space-y-1">
+            <ul className="mt-3 space-y-2">
               {t.exploreLinks.map((link) => (
                 <li key={link.href}>
                   <Link href={link.href} className="text-sm font-medium text-brand hover:underline">

@@ -16,7 +16,6 @@ import {
 export interface ChartImageExportOptions {
   chartId: string;
   setIsLegendExpanded?: (expanded: boolean) => void;
-  hideLegend?: boolean;
   exportFileName?: string;
 }
 
@@ -188,13 +187,14 @@ export async function addWatermark(
   chartDataUrl: string,
   bgColor: string,
   footerStyle: ExportFooterStyle = getExportFooterStyle(document.body),
+  pixelRatio = PNG_PIXEL_RATIO,
 ): Promise<string> {
   const img = await loadImage(chartDataUrl);
   if (!img) throw new Error('Could not decode the chart PNG');
 
   const isDark = hasDarkTheme(document.documentElement) || bgColor.includes('0 0%');
 
-  const WATERMARK_HEIGHT = PNG_FOOTER_HEIGHT * PNG_PIXEL_RATIO;
+  const WATERMARK_HEIGHT = Math.round(PNG_FOOTER_HEIGHT * pixelRatio);
   const canvas = document.createElement('canvas');
   canvas.width = img.width;
   canvas.height = img.height + WATERMARK_HEIGHT;
@@ -207,18 +207,25 @@ export async function addWatermark(
 
   ctx.drawImage(img, 0, 0);
 
-  drawExportFooter(ctx, footerStyle, canvas.width, contentHeight, WATERMARK_HEIGHT, 40);
+  drawExportFooter(
+    ctx,
+    footerStyle,
+    canvas.width,
+    contentHeight,
+    WATERMARK_HEIGHT,
+    20 * pixelRatio,
+  );
 
   return canvas.toDataURL('image/png');
 }
 
 export async function exportChartImage(
-  { chartId, setIsLegendExpanded, hideLegend = false, exportFileName }: ChartImageExportOptions,
+  { chartId, setIsLegendExpanded, exportFileName }: ChartImageExportOptions,
   ratio: PngAspectRatio,
   failureMessage: string,
 ) {
   let wasClosed = false;
-  if (setIsLegendExpanded && !hideLegend) {
+  if (setIsLegendExpanded) {
     const el = document.querySelector(`#${chartId}`);
     wasClosed = Boolean(el?.querySelector('[data-testid="legend-open-button"]'));
     if (wasClosed) {
@@ -244,12 +251,15 @@ export async function exportChartImage(
     clone.removeAttribute('id');
     const nestedExport = clone.querySelector(`[id="${chartId}-export"]`);
     if (nestedExport) nestedExport.remove();
-    if (hideLegend) {
-      for (const legend of clone.querySelectorAll(
-        '[data-slot="chart-legend-wrapper"], .legend-container',
-      )) {
-        legend.remove();
-      }
+    for (const legend of clone.querySelectorAll<HTMLElement>(
+      '[data-slot="chart-legend-wrapper"]',
+    )) {
+      legend.style.alignSelf = 'flex-start';
+      applyStyles(legend.lastElementChild as HTMLElement | null, {
+        height: 'auto',
+        minHeight: '0',
+        overflow: 'visible',
+      });
     }
 
     const figcaption = clone.querySelector('figcaption');
@@ -320,6 +330,8 @@ export async function exportChartImage(
       ) as HTMLElement | null;
       applyStyles(scrollContainer, {
         overflow: 'visible',
+        maxHeight: 'none',
+        maskImage: 'none',
         scrollbarGutter: 'auto',
         paddingRight: '8px',
       });
@@ -382,6 +394,7 @@ export async function exportChartImage(
         if (!hasVisibleControls) {
           scrollContainer.style.borderBottom = 'none';
           scrollContainer.style.paddingBottom = '0';
+          if (sibling) sibling.style.display = 'none';
         }
       }
     }
@@ -433,9 +446,9 @@ export async function exportChartImage(
     }
     const rerendered =
       ratio !== 'auto' || (await renderCanvasChartsForExport(element, clone, exportElement));
-    const captureDimensions =
+    const { pixelRatio, ...captureDimensions } =
       ratio === 'auto'
-        ? getExportCaptureDimensions(exportElement)
+        ? { ...getExportCaptureDimensions(exportElement), pixelRatio: PNG_PIXEL_RATIO }
         : await layoutPngExport(element, clone, exportElement, ratio);
     if (rerendered) {
       // New D3 nodes need the same export styling as the original clone.
@@ -451,7 +464,7 @@ export async function exportChartImage(
     const chartDataUrl = await toPng(exportElement, {
       ...captureDimensions,
       quality: 1,
-      pixelRatio: PNG_PIXEL_RATIO,
+      pixelRatio,
       cacheBust: true,
       skipFonts: false,
       fontEmbedCSS,
@@ -463,7 +476,7 @@ export async function exportChartImage(
       },
     });
 
-    const dataUrl = await addWatermark(chartDataUrl, bgColor, footerStyle);
+    const dataUrl = await addWatermark(chartDataUrl, bgColor, footerStyle, pixelRatio);
 
     const link = document.createElement('a');
     link.download = `${exportFileName || chartId}-${Date.now()}.png`;

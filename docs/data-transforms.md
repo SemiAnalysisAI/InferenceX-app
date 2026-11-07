@@ -21,7 +21,7 @@
 - **Reconstructed prefill energy** (`reconstructedPrefillJPerOutputToken`, `utils/role-energy.ts`). For validated (`power_valid === 1`, schema 2) disaggregated rows, `prefill_joules_per_input_token × (joules_per_output_token ÷ joules_per_input_token)` carries the prefill pool's energy onto the output-token axis: the ratio is the served input:output token count because schema-2 aggregate energy has one numerator. With `decode_joules_per_output_token` it sums back to the deployment's J/out. It feeds only the `i_pcompare=roles` comparison on the energy axis (PowerX Figure 7) and is never a y-axis of its own; aggregate rows and rows missing any of the four inputs omit it.
 - Historical Trends substitutes `output_tput_per_gpu := tput_per_gpu` for legacy rows lacking output throughput; provisioned energies in trends inherit that fallback.
 
-## Prefix-Cache Tier Shares (`/cache-reuse`)
+## Prefix-Cache Tier Shares (`/infx/cache-reuse`)
 
 The Prefix Cache Reuse tab stacks, per concurrency, where one configuration's prompt tokens came from: the chip's HBM KV cache, the host tier behind it, or nowhere (recomputed). It reads the calculator's `GPUDataPoint` groups (`useThroughputData`) and takes the tiers from each point's `sourceRow.metrics`, so official rows and `?unofficialrun=` overlays flow through the same mapper; the pure logic lives in `components/calculator/cache-reuse.ts`.
 

@@ -1,14 +1,17 @@
 'use client';
 
-import { Suspense, useMemo, useRef } from 'react';
+import { Suspense, useMemo } from 'react';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatNumber } from '@/lib/agentic-workload-explorer/format';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Stat } from '@/components/ui/stat';
+import { bucketLabel, formatNumber } from '@/lib/agentic-workload-explorer/format';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
-import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
 import {
   useTraceVersion,
   appendTraceVersion,
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type {
   PlatformData,
@@ -16,21 +19,22 @@ import type {
   PlatformTimeSeries,
 } from '@/lib/agentic-workload-explorer/api-types';
 import { formatSnapshotDate } from '@/lib/agentic-workload-explorer/snapshot';
-import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { ChartActions, Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { track } from '@/lib/analytics/analytics';
 
 const STRINGS = {
   en: {
     stats: 'Stats',
     uniqueOs: 'Unique OS',
-    uniqueCliVersions: 'Unique CLI Versions',
-    mostCommonOs: 'Most Common OS',
-    totalSessions: 'Total Sessions',
+    uniqueCliVersions: 'Unique CLI versions',
+    mostCommonOs: 'Most common OS',
+    totalSessions: 'Total sessions',
     failedToLoad: 'Failed to load platform data',
-    osDist: 'OS Distribution',
-    cliVersionDist: 'CLI Version Distribution',
-    nodeVersionDist: 'Node.js Version Distribution',
-    archDist: 'Architecture Distribution',
-    platformTrends: 'Platform Trends',
+    osDist: 'OS distribution',
+    cliVersionDist: 'CLI version distribution',
+    nodeVersionDist: 'Node.js version distribution',
+    archDist: 'Architecture distribution',
+    platformTrends: 'Platform trends',
     noData: 'No data',
     noTimeSeries: 'No time series data',
     sessionsPerDay: 'Sessions per day',
@@ -73,29 +77,6 @@ function aggregate(
 
 const TREND_COLORS = ['#6366f1', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-function SectionHeader({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="flex-1 h-px bg-border" />
-    </div>
-  );
-}
-
-function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
-  return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-        {label}
-      </div>
-      <div className="text-lg font-mono font-bold mt-1">{value}</div>
-      {detail && <div className="text-3xs font-mono text-muted-foreground mt-0.5">{detail}</div>}
-    </div>
-  );
-}
-
 function HorizontalBars({
   data,
   color,
@@ -107,6 +88,7 @@ function HorizontalBars({
   limit?: number;
   emptyLabel?: string;
 }) {
+  const locale = useLocale();
   const items = limit ? data.slice(0, limit) : data;
   const maxCount = items.length > 0 ? items[0].count : 0;
 
@@ -120,10 +102,11 @@ function HorizontalBars({
     <div className="space-y-1.5">
       {items.map((d) => {
         const widthPct = maxCount > 0 ? (d.count / maxCount) * 100 : 0;
+        const label = bucketLabel(d.label, locale);
         return (
           <div key={d.label} className="flex items-center gap-3">
-            <span className="text-2xs font-mono w-36 truncate shrink-0" title={d.label}>
-              {d.label}
+            <span className="text-2xs font-mono w-36 truncate shrink-0" title={label}>
+              {label}
             </span>
             <div className="flex-1 h-5 bg-surface-hover rounded-sm overflow-hidden">
               <div
@@ -204,7 +187,6 @@ function PlatformTrendsChart({
   tooltipSessions: (os: string, count: number, day: string) => string;
 }) {
   const locale = useLocale();
-  const svgRef = useRef<SVGSVGElement>(null);
   const { days, maxY, yTicks } = useMemo(() => {
     const dayMap = new Map<string, Record<string, number>>();
     for (const entry of timeSeries) {
@@ -259,26 +241,17 @@ function PlatformTrendsChart({
                 className="inline-block w-2.5 h-2.5 rounded-sm"
                 style={{ backgroundColor: colorMap[os] }}
               />
-              {os}
+              {bucketLabel(os, locale)}
             </span>
           ))}
         </div>
-        <ExportPngButton
-          locale={locale}
-          analyticsChart="platform-trends"
-          onClick={() => {
-            if (svgRef.current)
-              exportSvgToPng(svgRef.current, {
-                title: 'Platform Trends',
-                filename: 'platform-trends.png',
-                svgWidth: CHART_W,
-                svgHeight: CHART_H,
-              });
-          }}
+        <ChartActions
+          fileName="platform-trends"
+          onExportPng={() => track('agentic_workload_export_png', { chart: 'platform-trends' })}
         />
       </div>
 
-      <svg ref={svgRef} viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full">
+      <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full">
         {yTicks.map((tick) => (
           <g key={`y-${tick}`}>
             {tick > 0 && (
@@ -336,7 +309,9 @@ function PlatformTrendsChart({
                 fill={colorMap[os]}
                 rx={1}
               >
-                <title>{tooltipSessions(os, count, formatSnapshotDate(day))}</title>
+                <title>
+                  {tooltipSessions(bucketLabel(os, locale), count, formatSnapshotDate(day, locale))}
+                </title>
               </rect>,
             );
             yOffset += count;
@@ -384,13 +359,10 @@ function PlatformTrendsChart({
 }
 
 export default function PlatformPage() {
-  const t = STRINGS[useLocale()];
   return (
-    <Expandable title={t.platformTrends}>
-      <Suspense>
-        <PlatformPageContent />
-      </Suspense>
-    </Expandable>
+    <Suspense>
+      <PlatformPageContent />
+    </Suspense>
   );
 }
 
@@ -442,23 +414,21 @@ function PlatformPageContent() {
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-md border border-border bg-surface p-3">
+              <div key={i} className="rounded-xl border border-border/30 bg-card p-3">
                 <Skeleton className="h-3 w-20 mb-2" />
                 <Skeleton className="h-6 w-16" />
               </div>
             ))}
           </div>
         ) : data ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <StatCard label={t.uniqueOs} value={String(uniqueOs)} />
-            <StatCard label={t.uniqueCliVersions} value={String(uniqueCli)} />
-            <StatCard label={t.mostCommonOs} value={mostCommonOs} />
-            <StatCard label={t.totalSessions} value={formatNumber(totalSessions)} />
-          </div>
+          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <Stat boxed label={t.uniqueOs} value={String(uniqueOs)} />
+            <Stat boxed label={t.uniqueCliVersions} value={String(uniqueCli)} />
+            <Stat boxed label={t.mostCommonOs} value={mostCommonOs} />
+            <Stat boxed label={t.totalSessions} value={formatNumber(totalSessions)} />
+          </dl>
         ) : (
-          <div className="text-sm font-mono text-muted-foreground text-center py-8">
-            {t.failedToLoad}
-          </div>
+          <EmptyState>{t.failedToLoad}</EmptyState>
         )}
       </div>
 
@@ -466,44 +436,46 @@ function PlatformPageContent() {
         <>
           <div>
             <SectionHeader label={t.osDist} />
-            <div className="rounded-md border border-border bg-surface p-3">
+            <Card>
               <HorizontalBars data={osDist} color="#6366f1" emptyLabel={t.noData} />
-            </div>
+            </Card>
           </div>
 
           <div>
             <SectionHeader label={t.cliVersionDist} />
-            <div className="rounded-md border border-border bg-surface p-3">
+            <Card>
               <HorizontalBars data={cliDist} color="#06b6d4" limit={15} emptyLabel={t.noData} />
-            </div>
+            </Card>
           </div>
 
           <div>
             <SectionHeader label={t.nodeVersionDist} />
-            <div className="rounded-md border border-border bg-surface p-3">
+            <Card>
               <HorizontalBars data={nodeDist} color="#10b981" emptyLabel={t.noData} />
-            </div>
+            </Card>
           </div>
 
           <div>
             <SectionHeader label={t.archDist} />
-            <div className="rounded-md border border-border bg-surface p-3">
+            <Card>
               <HorizontalBars data={archDist} color="#f59e0b" emptyLabel={t.noData} />
-            </div>
+            </Card>
           </div>
 
           <div>
             <SectionHeader label={t.platformTrends} />
-            <div className="rounded-md border border-border bg-surface p-3">
-              <PlatformTrendsChart
-                timeSeries={data.timeSeries}
-                allOsList={allOsList}
-                colorMap={osColorMap}
-                noDataLabel={t.noTimeSeries}
-                sessionsPerDayLabel={t.sessionsPerDay}
-                tooltipSessions={t.tooltipSessions}
-              />
-            </div>
+            <Expandable title={t.platformTrends}>
+              <Card>
+                <PlatformTrendsChart
+                  timeSeries={data.timeSeries}
+                  allOsList={allOsList}
+                  colorMap={osColorMap}
+                  noDataLabel={t.noTimeSeries}
+                  sessionsPerDayLabel={t.sessionsPerDay}
+                  tooltipSessions={t.tooltipSessions}
+                />
+              </Card>
+            </Expandable>
           </div>
         </>
       )}

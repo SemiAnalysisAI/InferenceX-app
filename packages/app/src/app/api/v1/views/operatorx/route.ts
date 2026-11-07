@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 
 import { cachedJson, operatorXCacheTag } from '@/lib/cache/api-cache';
 import { getComparison, isPartialComparison } from '@/lib/operatorx/service';
+import { operatorXCategoryPath } from '@/lib/routing/operatorx-category';
 import { csvResponse } from '@/lib/views-api/csv';
 import { runViewsRoute, ViewsApiParamError, ViewsUpstreamError } from '@/lib/views-api/errors';
 import {
@@ -100,10 +101,10 @@ function csvRow(row: Row): Record<string, unknown> {
 /** The dashboard page showing this selection. */
 function pageUrl(op: ComparisonOp, view: ComparisonView): string {
   const q = new URLSearchParams(
-    view.model ? { op: 'model', model: view.model } : { op, workload: view.workload ?? '' },
+    view.model ? { model: view.model } : { workload: view.workload ?? '' },
   );
   if (view.parallel) q.set('parallel', view.parallel);
-  return `/operatorx?${q}`;
+  return `${operatorXCategoryPath(view.model ? 'model' : op)}?${q}`;
 }
 
 /**

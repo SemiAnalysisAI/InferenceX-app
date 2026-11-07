@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 
-import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
+import { READING_PAGE_CLASS, READING_TOP_CLASS } from '@/components/ui/reading-layout';
 import { enAlternates } from '@/lib/i18n/i18n';
+import { cn } from '@/lib/shared/utils';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 
@@ -44,54 +46,44 @@ export const metadata: Metadata = {
 export default function LandAcknowledgementPage() {
   return (
     <main data-testid="land-acknowledgement-page" className="relative">
-      <div className="container mx-auto px-4 lg:px-8 pb-8">
-        <Card className="gap-10">
-          <header className="max-w-3xl">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.32em] text-brand">
-              Land Acknowledgement
-            </p>
-            <h1 className="text-4xl font-semibold tracking-heading text-foreground md:text-5xl">
-              We recognize the Indigenous homelands connected to our US infrastructure.
-            </h1>
-            <p className="mt-4 text-sm leading-6 text-muted-foreground md:text-base">
-              InferenceX benchmark clusters serve traffic from several regions. This page focuses on
-              our US sites in San Jose, Los Angeles, and Chicago, and acknowledges the Indigenous
-              peoples who have stewarded these lands across generations and continue to do so today.
-            </p>
-          </header>
-
-          <section
-            data-testid="land-acknowledgement-regions"
-            className="grid gap-4 lg:grid-cols-3"
-            aria-label="Regional land acknowledgements"
-          >
-            {REGIONAL_ACKNOWLEDGEMENTS.map((entry) => (
-              <article
-                key={entry.region}
-                data-testid={`land-acknowledgement-${entry.region
-                  .toLowerCase()
-                  .replaceAll(' ', '-')}`}
-                className="rounded-2xl border border-border/40 bg-background/20 p-5"
-              >
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">
-                  {entry.region}
-                </p>
-                <h2 className="mt-3 text-xl font-semibold tracking-heading text-foreground">
-                  {entry.peoples}
-                </h2>
-                <p className="mt-4 text-sm leading-6 text-muted-foreground">
-                  {entry.acknowledgement}
-                </p>
-              </article>
-            ))}
-          </section>
-
-          <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-            Acknowledgement is only a starting point. We share this statement with respect for
-            Native sovereignty, history, and ongoing community presence, and we welcome corrections
-            if our wording should be improved.
+      <div className={cn(READING_PAGE_CLASS, READING_TOP_CLASS, 'flex flex-col gap-10')}>
+        <header className="max-w-3xl">
+          <p className="mb-3 text-xs font-medium text-muted-foreground">Land acknowledgement</p>
+          <Heading as="h1" level="reading">
+            We recognize the Indigenous homelands connected to our US infrastructure
+          </Heading>
+          <p className="mt-4 max-w-measure leading-reading text-muted-foreground">
+            InferenceX benchmark clusters serve traffic from several regions. This page focuses on
+            our US sites in San Jose, Los Angeles, and Chicago, and acknowledges the Indigenous
+            peoples who have stewarded these lands across generations and continue to do so today.
           </p>
-        </Card>
+        </header>
+
+        <section
+          data-testid="land-acknowledgement-regions"
+          className="grid gap-4 lg:grid-cols-3"
+          aria-label="Regional land acknowledgements"
+        >
+          {REGIONAL_ACKNOWLEDGEMENTS.map((entry) => (
+            <article
+              key={entry.region}
+              data-testid={`land-acknowledgement-${entry.region
+                .toLowerCase()
+                .replaceAll(' ', '-')}`}
+              className="rounded-xl border border-border/30 bg-card p-5"
+            >
+              <p className="text-xs font-medium text-muted-foreground">{entry.region}</p>
+              <h2 className="mt-2 text-xl font-semibold text-foreground">{entry.peoples}</h2>
+              <p className="mt-4 leading-reading text-foreground">{entry.acknowledgement}</p>
+            </article>
+          ))}
+        </section>
+
+        <p className="max-w-measure leading-reading text-foreground">
+          Acknowledgement is only a starting point. We share this statement with respect for Native
+          sovereignty, history, and ongoing community presence, and we welcome corrections if our
+          wording should be improved.
+        </p>
       </div>
     </main>
   );

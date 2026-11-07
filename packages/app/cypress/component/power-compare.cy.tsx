@@ -56,7 +56,7 @@ function mountCompare(
   { locale = 'en', width = 1000 }: { locale?: 'en' | 'zh'; width?: number } = {},
 ) {
   mountWithProviders(
-    <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+    <PathnameContext.Provider value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}>
       <div style={{ width, height: 640 }}>
         <ScatterGraph
           chartId="power-compare-test"
@@ -236,7 +236,7 @@ describe('Modeled power source links', () => {
           .should((points) => expect(points).to.have.length.at.least(2))
           .then((points) => clickScatterPoint(points[1]));
       }
-      cy.get('[data-chart-tooltip]:visible').within(() => {
+      cy.get('[data-testid="point-details-panel"]').within(() => {
         if (overlay) cy.contains('powerx-compare').should('exist');
         cy.get('[data-testid="tooltip-modeled-system-power"]').within(() => {
           cy.get(`a[href="${SYSTEM_POWER_MODEL_SOURCE_URL}"]`)
@@ -250,7 +250,7 @@ describe('Modeled power source links', () => {
               const bounds = $link[0].getBoundingClientRect();
               expect(bounds.left).to.be.at.least(0);
               expect(bounds.right).to.be.at.most(width);
-              const shell = $link.closest('[data-chart-tooltip]')[0].firstElementChild!;
+              const shell = $link.closest('[data-testid="point-details-panel"]')[0];
               const frame = shell.getBoundingClientRect();
               expect(bounds.top).to.be.at.least(frame.top);
               expect(bounds.bottom).to.be.at.most(frame.bottom);

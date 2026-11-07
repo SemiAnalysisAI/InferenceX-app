@@ -1,12 +1,14 @@
 'use client';
 
-import { Suspense, useMemo, useRef, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   HARNESSES,
   isHarness,
   type Harness,
 } from '@semianalysisai/inferencex-db/proxytrace/shared/harness';
+import { Button } from '@/components/ui/button';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -14,11 +16,16 @@ import {
   type ToolOsErrorRate,
 } from '@/components/agentic-workload-explorer/tool-os-error-rates';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
-import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
+import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-href';
 import { getToolColor } from '@/lib/agentic-workload-explorer/tool-colors';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
-import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { ChartActions, Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Stat } from '@/components/ui/stat';
 
 interface ToolAnalyticsData {
   toolCounts: { toolName: string; count: number }[];
@@ -277,47 +284,47 @@ const STRINGS = {
     sessions: 'Sessions',
     hideSmall: 'Hide n<5',
     noTransitionData: 'No transition data',
-    workflowPatterns: 'Workflow Patterns',
+    workflowPatterns: 'Workflow patterns',
     workflowCacheMissing:
       "Workflow patterns are not yet built for this snapshot — they will appear once the snapshot's tool_analytics_cache is rebuilt.",
-    workflowNotAvailable: 'Workflow patterns are not available in this snapshot.',
+    workflowNotAvailable: 'Workflow patterns are not available in this snapshot',
     workflowFetchError: (msg: string) => `Failed to read workflow patterns cache: ${msg}`,
     workflowNotEnough:
       'Not enough data to mine workflow patterns (need sessions with 3+ tool calls)',
     reload: 'Reload',
     reloadWorkflowAriaLabel: 'Reload workflow patterns',
-    repeatShare: 'Repeat Share',
+    repeatShare: 'Repeat share',
     repeatShareDetail: 'tool calls that repeat the previous tool back-to-back',
-    longestStreak: 'Longest Streak',
+    longestStreak: 'Longest streak',
     longestStreakDetail: 'most consecutive calls of a single tool in one session',
-    sessionsMined: 'Sessions Mined',
+    sessionsMined: 'Sessions mined',
     sessionsMinedDetail: (calls: string, steps: string) =>
       `${calls} tool calls → ${steps} collapsed steps`,
-    recurringMotifs: 'Recurring Motifs',
+    recurringMotifs: 'Recurring motifs',
     motifsSubtitle: (count: number, sessions: string) =>
       `(top ${count} · from ${sessions} sessions)`,
     motifsDescription:
       'Consecutive repeats are collapsed (Bash, Bash, Bash → one step) and only contiguous steps count, so each row is a real local workflow instead of a Bash permutation. ×N marks steps that average N repeated calls.',
-    toolStreaks: 'Tool Streaks',
+    toolStreaks: 'Tool streaks',
     toolStreaksDescription:
       'Maximal runs of the same tool called back-to-back — how bursty each tool is. Sessions counts sessions containing a streak of 2+.',
     colTool: 'Tool',
     colCalls: 'Calls',
     colRuns: 'Runs',
     colSessions: 'Sessions',
-    pingPongLoops: 'Ping-Pong Loops',
+    pingPongLoops: 'Ping-pong loops',
     pingPongDescription:
       'Alternating A→B→A→B segments of 2+ full cycles — the edit/verify and read/tweak feedback loops. Cycles = A→B round trips per segment.',
     noRecurringLoops: 'No recurring loops found',
-    toolWallTime: 'Tool Wall-Time',
-    turnaroundByTool: 'Turnaround by Tool',
+    toolWallTime: 'Tool wall-time',
+    turnaroundByTool: 'Turnaround by tool',
     clientSideWallTime: '(client-side wall time)',
     turnaroundByToolDescription: (single: string, total: string, pct: string, batchLabel: string) =>
       `Time between a response ending in one tool_use and the next request in the same session lane carrying its tool_result — tool execution plus harness overhead. Single-tool turns only (${single} of ${total} tool turns, ${pct}%); turns with parallel tool calls are lumped under ${batchLabel}; gaps over 30 minutes are dropped as idle.`,
-    turnaroundDistribution: 'Turnaround Distribution',
+    turnaroundDistribution: 'Turnaround distribution',
     colSamples: 'Samples',
     colMean: 'Mean',
-    turnaroundShapeByOs: 'Turnaround Shape by OS',
+    turnaroundShapeByOs: 'Turnaround shape by OS',
     splitByArch: 'Split by arch',
     turnaroundShapeDescription:
       'Share of samples per log-spaced bin, normalized per series. Session OS/arch come from client metadata (SDK headers, or the Codex user-agent when headers are absent). Dashed lines mark medians; platforms under 200 samples are hidden.',
@@ -325,61 +332,66 @@ const STRINGS = {
     tool: 'Tool',
     turnaroundAxisLabel: 'Turnaround (log scale)',
     medianTurnaroundByOs: (splitArch: boolean) =>
-      `Median Turnaround by ${splitArch ? 'Platform' : 'OS'}`,
+      `Median turnaround by ${splitArch ? 'platform' : 'OS'}`,
+    toolTurnaroundTitle: (tool: string, splitArch: boolean) =>
+      `${tool} turnaround by ${splitArch ? 'OS/arch' : 'OS'}`,
     medianTurnaroundDescription: (splitArch: boolean) =>
       `p50 with p90 below, per tool and ${splitArch ? 'OS/arch' : 'OS'}. Same client-side wall-time samples as the chart — differences are OS + machine + harness overhead, not model latency.`,
-    bashBreakdown: 'Bash Breakdown',
+    bashBreakdown: 'Bash breakdown',
     bashBreakdownDescription:
       "Split by the verification-kind classification already stored at ingest (raw commands never leave the proxy): test / typecheck / lint / build, everything else is 'other'. Timing columns come from the single-tool-turn samples above.",
     noBashCalls: 'No Bash calls',
     colKind: 'Kind',
     colShare: 'Share',
-    bashBinaries: 'Bash — Binaries',
+    bashBinaries: 'Bash — binaries',
     bashBinariesDescription: (count: string) =>
       `Showing ${count} distinct binaries from the current analytics snapshot, sorted by invocation count. Includes shell command positions plus allowlisted verification tools referenced behind runners (for example, uv run pytest). Timing columns come from single-tool-turn samples attributed to the command's first binary.`,
     bashTopBinariesAriaLabel: 'Bash top binaries',
     colBinary: 'Binary',
     colInvocations: 'Invocations',
-    usageBreakdown: 'Usage Breakdown',
+    usageBreakdown: 'Usage breakdown',
     batchLabel: '(parallel batch)',
     callsUnit: 'calls',
-    loadingToolAnalytics: 'Loading tool analytics...',
+    allTools: 'All',
+    otherTools: 'Other',
+    sessionCount: (n: string) => ` · ${n} sess`,
+    loadingToolAnalytics: 'Loading tool analytics…',
     cacheTableMissing: 'Tool analytics are not yet built for this snapshot',
     cacheTableMissingDetail:
       "Tool analytics will appear once the snapshot's tool_analytics_cache is rebuilt by the snapshot maintainer.",
-    notAvailableInSnapshot: 'Tool analytics are not available in this snapshot.',
+    notAvailableInSnapshot: 'Tool analytics are not available in this snapshot',
     notAvailableDetail: 'The frozen snapshot has no precomputed tool analytics for this view.',
     reloadToolAnalyticsAriaLabel: 'Reload tool analytics',
     failedToLoad: 'Failed to load tool analytics',
     retry: 'Retry',
     stats: 'Stats',
-    totalToolCalls: 'Total Tool Calls',
-    explicitToolErrorRate: 'Explicit Tool Error Rate',
+    totalToolCalls: 'Total tool calls',
+    explicitToolErrorRate: 'Explicit tool error rate',
     errorRateDetail: (errors: string, matched: string) =>
       `${errors} errors / ${matched} matched Anthropic results`,
-    verifiedEdited: 'Verified Edited',
+    verifiedEdited: 'Verified edited',
     verifiedEditedDetail: (verified: string, edited: string) =>
       `${verified} / ${edited} edited sessions`,
-    finalVerifiedPass: 'Final Verified Pass',
+    finalVerifiedPass: 'Final verified pass',
     finalVerifiedPassDetail: (n: string) => `${n} edited sessions`,
-    uniqueToolTypes: 'Unique Tool Types',
-    sessionsAnalyzed: 'Sessions Analyzed',
-    avgToolsPerSession: 'Avg Tools / Session',
-    recoveredFailures: 'Recovered Failures',
+    uniqueToolTypes: 'Unique tool types',
+    sessionsAnalyzed: 'Sessions analyzed',
+    avgToolsPerSession: 'Avg tools / session',
+    recoveredFailures: 'Recovered failures',
     recoveredFailuresDetail: (recovered: string, total: string) =>
       `${recovered} recovered / ${total} sessions with final failure signal`,
     distribution: 'Distribution',
-    toolUsageDistribution: 'Tool Usage Distribution',
-    topTransitions: 'Top Transitions',
-    transitionMatrix: 'Transition Matrix',
+    toolUsageDistribution: 'Tool usage distribution',
+    topTransitions: 'Top transitions',
+    transitionMatrix: 'Transition matrix',
     rowNormalizedProbability: 'row-normalized probability',
     rawCounts: 'raw counts',
-    showCounts: 'Show Counts',
-    showProbability: 'Show Probability',
+    showCounts: 'Show counts',
+    showProbability: 'Show probability',
     transitionMatrixDescription: (count: number) =>
       `Cell (i, j) = after tool i, tool j was called next. Top ${count} tools by usage.`,
-    explicitToolErrorRates: 'Explicit Tool Error Rates',
-    anthropicToolResults: 'Anthropic Tool Results',
+    explicitToolErrorRates: 'Explicit tool error rates',
+    anthropicToolResults: 'Anthropic tool results',
     matchedResults: (n: string) => `(${n} matched results)`,
     anthropicToolResultsDescription:
       'Explicit error rate is errors divided by matched Anthropic tool results. OpenAI and Codex are excluded because their protocol does not carry the same error flag; unmatched Anthropic calls remain unknown.',
@@ -389,42 +401,45 @@ const STRINGS = {
     colSuccess: 'Success',
     colErrors: 'Errors',
     colUnknown: 'Unknown',
-    colErrorRate: 'Error Rate',
-    verificationLoopAnalysis: 'Verification Loop Analysis',
-    sessionOutcomeProxies: 'Session Outcome Proxies',
+    colErrorRate: 'Error rate',
+    verificationLoopAnalysis: 'Verification loop analysis',
+    sessionOutcomeProxies: 'Session outcome proxies',
     sessionOutcomeDescription:
       'Session outcomes are proxies: pass/fail means the final recognized verification command after an edit passed or failed, not ground-truth task correctness.',
-    verificationCommandClasses: 'Verification Command Classes',
+    verificationCommandClasses: 'Verification command classes',
     noVerificationCommands: 'No recognized verification commands',
     colAttempts: 'Attempts',
-    colAfterEdit: 'After Edit',
+    colAfterEdit: 'After edit',
     colPass: 'Pass',
     colFail: 'Fail',
-    colFailRate: 'Fail Rate',
-    agenticLoopDepth: 'Agentic Loop Depth',
-    toolCallsPerSession: 'Tool Calls per Session',
-    uniqueToolsPerSession: 'Unique Tools per Session',
-    toolDiversityRatio: 'Tool Diversity Ratio (unique / total)',
-    axisToolCalls: 'Tool Calls',
-    axisUniqueTools: 'Unique Tools',
+    colFailRate: 'Fail rate',
+    agenticLoopDepth: 'Agentic loop depth',
+    toolCallsPerSession: 'Tool calls per session',
+    uniqueToolsPerSession: 'Unique tools per session',
+    toolDiversityRatio: 'Tool diversity ratio (unique / total)',
+    axisToolCalls: 'Tool calls',
+    axisUniqueTools: 'Unique tools',
     axisRatio: 'Ratio',
     noData: 'No data',
     binsClip: (bins: number, clipped: string) =>
       `${bins} bins${clipped ? ` · ${clipped} sessions above axis (~p95 clip)` : ''}`,
     outcomeLabels: {
-      verified_pass: 'Verified Pass',
-      fail_recovered: 'Fail Recovered',
-      fail_unrecovered: 'Fail Unrecovered',
-      edited_unverified: 'Edited Unverified',
+      verified_pass: 'Verified pass',
+      fail_recovered: 'Fail recovered',
+      fail_unrecovered: 'Fail unrecovered',
+      edited_unverified: 'Edited unverified',
       ambiguous: 'Ambiguous',
-      no_edit: 'No Edit',
+      no_edit: 'No edit',
     } as Record<OutcomeKey, string>,
     agentLabels: { all: 'All', claude: 'Claude Code', codex: 'Codex' } as Record<
       AgentFilter,
       string
     >,
+    harnessFilterGroupLabel: 'Harness',
+    loopSessions: (sessions: string, pct: string) => `${sessions} sessions (${pct}%)`,
+    loopCycles: (p50: number, max: number) => `p50 ${p50} · max ${max} cycles`,
     harnessFilterLabels: {
-      all: 'All Harnesses',
+      all: 'All harnesses',
       'claude-code': 'Claude Code',
       codex: 'Codex',
       pi: 'Pi',
@@ -446,7 +461,7 @@ const STRINGS = {
     workflowPatterns: '工作流模式',
     workflowCacheMissing:
       '当前快照尚未构建工作流模式——待快照的 tool_analytics_cache 重建后自动显示。',
-    workflowNotAvailable: '当前快照中无工作流模式数据。',
+    workflowNotAvailable: '当前快照中无工作流模式数据',
     workflowFetchError: (msg: string) => `读取工作流模式缓存失败：${msg}`,
     workflowNotEnough: '数据不足，无法挖掘工作流模式（需要含 3+ 次工具调用的会话）',
     reload: '重新加载',
@@ -491,6 +506,8 @@ const STRINGS = {
     turnaroundAxisLabel: '周转时间（对数坐标）',
     medianTurnaroundByOs: (splitArch: boolean) =>
       `按${splitArch ? '平台' : '操作系统'}的中位周转时间`,
+    toolTurnaroundTitle: (tool: string, splitArch: boolean) =>
+      `${tool} 按${splitArch ? 'OS/arch' : '操作系统'}的周转时间`,
     medianTurnaroundDescription: (splitArch: boolean) =>
       `p50 及下方 p90，按工具和${splitArch ? 'OS/arch' : 'OS'}分组。与图表使用相同的客户端耗时样本——差异来自 OS + 机器 + harness 开销，而非模型延迟。`,
     bashBreakdown: 'Bash 分类统计',
@@ -508,11 +525,14 @@ const STRINGS = {
     usageBreakdown: '使用量分布',
     batchLabel: '（并行批次）',
     callsUnit: '次调用',
-    loadingToolAnalytics: '正在加载工具分析数据...',
+    allTools: '全部',
+    otherTools: '其他',
+    sessionCount: (n: string) => ` · ${n} 个会话`,
+    loadingToolAnalytics: '正在加载工具分析数据…',
     cacheTableMissing: '当前快照尚未构建工具分析数据',
     cacheTableMissingDetail:
       '待快照的 tool_analytics_cache 由快照维护程序重建后，工具分析数据将自动显示。',
-    notAvailableInSnapshot: '当前快照中无工具分析数据。',
+    notAvailableInSnapshot: '当前快照中无工具分析数据',
     notAvailableDetail: '冻结快照中没有该视图的预计算工具分析数据。',
     reloadToolAnalyticsAriaLabel: '重新加载工具分析',
     failedToLoad: '加载工具分析数据失败',
@@ -588,6 +608,9 @@ const STRINGS = {
       AgentFilter,
       string
     >,
+    harnessFilterGroupLabel: 'Harness',
+    loopSessions: (sessions: string, pct: string) => `${sessions} 个会话（${pct}%）`,
+    loopCycles: (p50: number, max: number) => `p50 ${p50} · 最多 ${max} 轮`,
     harnessFilterLabels: {
       all: '全部 harness',
       'claude-code': 'Claude Code',
@@ -632,7 +655,6 @@ function Histogram({
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const svgRef = useRef<SVGSVGElement>(null);
   const sorted = useMemo(() => [...values].toSorted((a, b) => a - b), [values]);
 
   const maxCount = Math.max(...buckets.map((b) => b.count), 1);
@@ -671,23 +693,17 @@ function Histogram({
       <div>
         {title && (
           <div className="flex items-center justify-end mb-2">
-            <ExportPngButton
-              locale={locale}
-              analyticsChart={exportFilename?.replace(/\.png$/u, '') || 'tool-histogram'}
-              onClick={() => {
-                if (svgRef.current)
-                  exportSvgToPng(svgRef.current, {
-                    title,
-                    filename: exportFilename || 'histogram.png',
-                    svgWidth: CHART_WIDTH,
-                    svgHeight: CHART_HEIGHT,
-                  });
-              }}
+            <ChartActions
+              fileName={(exportFilename || 'histogram.png').replace(/\.png$/u, '')}
+              onExportPng={() =>
+                track('agentic_workload_export_png', {
+                  chart: exportFilename?.replace(/\.png$/u, '') || 'tool-histogram',
+                })
+              }
             />
           </div>
         )}
         <svg
-          ref={svgRef}
           viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
           className="w-full"
           style={{ maxHeight: 220 }}
@@ -834,18 +850,11 @@ function Histogram({
             {axisLabel}
           </text>
         </svg>
-        <div className="grid grid-cols-6 gap-1.5 mt-3 pt-3 border-t border-border">
+        <div className="grid grid-cols-6 gap-1.5 mt-3 pt-3 border-t border-border/20">
           {percentiles.map((p) => (
-            <div
-              key={p.label}
-              className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center"
-            >
-              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-                {p.label}
-              </div>
-              <div className="text-sm font-mono font-bold tracking-tight mt-0.5">
-                {fmt(p.value)}
-              </div>
+            <div key={p.label} className="rounded-md bg-muted/40 px-2 py-1.5 text-center">
+              <div className="text-xs font-medium text-muted-foreground">{p.label}</div>
+              <div className="text-sm font-mono font-medium mt-0.5">{fmt(p.value)}</div>
             </div>
           ))}
         </div>
@@ -865,18 +874,18 @@ function cellColorFn(intensity: number): string {
 }
 
 function TransitionHeatmap({
+  title,
   transitions,
   showProbability,
   hideSmallLabel,
   noDataLabel,
 }: {
+  title: string;
   transitions: { fromTool: string; toTool: string; count: number }[];
   showProbability: boolean;
   hideSmallLabel: string;
   noDataLabel: string;
 }) {
-  const locale = useLocale();
-  const svgRef = useRef<SVGSVGElement>(null);
   const [hideSmall, setHideSmall] = useState(true);
   const tools = useMemo(() => {
     const totals = new Map<string, number>();
@@ -908,7 +917,11 @@ function TransitionHeatmap({
 
   const n = tools.length;
   if (n === 0)
-    return <div className="text-sm text-muted-foreground text-center py-8">{noDataLabel}</div>;
+    return (
+      <EmptyState bare className="py-8">
+        {noDataLabel}
+      </EmptyState>
+    );
 
   const W = ROW_LABEL_W + n * CELL;
   const H = COL_LABEL_H + n * CELL;
@@ -936,38 +949,29 @@ function TransitionHeatmap({
   }
 
   return (
-    <Expandable title={'Tool Transition Matrix'}>
+    <Expandable title={title}>
       <div>
-        <div className="flex items-center justify-end gap-2 mb-2">
-          <button
+        <div className="flex items-center gap-2 mb-2">
+          <Button
             type="button"
+            variant="outline"
+            size="xs"
+            aria-pressed={hideSmall}
             onClick={() => {
               track('agentic_workload_transition_hide_small_toggled', { enabled: !hideSmall });
               setHideSmall((h) => !h);
             }}
-            className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
-              hideSmall
-                ? 'bg-foreground text-background border-foreground'
-                : 'border-border text-subtle hover:text-foreground hover:bg-surface-hover'
-            }`}
           >
             {hideSmallLabel}
-          </button>
-          <ExportPngButton
-            locale={locale}
-            analyticsChart="tool-transition-matrix"
-            onClick={() => {
-              if (svgRef.current)
-                exportSvgToPng(svgRef.current, {
-                  title: 'Tool Transition Matrix',
-                  filename: 'tool-transition-matrix.png',
-                  svgWidth: W,
-                  svgHeight: H,
-                });
-            }}
+          </Button>
+          <ChartActions
+            fileName="tool-transition-matrix"
+            onExportPng={() =>
+              track('agentic_workload_export_png', { chart: 'tool-transition-matrix' })
+            }
           />
         </div>
-        <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: H }}>
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: H }}>
           {tools.map((tool, j) => {
             const label = tool.length > 14 ? `${tool.slice(0, 13)}…` : tool;
             const cx = ROW_LABEL_W + j * CELL + CELL / 2;
@@ -1096,7 +1100,7 @@ function ToolChip({ tool, avgRun }: { tool: string; avgRun?: number }) {
   const showRun = avgRun !== undefined && avgRun >= 1.15;
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-3xs font-mono font-medium"
+      className="inline-flex items-center gap-1 rounded-md border px-1.5 py-px text-3xs font-mono font-medium"
       style={{
         borderColor: `${color}40`,
         backgroundColor: `${color}14`,
@@ -1132,8 +1136,8 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
   if (loading) {
     return (
       <section>
-        <SectionHeader label={t.workflowPatterns} count={0} />
-        <Skeleton className="h-40 w-full rounded-md" />
+        <SectionHeader label={t.workflowPatterns} />
+        <Skeleton className="h-40 w-full rounded-xl" />
       </section>
     );
   }
@@ -1141,12 +1145,8 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
   if (data?.setupRequired) {
     return (
       <section>
-        <SectionHeader label={t.workflowPatterns} count={0} />
-        <Card>
-          <CardContent className="py-6 text-center text-xs font-mono text-muted-foreground">
-            {t.workflowCacheMissing}
-          </CardContent>
-        </Card>
+        <SectionHeader label={t.workflowPatterns} />
+        <EmptyState>{t.workflowCacheMissing}</EmptyState>
       </section>
     );
   }
@@ -1155,34 +1155,32 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
     const canRetry = Boolean(data?.warming || error);
     return (
       <section>
-        <SectionHeader label={t.workflowPatterns} count={0} />
-        <Card>
-          <CardContent
-            className="flex flex-col items-center gap-3 py-6 text-center text-xs font-mono text-muted-foreground"
-            aria-live="polite"
-          >
-            <span>
-              {data?.warming
-                ? t.workflowNotAvailable
-                : error
-                  ? t.workflowFetchError(error.message)
-                  : t.workflowNotEnough}
-            </span>
-            {canRetry && (
-              <button
+        <SectionHeader label={t.workflowPatterns} />
+        <EmptyState
+          aria-live="polite"
+          action={
+            canRetry ? (
+              <Button
                 type="button"
+                variant="outline"
+                size="xs"
                 onClick={() => {
                   track('agentic_workload_workflow_patterns_reload');
                   reload();
                 }}
                 aria-label={t.reloadWorkflowAriaLabel}
-                className="border border-border bg-background px-3 py-1.5 text-3xs font-bold uppercase tracking-eyebrow text-foreground transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {t.reload}
-              </button>
-            )}
-          </CardContent>
-        </Card>
+              </Button>
+            ) : undefined
+          }
+        >
+          {data?.warming
+            ? t.workflowNotAvailable
+            : error
+              ? t.workflowFetchError(error.message)
+              : t.workflowNotEnough}
+        </EmptyState>
       </section>
     );
   }
@@ -1193,9 +1191,9 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
 
   return (
     <section>
-      <SectionHeader label={t.workflowPatterns} count={motifs.length} />
+      <SectionHeader label={t.workflowPatterns} detail={motifs.length} />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
+      <dl className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
         {[
           {
             label: t.repeatShare,
@@ -1218,17 +1216,16 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
             ),
           },
         ].map((stat) => (
-          <div key={stat.label} className="rounded-md border border-border bg-surface p-3">
-            <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground mb-1.5">
-              {stat.label}
-            </div>
-            <div className="text-lg font-mono font-bold tracking-tight">{stat.value}</div>
-            <p className="text-3xs text-muted-foreground mt-1 leading-relaxed font-mono">
-              {stat.detail}
-            </p>
-          </div>
+          <Stat
+            key={stat.label}
+            boxed
+            label={stat.label}
+            value={stat.value}
+            detail={stat.detail}
+            valueClassName="whitespace-normal"
+          />
         ))}
-      </div>
+      </dl>
 
       <Card>
         <CardHeader className="pb-2">
@@ -1238,7 +1235,7 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
               {t.motifsSubtitle(motifs.length, data.totalSessions.toLocaleString())}
             </span>
           </CardTitle>
-          <p className="text-3xs font-mono text-subtle mt-0.5">{t.motifsDescription}</p>
+          <p className="text-3xs font-mono text-muted-foreground mt-0.5">{t.motifsDescription}</p>
         </CardHeader>
         <CardContent>
           <div className="space-y-1.5">
@@ -1247,26 +1244,28 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
               const barPct = (m.support / maxSupport) * 100;
               return (
                 <div key={i} className="flex items-center gap-3">
-                  <div className="w-6 text-right text-3xs font-mono text-subtle shrink-0">
+                  <div className="w-6 text-right text-3xs font-mono text-muted-foreground shrink-0">
                     #{i + 1}
                   </div>
                   <div className="flex items-center gap-1 flex-1 min-w-0 flex-wrap">
                     {m.pattern.map((tool, ti) => (
                       <span key={ti} className="flex items-center gap-0.5">
-                        {ti > 0 && <span className="text-3xs text-subtle mx-0.5">&rarr;</span>}
+                        {ti > 0 && (
+                          <span className="text-3xs text-muted-foreground mx-0.5">&rarr;</span>
+                        )}
                         <ToolChip tool={tool} avgRun={m.avgRuns[ti]} />
                       </span>
                     ))}
                   </div>
                   <div className="w-24 sm:w-48 shrink-0">
-                    <div className="h-4 bg-background rounded overflow-hidden">
+                    <div className="h-4 bg-muted/40 rounded-sm overflow-hidden">
                       <div
-                        className="h-full bg-emerald-500/30 rounded"
+                        className="h-full bg-muted-foreground/40 rounded-sm"
                         style={{ width: `${Math.max(barPct, 3)}%` }}
                       />
                     </div>
                   </div>
-                  <div className="w-20 text-right text-3xs font-mono text-muted-foreground shrink-0">
+                  <div className="min-w-20 shrink-0 whitespace-nowrap text-right text-3xs font-mono tabular-nums text-muted-foreground">
                     {m.support.toLocaleString()} ({pct}%)
                   </div>
                 </div>
@@ -1280,12 +1279,14 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle>{t.toolStreaks}</CardTitle>
-            <p className="text-3xs font-mono text-subtle mt-0.5">{t.toolStreaksDescription}</p>
+            <p className="text-3xs font-mono text-muted-foreground mt-0.5">
+              {t.toolStreaksDescription}
+            </p>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full text-2xs font-mono">
-                <thead className="text-muted-foreground border-b border-border">
+                <thead className="text-muted-foreground border-b border-border/20">
                   <tr>
                     <th className="text-left py-1.5 font-medium">{t.colTool}</th>
                     <th className="text-right py-1.5 font-medium">{t.colCalls}</th>
@@ -1296,7 +1297,7 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
                     <th className="text-right py-1.5 font-medium">{t.colSessions}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-y divide-border/20">
                   {streaks.map((row) => (
                     <tr key={row.tool}>
                       <td className="py-1.5 font-medium" style={{ color: getToolColor(row.tool) }}>
@@ -1321,11 +1322,15 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle>{t.pingPongLoops}</CardTitle>
-            <p className="text-3xs font-mono text-subtle mt-0.5">{t.pingPongDescription}</p>
+            <p className="text-3xs font-mono text-muted-foreground mt-0.5">
+              {t.pingPongDescription}
+            </p>
           </CardHeader>
           <CardContent>
             {loops.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">{t.noRecurringLoops}</p>
+              <EmptyState bare className="py-6">
+                {t.noRecurringLoops}
+              </EmptyState>
             ) : (
               <div className="space-y-1.5">
                 {loops.map((loop) => {
@@ -1333,19 +1338,19 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
                   return (
                     <div
                       key={loop.pair.join('→')}
-                      className="flex items-center gap-2 text-2xs font-mono"
+                      className="flex flex-wrap items-center gap-x-2 gap-y-1 text-2xs font-mono sm:flex-nowrap"
                     >
                       <div className="flex items-center gap-1 w-[190px] shrink-0">
                         <ToolChip tool={loop.pair[0]} />
-                        <span className="text-3xs text-subtle">&harr;</span>
+                        <span className="text-3xs text-muted-foreground">&harr;</span>
                         <ToolChip tool={loop.pair[1]} />
                       </div>
-                      <span className="flex-1 border-b border-dotted border-border" />
-                      <span className="text-muted-foreground shrink-0">
-                        {loop.sessions.toLocaleString()} sessions ({pct}%)
+                      <span className="hidden flex-1 border-b border-dotted border-border/20 sm:block" />
+                      <span className="shrink-0 whitespace-nowrap tabular-nums text-muted-foreground">
+                        {t.loopSessions(loop.sessions.toLocaleString(), pct)}
                       </span>
-                      <span className="text-subtle shrink-0 w-24 text-right">
-                        p50 {loop.p50Cycles} · max {loop.maxCycles} cyc
+                      <span className="min-w-24 shrink-0 whitespace-nowrap text-right tabular-nums text-muted-foreground">
+                        {t.loopCycles(loop.p50Cycles, loop.maxCycles)}
                       </span>
                     </div>
                   );
@@ -1356,18 +1361,6 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
         </Card>
       </div>
     </section>
-  );
-}
-
-function SectionHeader({ label, count }: { label: string; count: number }) {
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="flex-1 h-px bg-border" />
-      <span className="text-3xs font-mono text-subtle">{count}</span>
-    </div>
   );
 }
 
@@ -1465,7 +1458,6 @@ function p50FromBins(bins: Map<number, number>): number | null {
 function OsTurnaroundCards({ byOs }: { byOs: ToolTimings['byOs'] }) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const svgRef = useRef<SVGSVGElement>(null);
 
   const tools = useMemo(() => {
     const totals = new Map<string, number>();
@@ -1629,91 +1621,82 @@ function OsTurnaroundCards({ byOs }: { byOs: ToolTimings['byOs'] }) {
   for (let bin = Math.ceil(lo / 8) * 8; bin <= hi; bin += 8) decadeTicks.push(bin);
 
   return (
-    <Expandable title={`${activeTool} turnaround by ${splitArch ? 'OS/arch' : 'OS'}`}>
+    <Expandable
+      title={t.toolTurnaroundTitle(activeTool === ALL_TOOL ? t.allTools : activeTool, splitArch)}
+    >
       <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-2">
               <CardTitle>{t.turnaroundShapeByOs}</CardTitle>
               <div className="flex items-center gap-2">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="xs"
+                  aria-pressed={splitArch}
                   onClick={() => {
                     track('agentic_workload_turnaround_split_arch_toggled', {
                       enabled: !splitArch,
                     });
                     setSplitArch((v) => !v);
                   }}
-                  className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
-                    splitArch
-                      ? 'bg-foreground text-background border-foreground'
-                      : 'border-border text-subtle hover:text-foreground hover:bg-surface-hover'
-                  }`}
                 >
                   {t.splitByArch}
-                </button>
-                <ExportPngButton
-                  locale={locale}
-                  analyticsChart="tool-turnaround-by-os"
-                  onClick={() => {
-                    if (svgRef.current)
-                      exportSvgToPng(svgRef.current, {
-                        title: `${activeTool} turnaround by ${splitArch ? 'OS/arch' : 'OS'}`,
-                        filename: `turnaround-by-os-${activeTool.toLowerCase()}.png`,
-                        svgWidth: CHART_WIDTH,
-                        svgHeight: CHART_HEIGHT,
-                      });
-                  }}
+                </Button>
+                <ChartActions
+                  fileName={`turnaround-by-os-${activeTool.toLowerCase()}`}
+                  onExportPng={() =>
+                    track('agentic_workload_export_png', { chart: 'tool-turnaround-by-os' })
+                  }
                 />
               </div>
             </div>
-            <p className="text-3xs font-mono text-subtle mt-0.5">{t.turnaroundShapeDescription}</p>
+            <p className="text-3xs font-mono text-muted-foreground mt-0.5">
+              {t.turnaroundShapeDescription}
+            </p>
             <div className="mt-1.5 space-y-1">
               <div className="flex items-start gap-2">
-                <span className="w-12 shrink-0 pt-1 text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
+                <span className="flex h-7 w-12 shrink-0 items-center text-xs font-medium text-muted-foreground">
                   {t.agent}
                 </span>
                 <div className="flex flex-wrap items-center gap-1">
                   {availableAgents.map((agent) => (
-                    <button
+                    <Button
                       key={agent}
                       type="button"
+                      variant="outline"
+                      size="2xs"
+                      aria-pressed={agent === agentFilter}
                       onClick={() => {
                         track('agentic_workload_turnaround_agent_filter_changed', { agent });
                         setAgentFilter(agent);
                       }}
-                      className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
-                        agent === agentFilter
-                          ? 'bg-foreground text-background border-foreground'
-                          : 'border-border text-subtle hover:text-foreground hover:bg-surface-hover'
-                      }`}
                     >
                       {t.agentLabels[agent]}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
               <div className="flex items-start gap-2">
-                <span className="w-12 shrink-0 pt-1 text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
+                <span className="flex h-7 w-12 shrink-0 items-center text-xs font-medium text-muted-foreground">
                   {t.tool}
                 </span>
                 <div className="flex flex-wrap items-center gap-1">
                   {selectableTools.map((tool) => (
-                    <button
+                    <Button
                       key={tool}
                       type="button"
+                      variant="outline"
+                      size="2xs"
+                      aria-pressed={tool === activeTool}
                       onClick={() => {
                         track('agentic_workload_turnaround_tool_selected', { tool });
                         setSelected(tool);
                       }}
-                      className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
-                        tool === activeTool
-                          ? 'bg-foreground text-background border-foreground'
-                          : 'border-border text-subtle hover:text-foreground hover:bg-surface-hover'
-                      }`}
                     >
-                      {tool}
-                    </button>
+                      {tool === ALL_TOOL ? t.allTools : tool}
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -1721,7 +1704,6 @@ function OsTurnaroundCards({ byOs }: { byOs: ToolTimings['byOs'] }) {
           </CardHeader>
           <CardContent>
             <svg
-              ref={svgRef}
               viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
               className="w-full"
               style={{ maxHeight: 220 }}
@@ -1820,7 +1802,7 @@ function OsTurnaroundCards({ byOs }: { byOs: ToolTimings['byOs'] }) {
                   <span style={{ color: platformColor(key) }}>{key}</span>
                   <span className="text-muted-foreground">
                     n={total.toLocaleString()}
-                    {sessions !== null && ` · ${sessions.toLocaleString()} sess`}
+                    {sessions !== null && t.sessionCount(sessions.toLocaleString())}
                     {p50Ms !== null && ` · p50 ${formatMs(p50Ms)}`}
                   </span>
                 </span>
@@ -1832,14 +1814,14 @@ function OsTurnaroundCards({ byOs }: { byOs: ToolTimings['byOs'] }) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle>{t.medianTurnaroundByOs(splitArch)}</CardTitle>
-            <p className="text-3xs font-mono text-subtle mt-0.5">
+            <p className="text-3xs font-mono text-muted-foreground mt-0.5">
               {t.medianTurnaroundDescription(splitArch)}
             </p>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full text-2xs font-mono">
-                <thead className="text-muted-foreground border-b border-border">
+                <thead className="text-muted-foreground border-b border-border/20">
                   <tr>
                     <th className="text-left py-1.5 font-medium">{t.colTool}</th>
                     {tableColumns.map((col) => (
@@ -1853,7 +1835,7 @@ function OsTurnaroundCards({ byOs }: { byOs: ToolTimings['byOs'] }) {
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-y divide-border/20">
                   {filteredTools.map((tool) => (
                     <tr key={tool}>
                       <td className="py-1.5 font-medium" style={{ color: getToolColor(tool) }}>
@@ -1866,12 +1848,12 @@ function OsTurnaroundCards({ byOs }: { byOs: ToolTimings['byOs'] }) {
                             {stat ? (
                               <>
                                 <div>{formatMs(stat.p50Ms)}</div>
-                                <div className="text-3xs text-subtle">
+                                <div className="text-3xs text-muted-foreground">
                                   p90 {formatMs(stat.p90Ms)}
                                 </div>
                               </>
                             ) : (
-                              <span className="text-subtle">—</span>
+                              <span className="text-muted-foreground">—</span>
                             )}
                           </td>
                         );
@@ -1947,7 +1929,7 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
 
   return (
     <section>
-      <SectionHeader label={t.toolWallTime} count={perTool.length} />
+      <SectionHeader label={t.toolWallTime} detail={perTool.length} />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -1955,7 +1937,7 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
               {t.turnaroundByTool}{' '}
               <span className="text-muted-foreground font-normal">{t.clientSideWallTime}</span>
             </CardTitle>
-            <p className="text-3xs font-mono text-subtle mt-0.5">
+            <p className="text-3xs font-mono text-muted-foreground mt-0.5">
               {t.turnaroundByToolDescription(
                 coverage.singleToolTurns.toLocaleString(),
                 coverage.toolTurns.toLocaleString(),
@@ -1967,7 +1949,7 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
           <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full text-2xs font-mono">
-                <thead className="text-muted-foreground border-b border-border">
+                <thead className="text-muted-foreground border-b border-border/20">
                   <tr>
                     <th className="text-left py-1.5 font-medium">{t.colTool}</th>
                     <th className="text-right py-1.5 font-medium">{t.colSamples}</th>
@@ -1977,7 +1959,7 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
                     <th className="text-right py-1.5 font-medium">{t.colMean}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-y divide-border/20">
                   {perTool.slice(0, 14).map((row) => (
                     <tr key={row.toolName}>
                       <td
@@ -1987,7 +1969,7 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
                             row.toolName === BATCH_LABEL ? '#6b7280' : getToolColor(row.toolName),
                         }}
                       >
-                        {row.toolName}
+                        {row.toolName === BATCH_LABEL ? t.batchLabel : row.toolName}
                       </td>
                       <td className="py-1.5 text-right">{Number(row.samples).toLocaleString()}</td>
                       <td className="py-1.5 text-right">{formatMs(row.p50Ms)}</td>
@@ -2016,21 +1998,19 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
             </div>
             <div className="flex flex-wrap gap-1 mt-1.5">
               {selectable.map((tool) => (
-                <button
+                <Button
                   key={tool}
                   type="button"
+                  variant="outline"
+                  size="2xs"
+                  aria-pressed={tool === activeTool}
                   onClick={() => {
                     track('agentic_workload_timing_tool_selected', { tool });
                     setSelected(tool);
                   }}
-                  className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
-                    tool === activeTool
-                      ? 'bg-foreground text-background border-foreground'
-                      : 'border-border text-subtle hover:text-foreground hover:bg-surface-hover'
-                  }`}
                 >
                   {tool}
-                </button>
+                </Button>
               ))}
             </div>
           </CardHeader>
@@ -2041,12 +2021,12 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
                 const pct = binTotal > 0 ? (count / binTotal) * 100 : 0;
                 return (
                   <div key={label} className="flex items-center gap-2">
-                    <span className="w-14 text-right text-2xs font-mono text-muted-foreground shrink-0">
+                    <span className="min-w-14 shrink-0 whitespace-nowrap text-right text-2xs font-mono text-muted-foreground">
                       {label}
                     </span>
                     <div className="flex-1 h-4 rounded-sm overflow-hidden bg-surface-hover">
                       <div
-                        className="h-full rounded-sm transition-all"
+                        className="h-full rounded-sm"
                         style={{
                           width: `${(count / maxBin) * 100}%`,
                           backgroundColor: activeTool ? getToolColor(activeTool) : '#6b7280',
@@ -2054,7 +2034,7 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
                         }}
                       />
                     </div>
-                    <span className="w-24 text-right text-2xs font-mono text-muted-foreground shrink-0">
+                    <span className="min-w-24 shrink-0 whitespace-nowrap text-right text-2xs font-mono tabular-nums text-muted-foreground">
                       {count.toLocaleString()} ({pct.toFixed(1)}%)
                     </span>
                   </div>
@@ -2076,15 +2056,19 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
                 (N={bashTotal.toLocaleString()} {t.callsUnit})
               </span>
             </CardTitle>
-            <p className="text-3xs font-mono text-subtle mt-0.5">{t.bashBreakdownDescription}</p>
+            <p className="text-3xs font-mono text-muted-foreground mt-0.5">
+              {t.bashBreakdownDescription}
+            </p>
           </CardHeader>
           <CardContent>
             {bashRows.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">{t.noBashCalls}</p>
+              <EmptyState bare className="py-8">
+                {t.noBashCalls}
+              </EmptyState>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-2xs font-mono">
-                  <thead className="text-muted-foreground border-b border-border">
+                  <thead className="text-muted-foreground border-b border-border/20">
                     <tr>
                       <th className="text-left py-1.5 font-medium">{t.colKind}</th>
                       <th className="text-right py-1.5 font-medium">{t.colCalls}</th>
@@ -2095,7 +2079,7 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
                       <th className="text-right py-1.5 font-medium">p99</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border">
+                  <tbody className="divide-y divide-border/20">
                     {bashRows.map((row) => {
                       const share = bashTotal > 0 ? (row.count / bashTotal) * 100 : 0;
                       return (
@@ -2114,7 +2098,7 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
                                   }}
                                 />
                               </div>
-                              <span className="w-12 text-right text-muted-foreground shrink-0">
+                              <span className="min-w-12 shrink-0 whitespace-nowrap text-right tabular-nums text-muted-foreground">
                                 {share.toFixed(1)}%
                               </span>
                             </div>
@@ -2146,7 +2130,7 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
                   (N={binaryTotal.toLocaleString()} invocations)
                 </span>
               </CardTitle>
-              <p className="text-3xs font-mono text-subtle mt-0.5">
+              <p className="text-3xs font-mono text-muted-foreground mt-0.5">
                 {t.bashBinariesDescription(binaryRows.length.toLocaleString())}
               </p>
             </CardHeader>
@@ -2158,7 +2142,7 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
                 className="max-h-80 overflow-auto overscroll-contain focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/40"
               >
                 <table className="w-full text-2xs font-mono">
-                  <thead className="sticky top-0 z-10 bg-background text-muted-foreground border-b border-border">
+                  <thead className="sticky top-0 z-10 bg-background text-muted-foreground border-b border-border/20">
                     <tr>
                       <th className="text-left py-1.5 font-medium">{t.colBinary}</th>
                       <th className="text-right py-1.5 font-medium">{t.colInvocations}</th>
@@ -2169,7 +2153,7 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
                       <th className="text-right py-1.5 font-medium">p99</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border">
+                  <tbody className="divide-y divide-border/20">
                     {binaryRows.map((row) => {
                       const share = binaryTotal > 0 ? (row.count / binaryTotal) * 100 : 0;
                       return (
@@ -2188,7 +2172,7 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
                                   }}
                                 />
                               </div>
-                              <span className="w-12 text-right text-muted-foreground shrink-0">
+                              <span className="min-w-12 shrink-0 whitespace-nowrap text-right tabular-nums text-muted-foreground">
                                 {share.toFixed(1)}%
                               </span>
                             </div>
@@ -2228,9 +2212,9 @@ function PieChartSection({
   toolCounts: { toolName: string; count: number }[];
   totalToolCalls: number;
 }) {
+  const t = STRINGS[useLocale()];
   const [hoveredSlice, setHoveredSlice] = useState<PieSlice | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const slices = useMemo(() => {
     const major: PieSlice[] = [];
@@ -2254,7 +2238,7 @@ function PieChartSection({
 
     if (minorItems.length > 0) {
       major.push({
-        label: 'Other',
+        label: t.otherTools,
         count: minorTotal,
         fraction: minorTotal / totalToolCalls,
         color: '#6b7280',
@@ -2263,14 +2247,13 @@ function PieChartSection({
     }
 
     return major;
-  }, [toolCounts, totalToolCalls]);
+  }, [toolCounts, totalToolCalls, t.otherTools]);
 
-  const t = STRINGS[useLocale()];
   return (
     <section>
-      <SectionHeader label={t.usageBreakdown} count={toolCounts.length} />
+      <SectionHeader label={t.usageBreakdown} detail={toolCounts.length} />
       <Expandable title={t.usageBreakdown} corner>
-        <div ref={containerRef} className="rounded-md border border-border bg-surface p-4 relative">
+        <div className="rounded-xl border border-border/30 bg-card p-4 relative">
           <div className="flex flex-col lg:flex-row items-center gap-6">
             <div className="shrink-0">
               <svg viewBox="-1.1 -1.1 2.2 2.2" width={220} height={220}>
@@ -2314,23 +2297,9 @@ function PieChartSection({
                         }}
                         onMouseEnter={(e) => {
                           setHoveredSlice(slice);
-                          const rect = containerRef.current?.getBoundingClientRect();
-                          if (rect) {
-                            setTooltipPos({
-                              x: e.clientX - rect.left,
-                              y: e.clientY - rect.top,
-                            });
-                          }
+                          setTooltipPos({ x: e.clientX, y: e.clientY });
                         }}
-                        onMouseMove={(e) => {
-                          const rect = containerRef.current?.getBoundingClientRect();
-                          if (rect) {
-                            setTooltipPos({
-                              x: e.clientX - rect.left,
-                              y: e.clientY - rect.top,
-                            });
-                          }
-                        }}
+                        onMouseMove={(e) => setTooltipPos({ x: e.clientX, y: e.clientY })}
                         onMouseLeave={() => setHoveredSlice(null)}
                       />
                     );
@@ -2344,7 +2313,10 @@ function PieChartSection({
                 <div
                   key={slice.label}
                   className="flex items-center gap-2"
-                  onMouseEnter={() => setHoveredSlice(slice)}
+                  onMouseEnter={(e) => {
+                    setHoveredSlice(slice);
+                    setTooltipPos({ x: e.clientX, y: e.clientY });
+                  }}
                   onMouseLeave={() => setHoveredSlice(null)}
                 >
                   <span
@@ -2361,34 +2333,22 @@ function PieChartSection({
           </div>
 
           {hoveredSlice && (
-            <div
-              className="absolute z-50 pointer-events-none rounded-md border border-border bg-background shadow-lg px-3 py-2 text-2xs font-mono max-w-[240px]"
-              style={{
-                left: Math.min(tooltipPos.x + 16, (containerRef.current?.clientWidth || 500) - 250),
-                top: tooltipPos.y > 200 ? tooltipPos.y - 20 : tooltipPos.y + 16,
-              }}
-            >
-              <div className="font-bold mb-1">
-                {hoveredSlice.label}: {hoveredSlice.count.toLocaleString()} (
-                {(hoveredSlice.fraction * 100).toFixed(1)}%)
-              </div>
-              {hoveredSlice.items && (
-                <div className="space-y-0.5 border-t border-border pt-1 mt-1">
-                  {hoveredSlice.items.map((item) => (
-                    <div
-                      key={item.toolName}
-                      className="flex justify-between gap-3 text-muted-foreground"
-                    >
-                      <span>{item.toolName}</span>
-                      <span className="tabular-nums">
-                        {Number(item.count).toLocaleString()} (
-                        {((Number(item.count) / totalToolCalls) * 100).toFixed(2)}%)
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <FloatingTooltip x={tooltipPos.x} y={tooltipPos.y} offset={16}>
+              <ChartHoverCardBody
+                title={hoveredSlice.label}
+                color={hoveredSlice.color}
+                metrics={[
+                  { value: hoveredSlice.count.toLocaleString(), label: t.callsUnit },
+                  { value: `${(hoveredSlice.fraction * 100).toFixed(1)}%`, label: t.colShare },
+                ]}
+                summary={hoveredSlice.items
+                  ?.map(
+                    (item) =>
+                      `${item.toolName} ${Number(item.count).toLocaleString()} (${((Number(item.count) / totalToolCalls) * 100).toFixed(2)}%)`,
+                  )
+                  .join(' · ')}
+              />
+            </FloatingTooltip>
           )}
         </div>
       </Expandable>
@@ -2416,6 +2376,7 @@ export default function ToolAnalyticsPage() {
 function ToolAnalyticsPageContent() {
   const locale = useLocale();
   const t = STRINGS[locale];
+  const explorerHref = useExplorerHref();
   const router = useRouter();
   const searchParams = useSearchParams();
   const raw = searchParams.get('harness');
@@ -2426,30 +2387,24 @@ function ToolAnalyticsPageContent() {
     if (value === 'all') params.delete('harness');
     else params.set('harness', value);
     const qs = params.toString();
-    router.replace(`/tool-analytics${qs ? `?${qs}` : ''}`, { scroll: false });
+    router.replace(explorerHref(`/tool-analytics${qs ? `?${qs}` : ''}`), { scroll: false });
   }
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-1">
-        {HARNESS_FILTERS.map((f) => (
-          <button
-            key={f.value}
-            type="button"
-            onClick={() => {
-              track('agentic_workload_harness_filter_changed', { harness: f.value });
-              setHarness(f.value);
-            }}
-            className={`px-2.5 py-1 text-3xs font-mono uppercase tracking-wider rounded-md transition-colors ${
-              harness === f.value
-                ? 'bg-foreground text-background'
-                : 'text-muted-foreground hover:text-foreground hover:bg-surface-hover'
-            }`}
-          >
-            {t.harnessFilterLabels[f.value]}
-          </button>
-        ))}
-      </div>
+      <SegmentedToggle
+        role="group"
+        ariaLabel={t.harnessFilterGroupLabel}
+        value={harness}
+        onValueChange={(value) => {
+          track('agentic_workload_harness_filter_changed', { harness: value });
+          setHarness(value);
+        }}
+        options={HARNESS_FILTERS.map((f) => ({
+          value: f.value,
+          label: t.harnessFilterLabels[f.value],
+        }))}
+      />
       <ToolAnalyticsView harness={harness} />
     </div>
   );
@@ -2504,7 +2459,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
         <div className="text-2xs font-mono text-muted-foreground">{t.loadingToolAnalytics}</div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="rounded-md border border-border bg-surface p-3">
+            <div key={i} className="rounded-xl border border-border/30 bg-card p-3">
               <Skeleton className="h-3 w-16 mb-2" />
               <Skeleton className="h-6 w-12" />
             </div>
@@ -2518,7 +2473,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-2 text-muted-foreground text-sm font-mono">
         <div>{t.cacheTableMissing}</div>
-        <div className="text-3xs text-subtle">{t.cacheTableMissingDetail}</div>
+        <div className="text-3xs text-muted-foreground">{t.cacheTableMissingDetail}</div>
       </div>
     );
   }
@@ -2531,18 +2486,20 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
         aria-live="polite"
       >
         <div>{t.notAvailableInSnapshot}</div>
-        <div className="text-3xs text-subtle">{t.notAvailableDetail}</div>
-        <button
+        <div className="text-3xs text-muted-foreground">{t.notAvailableDetail}</div>
+        <Button
           type="button"
+          variant="outline"
+          size="xs"
           onClick={() => {
             track('agentic_workload_tool_analytics_reload');
             reload();
           }}
           aria-label={t.reloadToolAnalyticsAriaLabel}
-          className="border border-border bg-background px-3 py-1.5 text-3xs font-bold uppercase tracking-eyebrow text-foreground transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="font-sans"
         >
           {t.reload}
-        </button>
+        </Button>
       </div>
     );
   }
@@ -2554,16 +2511,18 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
           {t.failedToLoad}
           {loadError ? `: ${loadError.message}` : ''}
         </div>
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="xs"
           onClick={() => {
             track('agentic_workload_tool_analytics_retry');
             reload();
           }}
-          className="border border-border bg-background px-3 py-1.5 text-3xs font-bold uppercase tracking-eyebrow text-foreground transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="font-sans"
         >
           {t.retry}
-        </button>
+        </Button>
       </div>
     );
   }
@@ -2625,7 +2584,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
       )}
 
       <section>
-        <SectionHeader label={t.stats} count={8} />
+        <SectionHeader label={t.stats} detail={8} />
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
             { label: t.totalToolCalls, value: totalToolCalls.toLocaleString() },
@@ -2665,11 +2624,9 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
               ),
             },
           ].map((stat) => (
-            <div key={stat.label} className="rounded-md border border-border bg-surface p-3">
-              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground mb-1.5">
-                {stat.label}
-              </div>
-              <div className="text-lg font-mono font-bold tracking-tight">{stat.value}</div>
+            <div key={stat.label} className="rounded-xl border border-border/30 bg-card p-3">
+              <div className="text-xs font-medium text-muted-foreground mb-1.5">{stat.label}</div>
+              <div className="text-lg font-medium tabular-nums">{stat.value}</div>
               {'detail' in stat && stat.detail && (
                 <p className="text-3xs text-muted-foreground mt-1 leading-relaxed font-mono">
                   {stat.detail}
@@ -2683,7 +2640,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
       <PieChartSection toolCounts={toolCounts} totalToolCalls={totalToolCalls} />
 
       <section>
-        <SectionHeader label={t.distribution} count={Math.min(toolCounts.length, 15)} />
+        <SectionHeader label={t.distribution} detail={Math.min(toolCounts.length, 15)} />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="pb-2">
@@ -2707,7 +2664,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                     </span>
                     <div className="flex-1 h-4 rounded-sm overflow-hidden bg-surface-hover">
                       <div
-                        className="h-full rounded-sm transition-all"
+                        className="h-full rounded-sm"
                         style={{
                           width: `${(Number(tc.count) / maxToolCount) * 100}%`,
                           backgroundColor: getToolColor(tc.toolName),
@@ -2715,7 +2672,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                         }}
                       />
                     </div>
-                    <span className="w-14 text-right text-2xs font-mono text-muted-foreground shrink-0">
+                    <span className="min-w-14 shrink-0 whitespace-nowrap text-right text-2xs font-mono tabular-nums text-muted-foreground">
                       {Number(tc.count).toLocaleString()}
                     </span>
                   </div>
@@ -2747,11 +2704,11 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                       <span className="shrink-0" style={{ color: getToolColor(tr.toTool) }}>
                         {tr.toTool}
                       </span>
-                      <span className="flex-1 border-b border-dotted border-border" />
+                      <span className="flex-1 border-b border-dotted border-border/20" />
                       <span className="text-muted-foreground shrink-0">
                         {Number(tr.count).toLocaleString()}
                       </span>
-                      <span className="text-subtle shrink-0 w-12 text-right">
+                      <span className="min-w-12 shrink-0 whitespace-nowrap text-right tabular-nums text-muted-foreground">
                         {pct.toFixed(1)}%
                       </span>
                     </div>
@@ -2766,36 +2723,38 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
       <ToolTimingSection timings={data.toolTimings} />
 
       <section>
-        <SectionHeader label={t.transitionMatrix} count={transitions.length} />
+        <SectionHeader label={t.transitionMatrix} detail={transitions.length} />
         <Card>
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <CardTitle>
                 {t.transitionMatrix}{' '}
                 <span className="text-muted-foreground font-normal">
                   ({showProbability ? t.rowNormalizedProbability : t.rawCounts})
                 </span>
               </CardTitle>
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="xs"
                 onClick={() => {
                   track('agentic_workload_transition_mode_toggled', {
                     show_probability: !showProbability,
                   });
                   setShowProbability((v) => !v);
                 }}
-                className="px-2 py-0.5 text-3xs font-mono rounded border border-border bg-surface-hover hover:bg-surface text-muted-foreground hover:text-foreground transition-colors"
               >
                 {showProbability ? t.showCounts : t.showProbability}
-              </button>
+              </Button>
             </div>
-            <p className="text-3xs font-mono text-subtle mt-0.5">
+            <p className="text-3xs font-mono text-muted-foreground mt-0.5">
               {t.transitionMatrixDescription(Math.min(15, toolCounts.length))}
             </p>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <TransitionHeatmap
+                title={t.transitionMatrix}
                 transitions={transitions}
                 showProbability={showProbability}
                 hideSmallLabel={t.hideSmall}
@@ -2809,7 +2768,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
       <WorkflowPatterns harness={harness} />
 
       <section>
-        <SectionHeader label={t.explicitToolErrorRates} count={toolErrorRates.length} />
+        <SectionHeader label={t.explicitToolErrorRates} detail={toolErrorRates.length} />
         <div className="space-y-4">
           <ToolOsErrorRates rows={toolErrorRatesByOs} />
           <Card>
@@ -2820,15 +2779,15 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                   {t.matchedResults(matchedToolResults.toLocaleString())}
                 </span>
               </CardTitle>
-              <p className="text-3xs font-mono text-subtle mt-0.5">
+              <p className="text-3xs font-mono text-muted-foreground mt-0.5">
                 {t.anthropicToolResultsDescription}
               </p>
             </CardHeader>
             <CardContent>
               {toolErrorRates.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">
+                <EmptyState bare className="py-8">
                   {t.noToolResultData}
-                </p>
+                </EmptyState>
               ) : (
                 <div
                   role="region"
@@ -2837,7 +2796,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                   className="max-h-64 overflow-auto overscroll-contain focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/40"
                 >
                   <table className="w-full text-2xs font-mono">
-                    <thead className="sticky top-0 z-10 bg-background text-muted-foreground border-b border-border">
+                    <thead className="sticky top-0 z-10 bg-background text-muted-foreground border-b border-border/20">
                       <tr>
                         <th className="text-left py-1.5 font-medium">{t.colTool}</th>
                         <th className="text-right py-1.5 font-medium">{t.colCalls}</th>
@@ -2848,7 +2807,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                         <th className="text-right py-1.5 font-medium">{t.colErrorRate}</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border">
+                    <tbody className="divide-y divide-border/20">
                       {toolErrorRates.map((row) => (
                         <tr key={row.toolName}>
                           <td
@@ -2861,13 +2820,13 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                           <td className="py-1.5 text-right">
                             {row.matchedResults.toLocaleString()}
                           </td>
-                          <td className="py-1.5 text-right text-emerald-500">
+                          <td className="py-1.5 text-right text-success">
                             {row.successes.toLocaleString()}
                           </td>
-                          <td className="py-1.5 text-right text-red-500">
+                          <td className="py-1.5 text-right text-destructive">
                             {row.errors.toLocaleString()}
                           </td>
-                          <td className="py-1.5 text-right text-subtle">
+                          <td className="py-1.5 text-right text-muted-foreground">
                             {row.unknown.toLocaleString()}
                           </td>
                           <td className="py-1.5 text-right">{formatPct(row.errorRate)}</td>
@@ -2885,7 +2844,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
       <section>
         <SectionHeader
           label={t.verificationLoopAnalysis}
-          count={verificationSummary.sessionsAnalyzed}
+          detail={verificationSummary.sessionsAnalyzed}
         />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card>
@@ -2904,12 +2863,15 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                   const pct = Number(outcome.count) / total;
                   return (
                     <div key={outcome.outcome} className="flex items-center gap-2">
-                      <span className="w-[150px] text-right text-2xs font-mono font-medium shrink-0">
+                      <span
+                        className="w-[150px] shrink-0 truncate text-right text-2xs font-mono font-medium"
+                        title={t.outcomeLabels[outcome.outcome]}
+                      >
                         {t.outcomeLabels[outcome.outcome]}
                       </span>
                       <div className="flex-1 h-4 rounded-sm overflow-hidden bg-surface-hover">
                         <div
-                          className="h-full rounded-sm transition-all"
+                          className="h-full rounded-sm"
                           style={{
                             width: `${pct * 100}%`,
                             backgroundColor: OUTCOME_COLORS[outcome.outcome],
@@ -2917,17 +2879,17 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                           }}
                         />
                       </div>
-                      <span className="w-14 text-right text-2xs font-mono text-muted-foreground shrink-0">
+                      <span className="min-w-14 shrink-0 whitespace-nowrap text-right text-2xs font-mono tabular-nums text-muted-foreground">
                         {Number(outcome.count).toLocaleString()}
                       </span>
-                      <span className="w-12 text-right text-2xs font-mono text-subtle shrink-0">
+                      <span className="min-w-12 shrink-0 whitespace-nowrap text-right text-2xs font-mono tabular-nums text-muted-foreground">
                         {formatPct(pct)}
                       </span>
                     </div>
                   );
                 })}
               </div>
-              <p className="text-3xs font-mono text-subtle mt-3 leading-relaxed">
+              <p className="text-3xs font-mono text-muted-foreground mt-3 leading-relaxed">
                 {t.sessionOutcomeDescription}
               </p>
             </CardContent>
@@ -2944,13 +2906,13 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
             </CardHeader>
             <CardContent>
               {verificationByKind.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">
+                <EmptyState bare className="py-8">
                   {t.noVerificationCommands}
-                </p>
+                </EmptyState>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-2xs font-mono">
-                    <thead className="text-muted-foreground border-b border-border">
+                    <thead className="text-muted-foreground border-b border-border/20">
                       <tr>
                         <th className="text-left py-1.5 font-medium">{t.colKind}</th>
                         <th className="text-right py-1.5 font-medium">{t.colAttempts}</th>
@@ -2961,7 +2923,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                         <th className="text-right py-1.5 font-medium">{t.colFailRate}</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border">
+                    <tbody className="divide-y divide-border/20">
                       {verificationByKind.map((row) => (
                         <tr key={row.kind}>
                           <td className="py-1.5 font-medium">{row.kind}</td>
@@ -2969,13 +2931,13 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                           <td className="py-1.5 text-right">
                             {row.afterEditAttempts.toLocaleString()}
                           </td>
-                          <td className="py-1.5 text-right text-emerald-500">
+                          <td className="py-1.5 text-right text-success">
                             {row.passes.toLocaleString()}
                           </td>
-                          <td className="py-1.5 text-right text-red-500">
+                          <td className="py-1.5 text-right text-destructive">
                             {row.failures.toLocaleString()}
                           </td>
-                          <td className="py-1.5 text-right text-subtle">
+                          <td className="py-1.5 text-right text-muted-foreground">
                             {row.unknown.toLocaleString()}
                           </td>
                           <td className="py-1.5 text-right">{formatPct(row.failureRate)}</td>
@@ -2991,7 +2953,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
       </section>
 
       <section>
-        <SectionHeader label={t.agenticLoopDepth} count={sessionToolStats.length} />
+        <SectionHeader label={t.agenticLoopDepth} detail={sessionToolStats.length} />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {[
             {
@@ -3026,9 +2988,9 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                     <CardTitle className="text-sm">{title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+                    <EmptyState bare className="h-40">
                       {t.noData}
-                    </div>
+                    </EmptyState>
                   </CardContent>
                 </Card>
               );
@@ -3044,7 +3006,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                       (N={values.length.toLocaleString()})
                     </span>
                   </CardTitle>
-                  <p className="text-3xs font-mono text-subtle mt-0.5">
+                  <p className="text-3xs font-mono text-muted-foreground mt-0.5">
                     {t.binsClip(buckets.length, clipped > 0 ? clipped.toLocaleString() : '')}
                   </p>
                 </CardHeader>

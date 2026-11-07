@@ -16,7 +16,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {
-    dateRangeLabel: 'Date Range',
+    dateRangeLabel: 'Date range',
     dateRangeTooltip:
       'Time window for calculating chip reliability metrics. Longer ranges provide more stable statistics but may not reflect recent changes in hardware performance.',
     dateRangePlaceholder: 'Select date range',

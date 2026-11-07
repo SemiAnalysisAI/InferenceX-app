@@ -1,11 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
-import {
-  generateOverlayTooltipContent,
-  type OverlayTooltipConfig,
-  type TooltipConfig,
-} from '@/components/inference/utils/tooltipUtils';
+import type { TooltipConfig } from '@/components/inference/utils/tooltipUtils';
+import { detailsText } from '@/components/inference/utils/point-details-test-helpers';
 
 const RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34716669498';
 const AUDIT_NAME =
@@ -51,7 +48,6 @@ function measuredPoint(overrides: Partial<InferenceData> = {}): InferenceData {
 function config(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
   return {
     data: measuredPoint(),
-    isPinned: true,
     xLabel: 'Interactivity (tok/s/user)',
     yLabel: 'Measured Power per Chip (W)',
     selectedYAxisMetric: 'y_measuredAvgPower',
@@ -60,7 +56,7 @@ function config(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
   };
 }
 
-function overlayConfig(overrides: Partial<OverlayTooltipConfig> = {}): OverlayTooltipConfig {
+function overlayConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
   return {
     ...config({ data: measuredPoint({ id: 0 }) }),
     overlayData: {
@@ -78,14 +74,11 @@ describe('View power trace tooltip action', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders on pinned overlay tooltips whose points carry id 0', () => {
-    const html = generateOverlayTooltipContent(overlayConfig());
-    expect(html).toContain(`<a ${ACTION}`);
-    expect(html).toContain('View power trace &rarr;');
+  it('renders in overlay point details whose points carry id 0', () => {
+    const html = detailsText(overlayConfig());
+    expect(html).toContain(ACTION);
+    expect(html).toContain('View power trace');
     expect(html).not.toContain('data-action="view-logs"');
-    expect(generateOverlayTooltipContent(overlayConfig({ isPinned: false }))).not.toContain(ACTION);
-    expect(
-      generateOverlayTooltipContent(overlayConfig({ selectedYAxisMetric: 'y_tpPerGpu' })),
-    ).not.toContain(ACTION);
+    expect(detailsText(overlayConfig({ selectedYAxisMetric: 'y_tpPerGpu' }))).not.toContain(ACTION);
   });
 });

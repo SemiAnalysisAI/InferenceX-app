@@ -96,7 +96,7 @@ function visitAgenticQuickFilters() {
     'availability',
   );
   cy.intercept('GET', '/api/v1/benchmarks*', { body: benchmarks }).as('benchmarks');
-  cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&i_spec=mtp', {
+  cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&i_spec=mtp', {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       unlockAgenticGate(win);
@@ -113,7 +113,7 @@ describe('Agentic Quick Filters', () => {
     expectHwKeyPoints('b200', true);
     expectHwKeyPoints('mi300x', true);
     cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
-    cy.get('[data-testid="scatter-quick-filters"]').should('contain.text', 'Quick Filters').click();
+    cy.get('[data-testid="scatter-quick-filters"]').should('contain.text', 'Quick filters').click();
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
     cy.get('[data-testid="quick-filters-selected-count"]').should('not.exist');
 

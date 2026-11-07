@@ -1,6 +1,6 @@
 # Agentic Workload Explorer
 
-The Agentic Workload Explorer (`/agentic-workload-explorer`, `/zh/agentic-workload-explorer`)
+The Agentic Workload Explorer (`/infx/agentic-workload-explorer`, `/zh/infx/agentic-workload-explorer`)
 is a feature-gated dashboard in **Hidden** (↑↑↓↓←→←→BA unlock). It is a port of the standalone
 [ProxyTrace-ReadOnly](https://github.com/SemiAnalysisAI/ProxyTrace-ReadOnly) dashboard. It
 shows a frozen, anonymized snapshot of real coding-agent traffic captured by ProxyTrace:

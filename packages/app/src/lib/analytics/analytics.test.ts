@@ -105,7 +105,7 @@ describe('pageviews', () => {
     const analytics = await import('./analytics');
 
     analytics.track('landing_page_viewed');
-    setUrl('/inference');
+    setUrl('/infx/inference');
     analytics.trackPageview();
     analytics.track('header_dashboard_clicked');
     analytics.registerAnalyticsClient({ capture });
@@ -113,8 +113,8 @@ describe('pageviews', () => {
     expect(capture.mock.calls.map(([name, props]) => [name, props.$current_url])).toEqual([
       ['$pageview', 'https://inferencex.semianalysis.com/'],
       ['landing_page_viewed', 'https://inferencex.semianalysis.com/'],
-      ['$pageview', 'https://inferencex.semianalysis.com/inference'],
-      ['header_dashboard_clicked', 'https://inferencex.semianalysis.com/inference'],
+      ['$pageview', 'https://inferencex.semianalysis.com/infx/inference'],
+      ['header_dashboard_clicked', 'https://inferencex.semianalysis.com/infx/inference'],
     ]);
   });
 
@@ -135,13 +135,13 @@ describe('pageviews', () => {
     analytics.registerAnalyticsClient({ capture });
     analytics.trackPageview();
 
-    setUrl('/submissions');
+    setUrl('/infx/submissions');
     analytics.track('submissions_page_viewed');
     analytics.trackPageview();
 
     expect(capture.mock.calls.map(([name, props]) => [name, props?.$current_url])).toEqual([
       ['$pageview', 'https://inferencex.semianalysis.com/'],
-      ['$pageview', 'https://inferencex.semianalysis.com/submissions'],
+      ['$pageview', 'https://inferencex.semianalysis.com/infx/submissions'],
       ['submissions_page_viewed', undefined],
     ]);
   });
@@ -151,15 +151,15 @@ describe('pageviews', () => {
     const analytics = await import('./analytics');
     analytics.trackPageview();
 
-    setUrl('/submissions');
+    setUrl('/infx/submissions');
     analytics.track('submissions_page_viewed');
     analytics.trackPageview();
     analytics.registerAnalyticsClient({ capture });
 
     expect(capture.mock.calls.map(([name, props]) => [name, props.$current_url])).toEqual([
       ['$pageview', 'https://inferencex.semianalysis.com/'],
-      ['$pageview', 'https://inferencex.semianalysis.com/submissions'],
-      ['submissions_page_viewed', 'https://inferencex.semianalysis.com/submissions'],
+      ['$pageview', 'https://inferencex.semianalysis.com/infx/submissions'],
+      ['submissions_page_viewed', 'https://inferencex.semianalysis.com/infx/submissions'],
     ]);
   });
 
@@ -168,25 +168,28 @@ describe('pageviews', () => {
     const register = vi.fn();
     const analytics = await import('./analytics');
     analytics.registerAnalyticsClient({ capture, register });
-    setUrl('/zh/inference');
+    setUrl('/zh/infx/inference');
     analytics.trackPageview();
 
-    analytics.trackVirtualPageview('/zh/inference/kimi-k3?i_seq=8k1k', 'client_pathname_change');
+    analytics.trackVirtualPageview(
+      '/zh/infx/inference/kimi-k3?i_seq=8k1k',
+      'client_pathname_change',
+    );
     // Next later reports the same URL, which must not double count.
-    setUrl('/zh/inference/kimi-k3?i_seq=8k1k');
+    setUrl('/zh/infx/inference/kimi-k3?i_seq=8k1k');
     analytics.trackPageview();
 
     const pageviews = capture.mock.calls.filter(([name]) => name === '$pageview');
     expect(pageviews).toHaveLength(2);
     expect(pageviews[1][1]).toMatchObject({
-      $current_url: 'https://inferencex.semianalysis.com/zh/inference/kimi-k3?i_seq=8k1k',
-      $pathname: '/zh/inference/kimi-k3',
-      route_template: '/inference/[model]',
+      $current_url: 'https://inferencex.semianalysis.com/zh/infx/inference/kimi-k3?i_seq=8k1k',
+      $pathname: '/zh/infx/inference/kimi-k3',
+      route_template: '/infx/inference/[model]',
       locale: 'zh',
       navigation_type: 'client_pathname_change',
     });
     expect(register).toHaveBeenLastCalledWith({
-      route_template: '/inference/[model]',
+      route_template: '/infx/inference/[model]',
       locale: 'zh',
     });
   });
@@ -229,7 +232,7 @@ describe('trackOncePerPageview', () => {
 
     expect(analytics.trackOncePerPageview('landing_page_viewed')).toBe(true);
     expect(analytics.trackOncePerPageview('landing_page_viewed')).toBe(false);
-    setUrl('/inference');
+    setUrl('/infx/inference');
     analytics.trackPageview();
     setUrl('/');
     analytics.trackPageview();

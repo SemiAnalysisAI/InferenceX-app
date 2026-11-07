@@ -16,7 +16,7 @@ import {
 } from './chart-shared';
 import { layoutChartLegend } from './chart-legend';
 import { logHistogram, logTicks, positiveValues } from './lognormal';
-import { quantile } from './time-series-math';
+import { niceAxis, quantile } from './time-series-math';
 
 const PAD = CHART_PAD;
 
@@ -104,7 +104,7 @@ export function Distribution({
   const max = edges.at(-1)!;
   const nBins = counts.length;
 
-  const yMax = Math.max(...counts, 1);
+  const { top: yMax, ticks: yTickVals } = niceAxis(Math.max(...counts, 1), { integer: true });
 
   const lnSpan = lnMax - lnMin;
   const xScale = (v: number) =>
@@ -130,8 +130,7 @@ export function Distribution({
     return { items };
   };
 
-  const xTickVals = logTicks(min, max);
-  const yTickVals = Array.from({ length: 5 }, (_, i) => (yMax * i) / 4);
+  const xTickVals = logTicks(min, max, innerW);
 
   return (
     <div className="w-full">
@@ -157,7 +156,7 @@ export function Distribution({
                 y={y + 3}
                 fontSize={10}
                 fill="currentColor"
-                opacity={0.55}
+                opacity={0.7}
                 textAnchor="end"
               >
                 {fmt(v)}
@@ -230,7 +229,7 @@ export function Distribution({
           y={H - legend.extraHeight - 22}
           fontSize={11}
           fill="currentColor"
-          opacity={0.55}
+          opacity={0.7}
           textAnchor="middle"
         >
           {t.valueAxis(unit)}
@@ -240,7 +239,7 @@ export function Distribution({
           y={(H - legend.extraHeight) / 2}
           fontSize={11}
           fill="currentColor"
-          opacity={0.55}
+          opacity={0.7}
           textAnchor="middle"
           transform={`rotate(-90 10 ${(H - legend.extraHeight) / 2})`}
         >

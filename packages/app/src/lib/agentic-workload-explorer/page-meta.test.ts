@@ -14,8 +14,8 @@ import {
 } from './page-meta';
 
 const APP_DIR = path.resolve(import.meta.dirname, '../../app');
-const EN_ROOT = path.join(APP_DIR, '(dashboard)/agentic-workload-explorer');
-const ZH_ROOT = path.join(APP_DIR, 'zh/(dashboard)/agentic-workload-explorer');
+const EN_ROOT = path.join(APP_DIR, '(dashboard)/infx/agentic-workload-explorer');
+const ZH_ROOT = path.join(APP_DIR, 'zh/(dashboard)/infx/agentic-workload-explorer');
 
 function routeDirs(root: string): string[] {
   return readdirSync(root, { withFileTypes: true })
@@ -55,8 +55,8 @@ describe('explorerSectionMetadata', () => {
   it('pairs canonical URLs and hreflang alternates across locales', () => {
     const en = explorerSectionMetadata('/sessions', 'en');
     const zh = explorerSectionMetadata('/sessions', 'zh');
-    expect(en.alternates?.canonical).toBe(`${SITE_URL}/agentic-workload-explorer/sessions`);
-    expect(zh.alternates?.canonical).toBe(`${SITE_URL}/zh/agentic-workload-explorer/sessions`);
+    expect(en.alternates?.canonical).toBe(`${SITE_URL}/infx/agentic-workload-explorer/sessions`);
+    expect(zh.alternates?.canonical).toBe(`${SITE_URL}/zh/infx/agentic-workload-explorer/sessions`);
     expect(zh.alternates?.languages).toEqual(en.alternates?.languages);
     expect(zh.openGraph).toMatchObject({ locale: 'zh_CN' });
     expect(en.robots).toBeUndefined();

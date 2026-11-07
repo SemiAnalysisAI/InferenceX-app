@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { track } from '@/lib/analytics/analytics';
+import { rangeProgressStyle } from '@/components/ui/control-styles';
 import {
   buildLadder,
   LADDER_HARDWARE,
@@ -99,7 +100,8 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
               setRaw(event.target.value);
               track('powerx_tutorial_load_watts', { value: Number(event.target.value) });
             }}
-            className="h-11 min-w-0 flex-1 accent-foreground md:h-9"
+            className="range-slider h-11 min-w-0 flex-1 md:h-9"
+            style={rangeProgressStyle(gpuWatts, 0, sweep.tdpWatts)}
           />
         </label>
         <span className="font-mono text-sm tabular-nums text-foreground">

@@ -11,8 +11,7 @@ describe('shared Blog localization chrome', () => {
     const toc = renderToStaticMarkup(<BlogToc headings={headings} locale="zh" />);
 
     expect(toc).toContain('aria-label="本页目录"');
-    expect(toc).toContain('（点击展开）');
     expect(toc).not.toContain('Table of contents');
-    expect(toc).not.toContain('click to expand');
+    expect(toc).not.toContain('On this page');
   });
 });

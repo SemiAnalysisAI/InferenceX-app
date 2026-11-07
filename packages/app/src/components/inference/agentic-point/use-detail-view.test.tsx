@@ -46,7 +46,7 @@ function renderedView(): string | null {
 
 beforeEach(() => {
   Reflect.deleteProperty(window.history, 'replaceState');
-  nativeReplace('/inference/agentic/42');
+  nativeReplace('/infx/inference/agentic/42');
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -63,7 +63,7 @@ afterEach(() => {
 describe('useDetailView', () => {
   it('replaces client-owned view state without Next navigation and preserves the rest of the URL', () => {
     nativeReplace(
-      '/inference/agentic/42?unofficialruns=11&view=timeline&sample=abc#server-metrics',
+      '/infx/inference/agentic/42?unofficialruns=11&view=timeline&sample=abc#server-metrics',
       { route: 'agentic-point' },
     );
     const nextReplace = vi.fn();
@@ -78,7 +78,7 @@ describe('useDetailView', () => {
 
     click('aggregates');
     expect(renderedView()).toBe('aggregates');
-    expect(window.location.pathname).toBe('/inference/agentic/42');
+    expect(window.location.pathname).toBe('/infx/inference/agentic/42');
     expect(window.location.hash).toBe('#server-metrics');
     expect(new URLSearchParams(window.location.search).get('view')).toBe('aggregates');
     expect(new URLSearchParams(window.location.search).get('unofficialruns')).toBe('11');
@@ -103,18 +103,18 @@ describe('useDetailView', () => {
   });
 
   it('updates the mounted selection when Back or forward changes the URL', () => {
-    nativeReplace('/inference/agentic/42?unofficialruns=11');
+    nativeReplace('/infx/inference/agentic/42?unofficialruns=11');
     renderProbe();
     expect(renderedView()).toBe('point');
 
     act(() => {
-      nativeReplace('/inference/agentic/42?unofficialruns=11&view=timeline');
+      nativeReplace('/infx/inference/agentic/42?unofficialruns=11&view=timeline');
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
     expect(renderedView()).toBe('timeline');
 
     act(() => {
-      nativeReplace('/inference/agentic/42?unofficialruns=11&view=aggregates');
+      nativeReplace('/infx/inference/agentic/42?unofficialruns=11&view=aggregates');
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
     expect(renderedView()).toBe('aggregates');

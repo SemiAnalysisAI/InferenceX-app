@@ -86,6 +86,7 @@ describe('API documentation', () => {
       excluded: 'Explain why rows were excluded and list missing requested metrics',
       copy: 'Copy',
       copied: 'Copied',
+      currentTheme: 'currently',
     },
     {
       path: '/zh/api',
@@ -94,6 +95,7 @@ describe('API documentation', () => {
       excluded: '说明数据行被排除的原因，并列出所请求指标的缺失项',
       copy: '复制',
       copied: '已复制',
+      currentTheme: '当前为',
     },
   ]) {
     it(`guides ${locale.path} visitors from a pinned public install to a traceable export`, () => {
@@ -104,7 +106,7 @@ describe('API documentation', () => {
       });
       cy.get('[data-testid="theme-toggle"]')
         .should('have.attr', 'aria-label')
-        .and('contain', 'currently');
+        .and('contain', locale.currentTheme);
 
       cy.get('[data-testid="copyable-code-block"]')
         .first()

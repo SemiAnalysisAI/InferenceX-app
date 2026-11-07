@@ -10,7 +10,7 @@ import { RequestTimelineView } from './request-timeline';
 
 vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/inference/agentic',
+  usePathname: () => '/infx/inference/agentic',
   useRouter: () => ({ push: vi.fn() }),
 }));
 

@@ -11,47 +11,50 @@ import { isEmbedPathname } from '@/lib/embed/embed-route';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import { StarButton } from './footer-star-cta';
+import { AGENTX_ROUTE, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 const STRINGS = {
   en: {
     description:
       'Continuous open-source AI accelerator system benchmarking. Real-world, reproducible, auditable performance data trusted by trillion dollar AI infrastructure operators like OpenAI, Meta, Oracle, Microsoft, etc.',
     semianalysis: 'SemiAnalysis',
-    mainSite: 'Main Site',
+    mainSite: 'Main site',
     newsletter: 'Newsletter',
     about: 'About',
-    legal: 'Legal',
-    landAcknowledgement: 'Land Acknowledgement',
-    privacyPolicy: 'Privacy Policy',
-    cookiePolicy: 'Cookie Policy',
-    contribute: 'Contribute',
+    landAcknowledgement: 'Land acknowledgement',
+    privacyPolicy: 'Privacy policy',
+    cookiePolicy: 'Cookie policy',
+    developers: 'Developers',
     benchmarks: 'Benchmarks',
-    agentxHarness: 'AgentX Harness',
+    agentxHarness: 'AgentX harness',
     visualization: 'Visualization',
-    more: 'More',
+    tools: 'Tools',
+    data: 'Data',
+    learn: 'Learn',
     supporters: 'Supporters',
     agentx: 'AgentX',
     telemetry: 'Telemetry',
     comparisons: 'Comparisons',
     articles: 'Articles',
-    hardwareResults: 'Hardware Results',
+    hardwareResults: 'Hardware results',
     whitepapers: 'Whitepapers',
-    apiReference: 'API Reference',
-    historicalTrends: 'Historical Trends',
-    tcoCalculator: 'TCO Calculator',
-    fleetLifecycle: 'Fleet Lifecycle',
-    firstTokenLimits: 'First-Token Limits',
-    cacheReuse: 'Prefix Cache Reuse',
-    gpuReliability: 'Chip Reliability',
-    gpuSpecsDashboard: 'Chip Specs Dashboard',
-    perfPerDollar: 'Performance per Dollar',
-    modelArchitectures: 'Model Architectures',
-    glossary: 'AI Inference Glossary',
-    chipSpecs: 'Chip Specs & Pricing',
-    rankings: 'GPU Rankings',
-    runPages: 'Model on GPU Results',
+    apiReference: 'API reference',
+    historicalTrends: 'Historical trends',
+    tcoCalculator: 'TCO calculator',
+    fleetLifecycle: 'Fleet lifecycle',
+    firstTokenLimits: 'First-token limits',
+    cacheReuse: 'Prefix cache reuse',
+    gpuReliability: 'Chip reliability',
+    gpuSpecsDashboard: 'Chip specs dashboard',
+    perfPerDollar: 'Performance per dollar',
+    modelArchitectures: 'Model architectures',
+    glossary: 'AI inference glossary',
+    chipSpecs: 'Chip specs & pricing',
+    rankings: 'GPU rankings',
+    runPages: 'Model on GPU results',
     cta: 'If this data helps your work, consider starring us on GitHub or sharing with your network.',
     rights: 'All rights reserved.',
+    logoAlt: 'SemiAnalysis logo',
   },
   zh: {
     description:
@@ -60,15 +63,16 @@ const STRINGS = {
     mainSite: 'SemiAnalysis 官网',
     newsletter: '订阅通讯',
     about: '关于 SemiAnalysis',
-    legal: '法律信息',
     landAcknowledgement: '原住民传统领地声明',
     privacyPolicy: '隐私政策',
     cookiePolicy: 'Cookie 政策',
-    contribute: '参与贡献',
+    developers: '开发者',
     benchmarks: '基准测试仓库',
     agentxHarness: 'AgentX 测试框架',
     visualization: '可视化工具',
-    more: '更多',
+    tools: '工具',
+    data: '数据',
+    learn: '学习资源',
     supporters: '业界评价',
     agentx: 'AgentX',
     telemetry: '遥测数据',
@@ -92,73 +96,104 @@ const STRINGS = {
     runPages: '模型在 GPU 上的实测结果',
     cta: '如果这些数据对您的工作有帮助，欢迎在 GitHub 上点个 Star，或分享给同事。',
     rights: '版权所有。',
+    logoAlt: 'SemiAnalysis 标志',
   },
 } as const;
 
 const FOOTER_EVENT_PROPERTIES = { placement: 'footer' } as const;
 
 const LINK_CLASS =
-  'inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8';
+  'inline-flex min-h-11 items-center rounded-md py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8';
 
 type FooterStringKey = keyof (typeof STRINGS)['en'];
 
-const SEMIANALYSIS_LINKS: readonly (readonly [string, string, FooterStringKey])[] = [
-  ['main-site', 'https://semianalysis.com', 'mainSite'],
-  ['newsletter', 'https://newsletter.semianalysis.com', 'newsletter'],
-  ['about', 'https://semianalysis.com/about/', 'about'],
-];
+type FooterLink = readonly [id: string, href: string, label: FooterStringKey, event?: string];
 
-const LEGAL_LINKS: readonly (readonly [string, string, FooterStringKey])[] = [
-  ['privacy', 'https://semianalysis.com/privacy-policy/', 'privacyPolicy'],
-  ['cookies', 'https://semianalysis.com/cookie-policy/', 'cookiePolicy'],
+const LINK_GROUPS: readonly {
+  heading: FooterStringKey;
+  links: readonly FooterLink[];
+}[] = [
+  {
+    heading: 'tools',
+    links: [
+      [
+        'historical',
+        getDashboardRoute('historical').path,
+        'historicalTrends',
+        'footer_historical_clicked',
+      ],
+      [
+        'calculator',
+        getDashboardRoute('calculator').path,
+        'tcoCalculator',
+        'footer_calculator_clicked',
+      ],
+      ['fleet', getDashboardRoute('fleet').path, 'fleetLifecycle', 'footer_fleet_clicked'],
+      [
+        'first-token',
+        getDashboardRoute('first-token').path,
+        'firstTokenLimits',
+        'footer_first_token_clicked',
+      ],
+      [
+        'cache-reuse',
+        getDashboardRoute('cache-reuse').path,
+        'cacheReuse',
+        'footer_cache_reuse_clicked',
+      ],
+      ['reliability', getDashboardRoute('reliability').path, 'gpuReliability'],
+      ['gpu-specs', getDashboardRoute('gpu-specs').path, 'gpuSpecsDashboard'],
+    ],
+  },
+  {
+    heading: 'data',
+    links: [
+      ['compare', '/compare', 'comparisons', 'footer_compare_clicked'],
+      ['compare-per-dollar', '/compare-per-dollar', 'perfPerDollar'],
+      ['rankings', '/rankings', 'rankings'],
+      ['hardware', '/hardware', 'hardwareResults', 'footer_hardware_clicked'],
+      ['run', '/run', 'runPages'],
+      ['chips', '/chips', 'chipSpecs'],
+    ],
+  },
+  {
+    heading: 'learn',
+    links: [
+      ['agentx', AGENTX_ROUTE.path, 'agentx', 'footer_agentx_clicked'],
+      ['articles', '/blog', 'articles', 'footer_articles_clicked'],
+      ['whitepapers', '/whitepaper', 'whitepapers', 'footer_whitepapers_clicked'],
+      ['model-architectures', '/model', 'modelArchitectures'],
+      ['glossary', '/glossary', 'glossary'],
+    ],
+  },
+  {
+    heading: 'developers',
+    links: [
+      ['api', '/api', 'apiReference', 'footer_api_clicked'],
+      [
+        'telemetry',
+        `${getDashboardRoute('inference').path}/agentic`,
+        'telemetry',
+        'footer_telemetry_clicked',
+      ],
+      ['benchmarks', 'https://github.com/SemiAnalysisAI/InferenceX', 'benchmarks'],
+      ['agentx-harness', 'https://github.com/SemiAnalysisAI/agentx-harness', 'agentxHarness'],
+      ['visualization', 'https://github.com/SemiAnalysisAI/InferenceX-app', 'visualization'],
+    ],
+  },
+  {
+    heading: 'semianalysis',
+    links: [
+      ['main-site', 'https://semianalysis.com', 'mainSite'],
+      ['newsletter', 'https://newsletter.semianalysis.com', 'newsletter'],
+      ['about', 'https://semianalysis.com/about/', 'about'],
+      ['supporters', '/quotes', 'supporters', 'footer_supporters_clicked'],
+      ['land-acknowledgement', '/land-acknowledgement', 'landAcknowledgement'],
+      ['privacy', 'https://semianalysis.com/privacy-policy/', 'privacyPolicy'],
+      ['cookies', 'https://semianalysis.com/cookie-policy/', 'cookiePolicy'],
+    ],
+  },
 ];
-
-const CONTRIBUTE_LINKS: readonly (readonly [string, string, FooterStringKey])[] = [
-  ['benchmarks', 'https://github.com/SemiAnalysisAI/InferenceX', 'benchmarks'],
-  ['agentx-harness', 'https://github.com/SemiAnalysisAI/agentx-harness', 'agentxHarness'],
-  ['visualization', 'https://github.com/SemiAnalysisAI/InferenceX-app', 'visualization'],
-];
-
-const MORE_LINKS: readonly (readonly [string, string, FooterStringKey, string?])[] = [
-  ['supporters', '/quotes', 'supporters', 'footer_supporters_clicked'],
-  ['agentx', '/agentx', 'agentx', 'footer_agentx_clicked'],
-  ['telemetry', '/inference/agentic', 'telemetry', 'footer_telemetry_clicked'],
-  ['compare', '/compare', 'comparisons', 'footer_compare_clicked'],
-  ['articles', '/blog', 'articles', 'footer_articles_clicked'],
-  ['hardware', '/hardware', 'hardwareResults', 'footer_hardware_clicked'],
-  ['whitepapers', '/whitepaper', 'whitepapers', 'footer_whitepapers_clicked'],
-  ['api', '/api', 'apiReference', 'footer_api_clicked'],
-  ['historical', '/historical', 'historicalTrends', 'footer_historical_clicked'],
-  ['calculator', '/calculator', 'tcoCalculator', 'footer_calculator_clicked'],
-  ['fleet', '/fleet', 'fleetLifecycle', 'footer_fleet_clicked'],
-  ['first-token', '/first-token', 'firstTokenLimits', 'footer_first_token_clicked'],
-  ['cache-reuse', '/cache-reuse', 'cacheReuse', 'footer_cache_reuse_clicked'],
-  ['reliability', '/reliability', 'gpuReliability'],
-  ['gpu-specs', '/gpu-specs', 'gpuSpecsDashboard'],
-  ['compare-per-dollar', '/compare-per-dollar', 'perfPerDollar'],
-  ['model-architectures', '/model', 'modelArchitectures'],
-  ['glossary', '/glossary', 'glossary'],
-  ['chips', '/chips', 'chipSpecs'],
-  ['rankings', '/rankings', 'rankings'],
-  ['run', '/run', 'runPages'],
-];
-
-const externalLinks = (
-  links: readonly (readonly [string, string, FooterStringKey])[],
-  t: (typeof STRINGS)[keyof typeof STRINGS],
-) =>
-  links.map(([id, href, label]) => (
-    <a
-      key={id}
-      data-testid={`footer-link-${id}`}
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={LINK_CLASS}
-    >
-      {t[label]}
-    </a>
-  ));
 
 export const Footer = () => {
   const locale = useLocale();
@@ -170,9 +205,9 @@ export const Footer = () => {
     <footer
       data-testid="footer"
       {...analyticsPlacement('footer')}
-      className="relative mt-auto w-full overflow-visible pt-16 md:pt-20"
+      className="relative mt-auto w-full overflow-visible pt-12 md:pt-16"
     >
-      <div className="container mx-auto border-t border-border/50 px-4 py-10 lg:px-8">
+      <div className="container mx-auto border-t border-border/30 px-4 py-10 lg:px-8">
         <div className="mb-8 grid gap-8 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-x-10">
           <div data-testid="footer-brand" className="flex min-w-0 flex-col items-start gap-3">
             <IntentPrefetchLink
@@ -185,7 +220,7 @@ export const Footer = () => {
                 width={140}
                 height={58}
                 src="/brand/logo-color.webp"
-                alt="SemiAnalysis logo"
+                alt={t.logoAlt}
                 className="h-auto"
               />
             </IntentPrefetchLink>
@@ -199,62 +234,51 @@ export const Footer = () => {
 
           <div
             data-testid="footer-links"
-            className="grid min-w-0 grid-cols-2 gap-x-6 gap-y-6 break-words sm:grid-cols-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,2fr)]"
+            className="grid min-w-0 grid-cols-2 gap-x-6 gap-y-6 break-words sm:grid-cols-3 xl:grid-cols-5"
           >
-            <div data-testid="footer-links-semianalysis" className="flex min-w-0 flex-col gap-1">
-              <h2 className="mb-1 text-sm font-semibold text-foreground">{t.semianalysis}</h2>
-              {externalLinks(SEMIANALYSIS_LINKS, t)}
-            </div>
-            <div data-testid="footer-links-legal" className="flex min-w-0 flex-col gap-1">
-              <h2 className="mb-1 text-sm font-semibold text-foreground">{t.legal}</h2>
-              <IntentPrefetchLink
-                data-testid="footer-link-land-acknowledgement"
-                href={`${prefix}/land-acknowledgement`}
-                className={LINK_CLASS}
+            {LINK_GROUPS.map((group) => (
+              <div
+                key={group.heading}
+                data-testid={`footer-links-${group.heading}`}
+                className="flex min-w-0 flex-col gap-1"
               >
-                {t.landAcknowledgement}
-              </IntentPrefetchLink>
-              {externalLinks(LEGAL_LINKS, t)}
-            </div>
-            <div data-testid="footer-links-contribute" className="flex min-w-0 flex-col gap-1">
-              <h2 className="mb-1 text-sm font-semibold text-foreground">{t.contribute}</h2>
-              {externalLinks(CONTRIBUTE_LINKS, t)}
-            </div>
-            <div
-              data-testid="footer-links-more"
-              className="col-span-full xl:col-span-1 flex min-w-0 flex-col gap-1"
-            >
-              <h2 className="mb-1 text-sm font-semibold text-foreground">{t.more}</h2>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-                {MORE_LINKS.map(([id, path, label, event]) => (
-                  <IntentPrefetchLink
-                    key={id}
-                    data-testid={`footer-link-${id}`}
-                    href={`${prefix}${path}`}
-                    onClick={event ? () => track(event, FOOTER_EVENT_PROPERTIES) : undefined}
-                    className={LINK_CLASS}
-                  >
-                    {t[label]}
-                  </IntentPrefetchLink>
-                ))}
+                <h2 className="mb-1 text-sm font-semibold text-foreground">{t[group.heading]}</h2>
+                {group.links.map(([id, href, label, event]) =>
+                  href.startsWith('https://') ? (
+                    <a
+                      key={id}
+                      data-testid={`footer-link-${id}`}
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={LINK_CLASS}
+                    >
+                      {t[label]}
+                    </a>
+                  ) : (
+                    <IntentPrefetchLink
+                      key={id}
+                      data-testid={`footer-link-${id}`}
+                      href={`${prefix}${href}`}
+                      onClick={event ? () => track(event, FOOTER_EVENT_PROPERTIES) : undefined}
+                      className={LINK_CLASS}
+                    >
+                      {t[label]}
+                    </IntentPrefetchLink>
+                  ),
+                )}
               </div>
-            </div>
+            ))}
           </div>
 
           <div
             data-testid="footer-cta"
             className="flex min-w-0 flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between lg:col-span-2"
           >
-            <div data-testid="footer-social-buttons" className="flex items-center gap-1.5">
-              <div className="rounded-md bg-background/80 w-fit">
-                <StarButton />
-              </div>
-              <div className="rounded-md bg-background/80 w-fit">
-                <ShareTwitterButton />
-              </div>
-              <div className="rounded-md bg-background/80 w-fit">
-                <ShareLinkedInButton />
-              </div>
+            <div data-testid="footer-social-buttons" className="flex items-center gap-2">
+              <StarButton />
+              <ShareTwitterButton />
+              <ShareLinkedInButton />
             </div>
             <p className="max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-right">
               {t.cta}
@@ -264,7 +288,7 @@ export const Footer = () => {
 
         <div
           data-testid="footer-bottom-bar"
-          className="border-t border-border/40 pt-6 flex flex-col md:flex-row items-center justify-between gap-4"
+          className="flex flex-col items-center justify-between gap-4 border-t border-border/30 pt-6 md:flex-row"
         >
           <p data-testid="footer-copyright" className="text-xs text-muted-foreground">
             &copy; {new Date().getFullYear()} semianalysis.com. {t.rights}

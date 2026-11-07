@@ -11,13 +11,16 @@ import {
 } from '@/lib/power/system-power-model';
 import { getInferenceHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import {
+  buildPointDetails,
+  generateHoverTooltipContent,
   getPointLabel,
-  generateTooltipContent,
-  generateOverlayTooltipContent,
-  generateGPUGraphTooltipContent,
   type TooltipConfig,
-  type OverlayTooltipConfig,
 } from '@/components/inference/utils/tooltipUtils';
+import {
+  comparisonDetailsText,
+  detailsHtml,
+  detailsText,
+} from '@/components/inference/utils/point-details-test-helpers';
 
 // ---------------------------------------------------------------------------
 // fixture factories
@@ -67,13 +70,21 @@ const mockHardwareConfig: HardwareConfig = {
 function tooltipConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
   return {
     data: pt(),
-    isPinned: false,
     xLabel: 'E2E Latency (ms)',
     yLabel: 'Throughput per Chip',
     selectedYAxisMetric: 'y_tpPerGpu',
     hardwareConfig: mockHardwareConfig,
     ...overrides,
   };
+}
+
+function latencyCells(config: TooltipConfig) {
+  const table = new DOMParser()
+    .parseFromString(detailsHtml(config), 'text/html')
+    .querySelector('[data-pinned-latency]')!;
+  return [...table.querySelectorAll('tr')].map((tr) =>
+    [...tr.children].map((cell) => cell.textContent),
+  );
 }
 
 const systemPower = {
@@ -129,16 +140,16 @@ describe('run-specific framework tooltip labels', () => {
     for (const point of [target, historical]) {
       const config = tooltipConfig({ data: point, hardwareConfig, locale });
       const outputs = [
-        generateTooltipContent(config),
-        generateGPUGraphTooltipContent(config),
-        generateOverlayTooltipContent({
+        detailsText(config),
+        comparisonDetailsText(config),
+        detailsText({
           ...config,
           overlayData: { data: [target, historical], hardwareConfig, label: 'test-run' },
         }),
       ];
       for (const html of outputs) {
         expect(html).toContain(
-          point === target ? 'MI355X (MoRI UMBP SGLang)' : 'MI355X (MoRI SGLang)',
+          point === target ? 'MI355X\nMoRI UMBP SGLang · FP8\n' : 'MI355X\nMoRI SGLang · FP8\n',
         );
         expect(html).not.toContain('MoRI SGLang / MoRI UMBP SGLang');
         if (point === historical) expect(html).not.toContain('MoRI UMBP SGLang');
@@ -152,12 +163,11 @@ describe('modeled system-power tooltip', () => {
     tooltipConfig({
       data: pt({ modeledSystemPower: systemPower }),
       selectedYAxisMetric: 'y_measuredAvgPower',
-      isPinned: true,
       ...overrides,
     });
 
   it('separates measured input, normalized IT power, and whole-deployment facility power', () => {
-    const html = generateTooltipContent(config());
+    const html = detailsText(config());
     expect(html).toContain('500 W/GPU');
     expect(html).toContain('750 W/GPU');
     expect(html).toContain('12,000 W');
@@ -167,11 +177,11 @@ describe('modeled system-power tooltip', () => {
     expect(html).toContain('Measured facility power');
     expect(html).not.toContain('Modeled');
     expect(html).toContain('2 full eight-GPU chassis · 16 GPUs');
-    expect(html).toContain('Operating state:</strong> agentic · scale-out on');
+    expect(html).toContain('Operating state: agentic · scale-out on');
     expect(html).toContain(
       'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
     );
-    expect(html).toContain(SYSTEM_POWER_MODEL_SOURCE_URL);
+    expect(detailsHtml(config())).toContain(SYSTEM_POWER_MODEL_SOURCE_URL);
     expect(html).not.toContain('12,000 W/GPU');
     expect(html).not.toContain('Unmeasured chassis GPUs');
   });
@@ -192,7 +202,7 @@ describe('modeled system-power tooltip', () => {
         chassisBasis: 'extrapolated',
       },
     });
-    const html = generateTooltipContent(config({ data }));
+    const html = detailsText(config({ data }));
     expect(html).toContain(
       '1 eight-GPU chassis · 4 of 8 GPUs measured, extrapolated to full chassis',
     );
@@ -201,9 +211,9 @@ describe('modeled system-power tooltip', () => {
     expect(html).toContain('3,600 W');
     expect(html).not.toContain('6000 W');
     expect(html).not.toContain('7200 W');
-    expect(html).toContain('<span>Total Chips:</span> <strong>4</strong>');
+    expect(html).toContain('4 chips');
 
-    const zh = generateTooltipContent(config({ data, locale: 'zh' }));
+    const zh = detailsText(config({ data, locale: 'zh' }));
     expect(zh).toContain('1 个八卡机箱 · 实测 4/8 张 GPU，按满机箱外推');
     expect(zh).toContain('假设机箱内未实测的 GPU 运行相同负载');
     expect(zh).toContain('3,000 W');
@@ -212,16 +222,16 @@ describe('modeled system-power tooltip', () => {
 
   it('names NVL72 trays, the measured Grace socket, and the rack-share basis (en/zh)', () => {
     const data = pt({ hwKey: 'gb300', modeledSystemPower: modelSystemPower(gb300DisaggRow()) });
-    const html = generateTooltipContent(config({ data }));
+    const html = detailsText(config({ data }));
     expect(html).toContain('2 full NVL72 compute trays · 8 GPUs');
-    expect(html).toContain('Measured Grace socket power:</strong> 98 W/socket');
+    expect(html).toContain('Measured Grace socket power: 98 W/socket');
     expect(html).toContain('Measured: GPU boards and whole Grace sockets');
     expect(html).toContain('each tray takes 1/18 of the rack');
     expect(html).toContain('PUE 1.1');
     expect(html).not.toContain('eight-GPU chassis');
     expect(html).not.toContain('regulator');
 
-    const zh = generateTooltipContent(config({ data, locale: 'zh' }));
+    const zh = detailsText(config({ data, locale: 'zh' }));
     expect(zh).toContain('2 个完整 NVL72 计算 tray · 8 张 GPU');
     expect(zh).toContain('Grace socket 实测功耗');
     expect(zh).toContain('每个 tray 分摊机架的 1/18');
@@ -237,14 +247,14 @@ describe('modeled system-power tooltip', () => {
     ];
     for (const [data, expected] of cases) {
       const official = config({ data });
-      const overlay = generateOverlayTooltipContent({
+      const overlay = detailsHtml({
         ...official,
         overlayData: {
           label: 'PowerX comparison',
           hardwareConfig: mockHardwareConfig,
-        } as OverlayTooltipConfig['overlayData'],
+        } as TooltipConfig['overlayData'],
       });
-      for (const html of [overlay, generateGPUGraphTooltipContent(official)]) {
+      for (const html of [overlay, detailsHtml({ ...official, comparisonDate: true })]) {
         for (const text of expected) expect(html).toContain(text);
         expect(html).toContain(SYSTEM_POWER_MODEL_REVISION);
       }
@@ -252,7 +262,7 @@ describe('modeled system-power tooltip', () => {
   });
 
   it('explains unsupported hardware on the measured baseline without substituting zero', () => {
-    const html = generateTooltipContent(
+    const html = detailsHtml(
       config({
         selectedYAxisMetric: 'y_measuredAvgPower',
         data: pt({
@@ -269,25 +279,23 @@ describe('modeled system-power tooltip', () => {
     expect(html).not.toContain('0 W/GPU');
   });
 
-  it('sets every system-power line in the 11px tooltip text size', () => {
-    for (const isPinned of [true, false]) {
-      const host = document.createElement('div');
-      host.innerHTML = generateTooltipContent(config({ isPinned }));
-      const section = host.querySelector('[data-testid="tooltip-modeled-system-power"]')!;
-      const sizes = new Set<string>();
-      const walker = document.createTreeWalker(section, NodeFilter.SHOW_TEXT);
-      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-        if (!node.textContent?.trim()) continue;
-        let el = node.parentElement;
-        while (el && el !== host && !el.style.fontSize) el = el.parentElement;
-        sizes.add(el && el !== host ? el.style.fontSize : 'inherited');
-      }
-      expect([...sizes]).toEqual(['11px']);
+  it('leaves every system-power line to the pinned panel text size', () => {
+    const host = document.createElement('div');
+    host.innerHTML = detailsHtml(config());
+    const section = host.querySelector('[data-testid="tooltip-modeled-system-power"]')!;
+    const sizes = new Set<string>();
+    const walker = document.createTreeWalker(section, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (!node.textContent?.trim()) continue;
+      let el = node.parentElement;
+      while (el && el !== host && !el.style.fontSize) el = el.parentElement;
+      sizes.add(el && el !== host ? el.style.fontSize : 'inherited');
     }
+    expect([...sizes]).toEqual(['inherited']);
   });
 
   it('keeps each power reading and its basis pill in the same grid cell', () => {
-    const html = generateTooltipContent(config({ isPinned: true }));
+    const html = detailsHtml(config());
     expect(html.split('<span data-power-reading>')).toHaveLength(4);
     for (const [watts, basis] of [
       [500, 'gpu'],
@@ -300,30 +308,30 @@ describe('modeled system-power tooltip', () => {
     }
   });
 
-  it('keeps hover compact and leaves unrelated metrics unchanged', () => {
-    const hover = generateTooltipContent(config({ isPinned: false }));
-    expect(hover).toContain('500 W/GPU');
+  it('keeps the hover card compact and leaves unrelated metrics unchanged', () => {
+    const hover = generateHoverTooltipContent({ ...config(), color: 'red' });
+    expect(hover).not.toContain('500 W/GPU');
     expect(hover).not.toContain('PUE 1.2');
-    expect(generateTooltipContent(config({ selectedYAxisMetric: 'y_tpPerGpu' }))).not.toContain(
+    expect(detailsHtml(config({ selectedYAxisMetric: 'y_tpPerGpu' }))).not.toContain(
       'tooltip-modeled-system-power',
     );
   });
 
   it('localizes the measurement boundary and occupancy assumptions', () => {
-    const html = generateTooltipContent(config({ locale: 'zh' }));
+    const html = detailsText(config({ locale: 'zh' }));
     expect(html).toContain('GPU 实测功耗');
     expect(html).toContain('整个部署的实测 IT 功耗');
     expect(html).toContain('实测数据中心功耗');
     expect(html).not.toContain('功耗估算');
     expect(html).toContain('2 个完整八卡机箱 · 16 张 GPU');
-    expect(html).toContain('运行状态：</strong> 智能体 · scale-out 开启');
+    expect(html).toContain('运行状态： 智能体 · scale-out 开启');
     expect(html).toContain('计入 GPU 机箱内的 CPU');
     expect(html).toContain('不计入独立的纯 CPU 前端或路由主机。');
   });
 
   it('breaks normalization and host scope into two compact lines in pinned tooltips', () => {
     for (const locale of ['en', 'zh'] as const) {
-      const html = generateTooltipContent(config({ locale }));
+      const html = detailsHtml(config({ locale }));
       const match = /(?<normalization>[^<>]+)<br\s*\/>(?<boundary>[^<>]+)<\/div>/u.exec(html);
       expect(match?.groups?.normalization).toContain(
         locale === 'en' ? 'all modeled chassis GPUs' : '建模机箱的 GPU 总数',
@@ -432,46 +440,34 @@ describe('getPointLabel', () => {
 });
 
 // ===========================================================================
-// generateTooltipContent
+// buildPointDetails
 // ===========================================================================
-describe('generateTooltipContent', () => {
+describe('buildPointDetails', () => {
   it('renders View charts as a same-tab anchor so browsers offer open-in-new-tab', () => {
-    const html = generateTooltipContent(
+    const html = detailsText(
       tooltipConfig({
         data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
-        isPinned: true,
         hasTrace: true,
       }),
     );
-    expect(html).toContain('<a data-action="view-charts"');
-    expect(html).toContain('href="/inference/agentic/1"');
+    expect(html).toContain('data-action="view-charts"');
+    expect(html).toContain('href="/infx/inference/agentic/1"');
     expect(html).not.toContain('data-action="view-charts" target=');
   });
 
-  it('renders View logs only for pinned points with a stored server log', () => {
-    const html = generateTooltipContent(
+  it('renders View logs only for points with a stored server log', () => {
+    const html = detailsText(
       tooltipConfig({
         data: pt({ id: 7, benchmark_type: 'agentic_traces' }),
-        isPinned: true,
         hasLog: true,
       }),
     );
-    expect(html).toContain('<a data-action="view-logs"');
-    expect(html).toContain('href="/inference/agentic/7?view=logs"');
+    expect(html).toContain('data-action="view-logs"');
+    expect(html).toContain('href="/infx/inference/agentic/7?view=logs"');
     expect(
-      generateTooltipContent(
+      detailsText(
         tooltipConfig({
           data: pt({ id: 7, benchmark_type: 'agentic_traces' }),
-          isPinned: false,
-          hasLog: true,
-        }),
-      ),
-    ).not.toContain('data-action="view-logs"');
-    expect(
-      generateTooltipContent(
-        tooltipConfig({
-          data: pt({ id: 7, benchmark_type: 'agentic_traces' }),
-          isPinned: true,
           hasLog: false,
         }),
       ),
@@ -479,7 +475,7 @@ describe('generateTooltipContent', () => {
   });
 
   it.each([
-    [{ spec_decoding: 'draft_model' }, 'Draft Model'],
+    [{ spec_decoding: 'draft_model' }, 'Draft model'],
     [
       {
         spec_decoding: 'draft_model',
@@ -494,43 +490,41 @@ describe('generateTooltipContent', () => {
     ],
     [{ spec_decoding: 'none', spec_algorithm: 'dspark', spec_draft_model: 'native' }, 'Off'],
   ])('labels speculative decoding by what the server ran: %j', (fields, label) => {
-    const html = generateTooltipContent(
+    const text = detailsText(
       tooltipConfig({ data: pt({ id: 3, benchmark_type: 'agentic_traces', ...fields }) }),
     );
-    expect(html).toContain(`<strong>Speculative Decoding:</strong> ${label}</div>`);
+    expect(text).toContain(`Speculative decoding: ${label}`);
   });
 
   it('routes fixed-sequence log actions to the fixed benchmark log viewer', () => {
-    const html = generateTooltipContent(
+    const html = detailsText(
       tooltipConfig({
         data: pt({ id: 96255, benchmark_type: 'single_turn' }),
-        isPinned: true,
         hasLog: true,
       }),
     );
-    expect(html).toContain('<a data-action="view-logs"');
-    expect(html).toContain('href="/inference/logs/96255"');
-    expect(html).not.toContain('/inference/agentic/96255');
+    expect(html).toContain('data-action="view-logs"');
+    expect(html).toContain('href="/infx/inference/logs/96255"');
+    expect(html).not.toContain('/infx/inference/agentic/96255');
   });
 
   it('localizes point-detail actions and their /zh routes', () => {
-    const html = generateTooltipContent(
+    const html = detailsText(
       tooltipConfig({
         data: pt({ id: 7, benchmark_type: 'agentic_traces' }),
-        isPinned: true,
         hasTrace: true,
         hasLog: true,
         locale: 'zh',
       }),
     );
     expect(html).toContain('查看图表');
-    expect(html).toContain('href="/zh/inference/agentic/7"');
+    expect(html).toContain('href="/zh/infx/inference/agentic/7"');
     expect(html).toContain('查看日志');
-    expect(html).toContain('href="/zh/inference/agentic/7?view=logs"');
+    expect(html).toContain('href="/zh/infx/inference/agentic/7?view=logs"');
   });
 
   it('localizes agentic request counters and workflow link chrome for Chinese tooltips', () => {
-    const html = generateTooltipContent(
+    const html = detailsText(
       tooltipConfig({
         locale: 'zh',
         runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
@@ -544,16 +538,17 @@ describe('generateTooltipContent', () => {
       }),
     );
 
-    expect(html).toContain('<strong>请求：</strong> 9 / 10 (90%)');
-    expect(html).toContain('<strong>提示 token：</strong>');
-    expect(html).toContain('<strong>生成 token：</strong>');
+    expect(html).toContain('请求： 9 / 10 (90%)');
+    expect(html).toContain('Token 数');
+    expect(html).toContain('提示 token 12,345');
+    expect(html).toContain('生成 token 678');
     expect(html).toContain('GitHub Actions 运行记录');
-    expect(html).not.toContain('<strong>Requests:</strong>');
-    expect(html).not.toContain('GitHub Actions Run');
+    expect(html).not.toContain('Requests:');
+    expect(html).not.toContain('GitHub Actions run');
   });
 
   it('localizes dates, DPA flags, and worker labels for Chinese disaggregated tooltips', () => {
-    const html = generateTooltipContent(
+    const html = detailsText(
       tooltipConfig({
         locale: 'zh',
         data: pt({
@@ -576,21 +571,21 @@ describe('generateTooltipContent', () => {
       }),
     );
 
-    expect(html).toContain('<strong>日期：</strong> 2026年1月2日');
-    expect(html).toContain('DPA: 是, worker 数: 2');
-    expect(html).toContain('DPA: 否, worker 数: 1');
-    expect(html).not.toContain('DPA: True');
-    expect(html).not.toContain('Workers:');
+    expect(html).toContain('\n2026年1月2日\n');
+    expect(html).toContain('个芯片 配置 worker 数');
+    expect(html).toContain('预填充 4 DEP2 2');
+    expect(html).toContain('解码 4 TEP4 1');
+    expect(html).not.toContain('True');
+    expect(html).not.toContain('Workers');
   });
 
   it('omits View charts when the point id is non-persisted (0 / NaN), even if pinned + hasTrace', () => {
     // Overlay agentic points arrive with id 0 / NaN — the button would otherwise
-    // link to /inference/agentic/0, a doomed lookup.
+    // link to /infx/inference/agentic/0, a doomed lookup.
     for (const badId of [0, Number.NaN]) {
-      const html = generateTooltipContent(
+      const html = detailsText(
         tooltipConfig({
           data: pt({ id: badId, benchmark_type: 'agentic_traces' }),
-          isPinned: true,
           hasTrace: true,
         }),
       );
@@ -600,23 +595,18 @@ describe('generateTooltipContent', () => {
   });
 
   it('includes hardware display label from config', () => {
-    const html = generateTooltipContent(tooltipConfig());
+    const html = detailsText(tooltipConfig());
     expect(html).toContain('H100');
   });
 
-  it('shows "Click elsewhere to dismiss" when isPinned is true', () => {
-    const html = generateTooltipContent(tooltipConfig({ isPinned: true }));
-    expect(html).toContain('Click elsewhere to dismiss');
-  });
-
-  it('caps pinned tooltip height so stacked actions stay inside the mobile viewport', () => {
-    const html = generateTooltipContent(
+  it('lists every point-detail action for a measured agentic point', () => {
+    const details = buildPointDetails(
       tooltipConfig({
-        isPinned: true,
         hasTrace: true,
         hasLog: true,
         showPowerTelemetry: true,
         selectedYAxisMetric: 'y_measuredAvgPower',
+        runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/1',
         data: pt({
           id: 42,
           benchmark_type: 'agentic_traces',
@@ -625,42 +615,39 @@ describe('generateTooltipContent', () => {
         }),
       }),
     );
-    expect(html).toContain('class="inferencex-pinned-tooltip"');
-    expect(html).toContain('data-action="view-power-trace"');
-  });
-
-  it('does not show dismiss text when isPinned is false', () => {
-    const html = generateTooltipContent(tooltipConfig({ isPinned: false }));
-    expect(html).not.toContain('Click elsewhere to dismiss');
+    expect(details.links.map((link) => link.action)).toEqual([
+      'run',
+      'view-charts',
+      'view-logs',
+      'view-power-telemetry',
+      'view-power-trace',
+    ]);
   });
 
   it('includes date, xLabel, and yLabel', () => {
-    const html = generateTooltipContent(tooltipConfig());
+    const html = detailsText(tooltipConfig());
     expect(html).toContain('2025-06-15');
     expect(html).toContain('E2E Latency (ms)');
     expect(html).toContain('Throughput per Chip');
   });
 
   it('includes image field when present', () => {
-    const html = generateTooltipContent(tooltipConfig({ data: pt({ image: 'vllm-v0.6.0' }) }));
-    expect(html).toContain('vllm-v0.6.0');
-    expect(html).toContain('Image:');
+    expect(detailsHtml(tooltipConfig({ data: pt({ image: 'vllm-v0.6.0' }) }))).toContain(
+      '<p>vllm-v0.6.0</p>',
+    );
   });
 
-  it('splits image and SHA onto separate lines', () => {
-    const html = generateTooltipContent(
-      tooltipConfig({ data: pt({ image: 'vllm-v0.6.0 abc123' }) }),
-    );
-    expect(html).toContain('vllm-v0.6.0<br />abc123');
+  it('keeps the complete image and SHA', () => {
+    const html = detailsHtml(tooltipConfig({ data: pt({ image: 'vllm-v0.6.0 abc123' }) }));
+    expect(html).toContain('<p>vllm-v0.6.0 abc123</p>');
   });
 
   it('omits image section when no image', () => {
-    const html = generateTooltipContent(tooltipConfig());
-    expect(html).not.toContain('Image:');
+    expect(detailsHtml(tooltipConfig())).not.toContain('pinned-image');
   });
 
   it('includes output throughput when metric is y_tpPerGpu and field exists', () => {
-    const html = generateTooltipContent(
+    const html = detailsText(
       tooltipConfig({
         selectedYAxisMetric: 'y_tpPerGpu',
         data: pt({ outputTputPerGpu: { y: 500, roof: false } }),
@@ -670,7 +657,7 @@ describe('generateTooltipContent', () => {
   });
 
   it('omits output throughput when metric is not y_tpPerGpu', () => {
-    const html = generateTooltipContent(
+    const html = detailsText(
       tooltipConfig({
         selectedYAxisMetric: 'y_costh',
         data: pt({ outputTputPerGpu: { y: 500, roof: false } }),
@@ -680,7 +667,7 @@ describe('generateTooltipContent', () => {
   });
 
   it('includes input throughput when metric is y_tpPerGpu and field exists', () => {
-    const html = generateTooltipContent(
+    const html = detailsText(
       tooltipConfig({
         selectedYAxisMetric: 'y_tpPerGpu',
         data: pt({ inputTputPerGpu: { y: 200, roof: false } }),
@@ -690,12 +677,12 @@ describe('generateTooltipContent', () => {
   });
 
   it('includes precision in uppercase', () => {
-    const html = generateTooltipContent(tooltipConfig({ data: pt({ precision: 'fp8' }) }));
+    const html = detailsText(tooltipConfig({ data: pt({ precision: 'fp8' }) }));
     expect(html).toContain('FP8');
   });
 
   it('shows offload type, backend, and version instead of the binary offload mode', () => {
-    const html = generateTooltipContent(
+    const html = detailsText(
       tooltipConfig({
         data: pt({
           benchmark_type: 'agentic_traces',
@@ -706,13 +693,13 @@ describe('generateTooltipContent', () => {
         }),
       }),
     );
-    expect(html).toContain('<strong>Offload Type:</strong> DRAM');
-    expect(html).toContain('<strong>KV Offload Engine:</strong> Mooncake 0.3.11.post1');
+    expect(html).toContain('Offload type: DRAM');
+    expect(html).toContain('KV offload engine: Mooncake 0.3.11.post1');
     expect(html).not.toContain('Offload Mode');
   });
 
   it('keeps a clearly marked binary fallback for legacy agentic rows', () => {
-    const enabled = generateTooltipContent(
+    const enabled = detailsText(
       tooltipConfig({
         data: pt({
           benchmark_type: 'agentic_traces',
@@ -721,7 +708,7 @@ describe('generateTooltipContent', () => {
         }),
       }),
     );
-    const disabledZh = generateTooltipContent(
+    const disabledZh = detailsText(
       tooltipConfig({
         locale: 'zh',
         data: pt({
@@ -732,12 +719,12 @@ describe('generateTooltipContent', () => {
       }),
     );
 
-    expect(enabled).toContain('<strong>Offload Type:</strong> Enabled (legacy data)');
-    expect(disabledZh).toContain('<strong>offload 类型：</strong> 已禁用（旧版数据）');
+    expect(enabled).toContain('Offload type: Enabled (legacy data)');
+    expect(disabledZh).toContain('offload 类型： 已禁用（旧版数据）');
   });
 
   it('does not treat the fixed-sequence offload default as legacy metadata', () => {
-    const html = generateTooltipContent(
+    const html = detailsText(
       tooltipConfig({
         data: pt({
           benchmark_type: 'single_turn',
@@ -747,12 +734,12 @@ describe('generateTooltipContent', () => {
       }),
     );
 
-    expect(html).not.toContain('Offload Type');
+    expect(html).not.toContain('Offload type');
     expect(html).not.toContain('legacy data');
   });
 
   it('shows multinode KV transfer and cache-hit metadata for fixed-sequence points', () => {
-    const html = generateTooltipContent(
+    const html = detailsText(
       tooltipConfig({
         data: pt({
           benchmark_type: 'single_turn',
@@ -762,12 +749,12 @@ describe('generateTooltipContent', () => {
         }),
       }),
     );
-    expect(html).toContain('<strong>KV Transfer Engine:</strong> NIXL');
-    expect(html).toContain('<strong>Chip Cache Hit Rate:</strong> 87.5%');
+    expect(html).toContain('KV transfer engine: NIXL');
+    expect(html).toContain('Chip 87.5%');
   });
 
   it('hides stale CPU cache hits when offload is disabled', () => {
-    const html = generateTooltipContent(
+    const html = detailsText(
       tooltipConfig({
         data: pt({
           kv_offloading: 'none',
@@ -779,13 +766,13 @@ describe('generateTooltipContent', () => {
       }),
     );
 
-    expect(html).not.toContain('CPU Cache Hit Rate');
-    expect(html).toContain('<strong>Chip Cache Hit Rate:</strong> 80.0%');
-    expect(html).toContain('<strong>Theoretical Cache Hit Rate:</strong> 90.0%');
+    expect(html).not.toContain('CPU');
+    expect(html).toContain('Chip 80.0%');
+    expect(html).toContain('theoretical 90.0%');
   });
 
   it('uses legacy offload mode to gate CPU cache hits when no descriptor exists', () => {
-    const disabled = generateTooltipContent(
+    const disabled = detailsText(
       tooltipConfig({
         data: pt({
           kv_offloading: undefined,
@@ -794,7 +781,7 @@ describe('generateTooltipContent', () => {
         }),
       }),
     );
-    const enabled = generateTooltipContent(
+    const enabled = detailsText(
       tooltipConfig({
         data: pt({
           kv_offloading: undefined,
@@ -804,12 +791,12 @@ describe('generateTooltipContent', () => {
       }),
     );
 
-    expect(disabled).not.toContain('CPU Cache Hit Rate');
-    expect(enabled).toContain('<strong>CPU Cache Hit Rate:</strong> 42.0%');
+    expect(disabled).not.toContain('CPU cache hit rate');
+    expect(enabled).toContain('CPU cache hit rate: 42.0%');
   });
 
   it('labels TRTLLM offload cache hits as a combined chip and CPU rate', () => {
-    const html = generateTooltipContent(
+    const html = detailsText(
       tooltipConfig({
         data: pt({
           framework: 'dynamo-trt',
@@ -820,13 +807,12 @@ describe('generateTooltipContent', () => {
       }),
     );
 
-    expect(html).toContain('<strong>Combined Chip + CPU Cache Hit Rate:</strong> 97.8%');
-    expect(html).not.toContain('<strong>CPU Cache Hit Rate:</strong>');
-    expect(html).not.toContain('<strong>Chip Cache Hit Rate:</strong>');
+    expect(html).toContain('Chip + CPU 97.8%');
+    expect(html).not.toContain('CPU cache hit rate');
   });
 
   it('uses Chinese labels for new cache metadata on /zh surfaces', () => {
-    const html = generateTooltipContent(
+    const html = detailsText(
       tooltipConfig({
         locale: 'zh',
         data: pt({
@@ -837,49 +823,97 @@ describe('generateTooltipContent', () => {
         }),
       }),
     );
-    expect(html).toContain('<strong>offload 类型：</strong> DRAM');
-    expect(html).toContain('<strong>KV offload 引擎：</strong> LMCache');
-    expect(html).toContain('<strong>路由器：</strong> vLLM Router 0.1.14');
+    expect(html).toContain('offload 类型： DRAM');
+    expect(html).toContain('KV offload 引擎： LMCache');
+    expect(html).toContain('路由器： vLLM Router 0.1.14');
   });
 
   it('omits the offload type row when the canonical tier is none', () => {
-    const en = generateTooltipContent(tooltipConfig({ data: pt({ kv_offloading: 'none' }) }));
-    const zh = generateTooltipContent(
-      tooltipConfig({ locale: 'zh', data: pt({ kv_offloading: 'none' }) }),
-    );
+    const en = detailsText(tooltipConfig({ data: pt({ kv_offloading: 'none' }) }));
+    const zh = detailsText(tooltipConfig({ locale: 'zh', data: pt({ kv_offloading: 'none' }) }));
 
-    expect(en).not.toContain('Offload Type');
+    expect(en).not.toContain('Offload type');
     expect(zh).not.toContain('offload 类型');
   });
 
   it('falls back to hwKey when hardware config entry is missing', () => {
-    const html = generateTooltipContent(tooltipConfig({ data: pt({ hwKey: 'unknown_gpu' }) }));
+    const html = detailsText(tooltipConfig({ data: pt({ hwKey: 'unknown_gpu' }) }));
     expect(html).toContain('unknown_gpu');
   });
 
-  it('sets user-select to "text" when pinned', () => {
-    const html = generateTooltipContent(tooltipConfig({ isPinned: true }));
-    expect(html).toContain('user-select: text');
-  });
-
-  it('sets user-select to "none" when not pinned', () => {
-    const html = generateTooltipContent(tooltipConfig({ isPinned: false }));
+  it('renders a compact, non-selectable hover card without links or a dismiss hint', () => {
+    const config = tooltipConfig({
+      data: pt({ id: 7, benchmark_type: 'agentic_traces', tp: 16, ep: 32, dp_attention: true }),
+      hasLog: true,
+      runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/1',
+    });
+    const html = generateHoverTooltipContent({ ...config, color: 'red' });
     expect(html).toContain('user-select: none');
+    expect(html).toContain('500');
+    expect(html).toContain('>ms<');
+    expect(html).toContain('16 chips · DPAEP32');
+    expect(html).toContain('conc 64');
+    expect(html).not.toContain('data-action');
+    expect(html).not.toContain('dismiss');
   });
 
-  it('does not include the removed Track Over Time action when pinned', () => {
-    const html = generateTooltipContent(tooltipConfig({ isPinned: true }));
+  it('does not include the removed Track Over Time action', () => {
+    const html = detailsText(tooltipConfig());
     expect(html).not.toContain('data-action="track-over-time"');
     expect(html).not.toContain('Track Over Time');
     expect(html).not.toContain('Untrack Over Time');
   });
+
+  it('tabulates median, P90 and P99 latency in axis units with dashes for missing fields', () => {
+    const data = pt({
+      mean_ttft: 9,
+      median_ttft: 0.31603,
+      p75_ttft: 9,
+      p90_ttft: 1.27063,
+      p95_ttft: 9,
+      p99_ttft: 0,
+      median_e2el: 2.25182,
+      p90_e2el: 20.53009,
+      median_intvty: 220.264,
+      p90_intvty: 178.571,
+      p99_intvty: 150.4,
+      p90_e2e_norm_intvty: 87.82,
+      total_prompt_tokens: 1000,
+      total_generation_tokens: 100,
+    });
+    expect(latencyCells(tooltipConfig({ data }))).toEqual([
+      ['', 'Med', 'P90', 'P99'],
+      ['TTFT s', '0.32', '1.27', '—'],
+      ['E2EL s', '2.25', '20.5', '—'],
+      ['Interactivity tok/s/user', '220', '179', '150'],
+      ['Norm. interactivity tok/s/user', '—', '87.8', '—'],
+    ]);
+    const zh = latencyCells(tooltipConfig({ data, locale: 'zh' }));
+    expect(zh[0]).toEqual(['', '中位', 'P90', 'P99']);
+    expect(zh.map((cells) => cells[0])).toEqual([
+      '',
+      'TTFT s',
+      '端到端延迟 s',
+      '交互性 tok/s/user',
+      '归一化交互性 tok/s/user',
+    ]);
+    const overlay = tooltipConfig({
+      data,
+      overlayData: { label: 'branch', hardwareConfig: mockHardwareConfig, data: [] },
+    });
+    expect(latencyCells(overlay)).toEqual(latencyCells(tooltipConfig({ data })));
+    const html = detailsHtml(tooltipConfig({ data }));
+    expect(html.indexOf('data-pinned-config')).toBeLessThan(html.indexOf('data-pinned-latency'));
+    expect(html.indexOf('data-pinned-latency')).toBeLessThan(html.indexOf('data-pinned-tokens'));
+    expect(detailsHtml(tooltipConfig())).not.toContain('data-pinned-latency');
+  });
 });
 
 // ===========================================================================
-// generateOverlayTooltipContent
+// buildPointDetails for unofficial overlays
 // ===========================================================================
-describe('generateOverlayTooltipContent', () => {
-  function overlayConfig(overrides: Partial<OverlayTooltipConfig> = {}): OverlayTooltipConfig {
+describe('buildPointDetails for unofficial overlays', () => {
+  function overlayConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
     return {
       ...tooltipConfig(),
       overlayData: {
@@ -892,34 +926,62 @@ describe('generateOverlayTooltipContent', () => {
     };
   }
 
-  it('includes red border style', () => {
-    const html = generateOverlayTooltipContent(overlayConfig());
-    expect(html).toContain('border: 2px solid #dc2626');
+  it('builds the overlay hover card and details from the official builders plus the notice', () => {
+    const official = generateHoverTooltipContent({ ...tooltipConfig(), color: 'red' });
+    const overlay = generateHoverTooltipContent({ ...overlayConfig(), color: 'red' });
+    const notice = /<div data-hover-notice[^>]*>(?<text>[^<]*)<\/div>/u.exec(overlay);
+    expect(notice?.groups?.text).toBe('✕ feature-branch');
+    expect(official).not.toContain('data-hover-notice');
+    expect(overlay.replace(notice![0], '')).toBe(official);
+
+    const {
+      html: officialHtml,
+      unofficial: officialNotice,
+      ...officialFields
+    } = buildPointDetails(tooltipConfig());
+    const { html: overlayHtml, unofficial, ...overlayFields } = buildPointDetails(overlayConfig());
+    expect(officialNotice).toBeUndefined();
+    expect(unofficial).toBe('✕ feature-branch');
+    expect(overlayFields).toEqual(officialFields);
+    expect(overlayHtml).toBe(officialHtml);
+    expect(overlayHtml).not.toContain('Branch');
   });
 
-  it('includes "UNOFFICIAL RUN" label', () => {
-    const html = generateOverlayTooltipContent(overlayConfig());
-    expect(html).toContain('UNOFFICIAL RUN');
+  it('falls back to the run id, then the unofficial label, without a branch', () => {
+    const noBranch = (runUrl?: string) =>
+      buildPointDetails(
+        overlayConfig({
+          overlayData: { label: '', hardwareConfig: mockHardwareConfig, data: [], runUrl },
+        }),
+      ).unofficial;
+    expect(noBranch('https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123')).toBe(
+      '✕ #123',
+    );
+    expect(noBranch()).toBe('✕ Unofficial run');
+  });
+
+  it('shows the branch notice', () => {
+    const html = detailsText(overlayConfig());
+    expect(html).toContain('✕ feature-branch');
   });
 
   it('includes branch label from overlayData', () => {
-    const html = generateOverlayTooltipContent(overlayConfig());
+    const html = detailsText(overlayConfig());
     expect(html).toContain('feature-branch');
   });
 
   it('uses overlayData.hardwareConfig for display label', () => {
-    const html = generateOverlayTooltipContent(overlayConfig({ data: pt({ hwKey: 'b200' }) }));
+    const html = detailsText(overlayConfig({ data: pt({ hwKey: 'b200' }) }));
     expect(html).toContain('B200');
   });
 
   it('includes concurrency info', () => {
-    const html = generateOverlayTooltipContent(overlayConfig());
-    expect(html).toContain('Concurrency');
-    expect(html).toContain('64');
+    const html = detailsText(overlayConfig());
+    expect(html).toContain('conc 64');
   });
 
   it('shows cache metadata for unofficial agentic overlays', () => {
-    const html = generateOverlayTooltipContent(
+    const html = detailsText(
       overlayConfig({
         data: pt({
           benchmark_type: 'agentic_traces',
@@ -932,43 +994,42 @@ describe('generateOverlayTooltipContent', () => {
         }),
       }),
     );
-    expect(html).toContain('<strong>Offload Type:</strong> DRAM');
-    expect(html).toContain('<strong>KV Offload Engine:</strong> HiCache');
-    expect(html).toContain('<strong>KV Transfer Engine:</strong> NIXL');
-    expect(html).toContain('<strong>Router:</strong> SGLang Router 0.3.2');
-    expect(html).toContain('<strong>CPU Cache Hit Rate:</strong> 42.0%');
+    expect(html).toContain('Offload type: DRAM');
+    expect(html).toContain('KV offload engine: HiCache');
+    expect(html).toContain('KV transfer engine: NIXL');
+    expect(html).toContain('Router: SGLang Router 0.3.2');
+    expect(html).toContain('CPU cache hit rate: 42.0%');
   });
 
   it('shows DCP and PCP for unofficial-run points', () => {
-    const html = generateOverlayTooltipContent(
+    const html = detailsText(
       overlayConfig({
-        data: pt({ ep: 1, decode_dcp_size: 8, prefill_pcp_size: 4 }),
+        data: pt({ ep: 1, dp_attention: false, decode_dcp_size: 8, prefill_pcp_size: 4 }),
       }),
     );
 
-    expect(html).toContain('<strong>Decode Context Parallelism (DCP):</strong> 8');
-    expect(html).toContain('<strong>Prefill Context Parallelism (PCP):</strong> 4');
+    expect(html).toContain('TP8/DCP8/PCP4');
   });
 
   it('shows point-level speculative decoding for mixed agentic overlays', () => {
-    const mtp = generateOverlayTooltipContent(
+    const mtp = detailsText(
       overlayConfig({
         data: pt({ benchmark_type: 'agentic_traces', spec_decoding: 'mtp' }),
       }),
     );
-    const standardZh = generateOverlayTooltipContent(
+    const standardZh = detailsText(
       overlayConfig({
         data: pt({ benchmark_type: 'agentic_traces', spec_decoding: 'none' }),
         locale: 'zh',
       }),
     );
 
-    expect(mtp).toContain('<strong>Speculative Decoding:</strong> MTP');
-    expect(standardZh).toContain('<strong>投机解码：</strong> 关闭');
+    expect(mtp).toContain('Speculative decoding: MTP');
+    expect(standardZh).toContain('投机解码： 关闭');
   });
 
   it('labels Kimi-K3 speculative decoding "DSpark" rather than the generic MTP', () => {
-    const html = generateOverlayTooltipContent(
+    const html = detailsText(
       overlayConfig({
         data: pt({
           benchmark_type: 'agentic_traces',
@@ -978,12 +1039,12 @@ describe('generateOverlayTooltipContent', () => {
       }),
     );
 
-    expect(html).toContain('<strong>Speculative Decoding:</strong> DSpark');
-    expect(html).not.toContain('<strong>Speculative Decoding:</strong> MTP');
+    expect(html).toContain('Speculative decoding: DSpark');
+    expect(html).not.toContain('Speculative decoding: MTP');
   });
 
   it('hides stale CPU cache hits for unofficial overlays without offload', () => {
-    const html = generateOverlayTooltipContent(
+    const html = detailsText(
       overlayConfig({
         data: pt({
           benchmark_type: 'agentic_traces',
@@ -994,29 +1055,31 @@ describe('generateOverlayTooltipContent', () => {
       }),
     );
 
-    expect(html).not.toContain('Offload Type');
-    expect(html).not.toContain('CPU Cache Hit Rate');
+    expect(html).not.toContain('Offload type');
+    expect(html).not.toContain('CPU cache hit rate');
   });
 });
 
 // ===========================================================================
-// generateGPUGraphTooltipContent
+// buildPointDetails for comparison dates
 // ===========================================================================
-describe('generateGPUGraphTooltipContent', () => {
-  it('includes "Chip Config:" label', () => {
-    const html = generateGPUGraphTooltipContent(tooltipConfig());
-    expect(html).toContain('Chip Config:');
+describe('buildPointDetails for comparison dates', () => {
+  it('dates points by comparison date and notes the data date', () => {
+    const html = comparisonDetailsText(
+      tooltipConfig({ data: pt({ date: '2025-06-15', actualDate: '2025-06-10' }) }),
+    );
+    expect(html).toContain('2025-06-15 (data from 2025-06-10)');
   });
 
   it('includes date and axis values', () => {
-    const html = generateGPUGraphTooltipContent(tooltipConfig());
+    const html = comparisonDetailsText(tooltipConfig());
     expect(html).toContain('2025-06-15');
     expect(html).toContain('E2E Latency (ms)');
     expect(html).toContain('Throughput per Chip');
   });
 
   it('shows input/output throughput when metric is y_tpPerGpu', () => {
-    const html = generateGPUGraphTooltipContent(
+    const html = comparisonDetailsText(
       tooltipConfig({
         selectedYAxisMetric: 'y_tpPerGpu',
         data: pt({
@@ -1030,7 +1093,7 @@ describe('generateGPUGraphTooltipContent', () => {
   });
 
   it('omits throughput fields when metric is not y_tpPerGpu', () => {
-    const html = generateGPUGraphTooltipContent(
+    const html = comparisonDetailsText(
       tooltipConfig({
         selectedYAxisMetric: 'y_costh',
         data: pt({
@@ -1044,61 +1107,40 @@ describe('generateGPUGraphTooltipContent', () => {
   });
 
   it('includes precision in uppercase', () => {
-    const html = generateGPUGraphTooltipContent(tooltipConfig({ data: pt({ precision: 'bf16' }) }));
+    const html = comparisonDetailsText(tooltipConfig({ data: pt({ precision: 'bf16' }) }));
     expect(html).toContain('BF16');
   });
 
   it('shows DCP and PCP in comparison point tooltips', () => {
-    const html = generateGPUGraphTooltipContent(
+    const html = comparisonDetailsText(
       tooltipConfig({
-        data: pt({ ep: 1, decode_dcp_size: 8, prefill_pcp_size: 4 }),
+        data: pt({ ep: 1, dp_attention: false, decode_dcp_size: 8, prefill_pcp_size: 4 }),
       }),
     );
 
-    expect(html).toContain('<strong>Decode Context Parallelism (DCP):</strong> 8');
-    expect(html).toContain('<strong>Prefill Context Parallelism (PCP):</strong> 4');
+    expect(html).toContain('TP8/DCP8/PCP4');
   });
 
-  it('splits image and SHA onto separate lines', () => {
-    const html = generateGPUGraphTooltipContent(
+  it('keeps the complete image and SHA', () => {
+    const html = comparisonDetailsText(
       tooltipConfig({ data: pt({ image: 'vllm-v0.6.0 abc123' }) }),
     );
-    expect(html).toContain('vllm-v0.6.0<br />abc123');
+    expect(html).toContain('vllm-v0.6.0 abc123');
   });
 
-  it('shows View charts only for pinned points with stored trace data', () => {
+  it('shows View charts only for points with stored trace data', () => {
+    const html = comparisonDetailsText(
+      tooltipConfig({
+        data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
+        hasTrace: true,
+      }),
+    );
+    expect(html).toContain('data-action="view-charts"');
+    expect(html).toContain('href="/infx/inference/agentic/1"');
     expect(
-      generateGPUGraphTooltipContent(
+      comparisonDetailsText(
         tooltipConfig({
           data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
-          isPinned: true,
-          hasTrace: true,
-        }),
-      ),
-    ).toContain('data-action="view-charts"');
-    expect(
-      generateGPUGraphTooltipContent(
-        tooltipConfig({
-          data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
-          isPinned: true,
-          hasTrace: true,
-        }),
-      ),
-    ).toContain('href="/inference/agentic/1"');
-    expect(
-      generateGPUGraphTooltipContent(
-        tooltipConfig({
-          data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
-          isPinned: false,
-          hasTrace: true,
-        }),
-      ),
-    ).not.toContain('data-action="view-charts"');
-    expect(
-      generateGPUGraphTooltipContent(
-        tooltipConfig({
-          data: pt({ id: 1, benchmark_type: 'agentic_traces' }),
-          isPinned: true,
           hasTrace: false,
         }),
       ),
@@ -1110,7 +1152,7 @@ describe('measured-power withheld tooltip line', () => {
   const reasons = ['sampling_gap_exceeded', 'expected_gpu_count_mismatch'];
 
   it('renders the withheld line in Chinese on /zh surfaces', () => {
-    const html = generateTooltipContent(
+    const html = detailsText(
       tooltipConfig({
         data: pt({ power_valid: 0, power_invalid_reasons: reasons }),
         locale: 'zh',
@@ -1121,7 +1163,7 @@ describe('measured-power withheld tooltip line', () => {
   });
 
   it('filters malformed codes before HTML interpolation (defense in depth)', () => {
-    const html = generateTooltipContent(
+    const html = detailsText(
       tooltipConfig({
         data: pt({
           power_valid: 0,
@@ -1135,19 +1177,19 @@ describe('measured-power withheld tooltip line', () => {
   });
 
   it('omits the line entirely when every code is malformed', () => {
-    const html = generateTooltipContent(
+    const html = detailsText(
       tooltipConfig({ data: pt({ power_valid: 0, power_invalid_reasons: ['<img src=x>'] }) }),
     );
     expect(html).not.toContain('Measured power withheld');
   });
 
   it.each([['absent reasons', pt({ power_valid: 0 })]])('omits the line for %s', (_name, data) => {
-    const html = generateTooltipContent(tooltipConfig({ data }));
+    const html = detailsText(tooltipConfig({ data }));
     expect(html).not.toContain('Measured power withheld');
   });
 
   it('gives unofficial overlay tooltips the same line', () => {
-    const html = generateOverlayTooltipContent({
+    const html = detailsText({
       ...tooltipConfig({ data: pt({ power_valid: 0, power_invalid_reasons: reasons }) }),
       overlayData: {
         label: 'feature-branch',
@@ -1155,13 +1197,13 @@ describe('measured-power withheld tooltip line', () => {
         data: [],
         runUrl: 'https://example.com',
       } as any,
-    } as OverlayTooltipConfig);
+    } as TooltipConfig);
     expect(html).toContain('Measured power withheld');
     expect(html).toContain('sampling gap exceeded');
   });
 
   it('gives GPU comparison tooltips the same line', () => {
-    const html = generateGPUGraphTooltipContent(
+    const html = comparisonDetailsText(
       tooltipConfig({ data: pt({ power_valid: 0, power_invalid_reasons: reasons }) }),
     );
     expect(html).toContain('Measured power withheld');
@@ -1193,16 +1235,16 @@ describe('worker power drilldown', () => {
     runUrl: 'https://example.com',
   } as any;
 
-  it('renders the worker table on a pinned tooltip in all three generators', () => {
-    const config = tooltipConfig({ data: pt({ workers }), isPinned: true });
+  it('renders the worker table in official, overlay and comparison details', () => {
+    const config = tooltipConfig({ data: pt({ workers }) });
     const outputs = [
-      generateTooltipContent(config),
-      generateOverlayTooltipContent({ ...config, overlayData }),
-      generateGPUGraphTooltipContent(config),
+      detailsHtml(config),
+      detailsHtml({ ...config, overlayData }),
+      detailsHtml({ ...config, comparisonDate: true }),
     ];
     for (const html of outputs) {
       expect(html).toContain('data-testid="tooltip-worker-power"');
-      expect(html).toContain('Measured Worker Power');
+      expect(html).toContain('Measured worker power');
       expect(html).toContain('<strong>prefill[0]</strong>');
       expect(html).toContain('612.3 W');
       expect(html).toContain('<strong>decode[0]</strong>');
@@ -1214,7 +1256,7 @@ describe('worker power drilldown', () => {
   });
 
   it('includes optional telemetry cells only when the worker carries them', () => {
-    const html = generateTooltipContent(tooltipConfig({ data: pt({ workers }), isPinned: true }));
+    const html = detailsHtml(tooltipConfig({ data: pt({ workers }) }));
     expect(html).toContain('68.4/79.2°C');
     expect(html).toContain('88.5%');
     expect(html).toContain('69.565 GiB');
@@ -1224,34 +1266,29 @@ describe('worker power drilldown', () => {
     expect(decodeRow).not.toContain('GiB');
   });
 
-  it('renders nothing when the tooltip is not pinned', () => {
-    const config = tooltipConfig({ data: pt({ workers }), isPinned: false });
-    expect(generateTooltipContent(config)).not.toContain('tooltip-worker-power');
-    expect(generateOverlayTooltipContent({ ...config, overlayData })).not.toContain(
-      'tooltip-worker-power',
-    );
-    expect(generateGPUGraphTooltipContent(config)).not.toContain('tooltip-worker-power');
+  it('leaves the worker table out of the hover card', () => {
+    const html = generateHoverTooltipContent({
+      ...tooltipConfig({ data: pt({ workers }) }),
+      color: 'red',
+    });
+    expect(html).not.toContain('tooltip-worker-power');
   });
 
-  it('caps the table at 8 rows with a "+N more workers" line', () => {
+  it('lists every worker without a cap', () => {
     const many = Array.from({ length: 10 }, (_, i) => ({
       role: 'decode',
       worker_idx: i,
       num_gpus: 8,
       avg_power_w: 700 + i,
     }));
-    const html = generateTooltipContent(
-      tooltipConfig({ data: pt({ workers: many }), isPinned: true }),
-    );
-    expect(html).toContain('<strong>decode[7]</strong>');
-    expect(html).not.toContain('<strong>decode[8]</strong>');
-    expect(html).toContain('+2 more workers');
+    const html = detailsHtml(tooltipConfig({ data: pt({ workers: many }) }));
+    expect(html).toContain('<strong>decode[0]</strong>');
+    expect(html).toContain('<strong>decode[9]</strong>');
+    expect(html).not.toContain('more workers');
   });
 
   it('renders the ZH strings under the zh locale', () => {
-    const html = generateTooltipContent(
-      tooltipConfig({ data: pt({ workers }), isPinned: true, locale: 'zh' }),
-    );
+    const html = detailsText(tooltipConfig({ data: pt({ workers }), locale: 'zh' }));
     expect(html).toContain('各 Worker 实测功耗');
     expect(html).toContain('8 芯片');
     const many = Array.from({ length: 9 }, (_, i) => ({
@@ -1260,10 +1297,9 @@ describe('worker power drilldown', () => {
       num_gpus: 8,
       avg_power_w: 700,
     }));
-    const capped = generateTooltipContent(
-      tooltipConfig({ data: pt({ workers: many }), isPinned: true, locale: 'zh' }),
-    );
-    expect(capped).toContain('另有 1 个 worker');
+    const all = detailsText(tooltipConfig({ data: pt({ workers: many }), locale: 'zh' }));
+    expect(all).toContain('decode[8]');
+    expect(all).not.toContain('另有');
   });
 
   it('HTML-escapes role and hosts strings from the JSONB boundary', () => {
@@ -1276,9 +1312,7 @@ describe('worker power drilldown', () => {
         avg_power_w: 700,
       },
     ];
-    const html = generateTooltipContent(
-      tooltipConfig({ data: pt({ workers: hostile }), isPinned: true }),
-    );
+    const html = detailsText(tooltipConfig({ data: pt({ workers: hostile }) }));
     expect(html).not.toContain('<img src=x');
     expect(html).not.toContain('<script>');
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
@@ -1288,43 +1322,43 @@ describe('worker power drilldown', () => {
 
 describe('power tier tooltip line', () => {
   it('states the certified tier on a measured axis', () => {
-    const html = generateTooltipContent(
+    const html = detailsText(
       tooltipConfig({
         selectedYAxisMetric: 'y_measuredAvgPower',
         data: pt({ power_tier: 'certified' }),
       }),
     );
-    expect(html).toContain('<strong>Power Measurement:</strong> Validated (current PowerX method)');
+    expect(html).toContain('Power measurement: Validated (current PowerX method)');
   });
 
   it('omits the tier line when the point carries no tier', () => {
-    const html = generateTooltipContent(
+    const html = detailsText(
       tooltipConfig({ selectedYAxisMetric: 'y_measuredAvgPower', data: pt() }),
     );
-    expect(html).not.toContain('Power Measurement');
+    expect(html).not.toContain('Power measurement');
   });
 
   it('renders the ZH strings under the zh locale', () => {
-    const legacy = generateTooltipContent(
+    const legacy = detailsText(
       tooltipConfig({
         selectedYAxisMetric: 'y_measuredJPerOutputToken',
         data: pt({ power_tier: 'legacy' }),
         locale: 'zh',
       }),
     );
-    const certified = generateTooltipContent(
+    const certified = detailsText(
       tooltipConfig({
         selectedYAxisMetric: 'y_measuredJPerOutputToken',
         data: pt({ power_tier: 'certified' }),
         locale: 'zh',
       }),
     );
-    expect(legacy).toContain('<strong>功耗测量：</strong> 历史测量（尚未按当前方法验证）');
-    expect(certified).toContain('<strong>功耗测量：</strong> 已验证（采用当前 PowerX 方法）');
+    expect(legacy).toContain('功耗测量： 历史测量（尚未按当前方法验证）');
+    expect(certified).toContain('功耗测量： 已验证（采用当前 PowerX 方法）');
   });
 
-  it('reaches overlay and GPU-graph tooltips through the same gate', () => {
-    const overlay = generateOverlayTooltipContent({
+  it('reaches overlay and GPU-graph tooltips on every axis', () => {
+    const overlay = detailsText({
       ...tooltipConfig({
         selectedYAxisMetric: 'y_measuredAvgPower',
         data: pt({ power_tier: 'legacy' }),
@@ -1336,13 +1370,13 @@ describe('power tier tooltip line', () => {
         runUrl: 'https://example.com',
       } as any,
     });
-    const gpuGraph = generateGPUGraphTooltipContent(
+    const gpuGraph = comparisonDetailsText(
       tooltipConfig({
         selectedYAxisMetric: 'y_measuredAvgPower',
         data: pt({ power_tier: 'legacy' }),
       }),
     );
-    const gpuGraphOffAxis = generateGPUGraphTooltipContent(
+    const gpuGraphOffAxis = comparisonDetailsText(
       tooltipConfig({
         selectedYAxisMetric: 'y_costh',
         data: pt({ power_tier: 'legacy' }),
@@ -1350,23 +1384,24 @@ describe('power tier tooltip line', () => {
     );
 
     expect(overlay).toContain(
-      '<strong>Power Measurement:</strong> Historical (not validated under the current method)',
+      'Power measurement: Historical (not validated under the current method)',
     );
     expect(gpuGraph).toContain(
-      '<strong>Power Measurement:</strong> Historical (not validated under the current method)',
+      'Power measurement: Historical (not validated under the current method)',
     );
-    expect(gpuGraphOffAxis).not.toContain('Power Measurement');
+    expect(gpuGraphOffAxis).toContain(
+      'Power measurement: Historical (not validated under the current method)',
+    );
   });
 });
 
 it.each(['en', 'zh'] as const)('keeps only the existing TPU log/chart actions in %s', (locale) => {
   const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX-Private-TPU/actions/runs/1';
   for (const available of [true, false]) {
-    const html = generateTooltipContent(
+    const html = detailsText(
       tooltipConfig({
         locale,
         runUrl,
-        isPinned: true,
         hasTrace: available,
         hasLog: available,
         data: pt({ id: 123, hwKey: 'tpuv7_vllm', benchmark_type: 'agentic_traces' }),

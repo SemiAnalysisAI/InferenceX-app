@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useRouter } from 'next/navigation';
 
 import { type RequestRecord, type RequestTimeline } from '@/hooks/api/use-request-timeline';
+import { EmptyState } from '@/components/ui/empty-state';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -116,7 +117,7 @@ const phaseOptions = (locale: Locale): SegmentedToggleOption<PhaseFilter>[] => {
 
 const TIMELINE_STRINGS = {
   en: {
-    empty: 'No requests in the current filter.',
+    empty: 'No requests in the current filter',
     rowMode: 'Row mode',
     phaseFilter: 'Phase filter',
     requests: (n: number) => `${n} request${n === 1 ? '' : 's'}`,
@@ -128,15 +129,15 @@ const TIMELINE_STRINGS = {
       'Time between the first request start and final request end with no requests in flight',
     resetZoom: 'reset zoom',
     conversation: 'Conversation',
-    worker: 'worker',
+    worker: 'Worker',
     collapse: 'Collapse streams',
     expand: 'Expand streams',
     aux: 'aux',
     chartAria: 'Request execution timeline',
-    hint: 'shift+scroll to zoom · drag to pan · double-click to reset',
+    hint: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
   },
   zh: {
-    empty: '当前筛选条件下没有请求。',
+    empty: '当前筛选条件下没有请求',
     rowMode: '时间线行模式',
     phaseFilter: '阶段筛选',
     requests: (n: number) => `${n} 个请求`,
@@ -431,11 +432,7 @@ export function RequestTimelineView({
   );
 
   if (rows.length === 0) {
-    return (
-      <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
-        {t.empty}
-      </div>
-    );
+    return <EmptyState>{t.empty}</EmptyState>;
   }
 
   const totalRequests = filtered.length;
@@ -495,7 +492,7 @@ export function RequestTimelineView({
         </span>
       </div>
 
-      <div className="rounded-md border border-border/60 bg-card overflow-hidden">
+      <div className="w-fit max-w-full overflow-hidden rounded-lg border border-border/30 bg-card">
         <div
           ref={scrollRef}
           data-testid="request-timeline-scroll"
@@ -505,14 +502,14 @@ export function RequestTimelineView({
         >
           <div className="flex w-max">
             <div
-              className="sticky left-0 z-10 flex-shrink-0 border-r border-border/60 bg-card"
+              className="sticky left-0 z-10 flex-shrink-0 border-r border-border/30 bg-card"
               style={{ width: `min(${LABEL_WIDTH}px, 48vw)`, height: svgHeight }}
             >
               <div
-                className="sticky top-0 z-20 border-b border-border/60 bg-card flex items-end px-2 pb-1"
+                className="sticky top-0 z-20 border-b border-border/30 bg-card flex items-end px-2 pb-1"
                 style={{ height: HEADER_HEIGHT }}
               >
-                <span className="text-[9px] font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
+                <span className="text-2xs font-medium text-muted-foreground">
                   {rowMode === 'conversation' ? t.conversation : t.worker}
                 </span>
               </div>
@@ -578,7 +575,7 @@ export function RequestTimelineView({
                         </span>
                       )}
                     </span>
-                    <span className="text-[9px] font-mono text-muted-foreground ml-auto shrink-0">
+                    <span className="text-3xs font-mono tabular-nums text-muted-foreground ml-auto shrink-0">
                       {row.requests.length > 0 ? row.requests.length : '—'}
                     </span>
                   </div>

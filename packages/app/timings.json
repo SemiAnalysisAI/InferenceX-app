@@ -281,7 +281,7 @@
         {
           "title": [
             "AgentX optimizations",
-            "links from /agentx to the optimizations index and to each project"
+            "links from /infx/agentx to the optimizations index and to each project"
           ],
           "duration": 259,
           "attempts": 1
@@ -329,7 +329,7 @@
         {
           "title": [
             "AgentX telemetry tutorial — English page",
-            "links back to /agentx and out to the agentic results"
+            "links back to /infx/agentx and out to the agentic results"
           ],
           "duration": 158,
           "attempts": 1
@@ -344,7 +344,7 @@
         },
         {
           "title": [
-            "AgentX telemetry tutorial — entry point on /agentx",
+            "AgentX telemetry tutorial — entry point on /infx/agentx",
             "shows the callout and navigates to the tutorial"
           ],
           "duration": 171,
@@ -352,8 +352,8 @@
         },
         {
           "title": [
-            "AgentX telemetry tutorial — entry point on /agentx",
-            "shows the Chinese callout on /zh/agentx"
+            "AgentX telemetry tutorial — entry point on /infx/agentx",
+            "shows the Chinese callout on /zh/infx/agentx"
           ],
           "duration": 266,
           "attempts": 1
@@ -1588,7 +1588,7 @@
         {
           "title": [
             "Dataset detail loading stability",
-            "keeps the footer below the viewport while /agentx/layout-dataset loads"
+            "keeps the footer below the viewport while /infx/agentx/layout-dataset loads"
           ],
           "duration": 1614,
           "attempts": 1
@@ -3369,7 +3369,7 @@
         {
           "title": [
             "GLM-5.3-Flash registration without published observations",
-            "keeps /inference/glm-5-3-flash distinct at 1280px"
+            "keeps /infx/inference/glm-5-3-flash distinct at 1280px"
           ],
           "duration": 1129,
           "attempts": 1
@@ -3377,7 +3377,7 @@
         {
           "title": [
             "GLM-5.3-Flash registration without published observations",
-            "keeps /zh/inference/glm-5-3-flash distinct at 1280px"
+            "keeps /zh/infx/inference/glm-5-3-flash distinct at 1280px"
           ],
           "duration": 608,
           "attempts": 1
@@ -3385,7 +3385,7 @@
         {
           "title": [
             "GLM-5.3-Flash registration without published observations",
-            "requests only Flash from the first unlocked /inference/glm-5-3-flash render and reload"
+            "requests only Flash from the first unlocked /infx/inference/glm-5-3-flash render and reload"
           ],
           "duration": 334,
           "attempts": 1
@@ -3393,7 +3393,7 @@
         {
           "title": [
             "GLM-5.3-Flash registration without published observations",
-            "requests only Flash from the first unlocked /inference?g_model=GLM-5.3-Flash render and reload"
+            "requests only Flash from the first unlocked /infx/inference?g_model=GLM-5.3-Flash render and reload"
           ],
           "duration": 302,
           "attempts": 1
@@ -3417,7 +3417,7 @@
         {
           "title": [
             "GLM-5.3-Flash registration without published observations",
-            "requests only Flash from the first unlocked /zh/inference/glm-5-3-flash render and reload"
+            "requests only Flash from the first unlocked /zh/infx/inference/glm-5-3-flash render and reload"
           ],
           "duration": 516,
           "attempts": 1
@@ -3425,7 +3425,7 @@
         {
           "title": [
             "GLM-5.3-Flash registration without published observations",
-            "requests only Flash from the first unlocked /zh/inference?g_model=GLM-5.3-Flash render and reload"
+            "requests only Flash from the first unlocked /zh/infx/inference?g_model=GLM-5.3-Flash render and reload"
           ],
           "duration": 408,
           "attempts": 1
@@ -3449,7 +3449,7 @@
         {
           "title": [
             "Per-model dashboard routes",
-            "retains an explicit legacy model across /evaluation"
+            "retains an explicit legacy model across /infx/evaluation"
           ],
           "duration": 558,
           "attempts": 1
@@ -3457,7 +3457,7 @@
         {
           "title": [
             "Per-model dashboard routes",
-            "renders DeepSeek V4.1 Flash chart data from bare /inference"
+            "renders DeepSeek V4.1 Flash chart data from bare /infx/inference"
           ],
           "duration": 224,
           "attempts": 1
@@ -3465,7 +3465,7 @@
         {
           "title": [
             "Per-model dashboard routes",
-            "opens bare /inference on DeepSeek V4.1 Flash without dropping shared filters"
+            "opens bare /infx/inference on DeepSeek V4.1 Flash without dropping shared filters"
           ],
           "duration": 146,
           "attempts": 1
@@ -3473,7 +3473,7 @@
         {
           "title": [
             "Per-model dashboard routes",
-            "retains the current model when navigating from /evaluation"
+            "retains the current model when navigating from /infx/evaluation"
           ],
           "duration": 520,
           "attempts": 1
@@ -3481,7 +3481,7 @@
         {
           "title": [
             "Per-model dashboard routes",
-            "retains an explicit legacy model across /zh/evaluation"
+            "retains an explicit legacy model across /zh/infx/evaluation"
           ],
           "duration": 738,
           "attempts": 1
@@ -3489,7 +3489,7 @@
         {
           "title": [
             "Per-model dashboard routes",
-            "renders DeepSeek V4.1 Flash chart data from bare /zh/inference"
+            "renders DeepSeek V4.1 Flash chart data from bare /zh/infx/inference"
           ],
           "duration": 323,
           "attempts": 1
@@ -3497,7 +3497,7 @@
         {
           "title": [
             "Per-model dashboard routes",
-            "opens bare /zh/inference on DeepSeek V4.1 Flash without dropping shared filters"
+            "opens bare /zh/infx/inference on DeepSeek V4.1 Flash without dropping shared filters"
           ],
           "duration": 186,
           "attempts": 1
@@ -3505,7 +3505,7 @@
         {
           "title": [
             "Per-model dashboard routes",
-            "retains the current model when navigating from /zh/evaluation"
+            "retains the current model when navigating from /zh/infx/evaluation"
           ],
           "duration": 492,
           "attempts": 1
@@ -3513,7 +3513,7 @@
         {
           "title": [
             "Per-model dashboard routes",
-            "seeds /historical/<slug> to the routed model and rewrites the URL on switch without a reload"
+            "seeds /infx/historical/<slug> to the routed model and rewrites the URL on switch without a reload"
           ],
           "duration": 375,
           "attempts": 1
@@ -3566,7 +3566,7 @@
         {
           "title": [
             "Inference model presentation",
-            "updates a bare /inference intro when the selector creates a model route"
+            "updates a bare /infx/inference intro when the selector creates a model route"
           ],
           "duration": 299,
           "attempts": 1
@@ -3574,7 +3574,7 @@
         {
           "title": [
             "Inference model presentation",
-            "follows an explicit query-model override on /inference/kimi-k3"
+            "follows an explicit query-model override on /infx/inference/kimi-k3"
           ],
           "duration": 150,
           "attempts": 1
@@ -3582,7 +3582,7 @@
         {
           "title": [
             "Inference model presentation",
-            "keeps model copy in server-rendered HTML on /inference/kimi-k3"
+            "keeps model copy in server-rendered HTML on /infx/inference/kimi-k3"
           ],
           "duration": 33,
           "attempts": 1
@@ -3598,7 +3598,7 @@
         {
           "title": [
             "Inference model presentation",
-            "updates a bare /zh/inference intro when the selector creates a model route"
+            "updates a bare /zh/infx/inference intro when the selector creates a model route"
           ],
           "duration": 284,
           "attempts": 1
@@ -3606,7 +3606,7 @@
         {
           "title": [
             "Inference model presentation",
-            "follows an explicit query-model override on /zh/inference/kimi-k3"
+            "follows an explicit query-model override on /zh/infx/inference/kimi-k3"
           ],
           "duration": 156,
           "attempts": 1
@@ -3614,7 +3614,7 @@
         {
           "title": [
             "Inference model presentation",
-            "keeps model copy in server-rendered HTML on /zh/inference/kimi-k3"
+            "keeps model copy in server-rendered HTML on /zh/infx/inference/kimi-k3"
           ],
           "duration": 23,
           "attempts": 1
@@ -3638,7 +3638,7 @@
         {
           "title": [
             "Model-local manual legend selection",
-            "preserves non-default query-model share state on /inference"
+            "preserves non-default query-model share state on /infx/inference"
           ],
           "duration": 1552,
           "attempts": 1
@@ -3646,7 +3646,7 @@
         {
           "title": [
             "Model-local manual legend selection",
-            "preserves non-default query-model share state on /inference/deepseek-v4-pro"
+            "preserves non-default query-model share state on /infx/inference/deepseek-v4-pro"
           ],
           "duration": 1577,
           "attempts": 1
@@ -3800,7 +3800,7 @@
         },
         {
           "title": [
-            "Huawei UBenchX launch banner",
+            "Huawei uBenchX launch banner",
             "opens Huawei core-memory profiles from /zh landing page"
           ],
           "duration": 946,
@@ -4066,7 +4066,7 @@
         },
         {
           "title": [
-            "uses shared Huawei colors in OperatorX and ubenchX across a live theme switch"
+            "uses shared Huawei colors in OperatorX and uBenchX across a live theme switch"
           ],
           "duration": 362,
           "attempts": 1
@@ -4744,7 +4744,7 @@
         {
           "title": [
             "Profit Estimator per GW — per-model route",
-            "serves /profit-estimator-per-gigawatt/kimi-k3 and 308s aliases to the canonical slug"
+            "serves /infx/profit-estimator-per-gigawatt/kimi-k3 and 308s aliases to the canonical slug"
           ],
           "duration": 128,
           "attempts": 1
@@ -4843,7 +4843,7 @@
         {
           "title": [
             "Profit Estimator — responsive control panels",
-            "keeps benchmark and pricing controls grouped on /profit-estimator at 375px"
+            "keeps benchmark and pricing controls grouped on /infx/profit-estimator at 375px"
           ],
           "duration": 869,
           "attempts": 1
@@ -4851,7 +4851,7 @@
         {
           "title": [
             "Profit Estimator — responsive control panels",
-            "keeps benchmark and pricing controls grouped on /profit-estimator at 768px"
+            "keeps benchmark and pricing controls grouped on /infx/profit-estimator at 768px"
           ],
           "duration": 881,
           "attempts": 1
@@ -4859,7 +4859,7 @@
         {
           "title": [
             "Profit Estimator — responsive control panels",
-            "keeps benchmark and pricing controls grouped on /profit-estimator at 1280px"
+            "keeps benchmark and pricing controls grouped on /infx/profit-estimator at 1280px"
           ],
           "duration": 872,
           "attempts": 1
@@ -5033,7 +5033,7 @@
         {
           "title": [
             "Profit estimator route parameters",
-            "defaults to roofline and preserves explicit Actual in /profit-estimator"
+            "defaults to roofline and preserves explicit Actual in /infx/profit-estimator"
           ],
           "duration": 1462,
           "attempts": 1
@@ -5041,7 +5041,7 @@
         {
           "title": [
             "Profit estimator route parameters",
-            "hydrates, edits, reloads and resets /profit-estimator route state"
+            "hydrates, edits, reloads and resets /infx/profit-estimator route state"
           ],
           "duration": 1664,
           "attempts": 1
@@ -5049,7 +5049,7 @@
         {
           "title": [
             "Profit estimator route parameters",
-            "defaults to roofline and preserves explicit Actual in /zh/profit-estimator-per-gigawatt"
+            "defaults to roofline and preserves explicit Actual in /zh/infx/profit-estimator-per-gigawatt"
           ],
           "duration": 865,
           "attempts": 1
@@ -5057,7 +5057,7 @@
         {
           "title": [
             "Profit estimator route parameters",
-            "hydrates, edits, reloads and resets /zh/profit-estimator-per-gigawatt route state"
+            "hydrates, edits, reloads and resets /zh/infx/profit-estimator-per-gigawatt route state"
           ],
           "duration": 1665,
           "attempts": 1
@@ -5425,7 +5425,7 @@
           "title": [
             "TCO Calculator",
             "cost target",
-            "owns the MW budget input now that the lifecycle section moved to /fleet"
+            "owns the MW budget input now that the lifecycle section moved to /infx/fleet"
           ],
           "duration": 6,
           "attempts": 1
@@ -5726,7 +5726,7 @@
         },
         {
           "title": [
-            "ubenchX hub and test routes",
+            "uBenchX hub and test routes",
             "opens /ubenchx on the mem-bw view with the Beta title and test selector"
           ],
           "duration": 310,
@@ -5734,7 +5734,7 @@
         },
         {
           "title": [
-            "ubenchX hub and test routes",
+            "uBenchX hub and test routes",
             "switches to the combined core profiles with the test selector"
           ],
           "duration": 696,
@@ -5742,7 +5742,7 @@
         },
         {
           "title": [
-            "ubenchX hub and test routes",
+            "uBenchX hub and test routes",
             "switches to the TPC Skyline table with the test selector"
           ],
           "duration": 285,
@@ -5750,7 +5750,7 @@
         },
         {
           "title": [
-            "ubenchX hub and test routes",
+            "uBenchX hub and test routes",
             "keeps a pinned sm-l2-distance tooltip on its cell while the pointer moves"
           ],
           "duration": 1224,
@@ -5905,7 +5905,7 @@
           "title": [
             "URL Parameter Persistence",
             "Hydration on shared-link entry",
-            "/inference?g_model=gpt-oss-120b seeds the model without a hydration error"
+            "/infx/inference?g_model=gpt-oss-120b seeds the model without a hydration error"
           ],
           "duration": 96,
           "attempts": 1
@@ -5914,7 +5914,7 @@
           "title": [
             "URL Parameter Persistence",
             "Hydration on shared-link entry",
-            "/inference with invalid ?g_model=junk falls back to the default"
+            "/infx/inference with invalid ?g_model=junk falls back to the default"
           ],
           "duration": 155,
           "attempts": 1
@@ -5923,7 +5923,7 @@
           "title": [
             "URL Parameter Persistence",
             "Hydration on shared-link entry",
-            "/inference with invalid ?i_prec=junk falls back to the default"
+            "/infx/inference with invalid ?i_prec=junk falls back to the default"
           ],
           "duration": 159,
           "attempts": 1
@@ -5968,7 +5968,7 @@
           "title": [
             "URL Parameter Persistence",
             "Default toggle states (share-link correctness)",
-            "an /inference link with neither toggle param renders high contrast AND parallelism labels off"
+            "an /infx/inference link with neither toggle param renders high contrast AND parallelism labels off"
           ],
           "duration": 275,
           "attempts": 1

@@ -32,7 +32,7 @@ export const dynamic = 'force-dynamic';
  * GET /api/v1/views/evaluation
  *
  * Aggregated evaluation chart rows for a model, benchmark, and run date — the
- * same latest-per-config, retry-averaged bars the `/evaluation` dashboard
+ * same latest-per-config, retry-averaged bars the `/infx/evaluation` dashboard
  * renders, computed by the shared `buildEvaluationChartRows` +
  * `aggregateEvaluationChartRows` (components/evaluation/chart-data).
  *

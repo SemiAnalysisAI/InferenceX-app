@@ -17,7 +17,7 @@ vi.mock('@/lib/d3-chart/chart-setup', { spy: true });
 vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: 'dark' }) }));
 vi.hoisted(() => {
-  globalThis.__scatterPathnameState = { value: '/inference' };
+  globalThis.__scatterPathnameState = { value: '/infx/inference' };
 });
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof NextNavigation>()),
@@ -234,7 +234,7 @@ export function dispatchAtPoint(
 export const rebuildCount = () => vi.mocked(setupChartStructure).mock.calls.length;
 
 beforeEach(() => {
-  globalThis.__scatterPathnameState.value = '/inference';
+  globalThis.__scatterPathnameState.value = '/infx/inference';
   vi.stubGlobal('ResizeObserver', MockResizeObserver);
   Object.defineProperty(SVGElement.prototype, 'getComputedTextLength', {
     configurable: true,

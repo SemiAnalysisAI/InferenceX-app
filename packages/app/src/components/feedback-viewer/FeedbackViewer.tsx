@@ -20,7 +20,9 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { relockFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 interface DecryptedRow {
   id: string;
@@ -69,7 +71,6 @@ function decryptRow(cipher: Cipher, row: FeedbackListRow): DecryptedRow {
 
 const STRINGS = {
   en: {
-    heading: 'User Feedback',
     explanation: 'All user-supplied columns are encrypted server-side. Paste the',
     explanationSuffix: 'to decrypt in your browser. The key never leaves this page.',
     keySecurity: 'Browser-only key handling · never persisted or sent to the server',
@@ -83,22 +84,21 @@ const STRINGS = {
     hideKey: 'Hide key',
     showKey: 'Show key',
     allDecryptsFailed: "All rows failed to decrypt — the key parses but doesn't match the data.",
-    fetchError: 'Failed to load feedback rows.',
+    fetchError: 'Could not load feedback rows',
     retry: 'Retry',
     loadingRows: 'Loading rows…',
-    noRows: 'No feedback rows yet.',
-    enterKey: 'Enter the key above to decrypt.',
+    noRows: 'No feedback yet',
+    enterKey: 'Enter the key above to decrypt',
     encryptedRowsLoaded: (n: number) => `${n} encrypted row${n === 1 ? '' : 's'} loaded.`,
     rowCount: (n: number) => `${n} row${n === 1 ? '' : 's'}`,
     failedToDecrypt: (n: number) => ` · ${n} failed to decrypt`,
-    decryptFailed: 'decrypt failed',
+    decryptFailed: 'Decrypt failed',
     whatWorksWell: 'What works well',
     whatCouldBeBetter: 'What could be better',
     wouldLikeToSee: 'Would like to see',
     invalidKey: 'The decryption key must be valid base64 for exactly 32 bytes.',
   },
   zh: {
-    heading: '用户反馈',
     explanation: '所有用户提交的字段均在服务端加密。粘贴',
     explanationSuffix: '即可在浏览器中解密。密钥不会离开此页面。',
     keySecurity: '仅在浏览器中处理密钥 · 不会持久化或发送到服务端',
@@ -112,11 +112,11 @@ const STRINGS = {
     hideKey: '隐藏密钥',
     showKey: '显示密钥',
     allDecryptsFailed: '所有行均解密失败——密钥格式正确但与数据不匹配。',
-    fetchError: '无法加载反馈数据。',
+    fetchError: '无法加载反馈数据',
     retry: '重试',
     loadingRows: '正在加载反馈记录……',
-    noRows: '暂无反馈记录。',
-    enterKey: '请在上方输入密钥进行解密。',
+    noRows: '暂无反馈记录',
+    enterKey: '请在上方输入密钥进行解密',
     encryptedRowsLoaded: (n: number) => `已加载 ${n} 条加密记录。`,
     rowCount: (n: number) => `共 ${n} 条记录`,
     failedToDecrypt: (n: number) => `，其中 ${n} 条解密失败`,
@@ -179,46 +179,45 @@ export default function FeedbackViewer() {
 
   return (
     <div data-testid="feedback-viewer" className="flex flex-col gap-4">
-      <Card className="border-primary/20 bg-primary/[0.02]">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold mb-2">{t.heading}</h2>
-            <p className="text-muted-foreground text-sm">
+      <Card>
+        <form onSubmit={handleUnlock} className="flex flex-col gap-3">
+          <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <p className="text-sm leading-6 text-muted-foreground">
               {t.explanation}
               <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">FEEDBACK_SECRET</code>
               {t.explanationSuffix}
             </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              className="-ml-2.5 shrink-0 text-muted-foreground sm:ml-0"
+              onClick={() => {
+                relockFeatureGate();
+                track('feedback_viewer_relocked');
+                router.push(
+                  locale === 'zh'
+                    ? `/zh${getDashboardRoute('inference').path}`
+                    : getDashboardRoute('inference').path,
+                );
+              }}
+              title={t.relock}
+            >
+              <Lock aria-hidden="true" />
+              {t.relock}
+            </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground"
-            onClick={() => {
-              relockFeatureGate();
-              track('feedback_viewer_relocked');
-              router.push(locale === 'zh' ? '/zh/inference' : '/inference');
-            }}
-            title={t.relock}
-          >
-            <Lock className="size-3" />
-            {t.relock}
-          </Button>
-        </div>
-      </Card>
-
-      <Card>
-        <form onSubmit={handleUnlock} className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="flex flex-wrap items-start justify-between gap-2 border-t border-border/20 pt-3">
             <div>
               <label htmlFor="feedback-key" className="text-xs font-medium">
                 {t.keyLabel}
               </label>
-              <p className="mt-1 text-2xs text-muted-foreground">{t.keySecurity}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t.keySecurity}</p>
             </div>
             {data && data.rows.length > 0 && decryptedRows === null && (
               <span
                 data-testid="feedback-encrypted-state"
-                className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-2xs font-medium text-amber-700 dark:text-amber-300"
+                className="text-xs text-muted-foreground tabular-nums"
               >
                 {t.encryptedState} · {data.rows.length}
               </span>
@@ -226,7 +225,7 @@ export default function FeedbackViewer() {
             {decryptedRows && decryptedRows.length > 0 && (
               <span
                 data-testid="feedback-decrypted-state"
-                className="rounded-full border border-border/50 bg-muted/40 px-2 py-1 text-2xs font-medium text-muted-foreground"
+                className="text-xs text-muted-foreground tabular-nums"
               >
                 {t.processedState} · {decryptedRows.length}
               </span>
@@ -245,17 +244,19 @@ export default function FeedbackViewer() {
                 placeholder={t.keyPlaceholder}
                 className="pr-11 font-mono"
               />
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => {
                   setShowKey((v) => !v);
                   track('feedback_viewer_key_visibility_toggled', { enabled: !showKey });
                 }}
                 aria-label={showKey ? t.hideKey : t.showKey}
-                className="absolute right-0 top-0 flex size-11 items-center justify-center text-muted-foreground hover:text-foreground sm:size-9"
+                className="absolute top-0 right-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
               >
                 {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </button>
+              </Button>
             </div>
             <Button
               type="submit"
@@ -308,24 +309,14 @@ export default function FeedbackViewer() {
         </Card>
       )}
 
-      {isLoading && (
-        <Card>
-          <p className="text-muted-foreground text-sm">{t.loadingRows}</p>
-        </Card>
-      )}
+      {isLoading && <EmptyState>{t.loadingRows}</EmptyState>}
 
-      {data && data.rows.length === 0 && (
-        <Card>
-          <p className="text-muted-foreground text-sm">{t.noRows}</p>
-        </Card>
-      )}
+      {data && data.rows.length === 0 && <EmptyState>{t.noRows}</EmptyState>}
 
       {data && data.rows.length > 0 && decryptedRows === null && (
-        <Card>
-          <p className="text-muted-foreground text-sm">
-            {t.encryptedRowsLoaded(data.rows.length)} {t.enterKey}
-          </p>
-        </Card>
+        <EmptyState>
+          {t.encryptedRowsLoaded(data.rows.length)} {t.enterKey}
+        </EmptyState>
       )}
 
       {decryptedRows && decryptedRows.length > 0 && (
@@ -396,13 +387,13 @@ function FieldRow({
 }) {
   const toneClass =
     tone === 'positive'
-      ? 'border-l-2 border-emerald-500/40'
+      ? 'border-success/40'
       : tone === 'negative'
-        ? 'border-l-2 border-amber-500/40'
-        : 'border-l-2 border-sky-500/40';
+        ? 'border-warning/40'
+        : 'border-border';
   return (
-    <div className={`pl-3 ${toneClass}`}>
-      <div className="text-3xs uppercase tracking-wide text-muted-foreground">{label}</div>
+    <div className={`border-l-2 pl-3 ${toneClass}`}>
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
       <p className="text-sm whitespace-pre-wrap break-words">{value}</p>
     </div>
   );

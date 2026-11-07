@@ -34,7 +34,7 @@ const STRINGS = {
     locked: 'Locked',
     title: (tier: string) => `${tier} pricing is in the ${TCO_MODEL_TITLE}`,
     lead: (tier: string) =>
-      `InferenceX publishes two TCO tiers: Owning at Large Hyperscaler Volume and Rent - 3 Year Commit. ${tier} and the other rental terms come from the same source, the SemiAnalysis ${TCO_MODEL_TITLE}.`,
+      `InferenceX publishes two TCO tiers: Owning at large hyperscaler volume and Rent – 3-year commit. ${tier} and the other rental terms come from the same source, the SemiAnalysis ${TCO_MODEL_TITLE}.`,
     includesHeading: 'What the model covers',
     includes: [
       'Current market GPU rental prices and their variation across on-demand, 1 month, 6 month, 1 year, 2 year and 3 year terms.',
@@ -96,7 +96,7 @@ export function TcoModelDialog({ tier, onClose, source }: TcoModelDialogProps) {
     <Dialog open={tier !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-xl" data-testid="tco-model-dialog">
         <DialogHeader>
-          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
             <Lock aria-hidden="true" className="size-3.5" />
             SemiAnalysis
           </div>
@@ -112,7 +112,7 @@ export function TcoModelDialog({ tier, onClose, source }: TcoModelDialogProps) {
           </ul>
           <p className="text-muted-foreground">{t.delivery}</p>
         </div>
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose}>
             {t.dismiss}
           </Button>

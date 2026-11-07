@@ -905,6 +905,30 @@ describe('new dashboard projections', () => {
     expect(body.rows).toEqual([]);
     expect(body.series).toEqual([{ key: 'amd', points: [] }]);
   });
+  it('defaults submission series to every vendor with submissions plus total', async () => {
+    mocks.submissions.mockImplementationOnce(() =>
+      Response.json({
+        summary: [],
+        volume: [
+          { date: '2026-08-22', hardware: 'jalapeno', datapoints: 4 },
+          { date: '2026-08-26', hardware: 'tpuv7', datapoints: 3 },
+          { date: '2026-08-26', hardware: 'h200', datapoints: 5 },
+        ],
+      }),
+    );
+    const result = await submissions(req('submissions', 'mode=cumulative'));
+    const body = await result.json();
+    expect(result.status).toBe(200);
+    expect(body.params.lines).toEqual(['nvidia', 'openai', 'google', 'total']);
+    expect(
+      Object.fromEntries(
+        body.series.map((line: { key: string; points: { value: number }[] }) => [
+          line.key,
+          line.points.map((point) => point.value),
+        ]),
+      ),
+    ).toEqual({ nvidia: [0, 5], openai: [4, 4], google: [0, 3], total: [4, 12] });
+  });
 });
 
 describe('cache-reuse recipe selection', () => {

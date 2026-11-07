@@ -25,12 +25,12 @@ const STRINGS = {
   en: {
     title: 'Known kernel support',
     description:
-      'The full SKU × library picture, independent of the runs above: green combinations work on the fleet, red combinations are known not to work (the numbered notes say why), and gray combinations are unavailable or awaiting qualification (see notes). Under each cell is the backend version the selected runs measured.',
+      'The full SKU × library picture, independent of the runs above: ✓ marks combinations that work on the fleet, ✕ marks combinations known not to work (the numbered notes say why), and a dash marks combinations that are unavailable or awaiting qualification (see notes). Under each cell is the backend version the selected runs measured.',
     modes: {
       normal: 'Throughput kernels',
       'low-latency': 'Low-latency kernels',
     },
-    axes: 'SKU / Library',
+    axes: 'SKU / library',
     works: 'Works',
     broken: 'Known not to work',
     na: 'Not applicable',
@@ -41,7 +41,7 @@ const STRINGS = {
   zh: {
     title: '已知 Kernel 支持情况',
     description:
-      '下表展示完整的 SKU × 集合通信库支持情况，不受上方已选运行影响：绿色表示该组合可在集群上运行，红色表示已知不可用（原因见编号注释），灰色表示该组合尚不可用或待验证（详见注释）。每个单元格下方是所选运行实测的后端版本。',
+      '下表展示完整的 SKU × 集合通信库支持情况，不受上方已选运行影响：✓ 表示该组合可在集群上运行，✕ 表示已知不可用（原因见编号注释），短横线表示该组合尚不可用或待验证（详见注释）。每个单元格下方是所选运行实测的后端版本。',
     modes: {
       normal: '吞吐量 Kernel',
       'low-latency': '低延迟 Kernel',
@@ -56,10 +56,17 @@ const STRINGS = {
   },
 } as const;
 
+/** Working pairs are the norm, so only the check mark carries color; broken pairs get the tint. */
 const EP_CHIP_CLASS: Record<CollectiveXKnownEp['status'], string> = {
-  works: 'border-emerald-600/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
-  broken: 'border-red-600/40 bg-red-500/10 text-red-700 dark:text-red-300',
-  na: 'border-border/60 bg-muted/20 text-muted-foreground/70',
+  works: 'bg-muted/50 text-foreground',
+  broken: 'bg-destructive/10 text-destructive',
+  na: 'text-muted-foreground/70',
+};
+
+const EP_GLYPH: Record<CollectiveXKnownEp['status'], { glyph: string; className?: string }> = {
+  works: { glyph: '✓', className: 'text-success' },
+  broken: { glyph: '✕' },
+  na: { glyph: '—' },
 };
 
 function EpChip({
@@ -75,7 +82,7 @@ function EpChip({
   noteText: string | null;
   formatNote: (number: number) => string;
 }) {
-  const glyph = ep.status === 'works' ? '✓' : ep.status === 'broken' ? '✕' : '—';
+  const { glyph, className: glyphClass } = EP_GLYPH[ep.status];
   const label = `EP${degree} ${glyph}${noteNumber === null ? '' : formatNote(noteNumber)}`;
   return (
     <span
@@ -84,9 +91,9 @@ function EpChip({
       data-status={ep.status}
       title={noteText ?? undefined}
       aria-label={noteText ? `${label}: ${noteText}` : label}
-      className={`inline-flex items-center gap-0.5 rounded border px-1.5 py-0.5 font-mono text-2xs leading-none whitespace-nowrap ${EP_CHIP_CLASS[ep.status]}`}
+      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-mono text-2xs leading-none whitespace-nowrap ${EP_CHIP_CLASS[ep.status]}`}
     >
-      EP{degree} {glyph}
+      EP{degree} <span className={glyphClass}>{glyph}</span>
       {noteNumber === null ? null : <sup className="font-sans">{noteNumber}</sup>}
     </span>
   );
@@ -116,7 +123,7 @@ export function CollectiveXSupportMatrices({
         </div>
       </div>
 
-      <div className="mt-5 grid min-w-0 gap-4">
+      <div className="mt-6 grid min-w-0 gap-8">
         {MODES.map((mode) => {
           const noteOrder = collectiveXKnownFootnoteOrder(mode);
           const noteNumberOf = (note: string | undefined): number | null =>
@@ -127,21 +134,19 @@ export function CollectiveXSupportMatrices({
             <section
               key={mode}
               data-testid={`collectivex-support-matrix-${mode}`}
-              className="min-w-0 overflow-hidden rounded-lg border border-border/60"
+              className="min-w-0 space-y-3"
             >
-              <h3 className="border-b border-border/60 bg-muted/20 px-4 py-3 text-sm font-semibold">
-                {t.modes[mode]}
-              </h3>
+              <h3 className="text-sm font-medium">{t.modes[mode]}</h3>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-max border-collapse text-sm">
                   <caption className="sr-only">
                     {t.modes[mode]} · {t.axes}
                   </caption>
                   <thead>
-                    <tr>
+                    <tr className="border-b border-border/30">
                       <th
                         scope="col"
-                        className="bg-muted/30 px-3 py-2 text-left text-xs font-medium whitespace-nowrap text-muted-foreground"
+                        className="px-3 py-2 text-left text-xs font-medium whitespace-nowrap text-muted-foreground"
                       >
                         {t.axes}
                       </th>
@@ -149,7 +154,7 @@ export function CollectiveXSupportMatrices({
                         <th
                           key={library}
                           scope="col"
-                          className="border-l border-border/60 bg-muted/30 px-3 py-2 text-center text-xs font-medium whitespace-nowrap"
+                          className="border-l border-border/20 px-3 py-2 text-center text-xs font-medium whitespace-nowrap"
                         >
                           {collectiveXBackendLabel(library)}
                         </th>
@@ -158,10 +163,10 @@ export function CollectiveXSupportMatrices({
                   </thead>
                   <tbody>
                     {COLLECTIVEX_KNOWN_SKUS.map((sku) => (
-                      <tr key={sku} className="border-t border-border/60">
+                      <tr key={sku} className="border-t border-border/20">
                         <th
                           scope="row"
-                          className="bg-muted/10 px-3 py-2 text-left font-mono text-xs font-semibold whitespace-nowrap"
+                          className="px-3 py-2 text-left font-mono text-xs font-medium whitespace-nowrap"
                         >
                           {sku.toUpperCase()}
                         </th>
@@ -176,7 +181,7 @@ export function CollectiveXSupportMatrices({
                               data-mode={mode}
                               data-sku={sku}
                               data-library={library}
-                              className="border-l border-border/60 px-2 py-1.5 text-center"
+                              className="border-l border-border/20 px-2 py-1.5 text-center"
                             >
                               {pairNa ? (
                                 <span
@@ -228,7 +233,7 @@ export function CollectiveXSupportMatrices({
                   </tbody>
                 </table>
               </div>
-              <div className="border-t border-border/60 bg-muted/10 px-4 py-3">
+              <div>
                 <h4 className="text-xs font-medium text-muted-foreground">{t.notes}</h4>
                 <ol
                   data-testid={`collectivex-known-notes-${mode}`}
@@ -251,9 +256,9 @@ function LegendKey({ status, label }: { status: CollectiveXKnownEp['status']; la
   return (
     <span className="inline-flex items-center gap-1.5">
       <span
-        className={`inline-flex items-center justify-center rounded border px-1.5 py-0.5 font-mono text-2xs leading-none ${EP_CHIP_CLASS[status]}`}
+        className={`inline-flex items-center justify-center rounded-md px-1.5 py-0.5 font-mono text-2xs leading-none ${EP_CHIP_CLASS[status]}`}
       >
-        {status === 'works' ? '✓' : status === 'broken' ? '✕' : '—'}
+        <span className={EP_GLYPH[status].className}>{EP_GLYPH[status].glyph}</span>
       </span>
       {label}
     </span>

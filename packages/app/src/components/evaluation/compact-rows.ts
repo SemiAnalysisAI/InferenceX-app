@@ -11,6 +11,8 @@ export interface CompactEvalRows {
     conc: number | null,
     run: number,
     metrics: Record<string, number>,
+    specAlgorithm: string | null,
+    specDraftModel: string | null,
   ][];
 }
 
@@ -78,60 +80,74 @@ export function compactEvalRows(evalRows: readonly EvalRow[]): CompactEvalRows {
     for (const key of DASHBOARD_METRIC_KEYS) {
       if (Object.hasOwn(row.metrics, key)) metrics[key] = row.metrics[key]!;
     }
-    compact.rows.push([row.id, config, row.task, row.date, row.conc, run, metrics]);
+    compact.rows.push([
+      row.id,
+      config,
+      row.task,
+      row.date,
+      row.conc,
+      run,
+      metrics,
+      row.spec_algorithm,
+      row.spec_draft_model,
+    ]);
   }
   return compact;
 }
 
 export function expandEvalRows({ configs, runs, rows }: CompactEvalRows): EvalRow[] {
-  return rows.map(([id, config, task, date, conc, run, metrics]) => {
-    const [
-      config_id,
-      hardware,
-      framework,
-      model,
-      precision,
-      spec_method,
-      disagg,
-      is_multinode,
-      prefill_tp,
-      prefill_ep,
-      prefill_dp_attention,
-      prefill_num_workers,
-      decode_tp,
-      decode_ep,
-      decode_dp_attention,
-      decode_num_workers,
-      num_prefill_gpu,
-      num_decode_gpu,
-    ] = configs[config]!;
-    const [timestamp, run_url] = runs[run]!;
-    return {
-      id,
-      config_id,
-      hardware,
-      framework,
-      model,
-      precision,
-      spec_method,
-      disagg,
-      is_multinode,
-      prefill_tp,
-      prefill_ep,
-      prefill_dp_attention,
-      prefill_num_workers,
-      decode_tp,
-      decode_ep,
-      decode_dp_attention,
-      decode_num_workers,
-      num_prefill_gpu,
-      num_decode_gpu,
-      task,
-      date,
-      conc,
-      metrics,
-      timestamp,
-      run_url,
-    };
-  });
+  return rows.map(
+    ([id, config, task, date, conc, run, metrics, spec_algorithm, spec_draft_model]) => {
+      const [
+        config_id,
+        hardware,
+        framework,
+        model,
+        precision,
+        spec_method,
+        disagg,
+        is_multinode,
+        prefill_tp,
+        prefill_ep,
+        prefill_dp_attention,
+        prefill_num_workers,
+        decode_tp,
+        decode_ep,
+        decode_dp_attention,
+        decode_num_workers,
+        num_prefill_gpu,
+        num_decode_gpu,
+      ] = configs[config]!;
+      const [timestamp, run_url] = runs[run]!;
+      return {
+        id,
+        config_id,
+        hardware,
+        framework,
+        model,
+        precision,
+        spec_method,
+        spec_algorithm,
+        spec_draft_model,
+        disagg,
+        is_multinode,
+        prefill_tp,
+        prefill_ep,
+        prefill_dp_attention,
+        prefill_num_workers,
+        decode_tp,
+        decode_ep,
+        decode_dp_attention,
+        decode_num_workers,
+        num_prefill_gpu,
+        num_decode_gpu,
+        task,
+        date,
+        conc,
+        metrics,
+        timestamp,
+        run_url,
+      };
+    },
+  );
 }

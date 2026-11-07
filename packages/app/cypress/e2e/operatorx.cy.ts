@@ -58,13 +58,16 @@ const gemm = comparisonView(
 );
 const moe = comparisonView(buildComparison('moe', []), null);
 
-it('shows measured and missing GPU coverage, then switches the URL to MoE', () => {
+it('shows measured and missing GPU coverage, then switches the path to MoE', () => {
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('gemm');
   cy.intercept('GET', '/api/v1/operatorx/compare?op=moe*', moe).as('moe');
 
-  cy.visit('/operatorx');
+  cy.visit('/opx/gemm?model=DeepSeek-V4-Pro');
   cy.wait('@gemm');
-  cy.get('[data-testid="operatorx-page"] h1').should('have.text', 'OperatorX (Experimental Beta)');
+  cy.get('[data-testid="operatorx-page"] h1')
+    .should('contain.text', 'OperatorX')
+    .find('[data-slot="badge"]')
+    .should('have.text', 'Experimental');
   cy.get('[data-testid="operatorx-coverage"]')
     .should('contain.text', 'Coverage of 2 cases')
     .and('contain.text', '2/2')
@@ -73,8 +76,33 @@ it('shows measured and missing GPU coverage, then switches the URL to MoE', () =
 
   cy.get('[data-testid="operatorx-page"]').contains('button', 'MoE').click();
   cy.wait('@moe');
-  cy.location('search').should('contain', 'op=moe');
+  cy.location('pathname').should('eq', '/opx/moe');
+  cy.location('search').should('eq', '?model=DeepSeek-V4-Pro');
   cy.contains('No results yet').should('be.visible');
+});
+
+it('moves a pre-split /operatorx?op= link to its /opx category in one 308', () => {
+  cy.request({ url: '/operatorx?op=model', followRedirect: false }).then((response) => {
+    expect(response.status).to.eq(308);
+    expect(new URL(response.headers.location as string, 'http://x').pathname).to.eq('/opx/model');
+  });
+  cy.visit('/operatorx?op=model');
+  cy.location('pathname').should('eq', '/opx/model');
+  cy.location('search').should('eq', '');
+});
+
+it('redirects a legacy ?op= link to the category path', () => {
+  cy.request({ url: '/opx?op=model&model=DeepSeek-V4-Pro', followRedirect: false })
+    .its('headers.location')
+    .should('match', /\/opx\/model\?model=DeepSeek-V4-Pro$/u);
+  cy.visit('/opx?op=model');
+  cy.location('pathname').should('eq', '/opx/model');
+  cy.location('search').should('eq', '');
+  cy.contains('[data-testid="operatorx-page"] [role="tab"]', 'Model view').should(
+    'have.attr',
+    'aria-selected',
+    'true',
+  );
 });
 
 it('defaults to a measured 950PR shape and normalized BF16, while honoring precision and scale changes', () => {
@@ -94,7 +122,7 @@ it('defaults to a measured 950PR shape and normalized BF16, while honoring preci
     null,
   );
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('ascend');
-  cy.visit('/operatorx');
+  cy.visit('/opx');
   cy.wait('@ascend');
   cy.get('[data-testid="operatorx-viz-metric-vs-size"]').scrollIntoView();
   cy.get('[data-testid="operatorx-viz-metric-vs-size"] [data-testid="chart-legend"]').should(
@@ -136,7 +164,7 @@ it('defaults to shared cases and shows disjoint FP8 measurements per accelerator
   });
   const view = comparisonView(buildComparison('gemm', datasets), null);
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view);
-  cy.visit('/operatorx');
+  cy.visit('/opx');
   cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
   // Shared cases only is on by default, and disjoint FP8 formats share no case.
   cy.get('#opx-summary-shared').should('have.attr', 'aria-checked', 'true');
@@ -181,7 +209,7 @@ it('shows median and best bars across the row above metric vs size at /', () => 
   });
   const view = comparisonView(buildComparison('gemm', datasets), null);
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('summary');
-  cy.visit('/operatorx');
+  cy.visit('/opx');
   cy.wait('@summary');
   cy.get('[data-testid^="operatorx-viz-"]')
     .last()
@@ -268,7 +296,7 @@ it('keeps a median label that does not fit its bar on the same row at /', () => 
   });
   const view = comparisonView(buildComparison('gemm', datasets), null);
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('short');
-  cy.visit('/operatorx');
+  cy.visit('/opx');
   cy.wait('@short');
   cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
   cy.get('#opx-summary-normalized').click().should('have.attr', 'aria-checked', 'false');
@@ -301,7 +329,7 @@ it('keeps 950PR FP8 points visible when normalized at /', () => {
     null,
   );
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('fp8');
-  cy.visit('/operatorx');
+  cy.visit('/opx');
   cy.wait('@fp8');
   cy.get('[data-testid="operatorx-viz-roofline"]')
     .scrollIntoView()
@@ -327,7 +355,7 @@ it('keeps 950PR FP8 points visible when normalized at /', () => {
 describe('OperatorX progressive rendering', { testIsolation: true }, () => {
   it('mounts lower charts near the viewport and preserves their controls at /', () => {
     cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('comparison');
-    cy.visit('/operatorx');
+    cy.visit('/opx');
     cy.wait('@comparison');
     cy.get('[data-testid^="operatorx-viz-"]')
       .first()
@@ -351,14 +379,17 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
       cy.visit(prefix || '/');
       const link = '[data-testid="landing-huawei-results-link"]';
       cy.get(link)
-        .should('have.attr', 'href', `${prefix}/ubenchx/core-memory-profiles`)
+        .should('have.attr', 'href', `${prefix}/ubx/core-memory-profiles`)
         .and('not.have.attr', 'data-prefetch-ready');
       cy.get('@operatorxIntent.all').should('have.length', 0);
       cy.get(link).focus();
       cy.location('pathname').should('eq', prefix || '/');
       cy.get(link).trigger('mouseover').focus().click();
-      cy.location('pathname').should('eq', `${prefix}/ubenchx/core-memory-profiles`);
-      cy.get('[data-testid="ascend-core-profiles"] h2').should('have.text', 'Huawei 950PR');
+      cy.location('pathname').should('eq', `${prefix}/ubx/core-memory-profiles`);
+      cy.get('[data-testid="ascend-core-profiles"] h2').should(
+        'have.text',
+        `Huawei 950PR Ascend 950PR_9579 · 128 MiB · ${prefix ? 'Cube 与 Vector 标量控制器' : 'Cube and Vector scalar controllers'}`,
+      );
       cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
       cy.get('@operatorxIntent.all').should('have.length', 0);
     });
@@ -366,7 +397,7 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
 
   it('renders every chart when viewport observation is unavailable', () => {
     cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('comparison');
-    cy.visit('/operatorx', {
+    cy.visit('/opx', {
       onBeforeLoad(win) {
         Object.defineProperty(win, 'IntersectionObserver', { value: undefined });
       },
@@ -380,7 +411,7 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
 
   it('toggles a GPU from a lower legend without scrolling the page', () => {
     cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('comparison');
-    cy.visit('/operatorx');
+    cy.visit('/opx');
     cy.wait('@comparison');
     cy.get('[data-testid="operatorx-viz-metric-vs-size"]')
       .scrollIntoView()
@@ -389,11 +420,12 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
       const before = win.scrollY;
       cy.get('[data-testid="operatorx-viz-metric-vs-size"] li label')
         .first()
-        .click({ scrollBehavior: false });
-      cy.get('[data-testid="operatorx-viz-metric-vs-size"] li input')
-        .first()
-        .should('not.be.checked')
-        .and('have.focus');
+        .then(($label) => {
+          cy.wrap($label).click({ scrollBehavior: false });
+          cy.get(`[id="${$label.attr('for')}"]`)
+            .should('not.be.checked')
+            .and('have.focus');
+        });
       cy.window().its('scrollY').should('eq', before);
     });
   });
@@ -415,7 +447,7 @@ const bandwidthPoints = () =>
         (element as unknown as { __data__: { gpuKey: string } }).__data__.gpuKey === 'Huawei 950PR',
     );
 
-it('uses shared Huawei colors in OperatorX and ubenchX across a live theme switch', () => {
+it('uses shared Huawei colors in OperatorX and uBenchX across a live theme switch', () => {
   const ascend = normalizeBundle(run('201', 'ascend950pr-external', [64, 128]));
   const nvidia = normalizeBundle(run('202', 'h200-dgxc', [64, 128]));
   for (const dataset of [ascend, nvidia]) {
@@ -441,30 +473,30 @@ it('uses shared Huawei colors in OperatorX and ubenchX across a live theme switc
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     },
   };
-  cy.visit('/operatorx', visitOptions);
+  cy.visit('/opx', visitOptions);
   cy.wait('@colorComparison');
   cy.get('[data-testid="operatorx-viz-roofline"]').scrollIntoView();
-  operatorPoints().first().should('have.css', 'fill', 'rgb(148, 106, 0)');
+  operatorPoints().first().should('have.css', 'fill', 'rgb(166, 90, 0)');
   cy.contains('[data-testid="operatorx-coverage"] li', '950PR')
     .find('.rounded-full')
     .first()
-    .should('have.css', 'background-color', 'rgb(148, 106, 0)');
+    .should('have.css', 'background-color', 'rgb(166, 90, 0)');
   cy.get('[data-testid="theme-toggle"]').click();
   cy.get('html').should('have.class', 'dark');
-  operatorPoints().first().should('have.css', 'fill', 'rgb(235, 192, 74)');
+  operatorPoints().first().should('have.css', 'fill', 'rgb(188, 104, 7)');
   cy.contains('[data-testid="operatorx-coverage"] li', '950PR')
     .find('.rounded-full')
     .first()
-    .should('have.css', 'background-color', 'rgb(235, 192, 74)');
+    .should('have.css', 'background-color', 'rgb(188, 104, 7)');
 
-  cy.visit('/ubenchx/mem-bw', visitOptions);
-  bandwidthPoints().first().should('have.css', 'fill', 'rgb(148, 106, 0)');
+  cy.visit('/ubx/mem-bw', visitOptions);
+  bandwidthPoints().first().should('have.css', 'fill', 'rgb(166, 90, 0)');
   cy.get('[data-testid="theme-toggle"]').click();
-  bandwidthPoints().first().should('have.css', 'fill', 'rgb(235, 192, 74)');
+  bandwidthPoints().first().should('have.css', 'fill', 'rgb(188, 104, 7)');
   bandwidthPoints().eq(20).trigger('mouseenter', { force: true });
   cy.get('[data-chart-tooltip="ubenchx-mbu"]')
     .should('contain', 'Huawei 950PR')
     .find('span')
     .first()
-    .should('have.css', 'background-color', 'rgb(235, 192, 74)');
+    .should('have.css', 'background-color', 'rgb(188, 104, 7)');
 });

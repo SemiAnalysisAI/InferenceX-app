@@ -1,10 +1,11 @@
 'use client';
 
-import { ArrowRight, Download } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Download } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { READING_LINK_CLASS } from '@/components/ui/reading-layout';
 import { track } from '@/lib/analytics/analytics';
 import { cn } from '@/lib/shared/utils';
 
@@ -14,7 +15,7 @@ interface WhitepaperPdfButtonProps {
   label: string;
   placement: 'hero' | 'closing' | 'card' | 'sidebar';
   size?: 'default' | 'lg' | 'sm';
-  variant?: 'default' | 'outline';
+  variant?: 'brand' | 'outline';
   className?: string;
 }
 
@@ -24,7 +25,7 @@ export function WhitepaperPdfButton({
   label,
   placement,
   size = 'lg',
-  variant = 'default',
+  variant = 'brand',
   className,
 }: WhitepaperPdfButtonProps) {
   return (
@@ -75,10 +76,11 @@ export function WhitepaperBackLink({ href, label }: { href: string; label: strin
     <nav>
       <Link
         href={href}
-        className="text-sm text-muted-foreground hover:underline mb-4 inline-block"
+        className="inline-flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         onClick={() => track('whitepaper_back_clicked')}
       >
-        &larr;&nbsp;&nbsp;{label}
+        <ArrowLeft aria-hidden="true" className="size-4" />
+        {label}
       </Link>
     </nav>
   );
@@ -98,7 +100,7 @@ export function WhitepaperSourceLink({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="font-medium text-brand hover:underline break-words"
+      className={cn(READING_LINK_CLASS, 'break-words')}
       onClick={() => track('whitepaper_source_clicked', { slug, href })}
     >
       {children}
@@ -127,7 +129,7 @@ export function WhitepaperCard({
     <article
       data-testid="whitepaper-card"
       className={cn(
-        'group relative flex min-w-0 flex-col gap-5 rounded-2xl border border-border/50 bg-card/60 p-5 backdrop-blur-[2px] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-lg hover:shadow-primary/5 sm:flex-row md:gap-7 md:p-7',
+        'group relative flex min-w-0 flex-col gap-5 rounded-xl border border-border/30 bg-card p-5 transition-colors hover:border-border sm:flex-row md:gap-8 md:p-6',
         className,
       )}
     >
@@ -135,7 +137,7 @@ export function WhitepaperCard({
       <div className="min-w-0 flex-1">
         <Link
           href={href}
-          className="focus-visible:outline-none before:absolute before:inset-0 before:rounded-2xl before:content-['']"
+          className="focus-visible:outline-none before:absolute before:inset-0 before:rounded-xl before:content-['']"
           onClick={() => track('whitepaper_card_clicked', { slug, title })}
         >
           <span className="sr-only">{title}</span>

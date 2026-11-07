@@ -106,7 +106,7 @@ describe('optional themes stay off the default page', () => {
       }
       cy.get('[data-testid="theme-toggle"]')
         .should('have.attr', 'aria-label')
-        .and('contain', 'currently');
+        .and('contain', route === '/zh' ? '当前为' : 'currently');
       cy.window().then((win) => {
         const splash = win.document.querySelector('.splash-text');
         if (splash) expect(win.getComputedStyle(splash).animationName).to.equal('none');
@@ -217,7 +217,7 @@ describe('optional themes stay off the default page', () => {
       });
       cy.get('[data-testid="theme-toggle"]')
         .should('have.attr', 'aria-label')
-        .and('contain', 'currently dark');
+        .and('contain', route === '/zh/about' ? '当前为深色' : 'currently dark');
       cy.document().then((doc) => {
         const baseline = seo(doc);
         cy.window().then((win) => {

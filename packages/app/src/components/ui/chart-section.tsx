@@ -35,21 +35,23 @@ export function ChartSection({
 }: ChartSectionProps) {
   return (
     <section className={className}>
-      <figure className="relative min-w-0 rounded-xl">
-        <ChartButtons
-          chartId={chartId}
-          analyticsPrefix={analyticsPrefix}
-          zoomResetEvent={zoomResetEvent}
-          setIsLegendExpanded={setIsLegendExpanded}
-          onExportCsv={onExportCsv}
-          exportFileName={exportFileName}
-          leadingControls={leadingControls}
-          hideImageExport={hideImageExport}
-          mobileVisible={mobileActions}
-          analyticsContext={analyticsContext}
-        />
-
-        <Card>{children}</Card>
+      <figure className="relative min-w-0">
+        <Card className="relative">
+          <ChartButtons
+            chartId={chartId}
+            analyticsPrefix={analyticsPrefix}
+            zoomResetEvent={zoomResetEvent}
+            setIsLegendExpanded={setIsLegendExpanded}
+            onExportCsv={onExportCsv}
+            exportFileName={exportFileName}
+            leadingControls={leadingControls}
+            hideImageExport={hideImageExport}
+            mobileVisible={mobileActions}
+            analyticsContext={analyticsContext}
+            className="md:absolute md:right-6 md:top-6 md:z-10 md:mb-0"
+          />
+          {children}
+        </Card>
       </figure>
     </section>
   );

@@ -211,7 +211,7 @@ describe('GlobalFilterProvider context isolation', () => {
       if (saved) {
         // The proxy canonicalizes the saved query before SSR; both initialModel
         // and the still-preserved URL selection therefore name Flash.
-        window.history.replaceState({}, '', '/inference/glm-5-3-flash?g_model=GLM-5.3-Flash');
+        window.history.replaceState({}, '', '/infx/inference/glm-5-3-flash?g_model=GLM-5.3-Flash');
         mocks.getUrlParam.mockImplementation((key) =>
           key === 'g_model' ? Model.GLM_5_3_Flash : undefined,
         );

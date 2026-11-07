@@ -14,8 +14,12 @@ import {
   type GpuPowerSeriesResponse,
 } from '@/components/gpu-power/power-series';
 import { useComparisonSeries } from '@/components/inference/hooks/useComparisonSeries';
-import { comparisonEntryLabel } from '@/components/inference/utils/comparisonEntry';
+import {
+  comparisonEntryDate,
+  comparisonEntryLabel,
+} from '@/components/inference/utils/comparisonEntry';
 import ChartLegend, { type LegendSwitchConfig } from '@/components/ui/chart-legend';
+import { ChartPointDetails } from '@/components/ui/chart-point-details';
 import { CONTROL_HEIGHT, SELECT_TRIGGER_STYLE } from '@/components/ui/control-styles';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
@@ -31,10 +35,11 @@ import { getModelSortIndex } from '@/lib/catalog/constants';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { LayerConfig, RenderContext, ZoomContext } from '@/lib/d3-chart/D3Chart/types';
 import { lttbDownsample } from '@/lib/d3-chart/downsample';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { CHART_FONT_SANS, CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { overlayRunColor, overlayRunIndex } from '@/lib/charts/overlay-run-style';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { cn, getDisplayLabel } from '@/lib/shared/utils';
+import { cn, getDisplayLabel, updateRepoUrl } from '@/lib/shared/utils';
 
 import {
   useInferenceActions,
@@ -111,7 +116,6 @@ const STRINGS = {
       'The selected trace is unavailable for these filters or has no retained telemetry.',
     xWall: 'Time (UTC)',
     xElapsed: 'Time since telemetry start (m:ss)',
-    resetFilter: 'Reset filter',
     perGpu: 'One line per GPU',
     perGpuHelp: 'Draw every GPU of a config instead of the mean across its GPUs.',
     raw: 'Raw 1-s samples',
@@ -127,7 +131,7 @@ const STRINGS = {
       `${runs} run${runs === 1 ? '' : 's'} · this can take up to a minute`,
     loadingMore: (runs: number) => `Loading ${runs} more run${runs === 1 ? '' : 's'}…`,
     errorTitle: 'GPU telemetry failed to load',
-    errorDetail: 'The run errors are listed below the chart.',
+    errorDetail: 'The run errors are listed below the chart',
     emptyTitle: 'No telemetry to show',
     loadError: (runId: string, message: string) => `Run ${runId}: ${message}`,
     noTraces:
@@ -137,9 +141,7 @@ const STRINGS = {
     droppedRuns: (runs: number) =>
       `Telemetry from ${runs} more run${runs === 1 ? '' : 's'} was not loaded (limit ${POWER_TIMELINE_MAX_RUNS} runs per chart).`,
     telemetry: 'Telemetry',
-    instructions:
-      'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Click a point to pin tooltip',
-    dismiss: 'Click elsewhere to dismiss',
+    instructions: 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
     phase: {
       before: 'Before window (startup / warmup)',
       window: 'Measurement window',
@@ -148,9 +150,10 @@ const STRINGS = {
     } satisfies Record<WindowPhase, string>,
     meanPerGpu: 'Mean per GPU',
     gpus: (count: number) => `${count} GPU${count === 1 ? '' : 's'}`,
-    min: 'min',
-    max: 'max',
     validated: 'Validated average',
+    range: 'Min / max',
+    phaseLabel: 'Phase',
+    gpuCount: 'GPUs',
     sinceStart: 'since start',
     tdp: 'TDP',
     allIn: 'all-in',
@@ -169,6 +172,8 @@ const STRINGS = {
     showAll: 'Show all',
     unofficialRun: 'Unofficial run',
     branch: 'Branch',
+    precision: 'Precision',
+    runDate: 'Run date',
     viewWorkflow: 'View workflow run',
   },
   zh: {
@@ -187,7 +192,6 @@ const STRINGS = {
     missingFocus: '所选曲线不符合当前筛选条件，或没有保留的遥测数据。',
     xWall: '时间（UTC）',
     xElapsed: '距遥测开始的时间（分:秒）',
-    resetFilter: '重置筛选',
     perGpu: '每个 GPU 一条线',
     perGpuHelp: '绘制配置中每个 GPU 的曲线，而不是各 GPU 的平均值。',
     raw: '原始 1 秒采样',
@@ -202,7 +206,7 @@ const STRINGS = {
     loadingDetail: (runs: number) => `${runs} 个运行 · 可能需要约一分钟`,
     loadingMore: (runs: number) => `正在加载另外 ${runs} 个运行……`,
     errorTitle: 'GPU 遥测数据加载失败',
-    errorDetail: '各运行的错误信息列在图表下方。',
+    errorDetail: '各运行的错误信息列在图表下方',
     emptyTitle: '暂无可显示的遥测数据',
     loadError: (runId: string, message: string) => `运行 ${runId}：${message}`,
     noTraces: '当前可见硬件没有遥测曲线。请在图例中启用一个系列或选择其他日期。',
@@ -210,8 +214,7 @@ const STRINGS = {
     droppedRuns: (runs: number) =>
       `另有 ${runs} 个运行的遥测数据未加载（每张图表最多 ${POWER_TIMELINE_MAX_RUNS} 个运行）。`,
     telemetry: '遥测来源',
-    instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
-    dismiss: '点击其他区域关闭',
+    instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置',
     phase: {
       before: '测量窗口之前（启动 / warmup）',
       window: '测量窗口内',
@@ -220,9 +223,10 @@ const STRINGS = {
     } satisfies Record<WindowPhase, string>,
     meanPerGpu: '每 GPU 平均',
     gpus: (count: number) => `${count} 个 GPU`,
-    min: '最小',
-    max: '最大',
     validated: '有效平均值',
+    range: '最小 / 最大',
+    phaseLabel: '阶段',
+    gpuCount: 'GPU 数',
     sinceStart: '距起点',
     tdp: 'TDP',
     allIn: 'all-in',
@@ -241,6 +245,8 @@ const STRINGS = {
     showAll: '显示全部',
     unofficialRun: '非官方运行',
     branch: '分支',
+    precision: '精度',
+    runDate: '运行日期',
     viewWorkflow: '查看工作流运行',
   },
 } as const;
@@ -408,7 +414,7 @@ function PowerTimelineStatusPanel({
         role="status"
         aria-live="polite"
       >
-        <p className="inline-flex items-center gap-2 rounded-full border bg-background/95 px-3 py-1 text-xs text-muted-foreground shadow-sm">
+        <p className="inline-flex items-center gap-2 rounded-md border border-border/30 bg-card px-3 py-1 text-xs text-muted-foreground">
           <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
           {t.loadingMore(status.runs)}
         </p>
@@ -1456,54 +1462,103 @@ export default function PowerTimeline({
     [activeHighlight],
   );
 
-  const tooltipContent = useCallback(
-    (sample: TimelineSample, isPinned: boolean) => {
-      const { trace } = sample;
+  const describeSample = useCallback(
+    (sample: TimelineSample) => {
+      const { trace, pool } = sample;
       const point = trace.point;
       const overlayInfo =
         sample.overlayIndex === null ? null : unofficialRunInfos[sample.overlayIndex];
       const tdp = HW_REGISTRY[baseHardware(point.hwKey)]?.tdp ?? 0;
       const elapsed = formatElapsed((sample.timeMs - trace.series.startMs) / 1000);
       const clock = `${formatUtcClock(new Date(sample.timeMs))} UTC`;
-      const time =
-        xMode === 'serving'
-          ? `${sample.x.toFixed(1)} s · ${t.serving} · ${clock}`
-          : xMode === 'wall'
-            ? `${clock} · +${elapsed} ${t.sinceStart}`
-            : `+${elapsed} · ${clock}`;
-      const colon = locale === 'zh' ? '：' : ':';
       const validated = point.measuredAvgPower?.y;
-      const { pool } = sample;
-      const readings = pool
-        ? `<div class="mt-1 text-muted-foreground">${t.pool}${colon} ${t.poolShort[pool.role]} · ${t.gpus(pool.gpuCount)}</div>
-        <div class="font-medium">${t.poolPower}${colon} ${formatWatts(sample.y)} W${
-          tdp > 0
-            ? ` <span class="text-muted-foreground">(${((sample.y / (tdp * pool.gpuCount)) * 100).toFixed(0)}% ${t.poolTdp})</span>`
-            : ''
-        }</div>
-        <div class="text-muted-foreground">${t.meanPerGpu}${colon} ${(sample.y / sample.gpuCount).toFixed(1)} W · ${t.min} ${sample.min.toFixed(1)} W · ${t.max} ${sample.max.toFixed(1)} W</div>`
-        : `<div class="mt-1 font-medium">${t.meanPerGpu}${colon} ${sample.y.toFixed(1)} W${
-            tdp > 0
-              ? ` <span class="text-muted-foreground">(${((sample.y / tdp) * 100).toFixed(0)}% ${t.tdp})</span>`
-              : ''
-          }</div>
-        <div class="text-muted-foreground">${t.gpus(sample.gpuCount)} · ${t.min} ${sample.min.toFixed(1)} W · ${t.max} ${sample.max.toFixed(1)} W</div>`;
-      return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 210px; user-select: ${isPinned ? 'text' : 'none'}">
-        ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
-        <div class="font-semibold mb-1" style="color: ${sample.color}">${seriesLabel(point)} · ${traceConfigLabel(point)}${
-          overlayInfo ? ` · ✕ ${overlayInfo.branch || `run ${overlayInfo.id}`}` : ''
-        }</div>
-        <div class="text-muted-foreground">${time}</div>
-        ${readings}
-        <div class="text-muted-foreground">${t.phase[sample.phase]}</div>
-        ${
-          typeof validated === 'number'
-            ? `<div class="text-muted-foreground">${t.validated}${colon} ${validated.toFixed(1)} W</div>`
-            : ''
-        }
-      </div>`;
+      const tdpShare = tdp > 0 ? (sample.y / (tdp * (pool ? pool.gpuCount : 1))) * 100 : null;
+      return {
+        title: seriesLabel(point),
+        subtitle: traceConfigLabel(point),
+        warning: overlayInfo ? `✕ ${overlayInfo.branch || `#${overlayInfo.id}`}` : undefined,
+        time:
+          xMode === 'serving'
+            ? `${sample.x.toFixed(1)} s · ${t.serving} · ${clock}`
+            : xMode === 'wall'
+              ? `${clock} · +${elapsed} ${t.sinceStart}`
+              : `+${elapsed} · ${clock}`,
+        watts: pool ? formatWatts(sample.y) : sample.y.toFixed(1),
+        wattsLabel: pool ? t.poolPower : t.meanPerGpu,
+        tdp:
+          tdpShare === null
+            ? null
+            : { value: `${tdpShare.toFixed(0)}%`, label: pool ? t.poolTdp : t.tdp },
+        rows: [
+          ...(pool
+            ? [
+                {
+                  label: t.pool,
+                  value: `${t.poolShort[pool.role]} · ${t.gpus(pool.gpuCount)}`,
+                },
+                { label: t.meanPerGpu, value: `${(sample.y / sample.gpuCount).toFixed(1)} W` },
+              ]
+            : [{ label: t.gpuCount, value: String(sample.gpuCount) }]),
+          {
+            label: t.range,
+            value: `${sample.min.toFixed(1)} W / ${sample.max.toFixed(1)} W`,
+          },
+          { label: t.phaseLabel, value: t.phase[sample.phase] },
+          ...(typeof validated === 'number'
+            ? [{ label: t.validated, value: `${validated.toFixed(1)} W` }]
+            : []),
+          { label: t.precision, value: point.precision.toUpperCase() },
+          { label: t.runDate, value: point.actualDate ?? comparisonEntryDate(point.date) },
+        ],
+        runUrl: point.run_url ? updateRepoUrl(point.run_url) : undefined,
+      };
     },
-    [unofficialRunInfos, xMode, t, locale, seriesLabel],
+    [unofficialRunInfos, xMode, t, seriesLabel],
+  );
+
+  const tooltipContent = useCallback(
+    (sample: TimelineSample) => {
+      const info = describeSample(sample);
+      return chartHoverCard(
+        {
+          title: info.title,
+          subtitle: info.subtitle,
+          color: sample.color,
+          warning: info.warning,
+          metrics: [{ value: info.watts, label: 'W' }, ...(info.tdp ? [info.tdp] : [])],
+          summary: `${info.time} · ${t.phase[sample.phase]}`,
+        },
+        { pinned: false },
+      );
+    },
+    [describeSample, t],
+  );
+
+  const tooltipDetails = useCallback(
+    (sample: TimelineSample, _isOverlay: boolean, close: () => void) => {
+      const info = describeSample(sample);
+      return (
+        <ChartPointDetails
+          title={info.title}
+          subtitle={info.subtitle}
+          color={sample.color}
+          warning={info.warning}
+          date={info.time}
+          metrics={[
+            { value: info.watts, label: `${info.wattsLabel} (W)` },
+            ...(info.tdp ? [info.tdp] : []),
+          ]}
+          rows={info.rows}
+          links={
+            info.runUrl
+              ? [{ action: 'run', label: t.viewWorkflow, href: info.runUrl, external: true }]
+              : []
+          }
+          onClose={close}
+        />
+      );
+    },
+    [describeSample, t],
   );
 
   const legendItems = useMemo(() => {
@@ -1520,6 +1575,7 @@ export default function PowerTimeline({
                 name: `✕ unofficial-run-${info.id}`,
                 label: `✕ ${branch}`,
                 color: overlayRunColor(index),
+                lineDasharray: 'none',
                 title: comparison ? t.unofficialRun : `${t.unofficialRun}: ${branch}`,
                 isHighlighted: true,
                 hw: `overlay-run-${info.id}`,
@@ -1528,7 +1584,7 @@ export default function PowerTimeline({
                 onClick: () => {},
                 tooltip: (
                   <div className="font-normal text-xs">
-                    <div className="text-red-500 font-semibold">{t.unofficialRun}</div>
+                    <div className="font-medium text-destructive">{t.unofficialRun}</div>
                     <div>
                       {t.branch}: {branch}
                     </div>
@@ -1556,6 +1612,7 @@ export default function PowerTimeline({
           name: `${hwKey} ${comparisonEntryLabel(date, runNumbering)}`,
           label: comparisonEntryLabel(date, runNumbering),
           color,
+          lineDasharray: 'none',
           title: hardwareConfig[hwKey] ? getDisplayLabel(hardwareConfig[hwKey]) : hwKey,
           hw: id,
           isActive: activeDates.has(id),
@@ -1575,6 +1632,7 @@ export default function PowerTimeline({
           name: config.name,
           label: getDisplayLabel(config),
           color: resolveColor(key),
+          lineDasharray: 'none',
           title: config.gpu,
           hw: key,
           isActive: officialHwTypes.has(key),
@@ -1685,6 +1743,7 @@ export default function PowerTimeline({
       grouped={comparison}
       disableActiveSort={comparison}
       legendItems={legendItems}
+      onItemRemove={(hw) => legendItems.find((item) => item.hw === hw)?.onClick()}
       isLegendExpanded={isLegendExpanded}
       onExpandedChange={(expanded) => {
         setIsLegendExpanded(expanded);
@@ -1694,11 +1753,7 @@ export default function PowerTimeline({
       onItemHoverEnd={() => setHighlight(null)}
       hideAtomFootnote
       switches={switches}
-      actions={
-        hwFiltered
-          ? [{ id: 'power-timeline-reset-filter', label: t.resetFilter, onClick: resetHwFilter }]
-          : undefined
-      }
+      reset={{ id: 'power-timeline-reset-filter', disabled: !hwFiltered, onClick: resetHwFilter }}
     />
   );
 
@@ -1855,6 +1910,7 @@ export default function PowerTimeline({
         tooltip={{
           rulerType: 'crosshair',
           content: tooltipContent,
+          details: tooltipDetails,
           getRulerX: (sample, xScale) => (xScale as AnyContinuousScale)(sample.x),
           getRulerY: (sample, yScale) => yScale(sample.drawnY ?? sample.y),
           onHoverStart: (selection) => {
@@ -1918,7 +1974,7 @@ export default function PowerTimeline({
       >
         {focusedTrace && (
           <p
-            className="inline-flex items-center gap-2 self-start rounded-full border px-2 py-0.5"
+            className="inline-flex items-center gap-2 self-start rounded-md border border-border/30 px-2 py-0.5"
             data-testid="power-timeline-focus"
           >
             <span>

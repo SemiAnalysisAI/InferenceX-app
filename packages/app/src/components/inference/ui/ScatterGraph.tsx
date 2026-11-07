@@ -9,11 +9,14 @@ import { useEphemeralUrlState } from '@/hooks/useUrlState';
 import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { rememberChartStateInUrl } from '@/lib/routing/url-state';
 import * as d3 from 'd3';
+import { chartFont, measureTextWidth, useFontsVersion } from '@/lib/d3-chart/dynamic-margins';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import dynamic from 'next/dynamic';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
+import { NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
+import { InlineNudgeSlot } from '@/components/nudges/inline-nudge-slot';
 import {
   useInferenceActions,
   useInferenceData,
@@ -25,12 +28,15 @@ import { useBenchmarkPresence } from '@/hooks/api/use-benchmark-presence';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import {
   avoidPointLabelCollisions,
+  fitPillSegments,
   parallelismLabelBoxes,
+  pillWidthBudget,
   placeLineLabels,
   updateRenderedLineLabels,
   renderLineLabels,
   type LineLabelPlacement,
   type LineLabelSeries,
+  type PillOccluder,
 } from '@/components/inference/ui/line-label-layer';
 import {
   labelOpacityForActiveState,
@@ -105,6 +111,7 @@ import {
 } from '@/lib/d3-chart/overlay-x-marker';
 import { useStableValue } from '@/hooks/useStableValue';
 import { perfRulerAxisMetricKey, usePerfRulerAxisReset } from '@/hooks/usePerfRulerAxisReset';
+import { frameworkDasharray } from '@/lib/charts/framework-dash';
 import {
   overlayRooflineDasharray,
   overlayRunColor,
@@ -113,7 +120,7 @@ import {
 import { nearestScrubCandidate, type ScrubCandidate } from '@/lib/charts/powerx-scrub';
 import {
   HIT_AREA_RADIUS,
-  formatLargeNumber,
+  compactAxisTickFormat,
   logTickFormat,
   getShapeKeyForPrecision,
 } from '@/lib/charts/chart-rendering';
@@ -143,12 +150,16 @@ import type {
   PowerVariant,
 } from '@/components/inference/types';
 import {
-  generateOverlayTooltipContent,
+  buildPointDetails,
   generateHoverTooltipContent,
-  generateTooltipContent,
+  type PointDetailAction,
 } from '@/components/inference/utils/tooltipUtils';
+import { PointDetailsPanel } from '@/components/inference/ui/PointDetailsPanel';
 import { usePowerTraceAction } from '@/components/inference/hooks/usePowerTraceAction';
-import { describeEngineComparisonConflict } from '@/components/inference/ui/engine-comparison-conflict-toast';
+import {
+  describeEngineComparisonConflict,
+  EngineComparisonConflictNotice,
+} from '@/components/inference/ui/engine-comparison-conflict-notice';
 import { ScatterEmptyState } from '@/components/inference/ui/ScatterEmptyState';
 import { ALL_IN_MEASURED_EMPTY, type PowerBasisLabelStyle } from '@/lib/power/power-basis';
 import {
@@ -265,7 +276,9 @@ const formatChangelogDescription = (desc: string | string[]): React.JSX.Element 
   );
 };
 
-const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
+const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 72 };
+const Y_AXIS_LABEL_GUTTER = 32;
+const Y_AXIS_MARGIN_STEP = 12;
 
 function groupPointsByDate(points: InferenceData[]): Map<string, InferenceData[]> {
   const byDate = new Map<string, InferenceData[]>();
@@ -464,28 +477,27 @@ const pointCountEn = (count: number) => `${count} ${count === 1 ? 'point' : 'poi
 
 const SCATTER_STRINGS = {
   en: {
-    logScale: 'Log Scale',
-    optimalOnly: 'Optimal Only',
-    paretoFrontier: 'Pareto Frontier',
+    logScale: 'Log scale',
+    optimalOnly: 'Optimal only',
+    paretoFrontier: 'Pareto frontier',
     paretoFrontierInfo:
       'Dotted line connecting the best visible results, with green shading beyond it. Switch off and on again for a sunny butterfly castle background; repeat to return to green.',
     optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
     powerBoundaryInfo:
       'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
     labels: '# of GPUs Label',
-    highContrast: 'High Contrast',
-    parallelismLabels: 'Parallelism Labels',
+    highContrast: 'High contrast',
+    parallelismLabels: 'Parallelism labels',
     concurrencyLabels: '# Concurrent Sessions',
-    gradientLabels: 'Gradient Labels',
-    lineLabels: 'Line Labels',
-    frameworkLabel: 'Framework Line Label',
-    offloadingLabel: 'Offloading Label',
-    perfRuler: 'Perf Ruler',
+    gradientLabels: 'Gradient labels',
+    lineLabels: 'Line labels',
+    frameworkLabel: 'Framework line label',
+    offloadingLabel: 'Offloading label',
+    perfRuler: 'Perf ruler',
     perfRulerInfo:
       'Click two curves to place a vertical ruler, then drag it to measure the ratio of their Y-axis values at any x value. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
-    resetFilter: 'Reset filter',
     clearPerfRulers: (count: number) => `Clear rulers (${count})`,
-    quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
+    quickFilters: (count: number) => (count > 0 ? `Quick filters (${count})` : 'Quick filters'),
     overflowMixed: (count: number) => `${pointCountEn(count)} clipped`,
     overflowCost: (count: number, limit: number) => `${pointCountEn(count)} > $${limit}/Mtok`,
     overflowLatency: (count: number, limit: number) => `${pointCountEn(count)} > ${limit}s TTFT`,
@@ -495,8 +507,8 @@ const SCATTER_STRINGS = {
       'This dataset does not report role-level prefill/decode energy. Choose a different model, scenario, precision, date, or measured-energy metric.',
     noMeasuredDataHint:
       'No measured GPU power is reported for this selection. Choose other chip configs, or a different model, scenario, precision or date.',
-    unofficialTitle: (branch: string) => `UNOFFICIAL: ${branch}`,
-    unofficialRun: 'UNOFFICIAL RUN',
+    unofficialTitle: (branch: string) => `Unofficial: ${branch}`,
+    unofficialRun: 'Unofficial run',
     branch: 'Branch',
     viewWorkflow: 'View workflow run',
   },
@@ -520,7 +532,6 @@ const SCATTER_STRINGS = {
     perfRuler: '性能标尺',
     perfRulerInfo:
       '先点击两条曲线放置垂直标尺，再拖动标尺，比较任意横坐标下两条曲线的纵轴数值之比。重复操作可添加多把标尺（最多 8 把）；悬停标尺并点击 × 可删除该标尺。关闭开关将清除所有标尺。',
-    resetFilter: '重置筛选',
     clearPerfRulers: (count: number) => `清除标尺（${count}）`,
     quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
     overflowMixed: (count: number) => `${count} 个点已截断`,
@@ -647,9 +658,7 @@ const ScatterGraph = React.memo(
     // PowerX names the measured boundaries the way its Count control does.
     const powerXSurface = usePowerXSurface();
     const powerLabelStyle: PowerBasisLabelStyle = powerXSurface ? 'count' : 'basis';
-    // PowerX on a touch-primary device: the pinned point sheet says Tap, not Click.
     const touchPrimary = useIsCoarsePointer();
-    const touchCopy = powerXSurface && touchPrimary;
     // PowerX, Power draw as % of TDP: shade each chip's headroom from its P90 draw to 100 %.
     const headroomShading = powerXSurface && selectedYAxisMetric === POWER_PERCENT_TDP_METRIC;
     const featureGateUnlocked = useFeatureGate();
@@ -1239,7 +1248,7 @@ const ScatterGraph = React.memo(
     const [fixedLogPointId, setFixedLogPointId] = useState<number | null>(null);
     const [powerTelemetryPoint, setPowerTelemetryPoint] = useState<InferenceData | null>(null);
 
-    const attachPowerTraceAction = usePowerTraceAction(chartRef);
+    const openPowerTrace = usePowerTraceAction(chartRef);
 
     const [pointsTableTarget, setPointsTableTarget] = useState<LegendPointsTarget | null>(null);
     const [quickFiltersOpen, setQuickFiltersOpen] = useState(false);
@@ -1506,17 +1515,39 @@ const ScatterGraph = React.memo(
       [xLabel, xScaleConfig._isLog],
     );
 
+    const yTickFormat = useMemo(
+      () => compactAxisTickFormat(yScaleConfig.domain),
+      [yScaleConfig.domain],
+    );
+
     const yAxisConfig = useMemo(
       () => ({
         label: yLabel,
         tickFormat:
-          yScaleConfig.type === 'log'
-            ? undefined
-            : (d: d3.AxisDomain) => formatLargeNumber(d as number),
+          yScaleConfig.type === 'log' ? undefined : (d: d3.AxisDomain) => yTickFormat(d as number),
         tickCount: 10,
       }),
-      [yLabel, yScaleConfig.type],
+      [yLabel, yScaleConfig.type, yTickFormat],
     );
+
+    const fontsVersion = useFontsVersion();
+    const chartMargin = useMemo(() => {
+      if (yScaleConfig.type === 'log' || typeof document === 'undefined') return CHART_MARGIN;
+      const font = chartFont(CHART_TYPE.axisLabel);
+      const widest = Math.max(
+        0,
+        ...d3
+          .scaleLinear()
+          .domain(yScaleConfig.domain)
+          .nice()
+          .ticks(10)
+          .map((tick) => measureTextWidth(yTickFormat(tick), font)),
+      );
+      const left =
+        Math.ceil((widest + Y_AXIS_LABEL_GUTTER) / Y_AXIS_MARGIN_STEP) * Y_AXIS_MARGIN_STEP;
+      return { ...CHART_MARGIN, left: Math.max(48, left) };
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- re-measure once web fonts load
+    }, [yScaleConfig.type, yScaleConfig.domain, yTickFormat, fontsVersion]);
 
     const isPointVisible = useCallback(
       (d: InferenceData) =>
@@ -1793,8 +1824,6 @@ const ScatterGraph = React.memo(
       [effectiveActiveHwTypes, selectedPrecisions, hiddenPowerVariants],
     );
 
-    const seriesColorRef = useRef({ getCssColor, resolveColor });
-    seriesColorRef.current = { getCssColor, resolveColor };
     const interactionRef = useRef({
       isPointVisible,
       isOverlayPointVisible,
@@ -1808,6 +1837,7 @@ const ScatterGraph = React.memo(
       presence,
       isPresencePending,
       showPowerTelemetry,
+      powerCompareMode,
     });
     interactionRef.current = {
       isPointVisible,
@@ -1822,6 +1852,7 @@ const ScatterGraph = React.memo(
       presence,
       isPresencePending,
       showPowerTelemetry,
+      powerCompareMode,
     };
 
     const perfRulerStore = usePerfRulerStore();
@@ -2266,44 +2297,107 @@ const ScatterGraph = React.memo(
       [zoomResetEventName, eventPrefix, xScaleConfig._isLog, yScaleConfig.type, pointLabelsVisible],
     );
 
-    const tooltipConfig = useMemo(
-      () => ({
-        rulerType: 'crosshair' as const,
-        content: (d: InferenceData, isPinned: boolean) => {
-          const { getCssColor: css, resolveColor: rc } = seriesColorRef.current;
-          if (!isPinned) {
-            return generateHoverTooltipContent({
-              data: d,
-              xLabel,
-              yLabel,
-              selectedYAxisMetric,
-              hardwareConfig,
-              color: css(rc(d.hwKey as string)),
-              locale,
-            });
-          }
-          return generateTooltipContent({
-            data: d,
-            color: css(rc(d.hwKey as string)),
-            isPinned,
-            xLabel,
-            yLabel,
-            selectedYAxisMetric,
-            hardwareConfig,
-            showPowerTelemetry: interactionRef.current.showPowerTelemetry,
-            runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
-            hasTrace:
-              d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)
-                ? (interactionRef.current.presence?.trace.has(d.id) ?? false)
-                : false,
-            hasLog: isPersistedBenchmarkId(d.id)
-              ? (interactionRef.current.presence?.log.has(d.id) ?? false)
+    const pointColor = useCallback(
+      (d: InferenceData, isOverlay: boolean) =>
+        isOverlay
+          ? overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl))
+          : interactionRef.current.getCssColor(
+              interactionRef.current.resolveColor(String(d.hwKey)),
+            ),
+      [runIndexByUrl],
+    );
+
+    const pointDetails = useCallback(
+      (d: InferenceData, isOverlay: boolean) =>
+        buildPointDetails({
+          data: d,
+          xLabel,
+          yLabel,
+          selectedYAxisMetric,
+          hardwareConfig,
+          overlayData: isOverlay ? (overlayData ?? undefined) : undefined,
+          showPowerTelemetry: interactionRef.current.showPowerTelemetry,
+          runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
+          hasTrace:
+            d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)
+              ? (interactionRef.current.presence?.trace.has(d.id) ?? false)
               : false,
-            locale,
-            powerLabelStyle,
-            touch: touchCopy,
+          hasLog: isPersistedBenchmarkId(d.id)
+            ? (interactionRef.current.presence?.log.has(d.id) ?? false)
+            : false,
+          locale,
+          powerLabelStyle,
+          color: pointColor(d, isOverlay),
+        }),
+      [
+        xLabel,
+        yLabel,
+        selectedYAxisMetric,
+        hardwareConfig,
+        overlayData,
+        locale,
+        powerLabelStyle,
+        pointColor,
+      ],
+    );
+
+    const hoverCard = useCallback(
+      (d: InferenceData, isOverlay: boolean) =>
+        generateHoverTooltipContent({
+          data: d,
+          xLabel,
+          yLabel,
+          selectedYAxisMetric,
+          hardwareConfig,
+          overlayData: isOverlay ? (overlayData ?? undefined) : undefined,
+          color: pointColor(d, isOverlay),
+          locale,
+        }),
+      [xLabel, yLabel, selectedYAxisMetric, hardwareConfig, overlayData, pointColor, locale],
+    );
+
+    const tooltipConfig = useMemo(() => {
+      const onAction = (
+        action: PointDetailAction,
+        event: React.MouseEvent<HTMLElement>,
+        d: InferenceData,
+        isOverlay: boolean,
+      ) => {
+        event.stopPropagation();
+        if (action === 'view-power-trace') {
+          openPowerTrace(event, d, isOverlay);
+        } else if (action === 'view-charts') {
+          if (!ephemeralUrlState) rememberChartStateInUrl();
+          track('latency_view_charts_opened', { id: d.id, gpu: String(d.hwKey), conc: d.conc });
+        } else if (action === 'view-power-telemetry') {
+          setPowerTelemetryPoint(d);
+          chartRef.current?.dismissTooltip();
+          track('inference_power_telemetry_opened', { id: d.id, gpu: d.hwKey, conc: d.conc });
+        } else if (action === 'view-logs' && typeof d.id === 'number') {
+          if (d.benchmark_type !== 'agentic_traces') {
+            event.preventDefault();
+            setFixedLogPointId(d.id);
+            chartRef.current?.dismissTooltip();
+          }
+          track('latency_view_logs_opened', {
+            id: d.id,
+            gpu: String(d.hwKey),
+            conc: d.conc,
+            benchmark_type: d.benchmark_type ?? 'single_turn',
           });
-        },
+        }
+      };
+      return {
+        rulerType: 'crosshair' as const,
+        content: (d: InferenceData) => hoverCard(d, false),
+        details: (d: InferenceData, isOverlay: boolean, close: () => void) => (
+          <PointDetailsPanel
+            details={pointDetails(d, isOverlay)}
+            color={pointColor(d, isOverlay)}
+            onClose={close}
+            onAction={(action, event) => onAction(action, event, d, isOverlay)}
+          />
+        ),
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
         getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
         onHoverStart: (_sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) => {
@@ -2328,62 +2422,10 @@ const ScatterGraph = React.memo(
             return;
           }
           track('latency_data_point_clicked', { gpu: String(d.hwKey), x: d.x, y: d.y });
-          const tooltipEl = chartRef.current?.getTooltipElement();
-          if (!tooltipEl) return;
-
-          const viewBtn = tooltipEl.querySelector('[data-action="view-charts"]');
-          if (viewBtn && isPersistedBenchmarkId(d.id)) {
-            viewBtn.addEventListener('click', (btnEvent) => {
-              btnEvent.stopPropagation();
-              if (!ephemeralUrlState) rememberChartStateInUrl();
-              track('latency_view_charts_opened', {
-                id: d.id,
-                gpu: String(d.hwKey),
-                conc: d.conc,
-              });
-            });
-          }
-          const powerBtn = tooltipEl.querySelector('[data-action="view-power-telemetry"]');
-          if (powerBtn && isPersistedBenchmarkId(d.id)) {
-            powerBtn.addEventListener('click', (event) => {
-              event.stopPropagation();
-              setPowerTelemetryPoint(d);
-              chartRef.current?.dismissTooltip();
-              track('inference_power_telemetry_opened', { id: d.id, gpu: d.hwKey, conc: d.conc });
-            });
-          }
-          const logsBtn = tooltipEl.querySelector('[data-action="view-logs"]');
-          if (logsBtn && typeof d.id === 'number') {
-            logsBtn.addEventListener('click', (btnEvent) => {
-              btnEvent.stopPropagation();
-              if (d.benchmark_type !== 'agentic_traces') {
-                btnEvent.preventDefault();
-                setFixedLogPointId(d.id!);
-                chartRef.current?.dismissTooltip();
-              }
-              track('latency_view_logs_opened', {
-                id: d.id,
-                gpu: String(d.hwKey),
-                conc: d.conc,
-                benchmark_type: d.benchmark_type ?? 'single_turn',
-              });
-            });
-          }
-          attachPowerTraceAction(tooltipEl, d, false);
         },
         attachToLayer: 1,
-      }),
-      [
-        attachPowerTraceAction,
-        xLabel,
-        yLabel,
-        selectedYAxisMetric,
-        hardwareConfig,
-        locale,
-        powerLabelStyle,
-        touchCopy,
-      ],
-    );
+      };
+    }, [pointDetails, pointColor, hoverCard, openPowerTrace]);
 
     const layers = useMemo((): LayerConfig<InferenceData>[] => {
       const wattsAxis = metricPlotsWatts(selectedYAxisMetric);
@@ -2417,6 +2459,35 @@ const ScatterGraph = React.memo(
           identity.variant?.kind === 'basis' &&
           flatSeriesValue(points.map((point) => point.y)) !== null
         );
+      };
+
+      const pillOccluders = (xScale: ContinuousScale, yScale: ContinuousScale) => {
+        const ir = interactionRef.current;
+        const project = (points: readonly InferenceData[]) =>
+          points.map((point) => ({ x: xScale(point.x), y: yScale(point.y) }));
+        const occluders: PillOccluder[] = [];
+        for (const [key, points] of Object.entries(displayedRooflines)) {
+          const { hw, precision, variant } = parseScatterSeriesKey(key);
+          if (
+            !ir.effectiveActiveHwTypes.has(hw) ||
+            !ir.selectedPrecisions.includes(precision) ||
+            ir.hiddenPowerVariants.has(variant ?? '')
+          ) {
+            continue;
+          }
+          const byDate = groupDisplayedPoints(points);
+          for (const [date, datePoints] of byDate) {
+            occluders.push({
+              key: byDate.size === 1 ? key : `${key}__${encodeURIComponent(date)}`,
+              points: project(datePoints),
+            });
+          }
+        }
+        for (const [overlayKey, group] of Object.entries(displayedOverlayRooflines)) {
+          if (!ir.activeOverlayHwTypes.has(group.hwKey)) continue;
+          occluders.push({ key: `overlay-${overlayKey}`, points: project(group.points) });
+        }
+        return occluders;
       };
 
       const rooflineLayer: CustomLayerConfig = {
@@ -2534,7 +2605,13 @@ const ScatterGraph = React.memo(
             .attr('fill', 'none')
             .attr('stroke', (d) => d.stroke)
             .attr('stroke-width', 2.5)
-            .attr('stroke-dasharray', (d) => powerVariantDashById(d.variant) || null)
+            .attr(
+              'stroke-dasharray',
+              (d) =>
+                powerVariantDashById(d.variant) ||
+                (ir.powerCompareMode === 'none' ? frameworkDasharray(d.hw) : null) ||
+                null,
+            )
             .attr('d', (d) => lineGen(d.points))
             .style('transition', 'opacity 150ms ease')
             .style('opacity', (d) => (d.visible ? 1 : 0));
@@ -2769,6 +2846,7 @@ const ScatterGraph = React.memo(
 
           renderLineLabels(zoomGroup, lineLabels, {
             seriesAttribute: 'data-series-id',
+            occluders: showLineLabels ? pillOccluders(xScale, yScale) : [],
             iconFor: (label) => getLineLabelVendorIcon(lineLabelHardwareKey(label.seriesId)),
             configureGroup: (labelGroup, label) => {
               labelGroup
@@ -2797,7 +2875,7 @@ const ScatterGraph = React.memo(
                   ? remainingLabel.slice(0, -engineLabel.length)
                   : remainingLabel;
               const runSegments = runTag
-                ? [{ className: 'll-run', text: runTag, fill: '#d1d5db', weight: '400' }]
+                ? [{ className: 'll-run', text: runTag, fill: 'white', weight: '400' }]
                 : [];
               const variantSegments = suffix
                 ? [{ className: 'll-variant', text: suffix, fill: 'white', weight: '500' }]
@@ -2820,7 +2898,7 @@ const ScatterGraph = React.memo(
                           {
                             className: 'll-engine',
                             text: engineLabel,
-                            fill: '#d1d5db',
+                            fill: 'white',
                             weight: '400',
                           },
                         ]
@@ -2838,9 +2916,18 @@ const ScatterGraph = React.memo(
                     ...runSegments,
                     ...variantSegments,
                   ];
+              const textX = Number(text.attr('x') ?? 0);
+              const fitted = fitPillSegments(
+                segments,
+                pillWidthBudget(ctx.width) - textX - 10,
+                (value, weight) =>
+                  measureTextWidth(value, chartFont(CHART_TYPE.lineLabel, weight), {
+                    whiteSpace: 'pre-wrap',
+                  }),
+              );
               text
                 .selectAll<SVGTSpanElement, (typeof segments)[number]>('tspan')
-                .data(segments, (segment) => segment.className)
+                .data(fitted, (segment) => segment.className)
                 .join('tspan')
                 .attr('class', (segment) => segment.className)
                 .attr('fill', (segment) => segment.fill)
@@ -2848,19 +2935,24 @@ const ScatterGraph = React.memo(
                 .attr('x', null)
                 .attr('dy', null)
                 .text((segment) => segment.text);
-              const textX = Number(text.attr('x') ?? 0);
               const maxLineWidth = ctx.width - textX - 10;
               let lineWidth = 0;
-              text.selectAll<SVGTSpanElement, unknown>('tspan').each(function () {
-                const width = this.getComputedTextLength();
-                if (lineWidth > 0 && lineWidth + width > maxLineWidth) {
-                  d3.select(this)
-                    .attr('x', textX)
-                    .attr('dy', CHART_TYPE.lineLabel + 3);
-                  lineWidth = 0;
-                }
-                lineWidth += width;
-              });
+              text
+                .selectAll<SVGTSpanElement, (typeof segments)[number]>('tspan')
+                .each(function (segment) {
+                  const width = measureTextWidth(
+                    segment.text,
+                    chartFont(CHART_TYPE.lineLabel, segment.weight),
+                    { whiteSpace: 'pre-wrap' },
+                  );
+                  if (lineWidth > 0 && lineWidth + width > maxLineWidth) {
+                    d3.select(this)
+                      .attr('x', textX)
+                      .attr('dy', CHART_TYPE.lineLabel + 3);
+                    lineWidth = 0;
+                  }
+                  lineWidth += width;
+                });
             },
           });
           applyParetoFadeRef.current(zoomGroup);
@@ -3006,7 +3098,9 @@ const ScatterGraph = React.memo(
               pinAnchors: pinLineLabels,
               obstacles: parallelismLabelBoxes(zoomGroup.node()),
             });
-            updateRenderedLineLabels(zoomGroup, zoomLabels);
+            updateRenderedLineLabels(zoomGroup, zoomLabels, {
+              occluders: pillOccluders(newXScale, newYScale),
+            });
           }
         },
       };
@@ -3231,20 +3325,8 @@ const ScatterGraph = React.memo(
                 hoverPath: xMarkerPath(7, 0.7),
                 tooltip,
                 handle: chartRef.current,
-                content: (point, pinned) =>
-                  generateOverlayTooltipContent({
-                    data: point,
-                    color: overlayRunColor(overlayRunIndex(point.run_url ?? null, runIndexByUrl)),
-                    isPinned: pinned,
-                    xLabel,
-                    yLabel,
-                    selectedYAxisMetric,
-                    hardwareConfig: overlayData.hardwareConfig,
-                    overlayData,
-                    locale,
-                    powerLabelStyle,
-                    touch: touchCopy,
-                  }),
+                panel: true,
+                content: (point) => hoverCard(point, true),
                 position: (event) => {
                   const [mouseX, mouseY] = d3.pointer(event, container);
                   return computeTooltipPosition(mouseX, mouseY, tooltip, container);
@@ -3272,7 +3354,6 @@ const ScatterGraph = React.memo(
                     y: point.y,
                     overlay: true,
                   });
-                  attachPowerTraceAction(ctx.tooltipElement, point, true);
                 },
               });
             },
@@ -3818,7 +3899,7 @@ const ScatterGraph = React.memo(
       locale,
       powerLabelStyle,
       drawPerfRuler,
-      attachPowerTraceAction,
+      hoverCard,
       touchScrub,
     ]);
 
@@ -4231,14 +4312,14 @@ const ScatterGraph = React.memo(
       >
         <D3Chart<InferenceData>
           ref={chartRef}
-          // PowerX drops the interaction hint under its charts; /inference keeps it.
+          // PowerX drops the interaction hint under its charts; /infx/inference keeps it.
           instructions={minimalChrome || powerXSurface ? '' : undefined}
           chartId={chartId}
           height={plotHeight}
           data={pointsData}
           dataIdentity={dataIdentity}
           metricIdentity={metricIdentity}
-          margin={CHART_MARGIN}
+          margin={chartMargin}
           watermark={getChartWatermark(isUnofficialRun)}
           testId="scatter-graph"
           grabCursor={true}
@@ -4265,330 +4346,343 @@ const ScatterGraph = React.memo(
             ) : undefined
           }
           legendElement={
-            <ChartLegend
-              variant="sidebar"
-              onItemHover={handleLegendHover}
-              onItemHoverEnd={handleLegendHoverEnd}
-              onItemRemove={showAllHardwareTypes ? undefined : handleRemoveHwType}
-              legendItems={[
-                ...(overlayData && unofficialRunInfos.length > 0
-                  ? unofficialRunInfos
-                      .map((info, idx) => {
-                        const hasPoints = overlayData.data.some(
-                          (d) =>
-                            overlayRunIndex(d.run_url ?? null, runIndexByUrl) === idx &&
-                            selectedPrecisions.includes(d.precision),
-                        );
-                        if (!hasPoints) return null;
-                        const branch = info.branch || `run ${info.id}`;
-                        return {
-                          name: `✕ unofficial-run-${info.id}`,
-                          label: getInferenceRunLabel(
-                            `✕ ${branch}`,
-                            overlayData.data.filter(
-                              (point) =>
-                                overlayRunIndex(point.run_url ?? null, runIndexByUrl) === idx &&
-                                selectedPrecisions.includes(point.precision),
+            <>
+              {!minimalChrome && (
+                <InlineNudgeSlot slot={NUDGE_SLOTS.inferenceLegend} className="mb-2" />
+              )}
+              <EngineComparisonConflictNotice className="mb-2" />
+              <ChartLegend
+                variant="sidebar"
+                onItemHover={handleLegendHover}
+                onItemHoverEnd={handleLegendHoverEnd}
+                onItemRemove={showAllHardwareTypes ? undefined : handleRemoveHwType}
+                legendItems={[
+                  ...(overlayData && unofficialRunInfos.length > 0
+                    ? unofficialRunInfos
+                        .map((info, idx) => {
+                          const hasPoints = overlayData.data.some(
+                            (d) =>
+                              overlayRunIndex(d.run_url ?? null, runIndexByUrl) === idx &&
+                              selectedPrecisions.includes(d.precision),
+                          );
+                          if (!hasPoints) return null;
+                          const branch = info.branch || `run ${info.id}`;
+                          return {
+                            name: `✕ unofficial-run-${info.id}`,
+                            label: getInferenceRunLabel(
+                              `✕ ${branch}`,
+                              overlayData.data.filter(
+                                (point) =>
+                                  overlayRunIndex(point.run_url ?? null, runIndexByUrl) === idx &&
+                                  selectedPrecisions.includes(point.precision),
+                              ),
                             ),
-                          ),
-                          color: overlayRunColor(idx),
-                          title: legendT.unofficialTitle(branch),
-                          isHighlighted: true,
-                          hw: `overlay-run-${info.id}`,
-                          isActive: true,
-                          onClick: () => {},
-                          onShowPoints: () => {
-                            setPointsTableTarget({
-                              kind: 'overlay',
-                              runIndex: idx,
-                              runId: info.id,
-                              branch,
-                            });
-                            track('inference_legend_points_table_opened', {
-                              gpu: `overlay-run-${info.id}`,
-                              framework: 'overlay',
-                            });
-                          },
-                          tooltip: (
-                            <div className="font-normal text-xs">
-                              <div className="text-red-500 font-semibold">
-                                {legendT.unofficialRun}
-                              </div>
-                              <div>
-                                {legendT.branch}: {branch}
-                              </div>
-                              {info.url && (
-                                <a
-                                  href={info.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="underline"
-                                >
-                                  {legendT.viewWorkflow}
-                                </a>
-                              )}
-                            </div>
-                          ),
-                        };
-                      })
-                      .filter((x): x is NonNullable<typeof x> => x !== null)
-                  : []),
-                ...Object.entries(hardwareConfig)
-                  .filter(([key]) =>
-                    showAllHardwareTypes
-                      ? effectiveActiveHwTypes.has(key)
-                      : hwTypesWithData.has(key),
-                  )
-                  .toSorted(
-                    ([a], [b]) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
-                  )
-                  .map(([key, hwConfig]: [string, any]) => {
-                    const isActive = showAllHardwareTypes
-                      ? true
-                      : effectiveOfficialHwTypes.has(key);
-                    const blocked = isActive ? undefined : blockedHwToggles.get(key);
-                    return {
-                      name: hwConfig.name,
-                      label: getDisplayLabel(hwConfig),
-                      color: resolveColor(key),
-                      title: hwConfig.gpu,
-                      isHighlighted: legendChangelogs.get(key)?.runId === selectedRunId,
-                      hw: key,
-                      isActive,
-                      blockedReason: blocked
-                        ? describeEngineComparisonConflict({ kind: 'blocked', ...blocked }, locale)
-                        : undefined,
-                      onClick: showAllHardwareTypes
-                        ? () => {}
-                        : () => {
-                            handleToggleHwType(key);
-                            track('latency_hw_type_toggled', { gpu: key });
-                          },
-                      onShowPoints: () => {
-                        setPointsTableTarget({ kind: 'official', hwKey: key });
-                        track('inference_legend_points_table_opened', {
-                          gpu: key,
-                          framework: hwConfig.framework ?? '',
-                        });
-                      },
-                      tooltip: legendChangelogs.has(key)
-                        ? formatChangelogDescription(
-                            legendChangelogs.get(key)!.entries.map((entry) => entry.description),
-                          )
-                        : null,
-                    };
-                  }),
-                ...powerVariantLegendItems,
-              ]}
-              disableActiveSort={false}
-              isLegendExpanded={isLegendExpanded}
-              onExpandedChange={(expanded) => {
-                setIsLegendExpanded(expanded);
-                track('latency_legend_expanded', { enabled: expanded });
-              }}
-              switches={[
-                ...(selectedYAxisMetric === 'y_inputTputPerGpu'
-                  ? []
-                  : [
-                      {
-                        id: 'scatter-log-scale',
-                        label: legendT.logScale,
-                        advanced: true,
-                        checked: logScale,
-                        onCheckedChange: (checked: boolean) => {
-                          setLogScale(checked);
-                          track('latency_log_scale_toggled', { enabled: checked });
-                        },
-                      },
-                    ]),
-                ...(paretoDirection
-                  ? [
-                      {
-                        id: 'scatter-hide-non-optimal',
-                        label: legendT.optimalOnly,
-                        checked: hideNonOptimal,
-                        onCheckedChange: (checked: boolean) => {
-                          setHideNonOptimal(checked);
-                          track('latency_hide_non_optimal_toggled', { enabled: checked });
-                        },
-                        ...(showPowerEnvelope || selectedSequence === Sequence.AgenticTraces
-                          ? {
-                              infoTooltip: showPowerEnvelope
-                                ? legendT.powerBoundaryInfo
-                                : legendT.optimalInfo,
-                            }
-                          : {}),
-                      },
-                      {
-                        id: `${chartId}-pareto-frontier`,
-                        label: legendT.paretoFrontier,
-                        advanced: true,
-                        checked: showParetoFrontier,
-                        infoTooltip: legendT.paretoFrontierInfo,
-                        onCheckedChange: (checked: boolean) => {
-                          setShowParetoFrontier(checked);
-                          track('inference_pareto_frontier_toggled', { enabled: checked });
-                        },
-                      },
-                    ]
-                  : []),
-                {
-                  id: 'scatter-point-labels',
-                  label: legendT.labels,
-                  advanced: true,
-                  checked: showPointLabels,
-                  onCheckedChange: (checked: boolean) => {
-                    setShowPointLabels(checked);
-                    track('latency_point_labels_toggled', { enabled: checked });
-                  },
-                },
-                {
-                  id: 'scatter-high-contrast',
-                  label: legendT.highContrast,
-                  advanced: true,
-                  checked: highContrast,
-                  onCheckedChange: (checked: boolean) => {
-                    setHighContrast(checked);
-                    track('latency_high_contrast_toggled', { enabled: checked });
-                  },
-                },
-                {
-                  id: 'scatter-parallelism-labels',
-                  label: legendT.parallelismLabels,
-                  checked: useAdvancedLabels,
-                  onCheckedChange: (checked: boolean) => {
-                    setUseAdvancedLabels(checked);
-                    track('latency_advanced_labels_toggled', { enabled: checked });
-                    if (checked && !showGradientLabels) {
-                      window.dispatchEvent(
-                        new CustomEvent(GRADIENT_NUDGE_EVENT, {
-                          detail: {
-                            enableGradient: () => {
-                              setShowGradientLabels(true);
-                              setUseAdvancedLabels(false);
-                              track('latency_gradient_labels_toggled', {
-                                enabled: true,
-                                source: 'nudge',
+                            color: overlayRunColor(idx),
+                            lineDasharray:
+                              powerCompareMode === 'none'
+                                ? overlayRooflineDasharray(idx)
+                                : undefined,
+                            title: legendT.unofficialTitle(branch),
+                            isHighlighted: true,
+                            hw: `overlay-run-${info.id}`,
+                            isActive: true,
+                            onClick: () => {},
+                            onShowPoints: () => {
+                              setPointsTableTarget({
+                                kind: 'overlay',
+                                runIndex: idx,
+                                runId: info.id,
+                                branch,
+                              });
+                              track('inference_legend_points_table_opened', {
+                                gpu: `overlay-run-${info.id}`,
+                                framework: 'overlay',
                               });
                             },
-                          },
-                        }),
-                      );
-                    }
-                  },
-                },
-                {
-                  id: 'scatter-gradient-labels',
-                  label: legendT.gradientLabels,
-                  checked: showGradientLabels,
-                  onCheckedChange: (checked: boolean) => {
-                    setShowGradientLabels(checked);
-                    track('latency_gradient_labels_toggled', { enabled: checked });
-                  },
-                },
-                {
-                  id: 'scatter-line-labels',
-                  label: legendT.lineLabels,
-                  advanced: true,
-                  checked: showLineLabels,
-                  onCheckedChange: (checked: boolean) => {
-                    setShowLineLabels(checked);
-                    track('latency_line_labels_toggled', { enabled: checked });
-                  },
-                },
-                {
-                  id: 'scatter-framework-label',
-                  label: legendT.frameworkLabel,
-                  advanced: true,
-                  checked: showFrameworkLabel,
-                  onCheckedChange: (checked: boolean) => {
-                    setShowFrameworkLabel(checked);
-                    track('latency_framework_label_toggled', { enabled: checked });
-                  },
-                },
-                {
-                  id: 'scatter-offloading-label',
-                  label: legendT.offloadingLabel,
-                  advanced: true,
-                  checked: showOffloadingLabel,
-                  onCheckedChange: (checked: boolean) => {
-                    setShowOffloadingLabel(checked);
-                    track('latency_offloading_label_toggled', { enabled: checked });
-                  },
-                },
-                {
-                  id: 'scatter-perf-ruler',
-                  label: legendT.perfRuler,
-                  advanced: true,
-                  checked: perfRulerMode,
-                  infoTooltip: legendT.perfRulerInfo,
-                  onCheckedChange: (checked: boolean) => {
-                    setPerfRulerMode(checked);
-                    if (!checked) {
-                      setPerfRulerState(clearPerfRulers);
-                      persistedRulers?.discardPending();
-                    }
-                    track('latency_perf_ruler_toggled', { enabled: checked });
-                  },
-                },
-                {
-                  id: 'scatter-concurrency-labels',
-                  label: legendT.concurrencyLabels,
-                  advanced: true,
-                  checked: showConcurrencyLabels,
-                  onCheckedChange: (checked: boolean) => {
-                    setShowConcurrencyLabels(checked);
-                    track('latency_concurrency_labels_toggled', { enabled: checked });
-                  },
-                },
-              ]}
-              onAdvancedExpandedChange={(expanded) => {
-                track('latency_advanced_controls_toggled', { enabled: expanded });
-              }}
-              actions={[
-                ...(effectiveOfficialHwTypes.size < hwTypesWithData.size ||
-                activeOverlayHwTypes.size < scopedOverlayHwTypes.size ||
-                quickFilterCount > 0
-                  ? [
-                      {
-                        id: 'scatter-reset-filter',
-                        label: legendT.resetFilter,
-                        onClick: () => {
-                          resetUnifiedSelection();
-                          clearQuickFilters();
-                          track('latency_legend_filter_reset');
-                        },
-                      },
-                    ]
-                  : []),
-                ...(perfRulerState.rulers.length > 0
-                  ? [
-                      {
-                        id: 'scatter-clear-perf-rulers',
-                        label: legendT.clearPerfRulers(perfRulerState.rulers.length),
-                        onClick: () => {
-                          track('latency_perf_ruler_cleared', {
-                            count: perfRulerState.rulers.length,
+                            tooltip: (
+                              <div className="font-normal text-xs">
+                                <div className="font-medium text-destructive">
+                                  {legendT.unofficialRun}
+                                </div>
+                                <div>
+                                  {legendT.branch}: {branch}
+                                </div>
+                                {info.url && (
+                                  <a
+                                    href={info.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline"
+                                  >
+                                    {legendT.viewWorkflow}
+                                  </a>
+                                )}
+                              </div>
+                            ),
+                          };
+                        })
+                        .filter((x): x is NonNullable<typeof x> => x !== null)
+                    : []),
+                  ...Object.entries(hardwareConfig)
+                    .filter(([key]) =>
+                      showAllHardwareTypes
+                        ? effectiveActiveHwTypes.has(key)
+                        : hwTypesWithData.has(key),
+                    )
+                    .toSorted(
+                      ([a], [b]) =>
+                        getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
+                    )
+                    .map(([key, hwConfig]: [string, any]) => {
+                      const isActive = showAllHardwareTypes
+                        ? true
+                        : effectiveOfficialHwTypes.has(key);
+                      const blocked = isActive ? undefined : blockedHwToggles.get(key);
+                      return {
+                        name: hwConfig.name,
+                        label: getDisplayLabel(hwConfig),
+                        color: resolveColor(key),
+                        lineDasharray:
+                          powerCompareMode === 'none' ? frameworkDasharray(key) : undefined,
+                        title: hwConfig.gpu,
+                        isHighlighted: legendChangelogs.get(key)?.runId === selectedRunId,
+                        hw: key,
+                        isActive,
+                        blockedReason: blocked
+                          ? describeEngineComparisonConflict(
+                              { kind: 'blocked', ...blocked },
+                              locale,
+                            )
+                          : undefined,
+                        onClick: showAllHardwareTypes
+                          ? () => {}
+                          : () => {
+                              handleToggleHwType(key);
+                              track('latency_hw_type_toggled', { gpu: key });
+                            },
+                        onShowPoints: () => {
+                          setPointsTableTarget({ kind: 'official', hwKey: key });
+                          track('inference_legend_points_table_opened', {
+                            gpu: key,
+                            framework: hwConfig.framework ?? '',
                           });
-                          setPerfRulerState(clearPerfRulers);
-                          persistedRulers?.discardPending();
                         },
-                      },
-                    ]
-                  : []),
-                {
-                  id: 'scatter-quick-filters',
-                  label: legendT.quickFilters(quickFilterCount),
-                  onClick: () => {
-                    setQuickFiltersOpen(true);
-                    track('inference_quick_filters_dialog_opened', { source: 'scatter_legend' });
+                        tooltip: legendChangelogs.has(key)
+                          ? formatChangelogDescription(
+                              legendChangelogs.get(key)!.entries.map((entry) => entry.description),
+                            )
+                          : null,
+                      };
+                    }),
+                  ...powerVariantLegendItems,
+                ]}
+                disableActiveSort={false}
+                isLegendExpanded={isLegendExpanded}
+                onExpandedChange={(expanded) => {
+                  setIsLegendExpanded(expanded);
+                  track('latency_legend_expanded', { enabled: expanded });
+                }}
+                switches={[
+                  ...(selectedYAxisMetric === 'y_inputTputPerGpu'
+                    ? []
+                    : [
+                        {
+                          id: 'scatter-log-scale',
+                          label: legendT.logScale,
+                          checked: logScale,
+                          onCheckedChange: (checked: boolean) => {
+                            setLogScale(checked);
+                            track('latency_log_scale_toggled', { enabled: checked });
+                          },
+                        },
+                      ]),
+                  ...(paretoDirection
+                    ? [
+                        {
+                          id: 'scatter-hide-non-optimal',
+                          label: legendT.optimalOnly,
+                          checked: hideNonOptimal,
+                          onCheckedChange: (checked: boolean) => {
+                            setHideNonOptimal(checked);
+                            track('latency_hide_non_optimal_toggled', { enabled: checked });
+                          },
+                          ...(showPowerEnvelope || selectedSequence === Sequence.AgenticTraces
+                            ? {
+                                infoTooltip: showPowerEnvelope
+                                  ? legendT.powerBoundaryInfo
+                                  : legendT.optimalInfo,
+                              }
+                            : {}),
+                        },
+                        {
+                          id: `${chartId}-pareto-frontier`,
+                          label: legendT.paretoFrontier,
+                          advanced: true,
+                          checked: showParetoFrontier,
+                          infoTooltip: legendT.paretoFrontierInfo,
+                          onCheckedChange: (checked: boolean) => {
+                            setShowParetoFrontier(checked);
+                            track('inference_pareto_frontier_toggled', { enabled: checked });
+                          },
+                        },
+                      ]
+                    : []),
+                  {
+                    id: 'scatter-point-labels',
+                    label: legendT.labels,
+                    advanced: true,
+                    checked: showPointLabels,
+                    onCheckedChange: (checked: boolean) => {
+                      setShowPointLabels(checked);
+                      track('latency_point_labels_toggled', { enabled: checked });
+                    },
                   },
-                },
-              ]}
-              hideAtomFootnote
-              readOnly={minimalChrome}
-              enableTooltips={true}
-            />
+                  {
+                    id: 'scatter-high-contrast',
+                    label: legendT.highContrast,
+                    advanced: true,
+                    checked: highContrast,
+                    onCheckedChange: (checked: boolean) => {
+                      setHighContrast(checked);
+                      track('latency_high_contrast_toggled', { enabled: checked });
+                    },
+                  },
+                  {
+                    id: 'scatter-parallelism-labels',
+                    label: legendT.parallelismLabels,
+                    checked: useAdvancedLabels,
+                    onCheckedChange: (checked: boolean) => {
+                      setUseAdvancedLabels(checked);
+                      track('latency_advanced_labels_toggled', { enabled: checked });
+                      if (checked && !showGradientLabels) {
+                        window.dispatchEvent(
+                          new CustomEvent(GRADIENT_NUDGE_EVENT, {
+                            detail: {
+                              enableGradient: () => {
+                                setShowGradientLabels(true);
+                                setUseAdvancedLabels(false);
+                                track('latency_gradient_labels_toggled', {
+                                  enabled: true,
+                                  source: 'nudge',
+                                });
+                              },
+                            },
+                          }),
+                        );
+                      }
+                    },
+                  },
+                  {
+                    id: 'scatter-gradient-labels',
+                    label: legendT.gradientLabels,
+                    checked: showGradientLabels,
+                    onCheckedChange: (checked: boolean) => {
+                      setShowGradientLabels(checked);
+                      track('latency_gradient_labels_toggled', { enabled: checked });
+                    },
+                  },
+                  {
+                    id: 'scatter-line-labels',
+                    label: legendT.lineLabels,
+                    advanced: true,
+                    checked: showLineLabels,
+                    onCheckedChange: (checked: boolean) => {
+                      setShowLineLabels(checked);
+                      track('latency_line_labels_toggled', { enabled: checked });
+                    },
+                  },
+                  {
+                    id: 'scatter-framework-label',
+                    label: legendT.frameworkLabel,
+                    advanced: true,
+                    checked: showFrameworkLabel,
+                    onCheckedChange: (checked: boolean) => {
+                      setShowFrameworkLabel(checked);
+                      track('latency_framework_label_toggled', { enabled: checked });
+                    },
+                  },
+                  {
+                    id: 'scatter-offloading-label',
+                    label: legendT.offloadingLabel,
+                    advanced: true,
+                    checked: showOffloadingLabel,
+                    onCheckedChange: (checked: boolean) => {
+                      setShowOffloadingLabel(checked);
+                      track('latency_offloading_label_toggled', { enabled: checked });
+                    },
+                  },
+                  {
+                    id: 'scatter-perf-ruler',
+                    label: legendT.perfRuler,
+                    advanced: true,
+                    checked: perfRulerMode,
+                    infoTooltip: legendT.perfRulerInfo,
+                    onCheckedChange: (checked: boolean) => {
+                      setPerfRulerMode(checked);
+                      if (!checked) {
+                        setPerfRulerState(clearPerfRulers);
+                        persistedRulers?.discardPending();
+                      }
+                      track('latency_perf_ruler_toggled', { enabled: checked });
+                    },
+                  },
+                  {
+                    id: 'scatter-concurrency-labels',
+                    label: legendT.concurrencyLabels,
+                    advanced: true,
+                    checked: showConcurrencyLabels,
+                    onCheckedChange: (checked: boolean) => {
+                      setShowConcurrencyLabels(checked);
+                      track('latency_concurrency_labels_toggled', { enabled: checked });
+                    },
+                  },
+                ]}
+                onAdvancedExpandedChange={(expanded) => {
+                  track('latency_advanced_controls_toggled', { enabled: expanded });
+                }}
+                reset={{
+                  id: 'scatter-reset-filter',
+                  disabled:
+                    effectiveOfficialHwTypes.size >= hwTypesWithData.size &&
+                    activeOverlayHwTypes.size >= scopedOverlayHwTypes.size &&
+                    quickFilterCount === 0,
+                  onClick: () => {
+                    resetUnifiedSelection();
+                    clearQuickFilters();
+                    track('latency_legend_filter_reset');
+                  },
+                }}
+                actions={[
+                  ...(perfRulerState.rulers.length > 0
+                    ? [
+                        {
+                          id: 'scatter-clear-perf-rulers',
+                          label: legendT.clearPerfRulers(perfRulerState.rulers.length),
+                          onClick: () => {
+                            track('latency_perf_ruler_cleared', {
+                              count: perfRulerState.rulers.length,
+                            });
+                            setPerfRulerState(clearPerfRulers);
+                            persistedRulers?.discardPending();
+                          },
+                        },
+                      ]
+                    : []),
+                  {
+                    id: 'scatter-quick-filters',
+                    label: legendT.quickFilters(quickFilterCount),
+                    onClick: () => {
+                      setQuickFiltersOpen(true);
+                      track('inference_quick_filters_dialog_opened', { source: 'scatter_legend' });
+                    },
+                  },
+                ]}
+                hideAtomFootnote
+                readOnly={minimalChrome}
+                collapsible={!minimalChrome}
+                enableTooltips={true}
+              />
+            </>
           }
         />
         <QuickFiltersDialog

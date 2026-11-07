@@ -63,7 +63,7 @@ const expectAudio = (source: string | null) =>
 // These decoder fixtures are test inputs, never benchmark evidence.
 function mountResultsClips(
   keys = ['b200', 'h200'],
-  pathname = '/video',
+  pathname = '/vgx',
   diagnostics = false,
   unofficialRun?: string,
   previews: string[] = [],
@@ -200,7 +200,7 @@ function mountResultsClips(
 
 describe('Video results synchronized clips', () => {
   it('selects one audio source during playback and resets audio when the case changes', () => {
-    mountResultsClips(['b200', 'h100'], '/video', true);
+    mountResultsClips(['b200', 'h100'], '/vgx', true);
     expectAudio(null);
     cy.get('[data-testid="video-results-audio"]').should('contain', 'Muted').click();
     cy.get('[role="option"]').should(($options) => {
@@ -232,7 +232,7 @@ describe('Video results synchronized clips', () => {
 
   it('resets hidden or failed audio sources and supports the Chinese unofficial-run view', () => {
     cy.viewport(390, 900);
-    mountResultsClips(['b200', 'h100'], '/zh/video', false, c1('h100').runId);
+    mountResultsClips(['b200', 'h100'], '/zh/vgx', false, c1('h100').runId);
     cy.get('[data-hardware="h100"]').should('contain', '非官方运行');
     pick('音频', '收听 B200');
     expectAudio('b200');
@@ -260,11 +260,11 @@ describe('Video results synchronized clips', () => {
 
   it('keeps native rerun media and PSNR separate from the original CI performance', () => {
     cy.viewport(390, 900);
-    mountResultsClips(['b200', 'h100'], '/video', true);
+    mountResultsClips(['b200', 'h100'], '/vgx', true);
     cy.get('[data-testid="video-results-case"]').should('contain', 'Matched-noise rerun');
     const tile = '[data-testid="video-results-clip"][data-hardware="b200"]';
     cy.get(tile).should('contain', '30 dB').and('contain', '4 GPU');
-    for (const label of ['wall time', 'J / clip', 'Participating', 'Allocated'])
+    for (const label of ['Wall time', 'J / clip', 'Participating', 'Allocated'])
       cy.get(tile).contains('dt', label).next('dd').should('have.text', '—');
     cy.get('@diagnostic-b200-url').then((url) =>
       cy.get(tile).find('video').should('have.attr', 'src', url),
@@ -284,7 +284,7 @@ describe('Video results synchronized clips', () => {
     });
     pick('Case', 'drum-taps · take 1');
     cy.get(tile).should('contain', '25 dB');
-    cy.get(tile).contains('dt', 'wall time').next('dd').should('have.text', '120 s');
+    cy.get(tile).contains('dt', 'Wall time').next('dd').should('have.text', '120 s');
     cy.get(tile).contains('dt', 'Participating').next('dd').should('have.text', '0.02');
     cy.get('[data-testid="video-results-sources"]').should('contain', c1('b200').runId);
   });
@@ -331,7 +331,7 @@ describe('Video results synchronized clips', () => {
         .wrap($video)
         .should(($element) => expect(($element[0] as HTMLVideoElement).paused).to.equal(true)),
     );
-    cy.get('[data-testid="video-results-view"][data-view="difference"]').click();
+    cy.get('[data-testid="video-results-view-difference"]').click();
     cy.get('[data-testid="video-results-clip"][data-hardware="h200"] canvas').should(($canvas) => {
       const rgba = ($canvas[0] as HTMLCanvasElement)
         .getContext('2d')!
@@ -363,7 +363,7 @@ describe('Video results synchronized clips', () => {
       video.src = 'data:video/mp4;base64,YmFk';
       video.load();
     });
-    cy.get('[data-testid="video-results-view"][data-view="difference"]').click();
+    cy.get('[data-testid="video-results-view-difference"]').click();
     cy.get(
       '[data-testid="video-results-clip"][data-hardware="b200"] [data-testid="video-results-media-empty"]',
     ).should('contain', 'reference');
@@ -373,7 +373,7 @@ describe('Video results synchronized clips', () => {
     );
   });
   it('plays a web rendition in Clip view and the sealed original for Difference, also for an overlay', () => {
-    mountResultsClips(['b200', 'h200'], '/video', false, c1('h200').runId, ['h200']);
+    mountResultsClips(['b200', 'h200'], '/vgx', false, c1('h200').runId, ['h200']);
     cy.get('[data-hardware="h200"]').should('contain', 'Unofficial run');
     cy.get('@preview-url').then((url) => tileVideo('h200').should('have.attr', 'src', url));
     cy.get('@original-b200').then((url) => tileVideo('b200').should('have.attr', 'src', url));
@@ -392,7 +392,7 @@ describe('Video results synchronized clips', () => {
     scrub(0.8);
     expectClipsAt(0.8);
 
-    cy.get('[data-testid="video-results-view"][data-view="difference"]').click();
+    cy.get('[data-testid="video-results-view-difference"]').click();
     cy.get('@original-h200').then((url) => tileVideo('h200').should('have.attr', 'src', url));
     // Swapping to the original reloads the tile; it must resume at the group's time, not 0.
     expectClipsAt(0.8);
@@ -404,12 +404,12 @@ describe('Video results synchronized clips', () => {
       expect([...rgba]).to.deep.equal([0, 0, 0, 255]);
     });
 
-    cy.get('[data-testid="video-results-view"][data-view="clip"]').click();
+    cy.get('[data-testid="video-results-view-clip"]').click();
     cy.get('@preview-url').then((url) => tileVideo('h200').should('have.attr', 'src', url));
     expectClipsAt(0.8);
   });
   it('falls back to the sealed original when a web rendition cannot be played', () => {
-    mountResultsClips(['b200', 'h200'], '/video', false, undefined, ['h200'], true);
+    mountResultsClips(['b200', 'h200'], '/vgx', false, undefined, ['h200'], true);
     cy.get('@original-h200').then((url) => tileVideo('h200').should('have.attr', 'src', url));
     tileVideo('h200').should(($video) =>
       expect(($video[0] as HTMLVideoElement).readyState).to.be.at.least(1),

@@ -139,7 +139,7 @@ describe('AgentX All in Measured chart and table', () => {
       let csvBlob: Blob | undefined;
       // Later loads rebuild the URL from these params, so each load names the view it expects.
       const chartUrl = (overrides: Record<string, string> = {}) =>
-        `${locale === 'zh' ? '/zh' : ''}/powerx?${new URLSearchParams({
+        `${locale === 'zh' ? '/zh' : ''}/pwx?${new URLSearchParams({
           g_model: 'Kimi-K3',
           i_seq: 'agentic-traces',
           i_prec: 'fp4',

@@ -18,7 +18,7 @@ tags:
 
 NVIDIA GB200 NVL72 运行 Dynamo vLLM 在 Kimi K2.5 NVFP4 8k/1k 上峰值达到 12,587 tok/s/GPU，而最优 B200 单节点 vLLM 配方在同一工作负载上峰值为 4,021 tok/s/GPU。这意味着每 GPU 峰值吞吐量有 3.13 倍的优势。NVL72 的机架级 NVLink 互联让解码端可以使用最高 Decode EP 16 的宽专家并行（在已测试的配方中），峰值配方为 8 GPU 解码池上的 Decode EP 8。B200 在最优实测配方上止步于 Decode EP 4。超过该点后，专家 all-to-all 通信开始受到 scale-out 互联延迟的制约。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference">
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 
@@ -78,7 +78,7 @@ GB200 NVL72 在 23 到 36 tok/s/user 区间内维持约 12,580 tok/s/GPU 的平�
   caption="Kimi K2.5 NVFP4 8k/1k Pareto 前沿。GB200 NVL72 Dynamo vLLM（2026-04-07）vs B200 vLLM（2026-03-27）。两次运行间隔 11 天。"
 />
 
-[在线图表](https://inferencex.semianalysis.com/inference?g_model=Kimi-K2.5&g_rundate=2026-04-07&g_runid=24100518225)，已预筛选为 4 月 7 日的 Kimi K2.5 数据。
+[在线图表](https://inferencex.semianalysis.com/infx/inference?g_model=Kimi-K2.5&g_rundate=2026-04-07&g_runid=24100518225)，已预筛选为 4 月 7 日的 Kimi K2.5 数据。
 
 ## NVL72 上的 vLLM 宽 EP
 
@@ -92,7 +92,7 @@ B200 在 16 GPU 池上以 30 tok/s/user 的交互性提供约 4k tok/s/GPU。TP 
 
 GB200 NVL72 在并发 2,048 到 4,096 范围内以 23 到 36 tok/s/user 的交互性提供 12.5k tok/s/GPU。已测试的单节点 B200 配方没有可比的工作点。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference">
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 

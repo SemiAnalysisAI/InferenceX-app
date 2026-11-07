@@ -10,11 +10,11 @@ import {
 describe('locked rent tiers', () => {
   it('lists the five unpublished rental terms from shortest to longest commit', () => {
     expect(LOCKED_RENT_TIERS.map((tier) => tier.label)).toEqual([
-      'Rent - On Demand',
-      'Rent - 1 Month Commit',
-      'Rent - 6 Month Commit',
-      'Rent - 1 Year Commit',
-      'Rent - 2 Year Commit',
+      'Rent – on demand',
+      'Rent – 1-month commit',
+      'Rent – 6-month commit',
+      'Rent – 1-year commit',
+      'Rent – 2-year commit',
     ]);
   });
 
@@ -39,7 +39,7 @@ describe('locked rent tiers', () => {
 
   it('localizes labels', () => {
     const tier = LOCKED_RENT_TIERS[0];
-    expect(lockedTierLabel(tier, 'en')).toBe('Rent - On Demand');
+    expect(lockedTierLabel(tier, 'en')).toBe('Rent – on demand');
     expect(lockedTierLabel(tier, 'zh')).toBe('租赁 - 按需');
   });
 });

@@ -8,15 +8,13 @@ import {
   TCO_SOURCE_URL,
 } from '@semianalysisai/inferencex-constants';
 
+import { profitChartQualifier, profitChartTitle } from '../calculator/profit-chart-heading';
 import { enAlternates, type Locale, ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '../i18n/i18n';
-
-export type WhitepaperKpiIcon = 'dollar' | 'trending' | 'percent';
 
 export interface WhitepaperKpi {
   value: string;
   label: string;
   caption: string;
-  icon: WhitepaperKpiIcon;
 }
 
 export interface WhitepaperComparisonItem {
@@ -62,9 +60,9 @@ export interface WhitepaperChartMeta {
   tcoSourceTitle: string;
   tcoSourceHref: string;
   sellingPrices: {
-    input: string;
-    cached: string;
-    output: string;
+    input: number;
+    cached: number;
+    output: number;
     source: string;
   };
 }
@@ -83,6 +81,7 @@ export interface WhitepaperCopy {
   sources: readonly WhitepaperSource[];
   authors: string;
   figureTitle: string;
+  figureQualifier: string;
   figures: readonly WhitepaperFigureCopy[];
   coverAlt: string;
   chipAlt: string;
@@ -133,7 +132,7 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
         srcDark: `${MI355X_ASSET_DIR}/figure-1-owned-hyperscaler-dark.png`,
         width: 2100,
         height: 810,
-        tcoBadge: 'MI355X: 1.5',
+        tcoBadge: 'MI355X: $1.50',
       },
       {
         id: 'figure-2',
@@ -141,7 +140,7 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
         srcDark: `${MI355X_ASSET_DIR}/figure-2-rental-3yr-dark.png`,
         width: 2100,
         height: 810,
-        tcoBadge: 'MI355X: 3',
+        tcoBadge: 'MI355X: $3.00',
       },
     ],
     chart: {
@@ -152,14 +151,14 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
       tcoSourceTitle: 'SemiAnalysis Market August 2026 Pricing Surveys & AI Cloud TCO Model',
       tcoSourceHref: TCO_SOURCE_URL,
       sellingPrices: {
-        input: '3',
-        cached: '0.3',
-        output: '15',
+        input: 3,
+        cached: 0.3,
+        output: 15,
         source: 'OpenRouter',
       },
     },
     en: {
-      typeLabel: 'Whitepaper · Executive Summary',
+      typeLabel: 'Whitepaper · Executive summary',
       title: 'AMD Instinct MI355X Kimi K3 Can Generate Up to $32B of Revenue per GigaWatt per Year',
       subtitle: 'Executive Summary - Agentic Inference Serving Economics Analysis',
       description:
@@ -178,20 +177,17 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
           value: '$32.6B',
           label: 'Revenue per GW-year',
           caption: 'Kimi K3 at OpenRouter list price, 60% utilization',
-          icon: 'dollar',
         },
         {
           value: '$16.5B',
           label: 'Profit per GW-year',
           caption:
             'Owned at hyperscaler volume at $1.50/GPU/hr compute; $3.95 of profit per chip-hour',
-          icon: 'trending',
         },
         {
           value: '50.7%',
           label: 'Profit margin',
           caption: 'After compute expense and 30% model license fee',
-          icon: 'percent',
         },
       ],
       comparison: {
@@ -253,11 +249,11 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
       sources: [
         {
           label: 'InferenceX profit estimator per gigawatt',
-          href: 'https://inferencex.semianalysis.com/profit-estimator-per-gigawatt/kimi-k3/target/45',
+          href: 'https://inferencex.semianalysis.com/infx/profit-estimator-per-gigawatt/kimi-k3/target/45',
         },
         {
           label: 'InferenceX AgentX dashboard',
-          href: 'https://inferencex.semianalysis.com/agentx',
+          href: 'https://inferencex.semianalysis.com/infx/agentx',
         },
         {
           label: 'OpenRouter Kimi K3 pricing',
@@ -269,11 +265,11 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
         },
       ],
       authors: WHITEPAPER_AUTHORS,
-      figureTitle:
-        'Kimi K3 2.8T Agentic Revenue & Profit Estimates per GigaWatt Per Year at P90 45 tok/s/user Interactivity',
+      figureTitle: profitChartTitle('en', 'gw-year', 'Kimi K3 2.8T', 'Agentic'),
+      figureQualifier: profitChartQualifier('en', 'P90', 45),
       figures: [
         {
-          costTier: 'Owning at Large Hyperscaler Volume',
+          costTier: 'Owning at large hyperscaler volume',
           caption:
             'Figure 1. Revenue and profit per GW-year, owned at hyperscaler volume ($1.50 per chip-hour). The bar totals $32.6B of revenue; segments from bottom to top are compute expense ($6.3B), model license fee ($9.8B), and profit ($16.5B, 50.7% margin).',
           alt: 'Figure 1: stacked bar of revenue per GW-year for MI355X on Kimi K3 2.8T, owned at $1.50 per GPU-hour. $32.6B of revenue splits into $6.3B compute expense, $9.8B model license fee, and $16.5B profit at a 50.7% margin.',
@@ -308,19 +304,16 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
           value: '$32.6B',
           label: '每 GW·年收入',
           caption: 'Kimi K3 按 OpenRouter 标价计费，60% 利用率',
-          icon: 'dollar',
         },
         {
           value: '$16.5B',
           label: '每 GW·年利润',
           caption: '按超大规模云厂商采购规模自建，算力成本 $1.50/GPU/hr；每芯片小时利润 $3.95',
-          icon: 'trending',
         },
         {
           value: '50.7%',
           label: '利润率',
           caption: '扣除算力支出和 30% 模型授权费之后',
-          icon: 'percent',
         },
       ],
       comparison: {
@@ -376,11 +369,11 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
       sources: [
         {
           label: 'InferenceX 每 GW 利润估算器',
-          href: 'https://inferencex.semianalysis.com/zh/profit-estimator-per-gigawatt/kimi-k3/target/45',
+          href: 'https://inferencex.semianalysis.com/zh/infx/profit-estimator-per-gigawatt/kimi-k3/target/45',
         },
         {
           label: 'InferenceX AgentX 仪表板',
-          href: 'https://inferencex.semianalysis.com/zh/agentx',
+          href: 'https://inferencex.semianalysis.com/zh/infx/agentx',
         },
         {
           label: 'OpenRouter Kimi K3 定价',
@@ -392,7 +385,8 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
         },
       ],
       authors: WHITEPAPER_AUTHORS_ZH,
-      figureTitle: 'Kimi K3 2.8T 智能体每吉瓦年收入与利润估算（P90 交互性 45 tok/s/user）',
+      figureTitle: profitChartTitle('zh', 'gw-year', 'Kimi K3 2.8T', '智能体'),
+      figureQualifier: profitChartQualifier('zh', 'P90', 45),
       figures: [
         {
           costTier: '自有 · 超大规模云厂商批量采购',
@@ -425,6 +419,13 @@ export function whitepaperCopy(paper: Whitepaper, locale: Locale): WhitepaperCop
   return locale === 'zh' ? paper.zh : paper.en;
 }
 
+/** Topic tags that are plain words; product, chip, and model tags render unchanged. */
+const WHITEPAPER_TAG_ZH: Record<string, string> = { Economics: '经济性' };
+
+export function whitepaperTagLabel(tag: string, locale: Locale): string {
+  return locale === 'zh' ? (WHITEPAPER_TAG_ZH[tag] ?? tag) : tag;
+}
+
 export function whitepaperIndexPath(locale: Locale): string {
   return locale === 'zh' ? '/zh/whitepaper' : '/whitepaper';
 }
@@ -448,7 +449,7 @@ export const WHITEPAPER_COPY = {
     indexDescription: `Executive summaries from the ${SITE_NAME} team on inference serving economics, measured on the live AgentX benchmark and published as downloadable PDFs.`,
     indexIntro:
       'Short research papers on inference serving economics, measured on the live AgentX benchmark and published as downloadable PDFs.',
-    indexEmpty: 'Coming soon.',
+    indexEmpty: 'No whitepapers yet',
     backToIndex: 'Back to whitepapers',
     downloadPdf: 'Download PDF',
     readSummary: 'Read the page',
@@ -464,25 +465,23 @@ export const WHITEPAPER_COPY = {
     closingBody: 'The two-page PDF includes both figures, the assumptions table, and source links.',
     pages: (count: number) => `${count} pages`,
     dataAsOf: (date: string) => `Data as of ${date}`,
-    indexEyebrow: 'InferenceX Research',
     tags: 'Tags',
-    scrollHint: 'Scroll sideways to see the full chart.',
+    openFullSize: 'Open full-size image in a new tab',
     keyNumbers: 'Key numbers',
     figures: 'Figures',
     onThisPage: 'On this page',
     pdfCardTitle: 'Executive summary',
     pdfCardMeta: (count: number) => `Executive summary · ${count} pages · PDF`,
     tcoBadgesLabel: 'TCO $/chip/hr:',
-    sourceLabel: 'Source:',
-    sellingPriceLabel: 'Selling Price per Million Tokens',
+    sellingPriceLabel: 'Selling price per million tokens:',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
-      `Input $${input} · Cached Input $${cached} · Output $${output} (${source})`,
+      `Input: $${input} · Cached input: $${cached} · Output: $${output} (${source})`,
   },
   zh: {
     indexTitle: '白皮书',
     indexDescription: `${SITE_NAME} 团队发布的推理服务经济性执行摘要，基于 AgentX 基准测试的实测数据，提供 PDF 下载。`,
     indexIntro: '关于推理服务经济性的短篇研究报告，基于 AgentX 基准测试的实测数据，提供 PDF 下载。',
-    indexEmpty: '即将上线。',
+    indexEmpty: '暂无白皮书',
     backToIndex: '返回白皮书列表',
     downloadPdf: '下载 PDF',
     readSummary: '阅读摘要',
@@ -498,19 +497,17 @@ export const WHITEPAPER_COPY = {
     closingBody: '两页 PDF 包含两张图、假设条件表和数据来源链接。',
     pages: (count: number) => `共 ${count} 页`,
     dataAsOf: (date: string) => `数据截至 ${date}`,
-    indexEyebrow: 'InferenceX 研究',
     tags: '标签',
-    scrollHint: '左右滑动查看完整图表。',
+    openFullSize: '在新标签页中打开原尺寸图片',
     keyNumbers: '核心数字',
     figures: '图表',
     onThisPage: '本页目录',
     pdfCardTitle: '执行摘要',
     pdfCardMeta: (count: number) => `执行摘要 · 共 ${count} 页 · PDF`,
     tcoBadgesLabel: 'TCO $/chip/hr：',
-    sourceLabel: '来源：',
-    sellingPriceLabel: '每百万 token 售价',
+    sellingPriceLabel: '每百万 token 售价：',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
-      `输入 $${input} · 缓存输入 $${cached} · 输出 $${output}（${source}）`,
+      `输入：$${input} · 缓存输入：$${cached} · 输出：$${output}（${source}）`,
   },
 } as const;
 

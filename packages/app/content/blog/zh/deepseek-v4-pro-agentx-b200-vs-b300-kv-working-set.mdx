@@ -20,7 +20,7 @@ tags:
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/939b9197-321d-4869-ba13-f0b800343b7b_2048x1300.png"
-  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=b200_vllm%2Cb300_vllm)"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=b200_vllm%2Cb300_vllm)"
 />
 
 真正有意思的不是这个汇总数字，而是 AgentX 服务端遥测在它下面揭示的内容。
@@ -31,14 +31,14 @@ tags:
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/f86888c4-c1a7-47b0-a580-d1a74876cb9c_2048x898.png"
-  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference/agentic/439522)"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/infx/inference/agentic/439522)"
 />
 
 换成并发 196 的 B200、其余参数不变，情况就反过来了：HBM 缓存命中率降到 73%，部署明显更依赖 DRAM，[offload](/zh/glossary/kv-cache-offload) 缓存命中率接近 20%。此时 HBM 中 KV cache 的工作集规模为 2200 万 token，大约是 B300 的一半。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/70a7a7c7-7918-459c-a4e0-f7fc1edca816_2048x887.png"
-  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference/agentic/439967)"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/infx/inference/agentic/439967)"
 />
 
 ## offload 层为什么需要余量
@@ -55,7 +55,7 @@ H200 SGLang FP8 能在低并发下服务 DeepSeek V4，从每美元性能看甚�
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/91dfd9ca-d13d-43e9-a57e-3be0fcc4a5cf_2048x1315.png"
-  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=h200_dynamo-sglang&i_optimal=0)"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=h200_dynamo-sglang&i_optimal=0)"
 />
 
 ---

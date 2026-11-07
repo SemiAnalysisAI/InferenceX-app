@@ -1,9 +1,14 @@
+import { ArrowRight } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Eyebrow } from '@/components/ui/eyebrow';
+import { Stat } from '@/components/ui/stat';
 import { getTelemetryGuide } from '@/lib/agentx/agentx-telemetry-zh';
 import type { Locale } from '@/lib/i18n/i18n';
 
 import { AgenticCatalogLink } from './agentic-catalog-link';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 const STRINGS = {
   en: {
@@ -27,7 +32,7 @@ export function AgenticCatalogHero({ locale }: { locale: Locale }) {
     <section data-testid="agentic-catalog-hero">
       <Card>
         <Eyebrow as="p">{guide.eyebrow}</Eyebrow>
-        <h1 className="mt-2 max-w-3xl text-2xl font-bold tracking-tight text-foreground lg:text-3xl">
+        <h1 className="mt-2 max-w-3xl text-2xl font-semibold text-foreground lg:text-3xl">
           {guide.title}
         </h1>
         <p className="mt-3 max-w-4xl text-base leading-7 text-muted-foreground lg:text-lg">
@@ -35,27 +40,29 @@ export function AgenticCatalogHero({ locale }: { locale: Locale }) {
         </p>
         <p className="mt-3 max-w-4xl text-sm leading-6 text-muted-foreground">{t.catalogLead}</p>
 
-        <dl className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border/70 bg-border/70 lg:grid-cols-4">
+        <dl className="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 lg:grid-cols-4">
           {guide.highlights.map((item) => (
-            <div key={item.label} className="flex flex-col bg-card px-4 py-4">
-              <dt className="order-2 mt-1 text-sm leading-5 text-muted-foreground">{item.label}</dt>
-              <dd className="order-1 font-mono text-xl font-semibold tabular-nums text-foreground">
-                {item.value}
-              </dd>
-            </div>
+            <Stat
+              key={item.label}
+              valueFirst
+              label={item.label}
+              value={item.value}
+              valueClassName="text-xl"
+            />
           ))}
         </dl>
 
         <div className="mt-6">
-          <AgenticCatalogLink
-            data-testid="agentic-catalog-tutorial-link"
-            href={`${prefix}/agentx/telemetry`}
-            analyticsEvent="agentic_catalog_tutorial_clicked"
-            className="inline-flex min-h-11 items-center gap-2 rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
-          >
-            {t.readTutorial}
-            <span aria-hidden="true">→</span>
-          </AgenticCatalogLink>
+          <Button asChild variant="brand" size="lg">
+            <AgenticCatalogLink
+              data-testid="agentic-catalog-tutorial-link"
+              href={`${prefix}${AGENTX_ROUTE.path}/telemetry`}
+              analyticsEvent="agentic_catalog_tutorial_clicked"
+            >
+              {t.readTutorial}
+              <ArrowRight aria-hidden="true" />
+            </AgenticCatalogLink>
+          </Button>
         </div>
       </Card>
     </section>

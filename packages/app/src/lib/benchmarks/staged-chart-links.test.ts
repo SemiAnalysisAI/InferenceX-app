@@ -28,7 +28,7 @@ describe('staged Pareto line links', () => {
     const [link] = buildStagedChartLinks(ORIGIN, '38295633957', [scope()]);
     const url = new URL(link!.url);
     expect(url.origin).toBe(ORIGIN);
-    expect(url.pathname).toBe('/inference');
+    expect(url.pathname).toBe('/infx/inference');
     const p = url.searchParams;
     expect(p.get('g_model')).toBe('Qwen-3.5-397B-A17B');
     expect(p.get('i_seq')).toBe('agentic-traces');

@@ -1,23 +1,21 @@
 'use client';
 
-import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
-import { MetricBadges, SourceLink } from '@/components/ui/chart-display-helpers';
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+import { PricesSourceLink } from '@/components/ui/chart-display-helpers';
+import { TcoPriceTable } from '@/components/ui/editable-tco-badges';
 import { InfoHelp } from '@/components/ui/option-info';
-import {
-  CaptionField,
-  ResultContext,
-  captionControlTriggerClassName,
-} from '@/components/ui/result-context';
+import { CaptionField, ResultContext } from '@/components/ui/result-context';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { costPerGpuHour } from './hardware';
+import { costPerGpuHour, hardwareLabel } from './hardware';
 import { COST_TIERS, TIER_LABELS } from './metrics';
 import type { ResultsState } from './results';
 import { COST_BASES } from './results-chart';
 
 const STRINGS = {
   en: {
-    tier: 'Cost Tier',
+    tier: 'Cost tier',
     tierHelp:
       'The $/GPU/hr pricing basis behind every cost and per-dollar value on this page, from the SemiAnalysis AI Cloud TCO Model.',
     basis: 'GPU basis',
@@ -25,10 +23,8 @@ const STRINGS = {
       'Participating counts the GPUs that generated the clips. Allocated counts every GPU the job reserved, idle ones included.',
     participating: 'Participating GPUs',
     allocated: 'Allocated GPUs',
-    tco: 'TCO $/chip/hr:',
-    source: 'Source:',
     official: 'SemiAnalysis InferenceX™',
-    overlay: 'SemiAnalysis InferenceX™ + UNOFFICIAL overlays',
+    overlay: 'SemiAnalysis InferenceX™ + unofficial overlays',
   },
   zh: {
     tier: '成本层级',
@@ -38,14 +34,12 @@ const STRINGS = {
     basisHelp: '“参与计算”只计入生成视频的 GPU；“分配”计入作业预留的全部 GPU，包括闲置的 GPU。',
     participating: '参与计算的 GPU',
     allocated: '分配的 GPU',
-    tco: 'TCO $/chip/hr：',
-    source: '来源：',
     official: 'SemiAnalysis InferenceX™',
     overlay: 'SemiAnalysis InferenceX™ + 非官方 overlays',
   },
 } as const;
 
-/** The cost tier, GPU basis and $/GPU/hr rates behind the chart, laid out like the inference caption. */
+/** The chart footer: cost tier, GPU basis and the $/GPU/hr rates behind the chart, as on /infx/inference. */
 export default function VideoCostContext({
   state,
   onUpdate,
@@ -61,16 +55,23 @@ export default function VideoCostContext({
   const locale = useLocale();
   const s = STRINGS[locale];
   const tierLabel = TIER_LABELS[state.costTier][locale];
-  const rates = Object.fromEntries(
-    hardwareKeys.flatMap((key) => {
-      const rate = costPerGpuHour(key, state.costTier);
-      return rate === null ? [] : [[key, rate]];
-    }),
-  );
+  const rates = hardwareKeys.flatMap((key) => {
+    const rate = costPerGpuHour(key, state.costTier);
+    return rate === null
+      ? []
+      : [
+          {
+            base: key,
+            label: HW_REGISTRY[key]?.badgeLabel ?? hardwareLabel(key),
+            value: rate.toFixed(2),
+          },
+        ];
+  });
   return (
     <div data-testid="results-cost-context">
       <ResultContext
         locale={locale}
+        layout="footer"
         costTier={tierLabel}
         costTierControl={
           <span className="inline-flex items-center gap-0.5">
@@ -84,7 +85,7 @@ export default function VideoCostContext({
               placeholder={s.tier}
               searchable={false}
               size="sm"
-              className={captionControlTriggerClassName}
+              className="w-auto max-w-full text-xs"
               contentClassName="w-80"
               groups={[
                 {
@@ -106,27 +107,23 @@ export default function VideoCostContext({
             label={s.basis}
             value={s[state.costBasis]}
             testId="results-cost-basis-caption"
+            hideLabel
             control={
               <span className="inline-flex items-center gap-0.5">
-                <SearchableSelect
-                  triggerId="results-cost-basis"
-                  triggerTestId="results-cost-basis"
-                  triggerAriaLabel={s.basis}
+                <SegmentedToggle
+                  role="group"
                   value={state.costBasis}
-                  onValueChange={(value) =>
-                    onUpdate({ costBasis: value as ResultsState['costBasis'] })
-                  }
-                  initialLabel={s[state.costBasis]}
-                  placeholder={s.basis}
-                  searchable={false}
+                  options={COST_BASES.map((basis) => ({
+                    value: basis,
+                    label: s[basis],
+                    testId: `results-cost-basis-${basis}`,
+                  }))}
+                  onValueChange={(costBasis) => onUpdate({ costBasis })}
+                  ariaLabel={s.basis}
+                  testId="results-cost-basis"
                   size="sm"
-                  className={captionControlTriggerClassName}
-                  groups={[
-                    {
-                      label: '',
-                      options: COST_BASES.map((basis) => ({ value: basis, label: s[basis] })),
-                    },
-                  ]}
+                  className="w-fit"
+                  buttonClassName="text-xs"
                 />
                 <InfoHelp label={s.basis} value="video-gpu-basis" align="start">
                   {s.basisHelp}
@@ -135,13 +132,20 @@ export default function VideoCostContext({
             }
           />
         }
+        controlsEnd={
+          rates.length > 0 ? (
+            <TcoPriceTable
+              items={rates}
+              testId="results-tco-table"
+              cellTestId="results-tco-rate"
+              inputIdPrefix="results-tco"
+            />
+          ) : undefined
+        }
         date={date ?? undefined}
         source={state.unofficialRun ? s.overlay : s.official}
+        metaEnd={<PricesSourceLink />}
       />
-      {Object.keys(rates).length > 0 && <MetricBadges label={s.tco} values={rates} />}
-      <SourceLink href={TCO_SOURCE_URL} sourceLabel={s.source}>
-        {TCO_SOURCE_TITLE}
-      </SourceLink>
     </div>
   );
 }

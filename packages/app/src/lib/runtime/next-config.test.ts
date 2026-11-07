@@ -17,7 +17,7 @@ const respond = (path: string) =>
   });
 
 describe('next.config custom routes', () => {
-  it.each(['/inference', '/zh/inference'])(
+  it.each(['/infx/inference', '/zh/infx/inference'])(
     'temporarily redirects %s to DeepSeek V4.1 Flash and preserves query filters',
     async (path) => {
       for (const query of [
@@ -33,7 +33,16 @@ describe('next.config custom routes', () => {
     },
   );
 
-  it.each(['/inference', '/zh/inference'])(
+  it.each([
+    '/infx/inference?i_metric=y_measuredAvgPower',
+    '/zh/infx/inference?i_power=none,certified',
+  ])('leaves the PowerX redirect on %s to the proxy', async (path) => {
+    const response = await respond(path);
+    expect(response.status).toBe(200);
+    expect(getRedirectUrl(response)).toBeNull();
+  });
+
+  it.each(['/infx/inference', '/zh/infx/inference'])(
     'preserves explicit model selections on %s',
     async (path) => {
       for (const suffix of [
@@ -51,12 +60,12 @@ describe('next.config custom routes', () => {
   it.each([
     ['/about/', '/about'],
     ['/zh/blog/some-post/', '/zh/blog/some-post'],
-    ['/datasets', '/agentx'],
-    ['/zh/datasets', '/zh/agentx'],
-    ['/xvideo', '/video'],
-    ['/zh/xxvideo', '/zh/video'],
-    ['/ubenchx', '/ubenchx/mem-bw'],
-    ['/zh/ubenchx', '/zh/ubenchx/mem-bw'],
+    ['/datasets', '/infx/agentx'],
+    ['/zh/datasets', '/zh/infx/agentx'],
+    ['/xvideo', '/vgx'],
+    ['/zh/xxvideo', '/zh/vgx'],
+    ['/ubx', '/ubx/mem-bw'],
+    ['/zh/ubx', '/zh/ubx/mem-bw'],
     ['/run/glm-5-2-on-b200', '/run/glm-5-3-on-b200'],
     ['/zh/run/glm-5-2-on-mi355x', '/zh/run/glm-5-3-on-mi355x'],
     ['/zh/rankings/cheapest-gpu-for-glm-5-2', '/zh/rankings/cheapest-gpu-for-glm-5-3'],
@@ -113,7 +122,7 @@ describe('next.config custom routes', () => {
 
   it.each([
     '/images/post/figure.png',
-    '/brand/left-pattern-full.svg',
+    '/brand/logo-color.webp',
     '/logos/nvidia.svg',
     '/whitepaper/amd-mi355x-32b-revenue-per-gigawatt-kimi-k3/cover.webp',
     '/whitepaper/amd-mi355x-32b-revenue-per-gigawatt-kimi-k3/pdf/summary.pdf',
@@ -129,7 +138,7 @@ describe('next.config custom routes', () => {
   it('leaves pages and API responses on their own cache headers', async () => {
     for (const path of [
       '/',
-      '/inference',
+      '/infx/inference',
       '/api/v1/availability',
       '/whitepaper',
       '/whitepaper/amd-mi355x-32b-revenue-per-gigawatt-kimi-k3',

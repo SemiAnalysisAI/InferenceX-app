@@ -25,6 +25,7 @@ interface ThemedFigureImageProps {
   loading: 'eager' | 'lazy';
   fetchPriority?: 'high' | 'auto';
   className: string;
+  fullSizeLabel?: string;
 }
 
 export function ThemedFigureImage({
@@ -39,6 +40,7 @@ export function ThemedFigureImage({
   loading,
   fetchPriority,
   className,
+  fullSizeLabel,
 }: ThemedFigureImageProps) {
   const { resolvedTheme } = useTheme();
   const isClient = useSyncExternalStore(subscribeClient, getClientSnapshot, getServerSnapshot);
@@ -51,9 +53,17 @@ export function ThemedFigureImage({
   const src = isClient ? (dark ? srcDark : srcLight) : undefined;
   const srcSet = isClient ? (dark ? srcSetDark : srcSetLight) : undefined;
   const noscriptDark = Boolean(srcDark);
-  const shared = { alt, sizes, width, height, loading, fetchPriority, className };
+  const shared = {
+    alt,
+    sizes,
+    width,
+    height,
+    loading,
+    fetchPriority,
+    className,
+  };
 
-  return (
+  const image = (
     <>
       <img
         {...shared}
@@ -80,5 +90,18 @@ export function ThemedFigureImage({
         />
       </noscript>
     </>
+  );
+  if (!fullSizeLabel) return image;
+  return (
+    <a
+      href={src ?? (noscriptDark ? srcDark : srcLight)}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={fullSizeLabel}
+      className="block rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      suppressHydrationWarning
+    >
+      {image}
+    </a>
   );
 }

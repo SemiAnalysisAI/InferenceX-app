@@ -140,7 +140,7 @@ case instead, upload its corrected result: the new run replaces that case and ke
   only measured pools. A later upload of other pools is a new run with a later `run_id` that
   also keeps the earlier pools' results, so it becomes the latest run (a superset) while the
   earlier one stays listed in the API.
-- **One run on the page**: `/collectivex` shows only the newest stored run with at least one
+- **One run on the page**: `/colx` shows only the newest stored run with at least one
   measured case; there is no run table or multi-run overlay. The header's Suites control picks
   the one section shown: `EP` (the default) shows the EP chart controls and chart, `KV` the
   kv-transfer section, and `swap_blocks` the swap_blocks section. KV and swap_blocks are offered
@@ -211,7 +211,7 @@ methodology link then points at `swap-blocks.md`. The chart selects direction, l
 plots block bytes in B/KiB/MiB/GiB, and keeps bandwidth linear with a zero baseline.
 Latency is logarithmic. Bandwidth is copied payload divided by host-observed latency,
 including submission and CUDA synchronization, counting payload once even for d2d.
-Both `/collectivex` and `/zh/collectivex` expose the controls and tooltips.
+Both `/colx` and `/zh/colx` expose the controls and tooltips.
 
 Bandwidth charts draw dashed nominal hardware rooflines for visible GPUs. Host transfers use **64 GB/s one-way PCIe 5.0 x16** on the
 registered x86 pools (including HGX B300's CPU uplink). GB200/GB300 use **225 GB/s per GPU

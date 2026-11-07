@@ -16,7 +16,7 @@ describe('Inference CSV export with an unofficial-run overlay', () => {
   before(() => {
     interceptOverlayRun();
     interceptDerivedAgenticMetrics();
-    cy.visit(`/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90`, {
+    cy.visit(`/infx/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90`, {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         unlockAgenticGate(win);

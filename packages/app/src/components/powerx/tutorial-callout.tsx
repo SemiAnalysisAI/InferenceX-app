@@ -10,12 +10,13 @@ const STRINGS: Record<Locale, Record<CalloutKind, string>> = {
   zh: { note: '提示', tip: '技巧', important: '重要', warning: '警告', caution: '注意' },
 };
 
-const RULE: Record<CalloutKind, string> = {
-  note: 'border-brand/60',
-  tip: 'border-brand/60',
-  important: 'border-foreground/60',
-  warning: 'border-destructive/70',
-  caution: 'border-destructive/70',
+/** Only warnings carry status color; the other kinds read from their label. */
+const LABEL_TONE: Record<CalloutKind, string> = {
+  note: 'text-foreground',
+  tip: 'text-foreground',
+  important: 'text-foreground',
+  warning: 'text-warning',
+  caution: 'text-destructive',
 };
 
 export interface TutorialCalloutProps {
@@ -24,19 +25,14 @@ export interface TutorialCalloutProps {
   children?: ReactNode;
 }
 
-/** A ruled aside, not a card. */
+/** A quiet aside on a muted surface step, without a colored rule or card border. */
 export function TutorialCallout({ kind, locale, children }: TutorialCalloutProps) {
   return (
     <aside
       data-callout={kind}
-      className={cn(
-        'not-prose my-8 max-w-[72ch] border-l-2 pl-5 text-base leading-7 text-muted-foreground [&_a]:text-brand [&_a]:underline [&_a]:underline-offset-2 [&_code]:text-foreground [&_p]:my-0 [&_strong]:text-foreground',
-        RULE[kind],
-      )}
+      className="not-prose my-8 max-w-[72ch] rounded-lg bg-muted/40 px-5 py-4 text-base leading-7 text-muted-foreground [&_a]:text-brand [&_a]:underline [&_a]:underline-offset-2 [&_code]:text-foreground [&_p]:my-0 [&_strong]:text-foreground"
     >
-      <p className="mb-1 font-mono text-xs font-semibold tracking-eyebrow text-foreground uppercase">
-        {STRINGS[locale][kind]}
-      </p>
+      <p className={cn('mb-1 text-sm font-medium', LABEL_TONE[kind])}>{STRINGS[locale][kind]}</p>
       {children}
     </aside>
   );

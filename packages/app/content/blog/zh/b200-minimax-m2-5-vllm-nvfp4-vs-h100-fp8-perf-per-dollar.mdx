@@ -20,7 +20,7 @@ tags:
 
 这 8.2 倍在峰值处可以清晰分解。在 110 tok/s/user 时，**B200 vLLM FP8 相比 H100 vLLM FP8 实现了 2.94 倍的每美元性能提升**——这是纯硬件代际提升，两个 SKU 上使用相同的 `MiniMaxAI/MiniMax-M2.5` 权重和相同的 vLLM 构建。**将 B200 权重切换为 `nvidia/MiniMax-M2.5-NVFP4` 后又叠加了 2.77 倍**——这是纯精度提升，由 [vllm-project/vllm #36307](https://github.com/vllm-project/vllm/pull/36307) 解锁——该 PR 添加了 trtllm-gen FP8 MoE kernel 的**模块化变体**，使 MiniMax 的非标准路由方法得以使用该 kernel。2.94 × 2.77 ≈ 8.14。精度提升随交互性增长而扩大（22 tok/s/user 时 1.65 倍 → 110 时 2.77 倍），这是因为 trtllm-gen kernel 相比旧版 triton 路径的优势在 GEMM 天花板成为瓶颈时更为突出。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=MiniMax-M2.5&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Ch100_vllm&i_linelabel=1&i_advlabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=MiniMax-M2.5&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Ch100_vllm&i_linelabel=1&i_advlabel=1">
   点击查看完整的 InferenceX 仪表板 →
 </DashboardCTA>
 
@@ -50,13 +50,13 @@ MiniMax-M2.5 是 M2 系列中面向编码和智能体的开源权重模型。其
 
 ## H100 vs B200 纸面规格对比
 
-在介绍具体配方之前，先看硬件。H100 SXM（Hopper，2023）和 B200 SXM（Blackwell，2025）相隔两代。下方雷达图将每个轴归一化到 [`/gpu-specs`](/gpu-specs) 中所有 NVIDIA + AMD SKU 的最大值——因此 H100 和 B200 的可见多边形在 GB200/GB300 NVL72 设定天花板的轴上（特别是 scale-up 域的显存容量和显存带宽，按 72-GPU NVLink 域扩展）被压缩。
+在介绍具体配方之前，先看硬件。H100 SXM（Hopper，2023）和 B200 SXM（Blackwell，2025）相隔两代。下方雷达图将每个轴归一化到 [`/infx/gpu-specs`](/infx/gpu-specs) 中所有 NVIDIA + AMD SKU 的最大值——因此 H100 和 B200 的可见多边形在 GB200/GB300 NVL72 设定天花板的轴上（特别是 scale-up 域的显存容量和显存带宽，按 72-GPU NVLink 域扩展）被压缩。
 
 <Figure
   srcLight="/images/b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar/specs-radar-light.png"
   srcDark="/images/b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar/specs-radar-dark.png"
-  alt="雷达图对比 H100 SXM 和 B200 SXM 在显存容量、显存带宽、FP4/FP8/BF16 TFLOP/s、scale-up 带宽、scale-up 域的显存容量和显存带宽上的表现。各轴按 /gpu-specs 中所有 GPU 的最大值归一化。"
-  caption="H100 SXM vs B200 SXM 在 InferenceX /gpu-specs 雷达图上的对比。各轴按每个指标的跨厂商最大值归一化（例如 FP4 最大值为 GB300 NVL72 的 15 PFLOP/s/GPU，因此 B200 的 9 PFLOP/s 读数约 60%；扩展域显存和带宽最大值由 GB200/GB300 NVL72 的 72-GPU NVLink 域设定，因此 H100 和 B200 的 8-GPU 域读数都较低）。H100 的 FP4 读数为 0%，因为 Hopper 没有 FP4 张量核心。"
+  alt="雷达图对比 H100 SXM 和 B200 SXM 在显存容量、显存带宽、FP4/FP8/BF16 TFLOP/s、scale-up 带宽、scale-up 域的显存容量和显存带宽上的表现。各轴按 /infx/gpu-specs 中所有 GPU 的最大值归一化。"
+  caption="H100 SXM vs B200 SXM 在 InferenceX /infx/gpu-specs 雷达图上的对比。各轴按每个指标的跨厂商最大值归一化（例如 FP4 最大值为 GB300 NVL72 的 15 PFLOP/s/GPU，因此 B200 的 9 PFLOP/s 读数约 60%；扩展域显存和带宽最大值由 GB200/GB300 NVL72 的 72-GPU NVLink 域设定，因此 H100 和 B200 的 8-GPU 域读数都较低）。H100 的 FP4 读数为 0%，因为 Hopper 没有 FP4 张量核心。"
 />
 
 本次基准测试涉及的两个 SKU 的绝对值：
@@ -183,7 +183,7 @@ B200 NVFP4 相对于 H100 的性能/成本优势**从 22 tok/s/user 时的 3.96 
   caption="MiniMax-M2.5（230B / 10B 激活参数）在 ISL 8192 / OSL 1024 下的表现。H100 和 B200 均使用 vLLM。标注表示每种配置的张量并行和专家并行度（如 TEP2 = TP=2 + EP=2，TP4 = TP=4 密集）。B200 NVFP4 前沿涵盖 TP=1/2/4/8 配方；B200 FP8 前沿涵盖 TP=2 和 TP=4；H100 FP8 为 TP=8。"
 />
 
-[实时图表](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=MiniMax-M2.5&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Ch100_vllm&i_linelabel=1&i_advlabel=1)，已预过滤为 MiniMax-M2.5 vLLM 在 H100 + B200 上 2026-05-22 运行的数据。[实时成本视图](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=MiniMax-M2.5&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Ch100_vllm&i_metric=y_costh&i_linelabel=1&i_advlabel=1)展示相同对比。
+[实时图表](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=MiniMax-M2.5&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Ch100_vllm&i_linelabel=1&i_advlabel=1)，已预过滤为 MiniMax-M2.5 vLLM 在 H100 + B200 上 2026-05-22 运行的数据。[实时成本视图](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=MiniMax-M2.5&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Ch100_vllm&i_metric=y_costh&i_linelabel=1&i_advlabel=1)展示相同对比。
 
 ## Blackwell 在 MiniMax-M2.5 上的后续方向
 
@@ -197,7 +197,7 @@ B200 NVFP4 相对于 H100 的性能/成本优势**从 22 tok/s/user 时的 3.96 
 
 NVIDIA 的 [Wei Zhao](https://github.com/wzhao18) 于 2026-03-12 在 vLLM 中合入了 [trtllm FP8 MoE 模块化 kernel](https://github.com/vllm-project/vllm/pull/36307)。感谢 Wei Zhao 和 vLLM TRT-LLM kernel 协作者、InferenceX 配方维护者以及 MiniMax AI 团队发布的开源权重。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=MiniMax-M2.5&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Ch100_vllm&i_linelabel=1&i_advlabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=MiniMax-M2.5&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Ch100_vllm&i_linelabel=1&i_advlabel=1">
   点击查看完整的 InferenceX 仪表板 →
 </DashboardCTA>
 

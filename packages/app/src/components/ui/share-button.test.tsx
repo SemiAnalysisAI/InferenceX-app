@@ -37,7 +37,7 @@ afterEach(() => {
 
 describe('ShareButton', () => {
   it('renders Chinese trigger, dialog chrome, and accessible input name on a Chinese route', () => {
-    localeState.pathname = '/zh/inference';
+    localeState.pathname = '/zh/infx/inference';
     renderUi(<ShareButton />);
 
     const trigger = container.querySelector<HTMLButtonElement>('[data-testid="share-button"]');

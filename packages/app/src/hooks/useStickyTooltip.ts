@@ -1,20 +1,8 @@
 import * as d3 from 'd3';
 import { useCallback, useRef, useState } from 'react';
 
-import { type ShapeKey, applyNormalState } from '@/lib/charts/chart-rendering';
 import { canvasPointLayerOf } from '@/lib/d3-chart/layers/canvas-point-registry';
-
-const VALID_SHAPE_KEYS: ReadonlySet<ShapeKey> = new Set([
-  'circle',
-  'square',
-  'triangle',
-  'diamond',
-]);
-
-const readShapeKey = (el: SVGElement): ShapeKey => {
-  const k = el.dataset.shapeKey;
-  return k && VALID_SHAPE_KEYS.has(k as ShapeKey) ? (k as ShapeKey) : 'circle';
-};
+import { setDotHovered } from '@/lib/d3-chart/pin-ring';
 
 export const useStickyTooltip = <T = any>() => {
   const [pinnedPoint, setPinnedPoint] = useState<T | null>(null);
@@ -61,12 +49,7 @@ export const useStickyTooltip = <T = any>() => {
         svg.select('.cursor-line').style('opacity', '0');
 
         svg.selectAll('.dot-group').each(function () {
-          const group = d3.select(this);
-          const shape = group.select<SVGElement>('.visible-shape');
-          const node = shape.node();
-          if (node) {
-            applyNormalState(shape as any, readShapeKey(node));
-          }
+          setDotHovered(this as Element, false);
         });
         canvasPointLayerOf(svgRef.current)?.clearHover();
       }

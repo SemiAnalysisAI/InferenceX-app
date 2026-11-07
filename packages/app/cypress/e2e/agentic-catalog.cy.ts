@@ -8,7 +8,7 @@ describe('AgentX telemetry catalog', () => {
   });
 
   it('lists configurations grouped by model, each opening a point-detail page', () => {
-    cy.visit('/inference/agentic', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/infx/inference/agentic', { onBeforeLoad: unlockAgenticGate });
 
     cy.get('[data-testid="agentic-catalog-summary"]').should('be.visible');
 
@@ -17,20 +17,20 @@ describe('AgentX telemetry catalog', () => {
       .should('have.length.greaterThan', 0)
       .first()
       .should('have.attr', 'href')
-      .and('match', /^\/inference\/agentic\/\d+$/u);
+      .and('match', /^\/infx\/inference\/agentic\/\d+$/u);
   });
 
   it('ships the Simplified Chinese catalog', () => {
-    cy.visit('/zh/inference/agentic', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/zh/infx/inference/agentic', { onBeforeLoad: unlockAgenticGate });
 
     cy.get('[data-testid="agentic-catalog-tutorial-link"]').should(
       'have.attr',
       'href',
-      '/zh/agentx/telemetry',
+      '/zh/infx/agentx/telemetry',
     );
     cy.get('[data-testid^="agentic-catalog-card-"]')
       .first()
       .should('have.attr', 'href')
-      .and('match', /^\/zh\/inference\/agentic\/\d+$/u);
+      .and('match', /^\/zh\/infx\/inference\/agentic\/\d+$/u);
   });
 });

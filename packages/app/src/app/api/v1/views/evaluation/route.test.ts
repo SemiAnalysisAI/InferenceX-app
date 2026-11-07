@@ -46,6 +46,8 @@ function evalRow(overrides: Partial<EvalRow> = {}): EvalRow {
     model: 'dsr1',
     precision: 'fp8',
     spec_method: 'none',
+    spec_algorithm: null,
+    spec_draft_model: null,
     disagg: false,
     is_multinode: false,
     prefill_tp: 8,

@@ -98,7 +98,7 @@ describe('PowerX Include facility switch (mobile)', () => {
 
   it('starts on, shows the facility layer and labels the PUE range of the chips', () => {
     mountWithProviders(
-      <PathnameContext.Provider value="/powerx">
+      <PathnameContext.Provider value="/pwx">
         <PowerXSurfaceProvider>
           <div style={{ width: '100%', maxWidth: 1120, padding: 12, boxSizing: 'border-box' }}>
             <div className="mb-3 flex flex-wrap items-start gap-x-6">

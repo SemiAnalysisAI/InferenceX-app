@@ -31,7 +31,7 @@ export function ExplorerShell({ children }: { children: ReactNode }) {
     <section className="flex min-w-0 flex-col gap-4" data-testid="agentic-workload-explorer">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <Heading as={isOverview ? 'h2' : 'h1'} level="section" className="mb-1">
+          <Heading as={isOverview ? 'h2' : 'h1'} level="title" className="mb-1">
             {strings.title}
           </Heading>
           <p className="text-sm text-muted-foreground">{strings.description}</p>

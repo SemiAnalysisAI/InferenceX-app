@@ -1,7 +1,7 @@
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { hasZhSibling, type Locale, zhPath } from '@/lib/i18n/i18n';
-import { DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
+import { AGENTX_ROUTE, DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
 
 import { pageTier } from './page-tiers';
 import { extractSections, parseLlmsTxt, type SeedPage } from './extract';
@@ -22,7 +22,7 @@ const CONCURRENCY = 2;
 const MAX_CRAWLED_PAGES = 160;
 const MAX_HTML_BYTES = 2_500_000;
 
-const CORE_PATHS = ['/', '/agentx', '/overview', '/about', '/blog', '/ubenchx'];
+const CORE_PATHS = ['/', AGENTX_ROUTE.path, '/overview', '/about', '/blog', '/ubx'];
 
 function zhCandidate(path: string, locale: Locale): string | null {
   if (locale !== 'zh' || !hasZhSibling(path)) return null;
@@ -124,7 +124,7 @@ export class SiteSearchEngine {
   seed(): Promise<void> {
     this.seeding ??= (async () => {
       for (const route of DASHBOARD_ROUTES) {
-        if (route.indexable && route.navGroup === 'primary') {
+        if (route.indexable && (route.navGroup === 'primary' || route.navGroup === 'merged')) {
           this.enqueue(route.path);
         }
       }

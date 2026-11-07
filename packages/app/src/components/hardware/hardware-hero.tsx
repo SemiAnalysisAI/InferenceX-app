@@ -32,11 +32,11 @@ export function HardwareHero({ meta, locale }: { meta: HardwarePageMeta; locale:
 
   return (
     <header
-      className="flex flex-col gap-5 border-b border-border/40 pb-8 pt-4 lg:pb-10 lg:pt-8"
+      className="flex flex-col gap-5 border-b border-border/30 pt-8 pb-8 md:pt-12 lg:pb-10"
       data-testid="hardware-hero"
     >
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-        <HardwareIndexLink href={hardwareIndexPath(locale)} label={t.indexTitle} />
+        <HardwareIndexLink href={hardwareIndexPath(locale)} label={t.indexHeading} />
         <span aria-hidden="true">&middot;</span>
         <time dateTime={meta.date}>{formatBlogDate(meta.date, locale)}</time>
         <span aria-hidden="true">&middot;</span>
@@ -55,15 +55,11 @@ export function HardwareHero({ meta, locale }: { meta: HardwarePageMeta; locale:
         )}
       </p>
       <div className="flex max-w-4xl flex-col gap-4">
-        <Heading
-          as="h1"
-          level="display"
-          className="text-3xl leading-tight md:text-4xl lg:text-5xl lg:leading-[1.08]"
-        >
+        <Heading as="h1" level="display" className="text-3xl leading-tight md:text-4xl lg:text-5xl">
           {meta.title}
         </Heading>
         <p
-          className="max-w-prose text-lg leading-7 text-muted-foreground"
+          className="max-w-measure text-lg leading-7 text-muted-foreground"
           data-testid="hardware-lede"
         >
           <HardwareLede lede={meta.lede} />

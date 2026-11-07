@@ -32,7 +32,7 @@ describe('bulkIdsFetcher', () => {
   });
 
   it('splits id sets above the route limit and merges every chunk', async () => {
-    // /inference/deepseek-r1 asked for 535 ids in one request and got a 400.
+    // /infx/inference/deepseek-r1 asked for 535 ids in one request and got a 400.
     const ids = Array.from({ length: 535 }, (_, index) => index + 1);
     const fetchMock = vi.fn((url: string) =>
       Promise.resolve(Response.json({ [chunkOf(url).at(-1)!]: true })),

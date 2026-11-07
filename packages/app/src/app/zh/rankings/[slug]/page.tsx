@@ -20,6 +20,7 @@ import {
   rankingPageTitleZh,
 } from '@/lib/live-seo/rankings-zh';
 import { getRankingPageData, type RankingPageData } from '@/lib/live-seo/run-rankings-data.server';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 import { RANKING_STANDARD_TIER } from '@/lib/live-seo/ranking-tier';
 
 export const revalidate = 86400;
@@ -207,7 +208,7 @@ export default async function ZhRankingPage({ params }: Props) {
         href: `/zh/model/${entry.model.slug}`,
         label: `${entry.model.seoName} 详解：架构、评估与性能`,
       },
-      { href: '/zh/inference', label: '交互式推理仪表盘' },
+      { href: `/zh${getDashboardRoute('inference').path}`, label: '交互式推理仪表盘' },
       { href: '/zh/overview', label: '跨模型推理排行榜' },
       { href: '/zh/compare', label: 'GPU 一对一对比' },
       { href: '/zh/chips', label: 'GPU 规格与价格' },

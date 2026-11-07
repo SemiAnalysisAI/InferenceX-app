@@ -1,10 +1,12 @@
 'use client';
 
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 
+import { Button } from '@/components/ui/button';
 import type { ConversationStructure } from '@/hooks/api/use-datasets';
 import { track } from '@/lib/analytics/analytics';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { compact, formatShare } from './format';
 import {
@@ -113,9 +115,6 @@ export function TraceFlamegraph({
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
   const [highlightKey, setHighlightKey] = useState<string | null>(target?.rowKey ?? null);
 
   useEffect(() => {
@@ -192,7 +191,7 @@ export function TraceFlamegraph({
   return (
     <div className="relative">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
           {LEGEND.map((l) => (
             <span key={l.key} className="inline-flex items-center gap-1.5">
               <span
@@ -211,27 +210,29 @@ export function TraceFlamegraph({
           </span>
         </div>
         {groupIndexes.length > 0 && (
-          <div className="flex items-center gap-1.5">
-            <button
+          <div className="ml-auto flex items-center gap-2">
+            <Button
               type="button"
+              variant="outline"
+              size="xs"
               onClick={() => {
                 track('datasets_flamegraph_expand_all');
                 expandAll();
               }}
-              className="rounded-md border border-border/40 px-2 py-1 text-xs hover:bg-accent"
             >
               {t.expandAll}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="outline"
+              size="xs"
               onClick={() => {
                 track('datasets_flamegraph_collapse_all');
                 collapseAll();
               }}
-              className="rounded-md border border-border/40 px-2 py-1 text-xs hover:bg-accent"
             >
               {t.collapseAll}
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -244,7 +245,7 @@ export function TraceFlamegraph({
 
       <div
         ref={scrollRef}
-        className="max-h-[520px] overflow-auto rounded-md border border-border/40 bg-muted/10 p-2"
+        className="max-h-[520px] overflow-auto rounded-md border border-border/30 bg-muted/10 p-2"
         data-testid="flamegraph-scroll"
       >
         <div className="flex min-w-[36rem] flex-col gap-0">
@@ -335,11 +336,19 @@ export function TraceFlamegraph({
                           });
                           if (row.groupIndex !== undefined) toggle(row.groupIndex);
                         }}
-                        className="flex items-center gap-1 truncate text-left text-xs font-medium text-foreground hover:text-primary"
+                        className="flex items-center gap-1 truncate text-left text-xs font-medium text-foreground hover:text-brand"
                       >
-                        <span className="inline-block w-3 text-muted-foreground">
-                          {row.isExpanded ? '▾' : '▸'}
-                        </span>
+                        {row.isExpanded ? (
+                          <ChevronDown
+                            aria-hidden="true"
+                            className="size-3 shrink-0 text-muted-foreground"
+                          />
+                        ) : (
+                          <ChevronRight
+                            aria-hidden="true"
+                            className="size-3 shrink-0 text-muted-foreground"
+                          />
+                        )}
                         <span className="truncate">{row.label}</span>
                       </button>
                     ) : (
@@ -348,7 +357,7 @@ export function TraceFlamegraph({
                   </div>
 
                   <div
-                    className="w-36 shrink-0 text-2xs tabular-nums text-muted-foreground"
+                    className="min-w-36 shrink-0 whitespace-nowrap text-2xs tabular-nums text-muted-foreground"
                     data-testid={`flamegraph-time-${row.key}`}
                   >
                     {row.timeLabel ?? '—'}
@@ -388,7 +397,7 @@ export function TraceFlamegraph({
                     </div>
                   </div>
 
-                  <div className="w-16 shrink-0 text-right text-2xs tabular-nums text-muted-foreground">
+                  <div className="min-w-16 shrink-0 whitespace-nowrap text-right text-2xs tabular-nums text-muted-foreground">
                     {compact(row.total)}
                   </div>
                 </div>
@@ -398,49 +407,45 @@ export function TraceFlamegraph({
         </div>
       </div>
 
-      {tooltip &&
-        mounted &&
-        createPortal(
-          <div
-            id="flamegraph-tooltip"
-            role="tooltip"
-            data-testid="flamegraph-tooltip"
-            className="pointer-events-none fixed z-50 rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs shadow-md"
-            style={{ left: tooltip.x + 12, top: tooltip.y + 12 }}
-          >
-            <div className="mb-1 font-medium text-foreground">
-              {tooltip.row.label}
-              {tooltip.row.sublabel ? (
-                <span className="ml-1 font-normal text-muted-foreground">
-                  {tooltip.row.sublabel}
-                </span>
-              ) : null}
-            </div>
-            <div className="grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 text-muted-foreground">
-              <span style={{ color: SEG.cached }}>{t.cachedPrefix}</span>
-              <span className="text-right tabular-nums text-foreground">
-                {compact(tooltip.row.cached)}
-              </span>
-              <span style={{ color: SEG.uncached }}>{t.uncachedInput}</span>
-              <span className="text-right tabular-nums text-foreground">
-                {compact(tooltip.row.uncached)}
-              </span>
-              <span style={{ color: SEG.output }}>{t.output}</span>
-              <span className="text-right tabular-nums text-foreground">
-                {compact(tooltip.row.output)}
-              </span>
-              <span>{t.cachedPct}</span>
-              <span className="text-right tabular-nums text-foreground">
-                {formatShare(tooltip.row.cached, tooltip.row.cached + tooltip.row.uncached)}
-              </span>
-              <span>{t.fromStart}</span>
-              <span className="text-right tabular-nums text-foreground">
-                {tooltip.row.timeLabel ?? '—'}
-              </span>
-            </div>
-          </div>,
-          document.body,
-        )}
+      {tooltip && (
+        <FloatingTooltip
+          x={tooltip.x}
+          y={tooltip.y}
+          id="flamegraph-tooltip"
+          role="tooltip"
+          data-testid="flamegraph-tooltip"
+          className="text-xs"
+        >
+          <div className="mb-1 font-medium text-foreground">
+            {tooltip.row.label}
+            {tooltip.row.sublabel ? (
+              <span className="ml-1 font-normal text-muted-foreground">{tooltip.row.sublabel}</span>
+            ) : null}
+          </div>
+          <div className="grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 text-muted-foreground">
+            <span style={{ color: SEG.cached }}>{t.cachedPrefix}</span>
+            <span className="text-right tabular-nums text-foreground">
+              {compact(tooltip.row.cached)}
+            </span>
+            <span style={{ color: SEG.uncached }}>{t.uncachedInput}</span>
+            <span className="text-right tabular-nums text-foreground">
+              {compact(tooltip.row.uncached)}
+            </span>
+            <span style={{ color: SEG.output }}>{t.output}</span>
+            <span className="text-right tabular-nums text-foreground">
+              {compact(tooltip.row.output)}
+            </span>
+            <span>{t.cachedPct}</span>
+            <span className="text-right tabular-nums text-foreground">
+              {formatShare(tooltip.row.cached, tooltip.row.cached + tooltip.row.uncached)}
+            </span>
+            <span>{t.fromStart}</span>
+            <span className="text-right tabular-nums text-foreground">
+              {tooltip.row.timeLabel ?? '—'}
+            </span>
+          </div>
+        </FloatingTooltip>
+      )}
     </div>
   );
 }

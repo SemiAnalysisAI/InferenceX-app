@@ -16,7 +16,7 @@ describe('Y-Axis Metrics All Render Data', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro');
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro');
     cy.scatterPoints().should('have.length.greaterThan', 0);
   });
 

@@ -1,16 +1,20 @@
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 
+import { getDashboardRoute } from './dashboard-routes';
 import { getInferenceModelBySlug } from './inference-model-slug';
 
-const INFERENCE_PATH = /^(?<locale>\/zh)?\/inference(?:\/(?<slug>[^/]+))?\/?$/u;
+const INFERENCE_PATH = new RegExp(
+  `^(?<locale>/zh)?${getDashboardRoute('inference').path}(?:/(?<slug>[^/]+))?/?$`,
+  'u',
+);
 
 /**
  * Power and energy metrics live on the PowerX tab. An Inference Performance link that
- * still carries one (`/inference?i_metric=y_measuredAvgPower`), or a power-tier filter
- * with no metric (`/inference?i_power=certified`), opens PowerX with the same
+ * still carries one (`/infx/inference?i_metric=y_measuredAvgPower`), or a power-tier filter
+ * with no metric (`/infx/inference?i_power=certified`), opens PowerX with the same
  * filters; the latter used to open the measured power chart, so it lands on the Power
  * draw view rather than PowerX's default Energy per token view. A model route
- * (`/inference/<slug>`) keeps its model as `g_model`, and its boundary compare, which
+ * (`/infx/inference/<slug>`) keeps its model as `g_model`, and its boundary compare, which
  * drew all four boundaries, becomes PowerX's `all`.
  * Returns null when the URL should load as is.
  */
@@ -32,7 +36,7 @@ export function powerXRedirectUrl(url: URL): URL | null {
   const model = slug ? getInferenceModelBySlug(slug)?.model : undefined;
   if (slug && !model) return null;
   const target = new URL(url);
-  target.pathname = `${match.groups?.locale ?? ''}/powerx`;
+  target.pathname = `${match.groups?.locale ?? ''}${getDashboardRoute('powerx').path}`;
   if (model && !target.searchParams.has('g_model')) target.searchParams.set('g_model', model);
   if (!target.searchParams.get('i_metric'))
     target.searchParams.set('i_metric', LEGACY_POWER_METRIC);

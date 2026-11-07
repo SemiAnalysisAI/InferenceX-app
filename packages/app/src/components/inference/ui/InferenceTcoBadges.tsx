@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
@@ -14,14 +14,15 @@ import {
 } from '@/components/inference/InferenceContext';
 import {
   costMetricFamily,
+  costTiersForFamily,
   isMetricKey,
   metricCostTier,
   metricForCostTier,
+  type CostTier,
 } from '@/components/inference/metric-registry';
 import { publishedCostsForTier } from '@/components/inference/published-costs';
-import { EditableTcoBadges } from '@/components/ui/editable-tco-badges';
+import { TcoPriceTable } from '@/components/ui/editable-tco-badges';
 import { track } from '@/lib/analytics/analytics';
-import { useLocale } from '@/lib/i18n/use-locale';
 
 function metricKeyOf(selectedYAxisMetric: string) {
   const key = selectedYAxisMetric.replace(/^y_/u, '');
@@ -35,15 +36,16 @@ export function parseInferenceCustomCost(raw: string): number | undefined {
 }
 
 export function InferenceTcoBadges({
-  label,
+  bases,
   values,
-  blankedBases,
+  editable = true,
+  className,
 }: {
-  label: string;
+  bases: readonly string[];
   values: Record<string, number>;
-  blankedBases?: string[];
+  editable?: boolean;
+  className?: string;
 }) {
-  const locale = useLocale();
   const inputIdPrefix = useId();
   const { selectedYAxisMetric } = useInferenceDisplay();
   const { userCosts } = useInferenceFilters();
@@ -56,6 +58,29 @@ export function InferenceTcoBadges({
   const customMetric = family ? metricForCostTier(family, 'custom') : undefined;
   const isCustom = metricKey !== undefined && metricKey === customMetric;
   const publishedTier = metricKey ? metricCostTier(metricKey) : undefined;
+  const baselineTier = useMemo(() => {
+    if (!isCustom || !family || !userCosts) return undefined;
+    let best: CostTier | undefined;
+    let bestMatches = -1;
+    for (const tier of costTiersForFamily(family)) {
+      if (tier === 'custom') continue;
+      const published = publishedCostsForTier(tier, tcoBasis);
+      const matches = Object.entries(userCosts).filter(
+        ([base, value]) => value === published[base],
+      ).length;
+      if (matches > bestMatches) {
+        best = tier;
+        bestMatches = matches;
+      }
+    }
+    return best;
+  }, [isCustom, family, userCosts, tcoBasis]);
+  const baseline = baselineTier ? publishedCostsForTier(baselineTier, tcoBasis) : undefined;
+  const overriddenBases = new Set(
+    baseline
+      ? Object.keys(userCosts ?? {}).filter((base) => userCosts?.[base] !== baseline[base])
+      : [],
+  );
 
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const ownedCostsRef = useRef<typeof userCosts>(null);
@@ -110,12 +135,14 @@ export function InferenceTcoBadges({
     track('inference_custom_cost_set', { gpu: base, value: raw });
   }, []);
 
-  const bases = Object.keys(values);
-  if (isCustom) {
-    for (const base of blankedBases ?? []) {
-      if (!bases.includes(base)) bases.push(base);
-    }
-  }
+  const handleReset = () => {
+    if (!family || !baselineTier) return;
+    const metric = `y_${metricForCostTier(family, baselineTier)}`;
+    setUserCosts(null);
+    setSelectedYAxisMetric(metric);
+    track('inference_custom_cost_reset', { ...analyticsContext, metric, cost_tier: baselineTier });
+  };
+
   const items = bases.map((base) => {
     const chipLabel = HW_REGISTRY[base]?.badgeLabel ?? base.toUpperCase();
     let value: string;
@@ -125,20 +152,22 @@ export function InferenceTcoBadges({
     } else {
       value = String(values[base]);
     }
-    return { base, label: chipLabel, value };
+    return { base, label: chipLabel, value, overridden: overriddenBases.has(base) };
   });
 
   return (
-    <EditableTcoBadges
-      label={label}
+    <TcoPriceTable
       items={items}
+      editable={editable}
       onChange={handleChange}
       onCommit={handleCommit}
-      inputLabel={(name) => (locale === 'zh' ? `${name} $/芯片/小时` : `${name} $/chip/hr`)}
+      onReset={overriddenBases.size > 0 ? handleReset : undefined}
+      resetTestId="inference-tco-reset"
       testId="inference-tco-badges"
-      badgeTestId="inference-tco-badge"
+      cellTestId="inference-tco-badge"
       inputIdPrefix={`cost-input-${inputIdPrefix}`}
       inputTestIdPrefix="cost-input"
+      className={className}
     />
   );
 }

@@ -1,14 +1,15 @@
 import { isZhPathname, type Locale, ZH_PREFIX } from '@/lib/i18n/i18n';
+import { AGENTX_ROUTE, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 // Dynamic App Router segments, so pageviews and web vitals group by template instead of by URL.
 const DYNAMIC_ROUTE_TEMPLATES = [
-  '/agentic-workload-explorer/sessions/[id]',
-  '/agentic-workload-explorer/sessions/[id]/[view]',
-  '/agentx/optimizations/[framework]',
-  '/agentx/[slug]',
-  '/agentx/[slug]/conversations/[convId]',
+  `${getDashboardRoute('agentic-workload-explorer').path}/sessions/[id]`,
+  `${getDashboardRoute('agentic-workload-explorer').path}/sessions/[id]/[view]`,
+  `${AGENTX_ROUTE.path}/optimizations/[framework]`,
+  `${AGENTX_ROUTE.path}/[slug]`,
+  `${AGENTX_ROUTE.path}/[slug]/conversations/[convId]`,
   '/blog/[slug]',
-  '/calculator/[model]',
+  `${getDashboardRoute('calculator').path}/[model]`,
   '/chips/[slug]',
   '/compare/[slug]',
   '/compare/[slug]/[scenario]',
@@ -21,16 +22,16 @@ const DYNAMIC_ROUTE_TEMPLATES = [
   '/embed/model/[slug]',
   '/glossary/[slug]',
   '/hardware/[slug]',
-  '/historical/[model]',
-  '/inference/agentic',
-  '/inference/agentic/[id]',
-  '/inference/logs/[id]',
-  '/inference/[model]',
+  `${getDashboardRoute('historical').path}/[model]`,
+  `${getDashboardRoute('inference').path}/agentic`,
+  `${getDashboardRoute('inference').path}/agentic/[id]`,
+  `${getDashboardRoute('inference').path}/logs/[id]`,
+  `${getDashboardRoute('inference').path}/[model]`,
   '/model/[slug]',
-  '/profit-estimator/[model]',
-  '/profit-estimator/[model]/[...filters]',
-  '/profit-estimator-per-gigawatt/[model]',
-  '/profit-estimator-per-gigawatt/[model]/[...filters]',
+  `${getDashboardRoute('profit-estimator').path}/[model]`,
+  `${getDashboardRoute('profit-estimator').path}/[model]/[...filters]`,
+  `${getDashboardRoute('profit-estimator-per-gigawatt').path}/[model]`,
+  `${getDashboardRoute('profit-estimator-per-gigawatt').path}/[model]/[...filters]`,
   '/rankings/[slug]',
   '/run/[slug]',
   '/whitepaper/[slug]',
@@ -56,7 +57,7 @@ function stripLocale(pathname: string): string {
   return pathname.slice(ZH_PREFIX.length) || '/';
 }
 
-/** Locale-independent route template for a pathname, e.g. `/zh/inference/kimi-k3` → `/inference/[model]`. */
+/** Locale-independent route template for a pathname, e.g. `/zh/infx/inference/kimi-k3` → `/infx/inference/[model]`. */
 export function routeTemplateForPathname(pathname: string): string {
   const enPath = stripLocale(pathname);
   const segments = enPath.split('/').filter(Boolean);

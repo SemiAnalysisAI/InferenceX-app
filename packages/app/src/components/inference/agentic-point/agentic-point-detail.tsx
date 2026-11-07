@@ -15,6 +15,7 @@ import {
 } from '@/hooks/api/use-trace-server-metrics';
 import { useBenchmarkSiblings } from '@/hooks/api/use-benchmark-siblings';
 import { NudgeEngine } from '@/components/nudges/nudge-engine';
+import { EmptyState } from '@/components/ui/empty-state';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { track } from '@/lib/analytics/analytics';
@@ -47,13 +48,14 @@ import {
 import { SiblingNav } from './sibling-nav';
 import type { ThroughputSeriesKey } from './time-series-math';
 import { useDetailView, type DetailView } from './use-detail-view';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export const AGENTIC_POINT_DETAIL_STRINGS = {
   en: {
     back: 'Back',
     inferenceChart: 'Inference chart',
     loadingSku: 'Loading SKU navigator…',
-    siblingError: 'Failed to load the SKU navigator.',
+    siblingError: 'Failed to load the SKU navigator',
     loadingPoint: 'Loading point metadata…',
     configsInSku: 'configs in SKU',
     requests: 'requests',
@@ -71,23 +73,23 @@ export const AGENTIC_POINT_DETAIL_STRINGS = {
       ' phase — a cache-warming pass whose outputs are capped at 1 token. Warmup OSL ≈ 1, and interactivity/decode are blank (single-token outputs have no inter-token latency).',
     warmupNoServerData:
       ' Warmup server-side metrics aren’t available for this point, so the server charts below are empty — the request-level charts above still reflect warmup.',
-    metricSourceError: 'The selected server-metrics source could not be loaded.',
-    traceFailure: 'Failed to load trace data for benchmark point #{id}.',
+    metricSourceError: 'The selected server-metrics source could not be loaded',
+    traceFailure: 'Failed to load trace data for benchmark point #{id}',
     missingTrace:
       'No stored trace_replay blob for benchmark point #{id}. This point predates the aiperf time-series capture, or its source artifacts have expired on GitHub.',
     loadingAggregates: 'loading…',
     loadingTimeline: 'Loading request timeline…',
     missingTimeline:
       "No per-request timeline for benchmark point #{id} — the profile_export.jsonl artifact isn't stored for this row.",
-    aggregatesError: 'Failed to load aggregate data across configurations.',
-    timelineError: 'Failed to load the request timeline.',
-    requestChartsError: 'Failed to load request chart data.',
+    aggregatesError: 'Failed to load aggregate data across configurations',
+    timelineError: 'Failed to load the request timeline',
+    requestChartsError: 'Failed to load request chart data',
   },
   zh: {
     back: '返回',
     inferenceChart: '推理图表',
     loadingSku: '加载 SKU 导航器……',
-    siblingError: 'SKU 导航数据加载失败。',
+    siblingError: 'SKU 导航数据加载失败',
     loadingPoint: '加载数据点元信息……',
     configsInSku: '个配置',
     requests: '个请求',
@@ -105,17 +107,17 @@ export const AGENTIC_POINT_DETAIL_STRINGS = {
       ' 阶段——该阶段用于建立 cache 状态，输出被限制为 1 个 token。warmup 阶段 OSL ≈ 1，交互性/解码指标为空（单 token 输出没有 token 间延迟）。',
     warmupNoServerData:
       ' 该数据点没有 warmup 阶段的服务器端指标，因此下方服务器图表为空——上方请求级图表仍反映 warmup 阶段数据。',
-    metricSourceError: '无法加载所选服务器指标来源。',
-    traceFailure: '无法加载基准测试数据点 #{id} 的 trace 数据。',
+    metricSourceError: '无法加载所选服务器指标来源',
+    traceFailure: '无法加载基准测试数据点 #{id} 的 trace 数据',
     missingTrace:
       '基准测试数据点 #{id} 未存储 trace_replay 数据。该数据点生成于 aiperf 时间序列采集功能上线前，或 GitHub 上的源产物已过期。',
     loadingAggregates: '加载中……',
     loadingTimeline: '正在加载请求时间线……',
     missingTimeline:
       '基准测试数据点 #{id} 没有逐请求时间线；对应数据行未存储 profile_export.jsonl 产物。',
-    aggregatesError: '跨配置聚合数据加载失败。',
-    timelineError: '请求时间线加载失败。',
-    requestChartsError: '请求图表数据加载失败。',
+    aggregatesError: '跨配置聚合数据加载失败',
+    timelineError: '请求时间线加载失败',
+    requestChartsError: '请求图表数据加载失败',
   },
 } as const;
 
@@ -185,7 +187,9 @@ export function AgenticPointDetail({ id }: Props) {
   const t = AGENTIC_POINT_DETAIL_STRINGS[locale];
   const withId = (template: string) => template.replace('{id}', String(id));
   const isZh = isZhPathname(pathname);
-  const inferenceBaseHref = isZh ? `${ZH_PREFIX}/inference` : '/inference';
+  const inferenceBaseHref = isZh
+    ? `${ZH_PREFIX}${getDashboardRoute('inference').path}`
+    : getDashboardRoute('inference').path;
   const [inferenceHref, setInferenceHref] = useState(inferenceBaseHref);
   useEffect(() => {
     setInferenceHref(withChartState(inferenceBaseHref));
@@ -269,7 +273,7 @@ export function AgenticPointDetail({ id }: Props) {
     (sliced?.series.prefixCacheHitRate.length ?? 0) > 1;
 
   return (
-    <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4 py-6">
+    <div className="flex flex-col gap-4 py-6">
       <NudgeEngine scope="agentic-detail" />
 
       <div className="flex items-center gap-2">
@@ -327,11 +331,7 @@ export function AgenticPointDetail({ id }: Props) {
       {view !== 'logs' &&
         metricsQuery.data === null &&
         !metricsQuery.isLoading &&
-        !metricsQuery.isError && (
-          <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
-            {withId(t.missingTrace)}
-          </div>
-        )}
+        !metricsQuery.isError && <EmptyState>{withId(t.missingTrace)}</EmptyState>}
 
       <div className="flex min-w-0 items-center justify-between gap-3">
         <SegmentedToggle
@@ -393,9 +393,7 @@ export function AgenticPointDetail({ id }: Props) {
           )
         ) : view === 'timeline' ? (
           timelineQuery.isLoading ? (
-            <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
-              {t.loadingTimeline}
-            </div>
+            <EmptyState>{t.loadingTimeline}</EmptyState>
           ) : timelineQuery.isError ? (
             <RetryableQueryError
               message={t.timelineError}
@@ -410,9 +408,7 @@ export function AgenticPointDetail({ id }: Props) {
               pointId={id}
             />
           ) : (
-            <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
-              {withId(t.missingTimeline)}
-            </div>
+            <EmptyState>{withId(t.missingTimeline)}</EmptyState>
           )
         ) : (
           <>
@@ -426,7 +422,7 @@ export function AgenticPointDetail({ id }: Props) {
             )}
             {!requestChartQuery.isError && effectivePhase === 'warmup' && (
               <p
-                className="rounded-md border-l-2 border-amber-500/60 bg-amber-500/10 px-3 py-2 text-xs text-muted-foreground"
+                className="rounded-md border-l-2 border-warning/60 bg-warning/10 px-3 py-2 text-xs text-muted-foreground"
                 data-testid="warmup-phase-note"
               >
                 {t.warmupNotePrefix}
@@ -443,7 +439,7 @@ export function AgenticPointDetail({ id }: Props) {
                 testId="agentic-metric-source-query-error"
               />
             )}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-x-8 gap-y-10 lg:grid-cols-2">
               {!requestChartQuery.isError && (
                 <>
                   <SequenceMetricCard

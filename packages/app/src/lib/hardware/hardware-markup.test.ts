@@ -26,12 +26,12 @@ describe('ledeSegments', () => {
 
 describe('link destinations', () => {
   it('opens absolute URLs as external links', () => {
-    expect(isExternalHref('https://inferencex.semianalysis.com/inference')).toBe(true);
-    expect(isExternalHref('/agentx/methodology')).toBe(false);
+    expect(isExternalHref('https://inferencex.semianalysis.com/infx/inference')).toBe(true);
+    expect(isExternalHref('/infx/agentx/methodology')).toBe(false);
   });
 
   it('accepts root-relative paths and https URLs only', () => {
-    expect(isSupportedHref('/zh/agentx/methodology')).toBe(true);
+    expect(isSupportedHref('/zh/infx/agentx/methodology')).toBe(true);
     expect(isSupportedHref('https://semianalysis.com/ai-cloud-tco-model/')).toBe(true);
     expect(isSupportedHref('//example.com')).toBe(false);
     expect(isSupportedHref('http://example.com')).toBe(false);

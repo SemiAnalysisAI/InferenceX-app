@@ -1,5 +1,5 @@
 'use client';
-import { chipBasisCsvNote } from '@/lib/benchmarks/chip-basis';
+import { CHIP_BASIS_METRICS, chipBasisCsvNote } from '@/lib/benchmarks/chip-basis';
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics/analytics';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
@@ -28,7 +28,7 @@ import {
 import {
   applyTokenRevenuePricing,
   cachedInputPricePerMillion,
-  formatTokenPrice,
+  formatTokenPriceLabel,
   usesTokenSalePricing,
 } from '@/components/inference/token-revenue';
 import {
@@ -79,10 +79,15 @@ import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ShareButton } from '@/components/ui/share-button';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
-import { Heading } from '@/components/ui/heading';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Heading, HeadingQualifier } from '@/components/ui/heading';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
-import { MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
-import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
+import {
+  MetricAssumptionNotes,
+  PricesSourceLink,
+  metricCostAssumptions,
+} from '@/components/ui/chart-display-helpers';
+import { ChipBasisCaption } from '@/components/ui/chip-basis-toggle';
 import { metricChartTitle, metricLabel, xAxisLabel } from '@/lib/charts/chart-utils';
 import { exportToCsv } from '@/lib/export/csv-export';
 import { inferenceChartToCsv } from '@/lib/export/csv-export-helpers';
@@ -120,6 +125,7 @@ import {
 } from '@/hooks/api/use-derived-agentic-metrics';
 import { useResidentSequenceLengths } from '@/hooks/api/use-resident-sequence-lengths';
 import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/catalog/constants';
+import { plottedChipBases } from '@/components/ui/editable-tco-badges';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { PowerXTutorialCta } from '@/components/powerx/powerx-tutorial-cta';
@@ -169,13 +175,11 @@ type InferenceViewMode = 'chart' | 'table';
 
 const STRINGS = {
   en: {
-    inferencePerformance: 'Inference Performance',
+    inferencePerformance: 'Inference performance',
     inferencePerformanceDesc:
-      'Agentic inference metrics from the AgentX scenario and fixed-sequence inference metrics across models, hardware configurations, and serving parameters.',
+      'Agentic inference metrics from the AgentX scenario and fixed-sequence inference metrics across models, hardware configurations, and serving parameters',
     chart: 'Chart',
     table: 'Table',
-    sourceUnofficial: 'Source: UNOFFICIAL',
-    sourceOfficial: 'Source: SemiAnalysis InferenceX™',
     revenuePrices: (input: string, cached: string | null, output: string) =>
       cached === null
         ? `Input $${input}/M tok · Output $${output}/M tok`
@@ -203,11 +207,9 @@ const STRINGS = {
   zh: {
     inferencePerformance: '推理性能',
     inferencePerformanceDesc:
-      '不同模型、硬件配置和服务参数下，来自 AgentX 场景的智能体推理指标与固定序列推理指标。',
+      '不同模型、硬件配置和服务参数下，来自 AgentX 场景的智能体推理指标与固定序列推理指标',
     chart: '图表',
     table: '表格',
-    sourceUnofficial: '来源：非官方',
-    sourceOfficial: '来源：SemiAnalysis InferenceX™',
     revenuePrices: (input: string, cached: string | null, output: string) =>
       cached === null
         ? `输入 $${input}/百万 token · 输出 $${output}/百万 token`
@@ -296,20 +298,6 @@ export function formatTokenLength(value: number): string {
   return `${(rounded / 1_000_000).toFixed(2).replace(/\.0+$/u, '')}m`;
 }
 
-function renderInferenceTcoBadges(props: {
-  label: string;
-  values: Record<string, number>;
-  blankedBases?: string[];
-}) {
-  return (
-    <InferenceTcoBadges
-      label={props.label}
-      values={props.values}
-      blankedBases={props.blankedBases}
-    />
-  );
-}
-
 export default function ChartDisplay({
   embedded = false,
   centerOnEnter = false,
@@ -343,7 +331,6 @@ export default function ChartDisplay({
     fixedSequenceStatistic,
     selectedXAxisMode,
     tokenRevenuePricing,
-    showLineLabels,
     showOffloadingLabel,
     powerCompare,
     tokenBasis,
@@ -1024,6 +1011,9 @@ export default function ChartDisplay({
           gpuCount: selectedOfficialHwTypes.size,
         })}
         mobileVisible
+        // On desktop the actions sit on the card's heading row, inset by the card padding,
+        // so the plot starts one row higher.
+        className="md:absolute md:right-6 md:top-6 md:z-10 md:mb-0"
         analyticsPrefix={
           isTimelineMode
             ? 'gpu_timeseries'
@@ -1038,13 +1028,10 @@ export default function ChartDisplay({
             onValueChange={(v) => handleViewModeChange(graphIndex, v)}
             ariaLabel={t.viewMode}
             testId={`inference-view-toggle-${graphIndex}`}
-            className="max-md:flex-1"
-            buttonClassName="max-md:flex-1 max-md:justify-center"
           />
         }
         hideImageExport={getViewMode(graphIndex) === 'table'}
         setIsLegendExpanded={setIsLegendExpanded}
-        hideLegendOnExport={showLineLabels}
         exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
         onExportMp4={
           replayAvailable ? () => replayHandlesRef.current[graphIndex]?.open() : undefined
@@ -1139,17 +1126,11 @@ export default function ChartDisplay({
         ]
       : renderableGraphs.length === 0
         ? [
-            <Card
-              key="empty-0"
-              data-testid="chart-empty-state"
-              className="flex min-h-[320px] items-center justify-center"
-            >
-              <p className="max-w-md text-center text-sm text-muted-foreground">
-                {selectedPowerBasis === 'utility-modeled'
-                  ? ALL_IN_MEASURED_EMPTY[locale]
-                  : t.noChartData}
-              </p>
-            </Card>,
+            <EmptyState key="empty-0" data-testid="chart-empty-state" className="min-h-80">
+              {selectedPowerBasis === 'utility-modeled'
+                ? ALL_IN_MEASURED_EMPTY[locale]
+                : t.noChartData}
+            </EmptyState>,
           ]
         : renderableGraphs.map((graph, graphIndex) => {
             const resolvedXLabel = xAxisLabel(graph.chartDefinition, locale);
@@ -1196,86 +1177,97 @@ export default function ChartDisplay({
                 getFrameworkLabel(point.framework).includes(ATOM_FOOTNOTE_MARKER),
             );
             const footerNotices =
-              hasOffloadHalo || residentSequenceLengths ? (
-                <>
-                  <div
-                    data-testid="chart-status-notes"
-                    className="flex flex-wrap items-center gap-x-5 gap-y-2"
-                  >
-                    {hasOffloadHalo && <OffloadHaloLegendKey />}
-                  </div>
-                  {residentSequenceLengths && !minimalChrome && !powerXSurface && (
-                    <p
-                      className="text-3xs leading-tight text-muted-foreground/70"
-                      data-testid="resident-sequence-lengths"
-                    >
-                      {t.completedSequenceLengths(
-                        residentSequenceLengths.isl.n.toLocaleString(
-                          locale === 'zh' ? 'zh-CN' : 'en-US',
-                        ),
-                      )}{' '}
-                      · ISL p50 {formatTokenLength(residentSequenceLengths.isl.p50)} · p75{' '}
-                      {formatTokenLength(residentSequenceLengths.isl.p75)} · p90{' '}
-                      {formatTokenLength(residentSequenceLengths.isl.p90)} · p95{' '}
-                      {formatTokenLength(residentSequenceLengths.isl.p95)} · p99{' '}
-                      {formatTokenLength(residentSequenceLengths.isl.p99)} | OSL p50{' '}
-                      {formatTokenLength(residentSequenceLengths.osl.p50)} · p75{' '}
-                      {formatTokenLength(residentSequenceLengths.osl.p75)} · p90{' '}
-                      {formatTokenLength(residentSequenceLengths.osl.p90)} · p95{' '}
-                      {formatTokenLength(residentSequenceLengths.osl.p95)} · p99{' '}
-                      {formatTokenLength(residentSequenceLengths.osl.p99)}
-                    </p>
-                  )}
-                </>
+              residentSequenceLengths && !minimalChrome && !powerXSurface ? (
+                <p
+                  className="text-3xs leading-tight text-muted-foreground/70"
+                  data-testid="resident-sequence-lengths"
+                >
+                  {t.completedSequenceLengths(
+                    residentSequenceLengths.isl.n.toLocaleString(
+                      locale === 'zh' ? 'zh-CN' : 'en-US',
+                    ),
+                  )}{' '}
+                  · ISL p50 {formatTokenLength(residentSequenceLengths.isl.p50)} · p75{' '}
+                  {formatTokenLength(residentSequenceLengths.isl.p75)} · p90{' '}
+                  {formatTokenLength(residentSequenceLengths.isl.p90)} · p95{' '}
+                  {formatTokenLength(residentSequenceLengths.isl.p95)} · p99{' '}
+                  {formatTokenLength(residentSequenceLengths.isl.p99)} | OSL p50{' '}
+                  {formatTokenLength(residentSequenceLengths.osl.p50)} · p75{' '}
+                  {formatTokenLength(residentSequenceLengths.osl.p75)} · p90{' '}
+                  {formatTokenLength(residentSequenceLengths.osl.p90)} · p95{' '}
+                  {formatTokenLength(residentSequenceLengths.osl.p95)} · p99{' '}
+                  {formatTokenLength(residentSequenceLengths.osl.p99)}
+                </p>
               ) : undefined;
+            const costAssumptions = minimalChrome
+              ? null
+              : metricCostAssumptions(selectedYAxisMetric, tcoBasis, userCosts);
+            const footerCostBases = costAssumptions
+              ? plottedChipBases(
+                  [
+                    ...[...selectedFooterRows.officialRows, ...selectedFooterRows.overlayRows].map(
+                      (point) => String(point.hwKey),
+                    ),
+                    ...costAssumptions.blankedBases,
+                  ],
+                  (base) =>
+                    base in costAssumptions.values || costAssumptions.blankedBases.includes(base),
+                )
+              : [];
             return (
               <section key={graphIndex}>
-                <figure data-testid="chart-figure" className="relative min-w-0 rounded-xl">
-                  {!minimalChrome && renderChartButtons(graph, graphIndex)}
-                  <Card data-coach-mark-root="">
+                <figure data-testid="chart-figure" className="relative min-w-0">
+                  <Card data-coach-mark-root="" className="relative">
+                    {!minimalChrome && renderChartButtons(graph, graphIndex)}
                     {(() => {
                       const chartHeading = (
                         <>
-                          <div className="flex items-start gap-1">
-                            <Heading as="h2" level="card">
-                              <ModelLogo
-                                model={graph.model as Model}
-                                className="mr-2 size-6 align-[-0.3em]"
-                              />
+                          <div
+                            className={`flex items-start gap-1 ${minimalChrome ? '' : 'md:pr-64'}`}
+                          >
+                            <Heading
+                              as="h2"
+                              level="card"
+                              logo={<ModelLogo model={graph.model as Model} className="size-6" />}
+                            >
                               {getModelLabel(graph.model as Model)}{' '}
                               {getSequenceLabel(graph.sequence as Sequence, locale)}{' '}
-                              {metricChartTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
-                              {(() => {
-                                if (isPowerTimeline) return null;
-                                if (!isAgenticSequence) {
-                                  const heading = String(graph.chartDefinition.heading);
-                                  return locale === 'zh' ? zhHeading(heading) : heading;
-                                }
-                                const xField = graph.chartDefinition.x_scale_field;
-                                if (xField?.endsWith('_ttft')) {
-                                  const percentile = xField.replace(/_ttft$/u, '');
-                                  return t.vsTtft(
-                                    percentile === 'median' ? 'Median' : percentile.toUpperCase(),
-                                  );
-                                }
-
-                                if (graph.chartDefinition.chartType === 'e2e') {
-                                  const modeSpec = DERIVED_X_MODE_SPECS[selectedXAxisMode];
-                                  if (modeSpec) {
-                                    const heading =
-                                      locale === 'zh' && modeSpec.headingZh
-                                        ? modeSpec.headingZh
-                                        : modeSpec.heading;
-                                    return heading(selectedPercentile.toUpperCase());
+                              {metricChartTitle(graph.chartDefinition, selectedYAxisMetric, locale)}
+                              <HeadingQualifier>
+                                {(() => {
+                                  if (isPowerTimeline) return null;
+                                  if (!isAgenticSequence) {
+                                    const heading = String(graph.chartDefinition.heading);
+                                    return locale === 'zh' ? zhHeading(heading) : heading;
                                   }
-                                  return isAgenticSequence
-                                    ? t.vsE2eLatency(selectedPercentile.toUpperCase())
-                                    : t.vsE2eLatency();
-                                }
+                                  const xField = graph.chartDefinition.x_scale_field;
+                                  if (xField?.endsWith('_ttft')) {
+                                    const percentile = xField.replace(/_ttft$/u, '');
+                                    return t.vsTtft(
+                                      percentile === 'median' ? 'Median' : percentile.toUpperCase(),
+                                    );
+                                  }
 
-                                const configured = graph.chartDefinition.heading;
-                                return locale === 'zh' ? zhHeading(String(configured)) : configured;
-                              })()}
+                                  if (graph.chartDefinition.chartType === 'e2e') {
+                                    const modeSpec = DERIVED_X_MODE_SPECS[selectedXAxisMode];
+                                    if (modeSpec) {
+                                      const heading =
+                                        locale === 'zh' && modeSpec.headingZh
+                                          ? modeSpec.headingZh
+                                          : modeSpec.heading;
+                                      return heading(selectedPercentile.toUpperCase());
+                                    }
+                                    return isAgenticSequence
+                                      ? t.vsE2eLatency(selectedPercentile.toUpperCase())
+                                      : t.vsE2eLatency();
+                                  }
+
+                                  const configured = graph.chartDefinition.heading;
+                                  return locale === 'zh'
+                                    ? zhHeading(String(configured))
+                                    : configured;
+                                })()}
+                              </HeadingQualifier>
                             </Heading>
                             {embedded && !minimalChrome && (
                               <OptionInfo
@@ -1327,14 +1319,20 @@ export default function ChartDisplay({
                                 : costTierOptionLabel(tier, locale);
                             })()}
                             costTierControl={
-                              embedded || minimalChrome ? undefined : <CostTierSelector />
+                              embedded || minimalChrome ? undefined : <CostTierSelector footer />
                             }
                             tcoBasis={
                               <TcoBasisCaption
                                 hardwareKeys={captionHwKeys}
                                 source="inference"
                                 interactive={!embedded && !minimalChrome}
+                                footer
                               />
+                            }
+                            chipBasis={
+                              !minimalChrome && CHIP_BASIS_METRICS.has(selectedYAxisMetric) ? (
+                                <ChipBasisCaption control={chipBasisControl} />
+                              ) : undefined
                             }
                             date={selectedRunDate}
                             dates={selectedDates}
@@ -1350,19 +1348,19 @@ export default function ChartDisplay({
                               isUnofficialRun
                                 ? locale === 'zh'
                                   ? 'SemiAnalysis InferenceX™ + 非官方 overlays'
-                                  : 'SemiAnalysis InferenceX™ + UNOFFICIAL overlays'
+                                  : 'SemiAnalysis InferenceX™ + unofficial overlays'
                                 : 'SemiAnalysis InferenceX™'
                             }
                             costBasis={
                               usesTokenSalePricing(selectedYAxisMetric) && tokenRevenuePricing
                                 ? t.revenuePrices(
-                                    formatTokenPrice(tokenRevenuePricing.inputPerMillion),
+                                    formatTokenPriceLabel(tokenRevenuePricing.inputPerMillion),
                                     graph.sequence === Sequence.AgenticTraces
-                                      ? formatTokenPrice(
+                                      ? formatTokenPriceLabel(
                                           cachedInputPricePerMillion(tokenRevenuePricing),
                                         )
                                       : null,
-                                    formatTokenPrice(tokenRevenuePricing.outputPerMillion),
+                                    formatTokenPriceLabel(tokenRevenuePricing.outputPerMillion),
                                   )
                                 : undefined
                             }
@@ -1370,6 +1368,22 @@ export default function ChartDisplay({
                               usesTokenSalePricing(selectedYAxisMetric) && tokenRevenuePricing
                                 ? 'token-revenue-subtitle-prices'
                                 : undefined
+                            }
+                            layout="footer"
+                            controlsEnd={
+                              costAssumptions && footerCostBases.length > 0 ? (
+                                <InferenceTcoBadges
+                                  bases={footerCostBases}
+                                  values={costAssumptions.values}
+                                  editable={costAssumptions.editable}
+                                />
+                              ) : undefined
+                            }
+                            markers={hasOffloadHalo ? <OffloadHaloLegendKey /> : undefined}
+                            metaEnd={
+                              costAssumptions && !costAssumptions.custom ? (
+                                <PricesSourceLink />
+                              ) : undefined
                             }
                           />
                           {minimalChrome ? (
@@ -1384,8 +1398,8 @@ export default function ChartDisplay({
                               selectedYAxisMetric={selectedYAxisMetric}
                               activeHwKeys={captionHwKeys}
                               userCosts={userCosts}
-                              renderCostBadges={renderInferenceTcoBadges}
-                              chipBasis={chipBasisControl}
+                              omitCostValues
+                              chipBasis={readOnlyChipBasisControl}
                             />
                           )}
                           {powerXLayout &&
@@ -1445,7 +1459,6 @@ export default function ChartDisplay({
                                 {t.e2eNormIntvtyDisclaimer}
                               </p>
                             )}
-                          <UnofficialDomainNotice />
                         </div>
                       );
                       const chartCaption = (
@@ -1457,9 +1470,7 @@ export default function ChartDisplay({
                       const chartFooter = (!powerXSurface || hasAtomSeries) && (
                         <div className="mt-3">
                           {!powerXSurface && chartContext}
-                          {hasAtomSeries && (
-                            <AtomEngineFootnote className="mt-2 text-xs leading-5" />
-                          )}
+                          {hasAtomSeries && <AtomEngineFootnote className="mt-2" />}
                         </div>
                       );
 
@@ -1615,7 +1626,7 @@ export default function ChartDisplay({
                               placement={powerCompare === 'roles' ? 'after' : 'before'}
                             />
                             {powerXWherePanelsOnly && hasAtomSeries && (
-                              <AtomEngineFootnote className="mt-2 text-xs leading-5" />
+                              <AtomEngineFootnote className="mt-2" />
                             )}
                           </>
                         );
@@ -1749,6 +1760,7 @@ export default function ChartDisplay({
         {!powerXSurface && !embedded && !minimalChrome && renderableGraphs.length === 0 && (
           <ResultContext
             locale={locale}
+            layout="footer"
             scenario={<InferenceScenarioSelector variant="caption" />}
           />
         )}

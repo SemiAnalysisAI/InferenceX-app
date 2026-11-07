@@ -493,6 +493,16 @@ const evaluationsSchema = arraySchema(
     model: stringSchema,
     precision: stringSchema,
     spec_method: stringSchema,
+    spec_algorithm: {
+      ...nullableStringSchema,
+      description:
+        'Speculative algorithm recorded by a benchmark result for the same config and workflow run, or null when none was recorded.',
+    },
+    spec_draft_model: {
+      ...nullableStringSchema,
+      description:
+        'Draft model recorded alongside spec_algorithm ("native" for built-in heads), or null when none was recorded.',
+    },
     disagg: booleanSchema,
     is_multinode: booleanSchema,
     prefill_tp: integerSchema,
@@ -1335,6 +1345,8 @@ export const apiOperations: readonly ApiOperation[] = [
           model: 'dsr1',
           precision: 'fp8',
           spec_method: 'none',
+          spec_algorithm: null,
+          spec_draft_model: null,
           disagg: false,
           is_multinode: false,
           prefill_tp: 8,
@@ -3403,6 +3415,21 @@ const quickstartText = {
   },
 } as const;
 
+/** Prose type labels and placeholder examples; schema type names stay as identifiers. */
+const PARAMETER_TEXT_ZH: Record<string, string> = {
+  'CSV list': 'CSV 列表',
+  'CSV number list': 'CSV 数字列表',
+  'CSV GPU list': 'CSV GPU 列表',
+  'CSV workload list': 'CSV 工作负载列表',
+  'comma-separated integers': '逗号分隔的整数',
+  'Exact key returned in serviceSources': 'serviceSources 中返回的完整键',
+};
+
+function localizeParameterText<T>(value: T, locale: ApiDocumentationLocale): T | string {
+  if (locale !== 'zh' || typeof value !== 'string') return value;
+  return PARAMETER_TEXT_ZH[value] ?? value;
+}
+
 function localizeOperation(
   operation: ApiOperation,
   locale: ApiDocumentationLocale,
@@ -3413,6 +3440,8 @@ function localizeOperation(
     description: operation.description[locale],
     parameters: operation.parameters.map((item) => ({
       ...item,
+      type: localizeParameterText(item.type, locale),
+      example: localizeParameterText(item.example, locale),
       description: item.description[locale],
     })),
     responses: operation.responses.map((item) => ({

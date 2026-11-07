@@ -12,7 +12,7 @@ export const VIDEO_ALIAS_REDIRECTS: readonly VideoAliasRedirect[] = LOCALE_PREFI
   (prefix) =>
     VIDEO_ROUTE_ALIASES.map((alias) => ({
       source: `${prefix}/${alias}/:path*`,
-      destination: `${prefix}/video/:path*`,
+      destination: `${prefix}/vgx/:path*`,
       permanent: true as const,
     })),
 );

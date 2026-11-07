@@ -3,7 +3,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { EditableTcoBadges } from '@/components/ui/editable-tco-badges';
+import { EditableTcoBadges, TcoPriceTable } from '@/components/ui/editable-tco-badges';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -51,7 +51,7 @@ describe('EditableTcoBadges', () => {
     expect(inputs[0].type).toBe('number');
     expect(inputs[0].getAttribute('aria-label')).toBe('GB300 $/chip/hr');
     expect(inputs[0].id).toBe('cost-input-gb300');
-    expect(container.querySelector('label[for="cost-input-gb300"]')?.textContent).toBe('GB300:');
+    expect(container.querySelector('label[for="cost-input-gb300"]')?.textContent).toBe('GB300');
     expect(inputs[1].value).toBe('');
     expect(container.querySelector('[data-testid="badges"]')?.textContent).toContain(
       'TCO $/chip/hr:',
@@ -89,5 +89,36 @@ describe('EditableTcoBadges', () => {
     const inputs = [...container.querySelectorAll<HTMLInputElement>('[data-testid="badge"] input')];
     expect(inputs[0].style.width).toBe('5.5ch');
     expect(inputs[1].style.width).toBe('2.5ch');
+  });
+});
+
+describe('TcoPriceTable', () => {
+  function renderTable(items: typeof ITEMS) {
+    act(() =>
+      root.render(
+        <TcoPriceTable
+          items={items}
+          editable
+          testId="table"
+          cellTestId="cell"
+          inputIdPrefix="cost-input"
+        />,
+      ),
+    );
+  }
+
+  it('keeps the focused cell mounted while its chip drops out of the items', () => {
+    renderTable(ITEMS);
+    const input = container.querySelector<HTMLInputElement>('[data-testid="cost-input-gb300"]');
+    if (!input) throw new Error('missing input');
+    act(() => input.focus());
+    renderTable(ITEMS.slice(1));
+    expect(container.querySelector('[data-testid="cost-input-gb300"]')).toBe(input);
+    expect(document.activeElement).toBe(input);
+    renderTable(ITEMS);
+    expect(container.querySelector('[data-testid="cost-input-gb300"]')).toBe(input);
+    act(() => input.blur());
+    renderTable(ITEMS.slice(1));
+    expect(container.querySelector('[data-testid="cost-input-gb300"]')).toBeNull();
   });
 });

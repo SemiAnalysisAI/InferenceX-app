@@ -29,7 +29,7 @@ At a high level, an [agentic workload](/glossary/agentic-coding-workload) is cha
 
 Considering the characteristics above, benchmarking these workloads is fundamentally different from the existing fixed-sequence-length benchmarks.
 
-Because prefix reuse is so high, KV tensors have to move efficiently across nodes and ranks — the job of transfer layers like NIXL, MORI-IO, and [Mooncake](/agentx/optimizations/mooncake). Conversations then have to be routed to the node or rank where their prefix already resides in order to maximize cache hit rate, which is what llm-d, [Dynamo](/agentx/optimizations/dynamo), and the vLLM and SGLang routers do. Long-context conversations stress HBM capacity for KV cache and force offload to slower memory tiers such as DRAM and SSD, which has to be done efficiently — Mooncake Store, [LMCache](/agentx/optimizations/lmcache), vLLM's CPU offloading, and SGLang HiCache all attack this layer.
+Because prefix reuse is so high, KV tensors have to move efficiently across nodes and ranks — the job of transfer layers like NIXL, MORI-IO, and [Mooncake](/infx/agentx/optimizations/mooncake). Conversations then have to be routed to the node or rank where their prefix already resides in order to maximize cache hit rate, which is what llm-d, [Dynamo](/infx/agentx/optimizations/dynamo), and the vLLM and SGLang routers do. Long-context conversations stress HBM capacity for KV cache and force offload to slower memory tiers such as DRAM and SSD, which has to be done efficiently — Mooncake Store, [LMCache](/infx/agentx/optimizations/lmcache), vLLM's CPU offloading, and SGLang HiCache all attack this layer.
 
 This is in contrast to fixed-sequence-length, single-turn workloads, where prefix reuse is not relevant and inference performance is largely reflective of baseline chip and kernel performance. That does not make the plethora of fixed-sequence-length data on InferenceX less important. Stripping away the complexities of agentic serving gives a clear picture of how low-level inference optimizations are progressing, and provides the baseline that AgentX results are read against.
 
@@ -44,13 +44,13 @@ Reconstructing subagent structure required changes in Claude Code itself. We wor
 
 Without those headers, a session that fans out N concurrent subagents is indistinguishable from N unrelated conversations, and the spawn and join dependencies that shape the [replay graph](/glossary/trace-replay) cannot be recovered.
 
-The full dataset rules, distributions, and source links are published in the [AgentX methodology](/agentx/methodology), and the concrete engine changes this workload has already exposed are tracked in the [AgentX optimization tracker](/agentx/optimizations).
+The full dataset rules, distributions, and source links are published in the [AgentX methodology](/infx/agentx/methodology), and the concrete engine changes this workload has already exposed are tracked in the [AgentX optimization tracker](/infx/agentx/optimizations).
 
 ## Acknowledgments
 
 Thanks to the Anthropic staff who shipped the agent-identification headers in Claude Code, and to the Alibaba and NVIDIA teams behind Qwen-Bailian and AIPerf, whose work the AgentX replay pipeline builds on.
 
-<DashboardCTA href="/inference?i_seq=agentic-traces">
+<DashboardCTA href="/infx/inference?i_seq=agentic-traces">
   Compare live AgentX inference results →
 </DashboardCTA>
 

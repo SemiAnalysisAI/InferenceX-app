@@ -27,17 +27,17 @@ describe('per-model profit estimator metadata', () => {
 
   it('canonicalizes the default model (Kimi K3) to the bare tab path only', () => {
     expect(defaultRouteModel('profit-estimator')).toBe(Model.Kimi_K3);
-    expect(modelTabCanonicalPath('profit-estimator', kimi)).toBe('/profit-estimator');
+    expect(modelTabCanonicalPath('profit-estimator', kimi)).toBe('/infx/profit-estimator');
     expect(modelTabCanonicalPath('profit-estimator', deepseek)).toBe(
-      `/profit-estimator/${deepseek.slug}`,
+      `/infx/profit-estimator/${deepseek.slug}`,
     );
-    expect(modelTabCanonicalPath('calculator', deepseek)).toBe('/calculator');
+    expect(modelTabCanonicalPath('calculator', deepseek)).toBe('/infx/calculator');
   });
 
   it('gives the per-gigawatt view its own Kimi-defaulted route and GW wording', () => {
     expect(defaultRouteModel('profit-estimator-per-gigawatt')).toBe(Model.Kimi_K3);
     expect(modelTabCanonicalPath('profit-estimator-per-gigawatt', kimi)).toBe(
-      '/profit-estimator-per-gigawatt',
+      '/infx/profit-estimator-per-gigawatt',
     );
     expect(MODEL_TAB_META['profit-estimator-per-gigawatt'].title(kimi.seoName)).toContain(
       'per GigaWatt',
@@ -51,7 +51,7 @@ describe('per-model profit estimator metadata', () => {
     expect(meta.title).toContain(deepseek.seoName);
     expect(meta.description).toContain(deepseek.seoName);
     expect(meta.alternates?.canonical).toBe(
-      `https://inferencex.semianalysis.com/profit-estimator/${deepseek.slug}`,
+      `https://inferencex.semianalysis.com/infx/profit-estimator/${deepseek.slug}`,
     );
   });
 });
@@ -84,9 +84,9 @@ describe('getTabTitle', () => {
 });
 
 describe('dashboard SEO metadata', () => {
-  it('canonicalizes /inference to itself rather than the landing page', () => {
+  it('canonicalizes /infx/inference to itself rather than the landing page', () => {
     expect(tabMetadata('inference').alternates?.canonical).toBe(
-      'https://inferencex.semianalysis.com/inference',
+      'https://inferencex.semianalysis.com/infx/inference',
     );
   });
 

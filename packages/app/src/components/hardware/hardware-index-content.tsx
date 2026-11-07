@@ -25,12 +25,10 @@ export function HardwareIndexContent({ locale }: { locale: Locale }) {
     <main className="relative" data-testid="hardware-index-page">
       <JsonLd data={buildHardwareIndexJsonLd(pages, locale)} />
       <div className="container mx-auto flex flex-col gap-8 px-4 pb-16 lg:gap-10 lg:px-8">
-        <header className="flex flex-col gap-3 pt-4 lg:pt-8">
-          <Eyebrow as="p" wide>
-            {t.indexEyebrow}
-          </Eyebrow>
+        <header className="flex flex-col gap-3 pt-8 md:pt-12">
+          <Eyebrow as="p">{t.indexEyebrow}</Eyebrow>
           <Heading as="h1" level="page" className="text-balance">
-            {t.indexTitle}
+            {t.indexHeading}
           </Heading>
           <p className="max-w-prose text-base text-muted-foreground lg:text-lg">{t.indexIntro}</p>
         </header>
@@ -42,7 +40,7 @@ export function HardwareIndexContent({ locale }: { locale: Locale }) {
             {pages.map((page) => (
               <article
                 key={page.slug}
-                className="group relative flex min-w-0 flex-col gap-4 rounded-2xl border border-border/50 bg-card/60 p-5 backdrop-blur-[2px] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-lg hover:shadow-primary/5 md:p-6"
+                className="group relative flex min-w-0 flex-col gap-4 rounded-xl border border-border/30 bg-card p-5 transition-colors hover:border-border md:p-6"
                 data-testid="hardware-card"
               >
                 <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
@@ -53,7 +51,7 @@ export function HardwareIndexContent({ locale }: { locale: Locale }) {
                 <Heading
                   as="h2"
                   level="card"
-                  className="text-balance text-lg leading-snug group-hover:text-brand lg:text-xl"
+                  className="text-balance text-lg leading-snug lg:text-xl"
                 >
                   <HardwareCardLink
                     slug={page.slug}

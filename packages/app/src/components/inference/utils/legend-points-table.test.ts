@@ -36,7 +36,7 @@ describe('pointDetailHref', () => {
   it('agentic point with numeric id links to the in-app detail page', () => {
     const d = pt({ benchmark_type: 'agentic_traces', id: 206863 });
     expect(pointDetailHref(d, false)).toEqual({
-      href: '/inference/agentic/206863',
+      href: '/infx/inference/agentic/206863',
       isExternal: false,
     });
   });
@@ -44,7 +44,7 @@ describe('pointDetailHref', () => {
   it('keeps a Chinese reader on /zh', () => {
     const d = pt({ benchmark_type: 'agentic_traces', id: 206863 });
     expect(pointDetailHref(d, false, 'zh')).toEqual({
-      href: '/zh/inference/agentic/206863',
+      href: '/zh/infx/inference/agentic/206863',
       isExternal: false,
     });
   });
@@ -109,7 +109,7 @@ describe('buildLegendPointsRows', () => {
       p90Intvty: 38.1,
       p50Ttft: 0.42,
       p90Ttft: 0.87,
-      href: '/inference/agentic/1',
+      href: '/infx/inference/agentic/1',
       isExternal: false,
     });
   });
@@ -120,7 +120,7 @@ describe('buildLegendPointsRows', () => {
       false,
       'zh',
     );
-    expect(rows[0].href).toBe('/zh/inference/agentic/1');
+    expect(rows[0].href).toBe('/zh/infx/inference/agentic/1');
   });
 
   it('default-sorts by concurrency ascending', () => {

@@ -433,7 +433,7 @@ function MultiSelect({
                 <span
                   key={value[index]}
                   data-slot="select-chip"
-                  className="bg-transparent text-foreground border border-border dark:bg-[#0a6ca8] dark:border-border inline-flex min-w-0 max-w-full items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0"
+                  className="bg-foreground/[0.08] text-foreground inline-flex min-w-0 max-w-full items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0"
                 >
                   {selectedOptions[index]?.icon}
                   <span className="min-w-0 truncate" title={label}>
@@ -450,7 +450,7 @@ function MultiSelect({
                       }
                     }}
                     className={cn(
-                      'hover:bg-primary/20 rounded-sm cursor-pointer transition-colors',
+                      'hover:bg-foreground/10 rounded-sm cursor-pointer transition-colors',
                       (disabled || isMinReached) && 'hidden',
                     )}
                     aria-label={`${t.removePrefix}${label}`}

@@ -69,11 +69,11 @@ describe('Header', () => {
 
   it('pushes locale navigation exactly once outside Overview', () => {
     cy.clock();
-    mountHeader('/inference');
+    mountHeader('/infx/inference');
     cy.get('[data-testid="language-toggle"]')
       .invoke('attr', 'href')
       .then((href) => {
-        expect(href).to.include('/zh/inference');
+        expect(href).to.include('/zh/infx/inference');
         cy.get('[data-testid="language-toggle"]').click();
         cy.wrap(mockRouter.push).should('have.been.calledOnceWith', href);
         cy.tick(5000);
@@ -106,32 +106,27 @@ describe('Header', () => {
   });
 
   it('still navigates to Dashboard from a sibling dashboard tab', () => {
-    mountHeader('/evaluation');
+    mountHeader('/infx/evaluation');
     cy.get('[data-testid="nav-link-dashboard"]').click();
-    cy.wrap(mockRouter.push).should('have.been.calledWith', '/inference');
+    cy.wrap(mockRouter.push).should('have.been.calledWith', '/infx/inference');
   });
 
   it('shows AgentX as a top-level nav link and highlights AgentX child pages', () => {
     cy.get('[data-testid="nav-link-agentx"]')
       .should('be.visible')
-      .and('have.attr', 'href', '/agentx')
-      .find('[data-nav-badge="agentx"]')
-      .should('have.text', 'NEW');
+      .and('have.attr', 'href', '/infx/agentx');
 
-    mountHeader('/agentx/claude-code-traces');
-    cy.get('[data-testid="nav-link-agentx"]').should('have.class', 'text-brand');
+    mountHeader('/infx/agentx/claude-code-traces');
+    cy.get('[data-testid="nav-link-agentx"]').should('have.attr', 'aria-current', 'page');
   });
 
   it('keeps AgentX in the Chinese navigation tree', () => {
-    mountHeader('/zh/agentx');
+    mountHeader('/zh/infx/agentx');
     cy.get('[data-testid="nav-link-agentx"]')
       .should('be.visible')
       .and('contain.text', 'AgentX')
-      .and('have.attr', 'href', '/zh/agentx')
-      .and('have.class', 'text-brand');
-    cy.get('[data-testid="nav-link-agentx"]')
-      .find('[data-nav-badge="agentx"]')
-      .should('have.text', '新');
+      .and('have.attr', 'href', '/zh/infx/agentx')
+      .and('have.attr', 'aria-current', 'page');
   });
 
   it('localizes the mobile navigation accessible name without changing English', () => {
@@ -142,14 +137,14 @@ describe('Header', () => {
       'Navigation menu',
     );
 
-    mountHeader('/zh/inference');
+    mountHeader('/zh/infx/inference');
     cy.get('[data-testid="mobile-menu-toggle"]').should('have.attr', 'aria-label', '导航菜单');
   });
 
-  it('orders the nav with Home first and AgentX second', () => {
-    const expected = ['Home', 'AgentX', 'Overview', 'Dashboard', 'ubenchX', 'About'];
+  it('orders the nav as Home, Overview, Dashboard, AgentX, uBenchX, About', () => {
+    const expected = ['Home', 'Overview', 'Dashboard', 'AgentX', 'uBenchX', 'About'];
     cy.get('[data-testid^="nav-link-"]').then(($links) => {
-      const labels = [...$links].map((link) => (link.textContent ?? '').replace('NEW', '').trim());
+      const labels = [...$links].map((link) => (link.textContent ?? '').replace('New', '').trim());
       expect(labels).to.deep.equal(expected);
     });
   });
@@ -171,13 +166,11 @@ describe('Header', () => {
       .should('have.attr', 'aria-expanded', 'true');
     cy.get('[data-testid="mobile-menu"]').within(() => {
       cy.contains('a', 'Overview').should('be.visible').and('have.attr', 'href', '/overview');
-      cy.contains('a', 'Dashboard').should('be.visible').and('have.attr', 'href', '/inference');
-      cy.contains('a', 'ubenchX').should('be.visible').and('have.attr', 'href', '/ubenchx/mem-bw');
-      cy.contains('a', 'AgentX')
+      cy.contains('a', 'Dashboard')
         .should('be.visible')
-        .and('have.attr', 'href', '/agentx')
-        .find('[data-nav-badge="agentx"]')
-        .should('have.text', 'NEW');
+        .and('have.attr', 'href', '/infx/inference');
+      cy.contains('a', 'uBenchX').should('be.visible').and('have.attr', 'href', '/ubx/mem-bw');
+      cy.contains('a', 'AgentX').should('be.visible').and('have.attr', 'href', '/infx/agentx');
       cy.contains('a', 'Comparisons').should('not.exist');
       cy.contains('a', 'Articles').should('not.exist');
       cy.contains('a', 'Supporters').should('not.exist');
@@ -253,8 +246,8 @@ describe('Header', () => {
     });
   });
 
-  it('keeps every primary link inside the header at the xl desktop breakpoint', () => {
-    cy.viewport(1280, 720);
+  it('keeps every primary link inside the header at the desktop nav breakpoint', () => {
+    cy.viewport(1120, 720);
     cy.get('[data-testid="header"]').then(($header) => {
       const header = $header[0];
       const bounds = header.getBoundingClientRect();
@@ -321,7 +314,7 @@ describe('Header', () => {
       cy.get('[data-testid="mobile-menu-toggle"]').click();
       cy.get('[data-testid="mobile-menu"]').should('be.visible');
       cy.get('[data-testid="mobile-menu"]').within(() => {
-        ['Home', 'Overview', 'Dashboard', 'ubenchX', 'AgentX', 'About'].forEach((label) => {
+        ['Home', 'Overview', 'Dashboard', 'uBenchX', 'AgentX', 'About'].forEach((label) => {
           cy.contains('a', label).should('be.visible');
         });
         ['Comparisons', 'Articles', 'Supporters', 'Telemetry'].forEach((label) => {

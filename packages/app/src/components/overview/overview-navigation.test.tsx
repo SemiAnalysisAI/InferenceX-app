@@ -282,7 +282,7 @@ describe('OverviewNavigationProvider', () => {
     expect(readProbe('tier')).toBe('75');
 
     stub.mockClear();
-    window.history.replaceState({}, '', '/inference');
+    window.history.replaceState({}, '', '/infx/inference');
     act(() => {
       window.dispatchEvent(new PopStateEvent('popstate'));
     });

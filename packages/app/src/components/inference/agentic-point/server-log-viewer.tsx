@@ -40,18 +40,18 @@ import {
 const STRINGS = {
   en: {
     title: 'Log files',
-    description: 'Raw .log and .out files captured for this benchmark point.',
+    description: 'Raw .log and .out files captured for this benchmark point',
     fileLabel: 'Log file',
     fileOne: 'file',
     fileMany: 'files',
     searchLabel: 'Search all log files',
-    searchPlaceholder: 'Search full log contents…',
-    searchHint: 'Searches every stored file, including content not loaded below.',
+    searchPlaceholder: 'Search logs',
+    searchHint: 'Searches every stored file, including content not loaded below',
     searching: 'Searching…',
     searchError: 'The logs could not be searched. Try again in a moment.',
-    noMatches: 'No matches found.',
+    noMatches: 'No matches found',
     searchIncomplete:
-      'Search stopped after the first 64 million characters; later content was not searched.',
+      'Search stopped after the first 64 million characters; later content was not searched',
     match: 'match',
     matches: 'matches',
     firstMatches: 'Showing the first',
@@ -59,7 +59,7 @@ const STRINGS = {
     goToMatch: 'Go to in logs',
     loading: 'Loading log files…',
     error: 'The log files could not be loaded. Try again in a moment.',
-    missing: 'No log files are stored for this benchmark point.',
+    missing: 'No log files are stored for this benchmark point',
     copy: 'Copy loaded logs',
     copied: 'Copied',
     download: 'Download selected log',
@@ -71,17 +71,17 @@ const STRINGS = {
   },
   zh: {
     title: '日志文件',
-    description: '该基准测试数据点采集的原始 .log 和 .out 文件。',
+    description: '该基准测试数据点采集的原始 .log 和 .out 文件',
     fileLabel: '日志文件',
     fileOne: '个文件',
     fileMany: '个文件',
     searchLabel: '搜索所有日志文件',
-    searchPlaceholder: '搜索完整日志内容……',
-    searchHint: '搜索所有已存储文件，包括下方尚未加载的内容。',
+    searchPlaceholder: '搜索日志',
+    searchHint: '搜索所有已存储文件，包括下方尚未加载的内容',
     searching: '正在搜索……',
     searchError: '无法搜索日志，请稍后重试。',
-    noMatches: '未找到匹配内容。',
-    searchIncomplete: '搜索已在前 6,400 万个字符处停止，之后的内容未被搜索。',
+    noMatches: '未找到匹配内容',
+    searchIncomplete: '搜索已在前 6,400 万个字符处停止，之后的内容未被搜索',
     match: '处匹配',
     matches: '处匹配',
     firstMatches: '显示前',
@@ -89,7 +89,7 @@ const STRINGS = {
     goToMatch: '在日志中定位',
     loading: '正在加载日志文件……',
     error: '无法加载日志文件，请稍后重试。',
-    missing: '该基准测试数据点没有已存储的日志文件。',
+    missing: '该基准测试数据点没有已存储的日志文件',
     copy: '复制已加载日志',
     copied: '已复制',
     download: '下载当前日志',
@@ -132,19 +132,17 @@ export function retryInitialServerLogQuery(
   else void refetchContent();
 }
 
-const LOG_SURFACE = 'bg-[#0b0e13]';
+const LOG_SURFACE = 'bg-muted/30';
 
 const LINE_TONE: Record<LogSeverity, string> = {
-  error: 'border-l-rose-400/80 bg-rose-500/8 text-rose-200',
-  warn: 'border-l-amber-300/70 bg-amber-300/6 text-amber-100',
-  debug: 'text-zinc-500',
-  info: 'text-zinc-300',
+  error: 'border-l-destructive/70 text-destructive',
+  warn: 'border-l-warning/70 text-warning',
+  debug: 'text-muted-foreground',
+  info: 'text-foreground/90',
 };
 
-const GUTTER_CLASS = cn(
-  'log-gutter sticky left-0 z-10 border-r border-white/8 px-3 text-right text-zinc-600 tabular-nums select-none',
-  LOG_SURFACE,
-);
+const GUTTER_CLASS =
+  'log-gutter sticky left-0 z-10 border-r border-border/30 bg-muted px-3 text-right text-muted-foreground/60 tabular-nums select-none';
 const LINE_CLASS = 'border-l-2 border-transparent pr-4 pl-2.5';
 
 const LogRow = memo(({ text, severity }: { text: string; severity: LogSeverity }) => (
@@ -178,22 +176,13 @@ function LogViewerNotice({
   return (
     <div
       className={cn(
-        'flex items-center gap-3 rounded-lg border px-4 py-6 text-sm',
+        'flex items-center gap-3 rounded-xl border px-4 py-6 text-sm',
         tone === 'destructive'
-          ? 'border-destructive/40 bg-destructive/10 text-destructive'
-          : 'border-border/40 bg-card/40 text-muted-foreground',
+          ? 'border-destructive/30 bg-destructive/10 text-destructive'
+          : 'border-border/30 bg-card text-muted-foreground',
       )}
     >
-      <span
-        className={cn(
-          'flex size-9 shrink-0 items-center justify-center rounded-md border',
-          tone === 'destructive'
-            ? 'border-destructive/30 bg-destructive/10'
-            : 'border-border/50 bg-background',
-        )}
-      >
-        {icon}
-      </span>
+      <span className="flex shrink-0 items-center">{icon}</span>
       <span className="min-w-0">{children}</span>
     </div>
   );
@@ -403,24 +392,21 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
 
   return (
     <section
-      className="overflow-hidden rounded-lg border border-border/60 bg-card/40 shadow-sm"
+      className="overflow-hidden rounded-xl border border-border/30 bg-card"
       data-testid="agentic-server-log-viewer"
       data-log-context={analyticsContext}
     >
-      <header className="flex min-w-0 items-start gap-3 border-b border-border/60 bg-muted/20 px-4 py-3">
-        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border border-border/60 bg-background text-muted-foreground">
-          <Terminal className="size-4" aria-hidden="true" />
-        </span>
+      <header className="flex min-w-0 items-baseline gap-3 border-b border-border/20 px-4 py-3">
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold text-foreground">{t.title}</h2>
+          <h2 className="text-sm font-medium text-foreground">{t.title}</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">{t.description}</p>
         </div>
-        <span className="shrink-0 rounded-full border border-border/60 bg-background px-2.5 py-0.5 font-mono text-2xs tabular-nums text-muted-foreground">
+        <span className="shrink-0 font-mono text-2xs tabular-nums text-muted-foreground">
           {formatter.format(files.length)} {files.length === 1 ? t.fileOne : t.fileMany}
         </span>
       </header>
 
-      <div className="grid min-w-0 gap-2 border-b border-border/60 bg-background/30 px-4 py-3">
+      <div className="grid min-w-0 gap-2 border-b border-border/20 px-4 py-3">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <label className="sr-only" htmlFor="agentic-log-file">
             {t.fileLabel}
@@ -463,7 +449,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
               placeholder={t.searchPlaceholder}
-              className="h-8 pr-9 pl-8.5 font-mono text-xs md:text-xs"
+              className="h-11 pr-9 pl-8.5 font-mono text-xs md:h-8 md:text-xs"
               data-testid="server-log-search"
             />
             {searchQuery.isFetching ? (
@@ -475,7 +461,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
           </div>
 
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <Button asChild variant="outline" size="sm" className="text-xs">
+            <Button asChild variant="outline" size="xs">
               <a
                 href={downloadUrl}
                 download
@@ -484,7 +470,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
                 }
                 data-testid="download-selected-server-log"
               >
-                <Download className="size-3.5" />
+                <Download />
                 {t.download}
               </a>
             </Button>
@@ -493,15 +479,10 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
               onClick={() => void copyLoadedLog()}
               disabled={log.length === 0}
               variant="outline"
-              size="sm"
-              className="text-xs"
+              size="xs"
               data-testid="copy-loaded-server-log"
             >
-              {copied ? (
-                <Check className="size-3.5 text-emerald-500" />
-              ) : (
-                <Copy className="size-3.5" />
-              )}
+              {copied ? <Check className="text-success" /> : <Copy />}
               {copied ? t.copied : t.copy}
             </Button>
           </div>
@@ -519,57 +500,52 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
         ) : null}
         {searchTerm && searchQuery.data ? (
           <div className="grid gap-1.5 pt-1" data-testid="server-log-search-results">
-            <p
-              className="font-mono text-3xs font-semibold tracking-eyebrow text-muted-foreground uppercase"
-              aria-live="polite"
-            >
+            <p className="text-xs font-medium text-muted-foreground" aria-live="polite">
               {searchQuery.data.truncated ? `${t.firstMatches} ` : ''}
               {formatter.format(searchQuery.data.matches.length)}{' '}
               {searchQuery.data.matches.length === 1 ? t.match : t.matches}
             </p>
             {searchQuery.data.incomplete ? (
               <p
-                className="text-2xs text-muted-foreground"
+                className="text-xs text-muted-foreground"
                 data-testid="server-log-search-incomplete"
               >
                 {t.searchIncomplete}
               </p>
             ) : null}
             {searchQuery.data.matches.length === 0 ? (
-              <p className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                {t.noMatches}
-              </p>
+              <p className="text-xs text-muted-foreground">{t.noMatches}</p>
             ) : (
               <div
                 className={cn(
-                  'max-h-72 divide-y divide-white/5 overflow-auto rounded-md border border-border/60',
+                  'max-h-72 divide-y divide-border/20 overflow-auto rounded-md border border-border/30',
                   LOG_SURFACE,
                 )}
               >
                 {searchQuery.data.matches.map((result) => (
                   <article key={`${result.fileName}:${result.offset}`} className="grid gap-1.5 p-3">
                     <div className="flex min-w-0 items-center gap-3 font-mono text-2xs">
-                      <span className="min-w-0 truncate text-zinc-300" title={result.fileName}>
-                        <FilePath path={result.fileName} className="[&>span]:text-zinc-500" />
+                      <span className="min-w-0 truncate text-foreground" title={result.fileName}>
+                        <FilePath path={result.fileName} />
                       </span>
-                      <span className="ml-auto shrink-0 text-zinc-500 tabular-nums">
+                      <span className="ml-auto shrink-0 text-muted-foreground tabular-nums">
                         {t.character} {formatter.format(result.offset + 1)}
                       </span>
                       <Button
                         type="button"
                         variant="ghost"
-                        size="sm"
-                        className="h-6 shrink-0 gap-1 px-2 text-2xs text-amber-200/90 hover:bg-amber-300/10 hover:text-amber-100"
+                        size="2xs"
+                        className="shrink-0"
                         onClick={() => goToSearchMatch(result)}
                         data-testid="go-to-server-log-match"
                       >
-                        <ArrowDownToLine className="size-3" />
+                        <ArrowDownToLine />
                         {t.goToMatch}
                       </Button>
                     </div>
-                    <pre className="max-h-20 overflow-hidden border-l-2 border-white/10 pl-2.5 font-mono text-xs leading-5 break-all whitespace-pre-wrap text-zinc-400">
+                    <pre className="max-h-20 overflow-hidden border-l-2 border-border/40 pl-2.5 font-mono text-xs leading-5 break-all whitespace-pre-wrap text-muted-foreground">
                       {readableLogText(result.before)}
-                      <mark className="rounded-xs bg-amber-300 px-0.5 text-zinc-950">
+                      <mark className="rounded-xs bg-warning/25 px-0.5 text-foreground">
                         {readableLogText(result.match)}
                       </mark>
                       {readableLogText(result.after)}
@@ -585,14 +561,14 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
       <pre
         ref={logViewportRef}
         className={cn(
-          'max-h-[70vh] min-h-[28rem] overflow-auto font-mono text-xs leading-5 selection:bg-sky-400/30',
+          'max-h-[70vh] min-h-112 overflow-auto font-mono text-xs leading-5',
           LOG_SURFACE,
         )}
         data-testid="server-log-content"
         onScroll={handleLogScroll}
         tabIndex={0}
       >
-        <code className="log-lines grid w-max min-w-full grid-cols-[auto_1fr] py-3">
+        <code className="log-lines grid w-max min-w-full grid-cols-[auto_1fr] [&>:nth-child(-n+2)]:pt-3 [&>:nth-last-child(-n+2)]:pb-3">
           {logLines.map((line, lineIndex) =>
             line.pieces.some((piece) => piece.highlighted) ? (
               <Fragment key={lineIndex}>
@@ -607,7 +583,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
                       <mark
                         key={pieceIndex}
                         ref={isJumpTarget ? jumpHighlightRef : undefined}
-                        className="rounded-xs bg-amber-300 px-0.5 text-zinc-950 ring-2 ring-amber-300/30 ring-offset-2 ring-offset-[#0b0e13] outline-none"
+                        className="rounded-xs bg-warning/25 px-0.5 text-foreground ring-1 ring-warning/60 outline-none"
                         data-testid={isJumpTarget ? 'server-log-jump-highlight' : undefined}
                         tabIndex={-1}
                       >
@@ -624,7 +600,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
         </code>
       </pre>
 
-      <footer className="flex flex-col gap-2 border-t border-border/60 bg-muted/20 px-4 py-2.5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+      <footer className="flex flex-col gap-2 border-t border-border/20 px-4 py-2.5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <span className="font-mono text-2xs tabular-nums">
           {formatter.format(log.length)} {t.loadedCharacters}
         </span>
@@ -640,20 +616,19 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
               onClick={() => loadMore('button')}
               disabled={query.isFetchingNextPage}
               variant="outline"
-              size="sm"
-              className="h-7 text-xs"
+              size="xs"
               data-testid="load-more-server-log"
             >
               {query.isFetchingNextPage ? (
-                <LoaderCircle className="size-3.5 animate-spin" />
+                <LoaderCircle className="animate-spin" />
               ) : (
-                <ChevronDown className="size-3.5" />
+                <ChevronDown />
               )}
               {query.isFetchingNextPage ? t.loadingMore : t.loadMore}
             </Button>
           ) : (
             <span className="inline-flex items-center gap-1.5 font-mono text-2xs">
-              <Check className="size-3.5 text-emerald-500" aria-hidden="true" />
+              <Check className="size-3.5 text-success" aria-hidden="true" />
               {t.endOfLog}
             </span>
           )}

@@ -6,9 +6,9 @@ publishDate: '2026-10-19'
 lede: '在 InferenceX AgentX 上，以 100 tok/s/user（GLM-5.2 为 120）比较，Vera Rubin NVL72 在已有 Vera Rubin 结果的全部四个模型上，每 1 美元 TCO 对应的总 token 数和每 MW 的 token 吞吐量都是 GB300 NVL72 的**1.8 至 2.0 倍**。各模型的每美元比值都在 GB300 NVL72 每个配置只服务不超过 4 个 agent 的区间达到峰值，最高为 MiniMax-M3 上的约 10.2 倍。'
 links:
   - label: '查看 AgentX 仪表板'
-    href: 'https://inferencex.semianalysis.com/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_metric=y_tokensPerDollarH'
+    href: 'https://inferencex.semianalysis.com/infx/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_metric=y_tokensPerDollarH'
   - label: '阅读测试方法'
-    href: '/zh/agentx/methodology'
+    href: '/zh/infx/agentx/methodology'
 tags:
   - agentx
   - agentic
@@ -36,7 +36,7 @@ tags:
 
 ## 测试方法
 
-[AgentX](/zh/agentx/methodology) 把真实的 Claude Code 会话回放为确定性的 [AIPerf](/zh/glossary/aiperf) 工作负载。AgentX v1.0 共有 393 个公开会话，完整 v1.0 语料中请求的输入 token 中位数为 142,016、输出 token 中位数为 444，每次运行在固定 seed 的 warmup 和前缀 primer 之后进行 1 小时的 profiling。所有图表的横轴都是 p90 交互性，即 1 / p90 token 间延迟，单位为 tok/s/user。纵轴是仪表板的默认指标，即每 1 美元 TCO 对应的总 token 数：总 token 吞吐量（统计输入 token，含 KV cache 命中部分，以及输出 token）除以提供服务的 GPU 的每小时成本。其中约 99% 是输入 token。
+[AgentX](/zh/infx/agentx/methodology) 把真实的 Claude Code 会话回放为确定性的 [AIPerf](/zh/glossary/aiperf) 工作负载。AgentX v1.0 共有 393 个公开会话，完整 v1.0 语料中请求的输入 token 中位数为 142,016、输出 token 中位数为 444，每次运行在固定 seed 的 warmup 和前缀 primer 之后进行 1 小时的 profiling。所有图表的横轴都是 p90 交互性，即 1 / p90 token 间延迟，单位为 tok/s/user。纵轴是仪表板的默认指标，即每 1 美元 TCO 对应的总 token 数：总 token 吞吐量（统计输入 token，含 KV cache 命中部分，以及输出 token）除以提供服务的 GPU 的每小时成本。其中约 99% 是输入 token。
 
 每美元数据采用 [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/) 中 hyperscaler 的自持成本：Vera Rubin NVL72 为 $3.61/GPU/hr，GB300 NVL72 为 $2.31/GPU/hr。InferenceX 的[外部和内部 TCO 口径](/zh/glossary/internal-vs-external-tco)只在 TPU v7 上有差别，因此这两套系统在两种口径下的成本相同，本文中的每美元比值在两种口径下都成立。每 MW 数据是用吞吐量除以 [SemiAnalysis Datacenter Industry Model](https://semianalysis.com/datacenter-industry-model/) 中为每 GPU 规划的全口径功率：Vera Rubin NVL72 为 3.3 kW，GB300 NVL72 为 2.12 kW。这些是已部署机架的规划数值，包含 CPU、网络和散热，并非这些测试运行期间的实测功耗。
 
@@ -60,7 +60,7 @@ Vera Rubin NVL72 沿用了 GB300 NVL72 的 72-GPU NVLink 域和 MGX 机架设计
 | TCO（按 hyperscaler 采购规模自持） |              $3.61/GPU/hr |                   $2.31/GPU/hr |      1.56x |
 | 每 GPU 全口径功率（规划值）        |                    3.3 kW |                        2.12 kW |      1.56x |
 
-Rubin 的数值取自 NVIDIA [Vera Rubin NVL72 规格](https://www.nvidia.com/en-us/data-center/vera-rubin-nvl72/)中的 Rubin GPU 一列；同一张规格表还列出每颗 GPU 50 PFLOP/s 的 NVFP4 推理算力，脚注注明为稀疏规格。NVIDIA 的 [Rubin](https://www.nvidia.com/en-us/data-center/technologies/rubin/) 页面称，Vera Rubin NVL72 配备新的 Transformer Engine，通过自适应压缩提升 NVFP4 推理性能。NVIDIA 公布的 [NVLink 6 每 GPU 带宽为 3 TB/s](https://www.nvidia.com/en-us/data-center/nvlink/)，这一口径把两个方向合计在内，是同口径下 NVLink 5（1.8 TB/s）的 1.7 倍。Blackwell Ultra 的数值来自 [InferenceX GPU 规格](/zh/gpu-specs)。TCO 和功率采用仪表板所用的数值。
+Rubin 的数值取自 NVIDIA [Vera Rubin NVL72 规格](https://www.nvidia.com/en-us/data-center/vera-rubin-nvl72/)中的 Rubin GPU 一列；同一张规格表还列出每颗 GPU 50 PFLOP/s 的 NVFP4 推理算力，脚注注明为稀疏规格。NVIDIA 的 [Rubin](https://www.nvidia.com/en-us/data-center/technologies/rubin/) 页面称，Vera Rubin NVL72 配备新的 Transformer Engine，通过自适应压缩提升 NVFP4 推理性能。NVIDIA 公布的 [NVLink 6 每 GPU 带宽为 3 TB/s](https://www.nvidia.com/en-us/data-center/nvlink/)，这一口径把两个方向合计在内，是同口径下 NVLink 5（1.8 TB/s）的 1.7 倍。Blackwell Ultra 的数值来自 [InferenceX GPU 规格](/zh/infx/gpu-specs)。TCO 和功率采用仪表板所用的数值。
 
 把芯片规格比值除以 1.56 倍的成本比，Rubin 的每美元优势在 HBM 带宽上为 1.54 倍，在稠密 NVFP4 算力上为 1.49 倍，在稠密 FP8 算力上为 2.24 倍。汇总表中的每美元领先幅度高于 HBM 带宽和 NVFP4 的数值，低于 FP8 的数值。
 

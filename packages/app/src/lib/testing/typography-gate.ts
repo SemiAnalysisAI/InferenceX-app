@@ -21,7 +21,7 @@ const SIZE_SUGGESTIONS: Record<string, string> = {
 };
 
 const TRACKING_SUGGESTION =
-  'use tracking-eyebrow (0.16em), tracking-eyebrow-wide (0.2em), tracking-heading (-0.04em), or a built-in tracking-* class';
+  'use tracking-heading (-0.04em) for display headings, or a built-in tracking-* class';
 
 const EXEMPT_PATH =
   /(?:opengraph-image|og-image-render|compare-og|typography-gate|check-typography)\.tsx?$|\.test\.tsx?$/u;

@@ -1,5 +1,5 @@
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
-import { DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
+import { AGENTX_ROUTE, DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
 
 export type Locale = 'en' | 'zh';
 
@@ -8,6 +8,11 @@ export const ZH_PREFIX = '/zh';
 export const ZH_LANG_TAG = 'zh-CN';
 
 export const ZH_OG_LOCALE = 'zh_CN';
+
+/** BCP 47 tag for `Intl` / `toLocale*String` formatting in the given site locale. */
+export function localeTag(locale: Locale): 'en-US' | typeof ZH_LANG_TAG {
+  return locale === 'zh' ? ZH_LANG_TAG : 'en-US';
+}
 
 export function zhPath(enPath: string): string {
   return enPath === '/' ? ZH_PREFIX : `${ZH_PREFIX}${enPath}`;
@@ -42,9 +47,9 @@ export const ZH_MIRRORED_ROUTES: readonly { path: string; exact?: boolean }[] = 
   { path: '/chips' },
   { path: '/model' },
   { path: '/embed' },
-  { path: '/agentx' },
-  { path: '/powerx/tutorial', exact: true },
-  { path: '/ubenchx' },
+  { path: AGENTX_ROUTE.path },
+  { path: '/pwx/tutorial', exact: true },
+  { path: '/ubx' },
   { path: '/rankings' },
   { path: '/run' },
 ];

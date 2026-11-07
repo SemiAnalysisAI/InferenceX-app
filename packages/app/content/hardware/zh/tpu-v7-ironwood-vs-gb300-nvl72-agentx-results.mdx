@@ -6,9 +6,9 @@ publishDate: '2026-10-19'
 lede: '在 Qwen3.5-397B 上，200 tok/s/user 时，按外部 TCO 计算，TPU v7 FP8 每 1 美元 TCO 产出的 token 数是 GB300 NVL72 FP8 的 **1.85 倍**，按内部 TCO 计算为 2.17 倍。使用 Dynamo TensorRT-LLM 的 GB300 NVL72 FP4 在两种 TCO 口径下的每个匹配点上都领先。在 Kimi K3 上，按外部 TCO 计算 GB300 NVL72 领先，按内部 TCO 计算 TPU v7 在约 53 到 149 tok/s/user 区间领先。'
 links:
   - label: '查看 AgentX 仪表板'
-    href: 'https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=interactivity&i_metric=y_tokensPerDollarH'
+    href: 'https://inferencex.semianalysis.com/infx/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=interactivity&i_metric=y_tokensPerDollarH'
   - label: '阅读测试方法'
-    href: '/zh/agentx/methodology'
+    href: '/zh/infx/agentx/methodology'
 tags:
   - agentx
   - agentic
@@ -59,7 +59,7 @@ TPU v7 目前在两个模型上有 AgentX 结果，即 Qwen3.5-397B 和 Kimi K3�
 | 自持 TCO（外部 / 内部）      |                 每小时 $1.21 / $1.03 |                  每小时 $2.31 | 0.52x / 0.45x |
 | 单芯片全口径功率（规划值）   |                             1.207 kW |                       2.12 kW |         0.57x |
 
-TPU v7 的数值来自 Google Cloud 的 [TPU7x 文档](https://docs.cloud.google.com/tpu/docs/tpu7x)，文档给出的芯片间互连（ICI）带宽为每芯片双向合计 1,200 GB/s。Blackwell Ultra 的数值来自 [InferenceX GPU 规格页](/zh/gpu-specs)。
+TPU v7 的数值来自 Google Cloud 的 [TPU7x 文档](https://docs.cloud.google.com/tpu/docs/tpu7x)，文档给出的芯片间互连（ICI）带宽为每芯片双向合计 1,200 GB/s。Blackwell Ultra 的数值来自 [InferenceX GPU 规格页](/zh/infx/gpu-specs)。
 
 在完全受带宽限制的 decode 步骤中，TPU v7 每美元优势的上限等于 HBM 带宽之比除以每小时成本之比，按外部成本计算为 0.92x / 0.52x ≈ 1.8x，按内部成本计算约为 2 倍。在 200、300 和 400 tok/s/user 处，Qwen3.5 表格中两种口径的每美元比值都超过了这一上限，原因是 GB300 NVL72 的 FP8 曲线在该区间比 TPU v7 下降得更快，而且存在覆盖空缺。在略高于 200 tok/s/user、TPU v7 前沿从 22 个 agent 降到 18 个 agent 的位置，该比值按外部成本计算降到约 1.6 倍，按内部成本计算降到约 1.9 倍。
 

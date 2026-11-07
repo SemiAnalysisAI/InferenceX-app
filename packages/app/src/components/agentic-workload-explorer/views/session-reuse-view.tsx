@@ -17,19 +17,19 @@ import {
 const STRINGS = {
   en: {
     loading: 'Loading session reuse…',
-    error: 'Unable to load session reuse.',
+    error: 'Unable to load session reuse',
     retry: 'Retry',
     setupRequired:
       'Analytics storage needs a server database migration. Contact your administrator.',
-    warming: 'Session reuse is not available in this snapshot.',
+    warming: 'Session reuse is not available in this snapshot',
     reload: 'Reload',
   },
   zh: {
     loading: '正在加载 session 复用数据…',
-    error: '无法加载 session 复用数据。',
+    error: '无法加载 session 复用数据',
     retry: '重试',
     setupRequired: '分析存储需要服务器数据库迁移。请联系管理员。',
-    warming: '此快照中暂无 session 复用数据。',
+    warming: '此快照中暂无 session 复用数据',
     reload: '重新加载',
   },
 } as const;

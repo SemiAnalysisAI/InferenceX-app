@@ -215,7 +215,7 @@ To preview locally, pass the settings on the command line instead of editing `.e
 cd packages/app
 INFERENCEX_SOURCE_REPOS="$REPO" GITHUB_TOKEN="$(gh auth token)" \
   bun --env-file=../../.env next dev --turbopack
-# Open http://localhost:3000/inference?unofficialrun=<run-id>
+# Open http://localhost:3000/infx/inference?unofficialrun=<run-id>
 ```
 
 The official curves still need `DATABASE_READONLY_URL`.

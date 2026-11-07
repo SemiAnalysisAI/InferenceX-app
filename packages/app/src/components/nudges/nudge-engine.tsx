@@ -20,6 +20,11 @@ import {
   assignedLandingBannerVariant,
   LANDING_BANNER_DISMISSED_ATTRIBUTE,
 } from '@/lib/nudges/landing-banner';
+import {
+  isNudgeSlotMounted,
+  NUDGE_SLOT_MOUNTED_EVENT,
+  setInlineNudge,
+} from '@/lib/nudges/inline-slot';
 import { BottomToast } from '@/components/ui/bottom-toast';
 import { CoachMark } from '@/components/ui/coach-mark';
 import { Button } from '@/components/ui/button';
@@ -35,6 +40,8 @@ function isEligible(
   { requireAnchor = true, requireConditions = true } = {},
 ): boolean {
   if (requireAnchor && def.type === 'coach-mark' && !def.content.anchor?.resolve()) return false;
+  if (requireAnchor && def.type === 'inline' && !isNudgeSlotMounted(def.content.slot ?? ''))
+    return false;
   if (!isWithinSchedule(def.schedule)) return false;
   if (def.variant && def.variant !== assignedLandingBannerVariant()) return false;
   if (def.permanentSuppressKey && isPermanentlySuppressed(def.permanentSuppressKey)) return false;
@@ -72,9 +79,12 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
   );
   const [activeOverlayId, setActiveOverlayId] = useState<string | null>(null);
   const [activeCoachMarkId, setActiveCoachMarkId] = useState<string | null>(null);
+  const [activeInlineId, setActiveInlineId] = useState<string | null>(null);
   const bannerShownRef = useRef(false);
   const overlayShownRef = useRef(false);
   const coachMarkShownRef = useRef(false);
+  const inlineShownRef = useRef(false);
+  const pendingInlineRef = useRef<Set<string>>(new Set());
 
   const triggerCountsRef = useRef<Record<string, number>>({});
   const eventDetailRef = useRef<Record<string, unknown> | null>(null);
@@ -85,9 +95,17 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
   const activeCoachMark = activeCoachMarkId
     ? scopeNudges.find((n) => n.id === activeCoachMarkId)
     : null;
+  const activeInline = activeInlineId ? scopeNudges.find((n) => n.id === activeInlineId) : null;
 
   const showNudge = useCallback((def: NudgeDefinition) => {
     if (sessionDismissedRef.current.has(def.id)) return;
+    if (
+      def.type === 'inline' &&
+      !isNudgeSlotMounted(def.content.slot ?? '') &&
+      isEligible(def, { requireAnchor: false })
+    ) {
+      pendingInlineRef.current.add(def.id);
+    }
     if (!isEligible(def)) return;
 
     if (def.type === 'banner') {
@@ -98,6 +116,11 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
       if (coachMarkShownRef.current) return;
       coachMarkShownRef.current = true;
       setActiveCoachMarkId(def.id);
+    } else if (def.type === 'inline') {
+      if (inlineShownRef.current) return;
+      inlineShownRef.current = true;
+      pendingInlineRef.current.delete(def.id);
+      setActiveInlineId(def.id);
     } else {
       if (overlayShownRef.current) return;
       overlayShownRef.current = true;
@@ -137,6 +160,48 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     setActiveCoachMarkId(null);
     coachMarkShownRef.current = false;
   }, [activeCoachMark]);
+
+  const dismissInline = useCallback(() => {
+    if (!activeInline) return;
+    trackNudgeEvent(activeInline, 'dismissed');
+    markDismissed(activeInline.storageKey, activeInline.dismissal);
+    sessionDismissedRef.current.add(activeInline.id);
+    setActiveInlineId(null);
+    inlineShownRef.current = false;
+  }, [activeInline]);
+
+  const handleInlineAction = useCallback(() => {
+    if (!activeInline) return;
+    trackNudgeEvent(activeInline, 'action');
+    activeInline.content.action?.onClick(eventDetailRef.current ?? undefined);
+    if (!dismissesOnAction(activeInline)) return;
+    markDismissed(activeInline.storageKey, activeInline.dismissal);
+    sessionDismissedRef.current.add(activeInline.id);
+    setActiveInlineId(null);
+    inlineShownRef.current = false;
+  }, [activeInline]);
+
+  useEffect(() => {
+    const slot = activeInline?.content.slot;
+    if (!activeInline || !slot) return;
+    setInlineNudge(slot, {
+      def: activeInline,
+      onDismiss: dismissInline,
+      onAction: handleInlineAction,
+    });
+    return () => setInlineNudge(slot, null);
+  }, [activeInline, dismissInline, handleInlineAction]);
+
+  useEffect(() => {
+    const showPending = () => {
+      for (const id of pendingInlineRef.current) {
+        const def = scopeNudges.find((n) => n.id === id);
+        if (def) showNudge(def);
+      }
+    };
+    window.addEventListener(NUDGE_SLOT_MOUNTED_EVENT, showPending);
+    return () => window.removeEventListener(NUDGE_SLOT_MOUNTED_EVENT, showPending);
+  }, [scopeNudges, showNudge]);
 
   const handleCoachMarkAction = useCallback(() => {
     if (!activeCoachMark) return;
@@ -209,7 +274,7 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
 
     for (const def of sorted) {
       if (def.id === activeBannerId || def.id === activeOverlayId) continue;
-      if (def.id === activeCoachMarkId) continue;
+      if (def.id === activeCoachMarkId || def.id === activeInlineId) continue;
       if (!isEligible(def, { requireAnchor: false, requireConditions: false })) continue;
       if (sessionDismissedRef.current.has(def.id)) continue;
 
@@ -236,7 +301,14 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
       for (const fn of cleanups) fn();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeBannerId, activeOverlayId, activeCoachMarkId, scope, bannerVariantResolved]);
+  }, [
+    activeBannerId,
+    activeOverlayId,
+    activeCoachMarkId,
+    activeInlineId,
+    scope,
+    bannerVariantResolved,
+  ]);
 
   useEffect(() => {
     const handlers: [string, () => void][] = [];
@@ -251,11 +323,15 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
         } else if (def.type === 'coach-mark' && activeCoachMarkId === def.id) {
           setActiveCoachMarkId(null);
           coachMarkShownRef.current = false;
+        } else if (def.type === 'inline' && activeInlineId === def.id) {
+          setActiveInlineId(null);
+          inlineShownRef.current = false;
         } else if (activeOverlayId === def.id) {
           setActiveOverlayId(null);
           overlayShownRef.current = false;
         }
         sessionDismissedRef.current.add(def.id);
+        pendingInlineRef.current.delete(def.id);
         if (def.permanentSuppressKey) {
           try {
             localStorage.setItem(def.permanentSuppressKey, '1');
@@ -272,7 +348,7 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
         window.removeEventListener(event, handler);
       }
     };
-  }, [activeBannerId, activeOverlayId, activeCoachMarkId, scopeNudges]);
+  }, [activeBannerId, activeOverlayId, activeCoachMarkId, activeInlineId, scopeNudges]);
 
   const deferToastForCoachMark = Boolean(activeCoachMark?.content.anchor);
 
@@ -414,7 +490,7 @@ function localized(locale: Locale, en: string, zh?: string): string {
 const RENDERER_STRINGS = {
   en: {
     explore: 'Explore',
-    maybeLater: 'Maybe Later',
+    maybeLater: 'Maybe later',
     close: 'Close',
     dismissBanner: 'Dismiss launch banner',
   },
@@ -436,7 +512,7 @@ function ToastRenderer({
   return (
     <BottomToast
       testId={content.testId}
-      icon={<Icon className={content.iconClassName} />}
+      icon={<Icon />}
       title={localized(locale, content.title, content.titleZh)}
       description={localized(locale, content.description, content.descriptionZh)}
       action={
@@ -470,6 +546,10 @@ function ModalRenderer({
   const titleId = `${idPrefix}-title`;
   const descriptionId = `${idPrefix}-description`;
   const centered = content.centered;
+  // Two equal-weight choices with no dismiss button: neither is the primary action.
+  const equalChoice = Boolean(
+    centered && content.hideDismissButton && content.primaryAction && content.secondaryAction,
+  );
   const dialogRef = useRef<HTMLDivElement>(null);
   const onDismissRef = useRef(onDismiss);
   onDismissRef.current = onDismiss;
@@ -532,14 +612,14 @@ function ModalRenderer({
       aria-describedby={descriptionId}
       className={
         centered
-          ? `relative z-50 w-[calc(100vw-2rem)] max-w-md rounded-xl border bg-background p-6 shadow-lg sm:p-8 ${content.containerClassName ?? ''}`
-          : `fixed bottom-4 right-4 z-50 w-[calc(100vw-2rem)] max-w-md rounded-lg border bg-background p-6 shadow-lg ${content.containerClassName ?? ''}`
+          ? 'relative z-50 w-[calc(100vw-2rem)] max-w-md rounded-xl border border-border/30 bg-card p-6 shadow-lg sm:p-8'
+          : 'fixed bottom-4 right-4 z-50 w-[calc(100vw-2rem)] max-w-md rounded-xl border border-border/30 bg-card p-6 shadow-lg'
       }
     >
       <button
         type="button"
         onClick={onDismiss}
-        className={`absolute rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none ${centered ? 'right-2 top-2 flex size-9 items-center justify-center focus-visible:ring-2 focus-visible:ring-ring' : 'right-4 top-4'}`}
+        className={`absolute flex size-9 items-center justify-center rounded-md opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${centered ? 'right-2 top-2' : 'right-3 top-5'}`}
         aria-label={rs.close}
       >
         <X className={centered ? 'size-5' : 'size-4'} />
@@ -551,7 +631,7 @@ function ModalRenderer({
           <div className={centered ? 'text-center' : 'space-y-1.5 pr-6'}>
             {centered && (
               <div className="mb-5 flex min-h-5 items-center justify-center gap-2">
-                <Icon className={`size-6 shrink-0 ${content.iconClassName ?? ''}`} />
+                <Icon className="size-6 shrink-0 text-muted-foreground" />
                 {content.badge && (
                   <NewBadge data-new-badge="launch-modal" flashing>
                     {localized(locale, content.badge, content.badgeZh)}
@@ -567,7 +647,7 @@ function ModalRenderer({
                   : 'flex items-center gap-2 text-lg font-semibold'
               }
             >
-              {!centered && <Icon className={`size-5 shrink-0 ${content.iconClassName ?? ''}`} />}
+              {!centered && <Icon className="size-5 shrink-0 text-muted-foreground" />}
               {localized(locale, content.title, content.titleZh)}
               {!centered && content.badge && (
                 <NewBadge data-new-badge="launch-modal" className="ml-1" flashing>
@@ -584,10 +664,7 @@ function ModalRenderer({
           </div>
           <div
             className={
-              centered &&
-              content.hideDismissButton &&
-              content.primaryAction &&
-              content.secondaryAction
+              equalChoice
                 ? 'grid grid-cols-2 gap-3'
                 : `flex flex-row flex-wrap gap-2 ${centered ? 'justify-center' : 'justify-end'}`
             }
@@ -600,17 +677,18 @@ function ModalRenderer({
               >
                 {localized(
                   locale,
-                  content.dismissLabel ?? 'Maybe Later',
+                  content.dismissLabel ?? rs.maybeLater,
                   content.dismissLabelZh ?? rs.maybeLater,
                 )}
               </Button>
             )}
             {content.primaryAction && (
               <Button
+                variant={equalChoice ? 'outline' : 'default'}
                 onClick={() => onAction(content.primaryAction)}
                 data-modal-primary=""
                 data-testid={content.testId ? `${content.testId}-action` : undefined}
-                className={`${centered ? 'min-h-11 [&_img]:size-5' : ''} ${content.actionClassName ?? ''}`}
+                className={centered ? 'min-h-11 [&_img]:size-5' : undefined}
               >
                 {content.primaryAction.icon}
                 {localized(locale, content.primaryAction.label, content.primaryAction.labelZh)}
@@ -618,9 +696,10 @@ function ModalRenderer({
             )}
             {content.secondaryAction && (
               <Button
+                variant={equalChoice ? 'outline' : 'default'}
                 onClick={() => onAction(content.secondaryAction)}
                 data-testid={content.testId ? `${content.testId}-secondary-action` : undefined}
-                className={`${centered ? 'min-h-11 [&_img]:size-5' : ''} ${content.actionClassName ?? ''}`}
+                className={centered ? 'min-h-11 [&_img]:size-5' : undefined}
               >
                 {content.secondaryAction.icon}
                 {localized(locale, content.secondaryAction.label, content.secondaryAction.labelZh)}
@@ -629,11 +708,12 @@ function ModalRenderer({
             {content.additionalActions?.map((action, index) => (
               <Button
                 key={action.label}
+                variant={equalChoice ? 'outline' : 'default'}
                 onClick={() => onAction(action)}
                 data-testid={
                   content.testId ? `${content.testId}-additional-action-${index}` : undefined
                 }
-                className={`${centered ? 'min-h-11 [&_img]:size-5' : ''} ${content.actionClassName ?? ''}`}
+                className={centered ? 'min-h-11 [&_img]:size-5' : undefined}
               >
                 {action.icon}
                 {localized(locale, action.label, action.labelZh)}
@@ -680,7 +760,7 @@ function CoachMarkRenderer({
   return (
     <CoachMark
       anchor={anchor}
-      icon={<Icon className={content.iconClassName} />}
+      icon={<Icon />}
       title={localized(locale, content.title, content.titleZh)}
       description={localized(locale, content.description, content.descriptionZh)}
       onDismiss={onDismiss}
@@ -719,6 +799,8 @@ export function BannerRenderer({
     onDismiss(def);
   };
 
+  const title = localized(locale, content.title, content.titleZh);
+  const titleBreak = title.lastIndexOf(' ');
   return (
     <section
       className="container mx-auto px-4 lg:px-8 mb-6 lg:mb-4"
@@ -728,30 +810,32 @@ export function BannerRenderer({
       <a
         href={href}
         onClick={handleClick}
-        className="group relative flex items-center gap-3 overflow-hidden rounded-xl border border-brand/40 bg-gradient-to-r from-brand/10 via-brand/5 to-transparent px-4 py-3 transition-all duration-200 hover:border-brand/70 hover:shadow-lg hover:shadow-brand/10"
+        className="group flex items-center gap-3 rounded-xl border border-border/30 bg-card px-4 py-3 transition-colors hover:bg-muted/40"
         data-testid={content.testId}
       >
-        <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-r from-transparent via-brand/10 to-transparent" />
-        <span className="relative flex size-8 shrink-0 items-center justify-center rounded-full bg-brand/15 text-brand">
-          <Icon className="size-4 animate-pulse" />
-        </span>
-        <div className="relative flex flex-1 flex-col sm:flex-row sm:items-center sm:gap-3 min-w-0">
+        <Icon className="size-4 shrink-0 text-muted-foreground max-sm:mt-0.5 max-sm:self-start" />
+        <div className="flex flex-1 flex-col sm:flex-row sm:items-center sm:gap-3 min-w-0">
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold leading-snug break-words">
-              <span className="align-middle">
-                {localized(locale, content.title, content.titleZh)}
-              </span>
-              {content.badge && (
-                <NewBadge data-new-badge="launch-banner" className="ml-2 align-middle" flashing>
-                  {localized(locale, content.badge, content.badgeZh)}
-                </NewBadge>
+            <p className="text-sm font-medium leading-snug break-words">
+              {content.badge ? (
+                <>
+                  <span className="align-middle">{title.slice(0, titleBreak + 1)}</span>
+                  <span className="whitespace-nowrap">
+                    <span className="align-middle">{title.slice(titleBreak + 1)}</span>
+                    <NewBadge data-new-badge="launch-banner" className="ml-2 align-middle" flashing>
+                      {localized(locale, content.badge, content.badgeZh)}
+                    </NewBadge>
+                  </span>
+                </>
+              ) : (
+                <span className="align-middle">{title}</span>
               )}
             </p>
             <p className="text-xs text-muted-foreground leading-snug break-words">
               {localized(locale, content.description, content.descriptionZh)}
             </p>
           </div>
-          <span className="hidden sm:inline-flex items-center gap-1 text-xs font-medium text-brand shrink-0 group-hover:translate-x-0.5 transition-transform duration-200">
+          <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand shrink-0 sm:mt-0">
             {localized(locale, content.linkLabel ?? rs.explore, content.linkLabelZh)}
             <ArrowRight className="size-3.5" />
           </span>
@@ -759,7 +843,7 @@ export function BannerRenderer({
         <button
           type="button"
           onClick={handleDismiss}
-          className="relative ml-1 rounded-md p-1 text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus:outline-none"
+          className="ml-1 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label={rs.dismissBanner}
           data-testid={content.testId ? `${content.testId}-dismiss` : undefined}
         >

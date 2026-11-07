@@ -13,12 +13,12 @@ const PROMO_POSTER_SRC = '/promo-poster.webp';
 const STRINGS = {
   en: {
     play: 'Play the InferenceX overview video',
-    fallback: 'Your browser cannot play this video.',
+    fallback: 'Your browser cannot play this video',
     download: 'Download the video instead',
   },
   zh: {
     play: '播放 InferenceX 概览视频',
-    fallback: '您的浏览器无法播放此视频。',
+    fallback: '您的浏览器无法播放此视频',
     download: '直接下载视频',
   },
 } as const;
@@ -36,7 +36,7 @@ export function PromoVideo() {
   }
 
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-border/40 bg-black">
+    <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-border/30 bg-black">
       <video
         ref={videoRef}
         className="size-full"
@@ -63,8 +63,8 @@ export function PromoVideo() {
           aria-label={t.play}
           className="group absolute inset-0 flex cursor-pointer items-center justify-center bg-black/20 transition-colors hover:bg-black/10"
         >
-          <span className="flex size-16 items-center justify-center rounded-full bg-background/80 shadow-lg backdrop-blur-sm transition-transform group-hover:scale-110 md:size-20">
-            <Play className="ml-1 size-7 fill-foreground text-foreground md:size-9" />
+          <span className="flex size-16 items-center justify-center rounded-full bg-background shadow-sm transition-colors group-hover:bg-muted md:size-20">
+            <Play className="ml-1 size-7 fill-foreground text-foreground md:size-8" />
           </span>
         </button>
       )}
