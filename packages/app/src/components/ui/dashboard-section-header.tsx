@@ -39,9 +39,9 @@ export function DashboardSectionHeader({
         {typeof title === 'string' && qualifier !== undefined ? (
           <>
             {title.slice(0, title.lastIndexOf(' ') + 1)}
-            <span className="whitespace-nowrap">
+            <span className="inline-flex items-center whitespace-nowrap">
               {title.slice(title.lastIndexOf(' ') + 1)}
-              <Badge variant="secondary" className="ml-2 align-baseline">
+              <Badge variant="secondary" className="ml-2">
                 {qualifier}
               </Badge>
             </span>

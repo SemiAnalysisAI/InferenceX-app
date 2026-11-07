@@ -14,6 +14,7 @@ import {
 } from '@/lib/d3-chart/tooltip-placement';
 import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { Card } from '@/components/ui/card';
+import { TABLE_HEAD_CELL_STYLE, TABLE_HEAD_ROW_STYLE } from '@/components/ui/control-styles';
 import { Heading } from '@/components/ui/heading';
 import { ResultContext, sourceLinkClassName } from '@/components/ui/result-context';
 import { Stat } from '@/components/ui/stat';
@@ -38,7 +39,9 @@ const STRINGS = {
     statsIntraGpc: 'Intra-GPC mean',
     statsInterGpc: 'Inter-GPC (same die) mean',
     statsCrossDie: 'Cross-die mean',
-    source: 'Source',
+    source: 'Source: ',
+    device: 'Device',
+    hardware: 'Hardware',
     driver: 'Driver',
     container: 'Container',
     aria: 'ubenchX SM-SM L2 latency difference heatmap',
@@ -60,7 +63,9 @@ const STRINGS = {
     statsIntraGpc: 'GPC 内平均',
     statsInterGpc: '跨 GPC（同 die）平均',
     statsCrossDie: '跨 die 平均',
-    source: '数据来源',
+    source: '数据来源：',
+    device: '设备',
+    hardware: '硬件',
     driver: '驱动',
     container: '容器',
     aria: 'ubenchX SM 间 L2 延迟差异热力图',
@@ -417,29 +422,58 @@ export function SmL2Content({ gpu = 'all' }: { gpu?: string }) {
               </dl>
               <div className="mt-3">
                 <ResultContext locale={locale} layout="footer" source="SemiAnalysis InferenceX™" />
+                <div className="mt-3 max-w-[80ch] space-y-1.5 text-xs leading-5 text-muted-foreground">
+                  <h3 className="font-medium text-foreground">{t.methodology}</h3>
+                  <p>{t.methodologyText}</p>
+                </div>
+                <div className="mt-3 overflow-x-auto" data-testid="sm-l2-device-specs">
+                  <table className="w-full text-left text-xs text-muted-foreground tabular-nums">
+                    <thead>
+                      <tr className={TABLE_HEAD_ROW_STYLE}>
+                        {[t.device, t.hardware, t.driver, 'CUDA', t.container].map((header) => (
+                          <th
+                            key={header}
+                            scope="col"
+                            className={`${TABLE_HEAD_CELL_STYLE} py-1.5 pr-4`}
+                          >
+                            {header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th
+                          scope="row"
+                          className="py-1.5 pr-4 font-medium whitespace-nowrap text-foreground"
+                        >
+                          {key}
+                        </th>
+                        <td className="py-1.5 pr-4 whitespace-nowrap">{view.metadata.gpu}</td>
+                        <td className="py-1.5 pr-4 whitespace-nowrap">{view.metadata.driver}</td>
+                        <td className="py-1.5 pr-4 whitespace-nowrap">{view.metadata.cuda}</td>
+                        <td className="min-w-64 py-1.5 pr-4 break-all">
+                          {view.metadata.container}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {t.source}
+                  <a
+                    href={view.metadata.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={sourceLinkClassName}
+                  >
+                    PR #
+                    {view.metadata.sourceUrl.slice(view.metadata.sourceUrl.lastIndexOf('/') + 1)}
+                  </a>
+                </p>
               </div>
             </Card>
           </figure>
-
-          <div className="space-y-1 text-xs text-muted-foreground">
-            <h3 className="text-sm font-medium text-foreground">{t.methodology}</h3>
-            <p>{t.methodologyText}</p>
-            <p>
-              <strong>{key}:</strong> {view.metadata.gpu} | {t.driver}: {view.metadata.driver} |
-              CUDA: {view.metadata.cuda} | {t.container}: {view.metadata.container}
-            </p>
-            <p>
-              {t.source}:{' '}
-              <a
-                href={view.metadata.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={sourceLinkClassName}
-              >
-                {view.metadata.sourceUrl}
-              </a>
-            </p>
-          </div>
         </section>
       ))}
     </div>

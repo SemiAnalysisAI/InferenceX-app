@@ -21,9 +21,11 @@ const STRINGS = {
     methodology: 'Methodology',
     methodologyText:
       'gpc_query launches thread-block clusters of every size from 2 up to the hardware maximum and records the SM each block runs on. A cluster always runs within one GPC, so SMs that share a cluster are merged into the same GPC. Each list gives TPCs (two SMs each) per GPC, sorted descending; positions are not physical GPC indices.',
+    device: 'Device',
+    hardware: 'Hardware',
     driver: 'Driver',
     container: 'Container',
-    source: 'Source',
+    source: 'Source: ',
     aria: 'ubenchX TPC Skyline table',
   },
   zh: {
@@ -35,9 +37,11 @@ const STRINGS = {
     methodology: '测试方法',
     methodologyText:
       'gpc_query 以 2 到硬件上限的各种规模启动线程块集群，并记录每个线程块所在的 SM。一个集群总是在同一个 GPC 内运行，因此同一集群中的 SM 会被合并到同一个 GPC。每个列表给出各 GPC 的 TPC 数量（每个 TPC 含两个 SM），按降序排列；位置并不对应物理 GPC 编号。',
+    device: '设备',
+    hardware: '硬件',
     driver: '驱动',
     container: '容器',
-    source: '数据来源',
+    source: '数据来源：',
     aria: 'ubenchX TPC Skyline 表',
   },
 } as const;
@@ -97,33 +101,67 @@ export function TpcSkylineContent() {
             </div>
             <div className="mt-3">
               <ResultContext locale={locale} layout="footer" source="SemiAnalysis InferenceX™" />
+              <div className="mt-3 max-w-[80ch] space-y-1.5 text-xs leading-5 text-muted-foreground">
+                <h3 className="font-medium text-foreground">{t.methodology}</h3>
+                <p>{t.methodologyText}</p>
+              </div>
+              <div className="mt-3 overflow-x-auto" data-testid="tpc-skyline-device-specs">
+                <table className="w-full text-left text-xs text-muted-foreground tabular-nums">
+                  <thead>
+                    <tr className={TABLE_HEAD_ROW_STYLE}>
+                      {[t.device, t.hardware, t.driver, 'CUDA', t.container, 'TPCs'].map(
+                        (header, index, headers) => (
+                          <th
+                            key={header}
+                            scope="col"
+                            className={`${TABLE_HEAD_CELL_STYLE} py-1.5 ${index === headers.length - 1 ? 'text-right' : 'pr-4'}`}
+                          >
+                            {header}
+                          </th>
+                        ),
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {RESULTS.map((r) => (
+                      <tr key={r.gpu} className="border-b border-border/30 last:border-b-0">
+                        <th
+                          scope="row"
+                          className="py-1.5 pr-4 font-medium whitespace-nowrap text-foreground"
+                        >
+                          {r.gpu}
+                        </th>
+                        <td className="py-1.5 pr-4 whitespace-nowrap">{r.metadata.gpu}</td>
+                        <td className="py-1.5 pr-4 whitespace-nowrap">{r.metadata.driver}</td>
+                        <td className="py-1.5 pr-4 whitespace-nowrap">{r.metadata.cuda}</td>
+                        <td className="min-w-64 py-1.5 pr-4 break-all">{r.metadata.container}</td>
+                        <td className="py-1.5 text-right whitespace-nowrap">{r.tpcCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-3 text-xs text-muted-foreground">
+                {t.source}
+                {sourceUrls.map((url, index) => (
+                  <span key={url}>
+                    {index > 0 && ' · '}
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={sourceLinkClassName}
+                    >
+                      {url.includes('/pull/')
+                        ? `PR #${url.slice(url.lastIndexOf('/') + 1)}`
+                        : url.slice(url.lastIndexOf('/') + 1)}
+                    </a>
+                  </span>
+                ))}
+              </p>
             </div>
           </Card>
         </figure>
-        <div className="space-y-1 text-xs text-muted-foreground">
-          <h3 className="text-sm font-medium text-foreground">{t.methodology}</h3>
-          <p>{t.methodologyText}</p>
-          {RESULTS.map((r) => (
-            <p key={r.gpu}>
-              <strong>{r.gpu}:</strong> {r.metadata.gpu} | {t.driver}: {r.metadata.driver} | CUDA:{' '}
-              {r.metadata.cuda} | {t.container}: {r.metadata.container} | {r.gpcCount} GPCs,{' '}
-              {r.tpcCount} TPCs, {r.smCount} SMs
-            </p>
-          ))}
-          {sourceUrls.map((url) => (
-            <p key={url}>
-              {t.source}:{' '}
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`break-all ${sourceLinkClassName}`}
-              >
-                {url}
-              </a>
-            </p>
-          ))}
-        </div>
       </section>
       <HuaweiSkuConfigurations />
     </div>

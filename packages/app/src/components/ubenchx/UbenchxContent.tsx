@@ -426,7 +426,7 @@ export function UbenchxContent() {
   const hub = (
     <UbenchxHub
       current="mem-bw"
-      controls={
+      chartControls={
         <div className="flex min-w-0 flex-col space-y-1.5">
           <LabelWithTooltip
             htmlFor="ubenchx-metric-select"

@@ -25,6 +25,7 @@ const STRINGS = {
     subtitle:
       'Low-level accelerator microbenchmarks measuring fundamental hardware characteristics',
     controls: 'Benchmark config',
+    chartControls: 'Chart config',
     test: 'Microbenchmark',
     testTooltip: 'The ubenchX microbenchmark to display.',
     memBwTitle: 'HBM bandwidth',
@@ -36,6 +37,7 @@ const STRINGS = {
     beta: 'Beta',
     subtitle: '底层加速器微基准测试，测量基础硬件特性',
     controls: '基准测试配置',
+    chartControls: '图表配置',
     test: '微基准测试',
     testTooltip: '要显示的 ubenchX 微基准测试。',
     memBwTitle: 'HBM 带宽',
@@ -55,9 +57,11 @@ export type UbenchxTestSlug = (typeof UBENCHX_TESTS)[number]['slug'];
 export function UbenchxHub({
   current,
   controls,
+  chartControls,
 }: {
   current: UbenchxTestSlug;
   controls?: ReactNode;
+  chartControls?: ReactNode;
 }) {
   const locale = useLocale();
   const router = useRouter();
@@ -75,43 +79,52 @@ export function UbenchxHub({
             description={t.subtitle}
             actions={<ShareButton />}
           />
-          <ControlPanel legend={t.controls}>
-            <div className="grid min-w-0 items-start gap-3 sm:grid-cols-2">
-              <div className="flex min-w-0 flex-col space-y-1.5">
-                <LabelWithTooltip
-                  htmlFor="ubenchx-test-select"
-                  label={t.test}
-                  tooltip={t.testTooltip}
-                />
-                <Select
-                  value={current}
-                  onValueChange={(value) => {
-                    if (value === current) return;
-                    track('ubenchx_test_selected', { test: value });
-                    router.push(`${prefix}/ubenchx/${value}`);
-                  }}
-                >
-                  <SelectTrigger
-                    id="ubenchx-test-select"
-                    data-testid="ubenchx-test-select"
-                    className="w-full"
+          <div
+            className={`grid min-w-0 items-start gap-x-6 gap-y-4 ${chartControls === undefined ? '' : 'lg:grid-cols-2'}`}
+          >
+            <ControlPanel legend={t.controls}>
+              <div className="grid min-w-0 items-start gap-3 sm:grid-cols-2">
+                <div className="flex min-w-0 flex-col space-y-1.5">
+                  <LabelWithTooltip
+                    htmlFor="ubenchx-test-select"
+                    label={t.test}
+                    tooltip={t.testTooltip}
+                  />
+                  <Select
+                    value={current}
+                    onValueChange={(value) => {
+                      if (value === current) return;
+                      track('ubenchx_test_selected', { test: value });
+                      router.push(`${prefix}/ubenchx/${value}`);
+                    }}
                   >
-                    <SelectValue>
-                      {t[UBENCHX_TESTS.find((test) => test.slug === current)!.titleKey]}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {UBENCHX_TESTS.map((test) => (
-                      <SelectItem key={test.slug} value={test.slug}>
-                        {t[test.titleKey]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                    <SelectTrigger
+                      id="ubenchx-test-select"
+                      data-testid="ubenchx-test-select"
+                      className="w-full"
+                    >
+                      <SelectValue>
+                        {t[UBENCHX_TESTS.find((test) => test.slug === current)!.titleKey]}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {UBENCHX_TESTS.map((test) => (
+                        <SelectItem key={test.slug} value={test.slug}>
+                          {t[test.titleKey]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {controls}
               </div>
-              {controls}
-            </div>
-          </ControlPanel>
+            </ControlPanel>
+            {chartControls !== undefined && (
+              <ControlPanel legend={t.chartControls}>
+                <div className="grid min-w-0 items-start gap-3 sm:grid-cols-2">{chartControls}</div>
+              </ControlPanel>
+            )}
+          </div>
         </div>
       </Card>
     </section>

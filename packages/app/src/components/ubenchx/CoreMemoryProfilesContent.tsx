@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
+import { TABLE_HEAD_CELL_STYLE, TABLE_HEAD_ROW_STYLE } from '@/components/ui/control-styles';
 import { Heading, HeadingQualifier } from '@/components/ui/heading';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { ResultContext, sourceLinkClassName } from '@/components/ui/result-context';
@@ -47,6 +48,9 @@ const STRINGS = {
       'Concurrent launches have no grid-wide starting barrier. Their fine structure is less repeatable than the broad grouping; these panels do not establish which cores physically share a cache.',
     source: 'Source data',
     methodology: 'Methodology',
+    device: 'Device',
+    driver: 'Driver',
+    runtime: 'Runtime',
     selected: 'Core pair',
     pinned: 'Pinned core pair',
     sharedScale: 'All four panels use the same color scale',
@@ -73,6 +77,9 @@ const STRINGS = {
       '并发启动没有网格级起始同步屏障。相比整体分组，细节模式的可重复性较弱；这些图不能确定哪些核心在物理上共享缓存。',
     source: '数据来源',
     methodology: '测试方法',
+    device: '设备',
+    driver: '驱动',
+    runtime: '运行时',
     selected: '核心对',
     pinned: '已固定的核心对',
     sharedScale: '四幅图使用相同的色标范围',
@@ -321,22 +328,54 @@ function AscendCoreProfiles({ note }: { note?: string }) {
           <div className="mt-3">
             <ResultContext locale={locale} layout="footer" source="SemiAnalysis InferenceX™" />
             {note && <p className="mt-2 text-xs leading-5 text-muted-foreground/70">{note}</p>}
+            <div className="mt-3 max-w-[80ch] space-y-1.5 text-xs leading-5 text-muted-foreground">
+              <h3 className="font-medium text-foreground">{t.methodology}</h3>
+              <p>{t.method}</p>
+              <p>{t.concurrentLimit}</p>
+            </div>
+            <div className="mt-3 overflow-x-auto" data-testid="core-profile-device-specs">
+              <table className="w-full text-left text-xs text-muted-foreground tabular-nums">
+                <thead>
+                  <tr className={TABLE_HEAD_ROW_STYLE}>
+                    {[t.device, t.hardware, t.driver, t.runtime].map((header) => (
+                      <th
+                        key={header}
+                        scope="col"
+                        className={`${TABLE_HEAD_CELL_STYLE} py-1.5 pr-4`}
+                      >
+                        {header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th
+                      scope="row"
+                      className="py-1.5 pr-4 font-medium whitespace-nowrap text-foreground"
+                    >
+                      Huawei 950PR
+                    </th>
+                    <td className="py-1.5 pr-4 whitespace-nowrap">{result.metadata.device}</td>
+                    <td className="py-1.5 pr-4 whitespace-nowrap">{result.metadata.driver}</td>
+                    <td className="py-1.5 pr-4 whitespace-nowrap">CANN {result.metadata.cann}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              <a
+                className={sourceLinkClassName}
+                href={result.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {t.source}
+              </a>
+            </p>
           </div>
         </Card>
       </figure>
-      <section className="space-y-1 text-xs text-muted-foreground">
-        <h3 className="text-sm font-medium text-foreground">{t.methodology}</h3>
-        <p>{t.method}</p>
-        <p>{t.concurrentLimit}</p>
-        <a
-          className={sourceLinkClassName}
-          href={result.sourceUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {t.source}
-        </a>
-      </section>
     </div>
   );
 }
