@@ -5,6 +5,7 @@ import { createMockEvaluationChartData } from '../support/mock-data';
 import { Model, Precision } from '@/lib/catalog/data-mappings';
 import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
+import { hoverTopmostOver } from '../support/scatter-points';
 
 describe('EvalBarChartD3', () => {
   it('omits default DP in table cells while preserving DP8 and physical chip counts', () => {
@@ -214,4 +215,79 @@ describe('EvalBarChartD3', () => {
       cy.get(tooltip).should('not.be.visible');
     });
   }
+
+  it('shows the unofficial card for an overlay marker drawn on an official point', () => {
+    const run = {
+      id: 123,
+      name: 'Run Sweep',
+      branch: 'feat/eval-overlap',
+      sha: 'abc123',
+      createdAt: '2025-03-20T00:00:00Z',
+      url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
+      conclusion: 'success',
+      status: 'completed',
+      isNonMainBranch: true,
+    };
+    const shared = createMockEvaluationChartData({
+      score: 0.875,
+      scoreError: 0.01,
+      minScore: 0.865,
+      maxScore: 0.885,
+      errorMin: 0.865,
+      errorMax: 0.885,
+    });
+    const officialRows = [
+      shared,
+      createMockEvaluationChartData({
+        evalResultId: 2,
+        configId: 2,
+        hwKey: 'h100_vllm' as never,
+        hardware: 'h100',
+        hwLabel: 'H100',
+        engineLabel: 'vLLM',
+        configLabel: 'H100 (vLLM)',
+        framework: 'vllm',
+        score: 0.7,
+        minScore: 0.69,
+        maxScore: 0.71,
+        errorMin: 0.69,
+        errorMax: 0.71,
+      }),
+    ];
+    const overlayHardware = new Set([String(shared.hwKey)]);
+    mountWithProviders(
+      <div style={{ width: 1000 }}>
+        <EvalBarChartD3 />
+      </div>,
+      {
+        evaluation: {
+          selectedModel: shared.model,
+          selectedBenchmark: shared.benchmark,
+          chartData: officialRows,
+          unfilteredChartData: officialRows,
+          unofficialChartData: [{ ...shared, evalResultId: 3, runUrl: run.url }],
+        },
+        unofficial: {
+          isUnofficialRun: true,
+          unofficialRunInfo: run,
+          unofficialRunInfos: [run],
+          runIndexByUrl: { [run.url]: 0 },
+          activeOverlayHwTypes: overlayHardware,
+          allOverlayHwTypes: overlayHardware,
+        },
+      },
+    );
+    const tooltip = 'body > [data-chart-tooltip="evaluation-chart"]';
+    cy.get('#evaluation-chart .point').should('have.length', 2);
+    cy.get('#evaluation-chart .unofficial-eval-point > circle').then(([hit]) =>
+      hoverTopmostOver(hit),
+    );
+    cy.get(`${tooltip} [data-hover-notice]`).should('contain.text', run.branch);
+    cy.get('#evaluation-chart .point')
+      .filter(
+        (_, point) => (point as unknown as { __data__: typeof shared }).__data__.score === 0.7,
+      )
+      .then(([point]) => hoverTopmostOver(point));
+    cy.get(tooltip).should('contain.text', 'H100').find('[data-hover-notice]').should('not.exist');
+  });
 });

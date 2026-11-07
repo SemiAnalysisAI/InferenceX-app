@@ -174,7 +174,14 @@ export interface TransitionGeometry {
   points: PointPositions | null;
 }
 
-const RAISE_ORDER = ['.dot-group', CANVAS_POINT_LAYER_SELECTOR, '.point', '.line-label'] as const;
+const RAISE_ORDER = [
+  '.dot-group',
+  CANVAS_POINT_LAYER_SELECTOR,
+  '.point',
+  '.unofficial-overlay-pt',
+  '.unofficial-eval-point',
+  '.line-label',
+] as const;
 const LINE_LABEL_RAISE = ['.line-label'] as const;
 const TRANSITION_POINT_SELECTOR = '.dot-group';
 const TRANSITION_ROOFLINE_SELECTOR = '.roofline-path';

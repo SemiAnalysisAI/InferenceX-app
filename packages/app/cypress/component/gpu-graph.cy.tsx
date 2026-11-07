@@ -7,6 +7,7 @@ import {
 } from '@/providers/unofficial-run-provider';
 import { useState, type ReactElement } from 'react';
 import { mountWithProviders } from '../support/test-utils';
+import { hoverTopmostOver } from '../support/scatter-points';
 import {
   createMockInferenceData,
   createMockChartDefinition,
@@ -972,6 +973,25 @@ describe('GPU comparison with unofficial runs', () => {
       'contain.text',
       '75,000',
     );
+  });
+
+  it('shows the unofficial card for an overlay point drawn on an official point', () => {
+    mountComparison(
+      createMockChartDefinition({ chartType: 'interactivity', y_tpPerGpu_roofline: 'upper_left' }),
+      [official(DATES[0], 32, 250), official(DATES[0], 8, 100)],
+      [overlay(32, 250)],
+    );
+    const tooltip = '[data-chart-tooltip="gpu-overlay"]';
+    cy.get('#gpu-overlay .unofficial-overlay-pt > circle').then(([hit]) => hoverTopmostOver(hit));
+    cy.get(`${tooltip} [data-hover-notice]`).should('contain.text', 'Unofficial run');
+    cy.get('#gpu-overlay .dot-group')
+      .filter((_, group) => (group as unknown as { __data__: InferenceData }).__data__.conc === 8)
+      .find('.visible-shape')
+      .then(([shape]) => hoverTopmostOver(shape));
+    cy.get(tooltip)
+      .should('contain.text', 'conc 8')
+      .find('[data-hover-notice]')
+      .should('not.exist');
   });
 
   it('toggles official and unofficial offload halos without removing history points', () => {

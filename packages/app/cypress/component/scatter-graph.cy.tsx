@@ -12,7 +12,12 @@ import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface'
 import chartDefinitions from '@/components/inference/metric-registry';
 import { mountWithProviders } from '../support/test-utils';
 import { expandLegendAdvanced } from '../support/legend-advanced';
-import { clickScatterPoint, visiblePoints } from '../support/scatter-points';
+import {
+  clickScatterPoint,
+  hoverTopmostAt,
+  hoverTopmostOver,
+  visiblePoints,
+} from '../support/scatter-points';
 import {
   createMockInferenceData,
   createMockChartDefinition,
@@ -129,6 +134,67 @@ describe('ScatterGraph', () => {
       cy.get('[data-testid="point-details-panel"]').should('not.exist');
     });
   }
+
+  it('shows the unofficial card for an overlay point drawn on an official point', () => {
+    const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123';
+    const shared = { precision: Precision.FP4, x: 20, y: 80 };
+    mountWithProviders(
+      <div style={{ width: 1000 }}>
+        <ScatterGraph
+          chartId="overlap-hover"
+          modelLabel="DeepSeek R1"
+          data={[
+            createMockInferenceData({ hwKey: 'b200_sglang', conc: 16, ...shared }),
+            createMockInferenceData({
+              hwKey: 'b200_sglang',
+              precision: Precision.FP4,
+              x: 60,
+              y: 30,
+              conc: 64,
+            }),
+          ]}
+          xLabel="Interactivity"
+          yLabel="Throughput"
+          chartDefinition={defaultChartDef}
+          transitionDuration={0}
+          overlayData={{
+            data: [
+              createMockInferenceData({ hwKey: 'h100_vllm', conc: 32, run_url: runUrl, ...shared }),
+            ],
+            hardwareConfig: hwConfig,
+            label: 'Preview',
+            runUrl,
+          }}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_sglang']),
+          hwTypesWithData: new Set(['b200_sglang']),
+          selectedPrecisions: [Precision.FP4],
+        },
+        unofficial: {
+          isUnofficialRun: true,
+          activeOverlayHwTypes: new Set(['h100_vllm']),
+          allOverlayHwTypes: new Set(['h100_vllm']),
+        },
+      },
+    );
+    const tooltip = '[data-chart-tooltip="overlap-hover"]';
+    cy.scatterPoints('#overlap-hover').should('have.length', 2);
+    cy.get('#overlap-hover .unofficial-overlay-pt > circle').then(([hit]) => hoverTopmostOver(hit));
+    cy.get(`${tooltip} [data-hover-notice]`).should('contain.text', 'Unofficial run');
+    cy.get(tooltip).should('contain.text', 'conc 32');
+    cy.scatterPoints('#overlap-hover').then((points) => {
+      const lone = points.find((point) => point.datum.conc === 64)!;
+      hoverTopmostAt(lone.hitArea.ownerDocument, lone.clientX, lone.clientY);
+    });
+    cy.get(tooltip)
+      .should('contain.text', 'conc 64')
+      .find('[data-hover-notice]')
+      .should('not.exist');
+  });
 
   it('keeps compact hover and pins full cache and role details in the UI font', () => {
     const data = [
