@@ -238,6 +238,17 @@ describe('normalizeArtifactRows', () => {
     expect(row.power_audit).toBeUndefined();
   });
 
+  it('drops required-power points without valid power, as ingest does', () => {
+    const rows = normalizeArtifactRows(
+      [
+        rawRow({ conc: 4, require_power: true, power_valid: 0 }),
+        rawRow({ conc: 8, power_valid: 0 }),
+      ],
+      '2026-03-01',
+    );
+    expect(rows.map((row) => row.conc)).toEqual([8]);
+  });
+
   it('preserves recipe identity for unofficial overlays', () => {
     const rows = normalizeArtifactRows(
       [

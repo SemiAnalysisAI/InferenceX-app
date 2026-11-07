@@ -7,7 +7,10 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { artifactRunId } from '@semianalysisai/inferencex-db/etl/tpu-normalization';
-import { mapBenchmarkRow } from '@semianalysisai/inferencex-db/etl/benchmark-mapper';
+import {
+  mapBenchmarkRow,
+  requiredPowerFailure,
+} from '@semianalysisai/inferencex-db/etl/benchmark-mapper';
 import { mapAggEvalRow, type EvalParams } from '@semianalysisai/inferencex-db/etl/eval-mapper';
 import { createSkipTracker } from '@semianalysisai/inferencex-db/etl/skip-tracker';
 import {
@@ -123,7 +126,8 @@ export function normalizeArtifactRows(
       undefined,
       artifactRunId(runUrl),
     );
-    if (!params) continue;
+    // A required point without valid power failed; ingest withholds it, so the overlay does too.
+    if (!params || requiredPowerFailure(raw, params)) continue;
     const { config } = params;
     results.push({
       // Synthetic id — overlay rows aren't persisted, so trace_replay lookups
