@@ -1,11 +1,15 @@
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync, readdirSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { benchmarkCurveScope } from '@semianalysisai/inferencex-constants';
+import {
+  benchmarkCurveScope,
+  curveLineImages,
+  extendCurveLineImages,
+  type BenchmarkCurveInput,
+} from '@semianalysisai/inferencex-constants';
 import { getStagedChartScopes } from './staged-chart-links';
 import type { DbClient } from '../connection';
 import { stablePowerPointIdentity } from '../etl/power-publication';
-import { loadStoredCurvePoints, publishedCurve } from '../etl/required-power-curve';
 import { applyBenchmarkPointBackfill } from '../etl/run-overrides';
 import { getAllBenchmarksForHistory, getBenchmarksForRun, getLatestBenchmarks } from './benchmarks';
 
@@ -86,7 +90,88 @@ interface CurveEntry {
 }
 const byEntry = (a: CurveEntry, b: CurveEntry) =>
   a.scope.localeCompare(b.scope) || a.point.localeCompare(b.point) || a.run - b.run;
-const loadCurvePoints = () => loadStoredCurvePoints(sql, [CURVE_MODEL], 0);
+
+// Independent TypeScript model of the curve selection that latest_benchmarks implements in SQL.
+interface CurvePoint {
+  identity: Record<string, unknown>;
+  image: string | null;
+  workflowRunId: number;
+  githubRunId: number;
+  runAttempt: number;
+  date: string;
+  runStartedAt: string | null;
+  appendOnly: boolean;
+}
+const curveInput = (point: CurvePoint) => point.identity as unknown as BenchmarkCurveInput;
+const runLineImages = (points: readonly CurvePoint[]) =>
+  curveLineImages(points.map((point) => ({ ...curveInput(point), image: point.image })));
+function publishedCurve(points: readonly CurvePoint[]): Map<string, CurvePoint[]> {
+  const latestAttempts = new Map<number, number>();
+  for (const point of points)
+    latestAttempts.set(
+      point.githubRunId,
+      Math.max(latestAttempts.get(point.githubRunId) ?? 0, point.runAttempt),
+    );
+  const scopes = new Map<string, Map<string, CurvePoint[]>>();
+  for (const point of points) {
+    if (point.runAttempt !== latestAttempts.get(point.githubRunId)) continue;
+    const key = benchmarkCurveScope(curveInput(point));
+    const runs = scopes.get(key) ?? new Map<string, CurvePoint[]>();
+    const runDate = JSON.stringify([point.workflowRunId, point.date]);
+    runs.set(runDate, [...(runs.get(runDate) ?? []), point]);
+    scopes.set(key, runs);
+  }
+  const result = new Map<string, CurvePoint[]>();
+  for (const [key, runs] of scopes) {
+    const byRun = new Map<number, CurvePoint[]>();
+    for (const group of runs.values())
+      for (const point of group)
+        byRun.set(point.workflowRunId, [...(byRun.get(point.workflowRunId) ?? []), point]);
+    const ranked = [...runs.values()].sort(
+      (a, b) =>
+        b[0].date.localeCompare(a[0].date) ||
+        (b[0].runStartedAt ? Date.parse(b[0].runStartedAt) : -Infinity) -
+          (a[0].runStartedAt ? Date.parse(a[0].runStartedAt) : -Infinity) ||
+        b[0].workflowRunId - a[0].workflowRunId,
+    );
+    const selected = new Map<string, CurvePoint>();
+    let chain = runLineImages(ranked[0]);
+    for (let index = 0; index < ranked.length; index++) {
+      const current = ranked[index];
+      for (const point of byRun.get(current[0].workflowRunId) ?? []) {
+        const id = stablePowerPointIdentity(point.identity);
+        if (!selected.has(id)) selected.set(id, point);
+      }
+      const older = ranked[index + 1];
+      chain =
+        current[0].appendOnly && older ? extendCurveLineImages(chain, runLineImages(older)) : null;
+      if (!chain) break;
+    }
+    result.set(key, [...selected.values()]);
+  }
+  return result;
+}
+async function loadCurvePoints(): Promise<CurvePoint[]> {
+  const rows = await sql`
+    SELECT c.*, br.benchmark_type, br.isl, br.osl, br.conc, br.offload_mode,
+      br.recipe_fingerprint, br.image, br.date::text AS point_date,
+      wr.id AS workflow_run_id, wr.github_run_id, wr.run_attempt,
+      wr.run_started_at::text, wr.append_only
+    FROM benchmark_results br
+    JOIN configs c ON c.id = br.config_id
+    JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
+    WHERE br.error IS NULL AND c.model = ${CURVE_MODEL}`;
+  return rows.map((row) => ({
+    identity: row,
+    image: row.image as string | null,
+    workflowRunId: Number(row.workflow_run_id),
+    githubRunId: Number(row.github_run_id),
+    runAttempt: Number(row.run_attempt),
+    date: String(row.point_date),
+    runStartedAt: row.run_started_at as string | null,
+    appendOnly: Boolean(row.append_only),
+  }));
+}
 async function expectSameCurve(state: string) {
   const projected = [...publishedCurve(await loadCurvePoints())]
     .flatMap(([scope, points]) =>

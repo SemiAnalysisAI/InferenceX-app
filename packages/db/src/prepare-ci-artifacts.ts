@@ -8,9 +8,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { requireIngestRepo } from './cli-utils.js';
 import { buildArtifactPlan } from './lib/ci-artifact-preparation.js';
 import { downloadArtifact, listRunArtifacts, type ArtifactMeta } from './lib/github-artifacts.js';
-import { verifyRequiredPowerArtifacts } from './etl/required-power-publication.js';
 import { describeRetryCopySelection, dropSupersededJobCopies } from './etl/retry-copies.js';
-import { isRunAttemptPurged } from './etl/run-overrides.js';
 
 interface GithubRunMetadata {
   head_sha?: string;
@@ -177,19 +175,6 @@ async function main(): Promise<void> {
     dropSupersededJobCopies(artifactsPath, plan.artifacts, sourceRunId),
   )) {
     console.log(line);
-  }
-  if (isRunAttemptPurged(Number(sourceRunId), sourceMetadata.run_attempt ?? 1)) {
-    console.log(`Source run ${sourceRunId} is purged; skipping required-power verification.`);
-  } else {
-    verifyRequiredPowerArtifacts(
-      artifactsPath,
-      {
-        runId: Number(sourceRunId),
-        runAttempt: sourceMetadata.run_attempt ?? 1,
-        headSha: sourceMetadata.head_sha ?? null,
-      },
-      process.env.INGEST_REQUIRE_POWER === 'true',
-    );
   }
   if (plan.reused) {
     writeReuseMetadata(artifactsPath, repo, sourceRunId, mergeRunId, sourceMetadata, mergeMetadata);

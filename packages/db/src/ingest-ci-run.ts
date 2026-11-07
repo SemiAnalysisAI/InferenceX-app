@@ -26,7 +26,6 @@ import { materializePowerSeriesForRun } from './queries/gpu-power-series';
 import {
   applyChangelogBackfills,
   applyRunFrameworkOverridesToChangelogs,
-  backfilledPoints,
   isRunAttemptPurged,
   planBenchmarkPoint,
   validateRunBackfills,
@@ -46,18 +45,13 @@ import {
   readReusedIngestMetadata,
 } from './etl/reused-ingest-metadata';
 import type { BenchmarkParams } from './etl/benchmark-mapper';
-import { readBenchmarkArtifacts, type BenchmarkArtifactFile } from './etl/benchmark-artifacts';
+import { readBenchmarkArtifacts } from './etl/benchmark-artifacts';
 import {
   benchmarkPointKey,
   describeRetryCopySelection,
   dropSupersededJobCopies,
   perJobPointKeys,
 } from './etl/retry-copies';
-import { preflightRequiredPowerCurves } from './etl/required-power-curve';
-import {
-  assertRequiredPowerPointsRetained,
-  verifyRequiredPowerArtifacts,
-} from './etl/required-power-publication';
 import {
   bulkIngestBenchmarkRows,
   bulkIngestRunStats,
@@ -342,29 +336,6 @@ async function main(): Promise<void> {
     }
   }
 
-  let benchmarkFilesRead: BenchmarkArtifactFile[] | undefined;
-  const benchmarkFiles = () =>
-    (benchmarkFilesRead ??= readBenchmarkArtifacts(artifactsDir, {
-      runId: runIdStr,
-      tracker,
-    }));
-
-  const powerSource = {
-    runId,
-    runAttempt: runAttemptNum,
-    headSha: ghInfo?.headSha ?? null,
-  };
-  const requiredPower = verifyRequiredPowerArtifacts(
-    artifactsDir,
-    powerSource,
-    process.env.INGEST_REQUIRE_POWER === 'true',
-    benchmarkFiles,
-  );
-  if (requiredPower)
-    console.log(
-      `  Required power: ${requiredPower.points.length} source benchmark points verified`,
-    );
-
   await preloadConfigs();
   console.log(`  ${configCache.size} configs preloaded`);
 
@@ -434,15 +405,6 @@ async function main(): Promise<void> {
   report.prLinks = [
     ...new Set(changelogs.flatMap((c) => c.entries.flatMap((e) => (e.prLink ? [e.prLink] : [])))),
   ];
-  if (evalsOnly && requiredPower)
-    throw new Error('Required power: benchmark scope cannot be published as an evals-only run');
-
-  if (requiredPower)
-    await preflightRequiredPowerCurves(sql, requiredPower, benchmarkFiles(), powerSource, {
-      date,
-      runStartedAt: workflowGhInfo?.runStartedAt ?? null,
-      appendOnly,
-    });
 
   const workflowRunId = await getOrCreateWorkflowRun({
     githubRunId: runId,
@@ -496,7 +458,6 @@ async function main(): Promise<void> {
   }
 
   console.log('\n--- Benchmark Results ---');
-  const retainedPowerPoints: BenchmarkParams[] = [];
   if (evalsOnly) {
     console.log('  Skipped (evals-only run)');
   } else {
@@ -526,7 +487,7 @@ async function main(): Promise<void> {
       );
     }
 
-    const files = benchmarkFiles();
+    const files = readBenchmarkArtifacts(artifactsDir, { runId: runIdStr, tracker });
     const expectedRunArtifacts = [
       ...new Set(
         files.flatMap((file) => {
@@ -722,7 +683,6 @@ async function main(): Promise<void> {
           totalDupBmk += dupCount;
           report.counts.benchmark.new += newCount;
           report.counts.benchmark.duplicate += dupCount;
-          if (requiredPower) retainedPowerPoints.push(...toInsert);
 
           for (const r of toInsert) {
             availRows.push({
@@ -931,15 +891,6 @@ async function main(): Promise<void> {
       await Promise.all(traceTasks);
     }
     await traceWorkerPool.close();
-    if (requiredPower)
-      assertRequiredPowerPointsRetained(
-        backfilledPoints(
-          { githubRunId: runIdNum, runAttempt: runAttemptNum },
-          requiredPower.points,
-        ),
-        retainedPowerPoints,
-        'after_insert',
-      );
     console.log(`  Benchmarks: +${totalNewBmk} new, ${totalDupBmk} dup`);
     if (totalTraceReplayLinked > 0 || tracker.skips.traceReplayMissing > 0) {
       console.log(

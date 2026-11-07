@@ -70,9 +70,6 @@ export function rawPowerWorkloadOf(raw: Record<string, unknown>): PowerWorkload 
   );
 }
 
-export function powerWorkloadForScenario(scenario: string): PowerWorkload | undefined {
-  return POWER_WORKLOADS.find((workload) => workload.scenario === scenario);
-}
 export interface PowerPublicationPoint {
   identity: Record<string, unknown>;
   metrics: Record<string, number>;

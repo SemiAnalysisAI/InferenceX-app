@@ -1,8 +1,7 @@
 import { serverLogArtifactSuffix } from '../etl/server-log-artifacts.js';
 import type { ArtifactMeta } from './github-artifacts.js';
 
-export const CHANGELOG_ARTIFACT_NAME = 'changelog-metadata';
-export const REQUIRED_POWER_MANIFEST = 'required-power-sweep-manifest';
+const CHANGELOG_ARTIFACT_NAME = 'changelog-metadata';
 const REUSED_INGEST_BUNDLE = 'reused-ingest-artifacts';
 const UNREAD_ARTIFACT_PREFIXES = ['job_event', 'al_gate'] as const;
 

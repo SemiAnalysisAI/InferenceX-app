@@ -13,7 +13,7 @@ import {
 import { readBenchmarkArtifacts } from './benchmark-artifacts';
 import { createSkipTracker } from './skip-tracker';
 
-const golden = path.resolve(import.meta.dirname, 'fixtures/powerx-manifest-v2');
+const golden = path.resolve(import.meta.dirname, 'fixtures/agentic-golden');
 const goldenRow = JSON.parse(
   fs.readFileSync(path.join(golden, 'bmk_agentic_golden/agg.json'), 'utf8'),
 ) as Record<string, unknown>;

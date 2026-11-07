@@ -6,7 +6,6 @@ import {
   powerPublicationPoint,
   powerVerificationReceipt,
   unmappedPowerResultIssue,
-  powerWorkloadForScenario,
   rawPowerWorkloadOf,
   verifyPowerPublication,
   type PublishedPowerRow,
@@ -76,9 +75,6 @@ describe('PowerX publication', () => {
       });
       expect(rawPowerWorkloadOf({ ...raw, ...row })).toBe(workload);
     }
-    expect(powerWorkloadForScenario('1k1k')).toMatchObject({ isl: 1024, osl: 1024 });
-    expect(powerWorkloadForScenario('8k1k')).toMatchObject({ isl: 8192, osl: 1024 });
-    expect(powerWorkloadForScenario('4k1k')).toBeUndefined();
   });
   it('verifies AgentX source identity, nullable sequences, energy and audit through DB/API', () => {
     const point = expected({

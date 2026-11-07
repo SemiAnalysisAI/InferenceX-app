@@ -1299,17 +1299,6 @@ export function planBenchmarkPoint<T extends BackfillablePoint>(
   return { kind: 'planned', point: applied.point, backfillId: applied.backfillId };
 }
 
-export function backfilledPoints<T extends Omit<BackfillablePoint, 'configId'>>(
-  run: { githubRunId: number; runAttempt: number | null | undefined },
-  points: readonly T[],
-): T[] {
-  return points.map(
-    (point) =>
-      applyBenchmarkPointBackfill(run.githubRunId, run.runAttempt, { ...point, configId: -1 })
-        .point,
-  );
-}
-
 export function isRunAttemptPurged(githubRunId: number, runAttempt?: number): boolean {
   if (PURGED_RUNS.has(githubRunId)) return true;
   if (runAttempt === undefined) return false;
