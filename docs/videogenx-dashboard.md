@@ -195,11 +195,16 @@ help carries the full qualification.
 
 ## Per-clip quality
 
-Per-clip quality is independent of the original candidate ZIP. The attachment binds
-run, artifact, source, manifest, cell, slot, case, prompt, seed, media path and SHA256.
-Model, generation, fairness and the selected plan case must match. Both original
-full-plan hashes are retained when an unrelated case changed. Only completed cases
-retained in the original reference receipt are eligible.
+Per-clip quality is independent of the original candidate ZIP. It comes from the trusted
+`h3-quality-<run>-<attempt>` artifact described in [Video History](./video-history.md).
+The attachment binds run, artifact, source, manifest, cell, slot, case, prompt, seed, media
+path and SHA256. Model, generation and fairness must match the public reference descriptor,
+and the reference is the descriptor case with the same prompt, seed and case settings. Both
+full-plan hashes are retained when an unrelated case changed. A clip the scorer did not
+compare shows its reason (invalid clip, checksum mismatch, no reference or settings differ) in
+place of PSNR. A named run that is not published shows PSNR and these reasons without media,
+and marks every clip of an artifact the scorer could not read. Publication does not store that
+unreadable state, so a later successful score can still attach.
 
 `evaluator.media.compare_media` compares every decoded RGB24 pixel/frame using
 full-stream MSE and peak=1 after division by 255, without resizing, trimming or
@@ -214,7 +219,7 @@ all groups under `clipQuality`, so case navigation changes presentation only.
 The deployment detail's Validity tab links to these per-clip scores. Cell-granularity CSV has no
 per-clip PSNR aggregate. Official and exact named channels retain their approval rules.
 
-中文：质量附件独立于原始候选 ZIP，精确绑定运行、产物、来源、manifest、测量单元、slot、用例、prompt、seed、媒体路径与 SHA256。模型、生成配置、公平性配置和所选计划用例必须一致；其他用例发生变化时仍保留双方原始完整计划哈希。只使用参考回执中实际完成并保留的用例。PSNR 对比全部解码 RGB24 像素和帧；完全一致单独标注，缺失或不兼容配对保持为空。该数值不代表语义质量或发布合格。JSON 返回全部用例组，CSV 不虚构逐条 PSNR 汇总值，发布批准规则不变。
+中文：质量附件独立于原始候选 ZIP，来自 [Video History](./video-history.md) 所述的可信 `h3-quality-<run>-<attempt>` 产物，精确绑定运行、产物、来源、manifest、测量单元、slot、用例、prompt、seed、媒体路径与 SHA256。模型、生成配置和公平性配置必须与公开参考描述文件一致，参考视频是描述文件中 prompt、seed 和用例配置都一致的用例；其他用例发生变化时仍保留双方完整计划哈希。评分器未比较的视频在 PSNR 位置显示原因（无效视频、校验和不符、无参考视频或配置不一致）。未发布的指定运行显示 PSNR 和上述原因，但不显示视频；评分器无法读取的产物，其中每条视频都会标明。发布时不存储这种无法读取的状态，因此之后评分成功时仍可附加。PSNR 对比全部解码 RGB24 像素和帧；完全一致单独标注，缺失或不兼容配对保持为空。该数值不代表语义质量或发布合格。JSON 返回全部用例组，CSV 不虚构逐条 PSNR 汇总值，发布批准规则不变。
 
 The local replay can also attach a separately sealed matched-noise diagnostic.
 The existing case picker puts this labelled rerun first while retaining every
