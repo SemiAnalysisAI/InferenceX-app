@@ -1,22 +1,5 @@
 const MODEL_SITE_URL = 'https://inferencex.semianalysis.com';
 
-function waitForScrollToSettle(): void {
-  cy.window().then(
-    (win) =>
-      new Cypress.Promise<void>((resolve) => {
-        let last = Number.NaN;
-        let stable = 0;
-        const tick = () => {
-          stable = win.scrollY === last ? stable + 1 : 0;
-          last = win.scrollY;
-          if (stable >= 3) resolve();
-          else win.setTimeout(tick, 100);
-        };
-        tick();
-      }),
-  );
-}
-
 function dismissStarModal(win: Window): void {
   win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
 }
@@ -446,10 +429,7 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="model-architecture-link"]')
         .should('have.attr', 'href')
         .and('equal', '/model/deepseek-r1');
-      // The inference page smooth-scrolls the chart into view on first load, and a
-      // scroll closes the tooltip; let that finish before opening it.
-      cy.window().its('scrollY').should('be.greaterThan', 0);
-      waitForScrollToSettle();
+      cy.window().its('scrollY').should('equal', 0);
       cy.get('[data-testid="model-architecture-link"]').scrollIntoView().focus();
       cy.get('[data-testid="model-architecture-tooltip"]')
         .should('be.visible')

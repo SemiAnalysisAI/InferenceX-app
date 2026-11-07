@@ -260,6 +260,14 @@ describe('GPU comparison agentic point detail', () => {
       .should('contain.text', 'vLLM')
       .and('not.contain.text', 'SGLang');
     cy.contains('button', 'Jun 12, 2026').should('be.visible');
+    cy.get('[data-testid="engine-comparison-conflict-notice"] button[aria-expanded]')
+      .should('have.attr', 'aria-expanded', 'false')
+      .click();
+    cy.get('[data-testid="engine-comparison-conflict-notice"] button[aria-expanded]').should(
+      'have.attr',
+      'aria-expanded',
+      'true',
+    );
     cy.contains('button', 'Review comparison warning').click();
     cy.get('[data-testid="engine-comparison-confirmation"]')
       .contains('button', 'I agree, show both')

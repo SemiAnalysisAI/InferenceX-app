@@ -175,7 +175,7 @@ describe('Inference Chart', () => {
       .first()
       .find('[data-testid="result-context"]')
       .should('contain.text', 'Cost tier: Owning at large hyperscaler volume')
-      .and('contain.text', 'Updated:')
+      .and(($ctx) => expect($ctx.text()).to.match(/Updated [A-Z][a-z]{2} \d{1,2}, \d{4}/))
       .and('contain.text', 'SemiAnalysis InferenceX')
       .and('not.contain.text', 'Model:')
       .and('not.contain.text', 'Workload:')
@@ -231,7 +231,7 @@ describe('Inference Chart', () => {
       .should('have.text', 'Uncached $1.122/M tok · Cached $0.08/M tok · Output $3.366/M tok')
       .closest('[data-testid="result-context"]')
       .should('contain.text', 'Cost basis:')
-      .and('contain.text', 'Updated:');
+      .and(($ctx) => expect($ctx.text()).to.match(/Updated [A-Z][a-z]{2} \d{1,2}, \d{4}/));
     cy.get('[data-testid="openrouter-pricing-link"]').should(
       'have.attr',
       'href',
@@ -264,7 +264,7 @@ describe('Inference Chart', () => {
     cy.get('#chart-0').should(($chart) => assertContextBelowPlot($chart[0]!));
     cy.get('#chart-0 [data-testid="cost-tier-selector"]').click();
     cy.get('[data-testid="cost-tier-rental"]').click();
-    cy.get('#chart-0 input[aria-label="B200 $/chip/hr"]').should('have.value', '3.7');
+    cy.get('#chart-0 input[aria-label="B200 $/chip/hr"]').should('have.value', '3.70');
     cy.get('#chart-0 [data-testid="cost-tier-selector"]').should(
       'contain.text',
       'Rent – 3-year commit',
