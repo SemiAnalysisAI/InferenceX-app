@@ -26,7 +26,7 @@ const STRINGS = {
     driver: 'Driver',
     container: 'Container',
     source: 'Source: ',
-    aria: 'ubenchX TPC Skyline table',
+    aria: 'uBenchX TPC Skyline table',
   },
   zh: {
     nvidia: 'NVIDIA 实测 TPC 分组',
@@ -42,7 +42,7 @@ const STRINGS = {
     driver: '驱动',
     container: '容器',
     source: '数据来源：',
-    aria: 'ubenchX TPC Skyline 表',
+    aria: 'uBenchX TPC Skyline 表',
   },
 } as const;
 

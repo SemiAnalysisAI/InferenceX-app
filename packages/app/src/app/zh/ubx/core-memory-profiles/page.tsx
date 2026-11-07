@@ -4,7 +4,7 @@ import { CoreMemoryProfilesContent } from '@/components/ubenchx/CoreMemoryProfil
 import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
-const TITLE = 'ubenchX：核心访存特征';
+const TITLE = 'uBenchX：核心访存特征';
 const DESCRIPTION =
   '对比 B200 SM 与 Huawei 950PR Cube/Vector 的访存特征，保留各设备原始计时单位和测试条件。';
 

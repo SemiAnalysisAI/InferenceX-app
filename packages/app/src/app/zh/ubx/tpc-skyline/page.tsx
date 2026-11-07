@@ -4,7 +4,7 @@ import { TpcSkylineContent } from '@/components/ubenchx/TpcSkylineContent';
 import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
-const TITLE = 'ubenchX：TPC Skyline 与 SKU 配置';
+const TITLE = 'uBenchX：TPC Skyline 与 SKU 配置';
 const DESCRIPTION =
   '展示 NVIDIA GPU 实测 TPC per GPC 分组，以及 Huawei 950PR 各 SKU 的核心数、频率、内存和缓存配置。';
 

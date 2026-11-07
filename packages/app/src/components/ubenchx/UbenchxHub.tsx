@@ -20,26 +20,26 @@ import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {
-    title: 'ubenchX microbenchmarks',
+    title: 'uBenchX microbenchmarks',
     beta: 'Beta',
     subtitle:
       'Low-level accelerator microbenchmarks measuring fundamental hardware characteristics',
     controls: 'Benchmark config',
     chartControls: 'Chart config',
     test: 'Microbenchmark',
-    testTooltip: 'The ubenchX microbenchmark to display.',
+    testTooltip: 'The uBenchX microbenchmark to display.',
     memBwTitle: 'HBM bandwidth',
     tpcSkylineTitle: 'TPC Skyline & SKU configurations',
     coreProfilesTitle: 'Core memory-access profiles',
   },
   zh: {
-    title: 'ubenchX 微基准测试',
+    title: 'uBenchX 微基准测试',
     beta: 'Beta',
     subtitle: '底层加速器微基准测试，测量基础硬件特性',
     controls: '基准测试配置',
     chartControls: '图表配置',
     test: '微基准测试',
-    testTooltip: '要显示的 ubenchX 微基准测试。',
+    testTooltip: '要显示的 uBenchX 微基准测试。',
     memBwTitle: 'HBM 带宽',
     tpcSkylineTitle: 'TPC Skyline 与 SKU 配置',
     coreProfilesTitle: '核心访存特征',

@@ -195,7 +195,7 @@ export const NAV_LABELS_ZH: Record<HeaderNavHref, string> = {
   '/': '首页',
   '/overview': '总览',
   [getDashboardRoute('inference').path]: '仪表板',
-  '/ubx': 'ubenchX',
+  '/ubx': 'uBenchX',
   [AGENTX_ROUTE.path]: 'AgentX',
   '/about': '关于',
 };

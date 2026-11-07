@@ -447,7 +447,7 @@ const bandwidthPoints = () =>
         (element as unknown as { __data__: { gpuKey: string } }).__data__.gpuKey === 'Huawei 950PR',
     );
 
-it('uses shared Huawei colors in OperatorX and ubenchX across a live theme switch', () => {
+it('uses shared Huawei colors in OperatorX and uBenchX across a live theme switch', () => {
   const ascend = normalizeBundle(run('201', 'ascend950pr-external', [64, 128]));
   const nvidia = normalizeBundle(run('202', 'h200-dgxc', [64, 128]));
   for (const dataset of [ascend, nvidia]) {

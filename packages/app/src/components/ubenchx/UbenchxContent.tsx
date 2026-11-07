@@ -83,7 +83,7 @@ const STRINGS = {
     tooltipMbu: 'MBU',
     tooltipPeak: 'Bandwidth reference',
     withUnit: (label: string, unit: string) => `${label} (${unit})`,
-    aria: 'ubenchX device-memory copy bandwidth charts',
+    aria: 'uBenchX device-memory copy bandwidth charts',
   },
   zh: {
     protocolNote:
@@ -120,7 +120,7 @@ const STRINGS = {
     tooltipMbu: 'MBU',
     tooltipPeak: '带宽参考值',
     withUnit: (label: string, unit: string) => `${label}（${unit}）`,
-    aria: 'ubenchX 显存拷贝带宽图表',
+    aria: 'uBenchX 显存拷贝带宽图表',
   },
 } as const;
 

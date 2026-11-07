@@ -141,8 +141,8 @@ describe('Header', () => {
     cy.get('[data-testid="mobile-menu-toggle"]').should('have.attr', 'aria-label', '导航菜单');
   });
 
-  it('orders the nav as Home, Overview, Dashboard, AgentX, ubenchX, About', () => {
-    const expected = ['Home', 'Overview', 'Dashboard', 'AgentX', 'ubenchX', 'About'];
+  it('orders the nav as Home, Overview, Dashboard, AgentX, uBenchX, About', () => {
+    const expected = ['Home', 'Overview', 'Dashboard', 'AgentX', 'uBenchX', 'About'];
     cy.get('[data-testid^="nav-link-"]').then(($links) => {
       const labels = [...$links].map((link) => (link.textContent ?? '').replace('New', '').trim());
       expect(labels).to.deep.equal(expected);
@@ -169,7 +169,7 @@ describe('Header', () => {
       cy.contains('a', 'Dashboard')
         .should('be.visible')
         .and('have.attr', 'href', '/infx/inference');
-      cy.contains('a', 'ubenchX').should('be.visible').and('have.attr', 'href', '/ubx/mem-bw');
+      cy.contains('a', 'uBenchX').should('be.visible').and('have.attr', 'href', '/ubx/mem-bw');
       cy.contains('a', 'AgentX').should('be.visible').and('have.attr', 'href', '/infx/agentx');
       cy.contains('a', 'Comparisons').should('not.exist');
       cy.contains('a', 'Articles').should('not.exist');
@@ -314,7 +314,7 @@ describe('Header', () => {
       cy.get('[data-testid="mobile-menu-toggle"]').click();
       cy.get('[data-testid="mobile-menu"]').should('be.visible');
       cy.get('[data-testid="mobile-menu"]').within(() => {
-        ['Home', 'Overview', 'Dashboard', 'ubenchX', 'AgentX', 'About'].forEach((label) => {
+        ['Home', 'Overview', 'Dashboard', 'uBenchX', 'AgentX', 'About'].forEach((label) => {
           cy.contains('a', label).should('be.visible');
         });
         ['Comparisons', 'Articles', 'Supporters', 'Telemetry'].forEach((label) => {

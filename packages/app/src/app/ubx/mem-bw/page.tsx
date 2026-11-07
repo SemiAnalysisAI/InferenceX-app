@@ -4,7 +4,7 @@ import { UbenchxContent } from '@/components/ubenchx/UbenchxContent';
 import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
-const TITLE = 'ubenchX: HBM bandwidth';
+const TITLE = 'uBenchX: HBM bandwidth';
 const DESCRIPTION =
   'Device-memory copy bandwidth microbenchmark on NVIDIA and AMD GPUs: latency, bandwidth and utilization (MBU) across message sizes from 8 B to 16 GiB.';
 

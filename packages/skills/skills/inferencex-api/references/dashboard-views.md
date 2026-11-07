@@ -960,14 +960,14 @@ The overview returns JSON by default. `format=csv` is available only with `view=
 
 The English and Chinese landing pages link Huawei Ascend 950PR results to
 `/ubx/core-memory-profiles` and `/zh/ubx/core-memory-profiles`, respectively,
-with the UbenchX subtitle. The logo and result button are presentation-only
-navigation and do not prefetch OperatorX. The existing ubenchX API covers this
+with the uBenchX subtitle. The logo and result button are presentation-only
+navigation and do not prefetch OperatorX. The existing uBenchX API covers this
 destination: `test=core-memory-profiles&gpu=all` returns Huawei Ascend first,
 followed by B200, matching the page and hardware selector order.
 
-中文：英文和中文首页的华为 Ascend 950PR 入口显示 UbenchX 副标题，分别链接至
+中文：英文和中文首页的华为 Ascend 950PR 入口显示 uBenchX 副标题，分别链接至
 `/ubx/core-memory-profiles` 和 `/zh/ubx/core-memory-profiles`。
-Logo 和结果按钮仅用于导航，不再预取 OperatorX 数据。目标页面沿用现有 ubenchX API：
+Logo 和结果按钮仅用于导航，不再预取 OperatorX 数据。目标页面沿用现有 uBenchX API：
 `test=core-memory-profiles&gpu=all` 先返回 Huawei Ascend，再返回 B200，与页面和硬件选择器顺序一致。
 
 ### Landing-page MiniMax M3.1 Flash link

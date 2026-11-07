@@ -1276,16 +1276,16 @@ export const apiContractSourceDigests = [
     source: 'src/components/ubenchx/ubenchx-transform.ts',
     sourceSha256: '3a1cadb4113285742499a1faa3ea9d6c5c66f2459435a2a80ad0c17e4ceb138d',
     reviewArea: {
-      en: 'ubenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
-      zh: 'ubenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
+      en: 'uBenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
+      zh: 'uBenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
     },
   },
   {
     source: 'src/components/ubenchx/ubenchx-data.ts',
     sourceSha256: '5d47b7e1a99601633494c932081cb71c912ddbb806503c897d8dbbaf1a6dfcba',
     reviewArea: {
-      en: 'ubenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
-      zh: 'ubenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
+      en: 'uBenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
+      zh: 'uBenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
     },
   },
 
@@ -1302,8 +1302,8 @@ export const apiContractSourceDigests = [
     source: 'src/components/ubenchx/core-memory-profiles.ts',
     sourceSha256: '96c51ab39b475653dac1e9c5d5dd42eb23c595b4e5e7f485d59a72a44afd99a4',
     reviewArea: {
-      en: 'ubenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
-      zh: 'ubenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
+      en: 'uBenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
+      zh: 'uBenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
     },
   },
 

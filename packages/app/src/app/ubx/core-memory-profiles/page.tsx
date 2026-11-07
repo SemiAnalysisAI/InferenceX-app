@@ -4,7 +4,7 @@ import { CoreMemoryProfilesContent } from '@/components/ubenchx/CoreMemoryProfil
 import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
-const TITLE = 'ubenchX: Core memory-access profiles';
+const TITLE = 'uBenchX: Core memory-access profiles';
 const DESCRIPTION =
   'Compare B200 SM and Huawei 950PR Cube/Vector memory-access profiles, preserving each device’s native timer units and measurement conditions.';
 

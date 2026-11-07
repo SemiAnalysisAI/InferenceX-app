@@ -4,7 +4,7 @@ import { TpcSkylineContent } from '@/components/ubenchx/TpcSkylineContent';
 import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
-const TITLE = 'ubenchX: TPC Skyline & SKU configurations';
+const TITLE = 'uBenchX: TPC Skyline & SKU configurations';
 const DESCRIPTION =
   'Measured NVIDIA TPC per GPC groupings alongside Huawei 950PR SKU configuration counts, clocks, memory and cache capacities.';
 

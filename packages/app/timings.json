@@ -3800,7 +3800,7 @@
         },
         {
           "title": [
-            "Huawei UBenchX launch banner",
+            "Huawei uBenchX launch banner",
             "opens Huawei core-memory profiles from /zh landing page"
           ],
           "duration": 946,
@@ -4066,7 +4066,7 @@
         },
         {
           "title": [
-            "uses shared Huawei colors in OperatorX and ubenchX across a live theme switch"
+            "uses shared Huawei colors in OperatorX and uBenchX across a live theme switch"
           ],
           "duration": 362,
           "attempts": 1
@@ -5726,7 +5726,7 @@
         },
         {
           "title": [
-            "ubenchX hub and test routes",
+            "uBenchX hub and test routes",
             "opens /ubenchx on the mem-bw view with the Beta title and test selector"
           ],
           "duration": 310,
@@ -5734,7 +5734,7 @@
         },
         {
           "title": [
-            "ubenchX hub and test routes",
+            "uBenchX hub and test routes",
             "switches to the combined core profiles with the test selector"
           ],
           "duration": 696,
@@ -5742,7 +5742,7 @@
         },
         {
           "title": [
-            "ubenchX hub and test routes",
+            "uBenchX hub and test routes",
             "switches to the TPC Skyline table with the test selector"
           ],
           "duration": 285,
@@ -5750,7 +5750,7 @@
         },
         {
           "title": [
-            "ubenchX hub and test routes",
+            "uBenchX hub and test routes",
             "keeps a pinned sm-l2-distance tooltip on its cell while the pointer moves"
           ],
           "duration": 1224,

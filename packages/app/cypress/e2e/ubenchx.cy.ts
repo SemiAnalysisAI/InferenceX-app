@@ -8,11 +8,11 @@ const dismissModal = {
   },
 };
 
-describe('ubenchX hub and test routes', () => {
+describe('uBenchX hub and test routes', () => {
   it('opens /ubx on the mem-bw view with the Beta title badge and test selector', () => {
     cy.visit('/ubx', dismissModal);
     cy.url().should('include', '/ubx/mem-bw');
-    cy.contains('h1', 'ubenchX microbenchmarks').should('be.visible');
+    cy.contains('h1', 'uBenchX microbenchmarks').should('be.visible');
     cy.get('h1 [data-slot="badge"]').should('have.text', 'Beta');
     cy.get('[data-testid="nav-link-ubenchx"]').should('have.attr', 'href', '/ubx/mem-bw');
     cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'HBM bandwidth');
@@ -37,7 +37,7 @@ describe('ubenchX hub and test routes', () => {
 
   it('switches to the combined core profiles with the test selector', () => {
     cy.visit('/ubx/mem-bw', dismissModal);
-    cy.contains('ubenchX').should('be.visible');
+    cy.contains('uBenchX').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').should('be.visible');
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
     cy.get('link[rel="alternate"][hreflang="zh-CN"]')
@@ -189,7 +189,7 @@ it('unpins core-profile cells by repeated click or Enter and clears them outside
   cy.get(`${panel} svg`).trigger('keydown', { key: 'Enter' });
   cy.get(value).should('be.empty').and('not.be.visible');
   cy.get(`${panel} svg rect`).eq(1).click();
-  cy.contains('h1', 'ubenchX microbenchmarks').click();
+  cy.contains('h1', 'uBenchX microbenchmarks').click();
   cy.get(value).should('be.empty').and('not.be.visible');
   cy.get(`${panel} svg rect`).eq(1).click();
   cy.get(`${panel} svg`).trigger('keydown', { key: 'Escape' });

@@ -44,7 +44,7 @@ const STRINGS = {
     hardware: 'Hardware',
     driver: 'Driver',
     container: 'Container',
-    aria: 'ubenchX SM-SM L2 latency difference heatmap',
+    aria: 'uBenchX SM-SM L2 latency difference heatmap',
     noData: 'No SM-L2 distance data available',
   },
   zh: {
@@ -68,7 +68,7 @@ const STRINGS = {
     hardware: '硬件',
     driver: '驱动',
     container: '容器',
-    aria: 'ubenchX SM 间 L2 延迟差异热力图',
+    aria: 'uBenchX SM 间 L2 延迟差异热力图',
     noData: '暂无 SM-L2 距离数据',
   },
 } as const;

@@ -215,7 +215,7 @@ describe('First-load navigation', () => {
   });
 });
 
-describe('Huawei UBenchX launch banner', { testIsolation: true }, () => {
+describe('Huawei uBenchX launch banner', { testIsolation: true }, () => {
   it('opens Huawei core-memory profiles from /zh landing page', () => {
     cy.visit('/zh', {
       onBeforeLoad(win) {
