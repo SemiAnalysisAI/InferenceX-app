@@ -280,8 +280,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'boolean',
     description: text(
-      'Include powerBreakdowns: per hardware line (hwKey + precision, as in the chart legend), each point’s All in Measured W/GPU split into measured GPU, measured CPU (Grace sockets on NVL72 or RAPL packages on x86 hosts, when socket telemetry is valid), and the modeled host CPU, memory, NICs, NVSwitch, storage, PCIe and misc parts, fans, PSU loss, scale-out network share and PUE facility overhead. Parts are the deployment share ÷ allocated GPUs and sum to totalWattsPerGpu. Points without validated GPU telemetry or a supported system model are omitted. JSON only.',
-      '返回 powerBreakdowns：按硬件曲线（hwKey + 精度，与图例一致）将每个点的 All in Measured W/GPU 拆分为实测 GPU、实测 CPU（NVL72 的 Grace 插槽或 x86 主机的 RAPL 封装，插槽遥测有效时），以及建模的主机 CPU、内存、网卡、NVSwitch、存储、PCIe 及其他部件、风扇、电源损耗、Scale-out 网络分摊和 PUE 机房开销。各部分为部署分摊值 ÷ 已分配 GPU 数，总和等于 totalWattsPerGpu。缺少有效 GPU 遥测或系统模型不支持的点会被省略。仅支持 JSON。',
+      'Include powerBreakdowns: per hardware line (hwKey + precision, as in the chart legend), each point’s All in Measured W/GPU split into measured GPU, measured CPU (Grace sockets on NVL72, or RAPL packages on fully measured x86 chassis, when socket telemetry is valid), and the modeled host CPU, memory, NICs, NVSwitch, storage, PCIe and misc parts, fans, PSU loss, scale-out network share and PUE facility overhead. Parts are the deployment share ÷ allocated GPUs and sum to totalWattsPerGpu. Points without validated GPU telemetry or a supported system model are omitted. JSON only.',
+      '返回 powerBreakdowns：按硬件曲线（hwKey + 精度，与图例一致）将每个点的 All in Measured W/GPU 拆分为实测 GPU、实测 CPU（NVL72 的 Grace 插槽，或完整分配的 x86 机箱的 RAPL 封装，插槽遥测有效时），以及建模的主机 CPU、内存、网卡、NVSwitch、存储、PCIe 及其他部件、风扇、电源损耗、Scale-out 网络分摊和 PUE 机房开销。各部分为部署分摊值 ÷ 已分配 GPU 数，总和等于 totalWattsPerGpu。缺少有效 GPU 遥测或系统模型不支持的点会被省略。仅支持 JSON。',
     ),
     schema: { type: 'boolean', default: false },
     example: 'true',
@@ -669,7 +669,7 @@ const responseSchema = objectSchema(
               type: 'string',
               enum: ['measured', 'modeled'],
               description:
-                '`measured` when validated socket telemetry replaces the modeled CPUs (Grace sockets on NVL72 trays, RAPL packages on x86 chassis); `modeled` otherwise.',
+                '`measured` when validated socket telemetry replaces the modeled CPUs (Grace sockets on NVL72 trays, RAPL packages on fully measured x86 chassis); `modeled` otherwise, including partially allocated x86 chassis.',
             },
             chassisBasis: { type: 'string', enum: ['full', 'extrapolated'] },
             point: identitySchema,

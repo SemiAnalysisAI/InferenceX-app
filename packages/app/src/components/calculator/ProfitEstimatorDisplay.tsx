@@ -323,7 +323,7 @@ const STRINGS = {
       extrapolated: '整机外推',
     },
     powerPreview: `${ALL_IN_MEASURED_NOTE.zh} 主机功耗按 AgentX 工作负载状态建模，并区分是否启用 KV cache offload。`,
-    powerDetails: `GPU 功耗在相同的吞吐量数据点间插值，计入 PUE（风冷机箱为 ${AIR_COOLED_SYSTEM_PUE}，液冷 NVL72 为 ${LIQUID_COOLED_RACK_PUE}）和 10% 功耗余量。聚合多节点按部署平均功耗估算各台服务器。NVL72 tray 平均分摊同一个建模机架的功耗；运行带有已验证的 Grace socket 遥测时使用实测功耗，否则使用 Grace 功耗估算值。整机箱运行的 x86 机箱在运行带有已验证的 CPU 遥测时使用实测 RAPL CPU 封装功耗，否则使用 CPU 功耗估算值。实测与估算的 CPU 功耗数据点不会相互插值。整机外推假设八卡服务器部署多个相同的实测单卡、双卡或四卡实例，每卡功耗和吞吐量保持不变；它不代表部分 GPU 闲置时的整机实测功耗。`,
+    powerDetails: `GPU 功耗在相同的吞吐量数据点间插值，计入 PUE（风冷机箱为 ${AIR_COOLED_SYSTEM_PUE}，液冷 NVL72 为 ${LIQUID_COOLED_RACK_PUE}）和 10% 功耗余量。聚合多节点按部署平均功耗估算各台服务器。NVL72 tray 平均分摊同一个建模机架的功耗；运行带有已验证的 Grace socket 遥测时使用实测功耗，否则使用 Grace 功耗估算值。完整分配的 x86 机箱在运行带有已验证的 CPU 遥测时使用实测 RAPL CPU 封装功耗，否则使用 CPU 功耗估算值。实测与估算的 CPU 功耗数据点不会相互插值。整机外推假设八卡服务器部署多个相同的实测单卡、双卡或四卡实例，每卡功耗和吞吐量保持不变；它不代表部分 GPU 闲置时的整机实测功耗。`,
     csvPowerHeaders: ['功耗口径', '功耗模型版本'],
     pricingGroup: '定价配置',
     costProviderLabel: '计价方式',

@@ -600,9 +600,10 @@ comparison and unofficial overlay has its own `tableRows`; latest does not pool 
 NVL72 rows need valid GPU power and take an equal compute-tray share of the InferenceX
 `power_model` rack at PUE 1.1. Validated Grace-socket power with complete socket
 coverage replaces the modeled Grace CPU and memory; otherwise (including CPU-rail-only
-and module readings) the rack's modeled Grace profile is used. x86 chassis rows with
-validated RAPL package power for every host socket use it for the host CPUs (DRAM stays
-modeled); otherwise the chassis' modeled CPU is used. Read `powerSource` for
+and module readings) the rack's modeled Grace profile is used. A fully measured x86
+chassis with validated RAPL package power for every host socket uses it for the host CPUs
+(DRAM stays modeled); partially allocated chassis and rows without that telemetry keep the
+modeled CPU. Read `powerSource` for
 topology, `cpu` (measured or modeled), PUE and the pinned InferenceX `power_model` commit. Model-only updates recalculate retained
 valid measurements after deployment; they do not require telemetry backfill. For
 GW-year estimates, `modeled` first selects
@@ -671,8 +672,8 @@ intercept, not idle power, and do not read the line outside its x-range.
 
 `powerBreakdown=true` returns `powerBreakdowns`: per hardware line (`hwKey|precision`,
 the chart legend grouping), each point's All in Measured W/GPU split into `gpu`
-(measured board power), `measuredCpu` (Grace sockets on NVL72 or RAPL packages on x86
-hosts, when socket telemetry is valid), and the modeled `cpu` (host sockets), `memory` (host DRAM), `nic` (NIC cards +
+(measured board power), `measuredCpu` (Grace sockets on NVL72, or RAPL packages on fully
+measured x86 chassis, when socket telemetry is valid), and the modeled `cpu` (host sockets), `memory` (host DRAM), `nic` (NIC cards +
 system-side optics), `nvswitch` (NVLink switch ASICs and trays), `storage` (NVMe), `other`
 (PCIe switches, retimers, shelf controllers), `fans`, `psuLoss` (AC/DC + DC/DC conversion
 loss), `network` (scale-out share) and `facility` (PUE overhead), in that stack order.
