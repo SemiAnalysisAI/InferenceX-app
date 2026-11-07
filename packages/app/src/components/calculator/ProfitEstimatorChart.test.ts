@@ -264,7 +264,7 @@ describe('profitPointDetails', () => {
     expect(JSON.stringify(details.rows)).toContain('$90');
   });
 
-  it('formats cents and drops the GPU-hour row on the chip-hour basis', () => {
+  it('formats cents and keeps revenue per GPU-hour on both bases', () => {
     const details = profitPointDetails(
       row({ revenue: 2.16, tco: 1.73, grossMargin: 0.43, labCut: 0.648, profit: -0.218 }),
       hardwareConfig,
@@ -273,9 +273,16 @@ describe('profitPointDetails', () => {
     );
     expect(details.summary).toContain('$2.16');
     expect(details.metrics[0]?.value).toBe('−$0.22');
-    expect(JSON.stringify(details)).not.toContain('/GPU/hr');
+    expect(details.rows).toContainEqual({ label: 'Revenue per GPU-hour', value: '$3.00/GPU/hr' });
+    expect(JSON.stringify(details)).not.toContain('GPU-hours per GW-year');
     const perGw = profitPointDetails(row(), hardwareConfig, assumptions, 'en');
-    expect(JSON.stringify(perGw)).toContain('/GPU/hr');
+    expect(perGw.rows).toContainEqual({ label: 'Revenue per GPU-hour', value: '$3.00/GPU/hr' });
+    expect(perGw.rows).toContainEqual({
+      label: 'GPU-hours per GW-year',
+      value: '6,394,160,584',
+    });
+    const zh = profitPointDetails(row(), hardwareConfig, assumptions, 'zh');
+    expect(zh.rows).toContainEqual({ label: '每吉瓦年 GPU 小时数', value: '6,394,160,584' });
   });
 
   it('renders Chinese copy', () => {

@@ -244,6 +244,7 @@ const STRINGS = {
     },
     revenue: 'Revenue',
     revenuePerGpuHour: 'Revenue per GPU-hour',
+    gpuHoursPerGwYear: 'GPU-hours per GW-year',
     tco: 'Compute expense',
     grossMargin: 'Gross margin',
     labCut: 'Model license fee',
@@ -278,6 +279,7 @@ const STRINGS = {
     },
     revenue: '收入',
     revenuePerGpuHour: '每 GPU 小时收入',
+    gpuHoursPerGwYear: '每吉瓦年 GPU 小时数',
     tco: '算力支出',
     grossMargin: '毛利',
     labCut: '模型许可费',
@@ -588,13 +590,9 @@ export function profitPointDetails(
         label: `${t.labCut} (${assumptions.labCutPct}% ${t.ofRevenue})`,
         value: usd(row.labCut),
       },
+      { label: t.revenuePerGpuHour, value: `$${row.revenuePerGpuHour.toFixed(2)}/GPU/hr` },
       ...(assumptions.basis === 'gw-year'
-        ? [
-            {
-              label: t.revenuePerGpuHour,
-              value: `$${row.revenuePerGpuHour.toFixed(2)}/GPU/hr`,
-            },
-          ]
+        ? [{ label: t.gpuHoursPerGwYear, value: Math.round(row.gpuHours).toLocaleString('en-US') }]
         : []),
     ],
   };
