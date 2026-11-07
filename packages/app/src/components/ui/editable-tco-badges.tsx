@@ -210,6 +210,13 @@ export function TcoPriceTable({
   className?: string;
 }) {
   const t = TABLE_STRINGS[useLocale()];
+  const [editing, setEditing] = useState<{ item: EditableTcoBadgeItem; index: number } | null>(
+    null,
+  );
+  const shownItems =
+    editing && !items.some(({ base }) => base === editing.item.base)
+      ? items.toSpliced(Math.min(editing.index, items.length), 0, editing.item)
+      : items;
   return (
     <div className={cn('relative max-w-full', className)}>
       <div
@@ -225,7 +232,7 @@ export function TcoPriceTable({
               >
                 {header ?? t.header}
               </th>
-              {items.map(({ base, label }) => (
+              {shownItems.map(({ base, label }) => (
                 <th
                   key={base}
                   scope="col"
@@ -247,12 +254,14 @@ export function TcoPriceTable({
               <th scope="row" className={cn(TABLE_CELL, 'text-left font-normal')}>
                 {rowLabel ?? t.row}
               </th>
-              {items.map(({ base, label, value, overridden }) => (
+              {shownItems.map(({ base, label, value, overridden }, index) => (
                 <td
                   key={base}
                   data-testid={cellTestId}
                   data-overridden={overridden ? '' : undefined}
                   className={cn(TABLE_CELL, CHIP_CELL, 'text-xs font-semibold')}
+                  onFocus={() => setEditing({ item: shownItems[index], index })}
+                  onBlur={() => setEditing(null)}
                 >
                   {editable ? (
                     <TcoCostInput
