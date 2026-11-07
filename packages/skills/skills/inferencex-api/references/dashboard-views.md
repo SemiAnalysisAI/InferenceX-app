@@ -892,7 +892,7 @@ identity and filters and never fills missing output duration.
 `view=overview` returns `clipQuality: { status, groups }`. The status describes
 artifact-read coverage (`ready`, `partial`, `unavailable`), not quality. Every group
 retains scope, prompt, seed and nullable take; each clip retains hardware, point/slot/case/media
-identity and nullable `quality`. The UI uses this same matching projection. All
+identity, nullable `quality` and nullable `unscored`. The UI uses this same matching projection. All
 groups are returned, so the case picker is presentation-only.
 
 Quality retains `attachmentSha256`, exact candidate run/artifact/source/manifest/
@@ -902,7 +902,13 @@ the scorer revision/hash/method. `decoded-rgb24-all-frames` compares every decod
 RGB pixel/frame using full-stream MSE, peak=1 after division by 255. `measured` has
 finite `psnrDb` in dB; `identical` means exact decoded equality with null PSNR;
 `incompatible` also withholds PSNR and retains safe public checks. Missing pairs
-are null. `qualityStatus=unjudged` and `releaseQualified=false` remain explicit.
+are null. A clip the scorer listed without comparing carries `unscored: { reason, fields }`:
+`invalid_candidate`, `checksum_mismatch`, `no_reference`, `settings_mismatch` (with the
+differing plan or case fields), or `unreadable` when the scorer could not read the artifact.
+Published pairs come from the trusted `h3-quality` artifact of the InferenceX Video Quality
+workflow, attached once at publication, and the reference `url` is the stored copy of the
+public release MP4. A named run absent from History gets its pairs and reasons read live,
+without media, so its clip and reference URLs are empty. `qualityStatus=unjudged` and `releaseQualified=false` remain explicit.
 No threshold, semantic score or cohort average is implied.
 
 The reference plays separately with shared playback/scrub and its recorded schedule
@@ -913,7 +919,7 @@ excludes per-clip quality. Original-artifact development replay can attach local
 sealed pairs under its existing gate, without publishing or approving them. Private
 filesystem paths, raw decoder error text and reference arrays are excluded.
 
-中文：overview 的 `clipQuality` 与界面共用逐条视频匹配投影，返回全部用例组；status 仅表示产物读取覆盖情况，不是质量结论。缺失配对为 null；有证据时保留候选与参考各自的完整身份、原始计划哈希及 scorer 版本。PSNR 使用全部解码 RGB24 像素和帧。measured 返回有限 dB 值；identical 表示完全一致、PSNR 为 null；incompatible 保留安全的检查字段并隐藏数值。质量仍为 unjudged、releaseQualified=false，不设合格阈值或样本组均值。参考视频独立同步播放，不冒充硬件 serving 结果。CSV 不包含逐条质量汇总；开发回放不会发布或批准附件，本机路径、原始解码错误及参考数组不对外返回。
+中文：overview 的 `clipQuality` 与界面共用逐条视频匹配投影，返回全部用例组；status 仅表示产物读取覆盖情况，不是质量结论。缺失配对为 null；有证据时保留候选与参考各自的完整身份、原始计划哈希及 scorer 版本。评分器未比较的视频返回 `unscored: { reason, fields }`，原因为 invalid_candidate、checksum_mismatch、no_reference、settings_mismatch（附不一致的计划或用例字段），评分器无法读取产物时为 unreadable。已发布的配对来自 InferenceX Video Quality 工作流上传的可信 h3-quality 产物，在发布时一次性附加，参考视频 url 指向公开 release MP4 的已存副本。History 中没有的指定运行实时读取配对和未评分原因，不含媒体，因此视频与参考 url 为空。PSNR 使用全部解码 RGB24 像素和帧。measured 返回有限 dB 值；identical 表示完全一致、PSNR 为 null；incompatible 保留安全的检查字段并隐藏数值。质量仍为 unjudged、releaseQualified=false，不设合格阈值或样本组均值。参考视频独立同步播放，不冒充硬件 serving 结果。CSV 不包含逐条质量汇总；开发回放不会发布或批准附件，本机路径、原始解码错误及参考数组不对外返回。
 
 Groups use `scope: ci | matched-noise-diagnostic`. A local diagnostic attachment
 adds separately sealed native rerun videos and scores; it does not replace the
