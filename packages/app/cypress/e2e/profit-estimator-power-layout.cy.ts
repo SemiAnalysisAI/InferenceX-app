@@ -395,7 +395,10 @@ describe('Profit Estimator — responsive control panels', () => {
           }
         });
         cy.get('#profit-utilization').clear().type('50').blur();
-        cy.get('[data-testid="result-context-utilization"]').should('have.text', '50%');
+        cy.get('[data-testid="result-context-utilization"] .export-only').should(
+          'have.text',
+          '50%',
+        );
         cy.get('#profit-price-source').click();
         cy.contains('[role="option"]', 'Moonshot list price').click();
         cy.get('[data-testid="profit-custom-prices"]').should('not.exist');
