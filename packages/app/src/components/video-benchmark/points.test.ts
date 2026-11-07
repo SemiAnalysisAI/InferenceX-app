@@ -219,6 +219,21 @@ describe('videoPoints', () => {
       ['sha:c2', 150.6],
     ]);
   });
+  it('lets a newer recorded layout supersede a cell published before layouts were recorded', () => {
+    const entry = (runId: string, id: string, server: VideoHistoryObservation['server']) => ({
+      ...page.entries[0],
+      id: `${runId}.1`,
+      runId,
+      sources: [{ ...source, id: runId, observations: [{ ...observation, id, server }] }],
+    });
+    const points = videoPoints([
+      {
+        ...page,
+        entries: [entry('5', 'recorded:c1', observation.server), entry('4', 'legacy:c1', null)],
+      },
+    ]);
+    expect(latestVideoCells(points).map((p) => p.id)).toEqual(['recorded:c1']);
+  });
 });
 
 describe('dashboardCells', () => {

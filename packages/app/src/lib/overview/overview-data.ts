@@ -473,6 +473,7 @@ function buildConfigs(
   model: Model,
   scenario: OverviewScenario,
   scenarioRows: readonly BenchmarkRow[],
+  tiers: readonly number[] = OVERVIEW_TIERS,
 ): OverviewConfigResult[] {
   const rowsByConfig = new Map<string, BenchmarkRow[]>();
   for (const row of scenarioRows) {
@@ -507,7 +508,14 @@ function buildConfigs(
         (row) => benchmarkCurveWorkflowRunId(row) === benchmarkCurveWorkflowRunId(winningRow),
       );
     }
-    const config = buildConfigResult(model, scenario, latestRows[0].precision, key, latestRows);
+    const config = buildConfigResult(
+      model,
+      scenario,
+      latestRows[0].precision,
+      key,
+      latestRows,
+      tiers,
+    );
     if (config) configs.push(config);
   }
   return configs;
@@ -682,10 +690,11 @@ export function overviewCostPerMtok(
 
 function sliceOverviewRow(
   row: OverviewCubeRow,
-  tier: OverviewTier,
+  tier: number,
   referenceHardware: OverviewReferenceHardware,
+  tiers: readonly number[] = OVERVIEW_TIERS,
 ): OverviewModelSummary {
-  const tierIndex = OVERVIEW_TIERS.indexOf(tier);
+  const tierIndex = tiers.indexOf(tier);
   const platforms = row.platforms.map((platform) => {
     const cubeRead = platform.reads[tierIndex];
     const config = cubeRead.config === null ? null : platform.configs[cubeRead.config];
@@ -746,7 +755,10 @@ interface OverviewAgenticTierPoint extends TcoTierPoint {
 
 /** AgentX: the tier axis stays P90 interactivity (the chart's SLA contract);
  *  the throughput read at the tier is total tok/s per deployed GPU. */
-function buildAgenticTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] {
+function buildAgenticTierReads(
+  rows: readonly BenchmarkRow[],
+  tiers: readonly number[],
+): TcoTierRead[] {
   const points = rows.flatMap((row): OverviewAgenticTierPoint[] => {
     const entry = rowToAggDataEntry(row, { modelPower: false });
     const factor = deployedGpuFactor(row);
@@ -773,14 +785,17 @@ function buildAgenticTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] {
       },
     ];
   });
-  return computeTierReads(points, OVERVIEW_TIERS);
+  return computeTierReads(points, tiers);
 }
 
 /** Single-turn 8K/1K: frontier points at the chart's stored interactivity,
  *  valued in total (input + output) tok/s per DEPLOYED GPU. Rows without a
  *  usable total-throughput metric are dropped — the overview cannot price
  *  them, so they must not shape the frontier either. */
-function buildSingleTurnTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] {
+function buildSingleTurnTierReads(
+  rows: readonly BenchmarkRow[],
+  tiers: readonly number[],
+): TcoTierRead[] {
   const points = rows.flatMap((row): TcoTierPoint[] => {
     const interactivity = singleTurnInteractivity(row.metrics);
     const totalTput = row.metrics.tput_per_gpu;
@@ -794,7 +809,7 @@ function buildSingleTurnTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] 
       },
     ];
   });
-  return computeTierReads(points, OVERVIEW_TIERS);
+  return computeTierReads(points, tiers);
 }
 
 function buildConfigResult(
@@ -803,8 +818,12 @@ function buildConfigResult(
   precision: string,
   key: string,
   rows: BenchmarkRow[],
+  tiers: readonly number[],
 ): OverviewConfigResult | null {
-  const feed = scenario === 'agentx' ? buildAgenticTierReads(rows) : buildSingleTurnTierReads(rows);
+  const feed =
+    scenario === 'agentx'
+      ? buildAgenticTierReads(rows, tiers)
+      : buildSingleTurnTierReads(rows, tiers);
   if (feed.length === 0) return null;
 
   const first = rows[0];
@@ -864,6 +883,7 @@ function buildOverviewCubeRow(
   rows: readonly BenchmarkRow[],
   engineScope: OverviewEngineScope,
   scenario: OverviewScenario,
+  tiers: readonly number[] = OVERVIEW_TIERS,
 ): OverviewCubeRow {
   const scenarioRows = overviewScenarioRows(scenario, overviewEngineRows(rows, engineScope));
   return {
@@ -873,9 +893,9 @@ function buildOverviewCubeRow(
     scenario,
     platforms: OVERVIEW_HARDWARE.map((hardware) => {
       const hardwareRows = scenarioRows.filter((row) => row.hardware === hardware);
-      const configs = buildConfigs(model, scenario, hardwareRows);
+      const configs = buildConfigs(model, scenario, hardwareRows, tiers);
       const selected: OverviewConfigView[] = [];
-      const reads = OVERVIEW_TIERS.map((tier): OverviewCubeRead => {
+      const reads = tiers.map((tier): OverviewCubeRead => {
         const read = selectPlatformRead(configs, tier);
         let index = selected.findIndex((view) => view.key === read.config?.key);
         if (read.config !== null && index === -1) index = selected.push(read.config) - 1;
@@ -906,6 +926,19 @@ export function buildOverviewModelSummary(
     buildOverviewCubeRow(model, rows, engineScope, scenario),
     tier,
     referenceHardware,
+  );
+}
+
+export function buildOverviewModelSummaries(
+  model: Model,
+  rows: BenchmarkRow[],
+  tiers: readonly number[],
+  engineScope: OverviewEngineScope,
+  scenario: OverviewScenario,
+): OverviewModelSummary[] {
+  const row = buildOverviewCubeRow(model, rows, engineScope, scenario, tiers);
+  return tiers.map((tier) =>
+    sliceOverviewRow(row, tier, OVERVIEW_DEFAULT_REFERENCE_HARDWARE, tiers),
   );
 }
 

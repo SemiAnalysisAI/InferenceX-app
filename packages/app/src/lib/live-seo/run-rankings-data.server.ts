@@ -8,7 +8,6 @@ import { getCachedBenchmarks } from '@/lib/benchmarks/benchmark-data.server';
 import { getChipHw } from '@/lib/catalog/chip-pages';
 import { buildDbKeyToSlugMap, getCachedAvailability } from '@/lib/compare/compare-availability';
 import {
-  buildOverviewModelSummary,
   OVERVIEW_PRIMARY_TIER,
   OVERVIEW_TIERS,
   overviewHardwareTierReader,
@@ -17,12 +16,17 @@ import {
   type OverviewTier,
 } from '@/lib/overview/overview-data';
 import {
-  buildRankingRows,
   getAllRankingPageEntries,
   type RankingPageEntry,
   type RankingRow,
 } from '@/lib/live-seo/rankings';
 import { getAllRunPageEntries, type RunPageEntry } from '@/lib/live-seo/run-pages';
+import {
+  rankingTierRows,
+  selectRankingTier,
+  unrankedHardwareLabels,
+  type RankingTier,
+} from '@/lib/live-seo/ranking-tier';
 
 async function loadAvailableRunEntries(): Promise<RunPageEntry[]> {
   const rows = await getCachedAvailability();
@@ -190,8 +194,9 @@ export const getRunPageData: (slug: string) => Promise<RunPageData | null> =
 
 export interface RankingPageData {
   scenario: OverviewScenario;
-  tier: OverviewTier;
+  tier: RankingTier;
   rows: RankingRow[];
+  unranked: string[];
   oldest: string | null;
   newest: string | null;
 }
@@ -203,13 +208,7 @@ async function loadRankingPageData(slug: string): Promise<RankingPageData | null
   if (!entry) return null;
   const rows = await getCachedBenchmarks(entry.dbKeys);
   const scenario = overviewHeadlineScenarioForModel(entry.model.model, rows);
-  const summary = buildOverviewModelSummary(
-    entry.model.model,
-    rows,
-    OVERVIEW_PRIMARY_TIER,
-    'community',
-    scenario,
-  );
+  const choice = selectRankingTier(entry.model.model, rows, scenario);
   let oldest: string | null = null;
   let newest: string | null = null;
   for (const row of rows) {
@@ -218,15 +217,16 @@ async function loadRankingPageData(slug: string): Promise<RankingPageData | null
     if (newest === null || row.date > newest) newest = row.date;
   }
   return {
-    scenario: summary.scenario,
-    tier: OVERVIEW_PRIMARY_TIER,
-    rows: buildRankingRows(summary, entry.kind),
+    scenario: choice.summary.scenario,
+    tier: choice.tier,
+    rows: rankingTierRows(choice, entry.kind),
+    unranked: unrankedHardwareLabels(choice),
     oldest,
     newest,
   };
 }
 
-const getCachedRankingPageData = cachedDerivedData(loadRankingPageData, 'ranking-page-data-v2');
+const getCachedRankingPageData = cachedDerivedData(loadRankingPageData, 'ranking-page-data-v4');
 
 export const getRankingPageData: (slug: string) => Promise<RankingPageData | null> =
   cache(getCachedRankingPageData);

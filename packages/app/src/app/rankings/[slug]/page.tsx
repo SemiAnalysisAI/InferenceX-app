@@ -23,6 +23,7 @@ import {
 } from '@/lib/live-seo/rankings';
 import { getRankingPageData, type RankingPageData } from '@/lib/live-seo/run-rankings-data.server';
 import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
+import { RANKING_STANDARD_TIER } from '@/lib/live-seo/ranking-tier';
 
 export const revalidate = 86400;
 
@@ -175,7 +176,14 @@ export default async function RankingPage({ params }: Props) {
     colCost: '$ / 1M tokens',
     colPrecision: 'Precision',
     colEngine: 'Engine',
-    emptyState: `No benchmark measurements are available for ${entry.model.seoName} at this operating point yet. The InferenceX fleet re-benchmarks continuously; this page fills in automatically as soon as runs land.`,
+    emptyState:
+      data.unranked.length > 0
+        ? `Current ${entry.model.seoName} benchmark runs don't reach a common interactivity target on enough hardware yet, so there is no ranking to show. The InferenceX fleet re-benchmarks continuously, and this page fills in automatically as new runs land.`
+        : `No benchmark measurements are available for ${entry.model.seoName} at this operating point yet. The InferenceX fleet re-benchmarks continuously; this page fills in automatically as soon as runs land.`,
+    unrankedNote:
+      data.unranked.length > 0
+        ? `Not measured at ${data.tier} tokens/s per user: ${data.unranked.join(', ')}.`
+        : null,
     siblingLead:
       entry.kind === 'fastest-gpu'
         ? 'Optimizing for cost instead of speed?'
@@ -187,7 +195,7 @@ export default async function RankingPage({ params }: Props) {
     methodologyHeading: 'Methodology',
     methodologyBody: [
       `Every number on this page is a measurement, not a spec-sheet estimate. The InferenceX fleet serves ${entry.model.seoName} on real hardware with community serving engines, sweeping concurrency to trace each platform's throughput-versus-interactivity frontier.`,
-      `Platforms are then read at the same operating point (${data.tier} tokens/s per user) so the comparison is iso-interactivity: a GPU cannot win by quoting throughput at an unusably slow per-user speed. Cost converts measured throughput to $ per million total tokens using $/GPU/hr rates from the SemiAnalysis AI Cloud TCO model.`,
+      `Platforms are then read at the same operating point (${data.tier} tokens/s per user) so the comparison is iso-interactivity: a GPU cannot win by quoting throughput at an unusably slow per-user speed. Rankings default to ${RANKING_STANDARD_TIER} tokens/s per user, the speed current runs cover on the most hardware, and use another speed only when it ranks more GPUs for this model. Cost converts measured throughput to $ per million total tokens using $/GPU/hr rates from the SemiAnalysis AI Cloud TCO model.`,
       `The derivation is shared with the InferenceX overview leaderboard, and results re-run continuously, so this ranking updates as new engine releases and configs land.`,
     ],
     faqHeading: 'Frequently asked questions',
