@@ -73,7 +73,7 @@ export function OverviewPresentationProvider({
   const surfaceRef = useRef<HTMLDivElement>(null);
   const scalerRef = useRef<HTMLDivElement>(null);
   const [presenting, setPresenting] = useState(false);
-  const [supported, setSupported] = useState(false);
+  const [supported, setSupported] = useState(true);
 
   const setPresentationIntent = useCallback(
     (enabled: boolean) => {
