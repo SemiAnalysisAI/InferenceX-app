@@ -69,7 +69,11 @@ export function ChartPointDetails<A extends string = string>({
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    ref.current?.scrollIntoView?.({ block: 'nearest' });
+    const panel = ref.current;
+    if (!panel) return;
+    const { top, bottom } = panel.getBoundingClientRect();
+    if (bottom > 0 && top < window.innerHeight) return;
+    panel.scrollIntoView?.({ block: 'nearest' });
   }, [title, subtitle, date]);
 
   const externalLinks = links.filter((link) => link.external && link.href);
@@ -86,7 +90,7 @@ export function ChartPointDetails<A extends string = string>({
       ref={ref}
       data-testid="point-details-panel"
       aria-label={t.title}
-      className="flex w-full flex-col rounded-lg border border-border/30 bg-background p-3 text-xs leading-5"
+      className="flex w-full scroll-mt-20 flex-col rounded-lg border border-border/30 bg-background p-3 text-xs leading-5"
     >
       {warning && <p className="mb-1 font-semibold text-destructive">{warning}</p>}
       <div className="flex items-start gap-1.5">
