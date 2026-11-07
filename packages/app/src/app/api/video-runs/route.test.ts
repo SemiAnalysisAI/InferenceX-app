@@ -22,7 +22,10 @@ vi.mock('@/lib/video/video-storage', () => {
     videoStorageEnabled: vi.fn(() => false),
     storedArtifacts: vi.fn(() => Promise.resolve([])),
     readStoredArtifact: readIndex,
-    readPublishedArtifact: vi.fn((...args: unknown[]) => readIndex(...args)),
+    readPublishedArtifact: vi.fn(async (...args: unknown[]) => ({
+      saved: await readIndex(...args),
+      complete: true,
+    })),
     renditionPreviews: vi.fn(() => Promise.resolve(new Map())),
     storeVideoArtifact: vi.fn(),
   };

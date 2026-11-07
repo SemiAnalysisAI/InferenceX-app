@@ -62,10 +62,9 @@ const cachedStoredArtifact = retained(
   async (runId: string, artifactId: string) => {
     const saved = await storedArtifacts(runId);
     const artifact = saved.find((item) => String(item.id) === artifactId);
-    const value: StoredArtifact | null = artifact
-      ? await readPublishedArtifact(runId, artifact)
-      : null;
-    return { value, retain: value !== null };
+    if (!artifact) return { value: null as StoredArtifact | null, retain: false };
+    const { saved: value, complete } = await readPublishedArtifact(runId, artifact);
+    return { value, retain: value !== null && complete };
   },
 );
 

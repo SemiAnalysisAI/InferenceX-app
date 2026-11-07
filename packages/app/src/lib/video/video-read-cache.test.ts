@@ -107,20 +107,26 @@ describe('shared VideoGenX read cache', () => {
     vi.mocked(storedArtifacts).mockImplementation((runId) =>
       Promise.resolve(runId === '10' ? [artifact] : []),
     );
-    vi.mocked(readPublishedArtifact).mockResolvedValue(saved);
+    vi.mocked(readPublishedArtifact).mockResolvedValue({ saved, complete: true });
     await expect(cachedPublishedArtifact('10', '20')).resolves.toEqual(saved);
     await expect(cachedPublishedArtifact('10', '20')).resolves.toEqual(saved);
     expect(readPublishedArtifact).toHaveBeenCalledTimes(1);
     await expect(cachedPublishedArtifact('11', '20')).resolves.toBeNull();
     await expect(cachedPublishedArtifact('11', '20')).resolves.toBeNull();
     expect(storedArtifacts).toHaveBeenCalledTimes(3);
+    // A failed quality read still serves the media but is read again next time.
+    vi.mocked(storedArtifacts).mockResolvedValue([{ ...artifact, id: 21 }]);
+    vi.mocked(readPublishedArtifact).mockResolvedValue({ saved, complete: false });
+    await expect(cachedPublishedArtifact('12', '21')).resolves.toEqual(saved);
+    await expect(cachedPublishedArtifact('12', '21')).resolves.toEqual(saved);
+    expect(readPublishedArtifact).toHaveBeenCalledTimes(3);
   });
 
   it('relists renditions on a short clock, because they are encoded after the publication purge', async () => {
     vi.useFakeTimers();
     try {
       vi.mocked(storedArtifacts).mockResolvedValue([artifact]);
-      vi.mocked(readPublishedArtifact).mockResolvedValue(saved);
+      vi.mocked(readPublishedArtifact).mockResolvedValue({ saved, complete: true });
       await cachedPublishedArtifact('10', '20');
       vi.advanceTimersByTime(RENDITION_LISTING_REVALIDATE_SECONDS * 1000);
       await cachedPublishedArtifact('10', '20');
@@ -134,7 +140,7 @@ describe('shared VideoGenX read cache', () => {
   it('rereads every page and artifact after a publication purge', async () => {
     vi.mocked(publishedVideoHistory).mockResolvedValue({ page: page(), complete: true });
     vi.mocked(storedArtifacts).mockResolvedValue([artifact]);
-    vi.mocked(readPublishedArtifact).mockResolvedValue(saved);
+    vi.mocked(readPublishedArtifact).mockResolvedValue({ saved, complete: true });
     await cachedVideoHistory(1, 1);
     await cachedPublishedArtifact('10', '20');
     purgeVideo();

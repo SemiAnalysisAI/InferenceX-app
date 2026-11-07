@@ -177,16 +177,23 @@ export async function readStoredQuality(
   return quality;
 }
 
-/** The stored index with its quality attachment, which is stored apart from the immutable index. */
+/**
+ * The stored index with its quality attachment, which is stored apart from the immutable index.
+ * Quality is optional, so a failed quality read still returns the index, marked incomplete so
+ * callers neither cache it nor hide the published media.
+ */
 export async function readPublishedArtifact(
   runId: string,
   artifact: CIArtifact,
-): Promise<StoredArtifact | null> {
+): Promise<{ saved: StoredArtifact | null; complete: boolean }> {
   const [saved, quality] = await Promise.all([
     readStoredArtifact(runId, artifact),
-    readStoredQuality(runId, artifact),
+    readStoredQuality(runId, artifact).catch(() => undefined),
   ]);
-  return saved && quality ? withQuality(saved, quality) : saved;
+  return {
+    saved: saved && quality ? withQuality(saved, quality) : saved,
+    complete: quality !== undefined,
+  };
 }
 
 /** First write wins; a later attachment for the same artifact reads back the stored one. */
