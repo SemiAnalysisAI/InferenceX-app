@@ -121,9 +121,9 @@ describe('GET /api/v1/views/overview', () => {
     const body = await response.json();
 
     expect(mockGetOverviewPageData).toHaveBeenCalledWith(
-      50,
+      100,
       'community',
-      'hardware',
+      '30d',
       'b200',
       'default',
       'all',
@@ -133,9 +133,9 @@ describe('GET /api/v1/views/overview', () => {
     expect(body.apiVersion).toBe('v1');
     expect(body.generatedAt).toBe('2026-08-20');
     expect(body.params).toEqual({
-      tier: 50,
+      tier: 100,
       engine: 'community',
-      compare: 'hardware',
+      compare: '30d',
       ref: 'b200',
       models: 'default',
       rows: 'all',

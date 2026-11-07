@@ -29,8 +29,8 @@ const parameters: readonly ApiParameter[] = [
       'Interactivity tier in output tokens per second per user. Cells are read at this tier.',
       '交互性档位，单位为每用户每秒输出 token。所有单元格按该档位读取。',
     ),
-    schema: { type: 'integer', enum: [30, 50, 75, 100, 150, 200], default: 50 },
-    example: 50,
+    schema: { type: 'integer', enum: [30, 50, 75, 100, 150, 200], default: 100 },
+    example: 100,
   },
   {
     name: 'engine',
@@ -53,8 +53,8 @@ const parameters: readonly ApiParameter[] = [
       'Comparison mode: hardware compares each cell against the reference GPU; a window (7d/30d/60d/90d) compares against the same cell that many days earlier.',
       '对比模式：hardware 表示与参照 GPU 对比；7d/30d/60d/90d 表示与相应天数之前的同一单元格对比。',
     ),
-    schema: { type: 'string', enum: ['hardware', '7d', '30d', '60d', '90d'], default: 'hardware' },
-    example: 'hardware',
+    schema: { type: 'string', enum: ['hardware', '7d', '30d', '60d', '90d'], default: '30d' },
+    example: '30d',
   },
   {
     name: 'ref',

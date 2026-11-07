@@ -3,9 +3,17 @@ import type { Result } from 'axe-core';
 const OVERVIEW_SURFACE = '[data-testid="overview-page"]';
 
 const OVERVIEW_ROUTES = [
-  { name: 'English hardware comparison', path: '/overview', comparison: 'hardware' },
-  { name: 'Chinese hardware comparison', path: '/zh/overview', comparison: 'hardware' },
-  { name: 'historical comparison', path: '/overview?compare=30d', comparison: '30d' },
+  {
+    name: 'English hardware comparison',
+    path: '/overview?tier=50&compare=hardware',
+    comparison: 'hardware',
+  },
+  {
+    name: 'Chinese hardware comparison',
+    path: '/zh/overview?tier=50&compare=hardware',
+    comparison: 'hardware',
+  },
+  { name: 'historical comparison', path: '/overview?tier=50', comparison: '30d' },
 ] as const;
 
 const OVERVIEW_THEMES = ['light', 'dark'] as const;

@@ -822,6 +822,22 @@ flags do not make public data sensitive.
 
 Pass a returned `data.recipes[].key` as `recipe`; `params.recipe` identifies the resolved selection. Missing or stale keys use the dashboard default. Each run uses the selected recipe if available, otherwise its own best-covered recipe. Inspect each bar's source row for its recipe identity. Without official rows, choices come from matching overlay runs.
 
+### Overview defaults
+
+`/overview`, `/zh/overview`, and `GET /api/v1/views/overview` default to
+`tier=100` (100 tok/s/user) and `compare=30d` (versus one month ago).
+Explicit `compare=hardware` selects the hardware-reference comparison;
+explicit tiers such as `tier=50` remain supported. Engine, model, and row
+scope controls are unchanged. Share links omit the default tier and comparison.
+The API returns the resolved selections in `params` and the actual baseline
+window in `historicalWindow`.
+
+中文：`/overview`、`/zh/overview` 和 `GET /api/v1/views/overview`
+默认使用 `tier=100`（100 tok/s/user）和 `compare=30d`（对比一个月前）。
+显式传入 `compare=hardware` 可切换为硬件参照对比；`tier=50` 等其他档位仍然可用。
+引擎、模型和行范围控件保持不变。分享链接省略默认档位和对比模式；
+API 在 `params` 中返回实际采用的参数，并在 `historicalWindow` 中返回基线窗口。
+
 ### VideoGenX results overview
 
 `GET /api/v1/views/video?view=overview` returns the same nine-group projection as

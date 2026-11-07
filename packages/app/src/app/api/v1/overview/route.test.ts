@@ -66,9 +66,9 @@ describe('GET /api/v1/overview', () => {
     );
 
     expect(mockGetOverviewPageData).toHaveBeenCalledWith(
-      50,
+      100,
       'community',
-      'hardware',
+      '30d',
       'b200',
       'default',
       'all',
