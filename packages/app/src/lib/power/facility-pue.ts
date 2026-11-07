@@ -1,7 +1,9 @@
 import type { Locale } from '@/lib/i18n/i18n';
 
-export const AIR_COOLED_SYSTEM_PUE = 1.3;
-export const LIQUID_COOLED_RACK_PUE = 1.1;
+import { CoolingProfile } from './power_model/cooling';
+
+export const AIR_COOLED_SYSTEM_PUE = new CoolingProfile({ mode: 'air' }).pue;
+export const LIQUID_COOLED_RACK_PUE = new CoolingProfile({ mode: 'liquid' }).pue;
 
 export const FACILITY_PUE_NOTE: Record<Locale, string> = {
   en: `Facility = measured IT power × assumed PUE (${AIR_COOLED_SYSTEM_PUE} air-cooled, ${LIQUID_COOLED_RACK_PUE} liquid-cooled).`,
