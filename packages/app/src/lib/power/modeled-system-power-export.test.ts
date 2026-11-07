@@ -268,6 +268,33 @@ describe('offline modeled PowerX comparisons', () => {
     });
   });
 
+  it('exports the validated RAPL inputs behind an x86 measured-CPU estimate', () => {
+    const source = input();
+    const row = source.rows[0];
+    row.benchmark.hardware = 'mi355x';
+    row.benchmark.power_audit = {
+      cpu: { sensor_kind: 'rapl_package', expected_sockets: 2, observed_sockets: 2 },
+    };
+    Object.assign(row.benchmark.metrics, {
+      cpu_power_valid: 1,
+      avg_cpu_socket_power_w: 210.25,
+      avg_total_cpu_power_w: 420.5,
+      total_cpu_energy_j: 27_195.92,
+    });
+    const result = buildComparison(source);
+    expect(result.rows[0]).toMatchObject({
+      measured_inputs: { cpu_power_valid: 1, total_cpu_package_w: 420.5 },
+      modeled: { cpuBasis: 'measured', measuredCpuSocketWatts: 210.25 },
+    });
+    const provenance = { app_revision: 'test', input_sha256: 'test', generated_at: 'test' };
+    expect(flatRows(result, { ...result.metadata, ...provenance }, {})[0]).toMatchObject({
+      cpu_power_valid: 1,
+      cpu_basis: 'measured',
+      measured_total_cpu_package_w: 420.5,
+      measured_total_cpu_package_j: 27_195.92,
+    });
+  });
+
   it('retains unsupported hardware and missing values, and escapes CSV text', () => {
     const source = input();
     source.rows[0].benchmark.hardware = 'H200';

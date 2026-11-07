@@ -43,6 +43,32 @@ const finite = (value: unknown): value is number =>
 const positive = (value: unknown): value is number => finite(value) && value > 0;
 const integer = (value: unknown): value is number => positive(value) && Number.isSafeInteger(value);
 const measurement = (value: unknown) => (finite(value) && value >= 0 ? value : null);
+/**
+ * The CPU-side telemetry behind `cpu_basis`: whole Grace sockets on NVL72, RAPL
+ * packages (no DRAM) on x86 hosts that ran the CPU leg. Absent otherwise.
+ */
+interface MeasuredCpuInputs {
+  cpu_power_valid?: number | null;
+  total_grace_w?: number | null;
+  total_grace_j?: number | null;
+  total_cpu_package_w?: number | null;
+  total_cpu_package_j?: number | null;
+}
+
+function measuredCpuInputs(row: BenchmarkRow): MeasuredCpuInputs {
+  const nvl72 = isNvl72Hardware(row.hardware);
+  if (!nvl72 && !row.power_audit?.cpu) return {};
+  const valid = row.metrics.cpu_power_valid === 1;
+  const watts = valid ? measurement(row.metrics.avg_total_cpu_power_w) : null;
+  const joules = valid ? measurement(row.metrics.total_cpu_energy_j) : null;
+  return {
+    cpu_power_valid: row.metrics.cpu_power_valid ?? null,
+    ...(nvl72
+      ? { total_grace_w: watts, total_grace_j: joules }
+      : { total_cpu_package_w: watts, total_cpu_package_j: joules }),
+  };
+}
+
 const mean = (values: (number | null)[]) =>
   values.length > 0 && values.every(finite)
     ? values.reduce((sum, value) => sum + value, 0) / values.length
@@ -145,7 +171,6 @@ export function buildComparison(input: ComparisonInput) {
         : row.metrics.power_valid === 0
           ? 'invalid'
           : 'unverified';
-    const cpuValid = row.metrics.cpu_power_valid === 1;
     return {
       id: entry.id,
       cell: entry.cell ?? null,
@@ -160,13 +185,7 @@ export function buildComparison(input: ComparisonInput) {
               total_gpu_w: measurement(row.metrics.avg_total_gpu_power_w),
               total_gpu_j: measurement(row.metrics.total_gpu_energy_j),
               gpu_j_per_output_token: measurement(row.metrics.joules_per_output_token),
-              ...(isNvl72Hardware(row.hardware)
-                ? {
-                    cpu_power_valid: row.metrics.cpu_power_valid ?? null,
-                    total_grace_w: cpuValid ? measurement(row.metrics.avg_total_cpu_power_w) : null,
-                    total_grace_j: cpuValid ? measurement(row.metrics.total_cpu_energy_j) : null,
-                  }
-                : {}),
+              ...measuredCpuInputs(row),
             }
           : null,
       modeled,
@@ -348,6 +367,8 @@ export function flatRows(
     cpu_power_valid: row.measured_inputs?.cpu_power_valid,
     measured_total_grace_w: row.measured_inputs?.total_grace_w,
     measured_total_grace_j: row.measured_inputs?.total_grace_j,
+    measured_total_cpu_package_w: row.measured_inputs?.total_cpu_package_w,
+    measured_total_cpu_package_j: row.measured_inputs?.total_cpu_package_j,
     modeled_status: row.modeled.status,
     modeled_unit: row.modeled.status === 'supported' ? row.modeled.unit : null,
     cpu_basis: row.modeled.status === 'supported' ? row.modeled.cpuBasis : null,
