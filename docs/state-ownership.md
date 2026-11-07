@@ -4,7 +4,7 @@ Reference for agents modifying filter behavior. Explains which context to touch 
 
 ## Provider State Map
 
-The bare `/inference` and `/zh/inference` routes use a temporary redirect to
+The bare `/infx/inference` and `/zh/infx/inference` routes use a temporary redirect to
 Kimi K3 in `next.config.ts`. Explicit `g_model` share links bypass that redirect,
 and all other query parameters are carried forward. Model-specific paths and
 other dashboard defaults are unchanged. The read-only inference API still
@@ -155,7 +155,7 @@ that chart instance (rulers only render in mode) and fires
 `interactivity_perf_ruler_shared_load` once per opened link, with `count` = the number of
 rulers the link carried, the first time any of them renders — never per commit batch, so
 the event counts links, not curve arrivals. Because the URL is read in a `useState`
-initialiser, a retained-provider tab switch onto `/inference?i_rulers=…` does not
+initialiser, a retained-provider tab switch onto `/infx/inference?i_rulers=…` does not
 re-import the param — the same limitation as the other `i_*` toggles.
 
 **`useInferenceActions`**
@@ -222,12 +222,12 @@ set from the destination URL.
 
 The two effects above combine into a trap: filter changes reach only the
 in-memory `currentState`, and the address bar keeps only the parameters the page
-loaded with, so **the URL of the `/inference` history entry does not describe the
+loaded with, so **the URL of the `/infx/inference` history entry does not describe the
 current chart**. Any full-document navigation away from the chart therefore loses
 every change made since load. The module is torn down, and Back returns to the
 loaded URL, which rebuilds from those parameters and the defaults.
 
-The agentic point-detail links (`/inference/agentic/<id>`, rendered by
+The agentic point-detail links (`/infx/inference/agentic/<id>`, rendered by
 `tooltipUtils.viewActionsHTML` and `legend-points-table.pointDetailHref`)
 are exactly that: plain `<a href>`, deliberately, so browsers can offer
 open-in-new-tab. Three helpers in `url-state.ts` bridge the gap:

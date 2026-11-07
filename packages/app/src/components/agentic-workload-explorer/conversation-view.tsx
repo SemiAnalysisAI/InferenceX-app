@@ -1,9 +1,11 @@
 'use client';
 
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, Search, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   formatDuration,
   formatInteractivity,
@@ -18,6 +20,7 @@ import { normalizeDashboardTrace } from '@semianalysisai/inferencex-db/proxytrac
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { useSearchTracking } from '@/lib/analytics/use-search-tracking';
+import { EmptyState } from '@/components/ui/empty-state';
 
 interface RequestData {
   id: string;
@@ -377,36 +380,37 @@ function parseRequestMessages(req: RequestData, onlyLastTurn: boolean): MessageN
   return nodes;
 }
 
+// Message kinds read from their label. User turns sit one surface step up, thinking is dashed.
 const typeStyles: Record<string, { label: string; color: string; border: string; bg: string }> = {
   user: {
     label: 'User',
-    color: 'text-blue-400',
-    border: 'border-blue-500/30',
-    bg: 'bg-blue-500/5',
+    color: 'text-foreground',
+    border: 'border-border/30',
+    bg: 'bg-muted/20',
   },
   assistant: {
     label: 'Assistant',
     color: 'text-foreground',
-    border: 'border-border',
+    border: 'border-border/30',
     bg: 'bg-card',
   },
   tool_use: {
-    label: 'Tool Call',
-    color: 'text-indigo-400',
-    border: 'border-indigo-500/30',
-    bg: 'bg-indigo-500/5',
+    label: 'Tool call',
+    color: 'text-muted-foreground',
+    border: 'border-border/30',
+    bg: 'bg-card',
   },
   tool_result: {
-    label: 'Tool Result',
-    color: 'text-emerald-400',
-    border: 'border-emerald-500/30',
-    bg: 'bg-emerald-500/5',
+    label: 'Tool result',
+    color: 'text-muted-foreground',
+    border: 'border-border/30',
+    bg: 'bg-card',
   },
   thinking: {
     label: 'Thinking',
-    color: 'text-amber-400',
-    border: 'border-amber-500/30',
-    bg: 'bg-amber-500/5',
+    color: 'text-muted-foreground',
+    border: 'border-dashed border-border/30',
+    bg: 'bg-card',
   },
 };
 
@@ -415,12 +419,12 @@ const STRINGS = {
     typeLabels: {
       user: 'User',
       assistant: 'Assistant',
-      tool_use: 'Tool Call',
-      tool_result: 'Tool Result',
+      tool_use: 'Tool call',
+      tool_result: 'Tool result',
       thinking: 'Thinking',
     } as Record<string, string>,
     noConversationData: 'No conversation data to display',
-    searchPlaceholder: 'Search messages, tool calls, content...',
+    searchPlaceholder: 'Search messages and tool calls',
     search: 'Search',
     noMatches: (query: string) => `No matches for “${query}”`,
     requestDivider: 'request',
@@ -428,13 +432,13 @@ const STRINGS = {
     cached: 'cached',
     newCache: 'new',
     hashIdsLabel: (count: number) => `hash_ids [${count} blocks]`,
-    hashIdsFailed: 'Failed to load hash_ids — collapse and expand to retry.',
+    hashIdsFailed: 'Failed to load hash_ids. Collapse and expand to retry.',
     hashIdsLoading: 'Loading…',
-    requestContext: 'Request Context',
+    requestContext: 'Request context',
     messagesInHistory: (n: number) => ` · ${n} messages in history`,
     nTools: (n: number) => ` · ${n} tools`,
     systemPromptSuffix: ' · system prompt',
-    systemPromptHeading: 'System Prompt',
+    systemPromptHeading: 'System prompt',
     toolsHeading: (n: number) => `Tools (${n})`,
     showToolDefs: 'Show tool definitions',
     showLess: 'Show less',
@@ -457,7 +461,7 @@ const STRINGS = {
       thinking: '思考',
     } as Record<string, string>,
     noConversationData: '无对话数据',
-    searchPlaceholder: '搜索消息、工具调用、内容…',
+    searchPlaceholder: '搜索消息和工具调用',
     search: '搜索',
     noMatches: (query: string) => `未找到“${query}”的匹配项`,
     requestDivider: '请求',
@@ -465,13 +469,13 @@ const STRINGS = {
     cached: '缓存命中',
     newCache: '新写入',
     hashIdsLabel: (count: number) => `hash_ids [${count} 个块]`,
-    hashIdsFailed: '加载 hash_ids 失败——收起后重新展开即可重试。',
+    hashIdsFailed: '加载 hash_ids 失败。收起后重新展开即可重试。',
     hashIdsLoading: '加载中…',
     requestContext: '请求上下文',
     messagesInHistory: (n: number) => ` · 历史消息 ${n} 条`,
     nTools: (n: number) => ` · ${n} 个工具`,
     systemPromptSuffix: ' · system prompt',
-    systemPromptHeading: 'System Prompt',
+    systemPromptHeading: '系统提示词',
     toolsHeading: (n: number) => `工具 (${n})`,
     showToolDefs: '查看工具定义',
     showLess: '收起',
@@ -540,7 +544,11 @@ export function ConversationView({
   const displayNodes = reversed ? [...sliced].toReversed() : sliced;
 
   if (tree.length === 0) {
-    return <p className="text-sm text-muted-foreground py-8 text-center">{t.noConversationData}</p>;
+    return (
+      <EmptyState bare className="py-8">
+        {t.noConversationData}
+      </EmptyState>
+    );
   }
 
   return (
@@ -549,28 +557,17 @@ export function ConversationView({
         <div className="flex items-center gap-2 mb-2">
           {showSearch ? (
             <div className="flex-1 relative">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-subtle"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
+              <Search
+                className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
               <input
                 ref={inputRef}
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t.searchPlaceholder}
-                className="w-full text-xs font-mono bg-background border border-border rounded-md pl-8 pr-8 py-1.5 text-foreground placeholder:text-subtle focus:outline-none focus:border-foreground/30 transition-colors"
+                className="h-11 w-full rounded-md border border-input bg-background pl-8 pr-8 text-xs font-mono text-foreground placeholder:text-muted-foreground transition-colors focus:border-foreground/30 focus:outline-none md:h-8"
               />
               {query && (
                 <button
@@ -578,56 +575,32 @@ export function ConversationView({
                     track('agentic_workload_conversation_search_cleared');
                     setQuery('');
                   }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-subtle hover:text-foreground"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
+                  <X className="size-3.5" aria-hidden="true" />
                 </button>
               )}
             </div>
           ) : (
-            <button
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
               onClick={() => {
                 track('agentic_workload_conversation_search_toggled', { enabled: true });
                 setShowSearch(true);
                 requestAnimationFrame(() => inputRef.current?.focus());
               }}
-              className="flex items-center gap-1.5 px-2 py-1 text-2xs font-mono text-subtle hover:text-foreground border border-border rounded-md hover:bg-surface-hover transition-colors"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
+              <Search aria-hidden="true" />
               {t.search}
-              <kbd className="text-3xs text-subtle border border-border rounded px-1 py-px ml-1">
+              <kbd className="rounded-sm border border-border/30 px-1 text-3xs leading-4 text-muted-foreground">
                 ⌘F
               </kbd>
-            </button>
+            </Button>
           )}
           {showSearch && q && (
-            <span className="text-3xs font-mono text-subtle shrink-0">
+            <span className="text-3xs font-mono text-muted-foreground shrink-0">
               {filtered.length} / {tree.length}
             </span>
           )}
@@ -658,16 +631,16 @@ export function ConversationView({
 }
 
 function SubagentGroup({ group, highlight }: { group: SubagentGroupNode; highlight?: string }) {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const [expanded, setExpanded] = useState(true);
 
-  const timeRange =
-    formatTime(group.startTime) === formatTime(group.endTime)
-      ? formatTime(group.startTime)
-      : `${formatTime(group.startTime)} – ${formatTime(group.endTime)}`;
+  const startLabel = formatTime(group.startTime, locale);
+  const endLabel = formatTime(group.endTime, locale);
+  const timeRange = startLabel === endLabel ? startLabel : `${startLabel} – ${endLabel}`;
 
   return (
-    <div className="rounded-md border border-purple-500/30 bg-purple-500/5">
+    <div>
       <button
         onClick={() => {
           track('agentic_workload_conversation_subagent_toggled', {
@@ -676,22 +649,18 @@ function SubagentGroup({ group, highlight }: { group: SubagentGroupNode; highlig
           });
           setExpanded(!expanded);
         }}
-        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-purple-500/10 transition-colors"
+        className="w-full flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg px-4 py-3 text-left hover:bg-muted/40 transition-colors"
       >
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
-          <span className="text-xs font-medium text-purple-400">{group.label}</span>
-          <Badge
-            variant="outline"
-            className="text-xs py-0 h-5 border-purple-500/30 text-purple-400"
-          >
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-foreground">{group.label}</span>
+          <Badge variant="outline" className="text-xs py-0 h-5">
             {t.requestBadge(group.requestCount)}
           </Badge>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs text-muted-foreground tabular-nums">
             {formatNumber(group.totalInputTokens)}/{formatNumber(group.totalOutputTokens)} tok
           </span>
           {(group.totalCacheRead > 0 || group.totalCacheCreation > 0) && (
-            <span className="text-xs text-cyan-400 font-mono">
+            <span className="text-xs text-muted-foreground font-mono">
               {group.totalCacheRead > 0 && `${formatNumber(group.totalCacheRead)} ${t.cached}`}
               {group.totalCacheRead > 0 && group.totalCacheCreation > 0 && ' · '}
               {group.totalCacheCreation > 0 &&
@@ -699,18 +668,19 @@ function SubagentGroup({ group, highlight }: { group: SubagentGroupNode; highlig
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          {group.totalCost > 0 && (
-            <span className="font-mono text-emerald-400">{formatCost(group.totalCost)}</span>
-          )}
+        <div className="ml-auto flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          {group.totalCost > 0 && <span className="font-mono">{formatCost(group.totalCost)}</span>}
           <span className="font-mono">{formatDuration(group.totalDurationMs)}</span>
           <span>{timeRange}</span>
-          <span>{expanded ? '▲' : '▼'}</span>
+          <ChevronDown
+            className={`size-4 transition-transform ${expanded ? 'rotate-180' : ''}`}
+            aria-hidden="true"
+          />
         </div>
       </button>
 
       {expanded && (
-        <div className="border-t border-purple-500/20 ml-4 pl-4 border-l-2 border-l-purple-500/20 py-2 pr-4 space-y-1">
+        <div className="ml-4 pl-4 border-l border-border/30 py-2 pr-4 space-y-1">
           {group.children.map((child, idx) => {
             const showDivider = idx > 0 && child.isRequestAnchor === true;
             return (
@@ -730,11 +700,9 @@ function RequestDivider() {
   const t = STRINGS[useLocale()];
   return (
     <div className="flex items-center gap-2 my-2" role="separator" aria-label="next request">
-      <div className="h-px flex-1 bg-border" />
-      <span className="text-3xs font-mono uppercase tracking-eyebrow-wide text-subtle">
-        {t.requestDivider}
-      </span>
-      <div className="h-px flex-1 bg-border" />
+      <div className="h-px flex-1 bg-border/30" />
+      <span className="text-xs text-muted-foreground font-medium">{t.requestDivider}</span>
+      <div className="h-px flex-1 bg-border/30" />
     </div>
   );
 }
@@ -770,10 +738,10 @@ function HashIdsDetails({
 
   return (
     <details className="mt-2" onToggle={onToggle}>
-      <summary className="text-3xs font-mono text-cyan-400 cursor-pointer hover:text-cyan-300">
+      <summary className="text-3xs font-mono text-muted-foreground cursor-pointer hover:text-foreground">
         {t.hashIdsLabel(count)}
       </summary>
-      <div className="text-3xs font-mono text-cyan-400/70 mt-1 break-all leading-relaxed">
+      <div className="text-3xs font-mono text-muted-foreground mt-1 break-all leading-relaxed">
         {loaded ? `[${loaded.join(', ')}]` : state === 'error' ? t.hashIdsFailed : t.hashIdsLoading}
       </div>
     </details>
@@ -789,7 +757,8 @@ function MessageRow({
   compact?: boolean;
   highlight?: string;
 }) {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const style = typeStyles[msg.type] || typeStyles.assistant;
 
   return (
@@ -798,7 +767,7 @@ function MessageRow({
       data-request-id={msg.requestId}
       className={`rounded-md border ${style.border} ${style.bg} ${compact ? 'px-3 py-2' : 'px-4 py-3'} scroll-mt-20`}
     >
-      <div className="flex items-start justify-between gap-x-3 mb-1.5">
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 mb-1.5">
         <div className="flex items-center gap-2 flex-wrap gap-y-1 min-w-0">
           <span className={`text-xs font-medium ${style.color}`}>
             {t.typeLabels[msg.type] ?? style.label}
@@ -812,38 +781,27 @@ function MessageRow({
             <span className="text-xs text-muted-foreground font-mono">{msg.model}</span>
           )}
           {msg.fastMode && (
-            <Badge
-              variant="outline"
-              className="text-xs py-0 h-5 border-orange-500/30 text-orange-400"
-            >
+            <Badge variant="outline" className="text-xs py-0 h-5">
               fast
             </Badge>
           )}
           {msg.is1mContext && (
-            <Badge
-              variant="outline"
-              className="text-xs py-0 h-5 border-sky-500/30 text-sky-400 font-mono"
-            >
+            <Badge variant="outline" className="text-xs py-0 h-5 font-mono">
               1M
             </Badge>
           )}
-          {msg.isRequestAnchor &&
-            msg.processors?.map((p) => (
-              <Badge
-                key={p}
-                variant="outline"
-                className="text-xs py-0 h-5 border-violet-500/30 text-violet-400 font-mono"
-              >
-                {p}
-              </Badge>
-            ))}
+          {msg.isRequestAnchor && msg.processors && msg.processors.length > 0 && (
+            <span className="text-xs font-mono text-muted-foreground">
+              {msg.processors.join(' · ')}
+            </span>
+          )}
           {msg.stopReason && msg.stopReason !== 'end_turn' && (
             <Badge variant="outline" className="text-xs py-0 h-5">
               {msg.stopReason}
             </Badge>
           )}
         </div>
-        <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0 flex-wrap justify-end gap-y-1">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <TokenInfo msg={msg} />
           {msg.ttftMs !== null && (
             <span className="font-mono">TTFT {formatDuration(msg.ttftMs)}</span>
@@ -854,9 +812,7 @@ function MessageRow({
               msg.cacheWriteTokens,
               msg.ttftMs,
             );
-            return ps === null ? null : (
-              <span className="font-mono text-sky-500">{formatPrefillSpeed(ps)}</span>
-            );
+            return ps === null ? null : <span className="font-mono">{formatPrefillSpeed(ps)}</span>;
           })()}
           {msg.tpotMs !== null && (
             <span className="font-mono">{formatInteractivity(msg.tpotMs)}</span>
@@ -864,7 +820,7 @@ function MessageRow({
           {msg.durationMs !== null && (
             <span className="font-mono">E2E {formatDuration(msg.durationMs)}</span>
           )}
-          <span>{formatTime(msg.timestamp)}</span>
+          <span>{formatTime(msg.timestamp, locale)}</span>
         </div>
       </div>
 
@@ -917,24 +873,24 @@ function RequestContextBlock({ context }: { context: NonNullable<MessageNode['re
       <div className="mt-2 space-y-2">
         {hasSystem && (
           <div>
-            <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-amber-400 mb-1">
+            <div className="text-xs font-medium text-muted-foreground mb-1">
               {t.systemPromptHeading}
             </div>
-            <pre className="text-xs font-mono bg-amber-500/5 border border-amber-500/20 rounded p-2 overflow-x-auto max-h-64 overflow-y-auto whitespace-pre-wrap">
+            <pre className="text-xs font-mono bg-muted/40 rounded-md p-2 overflow-x-auto max-h-64 overflow-y-auto whitespace-pre-wrap">
               {systemTexts!.join('\n\n---\n\n')}
             </pre>
           </div>
         )}
         {hasTools && (
           <div>
-            <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-indigo-400 mb-1">
+            <div className="text-xs font-medium text-muted-foreground mb-1">
               {t.toolsHeading(context.tools!.length)}
             </div>
             <details>
               <summary className="text-3xs font-mono text-muted-foreground cursor-pointer">
                 {t.showToolDefs}
               </summary>
-              <pre className="text-xs font-mono bg-indigo-500/5 border border-indigo-500/20 rounded p-2 overflow-x-auto max-h-64 overflow-y-auto mt-1">
+              <pre className="text-xs font-mono bg-muted/40 rounded-md p-2 overflow-x-auto max-h-64 overflow-y-auto mt-1">
                 {JSON.stringify(context.tools, null, 2)}
               </pre>
             </details>
@@ -954,7 +910,7 @@ function HighlightText({ text, query }: { text: string; query?: string }) {
     <>
       {parts.map((part, i) =>
         part.toLowerCase() === query.toLowerCase() ? (
-          <mark key={i} className="bg-amber-500/30 text-foreground rounded-sm px-px">
+          <mark key={i} className="bg-primary/25 text-foreground rounded-sm px-px">
             {part}
           </mark>
         ) : (
@@ -978,9 +934,7 @@ function TextContent({
   const [expanded, setExpanded] = useState(false);
 
   if (text === null) {
-    return (
-      <div className="text-xs font-mono text-muted-foreground italic">{t.contentStripped}</div>
-    );
+    return <div className="text-xs font-mono text-muted-foreground">{t.contentStripped}</div>;
   }
   if (!text) return null;
   if (typeof text !== 'string') {
@@ -1001,7 +955,7 @@ function TextContent({
             track('agentic_workload_conversation_text_toggled', { enabled: !expanded });
             setExpanded((value) => !value);
           }}
-          className="text-3xs font-mono text-subtle hover:text-foreground uppercase tracking-eyebrow"
+          className="text-xs text-muted-foreground hover:text-foreground font-medium"
         >
           {expanded ? t.showLess : t.showFull(formatNumber(text.length))}
         </button>
@@ -1027,9 +981,7 @@ function MarkdownText({ text }: { text: string }) {
           h1: ({ children }) => <h1 className="text-base font-semibold mt-3 mb-1.5">{children}</h1>,
           h2: ({ children }) => <h2 className="text-sm font-semibold mt-3 mb-1.5">{children}</h2>,
           h3: ({ children }) => <h3 className="text-sm font-semibold mt-2 mb-1">{children}</h3>,
-          h4: ({ children }) => (
-            <h4 className="text-xs font-semibold uppercase tracking-wide mt-2 mb-1">{children}</h4>
-          ),
+          h4: ({ children }) => <h4 className="text-xs font-medium mt-2 mb-1">{children}</h4>,
           ul: ({ children }) => (
             <ul className="list-disc list-outside pl-5 mb-2 space-y-0.5">{children}</ul>
           ),
@@ -1038,7 +990,7 @@ function MarkdownText({ text }: { text: string }) {
           ),
           li: ({ children }) => <li>{children}</li>,
           blockquote: ({ children }) => (
-            <blockquote className="border-l-2 border-border pl-3 text-muted-foreground italic mb-2">
+            <blockquote className="border-l-2 border-border/30 pl-3 text-muted-foreground mb-2">
               {children}
             </blockquote>
           ),
@@ -1047,23 +999,23 @@ function MarkdownText({ text }: { text: string }) {
               href={href}
               target="_blank"
               rel="noreferrer"
-              className="text-sky-400 hover:underline underline-offset-2"
+              className="text-brand underline-offset-2 hover:underline"
             >
               {children}
             </a>
           ),
-          hr: () => <hr className="my-3 border-border" />,
+          hr: () => <hr className="my-3 border-border/30" />,
           table: ({ children }) => (
             <div className="overflow-x-auto mb-2">
               <table className="text-xs font-mono border-collapse">{children}</table>
             </div>
           ),
           th: ({ children }) => (
-            <th className="border border-border bg-surface px-2 py-1 text-left font-semibold">
+            <th className="border border-border/30 bg-card px-2 py-1 text-left font-semibold">
               {children}
             </th>
           ),
-          td: ({ children }) => <td className="border border-border px-2 py-1">{children}</td>,
+          td: ({ children }) => <td className="border border-border/30 px-2 py-1">{children}</td>,
           code({ className, children, ...props }) {
             const isBlock = /language-/u.test(className ?? '');
             if (isBlock) {
@@ -1074,16 +1026,13 @@ function MarkdownText({ text }: { text: string }) {
               );
             }
             return (
-              <code
-                className="font-mono text-xs px-1 py-px rounded bg-surface border border-border"
-                {...props}
-              >
+              <code className="font-mono text-xs px-1 py-px rounded-sm bg-muted/50" {...props}>
                 {children}
               </code>
             );
           },
           pre: ({ children }) => (
-            <pre className="text-xs font-mono bg-surface border border-border rounded p-2.5 overflow-x-auto mb-2 whitespace-pre">
+            <pre className="text-xs font-mono bg-muted/40 rounded-md p-2.5 overflow-x-auto mb-2 whitespace-pre">
               {children}
             </pre>
           ),
@@ -1115,12 +1064,12 @@ function ToolCallContent({ name, input }: { name?: string; input?: Record<string
       <div className="space-y-1">
         <div className="text-sm font-mono text-muted-foreground">{String(input.file_path)}</div>
         {input.old_string !== null && (
-          <pre className="text-xs font-mono bg-red-500/10 text-red-400 rounded p-2 overflow-x-auto max-h-32 overflow-y-auto">
+          <pre className="text-xs font-mono bg-destructive/10 text-destructive rounded-md p-2 overflow-x-auto max-h-32 overflow-y-auto">
             {String(input.old_string)}
           </pre>
         )}
         {input.new_string !== null && (
-          <pre className="text-xs font-mono bg-emerald-500/10 text-emerald-400 rounded p-2 overflow-x-auto max-h-32 overflow-y-auto">
+          <pre className="text-xs font-mono bg-success/10 text-success rounded-md p-2 overflow-x-auto max-h-32 overflow-y-auto">
             {String(input.new_string)}
           </pre>
         )}
@@ -1130,7 +1079,7 @@ function ToolCallContent({ name, input }: { name?: string; input?: Record<string
 
   if (name === 'Bash' && input.command) {
     return (
-      <pre className="text-sm font-mono bg-muted/50 rounded p-2 overflow-x-auto">
+      <pre className="text-sm font-mono bg-muted/50 rounded-md p-2 overflow-x-auto">
         $ {String(input.command)}
       </pre>
     );
@@ -1145,7 +1094,7 @@ function ToolCallContent({ name, input }: { name?: string; input?: Record<string
             <summary className="text-xs text-muted-foreground cursor-pointer">
               {t.nLines(String(input.content).split('\n').length)}
             </summary>
-            <pre className="text-xs font-mono bg-muted/50 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto mt-1">
+            <pre className="text-xs font-mono bg-muted/50 rounded-md p-2 overflow-x-auto max-h-48 overflow-y-auto mt-1">
               {String(input.content)}
             </pre>
           </details>
@@ -1166,7 +1115,7 @@ function ToolCallContent({ name, input }: { name?: string; input?: Record<string
   return (
     <details>
       <summary className="text-xs text-muted-foreground cursor-pointer">{t.parameters}</summary>
-      <pre className="text-xs font-mono bg-muted/50 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto mt-1">
+      <pre className="text-xs font-mono bg-muted/50 rounded-md p-2 overflow-x-auto max-h-48 overflow-y-auto mt-1">
         {JSON.stringify(input, null, 2)}
       </pre>
     </details>
@@ -1176,9 +1125,7 @@ function ToolCallContent({ name, input }: { name?: string; input?: Record<string
 function ToolResultContent({ content, isError }: { content: string | unknown; isError?: boolean }) {
   const t = STRINGS[useLocale()];
   if (content === null) {
-    return (
-      <div className="text-xs font-mono text-muted-foreground italic">{t.contentStripped}</div>
-    );
+    return <div className="text-xs font-mono text-muted-foreground">{t.contentStripped}</div>;
   }
   if (!content) return null;
   if (typeof content !== 'string') {
@@ -1190,13 +1137,13 @@ function ToolResultContent({ content, isError }: { content: string | unknown; is
   return (
     <details open={!truncated}>
       <summary
-        className={`text-xs font-mono ${isError ? 'text-red-400' : 'text-muted-foreground'} ${truncated ? 'cursor-pointer' : 'list-none'} whitespace-pre-wrap break-words`}
+        className={`text-xs font-mono ${isError ? 'text-destructive' : 'text-muted-foreground'} ${truncated ? 'cursor-pointer' : 'list-none'} whitespace-pre-wrap break-words`}
       >
         {truncated ? `${content.slice(0, maxPreview)}...` : content}
       </summary>
       {truncated && (
         <pre
-          className={`text-xs font-mono ${isError ? 'text-red-400' : 'text-muted-foreground'} mt-2 overflow-x-auto max-h-64 overflow-y-auto whitespace-pre-wrap`}
+          className={`text-xs font-mono ${isError ? 'text-destructive' : 'text-muted-foreground'} mt-2 overflow-x-auto max-h-64 overflow-y-auto whitespace-pre-wrap`}
         >
           {content}
         </pre>
@@ -1239,12 +1186,12 @@ function TokenInfo({ msg }: { msg: MessageNode }) {
             {t.tokenIn} {formatNumber(msg.inputTokens || 0)}
           </span>
           {cacheRead > 0 && (
-            <span className="text-cyan-400">
+            <span>
               +{formatNumber(cacheRead)} {t.cacheReadLabel}
             </span>
           )}
           {cacheCreation > 0 && (
-            <span className="text-amber-400">
+            <span>
               +{formatNumber(cacheCreation)} {t.cacheCreateLabel}
             </span>
           )}
@@ -1257,7 +1204,7 @@ function TokenInfo({ msg }: { msg: MessageNode }) {
           {formatNumber(msg.inputTokens || 0)}/{formatNumber(msg.outputTokens || 0)} {t.tok}
         </span>
       )}
-      {cost !== null && <span className="text-emerald-400">{formatCost(cost)}</span>}
+      {cost !== null && <span>{formatCost(cost)}</span>}
     </span>
   );
 }

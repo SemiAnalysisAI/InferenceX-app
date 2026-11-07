@@ -29,15 +29,13 @@ afterEach(() => {
 });
 
 describe('chip specification table', () => {
-  it('keeps values aligned in a scrollable table and exposes the mobile hint', () => {
+  it('keeps values aligned in a scrollable table', () => {
     act(() => {
       root.render(<SpecTable entry={getAllChipPages()[0]} locale="en" />);
     });
 
-    const table = container.querySelector('table');
-    expect(table?.className).toContain('min-w-[36rem]');
+    expect(container.querySelector('.overflow-x-auto table')).not.toBeNull();
     expect(container.querySelector('td')?.className).toContain('text-right');
-    expect(container.textContent).toContain('Swipe horizontally');
   });
 
   it.each([
@@ -51,7 +49,6 @@ describe('chip specification table', () => {
       root.render(<SpecTable entry={entry} locale="zh" />);
     });
 
-    expect(container.textContent).toContain('左右滑动可查看全部规格参数');
     expect(container.textContent).toContain(topologyZh);
     expect(container.textContent).not.toContain(topologyEn);
     if (slug === 'b300') expect(container.textContent).toContain('1,100 W');

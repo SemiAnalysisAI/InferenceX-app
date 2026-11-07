@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-const localeState = vi.hoisted(() => ({ pathname: '/inference/agentic/206885' }));
+const localeState = vi.hoisted(() => ({ pathname: '/infx/inference/agentic/206885' }));
 vi.mock('next/navigation', () => ({
   usePathname: () => localeState.pathname,
 }));
@@ -111,11 +111,11 @@ describe('PointSummary', () => {
       }),
     );
 
-    expect(html).toContain('Offload Type');
+    expect(html).toContain('Offload type');
     expect(html).toContain('DRAM');
-    expect(html).toContain('KV Offload Engine');
+    expect(html).toContain('KV offload engine');
     expect(html).toContain('LMCache 0.5.1');
-    expect(html).toContain('KV Transfer Engine');
+    expect(html).toContain('KV transfer engine');
     expect(html).toContain('Mooncake');
     expect(html).toContain('Router');
     expect(html).toContain('vLLM Router 0.1.14');
@@ -128,7 +128,7 @@ describe('PointSummary', () => {
 
     expect(html).toContain('Prefix cache reuse for this config');
     expect(html).toContain(
-      'href="/cache-reuse?g_model=DeepSeek-R1-0528&amp;i_seq=agentic-traces&amp;i_prec=fp8&amp;c_cfg=gb200_dynamo-vllm&amp;c_recipe=agg%7Cmn%7Cp2x4%2F1%2F-%7Cd4x16%2F16%2Fdpa%7Cg8%2B64%7Cspec-none%7Coffload-off%7C&amp;g_rundate=2026-06-23"',
+      'href="/infx/cache-reuse?g_model=DeepSeek-R1-0528&amp;i_seq=agentic-traces&amp;i_prec=fp8&amp;c_cfg=gb200_dynamo-vllm&amp;c_recipe=agg%7Cmn%7Cp2x4%2F1%2F-%7Cd4x16%2F16%2Fdpa%7Cg8%2B64%7Cspec-none%7Coffload-off%7C&amp;g_rundate=2026-06-23"',
     );
   });
 
@@ -141,7 +141,7 @@ describe('PointSummary', () => {
   });
 
   it('renders runtime metadata labels in Simplified Chinese on /zh', () => {
-    localeState.pathname = '/zh/inference/agentic/206885';
+    localeState.pathname = '/zh/infx/inference/agentic/206885';
     const html = renderToStaticMarkup(
       createElement(PointSummary, {
         meta: meta({
@@ -152,7 +152,7 @@ describe('PointSummary', () => {
         }),
       }),
     );
-    localeState.pathname = '/inference/agentic/206885';
+    localeState.pathname = '/infx/inference/agentic/206885';
 
     expect(html).toContain('offload 类型');
     expect(html).toContain('KV offload 引擎');

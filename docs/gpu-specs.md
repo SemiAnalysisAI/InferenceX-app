@@ -21,7 +21,7 @@ not mean the NICs are absent.
   their SEO/social descriptions, and `/api/v1/views/options` (`hardware[].tdpW`)
   consume that value. Its 1.9 kW all-in provisioned power reference is unchanged.
 
-- `/chips/*`, `/zh/chips/*`, `/gpu-specs`, and `/zh/gpu-specs` share `GPU_SPECS` with
+- `/chips/*`, `/zh/chips/*`, `/infx/gpu-specs`, and `/zh/infx/gpu-specs` share `GPU_SPECS` with
   `/api/v1/views/gpu-specs` (JSON and CSV). NIC, network technology, bandwidth and
   MI355X's fourth-generation Infinity Fabric therefore agree across these views.
 - The scale-out bandwidth ranking includes GB200 (400 Gbit/s) and GB300 (800 Gbit/s).

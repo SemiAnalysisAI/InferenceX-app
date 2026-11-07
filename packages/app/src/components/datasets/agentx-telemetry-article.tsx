@@ -1,33 +1,24 @@
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 
+import { buttonVariants } from '@/components/ui/button';
+import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import {
   TELEMETRY_FIGURES,
   type TelemetryGuide,
-  type TelemetryHighlight,
   type TelemetrySection,
 } from '@/lib/agentx/agentx-telemetry';
 import { getTelemetryGuide } from '@/lib/agentx/agentx-telemetry-zh';
 import type { Locale } from '@/lib/i18n/i18n';
+import { cn } from '@/lib/shared/utils';
 
 import { AgentXTelemetryLink } from './agentx-telemetry-link';
+import { FactGrid } from './fact-grid';
+import { ARTICLE_H2_CLASS } from '@/components/ui/reading-layout';
+import { AGENTX_ROUTE, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 function localePrefix(locale: Locale): string {
   return locale === 'zh' ? '/zh' : '';
-}
-
-function Highlights({ items }: { items: readonly TelemetryHighlight[] }) {
-  return (
-    <dl className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border/70 bg-border/70 lg:grid-cols-4">
-      {items.map((item) => (
-        <div key={item.label} className="flex flex-col bg-card px-4 py-5">
-          <dt className="order-2 mt-1 text-sm leading-5 text-muted-foreground">{item.label}</dt>
-          <dd className="order-1 font-mono text-xl font-semibold tabular-nums text-foreground">
-            {item.value}
-          </dd>
-        </div>
-      ))}
-    </dl>
-  );
 }
 
 function SectionFigure({
@@ -49,7 +40,7 @@ function SectionFigure({
       className="group my-7 block rounded-xl focus-visible:outline-none"
     >
       <figure
-        className="overflow-hidden rounded-xl border border-border/70 bg-card transition-colors group-hover:border-primary/50"
+        className="overflow-hidden rounded-xl border border-border/30 bg-card transition-colors group-hover:border-border"
         data-testid={`agentx-telemetry-figure-${figure.key}`}
       >
         <Image
@@ -57,14 +48,15 @@ function SectionFigure({
           alt={figure.alt}
           width={asset.width}
           height={asset.height}
-          sizes="(max-width: 768px) 100vw, 1152px"
+          sizes="(max-width: 768px) 100vw, 720px"
           quality={100}
           className="h-auto w-full"
         />
-        <figcaption className="border-t border-border/70 px-4 py-3 text-sm leading-6 text-muted-foreground">
+        <figcaption className="border-t border-border/20 px-4 py-3 text-sm leading-6 text-muted-foreground">
           <span className="block">{figure.caption}</span>
-          <span className="mt-1 inline-block font-medium text-foreground underline decoration-border underline-offset-4 transition-colors group-hover:text-primary group-hover:decoration-primary">
-            {ui.figureCta} ↗
+          <span className="mt-1 inline-block font-medium text-foreground underline decoration-border underline-offset-4 transition-colors group-hover:text-brand group-hover:decoration-brand">
+            {ui.figureCta}
+            <ExternalLinkIcon aria-hidden="true" />
           </span>
         </figcaption>
       </figure>
@@ -87,19 +79,16 @@ function SectionBlock({
       className={className}
       data-testid={`agentx-telemetry-section-${section.id}`}
     >
-      <h2
-        id={section.id}
-        className="mb-4 scroll-mt-24 text-2xl font-semibold tracking-tight text-foreground"
-      >
+      <h2 id={section.id} className={cn(ARTICLE_H2_CLASS, 'mb-4')}>
         {section.heading}
       </h2>
-      <div className="space-y-4 text-base leading-7 text-muted-foreground">
+      <div className="space-y-4 text-base leading-reading text-foreground">
         {section.paragraphs.map((paragraph) => (
           <p key={paragraph}>{paragraph}</p>
         ))}
       </div>
       {section.bullets && section.bullets.length > 0 && (
-        <ul className="mt-5 space-y-2 border-l border-border pl-4 text-base leading-7 text-muted-foreground">
+        <ul className="mt-4 space-y-2 border-l border-border/20 pl-4 text-base leading-reading text-foreground">
           {section.bullets.map((bullet) => (
             <li key={bullet}>{bullet}</li>
           ))}
@@ -117,9 +106,13 @@ function SectionBlock({
                 target="_blank"
                 rel="noopener noreferrer"
                 prefetch={false}
-                className="inline-flex min-h-11 items-center rounded-md border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
+                className={cn(
+                  buttonVariants({ variant: 'outline', size: 'sm' }),
+                  'font-normal text-muted-foreground hover:text-foreground',
+                )}
               >
                 {link.label}
+                <ExternalLinkIcon aria-hidden="true" className="ml-0" />
               </AgentXTelemetryLink>
             </li>
           ))}
@@ -135,45 +128,43 @@ export function AgentXTelemetryArticle({ locale }: { locale: Locale }) {
 
   return (
     <article data-testid="agentx-telemetry-article">
-      <header className="border-b border-border/70 pb-8">
+      <header className="border-b border-border/20 pb-8">
         <AgentXTelemetryLink
-          href={`${prefix}/agentx`}
+          href={`${prefix}${AGENTX_ROUTE.path}`}
           analyticsEvent="agentx_telemetry_returned"
           analyticsTarget="agentx"
-          className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+          className="inline-flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
+          <ArrowLeft aria-hidden="true" className="size-4" />
           {guide.ui.backToAgentX}
         </AgentXTelemetryLink>
-        <p className="mt-8 font-mono text-xs font-semibold tracking-eyebrow-wide text-brand uppercase">
-          {guide.eyebrow}
-        </p>
+        <p className="mt-8 text-xs font-medium text-muted-foreground">{guide.eyebrow}</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
           {guide.title}
         </h1>
-        <p className="mt-5 max-w-3xl text-lg leading-8 text-muted-foreground">{guide.lead}</p>
-        <Highlights items={guide.highlights} />
+        <p className="mt-5 text-lg leading-8 text-muted-foreground">{guide.lead}</p>
+        <FactGrid items={guide.highlights} />
         <AgentXTelemetryLink
-          href={`${prefix}/inference?i_seq=agentic-traces`}
+          href={`${prefix}${getDashboardRoute('inference').path}?i_seq=agentic-traces`}
           analyticsEvent="agentx_telemetry_results_opened"
           analyticsTarget="telemetry-header"
           data-testid="agentx-telemetry-results-cta"
-          className="mt-6 inline-flex min-h-11 items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          className={cn(buttonVariants({ variant: 'brand' }), 'mt-6')}
         >
-          {guide.ui.openResults} →
+          {guide.ui.openResults}
+          <ArrowRight aria-hidden="true" />
         </AgentXTelemetryLink>
       </header>
 
       <div className="py-10">
-        <div className="space-y-4 text-base leading-7 text-muted-foreground">
+        <div className="space-y-4 text-base leading-reading text-foreground">
           {guide.intro.map((paragraph) => (
             <p key={paragraph}>{paragraph}</p>
           ))}
         </div>
 
         <nav aria-label={guide.ui.onThisPage} className="mt-10">
-          <p className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase">
-            {guide.ui.onThisPage}
-          </p>
+          <p className="text-xs font-medium text-muted-foreground">{guide.ui.onThisPage}</p>
           <ul className="mt-2 grid gap-x-8 gap-y-1 sm:grid-cols-2">
             {guide.sections.map((section) => (
               <li key={section.id}>
@@ -193,7 +184,7 @@ export function AgentXTelemetryArticle({ locale }: { locale: Locale }) {
             key={section.id}
             section={section}
             ui={guide.ui}
-            className={index === 0 ? 'mt-12' : 'mt-14 border-t border-border/70 pt-10'}
+            className={index === 0 ? 'mt-12' : 'mt-14 border-t border-border/20 pt-10'}
           />
         ))}
       </div>

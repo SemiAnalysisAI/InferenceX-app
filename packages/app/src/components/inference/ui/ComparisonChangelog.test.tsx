@@ -42,7 +42,7 @@ afterEach(() => {
 describe('ComparisonChangelog', () => {
   it('shows no count and no empty verdict before the data is requested', () => {
     const container = render({ deferred: true });
-    expect(container.querySelector('button')?.textContent).toBe('Config Changelog');
+    expect(container.querySelector('button')?.textContent).toBe('Config changelog');
     expect(container.textContent).toContain('Loading changelog…');
     expect(container.textContent).not.toContain('No config changelog data');
   });

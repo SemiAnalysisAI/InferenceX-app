@@ -139,7 +139,7 @@ describe('Agentic point request metric time series', () => {
         requests,
       },
     });
-    cy.visit('/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
     cy.wait('@requestChartData');
   });
 
@@ -346,7 +346,7 @@ describe('Agentic point request metric time series', () => {
       }
     });
 
-    cy.contains('button', 'TP8/DCP8 • c=8').should('be.visible');
+    cy.contains('button', 'TP8/DCP8 · c=8').should('be.visible');
     cy.get('[data-testid="detail-view-logs"]').click();
     cy.location('search').should('contain', 'view=logs');
     cy.get('#agentic-log-file').click();
@@ -486,10 +486,10 @@ describe('Agentic point request metric time series', () => {
     cy.get('[data-testid="detail-view-timeline"]').click();
     cy.get('[data-testid="timeline-total-idle-time"]').should('be.visible');
     cy.window().then((win) => {
-      win.history.pushState({}, '', '/agentx/test-dataset/conversations/conversation-1');
+      win.history.pushState({}, '', '/infx/agentx/test-dataset/conversations/conversation-1');
     });
     cy.go('back');
-    cy.location('pathname').should('eq', '/inference/agentic/206885');
+    cy.location('pathname').should('eq', '/infx/inference/agentic/206885');
     cy.location('search').should('contain', 'view=timeline');
     cy.get('[data-testid="detail-view-timeline"]').should('have.attr', 'aria-selected', 'true');
     cy.get('[data-testid="timeline-total-idle-time"]').should('be.visible');
@@ -541,7 +541,7 @@ describe('Agentic point request metric time series', () => {
             },
       );
     }).as('retryServerLogSearch');
-    cy.visit('/zh/inference/agentic/206885?view=logs&e2e=log-retries', {
+    cy.visit('/zh/infx/inference/agentic/206885?view=logs&e2e=log-retries', {
       onBeforeLoad: unlockAgenticGate,
     });
 
@@ -584,14 +584,14 @@ describe('Agentic point request metric time series', () => {
 
   it('renders the complete Chinese detail, mobile, metadata, and timeline click path', () => {
     cy.viewport(390, 900);
-    cy.visit('/zh/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/zh/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
 
     cy.get('link[rel="alternate"][hreflang="en"]')
       .should('have.attr', 'href')
-      .and('include', '/inference/agentic/206885');
+      .and('include', '/infx/inference/agentic/206885');
     cy.get('link[rel="alternate"][hreflang="zh-CN"]')
       .should('have.attr', 'href')
-      .and('include', '/zh/inference/agentic/206885');
+      .and('include', '/zh/infx/inference/agentic/206885');
     cy.get('[data-testid="sibling-sort-select"]').should('be.visible');
 
     cy.get('[data-testid="detail-view-timeline"]').click();
@@ -629,14 +629,16 @@ describe('Agentic point request metric time series', () => {
         expect(bounds.height).to.be.greaterThan(0);
       });
     expectNoPageOverflow();
-    cy.get('a[href^="/zh/agentx/fixture-dataset/conversations/conversation-1"]')
+    cy.get('a[href^="/zh/infx/agentx/fixture-dataset/conversations/conversation-1"]')
       .first()
       .should('have.attr', 'href')
       .and('include', 'turn=0');
-    cy.get('a[href^="/zh/agentx/fixture-dataset/conversations/conversation-1"]').first().click();
+    cy.get('a[href^="/zh/infx/agentx/fixture-dataset/conversations/conversation-1"]')
+      .first()
+      .click();
     cy.location('pathname').should(
       'equal',
-      '/zh/agentx/fixture-dataset/conversations/conversation-1',
+      '/zh/infx/agentx/fixture-dataset/conversations/conversation-1',
     );
   });
 
@@ -698,9 +700,9 @@ describe('Agentic point request metric time series', () => {
       );
     });
 
-    cy.visit('/zh/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/zh/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
     cy.get('[data-testid="agentic-request-charts-query-error"]')
-      .should('contain.text', '请求图表数据加载失败。')
+      .should('contain.text', '请求图表数据加载失败')
       .and('contain.text', '重试');
     cy.then(() => {
       requestChartAttemptsBeforeRetry = requestChartAttempts;
@@ -712,7 +714,7 @@ describe('Agentic point request metric time series', () => {
 
     cy.get('[data-testid="detail-view-aggregates"]').click();
     cy.get('[data-testid="agentic-aggregates-query-error"]')
-      .should('contain.text', '跨配置聚合数据加载失败。')
+      .should('contain.text', '跨配置聚合数据加载失败')
       .and('contain.text', '重试');
     cy.then(() => {
       aggregateAttemptsBeforeRetry = aggregateAttempts;
@@ -724,7 +726,7 @@ describe('Agentic point request metric time series', () => {
 
     cy.get('[data-testid="detail-view-timeline"]').click();
     cy.get('[data-testid="agentic-timeline-query-error"]')
-      .should('contain.text', '请求时间线加载失败。')
+      .should('contain.text', '请求时间线加载失败')
       .and('contain.text', '重试');
     cy.then(() => {
       timelineAttemptsBeforeRetry = timelineAttempts;
@@ -752,10 +754,10 @@ describe('Agentic point request metric time series', () => {
         failSibling ? { statusCode: 500, body: {} } : { statusCode: 200, body: benchmarkSiblings },
       );
     });
-    cy.visit('/zh/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/zh/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
 
     cy.get('[data-testid="agentic-trace-query-error"]')
-      .should('contain.text', '无法加载基准测试数据点 #206885 的 trace 数据。')
+      .should('contain.text', '无法加载基准测试数据点 #206885 的 trace 数据')
       .and('contain.text', '重试');
     cy.then(() => {
       traceAttemptsBeforeRetry = traceAttempts;
@@ -766,14 +768,14 @@ describe('Agentic point request metric time series', () => {
     cy.then(() => expect(traceAttempts).to.be.greaterThan(traceAttemptsBeforeRetry));
 
     cy.get('[data-testid="agentic-siblings-query-error"]')
-      .should('contain.text', 'SKU 导航数据加载失败。')
+      .should('contain.text', 'SKU 导航数据加载失败')
       .and('contain.text', '重试');
     cy.then(() => {
       siblingAttemptsBeforeRetry = siblingAttempts;
       failSibling = false;
     });
     cy.get('[data-testid="agentic-siblings-query-error"]').contains('button', '重试').click();
-    cy.contains('button', 'TP8/DCP8 • c=8').should('be.visible');
+    cy.contains('button', 'TP8/DCP8 · c=8').should('be.visible');
     cy.then(() => expect(siblingAttempts).to.be.greaterThan(siblingAttemptsBeforeRetry));
   });
 });
@@ -801,7 +803,7 @@ describe('Agentic request timeline virtualization', () => {
         requests,
       },
     });
-    cy.visit('/inference/agentic/206885?view=timeline', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/infx/inference/agentic/206885?view=timeline', { onBeforeLoad: unlockAgenticGate });
   });
 
   it('keeps row labels and SVG request bars bounded to the viewport', () => {
@@ -919,7 +921,7 @@ describe('Agentic point orchestrator metric sources', () => {
         metricSources: [{ source: prefill.source }, { source: decode.source }],
       },
     });
-    cy.visit('/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
   });
 
   it('switches every server chart to an orchestrator-normalized worker', () => {
@@ -989,12 +991,12 @@ describe('Agentic point orchestrator metric sources', () => {
         attempts <= 2 ? { statusCode: 500, body: {} } : { statusCode: 200, body: recovered },
       );
     });
-    cy.visit('/zh/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/zh/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
     cy.get('[data-testid="metric-source-select"]').click();
     cy.contains('[role="option"]', '解码 · decode-a').click();
 
     cy.get('[data-testid="agentic-metric-source-query-error"]')
-      .should('contain.text', '无法加载所选服务器指标来源。')
+      .should('contain.text', '无法加载所选服务器指标来源')
       .and('contain.text', '重试');
     cy.get('[data-testid="agentic-metric-source-query-error"]').contains('button', '重试').click();
     cy.get('[data-testid="agentic-metric-source-query-error"]').should('not.exist');
@@ -1043,7 +1045,7 @@ describe('Agentic point per-engine KV overlay', () => {
         metricSources: [],
       },
     });
-    cy.visit('/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/infx/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
   });
 
   it('draws one legend entry per engine and leaves named engines unprefixed', () => {

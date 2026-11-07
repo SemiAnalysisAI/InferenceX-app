@@ -71,12 +71,12 @@
   ],
   "sources": [
     {
-      "label": "inferencex.semianalysis.com/profit-estimator-per-gigawatt",
-      "href": "https://inferencex.semianalysis.com/profit-estimator-per-gigawatt"
+      "label": "inferencex.semianalysis.com/infx/profit-estimator-per-gigawatt",
+      "href": "https://inferencex.semianalysis.com/infx/profit-estimator-per-gigawatt"
     },
     {
-      "label": "inferencex.semianalysis.com/agentx",
-      "href": "https://inferencex.semianalysis.com/agentx"
+      "label": "inferencex.semianalysis.com/infx/agentx",
+      "href": "https://inferencex.semianalysis.com/infx/agentx"
     },
     {
       "label": "openrouter.ai/moonshotai/kimi-k3",

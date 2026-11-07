@@ -23,6 +23,7 @@ import {
   runPageKeywordsZh,
 } from '@/lib/live-seo/run-pages-zh';
 import { getRunPageData, type RunPageData } from '@/lib/live-seo/run-rankings-data.server';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export const revalidate = 86400;
 
@@ -217,7 +218,7 @@ export default async function ZhRunPage({ params }: Props) {
         label: `${entry.model.seoName} 详解：架构、评估与性能`,
       },
       { href: `/zh/chips/${entry.chip.slug}`, label: `${chipTitle} 规格与价格` },
-      { href: '/zh/inference', label: '交互式推理仪表盘' },
+      { href: `/zh${getDashboardRoute('inference').path}`, label: '交互式推理仪表盘' },
     ],
   };
 

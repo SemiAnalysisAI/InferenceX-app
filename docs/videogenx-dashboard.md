@@ -1,6 +1,6 @@
-# VideoGenX results (/video)
+# VideoGenX results (/vgx)
 
-`VideoDashboard` renders the same shared results view at `/video` and `/zh/video`.
+`VideoDashboard` renders the same shared results view at `/vgx` and `/zh/vgx`.
 It preserves the existing feature gate, route registry, published History reader,
 and sealed media loader. All visible copy lives in component-local `STRINGS`.
 
@@ -37,7 +37,7 @@ GPU count for the same workload. Workload-mix rows preserve each
 cohort separately rather than averaging across resolutions, durations or modes.
 
 `r_*` URL parameters record filters, hidden hardware, chart axes (`r_x`, `r_y`),
-cost basis (`r_basis`), Optimal Only (`r_optimal`), the open deployment
+cost basis (`r_basis`), Optimal only (`r_optimal`), the open deployment
 (`r_point`), deadline, cost tier, entered mode prices and utilization. `r_workload` uses a compact source point identifier;
 canonical workload JSON stays inside the projection. Share includes the `r_`
 registry scope. `?unofficialrun=<id>` reads only that run through
@@ -70,11 +70,12 @@ only; query IDs and API projection values remain unchanged.
 
 ## Layout
 
-The page follows the inference and AgentX two-level layout. The overview has four parts:
+The page follows the inference and AgentX two-level layout. The overview has five parts:
 
-1. The header card holds the cohort help, Share, one line naming the fixed model,
-   workload and engine, and three control panels: Chart config (X and Y metric),
-   Deployment (GPU count), Compare history and Run context. Compare history's Chip Config
+1. The header card (`DashboardSectionHeader` with the page title, cohort help and Share)
+   holds one line naming the fixed model, workload and engine, and `ControlPanel`s for
+   Chart config (X and Y metric), Deployment (GPU count), Compare history and Run
+   context. Compare history's Chip config
    picks up to four deployments and an optional date range; the chart then plots each one's
    runs in time order, labelled by run date, plus a named overlay run's matching
    deployment as its own series, while the table, clips and cost caption keep
@@ -84,29 +85,38 @@ The page follows the inference and AgentX two-level layout. The overview has fou
    have no selectors while one cohort is published; a shared `r_workload` link still
    selects its workload. The replay label appears only when fixture
    replay is active.
-2. The chart card plots every measured deployment of the selected workload. X is
+2. The chart card is a `ChartSection` with the shared chart buttons (PNG export, CSV of
+   the overview API's `format=csv`, legend toggle and zoom reset). The chart title sits in
+   the chart caption so PNG exports carry it. The chart plots every measured deployment
+   of the selected workload. X is
    median (default) or P90 latency per clip; when every plotted deployment generates
    clips of one length and frame rate, the axis title names both. Y is video-seconds
    per $1 TCO (default), videos per GPU-hour or GPU kJ per valid clip.
    `results-chart.ts` registers each metric with its label, unit and better direction.
    Each hardware and each overlay run is one series with its own Pareto frontier;
-   Optimal Only hides dominated deployments. The sidebar legend toggles hardware,
-   greys out roster hardware without a matched run, and holds the deployment-label
-   switch. Under the chart, a caption laid out like the inference one selects the cost
-   tier and GPU basis, names the update date and source, and lists each plotted
-   hardware's TCO $/chip/hr rate with its source link. Hovering a point shows the
-   inference chart's compact hover card (`hoverCardHTML`): hardware, concurrency, both axis values,
-   GPUs and deployment. Clicking pins the inference pinned card: date, both axis values,
-   concurrency, participating and allocated GPUs, valid clips, deployment, the other latency,
-   cost, energy, power, runtime and the GitHub Actions run link. Unofficial points carry the
-   run marker in both cards. Its View telemetry button opens the deployment detail. The Representative
-   deployments table below has one row per hardware and unofficial run, showing the
-   deployment with the most videos per participating GPU-hour. It scrolls
-   horizontally on narrow screens, and a row opens the same detail.
-3. The clip comparison described in Synchronized clips.
-4. Collapsed details: How to read these results, the profit estimator and
-   Performance history. How to read lists the measurements not yet collected. No
-   placeholder chart, illustrative value or uncalibrated rating schema is shipped.
+   Optimal only hides dominated deployments. The sidebar legend toggles hardware,
+   greys out roster hardware without a matched run, holds the deployment-label switch
+   and a Reset filter action. Under the chart, a `ResultContext` footer like the
+   inference one selects the cost tier and GPU basis (a segmented toggle), names the
+   update date and source, lists each plotted hardware's TCO $/chip/hr rate in a
+   `TcoPriceTable` and links the price source. Hovering a point shows the shared
+   compact hover card (`chartHoverCard`): hardware and engine, both axis values, GPUs,
+   deployment and concurrency. Clicking a point opens the shared point details panel
+   (`ChartPointDetails`): date, both axis values, concurrency, participating and
+   allocated GPUs, valid clips, deployment, the other latency, cost, energy, power,
+   runtime and the GitHub Actions run link. Unofficial points carry the run marker in
+   both. Its View telemetry action opens the deployment detail. The Representative
+   deployments table below is a sortable `DataTable` with one row per hardware and
+   unofficial run, showing the deployment with the most videos per participating
+   GPU-hour. It scrolls horizontally on narrow screens, and the hardware button in a
+   row opens the same detail.
+3. The clip comparison card described in Synchronized clips.
+4. Always-open cards for How to read these results and the profit estimator. How to
+   read lists the measurements not yet collected. The profit estimator's mode prices
+   and utilization sit in a Scenario `ControlPanel`. No placeholder chart, illustrative
+   value or uncalibrated rating schema is shipped.
+5. Performance history, collapsed under a chevron heading until opened or deep-linked,
+   because opening it reads stored History pages.
 
 `r_point` opens one deployment detail. Opening pushes a history entry marked in
 `history.state` through the `client-navigation` helpers, so the in-page Back button
@@ -117,9 +127,9 @@ and chart state survive the visit. An unknown, filtered or hidden `r_point` fall
 back to the overview. Once results load, the URL drops that key, so showing the
 hardware again or Share cannot reopen it. Overlay deployments open the same way.
 
-The detail header names hardware, model, engine, run date and any overlay run ID.
-Chips switch between the measured deployments of that hardware; dashed chips mark
-GPU counts without a measurement. A spec grid lists GPUs, concurrency, engine,
+The detail header (`DashboardSectionHeader` with Share) names hardware, model, engine,
+run date and any overlay run ID. Buttons switch between the measured deployments of that
+hardware; dashed boxes mark GPU counts without a measurement. A spec grid lists GPUs, concurrency, engine,
 runtime, workload, valid clips, power evidence and the hourly GPU rate. Three tabs
 hold the evidence:
 
@@ -298,7 +308,7 @@ official/unofficial source membership remain unchanged.
 | Model, workload, resolution, duration, mode, steps, GPU count, engine, date             | `r_*` selection fields                                                                 |
 | Hardware visibility, named run (stored or read live)                                    | `r_hidden`, `unofficialrun`, separate overlay cells preserving approval                |
 | Deadline, cost tier, mode prices, utilization                                           | Same pure calculations in `resultProjection`                                           |
-| Chart axes, cost basis, Optimal Only, open deployment                                   | `r_x`, `r_y`, `r_basis`, `r_optimal`, `r_point`; every axis value is in each cell      |
+| Chart axes, cost basis, Optimal only, open deployment                                   | `r_x`, `r_y`, `r_basis`, `r_optimal`, `r_point`; every axis value is in each cell      |
 | Deployment labels, detail tab, pinned point                                             | Presentation only                                                                      |
 | Clip transport, audio source, Difference, case navigation, History expand, theme, Share | Presentation only; published media metadata uses the existing read-only media contract |
 | Cohort help, prompt/source and hash disclosures, media link                             | Presentation only; existing history and published media reads provide their data       |
@@ -312,7 +322,7 @@ browser playback and difference failure, bilingual layout and 390px overflow.
 
 ## 中文说明
 
-`/video` 与 `/zh/video` 共用结果页，沿用现有路由、功能开关、History 和封存媒体读取器。
+`/vgx` 与 `/zh/vgx` 共用结果页，沿用现有路由、功能开关、History 和封存媒体读取器。
 未记录服务端布局（TP、Ulysses）的早期数据点无法与同一 GPU 数量下已记录布局的数据点区分，因此会被同一硬件、GPU 数量和并发数下更新的数据点取代；通过运行信息选择更早的运行时仍会显示。
 比较要求固定的 20 条视频 C1 工作负载，每种硬件至少 10 个有效样本；完整身份包含模型版本、
 生成参数、prompt、seed 和测量语义。较短 smoke、未完成及未匹配结果留在性能历史，不混入比较。
@@ -321,11 +331,11 @@ browser playback and difference failure, bilingual layout and 390px overflow.
 页面沿用推理与 AgentX 的两级布局。概览页首将筛选分为基准测试配置（模型、工作负载、引擎）、图表配置（X/Y 指标）、
 部署（GPU 数量）、对比历史趋势和运行信息。对比历史趋势中的芯片配置最多可选 4 个部署，并可限定日期范围；图表随即按时间顺序绘制各部署的每次运行并标注运行日期，指定的叠加运行中匹配的部署单独成一组，表格、视频和成本说明仍按所选运行显示。运行信息沿用推理页的运行日期和运行选择器：每个正式部署显示其在所选运行或之前的最新运行，运行链接打开对应的 GitHub Actions 运行。图表绘制所选工作负载的全部实测部署：X 轴为单条视频中位延迟（默认）或 P90 延迟，所有部署生成的视频时长和帧率相同时，轴标题会注明这两项；
 Y 轴为每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时生成视频数或每条有效视频的 GPU 能耗；每种硬件及每个叠加运行
-各自绘制 Pareto 前沿。右侧图例可隐藏硬件，没有匹配运行的硬件显示为灰色，图表下方的说明行与推理页一致，可切换成本层级和 GPU 口径，并列出更新时间、来源、各硬件的 TCO $/chip/hr 价格及其来源链接。
-图表下方的“代表性部署”表格每种硬件及每个叠加运行一行，展示按参与计算的 GPU 折算后每 GPU 小时生成视频数最多的部署，窄屏可横向滚动。
-悬停数据点时显示与推理图表相同的精简悬停卡片（`hoverCardHTML`）：硬件、并发数、两个坐标轴的数值、GPU 和部署。点击后固定显示推理页同款详情卡片：日期、两个坐标轴的数值、并发数、参与和分配的 GPU、有效视频数、部署、另一项延迟、成本、能耗、功率、Runtime 和 GitHub Actions 运行链接；非官方运行的数据点在两种卡片中都会标出运行编号。再点击“查看遥测”进入部署详情（`r_point`）；点击表格行则直接进入详情。详情入口在 `history.state` 中做标记，
+各自绘制 Pareto 前沿。右侧图例可隐藏硬件，没有匹配运行的硬件显示为灰色，并提供部署标签开关和“重置筛选”。图表卡片使用 `ChartSection`，带有共享的图表按钮（PNG 导出、overview API `format=csv` 的 CSV、图例开关和缩放重置），图表标题放在图表说明中，导出的 PNG 也会带上标题。图表下方的 `ResultContext` 页脚与推理页一致，可切换成本层级和 GPU 口径（分段切换），并列出更新时间、来源、各硬件 TCO $/chip/hr 价格表（`TcoPriceTable`）及价格来源链接。
+图表下方的“代表性部署”是可排序的 `DataTable`，每种硬件及每个叠加运行一行，展示按参与计算的 GPU 折算后每 GPU 小时生成视频数最多的部署，窄屏可横向滚动。
+悬停数据点时显示共享的精简悬停卡片（`chartHoverCard`）：硬件与引擎、两个坐标轴的数值、GPU、部署和并发数。点击后打开共享的数据点详情面板（`ChartPointDetails`）：日期、两个坐标轴的数值、并发数、参与和分配的 GPU、有效视频数、部署、另一项延迟、成本、能耗、功率、Runtime 和 GitHub Actions 运行链接；非官方运行的数据点在两处都会标出运行编号。再点击“查看遥测”进入部署详情（`r_point`）；点击表格行中的硬件按钮则直接进入详情。详情页页首使用 `DashboardSectionHeader` 并带分享按钮。详情入口在 `history.state` 中做标记，
 刷新或前进后页内返回仍会弹出该条目，浏览器后退也会回到原滚动位置；概览在后台保持挂载，视频、已加载的性能历史和图表状态不会丢失。
-详情页分为遥测、有效性、来源三个标签页。未知、已筛除或已隐藏的 `r_point` 回到概览，结果加载后会从 URL 中移除，重新显示该硬件或分享时不会再打开它。如何解读、利润估算器与性能历史默认折叠，尚未采集的指标在“如何解读”中列出，
+详情页分为遥测、有效性、来源三个标签页。未知、已筛除或已隐藏的 `r_point` 回到概览，结果加载后会从 URL 中移除，重新显示该硬件或分享时不会再打开它。“如何解读这些结果”和利润估算器始终展开，利润估算器的各模式价格和利用率放在“场景”控制面板中；性能历史需要读取已存储的 History 页面，因此默认折叠在带箭头的标题下，深链接时自动展开。尚未采集的指标在“如何解读”中列出，
 不使用占位图表或示意数值。功率无效时不展示功率或能耗结论。默认保留四个硬件视频窗口；
 符合相同工作负载及样本门槛的已批准 H100 结果或明确指定的诊断运行会增加 H100 窗口，名称和成本沿用硬件注册表。
 

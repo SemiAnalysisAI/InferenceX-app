@@ -75,7 +75,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-collectivex-view',
-    sourceSha256: '452190d2fa522279fa72f203994c819e8c56fa6f332551a36f07ce0a0ca2d8d4',
+    sourceSha256: '5726230a6ba1d4892c70250e947d3e088f610b5b69e76b1f76dd0704bc75e985',
   },
   {
     source: 'src/app/api/v1/views/compare/route.ts',
@@ -99,7 +99,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-evaluation-view',
-    sourceSha256: '38166deb4a4763f54d43e755f075b236765b554d2c11e767ce8366458f1fc05b',
+    sourceSha256: 'd9feffd423087fdb16341ff74db8bc2354d60e3b72c58502849717cd1b797409',
   },
   {
     source: 'src/app/api/v1/views/first-token/route.ts',
@@ -131,7 +131,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-gpu-specs-view',
-    sourceSha256: '65fd28d72582f2b97d79ddd8dc2b809136f867c9c6537f7080b08295fe8249ac',
+    sourceSha256: 'afebf0b12a371d9e13a3ac3b22886f8311366b6e69795384889b5c829ad11c3c',
   },
   {
     source: 'src/app/api/v1/views/historical/route.ts',
@@ -147,7 +147,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: 'e61587be769b322f974fc275534e2abab57b4a936725379bda4da1cf5dea068f',
+    sourceSha256: '67e21ed1cf1c3bf7a022c32292593cd4a40a9050a23bd02e981ce00ab479d74e',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -195,7 +195,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-reliability-view',
-    sourceSha256: 'f97eb40d65e999b80d8738aa24718da9a7e733555da6e6bea231c0a31cf63a0c',
+    sourceSha256: 'a3d490d9221e20a0df5fa54cde084eac9c1153d376494e94ebba2130cc5f2c28',
   },
   {
     source: 'src/app/api/v1/views/submissions/route.ts',
@@ -203,7 +203,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-submissions-view',
-    sourceSha256: 'cb183903e42941a66272deb3571a0750f264d3f917aff28a4f48f63566ade17e',
+    sourceSha256: 'ecfbca98e1deef38618b7576007365afaa71d78aabae3fe4670f00a8e28f75a2',
   },
   {
     source: 'src/app/api/v1/views/video/route.ts',
@@ -219,7 +219,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-operatorx-view',
-    sourceSha256: '89aa6ffe658926222451497ae0e4a65c1d73237771ab31edfc17ff212abecd2a',
+    sourceSha256: '38f35ad252e31f25db44060c2792384be6dbcb1dac69d217d857486a7ca3732a',
   },
   // Agentic Workload Explorer page backend (frozen ProxyTrace snapshot).
   {
@@ -656,7 +656,7 @@ export const apiRouteCatalog = [
       en: 'UI-only overlay for unofficial workflow artifacts. Append-only runs also include the published curve points they extend when each shared topology keeps its image. Development on loopback hosts may explicitly opt into local artifact files via INFERENCEX_LOCAL_ARTIFACT_DIR; production only reads the public GitHub source. Artifact availability and shape are not stable. The CDN caches completed runs for an hour, queued or in-progress runs for 30 seconds, and missing runs for five minutes; a GitHub rate limit returns an uncached 503 with Retry-After.',
       zh: '仅供界面叠加非官方工作流产物。append-only 运行还会包含其所扩展的已发布曲线数据点，前提是两者共有的每种拓扑都使用同一镜像。开发环境通过本机地址访问时，可用 INFERENCEX_LOCAL_ARTIFACT_DIR 显式启用本地文件；生产环境仅从公开 GitHub 来源读取。产物的可用性和结构并不稳定。CDN 对已完成的运行缓存 1 小时，对排队中或进行中的运行缓存 30 秒，对不存在的运行缓存 5 分钟；触发 GitHub 速率限制时返回不缓存的 503，并附带 Retry-After。',
     },
-    sourceSha256: '6ebfddfb38dc18e92e22039c68eb7609f3677193b8f2d4f0867e48f67ab41682',
+    sourceSha256: 'c5178f61e3b47290019285247aeec0f429d41feafe73e58e6e89cfb0d89327d9',
   },
   {
     source: 'src/app/api/v1/agentic-aggregates/route.ts',
@@ -1250,7 +1250,7 @@ export interface ApiContractSourceDigest {
 export const apiContractSourceDigests = [
   {
     source: '../constants/src/framework-aliases.ts',
-    sourceSha256: '6c220e6aed1465e647f2c3ffcb03828e0f98ac6b9edb4019f0dce6db10c4054e',
+    sourceSha256: 'f10297b86f7b29d2e88241344f02af488ecc1db43e096bb1913c4dcaab1531f9',
     reviewArea: {
       en: 'Shared engine labels, family classification and dashboard/read-only view filter parity.',
       zh: '共享引擎标签、系列分类，以及仪表板与只读视图的筛选一致性。',
@@ -1274,18 +1274,18 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/ubenchx/ubenchx-transform.ts',
-    sourceSha256: '9458ad2b969525fe68da5a3b54ac151384610d0bd2ba84585a9043b3a67bf949',
+    sourceSha256: '3a1cadb4113285742499a1faa3ea9d6c5c66f2459435a2a80ad0c17e4ceb138d',
     reviewArea: {
-      en: 'ubenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
-      zh: 'ubenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
+      en: 'uBenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
+      zh: 'uBenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
     },
   },
   {
     source: 'src/components/ubenchx/ubenchx-data.ts',
     sourceSha256: '5d47b7e1a99601633494c932081cb71c912ddbb806503c897d8dbbaf1a6dfcba',
     reviewArea: {
-      en: 'ubenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
-      zh: 'ubenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
+      en: 'uBenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
+      zh: 'uBenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
     },
   },
 
@@ -1302,8 +1302,8 @@ export const apiContractSourceDigests = [
     source: 'src/components/ubenchx/core-memory-profiles.ts',
     sourceSha256: '96c51ab39b475653dac1e9c5d5dd42eb23c595b4e5e7f485d59a72a44afd99a4',
     reviewArea: {
-      en: 'ubenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
-      zh: 'ubenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
+      en: 'uBenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
+      zh: 'uBenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
     },
   },
 
@@ -1502,7 +1502,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-transform.ts',
-    sourceSha256: '7ade60009996367fbd6bfcbcfd7ba155fd96e1676dcb0d320ca26821f948ba7a',
+    sourceSha256: '3b23eece1e21f423fd3e60f3e6d6a1b8214c120407b2b8fb935320b1b8570440',
     reviewArea: {
       en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
       zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',
@@ -1534,7 +1534,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/gpu-power/types.ts',
-    sourceSha256: '7c5bd549fa5c55ca906d08ecd6521ad5b06f1c95599d4f32d84c3fbfb7e3c0c1',
+    sourceSha256: '5df5b1fade9479c4f844590da7f8002d3faf608ec639ec856e77d9fa5beae45e',
     reviewArea: {
       en: 'GPU telemetry units, missing values, timestamp deduplication, and full-record live statistics definitions.',
       zh: 'GPU 遥测单位、缺失值、时间戳去重，以及实时产物全记录统计的定义。',
@@ -1542,7 +1542,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/calculator/profit-estimator.ts',
-    sourceSha256: '0eeaaed822068e9aa782e6b40ad1bb9ae31f70ef755f67622767f3b89ade4d1a',
+    sourceSha256: 'c55de32de8d96e3d086975f06b717c5799a7faacecc27c7396a49038451322b5',
     reviewArea: {
       en: 'Shared profit-estimator defaults and calculation parity, including model-specific target assumptions.',
       zh: '利润估算器的共享默认值与计算一致性，包括各模型的目标假设。',
@@ -1686,7 +1686,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/metrics.ts',
-    sourceSha256: '714a52e0ee739d79736a76e67dec77c2607be24951647829b3132baf72a43996',
+    sourceSha256: 'df07ac3fbb5cc7e0ff5e5a0c5d8706795dffdda6d9104b1e7b7f5c85b1739863',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1778,7 +1778,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/evaluation/date-resolution.ts',
-    sourceSha256: 'f1a3d397939d94a17e624c89a9f167c0109e37c8cbc32f902f426bada87529e1',
+    sourceSha256: '1490c0d5148487bcce2f940fcc3337ec79df3e4e82ad416f404cb207a4be1f4a',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1787,7 +1787,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/reliability/aggregate.ts',
-    sourceSha256: 'a885ffc19a600c94d640116b04c53c62b03a8b186c59da8b07fcb34939c00cc8',
+    sourceSha256: '2a44701069e3deaaca1c1cb31977c26cd3577ae0cd6edad3dc516fe7f4a093e8',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1983,7 +1983,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-id.ts',
-    sourceSha256: '36f9adf8a92cf5830abc01d0a389aa21eca9f429f31a9231b5d77e108c985d35',
+    sourceSha256: '3b536955cbcbcc2e57c4893c8ef5b3f298f4c1a5ead24b0981ce41ed5008b0a3',
     reviewArea: {
       en: 'Client-side persisted benchmark identifier recognition.',
       zh: '客户端持久化基准标识符识别。',
@@ -2069,7 +2069,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/collectivex/types.ts',
-    sourceSha256: 'ebe50f3ebd2018f33b39abe518acf55466b470794ae051564dbcff45a480211b',
+    sourceSha256: '9ca3df6d847e180bff96199fcc0bf6fa42b89898257d97570de0a1add2c872ea',
     reviewArea: {
       en: 'CollectiveX version negotiation and versioned dataset/run response types.',
       zh: 'CollectiveX 版本协商以及带版本的数据集与运行响应类型。',
@@ -2144,7 +2144,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/evaluations.ts',
-    sourceSha256: '937f1329a40edda00012b8058b7f802629ba972de88585c29fedd1447c4d1929',
+    sourceSha256: '38abc2279f364bedfd3f6c077490851c3b2e518896006bed3b027329f77316c2',
     reviewArea: {
       en: 'Evaluation aggregate result fields, provenance, metrics, and latest-attempt selection.',
       zh: '评测汇总结果字段、来源、指标和最新尝试选择。',

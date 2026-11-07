@@ -1,7 +1,11 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { Card } from '@/components/ui/card';
+import { ControlPanel } from '@/components/ui/control-panel';
+import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import {
   Select,
@@ -10,25 +14,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ShareButton } from '@/components/ui/share-button';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {
-    title: 'ubenchX Microbenchmarks (Beta)',
+    title: 'uBenchX microbenchmarks',
+    beta: 'Beta',
     subtitle:
-      'Low-level accelerator microbenchmarks measuring fundamental hardware characteristics.',
+      'Low-level accelerator microbenchmarks measuring fundamental hardware characteristics',
+    controls: 'Benchmark config',
+    chartControls: 'Chart config',
     test: 'Microbenchmark',
-    testTooltip: 'The ubenchX microbenchmark to display.',
-    memBwTitle: 'HBM Bandwidth',
+    testTooltip: 'The uBenchX microbenchmark to display.',
+    memBwTitle: 'HBM bandwidth',
     tpcSkylineTitle: 'TPC Skyline & SKU configurations',
     coreProfilesTitle: 'Core memory-access profiles',
   },
   zh: {
-    title: 'ubenchX 微基准测试（Beta）',
-    subtitle: '底层加速器微基准测试，测量基础硬件特性。',
+    title: 'uBenchX 微基准测试',
+    beta: 'Beta',
+    subtitle: '底层加速器微基准测试，测量基础硬件特性',
+    controls: '基准测试配置',
+    chartControls: '图表配置',
     test: '微基准测试',
-    testTooltip: '要显示的 ubenchX 微基准测试。',
+    testTooltip: '要显示的 uBenchX 微基准测试。',
     memBwTitle: 'HBM 带宽',
     tpcSkylineTitle: 'TPC Skyline 与 SKU 配置',
     coreProfilesTitle: '核心访存特征',
@@ -43,42 +54,79 @@ export const UBENCHX_TESTS = [
 
 export type UbenchxTestSlug = (typeof UBENCHX_TESTS)[number]['slug'];
 
-export function UbenchxHub({ current }: { current: UbenchxTestSlug }) {
+export function UbenchxHub({
+  current,
+  controls,
+  chartControls,
+}: {
+  current: UbenchxTestSlug;
+  controls?: ReactNode;
+  chartControls?: ReactNode;
+}) {
   const locale = useLocale();
   const router = useRouter();
   const t = STRINGS[locale];
   const prefix = locale === 'zh' ? '/zh' : '';
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">{t.title}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{t.subtitle}</p>
-      </div>
-      <div className="flex flex-col space-y-1.5 sm:w-[320px]">
-        <LabelWithTooltip htmlFor="ubenchx-test-select" label={t.test} tooltip={t.testTooltip} />
-        <Select
-          value={current}
-          onValueChange={(value) => {
-            if (value === current) return;
-            track('ubenchx_test_selected', { test: value });
-            router.push(`${prefix}/ubenchx/${value}`);
-          }}
-        >
-          <SelectTrigger id="ubenchx-test-select" data-testid="ubenchx-test-select">
-            <SelectValue>
-              {t[UBENCHX_TESTS.find((test) => test.slug === current)!.titleKey]}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {UBENCHX_TESTS.map((test) => (
-              <SelectItem key={test.slug} value={test.slug}>
-                {t[test.titleKey]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-    </div>
+    <section>
+      <Card>
+        <div className="flex flex-col gap-4">
+          <DashboardSectionHeader
+            headingAs="h1"
+            title={t.title}
+            qualifier={t.beta}
+            description={t.subtitle}
+            actions={<ShareButton />}
+          />
+          <div
+            className={`grid min-w-0 items-start gap-x-6 gap-y-4 ${chartControls === undefined ? '' : 'lg:grid-cols-2'}`}
+          >
+            <ControlPanel legend={t.controls}>
+              <div className="grid min-w-0 items-start gap-3 sm:grid-cols-2">
+                <div className="flex min-w-0 flex-col space-y-1.5">
+                  <LabelWithTooltip
+                    htmlFor="ubenchx-test-select"
+                    label={t.test}
+                    tooltip={t.testTooltip}
+                  />
+                  <Select
+                    value={current}
+                    onValueChange={(value) => {
+                      if (value === current) return;
+                      track('ubenchx_test_selected', { test: value });
+                      router.push(`${prefix}/ubx/${value}`);
+                    }}
+                  >
+                    <SelectTrigger
+                      id="ubenchx-test-select"
+                      data-testid="ubenchx-test-select"
+                      className="w-full"
+                    >
+                      <SelectValue>
+                        {t[UBENCHX_TESTS.find((test) => test.slug === current)!.titleKey]}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {UBENCHX_TESTS.map((test) => (
+                        <SelectItem key={test.slug} value={test.slug}>
+                          {t[test.titleKey]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {controls}
+              </div>
+            </ControlPanel>
+            {chartControls !== undefined && (
+              <ControlPanel legend={t.chartControls}>
+                <div className="grid min-w-0 items-start gap-3 sm:grid-cols-2">{chartControls}</div>
+              </ControlPanel>
+            )}
+          </div>
+        </div>
+      </Card>
+    </section>
   );
 }

@@ -245,6 +245,39 @@ describe('CollectiveX artifact assembly', () => {
     ).toBeNull();
   });
 
+  it('maps the chained pair period with the round trip bytes, and null when a result lacks it', () => {
+    const shard = makeRawShard({ rows: [{}] });
+    const built = () =>
+      buildDatasetFromNeutral(makeRawMatrix([requestedOf(shard)]), [shard], makeRunMeta()).series[0]
+        .points[0].components.pair_period;
+    const period = built();
+    expect(period?.latency_us.p50).toBe(871);
+    expect(period?.payload_bytes).toBe(784763904);
+    expect(period?.payload_data_rate_gbps_at_latency_percentile?.p50).toBeCloseTo(
+      (784763904 / 8 / 871) * 1e-3,
+      3,
+    );
+    delete (shard.measurement as { rows: Record<string, any>[] }).rows[0].components.pair_period;
+    expect(built()).toBeNull();
+  });
+
+  it('carries a result maturity onto its series, null when the result names none', () => {
+    const series = (maturity?: string) =>
+      buildDatasetFromNeutral(
+        makeRawMatrix([requestedOf(makeRawShard({}))]),
+        [
+          (() => {
+            const shard = makeRawShard({});
+            if (maturity) (shard.implementation as Record<string, unknown>).maturity = maturity;
+            return shard;
+          })(),
+        ],
+        makeRunMeta(),
+      ).series[0];
+    expect(series('candidate').maturity).toBe('candidate');
+    expect(series().maturity).toBeNull();
+  });
+
   it('keeps a withheld tail null through the derived rates', () => {
     const shard = makeRawShard({ rows: [{}] });
     const row = (shard.measurement as { rows: Record<string, any>[] }).rows[0];

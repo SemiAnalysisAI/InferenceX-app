@@ -137,19 +137,22 @@ export function daysSince(dateStr: string, today: Date): number {
   return Math.max(0, Math.floor(ms / 86_400_000));
 }
 
+/**
+ * Age text ramps from mostly foreground to mostly destructive. Mixing with the foreground token keeps
+ * the text readable on the destructive row tint in both themes (darker red in light, lighter red in dark).
+ */
 export function ageColorStyle(days: number): CSSProperties | undefined {
   if (days < 1) return undefined;
   const t = Math.min(AGE_MAX_RED_DAYS, days) / AGE_MAX_RED_DAYS;
-  const L = 0.78 - 0.28 * t;
-  const C = 0.12 + 0.12 * t;
-  return { color: `oklch(${L.toFixed(3)} ${C.toFixed(3)} 25)` };
+  const mix = Math.round(35 + 40 * t);
+  return { color: `color-mix(in oklch, var(--destructive) ${mix}%, var(--foreground))` };
 }
 
 export function ageRowStyle(days: number): CSSProperties | undefined {
   if (days < 1) return undefined;
   const t = Math.min(AGE_MAX_RED_DAYS, days) / AGE_MAX_RED_DAYS;
-  const alpha = (0.04 + 0.24 * t).toFixed(3);
-  return { backgroundColor: `oklch(0.60 0.22 25 / ${alpha})` };
+  const mix = Math.round(3 + 11 * t);
+  return { backgroundColor: `color-mix(in oklch, var(--destructive) ${mix}%, transparent)` };
 }
 
 /** Identity of an immutable build: its nightly commit, else its pinned digest reference. */

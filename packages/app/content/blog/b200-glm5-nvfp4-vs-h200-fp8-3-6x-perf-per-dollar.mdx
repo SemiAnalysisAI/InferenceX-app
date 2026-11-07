@@ -20,7 +20,7 @@ On GLM-5 8K/1K with both H200 and B200 running SGLang, NVIDIA's GLM-5-NVFP4 chec
 
 The 3.65x factors cleanly at the peak. At 80 tok/s/user, **B200 SGLang FP8 + MTP delivers 1.22x better performance per dollar than H200 SGLang FP8 + MTP** — the Blackwell generation + software step alone, with the same precision and the same EAGLE recipe on both sides. **Swapping the B200 weights from `zai-org/GLM-5-FP8` to `nvidia/GLM-5-NVFP4` stacks another 2.98x** — the precision step alone, riding on FlashInfer's TRT-LLM sparse MLA kernels that landed as the default on sm100/sm103 in [sgl-project/sglang #21783](https://github.com/sgl-project/sglang/pull/21783). 1.22 × 2.98 ≈ 3.65. The two steps trade places across the band — generation contributes more at low interactivity (1.36x at 50 tok/s/user) and precision contributes more at high (3.07x at 84 tok/s/user) — but the combined lift is steady.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-25&g_model=GLM-5&g_runid=26381101926&i_prec=fp4%2Cfp8&i_active=b200_sglang_mtp%2Ch200_sglang_mtp&i_linelabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-25&g_model=GLM-5&g_runid=26381101926&i_prec=fp4%2Cfp8&i_active=b200_sglang_mtp%2Ch200_sglang_mtp&i_linelabel=1">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 
@@ -37,13 +37,13 @@ NVIDIA additionally published a quantized weights release at [`nvidia/GLM-5-NVFP
 
 ## On-Paper Specs
 
-Before the recipes, the hardware. H200 SXM (Hopper) and B200 SXM (Blackwell) sit one generation apart. The radar below normalizes each axis to the maximum across every NVIDIA + AMD SKU in [`/gpu-specs`](/gpu-specs) — so the visible H200 and B200 polygons compress against axes where GB200/GB300 NVL72 set the ceiling (notably scale-up domain memory and scale-up domain memory bandwidth, which scale with the rack-scale 72-GPU NVLink domain).
+Before the recipes, the hardware. H200 SXM (Hopper) and B200 SXM (Blackwell) sit one generation apart. The radar below normalizes each axis to the maximum across every NVIDIA + AMD SKU in [`/infx/gpu-specs`](/infx/gpu-specs) — so the visible H200 and B200 polygons compress against axes where GB200/GB300 NVL72 set the ceiling (notably scale-up domain memory and scale-up domain memory bandwidth, which scale with the rack-scale 72-GPU NVLink domain).
 
 <Figure
   srcLight="/images/b200-glm5-nvfp4-vs-h200-fp8-3-6x-perf-per-dollar/specs-radar-light.png"
   srcDark="/images/b200-glm5-nvfp4-vs-h200-fp8-3-6x-perf-per-dollar/specs-radar-dark.png"
-  alt="Radar chart comparing H200 SXM and B200 SXM on memory, memory bandwidth, FP4/FP8/BF16 TFLOP/s, scale-up bandwidth, scale-up domain memory, and scale-up domain memory bandwidth. Axes normalized to the max across all GPUs in /gpu-specs."
-  caption="H200 SXM vs B200 SXM on the InferenceX /gpu-specs radar. Axes normalized to the cross-vendor maximum on each metric (e.g. FP4 max is GB300 NVL72 at 15 PFLOP/s/GPU, so B200's 9 PFLOP/s reads ~60%; scale-up domain memory and bandwidth maxes are set by GB200/GB300 NVL72's 72-GPU NVLink domain, so the H200 and B200 8-GPU domains both read low). H200 reads 0% on FP4 because Hopper has no FP4 tensor cores."
+  alt="Radar chart comparing H200 SXM and B200 SXM on memory, memory bandwidth, FP4/FP8/BF16 TFLOP/s, scale-up bandwidth, scale-up domain memory, and scale-up domain memory bandwidth. Axes normalized to the max across all GPUs in /infx/gpu-specs."
+  caption="H200 SXM vs B200 SXM on the InferenceX /infx/gpu-specs radar. Axes normalized to the cross-vendor maximum on each metric (e.g. FP4 max is GB300 NVL72 at 15 PFLOP/s/GPU, so B200's 9 PFLOP/s reads ~60%; scale-up domain memory and bandwidth maxes are set by GB200/GB300 NVL72's 72-GPU NVLink domain, so the H200 and B200 8-GPU domains both read low). H200 reads 0% on FP4 because Hopper has no FP4 tensor cores."
 />
 
 Absolute values for the two SKUs in this benchmark:
@@ -150,7 +150,7 @@ B200 NVFP4's performance-per-dollar lift over H200 peaks at **3.65x at 80 tok/s/
   caption="GLM-5 (744B / 40B active) at ISL 8192 / OSL 1024. SGLang v0.5.12 with EAGLE-based MTP on both H200 and B200. Labels denote GPU count per config (FP4 frontier is TP=4 on 4 GPUs plus one TP=8 / 8 GPU point at the right end; FP8 lines are TP=8 on 8 GPUs)."
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-25&g_model=GLM-5&g_runid=26381101926&i_prec=fp4%2Cfp8&i_active=b200_sglang_mtp%2Ch200_sglang_mtp&i_linelabel=1), pre-filtered to GLM-5 SGLang MTP on H200 + B200 for the 2026-05-25 run. [Live cost view](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-25&g_model=GLM-5&g_runid=26381101926&i_prec=fp4%2Cfp8&i_active=b200_sglang_mtp%2Ch200_sglang_mtp&i_metric=y_costh&i_linelabel=1) of the same comparison.
+[Live chart](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-25&g_model=GLM-5&g_runid=26381101926&i_prec=fp4%2Cfp8&i_active=b200_sglang_mtp%2Ch200_sglang_mtp&i_linelabel=1), pre-filtered to GLM-5 SGLang MTP on H200 + B200 for the 2026-05-25 run. [Live cost view](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-25&g_model=GLM-5&g_runid=26381101926&i_prec=fp4%2Cfp8&i_active=b200_sglang_mtp%2Ch200_sglang_mtp&i_metric=y_costh&i_linelabel=1) of the same comparison.
 
 ## What's Next for Blackwell on GLM-5
 
@@ -164,7 +164,7 @@ For chat-style GLM-5 serving in the 25–84 tok/s/user band on SGLang today, B20
 
 This recipe loop moved fast because the [SGLang NVIDIA collaboration](https://github.com/sgl-project/sglang/issues/19380) closed every Functional and Baseline Perf row across no-MTP/MTP and Agg/Disagg on Blackwell in roughly a quarter — NVFP4 IMA fixes in FlashInfer, sparse MLA defaults on sm100/sm103, IndexCache, EAGLE-based MTP for GLM-5 — and the InferenceX recipe loop wired the H200 MTP sibling in one week after upstream stabilized. Thanks to the SGLang maintainers, the FlashInfer team, the NVIDIA SGLang collaboration thread, and everyone landing PRs on the [tracking issue](https://github.com/sgl-project/sglang/issues/19380). Speed of the upstream-to-benchmark loop is the moat.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-25&g_model=GLM-5&g_runid=26381101926&i_prec=fp4%2Cfp8&i_active=b200_sglang_mtp%2Ch200_sglang_mtp&i_linelabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-25&g_model=GLM-5&g_runid=26381101926&i_prec=fp4%2Cfp8&i_active=b200_sglang_mtp%2Ch200_sglang_mtp&i_linelabel=1">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 

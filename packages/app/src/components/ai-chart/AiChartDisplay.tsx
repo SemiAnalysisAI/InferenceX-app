@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, ArrowUpRight, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { AlertCircle, ArrowUpRight, Eye, EyeOff } from 'lucide-react';
 
 import { track } from '@/lib/analytics/analytics';
 import { PROVIDER_OPTIONS, getProviderLabel } from '@/lib/ai-chart/ai-providers';
@@ -22,7 +22,6 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
-import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 
 import type { AiProvider } from './types';
 import { EXAMPLE_PROMPTS } from './example-prompts';
@@ -30,34 +29,34 @@ import AiChartResult from './AiChartResult';
 
 const STRINGS = {
   en: {
-    title: 'AI Chart Generation',
+    title: 'AI chart generation',
     description:
       'Turn a benchmark question into a chart. Choose an example or describe your own comparison.',
-    placeholder: 'Describe the chart you want to see...',
+    placeholder: 'Describe the chart you want',
     enterToGenerate: '+Enter to generate',
-    generating: 'Generating...',
-    generateChart: 'Generate Chart',
+    generating: 'Generating…',
+    generateChart: 'Generate chart',
     error: 'Error',
-    tryAgain: 'Try Again',
+    tryAgain: 'Try again',
     examplePrompts: 'Example prompts',
     hideKey: 'Hide API key',
     showKey: 'Show API key',
     promptLabel: 'What would you like to compare?',
-    promptHint: 'Describe a model, workload, and metric — or start with an example.',
+    promptHint: 'Describe a model, workload and metric, or start with an example',
     provider: 'AI provider',
     apiKey: 'API key',
     connection: 'Provider access',
     keyHint:
       'Required to generate. The key stays in this page’s memory and is sent only to your selected provider.',
-    needsBoth: 'Add a description and your provider’s API key to generate a chart.',
-    needsKey: 'Add your provider’s API key to generate this chart.',
-    needsPrompt: 'Describe a chart or choose an example to continue.',
-    examplesHint: 'Choose a starting point, then edit it to fit your question.',
+    needsBoth: 'Add a description and your provider’s API key to generate a chart',
+    needsKey: 'Add your provider’s API key to generate this chart',
+    needsPrompt: 'Describe a chart or choose an example to continue',
+    examplesHint: 'Choose a starting point, then edit it to fit your question',
   },
   zh: {
     title: 'AI 图表生成',
     description: '把基准测试问题转成图表。可从示例开始，也可自行描述要比较的内容。',
-    placeholder: '描述想查看的图表……',
+    placeholder: '描述想查看的图表',
     enterToGenerate: '+Enter 生成图表',
     generating: '生成中……',
     generateChart: '生成图表',
@@ -67,15 +66,15 @@ const STRINGS = {
     hideKey: '隐藏 API 密钥',
     showKey: '显示 API 密钥',
     promptLabel: '想比较什么？',
-    promptHint: '描述模型、工作负载和指标，或从示例开始。',
+    promptHint: '描述模型、工作负载和指标，或从示例开始',
     provider: 'AI 服务商',
     apiKey: 'API 密钥',
     connection: '服务商配置',
     keyHint: '生成图表需要 API 密钥。密钥仅保存在当前页面的内存中，并只发送给所选服务商。',
-    needsBoth: '填写图表描述和服务商 API 密钥后即可生成图表。',
-    needsKey: '填写服务商 API 密钥后即可生成此图表。',
-    needsPrompt: '描述所需图表或选择一个示例后继续。',
-    examplesHint: '选择一个示例，再按需要修改。',
+    needsBoth: '填写图表描述和服务商 API 密钥后即可生成图表',
+    needsKey: '填写服务商 API 密钥后即可生成此图表',
+    needsPrompt: '描述所需图表或选择一个示例后继续',
+    examplesHint: '选择一个示例，再按需要修改',
   },
 } as const;
 
@@ -130,26 +129,20 @@ export default function AiChartDisplay() {
 
   return (
     <div className="flex flex-col gap-4">
-      <DashboardSectionHeader
-        title={
-          <span className="flex items-center gap-2">
-            <Sparkles className="size-5 shrink-0" />
-            {t.title}
-          </span>
-        }
-        description={t.description}
-      />
+      <DashboardSectionHeader title={t.title} description={t.description} />
       <div
         className={`grid items-start gap-4 ${!result && !isLoading && !error ? 'lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]' : ''}`}
       >
         <Card className="space-y-4" data-testid="ai-chart-composer">
           <div className="space-y-2">
-            <Label htmlFor="ai-chart-prompt" className="font-semibold">
-              {t.promptLabel}
-            </Label>
-            <p id="ai-chart-prompt-hint" className="text-sm text-muted-foreground">
-              {t.promptHint}
-            </p>
+            <div className="space-y-1">
+              <Label htmlFor="ai-chart-prompt" className="text-base font-medium">
+                {t.promptLabel}
+              </Label>
+              <p id="ai-chart-prompt-hint" className="text-sm text-muted-foreground">
+                {t.promptHint}
+              </p>
+            </div>
             <Textarea
               id="ai-chart-prompt"
               aria-describedby="ai-chart-prompt-hint"
@@ -161,7 +154,7 @@ export default function AiChartDisplay() {
               className="min-h-28 resize-y"
             />
           </div>
-          <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-4">
+          <div className="space-y-3">
             <Heading level="label" as="h3">
               {t.connection}
             </Heading>
@@ -189,7 +182,7 @@ export default function AiChartDisplay() {
                     aria-describedby="ai-chart-key-hint"
                     className="pr-12"
                     type={showKey ? 'text' : 'password'}
-                    placeholder={`${getProviderLabel(provider)} API Key`}
+                    placeholder={`${getProviderLabel(provider)} ${t.apiKey}`}
                     value={apiKey}
                     onChange={(e) =>
                       setApiKeys((prev) => ({ ...prev, [provider]: e.target.value }))
@@ -215,7 +208,7 @@ export default function AiChartDisplay() {
               {t.keyHint}
             </p>
           </div>
-          <div className="flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 border-t border-border/20 pt-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1 text-xs text-muted-foreground">
               {(!apiKey.trim() || !prompt.trim()) && (
                 <p id="ai-chart-requirements">
@@ -239,7 +232,6 @@ export default function AiChartDisplay() {
               }
               disabled={isLoading || !apiKey.trim() || !prompt.trim()}
             >
-              <Sparkles className="size-4" />
               {isLoading ? t.generating : t.generateChart}
             </Button>
           </div>
@@ -257,7 +249,7 @@ export default function AiChartDisplay() {
                 <button
                   key={i}
                   type="button"
-                  className="flex min-h-11 items-start gap-3 rounded-lg border border-border bg-muted/20 p-3 text-left text-sm leading-relaxed text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent hover:text-foreground focus-visible:outline-none"
+                  className="flex min-h-11 items-start gap-3 rounded-lg border border-border/30 p-3 text-left text-sm leading-relaxed text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none"
                   onClick={() => handleExampleClick(example, i)}
                 >
                   <span className="flex-1">{example}</span>
@@ -280,7 +272,7 @@ export default function AiChartDisplay() {
       )}
 
       {error && (
-        <Card className="border-destructive">
+        <Card className="border-destructive/30">
           <CardContent className="flex items-start gap-3">
             <AlertCircle className="text-destructive mt-0.5 size-5 shrink-0" />
             <div data-testid="ai-chart-error">
@@ -304,7 +296,6 @@ export default function AiChartDisplay() {
 
       {result && (
         <>
-          <UnofficialDomainNotice />
           <AiChartResult charts={result.charts} summary={result.summary} />
         </>
       )}

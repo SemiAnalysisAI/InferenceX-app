@@ -1,6 +1,9 @@
 'use client';
 
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Stat } from '@/components/ui/stat';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
@@ -15,46 +18,35 @@ const STRINGS = {
 } as const;
 
 export function SkeletonSectionHeader({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="flex-1 h-px bg-border" />
-      <Skeleton className="h-2.5 w-6" />
-    </div>
-  );
-}
-
-function StatCardSkeleton() {
-  return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <Skeleton className="h-2.5 w-16 mb-2" />
-      <Skeleton className="h-5 w-12" />
-    </div>
-  );
+  return <SectionHeader label={label} detail={<Skeleton className="h-2.5 w-6" />} />;
 }
 
 export function StatGridSkeleton({ count = 17 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+    <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2">
       {Array.from({ length: count }).map((_, i) => (
-        <StatCardSkeleton key={i} />
+        <Stat
+          key={i}
+          boxed
+          label={<Skeleton className="h-2.5 w-16" />}
+          value={<Skeleton className="h-5 w-12" />}
+          className="[&_dd]:flex [&_dd]:h-7 [&_dd]:items-center [&_dt]:flex [&_dt]:h-4 [&_dt]:items-center"
+        />
       ))}
-    </div>
+    </dl>
   );
 }
 
 export function ChartSkeleton() {
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center gap-2 mb-2">
+    <Card>
+      <div className="mb-2 flex items-center gap-2">
         <Skeleton className="h-4 w-10" />
         <Skeleton className="h-4 w-16" />
         <Skeleton className="h-4 w-12" />
       </div>
       <Skeleton className="h-[160px] w-full" />
-    </div>
+    </Card>
   );
 }
 

@@ -1,8 +1,11 @@
 'use client';
 
+import { ChevronRight } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Heading } from '@/components/ui/heading';
 import { InfoHelp } from '@/components/ui/option-info';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import {
@@ -84,7 +87,7 @@ const STRINGS = {
       `Decoded RGB24 · all ${frames} frames · full-stream MSE. Descriptive cross-engine comparison; no quality pass/fail threshold. Different engines and parallel layouts produce different pixels from the same prompt and seed, so a low value alone does not indicate a defect.`,
     referenceNote:
       'Encoded reference MP4. PSNR compares every decoded RGB pixel and frame; it does not measure semantic quality.',
-    wall: 'wall time',
+    wall: 'Wall time',
     psnr: 'PSNR',
     energy: 'J / clip',
     costBasis: 'Modelled TCO · $/video-s',
@@ -308,10 +311,21 @@ export default function VideoResultsClips({
   return (
     <section
       id="comparison-clips"
-      aria-label={s.label}
+      aria-labelledby="comparison-clips-title"
       data-testid="video-results-clips"
       className="min-w-0 scroll-mt-24 space-y-3"
     >
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <Heading as="h2" level="card" id="comparison-clips-title">
+          {s.label}
+        </Heading>
+        {group?.scope === 'matched-noise-diagnostic' && (
+          <span className="text-sm text-muted-foreground">{s.diagnostic}</span>
+        )}
+        <InfoHelp label={s.label} value="clip-metrics" triggerTestId="video-results-metrics-help">
+          {group?.scope === 'matched-noise-diagnostic' ? s.diagnosticNote : s.metricsHelp}
+        </InfoHelp>
+      </div>
       {loading && (
         <p role="status" className="text-sm text-muted-foreground">
           {s.loading}
@@ -643,20 +657,21 @@ function SynchronizedClips({
 
   return (
     <>
-      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-        <span>{diagnostic ? s.diagnostic : s.label}</span>
-        <InfoHelp label={s.label} value="clip-metrics" triggerTestId="video-results-metrics-help">
-          {diagnostic ? s.diagnosticNote : s.metricsHelp}
-        </InfoHelp>
-      </div>
       <details
         data-testid="video-results-sources"
-        className="text-xs"
+        className="group/sources text-xs"
         onToggle={(event) =>
           track('video_results_sources_toggled', { enabled: event.currentTarget.open })
         }
       >
-        <summary className="cursor-pointer" tabIndex={0}>
+        <summary
+          className="flex w-fit cursor-pointer list-none items-center gap-1.5 text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden"
+          tabIndex={0}
+        >
+          <ChevronRight
+            aria-hidden="true"
+            className="size-3.5 transition-transform group-open/sources:rotate-90"
+          />
           {s.sources}
         </summary>
         <div data-testid="video-results-prompt" className="mt-3 space-y-1">
@@ -1027,25 +1042,22 @@ function SynchronizedClips({
             {progress(Math.round(buffered * 100))}
           </span>
         )}
-        <div role="group" aria-label={s.view} className="inline-flex gap-1 rounded-lg border p-1">
-          {(['clip', 'difference'] as const).map((mode) => (
-            <Button
-              key={mode}
-              data-testid="video-results-view"
-              data-view={mode}
-              variant={view === mode ? 'secondary' : 'ghost'}
-              size="sm"
-              aria-pressed={view === mode}
-              onClick={() => {
-                track('video_results_clips_view', { view: mode });
-                setDifferenceErrors(new Set());
-                setView(mode);
-              }}
-            >
-              {s[mode]}
-            </Button>
-          ))}
-        </div>
+        <SegmentedToggle
+          role="group"
+          ariaLabel={s.view}
+          value={view}
+          size="sm"
+          options={(['clip', 'difference'] as const).map((mode) => ({
+            value: mode,
+            label: s[mode],
+            testId: `video-results-view-${mode}`,
+          }))}
+          onValueChange={(mode) => {
+            track('video_results_clips_view', { view: mode });
+            setDifferenceErrors(new Set());
+            setView(mode);
+          }}
+        />
       </div>
       {view === 'difference' && (
         <div className="flex items-center gap-1 text-xs text-muted-foreground">

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 
 import { isFeatureGatedModelPath } from '@/lib/routing/model-feature-visibility';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 /** Presentation guard, not authorization. API and artifact access remain unchanged. */
 export function ModelFeatureBoundary({ children }: { children: ReactNode }) {
@@ -18,8 +19,8 @@ export function ModelFeatureBoundary({ children }: { children: ReactNode }) {
     if (ready && blocked) {
       router.replace(
         pathname?.startsWith('/zh/')
-          ? '/zh/inference/deepseek-v41-flash'
-          : '/inference/deepseek-v41-flash',
+          ? `/zh${getDashboardRoute('inference').path}/deepseek-v41-flash`
+          : `${getDashboardRoute('inference').path}/deepseek-v41-flash`,
       );
     }
   }, [ready, blocked, pathname, router]);

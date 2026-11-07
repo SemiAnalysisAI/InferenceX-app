@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 
 import { ChartHover, type HoverItem } from './chart-hover';
 import { ChartEmpty, PERCENTILE_COLORS } from './chart-shared';
+import { niceAxis } from './time-series-math';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 export type PercentileKey = 'mean' | 'p50' | 'p75' | 'p90' | 'p95' | 'p99';
@@ -59,9 +60,11 @@ export function AggregateChart({
   const fmt = (v: number) =>
     yFmt
       ? yFmt(v)
-      : v >= 10000
+      : v >= 1000
         ? new Intl.NumberFormat('en-US').format(Math.round(v))
-        : v.toFixed(v < 10 ? 2 : 0);
+        : v < 10
+          ? String(Number(v.toFixed(2)))
+          : v.toFixed(0);
 
   const computed = useMemo(() => {
     if (points.length === 0) return null;
@@ -72,22 +75,22 @@ export function AggregateChart({
         if (typeof v === 'number' && Number.isFinite(v) && v > yMaxComputed) yMaxComputed = v;
       }
     }
-    const yTop = yMax ?? (yMaxComputed === 0 ? 1 : yMaxComputed * 1.05);
+    const axis = yMax
+      ? { top: yMax, ticks: Array.from({ length: 5 }, (_, i) => (yMax * i) / 4) }
+      : niceAxis(yMaxComputed);
     const innerW = W - PAD.left - PAD.right;
     const innerH = H - PAD.top - PAD.bottom;
-    return { yTop, innerW, innerH };
+    return { yTop: axis.top, yTicks: axis.ticks, innerW, innerH };
   }, [points, W, H, yMax, percentileLines]);
 
   if (!computed) {
     return <ChartEmpty width={W} height={H} />;
   }
-  const { yTop, innerW, innerH } = computed;
+  const { yTop, yTicks, innerW, innerH } = computed;
 
   const xOf = (i: number) =>
     points.length === 1 ? PAD.left + innerW / 2 : PAD.left + (i / (points.length - 1)) * innerW;
   const yOf = (v: number) => PAD.top + (1 - v / yTop) * innerH;
-
-  const yTicks = Array.from({ length: 5 }, (_, i) => (yTop * i) / 4);
 
   const resolve = (fraction: number) => {
     const idx = Math.round(fraction * (points.length - 1));
@@ -128,14 +131,14 @@ export function AggregateChart({
                 y1={y}
                 y2={y}
                 stroke="currentColor"
-                opacity={0.08}
+                opacity={0.12}
               />
               <text
                 x={PAD.left - 8}
                 y={y + 3}
                 fontSize={10}
                 fill="currentColor"
-                opacity={0.55}
+                opacity={0.7}
                 textAnchor="end"
               >
                 {fmt(v)}

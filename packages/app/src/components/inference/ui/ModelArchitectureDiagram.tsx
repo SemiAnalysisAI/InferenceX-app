@@ -11,7 +11,6 @@ import { useLocale } from '@/lib/i18n/use-locale';
 
 import { getModelReleaseDate } from '@semianalysisai/inferencex-constants';
 
-import { Badge } from '@/components/ui/badge';
 import type { Model } from '@/lib/catalog/data-mappings';
 import {
   type ModelArchitecture,
@@ -31,6 +30,17 @@ interface ArchitectureContentProps {
   arch: ModelArchitecture;
   isExpanded: boolean;
   locale: Locale;
+  /** Drawer content sits inside a bordered panel and needs its own inset. */
+  inset: boolean;
+}
+
+/** Quiet one-line summary next to the heading, e.g. `MoE · GQA · 816B`. */
+function architectureSummary(arch: ModelArchitecture): string {
+  return [
+    arch.architectureType === 'moe' ? 'MoE' : 'Dense',
+    arch.attentionType === 'AlternatingSinkGQA' ? 'Sink/Full GQA' : arch.attentionType,
+    formatParamCount(arch.totalParams),
+  ].join(' · ');
 }
 
 interface DiagramRenderState {
@@ -44,7 +54,7 @@ interface DiagramRenderState {
 
 const ARCHITECTURE_STRINGS = {
   en: {
-    heading: 'Model Architecture',
+    heading: 'Model architecture',
     features: 'Features:',
     source: 'Source',
     releasedBy: 'Released by',
@@ -79,7 +89,7 @@ const ARCHITECTURE_STRINGS = {
   },
 } as const;
 
-function ArchitectureContent({ model, arch, isExpanded, locale }: ArchitectureContentProps) {
+function ArchitectureContent({ model, arch, isExpanded, locale, inset }: ArchitectureContentProps) {
   const t = ARCHITECTURE_STRINGS[locale];
   const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set());
   const svgRef = useRef<SVGSVGElement>(null);
@@ -158,76 +168,79 @@ function ArchitectureContent({ model, arch, isExpanded, locale }: ArchitectureCo
   return (
     <div
       id="architecture-content"
-      className={`overflow-hidden transition-all duration-200 ease-in-out ${
-        isExpanded ? 'max-h-[4000px] opacity-100' : 'max-h-0 opacity-0'
+      className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
+        isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
       }`}
     >
-      <div ref={containerRef} className="px-4 pb-4">
-        <svg
-          ref={svgRef}
-          className="w-full"
-          height={reservedHeight ?? undefined}
-          data-testid="model-architecture-svg"
-        />
-        {arch.advertisedContextWindow && arch.contextWindow && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            {t.contextNote(arch.advertisedContextWindow, arch.contextWindow)}
-          </p>
-        )}
-        {arch.residualType === 'AttnRes' && (
-          <p className="mt-2 text-xs text-muted-foreground">{t.latentNote}</p>
-        )}
-        {arch.routedExpertHiddenSize && arch.hiddenSize && arch.residualType !== 'AttnRes' && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            {t.pooledNote(arch.routedExpertHiddenSize, arch.hiddenSize)}
-          </p>
-        )}
-        {arch.attentionType === 'Hybrid' &&
-          arch.alternatingAttentionExpandable !== false &&
-          [0, 1].some(
-            (i) => expandedBlocks.has(`altBlock${i}`) && expandedBlocks.has(`altAttention${i}`),
-          ) && (
-            <p
-              className="mt-2 text-2xs leading-snug text-muted-foreground"
-              data-testid="hybrid-attention-note"
-            >
-              <span className="font-medium text-foreground">Local</span>{' '}
-              {locale === 'zh' ? '与' : 'and'}{' '}
-              <span className="font-medium text-foreground">Compressed</span> {t.hybrid}
+      <div className="min-h-0 overflow-hidden">
+        <div ref={containerRef} className={inset ? 'px-4 pb-4' : undefined}>
+          <svg
+            ref={svgRef}
+            className="w-full"
+            height={reservedHeight ?? undefined}
+            data-testid="model-architecture-svg"
+          />
+          {arch.advertisedContextWindow && arch.contextWindow && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {t.contextNote(arch.advertisedContextWindow, arch.contextWindow)}
             </p>
           )}
-        {(arch.hyperConnections ?? 0) > 1 &&
-          ['altBlock0', 'altBlock1', 'hashBlock', 'transformer', 'denseTransformer'].some((id) =>
-            expandedBlocks.has(id),
-          ) && (
-            <p className="mt-2 text-2xs leading-snug text-muted-foreground" data-testid="mhc-note">
-              <span className="font-medium text-foreground">
-                Hyper-Connections (mHC ×{arch.hyperConnections})
-              </span>{' '}
-              {t.mhc(arch.hyperConnections ?? 0)}
+          {arch.residualType === 'AttnRes' && (
+            <p className="mt-2 text-xs text-muted-foreground">{t.latentNote}</p>
+          )}
+          {arch.routedExpertHiddenSize && arch.hiddenSize && arch.residualType !== 'AttnRes' && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {t.pooledNote(arch.routedExpertHiddenSize, arch.hiddenSize)}
             </p>
           )}
-        {((arch.features?.length ?? 0) > 0 || arch.sourceUrl) && (
-          <div className="mt-3 pt-3 border-t border-border/50">
-            <div className="flex flex-wrap gap-1.5 items-center">
+          {arch.attentionType === 'Hybrid' &&
+            arch.alternatingAttentionExpandable !== false &&
+            [0, 1].some(
+              (i) => expandedBlocks.has(`altBlock${i}`) && expandedBlocks.has(`altAttention${i}`),
+            ) && (
+              <p
+                className="mt-2 text-2xs leading-snug text-muted-foreground"
+                data-testid="hybrid-attention-note"
+              >
+                <span className="font-medium text-foreground">Local</span>{' '}
+                {locale === 'zh' ? '与' : 'and'}{' '}
+                <span className="font-medium text-foreground">Compressed</span> {t.hybrid}
+              </p>
+            )}
+          {(arch.hyperConnections ?? 0) > 1 &&
+            ['altBlock0', 'altBlock1', 'hashBlock', 'transformer', 'denseTransformer'].some((id) =>
+              expandedBlocks.has(id),
+            ) && (
+              <p
+                className="mt-2 text-2xs leading-snug text-muted-foreground"
+                data-testid="mhc-note"
+              >
+                <span className="font-medium text-foreground">
+                  Hyper-Connections (mHC ×{arch.hyperConnections})
+                </span>{' '}
+                {t.mhc(arch.hyperConnections ?? 0)}
+              </p>
+            )}
+          {((arch.features?.length ?? 0) > 0 || arch.sourceUrl) && (
+            <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-border/30 pt-3 text-xs text-muted-foreground">
               {(arch.features?.length ?? 0) > 0 && (
-                <span className="text-xs text-muted-foreground mr-1">{t.features}</span>
+                <p className="min-w-0 flex-1">
+                  {t.features}{' '}
+                  <span className="text-foreground">
+                    {arch.features
+                      ?.map((feature, index) =>
+                        locale === 'zh' ? (arch.featuresZh?.[index] ?? feature) : feature,
+                      )
+                      .join(' · ')}
+                  </span>
+                </p>
               )}
-              {arch.features?.map((feature, index) => (
-                <Badge
-                  key={feature}
-                  variant="secondary"
-                  className="text-xs py-0 max-w-full whitespace-normal text-left"
-                >
-                  {locale === 'zh' ? (arch.featuresZh?.[index] ?? feature) : feature}
-                </Badge>
-              ))}
               {arch.sourceUrl && (
                 <Link
                   href={arch.sourceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5 ml-auto"
+                  className="ml-auto flex items-center gap-0.5 hover:text-foreground"
                   onClick={() =>
                     track('model_architecture_source_clicked', { url: arch.sourceUrl! })
                   }
@@ -236,21 +249,21 @@ function ArchitectureContent({ model, arch, isExpanded, locale }: ArchitectureCo
                 </Link>
               )}
             </div>
-          </div>
-        )}
-        {arch.developer && releaseDate && (
-          <p className="text-xs text-muted-foreground mt-2">
-            {t.releasedBy} {arch.developer}
-            {t.releasedOn}{' '}
-            {new Date(releaseDate).toLocaleDateString(locale === 'zh' ? 'zh-CN' : 'en-US', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-              // Dates are UTC calendar days; formatting in UTC matches the server render.
-              timeZone: 'UTC',
-            })}
-          </p>
-        )}
+          )}
+          {arch.developer && releaseDate && (
+            <p className="text-xs text-muted-foreground mt-2">
+              {t.releasedBy} {arch.developer}
+              {t.releasedOn}{' '}
+              {new Date(releaseDate).toLocaleDateString(locale === 'zh' ? 'zh-CN' : 'en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                // Dates are UTC calendar days; formatting in UTC matches the server render.
+                timeZone: 'UTC',
+              })}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -270,23 +283,21 @@ export default function ModelArchitectureDiagram({
 
   if (variant === 'inline') {
     return (
-      <div
-        className={`rounded-lg border border-border/50 bg-muted/30 overflow-hidden ${className}`}
-        data-testid="model-architecture-inline"
-      >
-        <div className="px-4 py-2 flex items-center gap-2">
+      <div className={className} data-testid="model-architecture-inline">
+        <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="text-sm font-medium">{t.heading}</span>
-          <Badge variant="outline" className="text-xs py-0">
-            {arch.architectureType === 'moe' ? 'MoE' : 'Dense'}
-          </Badge>
-          <Badge variant="outline" className="text-xs py-0">
-            {arch.attentionType === 'AlternatingSinkGQA' ? 'Sink/Full GQA' : arch.attentionType}
-          </Badge>
-          <Badge variant="outline" className="text-xs py-0">
-            {formatParamCount(arch.totalParams)}
-          </Badge>
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {architectureSummary(arch)}
+          </span>
         </div>
-        <ArchitectureContent key={model} model={model} arch={arch} isExpanded locale={locale} />
+        <ArchitectureContent
+          key={model}
+          model={model}
+          arch={arch}
+          isExpanded
+          locale={locale}
+          inset={false}
+        />
       </div>
     );
   }
@@ -298,9 +309,7 @@ export default function ModelArchitectureDiagram({
   };
 
   return (
-    <div
-      className={`rounded-lg border border-border/50 bg-muted/30 overflow-hidden transition-all ${className}`}
-    >
+    <div className={`overflow-hidden rounded-xl border border-border/30 ${className}`}>
       <button
         type="button"
         onClick={handleToggle}
@@ -322,15 +331,9 @@ export default function ModelArchitectureDiagram({
             <line x1="9" y1="9" x2="9" y2="21" />
           </svg>
           <span className="text-sm font-medium">{t.heading}</span>
-          <Badge variant="outline" className="text-xs py-0">
-            {arch.architectureType === 'moe' ? 'MoE' : 'Dense'}
-          </Badge>
-          <Badge variant="outline" className="text-xs py-0">
-            {arch.attentionType === 'AlternatingSinkGQA' ? 'Sink/Full GQA' : arch.attentionType}
-          </Badge>
-          <Badge variant="outline" className="text-xs py-0">
-            {formatParamCount(arch.totalParams)}
-          </Badge>
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {architectureSummary(arch)}
+          </span>
         </div>
         {isExpanded ? (
           <ChevronUp className="size-4 shrink-0 text-muted-foreground" />
@@ -344,6 +347,7 @@ export default function ModelArchitectureDiagram({
         arch={arch}
         isExpanded={isExpanded}
         locale={locale}
+        inset
       />
     </div>
   );

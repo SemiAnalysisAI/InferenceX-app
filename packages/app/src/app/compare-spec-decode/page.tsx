@@ -1,14 +1,22 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { enAlternates } from '@/lib/i18n/i18n';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 
+import {
+  CompareCatalogLink,
+  CompareCatalogLinks,
+  CompareModelSection,
+  ComparePairGrid,
+} from '@/components/compare/compare-catalog';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
+import { ModelLogo } from '@/components/ui/model-logo';
+import { type Model } from '@/lib/catalog/data-mappings';
 import {
   getSpecDecodePairsByModelSlug,
   type SpecDecodePair,
@@ -79,35 +87,21 @@ export default async function CompareSpecDecodeIndexPage() {
       <JsonLd data={jsonLd} />
       <section>
         <Card>
-          <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">
-            Chip Speculative Decoding Comparisons
-          </h1>
-          <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
+          <Heading as="h1" level="page">
+            Chip speculative decoding comparisons
+          </Heading>
+          <p className="mt-4 max-w-3xl text-base text-muted-foreground">
             {totalUrls.toLocaleString()} speculative decoding comparisons across{' '}
             {formatModelList(modelsWithPairs)}. Each page compares inference with the speculative
-            decoding method (MTP, EAGLE, etc.) enabled versus disabled on the same model and chip —
-            throughput, cost, and interactivity at matched operating points.
+            decoding method (MTP, EAGLE and others) enabled versus disabled on the same model and
+            chip, covering throughput, cost and interactivity at matched operating points.
           </p>
-          <div className="mt-6 flex flex-wrap gap-3" data-testid="compare-spec-decode-index-links">
-            <Link
-              href="/compare"
-              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
-            >
-              Chip comparisons
-              <span aria-hidden="true" className="text-lg lg:text-xl">
-                →
-              </span>
-            </Link>
-            <Link
-              href="/compare-per-dollar"
-              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
-            >
+          <CompareCatalogLinks testId="compare-spec-decode-index-links">
+            <CompareCatalogLink href="/compare">Chip comparisons</CompareCatalogLink>
+            <CompareCatalogLink href="/compare-per-dollar">
               Performance per dollar
-              <span aria-hidden="true" className="text-lg lg:text-xl">
-                →
-              </span>
-            </Link>
-          </div>
+            </CompareCatalogLink>
+          </CompareCatalogLinks>
         </Card>
       </section>
 
@@ -115,28 +109,29 @@ export default async function CompareSpecDecodeIndexPage() {
         const pairs = pairsByModel.get(model.slug) ?? [];
         const cards = buildCards(model, pairs);
         return (
-          <section key={model.slug} id={model.slug}>
-            <Card className="flex flex-col gap-4">
-              <div>
-                <h2 className="text-xl lg:text-2xl font-bold tracking-tight">{model.label}</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {pairs.length} speculative decoding comparison{pairs.length === 1 ? '' : 's'} with
-                  benchmark data on {model.label}.
-                </p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {cards.map(({ slug, label, archLine }) => (
-                  <ComparePairCardLink
-                    key={slug}
-                    href={`/compare-spec-decode/${slug}`}
-                    slug={slug}
-                    label={label}
-                    archLine={archLine}
-                  />
-                ))}
-              </div>
-            </Card>
-          </section>
+          <CompareModelSection
+            key={model.slug}
+            id={model.slug}
+            title={
+              <>
+                <ModelLogo model={model.displayName as Model} className="size-6" />
+                {model.label}
+              </>
+            }
+            summary={`${pairs.length} speculative decoding comparison${pairs.length === 1 ? '' : 's'} with benchmark data on ${model.label}`}
+          >
+            <ComparePairGrid>
+              {cards.map(({ slug, label, archLine }) => (
+                <ComparePairCardLink
+                  key={slug}
+                  href={`/compare-spec-decode/${slug}`}
+                  slug={slug}
+                  label={label}
+                  archLine={archLine}
+                />
+              ))}
+            </ComparePairGrid>
+          </CompareModelSection>
         );
       })}
     </>

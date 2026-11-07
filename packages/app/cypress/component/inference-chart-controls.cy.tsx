@@ -14,7 +14,7 @@ function CostControls({ showTcoBasis = false }: { showTcoBasis?: boolean }) {
       <InferenceChartControls showXAxisMode />
       <ResultContext
         locale="en"
-        costTier="Owning at Large Hyperscaler Volume"
+        costTier="Owning at large hyperscaler volume"
         tcoBasis={
           <TcoBasisCaption
             hardwareKeys={new Set(showTcoBasis ? ['tpuv7_vllm'] : ['b200_sglang'])}
@@ -76,13 +76,13 @@ describe('Inference ChartControls', () => {
       expect(
         labels.filter((label) => label.startsWith('Cost per Million Total Tokens')),
       ).to.deep.equal(['Cost per Million Total Tokens']);
-      expect(labels.filter((label) => label.includes('(Custom User Values)'))).to.deep.equal([
-        'Token Throughput per All in Utility MW (Custom User Values)',
+      expect(labels.filter((label) => label.includes('(Custom user values)'))).to.deep.equal([
+        'Token Throughput per All in Utility MW (Custom user values)',
       ]);
-      expect(labels.some((label) => label.includes('Owning at Large Hyperscaler Volume'))).to.equal(
+      expect(labels.some((label) => label.includes('Owning at large hyperscaler volume'))).to.equal(
         false,
       );
-      expect(labels.some((label) => label.includes('Rent - 3 Year Commit'))).to.equal(false);
+      expect(labels.some((label) => label.includes('Rent – 3-year commit'))).to.equal(false);
     });
     cy.get('[data-testid="locked-tier-badge"]').should('not.exist');
   });
@@ -95,19 +95,19 @@ describe('Inference ChartControls', () => {
     cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_costh');
   });
 
-  it('uses a full-width benchmark row above chart and history controls on desktop', () => {
+  it('gives benchmark config its own row above chart config and compare history on desktop', () => {
     cy.viewport(1280, 900);
     cy.get('fieldset').should('have.length', 3);
     cy.get('fieldset').then(($groups) => {
-      const rects = [...$groups].map((group) => group.getBoundingClientRect());
-      expect(rects[1].top).to.be.greaterThan(rects[0].bottom);
-      expect(rects[2].top).to.be.closeTo(rects[1].top, 1);
-      expect(rects[0].left).to.equal(rects[1].left);
-      expect(rects[0].right).to.equal(rects[2].right);
-      expect(rects[1].width, 'axes get more space than the history picker').to.be.greaterThan(
-        rects[2].width,
+      const [benchmark, chart, history] = [...$groups].map((group) =>
+        group.getBoundingClientRect(),
       );
-      expect(rects[0].height, 'benchmark controls fit in a single row').to.be.lessThan(130);
+      expect(chart.top).to.be.greaterThan(benchmark.bottom);
+      expect(chart.left).to.be.closeTo(benchmark.left, 1);
+      expect(history.top).to.be.closeTo(chart.top, 1);
+      expect(chart.right).to.be.lessThan(history.left);
+      expect(history.right).to.be.closeTo(benchmark.right, 1);
+      expect(benchmark.height, 'benchmark controls fit in a single row').to.be.lessThan(130);
     });
     cy.get('#model-select').then(($model) => {
       const model = $model[0].getBoundingClientRect();
@@ -163,21 +163,23 @@ describe('Inference ChartControls', () => {
         expect(y.top).to.be.greaterThan(x.bottom);
         expect(x.height).to.equal(44);
         expect(y.height).to.equal(x.height);
-        expect(x.width).to.be.at.most(176);
         expect(x.width).to.be.lessThan(y.width);
       });
     });
-    cy.get('#scenario-select').then(($scenario) => {
-      const scenario = $scenario[0].getBoundingClientRect();
-      cy.get('#precision-select').should(($precision) => {
-        const precision = $precision[0].getBoundingClientRect();
-        expect(precision.top).to.be.closeTo(scenario.top, 1);
-        expect(precision.left).to.be.greaterThan(scenario.right);
-      });
+    cy.get('#model-select').then(($model) => {
+      const model = $model[0].getBoundingClientRect();
+      cy.get('fieldset')
+        .first()
+        .find('#precision-select')
+        .should(($precision) => {
+          const precision = $precision[0].getBoundingClientRect();
+          expect(precision.top).to.be.greaterThan(model.bottom);
+          expect(precision.left).to.be.closeTo(model.left, 1);
+        });
     });
   });
 
-  it('keeps benchmark and chart settings in one row when history comparison is omitted', () => {
+  it('gives benchmark and chart settings full-width rows when history comparison is omitted', () => {
     cy.viewport(1280, 900);
     mountWithProviders(<InferenceChartControls hideGpuComparison />, {
       inference: {},
@@ -189,18 +191,16 @@ describe('Inference ChartControls', () => {
       .then(($groups) => {
         const benchmark = $groups[0].getBoundingClientRect();
         const chart = $groups[1].getBoundingClientRect();
-        expect(benchmark.top).to.equal(chart.top);
-        expect(benchmark.width).to.be.greaterThan(chart.width);
-        expect(benchmark.right).to.be.lessThan(chart.left);
+        expect(chart.top).to.be.greaterThan(benchmark.bottom);
+        expect(chart.left).to.be.closeTo(benchmark.left, 1);
+        expect(chart.right).to.be.closeTo(benchmark.right, 1);
         expect(benchmark.height, 'benchmark controls fit in a single row').to.be.lessThan(130);
       });
     cy.get('#model-select').then(($model) => {
       const model = $model[0].getBoundingClientRect();
-      cy.get('#scenario-select, #precision-select, [data-testid="yaxis-metric-selector"]').each(
-        ($control) => {
-          expect($control[0].getBoundingClientRect().top).to.be.closeTo(model.top, 1);
-        },
-      );
+      cy.get('#scenario-select, #precision-select').each(($control) => {
+        expect($control[0].getBoundingClientRect().top).to.be.closeTo(model.top, 1);
+      });
     });
   });
 
@@ -210,7 +210,7 @@ describe('Inference ChartControls', () => {
 
     cy.get('#model-select').should('be.visible');
     cy.get('#scenario-select').should('have.length', 1).and('not.be.visible');
-    cy.get('#precision-select').should('have.length', 1).and('not.be.visible');
+    cy.get('#precision-select').should('have.length', 1).and('be.visible');
     cy.get('[data-testid="inference-secondary-controls"] > button')
       .should('have.attr', 'aria-expanded', 'false')
       .click()
@@ -218,7 +218,7 @@ describe('Inference ChartControls', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
     cy.get('[data-testid="inference-secondary-controls"]').within(() => {
       cy.get('#scenario-select').should('be.visible');
-      cy.get('#precision-select').should('be.visible');
+      cy.get('#precision-select').should('not.exist');
     });
 
     cy.get('[data-testid="inference-secondary-controls"] > button')
@@ -226,7 +226,7 @@ describe('Inference ChartControls', () => {
       .should('have.attr', 'aria-expanded', 'false');
     cy.get('[data-testid="yaxis-metric-selector"]').should('not.be.visible');
     cy.get('#scenario-select').should('not.be.visible');
-    cy.get('#precision-select').should('not.be.visible');
+    cy.get('#precision-select').should('be.visible');
     cy.get('#model-select').should('contain.text', 'DeepSeek R1 0528');
   });
 
@@ -241,7 +241,7 @@ describe('Inference ChartControls', () => {
   it('localizes the mobile secondary changed-count label', () => {
     cy.viewport(390, 844);
     mountWithProviders(
-      <PathnameContext.Provider value="/zh/inference">
+      <PathnameContext.Provider value="/zh/infx/inference">
         <InferenceChartControls showXAxisMode />
       </PathnameContext.Provider>,
       { inference: {}, unofficial: {} },
@@ -425,7 +425,7 @@ describe('Inference ChartControls with GPUs selected', () => {
       },
     });
 
-    cy.contains('Comparison Date Range').should('be.visible');
+    cy.contains('Comparison date range').should('be.visible');
   });
 
   it('leaves the optional date range unflagged for a selected current config', () => {
@@ -473,7 +473,7 @@ describe('Inference axis selector — Chinese Agentic controls', () => {
   it('keeps every full option name and a localized FAQ link on phones', () => {
     cy.viewport(390, 844);
     mountWithProviders(
-      <PathnameContext.Provider value="/zh/inference">
+      <PathnameContext.Provider value="/zh/infx/inference">
         <InferenceChartControls showXAxisMode />
       </PathnameContext.Provider>,
       {
@@ -537,26 +537,11 @@ describe('Axis option help', () => {
     cy.get('@selectMetric').should('not.have.been.called');
   });
 
-  it('shows selected-value help inside #y-axis-select without opening its menu', () => {
-    cy.get('#y-axis-select').then(($trigger) => {
-      const bounds = $trigger[0].getBoundingClientRect();
-      cy.get('[data-testid="selected-option-help-y_tpPerGpu"]')
-        .should(($help) => {
-          const icon = $help.find('svg')[0].getBoundingClientRect();
-          expect(icon.left).to.be.greaterThan(bounds.left);
-          expect(icon.right).to.be.lessThan(bounds.right);
-          expect(icon.top).to.be.greaterThan(bounds.top);
-          expect(icon.bottom).to.be.lessThan(bounds.bottom);
-          expect($help[0].closest('button[role="combobox"]')).to.equal(null);
-        })
-        .trigger('pointerover', { pointerType: 'mouse' });
+  it('keeps metric help in the open #y-axis-select menu, not the closed control', () => {
+    cy.get('#y-axis-select').should(($trigger) => {
+      expect($trigger[0].parentElement!.querySelector('[data-slot="info-help"]')).to.equal(null);
     });
-    cy.get('[data-testid="selected-option-help-content-y_tpPerGpu"]')
-      .should('be.visible')
-      .and('contain.text', 'Rate of total tokens');
-    cy.get('#y-axis-select').should('have.attr', 'aria-expanded', 'false');
     cy.get('#y-axis-select').click('right');
-    cy.get('[data-testid="selected-option-help-y_tpPerGpu"]').should('not.exist');
     cy.get('[data-testid="option-help-y_tpPerGpu"]')
       .should('be.visible')
       .trigger('pointerover', { pointerType: 'mouse' });
@@ -564,16 +549,6 @@ describe('Axis option help', () => {
       .should('be.visible')
       .and('contain.text', 'Rate of total tokens');
     cy.get('#y-axis-select').should('have.attr', 'aria-expanded', 'true');
-  });
-
-  it('keeps selected-value help open when activating its focused button in #y-axis-select', () => {
-    cy.get('[data-testid="selected-option-help-y_tpPerGpu"]').focus().click();
-    cy.get('[data-testid="selected-option-help-content-y_tpPerGpu"]')
-      .should('be.visible')
-      .and('contain.text', 'Rate of total tokens');
-    cy.get('#y-axis-select').should('have.attr', 'aria-expanded', 'false');
-    cy.get('[data-testid="selected-option-help-y_tpPerGpu"]').type('{esc}');
-    cy.get('[data-testid="selected-option-help-content-y_tpPerGpu"]').should('not.exist');
   });
 
   it('keeps hover help readable across the pointer gap without taking search focus', () => {
@@ -754,7 +729,9 @@ describe('Workflow run dropdown', () => {
     it(`folds run context into mobile controls without duplicating desktop controls (${locale})`, () => {
       cy.viewport(375, 812);
       mountWithProviders(
-        <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+        <PathnameContext.Provider
+          value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+        >
           <InferenceChartControls showXAxisMode runContext={<WorkflowInfoDisplay />} />
         </PathnameContext.Provider>,
         { inference: { availableRuns }, globalFilters: {}, unofficial: {} },
@@ -798,7 +775,7 @@ describe('Workflow run dropdown', () => {
       cy.viewport(375, 812);
       cy.get('[data-testid="inference-run-context"]').should('not.be.visible');
       cy.get('#scenario-select').should('have.length', 1).and('not.be.visible');
-      cy.get('#precision-select').should('have.length', 1).and('not.be.visible');
+      cy.get('#precision-select').should('have.length', 1).and('be.visible');
     });
   }
 
@@ -833,7 +810,9 @@ describe('Workflow run dropdown', () => {
     it(`lays the run context out as aligned, equal-height stepper rows on a 361px phone (${locale})`, () => {
       cy.viewport(361, 780);
       mountWithProviders(
-        <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+        <PathnameContext.Provider
+          value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+        >
           <WorkflowInfoDisplay />
         </PathnameContext.Provider>,
         { inference: { availableRuns }, globalFilters: {} },

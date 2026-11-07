@@ -44,12 +44,7 @@ export function HardwareHeroLinks({
           </Link>
         );
         return primary ? (
-          <Button
-            key={link.href}
-            asChild
-            size="lg"
-            className="bg-brand text-primary-foreground hover:bg-brand/90"
-          >
+          <Button key={link.href} asChild size="lg" variant="brand">
             {anchor}
           </Button>
         ) : (
@@ -64,7 +59,7 @@ export function HardwareIndexLink({ href, label }: { href: string; label: string
   return (
     <Link
       href={href}
-      className="font-medium text-brand hover:underline"
+      className="font-medium text-foreground hover:underline"
       onClick={() => track('hardware_back_clicked')}
     >
       {label}
@@ -84,7 +79,7 @@ export function HardwareCardLink({
   return (
     <Link
       href={href}
-      className="focus-visible:outline-none before:absolute before:inset-0 before:rounded-2xl before:content-['']"
+      className="focus-visible:outline-none before:absolute before:inset-0 before:rounded-xl before:content-['']"
       onClick={() => track('hardware_card_clicked', { slug, title })}
     >
       {title}

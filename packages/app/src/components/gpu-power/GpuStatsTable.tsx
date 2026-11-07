@@ -82,13 +82,13 @@ const GpuStatsTable = React.memo(({ data, metricKey, storedStats }: GpuStatsTabl
           : 'Full-record statistics include startup and warmup; the selected chart window does not change this table.'}
       </p>
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="w-full text-xs tabular-nums">
           <thead>
-            <tr className="border-b">
+            <tr className="border-b border-border/30">
               {cols.map((c) => (
                 <th
                   key={c.key}
-                  className="px-2 py-1.5 text-left font-medium text-muted-foreground"
+                  className={`px-2 py-1.5 font-medium whitespace-nowrap text-muted-foreground ${c.key === 'gpuIndex' ? 'text-left' : 'text-right'}`}
                   aria-sort={sortCol === c.key ? (sortAsc ? 'ascending' : 'descending') : 'none'}
                 >
                   <button
@@ -106,18 +106,18 @@ const GpuStatsTable = React.memo(({ data, metricKey, storedStats }: GpuStatsTabl
           </thead>
           <tbody>
             {sorted.map((s) => (
-              <tr key={s.gpuIndex} className="border-b border-border/50 hover:bg-muted/50">
+              <tr key={s.gpuIndex} className="border-b border-border/30 hover:bg-muted/40">
                 <td className="px-2 py-1 font-medium">{s.gpuIndex}</td>
-                <td className="px-2 py-1">
+                <td className="px-2 py-1 text-right">
                   {locale === 'zh' ? s.count.toLocaleString('zh-CN') : s.count.toLocaleString()}
                 </td>
-                <td className="px-2 py-1">{fmtStat(s.min)}</td>
-                <td className="px-2 py-1">{fmtStat(s.max)}</td>
-                <td className="px-2 py-1">{fmtStat(s.mean)}</td>
-                <td className="px-2 py-1">{fmtStat(s.median)}</td>
-                <td className="px-2 py-1">{fmtStat(s.p95)}</td>
-                <td className="px-2 py-1">{fmtStat(s.p99)}</td>
-                <td className="px-2 py-1">{fmtStat(s.stddev)}</td>
+                <td className="px-2 py-1 text-right">{fmtStat(s.min)}</td>
+                <td className="px-2 py-1 text-right">{fmtStat(s.max)}</td>
+                <td className="px-2 py-1 text-right">{fmtStat(s.mean)}</td>
+                <td className="px-2 py-1 text-right">{fmtStat(s.median)}</td>
+                <td className="px-2 py-1 text-right">{fmtStat(s.p95)}</td>
+                <td className="px-2 py-1 text-right">{fmtStat(s.p99)}</td>
+                <td className="px-2 py-1 text-right">{fmtStat(s.stddev)}</td>
               </tr>
             ))}
           </tbody>

@@ -3,6 +3,7 @@ import type { StagedChartScope } from '@semianalysisai/inferencex-db/queries/sta
 
 import { makeRunComparisonEntry } from '@/components/inference/utils/comparisonEntry';
 import { buildAvailabilityHwKey } from '@/lib/charts/chart-utils';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export interface StagedChartLink {
   label: string;
@@ -41,7 +42,7 @@ export function buildStagedChartLinks(
       i_xmode: 'interactivity',
       i_metric: 'y_tpPerGpu',
     });
-    const url = `${origin.replace(/\/+$/u, '')}/inference?${params}`;
+    const url = `${origin.replace(/\/+$/u, '')}${getDashboardRoute('inference').path}?${params}`;
     links.set(url, {
       label: `${model} · ${sequence} · ${scope.precision.toUpperCase()} · ${hardware} · ${scope.date}`,
       url,

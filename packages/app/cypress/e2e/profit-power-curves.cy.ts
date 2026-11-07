@@ -44,7 +44,7 @@ function setup() {
 function unlock(win: Cypress.AUTWindow) {
   win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
   win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-  win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
+  win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');
 }
 
 const chart = () => cy.get('[data-testid="profit-estimator-chart"]');
@@ -56,7 +56,7 @@ describe('Profit power-valid curves', { testIsolation: true }, () => {
     const width = 1280;
     cy.viewport(width, 900);
     let csv: Blob | undefined;
-    cy.visit('/profit-estimator-per-gigawatt?c_power=modeled', {
+    cy.visit('/infx/profit-estimator-per-gigawatt?c_power=modeled', {
       onBeforeLoad: (win) => {
         unlock(win);
         win.URL.createObjectURL = (blob) => {
@@ -104,7 +104,7 @@ describe('Profit power-valid curves', { testIsolation: true }, () => {
     setup();
     cy.viewport(1280, 900);
     cy.visit(
-      `/profit-estimator-per-gigawatt?c_power=compare&i_gpus=mi355x_vllm&i_dstart=${PROFIT_HISTORY_DATE}&i_dend=${PROFIT_HISTORY_DATE}`,
+      `/infx/profit-estimator-per-gigawatt?c_power=compare&i_gpus=mi355x_vllm&i_dstart=${PROFIT_HISTORY_DATE}&i_dend=${PROFIT_HISTORY_DATE}`,
       { onBeforeLoad: unlock },
     );
     cy.get('#profit-target').should('have.value', '60');

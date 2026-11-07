@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import type { KnownConfigIssue } from '@/lib/benchmarks/known-issues';
 import type { CustomLayerConfig, RenderContext } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
+import { chartFont, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
 
 interface AnnotationBase {
@@ -36,11 +37,13 @@ export interface AnnotationRenderOptions {
   mutedForeground: string;
   rightInset?: number;
   onLinkClick?: (annotation: KnownIssueAnnotation) => void;
+  /** Group that holds the arrows, so they sit below its line labels. Defaults to the annotation layer. */
+  arrowParent?: d3.Selection<SVGGElement, unknown, null, undefined>;
 }
 
 export type KnownIssueLayerOptions = Omit<
   AnnotationRenderOptions,
-  'width' | 'height' | 'xScale' | 'yScale' | 'rightInset'
+  'width' | 'height' | 'xScale' | 'yScale' | 'rightInset' | 'arrowParent'
 >;
 
 export function createKnownIssueLayer(
@@ -55,6 +58,7 @@ export function createKnownIssueLayer(
       height: ctx.height,
       xScale,
       yScale,
+      arrowParent: ctx.layout.zoomGroup,
       rightInset:
         options.annotations.length === 0
           ? 0
@@ -102,36 +106,22 @@ const SWATCH_SPACE = 14;
 const ARROW_STANDOFF = 9;
 const MIN_ARROW_LEN = 24;
 
-function measureTextWidth(node: SVGTextElement | null, chars: number, fontSize: number): number {
-  if (node && typeof node.getComputedTextLength === 'function') {
-    try {
-      const len = node.getComputedTextLength();
-      if (Number.isFinite(len) && len > 0) return len;
-    } catch {}
-  }
-  return chars * fontSize * 0.58;
-}
-
 function fitTextToWidth(
   target:
     | d3.Selection<SVGTextElement, unknown, null, undefined>
     | d3.Selection<SVGTSpanElement, unknown, null, undefined>,
   full: string,
   maxWidth: number,
-  fontSize: number,
-  measureNode?: d3.Selection<SVGTextElement, unknown, null, undefined>,
+  font: string,
 ): number {
-  const node = (
-    measureNode ?? (target as d3.Selection<SVGTextElement, unknown, null, undefined>)
-  ).node();
   let chars = full.length;
-  let width = measureTextWidth(node, chars, fontSize);
+  let width = measureTextWidth(full, font);
   while (chars > 1 && width > maxWidth) {
     const ratio = maxWidth / width;
     chars = Math.max(1, Math.min(chars - 1, Math.floor(chars * ratio)));
     const text = `${full.slice(0, chars).trimEnd()}…`;
     target.text(text);
-    width = measureTextWidth(node, text.length, fontSize);
+    width = measureTextWidth(text, font);
   }
   return Math.min(width, maxWidth);
 }
@@ -162,28 +152,45 @@ export function renderKnownIssueAnnotations(
   const { chartId, width, height, xScale, yScale, annotations } = opts;
 
   g.selectAll('.known-issue-annotations').remove();
+  opts.arrowParent?.selectAll('.known-issue-arrows').remove();
   defs.selectAll(`[id^="known-issue-arrowhead-${chartId}"]`).remove();
   if (annotations.length === 0) return;
 
   const layer = g.append('g').attr('class', 'known-issue-annotations');
-  const arrowGroup = layer.append('g').attr('class', 'known-issue-arrows');
+  const arrowGroup = (opts.arrowParent ?? layer)
+    .insert('g', '.line-label')
+    .attr('class', 'known-issue-arrows');
 
   let yCursor = BOX_TOP;
   annotations.forEach((annotation, index) => {
     const { issue, preview, label, color, points } = annotation;
     const markerId = `known-issue-arrowhead-${chartId}-${index}`;
-    defs
-      .append('marker')
-      .attr('id', markerId)
-      .attr('viewBox', '0 0 10 10')
-      .attr('refX', 8)
-      .attr('refY', 5)
-      .attr('markerWidth', 7)
-      .attr('markerHeight', 7)
-      .attr('orient', 'auto')
-      .append('path')
-      .attr('d', 'M 0 0 L 10 5 L 0 10 z')
-      .attr('fill', color);
+    const outlineMarkerId = `${markerId}-outline`;
+    for (const [id, isOutline] of [
+      [markerId, false],
+      [outlineMarkerId, true],
+    ] as const) {
+      const head = defs
+        .append('marker')
+        .attr('id', id)
+        .attr('viewBox', '0 0 10 10')
+        .attr('refX', 8)
+        .attr('refY', 5)
+        .attr('markerUnits', 'userSpaceOnUse')
+        .attr('markerWidth', 12.25)
+        .attr('markerHeight', 12.25)
+        .attr('orient', 'auto')
+        .style('overflow', 'visible')
+        .append('path')
+        .attr('d', 'M 0 0 L 10 5 L 0 10 z')
+        .attr('fill', isOutline ? 'var(--background)' : color);
+      if (isOutline) {
+        head
+          .attr('stroke', 'var(--background)')
+          .attr('stroke-width', 1.65)
+          .attr('stroke-linejoin', 'round');
+      }
+    }
 
     const anchor = layer
       .append(issue === undefined ? 'g' : 'a')
@@ -228,21 +235,19 @@ export function renderKnownIssueAnnotations(
 
     const boxRight = width - BOX_RIGHT_GAP - (opts.rightInset ?? 0);
     const maxTextW = Math.max(0, boxRight - 2 - PAD_X * 2);
-    let w1 = measureTextWidth(text1.node(), label.length, LINE1_SIZE) + SWATCH_SPACE;
+    const line1Font = chartFont(LINE1_SIZE, 600);
+    const line2Font = chartFont(LINE2_SIZE);
+    let w1 = measureTextWidth(label, line1Font) + SWATCH_SPACE;
     if (w1 > maxTextW) {
-      w1 = fitTextToWidth(text1, label, maxTextW - SWATCH_SPACE, LINE1_SIZE) + SWATCH_SPACE;
+      w1 = fitTextToWidth(text1, label, maxTextW - SWATCH_SPACE, line1Font) + SWATCH_SPACE;
     }
-    let w2 = measureTextWidth(
-      text2.node(),
-      detail.length + (issue?.issueRef.length ?? 0),
-      LINE2_SIZE,
-    );
+    let w2 = measureTextWidth(detail + (issue?.issueRef ?? ''), line2Font);
     if (w2 > maxTextW && issue === undefined) {
       const detailTspan = text2.select<SVGTSpanElement>('tspan');
       const summary = preview!.summary;
       detailTspan.text(summary);
-      w2 = measureTextWidth(text2.node(), summary.length, LINE2_SIZE);
-      if (w2 > maxTextW) w2 = fitTextToWidth(detailTspan, summary, maxTextW, LINE2_SIZE, text2);
+      w2 = measureTextWidth(summary, line2Font);
+      if (w2 > maxTextW) w2 = fitTextToWidth(detailTspan, summary, maxTextW, line2Font);
     }
     const boxW = Math.max(w1, w2) + PAD_X * 2;
     const boxH = PAD_Y * 2 + LINE1_H + LINE2_H;
@@ -291,10 +296,21 @@ export function renderKnownIssueAnnotations(
         const endY = target.py - (dy / len) * ARROW_STANDOFF;
         const midX = (startX + endX) / 2 + (dy > 0 ? -dx * 0.12 : dx * 0.12);
         const midY = (bottomY + endY) / 2;
+        const d = `M ${startX} ${bottomY + 2} Q ${midX} ${midY} ${endX} ${endY}`;
+        arrowGroup
+          .append('path')
+          .attr('class', 'known-issue-arrow-outline')
+          .attr('d', d)
+          .attr('fill', 'none')
+          .attr('stroke', 'var(--background)')
+          .attr('stroke-width', 3.75)
+          .attr('stroke-linecap', 'round')
+          .attr('marker-end', `url(#${outlineMarkerId})`)
+          .attr('pointer-events', 'none');
         arrowGroup
           .append('path')
           .attr('class', 'known-issue-arrow')
-          .attr('d', `M ${startX} ${bottomY + 2} Q ${midX} ${midY} ${endX} ${endY}`)
+          .attr('d', d)
           .attr('fill', 'none')
           .attr('stroke', color)
           .attr('stroke-width', 1.75)

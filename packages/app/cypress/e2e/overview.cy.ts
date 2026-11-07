@@ -3,14 +3,14 @@ import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-con
 const MODEL_LABELS = [
   'Muse Spark Open 816B',
   'DeepSeek V4.1 Flash 552B',
-  'Kimi K3.1 Pro',
+  'Kimi K3.1 Pro 2.8T',
   'MiniMax M3.1 Flash 428B',
   'GLM5.2/GLM5.3',
   'Qwen3.5 397B',
 ];
 
 const PLATFORM_HEADERS = [
-  'Model · Scenario',
+  'Model · scenario',
   'B200 · Reference',
   'MI355X',
   'B300',
@@ -21,18 +21,18 @@ const PLATFORM_HEADERS = [
 const SINGLE_TURN = 'single_turn_8k1k';
 const MATRIX_ROWS = 8;
 const AGENTX = 'agentx';
-const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
+const AGENTX_LABEL = 'Long-context multi-turn realistic agentic scenario (AgentX)';
 const AGENTX_SHORT = 'AgentX';
 
-const PAGE_TITLE = 'Agentic Inference Costs';
+const PAGE_TITLE = 'Agentic inference costs';
 const SOURCE_NOTE = `Source: InferenceX & ${TCO_SOURCE_TITLE}`;
 const SOURCE_NOTE_ZH = `来源：InferenceX 与 ${TCO_SOURCE_TITLE}`;
 const SCOPE_METRIC = 'Hyperscaler cost';
 const SCOPE_DIRECTION = '↓ Lower is better';
-const SCOPE_LINE = `${SCOPE_METRIC} · ${SCOPE_DIRECTION} · ${SOURCE_NOTE}`;
+const SCOPE_LINE = `${SCOPE_METRIC} · ${SCOPE_DIRECTION}`;
 const SCOPE_METRIC_ZH = '超大规模云厂商成本';
 const SCOPE_DIRECTION_ZH = '↓ 越低越好';
-const SCOPE_LINE_ZH = `${SCOPE_METRIC_ZH} · ${SCOPE_DIRECTION_ZH} · ${SOURCE_NOTE_ZH}`;
+const SCOPE_LINE_ZH = `${SCOPE_METRIC_ZH} · ${SCOPE_DIRECTION_ZH}`;
 const OVERVIEW_TIERS = [30, 50, 75, 100, 150, 200] as const;
 
 function selectOverviewTier(tier: (typeof OVERVIEW_TIERS)[number]) {
@@ -53,6 +53,11 @@ function selectOverviewTier(tier: (typeof OVERVIEW_TIERS)[number]) {
     slider.dispatchEvent(new view.Event('input', { bubbles: true }));
     expect(slider.dataset.tier, 'slider committed tier').to.eq(String(tier));
   });
+}
+
+function expectScope(line: string, sourceNote: string) {
+  cy.get('[data-testid="overview-scope"]').should('have.text', line);
+  cy.get('[data-testid="overview-source-link"]').parent().should('have.text', sourceNote);
 }
 
 function expectNoHorizontalOverflow() {
@@ -112,9 +117,23 @@ function mobileModel(model: string, scenario?: string) {
   return cy.get(`[data-testid="overview-mobile-model"][data-model="${model}"]${row}`);
 }
 
-function expectCellTint(hardware: string, expected: string) {
+function expectCellTint(hardware: string, token: '--success' | '--destructive', alpha: number) {
   platform(hardware).then(([cell]) => {
-    expect(getComputedStyle(cell.closest('td')!).backgroundColor).to.contain(expected);
+    const probe = cell.ownerDocument.createElement('span');
+    probe.style.backgroundColor = `oklch(from var(${token}) l c h)`;
+    cell.ownerDocument.body.append(probe);
+    const tokenColor = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    const background = getComputedStyle(cell.closest('td')!).backgroundColor;
+    expect(tokenColor).to.match(/^oklch\(/);
+    expect(background).to.match(/^oklch\(/);
+    const [tokenChannels, cellChannels] = [tokenColor, background].map((color) =>
+      color.match(/[\d.]+/g)!.map(Number),
+    );
+    tokenChannels.forEach((channel, index) => {
+      expect(cellChannels[index]).to.be.closeTo(channel, 0.01);
+    });
+    expect(cellChannels[3]).to.eq(alpha);
   });
 }
 
@@ -151,8 +170,11 @@ describe('Overview page', () => {
       cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS + 1);
       desktopModel('GLM-5.3-Flash', AGENTX)
         .should('contain.text', 'GLM 5.3 Flash')
-        .find('[data-testid="overview-platform"]')
-        .should('have.length', 5);
+        .then(($row) => {
+          const platforms = $row.find('[data-testid="overview-platform"]').length;
+          const blank = $row.find('[data-testid="overview-row-no-results"]').length;
+          expect(platforms === 5 || (platforms === 0 && blank === 1)).to.equal(true);
+        });
       cy.reload();
       cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS + 1);
       desktopModel('GLM-5.3-Flash', AGENTX).scrollIntoView().should('be.visible');
@@ -225,7 +247,7 @@ describe('Overview page', () => {
 
   it('keeps one history entry when the overview request fails', () => {
     cy.viewport(1280, 900);
-    cy.visit('/inference');
+    cy.visit('/infx/inference');
     cy.visit('/overview');
     cy.intercept('GET', '**/api/v1/overview*', { statusCode: 500 }).as('overviewJsonFailure');
 
@@ -248,10 +270,10 @@ describe('Overview page', () => {
     cy.go('back');
     cy.location('search').should('eq', '');
     cy.go('back');
-    cy.location('pathname').should('eq', '/inference/deepseek-v41-flash');
+    cy.location('pathname').should('eq', '/infx/inference/deepseek-v41-flash');
   });
 
-  it('reveals deprecated and maintenance models via the bottom toggle', () => {
+  it('reveals deprecated and maintenance models via the toolbar toggle', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
     cy.get('[data-testid="overview-desktop-model"][data-model="gpt-oss-120b"]').should('not.exist');
@@ -365,7 +387,7 @@ describe('Overview page', () => {
     cy.get('[data-testid="overview-presentation-surface"]')
       .find('[data-testid="overview-comparison-switcher"]')
       .should('have.length', 1)
-      .and('have.class', 'justify-center');
+      .and('have.class', 'justify-start');
     cy.get('[data-testid="overview-comparison-switcher"]')
       .should('have.attr', 'aria-label', 'Compare')
       .within(() => {
@@ -478,7 +500,7 @@ describe('Overview page', () => {
         .and('have.attr', 'href')
         .then((href) => {
           const url = new URL(String(href), 'https://inferencex.local');
-          expect(url.pathname).to.equal('/inference');
+          expect(url.pathname).to.equal('/infx/inference');
           expect(url.searchParams.get('g_model')).to.equal('Qwen-3.5-397B-A17B');
           expect(url.searchParams.get('i_metric')).to.equal('y_costh');
           expect(url.searchParams.get('i_xmode')).to.equal('interactivity');
@@ -526,7 +548,7 @@ describe('Overview page', () => {
         cy.visit(href);
 
         cy.get('[data-testid="inference-chart-display"]').should('exist');
-        cy.contains('Comparison Date Range').should('be.visible');
+        cy.contains('Comparison date range').should('be.visible');
         cy.contains('button', 'Select date range').should('not.have.class', 'animate-pulse');
         cy.get('[data-testid="model-selector"]').click();
         cy.contains('[role="option"]', 'DeepSeek V4 Pro 0813 1.6T').click();
@@ -555,7 +577,7 @@ describe('Overview page', () => {
         expect(href).not.to.contain('i_dates=');
         cy.visit(href);
 
-        cy.contains('Comparison Date Range').should('be.visible');
+        cy.contains('Comparison date range').should('be.visible');
         cy.contains('button', 'Select date range')
           .should('not.have.class', 'animate-pulse')
           .and('not.have.class', 'border-red-500');
@@ -577,7 +599,7 @@ describe('Overview page', () => {
         expect(href).not.to.contain('i_dates=');
         cy.visit(href);
 
-        cy.contains('Comparison Date Range').should('not.exist');
+        cy.contains('Comparison date range').should('not.exist');
       });
   });
 
@@ -681,33 +703,42 @@ describe('Overview page', () => {
         cy.get('[data-overview-engine-scope="community"]')
           .should('have.attr', 'aria-current', 'true')
           .and('match', 'span')
-          .and('have.text', 'Open Source Community Engines (vLLM/SGLang)')
+          .and('have.text', 'Open-source community engines (vLLM/SGLang)')
           .and('not.have.attr', 'href');
         cy.get('[data-overview-engine-scope="all"]')
           .should('have.attr', 'href', '/overview?engine=all')
-          .and('have.text', 'All Platforms');
+          .and('have.text', 'All platforms');
       });
 
+    cy.get('[data-testid="overview-controls-panel"]')
+      .should('match', 'fieldset')
+      .and('contain.text', 'Benchmark config')
+      .within(() => {
+        cy.get('label').should('contain.text', 'SLO (tok/s/user)');
+        cy.get('label').should('contain.text', 'Engine scope');
+      });
     cy.get('[data-testid="overview-tier-switcher"]').then(([tier]) => {
       cy.get('[data-testid="overview-engine-scope-switcher"]').then(([scope]) => {
-        const tierRect = tier.getBoundingClientRect();
-        const scopeRect = scope.getBoundingClientRect();
-        expect((scopeRect.top + scopeRect.bottom) / 2).to.be.closeTo(
-          (tierRect.top + tierRect.bottom) / 2,
-          8,
+        expect(scope.getBoundingClientRect().top).to.be.closeTo(
+          tier.getBoundingClientRect().top,
+          2,
         );
       });
     });
 
     desktopModel('GLM-5.2').within(() => {
       expectAgentxScenario(AGENTX_LABEL);
-      cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
+      cy.get('[data-testid="overview-pair-missing"]').should('not.exist');
+      cy.get('[data-testid="overview-row-no-results"]').should(
+        'have.text',
+        'No results at this SLO',
+      );
     });
     cy.get(
       '[data-testid="overview-engine-scope-switcher"] [data-overview-engine-scope="all"]',
     ).click();
     cy.location('search').should('eq', '?engine=all');
-    desktopModel('GLM-5.2').find('[data-testid="overview-pair-missing"]').should('have.length', 5);
+    desktopModel('GLM-5.2').find('[data-testid="overview-row-no-results"]').should('exist');
     selectOverviewTier(100);
     cy.location('search').should('eq', '?tier=100&engine=all');
 
@@ -798,7 +829,7 @@ describe('Overview page', () => {
         .then(($badge) => {
           expect($badge.attr('style') ?? '').not.to.contain('background');
         });
-      expectCellTint('mi355x', 'rgba(16, 185, 129,');
+      expectCellTint('mi355x', '--success', 0.15);
     });
 
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
@@ -806,7 +837,7 @@ describe('Overview page', () => {
         .find('[data-testid="overview-cost-delta"]')
         .should('contain.text', '+71%')
         .and('have.attr', 'data-cost-polarity', 'pricier');
-      expectCellTint('gb200', 'rgba(239, 68, 68, 0.4)');
+      expectCellTint('gb200', '--destructive', 0.32);
       platform('gb300').find('[data-testid="overview-cost-delta"]').should('not.exist');
       platform('gb300').then(([cell]) => {
         expect(getComputedStyle(cell.closest('td')!).backgroundColor).to.match(
@@ -819,7 +850,7 @@ describe('Overview page', () => {
       platform('b200').then(([cell]) => {
         const td = cell.closest('td')!;
         expect(td.getAttribute('style') ?? '').not.to.contain('background');
-        expect(td.className).to.contain('bg-muted/30');
+        expect(td.className).to.contain('bg-muted/15');
       });
     });
 
@@ -829,10 +860,7 @@ describe('Overview page', () => {
         .should('contain.text', '∞')
         .and('have.attr', 'data-cost-polarity', 'no-baseline');
       platform('gb300').then(([cell]) => {
-        const [r, g, b] = getComputedStyle(cell.closest('td')!)
-          .backgroundColor.match(/\d+/g)!
-          .map(Number);
-        expect(Math.max(r, g, b) - Math.min(r, g, b)).to.be.lessThan(60);
+        expect(cell.closest('td')!.getAttribute('style') ?? '').not.to.contain('background');
       });
     });
   });
@@ -844,8 +872,8 @@ describe('Overview page', () => {
     cy.get('[data-testid="chart-section-tabs"]').should('not.exist');
     cy.get('[data-testid="nav-link-overview"]')
       .should('have.attr', 'href', '/overview')
-      .and('have.class', 'text-brand');
-    cy.get('[data-testid="nav-link-dashboard"]').should('not.have.class', 'text-brand');
+      .and('have.attr', 'aria-current', 'page');
+    cy.get('[data-testid="nav-link-dashboard"]').should('not.have.attr', 'aria-current');
 
     cy.get('[data-testid="overview-source-link"]')
       .should('have.attr', 'href', TCO_SOURCE_URL)
@@ -866,12 +894,15 @@ describe('Overview page', () => {
           expect([...$headers].map((header) => header.textContent?.trim())).to.deep.equal(
             PLATFORM_HEADERS,
           );
-          for (const header of $headers) {
-            expect(getComputedStyle(header).fontSize).to.equal('14px');
-          }
         });
         cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
-        cy.get('[data-testid="overview-platform"]').should('have.length', MATRIX_ROWS * 5);
+        cy.root().then(($root) => {
+          const blankRows = $root.find('[data-testid="overview-row-no-results"]').length;
+          cy.get('[data-testid="overview-platform"]').should(
+            'have.length',
+            (MATRIX_ROWS - blankRows) * 5,
+          );
+        });
         cy.get('a').contains('View details').should('exist');
         cy.get('th[scope="row"]')
           .find('a')
@@ -982,7 +1013,7 @@ describe('Overview page', () => {
             '$0.062. Open raw source dashboard for Jul 18: Qwen3.5 397B · MI355X · SGLang · FP8 · MTP',
           )
           .should('have.attr', 'href')
-          .and('include', '/inference?')
+          .and('include', '/infx/inference?')
           .and('include', 'g_model=Qwen-3.5-397B-A17B')
           .and('include', 'g_rundate=2026-07-18')
           .and('include', 'i_prec=fp8')
@@ -1048,7 +1079,7 @@ describe('Overview page', () => {
     });
 
     desktopModel('GLM-5.2').within(() => {
-      cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
+      cy.get('[data-testid="overview-row-no-results"]').should('have.length', 1);
     });
     cy.get('[data-testid="overview-pair-missing"]').each(($cell) => {
       expect($cell.text()).not.to.contain('∞');
@@ -1086,7 +1117,7 @@ describe('Overview page', () => {
     selectOverviewTier(100);
 
     cy.location('search').should('eq', '?tier=100');
-    cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE);
+    expectScope(SCOPE_LINE, SOURCE_NOTE);
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
       cy.get('[data-tier-option="100"]').should('have.attr', 'data-selected', 'true');
       cy.get('[data-tier-ridge="75"]').should('have.attr', 'data-state', 'filled');
@@ -1120,17 +1151,17 @@ describe('Overview page', () => {
 
     cy.visit('/overview?tier=30&models=all');
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
-      platform('b300').within(() => {
-        cy.get('[data-testid="overview-pair-missing"][data-hardware="b300"]')
-          .should('contain.text', '—')
-          .and('contain.text', 'no exact @30 result');
-      });
+      cy.get('[data-testid="overview-platform"]').should('not.exist');
+      cy.get('[data-testid="overview-row-no-results"]').should(
+        'have.text',
+        'No results at this SLO',
+      );
+    });
+    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('b200')
         .find('[data-testid="overview-pair-missing"]')
         .should('contain.text', '—')
         .and('contain.text', 'no exact @30 result');
-    });
-    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('b300').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="b300"]').should(
           'contain.text',
@@ -1146,13 +1177,13 @@ describe('Overview page', () => {
       .should('not.match', /∞\s*%/);
 
     cy.visit('/overview?tier=100');
-    cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE);
+    expectScope(SCOPE_LINE, SOURCE_NOTE);
     cy.get('[data-testid="language-toggle"]')
       .should('have.attr', 'href', '/zh/overview?tier=100')
       .click();
     cy.location('pathname').should('eq', '/zh/overview');
     cy.location('search').should('eq', '?tier=100');
-    cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE_ZH);
+    expectScope(SCOPE_LINE_ZH, SOURCE_NOTE_ZH);
   });
 
   it('uses the same cell semantics on mobile and fits both 390px and 320px widths', () => {
@@ -1163,12 +1194,13 @@ describe('Overview page', () => {
       cy.get('[data-testid="mobile-chart-select"]').should('not.exist');
       cy.get('[data-testid="overview-mobile-list"]').should('be.visible');
       cy.get('[data-testid="overview-tier-switcher"]').should('be.visible');
-      cy.get('[data-testid="overview-engine-scope-switcher"]')
+      cy.get('[data-testid="overview-engine-scope-switcher"]').should('be.visible');
+      cy.get('[data-testid="overview-engine-scope-select"]')
         .should('be.visible')
-        .find('[data-overview-engine-scope]')
-        .each(($option) => {
-          expect($option[0].getBoundingClientRect().height).to.be.at.least(44);
+        .then(([select]) => {
+          expect(select.getBoundingClientRect().height).to.be.at.least(44);
         });
+      cy.get('[data-overview-engine-scope]').should('not.be.visible');
       cy.get('[data-testid="overview-desktop-matrix"]').should('not.exist');
       mobileModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
         cy.get('[data-testid="overview-platform"]').should('have.length', 5);

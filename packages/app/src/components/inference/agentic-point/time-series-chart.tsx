@@ -15,7 +15,7 @@ import {
   type ChartLegendEntry,
 } from './chart-shared';
 import { layoutChartLegend } from './chart-legend';
-import { interpAt, maxTimeSeriesValue, type ChartSeries } from './time-series-math';
+import { interpAt, maxTimeSeriesValue, niceAxis, type ChartSeries } from './time-series-math';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 export * from './time-series-math';
@@ -80,13 +80,16 @@ export function TimeSeriesChart({
     const xMax = Math.max(durationS, 1);
     let refMax = 0;
     for (const refLine of refLines) refMax = Math.max(refMax, refLine.value);
-    const yMax = yMaxOpt ?? maxTimeSeriesValue(series, Math.max(1e-9, refMax));
+    const axis = yMaxOpt
+      ? { top: yMaxOpt, ticks: Array.from({ length: 5 }, (_, i) => (yMaxOpt * i) / 4) }
+      : niceAxis(maxTimeSeriesValue(series, Math.max(1e-9, refMax)));
+    const yMax = axis.top;
     const xScale = (t: number) => PAD.left + (t / xMax) * innerW;
     const yScale = (v: number) => PAD.top + (1 - v / yMax) * innerH;
-    return { innerW, innerH, xMax, yMax, xScale, yScale };
+    return { innerW, innerH, xMax, yMax, yTickVals: axis.ticks, xScale, yScale };
   }, [series, durationS, yMaxOpt, refLines, W, H, padBottom]);
 
-  const { innerW, innerH, xMax, yMax, xScale, yScale } = layout;
+  const { innerW, innerH, xMax, yMax, yTickVals, xScale, yScale } = layout;
 
   const subsample = (arr: TimeSeriesPoint[]) => {
     if (arr.length === 0) return arr;
@@ -94,8 +97,8 @@ export function TimeSeriesChart({
     return stride > 1 ? arr.filter((_, i) => i % stride === 0) : arr;
   };
 
-  const xTickVals = Array.from({ length: 5 }, (_, i) => (xMax * i) / 4);
-  const yTickVals = Array.from({ length: 5 }, (_, i) => (yMax * i) / 4);
+  const xTickCount = innerW < 480 ? 3 : 5;
+  const xTickVals = Array.from({ length: xTickCount }, (_, i) => (xMax * i) / (xTickCount - 1));
 
   const resolve = (fraction: number) => {
     const t = fraction * xMax;
@@ -126,14 +129,14 @@ export function TimeSeriesChart({
               y1={y}
               y2={y}
               stroke="currentColor"
-              opacity={0.08}
+              opacity={0.12}
             />
             <text
               x={PAD.left - 8}
               y={y + 3}
               fontSize={10}
               fill="currentColor"
-              opacity={0.55}
+              opacity={0.7}
               textAnchor="end"
             >
               {yFmt(v)}
@@ -238,7 +241,7 @@ export function TimeSeriesChart({
         y={H - legend.extraHeight - 22}
         fontSize={11}
         fill="currentColor"
-        opacity={0.55}
+        opacity={0.7}
         textAnchor="middle"
       >
         {locale === 'zh' ? '时间' : 'time'}
@@ -250,7 +253,7 @@ export function TimeSeriesChart({
           y={(H - legend.extraHeight) / 2}
           fontSize={11}
           fill="currentColor"
-          opacity={0.55}
+          opacity={0.7}
           textAnchor="middle"
           transform={`rotate(-90 10 ${(H - legend.extraHeight) / 2})`}
         >
@@ -282,8 +285,8 @@ const KNOWN_SOURCE_COLORS: Record<string, string> = {
 const SOURCE_LABELS: Record<string, Record<string, string>> = {
   en: {
     local_compute: 'Prefill',
-    local_cache_hit: 'HBM Cache Hit',
-    external_kv_transfer: 'Offload Cache Hit',
+    local_cache_hit: 'HBM cache hit',
+    external_kv_transfer: 'Offload cache hit',
     miss: 'Miss',
   },
   zh: {
@@ -422,7 +425,8 @@ export function StackedAreaChart({
     return { items, title: fmtSeconds(t) };
   };
 
-  const xTickVals = Array.from({ length: 5 }, (_, i) => (xMax * i) / 4);
+  const xTickCount = innerW < 480 ? 3 : 5;
+  const xTickVals = Array.from({ length: xTickCount }, (_, i) => (xMax * i) / (xTickCount - 1));
   const yTickVals = [0, 0.25, 0.5, 0.75, 1];
 
   return (
@@ -437,14 +441,14 @@ export function StackedAreaChart({
               y1={y}
               y2={y}
               stroke="currentColor"
-              opacity={0.08}
+              opacity={0.12}
             />
             <text
               x={PAD.left - 8}
               y={y + 3}
               fontSize={10}
               fill="currentColor"
-              opacity={0.55}
+              opacity={0.7}
               textAnchor="end"
             >
               {(v * 100).toFixed(0)}%
@@ -485,7 +489,7 @@ export function StackedAreaChart({
         y={H - legend.extraHeight - 22}
         fontSize={11}
         fill="currentColor"
-        opacity={0.55}
+        opacity={0.7}
         textAnchor="middle"
       >
         {locale === 'zh' ? '时间' : 'time'}
@@ -495,7 +499,7 @@ export function StackedAreaChart({
         y={(H - legend.extraHeight) / 2}
         fontSize={11}
         fill="currentColor"
-        opacity={0.55}
+        opacity={0.7}
         textAnchor="middle"
         transform={`rotate(-90 10 ${(H - legend.extraHeight) / 2})`}
       >

@@ -21,7 +21,9 @@ describe('QuickFiltersDialog', () => {
     it(`explains every filter on hover without changing selections (${locale}, ${width}px)`, () => {
       cy.viewport(width, 900);
       mountWithProviders(
-        <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+        <PathnameContext.Provider
+          value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+        >
           <QuickFiltersDialog
             open
             onOpenChange={cy.stub().as('changeOpen')}
@@ -133,7 +135,7 @@ describe('QuickFiltersDialog', () => {
 
   it('localizes active filter values and leaves inapplicable AgentX spec filters untouched', () => {
     mountWithProviders(
-      <PathnameContext.Provider value="/zh/agentx">
+      <PathnameContext.Provider value="/zh/infx/agentx">
         <ActiveQuickFilters />
       </PathnameContext.Provider>,
       {

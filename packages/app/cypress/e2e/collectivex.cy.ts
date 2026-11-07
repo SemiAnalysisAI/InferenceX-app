@@ -125,7 +125,7 @@ function showSuite(label: 'EP' | 'KV' | 'swap_blocks') {
 }
 
 function openCollectiveX() {
-  cy.visit('/collectivex');
+  cy.visit('/colx');
   cy.wait('@runs');
   cy.wait('@run');
   cy.get('[data-testid="collectivex-display"]').should('be.visible');
@@ -172,7 +172,7 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-routing-select"]').should('not.exist');
 
     cy.get('[data-testid="collectivex-main-chart"]')
-      .should('contain.text', 'Round trip (measured) · decode · p99')
+      .should('contain.text', 'Pair period (chained) · decode · p50')
       .and('contain.text', 'deepep-v2');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
 
@@ -221,7 +221,7 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-range-note"]').should('be.visible');
 
     cy.get('[data-testid="collectivex-explorer-chart"] .point').first().click({ force: true });
-    cy.get('[data-chart-tooltip]:visible')
+    cy.get('[data-testid="point-details-panel"]')
       .should('contain.text', 'Range across libraries')
       .and('contain.text', 'Median')
       .and('contain.text', '1 library at this point');
@@ -289,8 +289,8 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
     cy.get('[data-testid="collectivex-range-note"]').should('contain.text', 'best value');
     cy.get('[data-testid="collectivex-explorer-chart"] .point').first().click({ force: true });
-    cy.get('[data-chart-tooltip]:visible')
-      .should('contain.text', 'Best:')
+    cy.get('[data-testid="point-details-panel"]')
+      .should('contain.text', 'Best ·')
       .and('contain.text', '2 libraries at this point');
     cy.get('[data-testid="collectivex-explorer-chart"] svg').first().click(5, 5, { force: true });
     showView('Range by SKU');
@@ -422,7 +422,7 @@ describe('CollectiveX neutral run view', () => {
   });
 
   it('localizes the suite control and the complete chart click path on the Chinese route', () => {
-    cy.visit('/zh/collectivex');
+    cy.visit('/zh/colx');
     cy.wait('@runs');
     cy.wait('@run');
 
@@ -447,7 +447,7 @@ describe('CollectiveX neutral run view', () => {
       .and('not.include', '(note ');
 
     cy.viewport(1440, 900);
-    cy.visit('/zh/collectivex');
+    cy.visit('/zh/colx');
     cy.wait('@runs');
     cy.wait('@run');
     showView('序列');
@@ -457,15 +457,14 @@ describe('CollectiveX neutral run view', () => {
       .and('not.contain.text', '运行记录')
       .and('not.contain.text', '已显示运行');
     cy.get('[data-testid="collectivex-main-chart"]')
-      .should('contain.text', '往返（实测）')
+      .should('contain.text', '成对周期（连续）')
       .and('contain.text', '常规')
       .and('contain.text', '解码')
       .and('contain.text', '延迟（µs）');
 
     cy.get('[data-testid="collectivex-explorer-chart"] .point').first().click({ force: true });
-    cy.get('[data-chart-tooltip]:visible')
-      .should('contain.text', '点击其他区域关闭')
-      .and('contain.text', '往返')
+    cy.get('[data-testid="point-details-panel"]')
+      .should('contain.text', '往返')
       .and('contain.text', '常规')
       .and('contain.text', '解码')
       .and('contain.text', '延迟 p50 / p90 / p95 / p99');
@@ -473,7 +472,7 @@ describe('CollectiveX neutral run view', () => {
 
   it('keeps the Chinese explorer and suite control reachable at 375px', () => {
     cy.viewport(375, 844);
-    cy.visit('/zh/collectivex');
+    cy.visit('/zh/colx');
     cy.wait('@runs');
     cy.wait('@run');
 
@@ -486,27 +485,37 @@ describe('CollectiveX neutral run view', () => {
 });
 
 describe('CollectiveX availability states', () => {
+  it('moves old /collectivex links to /colx with the query intact', () => {
+    installRuns([]);
+    cy.visit('/zh/collectivex?x=1');
+    cy.location().should((location) => {
+      expect(location.pathname).to.eq('/zh/colx');
+      expect(location.search).to.eq('?x=1');
+    });
+    cy.get('[data-testid="collectivex-no-runs-selected"]').should('be.visible');
+  });
+
   it('reports a missing run list', () => {
     cy.intercept('GET', '/api/v1/collectivex/runs?*', {
       statusCode: 404,
       body: { error: 'Not found' },
     }).as('missing');
-    cy.visit('/collectivex');
+    cy.visit('/colx');
     cy.wait('@missing');
     cy.get('[data-testid="collectivex-error"]')
       .should('be.visible')
-      .and('contain.text', 'The CollectiveX dataset failed to load.')
+      .and('contain.text', 'The CollectiveX dataset failed to load')
       .and('not.contain.text', 'API error: 404');
     cy.get('[data-testid="collectivex-error-version-select"]').should('contain.text', 'V1');
   });
 
   it('says no results are stored when the run list is empty', () => {
     installRuns([]);
-    cy.visit('/collectivex');
+    cy.visit('/colx');
     cy.wait('@runs');
     cy.get('[data-testid="collectivex-no-runs-selected"]')
       .should('be.visible')
-      .and('contain.text', 'No CollectiveX results are stored yet.');
+      .and('contain.text', 'No CollectiveX results are stored yet');
     cy.get('[data-testid="collectivex-suite-filter"]').should('not.exist');
     cy.get('[data-testid="collectivex-chart-filters"]').should('not.exist');
     cy.get('[data-testid="collectivex-support-matrices"]').should('be.visible');
@@ -517,11 +526,11 @@ describe('CollectiveX availability states', () => {
       statusCode: 503,
       body: { error: 'unavailable' },
     }).as('down');
-    cy.visit('/collectivex');
+    cy.visit('/colx');
     cy.wait('@down');
     cy.get('[data-testid="collectivex-error"]')
       .should('be.visible')
-      .and('contain.text', 'The CollectiveX dataset failed to load.')
+      .and('contain.text', 'The CollectiveX dataset failed to load')
       .and('not.contain.text', 'API error: 503');
 
     let failRequests = true;
@@ -539,12 +548,12 @@ describe('CollectiveX availability states', () => {
       );
     }).as('zhDown');
     installRun();
-    cy.visit('/zh/collectivex');
+    cy.visit('/zh/colx');
     cy.wait('@zhDown');
     cy.wait('@zhDown');
     cy.get('[data-testid="collectivex-error"]')
       .should('contain.text', 'CollectiveX 运行暂不可用')
-      .and('contain.text', 'CollectiveX 数据集加载失败。')
+      .and('contain.text', 'CollectiveX 数据集加载失败')
       .and('not.contain.text', 'collectivex-internal-storage-detail');
     cy.contains('button', '重试')
       .then(() => {
@@ -562,7 +571,7 @@ describe('CollectiveX availability states', () => {
       body: dataset,
       delay: 500,
     }).as('slowRun');
-    cy.visit('/collectivex');
+    cy.visit('/colx');
     cy.wait('@runs');
     cy.get('[data-testid="collectivex-selected-runs-loading"]').should('be.visible');
     cy.wait('@slowRun');
@@ -575,7 +584,7 @@ describe('CollectiveX availability states', () => {
     });
     installRuns();
     installRun();
-    cy.visit('/collectivex');
+    cy.visit('/colx');
     cy.wait('@runs');
     cy.wait('@run');
     cy.get('[data-testid="collectivex-display"]').should('be.visible');
@@ -862,7 +871,7 @@ describe('CollectiveX swap_blocks', () => {
       });
     cy.get('@swapChart').find('.point').should('have.length', 2).last().click({ force: true });
     cy.get('body')
-      .should('contain.text', '32.768 GB/s')
+      .should('contain.text', '32.768p50 (GB/s)')
       .and('contain.text', 'Copied payload: 1 GiB');
     cy.get('[data-testid="swap-metric"]').contains('Latency').click();
     cy.get('@swapChart').should('contain.text', 'µs, log');
@@ -870,12 +879,14 @@ describe('CollectiveX swap_blocks', () => {
     cy.get('[data-testid="swap-layout"]').contains('Random').click();
     cy.get('[data-testid="swap-percentile"]').contains('p99').click();
     cy.get('@swapChart').find('.point').should('have.length', 1).click({ force: true });
-    cy.get('body').should('contain.text', '8.000 µs').and('contain.text', 'Copied payload: 4 KiB');
+    cy.get('body')
+      .should('contain.text', '8.000p99 (µs)')
+      .and('contain.text', 'Copied payload: 4 KiB');
     cy.get('[data-testid="swap-metric"]').contains('Bandwidth').click();
     cy.get('@swapChart').should('contain.text', 'GB/s').and('not.contain.text', 'µs, log');
   });
   it('renders the translated controls and tooltip on the Chinese route', () => {
-    cy.visit('/zh/collectivex');
+    cy.visit('/zh/colx');
     cy.wait('@runs');
     cy.wait('@run');
     showSuite('swap_blocks');

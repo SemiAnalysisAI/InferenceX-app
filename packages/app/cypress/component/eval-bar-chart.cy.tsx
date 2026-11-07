@@ -5,6 +5,7 @@ import { createMockEvaluationChartData } from '../support/mock-data';
 import { Model, Precision } from '@/lib/catalog/data-mappings';
 import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
+import { hoverTopmostOver } from '../support/scatter-points';
 
 describe('EvalBarChartD3', () => {
   it('omits default DP in table cells while preserving DP8 and physical chip counts', () => {
@@ -42,17 +43,26 @@ describe('EvalBarChartD3', () => {
       unofficial: { runIndexByUrl: { [runUrl]: 0 } },
     });
     cy.get('[data-testid="data-table-preset-all"]').click();
-    cy.contains('thead th', /^TP$/)
+    cy.contains('thead th', /^Prefill$/)
       .invoke('index')
       .then((index) => {
-        cy.get('tbody tr').eq(0).find('td').eq(index).should('have.text', '8');
-        cy.get('tbody tr').eq(1).find('td').eq(index).should('have.text', '1 / DP8');
+        cy.get('tbody tr').eq(0).find('td').eq(index).should('have.attr', 'colspan', '2');
+        cy.get('tbody tr')
+          .eq(0)
+          .find('td')
+          .eq(index)
+          .invoke('text')
+          .should('match', /^TP8(?!.*DP\d)/);
+        cy.get('tbody tr').eq(1).find('td').eq(index).should('contain.text', 'DP8');
       });
-    cy.contains('thead th', 'Physical Chips')
+    cy.contains('thead th', 'Physical chips')
       .invoke('index')
       .then((index) => {
         cy.get('tbody tr').each(($row) => {
-          cy.wrap($row).find('td').eq(index).should('have.text', '4');
+          cy.wrap($row)
+            .find('td')
+            .eq(index - 1)
+            .should('have.text', '4');
         });
       });
   });
@@ -68,7 +78,7 @@ describe('EvalBarChartD3', () => {
       },
       unofficial: {},
     });
-    cy.contains('Failed to load eval data.').should('be.visible');
+    cy.contains('Failed to load eval data').should('be.visible');
   });
 
   it('shows empty state when chartData is empty and selections are made', () => {
@@ -173,12 +183,15 @@ describe('EvalBarChartD3', () => {
       cy.get(tooltip).should('not.be.visible');
 
       cy.get(`${marker} .unofficial-eval-x`).click();
-      cy.get(tooltip)
+      cy.get(tooltip).should('not.be.visible');
+      cy.get('[data-testid="point-details-panel"]')
         .should('be.visible')
-        .and('have.css', 'pointer-events', 'auto')
         .and('contain.text', '0.9659')
-        .and('contain.text', 'Click elsewhere to dismiss');
-      cy.get(`${tooltip} a`).should('have.attr', 'href', run.url);
+        .and('contain.text', run.branch);
+      cy.get('[data-testid="point-details-panel"] a').should('have.attr', 'href', run.url);
+      cy.get('[data-testid="chart-pin-ring"]').should('exist');
+      cy.get('[data-testid="point-details-close"]').click();
+      cy.get('[data-testid="point-details-panel"]').should('not.exist');
 
       cy.get(marker)
         .invoke('attr', 'transform')
@@ -202,4 +215,79 @@ describe('EvalBarChartD3', () => {
       cy.get(tooltip).should('not.be.visible');
     });
   }
+
+  it('shows the unofficial card for an overlay marker drawn on an official point', () => {
+    const run = {
+      id: 123,
+      name: 'Run Sweep',
+      branch: 'feat/eval-overlap',
+      sha: 'abc123',
+      createdAt: '2025-03-20T00:00:00Z',
+      url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
+      conclusion: 'success',
+      status: 'completed',
+      isNonMainBranch: true,
+    };
+    const shared = createMockEvaluationChartData({
+      score: 0.875,
+      scoreError: 0.01,
+      minScore: 0.865,
+      maxScore: 0.885,
+      errorMin: 0.865,
+      errorMax: 0.885,
+    });
+    const officialRows = [
+      shared,
+      createMockEvaluationChartData({
+        evalResultId: 2,
+        configId: 2,
+        hwKey: 'h100_vllm' as never,
+        hardware: 'h100',
+        hwLabel: 'H100',
+        engineLabel: 'vLLM',
+        configLabel: 'H100 (vLLM)',
+        framework: 'vllm',
+        score: 0.7,
+        minScore: 0.69,
+        maxScore: 0.71,
+        errorMin: 0.69,
+        errorMax: 0.71,
+      }),
+    ];
+    const overlayHardware = new Set([String(shared.hwKey)]);
+    mountWithProviders(
+      <div style={{ width: 1000 }}>
+        <EvalBarChartD3 />
+      </div>,
+      {
+        evaluation: {
+          selectedModel: shared.model,
+          selectedBenchmark: shared.benchmark,
+          chartData: officialRows,
+          unfilteredChartData: officialRows,
+          unofficialChartData: [{ ...shared, evalResultId: 3, runUrl: run.url }],
+        },
+        unofficial: {
+          isUnofficialRun: true,
+          unofficialRunInfo: run,
+          unofficialRunInfos: [run],
+          runIndexByUrl: { [run.url]: 0 },
+          activeOverlayHwTypes: overlayHardware,
+          allOverlayHwTypes: overlayHardware,
+        },
+      },
+    );
+    const tooltip = 'body > [data-chart-tooltip="evaluation-chart"]';
+    cy.get('#evaluation-chart .point').should('have.length', 2);
+    cy.get('#evaluation-chart .unofficial-eval-point > circle').then(([hit]) =>
+      hoverTopmostOver(hit),
+    );
+    cy.get(`${tooltip} [data-hover-notice]`).should('have.text', `✕ ${run.branch}`);
+    cy.get('#evaluation-chart .point')
+      .filter(
+        (_, point) => (point as unknown as { __data__: typeof shared }).__data__.score === 0.7,
+      )
+      .then(([point]) => hoverTopmostOver(point));
+    cy.get(tooltip).should('contain.text', 'H100').find('[data-hover-notice]').should('not.exist');
+  });
 });

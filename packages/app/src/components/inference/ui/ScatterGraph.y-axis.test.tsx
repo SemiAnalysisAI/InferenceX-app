@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   HARDWARE_CONFIG,
@@ -10,6 +10,12 @@ import {
   overlayState,
   point,
 } from './ScatterGraph.test-harness';
+
+vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  measureTextWidth: (text: string, font: string) =>
+    text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
+}));
 
 const topYTick = (container: HTMLElement) =>
   Math.max(

@@ -1,5 +1,6 @@
 'use client';
 
+import { CONTROL_HEIGHT } from '@/components/ui/control-styles';
 import { cn } from '@/lib/shared/utils';
 
 export function CaptionPercentInput({
@@ -22,7 +23,8 @@ export function CaptionPercentInput({
   return (
     <span
       className={cn(
-        'inline-flex h-6 items-center rounded-sm border border-input px-1.5 text-xs font-medium text-foreground',
+        'inline-flex items-center rounded-md border border-input px-2 text-xs font-medium text-foreground',
+        CONTROL_HEIGHT.sm,
         "after:content-['%'] hover:bg-muted/60 has-[input:focus-visible]:border-ring has-[input:focus-visible]:ring-ring/50 has-[input:focus-visible]:ring-[3px]",
         className,
       )}

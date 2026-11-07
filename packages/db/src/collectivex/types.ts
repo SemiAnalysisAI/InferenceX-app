@@ -22,7 +22,7 @@ export function parseCollectiveXVersion(raw: string): CollectiveXVersion | null 
     : null;
 }
 
-export type CollectiveXOperation = 'dispatch' | 'stage' | 'combine' | 'roundtrip';
+export type CollectiveXOperation = 'pair_period' | 'dispatch' | 'stage' | 'combine' | 'roundtrip';
 export type CollectiveXPercentile = 'p50' | 'p90' | 'p95' | 'p99';
 export type CollectiveXOutcome =
   | 'success'
@@ -88,6 +88,8 @@ export interface CollectiveXSeries {
     vendor: 'nvidia' | 'amd';
   };
   points: CollectiveXPoint[];
+  /** `candidate`: no engine can select this configuration today. Absent on older results. */
+  maturity?: 'production' | 'candidate' | null;
 }
 
 export interface CollectiveXCoveragePoint {

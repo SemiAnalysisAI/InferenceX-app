@@ -53,7 +53,7 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     slug: 'kimi-k31-pro',
     displayName: 'Kimi-K3.1-Pro',
     dbKeys: ['kimik3.1'],
-    label: 'Kimi K3.1 Pro',
+    label: 'Kimi K3.1 Pro 2.8T',
     seoName: 'Kimi K3.1 Pro',
   },
   {

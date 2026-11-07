@@ -1,14 +1,22 @@
 'use client';
 
-import { Suspense, useRef, useState, type ReactNode } from 'react';
+import { Suspense, useMemo, useState, type ReactNode } from 'react';
+import { chartFont, measureTextWidth, useFontsVersion } from '@/lib/d3-chart/dynamic-margins';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Stat } from '@/components/ui/stat';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
-import { formatNumber, formatTimestamp } from '@/lib/agentic-workload-explorer/format';
-import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
+import {
+  formatExplorerDateTime,
+  formatNumber,
+  formatTimestamp,
+} from '@/lib/agentic-workload-explorer/format';
 import {
   useTraceVersion,
   appendTraceVersion,
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import type {
@@ -23,21 +31,21 @@ import {
   RangeToggle,
   type DayRange,
 } from '@/components/agentic-workload-explorer/range-toggle';
-import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { ChartActions, Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 
 const STRINGS = {
   en: {
     stats: 'Stats',
-    failedToLoad: 'Failed to load session insights data.',
-    avgDuration: 'Avg Duration',
-    avgTurnsPerSession: 'Avg Turns / Session',
-    avgCostPerSession: 'Avg Cost / Session',
-    activeFinal24h: 'Active (Final 24h)',
-    sessionDurationDistribution: 'Session Duration Distribution',
-    turnsPerSessionDistribution: 'Turns Per Session Distribution',
-    sessionCostDistribution: 'Session Cost Distribution',
-    sessionsOverTime: 'Sessions Over Time',
-    concurrentSessions: 'Concurrent Sessions',
+    failedToLoad: 'Failed to load session insights data',
+    avgDuration: 'Avg duration',
+    avgTurnsPerSession: 'Avg turns / session',
+    avgCostPerSession: 'Avg cost / session',
+    activeFinal24h: 'Active (final 24h)',
+    sessionDurationDistribution: 'Session duration distribution',
+    turnsPerSessionDistribution: 'Turns per session distribution',
+    sessionCostDistribution: 'Session cost distribution',
+    sessionsOverTime: 'Sessions over time',
+    concurrentSessions: 'Concurrent sessions',
     concurrentDetail: 'final 7 days, hourly',
     noDataAvailable: 'No data available',
     noDailySessionData: 'No daily session data available',
@@ -45,10 +53,10 @@ const STRINGS = {
     sessions: (n: number) => `${formatNumber(n)} sessions`,
     tooltipSessions: (n: number) => `${n} sessions`,
     active: 'active',
-    dailySessions: 'Daily Sessions',
-    exportSessionDuration: 'Session Duration Distribution',
-    exportTurnsPerSession: 'Turns Per Session Distribution',
-    exportSessionCost: 'Session Cost Distribution',
+    dailySessions: 'Daily sessions',
+    exportSessionDuration: 'Session duration distribution',
+    exportTurnsPerSession: 'Turns per session distribution',
+    exportSessionCost: 'Session cost distribution',
   },
   zh: {
     stats: '统计',
@@ -84,6 +92,38 @@ const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
 
 const SVG_FONT = 'var(--font-mono, ui-monospace, monospace)';
 const SVG_FONT_SIZE = '9px';
+
+const TICK_MIN_GAP = 6;
+
+interface AxisTickCandidate {
+  index: number;
+  x: number;
+  label: string;
+}
+
+/**
+ * Picks which candidate ticks to show. The last tick is end-anchored at its x so it stays inside
+ * the plot. The others are thinned to every `step`th candidate, using the smallest step at which
+ * no two labels touch; a tick that would collide with the anchored last label is dropped.
+ * Widths are in viewBox units, the same space the tick text renders in, so the spacing holds at
+ * every rendered chart width.
+ */
+function layoutAxisTicks(candidates: AxisTickCandidate[], widths: number[]): Set<number> {
+  const lastIdx = candidates.length - 1;
+  if (lastIdx < 0) return new Set();
+  const lastLeft = candidates[lastIdx].x - widths[lastIdx];
+  const right = (k: number) => candidates[k].x + widths[k] / 2;
+  for (let step = 1; step <= lastIdx; step++) {
+    const picked: number[] = [];
+    for (let k = 0; k < lastIdx; k += step) picked.push(k);
+    while (picked.length > 0 && right(picked.at(-1)!) + TICK_MIN_GAP > lastLeft) picked.pop();
+    const fits = picked.every(
+      (k, j) => j === 0 || right(picked[j - 1]) + TICK_MIN_GAP <= candidates[k].x - widths[k] / 2,
+    );
+    if (fits) return new Set([...picked, lastIdx]);
+  }
+  return new Set([lastIdx]);
+}
 
 function formatDurationLabel(seconds: number): string {
   seconds = Number(seconds);
@@ -131,29 +171,6 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   return ticks;
 }
 
-function SectionHeader({ label, detail }: { label: string; detail?: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="flex-1 h-px bg-border" />
-      {detail && <span className="text-3xs font-mono text-subtle">{detail}</span>}
-    </div>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-        {label}
-      </div>
-      <div className="text-lg font-mono font-bold mt-0.5">{value}</div>
-    </div>
-  );
-}
-
 const PERCENTILE_COLORS: Record<string, string> = {
   p25: '#94a3b8',
   p50: '#ef4444',
@@ -180,11 +197,11 @@ function HistogramChart({
   exportFilename?: string;
   emptyLabel: string;
 }) {
-  const locale = useLocale();
-  const svgRef = useRef<SVGSVGElement>(null);
   if (bins.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">{emptyLabel}</div>
+      <EmptyState bare className="py-8">
+        {emptyLabel}
+      </EmptyState>
     );
   }
 
@@ -201,33 +218,21 @@ function HistogramChart({
 
   return (
     <Expandable title={title}>
-      <div className="rounded-md border border-border bg-surface p-3">
+      <Card>
         {title && (
           <div className="flex items-center justify-end mb-2">
-            <ExportPngButton
-              locale={locale}
-              onClick={() => {
+            <ChartActions
+              fileName={(exportFilename || 'histogram.png').replace(/\.png$/u, '')}
+              onExportPng={() =>
                 track('agentic_workload_session_histogram_export', {
                   title,
                   file_name: exportFilename || 'histogram.png',
-                });
-                if (svgRef.current)
-                  exportSvgToPng(svgRef.current, {
-                    title,
-                    filename: exportFilename || 'histogram.png',
-                    svgWidth: CHART_W,
-                    svgHeight: CHART_H,
-                  });
-              }}
+                })
+              }
             />
           </div>
         )}
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-          className="w-full"
-          style={{ maxHeight: 240 }}
-        >
+        <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ maxHeight: 240 }}>
           {yTicks.map((t) => (
             <g key={`y-${t}`}>
               {t > 0 && (
@@ -342,7 +347,7 @@ function HistogramChart({
         </svg>
 
         {percentiles && (
-          <div className="grid grid-cols-6 gap-1.5 mt-3 pt-3 border-t border-border">
+          <div className="grid grid-cols-6 gap-1.5 mt-3 pt-3 border-t border-border/20">
             {(
               [
                 { label: 'p25', value: percentiles.p25 },
@@ -353,21 +358,14 @@ function HistogramChart({
                 { label: 'p99', value: percentiles.p99 },
               ] as const
             ).map((p) => (
-              <div
-                key={p.label}
-                className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center"
-              >
-                <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-                  {p.label}
-                </div>
-                <div className="text-sm font-mono font-bold tracking-tight mt-0.5">
-                  {formatX(p.value)}
-                </div>
+              <div key={p.label} className="rounded-md bg-muted/40 px-2 py-1.5 text-center">
+                <div className="text-xs font-medium text-muted-foreground">{p.label}</div>
+                <div className="text-sm font-mono font-medium mt-0.5">{formatX(p.value)}</div>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </Card>
     </Expandable>
   );
 }
@@ -386,11 +384,12 @@ function DailySessionsChart({
   exportTitle: string;
 }) {
   const locale = useLocale();
-  const svgRef = useRef<SVGSVGElement>(null);
   const labelEvery = Math.ceil(slice.length / 7);
   if (slice.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">{emptyLabel}</div>
+      <EmptyState bare className="py-8">
+        {emptyLabel}
+      </EmptyState>
     );
   }
 
@@ -405,29 +404,15 @@ function DailySessionsChart({
 
   return (
     <Expandable title={exportTitle}>
-      <div className="rounded-md border border-border bg-surface p-3">
+      <Card>
         <div className="flex items-center justify-between gap-2 mb-2">
           {controls}
-          <ExportPngButton
-            locale={locale}
-            onClick={() => {
-              track('agentic_workload_daily_sessions_export');
-              if (svgRef.current)
-                exportSvgToPng(svgRef.current, {
-                  title: exportTitle,
-                  filename: 'daily-sessions.png',
-                  svgWidth: CHART_W,
-                  svgHeight: CHART_H,
-                });
-            }}
+          <ChartActions
+            fileName="daily-sessions"
+            onExportPng={() => track('agentic_workload_daily_sessions_export')}
           />
         </div>
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-          className="w-full"
-          style={{ maxHeight: 240 }}
-        >
+        <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ maxHeight: 240 }}>
           {yTicks.map((t) => (
             <g key={`y-${t}`}>
               {t > 0 && (
@@ -478,7 +463,7 @@ function DailySessionsChart({
                   rx={1}
                 >
                   <title>
-                    {formatSnapshotDate(d.day)}: {tooltipSessions(d.sessionCount)}
+                    {formatSnapshotDate(d.day, locale)}: {tooltipSessions(d.sessionCount)}
                   </title>
                 </rect>
                 {i % labelEvery === 0 && (
@@ -489,14 +474,14 @@ function DailySessionsChart({
                     className="fill-muted-foreground"
                     style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
                   >
-                    {formatSnapshotDate(d.day)}
+                    {formatSnapshotDate(d.day, locale)}
                   </text>
                 )}
               </g>
             );
           })}
         </svg>
-      </div>
+      </Card>
     </Expandable>
   );
 }
@@ -513,10 +498,44 @@ function ConcurrentSessionsChart({
   exportTitle: string;
 }) {
   const locale = useLocale();
-  const svgRef = useRef<SVGSVGElement>(null);
+  const tickCandidates = useMemo(() => {
+    const interval = Math.max(1, Math.floor(data.length / 6));
+    const indices = data.map((_, i) => i).filter((i) => i % interval === 0);
+    if (data.length > 0 && indices.at(-1) !== data.length - 1) indices.push(data.length - 1);
+    return indices.map((index) => {
+      const date = new Date(data[index].hour);
+      const day = formatExplorerDateTime(
+        date,
+        locale,
+        { month: 'short', day: 'numeric' },
+        { axisTick: true },
+      );
+      const time = formatExplorerDateTime(date, locale, {
+        hour: 'numeric',
+        hour12: true,
+        timeZoneName: 'short',
+      });
+      return {
+        index,
+        x: MARGIN.left + (index / Math.max(data.length - 1, 1)) * PLOT_W,
+        label: `${day} ${time}`,
+      };
+    });
+  }, [data, locale]);
+  const fontsVersion = useFontsVersion();
+  const tickWidths = useMemo(() => {
+    if (tickCandidates.length === 0) return [];
+    const font = chartFont(9, 400, SVG_FONT);
+    return tickCandidates.map((c) => measureTextWidth(c.label, font));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-measure once web fonts load
+  }, [tickCandidates, fontsVersion]);
+  const visibleTicks = layoutAxisTicks(tickCandidates, tickWidths);
+
   if (data.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">{emptyLabel}</div>
+      <EmptyState bare className="py-8">
+        {emptyLabel}
+      </EmptyState>
     );
   }
 
@@ -536,103 +555,81 @@ function ConcurrentSessionsChart({
     'Z',
   ].join(' ');
 
-  const labelInterval = Math.max(1, Math.floor(data.length / 6));
-
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center justify-end mb-2">
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            track('agentic_workload_concurrent_sessions_export');
-            if (svgRef.current)
-              exportSvgToPng(svgRef.current, {
-                title: exportTitle,
-                filename: 'concurrent-sessions.png',
-                svgWidth: CHART_W,
-                svgHeight: CHART_H,
-              });
-          }}
-        />
-      </div>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-        className="w-full"
-        style={{ maxHeight: 240 }}
-      >
-        {yTicks.map((t) => (
-          <g key={`y-${t}`}>
-            {t > 0 && (
-              <line
-                x1={MARGIN.left}
-                y1={sy(t)}
-                x2={MARGIN.left + PLOT_W}
-                y2={sy(t)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
+    <Expandable title={exportTitle}>
+      <Card>
+        <div className="flex items-center justify-end mb-2">
+          <ChartActions
+            fileName="concurrent-sessions"
+            onExportPng={() => track('agentic_workload_concurrent_sessions_export')}
+          />
+        </div>
+        <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ maxHeight: 240 }}>
+          {yTicks.map((t) => (
+            <g key={`y-${t}`}>
+              {t > 0 && (
+                <line
+                  x1={MARGIN.left}
+                  y1={sy(t)}
+                  x2={MARGIN.left + PLOT_W}
+                  y2={sy(t)}
+                  stroke="currentColor"
+                  className="text-border"
+                  strokeWidth={0.5}
+                  strokeDasharray="3 3"
+                />
+              )}
+              <text
+                x={MARGIN.left - 6}
+                y={sy(t) + 3}
+                textAnchor="end"
+                className="fill-muted-foreground"
+                style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
+              >
+                {formatNumber(t)}
+              </text>
+            </g>
+          ))}
+
+          <line
+            x1={MARGIN.left}
+            y1={MARGIN.top + PLOT_H}
+            x2={MARGIN.left + PLOT_W}
+            y2={MARGIN.top + PLOT_H}
+            stroke="currentColor"
+            className="text-border"
+            strokeWidth={0.5}
+          />
+
+          <path d={areaPath} fill="#6366f1" opacity={0.15} />
+
+          <polyline points={points} fill="none" stroke="#6366f1" strokeWidth={1.5} />
+
+          {tickCandidates.map((tick, k) => (
             <text
-              x={MARGIN.left - 6}
-              y={sy(t) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-            >
-              {formatNumber(t)}
-            </text>
-          </g>
-        ))}
-
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top + PLOT_H}
-          x2={MARGIN.left + PLOT_W}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-border"
-          strokeWidth={0.5}
-        />
-
-        <path d={areaPath} fill="#6366f1" opacity={0.15} />
-
-        <polyline points={points} fill="none" stroke="#6366f1" strokeWidth={1.5} />
-
-        {data.map((d, i) => {
-          if (i % labelInterval !== 0) return null;
-          const date = new Date(d.hour);
-          const label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-          const timeLabel = date.toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            hour12: true,
-            timeZoneName: 'short',
-          });
-          return (
-            <text
-              key={d.hour}
-              x={sx(i)}
+              key={tick.index}
+              x={tick.x}
               y={MARGIN.top + PLOT_H + 14}
-              textAnchor="middle"
+              textAnchor={k === tickCandidates.length - 1 ? 'end' : 'middle'}
+              visibility={visibleTicks.has(k) ? undefined : 'hidden'}
+              aria-hidden={visibleTicks.has(k) ? undefined : true}
               className="fill-muted-foreground"
               style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
             >
-              {label} {timeLabel}
+              {tick.label}
             </text>
-          );
-        })}
+          ))}
 
-        {data.map((d, i) => (
-          <circle key={d.hour} cx={sx(i)} cy={sy(d.activeSessions)} r={1.5} fill="#6366f1">
-            <title>
-              {formatTimestamp(d.hour)}: {d.activeSessions} {activeLabel}
-            </title>
-          </circle>
-        ))}
-      </svg>
-    </div>
+          {data.map((d, i) => (
+            <circle key={d.hour} cx={sx(i)} cy={sy(d.activeSessions)} r={1.5} fill="#6366f1">
+              <title>
+                {formatTimestamp(d.hour, locale)}: {d.activeSessions} {activeLabel}
+              </title>
+            </circle>
+          ))}
+        </svg>
+      </Card>
+    </Expandable>
   );
 }
 
@@ -681,23 +678,21 @@ function SessionInsightsPageContent() {
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-md border border-border bg-surface p-3">
+              <div key={i} className="rounded-xl border border-border/30 bg-card p-3">
                 <Skeleton className="h-3 w-20 mb-2" />
                 <Skeleton className="h-6 w-16" />
               </div>
             ))}
           </div>
         ) : error || !data ? (
-          <div className="text-sm font-mono text-muted-foreground text-center py-8">
-            {t.failedToLoad}
-          </div>
+          <EmptyState>{t.failedToLoad}</EmptyState>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <StatCard label={t.avgDuration} value={formatDurationStat(data.stats.avgDuration)} />
-            <StatCard label={t.avgTurnsPerSession} value={data.stats.avgTurns.toFixed(1)} />
-            <StatCard label={t.avgCostPerSession} value={`$${data.stats.avgCost.toFixed(2)}`} />
-            <StatCard label={t.activeFinal24h} value={formatNumber(data.stats.active24h)} />
-          </div>
+          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <Stat boxed label={t.avgDuration} value={formatDurationStat(data.stats.avgDuration)} />
+            <Stat boxed label={t.avgTurnsPerSession} value={data.stats.avgTurns.toFixed(1)} />
+            <Stat boxed label={t.avgCostPerSession} value={`$${data.stats.avgCost.toFixed(2)}`} />
+            <Stat boxed label={t.activeFinal24h} value={formatNumber(data.stats.active24h)} />
+          </dl>
         )}
       </div>
 

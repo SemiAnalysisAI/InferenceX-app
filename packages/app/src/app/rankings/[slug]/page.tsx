@@ -22,6 +22,7 @@ import {
   type RankingPageEntry,
 } from '@/lib/live-seo/rankings';
 import { getRankingPageData, type RankingPageData } from '@/lib/live-seo/run-rankings-data.server';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 import { RANKING_STANDARD_TIER } from '@/lib/live-seo/ranking-tier';
 
 export const revalidate = 86400;
@@ -205,7 +206,7 @@ export default async function RankingPage({ params }: Props) {
         href: `/model/${entry.model.slug}`,
         label: `${entry.model.seoName} deep dive: architecture, evals, and performance`,
       },
-      { href: '/inference', label: 'Interactive inference dashboard' },
+      { href: getDashboardRoute('inference').path, label: 'Interactive inference dashboard' },
       { href: '/overview', label: 'Cross-model inference leaderboard' },
       { href: '/compare', label: 'Head-to-head GPU comparisons' },
       { href: '/chips', label: 'GPU specs and pricing' },

@@ -1,6 +1,7 @@
 import type { Locale } from '@/lib/i18n/i18n';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
-export const EXPLORER_BASE_PATH = '/agentic-workload-explorer';
+export const EXPLORER_BASE_PATH = getDashboardRoute('agentic-workload-explorer').path;
 
 export const EXPLORER_API_BASE = '/api/v1/agentic-workload-explorer';
 

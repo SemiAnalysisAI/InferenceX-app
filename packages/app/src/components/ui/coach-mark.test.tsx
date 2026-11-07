@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/inference',
+  usePathname: () => '/infx/inference',
 }));
 
 import { CoachMark } from '@/components/ui/coach-mark';

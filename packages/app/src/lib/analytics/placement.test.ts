@@ -52,7 +52,7 @@ describe('installOutboundLinkTracking', () => {
         <a id="gh" href="https://github.com/SemiAnalysisAI/InferenceX"><span id="label">GitHub</span></a>
       </header>
       <a id="bare" href="https://newsletter.semianalysis.com/">News</a>
-      <a id="local" href="/inference">Local</a>`;
+      <a id="local" href="/infx/inference">Local</a>`;
     const uninstall = installOutboundLinkTracking();
     document.addEventListener('click', stopNavigation);
     try {

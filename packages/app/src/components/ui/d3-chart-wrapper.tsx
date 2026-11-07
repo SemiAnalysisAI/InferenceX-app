@@ -1,15 +1,18 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { useIsCoarsePointer, useIsMobileViewport, useMediaQuery } from '@/hooks/useMediaQuery';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { chartFont, measureTextWidth, useFontsVersion } from '@/lib/d3-chart/dynamic-margins';
+import { CHART_TOOLTIP_Z_INDEX } from '@/lib/d3-chart/tooltip-placement';
+import { cn } from '@/lib/shared/utils';
 
 const DEFAULT_CHART_INSTRUCTIONS = {
-  en: 'Shift+Scroll to zoom • Drag to pan • Double-click to reset • Click a point to pin tooltip',
-  zh: '按住 Shift 滚动以缩放 · 拖动以平移 · 双击以重置 · 点击数据点固定提示框',
+  en: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
+  zh: '按住 Shift 滚动以缩放 · 拖动以平移 · 双击以重置',
 } as const;
 
 const SHEET_STRINGS = {
@@ -20,8 +23,8 @@ const SHEET_STRINGS = {
 const SHEET_SWIPE_DISMISS_PX = 64;
 
 const TOUCH_CHART_INSTRUCTIONS = {
-  en: 'Pinch to zoom • Two-finger drag to pan • Double-tap to reset • Tap a point to pin tooltip',
-  zh: '双指捏合以缩放 · 双指拖动以平移 · 双击以重置 · 点按数据点固定提示框',
+  en: 'Pinch to zoom · Two-finger drag to pan · Double-tap to reset',
+  zh: '双指捏合以缩放 · 双指拖动以平移 · 双击以重置',
 } as const;
 
 export const TOUCH_PRIMARY_QUERY = '(hover: none) and (pointer: coarse)';
@@ -29,10 +32,12 @@ export const TOUCH_PRIMARY_QUERY = '(hover: none) and (pointer: coarse)';
 export function resolveChartInstructions(
   instructions: string | undefined,
   locale: Locale,
-  useTouchHint: boolean,
+  zoomEnabled: boolean,
+  touchPrimary: boolean,
 ): string {
-  const resolved = instructions ?? DEFAULT_CHART_INSTRUCTIONS[locale];
-  return useTouchHint && resolved ? TOUCH_CHART_INSTRUCTIONS[locale] : resolved;
+  if (!zoomEnabled) return instructions ?? '';
+  if (touchPrimary && instructions !== '') return TOUCH_CHART_INSTRUCTIONS[locale];
+  return instructions ?? DEFAULT_CHART_INSTRUCTIONS[locale];
 }
 
 function PortalTooltip({
@@ -93,7 +98,7 @@ function PortalTooltip({
         opacity: pinned ? 1 : 0,
         pointerEvents: pinned ? 'auto' : 'none',
         display: pinned ? 'block' : 'none',
-        zIndex: 9999,
+        zIndex: CHART_TOOLTIP_Z_INDEX,
       }}
     />
   );
@@ -126,6 +131,8 @@ export interface D3ChartWrapperProps {
   dimensions: { width: number; height: number };
   plotTop?: number;
   pinnedPoint: unknown | null;
+  details?: React.ReactNode;
+  onDetailsClose?: () => void;
   isPinned: () => boolean;
   dismissTooltip: () => void;
   hideTooltipElements: (
@@ -151,6 +158,8 @@ export function D3ChartWrapper({
   dimensions,
   plotTop = 0,
   pinnedPoint,
+  details,
+  onDetailsClose,
   isPinned,
   dismissTooltip,
   hideTooltipElements,
@@ -169,42 +178,96 @@ export function D3ChartWrapper({
   const resolvedInstructions = resolveChartInstructions(
     instructions,
     locale,
-    zoomEnabled && isTouchPrimary,
+    zoomEnabled,
+    isTouchPrimary,
   );
+
+  const hasDetails = Boolean(details);
+  const onDetailsCloseRef = useRef(onDetailsClose);
+  onDetailsCloseRef.current = onDetailsClose;
+  const legendSlotRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!pinnedPoint) return;
 
     const dismiss = () => {
-      dismissTooltip();
+      if (hasDetails && onDetailsCloseRef.current) onDetailsCloseRef.current();
+      else dismissTooltip();
       hideTooltipElements(tooltipRef, svgRef);
     };
+    const inPopper = (target: EventTarget | null) =>
+      target instanceof Element && target.closest('[data-radix-popper-content-wrapper]') !== null;
     const onOutsideClick = (event: MouseEvent) => {
       const target = event.target;
       if (!(target instanceof Node)) return;
       // Point switching and empty-plot clicks already belong to the chart.
       if (svgRef.current?.contains(target) || tooltipRef.current?.contains(target)) return;
+      // The details panel sits in the legend slot and owns its own close button.
+      if (hasDetails && legendSlotRef.current?.contains(target)) return;
       // The mobile backdrop owns its dismissal and stops the underlying click.
       if (target instanceof Element && target.closest('[data-testid="chart-sheet-backdrop"]'))
         return;
+      if (inPopper(target)) return;
       dismiss();
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') dismiss();
+      if (event.key !== 'Escape' || inPopper(event.target)) return;
+      if (hasDetails) event.preventDefault();
+      dismiss();
     };
 
     // Capture outside clicks even when a page control stops propagation.
     document.addEventListener('click', onOutsideClick, true);
-    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, true);
     return () => {
       document.removeEventListener('click', onOutsideClick, true);
-      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keydown', onKeyDown, true);
     };
-  }, [pinnedPoint, dismissTooltip, hideTooltipElements, tooltipRef, svgRef]);
+  }, [pinnedPoint, hasDetails, dismissTooltip, hideTooltipElements, tooltipRef, svgRef]);
+
+  const legendWidthRef = useRef(0);
+  useLayoutEffect(() => {
+    if (!hasDetails && legendSlotRef.current) {
+      legendWidthRef.current = legendSlotRef.current.getBoundingClientRect().width;
+    }
+  });
+
+  const hintRef = useRef<HTMLParagraphElement>(null);
+  const [hintWidth, setHintWidth] = useState<number | null>(null);
+  const [hintInset, setHintInset] = useState(12);
+  const fontsVersion = useFontsVersion();
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg || !resolvedInstructions) return;
+    const natural = measureTextWidth(resolvedInstructions, chartFont(11));
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const svgRight = svg.getBoundingClientRect().right;
+      const label = svg.querySelector('.x-axis-label');
+      const space = label?.textContent
+        ? Math.floor(svgRight - label.getBoundingClientRect().right - 36)
+        : 0;
+      const domain = svg.querySelector('.x-axis > .domain');
+      if (domain)
+        setHintInset(Math.max(0, Math.round(svgRight - domain.getBoundingClientRect().right)));
+      setHintWidth(space * 2 >= natural + 24 ? space : null);
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+    schedule();
+    const mutations = new MutationObserver(schedule);
+    mutations.observe(svg, { childList: true, subtree: true, characterData: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      mutations.disconnect();
+    };
+  }, [svgRef, resolvedInstructions, fontsVersion]);
 
   const plot = (
     <div
-      className="flex flex-col lg:flex-row w-full"
+      className={cn('flex flex-col w-full', legendElement && 'lg:flex-row')}
       style={scrollablePlot ? { minWidth: scrollablePlot.minWidth } : undefined}
     >
       <div ref={setContainerRef} className="relative flex-1 min-w-0">
@@ -239,7 +302,7 @@ export function D3ChartWrapper({
           <PortalTooltip
             chartId={chartId}
             tooltipRef={tooltipRef}
-            pinned={Boolean(pinnedPoint)}
+            pinned={Boolean(pinnedPoint) && !hasDetails}
             onSheetDismiss={() => {
               dismissTooltip();
               hideTooltipElements(tooltipRef, svgRef);
@@ -248,7 +311,19 @@ export function D3ChartWrapper({
           {noDataOverlay}
         </div>
         {resolvedInstructions && (
-          <p className="no-export text-xs text-muted-foreground text-center mt-2">
+          <p
+            ref={hintRef}
+            data-testid="chart-instructions"
+            className={cn(
+              'no-export text-balance text-muted-foreground',
+              hintWidth === null
+                ? 'mt-2 text-center text-xs'
+                : 'pointer-events-none relative ml-auto -mt-[21px] mb-1.5 text-right text-2xs leading-4',
+            )}
+            style={
+              hintWidth === null ? undefined : { maxWidth: hintWidth, paddingRight: hintInset }
+            }
+          >
             {resolvedInstructions}
           </p>
         )}
@@ -256,13 +331,40 @@ export function D3ChartWrapper({
           <div id={`${chartId}-export`} className="p-4"></div>
         </div>
       </div>
-      {legendElement && (
+      {(legendElement || hasDetails) && (
         <div
+          ref={legendSlotRef}
           data-slot="chart-legend-wrapper"
-          className="w-full lg:w-auto lg:shrink-0 lg:self-start relative mt-3 lg:mt-[var(--chart-legend-top)] lg:has-[.sidebar-legend]:w-fit lg:has-[.sidebar-legend]:min-w-48 lg:has-[.sidebar-legend]:max-w-96"
-          style={{ '--chart-legend-top': `${plotTop + 8}px` } as React.CSSProperties}
+          className={cn(
+            'relative mt-3 w-full',
+            legendElement
+              ? cn(
+                  'lg:max-w-96 lg:shrink-0 lg:mt-[var(--chart-legend-top)]',
+                  hasDetails ? 'lg:self-start' : 'lg:self-stretch',
+                )
+              : 'max-w-96',
+            legendElement &&
+              (hasDetails
+                ? 'lg:w-[var(--chart-legend-width)]'
+                : 'lg:w-auto lg:has-[.sidebar-legend]:w-fit lg:has-[.sidebar-legend]:min-w-48'),
+          )}
+          style={
+            {
+              '--chart-legend-top': `${plotTop}px`,
+              '--chart-legend-width': `${legendWidthRef.current || 288}px`,
+            } as React.CSSProperties
+          }
         >
-          {legendElement}
+          {details}
+          <div
+            className={
+              hasDetails
+                ? 'hidden'
+                : 'contents lg:flex lg:h-0 lg:min-h-full lg:flex-col lg:overflow-y-auto'
+            }
+          >
+            {legendElement}
+          </div>
         </div>
       )}
     </div>

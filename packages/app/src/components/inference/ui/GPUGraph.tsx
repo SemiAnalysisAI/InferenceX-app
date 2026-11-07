@@ -18,6 +18,9 @@ import {
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
+import { InlineNudgeSlot } from '@/components/nudges/inline-nudge-slot';
+import { EngineComparisonConflictNotice } from '@/components/inference/ui/engine-comparison-conflict-notice';
+import { NUDGE_SLOTS } from '@/lib/nudges/inline-slot';
 import { Button } from '@/components/ui/button';
 import { OFFICIAL_PREVIEW_SERIES } from '@/components/ui/official-preview-notice';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
@@ -51,6 +54,7 @@ import {
   overlayMarkerPosition,
   xMarkerPath,
 } from '@/lib/d3-chart/overlay-x-marker';
+import { frameworkDasharray } from '@/lib/charts/framework-dash';
 import {
   overlayRooflineDasharray,
   overlayRunColor,
@@ -71,10 +75,10 @@ import type {
 import { comparisonEntryLabel } from '@/components/inference/utils/comparisonEntry';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import {
-  generateGPUGraphTooltipContent,
+  buildPointDetails,
   generateHoverTooltipContent,
-  generateOverlayTooltipContent,
 } from '@/components/inference/utils/tooltipUtils';
+import { PointDetailsPanel } from '@/components/inference/ui/PointDetailsPanel';
 import { useComparisonSeries } from '@/components/inference/hooks/useComparisonSeries';
 import { usePowerTraceAction } from '@/components/inference/hooks/usePowerTraceAction';
 import { pointLabelText } from '@/components/inference/ui/point-label';
@@ -116,6 +120,7 @@ import {
   renderLineLabels,
   updateRenderedLineLabels,
   type LineLabelSeries,
+  type PillOccluder,
 } from '@/components/inference/ui/line-label-layer';
 import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
 
@@ -133,7 +138,7 @@ const FixedSequenceLogDialog = dynamic(() =>
   ),
 );
 
-const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
+const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 72 };
 
 const OVERLAY_SERIES_PREFIX = 'overlay-run';
 
@@ -160,35 +165,34 @@ function labelTextFor(
   numbering: Map<string, number>,
   showFrameworkLabel: boolean,
 ): string {
-  return `${hardwareLabelFor(pts, showFrameworkLabel)} • ${comparisonEntryLabel(String(pts[0].date), numbering)}`;
+  return `${hardwareLabelFor(pts, showFrameworkLabel)} · ${comparisonEntryLabel(String(pts[0].date), numbering)}`;
 }
 
 const GPU_STRINGS = {
   en: {
-    logScale: 'Log Scale',
-    highContrast: 'High Contrast',
-    optimalOnly: 'Optimal Only',
+    logScale: 'Log scale',
+    highContrast: 'High contrast',
+    optimalOnly: 'Optimal only',
     powerBoundaryInfo:
       'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
     labels: '# of GPUs Label',
-    parallelismLabels: 'Parallelism Labels',
+    parallelismLabels: 'Parallelism labels',
     concurrencyLabels: '# Concurrent Sessions',
-    lineLabels: 'Line Labels',
-    frameworkLabel: 'Framework Line Label',
-    offloadingLabel: 'Offloading Label',
-    perfRuler: 'Perf Ruler',
+    lineLabels: 'Line labels',
+    frameworkLabel: 'Framework line label',
+    offloadingLabel: 'Offloading label',
+    perfRuler: 'Perf ruler',
     perfRulerInfo:
       'Click two curves to place a vertical ruler, then drag it to measure the ratio of their Y-axis values at any x value — across dates of the same chip config or across chip configs. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
-    resetFilter: 'Reset filter',
     clearPerfRulers: (count: number) => `Clear rulers (${count})`,
-    quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
+    quickFilters: (count: number) => (count > 0 ? `Quick filters (${count})` : 'Quick filters'),
     noData: 'No data available',
     noDataHint: 'Please change the model, sequence, precision, date range or chip selection.',
     noRoleEnergyDataHint:
       'This dataset does not report role-level prefill/decode energy. Choose a different model, scenario, precision, date, or measured-energy metric.',
     noMeasuredDataHint:
       'No measured GPU power is reported for this selection. Choose other chip configs, or a different model, scenario, precision or date.',
-    unofficialTitle: (branch: string) => `UNOFFICIAL: ${branch}`,
+    unofficialTitle: (branch: string) => `Unofficial: ${branch}`,
   },
   zh: {
     logScale: '对数缩放',
@@ -205,7 +209,6 @@ const GPU_STRINGS = {
     perfRuler: '性能标尺',
     perfRulerInfo:
       '先点击两条曲线放置垂直标尺，再拖动标尺，比较任意横坐标下两条曲线的纵轴数值之比，既可比较同一芯片配置的不同日期，也可比较不同芯片配置。重复操作可添加多把标尺（最多 8 把）；悬停标尺并点击 × 可删除该标尺。关闭开关将清除所有标尺。',
-    resetFilter: '重置筛选',
     clearPerfRulers: (count: number) => `清除标尺（${count}）`,
     quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
     noData: '暂无数据',
@@ -618,9 +621,10 @@ const GPUGraph = React.memo(
     const getRooflineDasharray = useCallback(
       (key: string) => {
         const point = rooflines[key]?.[0];
-        return point && overlayPointSet.has(point)
+        if (!point) return null;
+        return overlayPointSet.has(point)
           ? overlayRooflineDasharray(overlayRunOf(point))
-          : null;
+          : (frameworkDasharray(point.hwKey) ?? null);
       },
       [rooflines, overlayPointSet, overlayRunOf],
     );
@@ -667,12 +671,24 @@ const GPUGraph = React.memo(
         yScale: ContinuousScale,
         zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
       ) => {
-        if (!showLineLabels) return [];
+        if (!showLineLabels) return { labels: [], occluders: [] };
         const series = buildSeries();
-        return placeLineLabels(series, xScale, yScale, {
-          collisionWidth: 160,
-          obstacles: parallelismLabelBoxes(zoomGroup.node()),
-        });
+        const labelKeyByGraph = new Map(series.map((entry) => [entry.seriesId, entry.key]));
+        const occluders: PillOccluder[] = [];
+        for (const [key, points] of Object.entries(rooflines)) {
+          if (points.length === 0 || !isRooflineVisible(key)) continue;
+          occluders.push({
+            key: labelKeyByGraph.get(seriesIdOf(points[0])) ?? key,
+            points: points.map((point) => ({ x: xScale(point.x), y: yScale(point.y) })),
+          });
+        }
+        return {
+          labels: placeLineLabels(series, xScale, yScale, {
+            collisionWidth: 160,
+            obstacles: parallelismLabelBoxes(zoomGroup.node()),
+          }),
+          occluders,
+        };
       };
 
       return {
@@ -680,41 +696,41 @@ const GPUGraph = React.memo(
         key: 'line-labels',
         displayIdentity: `${showLineLabels ? 'visible' : 'hidden'}:${showFrameworkLabel}:${paletteIdentity}`,
         render: (zoomGroup, ctx) => {
-          renderLineLabels(
+          const { labels, occluders } = placeLabels(
+            ctx.xScale as ContinuousScale,
+            ctx.yScale as ContinuousScale,
             zoomGroup,
-            placeLabels(ctx.xScale as ContinuousScale, ctx.yScale as ContinuousScale, zoomGroup),
-            {
-              seriesAttribute: 'data-graph-id',
-              opacity: showLineLabels ? 0.95 : 0,
-            },
           );
+          renderLineLabels(zoomGroup, labels, {
+            seriesAttribute: 'data-graph-id',
+            opacity: showLineLabels ? 0.95 : 0,
+            occluders,
+          });
         },
         onDisplayUpdate: (zoomGroup, ctx) => {
           const transform = d3.zoomTransform(ctx.layout.svg.node()!);
-          renderLineLabels(
+          const { labels, occluders } = placeLabels(
+            transform.rescaleX(ctx.xScale as ContinuousScale),
+            transform.rescaleY(ctx.yScale as ContinuousScale),
             zoomGroup,
-            placeLabels(
-              transform.rescaleX(ctx.xScale as ContinuousScale),
-              transform.rescaleY(ctx.yScale as ContinuousScale),
-              zoomGroup,
-            ),
-            {
-              seriesAttribute: 'data-graph-id',
-              opacity: showLineLabels ? 0.95 : 0,
-            },
           );
+          renderLineLabels(zoomGroup, labels, {
+            seriesAttribute: 'data-graph-id',
+            opacity: showLineLabels ? 0.95 : 0,
+            occluders,
+          });
           zoomGroup.selectAll('.line-label').raise();
         },
         onZoom: (zoomGroup, ctx) => {
-          updateRenderedLineLabels(
+          const { labels, occluders } = placeLabels(
+            ctx.newXScale as ContinuousScale,
+            ctx.newYScale as ContinuousScale,
             zoomGroup,
-            placeLabels(
-              ctx.newXScale as ContinuousScale,
-              ctx.newYScale as ContinuousScale,
-              zoomGroup,
-            ),
-            { opacity: showLineLabels ? 0.95 : 0 },
           );
+          updateRenderedLineLabels(zoomGroup, labels, {
+            opacity: showLineLabels ? 0.95 : 0,
+            occluders,
+          });
         },
       };
     }, [
@@ -1081,6 +1097,7 @@ const GPUGraph = React.memo(
           hw: id,
           label: `✕ ${hardwareLabelFor(points)}`,
           color: overlayRunColor(runIndex),
+          lineDasharray: overlayRooflineDasharray(runIndex),
           title: legendT.unofficialTitle(branch),
           isActive: true,
           isRemovable: false,
@@ -1089,7 +1106,66 @@ const GPUGraph = React.memo(
       });
     }, [overlayPoints, overlaySeriesId, overlayRunOf, unofficialRunInfos, legendT]);
 
-    const attachPowerTraceAction = usePowerTraceAction(chartRef);
+    const openPowerTrace = usePowerTraceAction(chartRef);
+
+    const pointDetails = useCallback(
+      (d: InferenceData, isOverlay: boolean) =>
+        buildPointDetails({
+          data: d,
+          xLabel,
+          yLabel,
+          selectedYAxisMetric,
+          hardwareConfig,
+          overlayData: isOverlay ? (overlayData ?? undefined) : undefined,
+          comparisonDate: true,
+          comparisonLabel: comparisonEntryLabel(d.date, runNumbering),
+          showPowerTelemetry: showPowerTelemetryRef.current,
+          runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
+          hasTrace:
+            d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)
+              ? presenceRef.current?.trace.has(d.id) === true
+              : false,
+          hasLog: isPersistedBenchmarkId(d.id)
+            ? presenceRef.current?.log.has(d.id) === true
+            : false,
+          locale,
+          color: getColor(d),
+        }),
+      [
+        xLabel,
+        yLabel,
+        selectedYAxisMetric,
+        hardwareConfig,
+        overlayData,
+        getColor,
+        runNumbering,
+        locale,
+      ],
+    );
+    const hoverCard = useCallback(
+      (d: InferenceData, isOverlay: boolean) =>
+        generateHoverTooltipContent({
+          data: d,
+          xLabel,
+          yLabel,
+          selectedYAxisMetric,
+          hardwareConfig,
+          overlayData: isOverlay ? (overlayData ?? undefined) : undefined,
+          color: getColor(d),
+          comparisonLabel: comparisonEntryLabel(d.date, runNumbering),
+          locale,
+        }),
+      [
+        xLabel,
+        yLabel,
+        selectedYAxisMetric,
+        hardwareConfig,
+        overlayData,
+        getColor,
+        runNumbering,
+        locale,
+      ],
+    );
     const overlayPointsLayer: CustomLayerConfig = useMemo(() => {
       const updateLabels = (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
         zoomGroup
@@ -1167,24 +1243,8 @@ const GPUGraph = React.memo(
             hoverPath: xMarkerPath(7, 0.7),
             tooltip,
             handle: chartRef.current,
-            content: (point, pinned) => {
-              if (!overlayData) return '';
-              const config = {
-                data: point,
-                color: overlayRunColor(overlayRunOf(point)),
-                isPinned: pinned,
-                xLabel,
-                yLabel,
-                selectedYAxisMetric,
-                hardwareConfig: overlayData.hardwareConfig,
-                overlayData,
-                comparisonLabel: comparisonEntryLabel(point.date, runNumbering),
-                locale,
-              };
-              return pinned
-                ? generateOverlayTooltipContent(config)
-                : generateHoverTooltipContent(config);
-            },
+            panel: true,
+            content: (point) => hoverCard(point, true),
             position: (event) => {
               const [mouseX, mouseY] = d3.pointer(event, container);
               return computeTooltipPosition(mouseX, mouseY, tooltip, container);
@@ -1220,7 +1280,6 @@ const GPUGraph = React.memo(
                 y: point.y,
                 overlay: true,
               });
-              attachPowerTraceAction(ctx.tooltipElement, point, true);
             },
           });
         },
@@ -1237,17 +1296,12 @@ const GPUGraph = React.memo(
       visibleOverlayPoints,
       showOffloadingLabel,
       overlayRunOf,
-      overlayData,
       showPointLabels,
       pointLabelsVisible,
       useAdvancedLabels,
       showConcurrencyLabels,
-      xLabel,
-      yLabel,
-      selectedYAxisMetric,
-      runNumbering,
-      locale,
-      attachPowerTraceAction,
+      hoverCard,
+      getColor,
     ]);
 
     const handleLegendHover = useCallback(
@@ -1436,31 +1490,47 @@ const GPUGraph = React.memo(
         }}
         tooltip={{
           rulerType: 'crosshair',
-          content: (d: InferenceData, isPinned: boolean) => {
-            const config = {
-              data: d,
-              color: getCssColor(getColor(d)),
-              comparisonLabel: comparisonEntryLabel(d.date, runNumbering),
-              isPinned,
-              xLabel,
-              yLabel,
-              selectedYAxisMetric,
-              hardwareConfig,
-              showPowerTelemetry: showPowerTelemetryRef.current,
-              runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
-              hasTrace:
-                d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)
-                  ? presenceRef.current?.trace.has(d.id) === true
-                  : false,
-              hasLog: isPersistedBenchmarkId(d.id)
-                ? presenceRef.current?.log.has(d.id) === true
-                : false,
-              locale,
-            };
-            return isPinned
-              ? generateGPUGraphTooltipContent(config)
-              : generateHoverTooltipContent(config);
-          },
+          content: (d: InferenceData) => hoverCard(d, false),
+          details: (d: InferenceData, isOverlay: boolean, close: () => void) => (
+            <PointDetailsPanel
+              details={pointDetails(d, isOverlay)}
+              color={getColor(d)}
+              onClose={close}
+              onAction={(action, event) => {
+                event.stopPropagation();
+                if (action === 'view-power-trace') {
+                  openPowerTrace(event, d, isOverlay);
+                } else if (action === 'view-charts') {
+                  if (!ephemeralUrlState) rememberChartStateInUrl();
+                  track('gpu_timeseries_view_charts_opened', {
+                    id: d.id,
+                    gpu: String(d.hwKey),
+                    conc: d.conc,
+                  });
+                } else if (action === 'view-power-telemetry') {
+                  setPowerTelemetryPoint(d);
+                  chartRef.current?.dismissTooltip();
+                  track('inference_power_telemetry_opened', {
+                    id: d.id,
+                    gpu: d.hwKey,
+                    conc: d.conc,
+                  });
+                } else if (action === 'view-logs' && typeof d.id === 'number') {
+                  if (d.benchmark_type !== 'agentic_traces') {
+                    event.preventDefault();
+                    setFixedLogPointId(d.id);
+                    chartRef.current?.dismissTooltip();
+                  }
+                  track('gpu_timeseries_view_logs_opened', {
+                    id: d.id,
+                    gpu: String(d.hwKey),
+                    conc: d.conc,
+                    benchmark_type: d.benchmark_type ?? 'single_turn',
+                  });
+                }
+              }}
+            />
+          ),
           getRulerX: (d, xScale) => (xScale as d3.ScaleLinear<number, number>)(d.x),
           getRulerY: (d, yScale) => (yScale as d3.ScaleLinear<number, number>)(d.y),
           onHoverStart: (sel, d) =>
@@ -1492,58 +1562,6 @@ const GPUGraph = React.memo(
               x: d.x,
               y: d.y,
             });
-            const tooltipEl = chartRef.current?.getTooltipElement();
-            if (!tooltipEl) return;
-            const viewBtn = tooltipEl.querySelector('[data-action="view-charts"]');
-            if (viewBtn && isPersistedBenchmarkId(d.id)) {
-              viewBtn.addEventListener('click', (event) => {
-                event.stopPropagation();
-                if (!ephemeralUrlState) rememberChartStateInUrl();
-                track('gpu_timeseries_view_charts_opened', {
-                  id: d.id,
-                  gpu: String(d.hwKey),
-                  conc: d.conc,
-                });
-              });
-            }
-            const powerBtn = tooltipEl.querySelector('[data-action="view-power-telemetry"]');
-            if (powerBtn && isPersistedBenchmarkId(d.id)) {
-              powerBtn.addEventListener('click', (event) => {
-                event.stopPropagation();
-                setPowerTelemetryPoint(d);
-                chartRef.current?.dismissTooltip();
-                track('inference_power_telemetry_opened', {
-                  id: d.id,
-                  gpu: d.hwKey,
-                  conc: d.conc,
-                });
-              });
-            }
-            const logsBtn = tooltipEl.querySelector('[data-action="view-logs"]');
-            if (logsBtn && typeof d.id === 'number') {
-              logsBtn.addEventListener('click', (event) => {
-                event.stopPropagation();
-                if (d.benchmark_type !== 'agentic_traces') {
-                  event.preventDefault();
-                  setFixedLogPointId(d.id!);
-                  chartRef.current?.dismissTooltip();
-                }
-                track('gpu_timeseries_view_logs_opened', {
-                  id: d.id,
-                  gpu: String(d.hwKey),
-                  conc: d.conc,
-                  benchmark_type: d.benchmark_type ?? 'single_turn',
-                });
-              });
-            }
-            attachPowerTraceAction(tooltipEl, d, false);
-            requestAnimationFrame(() => {
-              const pinnedTooltip = chartRef.current?.getTooltipElement();
-              if (!pinnedTooltip || chartRef.current?.getPinnedPoint() !== d) return;
-              pinnedTooltip.style.opacity = '1';
-              pinnedTooltip.style.display = 'block';
-              pinnedTooltip.style.pointerEvents = 'auto';
-            });
           },
           attachToLayer: 1,
         }}
@@ -1570,191 +1588,199 @@ const GPUGraph = React.memo(
         }}
         onExportRender={decorateRender}
         legendElement={
-          <ChartLegend
-            variant="sidebar"
-            grouped={true}
-            disableActiveSort={true}
-            onItemHover={handleLegendHover}
-            onItemHoverEnd={handleLegendHoverEnd}
-            onItemRemove={handleLegendRemove}
-            legendItems={[
-              ...overlayLegendItems,
-              ...allGraphs
-                .filter(({ id }) => idsWithData.has(id))
-                .map(({ date, color, hwKey, id }) => ({
-                  name: `${hwKey} ${comparisonEntryLabel(date, runNumbering)}`,
-                  hw: id,
-                  label: comparisonEntryLabel(date, runNumbering),
-                  color,
-                  title: getDisplayLabel(getHardwareConfig(hwKey, modelLabel)),
-                  isActive: activeDates.has(id),
-                  onClick: () => {
-                    toggleActiveDate(id);
-                    track('interactivity_date_toggled', { date, gpu: hwKey });
+          <>
+            <InlineNudgeSlot slot={NUDGE_SLOTS.inferenceLegend} className="mb-2" />
+            <EngineComparisonConflictNotice className="mb-2" />
+            <ChartLegend
+              variant="sidebar"
+              grouped={true}
+              disableActiveSort={true}
+              onItemHover={handleLegendHover}
+              onItemHoverEnd={handleLegendHoverEnd}
+              onItemRemove={handleLegendRemove}
+              legendItems={[
+                ...overlayLegendItems,
+                ...allGraphs
+                  .filter(({ id }) => idsWithData.has(id))
+                  .map(({ date, color, hwKey, id }) => ({
+                    name: `${hwKey} ${comparisonEntryLabel(date, runNumbering)}`,
+                    hw: id,
+                    label: comparisonEntryLabel(date, runNumbering),
+                    color,
+                    lineDasharray: frameworkDasharray(hwKey),
+                    title: getDisplayLabel(getHardwareConfig(hwKey, modelLabel)),
+                    isActive: activeDates.has(id),
+                    onClick: () => {
+                      toggleActiveDate(id);
+                      track('interactivity_date_toggled', { date, gpu: hwKey });
+                    },
+                  })),
+              ]}
+              isLegendExpanded={isLegendExpanded}
+              onExpandedChange={(expanded) => {
+                setIsLegendExpanded(expanded);
+                track('interactivity_legend_expanded', { enabled: expanded });
+              }}
+              switches={[
+                {
+                  id: 'gpu-log-scale',
+                  label: legendT.logScale,
+                  advanced: true,
+                  checked: logScale,
+                  onCheckedChange: (c) => {
+                    setLogScale(c);
+                    track('interactivity_log_scale_toggled', { enabled: c });
                   },
-                })),
-            ]}
-            isLegendExpanded={isLegendExpanded}
-            onExpandedChange={(expanded) => {
-              setIsLegendExpanded(expanded);
-              track('interactivity_legend_expanded', { enabled: expanded });
-            }}
-            switches={[
-              {
-                id: 'gpu-log-scale',
-                label: legendT.logScale,
-                advanced: true,
-                checked: logScale,
-                onCheckedChange: (c) => {
-                  setLogScale(c);
-                  track('interactivity_log_scale_toggled', { enabled: c });
                 },
-              },
-              {
-                id: 'gpu-high-contrast',
-                label: legendT.highContrast,
-                advanced: true,
-                checked: highContrast,
-                onCheckedChange: (c) => {
-                  setHighContrast(c);
-                  track('interactivity_high_contrast_toggled', { enabled: c });
+                {
+                  id: 'gpu-high-contrast',
+                  label: legendT.highContrast,
+                  advanced: true,
+                  checked: highContrast,
+                  onCheckedChange: (c) => {
+                    setHighContrast(c);
+                    track('interactivity_high_contrast_toggled', { enabled: c });
+                  },
                 },
-              },
-              ...(frontierDirection
-                ? [
-                    {
-                      id: 'gpu-hide-non-optimal',
-                      label: legendT.optimalOnly,
-                      checked: hideNonOptimal,
-                      ...(powerEnvelopeMode ? { infoTooltip: legendT.powerBoundaryInfo } : {}),
-                      onCheckedChange: (c: boolean) => {
-                        setHideNonOptimal(c);
-                        track('interactivity_hide_non_optimal_toggled', { enabled: c });
+                ...(frontierDirection
+                  ? [
+                      {
+                        id: 'gpu-hide-non-optimal',
+                        label: legendT.optimalOnly,
+                        checked: hideNonOptimal,
+                        ...(powerEnvelopeMode ? { infoTooltip: legendT.powerBoundaryInfo } : {}),
+                        onCheckedChange: (c: boolean) => {
+                          setHideNonOptimal(c);
+                          track('interactivity_hide_non_optimal_toggled', { enabled: c });
+                        },
                       },
-                    },
-                  ]
-                : []),
-              {
-                id: 'gpu-point-labels',
-                label: legendT.labels,
-                advanced: true,
-                checked: showPointLabels,
-                onCheckedChange: (c) => {
-                  setShowPointLabels(c);
-                  track('interactivity_point_labels_toggled', { enabled: c });
+                    ]
+                  : []),
+                {
+                  id: 'gpu-point-labels',
+                  label: legendT.labels,
+                  advanced: true,
+                  checked: showPointLabels,
+                  onCheckedChange: (c) => {
+                    setShowPointLabels(c);
+                    track('interactivity_point_labels_toggled', { enabled: c });
+                  },
                 },
-              },
-              {
-                id: 'gpu-parallelism-labels',
-                label: legendT.parallelismLabels,
-                checked: useAdvancedLabels,
-                onCheckedChange: (c) => {
-                  setUseAdvancedLabels(c);
-                  track('interactivity_advanced_labels_toggled', { enabled: c });
+                {
+                  id: 'gpu-parallelism-labels',
+                  label: legendT.parallelismLabels,
+                  checked: useAdvancedLabels,
+                  onCheckedChange: (c) => {
+                    setUseAdvancedLabels(c);
+                    track('interactivity_advanced_labels_toggled', { enabled: c });
+                  },
                 },
-              },
-              {
-                id: 'gpu-line-labels',
-                label: legendT.lineLabels,
-                advanced: true,
-                checked: showLineLabels,
-                onCheckedChange: (c) => {
-                  setShowLineLabels(c);
-                  track('interactivity_line_labels_toggled', { enabled: c });
+                {
+                  id: 'gpu-line-labels',
+                  label: legendT.lineLabels,
+                  advanced: true,
+                  checked: showLineLabels,
+                  onCheckedChange: (c) => {
+                    setShowLineLabels(c);
+                    track('interactivity_line_labels_toggled', { enabled: c });
+                  },
                 },
-              },
-              {
-                id: 'gpu-framework-label',
-                label: legendT.frameworkLabel,
-                advanced: true,
-                checked: showFrameworkLabel,
-                onCheckedChange: (enabled) => {
-                  setShowFrameworkLabel(enabled);
-                  track('interactivity_framework_label_toggled', { enabled });
+                {
+                  id: 'gpu-framework-label',
+                  label: legendT.frameworkLabel,
+                  advanced: true,
+                  checked: showFrameworkLabel,
+                  onCheckedChange: (enabled) => {
+                    setShowFrameworkLabel(enabled);
+                    track('interactivity_framework_label_toggled', { enabled });
+                  },
                 },
-              },
-              {
-                id: 'gpu-concurrency-labels',
-                label: legendT.concurrencyLabels,
-                advanced: true,
-                checked: showConcurrencyLabels,
-                onCheckedChange: (c) => {
-                  setShowConcurrencyLabels(c);
-                  track('interactivity_concurrency_labels_toggled', { enabled: c });
+                {
+                  id: 'gpu-concurrency-labels',
+                  label: legendT.concurrencyLabels,
+                  advanced: true,
+                  checked: showConcurrencyLabels,
+                  onCheckedChange: (c) => {
+                    setShowConcurrencyLabels(c);
+                    track('interactivity_concurrency_labels_toggled', { enabled: c });
+                  },
                 },
-              },
-              {
-                id: 'gpu-offloading-label',
-                label: legendT.offloadingLabel,
-                advanced: true,
-                checked: showOffloadingLabel,
-                onCheckedChange: (checked: boolean) => {
-                  setShowOffloadingLabel(checked);
-                  track('interactivity_offloading_label_toggled', { enabled: checked });
+                {
+                  id: 'gpu-offloading-label',
+                  label: legendT.offloadingLabel,
+                  advanced: true,
+                  checked: showOffloadingLabel,
+                  onCheckedChange: (checked: boolean) => {
+                    setShowOffloadingLabel(checked);
+                    track('interactivity_offloading_label_toggled', { enabled: checked });
+                  },
                 },
-              },
-              {
-                id: 'gpu-perf-ruler',
-                label: legendT.perfRuler,
-                advanced: true,
-                checked: perfRulerMode,
-                infoTooltip: legendT.perfRulerInfo,
-                onCheckedChange: (c: boolean) => {
-                  setPerfRulerMode(c);
-                  if (!c) setPerfRulerState(clearPerfRulers);
-                  track('gpu_timeseries_perf_ruler_toggled', { enabled: c });
+                {
+                  id: 'gpu-perf-ruler',
+                  label: legendT.perfRuler,
+                  advanced: true,
+                  checked: perfRulerMode,
+                  infoTooltip: legendT.perfRulerInfo,
+                  onCheckedChange: (c: boolean) => {
+                    setPerfRulerMode(c);
+                    if (!c) setPerfRulerState(clearPerfRulers);
+                    track('gpu_timeseries_perf_ruler_toggled', { enabled: c });
+                  },
                 },
-              },
-            ]}
-            actions={[
-              ...(perfRulerMode && perfRulerState.rulers.length > 0
-                ? [
-                    {
-                      id: 'gpu-clear-perf-rulers',
-                      label: legendT.clearPerfRulers(perfRulerState.rulers.length),
-                      onClick: () => {
-                        track('gpu_timeseries_perf_ruler_cleared', {
-                          count: perfRulerState.rulers.length,
-                        });
-                        setPerfRulerState(clearPerfRulers);
-                      },
-                    },
-                  ]
-                : []),
-              {
+              ]}
+              reset={{
                 id: 'gpu-reset-filter',
-                label: legendT.resetFilter,
+                disabled:
+                  quickFilterCount === 0 &&
+                  allGraphs.every(({ id }) => !idsWithData.has(id) || activeDates.has(id)),
                 onClick: () => {
                   selectAllActiveDates();
                   clearQuickFilters();
                   track('gpu_timeseries_reset_filter');
                 },
-              },
-              {
-                id: 'gpu-quick-filters',
-                label: legendT.quickFilters(quickFilterCount),
-                onClick: () => {
-                  setQuickFiltersOpen(true);
-                  track('inference_quick_filters_dialog_opened', { source: 'timeline_legend' });
+              }}
+              actions={[
+                ...(perfRulerMode && perfRulerState.rulers.length > 0
+                  ? [
+                      {
+                        id: 'gpu-clear-perf-rulers',
+                        label: legendT.clearPerfRulers(perfRulerState.rulers.length),
+                        onClick: () => {
+                          track('gpu_timeseries_perf_ruler_cleared', {
+                            count: perfRulerState.rulers.length,
+                          });
+                          setPerfRulerState(clearPerfRulers);
+                        },
+                      },
+                    ]
+                  : []),
+                {
+                  id: 'gpu-quick-filters',
+                  label: legendT.quickFilters(quickFilterCount),
+                  onClick: () => {
+                    setQuickFiltersOpen(true);
+                    track('inference_quick_filters_dialog_opened', { source: 'timeline_legend' });
+                  },
                 },
-              },
-            ]}
-            hideAtomFootnote
-            readOnly={minimalChrome}
-            keyIndicators={
-              <>
-                {fixedLogPointId === null ? null : (
-                  <FixedSequenceLogDialog
-                    pointId={fixedLogPointId}
-                    onOpenChange={(open) => {
-                      if (!open) setFixedLogPointId(null);
-                    }}
-                  />
-                )}
-                <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
-              </>
-            }
-          />
+              ]}
+              hideAtomFootnote
+              readOnly={minimalChrome}
+              collapsible={!minimalChrome}
+              keyIndicators={
+                <>
+                  {fixedLogPointId === null ? null : (
+                    <FixedSequenceLogDialog
+                      pointId={fixedLogPointId}
+                      onOpenChange={(open) => {
+                        if (!open) setFixedLogPointId(null);
+                      }}
+                    />
+                  )}
+                  <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
+                </>
+              }
+            />
+          </>
         }
       />
     );

@@ -10,6 +10,12 @@ import { DAY_RANGES, RangeToggle } from '../range-toggle';
 import { ModelFilter } from '../model-filter';
 import { stubMatchMedia } from '@/test/match-media-stub';
 
+vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  measureTextWidth: (text: string, font: string) =>
+    text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
+}));
+
 vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
 vi.mock('@/hooks/useMediaQuery', () => ({

@@ -1,6 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
+import { TABLE_HEAD_CELL_STYLE, TABLE_HEAD_ROW_STYLE } from '@/components/ui/control-styles';
+import { ResultContext } from '@/components/ui/result-context';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { huaweiSkuConfigurations } from './huawei-sku-configurations';
@@ -27,7 +31,7 @@ const STRINGS = {
     measured:
       'Our core-profile experiments cover PR_9579: 28 Cube and 56 Vector cores, with 14 Cube and 28 Vector IDs observed in each of two die groups. This grouping must not be extrapolated to other SKUs; the table alone does not identify enabled core IDs or physical placement.',
     profiles: 'View measured PR_9579 core profiles',
-    scroll: 'Scroll horizontally to view all configuration columns.',
+    scroll: 'Scroll horizontally to view all configuration columns',
   },
   zh: {
     title: 'Huawei 950PR SKU 配置',
@@ -50,7 +54,7 @@ const STRINGS = {
     measured:
       '我们的核心访存实验覆盖 PR_9579：共 28 个 Cube 核心、56 个 Vector 核心，在两个 die 分组中各观察到 14 个 Cube 和 28 个 Vector 核心 ID。不能将这一分组推广到其他 SKU；仅凭配置表无法确定启用的核心 ID 或物理位置。',
     profiles: '查看 PR_9579 实测核心访存特征',
-    scroll: '横向滚动可查看全部配置列。',
+    scroll: '横向滚动可查看全部配置列',
   },
 } as const;
 
@@ -58,77 +62,88 @@ export function HuaweiSkuConfigurations() {
   const locale = useLocale();
   const t = STRINGS[locale];
   return (
-    <section className="space-y-4 border-t pt-8" data-testid="huawei-sku-configurations">
-      <h3 className="text-xl font-semibold tracking-tight">{t.title}</h3>
-      <p className="text-sm text-muted-foreground max-w-4xl">{t.intro}</p>
-      <p className="text-xs text-muted-foreground lg:hidden">{t.scroll}</p>
-      <div
-        className="overflow-x-auto rounded-lg border"
-        tabIndex={0}
-        role="region"
-        aria-label={t.title}
-      >
-        <table className="w-full text-sm" data-testid="huawei-sku-table">
-          <thead className="bg-muted/50">
-            <tr>
-              {t.columns.map((label) => (
-                <th
-                  key={label}
-                  scope="col"
-                  className="px-4 py-3 text-left font-semibold whitespace-nowrap"
-                >
-                  {label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {huaweiSkuConfigurations().map((row) => (
-              <tr
-                key={row.sku}
-                data-sku={row.sku}
-                className={
-                  row.hasCoreProfileMeasurements
-                    ? 'border-t bg-amber-50 dark:bg-amber-950/30'
-                    : 'border-t'
-                }
-              >
-                <th scope="row" className="px-4 py-3 text-left whitespace-nowrap font-medium">
-                  {row.sku}
-                  {row.hasCoreProfileMeasurements && (
-                    <span className="block text-xs text-muted-foreground mt-1">{t.tested}</span>
-                  )}
-                </th>
-                {[
-                  row.cubeCores,
-                  row.vectorCores,
-                  row.aiCpuCores,
-                  row.cubeClockMHz,
-                  row.memoryGiB,
-                  row.l2MiB,
-                  row.ddrRate.base,
-                  row.virtualisationOptions.join(', '),
-                ].map((value, index) => (
-                  <td key={index} className="px-4 py-3 tabular-nums whitespace-nowrap">
-                    {value}
-                  </td>
+    <section data-testid="huawei-sku-configurations">
+      <figure className="relative min-w-0">
+        <Card>
+          <figcaption>
+            <Heading as="h2" level="card">
+              {t.title}
+            </Heading>
+            <p className="mt-1 max-w-4xl text-sm text-muted-foreground">{t.intro}</p>
+          </figcaption>
+          <p className="mt-3 text-xs text-muted-foreground lg:hidden">{t.scroll}</p>
+          <div className="mt-3 overflow-x-auto" tabIndex={0} role="region" aria-label={t.title}>
+            <table className="w-full text-sm" data-testid="huawei-sku-table">
+              <thead>
+                <tr className={TABLE_HEAD_ROW_STYLE}>
+                  {t.columns.map((label, index) => (
+                    <th
+                      key={label}
+                      scope="col"
+                      className={`${TABLE_HEAD_CELL_STYLE} px-4 py-2.5 ${index > 0 && index < t.columns.length - 1 ? 'text-right' : 'text-left'}`}
+                    >
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {huaweiSkuConfigurations().map((row) => (
+                  <tr
+                    key={row.sku}
+                    data-sku={row.sku}
+                    className={
+                      row.hasCoreProfileMeasurements
+                        ? 'border-t border-border/30 bg-muted/20'
+                        : 'border-t border-border/30'
+                    }
+                  >
+                    <th scope="row" className="px-4 py-2.5 text-left whitespace-nowrap font-medium">
+                      {row.sku}
+                      {row.hasCoreProfileMeasurements && (
+                        <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                          {t.tested}
+                        </span>
+                      )}
+                    </th>
+                    {[
+                      row.cubeCores,
+                      row.vectorCores,
+                      row.aiCpuCores,
+                      row.cubeClockMHz,
+                      row.memoryGiB,
+                      row.l2MiB,
+                      row.ddrRate.base,
+                      row.virtualisationOptions.join(', '),
+                    ].map((value, index) => (
+                      <td
+                        key={index}
+                        className={`px-4 py-2.5 tabular-nums whitespace-nowrap ${index < 7 ? 'text-right' : ''}`}
+                      >
+                        {value}
+                      </td>
+                    ))}
+                  </tr>
                 ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p className="text-xs text-muted-foreground">{t.notes}</p>
-      <div className="border-l-2 border-amber-600 dark:border-amber-400 pl-4 space-y-2">
-        <p className="text-sm max-w-4xl">{t.measured}</p>
-        <Link
-          href={`${locale === 'zh' ? '/zh' : ''}/ubenchx/core-memory-profiles`}
-          className="text-sm underline underline-offset-4"
-          onClick={() => track('ubenchx_sku_profiles_opened', { gpu: 'PR_9579' })}
-        >
-          {t.profiles}
-        </Link>
-      </div>
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-3 space-y-2 rounded-lg bg-muted/30 px-4 py-3">
+            <p className="text-sm max-w-4xl">{t.measured}</p>
+            <Link
+              href={`${locale === 'zh' ? '/zh' : ''}/ubx/core-memory-profiles`}
+              className="text-sm underline underline-offset-4"
+              onClick={() => track('ubenchx_sku_profiles_opened', { gpu: 'PR_9579' })}
+            >
+              {t.profiles}
+            </Link>
+          </div>
+          <div className="mt-3">
+            <ResultContext locale={locale} layout="footer" source="SemiAnalysis InferenceX™" />
+            <p className="mt-2 text-xs leading-5 text-muted-foreground/70">{t.notes}</p>
+          </div>
+        </Card>
+      </figure>
     </section>
   );
 }

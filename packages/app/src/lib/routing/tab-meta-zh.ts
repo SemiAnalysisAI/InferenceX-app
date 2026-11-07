@@ -4,8 +4,10 @@ import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 import { zhAlternates, zhPath } from '@/lib/i18n/i18n';
 import type { ModelRoute, ModelRouteTab } from '@/lib/routing/model-routes';
 import {
+  AGENTX_ROUTE,
   getDashboardRoute,
   isDashboardRouteKey,
+  type DashboardRoute,
   type DashboardRouteKey,
 } from '@/lib/routing/dashboard-routes';
 import { socialMetadata } from '@/lib/seo/social-metadata';
@@ -149,8 +151,7 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
     '本页面展示 CollectiveX 专家并行（EP）通信基准测试结果：在统一工作负载、正确性校验与采样协议下，对比 DeepEP、MoRI、UCCL 及 NCCL/RCCL 参考实现的分发（dispatch）、合并（combine）与完整往返延迟。跨芯片速率均按逻辑载荷计算；只有发布器确认完整且稳定的官方队列才会生成排名与推荐。',
   submissions:
     '本页面列出提交到 InferenceX 的全部基准测试配置：按芯片厂商查看提交历史、活动趋势与数据点数量。',
-  'ai-chart':
-    '本页面提供 AI 驱动的图表生成工具：用自然语言描述您想查看的图表，系统会根据 InferenceX 基准测试数据自动生成可视化结果。',
+  'ai-chart': '用自然语言描述想看的对比，即可获得基于 InferenceX 基准测试数据生成的图表。',
   'current-inferencex-image':
     '本页面展示 InferenceX 当前使用的 Docker 镜像标签：按模型、芯片 SKU 和配置列出已部署版本，并与上游 vLLM、SGLang 最新发布版本对比，方便排查过期镜像。',
   video:
@@ -182,14 +183,20 @@ export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   feedback: '反馈',
 };
 
-export type HeaderNavHref = '/' | '/agentx' | '/overview' | '/inference' | '/ubenchx' | '/about';
+export type HeaderNavHref =
+  | '/'
+  | typeof AGENTX_ROUTE.path
+  | '/overview'
+  | Extract<DashboardRoute, { key: 'inference' }>['path']
+  | '/ubx'
+  | '/about';
 
 export const NAV_LABELS_ZH: Record<HeaderNavHref, string> = {
   '/': '首页',
   '/overview': '总览',
-  '/inference': '仪表板',
-  '/ubenchx': 'ubenchX',
-  '/agentx': 'AgentX',
+  [getDashboardRoute('inference').path]: '仪表板',
+  '/ubx': 'uBenchX',
+  [AGENTX_ROUTE.path]: 'AgentX',
   '/about': '关于',
 };
 

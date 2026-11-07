@@ -61,7 +61,7 @@ describe('ConversationView request states', () => {
         .locale,
     ).toBe('zh');
     expect(container.querySelector('[data-testid="conversation-view-not-found"]')).toBeNull();
-    expect(container.querySelector('a')?.getAttribute('href')).toBe('/zh/agentx/trace');
+    expect(container.querySelector('a')?.getAttribute('href')).toBe('/zh/infx/agentx/trace');
     const retry = [...container.querySelectorAll('button')].find(
       (button) => button.textContent === '重试',
     );

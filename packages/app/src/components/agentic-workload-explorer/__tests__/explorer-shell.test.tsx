@@ -3,7 +3,7 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const state = vi.hoisted(() => ({ pathname: '/agentic-workload-explorer', locale: 'en' }));
+const state = vi.hoisted(() => ({ pathname: '/infx/agentic-workload-explorer', locale: 'en' }));
 
 vi.mock('next/navigation', () => ({ usePathname: () => state.pathname }));
 vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => state.locale }));
@@ -29,18 +29,18 @@ function headingTags(pathname: string, locale = 'en'): string[] {
 }
 
 afterEach(() => {
-  state.pathname = '/agentic-workload-explorer';
+  state.pathname = '/infx/agentic-workload-explorer';
   state.locale = 'en';
 });
 
 describe('ExplorerShell heading level', () => {
   it('leaves the overview h1 to its TabIntro', () => {
-    expect(headingTags('/agentic-workload-explorer')).toEqual(['H2']);
-    expect(headingTags('/zh/agentic-workload-explorer', 'zh')).toEqual(['H2']);
+    expect(headingTags('/infx/agentic-workload-explorer')).toEqual(['H2']);
+    expect(headingTags('/zh/infx/agentic-workload-explorer', 'zh')).toEqual(['H2']);
   });
 
   it('gives every section page an h1 in both locales', () => {
-    expect(headingTags('/agentic-workload-explorer/graphs')).toEqual(['H1']);
-    expect(headingTags('/zh/agentic-workload-explorer/streaming', 'zh')).toEqual(['H1']);
+    expect(headingTags('/infx/agentic-workload-explorer/graphs')).toEqual(['H1']);
+    expect(headingTags('/zh/infx/agentic-workload-explorer/streaming', 'zh')).toEqual(['H1']);
   });
 });

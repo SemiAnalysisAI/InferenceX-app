@@ -4,6 +4,8 @@ import * as d3 from 'd3';
 import { useMemo, useRef } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import { ChartPointDetails } from '@/components/ui/chart-point-details';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
 
@@ -45,7 +47,8 @@ const STRINGS = {
       dispatch: 'Dispatch',
       stage: 'Stage',
       combine: 'Combine',
-      roundtrip: 'Round trip (measured)',
+      roundtrip: 'Round trip (fresh entry)',
+      pair_period: 'Pair period (chained)',
     },
     yAxis: {
       latency: 'Latency (µs)',
@@ -54,11 +57,9 @@ const STRINGS = {
       'payload-rate': 'Payload bandwidth at selected latency percentile (GB/s, per chip)',
     },
     xAxis: 'Source tokens / rank (log)',
-    unavailable: (operation: string) => `${operation} is unavailable for the selected series.`,
-    noSeries: 'No matching CollectiveX series.',
-    instructions:
-      'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
-    dismiss: 'Click elsewhere to dismiss',
+    unavailable: (operation: string) => `${operation} is unavailable for the selected series`,
+    noSeries: 'No matching CollectiveX series',
+    instructions: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
     atLatency: (percentile: string) => `at ${percentile} latency`,
     tokenCounts: (perRank: string, global: string) =>
       `${perRank} tokens/rank · ${global} global tokens`,
@@ -78,7 +79,8 @@ const STRINGS = {
       dispatch: '分发',
       stage: '中间处理',
       combine: '合并',
-      roundtrip: '往返（实测）',
+      roundtrip: '往返（单次）',
+      pair_period: '成对周期（连续）',
     },
     yAxis: {
       latency: '延迟（µs）',
@@ -87,10 +89,9 @@ const STRINGS = {
       'payload-rate': '所选延迟分位点的载荷带宽（GB/s，每芯片）',
     },
     xAxis: '每 rank 源 token 数（对数）',
-    unavailable: (operation: string) => `所选序列没有可用的${operation}数据。`,
-    noSeries: '没有匹配的 CollectiveX 序列。',
-    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
-    dismiss: '点击其他区域关闭',
+    unavailable: (operation: string) => `所选序列没有可用的${operation}数据`,
+    noSeries: '没有匹配的 CollectiveX 序列',
+    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置',
     atLatency: (percentile: string) => `（${percentile} 延迟分位点）`,
     tokenCounts: (perRank: string, global: string) =>
       `每 rank ${perRank} 个 token · 全局 ${global} 个 token`,
@@ -172,15 +173,6 @@ function highlightBands(root: Element | null, focusId: string | null): void {
       focusId === null ? BAND_STROKE : band.id === focusId ? BAND_FOCUS_STROKE : BAND_FADED_STROKE,
     )
     .attr('data-focused', (band) => (focusId !== null && band.id === focusId ? 'true' : null));
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
 }
 
 export function CollectiveXChart({
@@ -331,6 +323,66 @@ export function CollectiveXChart({
       </div>
     ) : undefined;
 
+  const describe = (point: CollectiveXChartPoint) => {
+    const measurement = point.point;
+    const op = `${t.operation[operation]} ${yAxis === 'latency' ? percentile : t.atLatency(percentile)}`;
+    const summary = t.tokenCounts(
+      locale === 'zh'
+        ? measurement.tokens_per_rank.toLocaleString('zh-CN')
+        : String(measurement.tokens_per_rank),
+      locale === 'zh'
+        ? measurement.global_tokens.toLocaleString('zh-CN')
+        : String(measurement.global_tokens),
+    );
+    const base = {
+      title: point.seriesLabel,
+      subtitle: op,
+      color: colors[point.colorKey] ?? '#888',
+      summary,
+    };
+    if (point.range) {
+      return {
+        ...base,
+        date: `${summary} · ${t.rangeCount(point.range.libraries)}`,
+        metrics: [
+          {
+            value: formatMetric(point.y, yAxis),
+            label:
+              rangeMode === 'best' ? `${t.best} · ${point.range.members[0].label}` : t.rangeMedian,
+          },
+          {
+            value: `${formatMetric(point.range.lo, yAxis)} – ${formatMetric(point.range.hi, yAxis)}`,
+            label: t.rangeHeading,
+          },
+        ],
+        rows: point.range.members.map((member) => ({
+          label: member.label,
+          value: formatMetric(member.y, yAxis),
+        })),
+        note: undefined,
+      };
+    }
+    const roundtrip = measurement.components.roundtrip;
+    const fit = fitsBySeries.get(point.seriesId);
+    const ranks = (components: typeof roundtrip) =>
+      formatCollectiveXLatencyPercentiles(components, t.unavailableValue);
+    return {
+      ...base,
+      date: `${summary} · ${t.latencyRanks}`,
+      metrics: [{ value: formatMetric(point.y, yAxis), label: op }],
+      rows: [
+        { label: t.operation.pair_period, value: ranks(measurement.components.pair_period) },
+        { label: t.operation.dispatch, value: ranks(measurement.components.dispatch) },
+        { label: t.operation.stage, value: ranks(measurement.components.stage) },
+        { label: t.operation.combine, value: ranks(measurement.components.combine) },
+        { label: t.roundTrip, value: `${ranks(roundtrip)}${roundtrip ? t.measured : ''}` },
+      ],
+      note: fit
+        ? t.fit(fit.betaGbps.toFixed(fit.betaGbps >= 100 ? 0 : 1), fit.alphaUs.toFixed(1))
+        : undefined,
+    };
+  };
+
   return (
     <div role="group" aria-label={t.aria}>
       <D3Chart<CollectiveXChartPoint>
@@ -406,52 +458,33 @@ export function CollectiveXChart({
           rulerType: 'crosshair',
           attachToLayer: 2,
           content: (point, isPinned) => {
-            const color = colors[point.colorKey] ?? '#888';
-            const pinnedNote = isPinned
-              ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>`
-              : '';
-            if (point.range) {
-              const rows = point.range.members
-                .map(
-                  (member) =>
-                    `<span>${escapeHtml(member.label)}</span><span>${formatMetric(member.y, yAxis)}</span>`,
-                )
-                .join('');
-              // Two-column grid, so every value starts at the same left edge.
-              const table = `<div class="grid text-muted-foreground" style="grid-template-columns: max-content max-content; column-gap: 1.5rem">${rows}</div>`;
-              return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 230px; max-width: 380px; user-select: ${isPinned ? 'text' : 'none'}">
-            ${pinnedNote}
-            <div class="font-semibold mb-1" style="color: ${color}">${escapeHtml(point.seriesLabel)}</div>
-            <div>${escapeHtml(t.operation[operation])} ${yAxis === 'latency' ? percentile : t.atLatency(percentile)}</div>
-            ${
-              rangeMode === 'best'
-                ? `<div>${t.best}: <strong>${formatMetric(point.y, yAxis)}</strong> · ${escapeHtml(point.range.members[0].label)}</div>`
-                : `<div>${t.rangeMedian}: <strong>${formatMetric(point.y, yAxis)}</strong></div>`
-            }
-            <div>${t.rangeHeading}: ${formatMetric(point.range.lo, yAxis)} – ${formatMetric(point.range.hi, yAxis)}</div>
-            <div class="text-muted-foreground">${t.tokenCounts(locale === 'zh' ? point.point.tokens_per_rank.toLocaleString('zh-CN') : String(point.point.tokens_per_rank), locale === 'zh' ? point.point.global_tokens.toLocaleString('zh-CN') : String(point.point.global_tokens))}</div>
-            <div class="mt-1 text-muted-foreground">${t.rangeCount(point.range.libraries)}</div>
-            ${table}
-          </div>`;
-            }
-            const measurement = point.point;
-            const measuredRoundtrip = measurement.components.roundtrip;
-            const fit = fitsBySeries.get(point.seriesId);
-            const fitLine = fit
-              ? `<div class="mt-1 text-muted-foreground">${t.fit(fit.betaGbps.toFixed(fit.betaGbps >= 100 ? 0 : 1), fit.alphaUs.toFixed(1))}</div>`
-              : '';
-            return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 230px; max-width: 380px; user-select: ${isPinned ? 'text' : 'none'}">
-            ${pinnedNote}
-            <div class="font-semibold mb-1" style="color: ${color}">${escapeHtml(point.seriesLabel)}</div>
-            <div>${escapeHtml(t.operation[operation])} ${yAxis === 'latency' ? percentile : t.atLatency(percentile)}: <strong>${formatMetric(point.y, yAxis)}</strong></div>
-            <div class="text-muted-foreground">${t.tokenCounts(locale === 'zh' ? measurement.tokens_per_rank.toLocaleString('zh-CN') : String(measurement.tokens_per_rank), locale === 'zh' ? measurement.global_tokens.toLocaleString('zh-CN') : String(measurement.global_tokens))}</div>
-            <div class="mt-1 text-muted-foreground">${t.latencyRanks}</div>
-            <div class="text-muted-foreground">${t.operation.dispatch}: ${formatCollectiveXLatencyPercentiles(measurement.components.dispatch, t.unavailableValue)}</div>
-            <div class="text-muted-foreground">${t.operation.stage}: ${formatCollectiveXLatencyPercentiles(measurement.components.stage, t.unavailableValue)}</div>
-            <div class="text-muted-foreground">${t.operation.combine}: ${formatCollectiveXLatencyPercentiles(measurement.components.combine, t.unavailableValue)}</div>
-            <div class="text-muted-foreground">${t.roundTrip}: ${formatCollectiveXLatencyPercentiles(measuredRoundtrip, t.unavailableValue)}${measuredRoundtrip ? t.measured : ''}</div>
-            ${fitLine}
-          </div>`;
+            const card = describe(point);
+            return chartHoverCard(
+              {
+                title: card.title,
+                subtitle: card.subtitle,
+                color: card.color,
+                metrics: card.metrics,
+                summary: card.summary,
+              },
+              { pinned: isPinned },
+            );
+          },
+          details: (point, _isOverlay, close) => {
+            const card = describe(point);
+            return (
+              <ChartPointDetails
+                title={card.title}
+                subtitle={card.subtitle}
+                color={card.color}
+                date={card.date}
+                metrics={card.metrics}
+                rows={card.rows}
+                onClose={close}
+              >
+                {card.note && <p className="mt-3 text-muted-foreground">{card.note}</p>}
+              </ChartPointDetails>
+            );
           },
           getRulerX: (point, scale) =>
             (scale as d3.ScaleLinear<number, number> | d3.ScaleLogarithmic<number, number>)(

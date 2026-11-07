@@ -15,7 +15,7 @@ const boxOf = (el: Element) => el.getBoundingClientRect();
 
 const dismissNudges = (win: Cypress.AUTWindow) => {
   win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-  win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
+  win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');
 };
 
 const firstRowCell = (header: string) =>
@@ -29,7 +29,7 @@ describe('Prefix Cache Reuse', () => {
   describe('official rows', () => {
     before(() => {
       interceptOverlayRun();
-      cy.visit('/cache-reuse', { onBeforeLoad: dismissNudges });
+      cy.visit('/infx/cache-reuse', { onBeforeLoad: dismissNudges });
       cy.wait('@benchmarks');
       cy.get('[data-testid="cache-reuse-figure"]').should('exist');
     });
@@ -52,9 +52,14 @@ describe('Prefix Cache Reuse', () => {
       cy.get('[data-testid="cache-reuse-config-selector"]')
         .invoke('text')
         .then((config) => {
-          cy.get('[data-testid="cache-reuse-figure"] figcaption')
-            .should('contain.text', config.trim())
-            .and('contain.text', 'Source: SemiAnalysis InferenceX');
+          cy.get('[data-testid="cache-reuse-figure"] figcaption').should(
+            'contain.text',
+            config.trim(),
+          );
+          cy.get('[data-testid="cache-reuse-figure"] [data-testid="result-context"]').should(
+            'contain.text',
+            'SemiAnalysis InferenceX',
+          );
         });
     });
   });
@@ -62,7 +67,7 @@ describe('Prefix Cache Reuse', () => {
   describe('share-link seeding', () => {
     it('falls back to a tiered configuration when the requested one is unknown', () => {
       interceptOverlayRun();
-      cy.visit('/cache-reuse?c_cfg=nope_sglang', { onBeforeLoad: dismissNudges });
+      cy.visit('/infx/cache-reuse?c_cfg=nope_sglang', { onBeforeLoad: dismissNudges });
       cy.wait('@benchmarks');
       cy.get(BARS).should('have.length', REAL_CONFIGS.length);
       cy.get('[data-testid="cache-reuse-config-selector"]').should('contain.text', 'B300');
@@ -92,7 +97,7 @@ describe('Prefix Cache Reuse', () => {
         }));
         cy.intercept('GET', '/api/v1/benchmarks*', { body: [...rows, ...other] }).as('recipes');
         const recipe = 'agg|sn|p1x8/1/-|d1x16/1/-|g8+16|spec-none|offload-on|';
-        cy.visit(`/cache-reuse?c_recipe=${encodeURIComponent(recipe)}`, {
+        cy.visit(`/infx/cache-reuse?c_recipe=${encodeURIComponent(recipe)}`, {
           onBeforeLoad: dismissNudges,
         });
         cy.wait('@recipes');
@@ -116,7 +121,9 @@ describe('Prefix Cache Reuse', () => {
   describe('unofficial-run overlay', () => {
     before(() => {
       interceptOverlayRun();
-      cy.visit(`/cache-reuse?unofficialrun=${OVERLAY_RUN_ID}`, { onBeforeLoad: dismissNudges });
+      cy.visit(`/infx/cache-reuse?unofficialrun=${OVERLAY_RUN_ID}`, {
+        onBeforeLoad: dismissNudges,
+      });
       cy.wait('@unofficialRun');
       cy.get(`${BARS}[data-series="run:0"]`).should('have.length', REAL_CONFIGS.length);
     });
@@ -141,7 +148,7 @@ describe('Prefix Cache Reuse', () => {
   describe('fixed sequences', () => {
     it('explains that fixed-sequence rows record no cache tiers', () => {
       interceptCalculatorOverlayRun();
-      cy.visit('/cache-reuse?i_seq=1k%2F1k', { onBeforeLoad: dismissNudges });
+      cy.visit('/infx/cache-reuse?i_seq=1k%2F1k', { onBeforeLoad: dismissNudges });
       cy.wait('@benchmarks');
       cy.get('[data-testid="cache-reuse-no-tiers"]').should('contain.text', 'Fixed-sequence');
       cy.get(BARS).should('not.exist');
@@ -168,7 +175,7 @@ describe('Prefix Cache Reuse', () => {
     it('draws phone-width bars as rows, lowest concurrency first, labels inside', () => {
       cy.viewport(393, 852);
       interceptOverlayRun();
-      cy.visit('/cache-reuse', { onBeforeLoad: dismissNudges });
+      cy.visit('/infx/cache-reuse', { onBeforeLoad: dismissNudges });
       cy.wait('@benchmarks');
       cy.get(BARS).should('have.length', REAL_CONFIGS.length);
       cy.get(BARS).each(($bar) => {
@@ -186,7 +193,7 @@ describe('Prefix Cache Reuse', () => {
     it('keeps desktop columns and their labels inside each segment', () => {
       cy.viewport(1280, 900);
       interceptOverlayRun();
-      cy.visit('/cache-reuse', { onBeforeLoad: dismissNudges });
+      cy.visit('/infx/cache-reuse', { onBeforeLoad: dismissNudges });
       cy.wait('@benchmarks');
       cy.get(BARS)
         .first()
@@ -201,7 +208,7 @@ describe('Prefix Cache Reuse', () => {
   describe('Chinese page', () => {
     it('renders the intro and Chinese tier labels', () => {
       interceptOverlayRun();
-      cy.visit('/zh/cache-reuse', { onBeforeLoad: dismissNudges });
+      cy.visit('/zh/infx/cache-reuse', { onBeforeLoad: dismissNudges });
       cy.wait('@benchmarks');
       cy.get('[data-testid="zh-tab-intro"]').should('be.visible');
       firstRowCell('HBM').should('have.text', '80.0%');

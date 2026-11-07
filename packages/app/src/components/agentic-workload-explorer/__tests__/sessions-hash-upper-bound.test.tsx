@@ -27,7 +27,7 @@ vi.mock('next/link', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/agentic-workload-explorer/sessions',
+  usePathname: () => '/infx/agentic-workload-explorer/sessions',
   useRouter: () => ({ replace: mocks.routerReplace }),
   useSearchParams: () => new URLSearchParams(),
 }));

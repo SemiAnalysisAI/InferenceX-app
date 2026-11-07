@@ -78,7 +78,7 @@ async function hydrate(container: HTMLDivElement) {
 
 describe('CalculatorUrlSeedBoundary', () => {
   it('hydrates the prerendered tool in place when the query does not change the seed', async () => {
-    const container = prerender('/calculator/kimi-k3?utm_source=newsletter');
+    const container = prerender('/infx/calculator/kimi-k3?utm_source=newsletter');
     const prerendered = container.querySelector('input');
     expect(prerendered?.dataset.model).toBe(Model.Kimi_K3);
 
@@ -90,7 +90,7 @@ describe('CalculatorUrlSeedBoundary', () => {
   });
 
   it('remounts the tool on the query seed after hydrating the path seed', async () => {
-    const container = prerender('/calculator/kimi-k3?g_model=DeepSeek-V4-Pro&i_seq=1k%2F1k');
+    const container = prerender('/infx/calculator/kimi-k3?g_model=DeepSeek-V4-Pro&i_seq=1k%2F1k');
     expect(container.querySelector('input')?.dataset.model).toBe(Model.Kimi_K3);
 
     const onRecoverableError = await hydrate(container);
@@ -102,7 +102,7 @@ describe('CalculatorUrlSeedBoundary', () => {
   });
 
   it('mounts a client-rendered tool once, on the query seed, and keeps it through URL rewrites', async () => {
-    window.history.replaceState(null, '', '/calculator/kimi-k3?g_model=DeepSeek-V4-Pro');
+    window.history.replaceState(null, '', '/infx/calculator/kimi-k3?g_model=DeepSeek-V4-Pro');
     const container = document.createElement('div');
     document.body.append(container);
     const root = createRoot(container);
@@ -111,7 +111,7 @@ describe('CalculatorUrlSeedBoundary', () => {
     expect(container.querySelector('input')?.dataset.model).toBe(Model.DeepSeek_V4_Pro);
     expect(mounts).toBe(1);
 
-    window.history.replaceState(null, '', '/calculator/kimi-k3?i_seq=1k%2F1k');
+    window.history.replaceState(null, '', '/infx/calculator/kimi-k3?i_seq=1k%2F1k');
     await act(() => root.render(page()));
 
     expect(container.querySelector('input')?.dataset.sequence).toBe('');

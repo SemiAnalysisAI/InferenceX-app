@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { DashboardOverviewSkeleton } from '@/components/agentic-workload-explorer/dashboard-skeleton';
 import {
   formatDollars,
@@ -10,6 +11,9 @@ import {
   formatPrefillSpeed,
 } from '@/lib/agentic-workload-explorer/format';
 import { InfoHelp } from '@/components/ui/option-info';
+import { Card } from '@/components/ui/card';
+import { Stat } from '@/components/ui/stat';
+import { cn } from '@/lib/shared/utils';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
 import { useModelFilter } from '@/hooks/agentic-workload-explorer/use-model-filter';
 import { ModelFilter } from '@/components/agentic-workload-explorer/model-filter';
@@ -23,12 +27,13 @@ import type {
   UsageBucket,
 } from '@/lib/agentic-workload-explorer/api-types';
 import {
-  LAST_DAY_LABEL,
-  PREV_DAY_LABEL,
+  lastDayLabel,
+  prevDayLabel,
   SNAPSHOT_END_CLOCK,
   snapshotNow,
 } from '@/lib/agentic-workload-explorer/snapshot';
 import { RangeToggle, type RangeOption } from '@/components/agentic-workload-explorer/range-toggle';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 
@@ -37,31 +42,31 @@ const STRINGS = {
     failedToLoad: 'Failed to load stats',
     stats: 'Stats',
     usage: 'Usage',
-    totalTokens: 'Total Tokens',
-    readWriteOut: 'Read : Write : Out',
-    estCost: 'Est. Cost',
+    totalTokens: 'Total tokens',
+    readWriteOut: 'Read : write : out',
+    estCost: 'Est. cost',
     input: 'Input',
-    cacheRead: 'Cache Read',
-    cacheWrite: 'Cache Write',
+    cacheRead: 'Cache read',
+    cacheWrite: 'Cache write',
     output: 'Output',
-    clientsLifetime: '# of Clients API Keys (Lifetime)',
-    activeKeys24h: 'Active API Keys (Final 24h)',
-    activeKeysTooltip: `API keys active in the snapshot's final 24 hours (ending ${LAST_DAY_LABEL} ${SNAPSHOT_END_CLOCK})`,
+    clientsLifetime: '# of clients API keys (lifetime)',
+    activeKeys24h: 'Active API keys (final 24h)',
+    activeKeysTooltip: `API keys active in the snapshot's final 24 hours (ending ${lastDayLabel('en')} ${SNAPSHOT_END_CLOCK})`,
     sessions: 'Sessions',
     sessionsGt20: 'Sessions (> 20 reqs)',
     sessionsGt20Tooltip: 'Sessions with more than 20 requests',
     requests: 'Requests',
-    cacheHitRate: 'Cache Hit Rate',
+    cacheHitRate: 'Cache hit rate',
     cacheHitRateTooltip: 'cacheRead / (cacheRead + input) — % of input tokens served from cache',
-    turnsPerSession: 'Turns / Session',
+    turnsPerSession: 'Turns / session',
     gapSeconds: 'Gap (seconds)',
     ttftP90: 'TTFT (p90)',
-    ttftTooltip: 'Time to First Token (streaming requests)',
+    ttftTooltip: 'Time to first token (streaming requests)',
     tpotP90: 'TPOT (p90)',
-    tpotTooltip: 'Time per Output Token (streaming requests)',
-    prefillSpeedP50: 'Prefill Speed (p50)',
+    tpotTooltip: 'Time per output token (streaming requests)',
+    prefillSpeedP50: 'Prefill speed (p50)',
     prefillSpeedTooltip:
-      'Prefill Speed: (cacheRead + cacheWrite) / TTFT (streaming requests with cache)',
+      'Prefill speed: (cacheRead + cacheWrite) / TTFT (streaming requests with cache)',
     interactivityP90: 'Interactivity (p90)',
     interactivityTooltip: 'Tokens per second per client (1000 / TPOT)',
     tokenDetail: (inp: string, cr: string, cw: string, out: string) =>
@@ -91,7 +96,7 @@ const STRINGS = {
     output: '输出',
     clientsLifetime: 'API Key 数量（全时段）',
     activeKeys24h: '活跃 API Key（最后 24 小时）',
-    activeKeysTooltip: `快照最后 24 小时内活跃的 API Key（截止 ${LAST_DAY_LABEL} ${SNAPSHOT_END_CLOCK}）`,
+    activeKeysTooltip: `快照最后 24 小时内活跃的 API Key（截止 ${lastDayLabel('zh')} ${SNAPSHOT_END_CLOCK}）`,
     sessions: '会话数',
     sessionsGt20: '会话数（> 20 请求）',
     sessionsGt20Tooltip: '超过 20 个请求的会话',
@@ -124,13 +129,9 @@ const STRINGS = {
   },
 } as const;
 import { Expandable, ExpandTrigger } from '@/components/agentic-workload-explorer/expandable-chart';
+import { TOKEN_SERIES_COLORS } from '@/components/agentic-workload-explorer/series-colors';
 
-const MIX_COLORS = {
-  input: 'bg-sky-500',
-  cacheRead: 'bg-emerald-500',
-  cacheWrite: 'bg-amber-500',
-  output: 'bg-violet-500',
-};
+const MIX_COLORS = TOKEN_SERIES_COLORS;
 
 export default function OverviewPage() {
   return (
@@ -281,8 +282,8 @@ function OverviewPageContent() {
     <div className="space-y-5">
       {modelFilterBar}
       <section>
-        <SectionHeader label={t.stats} count={plainCards.length + 3} />
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <SectionHeader label={t.stats} />
+        <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {plainCards.slice(0, 3).map((card) => (
             <StatCard
               key={card.label}
@@ -335,7 +336,7 @@ function OverviewPageContent() {
               tooltip={card.tooltip}
             />
           ))}
-        </div>
+        </dl>
 
         {(expanded === 'tokens' || expanded === 'ratio') && (
           <div className="mt-2">
@@ -350,18 +351,6 @@ function OverviewPageContent() {
       </section>
 
       <UsagePanel stats={stats} t={t} />
-    </div>
-  );
-}
-
-function SectionHeader({ label, count }: { label: string; count: number | string }) {
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="flex-1 h-px bg-border" />
-      <span className="text-3xs font-mono text-subtle">{count}</span>
     </div>
   );
 }
@@ -384,40 +373,36 @@ function StatCard({
   onClick?: () => void;
 }) {
   return (
-    <div
-      className={`rounded-md border bg-surface p-3 ${
-        expandable
-          ? `cursor-pointer hover:bg-surface-hover transition-colors ${isExpanded ? 'border-foreground/30' : 'border-border'}`
-          : 'border-border'
-      }`}
-      onClick={onClick}
-    >
-      <div className="flex items-center gap-1 mb-1.5">
-        <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
+    <Stat
+      boxed
+      label={
+        <span className="flex h-4 items-center gap-1">
           {label}
-        </div>
-        {tooltip && (
-          <InfoHelp label={label} value={label} analyticsEvent="selector_help_opened">
-            {tooltip}
-          </InfoHelp>
-        )}
-        {expandable && (
-          <svg
-            className={`w-2.5 h-2.5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2.5}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
-        )}
-      </div>
-      <div className="text-lg font-mono font-bold tracking-tight">{value}</div>
-      {detail && (
-        <p className="text-3xs text-muted-foreground mt-1 leading-relaxed font-mono">{detail}</p>
+          {tooltip && (
+            <InfoHelp label={label} value={label} analyticsEvent="selector_help_opened">
+              {tooltip}
+            </InfoHelp>
+          )}
+          {expandable && (
+            <ChevronDown
+              className={cn(
+                'size-3 text-muted-foreground transition-transform',
+                isExpanded && 'rotate-180',
+              )}
+              aria-hidden="true"
+            />
+          )}
+        </span>
+      }
+      value={value}
+      detail={detail}
+      valueClassName="whitespace-normal"
+      className={cn(
+        expandable && 'cursor-pointer transition-colors hover:bg-surface-hover',
+        isExpanded && 'border-foreground/30',
       )}
-    </div>
+      onClick={onClick}
+    />
   );
 }
 
@@ -448,13 +433,14 @@ function formatUsageTotal(v: number, mode: HistMode, t: T) {
 }
 
 function UsagePanel({ stats, t }: { stats: OverviewStats; t: T }) {
+  const locale = useLocale();
   const [period, setPeriod] = useState<UsagePeriod>('14d');
   const [mode, setMode] = useState<HistMode>('cost');
 
   const usagePeriods: RangeOption<UsagePeriod>[] = [
     { id: '24h', label: '24h', title: t.usagePeriod24hTitle },
-    { id: 'lastDay', label: LAST_DAY_LABEL, title: `${LAST_DAY_LABEL} UTC` },
-    { id: 'prevDay', label: PREV_DAY_LABEL, title: `${PREV_DAY_LABEL} UTC` },
+    { id: 'lastDay', label: lastDayLabel(locale), title: `${lastDayLabel(locale)} UTC` },
+    { id: 'prevDay', label: prevDayLabel(locale), title: `${prevDayLabel(locale)} UTC` },
     { id: '14d', label: '14d', title: t.usagePeriod14dTitle },
   ];
 
@@ -477,7 +463,7 @@ function UsagePanel({ stats, t }: { stats: OverviewStats; t: T }) {
 
   return (
     <section>
-      <SectionHeader label={t.usage} count={formatUsageTotal(total, mode, t)} />
+      <SectionHeader label={t.usage} detail={formatUsageTotal(total, mode, t)} />
       <div className="mb-2">
         <RangeToggle
           value={period}
@@ -679,7 +665,7 @@ function UsageHistogram({
   for (let i = 0; i <= 4; i++) yTicks.push(Math.round(yStep * i));
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
+    <Card>
       <div className="flex items-center gap-2 mb-2">
         <HistModeButtons mode={mode} setMode={setMode} histModes={histModes} />
         <span className="ml-auto">
@@ -781,7 +767,7 @@ function UsageHistogram({
           />
         </g>
       </svg>
-    </div>
+    </Card>
   );
 }
 
@@ -860,10 +846,10 @@ function UtcDayUsageHistogram({
   for (let i = 0; i <= 4; i++) yTicks.push(Math.round(yStep * i));
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
+    <Card>
       <div className="flex items-center gap-2 mb-2">
         <HistModeButtons mode={mode} setMode={setMode} histModes={histModes} />
-        <span className="text-3xs font-mono text-subtle ml-auto">{t.utcHours}</span>
+        <span className="text-3xs font-mono text-muted-foreground ml-auto">{t.utcHours}</span>
         <ExpandTrigger />
       </div>
       <svg
@@ -951,7 +937,7 @@ function UtcDayUsageHistogram({
           />
         </g>
       </svg>
-    </div>
+    </Card>
   );
 }
 
@@ -1016,10 +1002,10 @@ function DailyUsageHistogram({
   for (let i = 0; i <= 4; i++) yTicks.push(Math.round(yStep * i));
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
+    <Card>
       <div className="flex items-center gap-2 mb-2">
         <HistModeButtons mode={mode} setMode={setMode} histModes={histModes} />
-        <span className="text-3xs font-mono text-subtle ml-auto">{t.utcDays}</span>
+        <span className="text-3xs font-mono text-muted-foreground ml-auto">{t.utcDays}</span>
         <ExpandTrigger />
       </div>
       <svg
@@ -1107,7 +1093,7 @@ function DailyUsageHistogram({
           />
         </g>
       </svg>
-    </div>
+    </Card>
   );
 }
 
@@ -1128,19 +1114,19 @@ function MixBar({
   if (total === 0) return null;
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex h-5 rounded overflow-hidden gap-px">
+    <Card>
+      <div className="flex h-5 rounded-sm overflow-hidden gap-px">
         {segments.map((seg) => {
           const pct = (seg.value / total) * 100;
           if (pct < 0.5) return null;
           return (
             <div
               key={seg.label}
-              className={`${seg.color} opacity-70 relative`}
-              style={{ width: `${pct}%` }}
+              className="opacity-70 relative"
+              style={{ width: `${pct}%`, backgroundColor: seg.color }}
             >
               {pct > 8 && (
-                <span className="absolute inset-0 flex items-center justify-center text-3xs font-mono font-bold text-white">
+                <span className="absolute inset-0 flex items-center justify-center text-3xs font-mono font-medium text-white">
                   {pct.toFixed(0)}%
                 </span>
               )}
@@ -1153,14 +1139,17 @@ function MixBar({
           const pct = total > 0 ? (seg.value / total) * 100 : 0;
           return (
             <div key={seg.label} className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-sm ${seg.color} opacity-70`} />
+              <span
+                className="w-2 h-2 rounded-sm opacity-70"
+                style={{ backgroundColor: seg.color }}
+              />
               <span className="text-3xs font-mono text-muted-foreground">{seg.label}</span>
               <span className="text-3xs font-mono font-medium">{formatValue(seg.value)}</span>
-              <span className="text-3xs font-mono text-subtle">({pct.toFixed(1)}%)</span>
+              <span className="text-3xs font-mono text-muted-foreground">({pct.toFixed(1)}%)</span>
             </div>
           );
         })}
       </div>
-    </div>
+    </Card>
   );
 }

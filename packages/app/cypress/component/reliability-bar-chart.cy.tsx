@@ -11,7 +11,7 @@ describe('ReliabilityBarChartD3', () => {
       reliability: { error: 'Server error', chartData: [], refetch },
     });
     cy.get('[data-testid="reliability-error"]')
-      .should('contain.text', 'Failed to load reliability data.')
+      .should('contain.text', 'Failed to load reliability data')
       .find('button')
       .should('have.text', 'Retry')
       .click();

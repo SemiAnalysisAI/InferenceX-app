@@ -14,7 +14,7 @@ describe('official preview notices', () => {
   });
 
   it('renders both graph notices and tracks Jalapeño legend visibility', () => {
-    cy.visit(`/inference?${JALAPENO_QUERY}`);
+    cy.visit(`/infx/inference?${JALAPENO_QUERY}`);
 
     cy.get(JALAPENO_NOTICE).should('be.visible');
     cy.get(VERA_RUBIN_NOTICE).should('be.visible');
@@ -29,21 +29,23 @@ describe('official preview notices', () => {
   });
 
   it('keeps the July Vera Rubin notice off metrics where its curve is unsupported', () => {
-    cy.visit('/inference?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_tpPerGpu');
+    cy.visit(
+      '/infx/inference?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_tpPerGpu',
+    );
 
     cy.get(JALAPENO_NOTICE).should('be.visible');
     cy.get(VERA_RUBIN_NOTICE).should('not.exist');
   });
 
   it('appears with Jalapeño calculator results', () => {
-    cy.visit(`/calculator?${JALAPENO_QUERY}`);
+    cy.visit(`/infx/calculator?${JALAPENO_QUERY}`);
 
     cy.get(JALAPENO_NOTICE).should('be.visible');
 
     cy.get('[data-testid="calculator-controls"]').within(() => {
       cy.get('#calc-cost-type').click();
     });
-    cy.get('[role="option"]').contains('Output Tokens').click();
+    cy.get('[role="option"]').contains('Output tokens').click();
     cy.get('[data-testid="calculator-controls"] input[type="number"]')
       .first()
       .clear()
@@ -53,7 +55,7 @@ describe('official preview notices', () => {
   });
 
   it('appears with Jalapeño historical trend lines', () => {
-    cy.visit(`/historical?${JALAPENO_QUERY}`);
+    cy.visit(`/infx/historical?${JALAPENO_QUERY}`);
 
     cy.get('[data-testid="historical-trends-display"] input[type="number"]')
       .clear()
@@ -64,7 +66,9 @@ describe('official preview notices', () => {
   });
 
   it('keeps the July Vera Rubin notice off unsupported historical metrics', () => {
-    cy.visit('/historical?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_tpPerGpu');
+    cy.visit(
+      '/infx/historical?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_tpPerGpu',
+    );
 
     cy.get('[data-testid="historical-trends-display"] input[type="number"]')
       .clear()
@@ -75,11 +79,11 @@ describe('official preview notices', () => {
   });
 
   it('shows the Vera Rubin preview when its output-token fleet curve is visible', () => {
-    cy.visit('/fleet?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4');
+    cy.visit('/infx/fleet?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4');
 
     cy.get('[data-testid="fleet-legend"]').should('be.visible');
-    cy.get('#fleet-cost-type').click();
-    cy.get('[role="option"]').contains('Output Tokens').click();
+    cy.get('[data-testid="fleet-cost-type-selector"]').click();
+    cy.get('[role="option"]').contains('Output tokens').click();
     cy.get('[data-testid="fleet-legend"]').should('contain.text', 'Vera Rubin');
     cy.get('[data-testid="fleet-controls"] input[type="number"]').clear().type('100').blur();
     cy.get('[data-testid="calc-fleet-mw-input"]').should('have.value', '10');
@@ -87,12 +91,12 @@ describe('official preview notices', () => {
   });
 
   it('renders the TPU7x graph notice on the Qwen3.5 8k/1k curve and nowhere else', () => {
-    cy.visit(`/inference?${TPUV7_QUERY}`);
+    cy.visit(`/infx/inference?${TPUV7_QUERY}`);
 
     cy.get(TPUV7_NOTICE).should('be.visible');
     cy.get(JALAPENO_NOTICE).should('not.exist');
 
-    cy.visit(`/inference?${JALAPENO_QUERY}`);
+    cy.visit(`/infx/inference?${JALAPENO_QUERY}`);
     cy.get(JALAPENO_NOTICE).should('be.visible');
     cy.get(TPUV7_NOTICE).should('not.exist');
   });

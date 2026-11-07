@@ -16,7 +16,7 @@ import {
 import { track } from '@/lib/analytics/analytics';
 import {
   DASHBOARD_ROUTES,
-  dashboardRouteForPathname,
+  dashboardNavTabForPathname,
   getDashboardRoute,
   type DashboardRoute,
   type DashboardRouteKey,
@@ -24,7 +24,6 @@ import {
 import { localePath } from '@/lib/i18n/i18n';
 import { TAB_LABELS_ZH } from '@/lib/routing/tab-meta-zh';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
-import { Card } from '@/components/ui/card';
 import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useClientRouteSearch } from '@/hooks/useClientSearch';
@@ -36,23 +35,23 @@ import {
 import { cn } from '@/lib/shared/utils';
 
 const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
-  inference: 'Inference Performance',
+  inference: 'Inference performance',
   powerx: 'PowerX',
-  evaluation: 'Accuracy Evals',
-  historical: 'Historical Trends',
-  calculator: 'TCO Calculator',
-  fleet: 'Fleet Lifecycle',
-  'first-token': 'First-Token Limits',
-  'cache-reuse': 'Prefix Cache Reuse',
-  'profit-estimator': 'Profit Estimator',
-  'profit-estimator-per-gigawatt': 'Profit Estimator per GW',
+  evaluation: 'Accuracy evals',
+  historical: 'Historical trends',
+  calculator: 'TCO calculator',
+  fleet: 'Fleet lifecycle',
+  'first-token': 'First-token limits',
+  'cache-reuse': 'Prefix cache reuse',
+  'profit-estimator': 'Profit estimator',
+  'profit-estimator-per-gigawatt': 'Profit estimator per GW',
   reliability: 'Reliability',
-  'gpu-specs': 'Chip Specs',
+  'gpu-specs': 'Chip specs',
   submissions: 'Submissions',
   operatorx: 'OperatorX',
   collectivex: 'CollectiveX',
-  'agentic-workload-explorer': 'Agentic Workloads',
-  'ai-chart': 'AI Chart',
+  'agentic-workload-explorer': 'Agentic workloads',
+  'ai-chart': 'AI chart',
   'current-inferencex-image': 'Images',
   video: 'Video',
   feedback: 'Feedback',
@@ -62,18 +61,16 @@ const PRIMARY_TABS = DASHBOARD_ROUTES.filter((route) => route.navGroup === 'prim
 const GATED_TABS = DASHBOARD_ROUTES.filter((route) => route.navGroup === 'feature-gated');
 
 const tabLinkClass = cn(
-  'relative inline-flex items-center justify-center',
-  'text-base font-medium whitespace-nowrap',
+  'relative inline-flex items-center justify-center py-3',
+  'text-sm font-medium whitespace-nowrap',
   'text-muted-foreground',
   'border-b-2 border-transparent',
   'transition-colors duration-200',
-  'focus-visible:outline-none',
+  'focus-visible:outline-none focus-visible:text-foreground',
 );
 
 const currentTabClass = (active: boolean) =>
-  active
-    ? 'border-secondary dark:border-primary text-secondary dark:text-primary'
-    : 'hover:border-muted-foreground/30';
+  active ? 'border-brand text-foreground' : 'hover:text-foreground';
 
 function handleMobileSelect(tab: DashboardRouteKey) {
   window.dispatchEvent(new CustomEvent('inferencex:tab-change'));
@@ -136,10 +133,14 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
   const pathname = usePathname();
   const featureGateUnlocked = useFeatureGate();
   const locale = pathname === '/zh' || pathname.startsWith('/zh/') ? 'zh' : 'en';
-  const current = dashboardRouteForPathname(pathname)?.key ?? 'inference';
+  const current = dashboardNavTabForPathname(pathname) ?? 'inference';
   const currentRoute = getDashboardRoute(current);
-  const lockedCurrentGatedTab =
-    !featureGateUnlocked && currentRoute.navGroup === 'feature-gated' ? currentRoute : null;
+  const surfacedCurrentTab =
+    currentRoute.navGroup === 'footer-only' ||
+    (!featureGateUnlocked && currentRoute.navGroup === 'feature-gated')
+      ? currentRoute
+      : null;
+  const stripTabs = surfacedCurrentTab ? [...PRIMARY_TABS, surfacedCurrentTab] : PRIMARY_TABS;
   const tabLabel = (route: DashboardRoute) =>
     locale === 'zh' ? TAB_LABELS_ZH[route.key] : TAB_LABELS_EN[route.key];
 
@@ -161,21 +162,25 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
       ? (profitRoutePathname(path, new URLSearchParams({ unofficialruns: unofficialIds })) ??
         `${path}?unofficialruns=${unofficialIds}`)
       : path;
-    if (retainedModel && (path === '/inference' || path === '/zh/inference')) {
+    if (
+      retainedModel &&
+      (path === getDashboardRoute('inference').path ||
+        path === `/zh${getDashboardRoute('inference').path}`)
+    ) {
       return `${href}${unofficialIds ? '&' : '?'}g_model=${encodeURIComponent(retainedModel)}`;
     }
     return href;
   };
 
   return (
-    <div className="mb-1 pt-3 lg:mb-4 lg:pt-0">
-      <Card className="vt-dashboard-tabs p-0 md:p-0" data-slot="dashboard-navigation">
+    <div className="mb-1 lg:mb-2">
+      <div className="vt-dashboard-tabs" data-slot="dashboard-navigation">
         <MobileTabStrip
-          ariaLabel={locale === 'zh' ? '选择图表' : 'Select Chart'}
+          ariaLabel={locale === 'zh' ? '选择图表' : 'Select chart'}
           current={current}
-          routes={[...PRIMARY_TABS, ...(lockedCurrentGatedTab ? [lockedCurrentGatedTab] : [])]}
-          gatedRoutes={featureGateUnlocked ? GATED_TABS : []}
-          gatedLabel={locale === 'zh' ? '隐藏' : 'Hidden'}
+          routes={stripTabs}
+          showHidden={featureGateUnlocked}
+          locale={locale}
           tabLabel={tabLabel}
           tabHref={(path) => tabHref(localePath(path, locale))}
           isCurrentPage={(route) => {
@@ -185,13 +190,13 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
           onSelect={handleMobileSelect}
         />
 
-        <div className="hidden overflow-x-auto p-6 lg:block">
+        <div className="hidden overflow-x-auto border-b border-border/30 lg:block">
           <nav
             ref={navRef}
             data-testid="chart-section-tabs"
-            className="relative flex items-center justify-evenly min-w-0"
+            className="relative flex min-w-0 items-center gap-8"
           >
-            {PRIMARY_TABS.map((route) => (
+            {stripTabs.map((route) => (
               <IntentPrefetchLink
                 key={route.key}
                 href={tabHref(localePath(route.path, locale))}
@@ -202,7 +207,7 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
                 className={cn(
                   tabLinkClass,
                   currentTabClass(current === route.key && !indicator),
-                  current === route.key && 'text-secondary dark:text-primary',
+                  current === route.key && 'text-foreground',
                 )}
               >
                 {tabLabel(route)}
@@ -211,10 +216,9 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
             {indicator && (
               <span
                 aria-hidden
-                className="tab-indicator bg-secondary dark:bg-primary"
+                className="tab-indicator bg-brand"
                 style={{
-                  width: indicator.width,
-                  transform: `translateX(${indicator.left}px)`,
+                  transform: `translateX(${indicator.left}px) scaleX(${indicator.width})`,
                   ...(animate ? null : { transition: 'none' }),
                 }}
               />
@@ -231,7 +235,7 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
           </nav>
         </div>
         {footer}
-      </Card>
+      </div>
     </div>
   );
 }
@@ -242,24 +246,30 @@ function HiddenTabsPopover({
   onSelect,
   tabLabel,
   locale,
+  testId = 'tab-trigger-hidden',
+  className,
 }: {
   current: DashboardRouteKey;
   tabHref: (path: string) => string;
   onSelect: (tab: DashboardRouteKey) => void;
   tabLabel: (route: DashboardRoute) => string;
   locale: 'en' | 'zh';
+  testId?: string;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const active = getDashboardRoute(current).navGroup === 'feature-gated';
+  const currentRoute = getDashboardRoute(current);
+  const active = currentRoute.navGroup === 'feature-gated';
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
-        data-testid="tab-trigger-hidden"
+        data-testid={testId}
         data-ph-capture-attribute-tab="hidden"
-        className={cn(tabLinkClass, currentTabClass(active), 'gap-1 cursor-pointer')}
+        aria-current={active ? 'page' : undefined}
+        className={cn(tabLinkClass, currentTabClass(active), 'gap-1 cursor-pointer', className)}
       >
-        {locale === 'zh' ? '隐藏' : 'Hidden'}
+        {active ? tabLabel(currentRoute) : locale === 'zh' ? '隐藏' : 'Hidden'}
         <ChevronDown
           className={cn('size-4 transition-transform', open && 'rotate-180')}
           aria-hidden
@@ -283,8 +293,8 @@ function HiddenTabsPopover({
                     'block rounded-sm px-2 py-1.5 text-sm',
                     'transition-colors',
                     isActive
-                      ? 'bg-accent text-secondary dark:text-primary font-medium'
-                      : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                      ? 'bg-muted text-foreground font-medium'
+                      : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
                   )}
                 >
                   {tabLabel(route)}
@@ -302,8 +312,8 @@ function MobileTabStrip({
   ariaLabel,
   current,
   routes,
-  gatedRoutes,
-  gatedLabel,
+  showHidden,
+  locale,
   tabLabel,
   tabHref,
   isCurrentPage,
@@ -312,8 +322,8 @@ function MobileTabStrip({
   ariaLabel: string;
   current: DashboardRouteKey;
   routes: readonly DashboardRoute[];
-  gatedRoutes: readonly DashboardRoute[];
-  gatedLabel: string;
+  showHidden: boolean;
+  locale: 'en' | 'zh';
   tabLabel: (route: DashboardRoute) => string;
   tabHref: (path: string) => string;
   isCurrentPage: (route: DashboardRoute) => boolean;
@@ -339,7 +349,7 @@ function MobileTabStrip({
       el.scrollLeft = Math.max(0, target);
     }
     updateEdges();
-  }, [current, updateEdges, gatedRoutes.length]);
+  }, [current, updateEdges, showHidden]);
 
   useEffect(() => {
     const el = scrollerRef.current;
@@ -365,13 +375,7 @@ function MobileTabStrip({
           }
           onSelect(route.key);
         }}
-        className={cn(
-          'inline-flex min-h-10 shrink-0 items-center rounded-full border px-4 text-sm font-medium whitespace-nowrap',
-          'transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-          active
-            ? 'border-secondary bg-secondary text-secondary-foreground dark:border-primary dark:bg-primary dark:text-primary-foreground'
-            : 'border-border/60 bg-background/40 text-muted-foreground active:bg-accent',
-        )}
+        className={cn(tabLinkClass, currentTabClass(active), 'min-h-11 shrink-0 py-0')}
       >
         {tabLabel(route)}
       </IntentPrefetchLink>
@@ -379,42 +383,29 @@ function MobileTabStrip({
   };
 
   return (
-    <div className="relative lg:hidden">
-      <nav
-        ref={scrollerRef}
-        id="chart-select"
-        aria-label={ariaLabel}
-        data-testid="mobile-chart-select"
-        onScroll={updateEdges}
-        className="no-scrollbar flex gap-2 overflow-x-auto overscroll-x-contain p-3"
-      >
-        {routes.map(renderPill)}
-        {gatedRoutes.length > 0 && (
-          <>
-            <span
-              aria-hidden
-              className="shrink-0 self-center px-1 text-2xs font-medium uppercase tracking-eyebrow text-muted-foreground/70"
-            >
-              {gatedLabel}
-            </span>
-            {gatedRoutes.map(renderPill)}
-          </>
-        )}
-      </nav>
-      <span
-        aria-hidden
-        className={cn(
-          'pointer-events-none absolute inset-y-0 left-0 w-6 rounded-l-xl bg-gradient-to-r from-background to-transparent transition-opacity',
-          edges.start ? 'opacity-100' : 'opacity-0',
-        )}
-      />
-      <span
-        aria-hidden
-        className={cn(
-          'pointer-events-none absolute inset-y-0 right-0 w-8 rounded-r-xl bg-gradient-to-l from-background to-transparent transition-opacity',
-          edges.end ? 'opacity-100' : 'opacity-0',
-        )}
-      />
-    </div>
+    <nav
+      ref={scrollerRef}
+      id="chart-select"
+      aria-label={ariaLabel}
+      data-testid="mobile-chart-select"
+      onScroll={updateEdges}
+      className="no-scrollbar relative flex gap-6 overflow-x-auto overscroll-x-contain border-b border-border/30 lg:hidden"
+      style={{
+        maskImage: `linear-gradient(to right, ${edges.start ? 'transparent' : 'black'}, black 2rem, black calc(100% - 2.5rem), ${edges.end ? 'transparent' : 'black'})`,
+      }}
+    >
+      {routes.map(renderPill)}
+      {showHidden && (
+        <HiddenTabsPopover
+          current={current}
+          tabHref={tabHref}
+          onSelect={onSelect}
+          tabLabel={tabLabel}
+          locale={locale}
+          testId="mobile-tab-hidden"
+          className="min-h-11 shrink-0 py-0"
+        />
+      )}
+    </nav>
   );
 }

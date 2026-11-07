@@ -44,7 +44,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       }),
     });
     let csv: Blob | undefined;
-    cy.visit('/profit-estimator-per-gigawatt/deepseek-v41-flash?c_power=modeled', {
+    cy.visit('/infx/profit-estimator-per-gigawatt/deepseek-v41-flash?c_power=modeled', {
       onBeforeLoad: (win) => {
         unlockPowerGate(win);
         win.URL.createObjectURL = (blob) => {
@@ -108,7 +108,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         })),
       });
     });
-    cy.visit('/profit-estimator-per-gigawatt?c_power=compare', {
+    cy.visit('/infx/profit-estimator-per-gigawatt?c_power=compare', {
       onBeforeLoad: (win) => {
         suppressNudges(win);
         win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
@@ -155,7 +155,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         });
       });
       cy.visit(
-        `/profit-estimator-per-gigawatt?c_power=compare&i_gpus=b200_sglang,b300_vllm&i_dstart=${PROFIT_HISTORY_DATE}&i_dend=${PROFIT_HISTORY_DATE}`,
+        `/infx/profit-estimator-per-gigawatt?c_power=compare&i_gpus=b200_sglang,b300_vllm&i_dstart=${PROFIT_HISTORY_DATE}&i_dend=${PROFIT_HISTORY_DATE}`,
         { onBeforeLoad: unlockPowerGate },
       );
       chart()
@@ -186,7 +186,9 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         });
       }
     });
-    cy.visit('/profit-estimator-per-gigawatt?c_power=compare', { onBeforeLoad: unlockPowerGate });
+    cy.visit('/infx/profit-estimator-per-gigawatt?c_power=compare', {
+      onBeforeLoad: unlockPowerGate,
+    });
     cy.wait('@power-rows').its('request.query').should('not.have.property', 'view');
     cy.get('#profit-power').should('contain', 'Compare both');
     cy.get('#profit-target').should('have.value', '60');
@@ -195,7 +197,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
     chart().should('contain', 'All in Measured').and('contain', 'All in Provisioned');
   });
 
-  it('keeps all nine power comparison bars readable and reachable on mobile (en)', () => {
+  it('keeps all nine power comparison bars readable on mobile without a scroll window (en)', () => {
     stubOpenRouter();
     cy.viewport(390, 900);
     cy.intercept('GET', '/api/v1/benchmarks*', {
@@ -213,47 +215,25 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         ...profitNvl72Rows(),
       ],
     });
-    cy.visit('/profit-estimator-per-gigawatt?c_power=compare', {
+    cy.visit('/infx/profit-estimator-per-gigawatt?c_power=compare', {
       onBeforeLoad: unlockPowerGate,
     });
     chart().find('text.revenue-label').should('have.length', 9);
-    chart()
-      .find('image.bar-vendor-mark')
-      .should(($marks) => {
-        const boxes = [...$marks].map((mark) => mark.getBoundingClientRect());
-        for (let i = 1; i < boxes.length; i++) {
-          expect(boxes[i].left - boxes[i - 1].right, 'space between vendor marks').to.be.at.least(
-            4,
-          );
-        }
-      });
-    scroller().should('have.attr', 'tabindex', '0').and('have.attr', 'role', 'region');
-    scroller()
-      .scrollIntoView({ offset: { top: -70, left: 0 } })
-      .focus()
-      .should('have.focus');
-    scroller().then(($scroll) => {
-      const el = $scroll[0];
-      const event = new el.ownerDocument.defaultView!.KeyboardEvent('keydown', {
-        key: 'ArrowRight',
-        bubbles: true,
-        cancelable: true,
-      });
-      el.dispatchEvent(event);
-      expect(event.defaultPrevented, `handled key on ${el.clientWidth}/${el.scrollWidth}`).to.equal(
-        true,
-      );
-      expect(el.scrollLeft, 'synchronous scroll').to.be.greaterThan(0);
+    chart().find('image.bar-vendor-mark').should('not.exist');
+    scroller().should('not.have.attr', 'tabindex');
+    chart().contains('Scroll horizontally').should('not.exist');
+    chartSvg().should(($svg) => {
+      const plot = $svg[0].getBoundingClientRect();
+      expect(plot.right).to.be.at.most(390);
+      for (const bar of $svg[0].querySelectorAll('rect.bar')) {
+        expect(bar.getBoundingClientRect().right, 'bar inside the card').to.be.at.most(plot.right);
+      }
     });
-    scroller().should(($scroll) => expect($scroll[0].scrollLeft).to.be.greaterThan(0));
-    scroller().scrollTo('right');
-    chart().find('rect.bar-profit').last().should('be.visible');
-    chart().find('rect.bar-profit').last().click({ scrollBehavior: false });
-    cy.get('[data-chart-tooltip="profit-estimator-chart"]')
-      .should('be.visible')
-      .and('contain', 'MI355X');
-    chartSvg().trigger('click', { force: true, scrollBehavior: false });
+    chart().find('rect.bar-profit').last().click();
     cy.get('[data-chart-tooltip="profit-estimator-chart"]').should('not.be.visible');
+    cy.get('[data-testid="point-details-panel"]').should('be.visible').and('contain', 'MI355X');
+    chartSvg().trigger('click', { force: true, scrollBehavior: false });
+    cy.get('[data-testid="point-details-panel"]').should('not.exist');
     cy.document().should((doc) => {
       expect(doc.documentElement.scrollWidth).to.be.at.most(390);
     });
@@ -262,11 +242,6 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       expect(bounds.left).to.be.at.least(0);
       expect(bounds.right).to.be.at.most(390);
     });
-    scroller()
-      .scrollIntoView({ offset: { top: -70, left: 0 } })
-      .scrollTo('left');
-    chart().find('rect.bar-tco').first().should('be.visible');
-    scroller().scrollTo('right');
     let exportedPng = '';
     let exportedLabels: string[] = [];
     cy.window().then((win) => {
@@ -289,14 +264,13 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         return new Cypress.Promise<void>((resolve, reject) => {
           const png = new win.Image();
           png.addEventListener('load', () => {
-            expect(png.naturalWidth).to.be.greaterThan(1500);
+            expect(png.naturalWidth).to.be.greaterThan(1000);
             resolve();
           });
           png.addEventListener('error', () => reject(new Error('Profit PNG did not decode')));
           png.src = exportedPng;
         });
       });
-    scroller().should(($scroll) => expect($scroll[0].scrollLeft).to.be.greaterThan(0));
     cy.viewport(1280, 900);
     scroller().should('not.have.attr', 'tabindex');
     scroller().should(($scroll) => {
@@ -307,14 +281,14 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
 
   it('keeps the benchmark settings and restores the original chart after unavailable power', () => {
     stubOpenRouter();
-    cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: unlockPowerGate });
+    cy.visit('/infx/profit-estimator-per-gigawatt', { onBeforeLoad: unlockPowerGate });
     bars().its('length').should('be.greaterThan', 0);
     chart()
       .invoke('text')
       .then((original) => {
         cy.get('#profit-power').click();
         cy.get('[role="option"]').contains('All in Measured').click();
-        cy.contains('No SKU can be priced for the current selection.').should('be.visible');
+        cy.contains('No SKU can be priced for the current selection').should('be.visible');
         cy.get('#profit-target').should('have.value', '60');
         cy.get('[data-testid="profit-model-selector"]').should('contain', 'Kimi K3');
         cy.get('[data-testid="profit-price-source-selector"]').should('contain', 'Moonshot');
@@ -330,14 +304,15 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
 describe('Profit Estimator — responsive control panels', () => {
   beforeEach(stubOpenRouter);
 
-  for (const route of ['/profit-estimator']) {
+  for (const route of ['/infx/profit-estimator']) {
     for (const width of [375, 768, 1280]) {
       it(`keeps benchmark and pricing controls grouped on ${route} at ${width}px`, () => {
         cy.viewport(width, 1000);
         cy.visit(route, { onBeforeLoad: suppressNudges });
         chart().should('exist');
+        if (width < 768) cy.get('[data-testid="profit-secondary-controls"] > button').click();
         cy.get('[data-testid="profit-benchmark-panel"]').within(() => {
-          cy.get('legend').should('have.text', 'Benchmark Config');
+          cy.get('legend').should('have.text', 'Benchmark config');
           cy.get('#profit-model').should('contain.text', 'Kimi K3');
           cy.get('#profit-target').should('have.value', '60');
         });
@@ -369,7 +344,7 @@ describe('Profit Estimator — responsive control panels', () => {
           expect(history.right - chip.right, 'no empty history column').to.be.lessThan(24);
         });
         cy.get('[data-testid="profit-pricing-panel"]').within(() => {
-          cy.get('legend').should('have.text', 'Pricing Config');
+          cy.get('legend').should('have.text', 'Pricing config');
           cy.get('#profit-price-source').click();
         });
         cy.get('[data-testid="result-context-utilization"] #profit-utilization').should(
@@ -386,7 +361,7 @@ describe('Profit Estimator — responsive control panels', () => {
           .find('input')
           .should('have.length', 3);
         cy.get('[data-testid="profit-pricing-panel"] #profit-cost').should('not.exist');
-        cy.get('[data-testid="profit-caption"] [data-testid="profit-tco-badge"] input').should(
+        cy.get('[data-testid="profit-footer"] [data-testid="profit-tco-badge"] input').should(
           'have.length.greaterThan',
           0,
         );
@@ -420,7 +395,10 @@ describe('Profit Estimator — responsive control panels', () => {
           }
         });
         cy.get('#profit-utilization').clear().type('50').blur();
-        cy.get('[data-testid="result-context-utilization"]').should('have.text', '50%');
+        cy.get('[data-testid="result-context-utilization"] .export-only').should(
+          'have.text',
+          '50%',
+        );
         cy.get('#profit-price-source').click();
         cy.contains('[role="option"]', 'Moonshot list price').click();
         cy.get('[data-testid="profit-custom-prices"]').should('not.exist');

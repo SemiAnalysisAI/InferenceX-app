@@ -7,16 +7,6 @@
   align-items: start;
   grid-template-columns: minmax(0, 1fr);
 }
-.empty {
-  min-height: 60px;
-  display: grid;
-  place-content: center;
-  gap: 6px;
-  text-align: center;
-  padding: 10px 14px;
-  border: 1px dashed var(--results-rule);
-  color: var(--muted-foreground);
-}
 .scroll {
   max-width: 100%;
   overflow: auto;

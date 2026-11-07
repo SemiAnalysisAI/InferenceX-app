@@ -112,7 +112,7 @@ describe('Parallelism labels in standard controls', () => {
       cy.viewport(width, 900);
       interceptAgenticData();
       interceptDerivedAgenticMetrics();
-      cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces', {
+      cy.visit('/infx/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces', {
         onBeforeLoad(win) {
           unlockAgenticGate(win);
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -165,7 +165,7 @@ describe('Parallelism labels in standard controls', () => {
       interceptAgenticData();
       interceptDerivedAgenticMetrics();
       cy.visit(
-        `/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces&i_label=1&i_advlabel=${Number(parallelism)}`,
+        `/infx/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces&i_label=1&i_advlabel=${Number(parallelism)}`,
         {
           onBeforeLoad(win) {
             unlockAgenticGate(win);
@@ -187,7 +187,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
   before(() => {
     interceptAgenticData();
     interceptDerivedAgenticMetrics();
-    cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces', {
+    cy.visit('/infx/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         unlockAgenticGate(win);
@@ -248,21 +248,20 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
   });
 
   it('explains the offload halo in the info footer and distinguishes it from plain points', () => {
-    cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]')
+    cy.get('#chart-0 [data-testid="result-context-markers"] [data-testid="offload-halo-key"]')
       .should('be.visible')
-      .and('contain.text', 'KV offload ON');
+      .and('contain.text', 'KV offload on');
     cy.scatterPoints('#chart-0').should((points) => {
       const halos = points.filter((point) => point.halo !== null).length;
       expect(halos).to.be.at.least(1);
       expect(halos).to.be.lessThan(points.length);
     });
 
-    cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]').should(
-      'be.visible',
-    );
-    cy.get('#chart-0 [data-testid="offload-halo-key"]').should('not.exist');
+    cy.get(
+      '#chart-0 [data-testid="result-context-markers"] [data-testid="offload-halo-key"]',
+    ).should('be.visible');
     expandLegendAdvanced();
-    cy.get('label[for="scatter-offloading-label"]').should('have.text', 'Offloading Label');
+    cy.get('label[for="scatter-offloading-label"]').should('have.text', 'Offloading label');
     cy.get('#scatter-offloading-label').should('have.attr', 'data-state', 'checked').click();
     cy.get('[data-testid="offload-halo-key"]').should('not.exist');
     cy.scatterPoints('#chart-0').should((points) => {
@@ -286,9 +285,9 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.scatterPoints('#chart-0').should((points) => {
       expect(points.filter((point) => point.halo !== null)).to.have.length.at.least(1);
     });
-    cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]').should(
-      'be.visible',
-    );
+    cy.get(
+      '#chart-0 [data-testid="result-context-markers"] [data-testid="offload-halo-key"]',
+    ).should('be.visible');
     cy.get('[data-testid="share-button"]').click();
     cy.get('[data-testid="share-url-input"]')
       .invoke('val')
@@ -330,7 +329,7 @@ describe('X-axis mode URL param', () => {
   it('keeps a URL-restored mode through the agentic sequence resolving', () => {
     interceptAgenticData();
     interceptDerivedAgenticMetrics();
-    cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces&i_xmode=ttft', {
+    cy.visit('/infx/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces&i_xmode=ttft', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         unlockAgenticGate(win);
@@ -349,7 +348,7 @@ describe('Default scenario', () => {
     it(`keeps the labeled scenario field discoverable at ${width}px and recovers from empty data`, () => {
       interceptAgenticData();
       interceptDerivedAgenticMetrics();
-      cy.visit('/inference', {
+      cy.visit('/infx/inference', {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         },
@@ -362,7 +361,7 @@ describe('Default scenario', () => {
       cy.viewport(width, 800);
       interceptAgenticData();
       interceptDerivedAgenticMetrics();
-      cy.visit('/inference');
+      cy.visit('/infx/inference');
       cy.get('fieldset [data-testid="scenario-selector"]').should('not.exist');
       cy.get('#chart-0').should(($chart) => {
         const plot = $chart[0]!.querySelector('[data-testid="d3-chart-svg"]')!;
@@ -384,7 +383,10 @@ describe('Default scenario', () => {
           'help does not overlap the label',
         ).to.be.at.least(label.getBoundingClientRect().right);
       });
-      cy.get('label[for="scenario-select"]').should('be.visible').and('contain.text', 'Scenario');
+      // The footer control keeps its label for screen readers and exports, not on screen.
+      cy.get('label[for="scenario-select"]')
+        .should('have.class', 'sr-only')
+        .and('contain.text', 'Scenario');
       cy.get('h2 [data-testid="scenario-selector"]').should('not.exist');
       cy.get('[data-testid="scenario-selector"]').click('right', {
         scrollBehavior: 'center',
@@ -402,13 +404,13 @@ describe('Default scenario', () => {
 
   it('keeps 8K / 1K when the link asks for it explicitly', () => {
     interceptAgenticData();
-    cy.visit('/zh/inference');
-    cy.get('label[for="scenario-select"]').should('be.visible').and('have.text', '场景:');
+    cy.visit('/zh/infx/inference');
+    cy.get('label[for="scenario-select"]').should('have.class', 'sr-only').and('have.text', '场景');
     cy.get('[data-testid="result-context"] [data-testid="scenario-selector"]').should('be.visible');
     cy.get('h2 [data-testid="scenario-selector"]').should('not.exist');
 
     interceptFixedSequenceData();
-    cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=8k%2F1k', {
+    cy.visit('/infx/inference?g_model=deepseek-v4-pro&i_seq=8k%2F1k', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -420,7 +422,7 @@ describe('Default scenario', () => {
     cy.get('[data-testid="chart-figure"] svg').should('not.contain.text', 'P90 Interactivity');
 
     interceptFixedSequenceData();
-    cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=8k%2F1k', {
+    cy.visit('/infx/inference?g_model=deepseek-v4-pro&i_seq=8k%2F1k', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -437,7 +439,7 @@ describe('Default scenario', () => {
       body: availabilityBody(otherModelAvailability),
     }).as('availability');
     cy.intercept('GET', '/api/v1/benchmarks*', { body: otherModelBenchmarks }).as('benchmarks');
-    cy.visit('/inference?g_model=DeepSeek-R1-0528', {
+    cy.visit('/infx/inference?g_model=DeepSeek-R1-0528', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -450,7 +452,7 @@ describe('Default scenario', () => {
 describe('Label defaults for fixed-sequence scenarios', () => {
   it('offers only the three supported axes for fixed sequences', () => {
     interceptFixedSequenceData();
-    cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=8k%2F1k');
+    cy.visit('/infx/inference?g_model=deepseek-v4-pro&i_seq=8k%2F1k');
     openXAxisMenu();
     cy.get('[role="grid"] [data-select-option]').should('have.length', 3);
     cy.get('[data-testid="x-axis-mode-interactivity"]').should('be.visible');
@@ -600,7 +602,7 @@ describe('Measured prefill metrics preserve the selected x-axis', () => {
       },
     }).as('prefillOverlay');
     cy.visit(
-      `/powerx?g_model=DeepSeek-V4-Pro&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_measuredPrefillAvgPower&i_xmode=interactivity&i_best=0&i_optimal=0&i_active=b200_dynamo-sglang&unofficialrun=${OVERLAY_RUN_ID}`,
+      `/pwx?g_model=DeepSeek-V4-Pro&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_measuredPrefillAvgPower&i_xmode=interactivity&i_best=0&i_optimal=0&i_active=b200_dynamo-sglang&unofficialrun=${OVERLAY_RUN_ID}`,
       {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -655,7 +657,7 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
   before(() => {
     interceptAgenticDataWithOverlay();
     interceptDerivedAgenticMetrics();
-    cy.visit(`/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces`, {
+    cy.visit(`/infx/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces`, {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         unlockAgenticGate(win);
@@ -679,9 +681,9 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
       'contain.text',
       'P90 Interactivity (tok/s/user)',
     );
-    cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]')
+    cy.get('#chart-0 [data-testid="result-context-markers"] [data-testid="offload-halo-key"]')
       .should('be.visible')
-      .and('contain.text', 'KV offload ON');
+      .and('contain.text', 'KV offload on');
     expandLegendAdvanced();
     cy.get('#scatter-offloading-label').click();
     cy.get('[data-testid="offload-halo-key"]').should('not.exist');
@@ -691,7 +693,7 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
     });
     cy.get('#chart-0 .unofficial-overlay-pt').should('have.length.greaterThan', 0);
     cy.get('#scatter-offloading-label').click();
-    cy.get('[data-testid="offload-halo-key"]').should('contain.text', 'KV offload ON');
+    cy.get('[data-testid="offload-halo-key"]').should('contain.text', 'KV offload on');
     cy.get('#chart-0 .unofficial-overlay-pt .offload-halo').should('have.length.at.least', 1);
   });
 

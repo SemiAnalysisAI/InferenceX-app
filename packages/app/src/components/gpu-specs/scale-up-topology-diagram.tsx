@@ -27,9 +27,9 @@ const STRINGS = {
   en: {
     expand: 'Expand',
     expandHint: 'Click to expand',
-    previous: 'Previous Chip',
-    next: 'Next Chip',
-    title: 'Scale-Up Topology',
+    previous: 'Previous chip',
+    next: 'Next chip',
+    title: 'Scale-up topology',
     diagram: 'scale-up topology diagram',
     nodes: 'nodes',
     chips: 'Chips',
@@ -132,7 +132,7 @@ export const ScaleUpTopologyDiagram = forwardRef<
   return (
     <div className="flex flex-col">
       <div className="flex items-center gap-2 mb-2">
-        <h4 className="text-sm font-semibold">{spec.name}</h4>
+        <h4 className="text-sm font-medium">{spec.name}</h4>
         <span className="text-xs text-muted-foreground">
           {formatScaleUpTopology(spec.scaleUpTopology, locale)} &middot; {compactConfig.techName}
         </span>
@@ -162,7 +162,7 @@ export const ScaleUpTopologyDiagram = forwardRef<
               aria-label={t.previous}
               data-testid="scaleup-topology-nav-prev"
             >
-              <ChevronLeft className="size-5" />
+              <ChevronLeft className="size-4" />
             </Button>
             <DialogHeader className="flex-1">
               <DialogTitle>
@@ -186,7 +186,7 @@ export const ScaleUpTopologyDiagram = forwardRef<
               aria-label={t.next}
               data-testid="scaleup-topology-nav-next"
             >
-              <ChevronRight className="size-5" />
+              <ChevronRight className="size-4" />
             </Button>
           </div>
           <div className="overflow-x-auto">
@@ -363,13 +363,13 @@ function renderSwitchedTopology(
       .attr('width', swBoxW)
       .attr('height', swBoxH)
       .attr('rx', 4)
-      .attr('class', 'fill-purple-500/10 stroke-purple-500/50')
+      .attr('class', 'fill-muted stroke-muted-foreground/40')
       .attr('stroke-width', 1);
     g.append('text')
       .attr('x', pos.cx)
       .attr('y', swY + swBoxH / 2 + (compact ? 3 : 4))
       .attr('text-anchor', 'middle')
-      .attr('class', 'fill-purple-400 font-medium')
+      .attr('class', 'fill-foreground font-medium')
       .style('font-size', fontSize)
       .text(`NVSwitch ${i}`);
   }
@@ -686,14 +686,14 @@ function renderSwitchedNvl72Topology(
     .attr('width', node1W)
     .attr('height', node1H)
     .attr('rx', 6)
-    .attr('class', 'fill-amber-500/5 stroke-amber-500/40')
+    .attr('class', 'fill-none stroke-muted-foreground/30')
     .attr('stroke-width', 1)
     .attr('stroke-dasharray', '4 2');
   svg
     .append('text')
     .attr('x', node1X + nodePad)
     .attr('y', nodeY + nodeLabelH - 2)
-    .attr('class', 'fill-amber-500/70')
+    .attr('class', 'fill-muted-foreground')
     .style('font-size', smallFont)
     .style('font-weight', '500')
     .text(`${STRINGS[locale].node} 0`);
@@ -785,13 +785,13 @@ function renderSwitchedNvl72Topology(
       .attr('width', swBoxW)
       .attr('height', swBoxH)
       .attr('rx', 4)
-      .attr('class', 'fill-purple-500/10 stroke-purple-500/50')
+      .attr('class', 'fill-muted stroke-muted-foreground/40')
       .attr('stroke-width', 1);
     g.append('text')
       .attr('x', sw.x + swBoxW / 2)
       .attr('y', swY + swBoxH / 2 + (compact ? 3 : 4))
       .attr('text-anchor', 'middle')
-      .attr('class', 'fill-purple-400 font-medium')
+      .attr('class', 'fill-foreground font-medium')
       .style('font-size', smallFont)
       .text(sw.label);
   }

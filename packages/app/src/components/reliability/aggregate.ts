@@ -3,7 +3,7 @@ import type { ReliabilityRow } from '@/lib/api/api';
 import type { DateRangeSuccessRateData } from './types';
 
 /**
- * Pure reliability aggregation shared by the `/reliability` dashboard context
+ * Pure reliability aggregation shared by the `/infx/reliability` dashboard context
  * and the read-only views API (`/api/v1/views/reliability`).
  *
  * Extracted from `ReliabilityContext.tsx` so server route handlers can reuse

@@ -321,7 +321,8 @@ function collectTabParams(): URLSearchParams {
   }
 
   // Bare inference now has a different entry default than the retained legacy model.
-  if (/^(?:\/zh)?\/inference\/?$/u.test(window.location.pathname)) {
+  const enPathname = window.location.pathname.replace(/^\/zh(?=\/)/u, '').replace(/\/$/u, '');
+  if (enPathname === getDashboardRoute('inference').path) {
     const model = getInferenceNavigationModel();
     if (model) filtered.set('g_model', model);
   }

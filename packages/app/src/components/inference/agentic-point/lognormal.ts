@@ -40,7 +40,7 @@ export function logHistogram(values: readonly number[], bins: number): LogHistog
   return { edges, counts, lnStep, lnMin, lnMax };
 }
 
-export function logTicks(min: number, max: number): number[] {
+export function logTicks(min: number, max: number, innerWidth?: number): number[] {
   if (!(min > 0) || !(max > min)) return [];
   const decades = Math.log10(max) - Math.log10(min);
   const multipliers = decades > 3 ? [1] : decades > 1.5 ? [1, 5] : [1, 2, 5];
@@ -53,7 +53,7 @@ export function logTicks(min: number, max: number): number[] {
   }
   candidates.push(max);
 
-  const minGap = decades * 0.06;
+  const minGap = decades * (innerWidth ? Math.max(0.06, 56 / innerWidth) : 0.06);
   const kept: number[] = [];
   for (const tick of candidates) {
     const previous = kept.at(-1);

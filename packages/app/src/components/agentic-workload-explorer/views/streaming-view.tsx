@@ -1,7 +1,10 @@
 'use client';
 
-import { Suspense, useMemo, useRef } from 'react';
+import { Suspense, useMemo } from 'react';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Stat } from '@/components/ui/stat';
 import {
   formatNumber,
   formatDuration,
@@ -9,13 +12,13 @@ import {
   formatPrefillSpeed,
 } from '@/lib/agentic-workload-explorer/format';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
-import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
 import { useModelFilter } from '@/hooks/agentic-workload-explorer/use-model-filter';
 import { ModelFilter } from '@/components/agentic-workload-explorer/model-filter';
 import {
   useTraceVersion,
   appendTraceVersion,
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import type {
@@ -24,76 +27,80 @@ import type {
   ModelBreakdown,
   StreamingData,
 } from '@/lib/agentic-workload-explorer/api-types';
-import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import {
+  ChartActions,
+  ChartLabelRow,
+  Expandable,
+} from '@/components/agentic-workload-explorer/expandable-chart';
 
 const STRINGS = {
   en: {
     stats: 'Stats',
     streamingPct: 'Streaming %',
-    nonStreamingPct: 'Non-Streaming %',
-    avgStreamingLatency: 'Avg Streaming E2E Latency',
-    avgNonStreamingLatency: 'Avg Non-Streaming E2E Latency',
+    nonStreamingPct: 'Non-streaming %',
+    avgStreamingLatency: 'Avg streaming E2E latency',
+    avgNonStreamingLatency: 'Avg non-streaming E2E latency',
     ttftP50: 'TTFT (p50)',
     tpotP50: 'TPOT (p50)',
     interactivityP50: 'Interactivity (p50)',
-    prefillSpeedP50: 'Prefill Speed (p50)',
+    prefillSpeedP50: 'Prefill speed (p50)',
     failedToLoad: 'Failed to load streaming data',
-    streamingRatioOverTime: 'Streaming Ratio Over Time',
+    streamingRatioOverTime: 'Streaming ratio over time',
     noDailyRatioData: 'No daily ratio data',
     streamingPct30d: 'Streaming % (30 days)',
     noData: 'No data',
-    e2eLatencyComparison: 'E2E Latency Comparison',
-    streamingE2eLatency: 'Streaming E2E Latency',
-    nonStreamingE2eLatency: 'Non-Streaming E2E Latency',
+    e2eLatencyComparison: 'E2E latency comparison',
+    streamingE2eLatency: 'Streaming E2E latency',
+    nonStreamingE2eLatency: 'Non-streaming E2E latency',
     durationMs: 'Duration (ms)',
-    ttftTpotPrefill: 'TTFT & TPOT & Prefill Speed',
-    timeToFirstToken: 'Time to First Token',
+    ttftTpotPrefill: 'TTFT & TPOT & prefill speed',
+    timeToFirstToken: 'Time to first token',
     ttftMs: 'TTFT (ms)',
-    timePerOutputToken: 'Time per Output Token',
+    timePerOutputToken: 'Time per output token',
     tpotMsTok: 'TPOT (ms/tok)',
     interactivityLabel: 'Interactivity (output tok/s/user)',
     outputTokSUser: 'output tok/s/user',
-    prefillSpeedLabel: 'Prefill Speed (input tok/s/query)',
+    prefillSpeedLabel: 'Prefill speed (input tok/s/query)',
     inputTokSQuery: 'input tok/s/query',
-    tokenThroughput: 'Token Throughput',
+    tokenThroughput: 'Token throughput',
     streamingRequestsOnly: 'Streaming requests only (tokens/sec)',
     tokensSec: 'Tokens/sec',
-    streamingByModel: 'Streaming by Model',
+    streamingByModel: 'Streaming by model',
     model: 'Model',
     streaming: 'Streaming',
-    nonStreaming: 'Non-Streaming',
-    avgStreamingE2e: 'Avg Streaming E2E Latency',
-    avgNonStreamingE2e: 'Avg Non-Streaming E2E Latency',
+    nonStreaming: 'Non-streaming',
+    avgStreamingE2e: 'Avg streaming E2E latency',
+    avgNonStreamingE2e: 'Avg non-streaming E2E latency',
     exportStreamingRatio: 'Streaming % (30 days)',
-    exportStreamingLatency: 'Streaming E2E Latency',
-    exportNonStreamingLatency: 'Non-Streaming E2E Latency',
-    exportTtft: 'Time to First Token',
-    exportTpot: 'Time per Output Token',
+    exportStreamingLatency: 'Streaming E2E latency',
+    exportNonStreamingLatency: 'Non-streaming E2E latency',
+    exportTtft: 'Time to first token',
+    exportTpot: 'Time per output token',
     exportInteractivity: 'Interactivity (output tok/s/user)',
-    exportPrefillSpeed: 'Prefill Speed',
-    exportThroughput: 'Token Throughput',
+    exportPrefillSpeed: 'Prefill speed',
+    exportThroughput: 'Token throughput',
   },
   zh: {
     stats: '统计',
-    streamingPct: 'Streaming 占比',
-    nonStreamingPct: 'Non-Streaming 占比',
-    avgStreamingLatency: 'Streaming 平均端到端延迟',
-    avgNonStreamingLatency: 'Non-Streaming 平均端到端延迟',
+    streamingPct: '流式请求占比',
+    nonStreamingPct: '非流式请求占比',
+    avgStreamingLatency: '流式请求平均端到端延迟',
+    avgNonStreamingLatency: '非流式请求平均端到端延迟',
     ttftP50: 'TTFT (p50)',
     tpotP50: 'TPOT (p50)',
     interactivityP50: '交互性 (p50)',
     prefillSpeedP50: 'Prefill 速度 (p50)',
-    failedToLoad: '加载 streaming 数据失败',
-    streamingRatioOverTime: 'Streaming 占比趋势',
+    failedToLoad: '加载流式请求数据失败',
+    streamingRatioOverTime: '流式请求占比趋势',
     noDailyRatioData: '暂无每日比例数据',
-    streamingPct30d: 'Streaming %（30 天）',
+    streamingPct30d: '流式请求 %（30 天）',
     noData: '暂无数据',
     e2eLatencyComparison: '端到端延迟对比',
-    streamingE2eLatency: 'Streaming 端到端延迟',
-    nonStreamingE2eLatency: 'Non-Streaming 端到端延迟',
+    streamingE2eLatency: '流式请求端到端延迟',
+    nonStreamingE2eLatency: '非流式请求端到端延迟',
     durationMs: '时长 (ms)',
-    ttftTpotPrefill: 'TTFT & TPOT & Prefill Speed',
-    timeToFirstToken: '首 Token 时间',
+    ttftTpotPrefill: 'TTFT、TPOT 与 Prefill 速度',
+    timeToFirstToken: '首 token 延迟',
     ttftMs: 'TTFT (ms)',
     timePerOutputToken: '每输出 token 耗时',
     tpotMsTok: 'TPOT (ms/tok)',
@@ -102,18 +109,18 @@ const STRINGS = {
     prefillSpeedLabel: 'Prefill 速度（input tok/s/query）',
     inputTokSQuery: 'input tok/s/query',
     tokenThroughput: 'Token 吞吐量',
-    streamingRequestsOnly: '仅 streaming 请求（tokens/sec）',
-    tokensSec: 'Tokens/sec',
-    streamingByModel: '按模型的 Streaming 统计',
+    streamingRequestsOnly: '仅流式请求（token/s）',
+    tokensSec: 'token/s',
+    streamingByModel: '按模型的流式请求统计',
     model: '模型',
     streaming: '流式',
     nonStreaming: '非流式',
-    avgStreamingE2e: 'Streaming 平均端到端延迟',
-    avgNonStreamingE2e: 'Non-Streaming 平均端到端延迟',
-    exportStreamingRatio: 'Streaming 占比（30 天）',
-    exportStreamingLatency: 'Streaming 端到端延迟',
-    exportNonStreamingLatency: 'Non-Streaming 端到端延迟',
-    exportTtft: '首 Token 时间',
+    avgStreamingE2e: '流式请求平均端到端延迟',
+    avgNonStreamingE2e: '非流式请求平均端到端延迟',
+    exportStreamingRatio: '流式请求占比（30 天）',
+    exportStreamingLatency: '流式请求端到端延迟',
+    exportNonStreamingLatency: '非流式请求端到端延迟',
+    exportTtft: '首 token 延迟',
     exportTpot: '每输出 token 耗时',
     exportInteractivity: '交互性（output tok/s/user）',
     exportPrefillSpeed: 'Prefill 速度',
@@ -167,29 +174,6 @@ function formatAxisValue(v: number): string {
   return v.toFixed(1);
 }
 
-function SectionHeader({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="flex-1 h-px bg-border" />
-    </div>
-  );
-}
-
-function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
-  return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-        {label}
-      </div>
-      <div className="text-lg font-mono font-bold mt-1">{value}</div>
-      {detail && <div className="text-3xs font-mono text-muted-foreground mt-0.5">{detail}</div>}
-    </div>
-  );
-}
-
 const CHART_W = 600;
 const CHART_H = 200;
 const MARGIN = { top: 8, right: 12, bottom: 36, left: 48 };
@@ -209,8 +193,6 @@ function StreamingRatioChart({
   axisLabel: string;
   exportTitle: string;
 }) {
-  const locale = useLocale();
-  const svgRef = useRef<SVGSVGElement>(null);
   const sorted = useMemo(
     () => [...dailyRatio].toSorted((a, b) => a.day.localeCompare(b.day)),
     [dailyRatio],
@@ -218,12 +200,12 @@ function StreamingRatioChart({
 
   if (sorted.length === 0) {
     return (
-      <div className="rounded-md border border-border bg-surface p-3">
+      <Card>
         <SectionHeader label={headerLabel} />
         <div className="flex items-center justify-center h-40 text-2xs font-mono text-muted-foreground">
           {emptyLabel}
         </div>
-      </div>
+      </Card>
     );
   }
 
@@ -247,25 +229,15 @@ function StreamingRatioChart({
 
   return (
     <Expandable title={exportTitle}>
-      <div className="rounded-md border border-border bg-surface p-3">
+      <Card>
         <div className="flex items-center justify-between mb-2">
           <SectionHeader label={headerLabel} />
-          <ExportPngButton
-            locale={locale}
-            onClick={() => {
-              track('agentic_workload_streaming_ratio_export');
-              if (svgRef.current) {
-                exportSvgToPng(svgRef.current, {
-                  title: exportTitle,
-                  filename: 'streaming-ratio.png',
-                  svgWidth: CHART_W,
-                  svgHeight: CHART_H,
-                });
-              }
-            }}
+          <ChartActions
+            fileName="streaming-ratio"
+            onExportPng={() => track('agentic_workload_streaming_ratio_export')}
           />
         </div>
-        <svg ref={svgRef} viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full">
+        <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full">
           {yTicks.map((t) => (
             <g key={`y-${t}`}>
               {t > 0 && (
@@ -349,19 +321,17 @@ function StreamingRatioChart({
             {axisLabel}
           </text>
         </svg>
-      </div>
+      </Card>
     </Expandable>
   );
 }
-
-const HIST_W = 520;
-const HIST_H = 200;
 
 function Histogram({
   histogram,
   color,
   axisLabel,
   format,
+  caption,
   title,
   exportFilename,
   emptyLabel,
@@ -370,12 +340,11 @@ function Histogram({
   color: string;
   axisLabel: string;
   format?: (v: number) => string;
+  caption: string;
   title?: string;
   exportFilename?: string;
   emptyLabel: string;
 }) {
-  const locale = useLocale();
-  const svgRef = useRef<SVGSVGElement>(null);
   const { buckets } = histogram;
 
   const percentiles = histogram.percentiles.filter(
@@ -406,33 +375,20 @@ function Histogram({
   return (
     <Expandable title={title}>
       <div>
-        {title && exportFilename && (
-          <div className="flex justify-end mb-1">
-            <ExportPngButton
-              locale={locale}
-              onClick={() => {
+        <ChartLabelRow label={caption}>
+          {title && exportFilename && (
+            <ChartActions
+              fileName={exportFilename.replace(/\.png$/u, '')}
+              onExportPng={() =>
                 track('agentic_workload_streaming_histogram_export', {
                   title,
                   file_name: exportFilename,
-                });
-                if (svgRef.current) {
-                  exportSvgToPng(svgRef.current, {
-                    title,
-                    filename: exportFilename,
-                    svgWidth: HIST_W,
-                    svgHeight: HIST_H,
-                  });
-                }
-              }}
+                })
+              }
             />
-          </div>
-        )}
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-          className="w-full"
-          style={{ maxHeight: 220 }}
-        >
+          )}
+        </ChartLabelRow>
+        <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ maxHeight: 220 }}>
           {yTicks.map((t) => (
             <g key={`y-${t}`}>
               {t > 0 && (
@@ -590,12 +546,12 @@ function ModelTable({
   );
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
+    <Card>
       <SectionHeader label={strings.streamingByModel} />
       <div className="overflow-x-auto">
         <table className="w-full text-2xs font-mono">
           <thead>
-            <tr className="text-left text-3xs uppercase tracking-eyebrow text-muted-foreground border-b border-border">
+            <tr className="text-left text-xs text-muted-foreground border-b border-border/20 font-medium">
               <th className="py-1.5 pr-4">{strings.model}</th>
               <th className="py-1.5 pr-4 text-right">{strings.streaming}</th>
               <th className="py-1.5 pr-4 text-right">{strings.nonStreaming}</th>
@@ -609,7 +565,7 @@ function ModelTable({
               const total = m.streamingCount + m.nonStreamingCount;
               const pct = total > 0 ? ((m.streamingCount / total) * 100).toFixed(1) : '0.0';
               return (
-                <tr key={m.model} className="border-b border-border/50 hover:bg-surface-hover">
+                <tr key={m.model} className="border-b border-border/20 hover:bg-surface-hover">
                   <td
                     className="py-1.5 pr-4 text-foreground truncate max-w-[200px]"
                     title={m.model}
@@ -622,7 +578,7 @@ function ModelTable({
                   <td className="py-1.5 pr-4 text-right text-muted-foreground">
                     {formatNumber(m.nonStreamingCount)}
                   </td>
-                  <td className="py-1.5 pr-4 text-right text-cyan-500">{pct}%</td>
+                  <td className="py-1.5 pr-4 text-right">{pct}%</td>
                   <td className="py-1.5 pr-4 text-right text-muted-foreground">
                     {m.streamingAvgLatency === null ? '-' : formatDuration(m.streamingAvgLatency)}
                   </td>
@@ -637,7 +593,7 @@ function ModelTable({
           </tbody>
         </table>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -696,48 +652,57 @@ function StreamingPageContent() {
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-md border border-border bg-surface p-3">
+              <div key={i} className="rounded-xl border border-border/30 bg-card p-3">
                 <Skeleton className="h-3 w-20 mb-2" />
                 <Skeleton className="h-6 w-16" />
               </div>
             ))}
           </div>
         ) : data ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-            <StatCard
+          <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+            <Stat
+              boxed
               label={t.streamingPct}
               value={`${streamingPct}%`}
               detail={`${formatNumber(data.stats.streamingCount)} of ${formatNumber(data.stats.totalCount)}`}
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.nonStreamingPct}
               value={`${nonStreamingPct}%`}
               detail={`${formatNumber(data.stats.nonStreamingCount)} of ${formatNumber(data.stats.totalCount)}`}
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.avgStreamingLatency}
               value={formatDuration(data.stats.streamingAvgLatency)}
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.avgNonStreamingLatency}
               value={formatDuration(data.stats.nonStreamingAvgLatency)}
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.ttftP50}
               value={data.ttftStats.count > 0 ? formatDuration(data.ttftStats.p50) : '---'}
               detail={
                 data.ttftStats.count > 0 ? `p95 ${formatDuration(data.ttftStats.p95)}` : undefined
               }
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.tpotP50}
+              valueClassName="whitespace-normal"
               value={data.tpotStats.count > 0 ? `${data.tpotStats.p50.toFixed(1)}ms/tok` : '---'}
               detail={
                 data.tpotStats.count > 0 ? `p95 ${data.tpotStats.p95.toFixed(1)}ms/tok` : undefined
               }
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.interactivityP50}
+              valueClassName="whitespace-normal"
               value={data.tpotStats.count > 0 ? formatInteractivity(data.tpotStats.p50) : '---'}
               detail={
                 data.tpotStats.count > 0
@@ -745,8 +710,10 @@ function StreamingPageContent() {
                   : undefined
               }
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.prefillSpeedP50}
+              valueClassName="whitespace-normal"
               value={
                 data.prefillSpeedStats.count > 0
                   ? formatPrefillSpeed(data.prefillSpeedStats.p50)
@@ -758,11 +725,9 @@ function StreamingPageContent() {
                   : undefined
               }
             />
-          </div>
+          </dl>
         ) : (
-          <div className="text-sm font-mono text-muted-foreground text-center py-8">
-            {t.failedToLoad}
-          </div>
+          <EmptyState>{t.failedToLoad}</EmptyState>
         )}
       </div>
 
@@ -779,11 +744,9 @@ function StreamingPageContent() {
           <div>
             <SectionHeader label={t.e2eLatencyComparison} />
             <div className="grid lg:grid-cols-2 gap-4">
-              <div className="rounded-md border border-border bg-surface p-3">
-                <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground mb-2">
-                  {t.streamingE2eLatency}
-                </div>
+              <Card>
                 <Histogram
+                  caption={t.streamingE2eLatency}
                   histogram={data.streamingLatencyDistribution}
                   color="#06b6d4"
                   axisLabel={t.durationMs}
@@ -792,12 +755,10 @@ function StreamingPageContent() {
                   exportFilename="streaming-latency.png"
                   emptyLabel={t.noData}
                 />
-              </div>
-              <div className="rounded-md border border-border bg-surface p-3">
-                <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground mb-2">
-                  {t.nonStreamingE2eLatency}
-                </div>
+              </Card>
+              <Card>
                 <Histogram
+                  caption={t.nonStreamingE2eLatency}
                   histogram={data.nonStreamingLatencyDistribution}
                   color="#f59e0b"
                   axisLabel={t.durationMs}
@@ -806,18 +767,16 @@ function StreamingPageContent() {
                   exportFilename="non-streaming-latency.png"
                   emptyLabel={t.noData}
                 />
-              </div>
+              </Card>
             </div>
           </div>
 
           <div>
             <SectionHeader label={t.ttftTpotPrefill} />
             <div className="grid lg:grid-cols-2 gap-4">
-              <div className="rounded-md border border-border bg-surface p-3">
-                <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground mb-2">
-                  {t.timeToFirstToken}
-                </div>
+              <Card>
                 <Histogram
+                  caption={t.timeToFirstToken}
                   histogram={data.ttftDistribution}
                   color="#10b981"
                   axisLabel={t.ttftMs}
@@ -826,12 +785,10 @@ function StreamingPageContent() {
                   exportFilename="ttft.png"
                   emptyLabel={t.noData}
                 />
-              </div>
-              <div className="rounded-md border border-border bg-surface p-3">
-                <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground mb-2">
-                  {t.timePerOutputToken}
-                </div>
+              </Card>
+              <Card>
                 <Histogram
+                  caption={t.timePerOutputToken}
                   histogram={data.tpotDistribution}
                   color="#8b5cf6"
                   axisLabel={t.tpotMsTok}
@@ -840,12 +797,10 @@ function StreamingPageContent() {
                   exportFilename="tpot.png"
                   emptyLabel={t.noData}
                 />
-              </div>
-              <div className="rounded-md border border-border bg-surface p-3">
-                <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground mb-2">
-                  {t.interactivityLabel}
-                </div>
+              </Card>
+              <Card>
                 <Histogram
+                  caption={t.interactivityLabel}
                   histogram={data.interactivityDistribution}
                   color="#f59e0b"
                   axisLabel={t.outputTokSUser}
@@ -854,12 +809,10 @@ function StreamingPageContent() {
                   exportFilename="interactivity.png"
                   emptyLabel={t.noData}
                 />
-              </div>
-              <div className="rounded-md border border-border bg-surface p-3">
-                <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground mb-2">
-                  {t.prefillSpeedLabel}
-                </div>
+              </Card>
+              <Card>
                 <Histogram
+                  caption={t.prefillSpeedLabel}
                   histogram={data.prefillSpeedDistribution}
                   color="#0ea5e9"
                   axisLabel={t.inputTokSQuery}
@@ -868,16 +821,14 @@ function StreamingPageContent() {
                   exportFilename="prefill-speed.png"
                   emptyLabel={t.noData}
                 />
-              </div>
+              </Card>
             </div>
           </div>
 
-          <div className="rounded-md border border-border bg-surface p-3">
+          <Card>
             <SectionHeader label={t.tokenThroughput} />
-            <div className="text-3xs font-mono text-muted-foreground mb-2">
-              {t.streamingRequestsOnly}
-            </div>
             <Histogram
+              caption={t.streamingRequestsOnly}
               histogram={data.throughputDistribution}
               color="#10b981"
               axisLabel={t.tokensSec}
@@ -886,7 +837,7 @@ function StreamingPageContent() {
               exportFilename="throughput.png"
               emptyLabel={t.noData}
             />
-          </div>
+          </Card>
 
           {data.byModel.length > 0 && <ModelTable byModel={data.byModel} strings={t} />}
         </>

@@ -1,10 +1,13 @@
 'use client';
 
-import { Suspense, useRef, useState, type ReactNode } from 'react';
+import { Suspense, useState, type ReactNode } from 'react';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Stat } from '@/components/ui/stat';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
 import { formatNumber } from '@/lib/agentic-workload-explorer/format';
-import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
+import { Button } from '@/components/ui/button';
 import {
   useTraceVersion,
   appendTraceVersion,
@@ -22,39 +25,40 @@ import {
   RangeToggle,
   type DayRange,
 } from '@/components/agentic-workload-explorer/range-toggle';
-import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { ChartActions, Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 
 const STRINGS = {
   en: {
-    trafficOverview: 'Traffic Overview',
-    failedToLoad: 'Failed to load traffic data.',
-    totalRequests: 'Total Requests',
-    peakHour: 'Peak Hour',
-    avgRequestsPerDay: 'Avg Requests / Day',
-    requestsOverTime: 'Requests Over Time',
+    trafficOverview: 'Traffic overview',
+    failedToLoad: 'Failed to load traffic data',
+    totalRequests: 'Total requests',
+    peakHour: 'Peak hour',
+    avgRequestsPerDay: 'Avg requests / day',
+    requestsOverTime: 'Requests over time',
     requests: 'requests',
-    hourlyHeatmap: 'Hourly Heatmap',
+    hourlyHeatmap: 'Hourly heatmap',
     heatmapDetail: 'requests by day of week and hour',
-    streamingVsNonStreaming: 'Streaming vs Non-Streaming',
+    streamingVsNonStreaming: 'Streaming vs non-streaming',
     finalDays: (n: number) => `final ${n} days`,
     noDaily: 'No daily request data available',
     noHeatmap: 'No heatmap data available',
     noStreaming: 'No streaming breakdown data available',
     dayLabels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as readonly string[],
     streaming: 'Streaming',
-    nonStreaming: 'Non-Streaming',
+    nonStreaming: 'Non-streaming',
     hideSmall: 'Hide n<5',
-    exportDaily: 'Daily Requests',
-    exportHeatmap: 'Request Heatmap',
-    exportStreaming: 'Streaming vs Non-Streaming',
+    exportDaily: 'Daily requests',
+    exportHeatmap: 'Request heatmap',
+    exportStreaming: 'Streaming vs non-streaming',
     tooltipStreaming: 'streaming',
     tooltipNonStreaming: 'non-streaming',
   },
   zh: {
     trafficOverview: '流量概览',
-    failedToLoad: '无法加载流量数据。',
+    failedToLoad: '无法加载流量数据',
     totalRequests: '总请求数',
     peakHour: '峰值时段',
     avgRequestsPerDay: '日均请求数',
@@ -130,29 +134,6 @@ function formatPeakHour(peakHour: string | null): string {
   return `${h12}:00 ${suffix}`;
 }
 
-function SectionHeader({ label, detail }: { label: string; detail?: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="flex-1 h-px bg-border" />
-      {detail && <span className="text-3xs font-mono text-subtle">{detail}</span>}
-    </div>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-        {label}
-      </div>
-      <div className="text-lg font-mono font-bold mt-0.5">{value}</div>
-    </div>
-  );
-}
-
 function DailyRequestsChart({
   data,
   controls,
@@ -163,13 +144,12 @@ function DailyRequestsChart({
   strings: { noDaily: string; exportDaily: string; requests: string };
 }) {
   const locale = useLocale();
-  const svgRef = useRef<SVGSVGElement>(null);
   const labelEvery = Math.ceil(data.length / 7);
   if (data.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
+      <EmptyState bare className="py-8">
         {strings.noDaily}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -184,29 +164,15 @@ function DailyRequestsChart({
 
   return (
     <Expandable title={strings.exportDaily}>
-      <div className="rounded-md border border-border bg-surface p-3">
+      <Card>
         <div className="flex items-center justify-between gap-2 mb-2">
           {controls}
-          <ExportPngButton
-            locale={locale}
-            analyticsChart="daily-requests"
-            onClick={() => {
-              if (svgRef.current)
-                exportSvgToPng(svgRef.current, {
-                  title: strings.exportDaily,
-                  filename: 'daily-requests.png',
-                  svgWidth: CHART_W,
-                  svgHeight: CHART_H,
-                });
-            }}
+          <ChartActions
+            fileName="daily-requests"
+            onExportPng={() => track('agentic_workload_export_png', { chart: 'daily-requests' })}
           />
         </div>
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-          className="w-full"
-          style={{ maxHeight: 240 }}
-        >
+        <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ maxHeight: 240 }}>
           {yTicks.map((t) => (
             <g key={`y-${t}`}>
               {t > 0 && (
@@ -257,7 +223,8 @@ function DailyRequestsChart({
                   rx={1}
                 >
                   <title>
-                    {formatSnapshotDate(d.day)}: {formatNumber(d.requestCount)} {strings.requests}
+                    {formatSnapshotDate(d.day, locale)}: {formatNumber(d.requestCount)}{' '}
+                    {strings.requests}
                   </title>
                 </rect>
                 {i % labelEvery === 0 && (
@@ -268,14 +235,14 @@ function DailyRequestsChart({
                     className="fill-muted-foreground"
                     style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
                   >
-                    {formatSnapshotDate(d.day)}
+                    {formatSnapshotDate(d.day, locale)}
                   </text>
                 )}
               </g>
             );
           })}
         </svg>
-      </div>
+      </Card>
     </Expandable>
   );
 }
@@ -293,14 +260,12 @@ function HourlyHeatmap({
     requests: string;
   };
 }) {
-  const locale = useLocale();
-  const svgRef = useRef<SVGSVGElement>(null);
   const [hideSmall, setHideSmall] = useState(true);
   if (heatmap.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
+      <EmptyState bare className="py-8">
         {strings.noHeatmap}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -323,37 +288,26 @@ function HourlyHeatmap({
 
   return (
     <Expandable title={strings.exportHeatmap}>
-      <div className="rounded-md border border-border bg-surface p-3">
-        <div className="flex items-center justify-end gap-2 mb-2">
-          <button
+      <Card>
+        <div className="flex items-center gap-2 mb-2">
+          <Button
             type="button"
+            variant="outline"
+            size="xs"
+            aria-pressed={hideSmall}
             onClick={() => {
               setHideSmall((h) => !h);
               track('agentic_workload_traffic_heatmap_toggle', { enabled: !hideSmall });
             }}
-            className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
-              hideSmall
-                ? 'bg-foreground text-background border-foreground'
-                : 'border-border text-subtle hover:text-foreground hover:bg-surface-hover'
-            }`}
           >
             {strings.hideSmall}
-          </button>
-          <ExportPngButton
-            locale={locale}
-            analyticsChart="request-heatmap"
-            onClick={() => {
-              if (svgRef.current)
-                exportSvgToPng(svgRef.current, {
-                  title: strings.exportHeatmap,
-                  filename: 'request-heatmap.png',
-                  svgWidth: 600,
-                  svgHeight: 200,
-                });
-            }}
+          </Button>
+          <ChartActions
+            fileName="request-heatmap"
+            onExportPng={() => track('agentic_workload_export_png', { chart: 'request-heatmap' })}
           />
         </div>
-        <svg ref={svgRef} viewBox="0 0 600 200" className="w-full" style={{ maxHeight: 240 }}>
+        <svg viewBox="0 0 600 200" className="w-full" style={{ maxHeight: 240 }}>
           {strings.dayLabels.map((label, dow) => (
             <text
               key={`row-${dow}`}
@@ -416,7 +370,7 @@ function HourlyHeatmap({
             }),
           )}
         </svg>
-      </div>
+      </Card>
     </Expandable>
   );
 }
@@ -436,13 +390,12 @@ function StreamingChart({
   };
 }) {
   const locale = useLocale();
-  const svgRef = useRef<SVGSVGElement>(null);
   const sliced = data.slice(-30);
   if (sliced.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
+      <EmptyState bare className="py-8">
         {strings.noStreaming}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -456,127 +409,113 @@ function StreamingChart({
   const sy = (v: number) => MARGIN.top + PLOT_H - (v / yMax) * PLOT_H;
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center justify-end mb-2">
-        <ExportPngButton
-          locale={locale}
-          analyticsChart="streaming-vs-non-streaming"
-          onClick={() => {
-            if (svgRef.current)
-              exportSvgToPng(svgRef.current, {
-                title: strings.exportStreaming,
-                filename: 'streaming-vs-non-streaming.png',
-                svgWidth: CHART_W,
-                svgHeight: CHART_H,
-              });
-          }}
-        />
-      </div>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-        className="w-full"
-        style={{ maxHeight: 240 }}
-      >
-        {yTicks.map((t) => (
-          <g key={`y-${t}`}>
-            {t > 0 && (
-              <line
-                x1={MARGIN.left}
-                y1={sy(t)}
-                x2={MARGIN.left + PLOT_W}
-                y2={sy(t)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
-            <text
-              x={MARGIN.left - 6}
-              y={sy(t) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-            >
-              {formatNumber(t)}
-            </text>
-          </g>
-        ))}
-
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top + PLOT_H}
-          x2={MARGIN.left + PLOT_W}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-border"
-          strokeWidth={0.5}
-        />
-
-        {sliced.map((d, i) => {
-          const x = MARGIN.left + i * (barWidth + barGap);
-          const total = d.streamingCount + d.nonStreamingCount;
-          const streamH = (d.streamingCount / yMax) * PLOT_H;
-          const nonStreamH = (d.nonStreamingCount / yMax) * PLOT_H;
-
-          return (
-            <g key={d.day}>
-              <rect
-                x={x}
-                y={sy(total)}
-                width={barWidth}
-                height={Math.max(nonStreamH, total > 0 ? 0.5 : 0)}
-                fill="#6b7280"
-                rx={0}
-              >
-                <title>
-                  {d.day}: {formatNumber(d.nonStreamingCount)} {strings.tooltipNonStreaming}
-                </title>
-              </rect>
-              <rect
-                x={x}
-                y={sy(total) + Math.max(nonStreamH, 0)}
-                width={barWidth}
-                height={Math.max(streamH, total > 0 ? 0.5 : 0)}
-                fill="#06b6d4"
-                rx={0}
-              >
-                <title>
-                  {d.day}: {formatNumber(d.streamingCount)} {strings.tooltipStreaming}
-                </title>
-              </rect>
-              {i % 5 === 0 && (
-                <text
-                  x={x + barWidth / 2}
-                  y={MARGIN.top + PLOT_H + 14}
-                  textAnchor="middle"
-                  className="fill-muted-foreground"
-                  style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-                >
-                  {new Date(d.day).toLocaleDateString('en-US', {
-                    timeZone: 'UTC',
-                    month: 'short',
-                    day: 'numeric',
-                  })}
-                </text>
+    <Expandable title={strings.exportStreaming}>
+      <Card>
+        <div className="flex items-center justify-end mb-2">
+          <ChartActions
+            fileName="streaming-vs-non-streaming"
+            onExportPng={() =>
+              track('agentic_workload_export_png', { chart: 'streaming-vs-non-streaming' })
+            }
+          />
+        </div>
+        <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ maxHeight: 240 }}>
+          {yTicks.map((t) => (
+            <g key={`y-${t}`}>
+              {t > 0 && (
+                <line
+                  x1={MARGIN.left}
+                  y1={sy(t)}
+                  x2={MARGIN.left + PLOT_W}
+                  y2={sy(t)}
+                  stroke="currentColor"
+                  className="text-border"
+                  strokeWidth={0.5}
+                  strokeDasharray="3 3"
+                />
               )}
+              <text
+                x={MARGIN.left - 6}
+                y={sy(t) + 3}
+                textAnchor="end"
+                className="fill-muted-foreground"
+                style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
+              >
+                {formatNumber(t)}
+              </text>
             </g>
-          );
-        })}
-      </svg>
+          ))}
 
-      <div className="flex gap-4 mt-2">
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: '#06b6d4' }} />
-          <span className="text-3xs font-mono text-muted-foreground">{strings.streaming}</span>
+          <line
+            x1={MARGIN.left}
+            y1={MARGIN.top + PLOT_H}
+            x2={MARGIN.left + PLOT_W}
+            y2={MARGIN.top + PLOT_H}
+            stroke="currentColor"
+            className="text-border"
+            strokeWidth={0.5}
+          />
+
+          {sliced.map((d, i) => {
+            const x = MARGIN.left + i * (barWidth + barGap);
+            const total = d.streamingCount + d.nonStreamingCount;
+            const streamH = (d.streamingCount / yMax) * PLOT_H;
+            const nonStreamH = (d.nonStreamingCount / yMax) * PLOT_H;
+
+            return (
+              <g key={d.day}>
+                <rect
+                  x={x}
+                  y={sy(total)}
+                  width={barWidth}
+                  height={Math.max(nonStreamH, total > 0 ? 0.5 : 0)}
+                  fill="#6b7280"
+                  rx={0}
+                >
+                  <title>
+                    {d.day}: {formatNumber(d.nonStreamingCount)} {strings.tooltipNonStreaming}
+                  </title>
+                </rect>
+                <rect
+                  x={x}
+                  y={sy(total) + Math.max(nonStreamH, 0)}
+                  width={barWidth}
+                  height={Math.max(streamH, total > 0 ? 0.5 : 0)}
+                  fill="#06b6d4"
+                  rx={0}
+                >
+                  <title>
+                    {d.day}: {formatNumber(d.streamingCount)} {strings.tooltipStreaming}
+                  </title>
+                </rect>
+                {i % 5 === 0 && (
+                  <text
+                    x={x + barWidth / 2}
+                    y={MARGIN.top + PLOT_H + 14}
+                    textAnchor="middle"
+                    className="fill-muted-foreground"
+                    style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
+                  >
+                    {formatSnapshotDate(d.day, locale)}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+
+        <div className="flex gap-4 mt-2">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: '#06b6d4' }} />
+            <span className="text-3xs font-mono text-muted-foreground">{strings.streaming}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: '#6b7280' }} />
+            <span className="text-3xs font-mono text-muted-foreground">{strings.nonStreaming}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: '#6b7280' }} />
-          <span className="text-3xs font-mono text-muted-foreground">{strings.nonStreaming}</span>
-        </div>
-      </div>
-    </div>
+      </Card>
+    </Expandable>
   );
 }
 
@@ -618,22 +557,20 @@ function TrafficPageContent() {
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="rounded-md border border-border bg-surface p-3">
+              <div key={i} className="rounded-xl border border-border/30 bg-card p-3">
                 <Skeleton className="h-3 w-20 mb-2" />
                 <Skeleton className="h-6 w-16" />
               </div>
             ))}
           </div>
         ) : error || !data ? (
-          <div className="text-sm font-mono text-muted-foreground text-center py-8">
-            {t.failedToLoad}
-          </div>
+          <EmptyState>{t.failedToLoad}</EmptyState>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            <StatCard label={t.totalRequests} value={formatNumber(data.stats.totalRequests)} />
-            <StatCard label={t.peakHour} value={formatPeakHour(data.stats.peakHour)} />
-            <StatCard label={t.avgRequestsPerDay} value={formatNumber(data.stats.avgPerDay)} />
-          </div>
+          <dl className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <Stat boxed label={t.totalRequests} value={formatNumber(data.stats.totalRequests)} />
+            <Stat boxed label={t.peakHour} value={formatPeakHour(data.stats.peakHour)} />
+            <Stat boxed label={t.avgRequestsPerDay} value={formatNumber(data.stats.avgPerDay)} />
+          </dl>
         )}
       </div>
 

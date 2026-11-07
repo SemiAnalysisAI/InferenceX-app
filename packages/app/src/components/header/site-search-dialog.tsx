@@ -1,5 +1,6 @@
 'use client';
 
+import { Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
@@ -26,7 +27,7 @@ const STRINGS = {
     empty: 'Type to search. Related terms match too, so “energy” finds power and J/token pages.',
     tryLabel: 'Try',
     examples: ['MI355X vs B200', 'power efficiency', 'AgentX methodology', 'cheapest GPU DeepSeek'],
-    noResults: 'No matches.',
+    noResults: 'No matches',
     noResultsIndexing: 'No matches yet. Still indexing, results will appear as pages load.',
     previewBadge: 'Summary',
     previewHint: 'Full page not indexed yet',
@@ -45,8 +46,8 @@ const STRINGS = {
     loading: '正在加载站点索引…',
     empty: '输入关键词开始搜索。相关术语也会匹配，例如“能耗”可以找到功耗和 J/token 相关页面。',
     tryLabel: '试试',
-    examples: ['MI355X vs B200', '能效', 'AgentX methodology', 'DeepSeek 成本'],
-    noResults: '没有匹配结果。',
+    examples: ['MI355X vs B200', '能效', 'AgentX 测试方法', 'DeepSeek 成本'],
+    noResults: '没有匹配结果',
     noResultsIndexing: '暂无匹配结果。仍在索引中，页面加载后结果会陆续出现。',
     previewBadge: '摘要',
     previewHint: '完整页面尚未索引',
@@ -169,21 +170,8 @@ export function SiteSearchDialog({
         <DialogTitle className="sr-only">{strings.title}</DialogTitle>
         <DialogDescription className="sr-only">{strings.description}</DialogDescription>
 
-        <div className="flex items-center gap-3 border-b border-border px-4 pr-12">
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.75"
-            strokeLinecap="round"
-            aria-hidden
-            className="shrink-0 text-muted-foreground"
-          >
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.8-3.8" />
-          </svg>
+        <div className="flex items-center gap-3 border-b border-border/30 px-4 pr-12">
+          <Search size={18} aria-hidden className="shrink-0 text-muted-foreground" />
           <input
             data-testid="site-search-input"
             type="search"
@@ -206,8 +194,8 @@ export function SiteSearchDialog({
         <div className="relative h-0.5 bg-transparent" aria-hidden>
           {status.crawling && (
             <div
-              className="absolute inset-y-0 left-0 bg-brand/60 transition-[width] duration-300"
-              style={{ width: `${Math.round(progress * 100)}%` }}
+              className="absolute inset-0 origin-left bg-brand/60 transition-transform duration-300"
+              style={{ transform: `scaleX(${progress})` }}
             />
           )}
         </div>
@@ -223,7 +211,7 @@ export function SiteSearchDialog({
                     key={example}
                     type="button"
                     data-testid="site-search-example"
-                    className="min-h-9 rounded-full border border-border px-3 text-xs text-foreground transition-colors hover:bg-muted"
+                    className="min-h-9 rounded-md border border-border/40 px-3 text-xs text-foreground transition-colors hover:bg-muted/40"
                     onClick={() => {
                       setQuery(example);
                       track('header_search_example_clicked', { example });
@@ -260,7 +248,7 @@ export function SiteSearchDialog({
                     data-index={index}
                     data-testid="site-search-result"
                     className={cn(
-                      'block rounded-md px-3 py-2.5 transition-colors',
+                      'block rounded-sm px-3 py-2.5 transition-colors',
                       index === selected ? 'bg-muted' : 'hover:bg-muted/60',
                     )}
                     onMouseMove={() => setActiveIndex(index)}

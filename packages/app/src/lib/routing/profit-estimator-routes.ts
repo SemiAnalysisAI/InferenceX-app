@@ -1,4 +1,5 @@
 import type { Model } from '@/lib/catalog/data-mappings';
+import { getDashboardRoute } from './dashboard-routes';
 import {
   defaultRouteModel,
   modelRouteSlug,
@@ -48,10 +49,8 @@ export function parseProfitRouteFilters(filters: readonly string[]): URLSearchPa
 export function profitRouteParams(pathname: string): URLSearchParams | null {
   const parsed = parseModelRoutePathname(pathname);
   if (!parsed || !isProfitRouteTab(parsed.tab)) return null;
-  const parts = pathname.split(/[?#]/u, 1)[0].split('/').filter(Boolean);
-  const filters = parts.slice(parsed.zh ? 3 : 2);
   try {
-    return parseProfitRouteFilters(filters.map(decodeURIComponent));
+    return parseProfitRouteFilters(parsed.filters.map(decodeURIComponent));
   } catch {
     return null;
   }
@@ -85,9 +84,17 @@ export function profitRoutePathname(pathname: string, params: URLSearchParams): 
     const value = params.get(key);
     if (value) filters.push(name, encodeURIComponent(value));
   }
-  const base = `${parsed.zh ? '/zh' : ''}/${parsed.tab}`;
+  const base = `${parsed.zh ? '/zh' : ''}${getDashboardRoute(parsed.tab).path}`;
   if (!parsed.slug && model === defaultRouteModel(parsed.tab) && filters.length === 0) return base;
   return `${base}/${slug}${filters.length > 0 ? `/${filters.join('/')}` : ''}`;
+}
+
+export function profitRouteForTab(pathname: string, tab: ProfitRouteTab): string | null {
+  const parsed = parseModelRoutePathname(pathname);
+  if (!parsed || !isProfitRouteTab(parsed.tab)) return null;
+  const locale = parsed.zh ? '/zh' : '';
+  const from = `${locale}${getDashboardRoute(parsed.tab).path}`;
+  return `${locale}${getDashboardRoute(tab).path}${pathname.slice(from.length)}`;
 }
 
 export function setProfitRouteUnofficialRuns(url: URL, runIds: readonly string[]): void {

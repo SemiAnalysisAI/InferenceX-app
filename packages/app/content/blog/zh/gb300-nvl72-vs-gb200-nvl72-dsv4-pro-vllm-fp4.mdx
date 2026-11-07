@@ -23,7 +23,7 @@ tags:
 
 其机制在于 **HBM 余量**。DSv4-Pro 1.6T 参数量下，仅 FP4 权重就约占 800 GB，GB200 在窄预填充形态下可用 HBM 相当紧张，配方不得不在批大小上做出妥协以将模型装入显存。GB300 的 1.5 倍 HBM 容量（每 GPU 288 GB vs 192 GB）在相同形态下仍有数百 GB 的余量，使得预填充可以运行更大的批次来保持更宽解码池的饱和。在每 GPU TCO 溢价 20%（$2.65 vs $2.21/GPU/hr，数据来自 [SemiAnalysis AI Cloud TCO 模型](https://semianalysis.com/ai-cloud-tco-model/)）之后，GB300 在 27 tok/s/user 下**每百万 token 的成本仍便宜 2.31 倍**。更多 HBM，更多节省。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-vllm&g_model=DeepSeek-V4-Pro&i_linelabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-vllm&g_model=DeepSeek-V4-Pro&i_linelabel=1">
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 
@@ -40,13 +40,13 @@ DeepSeek-V4-Pro 是 DeepSeek 的旗舰 MoE 模型：**总参数量 1.6T，每 to
 
 ## 纸面规格对比
 
-GB300 NVL72（Blackwell Ultra）和 GB200 NVL72（Blackwell）共享相同的 NVLink 5 scale-up 互联、相同的 72 GPU 规模、相同一代 NVSwitch 以及相同的每 GPU 8 TB/s HBM 带宽。差异在于 HBM 容量和 dense FP4 算力。数值直接取自 [/gpu-specs](/gpu-specs)：
+GB300 NVL72（Blackwell Ultra）和 GB200 NVL72（Blackwell）共享相同的 NVLink 5 scale-up 互联、相同的 72 GPU 规模、相同一代 NVSwitch 以及相同的每 GPU 8 TB/s HBM 带宽。差异在于 HBM 容量和 dense FP4 算力。数值直接取自 [/infx/gpu-specs](/infx/gpu-specs)：
 
 <Figure
   srcLight="/images/gb300-nvl72-vs-gb200-nvl72-dsv4-pro-vllm-fp4/specs-radar-light.png"
   srcDark="/images/gb300-nvl72-vs-gb200-nvl72-dsv4-pro-vllm-fp4/specs-radar-dark.png"
   alt="GPU 规格雷达图，对比 GB200 NVL72（浅绿色）和 GB300 NVL72（深绿色）在 7 个维度上的表现：显存、显存带宽、FP4/FP8/BF16 TFLOP/s、Scale Up 带宽、Scale Up 域显存、Scale Up 域显存带宽。GB300 在显存和 FP4 两项上为 100%（设定天花板）；GB200 在这两项上约 67%，因为只有 GB300 的约三分之二。两者在显存带宽、Scale Up 带宽、Scale Up 域显存带宽、FP8、BF16 上持平。"
-  caption="GB200 NVL72（浅绿色）vs GB300 NVL72（深绿色），来自 /gpu-specs。各轴数值按面板中所有 SKU 的跨供应商最大值归一化。唯一的显著差异在于显存（GB300 设定 288 GB 天花板，GB200 约为 67%）和 FP4（GB300 设定 15 PFLOP/s 天花板，GB200 约为 67%）。其余——HBM 带宽、NVLink scale-up 带宽、规模、FP8、BF16——均相同。"
+  caption="GB200 NVL72（浅绿色）vs GB300 NVL72（深绿色），来自 /infx/gpu-specs。各轴数值按面板中所有 SKU 的跨供应商最大值归一化。唯一的显著差异在于显存（GB300 设定 288 GB 天花板，GB200 约为 67%）和 FP4（GB300 设定 15 PFLOP/s 天花板，GB200 约为 67%）。其余——HBM 带宽、NVLink scale-up 带宽、规模、FP8、BF16——均相同。"
 />
 
 | 规格                              | GB200 NVL72         | GB300 NVL72         | GB300 / GB200 |
@@ -132,13 +132,13 @@ GB200 的每 GPU 峰值吞吐量为 8,933，交互性为 15.3 tok/s/user。GB300
   caption="DeepSeek-V4-Pro 1.6T FP4 8K/1K Pareto 前沿。GB300 NVL72 vs GB200 NVL72，均使用 Dynamo vLLM，均采用分离式预填充/解码。在 InferenceX 上测量，日期为 2026-05-22（运行编号 26306422380）。点标签表示总 TP。"
 />
 
-[在线图表](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-vllm&g_model=DeepSeek-V4-Pro&i_linelabel=1)，已预筛选为 2026-05-22 运行中 GB200 NVL72 和 GB300 NVL72 Dynamo vLLM 的 DSv4-Pro FP4 8K/1K 数据。
+[在线图表](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-vllm&g_model=DeepSeek-V4-Pro&i_linelabel=1)，已预筛选为 2026-05-22 运行中 GB200 NVL72 和 GB300 NVL72 Dynamo vLLM 的 DSv4-Pro FP4 8K/1K 数据。
 
 ## 致谢
 
 感谢 NVIDIA 的 Dynamo 和 vLLM 团队——包括 Jatin Gangani、Kedar Potdar、Sridhar Ramaswamy、Ishan Dhanani 和 Sahithi Chigurupati——以及 vLLM 团队，是他们将 GB200 和 GB300 的 DSv4-Pro 配方交付落地，使得机架间对比成为可能。配套文章：[GB200 NVL72 vs B200 DeepSeek R1 对比](https://inferencex.semianalysis.com/zh/blog/gb200-nvl72-vs-b200-disagg-deepseek-r1-fp4-dynamo-trt)，覆盖了 SKU 梯队下一级的 scale-up 互联优势。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-vllm&g_model=DeepSeek-V4-Pro&i_linelabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-22&g_runid=26306422380&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-vllm&g_model=DeepSeek-V4-Pro&i_linelabel=1">
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 

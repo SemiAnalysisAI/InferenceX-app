@@ -1,5 +1,7 @@
 'use client';
 
+import { Card } from '@/components/ui/card';
+import { Stat } from '@/components/ui/stat';
 import { formatNumber } from '@/lib/agentic-workload-explorer/format';
 import type { PricingCoverage } from '@/lib/agentic-workload-explorer/api-types';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -10,9 +12,9 @@ function formatCoverage(value: number | null): string {
 
 function coverageColor(value: number | null): string {
   if (value === null) return 'text-muted-foreground';
-  if (value >= 0.999) return 'text-emerald-500';
-  if (value >= 0.99) return 'text-amber-500';
-  return 'text-rose-500';
+  if (value >= 0.999) return 'text-success';
+  if (value >= 0.99) return 'text-warning';
+  return 'text-destructive';
 }
 
 const STRINGS = {
@@ -20,20 +22,20 @@ const STRINGS = {
     heading: 'Usage with a stored cost estimate',
     description: (days: number) =>
       `Latest ${days} days. Failed or otherwise zero-usage requests are excluded; missing estimates are grouped by the reported model ID below.`,
-    requestCoverage: 'Request Coverage',
-    inputSideTokenCoverage: 'Input-Side Token Coverage',
-    outputTokenCoverage: 'Output Token Coverage',
+    requestCoverage: 'Request coverage',
+    inputSideTokenCoverage: 'Input-side token coverage',
+    outputTokenCoverage: 'Output token coverage',
     priced: 'priced',
     unpriced: 'unpriced',
     tokens: 'tokens',
-    allPriced: 'All usage-bearing model IDs have cost estimates.',
+    allPriced: 'All usage-bearing model IDs have cost estimates',
     unpricedRegionLabel: 'Unpriced model usage',
     caption: 'Usage-bearing requests without a stored cost estimate, grouped by model.',
-    colUnpricedModel: 'Unpriced Model',
+    colUnpricedModel: 'Unpriced model',
     colRequests: 'Requests',
     colInput: 'Input',
-    colCacheRead: 'Cache Read',
-    colCacheWrite: 'Cache Write',
+    colCacheRead: 'Cache read',
+    colCacheWrite: 'Cache write',
     colOutput: 'Output',
   },
   zh: {
@@ -46,7 +48,7 @@ const STRINGS = {
     priced: '已定价',
     unpriced: '未定价',
     tokens: 'tokens',
-    allPriced: '所有产生用量的模型 ID 均已有成本估算。',
+    allPriced: '所有产生用量的模型 ID 均已有成本估算',
     unpricedRegionLabel: '未定价模型用量',
     caption: '无成本估算的用量请求，按模型分组。',
     colUnpricedModel: '未定价模型',
@@ -68,30 +70,25 @@ function CoverageMetric({
   detail: string;
 }) {
   return (
-    <div className="rounded-md border border-border bg-background/40 p-3">
-      <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-        {label}
-      </div>
-      <div className={`mt-0.5 text-lg font-mono font-bold ${coverageColor(value)}`}>
-        {formatCoverage(value)}
-      </div>
-      <div className="mt-0.5 text-3xs font-mono text-muted-foreground">{detail}</div>
-    </div>
+    <Stat
+      label={label}
+      value={formatCoverage(value)}
+      detail={detail}
+      valueClassName={coverageColor(value)}
+    />
   );
 }
 
 export function PricingCoverageCard({ coverage }: { coverage: PricingCoverage }) {
   const t = STRINGS[useLocale()];
   return (
-    <div className="rounded-md border border-border bg-surface p-3 space-y-3">
+    <Card className="gap-4">
       <div>
-        <div className="text-3xs font-mono font-bold text-foreground">{t.heading}</div>
-        <p className="mt-0.5 text-3xs font-mono text-subtle">
-          {t.description(coverage.windowDays)}
-        </p>
+        <div className="text-sm font-medium text-foreground">{t.heading}</div>
+        <p className="mt-0.5 text-xs text-muted-foreground">{t.description(coverage.windowDays)}</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+      <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <CoverageMetric
           label={t.requestCoverage}
           value={coverage.requestCoverage}
@@ -107,10 +104,10 @@ export function PricingCoverageCard({ coverage }: { coverage: PricingCoverage })
           value={coverage.outputTokenCoverage}
           detail={`${formatNumber(coverage.pricedOutputTokens)} / ${formatNumber(coverage.outputTokens)} ${t.tokens}`}
         />
-      </div>
+      </dl>
 
       {coverage.byModel.length === 0 ? (
-        <div className="rounded-md border border-emerald-500/30 bg-emerald-500/8 px-3 py-2 text-2xs font-mono text-emerald-500">
+        <div className="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-xs text-success">
           {t.allPriced}
         </div>
       ) : (
@@ -122,7 +119,7 @@ export function PricingCoverageCard({ coverage }: { coverage: PricingCoverage })
         >
           <table className="w-full min-w-[680px] text-2xs font-mono">
             <caption className="sr-only">{t.caption}</caption>
-            <thead className="sticky top-0 z-10 border-b border-border bg-surface text-muted-foreground">
+            <thead className="sticky top-0 z-10 border-b border-border/20 bg-card text-muted-foreground">
               <tr>
                 <th scope="col" className="py-1.5 text-left font-medium">
                   {t.colUnpricedModel}
@@ -144,10 +141,10 @@ export function PricingCoverageCard({ coverage }: { coverage: PricingCoverage })
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-border/20">
               {coverage.byModel.map((row) => (
                 <tr key={row.model} className="transition-colors hover:bg-surface-hover/70">
-                  <th scope="row" className="py-1.5 text-left font-medium text-amber-500">
+                  <th scope="row" className="py-1.5 text-left font-medium text-warning">
                     {row.model}
                   </th>
                   <td className="py-1.5 text-right tabular-nums">
@@ -171,6 +168,6 @@ export function PricingCoverageCard({ coverage }: { coverage: PricingCoverage })
           </table>
         </div>
       )}
-    </div>
+    </Card>
   );
 }

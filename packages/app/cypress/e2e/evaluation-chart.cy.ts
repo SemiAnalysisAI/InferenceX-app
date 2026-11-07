@@ -8,7 +8,7 @@ describe('Evaluation Chart — Content & Interactions', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/evaluation');
+    cy.visit('/infx/evaluation');
     cy.get('[data-testid="evaluation-chart-display"]').should('be.visible');
     cy.get('[data-testid="evaluation-view-toggle"]').contains('Chart').click();
   });
@@ -17,7 +17,7 @@ describe('Evaluation Chart — Content & Interactions', () => {
     cy.get('#evaluation-chart')
       .closest('figure')
       .find('.sidebar-legend')
-      .contains('label', 'Show Labels')
+      .contains('label', 'Show labels')
       .should('exist');
 
     cy.get('#eval-show-labels').then(($switch) => {
@@ -70,7 +70,7 @@ describe('Evaluation sample sharing', () => {
         },
       });
     });
-    cy.visit('/evaluation');
+    cy.visit('/infx/evaluation');
     cy.get('[data-testid="evaluation-chart-display"]').should('be.visible');
     cy.get('[data-testid="evaluation-view-toggle"]').contains('Table').click();
   });
@@ -106,7 +106,7 @@ describe('Evaluation sample sharing', () => {
   });
 
   it('does not apply a stale sample id to a manually opened drawer', () => {
-    cy.visit('/evaluation?sample=0');
+    cy.visit('/infx/evaluation?sample=0');
     cy.get('[data-testid="evaluation-chart-display"]').should('be.visible');
     cy.get('[title="View per-sample prompts and responses"]').first().click();
 
@@ -199,7 +199,7 @@ describe('Evaluation evidence reader', () => {
 
   it('retains every evidence field and compares target with extracted answer at desktop width', () => {
     cy.viewport(1440, 900);
-    cy.visit('/evaluation');
+    cy.visit('/infx/evaluation');
     cy.get('[title="View per-sample prompts and responses"]').first().click();
     cy.wait('@evidenceSamples');
     cy.get('[data-eval-sample-id="7"] > button').click();
@@ -250,7 +250,9 @@ describe('Evaluation evidence reader', () => {
         },
       }).as('unofficialEvidence');
     });
-    cy.visit(`/evaluation?unofficialrun=${runId}&g_model=DeepSeek-V4-Pro&i_prec=fp4&e_bench=gsm8k`);
+    cy.visit(
+      `/infx/evaluation?unofficialrun=${runId}&g_model=DeepSeek-V4-Pro&i_prec=fp4&e_bench=gsm8k`,
+    );
     cy.wait('@unofficialEvidence');
     cy.get('[data-testid="evaluation-results-table"] [aria-label="Rows per page"]').click();
     cy.contains('[role="option"]', /^100$/u).click();
@@ -270,7 +272,7 @@ describe('Evaluation evidence reader', () => {
 
   it('stacks Chinese answer blocks on phones without losing raw output or metrics', () => {
     cy.viewport(390, 844);
-    cy.visit('/zh/evaluation');
+    cy.visit('/zh/infx/evaluation');
     cy.get('[title="查看逐样本提示词与模型响应"]').first().click();
     cy.wait('@evidenceSamples');
     cy.get('[data-eval-sample-id="7"] > button').click();
@@ -294,7 +296,7 @@ describe('Evaluation evidence reader', () => {
 describe('Evaluation Chart — Simplified Chinese mobile path', () => {
   beforeEach(() => {
     cy.viewport(390, 900);
-    cy.visit('/zh/evaluation', {
+    cy.visit('/zh/infx/evaluation', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         win.localStorage.setItem('inferencex-eval-samples-nudge-dismissed', String(Date.now()));
@@ -339,9 +341,9 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
             : { statusCode: 500, body: {} },
         );
       });
-      cy.visit('/zh/evaluation?e2e=fetch-error');
+      cy.visit('/zh/infx/evaluation?e2e=fetch-error');
       cy.get('[data-testid="evaluation-query-error"]')
-        .should('contain.text', '评估数据加载失败。')
+        .should('contain.text', '评估数据加载失败')
         .and('contain.text', '重试');
       cy.then(() => {
         succeed = true;
@@ -372,15 +374,15 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
           statusCode: 200,
           body: compactEvalRows(evaluations),
         });
-        cy.visit('/zh/evaluation?e2e=availability-retry');
+        cy.visit('/zh/infx/evaluation?e2e=availability-retry');
 
         cy.get('[data-testid="evaluation-query-error"]')
-          .should('contain.text', '筛选项可用性数据加载失败。')
+          .should('contain.text', '筛选项可用性数据加载失败')
           .and('contain.text', '重试');
         cy.get('[data-testid="evaluation-results-table"]').should('be.visible');
         cy.get('[data-testid="evaluation-view-toggle"]').contains('图表').click();
         cy.get('[data-testid="evaluation-query-error"]')
-          .should('contain.text', '筛选项可用性数据加载失败。')
+          .should('contain.text', '筛选项可用性数据加载失败')
           .and('contain.text', '重试');
         cy.get('#evaluation-chart svg circle').should('have.length.greaterThan', 0);
         cy.then(() => {
@@ -401,8 +403,8 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
       statusCode: 200,
       body: compactEvalRows([]),
     });
-    cy.visit('/zh/evaluation?e2e=empty-success');
-    cy.contains('当前筛选条件下没有可用数据。').should('be.visible');
+    cy.visit('/zh/infx/evaluation?e2e=empty-success');
+    cy.contains('当前筛选条件下没有可用数据').should('be.visible');
     cy.get('[data-testid="evaluation-view-toggle"]').contains('图表').click();
     cy.contains(/该模型暂无评估数据|所选模型与基准测试组合暂无评估数据/u).should('be.visible');
     cy.get('[data-testid="evaluation-query-error"]').should('not.exist');

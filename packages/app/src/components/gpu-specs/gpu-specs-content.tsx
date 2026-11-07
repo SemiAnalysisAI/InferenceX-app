@@ -9,7 +9,7 @@ import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading } from '@/components/ui/heading';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
-import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
+import { VendorDot } from '@/components/ui/vendor-dot';
 import {
   formatScaleOutTopology,
   formatScaleUpTopology,
@@ -18,7 +18,6 @@ import {
   getScaleUpDomainMemoryBw,
   GPU_CHART_METRICS,
   GPU_SPECS,
-  type GpuSpec,
 } from '@/lib/catalog/gpu-specs';
 import {
   TopologyDiagram,
@@ -50,29 +49,16 @@ function SpecCell({
     <Tag
       className={`px-3 py-2.5 ${header ? 'whitespace-normal' : 'whitespace-nowrap'} ${
         align === 'right' ? 'text-right' : 'text-left'
-      } ${header ? 'font-semibold text-xs uppercase tracking-wider text-muted-foreground' : 'text-sm'} ${sticky ? 'sticky left-0 z-10 bg-card after:absolute after:right-0 after:top-0 after:bottom-0 after:w-px after:bg-border' : ''} ${className}`}
+      } ${header ? 'text-xs font-medium text-muted-foreground' : 'text-sm tabular-nums'} ${sticky ? 'sticky left-0 z-10 bg-card after:absolute after:right-0 after:top-0 after:bottom-0 after:w-px after:bg-border/30' : ''} ${className}`}
     >
       {children}
     </Tag>
   );
 }
 
-function VendorBadge({ vendor }: { vendor: GpuSpec['vendor'] }) {
-  const isNvidia = vendor === 'nvidia';
-  return (
-    <span
-      className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-3xs font-medium ${
-        isNvidia ? 'bg-[#76b900]/15 text-[#76b900]' : 'bg-[#ed1c24]/15 text-[#ed1c24]'
-      }`}
-    >
-      {isNvidia ? 'NVIDIA' : 'AMD'}
-    </span>
-  );
-}
-
 const STRINGS = {
   en: {
-    heading: 'Chip Specifications',
+    heading: 'Chip specifications',
     description:
       'Hardware specifications for chips used in InferenceX™ benchmarks, including compute performance, memory bandwidth, and interconnect details.',
     viewTable: 'Table',
@@ -82,30 +68,30 @@ const STRINGS = {
     colGpu: 'Chip',
     colMemory: 'Memory',
     colMemBw: 'Mem BW',
-    colScaleUp: 'Scale Up',
-    colScaleUpBw: 'Scale Up BW',
-    colWorldSize: 'World Size',
-    colScaleUpDomainMem: 'Scale Up Domain Memory',
-    colScaleUpDomainMemBw: 'Scale Up Domain Mem BW',
-    colScaleUpTopology: 'Scale Up Topology',
-    colScaleUpSwitch: 'Scale Up Switch',
-    colScaleOutBwPerGpu: 'Scale Out BW per Chip',
-    colScaleOutTech: 'Scale Out Tech',
-    colScaleOutSwitch: 'Scale Out Switch',
-    colScaleOutTopology: 'Scale Out Topology',
+    colScaleUp: 'Scale-up',
+    colScaleUpBw: 'Scale-up BW',
+    colWorldSize: 'World size',
+    colScaleUpDomainMem: 'Scale-up domain memory',
+    colScaleUpDomainMemBw: 'Scale-up domain mem BW',
+    colScaleUpTopology: 'Scale-up topology',
+    colScaleUpSwitch: 'Scale-up switch',
+    colScaleOutBwPerGpu: 'Scale-out BW per chip',
+    colScaleOutTech: 'Scale-out tech',
+    colScaleOutSwitch: 'Scale-out switch',
+    colScaleOutTopology: 'Scale-out topology',
     colNic: 'NIC',
-    footnote1: 'Dense tensor core peak TFLOP/s (without sparsity).',
+    footnote1: 'Dense tensor core peak TFLOP/s (without sparsity)',
     footnote2:
       'NVL72 NIC specifications are shown per GPU; inter-rack switch and topology are not specified here.',
-    scaleOutHeading: 'Scale-Out Topology Diagrams',
+    scaleOutHeading: 'Scale-out topology diagrams',
     scaleOutDescription:
-      'Per-server scale-out network topology for each Chip SKU, showing Chip → NIC → leaf switch connectivity.',
-    scaleUpHeading: 'Scale-Up Topology Diagrams',
+      'Per-server scale-out network topology for each chip SKU, showing chip → NIC → leaf switch connectivity',
+    scaleUpHeading: 'Scale-up topology diagrams',
     scaleUpDescription:
-      'Intra-node scale-up interconnect topology for each Chip SKU, showing Chip → NVSwitch or direct Chip-to-Chip connectivity.',
+      'Intra-node scale-up interconnect topology for each chip SKU, showing chip → NVSwitch or direct chip-to-chip connectivity',
     tableHint: 'Compare the full hardware matrix. Scroll horizontally on smaller screens.',
-    chartHint: 'Compare one hardware metric at a time across all Chip SKUs.',
-    radarHint: 'Compare the relative shape of compute, memory, and interconnect capabilities.',
+    chartHint: 'Compare one hardware metric at a time across all chip SKUs',
+    radarHint: 'Compare the relative shape of compute, memory and interconnect capabilities',
   },
   zh: {
     heading: '芯片规格',
@@ -129,15 +115,15 @@ const STRINGS = {
     colScaleOutSwitch: '横向扩展交换机',
     colScaleOutTopology: '横向扩展拓扑',
     colNic: 'NIC',
-    footnote1: '密集 Tensor Core 峰值 TFLOP/s（不含稀疏加速）。',
+    footnote1: '密集 Tensor Core 峰值 TFLOP/s（不含稀疏加速）',
     footnote2: 'NVL72 网卡规格按单 GPU 列出；此处未列出机柜间的交换机和网络拓扑。',
     scaleOutHeading: '横向扩展拓扑图',
-    scaleOutDescription: '每台服务器的横向扩展网络拓扑，展示芯片 → NIC → Leaf 交换机的连接方式。',
+    scaleOutDescription: '每台服务器的横向扩展网络拓扑，展示芯片 → NIC → Leaf 交换机的连接方式',
     scaleUpHeading: '纵向扩展拓扑图',
-    scaleUpDescription: '节点内纵向扩展互联拓扑，展示芯片 → NVSwitch 或芯片直连方式。',
+    scaleUpDescription: '节点内纵向扩展互联拓扑，展示芯片 → NVSwitch 或芯片直连方式',
     tableHint: '比较完整硬件矩阵；在较小屏幕上可横向滚动查看。',
-    chartHint: '逐项比较所有芯片 SKU 的硬件指标。',
-    radarHint: '比较计算、显存和互联能力的相对轮廓。',
+    chartHint: '逐项比较所有芯片 SKU 的硬件指标',
+    radarHint: '比较计算、显存和互联能力的相对轮廓',
   },
 } as const;
 
@@ -154,9 +140,9 @@ function GpuSpecsTable({
   const t = STRINGS[locale];
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse min-w-[1400px]">
+      <table className="w-full min-w-350 border-collapse">
         <thead>
-          <tr className="border-b border-border">
+          <tr className="border-b border-border/30">
             <SpecCell header align="left" sticky>
               {t.colGpu}
             </SpecCell>
@@ -190,7 +176,7 @@ function GpuSpecsTable({
             <SpecCell header align="right">
               {t.colScaleUpBw}
             </SpecCell>
-            <SpecCell header align="right">
+            <SpecCell header align="right" className="whitespace-nowrap">
               {t.colWorldSize}
             </SpecCell>
             <SpecCell header align="right" className="min-w-36">
@@ -226,13 +212,13 @@ function GpuSpecsTable({
           {GPU_SPECS.map((spec) => (
             <tr
               key={spec.name}
-              className="border-b border-border/50 hover:bg-muted/30 transition-colors"
+              className="border-b border-border/30 transition-colors hover:bg-muted/40"
               onClick={() => track('gpu_specs_row_clicked', { gpu: spec.name })}
             >
               <SpecCell align="left" sticky>
                 <div className="flex items-center gap-2">
+                  <VendorDot vendor={spec.vendor} />
                   <span className="font-medium">{spec.name}</span>
-                  <VendorBadge vendor={spec.vendor} />
                 </div>
               </SpecCell>
               <SpecCell align="right">{spec.memory}</SpecCell>
@@ -250,7 +236,7 @@ function GpuSpecsTable({
               <SpecCell align="left">
                 <button
                   type="button"
-                  className="cursor-pointer underline decoration-dotted underline-offset-2 hover:text-primary transition-colors"
+                  className="cursor-pointer underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
                   onClick={(e) => {
                     e.stopPropagation();
                     onScaleUpTopologyClick?.(spec.name);
@@ -313,7 +299,7 @@ function GpuSpecsTable({
                 ) : (
                   <button
                     type="button"
-                    className="cursor-pointer underline decoration-dotted underline-offset-2 hover:text-primary transition-colors"
+                    className="cursor-pointer underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
                     onClick={(e) => {
                       e.stopPropagation();
                       onTopologyClick?.(spec.name);
@@ -400,7 +386,7 @@ export function GpuSpecsContent() {
           />
         </Card>
       </section>
-      <section className="pt-8 md:pt-0">
+      <section>
         <Card className="overflow-hidden">
           <div className="flex flex-col gap-3 pb-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="min-w-0 text-xs text-muted-foreground">
@@ -418,7 +404,6 @@ export function GpuSpecsContent() {
               testId="gpu-specs-view-toggle"
             />
           </div>
-          <UnofficialDomainNotice />
 
           {viewMode === 'table' && (
             <>
@@ -426,7 +411,7 @@ export function GpuSpecsContent() {
                 onTopologyClick={handleTopologyClick}
                 onScaleUpTopologyClick={handleScaleUpTopologyClick}
               />
-              <div className="px-4 md:px-8 pt-4">
+              <div className="pt-4">
                 <p className="text-xs text-muted-foreground">
                   <sup>1</sup> {t.footnote1}
                 </p>
@@ -442,17 +427,17 @@ export function GpuSpecsContent() {
           {viewMode === 'radar' && <GpuSpecsRadarChart />}
         </Card>
       </section>
-      <section className="pt-8 md:pt-0">
+      <section>
         <Card>
           <Heading as="h3" level="card" className="mb-2">
             {t.scaleOutHeading}
           </Heading>
           <p className="text-muted-foreground text-sm mb-6">{t.scaleOutDescription}</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
             {specsWithTopology.map((spec) => (
-              <div
+              <Card
                 key={spec.name}
-                className="border border-border/50 rounded-lg p-4"
+                className="rounded-lg p-4 md:p-4"
                 data-testid={`topology-${spec.name.toLowerCase().replaceAll(/\s+/gu, '-')}`}
               >
                 <TopologyDiagram
@@ -462,22 +447,22 @@ export function GpuSpecsContent() {
                   spec={spec}
                   allSpecs={specsWithTopology}
                 />
-              </div>
+              </Card>
             ))}
           </div>
         </Card>
       </section>
-      <section className="pt-8 md:pt-0">
+      <section>
         <Card>
           <Heading as="h3" level="card" className="mb-2">
             {t.scaleUpHeading}
           </Heading>
           <p className="text-muted-foreground text-sm mb-6">{t.scaleUpDescription}</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
             {GPU_SPECS.map((spec) => (
-              <div
+              <Card
                 key={spec.name}
-                className="border border-border/50 rounded-lg p-4"
+                className="rounded-lg p-4 md:p-4"
                 data-testid={`scaleup-topology-${spec.name.toLowerCase().replaceAll(/\s+/gu, '-')}`}
               >
                 <ScaleUpTopologyDiagram
@@ -487,7 +472,7 @@ export function GpuSpecsContent() {
                   spec={spec}
                   allSpecs={GPU_SPECS}
                 />
-              </div>
+              </Card>
             ))}
           </div>
         </Card>

@@ -93,7 +93,7 @@ describe('useFirstChartRenderTiming', () => {
       await Promise.resolve();
     });
 
-    window.history.pushState(null, '', '/inference/kimi-k3');
+    window.history.pushState(null, '', '/infx/inference/kimi-k3');
     now.mockReturnValue(60_000);
     markNavigationStart(window.location.pathname);
     now.mockReturnValue(60_420);
@@ -110,7 +110,7 @@ describe('useFirstChartRenderTiming', () => {
     expect(track).toHaveBeenLastCalledWith('inference_chart_rendered', {
       ms_since_navigation: 420,
       soft_navigation: true,
-      route: '/inference/kimi-k3',
+      route: '/infx/inference/kimi-k3',
     });
   });
 
@@ -125,7 +125,7 @@ describe('useFirstChartRenderTiming', () => {
     });
     expect(track).toHaveBeenCalledTimes(1);
 
-    window.history.pushState(null, '', '/inference/gpt-oss');
+    window.history.pushState(null, '', '/infx/inference/gpt-oss');
     now.mockReturnValue(90_000);
     markNavigationStart(window.location.pathname);
     now.mockReturnValue(90_010);
@@ -144,7 +144,7 @@ describe('useFirstChartRenderTiming', () => {
     expect(track).toHaveBeenLastCalledWith('inference_chart_rendered', {
       ms_since_navigation: 750,
       soft_navigation: true,
-      route: '/inference/gpt-oss',
+      route: '/infx/inference/gpt-oss',
     });
   });
 
@@ -168,7 +168,7 @@ describe('useFirstChartRenderTiming', () => {
     });
     expect(track).toHaveBeenCalledTimes(1);
 
-    window.history.pushState(null, '', '/inference/canvas-model');
+    window.history.pushState(null, '', '/infx/inference/canvas-model');
     now.mockReturnValue(70_000);
     markNavigationStart(window.location.pathname);
     now.mockReturnValue(70_250);
@@ -180,7 +180,7 @@ describe('useFirstChartRenderTiming', () => {
     expect(track).toHaveBeenLastCalledWith('inference_chart_rendered', {
       ms_since_navigation: 250,
       soft_navigation: true,
-      route: '/inference/canvas-model',
+      route: '/infx/inference/canvas-model',
     });
   });
 });

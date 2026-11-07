@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Heading } from '@/components/ui/heading';
 import { track } from '@/lib/analytics/analytics';
 import type { PostThumbnail } from '@/lib/blog/blog';
+import { blogTagLabel } from '@/lib/blog/blog-tag-label';
+import type { Locale } from '@/lib/i18n/i18n';
 import { cn } from '@/lib/shared/utils';
 
 export interface BlogPostCardProps {
@@ -17,6 +19,7 @@ export interface BlogPostCardProps {
   date: string;
   readingLabel: string;
   tags?: string[];
+  locale?: Locale;
   tagsLabel?: string;
   thumbnail: PostThumbnail | null;
   basePath?: string;
@@ -35,6 +38,7 @@ export function BlogPostCard({
   date,
   readingLabel,
   tags = [],
+  locale = 'en',
   tagsLabel = 'Tags',
   thumbnail,
   basePath = '/blog',
@@ -48,16 +52,16 @@ export function BlogPostCard({
     <article
       data-testid="blog-post-card"
       className={cn(
-        'group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card/60 backdrop-blur-[2px] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-lg hover:shadow-primary/5',
+        'group relative flex min-w-0 flex-col overflow-hidden rounded-xl border border-border/30 bg-card transition-colors hover:border-border',
         className,
       )}
     >
       <BlogThumbnail
         thumbnail={thumbnail}
-        tag={tags[0]}
+        tag={tags[0] && blogTagLabel(tags[0], locale)}
         readingLabel={readingLabel}
         priority={priority}
-        className="border-b border-border/40"
+        className="border-b border-border/30"
       />
       <div className="flex flex-1 flex-col gap-3 p-5">
         <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
@@ -83,12 +87,12 @@ export function BlogPostCard({
           <ul className="mt-auto flex flex-wrap gap-1.5 pt-1" aria-label={tagsLabel}>
             {shown.map((tag) => (
               <li key={tag}>
-                <Badge variant="outline">{tag}</Badge>
+                <Badge variant="secondary">{blogTagLabel(tag, locale)}</Badge>
               </li>
             ))}
             {hidden > 0 && (
               <li>
-                <Badge variant="outline" className="tabular-nums">
+                <Badge variant="secondary" className="tabular-nums">
                   +{hidden}
                 </Badge>
               </li>

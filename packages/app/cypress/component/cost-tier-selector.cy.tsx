@@ -19,19 +19,19 @@ describe('CostTierSelector', () => {
     it('shows published tiers, custom values and locked rental terms', () => {
       cy.get('[data-testid="cost-tier-selector"]')
         .should('be.visible')
-        .and('contain.text', 'Owning at Large Hyperscaler Volume')
+        .and('contain.text', 'Owning at large hyperscaler volume')
         .click('right');
       cy.get('[data-slot="select-item"]').then(($items) => {
         const labels = [...$items].map((item) => item.textContent?.trim() ?? '');
         expect(labels).to.deep.equal([
-          'Owning at Large Hyperscaler Volume',
-          'Rent - 3 Year Commit',
-          'Custom User Values',
-          'Rent - On DemandLocked',
-          'Rent - 1 Month CommitLocked',
-          'Rent - 6 Month CommitLocked',
-          'Rent - 1 Year CommitLocked',
-          'Rent - 2 Year CommitLocked',
+          'Owning at large hyperscaler volume',
+          'Rent – 3-year commit',
+          'Custom user values',
+          'Rent – on demandLocked',
+          'Rent – 1-month commitLocked',
+          'Rent – 6-month commitLocked',
+          'Rent – 1-year commitLocked',
+          'Rent – 2-year commitLocked',
         ]);
       });
       cy.get('[data-testid="locked-tier-badge"]').should('have.length', 5);
@@ -56,11 +56,11 @@ describe('CostTierSelector', () => {
     it('opens the TCO model dialog for locked rental tiers instead of changing the axis', () => {
       cy.get('[data-testid="cost-tier-selector"]').click('right');
       cy.get('[data-testid="cost-tier-locked-rent_1_year"]')
-        .should('contain.text', 'Rent - 1 Year Commit')
+        .should('contain.text', 'Rent – 1-year commit')
         .click();
       cy.get('[data-testid="tco-model-dialog"]')
         .should('be.visible')
-        .and('contain.text', 'Rent - 1 Year Commit');
+        .and('contain.text', 'Rent – 1-year commit');
       cy.get('[data-testid="tco-model-dialog-link"]')
         .should('have.attr', 'href', 'https://semianalysis.com/ai-cloud-tco-model/')
         .and('have.attr', 'target', '_blank');
@@ -86,7 +86,7 @@ describe('CostTierSelector', () => {
     cy.get('@setUserCosts').should('not.have.been.called');
   });
 
-  it('leaves Custom User Values out when the chart has no custom pricing path', () => {
+  it('leaves Custom user values out when the chart has no custom pricing path', () => {
     mountWithProviders(<CostTierSelector allowCustom={false} />, {
       inference: { selectedYAxisMetric: 'y_costh' },
       globalFilters: {},
@@ -103,6 +103,6 @@ describe('CostTierSelector', () => {
       inference: { selectedYAxisMetric: 'y_tokensPerDollarR' },
       globalFilters: {},
     });
-    cy.get('[data-testid="cost-tier-selector"]').should('contain.text', 'Rent - 3 Year Commit');
+    cy.get('[data-testid="cost-tier-selector"]').should('contain.text', 'Rent – 3-year commit');
   });
 });

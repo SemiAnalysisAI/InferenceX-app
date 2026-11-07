@@ -71,10 +71,6 @@
   background-color: rgba(0, 0, 0, 0.3) !important;
 }
 
-.minecraft .circuit-bg {
-  display: none;
-}
-
 @keyframes mc-dragon-flyacross {
   0% {
     transform: translate(110vw, 0) scale(1);

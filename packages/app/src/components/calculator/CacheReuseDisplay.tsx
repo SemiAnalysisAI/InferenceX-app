@@ -30,8 +30,10 @@ import {
 import { ControlPanel } from '@/components/ui/control-panel';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
+import { EmptyState } from '@/components/ui/empty-state';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Heading } from '@/components/ui/heading';
+import { ResultContext } from '@/components/ui/result-context';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -66,9 +68,9 @@ import { useThroughputData, type GroupMeta } from './useThroughputData';
 
 const STRINGS = {
   en: {
-    title: 'Prefix Cache Reuse',
-    benchmarkGroup: 'Benchmark Config',
-    chartGroup: 'Chart Config',
+    title: 'Prefix cache reuse',
+    benchmarkGroup: 'Benchmark config',
+    chartGroup: 'Chart config',
     configLabel: 'Configuration',
     configTooltip:
       'The chip and serving framework whose sweep is plotted. Configurations that reported no cache tier for this selection are listed but draw no bars.',
@@ -85,7 +87,8 @@ const STRINGS = {
       'Fixed-sequence runs record no prefix-cache tiers, so there is nothing to stack here. Switch the scenario to AgentX.',
     noTiers:
       'None of the measured rows for this configuration reported a prefix-cache tier. Try another configuration or run date.',
-    captionSource: 'Source: SemiAnalysis InferenceX',
+    source: 'SemiAnalysis InferenceX™',
+    sourceWithOverlays: 'SemiAnalysis InferenceX™ + unofficial overlays',
     unofficialRun: 'Unofficial run',
     colSeries: 'Series',
     colConcurrency: 'Concurrency',
@@ -115,7 +118,8 @@ const STRINGS = {
     noData: '当前选择没有实测数据。请尝试其他模型、工作负载或精度。',
     noTiersFixed: '固定序列的运行不记录前缀缓存层级，此处没有可堆叠的数据。请将场景切换为 AgentX。',
     noTiers: '该配置的实测数据行均未上报前缀缓存层级。请尝试其他配置或运行日期。',
-    captionSource: '来源：SemiAnalysis InferenceX',
+    source: 'SemiAnalysis InferenceX™',
+    sourceWithOverlays: 'SemiAnalysis InferenceX™ + 非官方 overlays',
     unofficialRun: '非官方运行',
     colSeries: '系列',
     colConcurrency: '并发数',
@@ -428,7 +432,12 @@ function CacheReuseInner() {
         sortValue: (r) => r.ceiling ?? -1,
         align: 'right',
       },
-      { header: t.colRecipe, cell: (r) => r.recipe, sortValue: (r) => r.recipe },
+      {
+        header: t.colRecipe,
+        cell: (r) => r.recipe,
+        sortValue: (r) => r.recipe,
+        className: 'whitespace-nowrap',
+      },
       {
         header: t.colRun,
         cell: (r) =>
@@ -437,7 +446,7 @@ function CacheReuseInner() {
               href={r.runUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-primary underline underline-offset-2"
+              className="text-brand underline underline-offset-2"
               onClick={() => track('cache_reuse_run_link_clicked')}
             >
               {t.viewRun}
@@ -490,15 +499,31 @@ function CacheReuseInner() {
 
   const caption = (
     <>
-      <Heading as="h2" level="card">
-        {t.title}
-      </Heading>
-      <p className="text-sm text-muted-foreground mb-2">
-        {getModelLabel(selectedModel)} • {getSequenceLabel(selectedSequence, locale)}
-        {selectedConfig ? ` • ${selectedConfig.label}` : ''}
-        {plottedRecipeLabel ? ` • ${plottedRecipeLabel}` : ''} • {t.captionSource}
-      </p>
+      <div className="md:pr-12">
+        <Heading as="h2" level="card">
+          {t.title}
+        </Heading>
+        <p className="text-sm text-muted-foreground mb-2">
+          {getModelLabel(selectedModel)} · {getSequenceLabel(selectedSequence, locale)}
+          {selectedConfig ? ` · ${selectedConfig.label}` : ''}
+          {plottedRecipeLabel ? ` · ${plottedRecipeLabel}` : ''}
+        </p>
+      </div>
+      {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
+      {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
+      {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
     </>
+  );
+
+  const footer = (
+    <div className="mt-3">
+      <ResultContext
+        locale={locale}
+        layout="footer"
+        date={selectedRunDate}
+        source={isUnofficialRun ? t.sourceWithOverlays : t.source}
+      />
+    </div>
   );
 
   const legendElement = (
@@ -526,13 +551,7 @@ function CacheReuseInner() {
 
   if (!loading && error) {
     console.error(error);
-    return (
-      <Card>
-        <div className="flex items-center justify-center h-64 text-muted-foreground">
-          {t.errorLoading}
-        </div>
-      </Card>
-    );
+    return <EmptyState className="h-64">{t.errorLoading}</EmptyState>;
   }
 
   return (
@@ -655,19 +674,14 @@ function CacheReuseInner() {
       )}
 
       {!loading && !hasAnyData && (
-        <Card>
-          <div
-            className="flex items-center justify-center h-64 text-muted-foreground text-center px-6"
-            data-testid="cache-reuse-no-data"
-          >
-            {t.noData}
-          </div>
-        </Card>
+        <EmptyState className="h-64" data-testid="cache-reuse-no-data">
+          {t.noData}
+        </EmptyState>
       )}
 
       {!loading && hasAnyData && (
         <Card>
-          <figure data-testid="cache-reuse-figure" className="relative rounded-lg">
+          <figure data-testid="cache-reuse-figure" className="relative min-w-0">
             <ChartButtons
               chartId="cache-reuse"
               analyticsPrefix="cache_reuse"
@@ -676,13 +690,11 @@ function CacheReuseInner() {
                 sequence: selectedSequence,
                 precisions: selectedPrecisions,
               })}
+              className="md:absolute md:right-0 md:top-0 md:z-10 md:mb-0"
               hideZoomReset
               onExportCsv={handleExportCsv}
               exportFileName={`InferenceX_cache_reuse_${selectedModel}`}
             />
-            {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
-            {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
-            {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
             {hasBars ? (
               <CacheReuseChart
                 result={result}
@@ -691,16 +703,15 @@ function CacheReuseInner() {
                 runInfoByIndex={runInfoByIndex}
                 legendElement={legendElement}
                 caption={caption}
+                footer={footer}
               />
             ) : (
               <>
                 <figcaption>{caption}</figcaption>
-                <div
-                  className="flex items-center justify-center h-48 text-muted-foreground text-center px-6"
-                  data-testid="cache-reuse-no-tiers"
-                >
+                <EmptyState bare className="h-48 px-6" data-testid="cache-reuse-no-tiers">
                   {isAgenticSequence ? t.noTiers : t.noTiersFixed}
-                </div>
+                </EmptyState>
+                {footer}
               </>
             )}
           </figure>

@@ -110,7 +110,7 @@ const GUIDE_ZH = {
     },
   } as Readonly<Record<string, SectionTranslation>>,
   ui: {
-    backToAgentX: '← AgentX 数据集',
+    backToAgentX: 'AgentX 数据集',
     onThisPage: '本页内容',
     figureCta: '查看原图',
     readMore: '阅读遥测数据教程',

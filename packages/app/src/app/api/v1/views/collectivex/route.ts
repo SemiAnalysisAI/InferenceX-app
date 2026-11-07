@@ -115,14 +115,17 @@ export function GET(request: NextRequest) {
     const operation = parseEnumParam(
       s.get('operation'),
       'operation',
-      ['roundtrip', 'dispatch', 'combine'],
-      'roundtrip',
+      ['pair_period', 'roundtrip', 'dispatch', 'combine'],
+      // Runs older than the chained family carry no pair period: default to the round trip there.
+      combined.some((item) => item.points.some((point) => point.components.pair_period !== null))
+        ? 'pair_period'
+        : 'roundtrip',
     );
     const percentile = parseEnumParam(
       s.get('percentile'),
       'percentile',
       ['p50', 'p95', 'p99'],
-      'p99',
+      'p50',
     );
     const yAxis = parseEnumParam(
       s.get('yAxis'),

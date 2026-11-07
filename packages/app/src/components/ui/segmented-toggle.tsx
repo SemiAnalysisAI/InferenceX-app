@@ -3,13 +3,19 @@
 import { ChevronDown } from 'lucide-react';
 import { type ReactNode } from 'react';
 
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/shared/utils';
-import { SEGMENTED_CONTAINER_STYLE, SELECT_TRIGGER_STYLE } from '@/components/ui/control-styles';
+import {
+  SEGMENT_RADIUS_STYLE,
+  SEGMENTED_CONTAINER_STYLE,
+  SELECT_TRIGGER_STYLE,
+} from '@/components/ui/control-styles';
 
 interface SegmentedToggleOptionBase<TValue extends string> {
   value: TValue;
   icon?: ReactNode;
   title?: string;
+  badge?: string;
   testId?: string;
   className?: string;
   disabled?: boolean;
@@ -52,7 +58,9 @@ interface SegmentedToggleProps<TValue extends string> {
 export function segmentedSelectOptionLabel<TValue extends string>(
   option: SegmentedToggleOption<TValue>,
 ): string {
-  const label = option.label ?? option.ariaLabel;
+  const label = option.badge
+    ? `${option.label ?? option.ariaLabel} · ${option.badge}`
+    : (option.label ?? option.ariaLabel);
   return option.title ? `${label} — ${option.title}` : label;
 }
 
@@ -64,7 +72,7 @@ export function SegmentedToggle<TValue extends string>({
   testId,
   className,
   buttonClassName,
-  activeButtonClassName = 'bg-muted text-foreground',
+  activeButtonClassName = 'bg-muted text-foreground dark:bg-input',
   inactiveButtonClassName = 'text-muted-foreground hover:text-foreground',
   size = 'sm',
   role = 'tablist',
@@ -124,7 +132,8 @@ export function SegmentedToggle<TValue extends string>({
           title={option.title}
           disabled={option.disabled}
           className={cn(
-            'inline-flex min-h-11 min-w-0 max-w-full items-center gap-1.5 rounded-[max(0px,calc(var(--radius)-var(--segmented-inset)))] px-2 py-1 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 md:py-0.5',
+            'inline-flex min-h-11 min-w-0 max-w-full items-center justify-center gap-1.5 px-1.5 py-1 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-60 md:py-0.5',
+            SEGMENT_RADIUS_STYLE,
             size === 'sm' ? 'md:min-h-6' : 'md:min-h-7',
             buttonClassName,
             value === option.value ? activeButtonClassName : inactiveButtonClassName,
@@ -135,6 +144,11 @@ export function SegmentedToggle<TValue extends string>({
         >
           {option.icon}
           {option.label}
+          {option.badge && (
+            <Badge variant="secondary" className="px-1.5 py-0">
+              {option.badge}
+            </Badge>
+          )}
         </button>
       ))}
     </div>

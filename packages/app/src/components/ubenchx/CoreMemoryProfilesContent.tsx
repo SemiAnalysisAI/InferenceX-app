@@ -11,6 +11,7 @@ import {
   type CoreProfilePanel,
 } from './core-memory-profiles';
 import { SmL2Content } from './SmL2Heatmap';
+import { UbenchxHub } from './UbenchxHub';
 import {
   Select,
   SelectContent,
@@ -18,12 +19,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Card } from '@/components/ui/card';
+import { TABLE_HEAD_CELL_STYLE, TABLE_HEAD_ROW_STYLE } from '@/components/ui/control-styles';
+import { Heading, HeadingQualifier } from '@/components/ui/heading';
+import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
+import { ResultContext, sourceLinkClassName } from '@/components/ui/result-context';
 
 const STRINGS = {
   en: {
     noPairs: 'No pairs',
-    title: 'Core memory-access profiles',
     hardware: 'Hardware',
+    hardwareTooltip: 'The device whose memory-access profiles are shown, or all of them.',
     allHardware: 'All hardware',
     comparison:
       'Compare memory-access grouping patterns on B200 and Huawei 950PR. Each device keeps its own color scale: B200 uses clock64 cycles; 950PR uses SYS_CNT ticks. Equal colors or numbers across devices do not mean equal latency.',
@@ -42,14 +48,17 @@ const STRINGS = {
       'Concurrent launches have no grid-wide starting barrier. Their fine structure is less repeatable than the broad grouping; these panels do not establish which cores physically share a cache.',
     source: 'Source data',
     methodology: 'Methodology',
+    device: 'Device',
+    driver: 'Driver',
+    runtime: 'Runtime',
     selected: 'Core pair',
     pinned: 'Pinned core pair',
-    sharedScale: 'All four panels use the same color scale.',
+    sharedScale: 'All four panels use the same color scale',
   },
   zh: {
     noPairs: '无核心对',
-    title: '核心访存特征',
     hardware: '硬件',
+    hardwareTooltip: '要显示访存特征的硬件，或显示全部硬件。',
     allHardware: '全部硬件',
     comparison:
       '对比 B200 与 Huawei 950PR 的访存分组模式。各设备使用独立色标：B200 以 clock64 周期计，950PR 以 SYS_CNT ticks 计。不同设备上颜色或数值相同，并不代表延迟相同。',
@@ -68,9 +77,12 @@ const STRINGS = {
       '并发启动没有网格级起始同步屏障。相比整体分组，细节模式的可重复性较弱；这些图不能确定哪些核心在物理上共享缓存。',
     source: '数据来源',
     methodology: '测试方法',
+    device: '设备',
+    driver: '驱动',
+    runtime: '运行时',
     selected: '核心对',
     pinned: '已固定的核心对',
-    sharedScale: '四幅图使用相同的色标范围。',
+    sharedScale: '四幅图使用相同的色标范围',
   },
 } as const;
 
@@ -94,7 +106,10 @@ function Panel({ panel, max, text }: { panel: CoreProfilePanel; max: number; tex
     (reason: string) => {
       setCell(null);
       setPinned(false);
-      track('ubenchx_core_profile_cell_cleared', { condition: panel.condition, reason });
+      track('ubenchx_core_profile_cell_cleared', {
+        condition: panel.condition,
+        reason,
+      });
     },
     [panel.condition],
   );
@@ -136,13 +151,13 @@ function Panel({ panel, max, text }: { panel: CoreProfilePanel; max: number; tex
   };
   return (
     <section ref={panelRef} className="space-y-2 min-w-0" data-testid={id}>
-      <h3 className="text-base font-semibold">
+      <h3 className="text-sm font-medium">
         {panel.coreType === 'cube' ? 'Cube' : 'Vector'} · {text[panel.launchMode]}
       </h3>
       <svg
         ref={svgRef}
         viewBox="0 0 420 420"
-        className="w-full"
+        className="w-full max-w-md"
         role="img"
         tabIndex={0}
         aria-label={`${panel.coreType}, ${text[panel.launchMode]}, ${text.units}`}
@@ -218,7 +233,7 @@ function Panel({ panel, max, text }: { panel: CoreProfilePanel; max: number; tex
           stroke="var(--muted-foreground)"
         />
         {ticks.map((i) => (
-          <g key={i} className="text-xs" fill="currentColor">
+          <g key={i} className="text-xs tabular-nums" fill="var(--muted-foreground)">
             <text x={start + (i + 0.5) * step} y={top + extent + 20} textAnchor="middle">
               {panel.coreIds[i]}
             </text>
@@ -237,7 +252,7 @@ function Panel({ panel, max, text }: { panel: CoreProfilePanel; max: number; tex
           y={top + extent + 48}
           textAnchor="middle"
           className="text-xs"
-          fill="currentColor"
+          fill="var(--muted-foreground)"
         >
           {text.core}
         </text>
@@ -245,7 +260,7 @@ function Panel({ panel, max, text }: { panel: CoreProfilePanel; max: number; tex
           transform={`translate(14 ${top + extent / 2}) rotate(-90)`}
           textAnchor="middle"
           className="text-xs"
-          fill="currentColor"
+          fill="var(--muted-foreground)"
         >
           {text.core}
         </text>
@@ -274,44 +289,93 @@ function Panel({ panel, max, text }: { panel: CoreProfilePanel; max: number; tex
   );
 }
 
-function AscendCoreProfiles() {
+function AscendCoreProfiles({ note }: { note?: string }) {
   const locale = useLocale(),
     t = STRINGS[locale];
   const result = useMemo(coreMemoryProfiles, []);
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold">Huawei 950PR</h2>
-        <p className="text-sm text-muted-foreground">{t.subtitle}</p>
-      </div>
-      <p className="text-sm text-muted-foreground">{t.limits}</p>
-      <div className="space-y-1 max-w-lg">
-        <p className="text-sm">{t.units}</p>
-        <div
-          className="h-4 rounded"
-          style={{
-            background: `linear-gradient(to right, ${Array.from({ length: 11 }, (_, i) => `${d3.interpolateReds(i / 10)} ${i * 10}%`).join(', ')})`,
-          }}
-        />
-        <div className="flex justify-between text-xs">
-          <span>0</span>
-          <span>{result.colorLimits[1].toFixed(2)}</span>
-        </div>
-        <p className="text-xs text-muted-foreground">{t.sharedScale}</p>
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {result.panels.map((panel) => (
-          <Panel key={panel.condition} panel={panel} max={result.colorLimits[1]} text={t} />
-        ))}
-      </div>
-      <section className="text-sm text-muted-foreground space-y-2">
-        <h3 className="font-semibold">{t.methodology}</h3>
-        <p>{t.method}</p>
-        <p>{t.concurrentLimit}</p>
-        <a className="underline" href={result.sourceUrl} target="_blank" rel="noopener noreferrer">
-          {t.source}
-        </a>
-      </section>
+    <div className="space-y-4">
+      <figure className="relative min-w-0">
+        <Card>
+          <figcaption>
+            <Heading as="h2" level="card">
+              Huawei 950PR
+              <HeadingQualifier>{t.subtitle}</HeadingQualifier>
+            </Heading>
+          </figcaption>
+          <div className="mt-3 space-y-6">
+            <p className="text-sm text-muted-foreground">{t.limits}</p>
+            <div className="space-y-1 max-w-lg">
+              <p className="text-sm">{t.units}</p>
+              <div
+                className="h-4 rounded-sm"
+                style={{
+                  background: `linear-gradient(to right, ${Array.from({ length: 11 }, (_, i) => `${d3.interpolateReds(i / 10)} ${i * 10}%`).join(', ')})`,
+                }}
+              />
+              <div className="flex justify-between text-xs tabular-nums">
+                <span>0</span>
+                <span>{result.colorLimits[1].toFixed(2)}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">{t.sharedScale}</p>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {result.panels.map((panel) => (
+                <Panel key={panel.condition} panel={panel} max={result.colorLimits[1]} text={t} />
+              ))}
+            </div>
+          </div>
+          <div className="mt-3">
+            <ResultContext locale={locale} layout="footer" source="SemiAnalysis InferenceX™" />
+            {note && <p className="mt-2 text-xs leading-5 text-muted-foreground/70">{note}</p>}
+            <div className="mt-3 max-w-[80ch] space-y-1.5 text-xs leading-5 text-muted-foreground">
+              <h3 className="font-medium text-foreground">{t.methodology}</h3>
+              <p>{t.method}</p>
+              <p>{t.concurrentLimit}</p>
+            </div>
+            <div className="mt-3 overflow-x-auto" data-testid="core-profile-device-specs">
+              <table className="w-full text-left text-xs text-muted-foreground tabular-nums">
+                <thead>
+                  <tr className={TABLE_HEAD_ROW_STYLE}>
+                    {[t.device, t.hardware, t.driver, t.runtime].map((header) => (
+                      <th
+                        key={header}
+                        scope="col"
+                        className={`${TABLE_HEAD_CELL_STYLE} py-1.5 pr-4`}
+                      >
+                        {header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th
+                      scope="row"
+                      className="py-1.5 pr-4 font-medium whitespace-nowrap text-foreground"
+                    >
+                      Huawei 950PR
+                    </th>
+                    <td className="py-1.5 pr-4 whitespace-nowrap">{result.metadata.device}</td>
+                    <td className="py-1.5 pr-4 whitespace-nowrap">{result.metadata.driver}</td>
+                    <td className="py-1.5 pr-4 whitespace-nowrap">CANN {result.metadata.cann}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              <a
+                className={sourceLinkClassName}
+                href={result.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {t.source}
+              </a>
+            </p>
+          </div>
+        </Card>
+      </figure>
     </div>
   );
 }
@@ -321,45 +385,48 @@ export function CoreMemoryProfilesContent() {
   const t = STRINGS[locale];
   const [gpu, setGpu] = useState('all');
   return (
-    <div className="space-y-8">
-      <div className="space-y-2">
-        <h2 className="text-xl font-semibold">{t.title}</h2>
-        <p className="text-sm text-muted-foreground max-w-4xl">{t.comparison}</p>
-      </div>
-      <div className="space-y-1.5 sm:w-72">
-        <label htmlFor="core-profile-hardware" className="text-sm font-medium">
-          {t.hardware}
-        </label>
-        <Select
-          value={gpu}
-          onValueChange={(value) => {
-            setGpu(value);
-            track('ubenchx_core_profile_hardware_selected', { gpu: value });
-          }}
-        >
-          <SelectTrigger id="core-profile-hardware" data-testid="core-profile-hardware">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t.allHardware}</SelectItem>
-            {CORE_PROFILE_GPU_KEYS.map((key) => (
-              <SelectItem key={key} value={key}>
-                {key === CORE_PROFILE_GPU ? 'Huawei 950PR' : key}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+    <div className="flex flex-col gap-4">
+      <UbenchxHub
+        current="core-memory-profiles"
+        controls={
+          <div className="flex min-w-0 flex-col space-y-1.5">
+            <LabelWithTooltip
+              htmlFor="core-profile-hardware"
+              label={t.hardware}
+              tooltip={t.hardwareTooltip}
+            />
+            <Select
+              value={gpu}
+              onValueChange={(value) => {
+                setGpu(value);
+                track('ubenchx_core_profile_hardware_selected', { gpu: value });
+              }}
+            >
+              <SelectTrigger
+                id="core-profile-hardware"
+                data-testid="core-profile-hardware"
+                className="w-full"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t.allHardware}</SelectItem>
+                {CORE_PROFILE_GPU_KEYS.map((key) => (
+                  <SelectItem key={key} value={key}>
+                    {key === CORE_PROFILE_GPU ? 'Huawei 950PR' : key}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        }
+      />
       {(gpu === 'all' || gpu === CORE_PROFILE_GPU) && (
         <section data-testid="ascend-core-profiles">
-          <AscendCoreProfiles />
+          <AscendCoreProfiles note={gpu === 'all' ? t.comparison : undefined} />
         </section>
       )}
-      {gpu !== CORE_PROFILE_GPU && (
-        <section className={gpu === 'all' ? 'border-t pt-8' : undefined}>
-          <SmL2Content gpu={gpu} />
-        </section>
-      )}
+      {gpu !== CORE_PROFILE_GPU && <SmL2Content gpu={gpu} />}
     </div>
   );
 }

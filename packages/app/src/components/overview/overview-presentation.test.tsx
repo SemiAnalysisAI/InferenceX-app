@@ -233,11 +233,11 @@ describe('OverviewPresentationSurface', () => {
     act(() => toggle()?.click());
 
     act(() => {
-      window.history.replaceState({}, '', '/inference');
+      window.history.replaceState({}, '', '/infx/inference');
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
 
-    expect(window.location.pathname).toBe('/inference');
+    expect(window.location.pathname).toBe('/infx/inference');
     expect(window.location.search).toBe('');
   });
 

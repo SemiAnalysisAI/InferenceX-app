@@ -50,12 +50,12 @@ export function transformUbenchxRun(gpuKey: string, run: UbenchxRun): UbenchxVie
   };
 }
 
-export function sizeAxisTicks(min: number, max: number): number[] {
+export function sizeAxisTicks(min: number, max: number, maxTicks = 7): number[] {
   if (!(min > 0 && max >= min) || !Number.isFinite(max)) throw new Error('Invalid size domain');
   if (min === max) return [min];
   const first = Math.ceil(Math.log2(min)),
     last = Math.floor(Math.log2(max));
-  const step = Math.max(1, Math.ceil((last - first) / 7));
+  const step = Math.max(1, Math.ceil((last - first) / maxTicks));
   const ticks = [min];
   for (let exponent = first + step; exponent <= last; exponent += step) ticks.push(2 ** exponent);
   if (ticks.at(-1) !== max) {

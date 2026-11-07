@@ -19,7 +19,7 @@ tags:
 
 The story is software-only — same MI355X CDNA4 silicon at $1.48/GPU/hr the whole time. The receipts: [sgl-project/sglang#20736](https://github.com/sgl-project/sglang/pull/20736), [sgl-project/sglang#21188](https://github.com/sgl-project/sglang/pull/21188), and [sgl-project/sglang#21421](https://github.com/sgl-project/sglang/pull/21421), all merged Mar–Apr and all gated on `SGLANG_USE_AITER=1`. Speed of the upstream-to-benchmark loop is the moat.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-05-19&i_gpus=mi355x_sglang&i_dstart=2026-02-20&i_dend=2026-05-19&i_prec=fp8">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-05-19&i_gpus=mi355x_sglang&i_dstart=2026-02-20&i_dend=2026-05-19&i_prec=fp8">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 
@@ -118,7 +118,7 @@ The 19x peak at 40 tok/s/user is partly a regime extension — the Feb TP=8 reci
   caption="Qwen3.5-397B-A17B FP8 8k/1k on MI355X SGLang. Three runs over 3 months: v0.5.8.post1 (Feb 20, TP=8), v0.5.10rc0 (Apr 16, TP=2/4), v0.5.12 (May 19, TP=2/4). Point labels denote the TP value used for that config."
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-05-19&i_gpus=mi355x_sglang&i_dstart=2026-02-20&i_dend=2026-05-19&i_prec=fp8), pre-filtered to MI355X SGLang Qwen3.5 FP8 across all three runs.
+[Live chart](https://inferencex.semianalysis.com/infx/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-05-19&i_gpus=mi355x_sglang&i_dstart=2026-02-20&i_dend=2026-05-19&i_prec=fp8), pre-filtered to MI355X SGLang Qwen3.5 FP8 across all three runs.
 
 ## What's Next for MI355X on Qwen3.5
 
@@ -128,7 +128,7 @@ The 19x peak at 40 tok/s/user is partly a regime extension — the Feb TP=8 reci
 
 This 3-month curve move is the work of [zhentaocc](https://github.com/zhentaocc) (Todd Chen) and [yichiche](https://github.com/yichiche) (Jacky Cheng) at AMD, who authored all three upstream SGLang PRs, with [HaiShaw](https://github.com/HaiShaw) reviewing and merging. Speed of the upstream-to-benchmark loop is the moat.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-05-19&i_gpus=mi355x_sglang&i_dstart=2026-02-20&i_dend=2026-05-19&i_prec=fp8">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-05-19&i_gpus=mi355x_sglang&i_dstart=2026-02-20&i_dend=2026-05-19&i_prec=fp8">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 

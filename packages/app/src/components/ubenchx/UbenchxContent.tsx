@@ -1,11 +1,17 @@
 'use client';
 
 import * as d3 from 'd3';
-import { useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState, useSyncExternalStore } from 'react';
 import { useTheme } from 'next-themes';
 import { isDarkTheme } from '@/lib/themes/themes';
-import { generateVendorColors, getVendor } from '@/lib/charts/dynamic-colors';
+import { generateVendorColors } from '@/lib/charts/dynamic-colors';
 
+import ChartLegend from '@/components/ui/chart-legend';
+import { ChartSection } from '@/components/ui/chart-section';
+import { TABLE_HEAD_CELL_STYLE, TABLE_HEAD_ROW_STYLE } from '@/components/ui/control-styles';
+import { Heading, HeadingQualifier } from '@/components/ui/heading';
+import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
+import { ResultContext, sourceLinkClassName } from '@/components/ui/result-context';
 import {
   Select,
   SelectContent,
@@ -15,9 +21,12 @@ import {
 } from '@/components/ui/select';
 import { track } from '@/lib/analytics/analytics';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 
+import { UbenchxHub } from './UbenchxHub';
 import { UBENCHX_GPU_KEYS, UBENCHX_RUNS } from './ubenchx-data';
 import {
   transformUbenchxRun,
@@ -26,33 +35,32 @@ import {
   type UbenchxDerivedRow,
 } from './ubenchx-transform';
 
-const GPU_COLORS: Record<string, string> = {
-  'B300 SXM': 'oklch(0.62 0.15 128)',
-  'GB200 NVL72': 'oklch(0.58 0.15 138)',
-  'B200 SXM': 'oklch(0.54 0.15 148)',
-  'H200 SXM': 'oklch(0.50 0.15 158)',
-  'H100 SXM': 'oklch(0.46 0.15 168)',
-  MI355X: 'oklch(0.62 0.20 18)',
-  MI325X: 'oklch(0.55 0.20 28)',
-  MI300X: 'oklch(0.48 0.20 38)',
-};
+const subscribeNoop = () => () => {};
+
+function ubenchxHwKey(key: string): string {
+  return key.startsWith('Huawei') ? key : key.split(' ')[0].toLowerCase();
+}
+
+function ubenchxColors(theme: 'light' | 'dark'): Record<string, string> {
+  const colors = generateVendorColors(UBENCHX_GPU_KEYS.map(ubenchxHwKey), theme);
+  return Object.fromEntries(UBENCHX_GPU_KEYS.map((key) => [key, colors[ubenchxHwKey(key)]]));
+}
 
 const STRINGS = {
   en: {
-    pageTitle: 'HBM Bandwidth',
-    pageSubtitle:
-      'Microbenchmark measuring device-memory copy bandwidth across message sizes on NVIDIA, AMD and Huawei accelerators.',
     protocolNote:
       'Huawei uses amortized rotating-buffer graph timing; NVIDIA/AMD use Triton copy timing. Small-message latency is not directly comparable.',
-    latencyTitle: 'Latency vs Message Size',
+    latencyTitle: 'Latency vs message size',
     latencyY: 'Latency (ms)',
-    mbuTitle: 'Memory Bandwidth Utilization (MBU) vs Message Size',
+    mbuTitle: 'Memory bandwidth utilization (MBU) vs message size',
     mbuY: 'MBU (%)',
-    bwTitle: 'Bandwidth vs Message Size',
+    bwTitle: 'Bandwidth vs message size',
     bwY: 'Bandwidth (TB/s)',
-    xAxis: 'Message Size',
+    xAxis: 'Message size',
     yMetric: 'Y-axis',
-    peakNote: 'MBU uses each device’s peak bandwidth.',
+    yMetricTooltip:
+      'The measurement plotted on the Y-axis, either memory bandwidth utilization, copy bandwidth or latency.',
+    peakNote: 'MBU uses each device’s peak bandwidth',
     methodology: 'Methodology',
     methodologyText:
       'NVIDIA/AMD: times b.copy_(a) on float32 tensors using triton.testing.do_bench; bandwidth = 2 * bytes / time (read + write). Power-of-two sizes from 8 B to 16 GiB.',
@@ -61,20 +69,23 @@ const STRINGS = {
     huaweiReference:
       'Huawei MBU uses the 1,638.4 GB/s peak (8 HBM stacks × 256 bits × 6.4 Gbps), which Huawei rounds to 1.6 TB/s.',
     amortized: 'Amortized graph copy time',
-    source: 'Source',
-    instructions:
-      'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
-    dismiss: 'Click elsewhere to dismiss',
+    sources: 'Sources: ',
+    device: 'Device',
+    hardware: 'Hardware',
+    driver: 'Driver',
+    runtime: 'Runtime',
+    container: 'Container',
+    peak: 'Peak bandwidth',
+    instructions: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
     tooltipSize: 'Size',
     tooltipLatency: 'Latency',
     tooltipBandwidth: 'Bandwidth',
     tooltipMbu: 'MBU',
     tooltipPeak: 'Bandwidth reference',
-    aria: 'ubenchX device-memory copy bandwidth charts',
+    withUnit: (label: string, unit: string) => `${label} (${unit})`,
+    aria: 'uBenchX device-memory copy bandwidth charts',
   },
   zh: {
-    pageTitle: 'HBM 带宽',
-    pageSubtitle: '测量 NVIDIA、AMD 和 Huawei 加速器在不同消息大小下的显存拷贝带宽。',
     protocolNote:
       'Huawei 使用轮转缓冲区的图执行摊销计时；NVIDIA/AMD 使用 Triton 拷贝计时。小消息延迟不能直接比较。',
     latencyTitle: '延迟 vs 消息大小',
@@ -85,7 +96,8 @@ const STRINGS = {
     bwY: '带宽（TB/s）',
     xAxis: '消息大小',
     yMetric: 'Y 轴',
-    peakNote: 'MBU 按各设备的峰值带宽计算。',
+    yMetricTooltip: '图表 Y 轴显示的测量值，可选显存带宽利用率、拷贝带宽或延迟。',
+    peakNote: 'MBU 按各设备的峰值带宽计算',
     methodology: '测试方法',
     methodologyText:
       'NVIDIA/AMD：使用 triton.testing.do_bench 计时 b.copy_(a)（float32 张量）；带宽 = 2 * bytes / time（读 + 写）。消息大小为 2 的幂次，从 8 B 到 16 GiB。',
@@ -94,15 +106,21 @@ const STRINGS = {
     huaweiReference:
       'Huawei 的 MBU 按峰值带宽 1,638.4 GB/s 计算（8 个 HBM stack × 256 位 × 6.4 Gbps），Huawei 将其取整为 1.6 TB/s。',
     amortized: '摊销后的图拷贝时间',
-    source: '数据来源',
-    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
-    dismiss: '点击其他区域关闭',
+    sources: '数据来源：',
+    device: '设备',
+    hardware: '硬件',
+    driver: '驱动',
+    runtime: '运行时',
+    container: '容器',
+    peak: '峰值带宽',
+    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置',
     tooltipSize: '大小',
     tooltipLatency: '延迟',
     tooltipBandwidth: '带宽',
     tooltipMbu: 'MBU',
     tooltipPeak: '带宽参考值',
-    aria: 'ubenchX 显存拷贝带宽图表',
+    withUnit: (label: string, unit: string) => `${label}（${unit}）`,
+    aria: 'uBenchX 显存拷贝带宽图表',
   },
 } as const;
 
@@ -153,50 +171,34 @@ function paddedDomain(values: number[]): [number, number] {
   return min === max ? [min / 2, max * 2] : [min / 1.2, max * 1.2];
 }
 
-const tooltipLine = (label: string, value: string) =>
-  `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${label}:</strong> ${value}</div>`;
-
 function formatTooltip(
   point: ChartPoint,
   isPinned: boolean,
   t: (typeof STRINGS)[Locale],
   colors: Record<string, string>,
 ): string {
-  const color = colors[point.gpuKey] ?? '#888';
-  return `
-    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
-      <div style="display: flex; align-items: center; gap: 6px; color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">
-        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 9999px; background: ${color};"></span>${point.gpuKey}
-      </div>
-      ${tooltipLine(t.tooltipSize, point.sizeLabel)}
-      ${tooltipLine(UBENCHX_RUNS[point.gpuKey].metadata.protocol ? t.amortized : t.tooltipLatency, `${point.timeMs.toFixed(4)} ms`)}
-      ${tooltipLine(t.tooltipBandwidth, `${(point.bandwidthGbps / 1000).toFixed(3)} TB/s`)}
-      ${tooltipLine(t.tooltipMbu, `${point.mbuPercent.toFixed(1)}%`)}
-      ${tooltipLine(t.tooltipPeak, `${point.peakBandwidthGbps / 1000} TB/s`)}
-    </div>
-  `;
-}
-
-function GpuLegend({
-  gpuKeys,
-  colors,
-}: {
-  gpuKeys: readonly string[];
-  colors: Record<string, string>;
-}) {
-  return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-      {gpuKeys.map((key) => (
-        <span key={key} className="inline-flex items-center gap-1.5">
-          <span
-            className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
-            style={{ backgroundColor: colors[key] ?? '#888' }}
-          />
-          {key}
-        </span>
-      ))}
-    </div>
+  return chartHoverCard(
+    {
+      title: point.gpuKey,
+      subtitle: point.sizeLabel,
+      color: colors[point.gpuKey] ?? '#888',
+      metrics: [
+        {
+          value: point.timeMs.toFixed(4),
+          label: t.withUnit(
+            UBENCHX_RUNS[point.gpuKey].metadata.protocol ? t.amortized : t.tooltipLatency,
+            'ms',
+          ),
+        },
+        {
+          value: (point.bandwidthGbps / 1000).toFixed(3),
+          label: t.withUnit(t.tooltipBandwidth, 'TB/s'),
+        },
+        { value: `${point.mbuPercent.toFixed(1)}%`, label: t.tooltipMbu },
+      ],
+      summary: `${t.tooltipPeak} ${Number((point.peakBandwidthGbps / 1000).toPrecision(3))} TB/s`,
+    },
+    { pinned: isPinned },
   );
 }
 
@@ -204,44 +206,59 @@ function UbenchxChart({
   chartId,
   allPoints,
   gpuKeys,
+  hidden,
+  setHidden,
   yLabel,
   yScaleType,
   locale,
+  percent,
   colors,
   theme,
+  caption,
+  footer,
 }: {
   chartId: string;
   allPoints: ChartPoint[];
   gpuKeys: readonly string[];
+  hidden: ReadonlySet<string>;
+  setHidden: (hidden: ReadonlySet<string>) => void;
   yLabel: string;
   yScaleType: 'log' | 'linear';
   locale: Locale;
+  percent: boolean;
   colors: Record<string, string>;
   theme: 'light' | 'dark';
+  caption: ReactNode;
+  footer: ReactNode;
 }) {
   const t = STRINGS[locale];
+  const [legendExpanded, setLegendExpanded] = useState(true);
+  const visiblePoints = useMemo(
+    () => allPoints.filter((p) => !hidden.has(p.gpuKey)),
+    [allPoints, hidden],
+  );
 
   const lines = useMemo(() => {
     const result: Record<string, { x: number; y: number }[]> = {};
     for (const key of gpuKeys) {
-      const pts = allPoints
+      const pts = visiblePoints
         .filter((p) => p.gpuKey === key)
         .sort((a, b) => a.x - b.x)
         .map((p) => ({ x: p.x, y: p.y }));
       if (pts.length > 0) result[key] = pts;
     }
     return result;
-  }, [allPoints, gpuKeys]);
+  }, [visiblePoints, gpuKeys]);
 
   const xDomain = useMemo<[number, number]>(() => {
     const xs = allPoints.map((p) => p.x);
     return [d3.min(xs) ?? 1, d3.max(xs) ?? 1];
   }, [allPoints]);
 
-  const yDomain = useMemo<[number, number]>(
-    () => paddedDomain(allPoints.map((p) => p.y)),
-    [allPoints],
-  );
+  const yDomain = useMemo<[number, number]>(() => {
+    const ys = visiblePoints.map((p) => p.y);
+    return percent ? [0, Math.max(100, d3.max(ys) ?? 0)] : paddedDomain(ys);
+  }, [visiblePoints, percent]);
 
   const yTickValues = useMemo(() => {
     if (yScaleType !== 'log') return undefined;
@@ -252,94 +269,140 @@ function UbenchxChart({
     return ticks;
   }, [yScaleType, yDomain]);
 
-  const xTickValues = useMemo(() => sizeAxisTicks(...xDomain), [xDomain]);
+  const isMobile = useIsMobileViewport();
+  const xTickValues = useMemo(
+    () => sizeAxisTicks(...xDomain, isMobile ? 4 : 7),
+    [xDomain, isMobile],
+  );
+
+  const toggleGpu = (key: string) => {
+    const next = new Set(hidden);
+    if (!next.delete(key)) next.add(key);
+    setHidden(next);
+    track('ubenchx_gpu_toggled', { gpu: key });
+  };
 
   return (
-    <D3Chart<ChartPoint>
+    <ChartSection
       chartId={chartId}
-      displayIdentity={theme}
-      data={allPoints}
-      height={440}
-      margin={{ top: 24, right: 20, bottom: 62, left: 78 }}
-      watermark="logo"
-      grabCursor
-      instructions={t.instructions}
-      xScale={{ type: 'log', domain: xDomain, nice: false }}
-      yScale={{ type: yScaleType, domain: yDomain, nice: yScaleType === 'linear' }}
-      xAxis={{
-        label: t.xAxis,
-        tickCount: 8,
-        tickValues: xTickValues,
-        tickFormat: (value) => formatBytes(Number(value)),
-      }}
-      yAxis={{
-        label: yLabel,
-        tickCount: 6,
-        tickValues: yTickValues,
-        tickFormat: (value) => {
-          const v = Number(value);
-          if (v === 0) return '0';
-          if (v >= 1000) return `${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}k`;
-          if (v >= 1) return v.toFixed(v >= 100 ? 0 : v >= 10 ? 1 : 2);
-          return String(Number(v.toPrecision(2)));
-        },
-      }}
-      layers={[
-        {
-          type: 'line',
-          key: `ubenchx-line-${chartId}`,
-          lines,
-          config: {
-            getColor: (key) => colors[key] ?? '#888',
-            strokeWidth: 2.25,
-            curve: d3.curveMonotoneX,
+      analyticsPrefix="ubenchx"
+      zoomResetEvent={`ubenchx_zoom_reset_${chartId}`}
+      setIsLegendExpanded={setLegendExpanded}
+      exportFileName={`InferenceX_${chartId}`}
+    >
+      <D3Chart<ChartPoint>
+        chartId={chartId}
+        caption={caption}
+        footer={footer}
+        displayIdentity={theme}
+        data={visiblePoints}
+        height={440}
+        margin={{ top: 24, right: 20, bottom: 62, left: 78 }}
+        watermark="logo"
+        grabCursor
+        instructions={t.instructions}
+        xScale={{ type: 'log', domain: xDomain, nice: false }}
+        yScale={{
+          type: yScaleType,
+          domain: yDomain,
+          nice: yScaleType === 'linear' && !percent,
+        }}
+        xAxis={{
+          label: t.xAxis,
+          tickCount: 8,
+          tickValues: xTickValues,
+          tickFormat: (value) => formatBytes(Number(value)),
+        }}
+        yAxis={{
+          label: yLabel,
+          tickCount: 6,
+          tickValues: yTickValues,
+          tickFormat: (value) => {
+            const v = Number(value);
+            if (v === 0) return '0';
+            if (v >= 1000) return `${Number((v / 1000).toFixed(v >= 10000 ? 0 : 1))}k`;
+            if (v >= 1) return String(Number(v.toFixed(v >= 100 ? 0 : v >= 10 ? 1 : 2)));
+            return String(Number(v.toPrecision(2)));
           },
-        },
-        {
-          type: 'point',
-          key: `ubenchx-points-${chartId}`,
-          data: allPoints,
-          config: {
-            getCx: () => 0,
-            getCy: () => 0,
-            getX: (point) => point.x,
-            getY: (point) => point.y,
-            getColor: (point) => colors[point.gpuKey] ?? '#888',
-            getRadius: () => 3.5,
-            stroke: 'var(--background)',
-            strokeWidth: 1,
-            keyFn: (point) => `${point.gpuKey}-${point.bytes}`,
-            maxPoints: Infinity,
+        }}
+        layers={[
+          {
+            type: 'line',
+            key: `ubenchx-line-${chartId}`,
+            lines,
+            config: {
+              getColor: (key) => colors[key] ?? '#888',
+              strokeWidth: 2.25,
+              curve: d3.curveMonotoneX,
+            },
           },
-        },
-      ]}
-      zoom={{
-        enabled: true,
-        resetEventName: `ubenchx_zoom_reset_${chartId}`,
-      }}
-      tooltip={{
-        rulerType: 'crosshair',
-        getRulerX: (point, scale) => (scale as d3.ScaleLogarithmic<number, number>)(point.x),
-        getRulerY: (point, scale) => scale(point.y),
-        attachToLayer: 1,
-        content: (point, isPinned) => formatTooltip(point, isPinned, STRINGS[locale], colors),
-      }}
-    />
+          {
+            type: 'point',
+            key: `ubenchx-points-${chartId}`,
+            data: visiblePoints,
+            config: {
+              getCx: () => 0,
+              getCy: () => 0,
+              getX: (point) => point.x,
+              getY: (point) => point.y,
+              getColor: (point) => colors[point.gpuKey] ?? '#888',
+              getRadius: () => 3.5,
+              stroke: 'var(--background)',
+              strokeWidth: 1,
+              keyFn: (point) => `${point.gpuKey}-${point.bytes}`,
+              maxPoints: Infinity,
+            },
+          },
+        ]}
+        zoom={{
+          enabled: true,
+          resetEventName: `ubenchx_zoom_reset_${chartId}`,
+        }}
+        tooltip={{
+          rulerType: 'crosshair',
+          getRulerX: (point, scale) => (scale as d3.ScaleLogarithmic<number, number>)(point.x),
+          getRulerY: (point, scale) => scale(point.y),
+          attachToLayer: 1,
+          content: (point, isPinned) => formatTooltip(point, isPinned, STRINGS[locale], colors),
+        }}
+        legendElement={
+          <ChartLegend
+            variant="sidebar"
+            isLegendExpanded={legendExpanded}
+            onExpandedChange={setLegendExpanded}
+            legendItems={gpuKeys.map((key) => ({
+              name: key,
+              label: key,
+              color: colors[key] ?? '#888',
+              lineDasharray: 'none',
+              isActive: !hidden.has(key),
+              onClick: toggleGpu,
+            }))}
+            onItemRemove={toggleGpu}
+            reset={{
+              id: 'ubenchx-reset-filter',
+              disabled: hidden.size === 0,
+              onClick: () => {
+                setHidden(new Set());
+                track('ubenchx_legend_filter_reset');
+              },
+            }}
+          />
+        }
+      />
+    </ChartSection>
   );
 }
 
 export function UbenchxContent() {
-  const theme = isDarkTheme(useTheme().resolvedTheme) ? 'dark' : 'light';
-  const colors = useMemo(
-    () => ({
-      ...GPU_COLORS,
-      ...generateVendorColors(
-        UBENCHX_GPU_KEYS.filter((key) => getVendor(key) === 'huawei'),
-        theme,
-      ),
-    }),
-    [theme],
+  const { resolvedTheme } = useTheme();
+  const hydrated = useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => false,
   );
+  const theme = hydrated && isDarkTheme(resolvedTheme) ? 'dark' : 'light';
+  const colors = useMemo(() => ubenchxColors(theme), [theme]);
   const locale = useLocale();
   const t = STRINGS[locale];
 
@@ -353,101 +416,164 @@ export function UbenchxContent() {
 
   const [metricKey, setMetricKey] = useState<ChartType>('mbu');
   const metric = Y_METRICS.find((m) => m.key === metricKey) ?? Y_METRICS[0];
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
 
   const points = useMemo(
     () => viewResults.flatMap((r) => makePoints(r.rows, metric.key, r.gpu, r.peakBandwidthGbps)),
     [viewResults, metric.key],
   );
 
+  const hub = (
+    <UbenchxHub
+      current="mem-bw"
+      chartControls={
+        <div className="flex min-w-0 flex-col space-y-1.5">
+          <LabelWithTooltip
+            htmlFor="ubenchx-metric-select"
+            label={t.yMetric}
+            tooltip={t.yMetricTooltip}
+          />
+          <Select
+            value={metric.key}
+            onValueChange={(value) => {
+              setMetricKey(value as ChartType);
+              track('ubenchx_metric_changed', { metric: value });
+            }}
+          >
+            <SelectTrigger
+              id="ubenchx-metric-select"
+              className="w-full"
+              data-testid="ubenchx-metric-select"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Y_METRICS.map((m) => (
+                <SelectItem key={m.key} value={m.key}>
+                  {t[m.label]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      }
+    />
+  );
+
   if (viewResults.length === 0) {
-    return <p className="text-sm text-muted-foreground">No data available.</p>;
+    return (
+      <div className="flex flex-col gap-4">
+        {hub}
+        <p className="text-sm text-muted-foreground">No data available</p>
+      </div>
+    );
   }
 
   const gpuKeys = viewResults.map((r) => r.gpu);
 
   const sourceUrls = [...new Set(viewResults.map((r) => r.metadata.sourceUrl))];
+  const specHeaders = [t.device, t.hardware, t.driver, 'PyTorch', t.runtime, t.container, t.peak];
 
   return (
-    <div className="space-y-8" role="group" aria-label={t.aria}>
-      <div>
-        <h2 className="text-xl font-semibold tracking-tight">{t.pageTitle}</h2>
-        <p className="text-sm text-muted-foreground mt-1">{t.pageSubtitle}</p>
-        <p className="text-sm text-muted-foreground mt-2">{t.protocolNote}</p>
-      </div>
+    <div className="flex flex-col gap-4" role="group" aria-label={t.aria}>
+      {hub}
 
-      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
-        <label
-          htmlFor="ubenchx-metric-select"
-          className="text-sm font-medium text-muted-foreground"
-        >
-          {t.yMetric}
-        </label>
-        <Select
-          value={metric.key}
-          onValueChange={(value) => {
-            setMetricKey(value as ChartType);
-            track('ubenchx_metric_changed', { metric: value });
-          }}
-        >
-          <SelectTrigger
-            id="ubenchx-metric-select"
-            className="w-full sm:w-[240px]"
-            data-testid="ubenchx-metric-select"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Y_METRICS.map((m) => (
-              <SelectItem key={m.key} value={m.key}>
-                {t[m.label]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <GpuLegend gpuKeys={gpuKeys} colors={colors} />
-
-      <section>
-        <h2 className="text-lg font-semibold mb-2">{t[metric.title]}</h2>
-        {metric.key === 'mbu' && <p className="text-xs text-muted-foreground mb-1">{t.peakNote}</p>}
-        <UbenchxChart
-          key={metric.key}
-          chartId={`ubenchx-${metric.key}`}
-          allPoints={points}
-          gpuKeys={gpuKeys}
-          yLabel={t[metric.label]}
-          yScaleType={metric.scale}
-          locale={locale}
-          colors={colors}
-          theme={theme}
-        />
-      </section>
-
-      <section className="text-xs text-muted-foreground space-y-1">
-        <h3 className="text-sm font-semibold">{t.methodology}</h3>
-        <p>{t.methodologyText}</p>
-        <p>{t.huaweiMethodology}</p>
-        <p>{t.huaweiReference}</p>
-        {viewResults.map((r) => (
-          <p key={r.gpu}>
-            <strong>{r.gpu}:</strong> {r.metadata.gpu} | Driver: {r.metadata.driver} | PyTorch:{' '}
-            {r.metadata.torch} |{' '}
-            {r.metadata.cann
-              ? `CANN: ${r.metadata.cann} | torch_npu: ${r.metadata.torchNpu}`
-              : `Triton: ${r.metadata.triton} | Container: ${r.metadata.container}`}{' '}
-            |{r.peakBandwidthGbps / 1000} TB/s
-          </p>
-        ))}
-        {sourceUrls.map((url) => (
-          <p key={url}>
-            {t.source}:{' '}
-            <a href={url} target="_blank" rel="noopener noreferrer" className="underline">
-              {url}
-            </a>
-          </p>
-        ))}
-      </section>
+      <UbenchxChart
+        key={metric.key}
+        chartId={`ubenchx-${metric.key}`}
+        allPoints={points}
+        gpuKeys={gpuKeys}
+        hidden={hidden}
+        setHidden={setHidden}
+        yLabel={t[metric.label]}
+        yScaleType={metric.scale}
+        locale={locale}
+        percent={metric.key === 'mbu'}
+        colors={colors}
+        theme={theme}
+        caption={
+          <div className="md:pr-24">
+            <Heading as="h2" level="card">
+              {t[metric.title]}
+              {metric.key === 'mbu' && <HeadingQualifier>{t.peakNote}</HeadingQualifier>}
+            </Heading>
+          </div>
+        }
+        footer={
+          <div className="mt-3">
+            <ResultContext locale={locale} layout="footer" source="SemiAnalysis InferenceX™" />
+            <div className="mt-3 max-w-[80ch] space-y-1.5 text-xs leading-5 text-muted-foreground">
+              <p>{t.protocolNote}</p>
+              <h3 className="pt-1.5 font-medium text-foreground">{t.methodology}</h3>
+              <p>{t.methodologyText}</p>
+              <p>{t.huaweiMethodology}</p>
+              <p>{t.huaweiReference}</p>
+            </div>
+            <div className="mt-3 overflow-x-auto" data-testid="ubenchx-device-specs">
+              <table className="w-full text-left text-xs text-muted-foreground tabular-nums">
+                <thead>
+                  <tr className={TABLE_HEAD_ROW_STYLE}>
+                    {specHeaders.map((header, index) => (
+                      <th
+                        key={header}
+                        scope="col"
+                        className={`${TABLE_HEAD_CELL_STYLE} py-1.5 ${index === specHeaders.length - 1 ? 'text-right' : 'pr-4'}`}
+                      >
+                        {header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {viewResults.map((r) => (
+                    <tr key={r.gpu} className="border-b border-border/30 last:border-b-0">
+                      <th
+                        scope="row"
+                        className="py-1.5 pr-4 font-medium whitespace-nowrap text-foreground"
+                      >
+                        {r.gpu}
+                      </th>
+                      <td className="py-1.5 pr-4 whitespace-nowrap">{r.metadata.gpu}</td>
+                      <td className="py-1.5 pr-4 whitespace-nowrap">{r.metadata.driver}</td>
+                      <td className="py-1.5 pr-4 whitespace-nowrap">{r.metadata.torch}</td>
+                      <td className="py-1.5 pr-4 whitespace-nowrap">
+                        {r.metadata.cann
+                          ? `CANN ${r.metadata.cann} · torch_npu ${r.metadata.torchNpu}`
+                          : `Triton ${r.metadata.triton}`}
+                      </td>
+                      <td className="min-w-64 py-1.5 pr-4 break-all">
+                        {r.metadata.cann ? '—' : r.metadata.container}
+                      </td>
+                      <td className="py-1.5 text-right whitespace-nowrap">
+                        {(r.peakBandwidthGbps / 1000).toFixed(2)} TB/s
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              {t.sources}
+              {sourceUrls.map((url, index) => {
+                const name = url.slice(url.lastIndexOf('/') + 1);
+                return (
+                  <span key={url}>
+                    {index > 0 && ' · '}
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={sourceLinkClassName}
+                    >
+                      {url.includes('/pull/') ? `PR #${name}` : name}
+                    </a>
+                  </span>
+                );
+              })}
+            </p>
+          </div>
+        }
+      />
     </div>
   );
 }

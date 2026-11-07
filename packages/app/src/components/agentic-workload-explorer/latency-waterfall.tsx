@@ -5,6 +5,9 @@ import { formatDuration } from '@/lib/agentic-workload-explorer/format';
 import { type StatRow } from '@/lib/agentic-workload-explorer/stat-rows';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { Button } from '@/components/ui/button';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 
 const COLORS = {
   prefill: '#0ea5e9',
@@ -14,12 +17,12 @@ const COLORS = {
 
 const STRINGS = {
   en: {
-    latencyDecomposition: 'Latency Decomposition',
+    latencyDecomposition: 'Latency decomposition',
     prefill: 'Prefill (TTFT)',
     decode: 'Decode',
     undecomposed: 'Undecomposed',
-    expandAll: 'Expand All',
-    collapseAll: 'Collapse All',
+    expandAll: 'Expand all',
+    collapseAll: 'Collapse all',
     noData: 'No request data available',
     e2e: 'E2E',
     outputTokens: 'output tokens',
@@ -35,7 +38,7 @@ const STRINGS = {
     collapseAll: '全部收起',
     noData: '暂无请求数据',
     e2e: '端到端',
-    outputTokens: 'output tokens',
+    outputTokens: '输出 token',
     turnLabel: (n: number) => `轮次 ${n}`,
     reqLabel: (n: number) => `请求 ${n}`,
   },
@@ -80,7 +83,6 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
     return all;
   });
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
 
@@ -197,15 +199,12 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
   const svgHeight = visibleRows.length * (ROW_HEIGHT + ROW_GAP) + ROW_GAP;
 
   const handleMouseMove = useCallback((e: React.MouseEvent, row: (typeof visibleRows)[number]) => {
-    const svgEl = svgRef.current;
-    if (!svgEl) return;
-    const rect = svgEl.getBoundingClientRect();
     const canDecompose = row.ttftMs !== null && row.ttftMs > 0 && row.durationMs > 0;
     const prefillMs = canDecompose ? row.ttftMs! : 0;
     const decodeMs = canDecompose ? row.durationMs - row.ttftMs! : 0;
     setTooltip({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x: e.clientX,
+      y: e.clientY,
       prefillMs,
       decodeMs,
       totalMs: row.durationMs,
@@ -233,13 +232,13 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
     <div className="space-y-4">
       <div className="space-y-2">
         <div className="flex items-center gap-3">
-          <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
+          <span className="text-xs font-medium text-muted-foreground">
             {t.latencyDecomposition}
           </span>
-          <div className="flex-1 h-px bg-border" />
+          <div className="flex-1 h-px bg-border/30" />
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           {legendItems(t).map((item) => (
             <div key={item.key} className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.color }} />
@@ -247,21 +246,13 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
             </div>
           ))}
           {subagentGroupTurns.length > 0 && (
-            <div className="flex items-center gap-1 ml-auto">
-              <button
-                type="button"
-                onClick={expandAll}
-                className="text-3xs font-mono text-subtle hover:text-foreground px-1.5 py-0.5 border border-border rounded hover:bg-surface-hover transition-colors"
-              >
+            <div className="ml-auto flex items-center gap-2">
+              <Button type="button" variant="outline" size="xs" onClick={expandAll}>
                 {t.expandAll}
-              </button>
-              <button
-                type="button"
-                onClick={collapseAll}
-                className="text-3xs font-mono text-subtle hover:text-foreground px-1.5 py-0.5 border border-border rounded hover:bg-surface-hover transition-colors"
-              >
+              </Button>
+              <Button type="button" variant="outline" size="xs" onClick={collapseAll}>
                 {t.collapseAll}
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -269,9 +260,9 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
 
       <div
         ref={containerRef}
-        className="bg-surface border border-border rounded-md p-4 overflow-x-auto relative"
+        className="bg-card border border-border/30 rounded-xl p-4 overflow-x-auto relative"
       >
-        <svg ref={svgRef} width={containerWidth - 32} height={svgHeight} className="block">
+        <svg width={containerWidth - 32} height={svgHeight} className="block">
           {visibleRows.map((row, idx) => {
             const y = idx * (ROW_HEIGHT + ROW_GAP) + ROW_GAP;
             const scale = barWidth > 0 ? barWidth / maxDuration : 0;
@@ -366,7 +357,7 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
                   x={barX + barWidth + 8}
                   y={y + ROW_HEIGHT / 2}
                   dominantBaseline="central"
-                  className="fill-current text-subtle"
+                  className="fill-current text-muted-foreground"
                   style={{
                     fontSize: '10px',
                     fontFamily: 'var(--font-mono, ui-monospace, monospace)',
@@ -384,62 +375,40 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
         </svg>
 
         {tooltip && (
-          <div
-            className="absolute pointer-events-none z-50 bg-background border border-border rounded-md shadow-lg px-3 py-2 space-y-1"
-            style={{
-              left: Math.min(tooltip.x + 12, containerWidth - 220),
-              top: tooltip.y - 8,
-              transform: 'translateY(-100%)',
-            }}
-          >
-            <div className="text-2xs font-mono font-medium text-foreground">{tooltip.label}</div>
-            <div className="text-3xs font-mono text-muted-foreground space-y-0.5">
-              {tooltip.canDecompose ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-2 h-2 rounded-sm inline-block"
-                      style={{ backgroundColor: COLORS.prefill }}
-                    />
-                    <span>
-                      {t.prefill}: {formatDuration(tooltip.prefillMs)} (
-                      {((tooltip.prefillMs / tooltip.totalMs) * 100).toFixed(0)}%)
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-2 h-2 rounded-sm inline-block"
-                      style={{ backgroundColor: COLORS.decode }}
-                    />
-                    <span>
-                      {t.decode}: {formatDuration(tooltip.decodeMs)} (
-                      {((tooltip.decodeMs / tooltip.totalMs) * 100).toFixed(0)}%)
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-2 h-2 rounded-sm inline-block"
-                    style={{ backgroundColor: COLORS.undecomposed }}
-                  />
-                  <span>
-                    {t.undecomposed}: {formatDuration(tooltip.totalMs)}
-                  </span>
-                </div>
-              )}
-              <div className="pt-1 border-t border-border">
-                {t.e2e}: {formatDuration(tooltip.totalMs)}
-                {tooltip.tpotMs !== null && <> &middot; TPOT: {tooltip.tpotMs.toFixed(1)}ms/tok</>}
-                {tooltip.outputTokens > 0 && (
-                  <>
-                    {' '}
-                    &middot; {tooltip.outputTokens} {t.outputTokens}
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
+          <FloatingTooltip x={tooltip.x} y={tooltip.y} placement="above">
+            <ChartHoverCardBody
+              title={tooltip.label}
+              metrics={
+                tooltip.canDecompose
+                  ? [
+                      {
+                        value: formatDuration(tooltip.prefillMs),
+                        label: `${t.prefill} · ${((tooltip.prefillMs / tooltip.totalMs) * 100).toFixed(0)}%`,
+                        color: COLORS.prefill,
+                      },
+                      {
+                        value: formatDuration(tooltip.decodeMs),
+                        label: `${t.decode} · ${((tooltip.decodeMs / tooltip.totalMs) * 100).toFixed(0)}%`,
+                        color: COLORS.decode,
+                      },
+                    ]
+                  : [
+                      {
+                        value: formatDuration(tooltip.totalMs),
+                        label: t.undecomposed,
+                        color: COLORS.undecomposed,
+                      },
+                    ]
+              }
+              summary={[
+                `${t.e2e}: ${formatDuration(tooltip.totalMs)}`,
+                tooltip.tpotMs === null ? null : `TPOT: ${tooltip.tpotMs.toFixed(1)}ms/tok`,
+                tooltip.outputTokens > 0 ? `${tooltip.outputTokens} ${t.outputTokens}` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            />
+          </FloatingTooltip>
         )}
       </div>
     </div>

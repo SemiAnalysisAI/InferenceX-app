@@ -23,7 +23,7 @@ const unlockPointerEvents = () => {
 
 describe('GLM-5.3-Flash registration without published observations', () => {
   for (const locale of ['', '/zh']) {
-    it(`keeps ${locale}/inference/glm-5-3-flash distinct at 1280px`, () => {
+    it(`keeps ${locale}/infx/inference/glm-5-3-flash distinct at 1280px`, () => {
       cy.viewport(1280, 900);
       cy.intercept('GET', '/api/v1/availability/compact', { body: availabilityBody([]) });
       cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
@@ -32,7 +32,7 @@ describe('GLM-5.3-Flash registration without published observations', () => {
         }
         request.reply({ body: [] });
       });
-      cy.visit(`${locale}/inference/kimi-k3`, {
+      cy.visit(`${locale}/infx/inference/kimi-k3`, {
         onBeforeLoad(win) {
           visitOptions.onBeforeLoad(win);
           win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
@@ -43,13 +43,13 @@ describe('GLM-5.3-Flash registration without published observations', () => {
       cy.wait('@flashBenchmarks');
       cy.get('[data-testid="model-selector"]').should('contain.text', 'GLM 5.3 Flash');
       cy.get('[data-testid="inference-page-heading"]').should('contain.text', 'GLM');
-      cy.location('pathname').should('eq', `${locale}/inference/glm-5-3-flash`);
+      cy.location('pathname').should('eq', `${locale}/infx/inference/glm-5-3-flash`);
       cy.get('[data-testid="inference-chart"] [data-layer="scatter"] circle').should('not.exist');
       cy.get('[data-testid="model-architecture-link"]').should('not.exist');
       cy.reload();
       cy.get('[data-testid="model-selector"]').should('contain.text', 'GLM 5.3 Flash');
       cy.get('[data-testid="model-architecture-link"]').should('not.exist');
-      cy.location('pathname').should('eq', `${locale}/inference/glm-5-3-flash`);
+      cy.location('pathname').should('eq', `${locale}/infx/inference/glm-5-3-flash`);
       cy.window().then((win) => {
         win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
         win.dispatchEvent(new win.Event('inferencex:feature-gate:locked'));
@@ -60,7 +60,10 @@ describe('GLM-5.3-Flash registration without published observations', () => {
   }
 
   for (const locale of ['', '/zh']) {
-    for (const route of ['/inference/glm-5-3-flash', '/inference?g_model=GLM-5.3-Flash']) {
+    for (const route of [
+      '/infx/inference/glm-5-3-flash',
+      '/infx/inference?g_model=GLM-5.3-Flash',
+    ]) {
       it(`requests only Flash from the first unlocked ${locale}${route} render and reload`, () => {
         const requestedModels: (string | null)[] = [];
         cy.intercept('GET', '/api/v1/availability/compact', { body: availabilityBody([]) });
@@ -79,7 +82,7 @@ describe('GLM-5.3-Flash registration without published observations', () => {
           },
         });
         cy.wait('@initialFlashBenchmarks');
-        cy.location('pathname').should('eq', `${locale}/inference/glm-5-3-flash`);
+        cy.location('pathname').should('eq', `${locale}/infx/inference/glm-5-3-flash`);
         cy.get('[data-testid="model-selector"]').should('contain.text', 'GLM 5.3 Flash');
         cy.reload();
         cy.wait('@initialFlashBenchmarks');
@@ -108,7 +111,7 @@ describe('GLM-5.3-Flash registration without published observations', () => {
       });
       cy.intercept('GET', '/api/v1/availability/compact', { body: availabilityBody([]) });
       cy.intercept('GET', '/api/v1/benchmarks*', { body: [] });
-      cy.visit(`${locale}/inference?unofficialrun=38825822770`, {
+      cy.visit(`${locale}/infx/inference?unofficialrun=38825822770`, {
         onBeforeLoad(win) {
           visitOptions.onBeforeLoad(win);
           win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
@@ -152,14 +155,14 @@ describe('GLM-5.3-Flash registration without published observations', () => {
           win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
         },
       };
-      cy.visit(`${locale}/inference/glm-5-3-flash`, locked);
-      cy.location('pathname').should('eq', `${locale}/inference/deepseek-v41-flash`);
+      cy.visit(`${locale}/infx/inference/glm-5-3-flash`, locked);
+      cy.location('pathname').should('eq', `${locale}/infx/inference/deepseek-v41-flash`);
       cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4.1 Flash');
       cy.get('[data-testid="model-selector"]').click();
       cy.contains('[role="option"]', 'GLM 5.3 Flash').should('not.exist');
       cy.get('body').type('{esc}');
-      cy.visit(`${locale}/inference?g_model=GLM-5.3-Flash`, locked);
-      cy.location('pathname').should('eq', `${locale}/inference/deepseek-v41-flash`);
+      cy.visit(`${locale}/infx/inference?g_model=GLM-5.3-Flash`, locked);
+      cy.location('pathname').should('eq', `${locale}/infx/inference/deepseek-v41-flash`);
       cy.get('[data-testid="model-selector"]').should('not.contain.text', 'GLM 5.3 Flash');
     });
   }
@@ -167,18 +170,18 @@ describe('GLM-5.3-Flash registration without published observations', () => {
 
 describe('Per-model dashboard routes', () => {
   for (const locale of ['', '/zh']) {
-    it(`retains an explicit legacy model across ${locale}/evaluation`, () => {
-      cy.visit(`${locale}/inference/deepseek-v4`, visitOptions);
+    it(`retains an explicit legacy model across ${locale}/infx/evaluation`, () => {
+      cy.visit(`${locale}/infx/inference/deepseek-v4`, visitOptions);
       cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4 Pro');
       cy.get('[data-testid="tab-trigger-evaluation"]').click();
-      cy.location('pathname').should('eq', `${locale}/evaluation`);
+      cy.location('pathname').should('eq', `${locale}/infx/evaluation`);
       cy.get('[data-testid="tab-trigger-inference"]')
-        .should('have.attr', 'href', `${locale}/inference?g_model=DeepSeek-V4-Pro`)
+        .should('have.attr', 'href', `${locale}/infx/inference?g_model=DeepSeek-V4-Pro`)
         .click();
       cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4 Pro');
     });
 
-    it(`renders DeepSeek V4.1 Flash chart data from bare ${locale}/inference`, () => {
+    it(`renders DeepSeek V4.1 Flash chart data from bare ${locale}/infx/inference`, () => {
       cy.intercept('GET', '/api/v1/availability/compact', {
         body: availabilityBody(
           modelSelectionAvailability
@@ -194,25 +197,27 @@ describe('Per-model dashboard routes', () => {
             .map((row) => ({ ...row, model: 'dsv41flash' })),
         });
       });
-      cy.visit(`${locale}/inference`, visitOptions);
-      cy.location('pathname').should('eq', `${locale}/inference/deepseek-v41-flash`);
+      cy.visit(`${locale}/infx/inference`, visitOptions);
+      cy.location('pathname').should('eq', `${locale}/infx/inference/deepseek-v41-flash`);
       cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4.1 Flash');
       cy.scatterPoints().should('have.length.greaterThan', 0);
     });
 
-    it(`opens bare ${locale}/inference on DeepSeek V4.1 Flash without dropping shared filters`, () => {
+    it(`opens bare ${locale}/infx/inference on DeepSeek V4.1 Flash without dropping shared filters`, () => {
       const query = '?i_seq=agentic-traces&i_prec=fp4&utm_source=default-model-test';
-      cy.request({ url: `${locale}/inference${query}`, followRedirect: false }).then((response) => {
-        expect(response.status).to.eq(307);
-        const destination = new URL(
-          String(response.headers.location),
-          String(Cypress.config('baseUrl')),
-        );
-        expect(destination.pathname).to.eq(`${locale}/inference/deepseek-v41-flash`);
-        expect(destination.search).to.eq(query);
-      });
-      cy.visit(`${locale}/inference${query}`, visitOptions);
-      cy.location('pathname').should('eq', `${locale}/inference/deepseek-v41-flash`);
+      cy.request({ url: `${locale}/infx/inference${query}`, followRedirect: false }).then(
+        (response) => {
+          expect(response.status).to.eq(307);
+          const destination = new URL(
+            String(response.headers.location),
+            String(Cypress.config('baseUrl')),
+          );
+          expect(destination.pathname).to.eq(`${locale}/infx/inference/deepseek-v41-flash`);
+          expect(destination.search).to.eq(query);
+        },
+      );
+      cy.visit(`${locale}/infx/inference${query}`, visitOptions);
+      cy.location('pathname').should('eq', `${locale}/infx/inference/deepseek-v41-flash`);
       cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4.1 Flash');
       cy.get('[data-testid="inference-page-heading"]').should(
         'contain.text',
@@ -220,16 +225,16 @@ describe('Per-model dashboard routes', () => {
       );
     });
 
-    it(`retains the current model when navigating from ${locale}/evaluation`, () => {
-      cy.visit(`${locale}/evaluation`, visitOptions);
+    it(`retains the current model when navigating from ${locale}/infx/evaluation`, () => {
+      cy.visit(`${locale}/infx/evaluation`, visitOptions);
       cy.get('[data-testid="tab-trigger-inference"]').click();
-      cy.location('pathname').should('eq', `${locale}/inference`);
+      cy.location('pathname').should('eq', `${locale}/infx/inference`);
       cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4 Pro');
     });
   }
 
-  it('seeds /historical/<slug> to the routed model and rewrites the URL on switch without a reload', () => {
-    cy.visit('/historical/minimax-m3', visitOptions);
+  it('seeds /infx/historical/<slug> to the routed model and rewrites the URL on switch without a reload', () => {
+    cy.visit('/infx/historical/minimax-m3', visitOptions);
     cy.get('[data-testid="historical-trends-display"]').should('be.visible');
     cy.get('[data-testid="model-selector"]').should('contain.text', 'MiniMax');
 
@@ -240,34 +245,34 @@ describe('Per-model dashboard routes', () => {
     cy.get('[data-testid="model-selector"]').click();
     cy.get('[role="option"]').not('[aria-selected="true"]').first().click();
 
-    cy.location('pathname').should('not.eq', '/historical/minimax-m3');
-    cy.location('pathname').should('match', /^\/historical\/[a-z0-9-]+$/u);
+    cy.location('pathname').should('not.eq', '/infx/historical/minimax-m3');
+    cy.location('pathname').should('match', /^\/infx\/historical\/[a-z0-9-]+$/u);
     cy.window().its('__modelRouteNoReloadMarker').should('eq', true);
   });
 
   it('moves from the bare tab path to a slugged path when a non-default model is chosen', () => {
-    cy.visit('/historical', visitOptions);
+    cy.visit('/infx/historical', visitOptions);
     cy.get('[data-testid="historical-trends-display"]').should('be.visible');
     unlockPointerEvents();
     cy.get('[data-testid="model-selector"]').click();
     cy.get('[role="option"]').not('[aria-selected="true"]').first().click();
-    cy.location('pathname').should('match', /^\/historical\/[a-z0-9-]+$/u);
+    cy.location('pathname').should('match', /^\/infx\/historical\/[a-z0-9-]+$/u);
   });
 
   it('redirects alias slugs to the canonical model slug, keeping share-link params', () => {
-    cy.visit('/calculator/kimi?i_seq=8k%2F1k', visitOptions);
-    cy.location('pathname').should('eq', '/calculator/kimi-k26');
+    cy.visit('/infx/calculator/kimi?i_seq=8k%2F1k', visitOptions);
+    cy.location('pathname').should('eq', '/infx/calculator/kimi-k26');
     cy.location('search').should('contain', 'i_seq=8k%2F1k');
   });
 
   it('language toggle follows the in-place rewritten per-model path', () => {
-    cy.visit('/historical/minimax-m3', visitOptions);
+    cy.visit('/infx/historical/minimax-m3', visitOptions);
     cy.get('[data-testid="historical-trends-display"]').should('be.visible');
     unlockPointerEvents();
     cy.get('[data-testid="model-selector"]').click();
     cy.get('[role="option"]').not('[aria-selected="true"]').first().click();
     cy.location('pathname')
-      .should('match', /^\/historical\/[a-z0-9-]+$/u)
+      .should('match', /^\/infx\/historical\/[a-z0-9-]+$/u)
       .then((rewritten) => {
         cy.get('[data-testid="language-toggle"]').click();
         cy.location('pathname').should('eq', `/zh${rewritten}`);
@@ -275,13 +280,13 @@ describe('Per-model dashboard routes', () => {
   });
 
   it('returns 404 for unknown model slugs', () => {
-    cy.request({ url: '/historical/not-a-model', failOnStatusCode: false })
+    cy.request({ url: '/infx/historical/not-a-model', failOnStatusCode: false })
       .its('status')
       .should('eq', 404);
   });
 
   it('renders the /zh sibling with a model-specific Chinese intro', () => {
-    cy.visit('/zh/historical/minimax-m3', visitOptions);
+    cy.visit('/zh/infx/historical/minimax-m3', visitOptions);
     cy.get('[data-testid="zh-tab-intro"]').should('be.visible').and('contain.text', 'MiniMax M3');
     cy.get('[data-testid="historical-trends-display"]').should('be.visible');
     cy.get('[data-testid="historical-trends-display"]').then(([display]) => {
@@ -326,7 +331,7 @@ function expectBestPerSku(enabled: boolean) {
   cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
 }
 
-function visitModel(model: string, extra = '', path = '/inference') {
+function visitModel(model: string, extra = '', path = '/infx/inference') {
   cy.intercept('GET', '/api/v1/availability/compact', {
     body: availabilityBody(modelSelectionAvailability),
   });
@@ -363,7 +368,7 @@ describe('Inference model presentation', () => {
         ),
       });
       cy.visit(
-        `${locale}/inference/kimi-k3?i_seq=agentic-traces&i_xmode=interactivity#benchmark`,
+        `${locale}/infx/inference/kimi-k3?i_seq=agentic-traces&i_xmode=interactivity#benchmark`,
         visitOptions,
       );
       cy.window().then((win) => {
@@ -380,7 +385,7 @@ describe('Inference model presentation', () => {
         cy.get('meta[name="twitter:description"]')
           .should('have.attr', 'content')
           .and('contain', name);
-        const path = `${locale}/inference/${slug}`;
+        const path = `${locale}/infx/inference/${slug}`;
         cy.location('pathname').should('eq', path);
         cy.get('link[rel="canonical"]').should(
           'have.attr',
@@ -395,7 +400,7 @@ describe('Inference model presentation', () => {
         cy.get('link[hreflang="zh-CN"]').should(
           'have.attr',
           'href',
-          `https://inferencex.semianalysis.com/zh/inference/${slug}`,
+          `https://inferencex.semianalysis.com/zh/infx/inference/${slug}`,
         );
       };
 
@@ -417,22 +422,22 @@ describe('Inference model presentation', () => {
       cy.location('hash').should('eq', '#benchmark');
       cy.reload();
       expectModel('Kimi K3', 'kimi-k3');
-      cy.get(`a[href="${locale}/evaluation"]`).filter(':visible').first().click();
-      cy.location('pathname').should('eq', `${locale}/evaluation`);
+      cy.get(`a[href="${locale}/infx/evaluation"]`).filter(':visible').first().click();
+      cy.location('pathname').should('eq', `${locale}/infx/evaluation`);
       cy.title().should('not.contain', 'Kimi K3');
       cy.go('back');
       expectModel('Kimi K3', 'kimi-k3');
     });
 
-    it(`updates a bare ${locale}/inference intro when the selector creates a model route`, () => {
-      visitModel('DeepSeek-V4.1-Flash', '', `${locale}/inference`);
+    it(`updates a bare ${locale}/infx/inference intro when the selector creates a model route`, () => {
+      visitModel('DeepSeek-V4.1-Flash', '', `${locale}/infx/inference`);
       selectModel(PRO);
       cy.get('[data-testid="inference-page-heading"]').should('contain.text', 'DeepSeek V4 Pro');
       cy.title().should('contain', 'DeepSeek V4 Pro');
     });
 
-    it(`follows an explicit query-model override on ${locale}/inference/kimi-k3`, () => {
-      visitModel('DeepSeek-V4.1-Flash', '', `${locale}/inference/kimi-k3`);
+    it(`follows an explicit query-model override on ${locale}/infx/inference/kimi-k3`, () => {
+      visitModel('DeepSeek-V4.1-Flash', '', `${locale}/infx/inference/kimi-k3`);
       cy.get('[data-testid="model-selector"]').should('contain.text', FLASH);
       cy.get('[data-testid="inference-page-heading"]').should(
         'contain.text',
@@ -441,8 +446,8 @@ describe('Inference model presentation', () => {
       cy.title().should('contain', 'DeepSeek V4.1 Flash');
     });
 
-    it(`keeps model copy in server-rendered HTML on ${locale}/inference/kimi-k3`, () => {
-      cy.request(`${locale}/inference/kimi-k3`).then(({ body }) => {
+    it(`keeps model copy in server-rendered HTML on ${locale}/infx/inference/kimi-k3`, () => {
+      cy.request(`${locale}/infx/inference/kimi-k3`).then(({ body }) => {
         const document = new DOMParser().parseFromString(body, 'text/html');
         expect(document.querySelector('h1')?.textContent).to.eq(
           locale ? 'Kimi K3 推理基准测试' : 'Kimi K3 Inference Benchmarks',
@@ -490,7 +495,7 @@ describe('Model-local manual legend selection', () => {
     expectBestPerSku(true);
   });
 
-  for (const path of ['/inference', '/inference/deepseek-v4-pro']) {
+  for (const path of ['/infx/inference', '/infx/inference/deepseek-v4-pro']) {
     it(`preserves non-default query-model share state on ${path}`, () => {
       visitModel('DeepSeek-V4.1-Flash', '&i_best=0&i_active=gb300_dynamo-sglang', path);
       cy.get('[data-testid="model-selector"]').should('contain.text', FLASH);

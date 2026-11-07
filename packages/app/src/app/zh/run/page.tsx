@@ -4,6 +4,8 @@ import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
+import { ModelLogo } from '@/components/ui/model-logo';
 import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
 import { ZH_LANG_TAG, zhAlternates } from '@/lib/i18n/i18n';
 import { socialMetadata } from '@/lib/seo/social-metadata';
@@ -72,25 +74,28 @@ export default async function ZhRunIndexPage() {
       <div className="container mx-auto px-4 lg:px-8">
         <div className="mx-auto max-w-5xl">
           <header className="pt-8 md:pt-12">
-            <h1 className="max-w-4xl text-4xl font-bold tracking-heading text-balance md:text-5xl">
+            <Heading as="h1" level="display" className="max-w-4xl">
               {title}
-            </h1>
+            </Heading>
             <p className="mt-4 max-w-3xl text-lg leading-relaxed text-muted-foreground">
               选一个模型和一款 GPU：下面每个页面都会回答它能跑多快、每百万 token
               成本多少、以及数字出自哪个推理引擎，数据来自真实硬件上持续重跑的基准测试。
             </p>
           </header>
 
-          <section className="mt-10 mb-16 space-y-8">
+          <section className="mt-10 mb-16 space-y-4">
             {models.map((model) => (
               <Card key={model.slug} className="gap-0 p-5">
-                <div className="flex items-baseline justify-between gap-3">
-                  <h2 className="text-lg font-semibold tracking-tight">{model.seoName}</h2>
-                  <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="flex items-center gap-2 text-lg font-semibold">
+                    <ModelLogo model={model.model} className="size-5" />
+                    {model.seoName}
+                  </h2>
+                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                     {(byModel.get(model.slug) ?? []).length} 款 GPU
                   </span>
                 </div>
-                <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+                <ul className="-mx-3 mt-3 grid gap-x-4 gap-y-1 sm:grid-cols-2">
                   {(byModel.get(model.slug) ?? []).map((entry) => {
                     const chipLabel = entry.chip.label;
                     return (

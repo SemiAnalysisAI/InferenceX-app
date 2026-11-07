@@ -17,7 +17,7 @@ import { fetchView, type TutorialViewResponse } from '@/lib/powerx/views-api';
 import { readWidgetHash, writeWidgetHash } from '@/lib/powerx/widget-hash';
 import { cn } from '@/lib/shared/utils';
 
-/** Shared chrome for the /powerx/tutorial widgets: hash state, chips, copy, legend, fetch. */
+/** Shared chrome for the /pwx/tutorial widgets: hash state, chips, copy, legend, fetch. */
 
 export interface WidgetProps {
   locale: Locale;
@@ -216,10 +216,10 @@ export function Chips<T extends string>({
               onClick={() => pick(option)}
               onKeyDown={(event) => onKeyDown(event, index)}
               className={cn(
-                'inline-flex min-h-11 items-center rounded-md px-3 font-medium whitespace-nowrap transition-colors motion-reduce:transition-none md:min-h-9',
-                size === 'lg' ? 'text-base' : 'text-sm',
+                'inline-flex min-h-11 items-center rounded-md px-3 font-medium whitespace-nowrap transition-colors motion-reduce:transition-none',
+                size === 'lg' ? 'text-base md:min-h-9' : 'text-sm md:min-h-8',
                 selected
-                  ? 'bg-foreground text-background'
+                  ? 'bg-muted text-foreground'
                   : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
                 option.disabled && 'cursor-not-allowed opacity-50 hover:bg-transparent',
               )}

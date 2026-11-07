@@ -19,7 +19,7 @@ describe('Landing banner A/B arms', () => {
     );
 
     cy.get('[data-banner-variant="operatorx"] [data-testid="launch-banner"]')
-      .should('have.attr', 'href', '/operatorx')
+      .should('have.attr', 'href', '/opx')
       .click();
     cy.get('@action').should('have.been.calledOnce');
     cy.get('@action').its('firstCall.args.0.variant').should('eq', 'operatorx');

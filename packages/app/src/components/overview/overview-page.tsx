@@ -5,7 +5,12 @@ import type { ReactNode } from 'react';
 import { TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
 
 import { Card } from '@/components/ui/card';
+import { ControlPanel } from '@/components/ui/control-panel';
+import { EmptyState } from '@/components/ui/empty-state';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
+import { Heading } from '@/components/ui/heading';
+import { sourceLinkClassName } from '@/components/ui/result-context';
+import { ShareButton } from '@/components/ui/share-button';
 import { OVERVIEW_HISTORY_WINDOW_DAYS, type OverviewPageData } from '@/lib/overview/overview-data';
 import { overviewHref } from '@/lib/overview/overview-links';
 
@@ -112,47 +117,53 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
       {presenting ? null : (
         <Card className="md:py-5">
           <header>
-            <div className="flex flex-col gap-y-1">
-              <h1 className="text-lg font-semibold">{strings.title}</h1>
-              <p
-                data-testid="overview-scope"
-                aria-label={strings.scopeAria}
-                className="inline-flex flex-wrap items-baseline gap-x-2 leading-snug"
-              >
-                <span
-                  data-testid="overview-scope-metric"
-                  className="text-base font-semibold text-foreground"
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-col gap-y-1">
+                <Heading as="h1" level="title">
+                  {strings.title}
+                </Heading>
+                <p
+                  data-testid="overview-scope"
+                  aria-label={strings.scopeAria}
+                  className="inline-flex flex-wrap items-baseline gap-x-2 leading-snug"
                 >
-                  {strings.scopeMetric}
-                </span>{' '}
-                <span aria-hidden="true" className="text-sm text-muted-foreground">
-                  ·
-                </span>{' '}
-                <span
-                  data-testid="overview-scope-direction"
-                  className="text-sm font-normal text-muted-foreground"
-                >
-                  {strings.scopeDirection}
-                </span>{' '}
-                <span aria-hidden="true" className="text-sm text-muted-foreground">
-                  ·
-                </span>{' '}
-                <span className="text-sm font-normal text-muted-foreground">
+                  <span
+                    data-testid="overview-scope-metric"
+                    className="text-base font-medium text-foreground"
+                  >
+                    {strings.scopeMetric}
+                  </span>{' '}
+                  <span aria-hidden="true" className="text-sm text-muted-foreground">
+                    ·
+                  </span>{' '}
+                  <span
+                    data-testid="overview-scope-direction"
+                    className="text-sm font-normal text-muted-foreground"
+                  >
+                    {strings.scopeDirection}
+                  </span>
+                </p>
+                <p className="text-xs leading-tight text-muted-foreground">
                   {strings.sourcePrefix}
                   <a
                     data-testid="overview-source-link"
                     href={TCO_SOURCE_URL}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none"
+                    className={sourceLinkClassName}
                   >
                     {strings.sourceLinkText}
                     <ExternalLinkIcon />
                   </a>
-                </span>
-              </p>
+                </p>
+              </div>
+              <ShareButton className="shrink-0" />
             </div>
-            <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-6">
+            <ControlPanel
+              legend={strings.controlsGroup}
+              data-testid="overview-controls-panel"
+              className="mt-3 grid-cols-1 sm:flex sm:flex-wrap sm:items-start sm:gap-x-6"
+            >
               <OverviewTierSwitcher
                 tier={data.tier}
                 engineScope={data.engineScope}
@@ -175,7 +186,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
                 locale={locale}
                 strings={strings}
               />
-            </div>
+            </ControlPanel>
           </header>
         </Card>
       )}
@@ -184,6 +195,60 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
         <OverviewMatrixSection locale={locale} />
       </OverviewPresentationSurface>
     </section>
+  );
+}
+
+function OverviewScopeToggles({
+  locale,
+  variant,
+}: {
+  locale: OverviewLocale;
+  variant?: 'section' | 'toolbar';
+}) {
+  const data = useOverviewData();
+  const referenceHardware = useOverviewReference();
+  const strings = OVERVIEW_STRINGS[locale];
+  return (
+    <>
+      {data.comparisonMode === 'hardware' ? (
+        <OverviewHardwareRowScopeToggle
+          variant={variant}
+          hardwareRowScope={data.hardwareRowScope}
+          emptyRowCount={data.emptyRowCount}
+          tier={data.tier}
+          engineScope={data.engineScope}
+          referenceHardware={referenceHardware}
+          modelScope={data.modelScope}
+          locale={locale}
+          strings={strings}
+        />
+      ) : (
+        <OverviewRowScopeToggle
+          variant={variant}
+          windowDays={OVERVIEW_HISTORY_WINDOW_DAYS[data.comparisonMode]}
+          rowScope={data.rowScope}
+          unchangedRowCount={data.unchangedRowCount}
+          tier={data.tier}
+          engineScope={data.engineScope}
+          referenceHardware={referenceHardware}
+          modelScope={data.modelScope}
+          locale={locale}
+          strings={strings}
+        />
+      )}
+      <OverviewModelScopeToggle
+        variant={variant}
+        modelScope={data.modelScope}
+        tier={data.tier}
+        engineScope={data.engineScope}
+        comparisonMode={data.comparisonMode}
+        referenceHardware={referenceHardware}
+        rowScope={data.rowScope}
+        hardwareRowScope={data.hardwareRowScope}
+        locale={locale}
+        strings={strings}
+      />
+    </>
   );
 }
 
@@ -209,13 +274,13 @@ function OverviewControlRow({ locale }: { locale: OverviewLocale }) {
 
   if (!presenting) {
     return (
-      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 md:grid md:grid-cols-[1fr_auto_1fr]">
-        <div className="hidden md:block" />
-        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 md:justify-self-center">
-          {views}
-        </div>
-        <div className="md:justify-self-end">
-          <OverviewPresentToggle strings={strings} />
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        {views}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          {data.models.length > 0 && <OverviewScopeToggles locale={locale} />}
+          <div className="max-sm:hidden">
+            <OverviewPresentToggle strings={strings} />
+          </div>
         </div>
       </div>
     );
@@ -238,44 +303,7 @@ function OverviewControlRow({ locale }: { locale: OverviewLocale }) {
       </div>
       <div className="justify-self-center">{views}</div>
       <div className="flex items-center gap-x-2 justify-self-end">
-        {data.comparisonMode === 'hardware' ? (
-          <OverviewHardwareRowScopeToggle
-            variant="toolbar"
-            hardwareRowScope={data.hardwareRowScope}
-            emptyRowCount={data.emptyRowCount}
-            tier={data.tier}
-            engineScope={data.engineScope}
-            referenceHardware={referenceHardware}
-            modelScope={data.modelScope}
-            locale={locale}
-            strings={strings}
-          />
-        ) : (
-          <OverviewRowScopeToggle
-            variant="toolbar"
-            windowDays={OVERVIEW_HISTORY_WINDOW_DAYS[data.comparisonMode]}
-            rowScope={data.rowScope}
-            unchangedRowCount={data.unchangedRowCount}
-            tier={data.tier}
-            engineScope={data.engineScope}
-            referenceHardware={referenceHardware}
-            modelScope={data.modelScope}
-            locale={locale}
-            strings={strings}
-          />
-        )}
-        <OverviewModelScopeToggle
-          variant="toolbar"
-          modelScope={data.modelScope}
-          tier={data.tier}
-          engineScope={data.engineScope}
-          comparisonMode={data.comparisonMode}
-          referenceHardware={referenceHardware}
-          rowScope={data.rowScope}
-          hardwareRowScope={data.hardwareRowScope}
-          locale={locale}
-          strings={strings}
-        />
+        <OverviewScopeToggles locale={locale} variant="toolbar" />
         <OverviewPresentToggle strings={strings} />
       </div>
     </div>
@@ -307,13 +335,9 @@ function OverviewMatrixSection({ locale }: { locale: OverviewLocale }) {
       <>
         <OverviewControlRow locale={locale} />
         <OverviewMatrixCard>
-          <p
-            role="status"
-            data-testid="overview-empty-state"
-            className="px-6 py-12 text-center text-sm text-muted-foreground"
-          >
+          <EmptyState bare role="status" data-testid="overview-empty-state" className="px-6 py-12">
             {strings.emptyState}
-          </p>
+          </EmptyState>
         </OverviewMatrixCard>
       </>
     );
@@ -339,49 +363,12 @@ function OverviewMatrixSection({ locale }: { locale: OverviewLocale }) {
                 referenceHardware={referenceHardware}
               />
             )}
-            <div className="flex flex-col gap-x-6 gap-y-2 border-t border-border/50 px-4 py-3 lg:flex-row lg:items-center lg:justify-between lg:px-6">
+            <div className="border-t border-border/50 px-4 py-3 lg:px-6">
               <OverviewMethodology
                 strings={strings}
                 comparisonMode={data.comparisonMode}
                 referenceHardware={referenceHardware}
               />
-              <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1">
-                {data.comparisonMode === 'hardware' ? (
-                  <OverviewHardwareRowScopeToggle
-                    hardwareRowScope={data.hardwareRowScope}
-                    emptyRowCount={data.emptyRowCount}
-                    tier={data.tier}
-                    engineScope={data.engineScope}
-                    referenceHardware={referenceHardware}
-                    modelScope={data.modelScope}
-                    locale={locale}
-                    strings={strings}
-                  />
-                ) : (
-                  <OverviewRowScopeToggle
-                    windowDays={OVERVIEW_HISTORY_WINDOW_DAYS[data.comparisonMode]}
-                    rowScope={data.rowScope}
-                    unchangedRowCount={data.unchangedRowCount}
-                    tier={data.tier}
-                    engineScope={data.engineScope}
-                    referenceHardware={referenceHardware}
-                    modelScope={data.modelScope}
-                    locale={locale}
-                    strings={strings}
-                  />
-                )}
-                <OverviewModelScopeToggle
-                  modelScope={data.modelScope}
-                  tier={data.tier}
-                  engineScope={data.engineScope}
-                  comparisonMode={data.comparisonMode}
-                  referenceHardware={referenceHardware}
-                  rowScope={data.rowScope}
-                  hardwareRowScope={data.hardwareRowScope}
-                  locale={locale}
-                  strings={strings}
-                />
-              </div>
             </div>
           </>
         )}

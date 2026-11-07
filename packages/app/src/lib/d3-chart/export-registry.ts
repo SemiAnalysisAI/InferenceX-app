@@ -6,7 +6,11 @@ export interface ChartExportScales {
   yScale: BuiltScale;
 }
 
-export type ChartExportDraw = <T>(props: D3ChartProps<T>, scales: ChartExportScales) => void;
+export type ChartExportDraw = <T>(
+  props: D3ChartProps<T>,
+  scales: ChartExportScales,
+  pinned?: unknown,
+) => void;
 
 type ChartExportSource = (draw: ChartExportDraw) => void;
 

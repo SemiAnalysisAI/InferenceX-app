@@ -2,6 +2,7 @@ import { globalParetoFrontier } from '@/lib/charts/pareto-frontier';
 
 import { snapTo } from './widget-hash';
 import { type TutorialViewResponse, viewsInferenceUrl } from './views-api';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 /**
  * The measured-vs-modeled chart: the same validated points on two metrics, energy per token
@@ -21,7 +22,7 @@ export const MM_METRIC_KEYS: Record<MmView, string> = {
 export const mmViewUrl = (view: MmView): string => viewsInferenceUrl(MM_METRIC_KEYS[view], MM_GPUS);
 
 export function mmDashboardUrl(view: MmView): string {
-  return `/inference?${new URLSearchParams({ i_metric: MM_METRIC_KEYS[view] }).toString()}`;
+  return `${getDashboardRoute('inference').path}?${new URLSearchParams({ i_metric: MM_METRIC_KEYS[view] }).toString()}`;
 }
 
 export interface PairedPoint {
