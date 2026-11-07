@@ -224,9 +224,10 @@ describe('prepareGpuMetricsArtifact', () => {
   it('prefers an SMI CSV in the bundle over its per-host power samples', () => {
     const artifact = writePowerAuditArtifact();
     fs.writeFileSync(path.join(artifact.artifactDir, 'gpu_metrics.csv'), NVIDIA_CSV);
-    expect(prepareGpuMetricsArtifact(artifact).map((series) => series.fileName)).toEqual([
-      'gpu_metrics.csv',
-    ]);
+    addCpuSamples(artifact);
+    const prepared = prepareGpuMetricsArtifact(artifact);
+    expect(prepared.map((series) => series.fileName)).toEqual(['gpu_metrics.csv']);
+    expect(prepared[0]!.sidecars.powerManifest).toEqual(MULTINODE_MANIFEST);
   });
 
   it.each([undefined, 'gpu_board_power'])(
