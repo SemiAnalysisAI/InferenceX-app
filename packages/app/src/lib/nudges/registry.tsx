@@ -29,7 +29,11 @@ import { ModelLogo } from '@/components/ui/model-logo';
 import { Model } from '@/lib/catalog/data-mappings';
 import { STARRED_EVENT, STARRED_KEY } from '@/lib/github/star-storage';
 import type { NudgeDefinition } from './types';
-import { AGENTX_ROUTE, getDashboardRoute } from '@/lib/routing/dashboard-routes';
+import {
+  AGENTX_ROUTE,
+  dashboardRouteForPathname,
+  getDashboardRoute,
+} from '@/lib/routing/dashboard-routes';
 
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
 
@@ -37,9 +41,7 @@ export const GRADIENT_NUDGE_EVENT = 'inferencex:parallelism-label-enabled';
 
 function isOnInferenceTab(): boolean {
   if (typeof window === 'undefined') return false;
-  const segments = window.location.pathname.split('/').filter(Boolean);
-  if (segments[0] === 'zh') segments.shift();
-  return (segments[0] ?? 'inference') === 'inference';
+  return dashboardRouteForPathname(window.location.pathname)?.key === 'inference';
 }
 
 /**

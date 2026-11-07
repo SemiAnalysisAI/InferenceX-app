@@ -388,7 +388,7 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
 
 describe('Dashboard nudges — reproducibility toast', () => {
   it('reproducibility nudge stays dismissed across reloads', () => {
-    cy.visit('/infx/inference', {
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro', {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
       },
@@ -445,7 +445,9 @@ describe('Dashboard nudges — inline filter hint', () => {
   });
 
   it('dismissal persists to localStorage and the nudge stays gone after reload', () => {
-    cy.visit('/infx/inference', { onBeforeLoad: suppressCompetingDashboardToasts });
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro', {
+      onBeforeLoad: suppressCompetingDashboardToasts,
+    });
     cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
     cy.get('[data-testid="filter-hint-nudge"]')
       .should('be.visible')
