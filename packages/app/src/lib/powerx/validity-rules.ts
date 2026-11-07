@@ -1,4 +1,4 @@
-import pinned from '@/lib/power/power-validity-thresholds.json';
+import thresholds from '@/lib/power/power-validity-thresholds.json';
 
 /**
  * The five checks the offline validator re-runs from the raw samples before a point is
@@ -7,9 +7,9 @@ import pinned from '@/lib/power/power-validity-thresholds.json';
  * `inferencex-e2e/infx/results/power/multinode.py` and `common.py`.
  */
 
-export const MAX_SAMPLE_GAP_SECONDS = pinned.thresholds.max_sample_gap_seconds;
-export const CLOCK_TOLERANCE_SECONDS = pinned.thresholds.clock_tolerance_seconds;
-export const CLOCK_TOLERANCE_PERCENT = pinned.thresholds.clock_tolerance_fraction * 100;
+export const MAX_SAMPLE_GAP_SECONDS = thresholds.max_sample_gap_seconds;
+export const CLOCK_TOLERANCE_SECONDS = thresholds.clock_tolerance_seconds;
+export const CLOCK_TOLERANCE_PERCENT = thresholds.clock_tolerance_fraction * 100;
 
 export const VALIDITY_CHECKS = [
   { id: 'devices', reason: 'expected_device_missing' },

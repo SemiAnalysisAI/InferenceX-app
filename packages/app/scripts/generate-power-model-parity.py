@@ -8,7 +8,7 @@ $INFERENCEX_REPO, else an InferenceX checkout next to this repository). The scri
 extracts power_model at REVISION into a temporary directory and imports it, so it
 needs Python >= 3.12 with pydantic 2, the upstream package's only dependency.
 
-It writes three files next to the port (packages/app/src/lib/power/power_model):
+It writes three files to packages/app/src/lib/power, next to the port:
 - power-model.manifest.json: the revision, its source tree, and every upstream
   Python module, which power-model-parity.test.ts maps one-to-one onto the port.
 - power-validity-thresholds.json: the power validators' exported thresholds at the
@@ -375,11 +375,9 @@ def main():
             "cases": parity_cases,
             "reports": parity_reports,
         },
-        "power-validity-thresholds.json": {
-            "revision": REVISION,
-            "sourcePath": THRESHOLDS_PATH,
-            "thresholds": json.loads(git(repo, "show", f"{REVISION}:{THRESHOLDS_PATH}")),
-        },
+        "power-validity-thresholds.json": json.loads(
+            git(repo, "show", f"{REVISION}:{THRESHOLDS_PATH}")
+        ),
     }
     args.output_dir.mkdir(parents=True, exist_ok=True)
     for filename, payload in outputs.items():
