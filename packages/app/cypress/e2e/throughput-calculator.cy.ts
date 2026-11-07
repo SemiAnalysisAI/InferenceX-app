@@ -48,14 +48,26 @@ describe('TCO Calculator', () => {
       });
     });
 
-    it('groups benchmark economics above the comparison target', () => {
+    it('groups benchmark config above pricing and the comparison target', () => {
       cy.viewport(1280, 900);
-      cy.get('[data-testid="calculator-controls"] fieldset').should('have.length', 2);
-      cy.get('[data-testid="calculator-controls"] fieldset').then(($groups) => {
-        const rects = [...$groups].map((group) => group.getBoundingClientRect());
-        expect(rects[1].top).to.be.greaterThan(rects[0].bottom);
+      cy.get('[data-testid="calculator-controls"] fieldset legend').should(($legends) => {
+        expect([...$legends].map((legend) => legend.textContent)).to.deep.equal([
+          'Benchmark config',
+          'Pricing config',
+          'Comparison target',
+        ]);
       });
-      cy.get('[data-testid="calc-cost-selector"]').should('contain.text', 'Hyperscaler');
+      cy.get('[data-testid="calculator-controls"] fieldset').then(($groups) => {
+        const [benchmark, pricing, target] = [...$groups].map((group) =>
+          group.getBoundingClientRect(),
+        );
+        expect(pricing.top).to.be.greaterThan(benchmark.bottom);
+        expect(target.top).to.be.greaterThan(benchmark.bottom);
+      });
+      cy.get('[data-testid="calc-cost-selector"]').should(
+        'contain.text',
+        'Owning at large hyperscaler volume',
+      );
       cy.get('[data-testid="calculator-metric-throughput"]').should('be.visible');
       cy.get('[data-testid="calculator-metric-throughput"]')
         .should('have.attr', 'aria-pressed', 'true')
@@ -99,15 +111,15 @@ describe('TCO Calculator', () => {
 
     it('displays chart title that updates when metric changes', () => {
       const metrics = [
-        { metric: 'throughput', title: 'Total Token Throughput per Chip', badges: [] },
+        { metric: 'throughput', title: 'Total token throughput per chip', badges: [] },
         {
           metric: 'power',
-          title: 'Tokens per Provisioned All-in Megawatt',
+          title: 'Total tokens per provisioned all-in megawatt',
           badges: ['All in power/chip', 'kW'],
         },
         {
           metric: 'cost',
-          title: 'Cost per Million',
+          title: 'Cost per million',
           badges: ['TCO', '$/chip/hr'],
         },
       ] as const;
