@@ -321,7 +321,7 @@ export default function CollectiveXDisplay() {
   const selectedRunErrors = runQueries.filter((query) => query.error).length;
   const isFetching = runsQuery.isFetching || runQueries.some((query) => query.isFetching);
   const [epSize, setEpSize] = useState(8);
-  const [operation, setOperation] = useState<CollectiveXOperation>('pair_period');
+  const [selectedOperation, setOperation] = useState<CollectiveXOperation>('pair_period');
   const [phase, setPhase] = useState<CollectiveXPhase>('decode');
   const [modes, setModes] = useState<CollectiveXMode[]>(['normal', 'low-latency']);
   const [precision, setPrecision] = useState<CollectiveXPrecision>('fp8');
@@ -341,11 +341,9 @@ export default function CollectiveXDisplay() {
       ),
     [combinedSeries],
   );
-  useEffect(() => {
-    if (combinedSeries.length > 0 && !hasPairPeriod && operation === 'pair_period') {
-      setOperation('roundtrip');
-    }
-  }, [combinedSeries.length, hasPairPeriod, operation]);
+  // Derived, not an effect: a run without a pair period never renders the empty headline.
+  const operation: CollectiveXOperation =
+    selectedOperation === 'pair_period' && !hasPairPeriod ? 'roundtrip' : selectedOperation;
   const operationOptions: SelectOption<CollectiveXOperation>[] = [
     ...(hasPairPeriod ? [{ value: 'pair_period' as const, label: t.operation.pair_period }] : []),
     { value: 'dispatch', label: t.operation.dispatch },

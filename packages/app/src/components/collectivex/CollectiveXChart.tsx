@@ -371,6 +371,7 @@ export function CollectiveXChart({
       date: `${summary} · ${t.latencyRanks}`,
       metrics: [{ value: formatMetric(point.y, yAxis), label: op }],
       rows: [
+        { label: t.operation.pair_period, value: ranks(measurement.components.pair_period) },
         { label: t.operation.dispatch, value: ranks(measurement.components.dispatch) },
         { label: t.operation.stage, value: ranks(measurement.components.stage) },
         { label: t.operation.combine, value: ranks(measurement.components.combine) },
