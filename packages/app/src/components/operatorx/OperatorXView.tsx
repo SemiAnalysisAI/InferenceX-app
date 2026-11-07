@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 
 import { Card } from '@/components/ui/card';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
+import { ShareButton } from '@/components/ui/share-button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useOperatorXModel } from '@/hooks/api/use-operatorx';
 import { useClientPathname } from '@/hooks/useClientPathname';
@@ -64,6 +65,7 @@ export default function OperatorXView() {
           headingAs="h1"
           title="OperatorX"
           qualifier={locale === 'zh' ? '实验性' : 'Experimental'}
+          actions={<ShareButton />}
         />
         <TabsList className="mt-4">
           {OPERATORX_CATEGORIES.map((c) => (
