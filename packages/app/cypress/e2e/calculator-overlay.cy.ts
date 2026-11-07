@@ -60,7 +60,7 @@ describe('TCO calculator — unofficial run overlay', () => {
       cy.get(Y_TICKS).should('contain.text', OVERLAY_RUN_BRANCH);
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
-        .should('contain.text', 'P90 Interactivity');
+        .should('contain.text', 'P90 interactivity');
     });
   });
 
