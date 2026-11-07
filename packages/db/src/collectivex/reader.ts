@@ -196,6 +196,9 @@ function mapPoint(row: RawRow, ep: number): CollectiveXPoint {
     tokens_per_rank: row.tokens_per_rank,
     global_tokens: row.global_tokens,
     components: {
+      // The methodology's headline: the steady-state period of back-to-back pairs, which moves
+      // the round trip's bytes. Absent from results older than the chained family.
+      pair_period: mapComponent(row.components.pair_period, provenance.roundtrip, ep),
       dispatch: component('dispatch'),
       stage: component('stage'),
       combine: component('combine'),

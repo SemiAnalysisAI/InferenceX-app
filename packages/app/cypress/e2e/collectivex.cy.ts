@@ -172,7 +172,7 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-routing-select"]').should('not.exist');
 
     cy.get('[data-testid="collectivex-main-chart"]')
-      .should('contain.text', 'Round trip (measured) · decode · p99')
+      .should('contain.text', 'Round trip (fresh entry) · decode · p50')
       .and('contain.text', 'deepep-v2');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
 

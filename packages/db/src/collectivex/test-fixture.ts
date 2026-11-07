@@ -60,6 +60,7 @@ function makeRawRow(index: number, row: RowOverrides, worldSize: number): Json {
     dispatch: component(417 + index),
     combine: component(392 + index),
     roundtrip: component(921 + index),
+    pair_period: component(871 + index),
     stage: row.stageUnavailable
       ? { availability: 'unavailable', percentiles_us: null }
       : component(120 + index),

@@ -81,13 +81,15 @@ const STRINGS = {
       dispatch: 'Dispatch',
       stage: 'Stage',
       combine: 'Combine',
-      roundtrip: 'Round trip',
+      roundtrip: 'Round trip (fresh entry)',
+      pair_period: 'Pair period (headline)',
     },
     operationHeading: {
       dispatch: 'Dispatch',
       stage: 'Stage',
       combine: 'Combine',
-      roundtrip: 'Round trip (measured)',
+      roundtrip: 'Round trip (fresh entry)',
+      pair_period: 'Pair period (chained)',
     },
     phase: { decode: 'Decode', prefill: 'Prefill' },
     phaseValue: { decode: 'decode', prefill: 'prefill' },
@@ -166,13 +168,15 @@ const STRINGS = {
       dispatch: '分发',
       stage: '中间处理',
       combine: '合并',
-      roundtrip: '往返',
+      roundtrip: '往返（单次）',
+      pair_period: '成对周期（主指标）',
     },
     operationHeading: {
       dispatch: '分发',
       stage: '中间处理',
       combine: '合并',
-      roundtrip: '往返（实测）',
+      roundtrip: '往返（单次）',
+      pair_period: '成对周期（连续）',
     },
     phase: { decode: '解码', prefill: '预填充' },
     phaseValue: { decode: '解码', prefill: '预填充' },
@@ -317,11 +321,11 @@ export default function CollectiveXDisplay() {
   const selectedRunErrors = runQueries.filter((query) => query.error).length;
   const isFetching = runsQuery.isFetching || runQueries.some((query) => query.isFetching);
   const [epSize, setEpSize] = useState(8);
-  const [operation, setOperation] = useState<CollectiveXOperation>('roundtrip');
+  const [operation, setOperation] = useState<CollectiveXOperation>('pair_period');
   const [phase, setPhase] = useState<CollectiveXPhase>('decode');
   const [modes, setModes] = useState<CollectiveXMode[]>(['normal', 'low-latency']);
   const [precision, setPrecision] = useState<CollectiveXPrecision>('fp8');
-  const [percentile, setPercentile] = useState<CollectiveXPercentile>('p99');
+  const [percentile, setPercentile] = useState<CollectiveXPercentile>('p50');
   const [yAxis, setYAxis] = useState<CollectiveXYAxis>('latency');
   const [sku, setSku] = useState('all');
   const [backend, setBackend] = useState('all');
@@ -329,7 +333,21 @@ export default function CollectiveXDisplay() {
   const [hiddenRangeIds, setHiddenRangeIds] = useState<Set<string>>(new Set());
   const [activeSeriesIds, setActiveSeriesIds] = useState<Set<string>>(new Set());
   const [legendExpanded, setLegendExpanded] = useState(true);
+  // Results older than the chained family carry no pair period: fall back to the round trip.
+  const hasPairPeriod = useMemo(
+    () =>
+      combinedSeries.some((item) =>
+        item.points.some((point) => point.components.pair_period !== null),
+      ),
+    [combinedSeries],
+  );
+  useEffect(() => {
+    if (combinedSeries.length > 0 && !hasPairPeriod && operation === 'pair_period') {
+      setOperation('roundtrip');
+    }
+  }, [combinedSeries.length, hasPairPeriod, operation]);
   const operationOptions: SelectOption<CollectiveXOperation>[] = [
+    ...(hasPairPeriod ? [{ value: 'pair_period' as const, label: t.operation.pair_period }] : []),
     { value: 'dispatch', label: t.operation.dispatch },
     { value: 'stage', label: t.operation.stage },
     { value: 'combine', label: t.operation.combine },

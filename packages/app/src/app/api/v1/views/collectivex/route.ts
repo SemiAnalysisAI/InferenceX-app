@@ -115,14 +115,14 @@ export function GET(request: NextRequest) {
     const operation = parseEnumParam(
       s.get('operation'),
       'operation',
-      ['roundtrip', 'dispatch', 'combine'],
-      'roundtrip',
+      ['pair_period', 'roundtrip', 'dispatch', 'combine'],
+      'pair_period',
     );
     const percentile = parseEnumParam(
       s.get('percentile'),
       'percentile',
       ['p50', 'p95', 'p99'],
-      'p99',
+      'p50',
     );
     const yAxis = parseEnumParam(
       s.get('yAxis'),
