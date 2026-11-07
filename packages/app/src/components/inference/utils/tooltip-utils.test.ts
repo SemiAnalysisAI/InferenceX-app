@@ -1192,7 +1192,7 @@ describe('worker power drilldown', () => {
     expect(html).not.toContain('tooltip-worker-power');
   });
 
-  it('caps the table at 8 rows with a "+N more workers" line', () => {
+  it('lists every worker without a cap', () => {
     const many = Array.from({ length: 10 }, (_, i) => ({
       role: 'decode',
       worker_idx: i,
@@ -1200,9 +1200,9 @@ describe('worker power drilldown', () => {
       avg_power_w: 700 + i,
     }));
     const html = detailsHtml(tooltipConfig({ data: pt({ workers: many }) }));
-    expect(html).toContain('<strong>decode[7]</strong>');
-    expect(html).not.toContain('<strong>decode[8]</strong>');
-    expect(html).toContain('+2 more workers');
+    expect(html).toContain('<strong>decode[0]</strong>');
+    expect(html).toContain('<strong>decode[9]</strong>');
+    expect(html).not.toContain('more workers');
   });
 
   it('renders the ZH strings under the zh locale', () => {
@@ -1215,8 +1215,9 @@ describe('worker power drilldown', () => {
       num_gpus: 8,
       avg_power_w: 700,
     }));
-    const capped = detailsText(tooltipConfig({ data: pt({ workers: many }), locale: 'zh' }));
-    expect(capped).toContain('另有 1 个 worker');
+    const all = detailsText(tooltipConfig({ data: pt({ workers: many }), locale: 'zh' }));
+    expect(all).toContain('decode[8]');
+    expect(all).not.toContain('另有');
   });
 
   it('HTML-escapes role and hosts strings from the JSONB boundary', () => {
@@ -1274,7 +1275,7 @@ describe('power tier tooltip line', () => {
     expect(certified).toContain('功耗测量： 已验证（采用当前 PowerX 方法）');
   });
 
-  it('reaches overlay and GPU-graph tooltips through the same gate', () => {
+  it('reaches overlay and GPU-graph tooltips on every axis', () => {
     const overlay = detailsText({
       ...tooltipConfig({
         selectedYAxisMetric: 'y_measuredAvgPower',
@@ -1306,7 +1307,9 @@ describe('power tier tooltip line', () => {
     expect(gpuGraph).toContain(
       'Power measurement: Historical (not validated under the current method)',
     );
-    expect(gpuGraphOffAxis).not.toContain('Power measurement');
+    expect(gpuGraphOffAxis).toContain(
+      'Power measurement: Historical (not validated under the current method)',
+    );
   });
 });
 

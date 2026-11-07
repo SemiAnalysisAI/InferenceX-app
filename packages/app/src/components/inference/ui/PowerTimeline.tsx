@@ -14,7 +14,10 @@ import {
   type GpuPowerSeriesResponse,
 } from '@/components/gpu-power/power-series';
 import { useComparisonSeries } from '@/components/inference/hooks/useComparisonSeries';
-import { comparisonEntryLabel } from '@/components/inference/utils/comparisonEntry';
+import {
+  comparisonEntryDate,
+  comparisonEntryLabel,
+} from '@/components/inference/utils/comparisonEntry';
 import ChartLegend, { type LegendSwitchConfig } from '@/components/ui/chart-legend';
 import { ChartPointDetails } from '@/components/ui/chart-point-details';
 import { CONTROL_HEIGHT, SELECT_TRIGGER_STYLE } from '@/components/ui/control-styles';
@@ -169,6 +172,8 @@ const STRINGS = {
     showAll: 'Show all',
     unofficialRun: 'Unofficial run',
     branch: 'Branch',
+    precision: 'Precision',
+    runDate: 'Run date',
     viewWorkflow: 'View workflow run',
   },
   zh: {
@@ -240,6 +245,8 @@ const STRINGS = {
     showAll: '显示全部',
     unofficialRun: '非官方运行',
     branch: '分支',
+    precision: '精度',
+    runDate: '运行日期',
     viewWorkflow: '查看工作流运行',
   },
 } as const;
@@ -1502,6 +1509,8 @@ export default function PowerTimeline({
           ...(typeof validated === 'number'
             ? [{ label: t.validated, value: `${validated.toFixed(1)} W` }]
             : []),
+          { label: t.precision, value: point.precision.toUpperCase() },
+          { label: t.runDate, value: point.actualDate ?? comparisonEntryDate(point.date) },
         ],
         runUrl: point.run_url ? updateRepoUrl(point.run_url) : undefined,
       };

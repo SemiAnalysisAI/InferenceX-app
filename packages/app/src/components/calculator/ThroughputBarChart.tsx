@@ -55,7 +55,14 @@ const OVERLAY_STRINGS = {
     precision: 'Precision',
     disaggregated: 'Disaggregated',
     yes: 'Yes',
+    no: 'No',
     dpaTrue: 'True',
+    inputOutputTput: 'Input · output tok/s/chip',
+    inputOutputCost: 'Input · output cost',
+    inputOutputPower: 'Input · output tok/s/MW',
+    cacheHit: 'KV cache hit rate',
+    theoreticalCacheHit: 'Theoretical cache hit rate',
+    inputShare: 'Input token share',
   },
   zh: {
     unofficialRun: '非官方运行',
@@ -69,7 +76,14 @@ const OVERLAY_STRINGS = {
     precision: '精度',
     disaggregated: '分离式',
     yes: '是',
+    no: '否',
     dpaTrue: '是',
+    inputOutputTput: '输入 · 输出 tok/s/chip',
+    inputOutputCost: '输入 · 输出成本',
+    inputOutputPower: '输入 · 输出 tok/s/MW',
+    cacheHit: 'KV cache 命中率',
+    theoreticalCacheHit: '理论 Cache 命中率',
+    inputShare: '输入 token 占比',
   },
 } as const;
 
@@ -156,6 +170,7 @@ export function getMetricLabel(
 
 const fixed = (value: number, digits: number) =>
   value.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
 const formatSig3 = d3.format('.3r');
 const formatSig3Si = d3.format('.3s');
 const compact = (value: number) =>
@@ -364,10 +379,29 @@ export function getThroughputPointDetails(
       ...(d.isOverlay && d.runLabel ? [{ label: t.branch, value: d.runLabel, wide: true }] : []),
       { label: t.cost, value: `${cost.value}${costLabel}` },
       { label: 'tok/s/MW', value: power.value },
+      {
+        label: t.inputOutputTput,
+        value: `${fixed(d.inputTputValue, 1)} · ${fixed(d.outputTputValue, 1)}`,
+      },
+      {
+        label: t.inputOutputCost,
+        value: `$${d.costInput.toFixed(3)} · $${d.costOutput.toFixed(3)}`,
+      },
+      {
+        label: t.inputOutputPower,
+        value: `${fixed(d.inputTpPerMw, 0)} · ${fixed(d.outputTpPerMw, 0)}`,
+      },
+      ...(d.cacheHitRate === undefined ? [] : [{ label: t.cacheHit, value: pct(d.cacheHitRate) }]),
+      ...(d.theoreticalCacheHitRate === undefined
+        ? []
+        : [{ label: t.theoreticalCacheHit, value: pct(d.theoreticalCacheHitRate) }]),
+      ...(d.inputTokenShare === undefined
+        ? []
+        : [{ label: t.inputShare, value: pct(d.inputTokenShare) }]),
       { label: t.concurrency, value: `~${d.concurrency}` },
       ...(precision ? [{ label: t.precision, value: precision.toUpperCase() }] : []),
       { label: t.parallelism, value: parallelism },
-      ...(d.nearestPoints[0]?.disagg ? [{ label: t.disaggregated, value: t.yes }] : []),
+      { label: t.disaggregated, value: d.nearestPoints[0]?.disagg ? t.yes : t.no },
     ],
     links: effectiveRunUrl
       ? [

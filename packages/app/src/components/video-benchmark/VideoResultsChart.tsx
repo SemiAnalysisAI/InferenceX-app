@@ -19,6 +19,7 @@ import type { ResultCell, ResultsState } from './results';
 import {
   RESULTS_X_METRIC_KEYS,
   RESULTS_X_METRICS,
+  RESULTS_Y_METRIC_KEYS,
   RESULTS_Y_METRICS,
   resultsChartSeries,
   resultsClip,
@@ -49,11 +50,17 @@ const STRINGS = {
     gpuSplit: 'GPUs (part. / alloc.)',
     deployment: 'Deployment',
     replicas: (count: number) => `${count} ${count === 1 ? 'replica' : 'replicas'}`,
+    replicasUnknown: 'replicas not recorded',
+    attention: (backend: string) => `${backend} attention`,
     concurrency: 'Concurrency',
     perVideo: 'Cost per video',
     energy: 'Energy per clip',
     power: 'Avg board power',
     valid: 'Valid clips',
+    completedFailed: 'Completed / failed',
+    meets: (seconds: string) => `Meets ${seconds} s deadline`,
+    videoSecondsPerHour: 'Video-seconds per hour',
+    powerLimit: 'Enforced power limit',
     runtime: 'Runtime',
     runLink: 'GitHub Actions run',
     viewTelemetry: 'View telemetry',
@@ -74,11 +81,17 @@ const STRINGS = {
     gpuSplit: 'GPU（参与 / 分配）',
     deployment: '部署',
     replicas: (count: number) => `${count} 个副本`,
+    replicasUnknown: '未记录副本数',
+    attention: (backend: string) => `${backend} 注意力`,
     concurrency: '并发数',
     perVideo: '每条视频成本',
     energy: '每条视频能耗',
     power: '板卡平均功率',
     valid: '有效视频',
+    completedFailed: '完成 / 失败',
+    meets: (seconds: string) => `${seconds} s 内完成`,
+    videoSecondsPerHour: '每小时视频秒数',
+    powerLimit: '强制功率上限',
     runtime: 'Runtime',
     runLink: 'GitHub Actions 运行记录',
     viewTelemetry: '查看遥测',
@@ -292,19 +305,40 @@ export default function VideoResultsChart({
                 value: `${n(point.participating, 0)} / ${n(point.allocated, 0)}`,
               },
               { label: s.valid, value: `${n(point.valid, 0)} / ${n(point.scheduled, 0)}` },
-              ...(d.strategy
-                ? [
-                    {
-                      label: s.deployment,
-                      value: [d.strategy, d.replicas].filter(Boolean).join(' · '),
-                      wide: true,
-                    },
-                  ]
-                : []),
+              {
+                label: s.completedFailed,
+                value: `${n(point.completed, 0)} / ${n(point.failed, 0)}`,
+              },
+              {
+                label: s.deployment,
+                value: [
+                  `TP${point.server?.tp ?? '?'} × Ulysses ${point.server?.ulysses ?? '?'}`,
+                  d.replicas ?? s.replicasUnknown,
+                  s.attention(point.server?.attention ?? '?'),
+                ].join(' · '),
+                wide: true,
+              },
               {
                 label: resultsMetricLabel(otherX, locale, clip),
                 value: n(other, otherX.digits),
               },
+              {
+                label: s.meets(n(state.deadlineSeconds)),
+                value:
+                  cell.deadlineAttainment === null
+                    ? '—'
+                    : `${n(cell.deadlineAttainment * 100, 0)}%`,
+              },
+              { label: s.videoSecondsPerHour, value: n(point.videoSecondsPerHour, 0) },
+              ...RESULTS_Y_METRIC_KEYS.filter(
+                (key) => key !== state.yMetric && key !== 'kjPerClip',
+              ).map((key) => ({
+                label: resultsMetricLabel(RESULTS_Y_METRICS[key], locale),
+                value: n(
+                  RESULTS_Y_METRICS[key].value(cell, selection),
+                  RESULTS_Y_METRICS[key].digits,
+                ),
+              })),
               { label: s.perVideo, value: cost ? `$${n(cost.perVideo, 4)}` : '—' },
               {
                 label: s.energy,
@@ -314,9 +348,11 @@ export default function VideoResultsChart({
                 label: s.power,
                 value: point.avgPowerW === null ? '—' : `${n(point.avgPowerW, 0)} W`,
               },
-              ...(point.runtime
-                ? [{ label: s.runtime, value: point.runtime.slice(0, 12), wide: true }]
-                : []),
+              {
+                label: s.powerLimit,
+                value: point.enforcedLimitW === null ? '—' : `${n(point.enforcedLimitW, 0)} W`,
+              },
+              ...(point.runtime ? [{ label: s.runtime, value: point.runtime, wide: true }] : []),
             ]}
             links={[
               {

@@ -196,12 +196,8 @@ const powerVariantRows = (
   return rows;
 };
 
-const powerTierRows = (
-  d: InferenceData,
-  selectedYAxisMetric: string,
-  locale: Locale,
-): PointDetailRow[] => {
-  if (!isMeasuredEnergyConfigKey(selectedYAxisMetric) || !d.power_tier) return [];
+const powerTierRows = (d: InferenceData, locale: Locale): PointDetailRow[] => {
+  if (!d.power_tier) return [];
   const t = TOOLTIP_STRINGS[locale];
   return [row(t.powerData, d.power_tier === 'certified' ? t.powerCertified : t.powerLegacy)];
 };
@@ -217,7 +213,7 @@ const escapeHtml = (s: string): string =>
 const SYSTEM_POWER_STRINGS = {
   en: {
     heading: 'InferenceX Power Model (beta)',
-    details: 'Deployment & model details',
+    details: 'Model assumptions',
     measuredGpu: 'Measured GPU power',
     itPerGpu: 'Measured IT power per GPU (no PUE)',
     facilityPerGpu: 'Measured facility power per GPU',
@@ -392,14 +388,15 @@ const modeledSystemPowerHTML = (
     ${estimate.unit === 'nvl72-tray' && estimate.measuredGraceSocketWatts !== null ? tooltipLine(t.graceSocket, `${fmtWatts(estimate.measuredGraceSocketWatts)} W/socket`) : ''}
     ${tooltipLine(t.itPerGpu, reading(estimate.itWattsPerGpu, 'it'))}
     ${tooltipLine(t.facilityPerGpu, reading(estimate.deploymentFacilityWatts / estimate.gpuCount, 'facility'))}
-    <details data-testid="tooltip-power-model-details" style="margin-top: 2px;">
-    <summary style="cursor: pointer; color: var(--muted-foreground);">${t.details}</summary>
     ${tooltipLine(t.state, `${t.workloads[estimate.operatingState.workload]} · ${t.scaleOut(estimate.operatingState.scaleOut)}`)}
     ${tooltipLine(t.deploymentIt, `${fmtWatts(estimate.deploymentItWatts)} W`)}
     ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmtWatts(estimate.deploymentFacilityWatts)} W`)}
-    <div style="color: var(--muted-foreground); margin-bottom: 4px;">${u.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)}${estimate.chassisBasis === 'extrapolated' ? `<br/>${u.extrapolation}` : ''}${estimate.topologyBasis === 'uniform-hosts' ? `<br/>${u.uniformHosts}` : ''}<br/>${estimate.unit === 'nvl72-tray' && estimate.cpuBasis === 'modeled' ? t.units['nvl72-tray'].modeledCpuAssumptions : u.assumptions}<br/>${u.network}<br/>${u.normalization}<br/>${u.boundary}</div>
+    <div style="color: var(--muted-foreground);">${u.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)}${estimate.chassisBasis === 'extrapolated' ? `<br/>${u.extrapolation}` : ''}${estimate.topologyBasis === 'uniform-hosts' ? `<br/>${u.uniformHosts}` : ''}</div>
+    <details data-testid="tooltip-power-model-details" style="margin-top: 2px;">
+    <summary style="cursor: pointer; color: var(--muted-foreground);">${t.details}</summary>
+    <div style="color: var(--muted-foreground); margin-bottom: 4px;">${estimate.unit === 'nvl72-tray' && estimate.cpuBasis === 'modeled' ? t.units['nvl72-tray'].modeledCpuAssumptions : u.assumptions}<br/>${u.network}<br/>${u.normalization}<br/>${u.boundary}</div>
     </details>
-    ${tooltipLine(t.model, `<a href="${escapeHtml(SYSTEM_POWER_MODEL_SOURCE_URL)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
+    ${tooltipLine(t.model, `<a href="${escapeHtml(SYSTEM_POWER_MODEL_SOURCE_URL)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision)}</a>`)}
   </div>`;
 };
 
@@ -407,21 +404,17 @@ const WORKER_POWER_STRINGS = {
   en: {
     heading: 'Measured worker power',
     chips: 'chips',
-    more: (n: number) => `+${n} more workers`,
   },
   zh: {
     heading: '各 Worker 实测功耗',
     chips: '芯片',
-    more: (n: number) => `另有 ${n} 个 worker`,
   },
 } as const;
-
-const WORKER_ROWS_LIMIT = 8;
 
 const workerPowerHTML = (d: InferenceData, locale: Locale): string => {
   if (!Array.isArray(d.workers) || d.workers.length === 0) return '';
   const t = WORKER_POWER_STRINGS[locale];
-  const rows = d.workers.slice(0, WORKER_ROWS_LIMIT).map((w) => {
+  const rows = d.workers.map((w) => {
     const parts = [
       `<strong>${escapeHtml(w.role)}[${w.worker_idx}]</strong>`,
       `${w.num_gpus} ${t.chips}`,
@@ -439,12 +432,84 @@ const workerPowerHTML = (d: InferenceData, locale: Locale): string => {
     if (Array.isArray(w.hosts) && w.hosts.length > 0) parts.push(escapeHtml(w.hosts.join(',')));
     return `<div style="color: var(--muted-foreground); overflow-wrap: anywhere;">${parts.join(' · ')}</div>`;
   });
-  const overflow = d.workers.length - WORKER_ROWS_LIMIT;
   return `<div data-testid="tooltip-worker-power" class="pinned-subsection">
       <div style="color: var(--foreground); font-weight: 600;">${t.heading}</div>
       ${rows.join('')}
-      ${overflow > 0 ? `<div style="color: var(--muted-foreground);">${t.more(overflow)}</div>` : ''}
     </div>`;
+};
+
+const MEASURED_POWER_STRINGS = {
+  en: {
+    power: 'Measured chip power',
+    energy: 'Measured energy',
+    telemetry: 'Chip telemetry',
+    avg: 'avg',
+    prefill: 'prefill',
+    decode: 'decode',
+    outputToken: 'J/output token',
+    totalToken: 'J/total token',
+    inputToken: 'J/input token',
+    query: 'J/query',
+    avgTemp: (v: string) => `${v} °C avg`,
+    peakTemp: (v: string) => `${v} °C peak`,
+    util: (v: string) => `${v}% util`,
+    memory: (v: string) => `${v} GiB memory`,
+  },
+  zh: {
+    power: '芯片实测功耗',
+    energy: '实测能耗',
+    telemetry: '芯片遥测',
+    avg: '平均',
+    prefill: '预填充',
+    decode: '解码',
+    outputToken: 'J/输出 token',
+    totalToken: 'J/总 token',
+    inputToken: 'J/输入 token',
+    query: 'J/请求',
+    avgTemp: (v: string) => `平均 ${v} °C`,
+    peakTemp: (v: string) => `峰值 ${v} °C`,
+    util: (v: string) => `利用率 ${v}%`,
+    memory: (v: string) => `显存 ${v} GiB`,
+  },
+} as const;
+
+const factsLineHTML = (label: string, facts: (string | false | undefined)[]): string => {
+  const shown = facts.filter(Boolean);
+  if (shown.length === 0) return '';
+  return `<div class="pinned-facts">${label ? `<span class="pinned-facts-label">${escapeHtml(label)}</span> ` : ''}${shown.join(' · ')}</div>`;
+};
+
+const wattsFact = (label: string, v: number | undefined) =>
+  isRate(v) && `${label} ${fmtWatts(v)} W`;
+
+const joulesFact = (v: number | undefined, unit: string, label = '') =>
+  isRate(v) && `${label ? `${label} ` : ''}${fmt(v)} ${unit}`;
+
+const measuredPowerHTML = (d: InferenceData, locale: Locale): string => {
+  const t = MEASURED_POWER_STRINGS[locale];
+  return (
+    factsLineHTML(t.power, [
+      wattsFact(t.avg, d.avg_power_w),
+      wattsFact('P75', d.p75_power_w),
+      wattsFact('P90', d.p90_power_w),
+      wattsFact(t.prefill, d.prefill_avg_power_w),
+      wattsFact(t.decode, d.decode_avg_power_w),
+    ]) +
+    factsLineHTML(t.energy, [
+      joulesFact(d.joules_per_output_token, t.outputToken),
+      joulesFact(d.joules_per_total_token, t.totalToken),
+      joulesFact(d.joules_per_input_token, t.inputToken),
+      joulesFact(d.joules_per_successful_query, t.query),
+      joulesFact(d.prefill_joules_per_input_token, t.inputToken, t.prefill),
+      joulesFact(d.decode_joules_per_output_token, t.outputToken, t.decode),
+    ]) +
+    factsLineHTML(t.telemetry, [
+      isRate(d.avg_temp_c) && t.avgTemp(fmt(d.avg_temp_c)),
+      isRate(d.peak_temp_c) && t.peakTemp(fmt(d.peak_temp_c)),
+      isRate(d.avg_util_pct) && t.util(fmt(d.avg_util_pct)),
+      isRate(d.avg_mem_used_mb) && t.memory(fmt(d.avg_mem_used_mb / 1024)),
+    ])
+  );
 };
 
 const CACHE_STRINGS = {
@@ -457,6 +522,7 @@ const CACHE_STRINGS = {
     cpuHitRate: 'CPU cache hit rate',
     combinedHitRate: 'Combined chip + CPU cache hit rate',
     theoreticalHitRate: 'Theoretical cache hit rate',
+    externalHitRate: 'External cache hit rate',
     legacyEnabled: 'Enabled (legacy data)',
     legacyDisabled: 'Disabled (legacy data)',
     hit: 'KV cache hit',
@@ -474,6 +540,7 @@ const CACHE_STRINGS = {
     cpuHitRate: 'CPU Cache 命中率',
     combinedHitRate: '芯片 + CPU 综合 Cache 命中率',
     theoreticalHitRate: '理论 Cache 命中率',
+    externalHitRate: '外部 Cache 命中率',
     legacyEnabled: '已启用（旧版数据）',
     legacyDisabled: '已禁用（旧版数据）',
     hit: 'KV cache 命中率',
@@ -508,6 +575,8 @@ const cacheHTML = (d: InferenceData, locale: Locale, color: string): string => {
   if (d.router_name) {
     rows.push(row(t.router, versionedComponentLabel(d.router_name, d.router_version)!));
   }
+  const externalHit = formatPct(d.server_external_cache_hit_rate);
+  if (externalHit) rows.push(row(t.externalHitRate, externalHit));
 
   const cache = pointCacheHit(d, locale);
   if (cache) {
@@ -637,17 +706,13 @@ const tokenBreakdownHTML = (d: InferenceData, locale: Locale): string => {
 
 const runtimeHTML = (d: InferenceData, locale: Locale): string => {
   const rows = speculativeRows(d, locale);
-  if (d.benchmark_type !== 'agentic_traces') return rowsHTML(rows);
-
   const t = AGENTIC_STRINGS[locale];
-  if (d.num_requests_total !== undefined && d.num_requests_successful !== undefined) {
+  const total = d.num_requests_total;
+  const successful = d.num_requests_successful;
+  if (total !== undefined || successful !== undefined) {
     const successPct =
-      d.num_requests_total > 0
-        ? ` (${((d.num_requests_successful / d.num_requests_total) * 100).toFixed(0)}%)`
-        : '';
-    rows.push(
-      row(t.requests, `${d.num_requests_successful} / ${d.num_requests_total}${successPct}`),
-    );
+      total && successful !== undefined ? ` (${((successful / total) * 100).toFixed(0)}%)` : '';
+    rows.push(row(t.requests, `${successful ?? '?'} / ${total ?? '?'}${successPct}`));
   }
 
   const tokens = tokenBreakdownHTML(d, locale);
@@ -758,6 +823,8 @@ const PARALLELISM_STRINGS = {
     singleNode: 'Single-node aggregate',
     multiNode: 'Multi-node aggregate',
     disaggregated: 'Disaggregated',
+    singleNodeDisagg: 'Single-node disaggregated',
+    multiNodeDisagg: 'Multi-node disaggregated',
     prefill: 'Prefill',
     decode: 'Decode',
     gpusUnit: 'Chips',
@@ -765,11 +832,11 @@ const PARALLELISM_STRINGS = {
     dataParallelism: 'Data parallelism',
     expertParallelism: 'Expert parallelism',
     pipelineParallelism: 'Pipeline parallelism',
-    decodeContextParallelism: 'Decode context parallelism (DCP)',
-    prefillContextParallelism: 'Prefill context parallelism (PCP)',
     dpAttention: 'DP attention',
     yes: 'True',
     no: 'False',
+    on: 'on',
+    off: 'off',
     workers: 'Workers',
     configuration: 'Configuration',
   },
@@ -777,6 +844,8 @@ const PARALLELISM_STRINGS = {
     singleNode: '单节点聚合',
     multiNode: '多节点聚合',
     disaggregated: '分离式',
+    singleNodeDisagg: '单节点分离式',
+    multiNodeDisagg: '多节点分离式',
     prefill: '预填充',
     decode: '解码',
     gpusUnit: '个芯片',
@@ -784,24 +853,49 @@ const PARALLELISM_STRINGS = {
     dataParallelism: '数据并行 (DP)',
     expertParallelism: '专家并行 (EP)',
     pipelineParallelism: '流水线并行 (PP)',
-    decodeContextParallelism: '解码上下文并行 (DCP)',
-    prefillContextParallelism: '预填充上下文并行 (PCP)',
     dpAttention: '数据并行注意力 (DPA)',
     yes: '是',
     no: '否',
+    on: '开启',
+    off: '关闭',
     workers: 'worker 数',
     configuration: '配置',
   },
 } as const;
 
-const legacyParallelismRows = (d: InferenceData, locale: Locale): PointDetailRow[] => {
+const known = (v: number | null | undefined) => (v === null || v === undefined ? '?' : v);
+
+const configLinesHTML = (d: InferenceData, locale: Locale): string => {
   const t = PARALLELISM_STRINGS[locale];
-  const aggregateDcp = meaningfulParallelismSize(d.prefill_dcp_size, d.decode_dcp_size);
-  const aggregatePcp = meaningfulParallelismSize(d.prefill_pcp_size, d.decode_pcp_size);
-  const rows: PointDetailRow[] = [];
-  if (aggregateDcp) rows.push(row(t.decodeContextParallelism, aggregateDcp));
-  if (aggregatePcp) rows.push(row(t.prefillContextParallelism, aggregatePcp));
-  return rows;
+  const dpa = (v: boolean | string | undefined) =>
+    `DPA ${v === undefined ? '?' : asBool(v) ? t.on : t.off}`;
+  if (!d.disagg) {
+    const dwdp = d.prefill_dwdp_size ?? 1;
+    return factsLineHTML('', [
+      `TP ${known(d.decode_tp)}`,
+      `EP ${known(d.ep)}`,
+      `DP ${known(d.dp)}`,
+      dpa(d.dp_attention),
+      `PP ${known(d.pp)}`,
+      `DCP ${known(meaningfulParallelismSize(d.prefill_dcp_size, d.decode_dcp_size) ?? d.decode_dcp_size ?? d.prefill_dcp_size)}`,
+      `PCP ${known(meaningfulParallelismSize(d.prefill_pcp_size, d.decode_pcp_size) ?? d.prefill_pcp_size ?? d.decode_pcp_size)}`,
+      `DWDP ${dwdp}`,
+      dwdp > 1 && `${t.workers} ${known(d.prefill_num_workers)}`,
+    ]);
+  }
+  return [true, false]
+    .map((prefill) =>
+      factsLineHTML(prefill ? t.prefill : t.decode, [
+        `TP ${known(prefill ? d.prefill_tp : d.decode_tp)}`,
+        `EP ${known((prefill ? d.prefill_ep : d.decode_ep) ?? d.ep)}`,
+        dpa((prefill ? d.prefill_dp_attention : d.decode_dp_attention) ?? d.dp_attention),
+        `PP ${known((prefill ? d.prefill_pp : d.decode_pp) ?? d.pp)}`,
+        `DCP ${known(prefill ? d.prefill_dcp_size : d.decode_dcp_size)}`,
+        `PCP ${known(prefill ? d.prefill_pcp_size : d.decode_pcp_size)}`,
+        prefill && `DWDP ${d.prefill_dwdp_size ?? 1}`,
+      ]),
+    )
+    .join('');
 };
 
 const pinnedFactsHTML = (d: InferenceData, locale: Locale, deployment: string, config = '') => {
@@ -823,7 +917,7 @@ const topologyHTML = (d: InferenceData, locale: Locale): string => {
     (d.prefill_ep === null || d.prefill_ep === undefined) &&
     !(d.prefill_dwdp_size && d.prefill_dwdp_size > 1)
   ) {
-    return `<div data-pinned-parallelism>${pinnedFactsHTML(d, locale, d.is_multinode ? t.multiNode : t.singleNode)}${rowsHTML(legacyParallelismRows(d, locale))}</div>`;
+    return `<div data-pinned-parallelism>${pinnedFactsHTML(d, locale, d.is_multinode ? t.multiNode : t.singleNode)}<div data-pinned-widths>${configLinesHTML(d, locale)}</div></div>`;
   }
   const bool = (v: boolean | string | undefined) =>
     v === undefined ? '?' : asBool(v) ? t.yes : t.no;
@@ -856,7 +950,15 @@ const topologyHTML = (d: InferenceData, locale: Locale): string => {
             d.prefill_dwdp_size && d.prefill_dwdp_size > 1 ? d.prefill_num_workers : undefined,
         },
       ];
-  const deployment = d.disagg ? t.disaggregated : d.is_multinode ? t.multiNode : t.singleNode;
+  const deployment = d.disagg
+    ? d.is_multinode === undefined
+      ? t.disaggregated
+      : d.is_multinode
+        ? t.multiNodeDisagg
+        : t.singleNodeDisagg
+    : d.is_multinode
+      ? t.multiNode
+      : t.singleNode;
   const compact = (r: Record<string, Cell>) => {
     if (r.DPA === '?') return `TP${r.TP}${typeof r.EP === 'number' ? ` / EP${r.EP}` : ''}`;
     return configSegmentLabel(
@@ -880,6 +982,7 @@ const topologyHTML = (d: InferenceData, locale: Locale): string => {
     </table></div>`
         : pinnedFactsHTML(d, locale, deployment, `<strong>${compact(rows[0])}</strong>`)
     }
+    <div data-pinned-widths>${configLinesHTML(d, locale)}</div>
   </div>`;
 };
 
@@ -940,9 +1043,10 @@ export const buildPointDetails = (config: TooltipConfig): PointDetails => {
       : [];
   const power =
     rowsHTML([
-      ...powerTierRows(d, selectedYAxisMetric, locale),
+      ...powerTierRows(d, locale),
       ...powerVariantRows(d, selectedYAxisMetric, locale, config.powerLabelStyle),
     ]) +
+    measuredPowerHTML(d, locale) +
     modeledSystemPowerHTML(d, selectedYAxisMetric, locale) +
     rowsHTML(powerWithheldRows(d, locale)) +
     workerPowerHTML(d, locale);
@@ -969,7 +1073,7 @@ export const buildPointDetails = (config: TooltipConfig): PointDetails => {
     ${pinnedSectionHTML(footer)}`,
     links: pointLinks({
       point: d,
-      runUrl: overlayData ? undefined : config.runUrl,
+      runUrl: config.runUrl,
       hasTraceData: Boolean(config.hasTrace),
       hasLogData: Boolean(config.hasLog),
       powerTraceMetric: selectedYAxisMetric,

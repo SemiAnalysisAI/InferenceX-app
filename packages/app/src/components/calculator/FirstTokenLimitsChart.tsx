@@ -55,6 +55,8 @@ const STRINGS = {
     parallelism: 'Parallelism',
     disaggregated: 'Disaggregated',
     yes: 'Yes',
+    no: 'No',
+    throughput: 'Total · input · output tok/s/chip',
     viewRun: 'View workflow run',
     viewOfficial: 'View raw result on GitHub',
   },
@@ -76,6 +78,8 @@ const STRINGS = {
     parallelism: '并行策略',
     disaggregated: '分离式',
     yes: '是',
+    no: '否',
+    throughput: '总 · 输入 · 输出 tok/s/chip',
     viewRun: '查看工作流运行',
     viewOfficial: '在 GitHub 查看原始结果',
   },
@@ -153,6 +157,7 @@ export function firstTokenPointDetails(
       .filter(Boolean)
       .join(' · '),
     warning: isOverlay ? t.unofficialRun : undefined,
+    date: winner.point.date,
     metrics: [
       { value: formatCost(winner.cost), label: getCostTypeLabel(costType) },
       { value: winner.ttft.toFixed(2), label: `${t.ttft(ttftStat)} (s)` },
@@ -165,10 +170,14 @@ export function firstTokenPointDetails(
       { label: t.cost, value: cost },
       { label: t.ttft(ttftStat), value: ttft },
       { label: t.interactivity(interactivityStat), value: interactivity },
+      {
+        label: t.throughput,
+        value: `${winner.point.throughput.toFixed(1)} · ${winner.point.inputThroughput.toFixed(1)} · ${winner.point.outputThroughput.toFixed(1)}`,
+      },
       { label: t.concurrency, value: String(winner.point.concurrency) },
       { label: t.precision, value: winner.precision.toUpperCase() },
       { label: t.parallelism, value: parallelism },
-      ...(winner.point.disagg ? [{ label: t.disaggregated, value: t.yes }] : []),
+      { label: t.disaggregated, value: winner.point.disagg ? t.yes : t.no },
     ],
     links: runUrl
       ? [

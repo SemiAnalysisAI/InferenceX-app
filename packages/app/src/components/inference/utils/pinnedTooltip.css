@@ -47,10 +47,16 @@
 .inferencex-pinned-tooltip .pinned-image p {
   display: inline;
   margin: 0;
+  word-break: break-all;
 }
 
 .inferencex-pinned-tooltip .pinned-facts {
   margin-bottom: 2px;
+}
+
+.inferencex-pinned-tooltip .pinned-facts-label {
+  color: var(--muted-foreground);
+  font-size: 12px;
 }
 
 .inferencex-pinned-tooltip .pinned-compact-topology strong,

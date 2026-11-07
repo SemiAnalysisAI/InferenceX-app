@@ -82,6 +82,7 @@ const EVALUATION_TOOLTIP_STRINGS = {
     minScore: 'Min score',
     maxScore: 'Max score',
     concurrency: 'Concurrency',
+    errorBar: 'Error bar',
     precision: 'Precision',
     tensorParallelism: 'Tensor parallelism',
     expertParallelism: 'Expert parallelism',
@@ -103,6 +104,7 @@ const EVALUATION_TOOLTIP_STRINGS = {
     minScore: '最低得分',
     maxScore: '最高得分',
     concurrency: '并发数',
+    errorBar: '误差线',
     precision: '精度',
     tensorParallelism: '张量并行 (TP)',
     expertParallelism: '专家并行 (EP)',
@@ -122,9 +124,10 @@ const parallelismRows = (data: EvaluationChartData, locale: Locale): ChartPointD
   const t = EVALUATION_TOOLTIP_STRINGS[locale];
   if (!data.disagg) {
     return [
+      { label: t.multinode, value: data.isMultinode ? t.yes : t.no },
       { label: t.tensorParallelism, value: String(data.tp) },
       { label: t.chips, value: String(data.physicalChips ?? data.numDecodeGpu) },
-      ...(data.dp && data.dp > 1 ? [{ label: 'DP', value: String(data.dp) }] : []),
+      { label: 'DP', value: String(data.dp ?? '?') },
       { label: t.expertParallelism, value: String(data.ep) },
       { label: t.dataParallelAttention, value: data.dp_attention ? t.yes : t.no },
     ];
@@ -173,6 +176,14 @@ export const evaluationPointDetails = (
       ...(unofficialBranch ? [{ label: t.branch, value: unofficialBranch, wide: true }] : []),
       { label: t.concurrency, value: String(data.conc) },
       { label: t.precision, value: precision },
+      ...(data.errorMin !== undefined && data.errorMax !== undefined
+        ? [
+            {
+              label: t.errorBar,
+              value: `${data.errorMin.toFixed(4)} – ${data.errorMax.toFixed(4)}`,
+            },
+          ]
+        : []),
       ...parallelismRows(data, locale),
     ],
     links: data.runUrl

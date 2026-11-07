@@ -36,9 +36,7 @@ const STRINGS = {
     instructions: 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
     seconds: 'Time (s)',
     chip: 'Chip',
-    power: 'Power',
-    temp: 'Temp',
-    utilization: 'Chip util',
+    sampledAt: 'Sampled at',
     rollingSuffix: (windowS: number) => `${windowS} s rolling avg`,
     smoothing: 'Smoothing',
     meanChips: 'Mean of visible chips',
@@ -51,9 +49,7 @@ const STRINGS = {
     instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置',
     seconds: '时间（秒）',
     chip: '芯片',
-    power: '功耗',
-    temp: '温度',
-    utilization: '芯片利用率',
+    sampledAt: '采样时间',
     rollingSuffix: (windowS: number) => `${windowS} 秒滚动平均`,
     smoothing: '平滑',
     meanChips: '可见芯片均值',
@@ -356,17 +352,24 @@ const GpuMetricsChart = React.memo(
                 unit: overlay.unit,
               }
             : null,
+        summary: [
+          rolling && t.rollingSuffix(display.windowS),
+          raw?.power !== undefined && `${raw.power.toFixed(1)} W`,
+          raw?.temperature !== undefined && `${raw.temperature}\u00B0C`,
+          raw?.gpuUtil !== undefined && `${raw.gpuUtil}%`,
+        ]
+          .filter(Boolean)
+          .join(' · '),
         rows: [
           ...(rolling ? [{ label: t.smoothing, value: t.rollingSuffix(display.windowS) }] : []),
-          ...(raw?.power === undefined
-            ? []
-            : [{ label: t.power, value: `${raw.power.toFixed(1)} W` }]),
-          ...(raw?.temperature === undefined
-            ? []
-            : [{ label: t.temp, value: `${raw.temperature}\u00B0C` }]),
-          ...(raw?.gpuUtil === undefined
-            ? []
-            : [{ label: t.utilization, value: `${raw.gpuUtil}%` }]),
+          ...(raw ? [{ label: t.sampledAt, value: raw.timestamp }] : []),
+          ...ALL_METRIC_OPTIONS.flatMap((metric) => {
+            const reading = raw?.[metric.key];
+            if (reading === undefined || !Number.isFinite(reading)) return [];
+            const unit =
+              metric.unit === '%' || metric.unit === '°C' ? metric.unit : ` ${metric.unit}`;
+            return [{ label: getGpuMetricLabel(metric, locale), value: `${reading}${unit}` }];
+          }),
         ],
       };
     };
@@ -520,7 +523,7 @@ const GpuMetricsChart = React.memo(
                       ]
                     : []),
                 ],
-                summary: point.rows.map((row) => row.value).join(' · ') || undefined,
+                summary: point.summary || undefined,
               },
               { pinned: false },
             );

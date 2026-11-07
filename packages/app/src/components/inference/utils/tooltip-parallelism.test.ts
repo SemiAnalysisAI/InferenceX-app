@@ -119,7 +119,7 @@ describe('tooltip parallelism — standard (ep field present)', () => {
   it('shows TP, EP and DP attention for non-multinode data', () => {
     const html = detailsText(tooltipConfig({ data: pt({ tp: 4, ep: 8, dp_attention: false }) }));
     expect(html).toContain('Single-node aggregate · 4 chips · EP8 · conc 64');
-    expect(html).not.toContain('DPA');
+    expect(html).toContain('TP ? · EP 8 · DP ? · DPA off · PP ? · DCP ? · PCP ? · DWDP 1');
   });
 
   it('shows dp_attention as True when enabled', () => {
@@ -140,7 +140,7 @@ describe('tooltip parallelism — standard (ep field present)', () => {
         tooltipConfig({ data: pt({ tp: 8, ep: 1, pp, dp_attention: false }) }),
       );
       expect(html).toContain('8 chips · TP8 · conc 64');
-      expect(html).not.toContain('PP');
+      expect(html).toContain(`PP ${pp ?? '?'} ·`);
     }
   });
 
@@ -176,8 +176,8 @@ describe('tooltip parallelism — standard (ep field present)', () => {
       }),
     );
 
-    expect(html).not.toContain('DCP');
-    expect(html).not.toContain('PCP');
+    expect(html).toContain('8 chips · TP8 / EP1 · conc 64');
+    expect(html).toContain('DCP 1 · PCP 1');
   });
 
   it('keeps an unknown expert width unknown when ep is null', () => {
@@ -186,7 +186,7 @@ describe('tooltip parallelism — standard (ep field present)', () => {
     (d as any).prefill_ep = 2;
     const html = detailsText(tooltipConfig({ data: d }));
     expect(html).toContain('4 chips · TP4 · conc 64');
-    expect(html).not.toContain('EP');
+    expect(html).toContain('EP ? ·');
   });
 });
 
@@ -212,7 +212,7 @@ describe('tooltip parallelism — multinode disagg', () => {
         }),
       }),
     );
-    expect(html).toContain('Disaggregated');
+    expect(html).toContain('Multi-node disaggregated ·');
     expect(html).toContain('Chips Configuration Workers');
     expect(html).toContain('Prefill 16 TEP4 2');
     expect(html).toContain('Decode 24 DPAEP32 3');

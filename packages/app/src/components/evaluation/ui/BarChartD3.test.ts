@@ -85,18 +85,19 @@ describe('sizeScoreLabelBackgrounds', () => {
 describe('evaluation chart locale presentation', () => {
   for (const unofficialBranch of [undefined, 'tpuv7_updates']) {
     it.each([
-      { dp: undefined, expected: false },
-      { dp: 1, expected: false },
-      { dp: 8, expected: true },
+      { dp: undefined, expected: '?' },
+      { dp: 1, expected: '1' },
+      { dp: 8, expected: '8' },
     ])(
-      `shows only non-default DP in ${unofficialBranch ? 'unofficial' : 'official'} details ($dp)`,
+      `shows DP, unknown included, in ${unofficialBranch ? 'unofficial' : 'official'} details ($dp)`,
       ({ dp, expected }) => {
         const { rows } = evaluationPointDetails(
           { ...makeDatum('TPU7x (vLLM)', 0.9), dp, physicalChips: 4 },
           unofficialBranch,
         );
         expect(rows).toContainEqual({ label: 'Chips', value: '4' });
-        expect(rows.some((row) => row.label === 'DP' && row.value === '8')).toBe(expected);
+        expect(rows).toContainEqual({ label: 'DP', value: expected });
+        expect(rows).toContainEqual({ label: 'Multinode', value: 'False' });
       },
     );
   }

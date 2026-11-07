@@ -193,7 +193,7 @@ describe('ScatterGraph', () => {
       });
     cy.get('[data-testid="point-details-panel"] p').first().should('contain.text', 'FP4');
     cy.get('[data-pinned-config]')
-      .should('contain.text', 'Disaggregated · 64 chips · conc 10,888')
+      .should('contain.text', 'Multi-node disaggregated · 64 chips · conc 10,888')
       .and('not.have.css', 'font-family', 'monospace');
     cy.get('[data-pinned-parallelism]')
       .should('contain.text', 'Prefill')

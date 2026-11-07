@@ -141,6 +141,7 @@ export function cacheReusePointDetails(
       .filter(Boolean)
       .join(' · '),
     warning: isOverlay ? t.unofficialRun : undefined,
+    date: point.date,
     metrics: [
       { value: formatShare(share.hbm), label: tierLabel('hbm', share.combined, locale) },
       ...(share.combined ? [] : [{ value: formatShare(share.host), label: t.host }]),
