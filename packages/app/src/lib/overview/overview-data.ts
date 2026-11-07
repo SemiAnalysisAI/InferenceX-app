@@ -31,7 +31,7 @@ import {
 export const OVERVIEW_WORKLOAD = { isl: 8192, osl: 1024 } as const;
 export const OVERVIEW_TIERS = [30, 50, 75, 100, 150, 200] as const;
 export type OverviewTier = (typeof OVERVIEW_TIERS)[number];
-export const OVERVIEW_PRIMARY_TIER = 50;
+export const OVERVIEW_PRIMARY_TIER = 100;
 export const OVERVIEW_HARDWARE = ['b200', 'mi355x', 'b300', 'gb200', 'gb300'] as const;
 export type OverviewReferenceHardware = (typeof OVERVIEW_HARDWARE)[number];
 export const OVERVIEW_DEFAULT_REFERENCE_HARDWARE: OverviewReferenceHardware = 'b200';
@@ -50,7 +50,7 @@ export const OVERVIEW_HISTORY_WINDOW_DAYS: Record<OverviewHistoryWindowKey, numb
 /** A history mode IS its window key, so `?compare=<key>` alone determines the
  *  payload and every href/caching path threads the window with no extra param. */
 export type OverviewComparisonMode = 'hardware' | OverviewHistoryWindowKey;
-export const OVERVIEW_DEFAULT_COMPARISON_MODE: OverviewComparisonMode = 'hardware';
+export const OVERVIEW_DEFAULT_COMPARISON_MODE: OverviewComparisonMode = '30d';
 export type OverviewModelScope = 'default' | 'all';
 export const OVERVIEW_DEFAULT_MODEL_SCOPE: OverviewModelScope = 'default';
 /** History mode only: `changed` narrows the matrix to rows that moved in the
@@ -98,6 +98,7 @@ export function resolveOverviewComparisonMode(
   raw: string | readonly string[] | undefined,
 ): OverviewComparisonMode {
   const candidate = Array.isArray(raw) ? raw[0] : raw;
+  if (candidate === 'hardware') return 'hardware';
   return (
     OVERVIEW_HISTORY_WINDOWS.find((window) => window === candidate) ??
     OVERVIEW_DEFAULT_COMPARISON_MODE
@@ -1146,7 +1147,7 @@ export function sliceOverviewCube(
     models: cube.rows.map((row) => sliceOverviewRow(row, tier, referenceHardware)),
     tier,
     engineScope: cube.engineScope,
-    comparisonMode: OVERVIEW_DEFAULT_COMPARISON_MODE,
+    comparisonMode: 'hardware',
     referenceHardware,
     modelScope: cube.modelScope,
     rowScope: 'all',

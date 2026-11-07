@@ -2027,7 +2027,8 @@ export const apiContractSourceDigests = [
     // AgentX-only. No parameter or response shape change, so the docs stand.
     // buildOverviewModelSummaries reads /rankings tiers, including ones outside
     // OVERVIEW_TIERS. The Overview BFF parameters and response shape are unchanged.
-    sourceSha256: '84b79e95a0d924845ce724ff9c945f057b480538430afa385badbbbdff58c013',
+    // Default controls are 100 tok/s/user and 30d; API docs and skills match.
+    sourceSha256: '66eb3d889e6d87beaee34051205a000628d607eca820eb0f765a3c88a4397c6d',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',

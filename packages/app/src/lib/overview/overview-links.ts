@@ -187,7 +187,7 @@ export function overviewHref(
   if (referenceHardware !== OVERVIEW_DEFAULT_REFERENCE_HARDWARE) {
     query.set('ref', referenceHardware);
   }
-  if (comparisonMode !== 'hardware') query.set('compare', comparisonMode);
+  if (comparisonMode !== OVERVIEW_DEFAULT_COMPARISON_MODE) query.set('compare', comparisonMode);
   if (modelScope !== OVERVIEW_DEFAULT_MODEL_SCOPE) query.set('models', modelScope);
   if (rowScope !== OVERVIEW_DEFAULT_ROW_SCOPE) query.set('rows', rowScope);
   if (hardwareRowScope !== OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE) {

@@ -8,7 +8,6 @@ import { getCachedBenchmarks } from '@/lib/benchmarks/benchmark-data.server';
 import { getChipHw } from '@/lib/catalog/chip-pages';
 import { buildDbKeyToSlugMap, getCachedAvailability } from '@/lib/compare/compare-availability';
 import {
-  OVERVIEW_PRIMARY_TIER,
   OVERVIEW_TIERS,
   overviewHardwareTierReader,
   overviewHeadlineScenarioForModel,
@@ -143,7 +142,9 @@ function buildRunPageData(entry: RunPageEntry, rows: BenchmarkRow[]): RunPageDat
     };
   });
 
-  const primaryRead = tierLadder.find((read) => read.tier === OVERVIEW_PRIMARY_TIER);
+  // Run-page headline costs keep their own tier, independent of overview defaults.
+  const primaryTier = 50;
+  const primaryRead = tierLadder.find((read) => read.tier === primaryTier);
   const hw = getChipHw(entry.chip);
   const costTiers: RunCostTier[] =
     primaryRead?.throughputPerGpu && primaryRead.throughputPerGpu > 0
@@ -172,7 +173,7 @@ function buildRunPageData(entry: RunPageEntry, rows: BenchmarkRow[]): RunPageDat
     bestThroughputPerGpu,
     bestMedianTtft,
     bestMedianTpot,
-    primaryTier: OVERVIEW_PRIMARY_TIER,
+    primaryTier,
     tierLadder,
     costTiers,
     oldest,
