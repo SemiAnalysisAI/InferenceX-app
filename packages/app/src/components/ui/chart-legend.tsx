@@ -296,7 +296,7 @@ export default function ChartLegend({
     </button>
   ) : null;
   const panelHeader =
-    isSidebar && !readOnly && (collapsible || actionElements) ? (
+    isSidebar && (collapsible || actionElements) ? (
       <div
         data-testid="legend-toolbar"
         className="-mx-1 -mt-1 pb-1 no-export flex shrink-0 items-start gap-1"

@@ -4679,6 +4679,7 @@ const ScatterGraph = React.memo(
                 ]}
                 hideAtomFootnote
                 readOnly={minimalChrome}
+                collapsible={!minimalChrome}
                 enableTooltips={true}
               />
             </>

@@ -1766,6 +1766,7 @@ const GPUGraph = React.memo(
               ]}
               hideAtomFootnote
               readOnly={minimalChrome}
+              collapsible={!minimalChrome}
               keyIndicators={
                 <>
                   {fixedLogPointId === null ? null : (
