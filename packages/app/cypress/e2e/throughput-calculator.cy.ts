@@ -477,7 +477,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 2);
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
-        .should('contain.text', 'P90 Interactivity');
+        .should('contain.text', 'P90 interactivity');
 
       cy.get('[data-testid="calculator-metric-cost"]').click();
       cy.get('[data-testid="calculator-bar-chart"] svg .value-label')
@@ -492,7 +492,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 2);
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
-        .should('contain.text', 'P75 Interactivity');
+        .should('contain.text', 'P75 interactivity');
       cy.get('[data-testid="calculator-controls"]').should(
         'contain.text',
         'Target P75 interactivity',
@@ -513,7 +513,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length', 1);
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
-        .should('contain.text', 'P75 Interactivity');
+        .should('contain.text', 'P75 interactivity');
     });
 
     it('hides the percentile selector behind the feature gate and defaults to P90', () => {
@@ -532,7 +532,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calc-percentile-selector"]').should('not.exist');
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
-        .should('contain.text', 'P90 Interactivity');
+        .should('contain.text', 'P90 interactivity');
       cy.get('[data-testid="calculator-controls"]').should(
         'contain.text',
         'Target P90 interactivity',
