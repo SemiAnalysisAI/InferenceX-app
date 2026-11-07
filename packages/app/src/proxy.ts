@@ -44,7 +44,7 @@ export const config: ProxyConfig = {
       has: [{ type: 'query', key: 'g_model', value: 'GLM-5\\.3-Flash' }],
     },
     { source: '/:locale(zh)?/opx/:category?', has: [{ type: 'query', key: 'op' }] },
-    '/:locale(zh)?/:tab(inference|profit-estimator|profit-estimator-per-gigawatt|evaluation|historical|calculator|fleet|first-token|cache-reuse|reliability|gpu-specs|submissions|ai-chart|current-inferencex-image|agentic-workload-explorer|agentx|operatorx|ubenchx)/:path*',
+    '/:locale(zh)?/:tab(inference|profit-estimator|profit-estimator-per-gigawatt|evaluation|historical|calculator|fleet|first-token|cache-reuse|reliability|gpu-specs|submissions|ai-chart|current-inferencex-image|agentic-workload-explorer|agentx|operatorx|ubenchx|powerx|collectivex|video)/:path*',
     '/:locale(zh)?/infx',
     '/:locale(zh)?/infx/:tab(calculator|historical|profit-estimator|profit-estimator-per-gigawatt)/:slug(deepseek|kimi|kimi-k25|qwen|glm|glm-5|glm-5-2|minimax|minimax-m25|llama|gptoss|[^/]*[A-Z][^/]*)/:filters*',
     {

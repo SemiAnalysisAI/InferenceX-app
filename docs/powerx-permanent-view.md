@@ -77,7 +77,7 @@ the selection has no measured GPU power (`noMeasuredDataHint`) instead of the ge
 
 ## PowerX layout
 
-`/powerx` and `/zh/powerx` render the shared `ChartDisplay` data pipeline and the same page
+`/pwx` and `/zh/pwx` render the shared `ChartDisplay` data pipeline and the same page
 chrome as `/infx/inference`, so the two tabs read as one dashboard. Nothing in the data layer
 changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share links,
 `?unofficialrun=` overlays and the views API are untouched.
@@ -86,10 +86,10 @@ PowerX sits behind the ↑↑↓↓←→←→BA feature gate (uppercase `B` an
 the letters are case-sensitive; use Caps Lock or Shift. Previously saved four-arrow
 unlocks are invalid when the updated app loads, so those visitors must enter the full
 code again. This is a client-side visibility flag, not authentication.
-`/powerx` is a `feature-gated` route, so it is
+`/pwx` is a `feature-gated` route, so it is
 listed under **Hidden** only once the gate is unlocked, and the AgentX point detail offers its
-PowerX view on the same condition. It is a soft flag: `PowerXFeatureGate` wraps `/powerx`,
-`/zh/powerx` and both tutorial pages, renders nothing until it reads the gate on the client,
+PowerX view on the same condition. It is a soft flag: `PowerXFeatureGate` wraps `/pwx`,
+`/zh/pwx` and both tutorial pages, renders nothing until it reads the gate on the client,
 and replaces a locked visitor onto the landing page (`/` or `/zh`), including after a relock.
 The gate lives in localStorage, so the server still sends the page and the read-only API is
 unchanged; the flag hides PowerX, it does not secure its data. An AgentX `?view=power` share
@@ -234,9 +234,9 @@ link still opens that view for locked visitors.
 
 ## Article figure → share link
 
-Base: `/powerx?g_model=<model>&i_seq=8k/1k&i_prec=<precision>` plus the hardware legend
+Base: `/pwx?g_model=<model>&i_seq=8k/1k&i_prec=<precision>` plus the hardware legend
 selection. Old `/infx/inference` links that carry a measured `i_metric`, or a power-tier filter (`i_power`)
-with no metric, are redirected to `/powerx` with the same query by `src/proxy.ts`
+with no metric, are redirected to `/pwx` with the same query by `src/proxy.ts`
 (`lib/routing/powerx-redirect.ts`; the no-metric case lands on the Power draw scatter,
 `i_metric=y_measuredAvgPower`, as such links used to chart power); Inference Performance
 no longer offers power metrics. Append:

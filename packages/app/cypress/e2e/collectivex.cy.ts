@@ -125,7 +125,7 @@ function showSuite(label: 'EP' | 'KV' | 'swap_blocks') {
 }
 
 function openCollectiveX() {
-  cy.visit('/collectivex');
+  cy.visit('/colx');
   cy.wait('@runs');
   cy.wait('@run');
   cy.get('[data-testid="collectivex-display"]').should('be.visible');
@@ -422,7 +422,7 @@ describe('CollectiveX neutral run view', () => {
   });
 
   it('localizes the suite control and the complete chart click path on the Chinese route', () => {
-    cy.visit('/zh/collectivex');
+    cy.visit('/zh/colx');
     cy.wait('@runs');
     cy.wait('@run');
 
@@ -447,7 +447,7 @@ describe('CollectiveX neutral run view', () => {
       .and('not.include', '(note ');
 
     cy.viewport(1440, 900);
-    cy.visit('/zh/collectivex');
+    cy.visit('/zh/colx');
     cy.wait('@runs');
     cy.wait('@run');
     showView('序列');
@@ -472,7 +472,7 @@ describe('CollectiveX neutral run view', () => {
 
   it('keeps the Chinese explorer and suite control reachable at 375px', () => {
     cy.viewport(375, 844);
-    cy.visit('/zh/collectivex');
+    cy.visit('/zh/colx');
     cy.wait('@runs');
     cy.wait('@run');
 
@@ -485,12 +485,22 @@ describe('CollectiveX neutral run view', () => {
 });
 
 describe('CollectiveX availability states', () => {
+  it('moves old /collectivex links to /colx with the query intact', () => {
+    installRuns([]);
+    cy.visit('/zh/collectivex?x=1');
+    cy.location().should((location) => {
+      expect(location.pathname).to.eq('/zh/colx');
+      expect(location.search).to.eq('?x=1');
+    });
+    cy.get('[data-testid="collectivex-no-runs-selected"]').should('be.visible');
+  });
+
   it('reports a missing run list', () => {
     cy.intercept('GET', '/api/v1/collectivex/runs?*', {
       statusCode: 404,
       body: { error: 'Not found' },
     }).as('missing');
-    cy.visit('/collectivex');
+    cy.visit('/colx');
     cy.wait('@missing');
     cy.get('[data-testid="collectivex-error"]')
       .should('be.visible')
@@ -501,7 +511,7 @@ describe('CollectiveX availability states', () => {
 
   it('says no results are stored when the run list is empty', () => {
     installRuns([]);
-    cy.visit('/collectivex');
+    cy.visit('/colx');
     cy.wait('@runs');
     cy.get('[data-testid="collectivex-no-runs-selected"]')
       .should('be.visible')
@@ -516,7 +526,7 @@ describe('CollectiveX availability states', () => {
       statusCode: 503,
       body: { error: 'unavailable' },
     }).as('down');
-    cy.visit('/collectivex');
+    cy.visit('/colx');
     cy.wait('@down');
     cy.get('[data-testid="collectivex-error"]')
       .should('be.visible')
@@ -538,7 +548,7 @@ describe('CollectiveX availability states', () => {
       );
     }).as('zhDown');
     installRun();
-    cy.visit('/zh/collectivex');
+    cy.visit('/zh/colx');
     cy.wait('@zhDown');
     cy.wait('@zhDown');
     cy.get('[data-testid="collectivex-error"]')
@@ -561,7 +571,7 @@ describe('CollectiveX availability states', () => {
       body: dataset,
       delay: 500,
     }).as('slowRun');
-    cy.visit('/collectivex');
+    cy.visit('/colx');
     cy.wait('@runs');
     cy.get('[data-testid="collectivex-selected-runs-loading"]').should('be.visible');
     cy.wait('@slowRun');
@@ -574,7 +584,7 @@ describe('CollectiveX availability states', () => {
     });
     installRuns();
     installRun();
-    cy.visit('/collectivex');
+    cy.visit('/colx');
     cy.wait('@runs');
     cy.wait('@run');
     cy.get('[data-testid="collectivex-display"]').should('be.visible');
@@ -876,7 +886,7 @@ describe('CollectiveX swap_blocks', () => {
     cy.get('@swapChart').should('contain.text', 'GB/s').and('not.contain.text', 'µs, log');
   });
   it('renders the translated controls and tooltip on the Chinese route', () => {
-    cy.visit('/zh/collectivex');
+    cy.visit('/zh/colx');
     cy.wait('@runs');
     cy.wait('@run');
     showSuite('swap_blocks');

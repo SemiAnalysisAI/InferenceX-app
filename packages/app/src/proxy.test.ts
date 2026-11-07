@@ -65,7 +65,7 @@ it('sends an old Inference Performance power link to PowerX with its filters', (
   );
   expect(response.status).toBe(307);
   expect(response.headers.get('location')).toBe(
-    'https://inferencex.semianalysis.com/powerx?g_model=DeepSeek-R1-0528&i_metric=y_measuredAvgPower',
+    'https://inferencex.semianalysis.com/pwx?g_model=DeepSeek-R1-0528&i_metric=y_measuredAvgPower',
   );
 });
 
@@ -125,7 +125,7 @@ it('retains PowerX and compare redirect precedence with a gated saved model', ()
   for (const [path, expected, status] of [
     [
       '/infx/inference?g_model=GLM-5.3-Flash&i_metric=y_measuredAvgPower',
-      '/powerx?g_model=GLM-5.3-Flash&i_metric=y_measuredAvgPower',
+      '/pwx?g_model=GLM-5.3-Flash&i_metric=y_measuredAvgPower',
       307,
     ],
     [
@@ -199,6 +199,12 @@ describe('legacy dashboard paths', () => {
     ['/zh/ubenchx/sm-l2-distance?gpu=all', '/zh/ubx/core-memory-profiles?gpu=all'],
     ['/ubenchx/mem-bw?x=1', '/ubx/mem-bw?x=1'],
     ['/zh/ubenchx/tpc-skyline', '/zh/ubx/tpc-skyline'],
+    ['/powerx?i_metric=y_measuredAvgPower', '/pwx?i_metric=y_measuredAvgPower'],
+    ['/zh/powerx/tutorial', '/zh/pwx/tutorial'],
+    ['/collectivex?unofficialruns=42', '/colx?unofficialruns=42'],
+    ['/zh/collectivex', '/zh/colx'],
+    ['/video?history-hardware=H200', '/vgx?history-hardware=H200'],
+    ['/zh/video', '/zh/vgx'],
   ])('sends %s to %s in one 308', (from, to) => {
     const response = redirect(from);
     expect(response.status).toBe(308);
@@ -209,7 +215,7 @@ describe('legacy dashboard paths', () => {
     for (const [from, to, status] of [
       [
         '/inference?g_model=DeepSeek-R1-0528&i_metric=y_measuredAvgPower',
-        '/powerx?g_model=DeepSeek-R1-0528&i_metric=y_measuredAvgPower',
+        '/pwx?g_model=DeepSeek-R1-0528&i_metric=y_measuredAvgPower',
         307,
       ],
       [
@@ -337,6 +343,10 @@ describe('proxy matcher', () => {
     '/zh/operatorx/gemm',
     '/ubenchx/mem-bw',
     '/zh/ubenchx',
+    '/powerx',
+    '/zh/powerx/tutorial',
+    '/collectivex',
+    '/zh/video',
     '/infx',
     '/zh/infx',
   ])('runs on %s', (url) => {

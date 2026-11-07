@@ -603,7 +603,7 @@ it('opens an old Inference power link on PowerX with the same metric', () => {
     },
   });
   cy.wait(['@powerLinkAvailability', '@powerLinkBenchmarks']);
-  cy.location('pathname').should('eq', '/powerx');
+  cy.location('pathname').should('eq', '/pwx');
   cy.contains('[data-testid="powerx-unit"] button', 'TDP').should(
     'have.attr',
     'aria-pressed',
@@ -625,7 +625,7 @@ it('replots measured settings for official and unofficial data and preserves ove
   interceptMeasuredComparison();
   cy.viewport(1440, 900);
   cy.visit(
-    `/powerx?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower`,
+    `/pwx?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower`,
     { onBeforeLoad: unlockAgenticGate },
   );
   cy.wait('@measuredOverlay');
@@ -649,7 +649,7 @@ it('says when chosen chip configs report no measured power, and plots them on ot
   interceptMeasuredComparison(singleTurnRows(null), []);
   cy.viewport(1440, 900);
   cy.visit(
-    '/powerx?g_model=DeepSeek-V4-Pro&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_gpus=b300_sglang',
+    '/pwx?g_model=DeepSeek-V4-Pro&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_gpus=b300_sglang',
     { onBeforeLoad: unlockAgenticGate },
   );
   cy.get('[data-testid="gpu-multiselect"]').should('contain', 'B300 (SGLang)');
@@ -785,7 +785,7 @@ describe('Date comparison with unofficial runs', () => {
     interceptMeasuredComparison();
     cy.viewport(1440, 900);
     cy.visit(
-      `/powerx?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_gpus=b300_sglang&i_dstart=${SINGLE_TURN_DATE}&i_dend=${SINGLE_TURN_DATE}&i_optimal=0`,
+      `/pwx?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_gpus=b300_sglang&i_dstart=${SINGLE_TURN_DATE}&i_dend=${SINGLE_TURN_DATE}&i_optimal=0`,
       { onBeforeLoad: unlockAgenticGate },
     );
     cy.wait('@measuredOverlay');
@@ -807,7 +807,7 @@ describe('Exact topology quick filter', () => {
     interceptMeasuredComparison(withTp4(officialBase), withTp4(overlayBase));
     cy.viewport(1440, 900);
     cy.visit(
-      `/powerx?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_optimal=0&i_best=0`,
+      `/pwx?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_optimal=0&i_best=0`,
       { onBeforeLoad: unlockAgenticGate },
     );
     cy.wait('@measuredOverlay');

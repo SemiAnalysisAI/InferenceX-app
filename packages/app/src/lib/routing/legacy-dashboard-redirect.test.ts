@@ -26,6 +26,9 @@ const EXPECTED: readonly (readonly [string, string])[] = [
   ['/agentx', '/infx/agentx'],
   ['/operatorx', '/opx'],
   ['/ubenchx', '/ubx'],
+  ['/video', '/vgx'],
+  ['/powerx', '/pwx'],
+  ['/collectivex', '/colx'],
 ];
 
 describe('legacy dashboard redirect table', () => {
@@ -66,6 +69,8 @@ describe('legacy dashboard redirect table', () => {
     expect(legacyDashboardPathname('/operatorx/model')).toBe('/opx/model');
     expect(legacyDashboardPathname('/ubenchx/mem-bw')).toBe('/ubx/mem-bw');
     expect(legacyDashboardPathname('/zh/ubenchx/tpc-skyline/')).toBe('/zh/ubx/tpc-skyline');
+    expect(legacyDashboardPathname('/powerx/tutorial')).toBe('/pwx/tutorial');
+    expect(legacyDashboardPathname('/zh/powerx/tutorial/')).toBe('/zh/pwx/tutorial');
   });
 
   it('sends the bare product root to the Inference tab', () => {
@@ -100,9 +105,9 @@ describe('legacy dashboard redirect table', () => {
     '/infx/unknown',
     '/opx',
     '/opx/gemm',
-    '/powerx',
-    '/video',
-    '/collectivex',
+    '/pwx',
+    '/vgx',
+    '/colx',
     '/feedback',
     '/ubx/mem-bw',
     '/api/v1/views/ubenchx',

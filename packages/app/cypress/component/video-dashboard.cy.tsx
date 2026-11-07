@@ -26,7 +26,7 @@ function assertResultsFit() {
 }
 
 function mount({
-  pathname = '/video',
+  pathname = '/vgx',
   search = '',
   edit,
   editPage,
@@ -110,7 +110,7 @@ describe('VideoGenX results', () => {
     }).as('history');
     const initialData = { state: parseResultsState('?r_tier=r'), history: null, sides: {} };
     cy.mount(
-      <PathnameContext.Provider value="/video">
+      <PathnameContext.Provider value="/vgx">
         <VideoDashboard initialData={initialData} pending />
       </PathnameContext.Provider>,
     );
@@ -119,7 +119,7 @@ describe('VideoGenX results', () => {
     cy.get('@history.all').should('have.length', 0);
     focusFirstControl(false);
     cy.mount(
-      <PathnameContext.Provider value="/video">
+      <PathnameContext.Provider value="/vgx">
         <VideoDashboard initialData={initialData} />
       </PathnameContext.Provider>,
     );
@@ -127,7 +127,7 @@ describe('VideoGenX results', () => {
     focusFirstControl(true);
   });
 
-  for (const pathname of ['/zh/video']) {
+  for (const pathname of ['/zh/vgx']) {
     it(`retains publication approval and source power verdicts in ${pathname} History`, () => {
       const zh = pathname.startsWith('/zh');
       mount({
@@ -541,10 +541,10 @@ describe('VideoGenX results', () => {
   });
 
   for (const [pathname, width] of [
-    ['/video', 1440],
-    ['/video', 390],
-    ['/zh/video', 1440],
-    ['/zh/video', 320],
+    ['/vgx', 1440],
+    ['/vgx', 390],
+    ['/zh/vgx', 1440],
+    ['/zh/vgx', 320],
   ] as const) {
     it(`keeps ${pathname} and its workload line readable at ${width} px`, () => {
       cy.viewport(width, 844);

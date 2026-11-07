@@ -48,7 +48,7 @@ export const ZH_MIRRORED_ROUTES: readonly { path: string; exact?: boolean }[] = 
   { path: '/model' },
   { path: '/embed' },
   { path: AGENTX_ROUTE.path },
-  { path: '/powerx/tutorial', exact: true },
+  { path: '/pwx/tutorial', exact: true },
   { path: '/ubx' },
   { path: '/rankings' },
   { path: '/run' },

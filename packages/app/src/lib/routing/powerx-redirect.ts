@@ -36,7 +36,7 @@ export function powerXRedirectUrl(url: URL): URL | null {
   const model = slug ? getInferenceModelBySlug(slug)?.model : undefined;
   if (slug && !model) return null;
   const target = new URL(url);
-  target.pathname = `${match.groups?.locale ?? ''}/powerx`;
+  target.pathname = `${match.groups?.locale ?? ''}${getDashboardRoute('powerx').path}`;
   if (model && !target.searchParams.has('g_model')) target.searchParams.set('g_model', model);
   if (!target.searchParams.get('i_metric'))
     target.searchParams.set('i_metric', LEGACY_POWER_METRIC);

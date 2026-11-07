@@ -46,7 +46,7 @@ interface DashboardShellCapabilityRoute extends DashboardShellCapabilities {
 
 export const DASHBOARD_SHELL_CAPABILITY_ROUTES = [
   {
-    path: '/video',
+    path: '/vgx',
     includeChildren: false,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     dashboardNudge: false,
@@ -60,7 +60,7 @@ export const DASHBOARD_SHELL_CAPABILITY_ROUTES = [
     tabNav: true,
   },
   {
-    path: '/collectivex',
+    path: '/colx',
     includeChildren: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     dashboardNudge: false,
@@ -78,8 +78,9 @@ export const DASHBOARD_SHELL_CAPABILITY_ROUTES = [
 export const DASHBOARD_ROUTES = [
   {
     key: 'video',
-    path: '/video',
-    canonicalPath: '/video',
+    path: '/vgx',
+    canonicalPath: '/vgx',
+    legacyPath: '/video',
     navGroup: 'feature-gated',
     indexable: false,
     localeMirrored: true,
@@ -99,8 +100,9 @@ export const DASHBOARD_ROUTES = [
   },
   {
     key: 'powerx',
-    path: '/powerx',
-    canonicalPath: '/powerx',
+    path: '/pwx',
+    canonicalPath: '/pwx',
+    legacyPath: '/powerx',
     navGroup: 'feature-gated',
     indexable: false,
     localeMirrored: true,
@@ -242,8 +244,9 @@ export const DASHBOARD_ROUTES = [
 
   {
     key: 'collectivex',
-    path: '/collectivex',
-    canonicalPath: '/collectivex',
+    path: '/colx',
+    canonicalPath: '/colx',
+    legacyPath: '/collectivex',
     navGroup: 'feature-gated',
     indexable: true,
     localeMirrored: true,

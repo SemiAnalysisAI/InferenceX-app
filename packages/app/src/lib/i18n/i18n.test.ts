@@ -89,7 +89,7 @@ describe('hasZhSibling', () => {
     expect(hasZhSibling('/infx/inference')).toBe(true);
     expect(hasZhSibling('/overview')).toBe(true);
     expect(hasZhSibling('/about')).toBe(true);
-    expect(hasZhSibling('/collectivex')).toBe(true);
+    expect(hasZhSibling('/colx')).toBe(true);
   });
 
   it.each(DASHBOARD_ROUTES.filter((route) => route.localeMirrored))(
@@ -136,7 +136,7 @@ describe('switchLocalePath', () => {
   it('switches English pages to their zh sibling', () => {
     expect(switchLocalePath('/')).toBe('/zh');
     expect(switchLocalePath('/infx/inference')).toBe('/zh/infx/inference');
-    expect(switchLocalePath('/collectivex')).toBe('/zh/collectivex');
+    expect(switchLocalePath('/colx')).toBe('/zh/colx');
     expect(switchLocalePath('/overview')).toBe('/zh/overview');
     expect(switchLocalePath('/blog/some-post')).toBe('/zh/blog/some-post');
   });
@@ -144,7 +144,7 @@ describe('switchLocalePath', () => {
   it('switches zh pages back to English', () => {
     expect(switchLocalePath('/zh')).toBe('/');
     expect(switchLocalePath('/zh/quotes')).toBe('/quotes');
-    expect(switchLocalePath('/zh/collectivex')).toBe('/collectivex');
+    expect(switchLocalePath('/zh/colx')).toBe('/colx');
     expect(switchLocalePath('/zh/overview')).toBe('/overview');
     expect(switchLocalePath('/zh/blog/some-post')).toBe('/blog/some-post');
   });

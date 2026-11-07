@@ -17,7 +17,7 @@ import { fetchView, type TutorialViewResponse } from '@/lib/powerx/views-api';
 import { readWidgetHash, writeWidgetHash } from '@/lib/powerx/widget-hash';
 import { cn } from '@/lib/shared/utils';
 
-/** Shared chrome for the /powerx/tutorial widgets: hash state, chips, copy, legend, fetch. */
+/** Shared chrome for the /pwx/tutorial widgets: hash state, chips, copy, legend, fetch. */
 
 export interface WidgetProps {
   locale: Locale;

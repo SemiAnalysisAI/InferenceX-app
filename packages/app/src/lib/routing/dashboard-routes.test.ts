@@ -88,8 +88,8 @@ describe('dashboard route registry', () => {
     expect(powerx.navGroup).toBe('feature-gated');
     expect(powerx.indexable).toBe(false);
     expect(powerx.localeMirrored).toBe(true);
-    expect(dashboardRouteForPathname('/powerx')?.key).toBe('powerx');
-    expect(dashboardRouteForPathname('/zh/powerx')?.key).toBe('powerx');
+    expect(dashboardRouteForPathname('/pwx')?.key).toBe('powerx');
+    expect(dashboardRouteForPathname('/zh/pwx')?.key).toBe('powerx');
   });
 
   it('exposes OperatorX in primary navigation for both locales', () => {
@@ -131,7 +131,7 @@ describe('dashboard route registry', () => {
     },
   );
 
-  it.each(['/collectivex', '/zh/collectivex'])(
+  it.each(['/colx', '/zh/colx'])(
     'keeps the CollectiveX route free of dashboard providers and nudges at %s',
     (pathname) => {
       expect(dashboardShellCapabilitiesForPathname(pathname)).toEqual({

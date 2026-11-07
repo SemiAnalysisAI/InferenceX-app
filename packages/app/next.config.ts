@@ -26,8 +26,8 @@ const SEO_REDIRECTS = [
   { source: '/datasets', destination: '/infx/agentx' },
   { source: '/zh/datasets', destination: '/zh/infx/agentx' },
   ...LOCALE_PREFIXES.flatMap((prefix) => [
-    { source: `${prefix}/xvideo`, destination: `${prefix}/video` },
-    { source: `${prefix}/xxvideo`, destination: `${prefix}/video` },
+    { source: `${prefix}/xvideo`, destination: `${prefix}/vgx` },
+    { source: `${prefix}/xxvideo`, destination: `${prefix}/vgx` },
     { source: `${prefix}/ubx`, destination: `${prefix}/ubx/mem-bw` },
     { source: `${prefix}/run/glm-5-2-on-:chip`, destination: `${prefix}/run/glm-5-3-on-:chip` },
     {

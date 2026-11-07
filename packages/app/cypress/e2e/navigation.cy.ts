@@ -123,10 +123,10 @@ describe('Chart Section Tabs — E2E', () => {
   });
 
   for (const [path, landing] of [
-    ['/powerx', '/'],
-    ['/zh/powerx', '/zh'],
-    ['/powerx/tutorial', '/'],
-    ['/zh/powerx/tutorial', '/zh'],
+    ['/pwx', '/'],
+    ['/zh/pwx', '/zh'],
+    ['/pwx/tutorial', '/'],
+    ['/zh/pwx/tutorial', '/zh'],
   ] as const) {
     it(`sends a locked visitor from ${path} to the landing page`, () => {
       cy.visit(path, {
@@ -141,14 +141,14 @@ describe('Chart Section Tabs — E2E', () => {
   }
 
   it('keeps PowerX open once the feature gate is unlocked', () => {
-    cy.visit('/powerx', {
+    cy.visit('/pwx', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
       },
     });
     cy.get('[data-testid="inference-chart-display"]').should('exist');
-    cy.location('pathname').should('eq', '/powerx');
+    cy.location('pathname').should('eq', '/pwx');
   });
 
   it('permanently redirects the retired PowerX page to the inference dashboard', () => {
@@ -378,7 +378,7 @@ describe('H3 video performance history', () => {
       ],
       nextPage: null,
     }).as('history');
-    cy.visit('/zh/video?history-hardware=NVIDIA%20H200');
+    cy.visit('/zh/vgx?history-hardware=NVIDIA%20H200');
     cy.wait('@history');
     cy.contains('summary', '性能历史').parent('details').should('have.attr', 'open');
     cy.get('[data-testid="results-history"] summary').should('contain', '性能历史');
@@ -423,7 +423,7 @@ describe('H3 video performance history', () => {
   });
   it('keeps the hidden Video tab behind the shared unlock and noindex', () => {
     cy.viewport(1440, 1000);
-    cy.visit('/video', {
+    cy.visit('/vgx', {
       onBeforeLoad(win) {
         win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
       },
@@ -437,7 +437,7 @@ describe('H3 video performance history', () => {
       '{upArrow}{upArrow}{downArrow}{downArrow}{leftArrow}{rightArrow}{leftArrow}{rightArrow}BA',
     );
     cy.get('[data-testid="tab-trigger-hidden"]').click();
-    cy.contains('a', 'Video').should('have.attr', 'href', '/video');
+    cy.contains('a', 'Video').should('have.attr', 'href', '/vgx');
     cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
   });
 });

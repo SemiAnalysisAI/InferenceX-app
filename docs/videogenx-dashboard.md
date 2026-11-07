@@ -1,6 +1,6 @@
-# VideoGenX results (/video)
+# VideoGenX results (/vgx)
 
-`VideoDashboard` renders the same shared results view at `/video` and `/zh/video`.
+`VideoDashboard` renders the same shared results view at `/vgx` and `/zh/vgx`.
 It preserves the existing feature gate, route registry, published History reader,
 and sealed media loader. All visible copy lives in component-local `STRINGS`.
 
@@ -314,7 +314,7 @@ browser playback and difference failure, bilingual layout and 390px overflow.
 
 ## 中文说明
 
-`/video` 与 `/zh/video` 共用结果页，沿用现有路由、功能开关、History 和封存媒体读取器。
+`/vgx` 与 `/zh/vgx` 共用结果页，沿用现有路由、功能开关、History 和封存媒体读取器。
 比较要求固定的 20 条视频 C1 工作负载，每种硬件至少 10 个有效样本；完整身份包含模型版本、
 生成参数、prompt、seed 和测量语义。较短 smoke、未完成及未匹配结果留在性能历史，不混入比较。
 历史记录保留尚无发布批准的存储结果；默认图表仅接纳发布回执与原始来源及 checkout 匹配的记录。

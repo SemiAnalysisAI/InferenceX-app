@@ -121,7 +121,7 @@ function mountTimeline(
     </div>
   );
   mountWithProviders(
-    <PathnameContext.Provider value={options.powerx ? '/powerx' : '/infx/inference'}>
+    <PathnameContext.Provider value={options.powerx ? '/pwx' : '/infx/inference'}>
       {options.powerx ? <PowerXSurfaceProvider>{timeline}</PowerXSurfaceProvider> : timeline}
     </PathnameContext.Provider>,
     providerOverrides(options.unofficial, options.activeHwTypes),

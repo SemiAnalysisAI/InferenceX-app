@@ -118,7 +118,7 @@ The overview page (`/overview`, `/zh/overview`) is prerendered with the default 
 
 ### API responses
 
-VideoGenX (`/video` and `/zh/video`) streams its shell with the URL selection
+VideoGenX (`/vgx` and `/zh/vgx`) streams its shell with the URL selection
 first and then the dashboard with the complete bounded History cohort and
 selected clip metadata, when video storage is configured; without it the browser
 reads History itself. The existing read-only handler is called in process,

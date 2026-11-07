@@ -51,7 +51,7 @@ export function isPhoneWidthPowerX(): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
   const segments = window.location.pathname.split('/').filter(Boolean);
   if (segments[0] === 'zh') segments.shift();
-  return segments[0] === 'powerx' && window.matchMedia(MOBILE_VIEWPORT_QUERY).matches;
+  return segments[0] === 'pwx' && window.matchMedia(MOBILE_VIEWPORT_QUERY).matches;
 }
 
 const notPhoneWidthPowerX = () => !isPhoneWidthPowerX();

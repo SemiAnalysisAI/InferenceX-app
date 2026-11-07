@@ -359,11 +359,11 @@ describe('TabNav — Hidden popover for gated tabs', () => {
     );
     cy.get('[data-testid="tab-trigger-hidden"]').click();
     cy.get('[data-testid="tab-hidden-popover"]').should('be.visible');
-    cy.get('[data-testid="tab-trigger-collectivex"]').should('have.attr', 'href', '/collectivex');
+    cy.get('[data-testid="tab-trigger-collectivex"]').should('have.attr', 'href', '/colx');
     cy.get('[data-testid="tab-trigger-ai-chart"]').should('have.attr', 'href', '/infx/ai-chart');
     cy.get('[data-testid="tab-hidden-popover"]')
       .find('[data-testid="tab-trigger-powerx"]')
-      .should('have.attr', 'href', '/powerx');
+      .should('have.attr', 'href', '/pwx');
     cy.get('[data-testid="tab-hidden-popover"]')
       .find('[data-testid="tab-trigger-submissions"]')
       .should('not.exist');
@@ -382,7 +382,7 @@ describe('TabNav — Hidden popover for gated tabs', () => {
     cy.get('[data-testid="tab-trigger-collectivex"]').should(
       'have.attr',
       'href',
-      '/collectivex?unofficialruns=42',
+      '/colx?unofficialruns=42',
     );
   });
 

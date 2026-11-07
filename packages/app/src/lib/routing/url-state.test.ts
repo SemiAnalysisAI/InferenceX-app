@@ -1062,10 +1062,10 @@ describe('buildShareUrl on the video dashboard', () => {
   });
 
   it('shares the live v_ params and nothing else', async () => {
-    setupWindow('?v_y=kjPerVideo&v_optimal=0&history-hardware=H200&i_metric=y_x', '/video');
+    setupWindow('?v_y=kjPerVideo&v_optimal=0&history-hardware=H200&i_metric=y_x', '/vgx');
     const { buildShareUrl } = await import('@/lib/routing/url-state');
     const url = new URL(buildShareUrl());
-    expect(url.pathname).toBe('/video');
+    expect(url.pathname).toBe('/vgx');
     expect(url.searchParams.get('v_y')).toBe('kjPerVideo');
     expect(url.searchParams.get('v_optimal')).toBe('0');
     expect(url.searchParams.has('history-hardware')).toBe(false);
@@ -1084,11 +1084,11 @@ describe('VideoGenX results share state', () => {
     vi.resetModules();
     const { location } = setupWindow('?r_range=last-month', '/infx/reliability');
     const { buildShareUrl } = await import('@/lib/routing/url-state');
-    location.pathname = '/zh/video';
+    location.pathname = '/zh/vgx';
     location.search =
       '?r_workload=source%3Ac1&r_gpus=4&r_deadline=60&r_price_t2v=0.08&unofficialrun=123';
     const url = new URL(buildShareUrl());
-    expect(url.pathname).toBe('/zh/video');
+    expect(url.pathname).toBe('/zh/vgx');
     expect(url.searchParams.get('r_workload')).toBe('source:c1');
     expect(url.searchParams.get('r_gpus')).toBe('4');
     expect(url.searchParams.get('r_deadline')).toBe('60');

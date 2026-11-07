@@ -82,7 +82,7 @@ const powerBenchmarks = powerConfigs.flatMap((config) =>
 function visitCertifiedPowerChart(
   extraParams = '',
   benchmarks = powerBenchmarks,
-  page: '/infx/inference' | '/powerx' = '/powerx',
+  page: '/infx/inference' | '/pwx' = '/pwx',
 ) {
   cy.intercept('GET', '/api/v1/availability/compact', {
     body: availabilityBody(powerAvailability),
