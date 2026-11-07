@@ -4,6 +4,20 @@ OperatorX is available directly in primary dashboard navigation without an unloc
 CollectiveX remains in **Hidden**. `/operatorx` and `/zh/operatorx` share the
 same reader, chart, filters, and coverage.
 
+Each category has its own page at `/operatorx/<category>` and `/zh/operatorx/<category>`,
+where the category is `gemm`, `moe`, `attention` or `model`. Bare `/operatorx` shows GEMM.
+The category tabs swap the path in place without a reload. They drop `workload` and
+`parallel`, which belong to one category, and keep every other query parameter. Older links
+with `?op=<category>` redirect permanently (308) to the category path with their other
+parameters intact. The proxy handles this in `operatorXCategoryRedirectUrl`
+(`packages/app/src/lib/routing/operatorx-category.ts`). Unknown categories return 404.
+
+中文：每个类别都有独立页面 `/operatorx/<category>` 与 `/zh/operatorx/<category>`，类别为
+`gemm`、`moe`、`attention` 或 `model`。直接访问 `/operatorx` 显示 GEMM。切换类别标签会就地替换
+路径而不重新加载页面，并去掉只属于单个类别的 `workload` 与 `parallel`，其他查询参数保持不变。
+旧的 `?op=<category>` 链接会永久重定向（308）到对应类别路径，
+并保留其他参数。未知类别返回 404。
+
 The view compares single-GPU GEMM and routed MoE operator timings on NVIDIA and AMD. The
 reader matches every requested case/backend against the stored shards, and ingest keeps each
 shard's newest attempt, so partial reruns retain earlier shards. Rows are separated into

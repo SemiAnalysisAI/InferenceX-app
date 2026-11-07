@@ -194,7 +194,7 @@ describe('default workload', () => {
   it('opens MoE on DeepSeek-V4.1-Flash when the request names no valid workload', () => {
     const c = moe(['moe:DeepSeek-R1-0528', 'moe:DeepSeek-V4.1-Flash']);
     expect(comparisonView(c, null).workload).toBe('moe:DeepSeek-V4.1-Flash');
-    // `/operatorx?op=moe&workload=moe` names no real workload.
+    // `/operatorx/moe?workload=moe` names no real workload.
     expect(comparisonView(c, 'moe').workload).toBe('moe:DeepSeek-V4.1-Flash');
   });
 

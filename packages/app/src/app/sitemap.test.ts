@@ -4,6 +4,7 @@ import { SITE_URL } from '@semianalysisai/inferencex-constants';
 import { DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
 import { getAllChipRouteSlugs } from '@/lib/catalog/chip-pages';
 import { PUBLIC_INFERENCE_MODEL_SLUGS as INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
+import { OPERATORX_CATEGORIES } from '@/lib/routing/operatorx-category';
 import { isFeatureGatedModelPath } from '@/lib/routing/model-feature-visibility';
 import { languageAlternates, zhPath } from '@/lib/i18n/i18n';
 import { getModelPageSlugs } from '@/lib/catalog/model-pages';
@@ -162,6 +163,15 @@ describe('sitemap locale parity', () => {
     for (const entry of INFERENCE_MODEL_SLUGS) {
       expect(urls.has(`${SITE_URL}/inference/${entry.slug}`)).toBe(true);
       expect(urls.has(`${SITE_URL}${zhPath(`/inference/${entry.slug}`)}`)).toBe(true);
+    }
+  });
+
+  it('emits both locales for every /operatorx/<category> page', async () => {
+    const entries = await sitemap();
+    const urls = new Set(entries.map((entry) => entry.url));
+    for (const entry of OPERATORX_CATEGORIES) {
+      expect(urls.has(`${SITE_URL}/operatorx/${entry.slug}`)).toBe(true);
+      expect(urls.has(`${SITE_URL}${zhPath(`/operatorx/${entry.slug}`)}`)).toBe(true);
     }
   });
 

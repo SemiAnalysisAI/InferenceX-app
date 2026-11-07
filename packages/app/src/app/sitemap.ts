@@ -27,6 +27,7 @@ import {
   ACTIVE_INFERENCE_MODEL_SLUGS,
   INFERENCE_MODEL_SLUGS,
 } from '@/lib/routing/inference-model-slug';
+import { OPERATORX_CATEGORIES, operatorXCategoryPath } from '@/lib/routing/operatorx-category';
 import { languageAlternates, zhPath } from '@/lib/i18n/i18n';
 import {
   defaultRouteModel,
@@ -140,6 +141,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'daily',
       priority: 0.7,
     }),
+    ...OPERATORX_CATEGORIES.flatMap((entry) =>
+      localizedPair(operatorXCategoryPath(entry.slug), {
+        lastModified: latestData,
+        changeFrequency: 'daily' as const,
+        priority: 0.8,
+      }),
+    ),
     ...localizedPair('/compare', {
       lastModified: latestData,
       changeFrequency: 'daily',

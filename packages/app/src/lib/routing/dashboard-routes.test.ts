@@ -166,6 +166,8 @@ describe('dashboard route registry', () => {
     expect(dashboardRouteForPathname('/inference')?.key).toBe('inference');
     expect(dashboardRouteForPathname('/')).toBeUndefined();
     expect(dashboardRouteForPathname('/zh/inference/agentic/42')?.key).toBe('inference');
+    expect(dashboardNavTabForPathname('/operatorx/model')).toBe('operatorx');
+    expect(dashboardNavTabForPathname('/zh/operatorx/moe')).toBe('operatorx');
     expect(dashboardRouteForPathname('/compare/foo-vs-bar')).toBeUndefined();
     expect(isDashboardRouteKey('not-a-tab')).toBe(false);
   });

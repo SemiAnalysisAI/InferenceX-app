@@ -154,6 +154,19 @@ it('canonicalizes a model-route alias with its query', () => {
   );
 });
 
+it('moves a legacy OperatorX op link to its category path with the rest of its query', () => {
+  const response = proxy(
+    new NextRequest(
+      'https://inferencex.semianalysis.com/zh/operatorx?op=model&model=DeepSeek-V4-Pro',
+    ),
+    { waitUntil: vi.fn() },
+  );
+  expect(response.status).toBe(308);
+  expect(response.headers.get('location')).toBe(
+    'https://inferencex.semianalysis.com/zh/operatorx/model?model=DeepSeek-V4-Pro',
+  );
+});
+
 describe('proxy matcher', () => {
   it.each(['inferencex-cli/1.2.3', 'inferencex-skill/0.4.0'])(
     'runs on API requests from %s',
@@ -212,6 +225,9 @@ describe('proxy matcher', () => {
     '/zh/profit-estimator-per-gigawatt/kimi-k3/target/30/percentile/p75',
     '/profit-estimator/kimi-k3?i_pctl=p75',
     '/zh/profit-estimator/kimi-k3/target/30?percentile=p50',
+    '/operatorx?op=model',
+    '/zh/operatorx?op=gemm&workload=gemm',
+    '/operatorx/gemm?op=moe',
   ])('runs on %s', (url) => {
     expect(unstable_doesMiddlewareMatch({ config, url })).toBe(true);
   });
@@ -240,6 +256,9 @@ describe('proxy matcher', () => {
     '/calculator',
     '/calculator/kimi-k3?i_seq=1k%2F1k&g_model=Kimi-K3',
     '/historical/kimi-k3',
+    '/operatorx',
+    '/operatorx/model?model=DeepSeek-V4-Pro',
+    '/zh/operatorx/moe',
     '/profit-estimator?i_pctl=p75',
     '/profit-estimator/kimi-k3/target/30?c_power=modeled',
     '/compare/deepseek-r1-b200-vs-mi355x/8k-1k/extra?utm_source=x',

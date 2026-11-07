@@ -219,7 +219,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-operatorx-view',
-    sourceSha256: '89aa6ffe658926222451497ae0e4a65c1d73237771ab31edfc17ff212abecd2a',
+    sourceSha256: '38f35ad252e31f25db44060c2792384be6dbcb1dac69d217d857486a7ca3732a',
   },
   // Agentic Workload Explorer page backend (frozen ProxyTrace snapshot).
   {

@@ -58,11 +58,11 @@ const gemm = comparisonView(
 );
 const moe = comparisonView(buildComparison('moe', []), null);
 
-it('shows measured and missing GPU coverage, then switches the URL to MoE', () => {
+it('shows measured and missing GPU coverage, then switches the path to MoE', () => {
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('gemm');
   cy.intercept('GET', '/api/v1/operatorx/compare?op=moe*', moe).as('moe');
 
-  cy.visit('/operatorx');
+  cy.visit('/operatorx/gemm?model=DeepSeek-V4-Pro');
   cy.wait('@gemm');
   cy.get('[data-testid="operatorx-page"] h1')
     .should('contain.text', 'OperatorX')
@@ -76,8 +76,23 @@ it('shows measured and missing GPU coverage, then switches the URL to MoE', () =
 
   cy.get('[data-testid="operatorx-page"]').contains('button', 'MoE').click();
   cy.wait('@moe');
-  cy.location('search').should('contain', 'op=moe');
+  cy.location('pathname').should('eq', '/operatorx/moe');
+  cy.location('search').should('eq', '?model=DeepSeek-V4-Pro');
   cy.contains('No results yet').should('be.visible');
+});
+
+it('redirects a legacy ?op= link to the category path', () => {
+  cy.request({ url: '/operatorx?op=model&model=DeepSeek-V4-Pro', followRedirect: false })
+    .its('headers.location')
+    .should('match', /\/operatorx\/model\?model=DeepSeek-V4-Pro$/u);
+  cy.visit('/operatorx?op=model');
+  cy.location('pathname').should('eq', '/operatorx/model');
+  cy.location('search').should('eq', '');
+  cy.contains('[data-testid="operatorx-page"] [role="tab"]', 'Model view').should(
+    'have.attr',
+    'aria-selected',
+    'true',
+  );
 });
 
 it('defaults to a measured 950PR shape and normalized BF16, while honoring precision and scale changes', () => {

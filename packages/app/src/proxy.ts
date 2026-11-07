@@ -10,14 +10,16 @@ import {
   INFERENCE_MODEL_SLUGS,
   inferenceModelRouteForSelection,
 } from '@/lib/routing/inference-model-slug';
+import { operatorXCategoryRedirectUrl } from '@/lib/routing/operatorx-category';
 
 const EMBED_CSP = 'frame-ancestors *';
 
 // Next reads this statically, so it must stay a literal. Only requests with work to do run the
 // proxy. That means CLI analytics on API routes (only the CLI and skill user agents are counted,
 // so browser API calls skip it), embed headers, legacy Inference power links that redirect to
-// PowerX, saved gated model selections, model-route aliases and retired profit percentiles, and
-// compare share links whose slug needs canonicalizing with their query intact.
+// PowerX, saved gated model selections, model-route aliases and retired profit percentiles,
+// legacy OperatorX `?op=` links, and compare share links whose slug needs canonicalizing with
+// their query intact.
 // A `has` query condition needs a named key, and a shared compare link can carry any parameter
 // (`i_metric`, `g_rundate`, `utm_*`), so compare detail document requests always match and the
 // redirect helper returns at once when the URL has no query. The scenario segment lists the
@@ -38,6 +40,7 @@ export const config: ProxyConfig = {
       source: '/:locale(zh)?/inference/:slug?',
       has: [{ type: 'query', key: 'g_model', value: 'GLM-5\\.3-Flash' }],
     },
+    { source: '/:locale(zh)?/operatorx/:category?', has: [{ type: 'query', key: 'op' }] },
     '/:locale(zh)?/:tab(calculator|historical|profit-estimator|profit-estimator-per-gigawatt)/:slug(deepseek|kimi|kimi-k25|qwen|glm|glm-5|glm-5-2|minimax|minimax-m25|llama|gptoss|[^/]*[A-Z][^/]*)/:filters*',
     {
       source: '/:locale(zh)?/:tab(profit-estimator|profit-estimator-per-gigawatt)/:slug/:filters*',
@@ -63,6 +66,8 @@ export function proxy(request: NextRequest, event: Pick<NextFetchEvent, 'waitUnt
   if (powerX) return NextResponse.redirect(powerX);
   const compare = compareCanonicalRedirectUrl(request.nextUrl);
   if (compare) return NextResponse.redirect(compare, 308);
+  const operatorX = operatorXCategoryRedirectUrl(request.nextUrl);
+  if (operatorX) return NextResponse.redirect(operatorX, 308);
   const modelRoute = modelRouteRedirectUrl(request.nextUrl);
   if (modelRoute) return NextResponse.redirect(modelRoute, 308);
   // A saved gated selection must be known from the pathname during SSR,

@@ -1,15 +1,25 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { usePathname } from 'next/navigation';
 
 import { Card } from '@/components/ui/card';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useOperatorXModel } from '@/hooks/api/use-operatorx';
+import { useClientPathname } from '@/hooks/useClientPathname';
 import { useClientSearch } from '@/hooks/useClientSearch';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { replaceClientSearch } from '@/lib/routing/client-navigation';
+import { replaceRouterPathname } from '@/lib/routing/client-navigation';
+import {
+  DEFAULT_OPERATORX_CATEGORY,
+  isOperatorXCategory,
+  OPERATORX_CATEGORIES,
+  operatorXCategoryForPathname,
+  operatorXCategoryRouteForSelection,
+  type OperatorXCategory,
+} from '@/lib/routing/operatorx-category';
 
 import { ComparisonDashboard } from './ComparisonDashboard';
 import { DEFAULT_MODEL, ModelViewLoading } from './model-view/shell';
@@ -18,26 +28,14 @@ const ModelView = dynamic(() => import('./model-view/ModelView').then((mod) => m
   loading: ModelViewLoading,
 });
 
-const CATEGORIES = [
-  { value: 'gemm', label: { en: 'GEMM', zh: 'GEMM' } },
-  { value: 'moe', label: { en: 'MoE', zh: 'MoE' } },
-  { value: 'attention', label: { en: 'Attention', zh: 'Attention' } },
-  { value: 'model', label: { en: 'Model view', zh: '模型视图' } },
-] as const;
-
-type Category = (typeof CATEGORIES)[number]['value'];
-
-function isCategory(value: string | null): value is Category {
-  return CATEGORIES.some((c) => c.value === value);
-}
-
 function selectCategory(value: string) {
+  if (!isOperatorXCategory(value)) return;
   track('operatorx_category_selected', { category: value });
-  const params = new URLSearchParams(window.location.search);
-  params.set('op', value);
-  params.delete('workload');
-  params.delete('parallel');
-  replaceClientSearch(params);
+  replaceRouterPathname(
+    operatorXCategoryRouteForSelection(window.location.pathname, value),
+    ['workload', 'parallel'],
+    { pageview: true },
+  );
 }
 
 function ModelViewTab() {
@@ -52,8 +50,8 @@ function ModelViewTab() {
 
 export default function OperatorXView() {
   const locale = useLocale();
-  const requested = new URLSearchParams(useClientSearch()).get('op');
-  const category: Category = isCategory(requested) ? requested : 'gemm';
+  const category: OperatorXCategory =
+    operatorXCategoryForPathname(useClientPathname(usePathname())) ?? DEFAULT_OPERATORX_CATEGORY;
   return (
     <Tabs
       value={category}
@@ -68,18 +66,18 @@ export default function OperatorXView() {
           qualifier={locale === 'zh' ? '实验性' : 'Experimental'}
         />
         <TabsList className="mt-4">
-          {CATEGORIES.map((c) => (
-            <TabsTrigger key={c.value} value={c.value}>
+          {OPERATORX_CATEGORIES.map((c) => (
+            <TabsTrigger key={c.slug} value={c.slug}>
               {c.label[locale]}
             </TabsTrigger>
           ))}
         </TabsList>
       </Card>
-      {CATEGORIES.map((c) => (
-        <TabsContent key={c.value} value={c.value}>
-          {c.value === 'model'
-            ? category === c.value && <ModelViewTab />
-            : category === c.value && <ComparisonDashboard op={c.value} />}
+      {OPERATORX_CATEGORIES.map((c) => (
+        <TabsContent key={c.slug} value={c.slug}>
+          {c.slug === 'model'
+            ? category === c.slug && <ModelViewTab />
+            : category === c.slug && <ComparisonDashboard op={c.slug} />}
         </TabsContent>
       ))}
     </Tabs>

@@ -234,7 +234,7 @@ const responseExample = {
       },
     ],
   },
-  url: '/operatorx?op=model&model=DeepSeek-V4-Pro',
+  url: '/operatorx/model?model=DeepSeek-V4-Pro',
   total: 1,
   pageSize: 100,
   rows: [exampleRow],
