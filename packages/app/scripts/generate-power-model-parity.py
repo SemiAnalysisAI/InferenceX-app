@@ -6,7 +6,7 @@ Usage: python3 packages/app/scripts/generate-power-model-parity.py [--inferencex
 PATH is a local SemiAnalysisAI/InferenceX clone that contains REVISION (default:
 $INFERENCEX_REPO, else an InferenceX checkout next to this repository). The script
 extracts power_model at REVISION into a temporary directory and imports it, so it
-needs Python >= 3.12 with pydantic 2, the upstream package's only dependency.
+needs Python >= 3.12 with pydantic >= 2.12, the upstream package's only dependency.
 
 It writes two files next to the port (packages/app/src/lib/power/power_model):
 - power-model.manifest.json: the revision, its source tree, and every upstream

@@ -9,7 +9,6 @@ on:
       - 'packages/app/scripts/generate-power-model-parity.py'
       - 'packages/app/src/lib/power/power-model.manifest.json'
       - 'packages/app/src/lib/power/power-model.parity.json'
-      - 'packages/app/src/lib/power/power_model/**'
 
 permissions: {}
 
@@ -50,5 +49,5 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
       - name: Compare fixture and manifest with the pinned revision
         run: >-
-          uv run --no-project --python 3.12 --with ./inferencex/power_model
+          uv run --no-project --exclude-newer PT12H --python 3.12 --with ./inferencex/power_model
           python packages/app/scripts/generate-power-model-parity.py --inferencex inferencex --check
