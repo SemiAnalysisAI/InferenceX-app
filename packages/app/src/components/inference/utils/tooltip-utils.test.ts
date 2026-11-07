@@ -78,6 +78,15 @@ function tooltipConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
   };
 }
 
+function latencyCells(config: TooltipConfig) {
+  const table = new DOMParser()
+    .parseFromString(detailsHtml(config), 'text/html')
+    .querySelector('[data-pinned-latency]')!;
+  return [...table.querySelectorAll('tr')].map((tr) =>
+    [...tr.children].map((cell) => cell.textContent),
+  );
+}
+
 const systemPower = {
   status: 'supported',
   unit: 'chassis',
@@ -853,6 +862,50 @@ describe('buildPointDetails', () => {
     expect(html).not.toContain('data-action="track-over-time"');
     expect(html).not.toContain('Track Over Time');
     expect(html).not.toContain('Untrack Over Time');
+  });
+
+  it('tabulates median, P90 and P99 latency in axis units with dashes for missing fields', () => {
+    const data = pt({
+      mean_ttft: 9,
+      median_ttft: 0.31603,
+      p75_ttft: 9,
+      p90_ttft: 1.27063,
+      p95_ttft: 9,
+      p99_ttft: 0,
+      median_e2el: 2.25182,
+      p90_e2el: 20.53009,
+      median_intvty: 220.264,
+      p90_intvty: 178.571,
+      p99_intvty: 150.4,
+      p90_e2e_norm_intvty: 87.82,
+      total_prompt_tokens: 1000,
+      total_generation_tokens: 100,
+    });
+    expect(latencyCells(tooltipConfig({ data }))).toEqual([
+      ['', 'Med', 'P90', 'P99'],
+      ['TTFT s', '0.32', '1.27', '—'],
+      ['E2EL s', '2.25', '20.5', '—'],
+      ['Interactivity tok/s/user', '220', '179', '150'],
+      ['Norm. interactivity tok/s/user', '—', '87.8', '—'],
+    ]);
+    const zh = latencyCells(tooltipConfig({ data, locale: 'zh' }));
+    expect(zh[0]).toEqual(['', '中位', 'P90', 'P99']);
+    expect(zh.map((cells) => cells[0])).toEqual([
+      '',
+      'TTFT s',
+      '端到端延迟 s',
+      '交互性 tok/s/user',
+      '归一化交互性 tok/s/user',
+    ]);
+    const overlay = tooltipConfig({
+      data,
+      overlayData: { label: 'branch', hardwareConfig: mockHardwareConfig, data: [] },
+    });
+    expect(latencyCells(overlay)).toEqual(latencyCells(tooltipConfig({ data })));
+    const html = detailsHtml(tooltipConfig({ data }));
+    expect(html.indexOf('data-pinned-config')).toBeLessThan(html.indexOf('data-pinned-latency'));
+    expect(html.indexOf('data-pinned-latency')).toBeLessThan(html.indexOf('data-pinned-tokens'));
+    expect(detailsHtml(tooltipConfig())).not.toContain('data-pinned-latency');
   });
 });
 

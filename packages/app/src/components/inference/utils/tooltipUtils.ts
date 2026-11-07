@@ -25,6 +25,10 @@ import {
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
 import { powerBasisPillHtml } from '@/components/inference/powerx/PowerBasisPill';
 import {
+  X_AXIS_EXPLANATIONS,
+  type XAxisKind,
+} from '@/components/inference/axis-metric-explanations';
+import {
   isAllInMeasuredConfigKey,
   isMeasuredEnergyConfigKey,
 } from '@/components/inference/metric-registry';
@@ -1030,6 +1034,55 @@ const pinnedMetricHTML = (label: string, value: number, metricKey?: string) => `
 const pinnedSectionHTML = (html: string) =>
   html ? `<div class="pinned-section">${html}</div>` : '';
 
+const LATENCY_STRINGS = {
+  en: {
+    caption: 'Latency',
+    median: 'Med',
+    ttft: 'TTFT',
+    e2eLatency: 'E2EL',
+    interactivity: 'Interactivity',
+    e2eNormalizedInteractivity: 'Norm. interactivity',
+  },
+  zh: {
+    caption: '延迟',
+    median: '中位',
+    ttft: 'TTFT',
+    e2eLatency: '端到端延迟',
+    interactivity: '交互性',
+    e2eNormalizedInteractivity: '归一化交互性',
+  },
+} as const satisfies Record<Locale, Record<XAxisKind | 'caption' | 'median', string>>;
+
+const latencyValue = (v: number | undefined): string => {
+  if (v === undefined || !Number.isFinite(v) || v <= 0) return '—';
+  if (v >= 999.5) return `${(v / 1000).toPrecision(3)}K`;
+  return v.toPrecision(v < 1 ? 2 : 3);
+};
+
+const latencyHTML = (d: InferenceData, locale: Locale): string => {
+  const t = LATENCY_STRINGS[locale];
+  const rows = (
+    [
+      ['ttft', [d.median_ttft, d.p90_ttft, d.p99_ttft]],
+      ['e2eLatency', [d.median_e2el, d.p90_e2el, d.p99_e2el]],
+      ['interactivity', [d.median_intvty, d.p90_intvty, d.p99_intvty]],
+      ['e2eNormalizedInteractivity', [undefined, d.p90_e2e_norm_intvty, undefined]],
+    ] satisfies [XAxisKind, (number | undefined)[]][]
+  )
+    .map(([kind, values]) => [kind, values.map(latencyValue)] as const)
+    .filter(([, cells]) => cells.some((cell) => cell !== '—'));
+  if (rows.length === 0) return '';
+  return `<table data-pinned-latency class="pinned-topology pinned-latency" aria-label="${t.caption}">
+      <thead><tr><th></th><th>${t.median}</th><th>P90</th><th>P99</th></tr></thead>
+      <tbody>${rows
+        .map(([kind, cells]) => {
+          const axis = X_AXIS_EXPLANATIONS[kind].name;
+          return `<tr><td title="${escapeHtml(axis[locale](null))}">${t[kind]} <span class="pinned-latency-unit">${escapeHtml(axisLabelUnit(axis.en(null)))}</span></td>${cells.map((cell) => `<td>${cell}</td>`).join('')}</tr>`;
+        })
+        .join('')}</tbody>
+    </table>`;
+};
+
 export const buildPointDetails = (config: TooltipConfig): PointDetails => {
   const { data: d, xLabel, yLabel, selectedYAxisMetric, overlayData } = config;
   const locale = config.locale ?? 'en';
@@ -1071,6 +1124,7 @@ export const buildPointDetails = (config: TooltipConfig): PointDetails => {
     html: `<div class="pinned-metrics">${pinnedMetricHTML(yLabel, d.y, selectedYAxisMetric)}${pinnedMetricHTML(xLabel, d.x)}</div>
     ${topologyHTML(d, locale)}
     ${rowsHTML(tputRows)}
+    ${pinnedSectionHTML(latencyHTML(d, locale))}
     ${pinnedSectionHTML(cacheHTML(d, locale, config.color ?? 'var(--foreground)') + runtimeHTML(d, locale))}
     ${pinnedSectionHTML(power)}
     ${pinnedSectionHTML(footer)}`,

@@ -32,6 +32,26 @@
   padding-right: 0;
 }
 
+.inferencex-pinned-tooltip .pinned-latency td {
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.inferencex-pinned-tooltip .pinned-latency td:first-child {
+  width: 100%;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  white-space: normal;
+}
+
+.inferencex-pinned-tooltip .pinned-latency-unit {
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
 .inferencex-pinned-tooltip .pinned-image {
   margin-top: 2px;
   color: var(--muted-foreground);
