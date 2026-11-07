@@ -110,6 +110,7 @@ export function expectNoPageOverflow(): void {
 }
 
 export function openXAxisMenu(): void {
+  cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value');
   cy.get('[data-testid="inference-secondary-controls"] > button').then(($toggle) => {
     if ($toggle.is(':visible') && $toggle.attr('aria-expanded') !== 'true') {
       cy.wrap($toggle).click();
