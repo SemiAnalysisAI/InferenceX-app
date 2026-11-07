@@ -27,6 +27,7 @@ import { Heading, HeadingQualifier } from '@/components/ui/heading';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
@@ -34,7 +35,8 @@ import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { RUN_CONTEXT_GRID, RunField } from '@/components/inference/ui/WorkflowInfoDisplay';
 import { hardwareLabel } from './hardware';
-import { layoutLabel, leadCell } from './deployment';
+import { compareDeployments, layoutLabel, leadCell } from './deployment';
+import { engineLabel, engineSort } from './engines';
 import { useVideoPoints } from './use-video-points';
 import type { VideoInitialData } from './initial-data';
 import {
@@ -83,6 +85,8 @@ const STRINGS = {
     compareRangePlaceholder: 'Select date range',
     secondaryControls: 'More chart controls',
     changed: 'changed',
+    engine: 'Engine',
+    all: 'All',
     date: 'Run date',
     yAxis: 'Y-axis metric',
     stepsUnit: 'steps',
@@ -143,6 +147,8 @@ const STRINGS = {
     compareRangePlaceholder: '选择日期范围',
     secondaryControls: '更多图表设置',
     changed: '项已更改',
+    engine: '引擎',
+    all: '全部',
     date: '运行日期',
     yAxis: 'Y 轴指标',
     stepsUnit: '步',
@@ -191,9 +197,6 @@ const subscribe = () => () => {};
 const DETAIL_ENTRY = 'videoResultsDetail';
 const onDetailEntry = () =>
   (window.history.state as Record<string, unknown> | null)?.[DETAIL_ENTRY] === true;
-
-const cellLabel = (cell: ResultCell) =>
-  `${hardwareLabel(cell.point.hardwareKey ?? '')}${cell.overlay ? ` · #${cell.point.runId}` : ''}`;
 
 export default function VideoDashboard({
   initialData,
@@ -314,7 +317,17 @@ export default function VideoDashboard({
     ...new Set(
       deploymentCells.flatMap(({ metadata }) => (metadata.engine ? [metadata.engine] : [])),
     ),
-  ];
+  ].toSorted((a, b) => engineSort(a) - engineSort(b));
+  // With two engines shown, a per-hardware pick (profit bar) names the engine it picked.
+  const cellLabel = (cell: ResultCell) =>
+    [
+      hardwareLabel(cell.point.hardwareKey ?? ''),
+      engines.length > 1 && cell.metadata.engine ? engineLabel(cell.metadata.engine) : null,
+      cell.overlay ? `#${cell.point.runId}` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  const compareConfigs = projection.state.configs;
   // Chip Config plots earlier runs, so their popovers open cells outside the as-of set.
   const detailPool = [...deploymentCells, ...projection.history];
   const detailCell =
@@ -331,9 +344,10 @@ export default function VideoDashboard({
           .filter(
             (cell) =>
               cell.point.hardwareKey === detailCell.point.hardwareKey &&
+              cell.metadata.engine === detailCell.metadata.engine &&
               cell.overlay === detailCell.overlay,
           )
-          .toSorted((a, b) => (a.point.participating ?? 0) - (b.point.participating ?? 0));
+          .toSorted((a, b) => compareDeployments(a.point, b.point));
   // Left in the URL, a dead key would reopen its detail once its hardware is shown again.
   const deadPoint = state.point !== null && !loading && !error && detailCell === undefined;
   useEffect(() => {
@@ -418,8 +432,9 @@ export default function VideoDashboard({
   const apiUrl = `/api/v1/views/video?view=overview&${resultsSearch(state)}`;
   const secondaryChanged = [
     state.yMetric !== DEFAULT_RESULTS_STATE.yMetric,
+    state.engine !== null,
     state.date !== null || state.run !== null,
-    state.configs.length > 0,
+    compareConfigs.length > 0,
   ].filter(Boolean).length;
   const model = deploymentCells[0]?.metadata.model ?? state.model ?? s.title;
   const csvUrl = `${apiUrl}&format=csv`;
@@ -475,7 +490,7 @@ export default function VideoDashboard({
                         className="mt-1 block text-xs font-medium"
                         data-testid="results-workload-summary"
                       >
-                        {[workloadLabel, ...engines].join(' · ')}
+                        {[workloadLabel, ...engines.map(engineLabel)].join(' · ')}
                       </span>
                     )}
                   </>
@@ -505,6 +520,28 @@ export default function VideoDashboard({
                     data-testid="results-chart-config"
                   >
                     {metricSelector()}
+                    {(options.engines.length > 1 || state.engine !== null) && (
+                      <div className="flex min-w-0 flex-col gap-1.5">
+                        <Label>{s.engine}</Label>
+                        <SegmentedToggle
+                          role="group"
+                          value={state.engine ?? 'all'}
+                          options={[
+                            { value: 'all', label: s.all },
+                            ...options.engines.map((engine) => ({
+                              value: engine,
+                              label: engineLabel(engine),
+                            })),
+                          ]}
+                          onValueChange={(value) => {
+                            track('video_results_engine_selected', { engine: value });
+                            update({ engine: value === 'all' ? null : value });
+                          }}
+                          ariaLabel={s.engine}
+                          testId="results-engine"
+                        />
+                      </div>
+                    )}
                   </ControlPanel>
                   <ControlPanel legend={s.compareHistory} data-testid="results-compare-history">
                     <div className="grid min-w-0 gap-3">
@@ -519,9 +556,15 @@ export default function VideoDashboard({
                           triggerTestId="results-chip-config"
                           options={projection.chipConfigs.map(({ key, point }) => ({
                             value: key,
-                            label: `${hardwareLabel(point.hardwareKey ?? '')} · ${layoutLabel(point, locale)}`,
+                            label: [
+                              hardwareLabel(point.hardwareKey ?? ''),
+                              point.results?.engine ? engineLabel(point.results.engine) : null,
+                              layoutLabel(point, locale),
+                            ]
+                              .filter(Boolean)
+                              .join(' · '),
                           }))}
-                          value={state.configs}
+                          value={compareConfigs}
                           onChange={(configs) => {
                             track('video_results_chip_config_selected', {
                               configs: configs.join(','),
@@ -540,7 +583,7 @@ export default function VideoDashboard({
                           selectedSuffix={locale === 'zh' ? ' 已选' : undefined}
                         />
                       </div>
-                      {state.configs.length > 0 && (
+                      {compareConfigs.length > 0 && (
                         <div className="flex min-w-0 flex-col space-y-1.5">
                           <LabelWithTooltip
                             htmlFor="date-picker"
@@ -692,7 +735,7 @@ export default function VideoDashboard({
             <div className="flex min-w-0 flex-col gap-6" data-testid="video-results-chart-card">
               <VideoResultsChart
                 cells={deploymentCells}
-                history={state.configs.length > 0 ? projection.history : null}
+                history={compareConfigs.length > 0 ? projection.history : null}
                 roster={roster}
                 state={state}
                 colorFor={colorFor}

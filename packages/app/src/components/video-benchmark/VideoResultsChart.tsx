@@ -2,7 +2,6 @@
 
 import { curveLinear } from 'd3';
 import { useMemo, type ReactNode } from 'react';
-import { FRAMEWORK_LABELS } from '@semianalysisai/inferencex-constants';
 import { Button } from '@/components/ui/button';
 import ChartLegend, { type CommonLegendItemProps } from '@/components/ui/chart-legend';
 import { ChartPointDetails } from '@/components/ui/chart-point-details';
@@ -12,8 +11,11 @@ import type { LayerConfig, TooltipConfig } from '@/lib/d3-chart/D3Chart/types';
 import { axisLabelUnit, chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
+import type { ShapeKey } from '@/lib/charts/chart-rendering';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { zeroAnchoredDomain } from './chart-domain';
+import { serverSplit } from './deployment';
+import { engineLabel, engineSort, engineStyle, type EngineStyle } from './engines';
 import { hardwareLabel, hardwareSort } from './hardware';
 import type { ResultCell, ResultsState } from './results';
 import {
@@ -64,6 +66,8 @@ const STRINGS = {
     runtime: 'Runtime',
     runLink: 'GitHub Actions run',
     viewTelemetry: 'View telemetry',
+    engines: 'Engines',
+    engineNotRecorded: 'Engine not recorded',
   },
   zh: {
     gpus: (count: number | null) => (count === null ? '未记录 GPU 数量' : `${count} 张 GPU`),
@@ -95,15 +99,48 @@ const STRINGS = {
     runtime: 'Runtime',
     runLink: 'GitHub Actions 运行记录',
     viewTelemetry: '查看遥测',
+    engines: '引擎',
+    engineNotRecorded: '未记录引擎',
   },
 };
 
 interface PlotPoint extends ResultsChartPoint {
-  /** The shared scatter layer keys shapes by precision; every video point is a circle. */
+  /** Required by the shared scatter layer; the engine, not a precision, sets the shape. */
   precision: '';
   hardwareKey: string;
+  engine: string | null;
   overlay: boolean;
   color: string;
+}
+
+const SWATCH_SHAPES: Record<ShapeKey, ReactNode> = {
+  circle: <circle cx="12" cy="6" r="3.5" />,
+  square: <rect x="8.5" y="2.5" width="7" height="7" />,
+  diamond: <path d="M12 1.5 L16.5 6 L12 10.5 L7.5 6 Z" />,
+  triangle: <path d="M12 2 L16 10 L8 10 Z" />,
+};
+
+/** The engine's point shape on its frontier dash, as the chart draws them. */
+function EngineSwatch({ style }: { style: EngineStyle }) {
+  return (
+    <svg
+      width="24"
+      height="12"
+      viewBox="0 0 24 12"
+      aria-hidden="true"
+      className="shrink-0 fill-current stroke-current"
+    >
+      <line
+        x1="1"
+        y1="6"
+        x2="23"
+        y2="6"
+        strokeWidth="1.5"
+        strokeDasharray={style.dasharray === 'none' ? undefined : style.dasharray}
+      />
+      <g stroke="none">{SWATCH_SHAPES[style.shape]}</g>
+    </svg>
+  );
 }
 
 export default function VideoResultsChart({
@@ -174,6 +211,7 @@ export default function VideoResultsChart({
           ...point,
           precision: '',
           hardwareKey: item.hardwareKey,
+          engine: item.engine,
           overlay: item.overlay,
           color: item.overlay ? overlayRunColor(0) : colorFor(item.hardwareKey),
         })),
@@ -199,6 +237,10 @@ export default function VideoResultsChart({
       ),
     [series, colorFor],
   );
+  const lineDashes = useMemo(
+    () => new Map(series.map((item) => [item.key, engineStyle(item.engine).dasharray])),
+    [series],
+  );
   const layers = useMemo<LayerConfig<PlotPoint>[]>(
     () => [
       {
@@ -207,6 +249,7 @@ export default function VideoResultsChart({
         lines,
         config: {
           getColor: (key) => lineColors.get(key) ?? 'var(--foreground)',
+          getStrokeDasharray: (key) => lineDashes.get(key) ?? 'none',
           strokeWidth: 2,
           curve: curveLinear,
         },
@@ -218,6 +261,7 @@ export default function VideoResultsChart({
         keyFn: (point) => point.key,
         config: {
           getColor: (point) => point.color,
+          getShapeKey: (point) => engineStyle(point.engine).shape,
           getOpacity: (point) => (point.optimal ? 1 : 0.35),
           getLabelText: (point) =>
             history ? (point.cell.metadata.date ?? '') : s.gpus(point.cell.point.participating),
@@ -225,6 +269,7 @@ export default function VideoResultsChart({
           hideLabels: !labels,
           dataAttrs: {
             hardware: (point) => point.hardwareKey,
+            engine: (point) => point.engine ?? 'na',
             overlay: (point) => String(point.overlay),
             point: (point) => point.key,
             optimal: (point) => String(point.optimal),
@@ -232,7 +277,7 @@ export default function VideoResultsChart({
         },
       },
     ],
-    [lines, lineColors, plotted, labels, s, history],
+    [lines, lineColors, lineDashes, plotted, labels, s, history],
   );
   const tooltip = useMemo<TooltipConfig<PlotPoint>>(() => {
     const otherX = RESULTS_X_METRICS[RESULTS_X_METRIC_KEYS.find((key) => key !== state.xMetric)!];
@@ -240,13 +285,11 @@ export default function VideoResultsChart({
     const describe = ({ cell, overlay, x: xValue, y: yValue }: PlotPoint) => {
       const { point } = cell;
       const engine = cell.metadata.engine;
-      const tp = point.server?.tp ?? null,
-        ulysses = point.server?.ulysses ?? null;
       return {
         title: hardwareLabel(point.hardwareKey ?? ''),
-        subtitle: engine ? (FRAMEWORK_LABELS[engine] ?? engine) : undefined,
+        subtitle: engine ? engineLabel(engine) : undefined,
         date: point.observedAt?.slice(0, 10) ?? '—',
-        strategy: tp !== null && ulysses !== null ? `TP${tp} × Ulysses ${ulysses}` : null,
+        strategy: serverSplit(point),
         replicas: point.replicas === null ? null : s.replicas(point.replicas),
         warning: overlay ? `✕ #${point.runId}` : undefined,
         yValue: n(yValue, y.digits),
@@ -426,6 +469,9 @@ export default function VideoResultsChart({
           },
     );
   const single = !history && series.length > 0 && series.every((item) => item.measured <= 1);
+  const engines = [...new Set(series.map((item) => item.engine))].toSorted(
+    (a, b) => engineSort(a) - engineSort(b),
+  );
 
   return (
     <D3Chart<PlotPoint>
@@ -528,14 +574,36 @@ export default function VideoResultsChart({
             },
           ]}
           keyIndicators={
-            state.unofficialRun ? (
-              <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                <span
-                  className="inline-block size-3 shrink-0 rounded-full"
-                  style={{ background: overlayRunColor(0) }}
-                />
-                {s.unofficial} #{state.unofficialRun}
-              </p>
+            engines.length > 1 || state.unofficialRun ? (
+              <>
+                {engines.length > 1 && (
+                  <ul
+                    className="mt-3 flex flex-col gap-1.5 text-xs text-muted-foreground"
+                    aria-label={s.engines}
+                    data-testid="results-engine-key"
+                  >
+                    {engines.map((engine) => (
+                      <li
+                        key={engine ?? 'na'}
+                        className="flex items-center gap-2"
+                        data-engine={engine ?? 'na'}
+                      >
+                        <EngineSwatch style={engineStyle(engine)} />
+                        {engine === null ? s.engineNotRecorded : engineLabel(engine)}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {state.unofficialRun && (
+                  <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                    <span
+                      className="inline-block size-3 shrink-0 rounded-full"
+                      style={{ background: overlayRunColor(0) }}
+                    />
+                    {s.unofficial} #{state.unofficialRun}
+                  </p>
+                )}
+              </>
             ) : undefined
           }
         />
