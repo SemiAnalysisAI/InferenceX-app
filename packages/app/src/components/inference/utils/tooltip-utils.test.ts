@@ -877,7 +877,7 @@ describe('buildPointDetails for unofficial overlays', () => {
     const official = generateHoverTooltipContent({ ...tooltipConfig(), color: 'red' });
     const overlay = generateHoverTooltipContent({ ...overlayConfig(), color: 'red' });
     const notice = /<div data-hover-notice[^>]*>(?<text>[^<]*)<\/div>/u.exec(overlay);
-    expect(notice?.groups?.text).toBe('✕ Unofficial run · feature-branch');
+    expect(notice?.groups?.text).toBe('✕ feature-branch');
     expect(official).not.toContain('data-hover-notice');
     expect(overlay.replace(notice![0], '')).toBe(official);
 
@@ -888,18 +888,28 @@ describe('buildPointDetails for unofficial overlays', () => {
     } = buildPointDetails(tooltipConfig());
     const { html: overlayHtml, unofficial, ...overlayFields } = buildPointDetails(overlayConfig());
     expect(officialNotice).toBeUndefined();
-    expect(unofficial).toBe('✕ Unofficial run');
+    expect(unofficial).toBe('✕ feature-branch');
     expect(overlayFields).toEqual(officialFields);
-    const branchLine = '<div class="tooltip-line"><strong>Branch:</strong> feature-branch</div>';
-    expect(overlayHtml).toContain(branchLine);
-    expect(
-      overlayHtml.replace(branchLine, '').replace('<div class="pinned-section"></div>', ''),
-    ).toBe(officialHtml);
+    expect(overlayHtml).toBe(officialHtml);
+    expect(overlayHtml).not.toContain('Branch');
   });
 
-  it('includes "UNOFFICIAL RUN" label', () => {
+  it('falls back to the run id, then the unofficial label, without a branch', () => {
+    const noBranch = (runUrl?: string) =>
+      buildPointDetails(
+        overlayConfig({
+          overlayData: { label: '', hardwareConfig: mockHardwareConfig, data: [], runUrl },
+        }),
+      ).unofficial;
+    expect(noBranch('https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123')).toBe(
+      '✕ #123',
+    );
+    expect(noBranch()).toBe('✕ Unofficial run');
+  });
+
+  it('shows the branch notice', () => {
     const html = detailsText(overlayConfig());
-    expect(html).toContain('Unofficial run');
+    expect(html).toContain('✕ feature-branch');
   });
 
   it('includes branch label from overlayData', () => {

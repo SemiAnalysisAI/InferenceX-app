@@ -126,10 +126,9 @@ export const fmt = (v: number): string => {
 
 const TOOLTIP_STRINGS = {
   en: {
-    unofficialRun: '✕ Unofficial run',
+    unofficialRun: 'Unofficial run',
     dataFrom: (d: string) => `(data from ${d})`,
     date: 'Date',
-    branch: 'Branch',
     image: 'Image',
     inputTputPerChip: 'Input Token Throughput per Chip',
     outputTputPerChip: 'Output Token Throughput per Chip',
@@ -142,10 +141,9 @@ const TOOLTIP_STRINGS = {
     run: 'GitHub Actions run',
   },
   zh: {
-    unofficialRun: '✕ 非官方运行',
+    unofficialRun: '非官方运行',
     dataFrom: (d: string) => `（数据来自 ${d}）`,
     date: '日期',
-    branch: '分支',
     image: '镜像',
     inputTputPerChip: '每芯片输入 token 吞吐量',
     outputTputPerChip: '每芯片输出 token 吞吐量',
@@ -158,6 +156,14 @@ const TOOLTIP_STRINGS = {
     run: 'GitHub Actions 运行记录',
   },
 } as const;
+
+const overlayNotice = (d: InferenceData, overlayData: OverlayData, locale: Locale): string => {
+  const run = overlayData.getRunForRow?.(d);
+  const branch = run ? run.branch : overlayData.label;
+  const runId = (run?.url ?? d.run_url ?? overlayData.runUrl)?.match(/\/runs\/(?<id>\d+)/u)?.groups
+    ?.id;
+  return `✕ ${branch || (runId ? `#${runId}` : TOOLTIP_STRINGS[locale].unofficialRun)}`;
+};
 
 interface PointDetailRow {
   label: string;
@@ -1050,18 +1056,15 @@ export const buildPointDetails = (config: TooltipConfig): PointDetails => {
     modeledSystemPowerHTML(d, selectedYAxisMetric, locale) +
     rowsHTML(powerWithheldRows(d, locale)) +
     workerPowerHTML(d, locale);
-  const branch = overlayData ? (overlayData.getRunForRow?.(d)?.branch ?? overlayData.label) : '';
-  const footer =
-    (branch ? tooltipLine(t.branch, escapeHtml(branch)) : '') +
-    (d.image
-      ? `<div class="pinned-image"><span>${t.image}</span><p>${escapeHtml(d.image.trim())}</p></div>`
-      : '');
+  const footer = d.image
+    ? `<div class="pinned-image"><span>${t.image}</span><p>${escapeHtml(d.image.trim())}</p></div>`
+    : '';
   const entryDate = comparisonEntryDate(d.date);
   const comparisonDate = config.comparisonLabel ?? formatTooltipDate(entryDate, locale);
   return {
     title: hw?.label ?? String(d.hwKey),
     subtitle: [engines, d.precision.toUpperCase()].filter(Boolean).join(' · '),
-    unofficial: overlayData ? t.unofficialRun : undefined,
+    unofficial: overlayData ? overlayNotice(d, overlayData, locale) : undefined,
     date: config.comparisonDate
       ? `${comparisonDate}${d.actualDate && d.actualDate !== entryDate ? ` ${t.dataFrom(ownDate)}` : ''}`
       : (config.comparisonLabel ?? ownDate),
@@ -1156,8 +1159,7 @@ export const generateHoverTooltipContent = (config: HoverTooltipConfig): string 
     speculativeDecodingName({ method: d.spec_decoding, algorithm: d.spec_algorithm }, d.model),
   ].filter(Boolean);
   const cache = pointCacheHit(d, locale);
-  const branch = overlayData?.getRunForRow?.(d)?.branch ?? overlayData?.label;
-  const notice = overlayData ? `${detailStrings.unofficialRun}${branch ? ` · ${branch}` : ''}` : '';
+  const notice = overlayData ? overlayNotice(d, overlayData, locale) : '';
   const sourceDate =
     d.actualDate && d.actualDate !== comparisonEntryDate(d.date)
       ? ` ${detailStrings.dataFrom(formatTooltipDate(d.actualDate, locale))}`

@@ -282,7 +282,7 @@ describe('EvalBarChartD3', () => {
     cy.get('#evaluation-chart .unofficial-eval-point > circle').then(([hit]) =>
       hoverTopmostOver(hit),
     );
-    cy.get(`${tooltip} [data-hover-notice]`).should('contain.text', run.branch);
+    cy.get(`${tooltip} [data-hover-notice]`).should('have.text', `✕ ${run.branch}`);
     cy.get('#evaluation-chart .point')
       .filter(
         (_, point) => (point as unknown as { __data__: typeof shared }).__data__.score === 0.7,

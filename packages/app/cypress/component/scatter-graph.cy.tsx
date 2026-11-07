@@ -184,7 +184,7 @@ describe('ScatterGraph', () => {
     const tooltip = '[data-chart-tooltip="overlap-hover"]';
     cy.scatterPoints('#overlap-hover').should('have.length', 2);
     cy.get('#overlap-hover .unofficial-overlay-pt > circle').then(([hit]) => hoverTopmostOver(hit));
-    cy.get(`${tooltip} [data-hover-notice]`).should('contain.text', 'Unofficial run');
+    cy.get(`${tooltip} [data-hover-notice]`).should('have.text', '✕ Preview');
     cy.get(tooltip).should('contain.text', 'conc 32');
     cy.scatterPoints('#overlap-hover').then((points) => {
       const lone = points.find((point) => point.datum.conc === 64)!;

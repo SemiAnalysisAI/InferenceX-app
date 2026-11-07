@@ -235,7 +235,7 @@ describe('generateHoverTooltipContent', () => {
     });
     expect(html).toContain('border: 1px solid var(--border)');
     expect(html).toContain('data-hover-notice');
-    expect(html).toContain('Unofficial run');
+    expect(html).toContain('✕ feature-branch');
   });
 
   it('renders Chinese copy', () => {

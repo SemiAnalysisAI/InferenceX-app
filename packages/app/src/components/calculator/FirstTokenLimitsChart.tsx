@@ -46,7 +46,6 @@ const STRINGS = {
     lower: (pct: number) => `${pct}% lower`,
     only: (label: string) => `${label} only`,
     unofficialRun: 'Unofficial run',
-    branch: 'Branch',
     cost: 'Cost',
     ttft: (stat: string) => `${stat} TTFT`,
     interactivity: (stat: string) => `${stat} interactivity`,
@@ -69,7 +68,6 @@ const STRINGS = {
     lower: (pct: number) => `低 ${pct}%`,
     only: (label: string) => `仅 ${label}`,
     unofficialRun: '非官方运行',
-    branch: '分支',
     cost: '成本',
     ttft: (stat: string) => zhStatPhrase('TTFT', stat),
     interactivity: (stat: string) => zhStatPhrase('交互性', stat),
@@ -156,7 +154,7 @@ export function firstTokenPointDetails(
     ]
       .filter(Boolean)
       .join(' · '),
-    warning: isOverlay ? t.unofficialRun : undefined,
+    warning: isOverlay ? `✕ ${runInfo?.branch || t.unofficialRun}` : undefined,
     date: winner.point.date,
     metrics: [
       { value: formatCost(winner.cost), label: getCostTypeLabel(costType) },
@@ -166,7 +164,6 @@ export function firstTokenPointDetails(
       ' · ',
     ),
     rows: [
-      ...(runInfo?.branch ? [{ label: t.branch, value: runInfo.branch, wide: true }] : []),
       { label: t.cost, value: cost },
       { label: t.ttft(ttftStat), value: ttft },
       { label: t.interactivity(interactivityStat), value: interactivity },

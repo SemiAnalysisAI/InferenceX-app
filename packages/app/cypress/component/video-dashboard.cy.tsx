@@ -188,9 +188,9 @@ describe('VideoGenX results', () => {
     points(overlay).should('have.length', 1).and('have.attr', 'data-optimal', 'true');
     searchParam('r_optimal').should('equal', '1');
     points(overlay).trigger('mouseenter', { force: true });
-    cy.get('[data-chart-tooltip="video-results-chart"]').should(
-      'contain',
-      'Unofficial run #34341996789',
+    cy.get('[data-chart-tooltip="video-results-chart"] [data-hover-notice]').should(
+      'have.text',
+      '✕ #34341996789',
     );
     points(overlay).trigger('mouseleave', { force: true });
     toggleHardware('b200');

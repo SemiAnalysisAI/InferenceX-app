@@ -75,8 +75,7 @@ const fmtSideTooltip = (tp: number, ep: number, dpa: boolean, nw: number, locale
 const EVALUATION_TOOLTIP_STRINGS = {
   en: {
     runLink: 'GitHub Actions run',
-    unofficial: '✕ Unofficial run',
-    branch: 'Branch',
+    unofficial: 'Unofficial run',
     date: 'Date',
     meanScore: 'Mean score',
     minScore: 'Min score',
@@ -97,8 +96,7 @@ const EVALUATION_TOOLTIP_STRINGS = {
   },
   zh: {
     runLink: 'GitHub Actions 运行记录',
-    unofficial: '✕ 非官方运行',
-    branch: '分支',
+    unofficial: '非官方运行',
     date: '日期',
     meanScore: '平均得分',
     minScore: '最低得分',
@@ -162,18 +160,21 @@ export const evaluationPointDetails = (
   const t = EVALUATION_TOOLTIP_STRINGS[locale];
   const precision = getPrecisionLabel(data.precision as Precision);
   const date = formatEvaluationDate(data.date, locale);
+  const runId = data.runUrl?.match(/\/runs\/(?<id>\d+)/u)?.groups?.id;
   return {
     title: data.hwLabel,
     subtitle: data.engineLabel || undefined,
     date,
-    warning: unofficialBranch ? t.unofficial : undefined,
+    warning:
+      unofficialBranch === undefined
+        ? undefined
+        : `✕ ${unofficialBranch || (runId ? `#${runId}` : t.unofficial)}`,
     metrics: [
       { value: data.score.toFixed(4), label: t.meanScore },
       { value: (data.minScore ?? data.score).toFixed(4), label: t.minScore },
       { value: (data.maxScore ?? data.score).toFixed(4), label: t.maxScore },
     ],
     rows: [
-      ...(unofficialBranch ? [{ label: t.branch, value: unofficialBranch, wide: true }] : []),
       { label: t.concurrency, value: String(data.conc) },
       { label: t.precision, value: precision },
       ...(data.errorMin !== undefined && data.errorMax !== undefined
@@ -206,7 +207,7 @@ export const generateEvaluationTooltipContent = (
     color,
     metrics: [details.metrics[0]],
     summary: details.summary,
-    warning: details.warning && `${details.warning} · ${unofficialBranch}`,
+    warning: details.warning,
   });
 };
 
@@ -849,7 +850,7 @@ export default function EvalBarChartD3({
         <ChartPointDetails
           {...evaluationPointDetails(
             datum,
-            isOverlay ? branchForRowRef.current(datum) : undefined,
+            isOverlay ? (branchForRowRef.current(datum) ?? '') : undefined,
             locale,
           )}
           color={pointColor(datum, isOverlay)}
@@ -1166,7 +1167,7 @@ export default function EvalBarChartD3({
               generateEvaluationTooltipContent(
                 datum,
                 pointColor(datum, true),
-                branchForRowRef.current(datum),
+                branchForRowRef.current(datum) ?? '',
                 locale,
               ),
             position: (event) => {

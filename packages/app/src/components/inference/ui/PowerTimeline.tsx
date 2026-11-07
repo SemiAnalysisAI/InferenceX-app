@@ -1476,9 +1476,7 @@ export default function PowerTimeline({
       return {
         title: seriesLabel(point),
         subtitle: traceConfigLabel(point),
-        warning: overlayInfo
-          ? `✕ ${t.unofficialRun} · ${overlayInfo.branch || `run ${overlayInfo.id}`}`
-          : undefined,
+        warning: overlayInfo ? `✕ ${overlayInfo.branch || `#${overlayInfo.id}`}` : undefined,
         time:
           xMode === 'serving'
             ? `${sample.x.toFixed(1)} s · ${t.serving} · ${clock}`

@@ -570,7 +570,7 @@ describe('getThroughputPointDetails', () => {
     expect(generateTooltipHTML(d, 'red')).not.toContain('Unofficial run');
   });
 
-  it('adds the unofficial warning, branch, and overlay run link for overlay bars', () => {
+  it('adds the branch notice and overlay run link for overlay bars', () => {
     const d = throughputDetails(
       makeResult({
         hwKey: 'b300',
@@ -581,17 +581,13 @@ describe('getThroughputPointDetails', () => {
       }),
       officialRunUrl,
     );
-    expect(d.warning).toBe('Unofficial run');
-    expect(d.rows).toContainEqual({
-      label: 'Branch',
-      value: 'feat/my-branch',
-      wide: true,
-    });
+    expect(d.warning).toBe('✕ feat/my-branch');
+    expect(d.rows?.map((row) => row.label)).not.toContain('Branch');
     expect(d.links[0]).toMatchObject({
       label: 'View workflow run',
       href: overlayRunUrl,
     });
-    expect(generateTooltipHTML(d, 'red')).toContain('Unofficial run');
+    expect(generateTooltipHTML(d, 'red')).toContain('✕ feat/my-branch');
   });
 
   it('localizes the overlay strings in Chinese', () => {
@@ -606,12 +602,8 @@ describe('getThroughputPointDetails', () => {
       undefined,
       'zh',
     );
-    expect(d.warning).toBe('非官方运行');
-    expect(d.rows).toContainEqual({
-      label: '分支',
-      value: 'feat/my-branch',
-      wide: true,
-    });
+    expect(d.warning).toBe('✕ feat/my-branch');
+    expect(d.rows?.map((row) => row.label)).not.toContain('分支');
     expect(d.links[0]?.label).toBe('查看工作流运行');
   });
 

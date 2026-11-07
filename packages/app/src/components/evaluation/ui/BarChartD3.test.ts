@@ -115,7 +115,7 @@ describe('evaluation chart locale presentation', () => {
     const official = generateEvaluationTooltipContent(datum, '#000');
     const overlay = generateEvaluationTooltipContent(datum, '#000', 'feat/x');
     const notice =
-      '<div data-hover-notice style="color: #dc2626; font-size: 11px; font-weight: 600; margin-bottom: 4px;">✕ Unofficial run · feat/x</div>';
+      '<div data-hover-notice style="color: #dc2626; font-size: 11px; font-weight: 600; margin-bottom: 4px;">✕ feat/x</div>';
     expect(overlay.replace(notice, '')).toBe(official);
 
     const { warning, rows, ...overlayFields } = evaluationPointDetails(datum, 'feat/x');
@@ -125,9 +125,16 @@ describe('evaluation chart locale presentation', () => {
       ...officialFields
     } = evaluationPointDetails(datum);
     expect(officialWarning).toBeUndefined();
-    expect(warning).toBe('✕ Unofficial run');
+    expect(warning).toBe('✕ feat/x');
     expect(overlayFields).toEqual(officialFields);
-    expect(rows).toEqual([{ label: 'Branch', value: 'feat/x', wide: true }, ...officialRows]);
+    expect(rows).toEqual(officialRows);
+    expect(
+      evaluationPointDetails(
+        { ...datum, runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123' },
+        '',
+      ).warning,
+    ).toBe('✕ #123');
+    expect(evaluationPointDetails(datum, '', 'zh').warning).toBe('✕ 非官方运行');
   });
 
   it('preserves the raw English date while formatting the Chinese date', () => {
@@ -144,7 +151,7 @@ describe('evaluation chart locale presentation', () => {
       'feature/zh',
       'zh',
     );
-    expect(details.warning).toContain('非官方运行');
+    expect(details.warning).toBe('✕ feature/zh');
     expect(details.metrics[0].label).toBe('平均得分');
     expect(details.rows).toContainEqual({ label: '并发数', value: '1' });
     expect(details.links[0]).toMatchObject({

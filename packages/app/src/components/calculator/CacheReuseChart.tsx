@@ -49,7 +49,6 @@ export const CACHE_REUSE_STRINGS = {
     noTiers: 'No cache tiers reported',
     instructions: 'Hover a bar for the breakdown',
     unofficialRun: 'Unofficial run',
-    branch: 'Branch',
     concurrency: 'Concurrency',
     hostSource: 'Host tier from',
     external: 'router / external cache',
@@ -72,7 +71,6 @@ export const CACHE_REUSE_STRINGS = {
     noTiers: '未上报缓存层级',
     instructions: '悬停柱形查看拆分',
     unofficialRun: '非官方运行',
-    branch: '分支',
     concurrency: '并发数',
     hostSource: '主机层来源',
     external: 'router / 外部缓存',
@@ -140,7 +138,7 @@ export function cacheReusePointDetails(
     ]
       .filter(Boolean)
       .join(' · '),
-    warning: isOverlay ? t.unofficialRun : undefined,
+    warning: isOverlay ? `✕ ${runInfo?.branch || t.unofficialRun}` : undefined,
     date: point.date,
     metrics: [
       { value: formatShare(share.hbm), label: tierLabel('hbm', share.combined, locale) },
@@ -149,7 +147,6 @@ export function cacheReusePointDetails(
     ],
     summary: [`${t.concurrency} ${point.concurrency}`, recipe].join(' · '),
     rows: [
-      ...(runInfo?.branch ? [{ label: t.branch, value: runInfo.branch, wide: true }] : []),
       { label: t.concurrency, value: String(point.concurrency) },
       ...(share.hostSource === null ? [] : [{ label: t.hostSource, value: t[share.hostSource] }]),
       ...(share.theoretical === null

@@ -248,7 +248,7 @@ export default function VideoResultsChart({
         date: point.observedAt?.slice(0, 10) ?? '—',
         strategy: tp !== null && ulysses !== null ? `TP${tp} × Ulysses ${ulysses}` : null,
         replicas: point.replicas === null ? null : s.replicas(point.replicas),
-        warning: overlay ? `${s.unofficial} #${point.runId}` : undefined,
+        warning: overlay ? `✕ #${point.runId}` : undefined,
         yValue: n(yValue, y.digits),
         xValue: n(xValue, x.digits),
       };

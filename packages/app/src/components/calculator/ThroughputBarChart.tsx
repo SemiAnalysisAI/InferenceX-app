@@ -45,7 +45,6 @@ import type {
 const OVERLAY_STRINGS = {
   en: {
     unofficialRun: 'Unofficial run',
-    branch: 'Branch',
     viewRun: 'View workflow run',
     viewRaw: 'View raw result on GitHub',
     clamped: 'Outside measured range — showing nearest data point',
@@ -66,7 +65,6 @@ const OVERLAY_STRINGS = {
   },
   zh: {
     unofficialRun: '非官方运行',
-    branch: '分支',
     viewRun: '查看工作流运行',
     viewRaw: '在 GitHub 查看原始结果',
     clamped: '超出实测范围——显示最接近的数据点',
@@ -367,7 +365,7 @@ export function getThroughputPointDetails(
   return {
     title: config ? getDisplayLabel(config) : d.hwKey,
     subtitle: precision.toUpperCase(),
-    warning: d.isOverlay ? t.unofficialRun : undefined,
+    warning: d.isOverlay ? `✕ ${d.runLabel ?? t.unofficialRun}` : undefined,
     metrics:
       barMetric === 'cost'
         ? [cost, throughput]
@@ -376,7 +374,6 @@ export function getThroughputPointDetails(
           : [throughput, cost],
     summary: [parallelism, `${t.concurrency} ~${d.concurrency}`].join(' · '),
     rows: [
-      ...(d.isOverlay && d.runLabel ? [{ label: t.branch, value: d.runLabel, wide: true }] : []),
       { label: t.cost, value: `${cost.value}${costLabel}` },
       { label: 'tok/s/MW', value: power.value },
       {

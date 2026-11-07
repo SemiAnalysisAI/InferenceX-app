@@ -956,9 +956,10 @@ describe('GPU comparison with unofficial runs', () => {
       .trigger('mouseenter')
       .trigger('mousemove', { clientX: 400, clientY: 300 });
     cy.get('[data-chart-tooltip="gpu-overlay"]').should('have.css', 'display', 'block');
-    cy.get('[data-chart-tooltip="gpu-overlay"] [data-hover-notice]')
-      .should('contain.text', 'Unofficial run')
-      .and('contain.text', 'feat/power-sweep');
+    cy.get('[data-chart-tooltip="gpu-overlay"] [data-hover-notice]').should(
+      'have.text',
+      '✕ feat/power-sweep',
+    );
     cy.get('[data-chart-tooltip="gpu-overlay"] [data-hover-context]').should(
       'contain.text',
       '2025-03-20',
@@ -968,7 +969,10 @@ describe('GPU comparison with unofficial runs', () => {
       .invoke('attr', 'style')
       .should('include', `background: ${overlayRunColor(0)}`);
     cy.get('#gpu-overlay .unofficial-overlay-pt .overlay-x').first().click({ force: true });
-    cy.get('[data-testid="point-details-panel"]').should('contain.text', 'Unofficial run');
+    cy.get('[data-testid="point-details-panel"]')
+      .should('contain.text', '✕ feat/power-sweep')
+      .and('not.contain.text', 'Unofficial run')
+      .and('not.contain.text', 'Branch');
     cy.get('[data-testid="point-details-panel"] [data-pinned-tokens]').should(
       'contain.text',
       '75,000',
@@ -983,7 +987,7 @@ describe('GPU comparison with unofficial runs', () => {
     );
     const tooltip = '[data-chart-tooltip="gpu-overlay"]';
     cy.get('#gpu-overlay .unofficial-overlay-pt > circle').then(([hit]) => hoverTopmostOver(hit));
-    cy.get(`${tooltip} [data-hover-notice]`).should('contain.text', 'Unofficial run');
+    cy.get(`${tooltip} [data-hover-notice]`).should('have.text', '✕ feat/power-sweep');
     cy.get('#gpu-overlay .dot-group')
       .filter((_, group) => (group as unknown as { __data__: InferenceData }).__data__.conc === 8)
       .find('.visible-shape')
