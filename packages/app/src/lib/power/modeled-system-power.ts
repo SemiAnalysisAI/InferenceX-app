@@ -16,6 +16,7 @@ import {
 } from '@/lib/power/system-power-model';
 
 const CHASSIS_GPU_COUNT = 8;
+const CHASSIS_CPU_SOCKETS = 2;
 const TRAY_GPU_COUNT = 4;
 const TRAY_GRACE_SOCKETS = 2;
 
@@ -35,6 +36,7 @@ export type SystemPowerUnit = 'chassis' | 'nvl72-tray';
 
 interface SupportedSystemPower {
   status: 'supported';
+  unit: SystemPowerUnit;
   hardware: string;
   modelRevision: string;
   operatingState: SystemPowerOperatingState;
@@ -53,16 +55,19 @@ interface SupportedSystemPower {
   telemetryBasis: 'validated-v2' | 'validated-unversioned-single-node';
   topologyBasis: 'single-node' | 'worker-hosts' | 'uniform-hosts';
   chassisBasis: 'full' | 'extrapolated';
+  /**
+   * `measured` when validated same-window socket telemetry replaces the
+   * modeled CPUs: whole Grace sockets on NVL72 trays, RAPL packages (no DRAM)
+   * on x86 chassis.
+   */
+  cpuBasis: 'measured' | 'modeled';
+  /** Mean power of one measured CPU socket, the model's input; null when modeled. */
+  measuredCpuSocketWatts: number | null;
 }
 
 export type SystemPowerEstimate =
   | { status: 'unsupported'; reason: SystemPowerUnsupportedReason; modelRevision: string }
-  | (SupportedSystemPower & { unit: 'chassis' })
-  | (SupportedSystemPower & {
-      unit: 'nvl72-tray';
-      cpuBasis: 'measured' | 'modeled';
-      measuredGraceSocketWatts: number | null;
-    });
+  | SupportedSystemPower;
 
 interface MeasuredChassis {
   measuredGpus: number;
@@ -146,19 +151,20 @@ export function modelSystemPower(row: BenchmarkRow): SystemPowerEstimate {
     return unavailable('gpu-count');
   }
 
+  // Each unit's model takes one kind of socket reading: the whole Grace socket
+  // on a tray, the RAPL package (which has no DRAM domain) on an x86 chassis.
   const cpuAudit = row.power_audit?.cpu;
-  const graceSocketWatts = m.avg_cpu_socket_power_w;
+  const socketWatts = m.avg_cpu_socket_power_w;
   let measuredSockets =
-    rack &&
     m.cpu_power_valid === 1 &&
-    cpuAudit?.sensor_kind === 'grace_socket' &&
+    cpuAudit?.sensor_kind === (rack ? 'grace_socket' : 'rapl_package') &&
     count(cpuAudit.expected_sockets) &&
     cpuAudit.observed_sockets === cpuAudit.expected_sockets &&
     positive(m.avg_total_cpu_power_w) &&
-    positive(graceSocketWatts) &&
+    positive(socketWatts) &&
     matchingWatts(
       m.avg_total_cpu_power_w,
-      graceSocketWatts * cpuAudit.observed_sockets,
+      socketWatts * cpuAudit.observed_sockets,
       cpuAudit.observed_sockets,
     );
 
@@ -267,8 +273,10 @@ export function modelSystemPower(row: BenchmarkRow): SystemPowerEstimate {
     }
     topologyBasis = 'worker-hosts';
   }
-  measuredSockets &&= cpuAudit?.observed_sockets === chassis.length * TRAY_GRACE_SOCKETS;
-  const socketInput = measuredSockets ? graceSocketWatts! : null;
+  measuredSockets &&=
+    cpuAudit?.observed_sockets ===
+    chassis.length * (rack ? TRAY_GRACE_SOCKETS : CHASSIS_CPU_SOCKETS);
+  const socketInput = measuredSockets ? socketWatts! : null;
 
   let models: (SystemUnitPower | null)[];
   let state: SystemPowerOperatingState | null;
@@ -295,7 +303,7 @@ export function modelSystemPower(row: BenchmarkRow): SystemPowerEstimate {
     if (!state) return unavailable('workload');
     const operating = state;
     models = chassis.map((c) =>
-      estimateChassisPower(system.hardware, c.modelInputWatts, operating),
+      estimateChassisPower(system.hardware, c.modelInputWatts, socketInput, operating),
     );
   }
   if (models.some((model) => model === null)) return unavailable('model-domain');
@@ -312,8 +320,9 @@ export function modelSystemPower(row: BenchmarkRow): SystemPowerEstimate {
       ? share((r) => r.model.breakdown[key])
       : results.reduce((sum, r) => sum + r.model.breakdown[key], 0);
   }
-  const estimate: SupportedSystemPower = {
+  return {
     status: 'supported',
+    unit: system.unit,
     hardware,
     modelRevision: SYSTEM_POWER_MODEL_REVISION,
     operatingState: state,
@@ -331,13 +340,7 @@ export function modelSystemPower(row: BenchmarkRow): SystemPowerEstimate {
     telemetryBasis: unversionedSingleNode ? 'validated-unversioned-single-node' : 'validated-v2',
     topologyBasis,
     chassisBasis: extrapolated ? 'extrapolated' : 'full',
+    cpuBasis: socketInput === null ? 'modeled' : 'measured',
+    measuredCpuSocketWatts: socketInput,
   };
-  return system.unit === 'nvl72-tray'
-    ? {
-        ...estimate,
-        unit: 'nvl72-tray',
-        cpuBasis: socketInput === null ? 'modeled' : 'measured',
-        measuredGraceSocketWatts: socketInput,
-      }
-    : { ...estimate, unit: 'chassis' };
 }

@@ -124,6 +124,32 @@ describe('buildPowerBreakdowns', () => {
     expect(series.allInProvisionedWattsPerGpu).toBeGreaterThan(series.points[1].totalWattsPerGpu);
   });
 
+  it('draws validated x86 RAPL packages as the measured CPU layer', () => {
+    const base = row(600);
+    const [series] = buildPowerBreakdowns([
+      point(
+        600,
+        { hwKey: 'mi355x_sglang' },
+        {
+          hardware: 'mi355x',
+          power_audit: {
+            cpu: { sensor_kind: 'rapl_package', expected_sockets: 2, observed_sockets: 2 },
+          },
+          metrics: {
+            ...base.metrics,
+            cpu_power_valid: 1,
+            avg_cpu_socket_power_w: 210.25,
+            avg_total_cpu_power_w: 420.5,
+          },
+        },
+      ),
+    ]);
+    expect(series.categories).toContain('measuredCpu');
+    expect(series.categories).not.toContain('cpu');
+    expect(series.points[0].cpuBasis).toBe('measured');
+    expect(series.points[0].wattsPerGpu.measuredCpu).toBeCloseTo(420.5 / 8, 9);
+  });
+
   it('groups by hardware and precision and drops points without a supported estimate', () => {
     const series = buildPowerBreakdowns([
       point(300),
@@ -320,8 +346,8 @@ describe('six-layer overview', () => {
 
   it('knows which parts are measured, move with load or stay fixed, as the model does', () => {
     const state = { workload: 'agentic', scaleOut: true } as const;
-    const low = estimateChassisPower('h200', 8 * 226, state)!.breakdown;
-    const high = estimateChassisPower('h200', 8 * 474, state)!.breakdown;
+    const low = estimateChassisPower('h200', 8 * 226, null, state)!.breakdown;
+    const high = estimateChassisPower('h200', 8 * 474, null, state)!.breakdown;
     for (const key of SYSTEM_POWER_CATEGORIES) {
       if (key === 'measuredCpu') continue;
       const behaviour = POWER_PART_BEHAVIOUR[key];
@@ -392,7 +418,7 @@ describe('stackedBandsAt', () => {
     },
     totalWattsPerGpu: gpu + cpu + facility,
     pue: 1.2,
-    cpuBasis: null,
+    cpuBasis: 'modeled',
     chassisBasis: 'full',
   });
   const points = [

@@ -109,6 +109,8 @@ const systemPower = {
   topologyBasis: 'worker-hosts',
   chassisBasis: 'full',
   telemetryBasis: 'validated-v2',
+  cpuBasis: 'modeled',
+  measuredCpuSocketWatts: null,
 } satisfies SystemPowerEstimate;
 
 describe('run-specific framework tooltip labels', () => {
@@ -233,6 +235,21 @@ describe('modeled system-power tooltip', () => {
       [
         pt({ hwKey: 'gb300', modeledSystemPower: modelSystemPower(gb300DisaggRow()) }),
         ['2 full NVL72 compute trays · 8 GPUs', '98 W/socket', 'PUE 1.1'],
+      ],
+      [
+        pt({
+          hwKey: 'mi355x',
+          modeledSystemPower: {
+            ...systemPower,
+            hardware: 'mi355x',
+            cpuBasis: 'measured',
+            measuredCpuSocketWatts: 210.25,
+          },
+        }),
+        [
+          'Measured CPU package power (RAPL):</strong> 210 W/socket',
+          'Measured: GPU boards and host CPU packages',
+        ],
       ],
     ];
     for (const [data, expected] of cases) {

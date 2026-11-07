@@ -18,11 +18,11 @@ export type ProfitPowerBasis = 'provisioned' | 'modeled' | 'compare';
 /**
  * What the measured + modeled budget was measured on: an eight-GPU chassis
  * measures the GPU boards and models the rest; an NVL72 tray takes an equal
- * share of a modeled rack and measures its Grace sockets when telemetry allows.
+ * share of a modeled rack. Either measures its CPU sockets when telemetry allows.
  */
 export interface ProfitPowerSource {
   topology: SystemPowerUnit;
-  /** Grace sockets on NVL72 trays: measured, or the model's profile. Chassis CPUs are always modeled. */
+  /** Grace sockets on NVL72 trays or RAPL packages on x86 chassis: measured, or the model's profile. */
   cpu: 'measured' | 'modeled';
   /** Facility PUE the estimate applied once after IT power. */
   pue: number;
@@ -77,7 +77,7 @@ function planningPower(point: GPUDataPoint): PlanningPower {
     extrapolated: estimate.chassisBasis === 'extrapolated',
     source: {
       topology: estimate.unit,
-      cpu: estimate.unit === 'nvl72-tray' ? estimate.cpuBasis : 'modeled',
+      cpu: estimate.cpuBasis,
       pue: estimate.pue,
       modelRevision: estimate.modelRevision,
     },

@@ -2,7 +2,10 @@ import type { Locale } from '@/lib/i18n/i18n';
 
 import manifest from './power-model.manifest.json';
 import { create_power_model, type PowerEstimate, type PowerModel, ValueError } from './power_model';
-import type { PowerComponentBreakdown as PowerComponent } from './power_model/base';
+import type {
+  EstimateOptions,
+  PowerComponentBreakdown as PowerComponent,
+} from './power_model/base';
 import { SYSTEMS } from './power_model/models/advanced/systems/catalog';
 import type { RackScaleSystem } from './power_model/models/advanced/systems/rack_scale/rack_scale';
 
@@ -40,11 +43,11 @@ export interface SystemPowerOperatingState {
 
 /**
  * Where a modeled unit's watts go, one part per component class in the stack
- * order PowerX draws them (bottom up): measured GPU boards, measured Grace
- * sockets (NVL72 rows with same-window CPU telemetry), then the modeled host
- * CPUs, memory, NICs, NVSwitch, storage, the small PCIe parts, fans, power
- * conversion loss, the scale-out network share, and the facility overhead PUE
- * adds. The parts sum to `facilityWatts`; every part but `facility` sums to
+ * order PowerX draws them (bottom up): measured GPU boards, measured CPU
+ * sockets (NVL72 Grace sockets or x86 RAPL packages with same-window CPU
+ * telemetry), then the modeled host CPUs, memory, NICs, NVSwitch, storage, the
+ * small PCIe parts, fans, power conversion loss, the scale-out network share,
+ * and the facility overhead PUE adds. The parts sum to `facilityWatts`; every part but `facility` sums to
  * `itWatts`.
  */
 export const SYSTEM_POWER_CATEGORIES = [
@@ -67,7 +70,7 @@ export type SystemPowerBreakdown = Record<SystemPowerCategory, number>;
 export const SYSTEM_POWER_CATEGORY_LABELS: Record<Locale, Record<SystemPowerCategory, string>> = {
   en: {
     gpu: 'GPU',
-    measuredCpu: 'Grace CPU',
+    measuredCpu: 'Measured CPU',
     cpu: 'CPU',
     memory: 'Memory',
     nic: 'NICs',
@@ -81,7 +84,7 @@ export const SYSTEM_POWER_CATEGORY_LABELS: Record<Locale, Record<SystemPowerCate
   },
   zh: {
     gpu: 'GPU',
-    measuredCpu: 'Grace CPU',
+    measuredCpu: '实测 CPU',
     cpu: 'CPU',
     memory: '内存',
     nic: '网卡',
@@ -128,6 +131,8 @@ export const scaleSystemPowerBreakdown = (
 const SCALE_OUT_GROUP = 'Scale-out networking';
 const MEASURED_GPU_LEAF = 'GPUs';
 const MEASURED_GRACE_LEAF = 'Grace socket (measured)';
+/** The x86 RAPL input is the generic `CPU` class; the modeled socket is `X86CPU`. */
+const MEASURED_X86_CPU_LEAF = 'CPU';
 
 /**
  * Leaf component name → part, first match wins. The names are the pinned
@@ -152,7 +157,7 @@ const LEAF_CATEGORIES = new Map<string, SystemPowerCategory>();
 export function systemPowerLeafCategory(topName: string, leafName: string): SystemPowerCategory {
   if (topName === SCALE_OUT_GROUP) return 'network';
   if (leafName === MEASURED_GPU_LEAF) return 'gpu';
-  if (leafName === MEASURED_GRACE_LEAF) return 'measuredCpu';
+  if (leafName === MEASURED_GRACE_LEAF || leafName === MEASURED_X86_CPU_LEAF) return 'measuredCpu';
   let category = LEAF_CATEGORIES.get(leafName);
   if (!category) {
     category = LEAF_CATEGORY_RULES.find(([pattern]) => pattern.test(leafName))?.[1] ?? 'other';
@@ -202,15 +207,14 @@ function powerModel(system: keyof typeof SYSTEMS, state: SystemPowerOperatingSta
 function estimateSystem(
   system: keyof typeof SYSTEMS,
   gpuWattsPerGpu: number,
-  graceSocketWatts: number | null,
+  measuredSocket: EstimateOptions,
   state: SystemPowerOperatingState,
 ): SystemUnitPower | null {
-  if (![gpuWattsPerGpu, graceSocketWatts ?? 0].every(Number.isFinite)) return null;
+  const inputs = [gpuWattsPerGpu, ...Object.values(measuredSocket).map((watts) => watts ?? 0)];
+  if (!inputs.every(Number.isFinite)) return null;
   let estimate: PowerEstimate;
   try {
-    estimate = powerModel(system, state).estimate_breakdown(gpuWattsPerGpu, {
-      cpu_and_dram_measured_power_per_socket: graceSocketWatts,
-    });
+    estimate = powerModel(system, state).estimate_breakdown(gpuWattsPerGpu, measuredSocket);
   } catch (error) {
     if (error instanceof ValueError) return null;
     throw error;
@@ -225,15 +229,21 @@ function estimateSystem(
 
 const CHASSIS_GPU_COUNT = 8;
 
+/**
+ * `raplSocketWatts` is one host CPU package's mean RAPL power, or null to model
+ * the CPUs. RAPL package power has no DRAM domain, so it replaces only the
+ * modeled CPU and the DIMMs stay modeled.
+ */
 export function estimateChassisPower(
   hardware: SystemPowerHardware,
   chassisGpuWatts: number,
+  raplSocketWatts: number | null,
   state: SystemPowerOperatingState,
 ): SystemUnitPower | null {
   return estimateSystem(
     CHASSIS_SYSTEMS[hardware],
     chassisGpuWatts / CHASSIS_GPU_COUNT,
-    null,
+    { cpu_measured_power_per_socket: raplSocketWatts },
     state,
   );
 }
@@ -244,7 +254,12 @@ export function estimateRackPower(
   graceSocketWatts: number | null,
   state: SystemPowerOperatingState,
 ): SystemUnitPower | null {
-  return estimateSystem(RACK_SYSTEMS[hardware], gpuWattsPerGpu, graceSocketWatts, state);
+  return estimateSystem(
+    RACK_SYSTEMS[hardware],
+    gpuWattsPerGpu,
+    { cpu_and_dram_measured_power_per_socket: graceSocketWatts },
+    state,
+  );
 }
 
 const RACKS: Record<RackPowerHardware, RackScaleSystem> = {

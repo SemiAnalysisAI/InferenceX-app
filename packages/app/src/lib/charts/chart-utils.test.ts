@@ -974,6 +974,8 @@ describe('createChartDataPoint power-boundary fields', () => {
     telemetryBasis: 'validated-v2' as const,
     topologyBasis: 'worker-hosts' as const,
     chassisBasis: 'extrapolated' as const,
+    cpuBasis: 'modeled' as const,
+    measuredCpuSocketWatts: null,
   };
   const validated = {
     power_valid: 1,

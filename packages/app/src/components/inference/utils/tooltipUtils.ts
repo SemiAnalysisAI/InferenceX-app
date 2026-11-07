@@ -231,11 +231,15 @@ const SYSTEM_POWER_STRINGS = {
       'agentic-cpu-offloading': 'agentic with KV cache offload',
     } satisfies Record<SystemPowerWorkload, string>,
     scaleOut: (on: boolean) => (on ? 'scale-out on' : 'scale-out off'),
-    graceSocket: 'Measured Grace socket power',
     units: {
       chassis: {
-        assumptions:
-          'Host CPU, DRAM, and NIC power follow the operating state; fan power and PSU losses follow chassis load.',
+        cpuSocket: 'Measured CPU package power (RAPL)',
+        assumptions: {
+          measured:
+            'Measured: GPU boards and host CPU packages (RAPL, which excludes DRAM). DRAM and NIC power follow the operating state; fan power and PSU losses follow chassis load.',
+          modeled:
+            'Host CPU, DRAM, and NIC power follow the operating state; fan power and PSU losses follow chassis load.',
+        },
         network:
           'IT power adds the chassis share of scale-out switches, at idle power when scale-out is off.',
         topology: (units: number, measured: number, modeled: number) =>
@@ -251,10 +255,13 @@ const SYSTEM_POWER_STRINGS = {
         boundary: 'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
       },
       'nvl72-tray': {
-        assumptions:
-          'Measured: GPU boards and whole Grace sockets (CPU, SysIO, LPDDR5X). Modeled: tray NICs, optics, drives, fans, and 48 V conversion; NVSwitch trays and power shelves.',
-        modeledCpuAssumptions:
-          'Measured: GPU boards. Modeled: Grace CPUs and LPDDR5X for the operating state (no validated Grace-socket telemetry for this run), tray NICs, optics, drives, fans, and 48 V conversion; NVSwitch trays and power shelves.',
+        cpuSocket: 'Measured Grace socket power',
+        assumptions: {
+          measured:
+            'Measured: GPU boards and whole Grace sockets (CPU, SysIO, LPDDR5X). Modeled: tray NICs, optics, drives, fans, and 48 V conversion; NVSwitch trays and power shelves.',
+          modeled:
+            'Measured: GPU boards. Modeled: Grace CPUs and LPDDR5X for the operating state (no validated Grace-socket telemetry for this run), tray NICs, optics, drives, fans, and 48 V conversion; NVSwitch trays and power shelves.',
+        },
         network:
           'IT power adds the rack share of scale-out switches, at idle power when scale-out is off.',
         topology: (units: number, measured: number, modeled: number) => {
@@ -300,11 +307,14 @@ const SYSTEM_POWER_STRINGS = {
       'agentic-cpu-offloading': '智能体（含 KV cache offload）',
     } satisfies Record<SystemPowerWorkload, string>,
     scaleOut: (on: boolean) => (on ? 'scale-out 开启' : 'scale-out 关闭'),
-    graceSocket: 'Grace socket 实测功耗',
     units: {
       chassis: {
-        assumptions:
-          '主机 CPU、DRAM 和 NIC 功耗取决于运行状态；风扇功耗和 PSU 损耗随机箱负载变化。',
+        cpuSocket: 'CPU 封装实测功耗（RAPL）',
+        assumptions: {
+          measured:
+            '实测：GPU 板卡和主机 CPU 封装功耗（RAPL，不含 DRAM）。DRAM 和 NIC 功耗取决于运行状态；风扇功耗和 PSU 损耗随机箱负载变化。',
+          modeled: '主机 CPU、DRAM 和 NIC 功耗取决于运行状态；风扇功耗和 PSU 损耗随机箱负载变化。',
+        },
         network: 'IT 功耗包含该机箱分摊的 scale-out 交换机功耗；scale-out 关闭时按空闲功耗计。',
         topology: (units: number, measured: number, modeled: number) =>
           measured === modeled
@@ -317,10 +327,13 @@ const SYSTEM_POWER_STRINGS = {
         boundary: '计入 GPU 机箱内的 CPU；不计入独立的纯 CPU 前端或路由主机。',
       },
       'nvl72-tray': {
-        assumptions:
-          '实测：GPU 板卡和整个 Grace socket（CPU、SysIO、LPDDR5X）。建模：tray 内的网卡、光模块、硬盘、风扇和 48 V 转换损耗，以及 NVSwitch tray 和电源架。',
-        modeledCpuAssumptions:
-          '实测：GPU 板卡。建模：按运行状态估算的 Grace CPU 和 LPDDR5X（该运行没有通过验证的 Grace socket 遥测），tray 内的网卡、光模块、硬盘、风扇和 48 V 转换损耗，以及 NVSwitch tray 和电源架。',
+        cpuSocket: 'Grace socket 实测功耗',
+        assumptions: {
+          measured:
+            '实测：GPU 板卡和整个 Grace socket（CPU、SysIO、LPDDR5X）。建模：tray 内的网卡、光模块、硬盘、风扇和 48 V 转换损耗，以及 NVSwitch tray 和电源架。',
+          modeled:
+            '实测：GPU 板卡。建模：按运行状态估算的 Grace CPU 和 LPDDR5X（该运行没有通过验证的 Grace socket 遥测），tray 内的网卡、光模块、硬盘、风扇和 48 V 转换损耗，以及 NVSwitch tray 和电源架。',
+        },
         network: 'IT 功耗包含机架分摊的 scale-out 交换机功耗；scale-out 关闭时按空闲功耗计。',
         topology: (units: number, measured: number, modeled: number) =>
           measured === modeled
@@ -391,7 +404,7 @@ const modeledSystemPowerHTML = (
   return `<div data-testid="tooltip-modeled-system-power" style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; font-size: 11px;">
     <strong>${t.heading}</strong>
     ${tooltipLine(t.measuredGpu, reading(estimate.measuredGpuWattsPerGpu, 'gpu'))}
-    ${estimate.unit === 'nvl72-tray' && estimate.measuredGraceSocketWatts !== null ? tooltipLine(t.graceSocket, `${fmtWatts(estimate.measuredGraceSocketWatts)} W/socket`) : ''}
+    ${estimate.measuredCpuSocketWatts === null ? '' : tooltipLine(u.cpuSocket, `${fmtWatts(estimate.measuredCpuSocketWatts)} W/socket`)}
     ${tooltipLine(t.itPerGpu, reading(estimate.itWattsPerGpu, 'it'))}
     ${tooltipLine(t.facilityPerGpu, reading(estimate.deploymentFacilityWatts / estimate.gpuCount, 'facility'))}
     ${
@@ -402,7 +415,7 @@ const modeledSystemPowerHTML = (
       ${tooltipLine(t.state, `${t.workloads[estimate.operatingState.workload]} · ${t.scaleOut(estimate.operatingState.scaleOut)}`)}
       ${tooltipLine(t.deploymentIt, `${fmtWatts(estimate.deploymentItWatts)} W`)}
       ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmtWatts(estimate.deploymentFacilityWatts)} W`)}
-      <div style="color: var(--muted-foreground); margin-bottom: 4px;">${u.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)}${estimate.chassisBasis === 'extrapolated' ? `<br/>${u.extrapolation}` : ''}${estimate.topologyBasis === 'uniform-hosts' ? `<br/>${u.uniformHosts}` : ''}<br/>${estimate.unit === 'nvl72-tray' && estimate.cpuBasis === 'modeled' ? t.units['nvl72-tray'].modeledCpuAssumptions : u.assumptions}<br/>${u.network}<br/>${u.normalization}<br/>${u.boundary}</div>
+      <div style="color: var(--muted-foreground); margin-bottom: 4px;">${u.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)}${estimate.chassisBasis === 'extrapolated' ? `<br/>${u.extrapolation}` : ''}${estimate.topologyBasis === 'uniform-hosts' ? `<br/>${u.uniformHosts}` : ''}<br/>${u.assumptions[estimate.cpuBasis]}<br/>${u.network}<br/>${u.normalization}<br/>${u.boundary}</div>
       </details>
       ${tooltipLine(t.model, `<a href="${escapeHtml(SYSTEM_POWER_MODEL_SOURCE_URL)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
     `

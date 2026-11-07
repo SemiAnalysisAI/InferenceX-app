@@ -10,7 +10,7 @@ import { gb300DisaggRow } from '@/lib/power/nvl72-power.fixture';
 import { estimateChassisPower } from '@/lib/power/system-power-model';
 
 const h200 = (gpuWatts: number) =>
-  estimateChassisPower('h200', gpuWatts, { workload: 'fixed-seq-len', scaleOut: false })!;
+  estimateChassisPower('h200', gpuWatts, null, { workload: 'fixed-seq-len', scaleOut: false })!;
 
 function input(): ComparisonInput {
   return {
@@ -247,7 +247,7 @@ describe('offline modeled PowerX comparisons', () => {
     const [x86Flat, gb300Flat] = flatRows(result, { ...result.metadata, ...provenance }, {});
     expect(gb300Flat.measured_total_grace_j).toBe(41_346.013);
     expect(gb300Flat.cpu_basis).toBe('measured');
-    expect(x86Flat.cpu_basis).toBeNull();
+    expect(x86Flat.cpu_basis).toBe('modeled');
     expect(x86Flat.measured_total_grace_j).toBeUndefined();
     expect(result.rows[0]).toEqual(baseline.rows[0]);
     expect(result.cells[0]).toEqual(baseline.cells[0]);
@@ -257,7 +257,7 @@ describe('offline modeled PowerX comparisons', () => {
     expect(modeledCpu.modeled).toMatchObject({
       status: 'supported',
       cpuBasis: 'modeled',
-      measuredGraceSocketWatts: null,
+      measuredCpuSocketWatts: null,
     });
     expect(
       flatRows(buildComparison(source), { ...result.metadata, ...provenance }, {})[1].cpu_basis,

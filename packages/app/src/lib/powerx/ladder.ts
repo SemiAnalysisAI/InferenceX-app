@@ -89,7 +89,7 @@ export function buildLadder(hardware: LadderHardware, gpuWatts: number): Ladder 
   const gpuCount = systemUnitGpuCount(hardware);
   const unit = isRackPowerHardware(hardware)
     ? estimateRackPower(hardware, gpuWatts, null, AGENTIC)
-    : estimateChassisPower(hardware, gpuWatts * gpuCount, AGENTIC);
+    : estimateChassisPower(hardware, gpuWatts * gpuCount, null, AGENTIC);
   if (!unit) return null;
   const perGpu = (watts: number) => watts / gpuCount;
   const boardCategories: readonly LadderCategory[] = isRackPowerHardware(hardware)

@@ -1438,7 +1438,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/calculator/profit-power.ts',
-    sourceSha256: 'e2b76e9625af7f2aba4968c41525f9939727477dce81215a57974a100998cd23',
+    sourceSha256: 'b4f971da14762424e11d843f7f2002f2195446291f1b7105b1302d5225e5676a',
     reviewArea: {
       en: 'Power-valid curve selection at fixed targets, compatible power bases, paired throughput and provisioned fallback shared by Profit UI and API.',
       zh: '利润界面与 API 共用的有效功耗曲线选择、固定目标值、功耗口径兼容性、配对吞吐量与预配估算回退。',
@@ -1486,10 +1486,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/power-breakdown.ts',
-    sourceSha256: 'dc11d8c04a614a9313e390b5eb0911beb1dc94473984eaa6f9a62b9542af1d09',
+    sourceSha256: 'b01ccc78402af733346282bc95974fd5377130494825af43e3df13de1fafcabd',
     reviewArea: {
-      en: 'Per-point system power breakdown: measured GPU and Grace parts, then the modeled CPU, memory, NIC, NVSwitch, storage, PCIe/misc, fan, PSU-loss, scale-out network and PUE overhead parts, summing to All in Measured W/GPU; the IT (no PUE) boundary is the same stack without the facility part.',
-      zh: '逐点系统功耗构成：实测 GPU 与 Grace 部分，以及建模的 CPU、内存、网卡、NVSwitch、存储、PCIe 及其他、风扇、电源损耗、横向扩展网络与 PUE 开销部分，合计等于 All in Measured W/GPU；IT（不含 PUE）边界即去掉数据中心开销后的同一堆叠。',
+      en: 'Per-point system power breakdown: measured GPU and CPU-socket parts, then the modeled CPU, memory, NIC, NVSwitch, storage, PCIe/misc, fan, PSU-loss, scale-out network and PUE overhead parts, summing to All in Measured W/GPU; the IT (no PUE) boundary is the same stack without the facility part.',
+      zh: '逐点系统功耗构成：实测 GPU 与 CPU 插槽部分，以及建模的 CPU、内存、网卡、NVSwitch、存储、PCIe 及其他、风扇、电源损耗、横向扩展网络与 PUE 开销部分，合计等于 All in Measured W/GPU；IT（不含 PUE）边界即去掉数据中心开销后的同一堆叠。',
     },
   },
   {

@@ -21,21 +21,21 @@ import {
 /**
  * Per-point "what each power account counts" breakdown (PowerX Figure 1): the
  * All in Measured W/GPU of one point split into measured GPU board power,
- * measured Grace sockets (NVL72 only), the modeled host CPUs, memory, NICs,
- * NVSwitch, storage and PCIe parts, fans, PSU loss, the scale-out network
- * share and PUE facility overhead. Every part is the deployment's share
- * divided by its allocated GPUs, so the parts sum to the point's All in
- * Measured W/GPU exactly.
+ * measured CPU sockets (NVL72 Grace sockets or x86 RAPL packages, when
+ * validated), the modeled host CPUs, memory, NICs, NVSwitch, storage and PCIe
+ * parts, fans, PSU loss, the scale-out network share and PUE facility
+ * overhead. Every part is the deployment's share divided by its allocated
+ * GPUs, so the parts sum to the point's All in Measured W/GPU exactly.
  */
 
 export type { SystemPowerCategory };
 
 /**
  * The plot draws six layers, not twelve parts (PowerX Figure 1's boxes):
- * measured GPU boards, measured Grace sockets (NVL72 only), the modeled server
- * parts (host CPUs, memory, NICs, NVSwitch, storage, PCIe), fans + PSU loss,
- * the scale-out network share and the facility overhead PUE adds. The parts
- * list beside the chart carries the per-component detail.
+ * measured GPU boards, measured CPU sockets, the modeled server parts (host
+ * CPUs, memory, NICs, NVSwitch, storage, PCIe), fans + PSU loss, the
+ * scale-out network share and the facility overhead PUE adds. The parts list
+ * beside the chart carries the per-component detail.
  */
 export const POWER_BANDS = [
   'gpu',
@@ -208,7 +208,7 @@ export interface PowerBreakdownPoint {
   /** All in Measured W/GPU. */
   totalWattsPerGpu: number;
   pue: number;
-  cpuBasis: 'measured' | 'modeled' | null;
+  cpuBasis: 'measured' | 'modeled';
   chassisBasis: 'full' | 'extrapolated';
 }
 
@@ -290,7 +290,7 @@ function powerBreakdownForPoint(
     wattsPerGpu,
     totalWattsPerGpu: total,
     pue: model.pue,
-    cpuBasis: model.unit === 'nvl72-tray' ? model.cpuBasis : null,
+    cpuBasis: model.cpuBasis,
     chassisBasis: model.chassisBasis,
   };
 }

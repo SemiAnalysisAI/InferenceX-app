@@ -43,7 +43,7 @@ const STRINGS = {
     parts: 'Power layers at this point',
     bands: {
       gpu: 'GPU',
-      measuredCpu: 'Grace CPU',
+      measuredCpu: 'CPU',
       server: 'Server',
       fansPsu: 'Fans + PSU',
       network: 'Network',
@@ -51,7 +51,7 @@ const STRINGS = {
     } satisfies Record<PowerBand, string>,
     bandTitles: {
       gpu: 'Measured GPU',
-      measuredCpu: 'Measured Grace CPU',
+      measuredCpu: 'Measured CPU',
       server: 'Server parts',
       fansPsu: 'Fans + PSU loss',
       network: 'Network share',
@@ -74,7 +74,7 @@ const STRINGS = {
     parts: '该点的功耗分层',
     bands: {
       gpu: 'GPU',
-      measuredCpu: 'Grace CPU',
+      measuredCpu: 'CPU',
       server: '服务器',
       fansPsu: '风扇 + 电源',
       network: '网络',
@@ -82,7 +82,7 @@ const STRINGS = {
     } satisfies Record<PowerBand, string>,
     bandTitles: {
       gpu: '实测 GPU',
-      measuredCpu: '实测 Grace CPU',
+      measuredCpu: '实测 CPU',
       server: '服务器部件',
       fansPsu: '风扇 + 电源损耗',
       network: '网络分摊',

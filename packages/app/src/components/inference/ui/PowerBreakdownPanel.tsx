@@ -108,7 +108,7 @@ const STRINGS = {
       'No point in this view has both validated GPU telemetry and a supported system power model.',
     bands: {
       gpu: 'Measured GPU',
-      measuredCpu: 'Measured Grace CPU',
+      measuredCpu: 'Measured CPU',
       server: 'Server parts',
       fansPsu: 'Fans + PSU loss',
       network: 'Network share',
@@ -116,7 +116,7 @@ const STRINGS = {
     } satisfies Record<PowerBand, string>,
     categories: {
       gpu: 'GPU',
-      measuredCpu: 'Grace CPU',
+      measuredCpu: 'Measured CPU',
       cpu: 'CPU',
       memory: 'Memory',
       nic: 'NICs',
@@ -159,7 +159,7 @@ const STRINGS = {
     empty: '当前视图中没有同时具备有效 GPU 遥测和受支持系统功耗模型的数据点。',
     bands: {
       gpu: '实测 GPU',
-      measuredCpu: '实测 Grace CPU',
+      measuredCpu: '实测 CPU',
       server: '服务器部件',
       fansPsu: '风扇 + 电源损耗',
       network: '网络分摊',
@@ -167,7 +167,7 @@ const STRINGS = {
     } satisfies Record<PowerBand, string>,
     categories: {
       gpu: 'GPU',
-      measuredCpu: 'Grace CPU',
+      measuredCpu: '实测 CPU',
       cpu: 'CPU',
       memory: '内存',
       nic: '网卡',
@@ -224,7 +224,7 @@ const CURSOR_LABEL_CHAR_PX = 6.2;
 
 const CSV_COLUMNS: Record<SystemPowerCategory, string> = {
   gpu: 'measured_gpu_w_per_gpu',
-  measuredCpu: 'measured_grace_cpu_w_per_gpu',
+  measuredCpu: 'measured_cpu_w_per_gpu',
   cpu: 'cpu_w_per_gpu',
   memory: 'memory_w_per_gpu',
   nic: 'nic_w_per_gpu',
@@ -337,7 +337,12 @@ function tooltipHtml(
   // under the chart, so the panel reads as data first.
   const notes = [
     entry.chassisBasis === 'extrapolated' ? t.extrapolated : null,
-    entry.cpuBasis === 'modeled' ? t.graceModeled : null,
+    // Flag a missing Grace reading only: most x86 hosts have no CPU telemetry.
+    entry.cpuBasis === 'modeled' &&
+    entry.point.modeledSystemPower?.status === 'supported' &&
+    entry.point.modeledSystemPower.unit === 'nvl72-tray'
+      ? t.graceModeled
+      : null,
     t.note(SYSTEM_POWER_MODEL_REVISION.slice(0, 7)),
   ]
     .filter(Boolean)

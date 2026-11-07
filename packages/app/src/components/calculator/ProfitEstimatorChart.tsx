@@ -199,6 +199,8 @@ const STRINGS = {
     powerBasis: 'Power basis',
     powerBasisLabels: {
       chassis: 'measured GPU board; CPU, DRAM, networking, storage, board, fans and PSU modeled',
+      'chassis-measured-cpu':
+        'measured GPU board and CPU package (RAPL); DRAM, networking, storage, board, fans and PSU modeled',
       'nvl72-tray':
         'measured GPU board and Grace socket; tray networking, storage, fans and conversion, NVSwitch trays and power shelves modeled',
       'nvl72-tray-modeled-cpu':
@@ -234,6 +236,8 @@ const STRINGS = {
     powerBasis: '功耗口径',
     powerBasisLabels: {
       chassis: '实测 GPU 板卡功耗；CPU、DRAM、网络、存储、主板、风扇和 PSU 由模型估算',
+      'chassis-measured-cpu':
+        '实测 GPU 板卡和 CPU 封装（RAPL）功耗；DRAM、网络、存储、主板、风扇和 PSU 由模型估算',
       'nvl72-tray':
         '实测 GPU 板卡和 Grace socket 功耗；tray 内网络、存储、风扇和电源转换，以及 NVSwitch tray 和电源架由模型估算',
       'nvl72-tray-modeled-cpu':
@@ -252,6 +256,9 @@ export function powerBasisLabel(source: ProfitPowerSource, locale: Locale): stri
   const labels = STRINGS[locale].powerBasisLabels;
   if (source.topology === 'nvl72-tray' && source.cpu === 'modeled') {
     return labels['nvl72-tray-modeled-cpu'];
+  }
+  if (source.topology === 'chassis' && source.cpu === 'measured') {
+    return labels['chassis-measured-cpu'];
   }
   return labels[source.topology];
 }

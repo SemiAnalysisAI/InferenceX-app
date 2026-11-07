@@ -61,7 +61,7 @@ const STRINGS = {
     legend: 'Power layers',
     bands: {
       gpu: 'GPU',
-      measuredCpu: 'Grace CPU',
+      measuredCpu: 'Measured CPU',
       server: 'Server parts',
       fansPsu: 'Fans + PSU loss',
       network: 'Network share',
@@ -75,7 +75,7 @@ const STRINGS = {
       `Not shown: ${labels}. Its GPU power is measured, but there is no whole-system model for this setup yet.`,
     categories: {
       gpu: 'GPU',
-      measuredCpu: 'Grace CPU',
+      measuredCpu: 'Measured CPU',
       cpu: 'CPU',
       memory: 'Memory',
       nic: 'NICs',
@@ -103,7 +103,7 @@ const STRINGS = {
     legend: '功耗分层',
     bands: {
       gpu: 'GPU',
-      measuredCpu: 'Grace CPU',
+      measuredCpu: '实测 CPU',
       server: '服务器部件',
       fansPsu: '风扇 + 电源损耗',
       network: '网络分摊',
@@ -116,7 +116,7 @@ const STRINGS = {
     noModel: (labels: string) => `未显示：${labels}。其 GPU 功耗为实测，但该配置暂无整机功耗模型。`,
     categories: {
       gpu: 'GPU',
-      measuredCpu: 'Grace CPU',
+      measuredCpu: '实测 CPU',
       cpu: 'CPU',
       memory: '内存',
       nic: '网卡',

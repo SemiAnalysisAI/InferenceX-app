@@ -16,7 +16,7 @@ import {
 } from '@/lib/power/system-power-model';
 
 const chassis = (hardware: SystemPowerHardware, gpuWatts: number, scaleOut = false) =>
-  estimateChassisPower(hardware, gpuWatts, { workload: 'fixed-seq-len', scaleOut })!;
+  estimateChassisPower(hardware, gpuWatts, null, { workload: 'fixed-seq-len', scaleOut })!;
 
 function row(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   return {
@@ -122,12 +122,6 @@ describe('modeled system power admission and accounting', () => {
       status: 'unsupported',
       reason: 'hardware',
     });
-  });
-
-  it('ignores CPU-side keys on x86 chassis rows', () => {
-    const source = row();
-    Object.assign(source.metrics, GRACE, { cpu_power_valid: 1 });
-    expect(modelSystemPower(source)).toEqual(modelSystemPower(row()));
   });
 
   it('models every single_turn sequence and leaves other benchmark types unavailable', () => {
@@ -630,6 +624,73 @@ describe('deployment power breakdown', () => {
   });
 });
 
+const RAPL = { avg_cpu_socket_power_w: 210.25, avg_total_cpu_power_w: 420.5 };
+function mi355xRow(
+  metrics: Record<string, number | undefined> = {},
+  overrides: Partial<BenchmarkRow> = {},
+): BenchmarkRow {
+  return row({
+    hardware: 'mi355x',
+    power_audit: {
+      cpu: { sensor_kind: 'rapl_package', expected_sockets: 2, observed_sockets: 2 },
+    },
+    metrics: {
+      ...row().metrics,
+      cpu_power_valid: 1,
+      ...RAPL,
+      ...(metrics as Record<string, number>),
+    },
+    ...overrides,
+  });
+}
+
+describe('x86 RAPL CPU telemetry gate', () => {
+  it('feeds validated RAPL package power to the chassis model as the measured CPU', () => {
+    const result = supported(mi355xRow());
+    expect(result).toMatchObject({ cpuBasis: 'measured', measuredCpuSocketWatts: 210.25 });
+    const state = { workload: 'fixed-seq-len', scaleOut: false } as const;
+    const measured = estimateChassisPower('mi355x', 2798.868, 210.25, state)!;
+    expect(result.itWatts).toBeCloseTo(measured.itWatts, 9);
+    expect(result.itWatts).not.toBeCloseTo(chassis('mi355x', 2798.868).itWatts, 3);
+    // RAPL has no DRAM domain: the packages replace the modeled CPUs, the DIMMs stay modeled.
+    expect(result.deploymentBreakdownWatts.measuredCpu).toBeCloseTo(420.5, 6);
+    expect(result.deploymentBreakdownWatts.cpu).toBe(0);
+    expect(result.deploymentBreakdownWatts.memory).toBe(
+      chassis('mi355x', 2798.868).breakdown.memory,
+    );
+    expect(total(result.deploymentBreakdownWatts)).toBeCloseTo(result.deploymentFacilityWatts, 6);
+  });
+
+  it.each([
+    ['a legacy row without a CPU verdict', mi355xRow({ cpu_power_valid: undefined })],
+    ['a missing CPU audit', mi355xRow({}, { power_audit: undefined })],
+    [
+      'a Grace sensor kind',
+      mi355xRow(
+        {},
+        {
+          power_audit: {
+            cpu: { sensor_kind: 'grace_socket', expected_sockets: 2, observed_sockets: 2 },
+          },
+        },
+      ),
+    ],
+    [
+      'other than two sockets per chassis',
+      mi355xRow(
+        { avg_total_cpu_power_w: 210.25 },
+        {
+          power_audit: {
+            cpu: { sensor_kind: 'rapl_package', expected_sockets: 1, observed_sockets: 1 },
+          },
+        },
+      ),
+    ],
+  ])('models the host CPUs of x86 rows with %s', (_name, source) => {
+    expect(modelSystemPower(source)).toEqual(modelSystemPower(row({ hardware: 'mi355x' })));
+  });
+});
+
 const modeledGraceTray = () =>
   estimateRackPower('gb200', 900.25, null, { workload: 'fixed-seq-len', scaleOut: false })!;
 
@@ -682,7 +743,7 @@ describe('NVL72 Grace-socket telemetry gate', () => {
       status: 'supported',
       unit: 'nvl72-tray',
       cpuBasis: 'modeled',
-      measuredGraceSocketWatts: null,
+      measuredCpuSocketWatts: null,
       chassisCount: 1,
     });
     if (result.status !== 'supported') throw new Error(result.reason);
@@ -695,7 +756,7 @@ describe('NVL72 Grace-socket telemetry gate', () => {
     expect(result).toMatchObject({
       status: 'supported',
       cpuBasis: 'measured',
-      measuredGraceSocketWatts: 250.5,
+      measuredCpuSocketWatts: 250.5,
     });
     if (result.status !== 'supported') throw new Error(result.reason);
     const measured = estimateRackPower('gb200', 900.25, 250.5, {
@@ -742,7 +803,7 @@ describe('NVL72 Grace-socket telemetry gate', () => {
     expect(modelSystemPower(threeSockets)).toMatchObject({
       status: 'supported',
       cpuBasis: 'modeled',
-      measuredGraceSocketWatts: null,
+      measuredCpuSocketWatts: null,
     });
     disagg.workers![1].num_gpus = 5;
     expect(modelSystemPower(disagg)).toMatchObject({ reason: 'topology' });
@@ -793,7 +854,7 @@ describe('NVL72 rack estimate from measured GPU boards and Grace sockets', () =>
       modeledGpuCount: 8,
       measuredGpuWattsPerGpu: 594.191,
       cpuBasis: 'measured',
-      measuredGraceSocketWatts: 98.066,
+      measuredCpuSocketWatts: 98.066,
       operatingState: { workload: 'fixed-seq-len', scaleOut: true },
       topologyBasis: 'worker-hosts',
       chassisBasis: 'full',

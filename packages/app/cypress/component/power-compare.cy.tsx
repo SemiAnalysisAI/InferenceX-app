@@ -222,6 +222,8 @@ describe('Modeled power source links', () => {
               topologyBasis: 'single-node',
               chassisBasis: 'full',
               telemetryBasis: 'validated-v2',
+              cpuBasis: 'modeled',
+              measuredCpuSocketWatts: null,
             },
           }),
         );

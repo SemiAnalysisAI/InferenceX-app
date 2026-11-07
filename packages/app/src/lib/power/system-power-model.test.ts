@@ -93,7 +93,7 @@ describe('system power model adapter', () => {
     'models %s as the upstream %s chassis at chassis GPU watts / 8',
     (hardware, system) => {
       expect(isSystemPowerHardware(hardware)).toBe(true);
-      expect(estimateChassisPower(hardware, 8 * 612.5, STATE)).toMatchObject(
+      expect(estimateChassisPower(hardware, 8 * 612.5, null, STATE)).toMatchObject(
         upstream(system, 612.5),
       );
     },
@@ -119,6 +119,7 @@ describe('system power model adapter', () => {
   const PINNED_LEAVES: Record<string, SystemPowerCategory> = {
     GPUs: 'gpu',
     'Grace socket (measured)': 'measuredCpu',
+    CPU: 'measuredCpu',
     X86CPU: 'cpu',
     GraceCPU: 'cpu',
     DDR5DIMM: 'memory',
@@ -175,12 +176,15 @@ describe('system power model adapter', () => {
     for (const system of systems) {
       for (const workload of workloads) {
         for (const scaleOut of [false, true]) {
-          for (const socket of system.startsWith('gb') ? [null, 98.066] : [null]) {
+          const measured = system.startsWith('gb')
+            ? { cpu_and_dram_measured_power_per_socket: 98.066 }
+            : { cpu_measured_power_per_socket: 210.25 };
+          for (const socket of [{}, measured]) {
             const estimate = create_power_model({
               system,
               workload_state: workload,
               using_scale_out: scaleOut,
-            }).estimate_breakdown(700, { cpu_and_dram_measured_power_per_socket: socket });
+            }).estimate_breakdown(700, socket);
             for (const top of estimate.components) visit(top.name, top);
           }
         }
@@ -208,7 +212,7 @@ describe('system power model adapter', () => {
     expect(new Set(Object.values(SYSTEMS).map((system) => system.default_cooling.pue))).toEqual(
       new Set([AIR_COOLED_SYSTEM_PUE, LIQUID_COOLED_RACK_PUE]),
     );
-    expect(AIR_COOLED_SYSTEM_PUE).toBe(estimateChassisPower('b200', 5600, STATE)!.pue);
+    expect(AIR_COOLED_SYSTEM_PUE).toBe(estimateChassisPower('b200', 5600, null, STATE)!.pue);
     expect(LIQUID_COOLED_RACK_PUE).toBe(estimateRackPower('gb300', 700, null, STATE)!.pue);
   });
 
@@ -220,10 +224,10 @@ describe('system power model adapter', () => {
   });
 
   it('returns null where the upstream model rejects the input', () => {
-    expect(estimateChassisPower('h100', -8, STATE)).toBeNull();
-    expect(estimateChassisPower('h100', Number.NaN, STATE)).toBeNull();
+    expect(estimateChassisPower('h100', -8, null, STATE)).toBeNull();
+    expect(estimateChassisPower('h100', Number.NaN, null, STATE)).toBeNull();
     expect(estimateRackPower('gb200', 700, Number.POSITIVE_INFINITY, STATE)).toBeNull();
-    expect(estimateChassisPower('h100', 8 * 2400, STATE)).toBeNull();
+    expect(estimateChassisPower('h100', 8 * 2400, null, STATE)).toBeNull();
     expect(estimateRackPower('gb300', 2400, null, STATE)).toBeNull();
   });
 
@@ -253,7 +257,7 @@ describe('system power model adapter', () => {
     for (const watts of [161.75, 612.5, 1010.125, 2400]) {
       for (const state of states) {
         for (const [hardware, system] of chassis) {
-          const actual = estimateChassisPower(hardware, 8 * watts, state);
+          const actual = estimateChassisPower(hardware, 8 * watts, null, state);
           expect(actual, `${hardware} ${watts} W`).toEqual(fresh(system, watts, null, state));
           if (actual) expect(Object.keys(actual.breakdown)).toEqual(SYSTEM_POWER_CATEGORIES);
           compared++;
