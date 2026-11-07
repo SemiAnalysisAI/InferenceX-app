@@ -12,7 +12,7 @@ import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import {
   immutable,
-  readStoredArtifact,
+  readPublishedArtifact,
   renditionMediaPath,
   renditionPreviews,
   renditionReceiptPath,
@@ -82,7 +82,7 @@ const indexes = run
 let unreadable = 0;
 const saved = await Promise.all(
   indexes.map(({ runId, artifact }) =>
-    readStoredArtifact(runId, artifact).catch((error: unknown) => {
+    readPublishedArtifact(runId, artifact).catch((error: unknown) => {
       unreadable++;
       console.error(
         `unreadable run ${runId} artifact ${artifact.id}: ${error instanceof Error ? error.message : error}`,

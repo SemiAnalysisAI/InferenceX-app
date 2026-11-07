@@ -10,7 +10,8 @@ import {
   type ResultsClipSide,
 } from './results-clips';
 import { referenceQualityFixture } from './reference-quality.fixture';
-import { verifiedReferencePairs } from './reference-quality';
+import { withQuality } from './stored';
+import { verifiedQuality } from './reference-quality';
 
 const record = (changes: Partial<CaseRecord> = {}): CaseRecord => ({
   slotId: 'measurement-r001-c001',
@@ -32,6 +33,7 @@ const side = (
   hardwareKey,
   generationKey,
   quality: new Map(),
+  unscored: new Map(),
   records,
   media: new Map(
     records.flatMap((r) => {
@@ -59,14 +61,59 @@ describe('results clip matching', () => {
     expect(() => publishedResultsSide({ ...f.stored, runId: 'other' }, point)).toThrow(
       'Stored artifact identity mismatch',
     );
-    f.stored.quality = verifiedReferencePairs(f.attachment, f.receipts, [f.stored], '9'.repeat(64));
-    f.stored.quality[0].reference.url = '/reference.mp4';
+    const quality = verifiedQuality(f.attachment, f.descriptor, f.stored, '9'.repeat(64)).pairs;
+    quality[0].reference.url = '/reference.mp4';
+    f.stored.quality = quality;
     const [group] = resultsClipGroups([publishedResultsSide(f.stored, point)]);
     expect(group.clips.get('h200')?.quality?.psnrDb).toBe(25);
     expect(resultsClipReference(group, new Set())?.url).toBe('/reference.mp4');
     expect(resultsClipReference(group, new Set(['h200']))).toBeNull();
-    f.stored.quality[0].candidate.artifact_id = 8;
+    quality[0].candidate.artifact_id = 8;
     expect(publishedResultsSide(f.stored, point).quality.size).toBe(0);
+  });
+  it('keeps an unpublished run clip with its PSNR or unscored reason but no media or reference', () => {
+    const f = referenceQualityFixture();
+    const page: VideoHistoryPage = {
+      schemaVersion: 1,
+      nextPage: null,
+      entries: [videoHistoryEntry(f.stored, null)],
+    };
+    const point = namedRunPoints([page], '123').find((item) => item.cell === 'c1')!;
+    expect(resultsClipGroups([publishedResultsSide(f.stored, point)])).toEqual([]);
+    const pair = f.attachment.pairs[0];
+    f.attachment.unscored.push({
+      candidate: { ...pair.candidate, slot_id: 'measurement-r002-c001' },
+      reason: 'no_reference',
+      fields: [],
+    });
+    const live = withQuality(
+      f.stored,
+      verifiedQuality(f.attachment, f.descriptor, f.stored, '9'.repeat(64)),
+    );
+    const groups = resultsClipGroups([publishedResultsSide(live, point)]);
+    expect(
+      groups.map((group) => {
+        const clip = group.clips.get('h200')!;
+        return [group.take, clip.url, clip.quality?.psnrDb ?? null, clip.unscored?.reason ?? null];
+      }),
+    ).toEqual([
+      [1, '', 25, null],
+      [2, '', null, 'no_reference'],
+    ]);
+    expect(resultsClipReference(groups[0], new Set())).toBeNull();
+    const unreadable = withQuality(f.stored, { pairs: [], unscored: [], unreadable: true });
+    expect(
+      resultsClipGroups([publishedResultsSide(unreadable, point)]).map(
+        (group) => group.clips.get('h200')?.unscored?.reason,
+      ),
+    ).toEqual(['unreadable', 'unreadable', 'unreadable', 'unreadable']);
+    // A published run hides a clip whose MP4 is not stored, as before quality existed.
+    live.sources[0].assets = [
+      [pair.candidate.media_path, { url: '/c.mp4', downloadUrl: '/c.mp4' }],
+    ];
+    expect(
+      resultsClipGroups([publishedResultsSide(live, point)]).map((group) => group.take),
+    ).toEqual([1]);
   });
   it('groups exact seeds and workloads by recorded take without shifting missing records', () => {
     const later = record({ slotId: 'measurement-r002-c001', seconds: 121 });

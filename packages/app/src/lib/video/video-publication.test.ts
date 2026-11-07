@@ -19,6 +19,7 @@ describe('explicit video publication job', () => {
         artifactName: `h3-video-10-${body.artifactId === '20' ? '1' : '2'}`,
         mergeRunId: '99',
         sources: [{}, {}],
+        quality: body.artifactId === '20' ? 20 : null,
       }),
     );
     const onStored = vi.fn();
@@ -29,8 +30,8 @@ describe('explicit video publication job', () => {
       { runId: '10', artifactId: '22', mergeRunId: '99' },
     ]);
     expect(onStored.mock.calls).toEqual([
-      ['10', '20', 2],
-      ['10', '22', 2],
+      ['10', '20', 2, 20],
+      ['10', '22', 2, null],
     ]);
   });
 
@@ -49,14 +50,16 @@ describe('explicit video publication job', () => {
         runId: '10',
         artifactId: 21,
         artifactName: 'h3-video-10-2',
-        mergeRunId: null,
+        // A manual republish returns the approval recorded by the original dispatch.
+        mergeRunId: '99',
         sources: [{}],
+        quality: 'failed',
       });
     const onStored = vi.fn();
     await expect(
       publishVideoResults({ get, post, runId: '10', mergeRunId: null, onStored }),
     ).rejects.toThrow('1 video publications failed');
-    expect(onStored).toHaveBeenCalledExactlyOnceWith('10', '21', 1);
+    expect(onStored).toHaveBeenCalledExactlyOnceWith('10', '21', 1, 'failed');
   });
 
   it('requires an explicit source and rejects an empty artifact list', async () => {

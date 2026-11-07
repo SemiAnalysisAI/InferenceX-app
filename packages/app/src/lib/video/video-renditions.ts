@@ -54,8 +54,9 @@ export interface RenditionSource {
 }
 
 /**
- * Every sealed MP4 of the stored sources, once per content hash, split by whether a rendition
- * receipt already exists. Fidelity sources reuse their originals' objects and dedupe here.
+ * Every sealed MP4 of the stored sources and stored reference pairs, once per content hash,
+ * split by whether a rendition receipt already exists. Fidelity sources reuse their originals'
+ * objects and dedupe here.
  */
 export function renditionPlan(
   artifacts: readonly StoredArtifact[],
@@ -71,6 +72,13 @@ export function renditionPlan(
         if (!sources.has(sha256)) sources.set(sha256, { sha256, path, url: asset.url });
       }
     }
+  for (const { reference } of artifacts.flatMap((saved) => saved.quality ?? []))
+    if (reference.url && !sources.has(reference.media_sha256))
+      sources.set(reference.media_sha256, {
+        sha256: reference.media_sha256,
+        path: reference.media_path,
+        url: reference.url,
+      });
   const pending = [...sources.values()].filter((source) => !done.has(source.sha256));
   return { pending, existing: sources.size - pending.length };
 }
@@ -143,6 +151,10 @@ export function withRenditionPreviews(
   if (previews.size === 0) return saved;
   return {
     ...saved,
+    quality: saved.quality?.map((pair) => {
+      const previewUrl = previews.get(pair.reference.media_sha256);
+      return previewUrl ? { ...pair, reference: { ...pair.reference, previewUrl } } : pair;
+    }),
     sources: saved.sources.map((source) => {
       const checksums = new Map(source.checksums);
       return {

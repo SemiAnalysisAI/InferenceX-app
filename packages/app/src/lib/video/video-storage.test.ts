@@ -115,6 +115,10 @@ describe('persistent H3 media', () => {
     await expect(
       approveVideoPublication('10', withDigest, saved, '100', new AbortController().signal),
     ).rejects.toThrow('different merge identity');
+    // A manual republish names no merge run and reuses the approval.
+    expect(
+      await approveVideoPublication('10', withDigest, saved, null, new AbortController().signal),
+    ).toEqual(approved);
     expect(vi.mocked(put).mock.calls).toHaveLength(before + 1);
     vi.mocked(list).mockResolvedValue({
       blobs: [

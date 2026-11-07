@@ -7,7 +7,7 @@ import VideoResultsClips from '@/components/video-benchmark/VideoResultsClips';
 import history from '../fixtures/api/video-history.json';
 import { servingArtifact } from '../support/video-artifacts';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
-import { verifiedReferencePairs } from '@/components/video-benchmark/reference-quality';
+import { verifiedQuality } from '@/components/video-benchmark/reference-quality';
 
 // Retained H100/H200/B200 C1/C2/C4 observations; clips come from synthetic stored artifacts.
 const points = videoPoints([history as unknown as VideoHistoryPage]);
@@ -68,6 +68,7 @@ function mountResultsClips(
   unofficialRun?: string,
   previews: string[] = [],
   brokenPreview = false,
+  unpublished: string[] = [],
 ) {
   const referenceMedia = { url: '', diagnosticUrl: '', previewUrl: '' };
   cy.fixture('video-results/reference.mp4', 'base64').then((encoded: string) => {
@@ -119,12 +120,12 @@ function mountResultsClips(
           ]);
           cy.wrap(url).as(`original-${key}`);
           const qualityFixture = referenceQualityFixture();
-          const [quality] = verifiedReferencePairs(
+          const [quality] = verifiedQuality(
             qualityFixture.attachment,
-            qualityFixture.receipts,
-            [qualityFixture.stored],
+            qualityFixture.descriptor,
+            qualityFixture.stored,
             '9'.repeat(64),
-          );
+          ).pairs;
           quality.candidate = {
             ...quality.candidate,
             run_id: point.runId,
@@ -133,6 +134,8 @@ function mountResultsClips(
             manifest_sha256: point.id.split(':')[0],
           };
           quality.reference.url = referenceMedia.url;
+          if (previews.includes('reference'))
+            quality.reference.previewUrl = referenceMedia.previewUrl;
           saved.quality = [quality];
           if (diagnostics) {
             const diagnosticUrl = win.URL.createObjectURL(
@@ -171,7 +174,17 @@ function mountResultsClips(
               },
             ];
           }
-          cy.intercept('GET', mediaUrl(point), saved).as(`results-${key}`);
+          if (unpublished.includes(key)) {
+            // An unstored named run: no published media, only documents and PSNR read live.
+            cy.intercept('GET', mediaUrl(point), { statusCode: 204 });
+            saved.sources[0].assets = [];
+            quality.reference.url = '';
+            cy.intercept(
+              'GET',
+              mediaUrl(point).replace('format=published', 'format=live'),
+              saved,
+            ).as(`results-${key}`);
+          } else cy.intercept('GET', mediaUrl(point), saved).as(`results-${key}`);
         });
       },
     );
@@ -373,10 +386,17 @@ describe('Video results synchronized clips', () => {
     );
   });
   it('plays a web rendition in Clip view and the sealed original for Difference, also for an overlay', () => {
-    mountResultsClips(['b200', 'h200'], '/video', false, c1('h200').runId, ['h200']);
+    mountResultsClips(['b200', 'h200'], '/video', false, c1('h200').runId, [
+      'b200',
+      'h200',
+      'reference',
+    ]);
     cy.get('[data-hardware="h200"]').should('contain', 'Unofficial run');
     cy.get('@preview-url').then((url) => tileVideo('h200').should('have.attr', 'src', url));
-    cy.get('@original-b200').then((url) => tileVideo('b200').should('have.attr', 'src', url));
+    cy.get('@preview-url').then((url) => tileVideo('b200').should('have.attr', 'src', url));
+    cy.get('@preview-url').then((url) =>
+      cy.get('[data-testid="video-results-reference"] video').should('have.attr', 'src', url),
+    );
     cy.get('[data-testid="video-results-sources"] summary').click();
     cy.get('[data-testid="video-results-prompt"]').should(
       'contain',
@@ -394,6 +414,9 @@ describe('Video results synchronized clips', () => {
 
     cy.get('[data-testid="video-results-view"][data-view="difference"]').click();
     cy.get('@original-h200').then((url) => tileVideo('h200').should('have.attr', 'src', url));
+    cy.get('[data-testid="video-results-reference"] video')
+      .invoke('attr', 'src')
+      .then((src) => cy.get('@preview-url').should('not.equal', src));
     // Swapping to the original reloads the tile; it must resume at the group's time, not 0.
     expectClipsAt(0.8);
     // The h200 original equals the reference, so only the original yields a black difference.
@@ -407,6 +430,15 @@ describe('Video results synchronized clips', () => {
     cy.get('[data-testid="video-results-view"][data-view="clip"]').click();
     cy.get('@preview-url').then((url) => tileVideo('h200').should('have.attr', 'src', url));
     expectClipsAt(0.8);
+  });
+  it('shows PSNR without media for an unpublished named run', () => {
+    mountResultsClips(['b200', 'h200'], '/video', false, c1('h200').runId, [], false, ['h200']);
+    cy.get('[data-hardware="h200"]')
+      .should('contain', 'Media is not shown for an unpublished run.')
+      .and('contain', '25 dB')
+      .find('video')
+      .should('not.exist');
+    cy.get('[data-hardware="b200"] video').should('exist');
   });
   it('falls back to the sealed original when a web rendition cannot be played', () => {
     mountResultsClips(['b200', 'h200'], '/video', false, undefined, ['h200'], true);

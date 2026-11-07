@@ -75,6 +75,7 @@ const STRINGS = {
     differenceUnavailable:
       'Difference unavailable: frames must have matching geometry and permit cross-origin pixel reads.',
     mediaError: 'This clip could not be played.',
+    unpublishedMedia: 'Media is not shown for an unpublished run.',
     reference: 'Official Diffusers reference',
     schedule: (updates: number, sigmas: number) => `${updates} updates · ${sigmas} sigma points`,
     exactMatch: 'Exact match',
@@ -92,6 +93,25 @@ const STRINGS = {
     energyNote:
       'Mean GPU-board joules per valid clip in the selected measurement cell; not a per-clip energy trace.',
     psnrNote: 'No sealed paired PSNR result is available for this clip.',
+    unscored: {
+      invalid_candidate: 'Invalid clip',
+      checksum_mismatch: 'Checksum mismatch',
+      no_reference: 'No reference',
+      settings_mismatch: 'Settings differ',
+      unreadable: 'Unreadable artifact',
+    },
+    unscoredNote: {
+      invalid_candidate: () =>
+        'The quality scorer did not compare this clip because it is not a valid measured output.',
+      checksum_mismatch: () =>
+        'The quality scorer did not compare this clip because its bytes do not match the recorded SHA256.',
+      no_reference: () =>
+        'The quality scorer did not compare this clip because the reference set has no clip for this case.',
+      settings_mismatch: (fields: string[]) =>
+        `The quality scorer did not compare this clip because its settings differ from the reference${fields.length > 0 ? `: ${fields.join(', ')}` : ''}.`,
+      unreadable: () =>
+        'The quality scorer could not read this artifact, so none of its clips were compared.',
+    },
     metricsHelp:
       'PSNR uses a sealed Diffusers reference pair and every decoded RGB frame. J/clip is the selected cell mean. Both TCO bases use the selected tier, recorded GPU count and valid decoded output duration.',
     gpu: (n: number) => `${n} GPU`,
@@ -141,6 +161,7 @@ const STRINGS = {
     noReference: '此视频暂无已封存的参考配对。',
     differenceUnavailable: '无法显示差异：帧尺寸必须一致，且视频需允许跨域像素读取。',
     mediaError: '此视频无法播放。',
+    unpublishedMedia: '未发布的运行不显示视频。',
     reference: '官方 Diffusers 参考',
     schedule: (updates: number, sigmas: number) => `${updates} 次更新 · ${sigmas} 个 sigma 点`,
     exactMatch: '完全一致',
@@ -156,6 +177,21 @@ const STRINGS = {
     allocatedCost: '分配 GPU',
     energyNote: '所选测量单元每条有效视频的平均 GPU 板卡能耗，不是单条视频的能耗轨迹。',
     psnrNote: '此视频尚无已封存的配对 PSNR 结果。',
+    unscored: {
+      invalid_candidate: '无效视频',
+      checksum_mismatch: '校验和不符',
+      no_reference: '无参考视频',
+      settings_mismatch: '配置不一致',
+      unreadable: '产物无法读取',
+    },
+    unscoredNote: {
+      invalid_candidate: () => '该视频不是有效的测量输出，质量评分器未作比较。',
+      checksum_mismatch: () => '该视频文件的 SHA256 与记录值不符，质量评分器未作比较。',
+      no_reference: () => '参考集中没有该用例的视频，质量评分器未作比较。',
+      settings_mismatch: (fields: string[]) =>
+        `该视频的配置与参考不一致${fields.length > 0 ? `（${fields.join('、')}）` : ''}，质量评分器未作比较。`,
+      unreadable: () => '质量评分器无法读取该产物，因此其中的视频均未比较。',
+    },
     metricsHelp:
       'PSNR 使用已封存的 Diffusers 参考配对，比较全部解码 RGB 帧。J/clip 是所选测量单元的平均值。两种 TCO 口径均使用所选成本档位、记录的 GPU 数量和有效输出的实际时长。',
     gpu: (n: number) => `${n} 张 GPU`,
@@ -239,10 +275,14 @@ export default function VideoResultsClips({
     setFailed(false);
     void Promise.allSettled(
       missing.map(async (point) => {
-        const response = await fetch(
-          `/api/video-runs?run=${encodeURIComponent(point.runId)}&artifact=${encodeURIComponent(String(point.artifactId))}&format=published`,
-          { signal: controller.signal },
-        );
+        const read = (format: 'published' | 'live') =>
+          fetch(
+            `/api/video-runs?run=${encodeURIComponent(point.runId)}&artifact=${encodeURIComponent(String(point.artifactId))}&format=${format}`,
+            { signal: controller.signal },
+          );
+        let response = await read('published');
+        // An unstored named run carries PSNR without media.
+        if (response.status === 204 && point.runId === unofficialRun) response = await read('live');
         if (response.status === 204) {
           if (controller.signal.aborted) return null;
           cache.current.set(sourceKey(point), null);
@@ -261,7 +301,7 @@ export default function VideoResultsClips({
       setLoading(false);
     });
     return () => controller.abort();
-  }, [selected, retry]);
+  }, [selected, retry, unofficialRun]);
   const groups = useMemo(() => resultsClipGroups(sides), [sides]);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const group = groups.find((item) => item.key === selectedGroup) ?? groups[0] ?? null;
@@ -359,7 +399,7 @@ function SynchronizedClips({
   const reference = referenceClip && !errors.has('reference') ? referenceClip : null;
   const visibleKey = [...visible, ...(referenceClip ? ['reference'] : [])].join(',');
   const playable = [
-    ...visible.filter((key) => group?.clips.has(key) && !errors.has(key)),
+    ...visible.filter((key) => group?.clips.get(key)?.url && !errors.has(key)),
     ...(reference ? ['reference'] : []),
   ];
   const audioSources = playable.filter((key) => key !== 'reference');
@@ -382,12 +422,15 @@ function SynchronizedClips({
   }, [group, visibleKey]);
 
   // Changing a tile's source (view switch, rendition fallback) reloads it at 0. Before metadata,
-  // currentTime sets the start position, so the tile resumes at the time of a clip that kept its source.
+  // currentTime sets the start position, so the tile resumes at the time of a clip that kept its source,
+  // or at the group time when every source changed.
+  const shownTime = useRef(0);
+  shownTime.current = shown.time;
   useLayoutEffect(() => {
     const anchor = [...videos.current.values()].find((video) => video.readyState > 0);
-    if (!anchor) return;
+    const resumeAt = anchor ? anchor.currentTime : shownTime.current;
     for (const video of videos.current.values())
-      if (video.readyState === 0) video.currentTime = anchor.currentTime;
+      if (video.readyState === 0) video.currentTime = resumeAt;
   }, [view, failedPreviews]);
 
   // Owns `muted`: <Activity> re-runs this body on reveal, whereas an unchanged muted prop would not be reapplied.
@@ -626,10 +669,12 @@ function SynchronizedClips({
               {s.seed} {group.seed} · {diagnostic ? s.diagnostic : s.take(group.take)}
             </p>
           )}
-          {visible.some((key) => {
-            const preview = group?.clips.get(key)?.previewUrl;
-            return preview && !failedPreviews.has(preview);
-          }) && <p className="text-muted-foreground">{s.webEncode}</p>}
+          {[
+            ...visible.map((key) => group?.clips.get(key)?.previewUrl),
+            referenceClip?.previewUrl,
+          ].some((preview) => preview && !failedPreviews.has(preview)) && (
+            <p className="text-muted-foreground">{s.webEncode}</p>
+          )}
         </div>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[44rem] text-left">
@@ -667,7 +712,7 @@ function SynchronizedClips({
                       {point ? (point.approved === true ? s.approved : s.unapproved) : '—'}
                     </td>
                     <td className="whitespace-nowrap">
-                      {clip ? (
+                      {clip?.url ? (
                         <a
                           className="underline"
                           href={clip.url}
@@ -697,7 +742,13 @@ function SynchronizedClips({
                 if (element) videos.current.set('reference', element);
                 else videos.current.delete('reference');
               }}
-              src={referenceClip.url}
+              src={
+                view === 'clip' &&
+                referenceClip.previewUrl &&
+                !failedPreviews.has(referenceClip.previewUrl)
+                  ? referenceClip.previewUrl
+                  : referenceClip.url
+              }
               muted
               playsInline
               crossOrigin="anonymous"
@@ -711,7 +762,12 @@ function SynchronizedClips({
                 if (Number.isFinite(value) && value > 0)
                   setDurations((previous) => ({ ...previous, reference: value }));
               }}
-              onError={() => setErrors((previous) => new Set([...previous, 'reference']))}
+              onError={(event) => {
+                const preview = referenceClip.previewUrl;
+                if (preview && event.currentTarget.currentSrc === preview)
+                  setFailedPreviews((previous) => new Set([...previous, preview]));
+                else setErrors((previous) => new Set([...previous, 'reference']));
+              }}
             />
             {errors.has('reference') && (
               <p
@@ -759,11 +815,13 @@ function SynchronizedClips({
           const unavailable = errors.has(key)
             ? s.mediaError
             : clip
-              ? view === 'difference' && !pairedReference
-                ? s.noReference
-                : view === 'difference' && differenceErrors.has(key)
-                  ? s.differenceUnavailable
-                  : null
+              ? clip.url
+                ? view === 'difference' && !pairedReference
+                  ? s.noReference
+                  : view === 'difference' && differenceErrors.has(key)
+                    ? s.differenceUnavailable
+                    : null
+                : s.unpublishedMedia
               : s.missing;
           return (
             <article
@@ -789,7 +847,7 @@ function SynchronizedClips({
                 </span>
               </div>
               <div className="relative aspect-video overflow-hidden bg-black">
-                {clip && (
+                {clip?.url && (
                   <video
                     ref={(element) => {
                       if (element) videos.current.set(key, element);
@@ -827,7 +885,7 @@ function SynchronizedClips({
                     }}
                   />
                 )}
-                {view === 'difference' && clip && (
+                {view === 'difference' && clip?.url && (
                   <canvas
                     ref={(element) => {
                       if (element) canvases.current.set(key, element);
@@ -867,12 +925,16 @@ function SynchronizedClips({
                       ? s.exactMatch
                       : clip?.quality?.status === 'measured'
                         ? `${display(clip.quality.psnrDb, 2)} dB`
-                        : '—',
+                        : clip?.unscored
+                          ? s.unscored[clip.unscored.reason]
+                          : '—',
                     clip?.quality
                       ? clip.quality.status === 'incompatible'
                         ? s.incompatible
                         : s.psnrMeasured(clip.quality.totalFrames)
-                      : s.psnrNote,
+                      : clip?.unscored
+                        ? s.unscoredNote[clip.unscored.reason](clip.unscored.fields)
+                        : s.psnrNote,
                   ],
                   [
                     s.energy,

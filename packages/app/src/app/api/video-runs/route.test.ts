@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fakeNextCache, resetFakeNextCache } from '@/lib/testing/fake-next-cache';
 import { GET, POST } from './route';
 import { publishedVideoHistory, recordVideoHistory } from '@/lib/video/video-history-store';
+import { publishVideoQuality } from '@/lib/video/video-quality';
 import {
   approveVideoPublication,
   readStoredArtifact,
@@ -14,13 +15,21 @@ import {
 
 vi.mock('next/cache', () => fakeNextCache);
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({ FIXTURES_MODE: false }));
-vi.mock('@/lib/video/video-storage', () => ({
-  approveVideoPublication: vi.fn(),
-  videoStorageEnabled: vi.fn(() => false),
-  storedArtifacts: vi.fn(() => Promise.resolve([])),
-  readStoredArtifact: vi.fn(),
-  renditionPreviews: vi.fn(() => Promise.resolve(new Map())),
-  storeVideoArtifact: vi.fn(),
+vi.mock('@/lib/video/video-storage', () => {
+  const readIndex = vi.fn();
+  return {
+    approveVideoPublication: vi.fn(),
+    videoStorageEnabled: vi.fn(() => false),
+    storedArtifacts: vi.fn(() => Promise.resolve([])),
+    readStoredArtifact: readIndex,
+    readPublishedArtifact: vi.fn((...args: unknown[]) => readIndex(...args)),
+    renditionPreviews: vi.fn(() => Promise.resolve(new Map())),
+    storeVideoArtifact: vi.fn(),
+  };
+});
+vi.mock('@/lib/video/video-quality', () => ({
+  publishVideoQuality: vi.fn(() => Promise.resolve(null)),
+  liveTrustedQuality: vi.fn(() => Promise.resolve(null)),
 }));
 vi.mock('@/lib/video/video-history-store', () => ({
   publishedVideoHistory: vi.fn(() =>
@@ -503,13 +512,14 @@ describe('explicit H3 publication', () => {
     vi.mocked(videoStorageEnabled).mockReturnValue(true);
     vi.mocked(readStoredArtifact).mockResolvedValue(saved as never);
     vi.mocked(approveVideoPublication).mockResolvedValue(receipt as never);
+    vi.mocked(publishVideoQuality).mockResolvedValueOnce({ pairs: [{}, {}] } as never);
     await GET(request('?format=history'));
     fetchMock
       .mockResolvedValueOnce(response({ private: false }))
       .mockResolvedValueOnce(response(artifact));
     const result = await POST(post({ runId: '10', artifactId: '20', mergeRunId: '99' }));
     expect(result.status).toBe(200);
-    expect(await result.json()).toEqual(receipt);
+    expect(await result.json()).toEqual({ ...receipt, quality: 2 });
     expect(readStoredArtifact).toHaveBeenCalledWith('10', artifact);
     expect(approveVideoPublication).toHaveBeenCalledWith(
       '10',
@@ -526,6 +536,21 @@ describe('explicit H3 publication', () => {
     expect(vi.mocked(recordVideoHistory).mock.invocationCallOrder[0]).toBeGreaterThan(
       vi.mocked(approveVideoPublication).mock.invocationCallOrder[0],
     );
+  });
+
+  it('publishes a run whose quality is missing or cannot be attached', async () => {
+    vi.stubEnv('INVALIDATE_SECRET', 'test-secret');
+    vi.mocked(videoStorageEnabled).mockReturnValue(true);
+    vi.mocked(readStoredArtifact).mockResolvedValue(saved as never);
+    vi.mocked(approveVideoPublication).mockResolvedValue(receipt as never);
+    vi.mocked(publishVideoQuality).mockRejectedValueOnce(new Error('quality listing failed'));
+    fetchMock
+      .mockResolvedValueOnce(response({ private: false }))
+      .mockResolvedValueOnce(response(artifact));
+    const result = await POST(post({ runId: '10', artifactId: '20', mergeRunId: '99' }));
+    expect(result.status).toBe(200);
+    expect(await result.json()).toEqual({ ...receipt, quality: 'failed' });
+    expect(recordVideoHistory).toHaveBeenCalledExactlyOnceWith(saved);
   });
 
   it('reports a publication whose History entry was not recorded as failed and still drops cached History', async () => {

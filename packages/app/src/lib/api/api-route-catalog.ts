@@ -211,7 +211,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-video-view',
-    sourceSha256: 'ad681cc19e3c1f01ca182853eca0c9e4e61f41845a08f3d221030dc112cb63d7',
+    sourceSha256: '34c25a612db39d3c6a2a21d7d90c04771e11b7e17f86dfa6036c562964430864',
   },
   {
     source: 'src/app/api/v1/views/operatorx/route.ts',
@@ -631,10 +631,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'Hidden H3 viewer transport for public CI runs, checksum-verified artifact ZIPs and stored History. Every GET is read-only, including format=media on a cache miss (204). History can return up to five pages in one response and serves entries from the newest History snapshot only while each record matches its index and receipt upload times. Synthetic History replay and explicit original-artifact replay with private MP4 ranges are development-only. History retains legacy indexes but labels only source-bound approval receipts as approved; default charts use those approved entries. Published History pages (keyed by first page and page count) and media payloads are cached across instances under the video tag, without a GitHub read; pages whose index or approval reads failed and missing media are not retained. Publication and History backfill (also when they fail after a write) and ?scope=video expire that cache at once; entries also refresh in the background after 5 minutes, and pages past the end are not retained. Published media assets may carry an optional previewUrl, a web playback rendition matched by the sealed SHA256 of that asset from a shared listing of rendition receipts; renditions are encoded after publication, so that listing refreshes in the background after 60 seconds. url stays the sealed original, and a failed listing serves originals only. format=live with run reads an unstored run: for the newest attempt of each native h3-results configuration it range-reads only the JSON documents and SHA256SUMS from the GitHub artifact ZIP, verifies them against SHA256SUMS and the manifest identity, and returns a History-shaped page whose entries are never stored, approved or given media. A failed artifact read becomes an entry error. Successful artifact reads are reused per artifact ID and digest in a process cache of 32 entries; live pages are not cached under the video tag. HTTP stays private, no-store. Metadata-only development fixtures return 204 for media and an empty live page. This UI contract is not a public data API.',
-      zh: '供隐藏的 H3 查看器读取公开 CI 运行、校验和已验证的产物 ZIP 与已存历史。所有 GET 都只读，包括 format=media 未命中时返回 204。历史可在一次响应中返回最多五页，只有记录仍与索引和回执上传时间一致时才使用最新历史快照中的条目。合成历史回放及读取原始产物 MP4 字节区间的显式回放仅用于开发环境。历史保留旧索引，但只有与来源绑定的批准回执才标为 approved；默认图表只使用这些条目。已发布 History 页（按起始页与页数）与媒体载荷以 video 标签跨实例缓存，读取时不调用 GitHub；索引或批准回执读取失败的页和缺失媒体不保留。发布、历史补建（包括写入后失败的情况）或 ?scope=video 会立即使缓存失效；条目在 5 分钟后也会在后台刷新，超出末页的页不保留。已发布媒体可附带 previewUrl，即网页播放用的转码版本，由共享缓存的转码回执列表按媒体封存的 SHA256 匹配得到；转码在发布之后才完成，因此该列表 60 秒后会在后台刷新。url 仍指向封存的原始视频，列表读取失败时只返回原始视频。format=live 需同时提供 run，用于读取尚未存储的运行：对每个原生 h3-results 配置的最新一次尝试，只按字节区间读取 GitHub 产物 ZIP 中的 JSON 文档和 SHA256SUMS，经 SHA256SUMS 与 manifest 身份校验后，返回与 History 结构相同的页面；这些条目不会被存储或批准，也不附带媒体。单个产物读取失败时，对应条目记录错误。读取成功的产物按产物 ID 和摘要在服务进程内复用，最多 32 项；live 页面不进入 video 标签缓存。HTTP 仍为 private, no-store。开发环境的纯元数据 fixture 对媒体请求返回 204，对 live 请求返回空页面。此界面契约不是公开数据 API。',
+      en: 'Hidden H3 viewer transport for public CI runs, checksum-verified artifact ZIPs and stored History. Every GET is read-only, including format=media on a cache miss (204). History can return up to five pages in one response and serves entries from the newest History snapshot only while each record matches its index and receipt upload times. Synthetic History replay and explicit original-artifact replay with private MP4 ranges are development-only. History retains legacy indexes but labels only source-bound approval receipts as approved; default charts use those approved entries. Published History pages (keyed by first page and page count) and media payloads are cached across instances under the video tag, without a GitHub read; pages whose index or approval reads failed and missing media are not retained. Publication and History backfill (also when they fail after a write) and ?scope=video expire that cache at once; entries also refresh in the background after 5 minutes, and pages past the end are not retained. Published media assets may carry an optional previewUrl, a web playback rendition matched by the sealed SHA256 of that asset from a shared listing of rendition receipts; renditions are encoded after publication, so that listing refreshes in the background after 60 seconds. url stays the sealed original, and a failed listing serves originals only. Published media also carry the separately stored quality of the artifact: verified per-clip PSNR pairs whose reference url is a stored copy of the public reference MP4 (with its own optional previewUrl), and unscored clips with their reason. format=live with run reads an unstored run: for the newest attempt of each native h3-results configuration it range-reads only the JSON documents and SHA256SUMS from the GitHub artifact ZIP, verifies them against SHA256SUMS and the manifest identity, and returns a History-shaped page whose entries are never stored, approved or given media. A failed artifact read becomes an entry error. format=live with run and artifact returns the verified documents of that current result artifact, plus the pairs and unscored clips (or qualityUnreadable when the scorer could not read it) of the trusted h3-quality-<run>-<attempt> artifact (uploaded by a video-quality.yml workflow_run or dispatch of a main commit of SemiAnalysisAI/InferenceX, verified against its SHA256SUMS and reference descriptor, and looked up from the attempt of the artifact up to the latest attempt of the run) without media URLs, or 204 when the artifact is not a current result of the run. Successful artifact reads are reused per artifact ID and digest in a process cache of 32 entries, and its quality lookup, found or not, for 5 minutes; live responses are not cached under the video tag. HTTP stays private, no-store. Metadata-only development fixtures return 204 for media and live artifacts and an empty live page. This UI contract is not a public data API.',
+      zh: '供隐藏的 H3 查看器读取公开 CI 运行、校验和已验证的产物 ZIP 与已存历史。所有 GET 都只读，包括 format=media 未命中时返回 204。历史可在一次响应中返回最多五页，只有记录仍与索引和回执上传时间一致时才使用最新历史快照中的条目。合成历史回放及读取原始产物 MP4 字节区间的显式回放仅用于开发环境。历史保留旧索引，但只有与来源绑定的批准回执才标为 approved；默认图表只使用这些条目。已发布 History 页（按起始页与页数）与媒体载荷以 video 标签跨实例缓存，读取时不调用 GitHub；索引或批准回执读取失败的页和缺失媒体不保留。发布、历史补建（包括写入后失败的情况）或 ?scope=video 会立即使缓存失效；条目在 5 分钟后也会在后台刷新，超出末页的页不保留。已发布媒体可附带 previewUrl，即网页播放用的转码版本，由共享缓存的转码回执列表按媒体封存的 SHA256 匹配得到；转码在发布之后才完成，因此该列表 60 秒后会在后台刷新。url 仍指向封存的原始视频，列表读取失败时只返回原始视频。已发布媒体还附带该产物单独存储的质量结果：经校验的逐条 PSNR 配对（参考视频 url 指向公开参考 MP4 的已存副本，并可附带自己的 previewUrl），以及未评分视频及原因。format=live 需同时提供 run，用于读取尚未存储的运行：对每个原生 h3-results 配置的最新一次尝试，只按字节区间读取 GitHub 产物 ZIP 中的 JSON 文档和 SHA256SUMS，经 SHA256SUMS 与 manifest 身份校验后，返回与 History 结构相同的页面；这些条目不会被存储或批准，也不附带媒体。单个产物读取失败时，对应条目记录错误。format=live 同时提供 run 与 artifact 时，返回该当前结果产物经校验的文档，并附上可信 h3-quality-<run>-<attempt> 产物（由 SemiAnalysisAI/InferenceX 的 video-quality.yml 以 workflow_run 或手动触发方式在 main 分支提交上运行后上传，经其 SHA256SUMS 与参考描述文件校验，并从该产物所属尝试起查找到运行的最新尝试）中的配对和未评分视频（评分器无法读取该产物时为 qualityUnreadable），不含媒体 URL；该产物不是此运行的当前结果时返回 204。读取成功的产物按产物 ID 和摘要在服务进程内复用，最多 32 项；其质量查找结果无论有无都复用 5 分钟；live 响应不进入 video 标签缓存。HTTP 仍为 private, no-store。开发环境的纯元数据 fixture 对媒体和 live 产物请求返回 204，对 live 页面请求返回空页面。此界面契约不是公开数据 API。',
     },
-    sourceSha256: '283e8b04ffdac17da14fc21499ac8f8c0621f70e945af814b064c228cf6b6ef3',
+    sourceSha256: '4a2be6372388018d71f5b02a17958333b7b725313f1661c5eff31d37ce025e2e',
   },
   {
     source: 'src/app/api/video-runs/route.ts',
@@ -642,10 +642,10 @@ export const apiRouteCatalog = [
     method: 'POST',
     classification: 'admin',
     exclusionReason: {
-      en: 'Bearer-protected mutation for one explicit H3 source/artifact. It stores verified media, an immutable source-bound publication receipt and a new History snapshot; authorization does not assert benchmark qualification. The body {"history":"backfill"} rebuilds missing History snapshot records from already stored indexes. This operator path is outside the public read API.',
-      zh: '受 Bearer 密钥保护的单个 H3 来源与产物写操作。它存储已校验媒体、绑定来源的不可变发布回执和新的历史快照；授权不代表 benchmark 质量验收。请求体 {"history":"backfill"} 会根据已存索引补建缺失的历史快照记录。此运维入口不属于公开只读 API。',
+      en: 'Bearer-protected mutation for one explicit H3 source/artifact. It stores verified media, an immutable source-bound publication receipt and a new History snapshot; authorization does not assert benchmark qualification. Without a merge run ID it reuses an existing publication receipt, so a manual republish can attach quality later. It then attaches the trusted quality of the artifact once, storing each reference MP4 content-addressed after matching the SHA256 and size in the descriptor; a missing or unverifiable quality artifact never fails publication, a share that only marks the artifact unreadable is not stored, a stored attachment is never rewritten, and the response adds quality: the attached pair count, null when none is available yet, or failed. The body {"history":"backfill"} rebuilds missing History snapshot records from already stored indexes. This operator path is outside the public read API.',
+      zh: '受 Bearer 密钥保护的单个 H3 来源与产物写操作。它存储已校验媒体、绑定来源的不可变发布回执和新的历史快照；授权不代表 benchmark 质量验收。未提供 merge 运行 ID 时沿用已有的发布回执，因此手动重新发布可在之后补附质量结果。随后对该产物的可信质量结果只附加一次：按参考描述文件中的 SHA256 与大小核对每个参考 MP4 后按内容地址存储；缺失或无法校验的质量产物不会导致发布失败，只标记该产物无法读取的结果不会存储，已存储的质量附件不会被改写，响应额外返回 quality：已附加的配对数量，暂无结果时为 null，附加失败时为 failed。请求体 {"history":"backfill"} 会根据已存索引补建缺失的历史快照记录。此运维入口不属于公开只读 API。',
     },
-    sourceSha256: '283e8b04ffdac17da14fc21499ac8f8c0621f70e945af814b064c228cf6b6ef3',
+    sourceSha256: '4a2be6372388018d71f5b02a17958333b7b725313f1661c5eff31d37ce025e2e',
   },
   {
     source: 'src/app/api/unofficial-run/route.ts',
@@ -1590,31 +1590,31 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/video/video-read-cache.ts',
-    sourceSha256: 'dc3d364c85dc7b6198082f8dd6df1e89cdb7fe11e67229eaa45722e9ead98c3b',
+    sourceSha256: '579e526db3549f0a515f53e0c3205c59e882a7bef84ab37991c222e8a3f6b830',
     reviewArea: {
-      en: 'VideoGenX published History, media and rendition-listing cache shared across instances under the video tag.',
-      zh: 'VideoGenX 已发布 History、媒体及转码回执列表以 video 标签跨实例共享的缓存。',
+      en: 'VideoGenX published History, media with its stored quality, and rendition-listing cache shared across instances under the video tag.',
+      zh: 'VideoGenX 已发布 History、含已存质量结果的媒体及转码回执列表以 video 标签跨实例共享的缓存。',
     },
   },
   {
     source: 'src/lib/video/video-renditions.ts',
-    sourceSha256: '7be3d6f4253b3d1c1eb14d74213a5722124ffb7c0a438e8d248b9bdd49181fe8',
+    sourceSha256: 'c9aed62f139f02c929706c8d11b28509b20fe54e79954bc68b49f0b86f46a150',
     reviewArea: {
-      en: 'VideoGenX web playback rendition receipts and the read-time previewUrl on published media; url, Difference and PSNR keep the sealed original.',
-      zh: 'VideoGenX 网页播放转码回执，以及读取时附加到已发布媒体的 previewUrl；url、差异预览和 PSNR 仍使用封存的原始视频。',
+      en: 'VideoGenX web playback rendition receipts and the read-time previewUrl on published media and stored reference clips; url, Difference and PSNR keep the sealed original.',
+      zh: 'VideoGenX 网页播放转码回执，以及读取时附加到已发布媒体和已存参考视频的 previewUrl；url、差异预览和 PSNR 仍使用封存的原始视频。',
     },
   },
   {
     source: 'src/lib/video/video-live-run.ts',
-    sourceSha256: '97dc5178fa9097d9aafd31097fb0a4fb2e9765fb4129589463cf4de060714776',
+    sourceSha256: '2b3fcbf7c234150551df0362a4b410d310aa1c48454d353fc43ab9f8dcdc5ced',
     reviewArea: {
-      en: 'VideoGenX live read of an unstored run: native result artifact selection, verified documents only, never stored, approved or given media.',
-      zh: 'VideoGenX 实时读取未存储的运行：选择原生结果产物，只读取经校验的文档，不存储、不批准，也不附带媒体。',
+      en: 'VideoGenX live read of an unstored run or one of its result artifacts: native result artifact selection, verified documents only, never stored, approved or given media.',
+      zh: 'VideoGenX 实时读取未存储的运行或其中单个结果产物：选择原生结果产物，只读取经校验的文档，不存储、不批准，也不附带媒体。',
     },
   },
   {
     source: 'src/lib/video/video-replay.ts',
-    sourceSha256: 'f7095cc59ca891de5b57c96ebadde92b039c3a389ebb4ee70a14f3091ba6a781',
+    sourceSha256: '5c1407c2627e2f427b37ec98801bc14beba8afc25945b84a73e0f9edfb5843c1',
     reviewArea: {
       en: 'Development-only original artifact replay, exact source media membership and private byte-range delivery.',
       zh: '仅开发环境使用的原始产物回放、精确来源媒体匹配及私有字节区间读取。',
@@ -1630,10 +1630,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/reference-quality.ts',
-    sourceSha256: 'ba76cd4e72124871dd3ba104357631d1a2c632a3fa6b1fc7f7f760f4e0d5d4dd',
+    sourceSha256: 'f70223dbb492c3f549c4c9de0abf34b1253c729e8455f45af175505ab5ab4015',
     reviewArea: {
-      en: 'Sealed per-clip reference identity, decoded all-frame PSNR, exact equality, missing/incompatible states and safe public diagnostics.',
-      zh: '封存的逐条视频参考身份、解码全帧 PSNR、完全一致、缺失与不兼容状态，以及安全的公开诊断字段。',
+      en: 'Per-clip reference identity bound to the public reference descriptor, h3-quality SHA256SUMS and descriptor seals, decoded all-frame PSNR, exact equality, missing, incompatible, unscored and unreadable states, and safe public diagnostics.',
+      zh: '绑定公开参考描述文件的逐条视频参考身份、h3-quality 的 SHA256SUMS 与描述文件封印、解码全帧 PSNR、完全一致、缺失、不兼容、未评分与无法读取状态，以及安全的公开诊断字段。',
     },
   },
   {
@@ -1646,26 +1646,26 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-clips.ts',
-    sourceSha256: 'f4a0eccdba30ad3d4ed9c5da26022513cf21d985364badb90475f2d459b0d756',
+    sourceSha256: '6f8205a834e6b2dda0f0b609ea175dbad18daa189eed9ed106e29771b6decf03',
     reviewArea: {
-      en: 'Exact candidate/reference pairing and per-clip quality projection shared by Results and the overview API.',
-      zh: 'Results 与 overview API 共用的精确候选/参考配对及逐条质量投影。',
+      en: 'Exact candidate/reference pairing, unscored reasons and per-clip quality projection shared by Results and the overview API, including PSNR without media for an unstored named run.',
+      zh: 'Results 与 overview API 共用的精确候选/参考配对、未评分原因及逐条质量投影，包括未存储的指定运行在无媒体时的 PSNR。',
     },
   },
   {
     source: 'src/components/video-benchmark/stored.ts',
-    sourceSha256: '4d99e2539248c17a996d8fce5cf42943cb5a91349b04a27961866f21c90a06cc',
+    sourceSha256: '39c9525171e71acff2c4272ccbef06876d9eda3b71aba5ea37f2261f73b34047',
     reviewArea: {
-      en: 'Original stored artifact identity, optional read-time playback previewUrl and independently verified optional quality attachment without approval promotion.',
-      zh: '原始已存储产物身份、读取时附加的可选播放 previewUrl，以及独立校验的可选质量附件，不提升发布批准状态。',
+      en: 'Original stored artifact identity, optional read-time playback previewUrl, and the separately stored, independently verified quality attachment (pairs, unscored clips, unreadable flag) merged at read time without approval promotion.',
+      zh: '原始已存储产物身份、读取时附加的可选播放 previewUrl，以及单独存储、独立校验并在读取时合并的质量附件（配对、未评分视频、无法读取标记），不提升发布批准状态。',
     },
   },
   {
     source: 'src/lib/video/video-quality.ts',
-    sourceSha256: 'e6f9a71f18fe856b0e3c543c3df3bb8868ad0433fdf684bef15be80e3ce7c47d',
+    sourceSha256: 'e597a9cd54655c477832ee2a261c6290f8867ef24ee5644db5a3ff9fefe4c3a7',
     reviewArea: {
-      en: 'Development-only quality manifest and original reference receipt/media byte seals; private filesystem paths stay local.',
-      zh: '仅开发环境使用的质量配置、原始参考回执和媒体字节封印；本机路径仅保留在本地。',
+      en: 'Trusted h3-quality artifact lookup (video-quality.yml from a main commit, across attempts), a 5-minute live lookup cache, one-time quality attachment with descriptor-verified reference MP4 storage, and development-only quality and diagnostic replay readers; private filesystem paths stay local.',
+      zh: '可信 h3-quality 产物查找（main 分支提交上的 video-quality.yml，可跨尝试）、5 分钟的 live 查找缓存、一次性附加质量结果并存储经参考描述文件校验的参考 MP4，以及仅开发环境使用的质量与诊断回放读取器；本机路径仅保留在本地。',
     },
   },
   {

@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import { readVideoReplay } from '@/components/video-benchmark/replay';
 import { videoHistoryEntry } from '@/components/video-benchmark/history';
-import type { StoredArtifact } from '@/components/video-benchmark/stored';
+import { withQuality, type StoredArtifact } from '@/components/video-benchmark/stored';
 import { readLocalVideoDiagnostics, readLocalVideoQuality } from './video-quality';
 import type { Json } from '@/components/video-benchmark/bundle';
 import type { NextRequest } from 'next/server';
@@ -121,24 +121,22 @@ function snapshot(): Promise<Snapshot[]> {
             // Filesystem/decoder details belong to local diagnostics, never the HTTP response.
             throw new Error('Quality attachment failed verification');
           });
-          for (const replay of snapshots) {
-            replay.stored.quality = quality.pairs
-              .filter(
-                (pair) =>
-                  pair.candidate.run_id === replay.stored.runId &&
-                  pair.candidate.artifact_id === replay.stored.artifact.id,
-              )
-              .map((pair) => {
-                const { receipt_sha256: receipt, media_path: path } = pair.reference;
+          snapshots.forEach((replay, index) => {
+            const verified = quality.qualities[index];
+            replay.stored = withQuality(replay.stored, {
+              ...verified,
+              pairs: verified.pairs.map((pair) => {
+                const { media_sha256: sha, media_path: path } = pair.reference;
                 const url = replayAssetUrl(
                   replay,
-                  `reference:${receipt}`,
+                  `reference:${sha}`,
                   path,
-                  quality.media.get(receipt)!.get(path)!,
+                  quality.media.get(sha)!,
                 );
                 return { ...pair, reference: { ...pair.reference, url } };
-              });
-          }
+              }),
+            });
+          });
         }
         if (typeof config === 'object' && config !== null && 'diagnostics' in config) {
           const diagnostics = await readLocalVideoDiagnostics(

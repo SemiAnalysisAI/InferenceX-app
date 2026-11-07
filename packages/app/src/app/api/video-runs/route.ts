@@ -16,7 +16,9 @@ import {
   type VideoHistoryPage,
 } from '@/components/video-benchmark/history';
 import { recordVideoHistory } from '@/lib/video/video-history-store';
-import { liveVideoRunPage } from '@/lib/video/video-live-run';
+import { liveVideoArtifact, liveVideoRunPage } from '@/lib/video/video-live-run';
+import { liveTrustedQuality, publishVideoQuality } from '@/lib/video/video-quality';
+import { withQuality } from '@/components/video-benchmark/stored';
 import {
   approveVideoPublication,
   readStoredArtifact,
@@ -102,7 +104,7 @@ export async function GET(request: NextRequest) {
     !id(page) ||
     !Number.isSafeInteger(Number(page)) ||
     (history && (runId || artifactId)) ||
-    (live && (!runId || artifactId)) ||
+    (live && !runId) ||
     !/^[1-9]$/u.test(pages) ||
     Number(pages) > VIDEO_HISTORY_MAX_PAGES ||
     (pages !== '1' && !history)
@@ -122,6 +124,7 @@ export async function GET(request: NextRequest) {
     // The committed History fixture has metadata only; media needs an explicit local replay.
     if (media) return new Response(null, { status: 204, headers });
     // Fixture runs stay hermetic: an unknown named run never reaches GitHub.
+    if (live && artifactId) return new Response(null, { status: 204, headers });
     if (live)
       return NextResponse.json({ schemaVersion: 1, entries: [], nextPage: null }, { headers });
     const fixture = loadFixture<VideoHistoryPage>('video-history');
@@ -187,6 +190,19 @@ export async function GET(request: NextRequest) {
       const artifacts = await runArtifacts(runId, await firstArtifactPage(runId));
       if (!artifacts)
         return NextResponse.json({ error: 'Cannot list CI artifacts' }, { status: 502, headers });
+      if (artifactId) {
+        const saved = await liveVideoArtifact(
+          runId,
+          Number(artifactId),
+          artifacts,
+          github,
+          deadline,
+        );
+        if (!saved) return new Response(null, { status: 204, headers });
+        // PSNR without media: an unstored run has no published candidate or reference clips.
+        const quality = await liveTrustedQuality(saved, github, deadline).catch(() => null);
+        return NextResponse.json(quality ? withQuality(saved, quality) : saved, { headers });
+      }
       return NextResponse.json(await liveVideoRunPage(runId, artifacts, github, deadline), {
         headers,
       });
@@ -382,7 +398,12 @@ export async function POST(request: Request) {
     }
     const receipt = await approveVideoPublication(runId, artifact, saved, mergeRunId, deadline);
     await recordVideoHistory(saved);
-    return NextResponse.json(receipt, { headers });
+    // Quality arrives from a separate workflow, often after publication; it never blocks it.
+    const quality = await publishVideoQuality(saved, github, deadline).then(
+      (stored) => stored?.pairs.length ?? null,
+      () => 'failed' as const,
+    );
+    return NextResponse.json({ ...receipt, quality }, { headers });
   } catch {
     return NextResponse.json(
       { error: 'Video publication failed; retry the exact source artifact' },

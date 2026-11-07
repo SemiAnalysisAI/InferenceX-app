@@ -2,7 +2,7 @@ import { at, type Json } from './bundle';
 import { servingFixture } from './serving.fixture';
 import type { StoredArtifact } from './stored';
 
-/** Test-only sealed-pair metadata. No media bytes or measured results. */
+/** Test-only quality attachment and reference descriptor. No media bytes or measured results. */
 export function referenceQualityFixture(
   requests = 4,
   runId = '123',
@@ -47,34 +47,25 @@ export function referenceQualityFixture(
   };
   const plan = structuredClone(at(fixture.documents.get('gpu/c1/baseline/run.json'), 'plan'));
   const caseValue = at(plan, 'cases', 0);
-  const receipt = {
-    status: 'selection_complete',
-    quality_status: 'unjudged',
-    release_qualified: false,
-    runtime: {
-      diffusers_source: {
-        url: `https://github.com/huggingface/diffusers/archive/${'d'.repeat(40)}.tar.gz`,
-      },
-    },
-    model_snapshot: { requested_revision: 'a'.repeat(40) },
-    schedule: Object.fromEntries(
-      ['video', 'audio'].map((modality) => [
-        modality,
-        {
-          updates: 50,
-          sigmas: Array.from({ length: 51 }, (_, i) => 1 - i / 50),
-          float32_le_sha256: '2'.repeat(64),
-        },
-      ]),
-    ),
-    plan,
-    plan_sha256: 'b'.repeat(64),
-    selection: ['drum-taps'],
+  const release = { repository: 'SemiAnalysisAI/InferenceX', tag: 'h3-v2-release-v1-references' };
+  const descriptor = {
+    schema_version: 1,
+    release,
+    model_id: at(plan, 'model_id'),
+    model_revision: at(plan, 'model_revision'),
+    generation: at(plan, 'generation'),
+    fairness: at(plan, 'fairness'),
     cases: [
-      { ...(caseValue as Record<string, Json>), sha256: { 'reference.mp4': 'c'.repeat(64) } },
+      {
+        ...(caseValue as Record<string, Json>),
+        asset: 'drum-taps.mp4',
+        sha256: 'c'.repeat(64),
+        bytes: 1024,
+        receipt_sha256: 'd'.repeat(64),
+        plan_sha256: 'b'.repeat(64),
+      },
     ],
   };
-  const referenceSha = 'd'.repeat(64);
   const attachment = {
     schema_version: 1,
     quality_status: 'unjudged',
@@ -85,13 +76,7 @@ export function referenceQualityFixture(
       sha256: 'f'.repeat(64),
       method: 'decoded-rgb24-all-frames',
     },
-    references: [
-      {
-        receipt_path: '/private/reference.json',
-        receipt_sha256: referenceSha,
-        checksums_sha256: '1'.repeat(64),
-      },
-    ],
+    references: { descriptor: 'h3-v2.json', descriptor_sha256: '1'.repeat(64), release },
     pairs: [
       {
         candidate: {
@@ -108,9 +93,9 @@ export function referenceQualityFixture(
           media_sha256: 'e11'.padEnd(64, '0'),
         },
         reference: {
-          receipt_sha256: referenceSha,
+          receipt_sha256: 'd'.repeat(64),
           case_id: 'drum-taps',
-          media_path: 'drum-taps/reference.mp4',
+          media_path: 'drum-taps.mp4',
           media_sha256: 'c'.repeat(64),
         },
         comparison: {
@@ -127,12 +112,8 @@ export function referenceQualityFixture(
         },
       },
     ],
+    unscored: [] as Json[],
+    unreadable: [] as Json[],
   };
-  return {
-    stored,
-    receipt,
-    attachment,
-    referenceSha,
-    receipts: new Map([[referenceSha, receipt as Json]]),
-  };
+  return { stored, descriptor, attachment, plan };
 }
