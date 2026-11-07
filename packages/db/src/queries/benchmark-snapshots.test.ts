@@ -92,12 +92,11 @@ const byEntry = (a: CurveEntry, b: CurveEntry) =>
   a.scope.localeCompare(b.scope) || a.point.localeCompare(b.point) || a.run - b.run;
 
 // Independent TypeScript model of the curve selection that latest_benchmarks implements in SQL.
+// Its input already comes from latest_workflow_runs, so only the latest attempt of each run is seen.
 interface CurvePoint {
   identity: Record<string, unknown>;
   image: string | null;
   workflowRunId: number;
-  githubRunId: number;
-  runAttempt: number;
   date: string;
   runStartedAt: string | null;
   appendOnly: boolean;
@@ -106,15 +105,8 @@ const curveInput = (point: CurvePoint) => point.identity as unknown as Benchmark
 const runLineImages = (points: readonly CurvePoint[]) =>
   curveLineImages(points.map((point) => ({ ...curveInput(point), image: point.image })));
 function publishedCurve(points: readonly CurvePoint[]): Map<string, CurvePoint[]> {
-  const latestAttempts = new Map<number, number>();
-  for (const point of points)
-    latestAttempts.set(
-      point.githubRunId,
-      Math.max(latestAttempts.get(point.githubRunId) ?? 0, point.runAttempt),
-    );
   const scopes = new Map<string, Map<string, CurvePoint[]>>();
   for (const point of points) {
-    if (point.runAttempt !== latestAttempts.get(point.githubRunId)) continue;
     const key = benchmarkCurveScope(curveInput(point));
     const runs = scopes.get(key) ?? new Map<string, CurvePoint[]>();
     const runDate = JSON.stringify([point.workflowRunId, point.date]);
@@ -155,8 +147,7 @@ async function loadCurvePoints(): Promise<CurvePoint[]> {
   const rows = await sql`
     SELECT c.*, br.benchmark_type, br.isl, br.osl, br.conc, br.offload_mode,
       br.recipe_fingerprint, br.image, br.date::text AS point_date,
-      wr.id AS workflow_run_id, wr.github_run_id, wr.run_attempt,
-      wr.run_started_at::text, wr.append_only
+      wr.id AS workflow_run_id, wr.run_started_at::text, wr.append_only
     FROM benchmark_results br
     JOIN configs c ON c.id = br.config_id
     JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
@@ -165,8 +156,6 @@ async function loadCurvePoints(): Promise<CurvePoint[]> {
     identity: row,
     image: row.image as string | null,
     workflowRunId: Number(row.workflow_run_id),
-    githubRunId: Number(row.github_run_id),
-    runAttempt: Number(row.run_attempt),
     date: String(row.point_date),
     runStartedAt: row.run_started_at as string | null,
     appendOnly: Boolean(row.append_only),
@@ -559,7 +548,7 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     ).toEqual(currentIds);
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2', '2026-09-11', true))).toEqual([8]);
   });
-  it('projects the same curve in TypeScript as latest_benchmarks and the dated query', async () => {
+  it('matches an independent curve model in latest_benchmarks and the dated query', async () => {
     await addPoint(100, 1, 3, 1);
     await addPoint(101, 1, 4, 1);
     await expectSameCurve('agentic scope collapses topology and offload variants');
