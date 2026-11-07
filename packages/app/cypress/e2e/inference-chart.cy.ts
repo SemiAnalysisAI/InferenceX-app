@@ -348,8 +348,8 @@ describe('Deprecated model source attribution', () => {
       });
       cy.get('#chart-0 svg[data-testid="d3-chart-svg"]').should('be.visible');
       cy.get('#chart-0 [data-testid="result-context"]')
-        .should('contain.text', 'Source: SemiAnalysis InferenceX™')
-        .and(deprecated ? 'contain.text' : 'not.contain.text', '(Deprecated)');
+        .should('contain.text', 'SemiAnalysis InferenceX™')
+        .and(deprecated ? 'contain.text' : 'not.contain.text', '(deprecated)');
       cy.get('.deprecated-watermark').should('not.exist');
     }
   });
@@ -387,7 +387,7 @@ describe('Deprecated model source attribution', () => {
     });
     cy.get('#chart-0 [data-testid="result-context"]').should(
       'contain.text',
-      'Source: SemiAnalysis InferenceX™ (Deprecated)',
+      'SemiAnalysis InferenceX™ (deprecated)',
     );
     let exportedPng = '';
     let exportedCaption = '';
@@ -409,7 +409,7 @@ describe('Deprecated model source attribution', () => {
     cy.get('[data-testid="export-png-button"]').click();
     cy.window().should(() => {
       expect(exportedPng).to.match(/^data:image\/png;base64,/u);
-      expect(exportedCaption).to.contain('Source: SemiAnalysis InferenceX™ (Deprecated)');
+      expect(exportedCaption).to.contain('SemiAnalysis InferenceX™ (deprecated)');
     });
 
     cy.visit(`/infx/inference/minimax-m3?i_seq=agentic-traces&unofficialrun=${OVERLAY_RUN_ID}`, {
@@ -420,7 +420,7 @@ describe('Deprecated model source attribution', () => {
     cy.get('#chart-0').should(($chart) => assertContextBelowPlot($chart[0]!));
     cy.get('#chart-0 [data-testid="result-context"]').should(
       'contain.text',
-      'Source: SemiAnalysis InferenceX™ + unofficial overlays (Deprecated)',
+      'SemiAnalysis InferenceX™ + unofficial overlays (deprecated)',
     );
     cy.get('#chart-0 .unofficial-watermark-image').should('exist');
     cy.get('.deprecated-watermark').should('not.exist');
@@ -428,7 +428,7 @@ describe('Deprecated model source attribution', () => {
     cy.get('#chart-0 .unofficial-overlay-pt').should('not.exist');
     cy.get('#chart-0 [data-testid="result-context"]').should(
       'contain.text',
-      'Source: SemiAnalysis InferenceX™ (Deprecated)',
+      'SemiAnalysis InferenceX™ (deprecated)',
     );
 
     cy.viewport(375, 900);
@@ -438,7 +438,7 @@ describe('Deprecated model source attribution', () => {
     cy.wait('@historicalM3Overlay');
     cy.get('#chart-0 [data-testid="result-context"]').should(
       'contain.text',
-      '来源: SemiAnalysis InferenceX™ + 非官方 overlays (已弃用)',
+      'SemiAnalysis InferenceX™ + 非官方 overlays (已弃用)',
     );
     cy.get('.deprecated-watermark').should('not.exist');
     cy.get('#chart-0').should(($chart) => assertContextBelowPlot($chart[0]!));
@@ -464,11 +464,11 @@ describe('Inference Chart — Simplified Chinese mobile path', () => {
       .should('be.visible')
       .closest('[data-testid="result-context"]')
       .should('contain.text', '场景:');
-    cy.get('#precision-select').should('have.length', 1).and('not.be.visible');
+    cy.get('#precision-select').should('have.length', 1).and('be.visible');
     cy.get('[data-testid="inference-secondary-controls"] > button').click();
     cy.get('[data-testid="inference-secondary-controls"]').within(() => {
       cy.get('[data-testid="scenario-selector"]').should('not.exist');
-      cy.get('#precision-select').should('be.visible');
+      cy.get('#precision-select').should('not.exist');
     });
     cy.get('[data-testid="inference-secondary-controls"]')
       .find('[data-testid="inference-run-context"]')

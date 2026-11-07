@@ -65,7 +65,7 @@ describe('Profit Estimator per GW', () => {
     openFormulaNotes();
     cy.get('[data-testid="profit-utilization-input"]').clear().type('30').blur();
     cy.get('[data-testid="profit-formula-notes"]').should('contain.text', '30% utilization');
-    cy.get('[data-testid="result-context-utilization"]').should('have.text', '30%');
+    cy.get('[data-testid="result-context-utilization"] .export-only').should('have.text', '30%');
     revenueLabels()
       .first()
       .invoke('text')
@@ -88,7 +88,7 @@ describe('Profit Estimator per GW', () => {
     openFormulaNotes();
     cy.get('[data-testid="profit-lab-cut-input"]').clear().type('250').blur();
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '100');
-    cy.get('[data-testid="result-context-license-fee"]').should('have.text', '100%');
+    cy.get('[data-testid="result-context-license-fee"] .export-only').should('have.text', '100%');
     cy.get('[data-testid="profit-formula-notes"]').should(
       'contain.text',
       'Model license fee = 100%',
@@ -191,11 +191,11 @@ describe('Profit Estimator per GW', () => {
       'contain.text',
       'Owning at large hyperscaler volume',
     );
-    expectTcoCost('mi355x', 'MI355X', '1.5');
+    expectTcoCost('mi355x', 'MI355X', '1.50');
     cy.get('[data-testid="profit-custom-cost-gb300"]').clear().type('4').blur();
     cy.get('[data-testid="result-context-cost-tier"]').should('contain.text', 'Custom');
     expectTcoCost('gb300', 'GB300', '4');
-    expectTcoCost('mi355x', 'MI355X', '1.5');
+    expectTcoCost('mi355x', 'MI355X', '1.50');
     cy.get('[data-testid="profit-footer"] [data-testid="tco-prices-source"]').should('not.exist');
     cy.get('button#profit-cost').click();
     cy.get('[data-testid="cost-provider-costh"]').click();
