@@ -144,6 +144,23 @@ export function isAgenticRow(row: Record<string, unknown>): boolean {
   return String(row.scenario_type ?? '').startsWith('agentic');
 }
 
+/**
+ * Describes a mapped row the producer marked `require_power` whose power is not valid, else null.
+ * REQUIRE_POWER failed that point, but AgentX results upload even from a failed job.
+ */
+export function requiredPowerFailure(
+  raw: Record<string, unknown>,
+  point: BenchmarkParams,
+): string | null {
+  if (raw.require_power !== true || point.metrics.power_valid === 1) return null;
+  const { model, hardware, framework, precision } = point.config;
+  const why =
+    point.metrics.power_valid === undefined
+      ? `power_missing ${String(raw.power_missing ?? 'unspecified')}`
+      : `power_invalid_reasons ${(point.powerInvalidReasons ?? []).join(',') || 'none recorded'}`;
+  return `${model} ${hardware} ${framework} ${precision} ${point.benchmarkType} conc ${point.conc}: ${why}`;
+}
+
 export function mapBenchmarkRow(
   row: Record<string, any>,
   tracker: SkipTracker,

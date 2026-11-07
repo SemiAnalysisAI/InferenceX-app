@@ -31,7 +31,7 @@ function tempRoot(): string {
 
 const SIBLINGS = ['bmk_agentic_', 'agentic_', 'power_audit_', 'multinode_server_logs_'];
 
-function writeCopy(dir: string, suffix: string, row: Record<string, unknown>): void {
+function writeCopy(dir: string, suffix: string, row: unknown): void {
   for (const prefix of SIBLINGS) fs.mkdirSync(path.join(dir, `${prefix}${suffix}`));
   fs.writeFileSync(path.join(dir, `bmk_agentic_${suffix}`, 'result.json'), JSON.stringify(row));
   fs.writeFileSync(path.join(dir, `power_audit_${suffix}`, 'gpu_metrics.csv'), 'x');
@@ -44,6 +44,31 @@ function metas(entries: [string, string, number][]): RetryArtifactMeta[] {
 }
 
 describe('dropSupersededJobCopies', () => {
+  it('keeps the newest copy whole when a rerun moves which required-power point failed', () => {
+    const dir = tempRoot();
+    const point = (users: number, valid: boolean) => ({
+      ...goldenRow,
+      conc: users,
+      users,
+      require_power: true,
+      ...(valid ? {} : { power_valid: 0 }),
+    });
+    writeCopy(dir, 'job-attempt1', [point(4, true), point(8, true), point(16, false)]);
+    writeCopy(dir, 'job-attempt2', [point(4, false), point(8, true), point(16, true)]);
+
+    const selection = dropSupersededJobCopies(
+      dir,
+      metas([
+        ['job-attempt1', '2026-10-13T00:00:00Z', 1],
+        ['job-attempt2', '2026-10-14T00:00:00Z', 2],
+      ]),
+    );
+
+    expect(selection.superseded.map((copy) => [copy.suffix, copy.keptSuffix])).toEqual([
+      ['job-attempt1', 'job-attempt2'],
+    ]);
+  });
+
   it('keeps the latest attempt of a point and every sibling of that copy', () => {
     const dir = tempRoot();
     writeCopy(dir, 'conc48-aaaa', { ...goldenRow, median_e2el: 1 });

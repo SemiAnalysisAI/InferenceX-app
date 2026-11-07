@@ -50,6 +50,8 @@ export interface IngestRunReport {
     changelogEntriesWritten: number;
   };
   unmapped: { models: string[]; hardware: string[]; precisions: string[]; datasets: string[] };
+  /** Points marked `require_power` that arrived without valid power, so were not published. */
+  withheldRequiredPower: string[];
 }
 
 export function createIngestRunReport(runId: number, runAttempt: number): IngestRunReport {
@@ -84,6 +86,7 @@ export function createIngestRunReport(runId: number, runAttempt: number): Ingest
       changelogEntriesWritten: 0,
     },
     unmapped: { models: [], hardware: [], precisions: [], datasets: [] },
+    withheldRequiredPower: [],
   };
 }
 
@@ -123,5 +126,13 @@ export function renderIngestRunReportMarkdown(report: IngestRunReport): string {
     if (names.length > 0) lines.push(`- unmapped ${kind}: ${cell(names.join(', '))}`);
   }
   lines.push('', '</details>', '');
+  if (report.withheldRequiredPower.length > 0) {
+    lines.push(
+      `Required-power points not published (${report.withheldRequiredPower.length}):`,
+      '',
+      ...report.withheldRequiredPower.map((point) => `- ${cell(point)}`),
+      '',
+    );
+  }
   return lines.join('\n');
 }

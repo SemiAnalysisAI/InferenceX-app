@@ -36,9 +36,15 @@ describe('ingest run report', () => {
     report.status = 'failed';
     report.error = 'boom | `x`\nnext';
     report.unmapped.models = ['a|b'];
+    report.withheldRequiredPower = [
+      'bmk_x/agg.json: m h f p agentic_traces conc 2: power_missing x',
+    ];
     const markdown = renderIngestRunReportMarkdown(report);
     expect(markdown).toContain('Status: **failed**');
     expect(markdown).toContain("Error: `boom   'x' next`");
     expect(markdown).toContain('- unmapped models: a b');
+    expect(markdown).toContain(
+      'Required-power points not published (1):\n\n- bmk_x/agg.json: m h f p agentic_traces conc 2: power_missing x',
+    );
   });
 });

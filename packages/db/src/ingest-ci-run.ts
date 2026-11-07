@@ -531,9 +531,17 @@ async function main(): Promise<void> {
       let fileExpectationsUnknown = file.nonObjectRows > 0;
       const aggregateFile = !file.path.startsWith('bmk_');
       let coveredRows = 0;
-      const rows = file.rows.flatMap(({ raw, mapped, failed }) => {
+      const rows = file.rows.flatMap(({ raw, mapped, failed, withheld }) => {
         if (mapped && aggregateFile && perJobPoints.has(benchmarkPointKey(mapped))) {
           coveredRows++;
+          return [];
+        }
+        if (withheld) {
+          const point = `${relativeFile}: ${withheld}`;
+          console.log(`    withheld required-power point: ${point}`);
+          report.counts.benchmark.skipped++;
+          report.withheldRequiredPower.push(point);
+          powerPublicationWarnings.push(`Required-power point not published: ${point}`);
           return [];
         }
         if (mapped) return [mapped];

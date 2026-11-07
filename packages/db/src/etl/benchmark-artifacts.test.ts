@@ -78,7 +78,7 @@ describe('readBenchmarkArtifacts', () => {
     expect(gpus(null)).not.toEqual([4]);
   });
 
-  it('withholds required-power rows without valid power and keeps legacy rows', () => {
+  it('flags required-power rows without valid power and keeps their point identity', () => {
     const dir = bundle();
     const aggPath = path.join(dir, 'bmk_agentic_golden/agg.json');
     const row = JSON.parse(fs.readFileSync(aggPath, 'utf8'));
@@ -96,17 +96,12 @@ describe('readBenchmarkArtifacts', () => {
         point(4, { require_power: true }),
       ]),
     );
-    const tracker = createSkipTracker();
-    const [file] = readBenchmarkArtifacts(dir, { runId: 123, tracker });
-    expect(file.rows.map(({ mapped, failed }) => [mapped?.conc ?? null, failed])).toEqual([
-      [null, true],
-      [3, false],
-      [4, false],
+    const [file] = readBenchmarkArtifacts(dir, { runId: 123, tracker: createSkipTracker() });
+    expect(file.rows.map(({ mapped, withheld }) => [mapped?.conc, withheld])).toEqual([
+      [2, 'qwen3.5 h100 sglang fp8 agentic_traces conc 2: power_invalid_reasons gpu_missing'],
+      [3, null],
+      [4, null],
     ]);
-    expect(file.rows[1].mapped?.metrics.power_valid).toBe(0);
     expect(file.rows[2].mapped?.metrics).not.toHaveProperty('require_power');
-    expect(tracker.requiredPowerSkips).toEqual([
-      'bmk_agentic_golden/agg.json: qwen3.5 h100 sglang fp8 agentic_traces conc 2: power_invalid_reasons gpu_missing',
-    ]);
   });
 });
