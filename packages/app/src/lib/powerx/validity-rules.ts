@@ -9,7 +9,10 @@ import thresholds from '@/lib/power/power-validity-thresholds.json';
 
 export const MAX_SAMPLE_GAP_SECONDS = thresholds.max_sample_gap_seconds;
 export const CLOCK_TOLERANCE_SECONDS = thresholds.clock_tolerance_seconds;
-export const CLOCK_TOLERANCE_PERCENT = thresholds.clock_tolerance_fraction * 100;
+// Rounded so a fraction such as 0.07 prints 7, not 7.000000000000001.
+export const CLOCK_TOLERANCE_PERCENT = Number(
+  (thresholds.clock_tolerance_fraction * 100).toPrecision(12),
+);
 
 export const VALIDITY_CHECKS = [
   { id: 'devices', reason: 'expected_device_missing' },
