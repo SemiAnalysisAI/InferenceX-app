@@ -106,6 +106,8 @@ export interface PowerAudit {
   source?: string;
   observed_gpu_ids?: string[];
   cpu?: PowerAuditCpu;
+  warnings?: string[];
+  warning_details?: string[];
 }
 
 export const POWER_AUDIT_CPU_SENSOR_KINDS = [
@@ -464,6 +466,15 @@ export function extractPowerAudit(raw: unknown): PowerAudit | undefined {
   }
   const cpu = extractPowerAuditCpu(e.cpu);
   if (cpu !== undefined) audit.cpu = cpu;
+  const warnings = extractPowerInvalidReasons(e.warnings);
+  if (warnings !== undefined) {
+    audit.warnings = warnings;
+    audit.warning_details = Array.isArray(e.warning_details)
+      ? e.warning_details
+          .filter((d): d is string => typeof d === 'string' && d.length > 0 && d.length <= 256)
+          .slice(0, MAX_POWER_REASON_CODES)
+      : [];
+  }
   const hasNumericField = Object.keys(audit).length > 0;
 
   audit.producer_sha = auditSha(e.producer_sha);

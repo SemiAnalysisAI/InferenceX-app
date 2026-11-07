@@ -45,6 +45,8 @@ describe('measured-power API documentation', () => {
         'producer_sha',
         'exporter_image_sha256',
         'cpu',
+        'warnings',
+        'warning_details',
       ].toSorted(),
     );
     expect(audit?.required).toBeUndefined();

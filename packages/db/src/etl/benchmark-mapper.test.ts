@@ -1242,6 +1242,15 @@ describe('extractPowerAudit', () => {
     expect(extractPowerAudit(fullAudit)).toEqual(fullAudit);
   });
 
+  it('keeps topology warnings with their details', () => {
+    const warned = {
+      ...fullAudit,
+      warnings: ['topology_env_mismatch_warning'],
+      warning_details: ["workflow env expects role GPUs {'agg': 8}, manifest plans {'agg': 4}"],
+    };
+    expect(extractPowerAudit(warned)).toEqual(warned);
+  });
+
   it('omits Infinity / NaN / junk-string numerics (partial audit beats none)', () => {
     expect(
       extractPowerAudit({

@@ -309,6 +309,15 @@ const powerAuditSchema: ApiSchema = {
       description:
         'CPU-side leg provenance emitted alongside cpu_power_valid: the sensor kind that fed the CPU-side keys (on NVL72, module preferred over grace_socket over dcgm_cpu_rail; rapl_package on single-node AMD EPYC hosts), its collector, expected vs. observed sockets (two per compute tray or AMD host), stored sample rows, and the leg’s reason codes (empty when valid). Absent on runs without the CPU-side leg.',
     },
+    warnings: {
+      ...arraySchema(stringSchema),
+      description:
+        'Producer warning codes that did not withhold power. topology_env_mismatch_warning means the workflow’s role GPU counts differed from the srt-slurm manifest placement, which the power metrics and GPU counts follow.',
+    },
+    warning_details: {
+      ...arraySchema(stringSchema),
+      description: 'Human-readable detail for each warning, such as both role GPU counts.',
+    },
   },
   additionalProperties: true,
   description:
