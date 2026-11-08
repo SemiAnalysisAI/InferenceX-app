@@ -11,7 +11,10 @@ import {
 
 import { revalidateTag, unstable_cache } from 'next/cache';
 import { after } from 'next/server';
-import { workAsyncStorage } from 'next/dist/server/app-render/work-async-storage.external';
+import {
+  willConsumerServerCache,
+  workUnitAsyncStorage,
+} from 'next/dist/server/app-render/work-unit-async-storage.external';
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 import {
   CONTENT_BLOB_KEY_PREFIX,
@@ -346,7 +349,7 @@ export function cachedQuery<T, Args extends unknown[]>(
   return async (...args: Args): Promise<T> =>
     unpack(
       args,
-      await (workAsyncStorage.getStore()?.isStaticGeneration
+      await (willConsumerServerCache(workUnitAsyncStorage.getStore())
         ? pageCached(...args)
         : routeCached(...args)),
     );
