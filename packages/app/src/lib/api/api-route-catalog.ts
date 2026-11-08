@@ -1913,7 +1913,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/api-cache.ts',
-    sourceSha256: 'c675a6503372b59bb2c4755308bafb6e02ac9b849f29e064cae45c2806a1fa7c',
+    sourceSha256: 'fb76d75740366f9df9b2a85059f71314c399f1741a5c9b054d5ffd7691dde18f',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',
