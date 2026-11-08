@@ -12,6 +12,11 @@ parameters are preserved. This is a navigation default, not an API default:
 the landing page. Existing model-specific links and historical results remain available.
 Kimi K3.1 Pro is first in the shared model selector and `/api/v1/views/options` model list;
 the remaining models keep their relative order.
+The homepage and comparison-page featured model lists also lead with Kimi K3.1 Pro,
+and their dashboard button opens its model route. This changes navigation order only,
+not comparison calculations or API model requirements.
+Locked model routes and relocked selections also fall back to Kimi K3.1 Pro.
+This is a UI feature gate, not an API access restriction.
 
 `/infx/inference` 和 `/zh/infx/inference` 在未通过 `g_model` 指定模型时，会临时重定向到
 各自的 `/kimi-k31-pro` 页面，并保留其他查询参数。这只改变页面入口；
@@ -19,6 +24,10 @@ the remaining models keep their relative order.
 可查询入口页面对应的模型。已有模型链接和历史结果不受影响。
 共享模型选择器和 `/api/v1/views/options` 返回的模型列表均将 Kimi K3.1 Pro 排在首位，
 其余模型的相对顺序不变。
+首页和比较页的推荐模型列表也将 Kimi K3.1 Pro 排在首位，仪表盘按钮进入该模型页面。
+这只改变导航顺序，不影响比较计算或 API 的模型参数要求。
+被功能开关拦截的模型页面和重新锁定后的模型选择也回退到 Kimi K3.1 Pro。
+这是 UI 功能开关，不限制 API 访问。
 
 Inference places Scenario beside Cost Tier and TCO Basis below the plot on desktop
 and mobile. An empty selection keeps Scenario below the empty chart for recovery.

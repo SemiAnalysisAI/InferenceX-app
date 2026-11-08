@@ -119,7 +119,7 @@ describe('landing model curation', () => {
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
         cy.get('[data-testid^="compare-agentx-model-"]').should(($links) => {
           expect([...$links].map((link) => link.getAttribute('href'))).to.deep.eq(
-            ['deepseek-v41-flash', 'kimi-k31-pro'].map(
+            ['kimi-k31-pro', 'deepseek-v41-flash'].map(
               (slug) => `${prefix}/infx/inference/${slug}`,
             ),
           );
@@ -147,7 +147,7 @@ describe('landing model curation', () => {
           .next('nav')
           .find('[data-testid^="compare-agentx-model-"]')
           .first()
-          .should('have.attr', 'data-testid', 'compare-agentx-model-deepseek-v41-flash');
+          .should('have.attr', 'data-testid', 'compare-agentx-model-kimi-k31-pro');
         cy.get('[data-testid="landing-minimax-m31-flash-results-link"]')
           .should('contain.text', 'MiniMax M3.1 Flash')
           .and('contain.text', 'AgentX')
@@ -211,7 +211,7 @@ describe('landing model curation', () => {
           .next('nav')
           .find('[data-testid^="compare-agentx-model-"]')
           .first()
-          .should('have.attr', 'data-testid', 'compare-agentx-model-deepseek-v41-flash');
+          .should('have.attr', 'data-testid', 'compare-agentx-model-kimi-k31-pro');
       });
 
       cy.visit(`${prefix}/compare`);

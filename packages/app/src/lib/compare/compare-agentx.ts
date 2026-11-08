@@ -3,8 +3,8 @@ import { getInferenceModelBySlug, inferenceModelPath } from '@/lib/routing/infer
 import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 const FEATURED_AGENTX_MODEL_SLUGS = [
-  'deepseek-v41-flash',
   'kimi-k31-pro',
+  'deepseek-v41-flash',
   'muse-spark-open',
   'kimi-k3',
   'deepseek-v4',
