@@ -433,7 +433,7 @@ describe('GlobalFilterProvider context isolation', () => {
       mocks.featureGateUnlocked = false;
       rerenderProvider?.();
     });
-    expect(selectionSnapshot?.selectedModel).toBe(Model.DeepSeek_V4_1_Flash);
+    expect(selectionSnapshot?.selectedModel).toBe(Model.Kimi_K3_1_Pro);
     expect(availabilitySnapshot?.availableModels).not.toContain(Model.GLM_5_3_Flash);
   });
 

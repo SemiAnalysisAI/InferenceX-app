@@ -19,8 +19,8 @@ export function ModelFeatureBoundary({ children }: { children: ReactNode }) {
     if (ready && blocked) {
       router.replace(
         pathname?.startsWith('/zh/')
-          ? `/zh${getDashboardRoute('inference').path}/deepseek-v41-flash`
-          : `${getDashboardRoute('inference').path}/deepseek-v41-flash`,
+          ? `/zh${getDashboardRoute('inference').path}/kimi-k31-pro`
+          : `${getDashboardRoute('inference').path}/kimi-k31-pro`,
       );
     }
   }, [ready, blocked, pathname, router]);

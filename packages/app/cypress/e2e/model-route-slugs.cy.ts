@@ -186,16 +186,18 @@ describe('GLM-5.3-Flash registration without published observations', () => {
       expect(sourceAvailability.length, 'nonempty source availability fixture').to.be.greaterThan(
         0,
       );
-      const flashAvailability = sourceAvailability.map((row) => ({ ...row, model: 'dsv41flash' }));
-      expect([...new Set(flashAvailability.map((row) => row.model))]).to.deep.equal(['dsv41flash']);
+      const fallbackAvailability = sourceAvailability.map((row) => ({ ...row, model: 'kimik3.1' }));
+      expect([...new Set(fallbackAvailability.map((row) => row.model))]).to.deep.equal([
+        'kimik3.1',
+      ]);
       cy.intercept('GET', '/api/v1/availability/compact', {
-        body: availabilityBody(flashAvailability),
+        body: availabilityBody(fallbackAvailability),
       });
       cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
         expect(
           new URL(request.url).searchParams.get('model'),
           'first and later locked requests',
-        ).to.eq('DeepSeek-V4.1-Flash');
+        ).to.eq('Kimi-K3.1-Pro');
         request.reply({ body: [] });
       });
       const locked = {
@@ -205,13 +207,13 @@ describe('GLM-5.3-Flash registration without published observations', () => {
         },
       };
       cy.visit(`${locale}/infx/inference/glm-5-3-flash`, locked);
-      cy.location('pathname').should('eq', `${locale}/infx/inference/deepseek-v41-flash`);
-      cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4.1 Flash');
+      cy.location('pathname').should('eq', `${locale}/infx/inference/kimi-k31-pro`);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3.1 Pro');
       cy.get('[data-testid="model-selector"]').click();
       cy.contains('[role="option"]', 'GLM 5.3 Flash').should('not.exist');
       cy.get('body').type('{esc}');
       cy.visit(`${locale}/infx/inference?g_model=GLM-5.3-Flash`, locked);
-      cy.location('pathname').should('eq', `${locale}/infx/inference/deepseek-v41-flash`);
+      cy.location('pathname').should('eq', `${locale}/infx/inference/kimi-k31-pro`);
       cy.get('[data-testid="model-selector"]').should('not.contain.text', 'GLM 5.3 Flash');
     });
   }
