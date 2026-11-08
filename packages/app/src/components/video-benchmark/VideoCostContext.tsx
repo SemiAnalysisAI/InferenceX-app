@@ -114,7 +114,7 @@ export default function VideoCostContext({
             }
           />
         }
-        controlsEnd={
+        priceTable={
           rates.length > 0 ? (
             <TcoPriceTable
               items={rates}

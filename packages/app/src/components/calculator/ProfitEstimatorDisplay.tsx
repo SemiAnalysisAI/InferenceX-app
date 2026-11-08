@@ -1399,7 +1399,7 @@ function ProfitEstimatorInner({
         licenseFee={`${assumptions.labCutPct}%`}
         licenseFeeControl={labCutControl}
         licenseFeeControlId="profit-lab-cut"
-        controlsEnd={
+        priceTable={
           tcoBadges.length > 0 ? (
             <TcoPriceTable
               items={tcoBadges}

@@ -1372,7 +1372,7 @@ export default function ChartDisplay({
                                 : undefined
                             }
                             layout="footer"
-                            controlsEnd={
+                            priceTable={
                               costAssumptions && footerCostBases.length > 0 ? (
                                 <InferenceTcoBadges
                                   bases={footerCostBases}

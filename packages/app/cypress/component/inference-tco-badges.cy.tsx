@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
+import { CostTierSelector } from '@/components/inference/ui/CostTierSelector';
 import { InferenceTcoBadges } from '@/components/inference/ui/InferenceTcoBadges';
+import { PricesSourceLink } from '@/components/ui/chart-display-helpers';
+import { ResultContext } from '@/components/ui/result-context';
 import { getGpuSpecs } from '@/lib/catalog/constants';
 import { createMockInferenceContextValues } from '../support/mock-data';
 import { mountWithProviders } from '../support/test-utils';
@@ -10,6 +13,9 @@ import { mountWithProviders } from '../support/test-utils';
 const VALUES = { gb300: 2.31, mi355x: 1.5 };
 const BASES = Object.keys(VALUES);
 const REGISTRY_BASES = Object.keys(HW_REGISTRY);
+const PUBLISHED = Object.fromEntries(
+  REGISTRY_BASES.map((base) => [base, getGpuSpecs(base, 'external').costh]),
+);
 const GB300_INPUT = '[data-testid="cost-input-gb300"]';
 
 describe('InferenceTcoBadges', () => {
@@ -185,5 +191,107 @@ describe('InferenceTcoBadges', () => {
     });
     cy.get('[data-testid="inference-tco-badges"] input').should('not.exist');
     cy.get('[data-testid="inference-tco-badge"]').first().should('have.text', '2.31');
+  });
+
+  for (const width of [375, 768, 1440]) {
+    it(`puts the cost tier in the price table row and the source under it at ${width}px`, () => {
+      cy.viewport(width, 400);
+      mountWithProviders(
+        <ResultContext
+          locale="en"
+          layout="footer"
+          costTier="Owning at large hyperscaler volume"
+          costTierControl={<CostTierSelector footer />}
+          priceTable={<InferenceTcoBadges bases={REGISTRY_BASES.slice(0, 9)} values={PUBLISHED} />}
+          date="2026-11-07"
+          source="SemiAnalysis InferenceX™"
+          metaEnd={<PricesSourceLink />}
+        />,
+        { inference: { selectedYAxisMetric: 'y_tokensPerDollarH' }, globalFilters: {} },
+      );
+      cy.get('[data-testid="inference-tco-badges"] tbody th')
+        .should('not.contain.text', 'TCO')
+        .find('[data-testid="result-context-cost-tier"] [data-testid="cost-tier-selector"]')
+        .should('be.visible')
+        .and('contain.text', 'Owning at large hyperscaler volume');
+      cy.get('[data-testid="cost-tier-selector"]').should('have.length', 1);
+      cy.get('[data-testid="result-context-cost-tier"] .export-only')
+        .should('have.text', 'Owning at large hyperscaler volume')
+        .and('not.be.visible');
+      cy.get('[data-testid="inference-tco-badges"]').then(($table) => {
+        const table = $table[0].getBoundingClientRect();
+        expect(table.right).to.be.at.most(width);
+        const grid = $table[0].querySelector('table')!.getBoundingClientRect();
+        if (grid.width < width) expect(table.right - grid.right).to.be.closeTo(1, 0.5);
+        cy.get('[data-testid="result-context"]').should(($context) => {
+          expect(Math.abs(table.left - $context[0].getBoundingClientRect().left)).to.be.lessThan(1);
+        });
+        cy.get('[data-testid="tco-prices-source"]').should(($source) => {
+          const source = $source[0].getBoundingClientRect();
+          expect(source.top).to.be.at.least(table.bottom);
+          expect(Math.abs(source.left - table.left)).to.be.lessThan(1);
+          expect(source.right).to.be.at.most(width);
+        });
+        cy.get('[data-testid="result-context"] dd.tabular-nums').should(($date) => {
+          const doc = $date[0].ownerDocument;
+          const date = $date[0].getBoundingClientRect();
+          const source = doc
+            .querySelector('[data-testid="tco-prices-source"]')!
+            .getBoundingClientRect();
+          expect($date[0].textContent).to.equal('Nov 7, 2026');
+          if (width >= 1440) {
+            const context = doc
+              .querySelector('[data-testid="result-context"]')!
+              .getBoundingClientRect();
+            const meta = $date[0].closest('dl')!.parentElement!.getBoundingClientRect();
+            expect(date.left).to.be.greaterThan(table.right);
+            expect(Math.abs(meta.right - context.right)).to.be.lessThan(1);
+            expect(Math.abs(source.bottom - date.bottom)).to.be.lessThan(3);
+          } else {
+            expect(date.top).to.be.at.least(source.bottom);
+          }
+        });
+      });
+      cy.get('[data-testid="tco-prices-source"]').should('have.length', 1);
+      cy.get('[data-testid="inference-tco-badge"]')
+        .first()
+        .should(($cell) => expect($cell[0].getBoundingClientRect().right).to.be.at.most(width));
+      cy.get(GB300_INPUT).scrollIntoView().should('be.visible');
+      cy.document().should((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+      });
+    });
+  }
+
+  it('keeps the tier cell the same width whichever tier is selected', () => {
+    cy.viewport(1440, 400);
+    const widths: number[] = [];
+    for (const [metric, label] of [
+      ['y_tokensPerDollarH', 'Owning at large hyperscaler volume'],
+      ['y_tokensPerDollarUser', 'Custom'],
+    ] as const) {
+      mountWithProviders(
+        <ResultContext
+          locale="en"
+          layout="footer"
+          costTier={label}
+          costTierControl={<CostTierSelector footer />}
+          priceTable={<InferenceTcoBadges bases={BASES} values={VALUES} />}
+        />,
+        { inference: { selectedYAxisMetric: metric, userCosts: VALUES }, globalFilters: {} },
+      );
+      cy.get('[data-testid="cost-tier-selector"]')
+        .should('contain.text', label)
+        .should(($trigger) => {
+          expect($trigger[0].scrollWidth).to.be.at.most($trigger[0].clientWidth);
+        });
+      cy.get('[data-testid="inference-tco-badges"] tbody th').then(($cell) => {
+        widths.push($cell[0].getBoundingClientRect().width);
+      });
+    }
+    cy.then(() => {
+      expect(widths[0]).to.equal(widths[1]);
+      expect(widths[0]).to.be.lessThan(320);
+    });
   });
 });

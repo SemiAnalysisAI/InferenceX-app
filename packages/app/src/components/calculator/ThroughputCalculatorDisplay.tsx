@@ -1307,7 +1307,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                             <ChipBasisCaption control={chipBasisControl} />
                           )
                         }
-                        controlsEnd={priceTable}
+                        priceTable={priceTable}
                         date={selectedRunDate}
                         source={`${getModelLabel(selectedModel)} · ${selectedPrecisions
                           .map((p) => getPrecisionLabel(p as Precision))

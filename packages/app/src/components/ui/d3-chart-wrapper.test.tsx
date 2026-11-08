@@ -162,3 +162,146 @@ describe('resolveChartInstructions', () => {
     );
   });
 });
+
+const fire = (target: EventTarget, event: Event) => act(() => void target.dispatchEvent(event));
+const pointer = (type: string, clientX: number) =>
+  new MouseEvent(type, { bubbles: true, clientX, clientY: 10 });
+
+const touchMove = (fingers: number) =>
+  Object.assign(new Event('touchmove', { bubbles: true }), {
+    touches: Array.from({ length: fingers }),
+  });
+
+const nextFrame = () =>
+  act(async () => {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
+
+const IDENTITY = { k: 1, x: 0, y: 0 };
+const zoomed = (svg: SVGSVGElement, transform = IDENTITY) => Reflect.set(svg, '__zoom', transform);
+const drag = (svg: SVGSVGElement, from: EventTarget) => {
+  fire(from, pointer('mousedown', 10));
+  // d3-zoom stops a drag's mousemove at the window, so it never reaches the svg.
+  fire(window, new MouseEvent('mousemove', { bubbles: true, buttons: 1, clientX: 40 }));
+};
+
+describe('D3ChartWrapper zoom hint placement', () => {
+  const hint = () => container.querySelector<HTMLElement>('[data-testid="chart-instructions"]');
+  it('overlays the zoom hint on the plot instead of taking a line under it', () => {
+    const svgRef = renderWrapper();
+    expect(hint()?.parentElement).toBe(svgRef.current?.parentElement);
+    expect(hint()?.classList.contains('absolute')).toBe(true);
+    expect(hint()?.classList.contains('pointer-events-none')).toBe(true);
+    expect(hint()?.classList.contains('no-export')).toBe(true);
+    expect(hint()?.style.top).not.toBe('');
+    expect(hint()?.style.right).not.toBe('');
+  });
+
+  it('keeps the hint while input does not move the zoom transform', async () => {
+    const svg = renderWrapper().current!;
+    zoomed(svg);
+    for (const event of [
+      new WheelEvent('wheel', { bubbles: true, shiftKey: true }),
+      touchMove(2),
+      new MouseEvent('dblclick', { bubbles: true }),
+    ]) {
+      fire(svg, event);
+      await nextFrame();
+    }
+    drag(svg, svg);
+    fire(window, pointer('mouseup', 40));
+    await nextFrame();
+    expect(hint()?.dataset.dismissed).toBeUndefined();
+    expect(hint()?.classList.contains('opacity-0')).toBe(false);
+  });
+
+  it.each([
+    ['plain scrolling', () => new WheelEvent('wheel', { bubbles: true })],
+    ['browser pinch-zoom', () => new WheelEvent('wheel', { bubbles: true, ctrlKey: true })],
+    ['a one-finger swipe', () => touchMove(1)],
+    ['hovering', () => pointer('mousemove', 80)],
+  ] as const)('ignores a transform change during %s', async (_name, event) => {
+    const svg = renderWrapper().current!;
+    zoomed(svg);
+    fire(svg, event());
+    zoomed(svg, { k: 2, x: 0, y: 0 });
+    await nextFrame();
+    expect(hint()?.dataset.dismissed).toBeUndefined();
+  });
+
+  it('ignores zoom gestures and drags that start outside the chart', async () => {
+    const svg = renderWrapper().current!;
+    zoomed(svg);
+    fire(document.body, new WheelEvent('wheel', { bubbles: true, shiftKey: true }));
+    zoomed(svg, { k: 2, x: 0, y: 0 });
+    await nextFrame();
+    drag(svg, document.body);
+    zoomed(svg, { k: 3, x: 0, y: 0 });
+    await nextFrame();
+    expect(hint()?.dataset.dismissed).toBeUndefined();
+  });
+
+  it('does not take the chart writing its first transform for a zoom', async () => {
+    const svg = renderWrapper().current!;
+    fire(svg, new WheelEvent('wheel', { bubbles: true, shiftKey: true }));
+    zoomed(svg);
+    await nextFrame();
+    expect(hint()?.dataset.dismissed).toBeUndefined();
+  });
+
+  it('stops tracking a drag once the button is released', async () => {
+    const svg = renderWrapper().current!;
+    zoomed(svg);
+    fire(svg, pointer('mousedown', 10));
+    fire(window, pointer('mouseup', 10));
+    fire(svg, new MouseEvent('mousemove', { bubbles: true, clientX: 200 }));
+    zoomed(svg, { k: 2, x: 0, y: 0 });
+    await nextFrame();
+    expect(hint()?.dataset.dismissed).toBeUndefined();
+  });
+
+  it.each([
+    [
+      'Shift+Scroll',
+      (svg: SVGSVGElement) => fire(svg, new WheelEvent('wheel', { bubbles: true, shiftKey: true })),
+    ],
+    ['a two-finger touch move', (svg: SVGSVGElement) => fire(svg, touchMove(2))],
+    ['a drag', (svg: SVGSVGElement) => drag(svg, svg)],
+  ] as const)('fades the hint out once %s moves the zoom transform', async (_name, gesture) => {
+    const svg = renderWrapper().current!;
+    zoomed(svg);
+    gesture(svg);
+    zoomed(svg, { k: 1, x: -30, y: 0 });
+    await nextFrame();
+    expect(hint()?.dataset.dismissed).toBe('');
+    expect(hint()?.classList.contains('opacity-0')).toBe(true);
+    expect(hint()?.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('fades the hint out after an animated double-click zoom settles', () => {
+    vi.useFakeTimers();
+    try {
+      const svg = renderWrapper().current!;
+      zoomed(svg);
+      fire(svg, new MouseEvent('dblclick', { bubbles: true }));
+      act(() => vi.advanceTimersByTime(50));
+      expect(hint()?.dataset.dismissed).toBeUndefined();
+      zoomed(svg, { k: 2, x: 0, y: 0 });
+      act(() => vi.advanceTimersByTime(400));
+      expect(hint()?.dataset.dismissed).toBe('');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves the hint of a chart without zoom under the plot', () => {
+    const svgRef = renderWrapper('Hover over a bar for details', false);
+    expect(hint()?.textContent).toBe('Hover over a bar for details');
+    expect(hint()?.classList.contains('absolute')).toBe(false);
+    expect(hint()?.parentElement).toBe(svgRef.current?.parentElement?.parentElement);
+    fire(svgRef.current!, new MouseEvent('dblclick'));
+    expect(hint()?.classList.contains('opacity-0')).toBe(false);
+  });
+});

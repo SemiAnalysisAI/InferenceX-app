@@ -3,12 +3,14 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { zoomEventFilter } from '@/hooks/useChartZoom';
 import { useIsCoarsePointer, useIsMobileViewport, useMediaQuery } from '@/hooks/useMediaQuery';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { chartFont, measureTextWidth, useFontsVersion } from '@/lib/d3-chart/dynamic-margins';
 import { CHART_TOOLTIP_Z_INDEX } from '@/lib/d3-chart/tooltip-placement';
 import { cn } from '@/lib/shared/utils';
+
+const ZOOM_HINT_SETTLE_MS = 400;
 
 const DEFAULT_CHART_INSTRUCTIONS = {
   en: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
@@ -232,38 +234,84 @@ export function D3ChartWrapper({
     }
   });
 
-  const hintRef = useRef<HTMLParagraphElement>(null);
-  const [hintWidth, setHintWidth] = useState<number | null>(null);
-  const [hintInset, setHintInset] = useState(12);
-  const fontsVersion = useFontsVersion();
+  // A zoom hint sits in the plot's top-right corner and goes away once the reader zooms or
+  // pans; a chart that cannot zoom keeps its hint under the plot.
+  const hintInPlot = Boolean(resolvedInstructions) && zoomEnabled;
+  const [hintCorner, setHintCorner] = useState({ top: 8, right: 12 });
+  const [hintDismissed, setHintDismissed] = useState(false);
   useEffect(() => {
     const svg = svgRef.current;
-    if (!svg || !resolvedInstructions) return;
-    const natural = measureTextWidth(resolvedInstructions, chartFont(11));
+    if (!svg || !hintInPlot) return;
     let frame = 0;
     const measure = () => {
       frame = 0;
-      const svgRight = svg.getBoundingClientRect().right;
-      const label = svg.querySelector('.x-axis-label');
-      const space = label?.textContent
-        ? Math.floor(svgRight - label.getBoundingClientRect().right - 36)
-        : 0;
-      const domain = svg.querySelector('.x-axis > .domain');
-      if (domain)
-        setHintInset(Math.max(0, Math.round(svgRight - domain.getBoundingClientRect().right)));
-      setHintWidth(space * 2 >= natural + 24 ? space : null);
+      const bounds = svg.getBoundingClientRect();
+      const xDomain = svg.querySelector('.x-axis > .domain')?.getBoundingClientRect();
+      const yDomain = svg.querySelector('.y-axis > .domain')?.getBoundingClientRect();
+      const top = Math.max(0, Math.round((yDomain?.top ?? bounds.top) - bounds.top)) + 8;
+      const right = Math.max(0, Math.round(bounds.right - (xDomain?.right ?? bounds.right))) + 12;
+      setHintCorner((current) =>
+        current.top === top && current.right === right ? current : { top, right },
+      );
     };
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(measure);
     };
     schedule();
     const mutations = new MutationObserver(schedule);
-    mutations.observe(svg, { childList: true, subtree: true, characterData: true });
+    mutations.observe(svg, { childList: true, subtree: true });
     return () => {
       cancelAnimationFrame(frame);
       mutations.disconnect();
     };
-  }, [svgRef, resolvedInstructions, fontsVersion]);
+  }, [svgRef, hintInPlot]);
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg || !hintInPlot || hintDismissed) return;
+    // The hint goes once a zoom gesture on this chart actually moves its zoom transform, so
+    // page scrolling, clicks, gestures the zoom ignores and the chart's own setup leave it
+    // in place. Window capture listeners still see a drag that d3-zoom stops from propagating.
+    const transform = () => {
+      const zoom = Reflect.get(svg, '__zoom') as { k: number; x: number; y: number } | undefined;
+      return zoom ? `${zoom.k},${zoom.x},${zoom.y}` : null;
+    };
+    let frame = 0;
+    let timer = 0;
+    let dragging = false;
+    const onInput = (event: Event) => {
+      const onChart = event.target instanceof Node && svg.contains(event.target);
+      if (event.type === 'mousedown') {
+        dragging = onChart && zoomEventFilter(event as MouseEvent);
+        return;
+      }
+      if (event.type === 'mouseup') {
+        dragging = false;
+        return;
+      }
+      if (event.type === 'mousemove' ? !dragging : !onChart || !zoomEventFilter(event)) return;
+      const before = transform();
+      if (before === null || frame) return;
+      const check = () => {
+        const after = transform();
+        if (after !== null && after !== before) setHintDismissed(true);
+      };
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        check();
+      });
+      // An animated zoom (double-click) has not moved yet on the next frame.
+      window.clearTimeout(timer);
+      timer = window.setTimeout(check, ZOOM_HINT_SETTLE_MS);
+    };
+    const events = ['wheel', 'mousedown', 'mousemove', 'mouseup', 'touchmove', 'dblclick'] as const;
+    for (const type of events)
+      window.addEventListener(type, onInput, { capture: true, passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+      for (const type of events) window.removeEventListener(type, onInput, { capture: true });
+    };
+  }, [svgRef, hintInPlot, hintDismissed]);
 
   const plot = (
     <div
@@ -309,20 +357,25 @@ export function D3ChartWrapper({
             }}
           />
           {noDataOverlay}
+          {hintInPlot && (
+            <p
+              data-testid="chart-instructions"
+              data-dismissed={hintDismissed ? '' : undefined}
+              aria-hidden={hintDismissed || undefined}
+              className={cn(
+                'no-export pointer-events-none absolute max-w-[60%] text-right text-2xs leading-4 text-balance text-muted-foreground/80 transition-opacity duration-300',
+                hintDismissed && 'opacity-0',
+              )}
+              style={hintCorner}
+            >
+              {resolvedInstructions}
+            </p>
+          )}
         </div>
-        {resolvedInstructions && (
+        {resolvedInstructions && !hintInPlot && (
           <p
-            ref={hintRef}
             data-testid="chart-instructions"
-            className={cn(
-              'no-export text-balance text-muted-foreground',
-              hintWidth === null
-                ? 'mt-2 text-center text-xs'
-                : 'pointer-events-none relative ml-auto -mt-[21px] mb-1.5 text-right text-2xs leading-4',
-            )}
-            style={
-              hintWidth === null ? undefined : { maxWidth: hintWidth, paddingRight: hintInset }
-            }
+            className="no-export mt-2 text-center text-xs text-balance text-muted-foreground"
           >
             {resolvedInstructions}
           </p>
