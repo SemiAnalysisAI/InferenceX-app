@@ -1,8 +1,10 @@
-import { chipConfigKey } from './deployment';
+import { frontierArea } from '@/components/inference/utils/best-series-per-sku';
+import { chipConfigKey, runtimeKey } from './deployment';
 import { engineSort } from './engines';
 import { paretoFrontier } from './frontier';
 import { hardwareSort, type CostTier } from './hardware';
-import type { ResultCell } from './results';
+import { isLossy, optimizationsOf } from './optimizations';
+import type { ResultCell, ResultsState } from './results';
 
 export type CostBasis = 'participating' | 'allocated';
 export const COST_BASES: readonly CostBasis[] = ['participating', 'allocated'];
@@ -134,11 +136,15 @@ export interface ResultsChartPoint {
 }
 
 export interface ResultsChartSeries {
-  /** Unique per hardware, engine and run channel. */
+  /** Unique per hardware, runtime (engine and optimizations) and run channel. */
   key: string;
   hardwareKey: string;
   /** Serving engine; null when the cells did not record one. */
   engine: string | null;
+  /** Declared runtime optimizations, sorted. */
+  optimizations: readonly string[];
+  /** Any optimization changes the generated video, so the series never ranks against exact ones. */
+  lossy: boolean;
   overlay: boolean;
   /** Plotted points: the frontier only when Optimal Only is on. */
   points: ResultsChartPoint[];
@@ -153,13 +159,33 @@ export interface ResultsChartSelection extends ResultsMetricContext {
   y: ResultsYMetric;
   optimal: boolean;
   hidden: readonly string[];
+  compareEngines: boolean;
+  lossy: boolean;
 }
 
-/** Series order: hardware, then engine, the named run after the official one. */
+export const resultsSelection = (state: ResultsState): ResultsChartSelection => ({
+  x: state.xMetric,
+  y: state.yMetric,
+  basis: state.costBasis,
+  tier: state.costTier,
+  optimal: state.optimal,
+  hidden: state.hidden,
+  compareEngines: state.compareEngines,
+  lossy: state.lossy,
+});
+
+/** Series order: hardware, then engine, lossless before lossy, the named run after the official one. */
 const seriesOrder = (a: ResultsChartSeries, b: ResultsChartSeries) =>
   hardwareSort(a.hardwareKey) - hardwareSort(b.hardwareKey) ||
   engineSort(a.engine) - engineSort(b.engine) ||
+  Number(a.lossy) - Number(b.lossy) ||
   Number(a.overlay) - Number(b.overlay);
+
+const seriesRuntime = (cell: ResultCell) => ({
+  engine: cell.metadata.engine,
+  optimizations: optimizationsOf(cell.point),
+  lossy: isLossy(cell.point),
+});
 
 /** Points the chart can place: visible hardware with finite values on both axes. */
 function plottedPoints(
@@ -206,7 +232,7 @@ export function resultsHistorySeries(
       return {
         key,
         hardwareKey: ordered[0].cell.point.hardwareKey!,
-        engine: ordered[0].cell.metadata.engine,
+        ...seriesRuntime(ordered[0].cell),
         overlay: ordered[0].cell.overlay,
         points: ordered,
         frontier: ordered,
@@ -217,8 +243,30 @@ export function resultsHistorySeries(
 }
 
 /**
- * One series per hardware, engine and run channel, each with its own deployment
- * frontier, so Optimal Only never lets one engine's frontier hide another's.
+ * Each hardware's lossless series with the largest frontier area, per run channel:
+ * InferenceX's best-series rule, so one engine is the default line per hardware.
+ * Ties keep the earlier series in display order.
+ */
+function bestPerHardware(
+  series: readonly ResultsChartSeries[],
+  selection: ResultsChartSelection,
+): ResultsChartSeries[] {
+  const maximizeX = RESULTS_X_METRICS[selection.x].better === 'higher',
+    maximizeY = RESULTS_Y_METRICS[selection.y].better === 'higher';
+  const best = new Map<string, { item: ResultsChartSeries; area: number }>();
+  for (const item of series.toSorted(seriesOrder)) {
+    const channel = `${item.hardwareKey}${item.overlay ? '-overlay' : ''}`;
+    const area = frontierArea(item.frontier, maximizeX, maximizeY);
+    if (area > (best.get(channel)?.area ?? -1)) best.set(channel, { item, area });
+  }
+  return [...best.values()].map(({ item }) => item);
+}
+
+/**
+ * Series to plot, one per hardware, runtime and run channel, each with its own
+ * deployment frontier so Optimal Only never lets one runtime hide another's.
+ * Lossless series compete for each hardware's default line; comparing engines
+ * keeps all of them. Lossy series never compete and appear only when requested.
  */
 export function resultsChartSeries(
   cells: readonly ResultCell[],
@@ -229,22 +277,41 @@ export function resultsChartSeries(
   const groups = Map.groupBy(
     plottedPoints(cells, selection),
     ({ hardwareKey, point: { cell } }) =>
-      `${hardwareKey}:${cell.metadata.engine ?? 'na'}${cell.overlay ? '-overlay' : ''}`,
+      `${hardwareKey}:${runtimeKey(cell.point)}${cell.overlay ? '-overlay' : ''}`,
   );
-  return [...groups]
-    .map(([key, plotted]): ResultsChartSeries => {
-      const points = plotted.map(({ point }) => point);
-      const frontier = paretoFrontier(points, x.better, y.better);
-      for (const point of frontier) point.optimal = true;
-      return {
-        key,
-        hardwareKey: plotted[0].hardwareKey,
-        engine: points[0].cell.metadata.engine,
-        overlay: points[0].cell.overlay,
-        points: selection.optimal ? frontier : points,
-        frontier,
-        measured: points.length,
-      };
-    })
-    .toSorted(seriesOrder);
+  const series = [...groups].map(([key, plotted]): ResultsChartSeries => {
+    const points = plotted.map(({ point }) => point);
+    const frontier = paretoFrontier(points, x.better, y.better);
+    for (const point of frontier) point.optimal = true;
+    return {
+      key,
+      hardwareKey: plotted[0].hardwareKey,
+      ...seriesRuntime(points[0].cell),
+      overlay: points[0].cell.overlay,
+      points: selection.optimal ? frontier : points,
+      frontier,
+      measured: points.length,
+    };
+  });
+  const lossless = series.filter((item) => !item.lossy);
+  return [
+    ...(selection.compareEngines ? lossless : bestPerHardware(lossless, selection)),
+    ...(selection.lossy ? series.filter((item) => item.lossy) : []),
+  ].toSorted(seriesOrder);
+}
+
+/**
+ * Some hardware shows two engines in one run channel, which asks for the
+ * engine-comparison consent first. A named run is ranked on its own, so its
+ * engine differing from the official one is not a comparison.
+ */
+export function comparesEngines(series: readonly ResultsChartSeries[]): boolean {
+  const engines = new Map<string, Set<string | null>>();
+  for (const { hardwareKey, overlay, engine } of series) {
+    const channel = `${hardwareKey}${overlay ? '-overlay' : ''}`;
+    const seen = engines.get(channel) ?? new Set();
+    if (seen.add(engine).size > 1) return true;
+    engines.set(channel, seen);
+  }
+  return false;
 }

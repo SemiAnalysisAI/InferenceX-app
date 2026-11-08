@@ -1,4 +1,4 @@
-import { deploymentKey, isQueueing } from './deployment';
+import { deploymentKey, isQueueing, runtimeKey } from './deployment';
 import { paretoFrontier } from './frontier';
 import { hardwareLabel } from './hardware';
 import { metricValue, VIDEO_METRICS, type VideoPoint } from './metrics';
@@ -56,12 +56,12 @@ export function plotVideoPoints(
       },
     ];
   });
-  const byEngine = Map.groupBy(plotted, (p) => `${p.hardwareKey}:${p.results?.engine ?? 'na'}`);
+  const byRuntime = Map.groupBy(plotted, (p) => `${p.hardwareKey}:${runtimeKey(p)}`);
   const xBetter = VIDEO_METRICS[state.x].polarity;
   const yBetter = VIDEO_METRICS[state.y].polarity;
   const frontiers: Record<string, PlottedVideoPoint[]> = {};
   let multiLayout = false;
-  for (const [key, list] of byEngine) {
+  for (const [key, list] of byRuntime) {
     frontiers[key] = paretoFrontier(list, xBetter, yBetter);
     for (const p of frontiers[key]) p.optimal = true;
     if (new Set(list.map(deploymentKey)).size > 1) multiLayout = true;
@@ -75,7 +75,7 @@ export function plotVideoPoints(
 
 /**
  * Cells the table and CSV list: what the chart draws. With Optimal Only on,
- * each hardware and engine's frontier deployments for the selected axes; off, every
+ * each hardware and runtime's frontier deployments for the selected axes; off, every
  * non-queued deployment, including cells without a value on an axis.
  */
 export function listedVideoCells(

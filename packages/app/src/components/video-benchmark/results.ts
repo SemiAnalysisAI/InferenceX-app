@@ -3,6 +3,7 @@ import { costPerGpuHour, type CostTier } from './hardware';
 import { metricValue, type VideoPoint } from './metrics';
 import { chipConfigKey, compareDeployments } from './deployment';
 import { engineSort } from './engines';
+import { optimizationsOf } from './optimizations';
 import { DASHBOARD_SAMPLE_FLOOR, latestVideoCells } from './points';
 import type { ResultsEvidence } from './results-evidence';
 import {
@@ -33,7 +34,12 @@ export interface ResultsState {
   mode: string | null;
   steps: number | null;
   gpuCount: number | null;
+  /** Limits cells to one engine; null keeps every engine. */
   engine: string | null;
+  /** Plot every engine's lossless series per hardware, not only the best one. */
+  compareEngines: boolean;
+  /** Also plot lossy-optimization series; they never compete for a hardware's default line. */
+  lossy: boolean;
   /** As-of execution date: each deployment's latest run measured on or before it. */
   date: string | null;
   /** Run on the selected date to view as of; null is that date's last run. */
@@ -65,6 +71,8 @@ export const DEFAULT_RESULTS_STATE: ResultsState = {
   steps: null,
   gpuCount: null,
   engine: null,
+  compareEngines: false,
+  lossy: false,
   date: null,
   run: null,
   configs: [],
@@ -94,6 +102,8 @@ export const RESULTS_QUERY_PARAMS = [
   'r_steps',
   'r_gpus',
   'r_engine',
+  'r_compare',
+  'r_lossy',
   'r_date',
   'r_run',
   'r_configs',
@@ -135,6 +145,9 @@ export function parseResultsState(search: string | URLSearchParams): ResultsStat
     // Retired overview controls cannot be restored by an old shared link.
     gpuCount: null,
     engine: s.get('r_engine') || null,
+    // One selected engine leaves nothing to compare.
+    compareEngines: !s.get('r_engine') && s.get('r_compare') === '1',
+    lossy: s.get('r_lossy') === '1',
     date: s.get('r_date') || null,
     run: /^[1-9]\d*$/u.test(s.get('r_run') ?? '') ? s.get('r_run') : null,
     configs: [...new Set((s.get('r_configs') ?? '').split(',').filter(Boolean))].slice(
@@ -172,6 +185,8 @@ export function resultsSearch(state: ResultsState): string {
     r_mode: state.mode,
     r_steps: state.steps,
     r_engine: state.engine,
+    r_compare: state.compareEngines ? 1 : null,
+    r_lossy: state.lossy ? 1 : null,
     r_date: state.date,
     r_run: state.run,
     r_configs: state.configs.join(',') || null,
@@ -227,6 +242,7 @@ export function resultMetadata(point: VideoPoint) {
     measurementBoundary: text(at(identity, 'semantics', 'boundary')) || null,
     mode: point.results?.mode ?? (text(at(generation, 'mode')) || text(at(plan, 'mode')) || null),
     engine: point.results?.engine ?? null,
+    optimizations: optimizationsOf(point),
     date: point.observedAt?.slice(0, 10) ?? null,
   };
 }

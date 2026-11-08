@@ -494,9 +494,19 @@ export function withUnrankedSkus(
  * a long tail of small leads, missing coverage earns nothing, and reciprocal
  * metrics such as $/M tok and tok/$ rank identically.
  */
-export function hypervolume(points: readonly InferenceData[], direction: Direction): number {
-  const maximizeX = paretoMaximizesX(direction);
-  const maximizeY = direction.startsWith('upper');
+export function hypervolume(
+  points: readonly Pick<InferenceData, 'x' | 'y'>[],
+  direction: Direction,
+): number {
+  return frontierArea(points, paretoMaximizesX(direction), direction.startsWith('upper'));
+}
+
+/** Area the points dominate from the origin, after inverting each axis where lower is better. */
+export function frontierArea(
+  points: readonly { x: number; y: number }[],
+  maximizeX: boolean,
+  maximizeY: boolean,
+): number {
   const mapped = points
     .map((point) => ({
       u: maximizeX ? point.x : 1 / point.x,

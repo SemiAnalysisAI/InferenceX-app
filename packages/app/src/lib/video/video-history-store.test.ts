@@ -355,8 +355,8 @@ describe('history projection version', () => {
     for (const file of [...seen].toSorted())
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
-      projection: 2,
-      sources: '6009a561e39fd8f86766f476b3cebc636eed025981a5bc3aa32d44bac069ed9d',
+      projection: 3,
+      sources: 'cb64f074b62caa5bf6fbf722df7a446d3b5a736c60101b23c5e369a3d972e899',
     });
   });
 });

@@ -6,6 +6,7 @@ import { videoPoints } from './points';
 import { DEFAULT_RESULTS_STATE, resultProjection, type ResultsState } from './results';
 import type { ResultsEvidence } from './results-evidence';
 import {
+  comparesEngines,
   RESULTS_X_METRICS,
   resultsChartSeries,
   resultsClip,
@@ -59,9 +60,13 @@ const selection = (change: Partial<ResultsChartSelection> = {}): ResultsChartSel
   tier: 'h',
   optimal: false,
   hidden: [],
+  compareEngines: false,
+  lossy: false,
   ...change,
 });
 const ids = (points: { cell: { point: VideoPoint } }[]) => points.map((p) => p.cell.point.id);
+const runtime = (series: ResultsChartSeries[]) =>
+  series.map((s) => [s.engine, s.optimizations.join('+'), s.lossy]);
 const value = (series: ResultsChartSeries, id: string) =>
   series.points.find((p) => p.cell.point.id === id)?.y;
 
@@ -129,26 +134,55 @@ describe('resultsChartSeries', () => {
     expect(hidden.map((s) => s.key)).toEqual(['b200:na']);
   });
 
-  it('gives each engine on one hardware its own series and frontier, named run included', () => {
+  it('plots each GPU’s best engine unless engines are compared, ranking a named run on its own', () => {
     const b200 = (name: string, engine: string, p50: number, change: Partial<VideoPoint> = {}) =>
       deployment(name, 4, p50, 400 - p50, 200, {
         hardwareKey: 'b200',
         results: { engine } as ResultsEvidence,
         ...change,
       });
-    // The slower, costlier vLLM-Omni cell would sit off an SGLang frontier.
-    const series = resultsChartSeries(
-      cells(
-        [b200('sglang', 'sglang', 30), b200('vllm', 'vllm-omni', 40)],
-        { unofficialRun: '200' },
-        [b200('named', 'vllm-omni', 50, { runId: '200', approved: false })],
-      ),
-      selection({ optimal: true }),
+    const deployments = cells(
+      [b200('sglang', 'sglang', 30), b200('vllm', 'vllm-omni', 40)],
+      { unofficialRun: '200' },
+      [b200('named', 'vllm-omni', 50, { runId: '200', approved: false })],
     );
-    expect(series.map((s) => [s.engine, s.overlay, ids(s.points)])).toEqual([
+    const plotted = (change: Partial<ResultsChartSelection>) =>
+      resultsChartSeries(deployments, selection({ optimal: true, ...change }));
+    const best = plotted({});
+    expect(best.map((s) => [s.engine, s.overlay, ids(s.points)])).toEqual([
       ['sglang', false, ['sglang:c1']],
-      ['vllm-omni', false, ['vllm:c1']],
       ['vllm-omni', true, ['named:c1']],
+    ]);
+    expect(comparesEngines(best)).toBe(false);
+    const compared = plotted({ compareEngines: true });
+    expect(compared.map((s) => [s.engine, s.overlay])).toEqual([
+      ['sglang', false],
+      ['vllm-omni', false],
+      ['vllm-omni', true],
+    ]);
+    expect(comparesEngines(compared)).toBe(true);
+  });
+
+  it('never lets a faster lossy series become a GPU’s default line', () => {
+    const run = (name: string, engine: string, p50: number, optimizations: string[]) =>
+      deployment(name, 4, p50, 400 - p50, 200, {
+        hardwareKey: 'b200',
+        results: { engine, optimizations } as ResultsEvidence,
+      });
+    // Same engine and layout with and without caching: two deployments, neither replaces the other.
+    const deployments = cells([
+      run('stock', 'sglang', 40, []),
+      run('fused', 'sol-engine', 30, ['cuda-graph', 'kernel-fusion']),
+      run('cached', 'sol-engine', 10, ['first-block-cache', 'sol-attn']),
+      run('unreviewed', 'sol-engine', 5, ['mystery-cache']),
+    ]);
+    expect(runtime(resultsChartSeries(deployments, selection()))).toEqual([
+      ['sol-engine', 'cuda-graph+kernel-fusion', false],
+    ]);
+    expect(runtime(resultsChartSeries(deployments, selection({ lossy: true })))).toEqual([
+      ['sol-engine', 'cuda-graph+kernel-fusion', false],
+      ['sol-engine', 'first-block-cache+sol-attn', true],
+      ['sol-engine', 'mystery-cache', true],
     ]);
   });
 });

@@ -155,6 +155,8 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-view-options',
+    // Kimi K3.1 Pro leads MODEL_OPTIONS and the inference landing route;
+    // explicit-model API requirements and defaults.model remain unchanged.
     sourceSha256: '79f8765d704cef43d9c976fe2a40e1a4dd23a3de0b30c411dacbf8144a345327',
   },
   {
@@ -1558,7 +1560,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results.ts',
-    sourceSha256: 'd3cf1910e8285a6d39ac44b19ba70a06e347e28dd7c892b8f4c37c1e25c41c70',
+    sourceSha256: 'eeb33ba30b339221da30938341f8347df7451bdeb625b31f053ac4d5730049f6',
     reviewArea: {
       en: 'Shared VideoGenX results selectors, sample admission, dual GPU cost bases and modelled profit.',
       zh: 'VideoGenX 结果页共用的筛选、样本准入、两种 GPU 成本口径及估算利润。',
@@ -1566,7 +1568,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-chart.ts',
-    sourceSha256: '98ea067ac095a02c7f1f127c0b3864765b3a817deec3ee3d418e49e08d8286a8',
+    sourceSha256: '280c0eb419d43e0e759fde3821c287208a50035be296a63c12153209389207c2',
     reviewArea: {
       en: 'VideoGenX results chart axes, accepted r_x/r_y metric keys, GPU basis and deployment detail key.',
       zh: 'VideoGenX 结果图表的坐标轴、r_x/r_y 可接受的指标键、GPU 口径及部署详情键。',
@@ -1574,7 +1576,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-csv.ts',
-    sourceSha256: '5a769d8f0acdddc566aa79da0ee37c4b32a6bbd73a1aa9a512700755a5d6f90a',
+    sourceSha256: '25d35cb98a304d628bd932129d1b0c36ba1cd1bc9064bba23add1c76f2d1e77a',
     reviewArea: {
       en: 'VideoGenX overview CSV identities, selected cells, units, missing values and dual GPU cost bases.',
       zh: 'VideoGenX overview CSV 的身份、所选数据点、单位、缺失值与两种 GPU 成本口径。',
@@ -1622,7 +1624,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-evidence.ts',
-    sourceSha256: 'aac5717719255bf49d9c2e61f4ff2ad75c05559de2a0cae39d50fb587d5ecc05',
+    sourceSha256: 'c052acf13c5151344e9ce00e8966733fe79a137d3509ccfad88a6e83da9f265c',
     reviewArea: {
       en: 'Sealed video completion, client timing and valid power metadata; absent measurements remain null.',
       zh: '封印视频的完成数、客户端计时及有效功率元数据；缺失测量保留 null。',
@@ -1702,7 +1704,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/plot.ts',
-    sourceSha256: '4596a907e3a85afe6fd35d39e5add67e0654c54623c780ef3d3010d0bb90e352',
+    sourceSha256: 'd091c85d7aad897e7dd16a49549e4b3308ea6e4699786d6a236c99f9d1213106',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1710,7 +1712,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/deployment.ts',
-    sourceSha256: 'e2c61ead0053527445ec7a3d110a31c2a2d88926a5cdc3b2b0d5aa7b83023570',
+    sourceSha256: 'e95c5d2785b60ca717e76aca8bdce717fca478789fb87cd4ca831317863c7d68',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -2027,7 +2029,8 @@ export const apiContractSourceDigests = [
     // AgentX-only. No parameter or response shape change, so the docs stand.
     // buildOverviewModelSummaries reads /rankings tiers, including ones outside
     // OVERVIEW_TIERS. The Overview BFF parameters and response shape are unchanged.
-    sourceSha256: '84b79e95a0d924845ce724ff9c945f057b480538430afa385badbbbdff58c013',
+    // Default controls are 100 tok/s/user and 30d; API docs and skills match.
+    sourceSha256: '66eb3d889e6d87beaee34051205a000628d607eca820eb0f765a3c88a4397c6d',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',

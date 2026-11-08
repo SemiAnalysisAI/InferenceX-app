@@ -35,7 +35,7 @@ import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { RUN_CONTEXT_GRID, RunField } from '@/components/inference/ui/WorkflowInfoDisplay';
 import { hardwareLabel } from './hardware';
-import { compareDeployments, layoutLabel, leadCell } from './deployment';
+import { compareDeployments, layoutLabel, leadCell, runtimeKey } from './deployment';
 import { engineLabel, engineSort } from './engines';
 import { useVideoPoints } from './use-video-points';
 import type { VideoInitialData } from './initial-data';
@@ -51,12 +51,18 @@ import {
   type VideoMode,
 } from './results';
 import {
+  comparesEngines,
   RESULTS_X_METRICS,
   RESULTS_Y_METRIC_KEYS,
   RESULTS_Y_METRICS,
+  resultsChartSeries,
   resultsMetricLabel,
   resultsPointKey,
+  resultsSelection,
 } from './results-chart';
+import { optimizationsOf, runtimeLabel } from './optimizations';
+import { EngineComparisonConfirmation } from '@/components/inference/ui/engine-comparison-confirmation';
+import { useEngineComparisonConsent } from '@/components/inference/hooks/use-engine-comparison-consent';
 import VideoDeploymentDetail from './VideoDeploymentDetail';
 import VideoResultsChart, { VIDEO_RESULTS_CHART_ID } from './VideoResultsChart';
 import VideoCostContext from './VideoCostContext';
@@ -87,6 +93,16 @@ const STRINGS = {
     changed: 'changed',
     engine: 'Engine',
     all: 'All',
+    bestEngine: 'Best',
+    engineHelp:
+      'Best shows the lossless engine with the largest Pareto frontier area on each GPU. All shows every engine. Lossy optimizations are never ranked.',
+    engineComparison: {
+      title: 'Show two engines on the same GPU?',
+      description:
+        'By continuing to display two serving engines on the same GPU, I agree not to use this comparison to start engine drama on Twitter, XHS or other forums.',
+      cancel: 'Cancel',
+      confirm: 'I agree, show both',
+    },
     date: 'Run date',
     yAxis: 'Y-axis metric',
     stepsUnit: 'steps',
@@ -149,6 +165,16 @@ const STRINGS = {
     changed: '项已更改',
     engine: '引擎',
     all: '全部',
+    bestEngine: '最优',
+    engineHelp:
+      '「最优」显示每张 GPU 上 Pareto 前沿面积最大的无损引擎，「全部」显示所有引擎。有损优化不参与评选。',
+    engineComparison: {
+      title: '在同一 GPU 上显示两个引擎？',
+      description:
+        '继续在同一 GPU 上显示两个引擎，即表示我同意不利用这组对比在 Twitter、小红书或其他论坛上挑起引擎之间的争论。',
+      cancel: '取消',
+      confirm: '我同意，同时显示',
+    },
     date: '运行日期',
     yAxis: 'Y 轴指标',
     stepsUnit: '步',
@@ -289,6 +315,28 @@ export default function VideoDashboard({
     [points, state, namedPoints],
   );
   const { options, roster } = projection;
+  const consent = useEngineComparisonConsent('video-results');
+  /** Asks before a change first puts two engines on one GPU, as the InferenceX charts do. */
+  const updateSeries = (patch: Partial<ResultsState>) => {
+    const plotted = (next: ResultsState) => {
+      const p = resultProjection(points, { ...next, hidden: [] }, namedPoints);
+      return resultsChartSeries(
+        [...p.deploymentCells, ...p.overlayDeploymentCells],
+        resultsSelection(next),
+      );
+    };
+    const current = latest.current;
+    if (
+      consent.accepted ||
+      comparesEngines(plotted(current)) ||
+      !comparesEngines(plotted({ ...current, ...patch }))
+    ) {
+      update(patch);
+      return;
+    }
+    consent.request(() => update(patch));
+    track('video_results_engine_comparison_opened');
+  };
   const dayRuns = projection.runs.filter((run) => run.date === projection.run?.date);
   const hidden = useMemo(() => new Set(state.hidden), [state.hidden]);
   const shown = (cell: ResultCell) => !hidden.has(cell.point.hardwareKey ?? '');
@@ -344,7 +392,7 @@ export default function VideoDashboard({
           .filter(
             (cell) =>
               cell.point.hardwareKey === detailCell.point.hardwareKey &&
-              cell.metadata.engine === detailCell.metadata.engine &&
+              runtimeKey(cell.point) === runtimeKey(detailCell.point) &&
               cell.overlay === detailCell.overlay,
           )
           .toSorted((a, b) => compareDeployments(a.point, b.point));
@@ -432,7 +480,7 @@ export default function VideoDashboard({
   const apiUrl = `/api/v1/views/video?view=overview&${resultsSearch(state)}`;
   const secondaryChanged = [
     state.yMetric !== DEFAULT_RESULTS_STATE.yMetric,
-    state.engine !== null,
+    state.engine !== null || state.compareEngines,
     state.date !== null || state.run !== null,
     compareConfigs.length > 0,
   ].filter(Boolean).length;
@@ -522,11 +570,12 @@ export default function VideoDashboard({
                     {metricSelector()}
                     {(options.engines.length > 1 || state.engine !== null) && (
                       <div className="flex min-w-0 flex-col gap-1.5">
-                        <Label>{s.engine}</Label>
+                        <LabelWithTooltip label={s.engine} tooltip={s.engineHelp} />
                         <SegmentedToggle
                           role="group"
-                          value={state.engine ?? 'all'}
+                          value={state.compareEngines ? 'all' : (state.engine ?? 'best')}
                           options={[
+                            { value: 'best', label: s.bestEngine },
                             { value: 'all', label: s.all },
                             ...options.engines.map((engine) => ({
                               value: engine,
@@ -535,7 +584,10 @@ export default function VideoDashboard({
                           ]}
                           onValueChange={(value) => {
                             track('video_results_engine_selected', { engine: value });
-                            update({ engine: value === 'all' ? null : value });
+                            updateSeries({
+                              engine: value === 'best' || value === 'all' ? null : value,
+                              compareEngines: value === 'all',
+                            });
                           }}
                           ariaLabel={s.engine}
                           testId="results-engine"
@@ -558,7 +610,7 @@ export default function VideoDashboard({
                             value: key,
                             label: [
                               hardwareLabel(point.hardwareKey ?? ''),
-                              point.results?.engine ? engineLabel(point.results.engine) : null,
+                              runtimeLabel(point.results?.engine ?? null, optimizationsOf(point)),
                               layoutLabel(point, locale),
                             ]
                               .filter(Boolean)
@@ -743,7 +795,7 @@ export default function VideoDashboard({
                 onLabelsChange={setLabels}
                 legendExpanded={legendExpanded}
                 onLegendExpandedChange={setLegendExpanded}
-                onUpdate={update}
+                onUpdate={updateSeries}
                 onOpen={openPoint}
                 heading={heading}
                 footer={
@@ -932,6 +984,18 @@ export default function VideoDashboard({
           </footer>
         </div>
       </Activity>
+      <EngineComparisonConfirmation
+        copy={s.engineComparison}
+        open={consent.open}
+        onCancel={() => {
+          consent.cancel();
+          track('video_results_engine_comparison_cancelled');
+        }}
+        onConfirm={() => {
+          consent.confirm();
+          track('video_results_engine_comparison_accepted');
+        }}
+      />
     </div>
   );
 }

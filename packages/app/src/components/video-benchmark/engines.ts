@@ -1,20 +1,14 @@
 import type { ShapeKey } from '@/lib/charts/chart-rendering';
 
-export interface EngineStyle {
-  /** Point shape on the results chart. */
-  shape: ShapeKey;
-  /** SVG stroke-dasharray of the engine's frontier line. */
-  dasharray: string;
-}
-
-/** Serving engines in display order. Color stays the hardware's; the engine sets shape and dash. */
-const ENGINES: readonly ({ key: string; label: string } & EngineStyle)[] = [
-  { key: 'sglang', label: 'SGLang', shape: 'circle', dasharray: 'none' },
-  { key: 'vllm-omni', label: 'vLLM-Omni', shape: 'diamond', dasharray: '6 4' },
+/** Serving engines in display order. Color stays the hardware's; the engine sets the point shape. */
+const ENGINES: readonly { key: string; label: string; shape: ShapeKey }[] = [
+  { key: 'sglang', label: 'SGLang', shape: 'circle' },
+  { key: 'vllm-omni', label: 'vLLM-Omni', shape: 'diamond' },
+  { key: 'sol-engine', label: 'NVIDIA Sol Engine', shape: 'triangle' },
 ];
 
-/** An engine outside the registry, or none recorded, still gets a style no listed engine uses. */
-const UNLISTED: EngineStyle = { shape: 'square', dasharray: '2 3' };
+/** An engine outside the registry, or none recorded, still gets a shape no listed engine uses. */
+const UNLISTED: ShapeKey = 'square';
 
 const entry = (key: string | null) => ENGINES.find((engine) => engine.key === key);
 
@@ -27,4 +21,4 @@ export function engineSort(key: string | null): number {
   return index === -1 ? ENGINES.length : index;
 }
 
-export const engineStyle = (key: string | null): EngineStyle => entry(key) ?? UNLISTED;
+export const engineShape = (key: string | null): ShapeKey => entry(key)?.shape ?? UNLISTED;

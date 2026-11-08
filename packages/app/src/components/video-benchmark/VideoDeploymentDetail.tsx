@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { layoutLabel } from './deployment';
-import { engineLabel } from './engines';
+import { runtimeLabel } from './optimizations';
 import { costPerGpuHour, hardwareLabel } from './hardware';
 import { TIER_LABELS } from './metrics';
 import type { ResultCell, ResultsState } from './results';
@@ -229,7 +229,7 @@ export default function VideoDeploymentDetail({
   onPsnr,
 }: {
   cell: ResultCell;
-  /** Deployments of the same hardware, engine and run channel across every GPU count. */
+  /** Deployments of the same hardware, runtime and run channel across every GPU count. */
   siblings: ResultCell[];
   gpuCounts: number[];
   workloadLabel: string;
@@ -244,7 +244,7 @@ export default function VideoDeploymentDetail({
   const s = STRINGS[locale];
   const { point, evidence } = cell;
   const hardware = hardwareLabel(point.hardwareKey ?? '');
-  const engine = cell.metadata.engine ? engineLabel(cell.metadata.engine) : s.notRecorded;
+  const engine = runtimeLabel(cell.metadata.engine, cell.metadata.optimizations) ?? s.notRecorded;
   const powerEvidence =
     evidence?.powerValid === true
       ? s.validPower

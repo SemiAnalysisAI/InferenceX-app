@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { deploymentKey, isQueueing, layoutLabel, leadCell, sharedLayoutCells } from './deployment';
 import type { VideoPoint } from './metrics';
+import type { ResultsEvidence } from './results-evidence';
 
 const base: VideoPoint = {
   id: 'a',
@@ -93,7 +94,7 @@ describe('deployment', () => {
     ).toEqual(['a', 'b4']);
     expect(sharedLayoutCells([])).toEqual([]);
   });
-  it('leads with the most efficient non-queued deployment of the hardware', () => {
+  it('leads with the most efficient non-queued, lossless deployment of the hardware', () => {
     const eightBoards = {
       ...base,
       id: 'b',
@@ -116,6 +117,13 @@ describe('deployment', () => {
     expect(leadCell([base, tie], 'h200', options)?.id).toBe('d');
     const noRate = { ...base, id: 'e', wallSeconds: null };
     expect(leadCell([noRate], 'h200', options)?.id).toBe('e');
+    const cached = {
+      ...base,
+      id: 'f',
+      wallSeconds: 1000,
+      results: { engine: 'sol-engine', optimizations: ['first-block-cache'] } as ResultsEvidence,
+    };
+    expect(leadCell([base, cached], 'h200', options)?.id).toBe('a');
   });
   it('requires a known shared workload and layout at C1 for evidence comparisons', () => {
     const matching = { ...base, id: 'b', hardwareKey: 'b200' };
