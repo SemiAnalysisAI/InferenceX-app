@@ -42,6 +42,17 @@ const expectPointsFaded = (faded: boolean) =>
 const expectVisiblePointCount = (scope: string, count: number) =>
   cy.scatterPoints(scope).should((points) => expect(visiblePoints(points)).to.have.length(count));
 
+const mouse = (type: string, x: number, y: number, buttons: number) =>
+  new MouseEvent(type, {
+    clientX: x,
+    clientY: y,
+    button: 0,
+    buttons,
+    bubbles: true,
+    cancelable: true,
+    view: window,
+  });
+
 describe('ScatterGraph', () => {
   for (const overlay of [false, true]) {
     it(`dismisses pinned ${overlay ? 'unofficial' : 'official'} details outside the chart and on Escape`, () => {
@@ -188,9 +199,38 @@ describe('ScatterGraph', () => {
         expect(hint.bottom).to.be.lessThan(xDomain.top);
         expect(doc.elementFromPoint(hint.left + 4, hint.top + 4)).not.to.equal($hint[0]);
       });
-    cy.get('#zoom-hint [data-testid="d3-chart-svg"]').trigger('wheel', {
-      deltaY: -120,
-      shiftKey: true,
+    cy.get('#zoom-hint [data-testid="d3-chart-svg"]').then(($svg) => {
+      const svg = $svg[0];
+      const bounds = svg.getBoundingClientRect();
+      const x = bounds.x + bounds.width / 2;
+      const y = bounds.y + bounds.height / 2;
+      // A click, hovering away, plain scrolling, and a drag while fully zoomed out (there is
+      // nowhere to pan to): none of these move the chart.
+      svg.dispatchEvent(mouse('mousedown', x, y, 1));
+      window.dispatchEvent(mouse('mouseup', x, y, 0));
+      svg.dispatchEvent(mouse('mousemove', x + 200, y, 0));
+      svg.dispatchEvent(new WheelEvent('wheel', { deltaY: -240, bubbles: true, view: window }));
+      svg.dispatchEvent(mouse('mousedown', x, y, 1));
+      window.dispatchEvent(mouse('mousemove', x + 120, y, 1));
+      window.dispatchEvent(mouse('mouseup', x + 120, y, 0));
+    });
+    cy.wait(600);
+    cy.get('#zoom-hint [data-testid="chart-instructions"]')
+      .should('be.visible')
+      .and('not.have.attr', 'data-dismissed');
+    cy.get('#zoom-hint [data-testid="d3-chart-svg"]').then(($svg) => {
+      const bounds = $svg[0].getBoundingClientRect();
+      $svg[0].dispatchEvent(
+        new WheelEvent('wheel', {
+          deltaY: -240,
+          shiftKey: true,
+          clientX: bounds.x + bounds.width / 2,
+          clientY: bounds.y + bounds.height / 2,
+          bubbles: true,
+          cancelable: true,
+          view: window,
+        }),
+      );
     });
     cy.get('#zoom-hint [data-testid="chart-instructions"]')
       .should('not.be.visible')

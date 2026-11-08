@@ -3,12 +3,13 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { zoomEventFilter } from '@/hooks/useChartZoom';
 import { useIsCoarsePointer, useIsMobileViewport, useMediaQuery } from '@/hooks/useMediaQuery';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { CHART_TOOLTIP_Z_INDEX } from '@/lib/d3-chart/tooltip-placement';
 import { cn } from '@/lib/shared/utils';
+
+const ZOOM_HINT_SETTLE_MS = 400;
 
 const DEFAULT_CHART_INSTRUCTIONS = {
   en: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
@@ -266,36 +267,37 @@ export function D3ChartWrapper({
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg || !hintInPlot || hintDismissed) return;
-    // Only the gestures the chart's own zoom accepts count, so page scrolling, browser
-    // pinch-zoom and one-finger swipes leave the hint in place.
-    const dismiss = () => setHintDismissed(true);
-    let dragStart: { x: number; y: number } | null = null;
-    const onGesture = (event: WheelEvent | MouseEvent | TouchEvent) => {
-      if (zoomEventFilter(event)) dismiss();
+    // The hint goes once the reader's input actually moves the chart's zoom transform, so
+    // page scrolling, clicks and gestures the zoom ignores leave it in place. Window capture
+    // listeners still see a drag that d3-zoom stops from propagating.
+    const transform = () => {
+      const zoom = Reflect.get(svg, '__zoom') as { k: number; x: number; y: number } | undefined;
+      return zoom ? `${zoom.k},${zoom.x},${zoom.y}` : '';
     };
-    const onMouseDown = (event: MouseEvent) => {
-      dragStart = zoomEventFilter(event) ? { x: event.clientX, y: event.clientY } : null;
+    let frame = 0;
+    let timer = 0;
+    const onInput = (event: Event) => {
+      if (event.type === 'mousemove' && !((event as MouseEvent).buttons & 1)) return;
+      if (frame) return;
+      const before = transform();
+      const check = () => {
+        if (transform() !== before) setHintDismissed(true);
+      };
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        check();
+      });
+      // An animated zoom (double-click) has not moved yet on the next frame.
+      window.clearTimeout(timer);
+      timer = window.setTimeout(check, ZOOM_HINT_SETTLE_MS);
     };
-    const onMouseMove = (event: MouseEvent) => {
-      if (dragStart && Math.hypot(event.clientX - dragStart.x, event.clientY - dragStart.y) > 4)
-        dismiss();
-    };
-    const onMouseUp = () => {
-      dragStart = null;
-    };
-    svg.addEventListener('wheel', onGesture, { passive: true });
-    svg.addEventListener('dblclick', onGesture);
-    svg.addEventListener('touchmove', onGesture, { passive: true });
-    svg.addEventListener('mousedown', onMouseDown);
-    svg.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
+    const events = ['wheel', 'mousemove', 'touchmove', 'dblclick'] as const;
+    for (const type of events)
+      window.addEventListener(type, onInput, { capture: true, passive: true });
     return () => {
-      svg.removeEventListener('wheel', onGesture);
-      svg.removeEventListener('dblclick', onGesture);
-      svg.removeEventListener('touchmove', onGesture);
-      svg.removeEventListener('mousedown', onMouseDown);
-      svg.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+      for (const type of events) window.removeEventListener(type, onInput, { capture: true });
     };
   }, [svgRef, hintInPlot, hintDismissed]);
 

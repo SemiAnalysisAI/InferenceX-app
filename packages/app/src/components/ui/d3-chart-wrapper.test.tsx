@@ -172,6 +172,13 @@ const touchMove = (fingers: number) =>
     touches: Array.from({ length: fingers }),
   });
 
+const nextFrame = () =>
+  act(async () => {
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
+
 describe('D3ChartWrapper zoom hint placement', () => {
   const hint = () => container.querySelector<HTMLElement>('[data-testid="chart-instructions"]');
   it('overlays the zoom hint on the plot instead of taking a line under it', () => {
@@ -184,36 +191,60 @@ describe('D3ChartWrapper zoom hint placement', () => {
     expect(hint()?.style.right).not.toBe('');
   });
 
-  it('keeps the hint through gestures the chart does not zoom on', () => {
+  it('keeps the hint while input does not move the zoom transform', async () => {
     const svg = renderWrapper().current!;
-    fire(svg, new WheelEvent('wheel', { bubbles: true }));
-    fire(svg, new WheelEvent('wheel', { ctrlKey: true }));
-    fire(svg, new WheelEvent('wheel', { ctrlKey: true, shiftKey: true }));
-    fire(svg, touchMove(1));
-    fire(svg, pointer('mousemove', 80));
-    fire(svg, pointer('mousedown', 10));
-    fire(svg, pointer('mousemove', 12));
-    fire(window, pointer('mouseup', 12));
-    fire(svg, pointer('mousemove', 200));
-    fire(svg, new MouseEvent('mousedown', { button: 2, clientX: 10, clientY: 10 }));
-    fire(svg, pointer('mousemove', 200));
-    fire(window, pointer('mouseup', 200));
-    fire(svg, new MouseEvent('dblclick', { ctrlKey: true }));
+    for (const event of [
+      new WheelEvent('wheel', { bubbles: true }),
+      new WheelEvent('wheel', { bubbles: true, ctrlKey: true }),
+      touchMove(1),
+      pointer('mousedown', 10),
+      pointer('mouseup', 10),
+      new MouseEvent('mousemove', { bubbles: true, buttons: 1, clientX: 80 }),
+      new MouseEvent('dblclick', { bubbles: true, ctrlKey: true }),
+    ]) {
+      fire(svg, event);
+      await nextFrame();
+    }
     expect(hint()?.dataset.dismissed).toBeUndefined();
     expect(hint()?.classList.contains('opacity-0')).toBe(false);
   });
 
-  it.each([
-    ['Shift+Scroll', () => [new WheelEvent('wheel', { shiftKey: true })]],
-    ['a two-finger touch move', () => [touchMove(2)]],
-    ['a drag', () => [pointer('mousedown', 10), pointer('mousemove', 40)]],
-    ['a double-click', () => [new MouseEvent('dblclick')]],
-  ] as const)('fades the hint out after %s', (_name, events) => {
+  it('ignores a transform change that arrives while the pointer only hovers', async () => {
     const svg = renderWrapper().current!;
-    for (const event of events()) fire(svg, event);
+    fire(svg, pointer('mousemove', 80));
+    Reflect.set(svg, '__zoom', { k: 2, x: 0, y: 0 });
+    await nextFrame();
+    expect(hint()?.dataset.dismissed).toBeUndefined();
+  });
+
+  it.each([
+    ['Shift+Scroll', () => new WheelEvent('wheel', { bubbles: true, shiftKey: true })],
+    ['a two-finger touch move', () => touchMove(2)],
+    ['a drag', () => new MouseEvent('mousemove', { bubbles: true, buttons: 1, clientX: 40 })],
+  ] as const)('fades the hint out once %s moves the zoom transform', async (_name, event) => {
+    const svg = renderWrapper().current!;
+    // d3-zoom stops a drag's mousemove at the window, so it never reaches the svg.
+    fire(_name === 'a drag' ? window : svg, event());
+    Reflect.set(svg, '__zoom', { k: 1, x: -30, y: 0 });
+    await nextFrame();
     expect(hint()?.dataset.dismissed).toBe('');
     expect(hint()?.classList.contains('opacity-0')).toBe(true);
     expect(hint()?.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('fades the hint out after an animated double-click zoom settles', () => {
+    vi.useFakeTimers();
+    try {
+      const svg = renderWrapper().current!;
+      fire(svg, new MouseEvent('dblclick', { bubbles: true }));
+      act(() => vi.advanceTimersByTime(50));
+      expect(hint()?.dataset.dismissed).toBeUndefined();
+      Reflect.set(svg, '__zoom', { k: 2, x: 0, y: 0 });
+      act(() => vi.advanceTimersByTime(400));
+      expect(hint()?.dataset.dismissed).toBe('');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('leaves the hint of a chart without zoom under the plot', () => {
