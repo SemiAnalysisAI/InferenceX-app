@@ -1,7 +1,7 @@
 'use client';
 
 import { BookOpen, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { GITHUB_REPO_FULL } from '@semianalysisai/inferencex-constants';
 
@@ -26,7 +26,11 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-import { CollectiveXChart } from './CollectiveXChart';
+import {
+  CollectiveXChart,
+  isolateCollectiveXSeries,
+  restoreCollectiveXSeries,
+} from './CollectiveXChart';
 import { CollectiveXSwapSection, SwapBlocksName } from './CollectiveXSwapSection';
 import { CollectiveXKvSection } from './CollectiveXKvSection';
 import { CollectiveXChangelog } from './CollectiveXChangelog';
@@ -333,6 +337,9 @@ export default function CollectiveXDisplay() {
   const [hiddenRangeIds, setHiddenRangeIds] = useState<Set<string>>(new Set());
   const [activeSeriesIds, setActiveSeriesIds] = useState<Set<string>>(new Set());
   const [legendExpanded, setLegendExpanded] = useState(true);
+  const mainChartRef = useRef<HTMLDivElement | null>(null);
+  // The band a pinned point focused before a legend hover took over the highlight.
+  const pinnedBandRef = useRef<string | null>(null);
   // Results older than the chained family carry no pair period: fall back to the round trip.
   const hasPairPeriod = useMemo(
     () =>
@@ -894,7 +901,7 @@ export default function CollectiveXDisplay() {
                   />
                 </div>
               </Card>
-              <Card data-testid="collectivex-main-chart" className="relative">
+              <Card ref={mainChartRef} data-testid="collectivex-main-chart" className="relative">
                 <CollectiveXChart
                   chartId="collectivex-explorer"
                   testId="collectivex-explorer-chart"
@@ -918,6 +925,12 @@ export default function CollectiveXDisplay() {
                     <ChartLegend
                       variant="sidebar"
                       legendItems={rangeView ? rangeLegendItems : legendItems}
+                      onItemHover={(id) => {
+                        pinnedBandRef.current = isolateCollectiveXSeries(mainChartRef.current, id);
+                      }}
+                      onItemHoverEnd={() =>
+                        restoreCollectiveXSeries(mainChartRef.current, pinnedBandRef.current)
+                      }
                       onItemRemove={(id) => {
                         if (rangeView) {
                           setHiddenRangeIds((previous) => new Set([...previous, id]));

@@ -232,6 +232,18 @@ describe('CollectiveX neutral run view', () => {
     cy.get('@band').should('not.have.attr', 'data-focused');
     cy.get('@band').should('have.attr', 'fill-opacity', '0.16');
 
+    // Hovering the band's legend entry isolates it like hovering one of its points.
+    cy.get('[data-testid="collectivex-main-chart"] [data-testid="chart-legend"] label')
+      .first()
+      .trigger('mouseover');
+    cy.get('@band')
+      .should('have.attr', 'data-focused', 'true')
+      .and('have.attr', 'fill-opacity', '0.3');
+    cy.get('[data-testid="collectivex-main-chart"] [data-testid="chart-legend"] label')
+      .first()
+      .trigger('mouseout');
+    cy.get('@band').should('not.have.attr', 'data-focused');
+
     showView('Series');
     cy.get('[data-testid="collectivex-range-band"]').should('not.exist');
     showView('Range by SKU');
