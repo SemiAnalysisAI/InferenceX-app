@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
 import { getModelSortIndex } from '@/lib/catalog/constants';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -163,6 +163,30 @@ const TABLE_STRINGS = {
   },
 } as const;
 
+interface TcoPriceTableSlots {
+  rowLabel?: ReactNode;
+  footnote?: ReactNode;
+}
+
+const TcoPriceTableSlotsContext = createContext<TcoPriceTableSlots>({});
+
+/**
+ * Lets the chart footer hand the price table its row label (the cost tier that
+ * produced the prices) and its footnote (their source).
+ */
+export function TcoPriceTableSlotsProvider({
+  rowLabel,
+  footnote,
+  children,
+}: TcoPriceTableSlots & { children: ReactNode }) {
+  const slots = useMemo(() => ({ rowLabel, footnote }), [rowLabel, footnote]);
+  return (
+    <TcoPriceTableSlotsContext.Provider value={slots}>
+      {children}
+    </TcoPriceTableSlotsContext.Provider>
+  );
+}
+
 export function plottedChipBases(
   hwKeys: Iterable<string>,
   hasPrice: (base: string) => boolean,
@@ -210,6 +234,7 @@ export function TcoPriceTable({
   className?: string;
 }) {
   const t = TABLE_STRINGS[useLocale()];
+  const slots = useContext(TcoPriceTableSlotsContext);
   const [editing, setEditing] = useState<{ item: EditableTcoBadgeItem; index: number } | null>(
     null,
   );
@@ -218,7 +243,7 @@ export function TcoPriceTable({
       ? items.toSpliced(Math.min(editing.index, items.length), 0, editing.item)
       : items;
   return (
-    <div className={cn('relative max-w-full', className)}>
+    <div className={cn('max-w-full', className)}>
       <div
         data-testid={testId}
         className="max-w-full overflow-x-auto rounded-md border border-border/60 text-muted-foreground"
@@ -251,8 +276,14 @@ export function TcoPriceTable({
           </thead>
           <tbody>
             <tr>
-              <th scope="row" className={cn(TABLE_CELL, 'text-left font-normal')}>
-                {rowLabel ?? t.row}
+              <th
+                scope="row"
+                className={cn(
+                  TABLE_CELL,
+                  'text-left font-normal max-sm:[&_[aria-haspopup]]:max-w-36',
+                )}
+              >
+                {slots.rowLabel ?? rowLabel ?? t.row}
               </th>
               {shownItems.map(({ base, label, value, overridden }, index) => (
                 <td
@@ -286,16 +317,19 @@ export function TcoPriceTable({
           </tbody>
         </table>
       </div>
-      {onReset && (
-        <div className="no-export mt-1 xl:absolute xl:top-full xl:left-0 xl:mt-0.5">
-          <button
-            type="button"
-            data-testid={resetTestId}
-            className="cursor-pointer rounded-xs text-2xs leading-4 text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
-            onClick={onReset}
-          >
-            {t.reset}
-          </button>
+      {(slots.footnote || onReset || editable) && (
+        <div className="mt-1 flex min-h-4 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          {slots.footnote}
+          {onReset && (
+            <button
+              type="button"
+              data-testid={resetTestId}
+              className="no-export cursor-pointer rounded-xs text-2xs leading-4 text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+              onClick={onReset}
+            >
+              {t.reset}
+            </button>
+          )}
         </div>
       )}
     </div>

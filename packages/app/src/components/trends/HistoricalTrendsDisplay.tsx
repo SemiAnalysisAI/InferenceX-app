@@ -516,7 +516,7 @@ export default function HistoricalTrendsDisplay() {
                         }
                         date={selectedRunDate || undefined}
                         source="SemiAnalysis InferenceX™"
-                        controlsEnd={
+                        priceTable={
                           costAssumptions && costBases.length > 0 ? (
                             <TcoPriceTable
                               items={costBases.map((base) => ({

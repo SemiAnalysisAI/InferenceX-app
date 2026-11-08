@@ -708,7 +708,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
         chipBasis={
           costType === 'total' ? undefined : <ChipBasisCaption control={chipBasisControl} />
         }
-        controlsEnd={
+        priceTable={
           plottedBases.length > 0 ? (
             <TcoPriceTable
               items={plottedBases.map((base) => ({

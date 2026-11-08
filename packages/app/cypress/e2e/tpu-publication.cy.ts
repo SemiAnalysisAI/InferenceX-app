@@ -100,7 +100,7 @@ describe('TPU publication preview', () => {
     );
   });
   for (const width of [375, 768, 1440]) {
-    it(`keeps TCO beside Cost Tier below the plot without clipping at ${width}px`, () => {
+    it(`keeps TCO basis above the tier's price table below the plot without clipping at ${width}px`, () => {
       cy.viewport(width, 900);
       cy.visit(`/infx/inference?${query}`);
       cy.wait('@tpuPreview');
@@ -133,17 +133,12 @@ describe('TPU publication preview', () => {
               expect(button.getBoundingClientRect().bottom).to.be.at.most(bounds.bottom);
             }
           });
-        cy.get('[data-testid="result-context-cost-tier"]').then(($tier) => {
+        cy.get('[data-testid="inference-tco-badges"] tbody th').then(($rowHeader) => {
+          expect($rowHeader.find('[data-testid="cost-tier-selector"]')).to.have.length(1);
           cy.get('[data-testid="result-context-tco-basis"]').should(($basis) => {
-            expect($tier[0].parentElement!.nextElementSibling).to.equal($basis[0].parentElement);
-            if (width >= 1280) {
-              const tier = $tier[0].getBoundingClientRect();
-              const basis = $basis[0].getBoundingClientRect();
-              expect(basis.left).to.be.greaterThan(tier.right);
-              expect(
-                Math.abs(tier.top + tier.height / 2 - basis.top - basis.height / 2),
-              ).to.be.lessThan(3);
-            }
+            expect($basis[0].getBoundingClientRect().bottom).to.be.at.most(
+              $rowHeader[0].closest('table')!.getBoundingClientRect().top,
+            );
           });
         });
         cy.get('[data-testid="result-context-tco-basis"] .export-only')

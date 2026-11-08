@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { TcoPriceTableSlotsProvider } from '@/components/ui/editable-tco-badges';
 import type { Locale } from '@/lib/i18n/i18n';
 import { formatDisplayDate } from '@/lib/shared/display-date';
 import { cn } from '@/lib/shared/utils';
@@ -35,7 +36,8 @@ export interface ResultContextProps {
   costBasis?: string;
   costBasisTestId?: string;
   layout?: 'footer';
-  controlsEnd?: ReactNode;
+  /** Footer only. The table takes the cost tier as its row label and `metaEnd` as its footnote. */
+  priceTable?: ReactNode;
   markers?: ReactNode;
   metaEnd?: ReactNode;
 }
@@ -126,7 +128,7 @@ export function ResultContext({
   costBasis,
   costBasisTestId,
   layout,
-  controlsEnd,
+  priceTable,
   markers,
   metaEnd,
 }: ResultContextProps) {
@@ -178,55 +180,69 @@ export function ResultContext({
     const singleDate = !hasRange && !(dates && dates.length > 1);
     return (
       <div data-testid="result-context" className="mb-2 text-xs text-muted-foreground">
-        {(scenario ||
-          costTier ||
-          utilization ||
-          licenseFee ||
-          tcoBasis ||
-          chipBasis ||
-          controlsEnd) && (
-          <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-            <dl className="contents">
-              {scenario}
-              {precision && (
-                <div>
-                  <dt className="inline font-medium text-foreground">{labels.precision}:</dt>{' '}
-                  <dd className="inline">{precision}</dd>
-                </div>
-              )}
-              {costTier && (
-                <CaptionField
-                  label={labels.costTier}
-                  value={costTier}
-                  control={costTierControl}
-                  testId="result-context-cost-tier"
-                  hideLabel
-                />
-              )}
-              {utilization && (
-                <CaptionField
-                  label={labels.utilization}
-                  value={utilization}
-                  control={utilizationControl}
-                  controlId={utilizationControlId}
-                  testId="result-context-utilization"
-                  hideLabel
-                />
-              )}
-              {licenseFee && (
-                <CaptionField
-                  label={labels.licenseFee}
-                  value={licenseFee}
-                  control={licenseFeeControl}
-                  controlId={licenseFeeControlId}
-                  testId="result-context-license-fee"
-                  hideLabel
-                />
-              )}
-              {tcoBasis}
-              {chipBasis}
-            </dl>
-            {controlsEnd && <div className="ml-auto max-w-full min-w-0">{controlsEnd}</div>}
+        <dl className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 empty:hidden">
+          {scenario}
+          {precision && (
+            <div>
+              <dt className="inline font-medium text-foreground">{labels.precision}:</dt>{' '}
+              <dd className="inline">{precision}</dd>
+            </div>
+          )}
+          {costTier && !priceTable && (
+            <CaptionField
+              label={labels.costTier}
+              value={costTier}
+              control={costTierControl}
+              testId="result-context-cost-tier"
+              hideLabel
+            />
+          )}
+          {utilization && (
+            <CaptionField
+              label={labels.utilization}
+              value={utilization}
+              control={utilizationControl}
+              controlId={utilizationControlId}
+              testId="result-context-utilization"
+              hideLabel
+            />
+          )}
+          {licenseFee && (
+            <CaptionField
+              label={labels.licenseFee}
+              value={licenseFee}
+              control={licenseFeeControl}
+              controlId={licenseFeeControlId}
+              testId="result-context-license-fee"
+              hideLabel
+            />
+          )}
+          {tcoBasis}
+          {chipBasis}
+        </dl>
+        {priceTable && (
+          <div className="mb-2">
+            <TcoPriceTableSlotsProvider
+              rowLabel={
+                costTier && (
+                  <span data-testid="result-context-cost-tier">
+                    {costTierControl ? (
+                      <>
+                        <span className="no-export inline-flex items-center align-middle">
+                          {costTierControl}
+                        </span>
+                        <span className="export-only hidden">{costTier}</span>
+                      </>
+                    ) : (
+                      costTier
+                    )}
+                  </span>
+                )
+              }
+              footnote={metaEnd}
+            >
+              {priceTable}
+            </TcoPriceTableSlotsProvider>
           </div>
         )}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -262,7 +278,7 @@ export function ResultContext({
               {markers}
             </div>
           )}
-          {metaEnd && <div className="ml-auto">{metaEnd}</div>}
+          {metaEnd && !priceTable && <div className="ml-auto">{metaEnd}</div>}
         </div>
       </div>
     );
