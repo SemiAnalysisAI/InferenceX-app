@@ -126,7 +126,7 @@ describe('ResultContext', () => {
     expect(container.textContent).toContain('Updated: Sep 1, 2026');
   });
 
-  it('makes the cost tier the price table row label and the price source its footnote', () => {
+  it('makes the cost tier the price table row label above one meta line', () => {
     const container = document.createElement('div');
     act(() => {
       createRoot(container).render(
@@ -154,22 +154,18 @@ describe('ResultContext', () => {
     const tiers = container.querySelectorAll('[data-testid="result-context-cost-tier"]');
     expect(tiers).toHaveLength(1);
     const rowHeader = container.querySelector('[data-testid="prices"] tbody th');
-    expect(tiers[0].parentElement).toBe(rowHeader);
+    expect(tiers[0].closest('th')).toBe(rowHeader);
     expect(rowHeader?.textContent).not.toContain('TCO');
     expect(tiers[0].querySelector('.no-export [data-testid="tier-control"]')).not.toBeNull();
     expect(tiers[0].querySelector('.export-only.hidden')?.textContent).toBe('Rent – 3-year commit');
     const table = container.querySelector('[data-testid="prices"]');
-    const source = container.querySelector('[data-testid="prices-source"]');
-    expect(container.querySelectorAll('[data-testid="prices-source"]')).toHaveLength(1);
-    expect(table?.parentElement?.contains(source)).toBe(true);
-    expect(table?.contains(source)).toBe(false);
     expect(order(container.querySelector('[data-testid="tco-slot"]'), table)).toBeTruthy();
     const markers = container.querySelector('[data-testid="result-context-markers"]');
-    expect(order(source, markers)).toBeTruthy();
-    expect(markers?.textContent).toBe('KV offload on');
+    expect(order(table, markers)).toBeTruthy();
     expect(markers?.parentElement?.textContent).toBe(
-      'Updated Sep 1, 2026SourceSemiAnalysis InferenceX™KV offload on',
+      'Updated Sep 1, 2026SourceSemiAnalysis InferenceX™KV offload onPrices: model',
     );
+    expect(markers?.parentElement?.lastElementChild?.classList.contains('ml-auto')).toBe(true);
   });
 
   it('keeps the tier on the controls row and the source on the meta line without a price table', () => {

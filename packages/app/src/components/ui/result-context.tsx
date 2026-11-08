@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { TcoPriceTableSlotsProvider } from '@/components/ui/editable-tco-badges';
+import { TcoPriceTableRowLabelProvider } from '@/components/ui/editable-tco-badges';
 import type { Locale } from '@/lib/i18n/i18n';
 import { formatDisplayDate } from '@/lib/shared/display-date';
 import { cn } from '@/lib/shared/utils';
@@ -36,7 +36,7 @@ export interface ResultContextProps {
   costBasis?: string;
   costBasisTestId?: string;
   layout?: 'footer';
-  /** Footer only. The table takes the cost tier as its row label and `metaEnd` as its footnote. */
+  /** Footer only. The table takes the cost tier as its row label. */
   priceTable?: ReactNode;
   markers?: ReactNode;
   metaEnd?: ReactNode;
@@ -220,69 +220,64 @@ export function ResultContext({
           {tcoBasis}
           {chipBasis}
         </dl>
-        <div
-          className={cn(priceTable && 'flex flex-wrap items-end justify-between gap-x-6 gap-y-2')}
-        >
-          {priceTable && (
-            <div className="max-w-full min-w-0">
-              <TcoPriceTableSlotsProvider
-                rowLabel={
-                  costTier && (
-                    <span data-testid="result-context-cost-tier">
-                      {costTierControl ? (
-                        <>
-                          <span className="no-export inline-flex items-center align-middle">
-                            {costTierControl}
-                          </span>
-                          <span className="export-only hidden">{costTier}</span>
-                        </>
-                      ) : (
-                        costTier
-                      )}
-                    </span>
-                  )
-                }
-                footnote={metaEnd}
-              >
-                {priceTable}
-              </TcoPriceTableSlotsProvider>
-            </div>
-          )}
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <dl className={cn('contents', !markers && '[&>:last-child]:after:content-none')}>
-              {dateValue && (
-                <div className={META_ITEM}>
-                  <dt className="inline">
-                    {singleDate ? (locale === 'zh' ? '更新时间' : 'Updated') : `${dateLabel}:`}
-                  </dt>{' '}
-                  <dd className="inline tabular-nums">{dateValue}</dd>
-                </div>
-              )}
-              {source && (
-                <div className={META_ITEM}>
-                  <dt className="sr-only">{labels.source}</dt>
-                  <dd className="inline">
-                    {source}
-                    {deprecated && (locale === 'zh' ? ' (已弃用)' : ' (deprecated)')}
-                  </dd>
-                </div>
-              )}
-              {costBasis && (
-                <div className={META_ITEM}>
-                  <dt className="inline">{labels.cost}:</dt>{' '}
-                  <dd className="inline" data-testid={costBasisTestId}>
-                    {costBasis}
-                  </dd>
-                </div>
-              )}
-            </dl>
-            {markers && (
-              <div data-testid="result-context-markers" className="inline-flex items-center">
-                {markers}
+        {priceTable && (
+          <div className="mb-2">
+            <TcoPriceTableRowLabelProvider
+              value={
+                costTier && (
+                  <span data-testid="result-context-cost-tier">
+                    {costTierControl ? (
+                      <>
+                        <span className="no-export inline-flex items-center align-middle">
+                          {costTierControl}
+                        </span>
+                        <span className="export-only hidden">{costTier}</span>
+                      </>
+                    ) : (
+                      costTier
+                    )}
+                  </span>
+                )
+              }
+            >
+              {priceTable}
+            </TcoPriceTableRowLabelProvider>
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <dl className={cn('contents', !markers && '[&>:last-child]:after:content-none')}>
+            {dateValue && (
+              <div className={META_ITEM}>
+                <dt className="inline">
+                  {singleDate ? (locale === 'zh' ? '更新时间' : 'Updated') : `${dateLabel}:`}
+                </dt>{' '}
+                <dd className="inline tabular-nums">{dateValue}</dd>
               </div>
             )}
-            {metaEnd && !priceTable && <div className="ml-auto">{metaEnd}</div>}
-          </div>
+            {source && (
+              <div className={META_ITEM}>
+                <dt className="sr-only">{labels.source}</dt>
+                <dd className="inline">
+                  {source}
+                  {deprecated && (locale === 'zh' ? ' (已弃用)' : ' (deprecated)')}
+                </dd>
+              </div>
+            )}
+            {costBasis && (
+              <div className={META_ITEM}>
+                <dt className="inline">{labels.cost}:</dt>{' '}
+                <dd className="inline" data-testid={costBasisTestId}>
+                  {costBasis}
+                </dd>
+              </div>
+            )}
+          </dl>
+          {markers && (
+            <div data-testid="result-context-markers" className="inline-flex items-center">
+              {markers}
+            </div>
+          )}
+          {metaEnd && <div className="ml-auto">{metaEnd}</div>}
         </div>
       </div>
     );

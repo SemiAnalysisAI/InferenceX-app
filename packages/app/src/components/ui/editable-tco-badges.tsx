@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 
 import { getModelSortIndex } from '@/lib/catalog/constants';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -143,8 +143,7 @@ export function EditableTcoBadges({
   );
 }
 
-const TABLE_CELL =
-  'whitespace-nowrap px-2.5 py-0.5 text-right [&+&]:border-l [&+&]:border-border/60';
+const TABLE_CELL = 'whitespace-nowrap px-2.5 py-0.5 text-right first:pl-0';
 
 const CHIP_CELL = 'w-16';
 
@@ -163,29 +162,14 @@ const TABLE_STRINGS = {
   },
 } as const;
 
-interface TcoPriceTableSlots {
-  rowLabel?: ReactNode;
-  footnote?: ReactNode;
-}
+const TcoPriceTableRowLabelContext = createContext<ReactNode>(undefined);
 
-const TcoPriceTableSlotsContext = createContext<TcoPriceTableSlots>({});
+/** Lets the chart footer hand the price table the cost tier that produced the prices as its row label. */
+export const TcoPriceTableRowLabelProvider = TcoPriceTableRowLabelContext.Provider;
 
-/**
- * Lets the chart footer hand the price table its row label (the cost tier that
- * produced the prices) and its footnote (their source).
- */
-export function TcoPriceTableSlotsProvider({
-  rowLabel,
-  footnote,
-  children,
-}: TcoPriceTableSlots & { children: ReactNode }) {
-  const slots = useMemo(() => ({ rowLabel, footnote }), [rowLabel, footnote]);
-  return (
-    <TcoPriceTableSlotsContext.Provider value={slots}>
-      {children}
-    </TcoPriceTableSlotsContext.Provider>
-  );
-}
+/** A select inside the row label reads as text: no border, caption height, chevron beside the label. */
+const ROW_LABEL_SELECT =
+  '[&_[data-slot=select-trigger]]:h-6 [&_[data-slot=select-trigger]]:w-auto [&_[data-slot=select-trigger]]:max-w-28 sm:[&_[data-slot=select-trigger]]:max-w-64 [&_[data-slot=select-trigger]]:gap-1 [&_[data-slot=select-trigger]]:border-transparent [&_[data-slot=select-trigger]]:bg-transparent [&_[data-slot=select-trigger]]:px-0 [&_[data-slot=select-trigger]]:font-medium [&_[data-slot=select-trigger]]:text-foreground [&_[data-slot=select-trigger]]:shadow-none [&_[data-slot=select-trigger]:hover]:bg-transparent [&_[data-slot=select-trigger]:hover]:text-brand';
 
 export function plottedChipBases(
   hwKeys: Iterable<string>,
@@ -234,7 +218,7 @@ export function TcoPriceTable({
   className?: string;
 }) {
   const t = TABLE_STRINGS[useLocale()];
-  const slots = useContext(TcoPriceTableSlotsContext);
+  const slotRowLabel = useContext(TcoPriceTableRowLabelContext);
   const [editing, setEditing] = useState<{ item: EditableTcoBadgeItem; index: number } | null>(
     null,
   );
@@ -244,10 +228,7 @@ export function TcoPriceTable({
       : items;
   return (
     <div className={cn('max-w-full', className)}>
-      <div
-        data-testid={testId}
-        className="w-fit max-w-full overflow-x-auto rounded-md border border-border/60 text-muted-foreground"
-      >
+      <div data-testid={testId} className="w-fit max-w-full overflow-x-auto text-muted-foreground">
         <table className="border-separate border-spacing-0 text-2xs tabular-nums">
           <thead>
             <tr>
@@ -256,6 +237,16 @@ export function TcoPriceTable({
                 className={cn(TABLE_CELL, 'border-b border-border/60 text-left font-normal')}
               >
                 {header ?? t.header}
+                {onReset && (
+                  <button
+                    type="button"
+                    data-testid={resetTestId}
+                    className="no-export ml-2 cursor-pointer rounded-xs text-2xs leading-4 text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                    onClick={onReset}
+                  >
+                    {t.reset}
+                  </button>
+                )}
               </th>
               {shownItems.map(({ base, label }) => (
                 <th
@@ -280,10 +271,15 @@ export function TcoPriceTable({
                 scope="row"
                 className={cn(
                   TABLE_CELL,
-                  'text-left font-normal [&_[data-slot=select-trigger]]:w-32 sm:[&_[data-slot=select-trigger]]:w-64',
+                  'text-left font-normal',
+                  slotRowLabel && ROW_LABEL_SELECT,
                 )}
               >
-                {slots.rowLabel ?? rowLabel ?? t.row}
+                {slotRowLabel ? (
+                  <span className="inline-flex w-36 items-center sm:w-72">{slotRowLabel}</span>
+                ) : (
+                  (rowLabel ?? t.row)
+                )}
               </th>
               {shownItems.map(({ base, label, value, overridden }, index) => (
                 <td
@@ -317,21 +313,6 @@ export function TcoPriceTable({
           </tbody>
         </table>
       </div>
-      {(slots.footnote || onReset || editable) && (
-        <div className="mt-1 flex min-h-4 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          {slots.footnote}
-          {onReset && (
-            <button
-              type="button"
-              data-testid={resetTestId}
-              className="no-export cursor-pointer rounded-xs text-2xs leading-4 text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
-              onClick={onReset}
-            >
-              {t.reset}
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 }

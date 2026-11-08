@@ -168,17 +168,10 @@ describe('InferenceTcoBadges', () => {
     cy.get('[data-testid="cost-input-mi355x"]')
       .closest('td')
       .should('not.have.attr', 'data-overridden');
-    cy.get('[data-testid="inference-tco-badges"] [data-testid="inference-tco-reset"]').should(
-      'not.exist',
-    );
-    cy.get('[data-testid="inference-tco-badges"]').then(($table) => {
-      cy.get('[data-testid="inference-tco-reset"]').should(($reset) => {
-        const table = $table[0].getBoundingClientRect();
-        const reset = $reset[0].getBoundingClientRect();
-        expect(reset.top).to.be.at.least(table.bottom);
-        expect(Math.abs(reset.left - table.left)).to.be.lessThan(1);
-      });
-    });
+    cy.get('[data-testid="inference-tco-badges"] thead th')
+      .first()
+      .find('[data-testid="inference-tco-reset"]')
+      .should('be.visible');
     cy.get('[data-testid="inference-tco-reset"]').should('have.text', 'Reset').click();
     cy.get('@setUserCosts').should('have.been.calledWith', null);
     cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_costh');
@@ -194,7 +187,7 @@ describe('InferenceTcoBadges', () => {
   });
 
   for (const width of [375, 768, 1440]) {
-    it(`puts the cost tier in the price table row and the source under it at ${width}px`, () => {
+    it(`puts the cost tier in the price table row above one meta line at ${width}px`, () => {
       cy.viewport(width, 400);
       mountWithProviders(
         <ResultContext
@@ -221,34 +214,25 @@ describe('InferenceTcoBadges', () => {
       cy.get('[data-testid="inference-tco-badges"]').then(($table) => {
         const table = $table[0].getBoundingClientRect();
         expect(table.right).to.be.at.most(width);
-        const grid = $table[0].querySelector('table')!.getBoundingClientRect();
-        if (grid.width < width) expect(table.right - grid.right).to.be.closeTo(1, 0.5);
         cy.get('[data-testid="result-context"]').should(($context) => {
-          expect(Math.abs(table.left - $context[0].getBoundingClientRect().left)).to.be.lessThan(1);
-        });
-        cy.get('[data-testid="tco-prices-source"]').should(($source) => {
-          const source = $source[0].getBoundingClientRect();
-          expect(source.top).to.be.at.least(table.bottom);
-          expect(Math.abs(source.left - table.left)).to.be.lessThan(1);
-          expect(source.right).to.be.at.most(width);
-        });
-        cy.get('[data-testid="result-context"] dd.tabular-nums').should(($date) => {
-          const doc = $date[0].ownerDocument;
-          const date = $date[0].getBoundingClientRect();
+          const context = $context[0].getBoundingClientRect();
+          const doc = $context[0].ownerDocument;
+          const tier = doc.querySelector('[data-testid="cost-tier-selector"]')!;
+          const date = doc.querySelector('[data-testid="result-context"] dd.tabular-nums')!;
           const source = doc
             .querySelector('[data-testid="tco-prices-source"]')!
             .getBoundingClientRect();
-          expect($date[0].textContent).to.equal('Nov 7, 2026');
+          expect(Math.abs(table.left - context.left)).to.be.lessThan(1);
+          expect(Math.abs(tier.getBoundingClientRect().left - context.left)).to.be.lessThan(2);
+          expect(getComputedStyle(tier).borderTopColor).to.equal('rgba(0, 0, 0, 0)');
+          expect(getComputedStyle($table[0]).borderTopWidth).to.equal('0px');
+          expect(date.textContent).to.equal('Nov 7, 2026');
+          expect(date.getBoundingClientRect().top).to.be.at.least(table.bottom);
+          expect(source.top).to.be.at.least(table.bottom);
+          expect(source.right).to.be.at.most(width);
           if (width >= 1440) {
-            const context = doc
-              .querySelector('[data-testid="result-context"]')!
-              .getBoundingClientRect();
-            const meta = $date[0].closest('dl')!.parentElement!.getBoundingClientRect();
-            expect(date.left).to.be.greaterThan(table.right);
-            expect(Math.abs(meta.right - context.right)).to.be.lessThan(1);
-            expect(Math.abs(source.bottom - date.bottom)).to.be.lessThan(3);
-          } else {
-            expect(date.top).to.be.at.least(source.bottom);
+            expect(Math.abs(source.right - context.right)).to.be.lessThan(1);
+            expect(Math.abs(source.bottom - date.getBoundingClientRect().bottom)).to.be.lessThan(3);
           }
         });
       });

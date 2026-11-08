@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   EditableTcoBadges,
   TcoPriceTable,
-  TcoPriceTableSlotsProvider,
+  TcoPriceTableRowLabelProvider,
 } from '@/components/ui/editable-tco-badges';
 
 let container: HTMLDivElement;
@@ -136,13 +136,10 @@ describe('TcoPriceTable', () => {
     expect(container.querySelector('[data-testid="table"]')?.nextElementSibling).toBeNull();
   });
 
-  it('takes its row label and footnote from the footer, with Reset beside the footnote', () => {
+  it('takes its row label from the footer and keeps Reset in the header corner', () => {
     act(() =>
       root.render(
-        <TcoPriceTableSlotsProvider
-          rowLabel={<span data-testid="tier">Rent – 3-year commit</span>}
-          footnote={<span data-testid="source">Prices: model</span>}
-        >
+        <TcoPriceTableRowLabelProvider value={<span data-testid="tier">Rent – 3-year commit</span>}>
           <TcoPriceTable
             items={ITEMS}
             editable
@@ -152,16 +149,13 @@ describe('TcoPriceTable', () => {
             cellTestId="cell"
             inputIdPrefix="cost"
           />
-        </TcoPriceTableSlotsProvider>,
+        </TcoPriceTableRowLabelProvider>,
       ),
     );
     expect(container.querySelector('tbody th')?.textContent).toBe('Rent – 3-year commit');
-    const footnote = container.querySelector('[data-testid="table"]')?.nextElementSibling;
-    expect([...(footnote?.children ?? [])].map((el) => (el as HTMLElement).dataset.testid)).toEqual(
-      ['source', 'reset'],
-    );
-    expect(container.querySelector('[data-testid="reset"]')?.classList.contains('no-export')).toBe(
-      true,
-    );
+    const reset = container.querySelector('thead th [data-testid="reset"]');
+    expect(reset?.parentElement?.textContent).toBe('$/chip/hrReset');
+    expect(reset?.classList.contains('no-export')).toBe(true);
+    expect(container.querySelector('[data-testid="table"]')?.nextElementSibling).toBeNull();
   });
 });
