@@ -6,7 +6,6 @@ import { createPortal } from 'react-dom';
 import { useIsCoarsePointer, useIsMobileViewport, useMediaQuery } from '@/hooks/useMediaQuery';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { chartFont, measureTextWidth, useFontsVersion } from '@/lib/d3-chart/dynamic-margins';
 import { CHART_TOOLTIP_Z_INDEX } from '@/lib/d3-chart/tooltip-placement';
 import { cn } from '@/lib/shared/utils';
 
@@ -232,38 +231,73 @@ export function D3ChartWrapper({
     }
   });
 
-  const hintRef = useRef<HTMLParagraphElement>(null);
-  const [hintWidth, setHintWidth] = useState<number | null>(null);
-  const [hintInset, setHintInset] = useState(12);
-  const fontsVersion = useFontsVersion();
+  // A zoom hint sits in the plot's top-right corner and goes away once the reader zooms or
+  // pans; a chart that cannot zoom keeps its hint under the plot.
+  const hintInPlot = Boolean(resolvedInstructions) && zoomEnabled;
+  const [hintCorner, setHintCorner] = useState({ top: 8, right: 12 });
+  const [hintDismissed, setHintDismissed] = useState(false);
   useEffect(() => {
     const svg = svgRef.current;
-    if (!svg || !resolvedInstructions) return;
-    const natural = measureTextWidth(resolvedInstructions, chartFont(11));
+    if (!svg || !hintInPlot) return;
     let frame = 0;
     const measure = () => {
       frame = 0;
-      const svgRight = svg.getBoundingClientRect().right;
-      const label = svg.querySelector('.x-axis-label');
-      const space = label?.textContent
-        ? Math.floor(svgRight - label.getBoundingClientRect().right - 36)
-        : 0;
-      const domain = svg.querySelector('.x-axis > .domain');
-      if (domain)
-        setHintInset(Math.max(0, Math.round(svgRight - domain.getBoundingClientRect().right)));
-      setHintWidth(space * 2 >= natural + 24 ? space : null);
+      const bounds = svg.getBoundingClientRect();
+      const xDomain = svg.querySelector('.x-axis > .domain')?.getBoundingClientRect();
+      const yDomain = svg.querySelector('.y-axis > .domain')?.getBoundingClientRect();
+      const top = Math.max(0, Math.round((yDomain?.top ?? bounds.top) - bounds.top)) + 8;
+      const right = Math.max(0, Math.round(bounds.right - (xDomain?.right ?? bounds.right))) + 12;
+      setHintCorner((current) =>
+        current.top === top && current.right === right ? current : { top, right },
+      );
     };
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(measure);
     };
     schedule();
     const mutations = new MutationObserver(schedule);
-    mutations.observe(svg, { childList: true, subtree: true, characterData: true });
+    mutations.observe(svg, { childList: true, subtree: true });
     return () => {
       cancelAnimationFrame(frame);
       mutations.disconnect();
     };
-  }, [svgRef, resolvedInstructions, fontsVersion]);
+  }, [svgRef, hintInPlot]);
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg || !hintInPlot || hintDismissed) return;
+    const dismiss = () => setHintDismissed(true);
+    let dragStart: { x: number; y: number } | null = null;
+    const onWheel = (event: WheelEvent) => {
+      if (event.shiftKey || event.ctrlKey) dismiss();
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      dragStart = { x: event.clientX, y: event.clientY };
+    };
+    const onPointerMove = (event: PointerEvent) => {
+      if (dragStart && Math.hypot(event.clientX - dragStart.x, event.clientY - dragStart.y) > 4)
+        dismiss();
+    };
+    const onPointerUp = () => {
+      dragStart = null;
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      if (event.touches.length > 1) dismiss();
+    };
+    svg.addEventListener('wheel', onWheel, { passive: true });
+    svg.addEventListener('dblclick', dismiss);
+    svg.addEventListener('pointerdown', onPointerDown);
+    svg.addEventListener('pointermove', onPointerMove);
+    svg.addEventListener('touchmove', onTouchMove, { passive: true });
+    window.addEventListener('pointerup', onPointerUp);
+    return () => {
+      svg.removeEventListener('wheel', onWheel);
+      svg.removeEventListener('dblclick', dismiss);
+      svg.removeEventListener('pointerdown', onPointerDown);
+      svg.removeEventListener('pointermove', onPointerMove);
+      svg.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+  }, [svgRef, hintInPlot, hintDismissed]);
 
   const plot = (
     <div
@@ -309,20 +343,25 @@ export function D3ChartWrapper({
             }}
           />
           {noDataOverlay}
+          {hintInPlot && (
+            <p
+              data-testid="chart-instructions"
+              data-dismissed={hintDismissed ? '' : undefined}
+              aria-hidden={hintDismissed || undefined}
+              className={cn(
+                'no-export pointer-events-none absolute max-w-[60%] text-right text-2xs leading-4 text-balance text-muted-foreground/80 transition-opacity duration-300',
+                hintDismissed && 'opacity-0',
+              )}
+              style={hintCorner}
+            >
+              {resolvedInstructions}
+            </p>
+          )}
         </div>
-        {resolvedInstructions && (
+        {resolvedInstructions && !hintInPlot && (
           <p
-            ref={hintRef}
             data-testid="chart-instructions"
-            className={cn(
-              'no-export text-balance text-muted-foreground',
-              hintWidth === null
-                ? 'mt-2 text-center text-xs'
-                : 'pointer-events-none relative ml-auto -mt-[21px] mb-1.5 text-right text-2xs leading-4',
-            )}
-            style={
-              hintWidth === null ? undefined : { maxWidth: hintWidth, paddingRight: hintInset }
-            }
+            className="no-export mt-2 text-center text-xs text-balance text-muted-foreground"
           >
             {resolvedInstructions}
           </p>

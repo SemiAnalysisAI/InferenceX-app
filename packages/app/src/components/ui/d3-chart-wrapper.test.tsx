@@ -162,3 +162,54 @@ describe('resolveChartInstructions', () => {
     );
   });
 });
+
+const fire = (target: EventTarget, event: Event) => act(() => void target.dispatchEvent(event));
+const pointer = (type: string, clientX: number) =>
+  new MouseEvent(type, { bubbles: true, clientX, clientY: 10 });
+
+describe('D3ChartWrapper zoom hint placement', () => {
+  const hint = () => container.querySelector<HTMLElement>('[data-testid="chart-instructions"]');
+  it('overlays the zoom hint on the plot instead of taking a line under it', () => {
+    const svgRef = renderWrapper();
+    expect(hint()?.parentElement).toBe(svgRef.current?.parentElement);
+    expect(hint()?.classList.contains('absolute')).toBe(true);
+    expect(hint()?.classList.contains('pointer-events-none')).toBe(true);
+    expect(hint()?.classList.contains('no-export')).toBe(true);
+    expect(hint()?.style.top).not.toBe('');
+    expect(hint()?.style.right).not.toBe('');
+  });
+
+  it('keeps the hint through hovering, clicking and plain scrolling', () => {
+    const svg = renderWrapper().current!;
+    fire(svg, new WheelEvent('wheel', { bubbles: true }));
+    fire(svg, pointer('pointermove', 80));
+    fire(svg, pointer('pointerdown', 10));
+    fire(svg, pointer('pointermove', 12));
+    fire(window, pointer('pointerup', 12));
+    fire(svg, pointer('pointermove', 200));
+    expect(hint()?.dataset.dismissed).toBeUndefined();
+    expect(hint()?.classList.contains('opacity-0')).toBe(false);
+  });
+
+  it.each([
+    ['Shift+Scroll', () => [new WheelEvent('wheel', { shiftKey: true })]],
+    ['a pinch-to-zoom wheel', () => [new WheelEvent('wheel', { ctrlKey: true })]],
+    ['a drag', () => [pointer('pointerdown', 10), pointer('pointermove', 40)]],
+    ['a double-click', () => [new MouseEvent('dblclick')]],
+  ] as const)('fades the hint out after %s', (_name, events) => {
+    const svg = renderWrapper().current!;
+    for (const event of events()) fire(svg, event);
+    expect(hint()?.dataset.dismissed).toBe('');
+    expect(hint()?.classList.contains('opacity-0')).toBe(true);
+    expect(hint()?.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('leaves the hint of a chart without zoom under the plot', () => {
+    const svgRef = renderWrapper('Hover over a bar for details', false);
+    expect(hint()?.textContent).toBe('Hover over a bar for details');
+    expect(hint()?.classList.contains('absolute')).toBe(false);
+    expect(hint()?.parentElement).toBe(svgRef.current?.parentElement?.parentElement);
+    fire(svgRef.current!, new MouseEvent('dblclick'));
+    expect(hint()?.classList.contains('opacity-0')).toBe(false);
+  });
+});
