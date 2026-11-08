@@ -335,6 +335,7 @@ export default function ChartDisplay({
     showOffloadingLabel,
     powerCompare,
     tokenBasis,
+    isLegendExpanded,
   } = useInferenceDisplay();
   const {
     setSelectedDates,
@@ -1216,6 +1217,20 @@ export default function ChartDisplay({
                     base in costAssumptions.values || costAssumptions.blankedBases.includes(base),
                 )
               : [];
+            const sidebarCostTier = metricCostTier(
+              selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,
+            );
+            // The legend sidebar carries the tier and prices while it is open; a collapsed
+            // legend, the table view, date comparison and embeds keep the footer table.
+            const costInSidebar =
+              Boolean(costAssumptions) &&
+              footerCostBases.length > 0 &&
+              Boolean(sidebarCostTier) &&
+              isLegendExpanded &&
+              !embedded &&
+              !powerXSurface &&
+              !isGpuComparison &&
+              getViewMode(graphIndex) !== 'table';
             return (
               <section key={graphIndex}>
                 <figure data-testid="chart-figure" className="relative min-w-0">
@@ -1312,6 +1327,7 @@ export default function ChartDisplay({
                                 : undefined
                             }
                             costTier={(() => {
+                              if (costInSidebar) return undefined;
                               const tier = metricCostTier(
                                 selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,
                               );
@@ -1373,7 +1389,7 @@ export default function ChartDisplay({
                             }
                             layout="footer"
                             priceTable={
-                              costAssumptions && footerCostBases.length > 0 ? (
+                              costAssumptions && footerCostBases.length > 0 && !costInSidebar ? (
                                 <InferenceTcoBadges
                                   bases={footerCostBases}
                                   values={costAssumptions.values}
@@ -1556,6 +1572,30 @@ export default function ChartDisplay({
                             chartDefinition={graph.chartDefinition}
                             caption={caption}
                             footer={chartFooter}
+                            legendAssumptions={
+                              costInSidebar && costAssumptions ? (
+                                <div
+                                  data-testid="legend-cost-assumptions"
+                                  className="text-xs text-muted-foreground"
+                                >
+                                  <div data-testid="result-context-cost-tier" className="mb-1.5">
+                                    <span className="no-export">
+                                      <CostTierSelector footer />
+                                    </span>
+                                    <span className="export-only hidden font-medium text-foreground">
+                                      {sidebarCostTier &&
+                                        costTierOptionLabel(sidebarCostTier, locale)}
+                                    </span>
+                                  </div>
+                                  <InferenceTcoBadges
+                                    orientation="rows"
+                                    bases={footerCostBases}
+                                    values={costAssumptions.values}
+                                    editable={costAssumptions.editable}
+                                  />
+                                </div>
+                              ) : undefined
+                            }
                             overlayData={
                               overlayDataByChartType[graph.chartDefinition.chartType] ?? undefined
                             }

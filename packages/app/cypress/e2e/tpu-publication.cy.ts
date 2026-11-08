@@ -100,7 +100,7 @@ describe('TPU publication preview', () => {
     );
   });
   for (const width of [375, 768, 1440]) {
-    it(`keeps TCO basis above the tier's price table below the plot without clipping at ${width}px`, () => {
+    it(`keeps TCO basis below the plot and the tier with its prices in the legend without clipping at ${width}px`, () => {
       cy.viewport(width, 900);
       cy.visit(`/infx/inference?${query}`);
       cy.wait('@tpuPreview');
@@ -118,8 +118,15 @@ describe('TPU publication preview', () => {
       cy.get('[data-testid="inference-chart-configuration"]').within(() => {
         cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
       });
+      cy.get(
+        '[data-testid="chart-figure"] [data-testid="legend-assumptions"] [data-testid="cost-tier-selector"]',
+      ).should('exist');
+      cy.get(
+        '[data-testid="chart-figure"] [data-testid="legend-assumptions"] [data-testid="inference-tco-badge"]',
+      ).should('have.length.greaterThan', 0);
       cy.get('[data-testid="chart-figure"] [data-testid="result-context"]').within(() => {
-        cy.get('[data-testid="cost-tier-selector"]').should('be.visible');
+        cy.get('[data-testid="cost-tier-selector"]').should('not.exist');
+        cy.get('[data-testid="inference-tco-badges"]').should('not.exist');
         cy.get('[data-testid="tco-basis-toggle"]')
           .should('be.visible')
           .should(($toggle) => {
@@ -133,14 +140,6 @@ describe('TPU publication preview', () => {
               expect(button.getBoundingClientRect().bottom).to.be.at.most(bounds.bottom);
             }
           });
-        cy.get('[data-testid="inference-tco-badges"] tbody th').then(($rowHeader) => {
-          expect($rowHeader.find('[data-testid="cost-tier-selector"]')).to.have.length(1);
-          cy.get('[data-testid="result-context-tco-basis"]').should(($basis) => {
-            expect($basis[0].getBoundingClientRect().bottom).to.be.at.most(
-              $rowHeader[0].closest('table')!.getBoundingClientRect().top,
-            );
-          });
-        });
         cy.get('[data-testid="result-context-tco-basis"] .export-only')
           .should('have.text', 'Internal')
           .and('not.be.visible');

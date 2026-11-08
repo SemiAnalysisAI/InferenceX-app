@@ -304,6 +304,14 @@ describe('Inference Chart', () => {
       .should('contain.text', 'Owning at large hyperscaler volume')
       .find('[data-testid="cost-tier-selector"]')
       .should('be.visible');
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .find('[data-testid="legend-assumptions"] [data-testid="inference-tco-badge"]')
+      .should('have.length.greaterThan', 0);
+    cy.get('[data-testid="chart-figure"] [data-testid="result-context"]')
+      .first()
+      .find('[data-testid="inference-tco-badges"]')
+      .should('not.exist');
     cy.scatterPoints(CHART_DISPLAY).should('have.length.greaterThan', 0);
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
       'have.length.greaterThan',

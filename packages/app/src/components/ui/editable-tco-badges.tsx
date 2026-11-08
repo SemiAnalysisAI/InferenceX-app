@@ -205,6 +205,7 @@ export function TcoPriceTable({
   rowLabel,
   items,
   editable = false,
+  orientation = 'columns',
   twoDecimals = true,
   onChange,
   onCommit,
@@ -221,6 +222,8 @@ export function TcoPriceTable({
   rowLabel?: string;
   items: readonly EditableTcoBadgeItem[];
   editable?: boolean;
+  /** `rows` lists one chip per line for narrow panels such as the legend sidebar. */
+  orientation?: 'columns' | 'rows';
   twoDecimals?: boolean;
   onChange?: (base: string, raw: string) => void;
   onCommit?: (base: string, raw: string) => void;
@@ -242,6 +245,74 @@ export function TcoPriceTable({
     editing && !items.some(({ base }) => base === editing.item.base)
       ? items.toSpliced(Math.min(editing.index, items.length), 0, editing.item)
       : items;
+  const renderValue = ({ base, label, value, overridden }: EditableTcoBadgeItem) =>
+    editable ? (
+      <TcoCostInput
+        id={`${inputIdPrefix}-${base}`}
+        testId={`${inputTestIdPrefix}-${base}`}
+        ariaLabel={(inputLabel ?? t.input)(label)}
+        value={value}
+        overridden={overridden}
+        twoDecimals={twoDecimals}
+        className="text-right font-semibold"
+        onChange={(raw) => onChange?.(base, raw)}
+        onCommit={onCommit ? (raw) => onCommit(base, raw) : undefined}
+      />
+    ) : (
+      <span className="text-foreground">{twoDecimals ? twoDecimalValue(value) : value}</span>
+    );
+  if (orientation === 'rows') {
+    return (
+      <div className={cn('max-w-full', className)}>
+        <table
+          data-testid={testId}
+          className="w-full border-separate border-spacing-0 text-xs text-muted-foreground tabular-nums"
+        >
+          <thead>
+            <tr>
+              <th scope="col" colSpan={2} className="pb-0.5 text-left text-2xs font-normal">
+                {header ?? t.header}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {shownItems.map((item, index) => (
+              <tr key={item.base}>
+                <th scope="row" className="py-0.5 text-left font-normal whitespace-nowrap">
+                  {editable ? (
+                    <label htmlFor={`${inputIdPrefix}-${item.base}`} className="cursor-text">
+                      {item.label}
+                    </label>
+                  ) : (
+                    item.label
+                  )}
+                </th>
+                <td
+                  data-testid={cellTestId}
+                  data-overridden={item.overridden ? '' : undefined}
+                  className="py-0.5 text-right font-semibold"
+                  onFocus={() => setEditing({ item, index })}
+                  onBlur={() => setEditing(null)}
+                >
+                  {renderValue(item)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {onReset && (
+          <button
+            type="button"
+            data-testid={resetTestId}
+            className="no-export mt-1 cursor-pointer rounded-xs text-2xs leading-4 text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+            onClick={onReset}
+          >
+            {t.reset}
+          </button>
+        )}
+      </div>
+    );
+  }
   return (
     <div className={cn('max-w-full', className)}>
       <div
@@ -294,23 +365,7 @@ export function TcoPriceTable({
                   onFocus={() => setEditing({ item: shownItems[index], index })}
                   onBlur={() => setEditing(null)}
                 >
-                  {editable ? (
-                    <TcoCostInput
-                      id={`${inputIdPrefix}-${base}`}
-                      testId={`${inputTestIdPrefix}-${base}`}
-                      ariaLabel={(inputLabel ?? t.input)(label)}
-                      value={value}
-                      overridden={overridden}
-                      twoDecimals={twoDecimals}
-                      className="text-right font-semibold"
-                      onChange={(raw) => onChange?.(base, raw)}
-                      onCommit={onCommit ? (raw) => onCommit(base, raw) : undefined}
-                    />
-                  ) : (
-                    <span className="text-foreground">
-                      {twoDecimals ? twoDecimalValue(value) : value}
-                    </span>
-                  )}
+                  {renderValue({ base, label, value, overridden })}
                 </td>
               ))}
             </tr>

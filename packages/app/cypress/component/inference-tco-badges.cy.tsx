@@ -4,6 +4,7 @@ import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
 import { CostTierSelector } from '@/components/inference/ui/CostTierSelector';
 import { InferenceTcoBadges } from '@/components/inference/ui/InferenceTcoBadges';
+import ChartLegend from '@/components/ui/chart-legend';
 import { PricesSourceLink } from '@/components/ui/chart-display-helpers';
 import { ResultContext } from '@/components/ui/result-context';
 import { getGpuSpecs } from '@/lib/catalog/constants';
@@ -293,5 +294,70 @@ describe('InferenceTcoBadges', () => {
       expect(widths[0]).to.equal(widths[1]);
       expect(widths[0]).to.be.lessThan(320);
     });
+  });
+
+  it('lists the tier and editable prices in the legend sidebar under the switches', () => {
+    cy.viewport(1440, 700);
+    mountWithProviders(
+      <div style={{ width: 340 }}>
+        <ChartLegend
+          variant="sidebar"
+          isLegendExpanded
+          onExpandedChange={() => {}}
+          legendItems={[
+            {
+              name: 'gb300',
+              label: 'GB300 NVL72 (Dynamo vLLM)',
+              color: '#8a4',
+              isActive: true,
+              onClick: () => {},
+            },
+            {
+              name: 'mi355x',
+              label: 'MI355X (vLLM)',
+              color: '#c44',
+              isActive: true,
+              onClick: () => {},
+            },
+          ]}
+          switches={[{ id: 'log', label: 'Log scale', checked: false, onCheckedChange: () => {} }]}
+          assumptions={
+            <div data-testid="legend-cost-assumptions">
+              <CostTierSelector footer />
+              <InferenceTcoBadges orientation="rows" bases={BASES} values={VALUES} />
+            </div>
+          }
+        />
+      </div>,
+      { inference: { selectedYAxisMetric: 'y_tokensPerDollarH' }, globalFilters: {} },
+    );
+    cy.get('[data-testid="legend-display-controls"] [data-testid="legend-assumptions"]').should(
+      ($panel) => {
+        const panel = $panel[0].getBoundingClientRect();
+        const lastSwitch = $panel[0].previousElementSibling!.getBoundingClientRect();
+        expect(panel.right).to.be.at.most(340);
+        expect(lastSwitch.bottom).to.be.at.most(panel.top);
+      },
+    );
+    cy.get('[data-testid="legend-assumptions"] [data-testid="cost-tier-selector"]')
+      .should('be.visible')
+      .and('contain.text', 'Owning at large hyperscaler volume')
+      .should(($trigger) => {
+        expect($trigger[0].scrollWidth).to.be.at.most($trigger[0].clientWidth);
+      });
+    cy.get('[data-testid="legend-assumptions"] table[data-testid="inference-tco-badges"]').within(
+      () => {
+        cy.get('tbody tr').should('have.length', 2);
+        cy.get('tbody tr').first().find('th').should('have.text', 'GB300');
+        cy.get(GB300_INPUT).should('have.value', '2.31');
+      },
+    );
+    cy.get('[data-testid="inference-tco-badge"]').then(($cells) => {
+      const [first, second] = $cells.toArray().map((cell) => cell.getBoundingClientRect());
+      expect(second.top).to.be.at.least(first.bottom);
+      expect(Math.abs(second.right - first.right)).to.be.lessThan(1);
+    });
+    cy.get(GB300_INPUT).type('{selectall}9');
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_tokensPerDollarUser');
   });
 });

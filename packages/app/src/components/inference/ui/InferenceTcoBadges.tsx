@@ -39,11 +39,13 @@ export function InferenceTcoBadges({
   bases,
   values,
   editable = true,
+  orientation,
   className,
 }: {
   bases: readonly string[];
   values: Record<string, number>;
   editable?: boolean;
+  orientation?: 'columns' | 'rows';
   className?: string;
 }) {
   const inputIdPrefix = useId();
@@ -159,6 +161,7 @@ export function InferenceTcoBadges({
     <TcoPriceTable
       items={items}
       editable={editable}
+      orientation={orientation}
       onChange={handleChange}
       onCommit={handleCommit}
       onReset={overriddenBases.size > 0 ? handleReset : undefined}

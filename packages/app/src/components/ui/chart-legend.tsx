@@ -72,6 +72,8 @@ export interface ChartLegendProps {
   actions?: LegendActionConfig[];
   grouped?: boolean;
   keyIndicators?: React.ReactNode;
+  /** Sidebar only: assumptions behind the plotted metric, shown under the display switches. */
+  assumptions?: React.ReactNode;
   enableTooltips?: boolean;
   maxHeight?: number;
   containerStyle?: React.CSSProperties;
@@ -96,6 +98,7 @@ export default function ChartLegend({
   actions,
   grouped = false,
   keyIndicators,
+  assumptions,
   enableTooltips = false,
   maxHeight,
   containerStyle,
@@ -117,6 +120,7 @@ export default function ChartLegend({
     switches = undefined;
     reset = undefined;
     actions = undefined;
+    assumptions = undefined;
     onItemRemove = undefined;
     enableTooltips = false;
   }
@@ -439,7 +443,11 @@ export default function ChartLegend({
   };
 
   const hasBottomControls =
-    switchElements || (!isSidebar && actionElements) || keyIndicators || hasAtomFootnote;
+    switchElements ||
+    (!isSidebar && actionElements) ||
+    keyIndicators ||
+    (isSidebar && assumptions) ||
+    hasAtomFootnote;
   const bottomControls = hasBottomControls ? (
     <div
       data-testid="legend-display-controls"
@@ -451,6 +459,14 @@ export default function ChartLegend({
       {!isSidebar && actionElements}
       {switchElements}
       {keyIndicators}
+      {isSidebar && assumptions && (
+        <div
+          data-testid="legend-assumptions"
+          className={cn((switchElements || keyIndicators) && 'mt-2 border-t border-border/50 pt-2')}
+        >
+          {assumptions}
+        </div>
+      )}
       {hasAtomFootnote && <AtomEngineFootnote className="mt-2 no-export" />}
     </div>
   ) : null;

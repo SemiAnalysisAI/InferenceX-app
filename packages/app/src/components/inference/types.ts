@@ -325,6 +325,8 @@ export interface ScatterGraphProps {
   chartDefinition: ChartDefinition;
   caption?: React.ReactNode;
   footer?: React.ReactNode;
+  /** Shown in the legend sidebar under the display switches. */
+  legendAssumptions?: React.ReactNode;
   onShowTable?: () => void;
   showAllHardwareTypes?: boolean;
   hardwareConfigOverride?: HardwareConfig;

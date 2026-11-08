@@ -164,4 +164,58 @@ describe('TcoPriceTable', () => {
       true,
     );
   });
+
+  it('lists one chip per row for narrow panels, with Reset under the list', () => {
+    act(() =>
+      root.render(
+        <TcoPriceTable
+          items={ITEMS}
+          editable
+          orientation="rows"
+          onReset={() => {}}
+          resetTestId="reset"
+          testId="table"
+          cellTestId="cell"
+          inputIdPrefix="cost"
+        />,
+      ),
+    );
+    const table = container.querySelector('table[data-testid="table"]');
+    expect(table?.querySelector('thead th')?.textContent).toBe('$/chip/hr');
+    expect(
+      [...(table?.querySelectorAll('tbody tr') ?? [])].map((row) => [
+        row.querySelector('th')?.textContent,
+        row.querySelector<HTMLInputElement>('td[data-testid="cell"] input')?.value,
+      ]),
+    ).toEqual([
+      ['GB300', '2.31'],
+      ['MI355X', ''],
+    ]);
+    expect((table?.nextElementSibling as HTMLElement | null)?.dataset.testid).toBe('reset');
+  });
+
+  it('keeps a focused row mounted while its chip drops out of the list', () => {
+    const renderRows = (items: typeof ITEMS) =>
+      act(() =>
+        root.render(
+          <TcoPriceTable
+            items={items}
+            editable
+            orientation="rows"
+            testId="table"
+            cellTestId="cell"
+            inputIdPrefix="cost-input"
+          />,
+        ),
+      );
+    renderRows(ITEMS);
+    const input = container.querySelector<HTMLInputElement>('[data-testid="cost-input-gb300"]');
+    if (!input) throw new Error('missing input');
+    act(() => input.focus());
+    renderRows(ITEMS.slice(1));
+    expect(container.querySelector('[data-testid="cost-input-gb300"]')).toBe(input);
+    act(() => input.blur());
+    renderRows(ITEMS.slice(1));
+    expect(container.querySelector('[data-testid="cost-input-gb300"]')).toBeNull();
+  });
 });

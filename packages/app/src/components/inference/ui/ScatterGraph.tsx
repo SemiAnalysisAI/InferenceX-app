@@ -561,6 +561,7 @@ const ScatterGraph = React.memo(
     chartDefinition,
     caption,
     footer,
+    legendAssumptions,
     onShowTable,
     showAllHardwareTypes = false,
     hardwareConfigOverride,
@@ -4637,6 +4638,7 @@ const ScatterGraph = React.memo(
                     },
                   },
                 ]}
+                assumptions={legendAssumptions}
                 onAdvancedExpandedChange={(expanded) => {
                   track('latency_advanced_controls_toggled', { enabled: expanded });
                 }}
