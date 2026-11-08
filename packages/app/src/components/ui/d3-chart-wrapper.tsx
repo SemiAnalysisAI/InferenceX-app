@@ -3,6 +3,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { zoomEventFilter } from '@/hooks/useChartZoom';
 import { useIsCoarsePointer, useIsMobileViewport, useMediaQuery } from '@/hooks/useMediaQuery';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -265,37 +266,36 @@ export function D3ChartWrapper({
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg || !hintInPlot || hintDismissed) return;
+    // Only the gestures the chart's own zoom accepts count, so page scrolling, browser
+    // pinch-zoom and one-finger swipes leave the hint in place.
     const dismiss = () => setHintDismissed(true);
     let dragStart: { x: number; y: number } | null = null;
-    const onWheel = (event: WheelEvent) => {
-      if (event.shiftKey || event.ctrlKey) dismiss();
+    const onGesture = (event: WheelEvent | MouseEvent | TouchEvent) => {
+      if (zoomEventFilter(event)) dismiss();
     };
-    const onPointerDown = (event: PointerEvent) => {
-      dragStart = { x: event.clientX, y: event.clientY };
+    const onMouseDown = (event: MouseEvent) => {
+      dragStart = zoomEventFilter(event) ? { x: event.clientX, y: event.clientY } : null;
     };
-    const onPointerMove = (event: PointerEvent) => {
+    const onMouseMove = (event: MouseEvent) => {
       if (dragStart && Math.hypot(event.clientX - dragStart.x, event.clientY - dragStart.y) > 4)
         dismiss();
     };
-    const onPointerUp = () => {
+    const onMouseUp = () => {
       dragStart = null;
     };
-    const onTouchMove = (event: TouchEvent) => {
-      if (event.touches.length > 1) dismiss();
-    };
-    svg.addEventListener('wheel', onWheel, { passive: true });
-    svg.addEventListener('dblclick', dismiss);
-    svg.addEventListener('pointerdown', onPointerDown);
-    svg.addEventListener('pointermove', onPointerMove);
-    svg.addEventListener('touchmove', onTouchMove, { passive: true });
-    window.addEventListener('pointerup', onPointerUp);
+    svg.addEventListener('wheel', onGesture, { passive: true });
+    svg.addEventListener('dblclick', onGesture);
+    svg.addEventListener('touchmove', onGesture, { passive: true });
+    svg.addEventListener('mousedown', onMouseDown);
+    svg.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
     return () => {
-      svg.removeEventListener('wheel', onWheel);
-      svg.removeEventListener('dblclick', dismiss);
-      svg.removeEventListener('pointerdown', onPointerDown);
-      svg.removeEventListener('pointermove', onPointerMove);
-      svg.removeEventListener('touchmove', onTouchMove);
-      window.removeEventListener('pointerup', onPointerUp);
+      svg.removeEventListener('wheel', onGesture);
+      svg.removeEventListener('dblclick', onGesture);
+      svg.removeEventListener('touchmove', onGesture);
+      svg.removeEventListener('mousedown', onMouseDown);
+      svg.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
     };
   }, [svgRef, hintInPlot, hintDismissed]);
 

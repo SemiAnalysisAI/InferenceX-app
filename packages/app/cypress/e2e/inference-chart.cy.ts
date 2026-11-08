@@ -173,8 +173,14 @@ describe('Inference Chart', () => {
 
     cy.get('[data-testid="chart-figure"]')
       .first()
+      .find(
+        '[data-testid="inference-tco-badges"] tbody th [data-testid="result-context-cost-tier"]',
+      )
+      .should('contain.text', 'Owning at large hyperscaler volume');
+    cy.get('[data-testid="chart-figure"]')
+      .first()
       .find('[data-testid="result-context"]')
-      .should('contain.text', 'Cost tier: Owning at large hyperscaler volume')
+      .should('not.contain.text', 'Cost tier:')
       .and(($ctx) => expect($ctx.text()).to.match(/Updated [A-Z][a-z]{2} \d{1,2}, \d{4}/))
       .and('contain.text', 'SemiAnalysis InferenceX')
       .and('not.contain.text', 'Model:')

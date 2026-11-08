@@ -167,6 +167,11 @@ const fire = (target: EventTarget, event: Event) => act(() => void target.dispat
 const pointer = (type: string, clientX: number) =>
   new MouseEvent(type, { bubbles: true, clientX, clientY: 10 });
 
+const touchMove = (fingers: number) =>
+  Object.assign(new Event('touchmove', { bubbles: true }), {
+    touches: Array.from({ length: fingers }),
+  });
+
 describe('D3ChartWrapper zoom hint placement', () => {
   const hint = () => container.querySelector<HTMLElement>('[data-testid="chart-instructions"]');
   it('overlays the zoom hint on the plot instead of taking a line under it', () => {
@@ -179,22 +184,29 @@ describe('D3ChartWrapper zoom hint placement', () => {
     expect(hint()?.style.right).not.toBe('');
   });
 
-  it('keeps the hint through hovering, clicking and plain scrolling', () => {
+  it('keeps the hint through gestures the chart does not zoom on', () => {
     const svg = renderWrapper().current!;
     fire(svg, new WheelEvent('wheel', { bubbles: true }));
-    fire(svg, pointer('pointermove', 80));
-    fire(svg, pointer('pointerdown', 10));
-    fire(svg, pointer('pointermove', 12));
-    fire(window, pointer('pointerup', 12));
-    fire(svg, pointer('pointermove', 200));
+    fire(svg, new WheelEvent('wheel', { ctrlKey: true }));
+    fire(svg, new WheelEvent('wheel', { ctrlKey: true, shiftKey: true }));
+    fire(svg, touchMove(1));
+    fire(svg, pointer('mousemove', 80));
+    fire(svg, pointer('mousedown', 10));
+    fire(svg, pointer('mousemove', 12));
+    fire(window, pointer('mouseup', 12));
+    fire(svg, pointer('mousemove', 200));
+    fire(svg, new MouseEvent('mousedown', { button: 2, clientX: 10, clientY: 10 }));
+    fire(svg, pointer('mousemove', 200));
+    fire(window, pointer('mouseup', 200));
+    fire(svg, new MouseEvent('dblclick', { ctrlKey: true }));
     expect(hint()?.dataset.dismissed).toBeUndefined();
     expect(hint()?.classList.contains('opacity-0')).toBe(false);
   });
 
   it.each([
     ['Shift+Scroll', () => [new WheelEvent('wheel', { shiftKey: true })]],
-    ['a pinch-to-zoom wheel', () => [new WheelEvent('wheel', { ctrlKey: true })]],
-    ['a drag', () => [pointer('pointerdown', 10), pointer('pointermove', 40)]],
+    ['a two-finger touch move', () => [touchMove(2)]],
+    ['a drag', () => [pointer('mousedown', 10), pointer('mousemove', 40)]],
     ['a double-click', () => [new MouseEvent('dblclick')]],
   ] as const)('fades the hint out after %s', (_name, events) => {
     const svg = renderWrapper().current!;
