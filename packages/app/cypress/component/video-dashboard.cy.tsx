@@ -27,7 +27,7 @@ function assertResultsFit() {
 
 function mount({
   pathname = '/vgx',
-  search = '',
+  search = '?r_y=videosPerGpuHour',
   edit,
   editPage,
 }: {
@@ -53,14 +53,16 @@ function mount({
   cy.get('[data-testid="video-results"]').should('be.visible');
 }
 
-/** The hardware button in a results table row; it carries the row's hardware, overlay and point key. */
-const row = (hardware: string) =>
-  cy.get(`[data-testid="results-table"] [data-testid="results-row"][data-hardware="${hardware}"]`);
-const cells = (hardware: string) => row(hardware).closest('tr').find('td');
 const points = (selector = '') =>
   cy.get(`[data-testid="video-results-chart"] .dot-group${selector}`);
-const openRow = (hardware: string, overlay = false) =>
-  row(hardware).filter(`[data-overlay="${overlay}"]`).click();
+const hardwarePoints = (hardware: string) => points(`[data-hardware="${hardware}"]`);
+const openPoint = (hardware: string, overlay = false) => {
+  hardwarePoints(hardware)
+    .filter(`[data-overlay="${overlay}"]`)
+    .find('.visible-shape')
+    .click({ force: true });
+  cy.get('[data-testid="point-details-panel"] [data-action="view-telemetry"]').click();
+};
 const toggleHardware = (hardware: string) => cy.get(`label[for="checkbox-${hardware}"]`).click();
 const searchParam = (key: string) =>
   cy.location('search').then((search) => new URLSearchParams(search).get(key));
@@ -155,9 +157,10 @@ describe('VideoGenX results', () => {
     });
   }
 
-  it('keeps every named-run deployment in the chart while the table follows the GPU count', () => {
+  it('ignores retired controls and keeps every named-run GPU count in the chart', () => {
     mount({
-      search: '?unofficialrun=34341996789&r_gpus=3&r_y=videosPerGpuHour&r_optimal=0',
+      search:
+        '?unofficialrun=34341996789&r_gpus=3&r_basis=allocated&r_x=p90&r_y=videosPerGpuHour&r_optimal=0',
       editPage: (page) => {
         const entry = page.entries.find((item) => item.runId === '34341996789')!;
         entry.approved = false;
@@ -173,20 +176,25 @@ describe('VideoGenX results', () => {
     });
     cy.window().then((win) => cy.spy(win.console, 'error').as('consoleError'));
     const overlay = '[data-hardware="b200"][data-overlay="true"]';
-    row('b200').should('not.exist');
+    cy.get('[data-testid="results-table"]').should('not.exist');
+    cy.get('[data-testid="results-gpus"]').should('not.exist');
+    cy.get('[data-testid="results-x-metric"]').should('not.exist');
+    cy.get('[data-testid="results-cost-basis"]').should('not.exist');
+    cy.get('[data-testid="video-results-chart"] .x-axis-label').should('contain', 'Median');
     points(overlay).should('have.length', 2);
     // Same latency on half the boards doubles videos per GPU-hour, so the 4-GPU cell is dominated.
     points(`${overlay}[data-optimal="false"]`).should('have.length', 1);
-    cy.get('[data-testid="results-gpus"]').contains('button', /^2$/).click();
-    cells('b200').eq(1).should('have.text', '2 / 2');
-    points(overlay).should('have.length', 2);
-    cy.get('[data-testid="results-gpus"]').contains('button', /^4$/).click();
-    cells('b200').eq(1).should('have.text', '4 / 8');
-    cy.location('search').should('contain', 'r_gpus=4');
+    points(overlay).then(($points) => {
+      const values = [...$points]
+        .map((point) => (point as unknown as { __data__: { y: number } }).__data__.y)
+        .sort((a, b) => a - b);
+      expect(values[1]).to.be.closeTo(values[0] * 2, 1e-9);
+    });
     cy.get('@consoleError').should('not.be.calledWithMatch', /Cannot update a component/);
     cy.get('label[for="video-results-optimal"]').click();
     points(overlay).should('have.length', 1).and('have.attr', 'data-optimal', 'true');
     searchParam('r_optimal').should('equal', '1');
+    for (const key of ['r_gpus', 'r_basis', 'r_x']) searchParam(key).should('equal', null);
     points(overlay).trigger('mouseenter', { force: true });
     cy.get('[data-chart-tooltip="video-results-chart"] [data-hover-notice]').should(
       'have.text',
@@ -194,25 +202,25 @@ describe('VideoGenX results', () => {
     );
     points(overlay).trigger('mouseleave', { force: true });
     toggleHardware('b200');
-    row('b200').should('not.exist');
+    hardwarePoints('b200').should('not.exist');
     points(overlay).should('not.exist');
   });
 
   it('shows a named unapproved run without an approved cohort and clears it without promotion', () => {
     mount({
-      search: '?unofficialrun=34341996789',
+      search: '?unofficialrun=34341996789&r_y=videosPerGpuHour',
       editPage: (page) => {
         for (const entry of page.entries) entry.approved = false;
       },
     });
-    row('b200').should('have.attr', 'data-overlay', 'true');
+    hardwarePoints('b200').should('have.attr', 'data-overlay', 'true');
     cy.get('[data-testid="video-results-clip"][data-hardware="b200"]').should(
       'contain',
       'Unofficial run',
     );
     cy.get('[data-testid="video-results-sources"] summary').click();
     cy.get('[data-testid="video-results-sources"]').should('contain', 'No matching receipt');
-    cy.get('[data-testid="results-row"][data-overlay="false"]').should('not.exist');
+    points('[data-overlay="false"]').should('not.exist');
     cy.get('@history.all')
       .its('length')
       .then((requestCount) => {
@@ -220,7 +228,7 @@ describe('VideoGenX results', () => {
         cy.get('@history.all').should('have.length', requestCount);
       });
     cy.get('[data-testid="results-overlay"]').should('not.exist');
-    cy.get('[data-testid="results-row"]').should('not.exist');
+    points().should('not.exist');
     cy.get('[data-testid="video-results-clip"] video').should('not.exist');
     cy.get('[data-testid="video-results-play"]').should('be.disabled');
     cy.get('[data-testid="video-results-scrub"]').should('be.disabled');
@@ -233,7 +241,7 @@ describe('VideoGenX results', () => {
 
   it('restores the approved workload after dismissing an explicitly selected named-only workload', () => {
     mount({
-      search: '?unofficialrun=34341996789',
+      search: '?unofficialrun=34341996789&r_y=videosPerGpuHour',
       editPage: (page) => {
         const entry = page.entries.find((item) => item.runId === '34341996789')!;
         entry.approved = false;
@@ -246,7 +254,7 @@ describe('VideoGenX results', () => {
           }
       },
     });
-    row('h200').should('exist');
+    hardwarePoints('h200').should('exist');
     cy.get<string>('@namedWorkload').then((sourceId) => {
       cy.window().then((win) => {
         win.history.pushState(
@@ -257,11 +265,11 @@ describe('VideoGenX results', () => {
         win.dispatchEvent(new PopStateEvent('popstate'));
       });
     });
-    row('b200').should('have.attr', 'data-overlay', 'true');
-    row('h200').should('not.exist');
+    hardwarePoints('b200').should('have.attr', 'data-overlay', 'true');
+    hardwarePoints('h200').should('not.exist');
     cy.get('[data-testid="results-overlay-dismiss"]').click();
-    row('h200').should('have.attr', 'data-overlay', 'false');
-    row('b200').should('not.exist');
+    hardwarePoints('h200').should('have.attr', 'data-overlay', 'false');
+    hardwarePoints('b200').should('not.exist');
     cy.location('search').should('not.contain', 'r_workload=').and('not.contain', 'unofficialrun');
   });
 
@@ -300,13 +308,17 @@ describe('VideoGenX results', () => {
     cy.wait('@approvedMedia');
     cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('exist');
     cy.window().then((win) => {
-      win.history.replaceState(null, '', `${win.location.pathname}?unofficialrun=${namedRun}`);
+      win.history.replaceState(
+        null,
+        '',
+        `${win.location.pathname}?unofficialrun=${namedRun}&r_y=videosPerGpuHour`,
+      );
       win.dispatchEvent(new win.PopStateEvent('popstate'));
     });
-    row('b200').should('have.length', 2);
+    hardwarePoints('b200').should('have.length', 2);
     cy.wait('@namedMedia');
     cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('not.exist');
-    openRow('b200', true);
+    openPoint('b200', true);
     searchParam('r_point').should('match', new RegExp(`^${namedRun}:`, 'u'));
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
     cy.get('[data-testid="video-results-detail"]').should('contain', `Unofficial run #${namedRun}`);
@@ -316,20 +328,20 @@ describe('VideoGenX results', () => {
       .and('contain', '99991')
       .and('contain', 'No matching approval receipt');
     cy.get('[data-testid="results-detail-back"]').click();
-    openRow('b200');
+    openPoint('b200');
     cy.get('[data-testid="results-detail-tab-sources"]').click();
     cy.get('[data-testid="video-results-detail"]')
       .should('contain', '34341996789')
       .and('not.contain', namedRun);
     cy.get('[data-testid="results-detail-back"]').click();
     toggleHardware('b200');
-    row('b200').should('not.exist');
+    hardwarePoints('b200').should('not.exist');
     toggleHardware('b200');
-    row('b200').should('have.length', 2);
+    hardwarePoints('b200').should('have.length', 2);
     cy.get('[data-testid="results-overlay-dismiss"]').click();
     cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('exist');
     cy.get('@approvedMedia.all').should('have.length', 1);
-    row('b200').should('have.length', 1).and('have.attr', 'data-overlay', 'false');
+    hardwarePoints('b200').should('have.length', 1).and('have.attr', 'data-overlay', 'false');
   });
 
   it('applies the sample floor, preserves unknown allocation and drops every planned placeholder', () => {
@@ -346,22 +358,21 @@ describe('VideoGenX results', () => {
       'have.text',
       'How to read these results',
     );
-    cy.get('[data-testid="results-profit"] h2').should('have.text', 'Profit estimator');
+    cy.get('[data-testid="results-profit"] h3').should('have.text', 'Profit estimator');
+    cy.get('[data-testid="results-advanced"]').should('not.have.attr', 'open');
     cy.get('details[data-testid^="results-"] > summary h2').should(($titles) => {
-      expect([...$titles].map((title) => title.textContent)).to.deep.equal(['Performance history']);
+      expect([...$titles].map((title) => title.textContent)).to.deep.equal([
+        'Advanced',
+        'Performance history',
+      ]);
     });
     cy.get('[data-testid="results-not-measured"]').should('contain', 'LoRA switch time');
     cy.get('[data-testid="results-empty"][data-state="planned"]').should('not.exist');
-    cy.get('[data-testid="results-row"]').should('have.length', 2);
-    row('h100').should('not.exist');
+    points().should('have.length', 2);
+    hardwarePoints('h100').should('not.exist');
     cy.get('#checkbox-h100').should('not.exist');
-    cells('b200').eq(6).should('contain', '0.15');
-    cells('h200').eq(6).should('contain', '0.204');
-    cells('h200').eq(1).should('have.text', '4 / —');
-    cy.get('[data-testid="results-cost-basis-allocated"]').click();
-    searchParam('r_basis').should('equal', 'allocated');
-    cells('b200').eq(6).should('contain', '0.3');
-    cells('h200').eq(6).should('have.text', '—');
+    points('[data-hardware="h200"] .visible-shape').click({ force: true });
+    cy.get('[data-testid="point-details-panel"]').should('contain', '4 / —');
     cy.get('[data-testid="results-tco-table"]')
       .should('contain', 'B200')
       .and('not.contain', 'MI355X');
@@ -409,7 +420,9 @@ describe('VideoGenX results', () => {
         observation.results = evidence(observation);
       },
     });
-    cy.get('[data-testid="results-profit"] [data-testid="results-empty"]').should('exist');
+    cy.get('[data-testid="results-advanced"]').should('not.have.attr', 'open');
+    cy.get('[data-testid="results-advanced"] > summary').click();
+    cy.get('[data-testid="results-profit"] [data-testid="results-empty"]').should('be.visible');
     cy.get('[data-testid="results-price-t2v"]').type('0.05');
     cy.location('search').should('contain', 'r_price_t2v=0.05');
     cy.get('[data-testid="results-profit"] [data-hardware="b200"]').should('contain', '3.27');
@@ -421,10 +434,16 @@ describe('VideoGenX results', () => {
     });
     cy.get('[data-testid="results-profit"] [data-hardware="b200"]').should('contain', '0.77');
     cy.location('search').should('contain', 'r_utilization=0.5');
+    cy.get('[data-testid="results-advanced"] > summary').click();
+    cy.get('[data-testid="results-advanced"]').should('not.have.attr', 'open');
+    cy.get('[data-testid="results-advanced"] > summary').click();
+    cy.get('[data-testid="results-price-t2v"]').should('have.value', '0.05');
+    cy.get('[data-testid="results-profit"] [data-hardware="b200"]').should('contain', '0.77');
   });
 
-  it('plots the selected axis metrics and cost basis', () => {
+  it('plots the selected Y metric with participating GPUs and median latency', () => {
     mount({
+      search: '?r_basis=allocated&r_x=p90',
       edit: (observation) => {
         observation.videoSecondsPerHour = 400;
       },
@@ -437,11 +456,8 @@ describe('VideoGenX results', () => {
       'have.text',
       'Median latency per 8 s clip at 24 fps (s)',
     );
-    plottedY('b200').then((participating) => {
-      cy.get('[data-testid="results-cost-basis-allocated"]').click();
-      // B200 reserved eight boards for four participating ones; H200 used all four.
-      plottedY('b200').should('be.closeTo', participating / 2, 1e-9);
-    });
+    // B200 reserves eight boards, but only the four participating boards are charged.
+    plottedY('b200').should('be.closeTo', 400 / (4 * 1.73), 1e-9);
     cy.get('[data-testid="results-y-metric"]').click();
     cy.contains('[data-select-option]', 'GPU energy per valid clip (kJ)').click();
     searchParam('r_y').should('equal', 'kjPerClip');
@@ -449,7 +465,7 @@ describe('VideoGenX results', () => {
     plottedY('b200').should('be.closeTo', 301.1, 0.1);
   });
 
-  it('opens deployment telemetry from the popover and table, switches tabs and returns', () => {
+  it('opens deployment telemetry from chart points, switches tabs and returns', () => {
     mount({
       search: '?r_y=videosPerGpuHour',
       edit: (observation) => {
@@ -492,12 +508,11 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="video-results-detail"]').should('not.exist');
     cy.location('search').should('not.contain', 'r_point=');
     points().should('have.length', 3);
-    row('h200').should('have.attr', 'aria-label', 'Open telemetry for H200');
-    openRow('h200');
+    openPoint('h200');
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
     cy.go('back');
     cy.get('[data-testid="video-results-detail"]').should('not.exist');
-    row('h200').should('be.visible');
+    hardwarePoints('h200').should('be.visible');
     cy.go('forward');
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
     cy.get('[data-testid="results-detail-back"]').click();
@@ -511,14 +526,14 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="video-results-detail"]').should('not.exist');
     points().should('have.length', 3);
     searchParam('r_point').should('equal', null);
-    row('b200')
-      .invoke('attr', 'data-point')
+    hardwarePoints('b200')
+      .then(($points) => ($points[0] as unknown as { __data__: { key: string } }).__data__.key)
       .then((point) => {
         cy.window().then((win) => {
           win.history.replaceState(
             null,
             '',
-            `${win.location.pathname}?r_point=${encodeURIComponent(point!)}`,
+            `${win.location.pathname}?r_point=${encodeURIComponent(point!)}&r_y=videosPerGpuHour`,
           );
           win.dispatchEvent(new win.PopStateEvent('popstate'));
         });
@@ -527,15 +542,15 @@ describe('VideoGenX results', () => {
           win.history.replaceState(
             null,
             '',
-            `${win.location.pathname}?r_point=${encodeURIComponent(point!)}&r_hidden=b200`,
+            `${win.location.pathname}?r_point=${encodeURIComponent(point!)}&r_hidden=b200&r_y=videosPerGpuHour`,
           );
           win.dispatchEvent(new win.PopStateEvent('popstate'));
         });
         cy.get('[data-testid="video-results-detail"]').should('not.exist');
-        row('b200').should('not.exist');
+        hardwarePoints('b200').should('not.exist');
         searchParam('r_point').should('equal', null);
         toggleHardware('b200');
-        row('b200').should('exist');
+        hardwarePoints('b200').should('exist');
         cy.get('[data-testid="video-results-detail"]').should('not.exist');
       });
   });
@@ -572,16 +587,16 @@ describe('VideoGenX results', () => {
         expect(label.left, 'x-axis title starts inside the chart').to.be.at.least(svg.left);
         expect(label.right, 'x-axis title ends inside the chart').to.be.at.most(svg.right);
       });
-      cy.get('[data-testid="results-table"] table').should(($table) => {
-        const container = $table[0].parentElement!;
-        expect(getComputedStyle(container).overflowX).to.equal('auto');
-        if (width < 768) expect(container.scrollWidth).to.be.greaterThan(container.clientWidth);
-      });
-      cy.get('#video-results-table-title').should(($title) => {
-        expect($title[0].scrollWidth, 'table title fits beside the deadline').to.be.at.most(
-          $title[0].clientWidth,
-        );
-      });
+      cy.get('[data-testid="results-table"]').should('not.exist');
+      cy.get('[data-testid="results-gpus"]').should('not.exist');
+      cy.get('[data-testid="results-x-metric"]').should('not.exist');
+      cy.get('[data-testid="results-cost-basis"]').should('not.exist');
+      cy.get('[data-testid="results-advanced"] > summary')
+        .should('contain', pathname.startsWith('/zh') ? '高级选项' : 'Advanced')
+        .click();
+      cy.get('[data-testid="results-price-t2v"]').should('be.visible');
+      cy.get('[data-testid="results-advanced"] > summary').click();
+      cy.get('[data-testid="results-advanced"]').should('not.have.attr', 'open');
       cy.get('[data-testid="video-results-clip"]').should(($tiles) => {
         expect($tiles, 'one tile per measured hardware').to.have.length(3);
         const first = $tiles[0].getBoundingClientRect();
@@ -609,7 +624,7 @@ describe('VideoGenX results', () => {
       });
       assertResultsFit();
       cy.get('[data-testid="video-results-sources"] summary').click();
-      openRow('b200');
+      openPoint('b200');
       cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
       cy.get('[data-testid="results-detail-tab-telemetry"]').should(
         'have.text',

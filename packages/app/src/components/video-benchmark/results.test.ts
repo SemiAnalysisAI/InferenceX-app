@@ -319,7 +319,7 @@ describe('VideoGenX results contract', () => {
       duration: 8,
       mode: 't2v',
       steps: 50,
-      gpuCount: 4,
+      gpuCount: null,
       engine: 'sglang',
       date: '2026-10-18',
       run: '456',
@@ -333,9 +333,9 @@ describe('VideoGenX results contract', () => {
       apiPrices: { t2v: 0, i2v: 0.1, r2v: null },
       utilization: 0.5,
       unofficialRun: '123',
-      xMetric: 'p90',
+      xMetric: 'p50',
       yMetric: 'kjPerClip',
-      costBasis: 'allocated',
+      costBasis: 'participating',
       optimal: false,
       point: '123:selected-source:c1',
     };
@@ -352,6 +352,7 @@ describe('VideoGenX results contract', () => {
     expect(shared.get('r_price_t2v')).toBe('0');
     expect(shared.get('r_price_i2v')).toBe('0.1');
     expect(shared.has('r_price_r2v')).toBe(false);
+    for (const key of ['r_gpus', 'r_x', 'r_basis']) expect(shared.has(key)).toBe(false);
     expect(
       parseResultsState(
         'r_api=NaN&r_deadline=-2&r_utilization=Infinity&r_x=p95&r_y=toString&r_basis=both&r_optimal=no&r_point=',

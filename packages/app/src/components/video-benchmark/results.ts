@@ -5,7 +5,6 @@ import { chipConfigKey } from './deployment';
 import { DASHBOARD_SAMPLE_FLOOR, latestVideoCells } from './points';
 import type { ResultsEvidence } from './results-evidence';
 import {
-  isResultsXMetric,
   isResultsYMetric,
   type CostBasis,
   type ResultsXMetric,
@@ -119,8 +118,7 @@ export const RESULTS_QUERY_PARAMS = [
 export function parseResultsState(search: string | URLSearchParams): ResultsState {
   const s = typeof search === 'string' ? new URLSearchParams(search) : search;
   const overlay = s.get('unofficialruns') ?? s.get('unofficialrun');
-  const x = s.get('r_x'),
-    y = s.get('r_y');
+  const y = s.get('r_y');
   const numeric = (key: string, fallback: number | null, allowZero = false) => {
     if (!s.has(key) || s.get(key)?.trim() === '') return fallback;
     const n = Number(s.get(key));
@@ -133,7 +131,8 @@ export function parseResultsState(search: string | URLSearchParams): ResultsStat
     duration: numeric('r_duration', null),
     mode: s.get('r_mode') || null,
     steps: numeric('r_steps', null),
-    gpuCount: numeric('r_gpus', null),
+    // Retired overview controls cannot be restored by an old shared link.
+    gpuCount: null,
     engine: s.get('r_engine') || null,
     date: s.get('r_date') || null,
     run: /^[1-9]\d*$/u.test(s.get('r_run') ?? '') ? s.get('r_run') : null,
@@ -154,9 +153,9 @@ export function parseResultsState(search: string | URLSearchParams): ResultsStat
     },
     utilization: Math.min(numeric('r_utilization', 1, true)!, 1),
     unofficialRun: /^[1-9]\d*$/u.test(overlay ?? '') ? overlay : null,
-    xMetric: isResultsXMetric(x) ? x : DEFAULT_RESULTS_STATE.xMetric,
+    xMetric: 'p50',
     yMetric: isResultsYMetric(y) ? y : DEFAULT_RESULTS_STATE.yMetric,
-    costBasis: s.get('r_basis') === 'allocated' ? 'allocated' : 'participating',
+    costBasis: 'participating',
     optimal: s.get('r_optimal') !== '0',
     point: s.get('r_point') || null,
   };
@@ -171,7 +170,6 @@ export function resultsSearch(state: ResultsState): string {
     r_duration: state.duration,
     r_mode: state.mode,
     r_steps: state.steps,
-    r_gpus: state.gpuCount,
     r_engine: state.engine,
     r_date: state.date,
     r_run: state.run,
@@ -186,9 +184,7 @@ export function resultsSearch(state: ResultsState): string {
     r_price_i2v: state.apiPrices.i2v,
     r_price_r2v: state.apiPrices.r2v,
     r_utilization: state.utilization,
-    r_x: state.xMetric,
     r_y: state.yMetric,
-    r_basis: state.costBasis,
     r_optimal: state.optimal ? 1 : 0,
     r_point: state.point,
     unofficialruns: state.unofficialRun,

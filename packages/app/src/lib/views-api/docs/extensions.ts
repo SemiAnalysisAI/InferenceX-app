@@ -511,8 +511,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
   ],
   r_steps: ['Recorded denoising step count.', '记录的去噪步数。'],
   r_gpus: [
-    'Participating GPU count for the results table and clips. deploymentCells and overlayDeploymentCells retain the official and named-run GPU-count series before this filter.',
-    '结果表格和视频对比使用的参与计算 GPU 数。deploymentCells 和 overlayDeploymentCells 分别保留正式结果及指定运行在此筛选前的 GPU 数序列。',
+    'Deprecated overview control, accepted but ignored. All GPU counts are included; params.gpuCount is null.',
+    '已弃用的概览控件参数，仍可传入但会被忽略。始终包含全部 GPU 数量，params.gpuCount 返回 null。',
   ],
   r_engine: [
     'Recorded engine name, separate from runtime revision.',
@@ -571,16 +571,16 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '估算利用率，范围 0–1，默认 1。收入随利用率变化，预留 GPU 每小时成本不变。',
   ],
   r_x: [
-    'Chart x metric: p50 (default) or p90 per-clip latency. Presentation only; echoed in params without changing returned cells.',
-    '图表 X 轴指标：单条视频 p50（默认）或 p90 延迟。仅影响展示，在 params 中返回，不改变返回的 cells。',
+    'Deprecated overview control, accepted but ignored. The chart always uses median per-clip latency; params.xMetric is p50.',
+    '已弃用的概览控件参数，仍可传入但会被忽略。图表始终使用单条视频中位延迟，params.xMetric 返回 p50。',
   ],
   r_y: [
     'Chart y metric: videoSecondsPerDollar (default), videosPerGpuHour or kjPerClip. Presentation only; invalid values use the default.',
     '图表 Y 轴指标：videoSecondsPerDollar（默认）、videosPerGpuHour 或 kjPerClip。仅影响展示；无效值使用默认值。',
   ],
   r_basis: [
-    'GPU basis for the chart and table costs and videos per GPU-hour: participating (default) or allocated. Both bases are always returned.',
-    '图表和表格计算成本及每 GPU 小时生成视频数时采用的 GPU 口径：participating（默认）或 allocated。响应始终同时返回两种口径。',
+    'Deprecated overview control, accepted but ignored. The chart always uses participating GPUs; params.costBasis is participating. Both cost bases remain in the evidence and CSV.',
+    '已弃用的概览控件参数，仍可传入但会被忽略。图表始终采用参与计算的 GPU 口径，params.costBasis 返回 participating。证据数据和 CSV 仍保留两种成本口径。',
   ],
   r_optimal: [
     'Optimal Only: 0 also plots dominated deployments; any other value plots each hardware frontier only. Presentation only.',

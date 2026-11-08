@@ -305,7 +305,7 @@ describe('published VideoGenX dashboard projection', () => {
     history.nextPage = null;
     source.mockImplementation(() => Response.json(history));
     const query =
-      'view=overview&r_tier=r&r_deadline=60&r_utilization=0.5&r_hidden=mi355x&unofficialrun=123';
+      'view=overview&r_tier=r&r_deadline=60&r_utilization=0.5&r_hidden=mi355x&unofficialrun=123&r_gpus=999&r_basis=allocated&r_x=p90';
     const response = await GET(request(query));
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -313,6 +313,18 @@ describe('published VideoGenX dashboard projection', () => {
     expect(body).toMatchObject(expected);
     expect(body.cells.length).toBeGreaterThan(0);
     expect(body.params.view).toBe('overview');
+    expect(body.params).toMatchObject({
+      gpuCount: null,
+      xMetric: 'p50',
+      costBasis: 'participating',
+    });
+    const defaults = resultProjection(
+      videoPoints([history]),
+      parseResultsState(
+        'r_tier=r&r_deadline=60&r_utilization=0.5&r_hidden=mi355x&unofficialrun=123',
+      ),
+    );
+    expect(body.cells).toEqual(defaults.cells);
     expect(body.coverage.pagesRead).toBe(1);
     expect(
       source.mock.calls.every(([req]) =>

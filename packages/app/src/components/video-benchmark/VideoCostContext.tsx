@@ -6,12 +6,10 @@ import { TcoPriceTable } from '@/components/ui/editable-tco-badges';
 import { InfoHelp } from '@/components/ui/option-info';
 import { CaptionField, ResultContext } from '@/components/ui/result-context';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { costPerGpuHour, hardwareLabel } from './hardware';
 import { COST_TIERS, TIER_LABELS } from './metrics';
 import type { ResultsState } from './results';
-import { COST_BASES } from './results-chart';
 
 const STRINGS = {
   en: {
@@ -22,7 +20,6 @@ const STRINGS = {
     basisHelp:
       'Participating counts the GPUs that generated the clips. Allocated counts every GPU the job reserved, idle ones included.',
     participating: 'Participating GPUs',
-    allocated: 'Allocated GPUs',
     official: 'SemiAnalysis InferenceX™',
     overlay: 'SemiAnalysis InferenceX™ + unofficial overlays',
   },
@@ -33,7 +30,6 @@ const STRINGS = {
     basis: 'GPU 口径',
     basisHelp: '“参与计算”只计入生成视频的 GPU；“分配”计入作业预留的全部 GPU，包括闲置的 GPU。',
     participating: '参与计算的 GPU',
-    allocated: '分配的 GPU',
     official: 'SemiAnalysis InferenceX™',
     overlay: 'SemiAnalysis InferenceX™ + 非官方 overlays',
   },
@@ -105,26 +101,12 @@ export default function VideoCostContext({
         tcoBasis={
           <CaptionField
             label={s.basis}
-            value={s[state.costBasis]}
+            value={s.participating}
             testId="results-cost-basis-caption"
             hideLabel
             control={
               <span className="inline-flex items-center gap-0.5">
-                <SegmentedToggle
-                  role="group"
-                  value={state.costBasis}
-                  options={COST_BASES.map((basis) => ({
-                    value: basis,
-                    label: s[basis],
-                    testId: `results-cost-basis-${basis}`,
-                  }))}
-                  onValueChange={(costBasis) => onUpdate({ costBasis })}
-                  ariaLabel={s.basis}
-                  testId="results-cost-basis"
-                  size="sm"
-                  className="w-fit"
-                  buttonClassName="text-xs"
-                />
+                <span>{s.participating}</span>
                 <InfoHelp label={s.basis} value="video-gpu-basis" align="start">
                   {s.basisHelp}
                 </InfoHelp>
