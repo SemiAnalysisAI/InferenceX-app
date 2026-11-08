@@ -358,10 +358,10 @@ describe('Chart Selectors', () => {
       cy.get('[role="option"]').then(($options) => {
         expect([...$options].slice(0, 8).map((option) => option.textContent?.trim())).to.deep.equal(
           [
+            'Kimi K3.1 Pro 2.8T',
             'DeepSeek V4.1 Flash 552B',
             'GLM5.2/GLM5.3 744B',
             'GLM 5.3 Flash',
-            'Kimi K3.1 Pro 2.8T',
             'MiniMax M3.1 Flash 428B',
             'Muse Spark Open 816B',
             'Qwen3.5 397B',

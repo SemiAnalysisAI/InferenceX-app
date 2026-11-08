@@ -252,7 +252,7 @@ export function GlobalFilterProvider({
   // and the render immediately after relocking. Every consumer sees this value.
   const selectedModel = isModelVisible(requestedModel, featureGateUnlocked)
     ? requestedModel
-    : Model.DeepSeek_V4_1_Flash;
+    : Model.Kimi_K3_1_Pro;
   useIsomorphicLayoutEffect(() => {
     if (!modelGatePending) setInferenceNavigationModel(selectedModel);
   }, [selectedModel, modelGatePending]);

@@ -155,6 +155,8 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-view-options',
+    // Kimi K3.1 Pro leads MODEL_OPTIONS and the inference landing route;
+    // explicit-model API requirements and defaults.model remain unchanged.
     sourceSha256: '79f8765d704cef43d9c976fe2a40e1a4dd23a3de0b30c411dacbf8144a345327',
   },
   {

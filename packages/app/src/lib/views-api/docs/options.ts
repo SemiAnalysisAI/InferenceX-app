@@ -48,7 +48,7 @@ const responseSchema = objectSchema(
         }),
       ),
       description:
-        'Models in selector order within each category. This presentation order does not change defaults.model.',
+        'Models in selector order within each category, with Kimi-K3.1-Pro first. The bare inference page opens Kimi-K3.1-Pro; this navigation default does not change defaults.model or remove the inference API requirement for an explicit model.',
     },
     sequences: arraySchema(
       objectSchema({

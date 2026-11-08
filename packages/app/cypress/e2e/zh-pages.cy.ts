@@ -41,10 +41,10 @@ describe('Chinese (/zh) pages', () => {
     });
 
     it('renders the Chinese h1 without an intro box', () => {
-      cy.location('pathname').should('eq', '/zh/infx/inference/deepseek-v41-flash');
+      cy.location('pathname').should('eq', '/zh/infx/inference/kimi-k31-pro');
       cy.get('[data-testid="inference-page-heading"]').should(
         'have.text',
-        'DeepSeek V4.1 Flash 推理基准测试',
+        'Kimi K3.1 Pro 推理基准测试',
       );
       cy.get('[data-testid="zh-tab-intro"]').should('not.exist');
 

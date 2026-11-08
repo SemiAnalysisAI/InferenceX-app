@@ -15,8 +15,8 @@ import { overviewScenariosForModel } from '../overview/overview-data';
 describe('AgentX comparison links', () => {
   it('keeps the featured AgentX models in the editorial order', () => {
     expect(FEATURED_AGENTX_MODELS.map((model) => model.slug)).toEqual([
-      'deepseek-v41-flash',
       'kimi-k31-pro',
+      'deepseek-v41-flash',
       'muse-spark-open',
       'kimi-k3',
       'deepseek-v4',
@@ -48,7 +48,7 @@ describe('AgentX comparison links', () => {
 
   it('opens the bare model subroute — Agentic + Optimal Only are already the defaults', () => {
     expect(agentxDashboardHref('en', FEATURED_AGENTX_MODELS[0])).toBe(
-      '/infx/inference/deepseek-v41-flash',
+      '/infx/inference/kimi-k31-pro',
     );
     expect(agentxDashboardHref('zh', FEATURED_AGENTX_MODELS[4])).toBe(
       '/zh/infx/inference/deepseek-v4',
@@ -77,7 +77,7 @@ describe('AgentX comparison links', () => {
     expect(comparisonPairHref('zh', 'deepseek-v41-flash-gb300-vs-b200', 'compare-per-dollar')).toBe(
       '/zh/compare-per-dollar/deepseek-v41-flash-gb300-vs-b200',
     );
-    expect(FEATURED_AGENTX_MODELS[0]).toBe(flash);
+    expect(FEATURED_AGENTX_MODELS[1]).toBe(flash);
     expect(agentxDashboardHref('en', flash)).toBe('/infx/inference/deepseek-v41-flash');
   });
 
@@ -116,7 +116,7 @@ describe('AgentX comparison links', () => {
     });
     expect(agentxDashboardHref('en', k31)).toBe('/infx/inference/kimi-k31-pro');
     expect(agentxDashboardHref('zh', k31)).toBe('/zh/infx/inference/kimi-k31-pro');
-    expect(FEATURED_AGENTX_MODELS[1]).toBe(k31);
+    expect(FEATURED_AGENTX_MODELS[0]).toBe(k31);
     expect(overviewScenariosForModel(Model.Kimi_K3_1_Pro)).toEqual(['agentx']);
   });
 

@@ -189,8 +189,11 @@ describe('First-load navigation', () => {
 
   it('navigates to dashboard from the header with one click', () => {
     cy.get('[data-testid="nav-link-dashboard"]').click();
-    cy.location('pathname').should('eq', '/infx/inference/deepseek-v41-flash');
-    cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4.1 Flash');
+    cy.location('pathname').should('eq', '/infx/inference/kimi-k31-pro');
+    cy.get('[data-testid="model-selector"]').should(($selector) => {
+      // The captured availability snapshot predates K3.1; retain its routed identity.
+      expect(['Kimi K3.1 Pro 2.8T', 'Kimi-K3.1-Pro']).to.include($selector.text().trim());
+    });
   });
 
   it('navigates to comparisons from the footer with one click', () => {

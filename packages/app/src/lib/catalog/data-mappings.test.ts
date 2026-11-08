@@ -31,6 +31,19 @@ import {
 } from '@/lib/catalog/data-mappings';
 
 describe('model selector ordering', () => {
+  it('puts Kimi K3.1 Pro first without reordering the other default models', () => {
+    expect(MODEL_OPTIONS.filter(isModelDefault)).toEqual([
+      Model.Kimi_K3_1_Pro,
+      Model.DeepSeek_V4_1_Flash,
+      Model.GLM_5_2,
+      Model.GLM_5_3_Flash,
+      Model.MiniMax_M3_1_Flash,
+      Model.Muse_Spark_Open,
+      Model.Qwen3_5,
+      Model.Qwen3_8_Flash_Next,
+    ]);
+  });
+
   it('keeps non-default models in their existing order and excludes hidden models', () => {
     expect(MODEL_OPTIONS.filter((model) => !isModelDefault(model))).toEqual([
       Model.DeepSeek_V4_Pro,
