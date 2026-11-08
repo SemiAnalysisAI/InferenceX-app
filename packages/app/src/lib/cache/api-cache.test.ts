@@ -6,6 +6,7 @@ import {
   gzipSync,
 } from 'node:zlib';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as WorkUnitStorage from 'next/dist/server/app-render/work-unit-async-storage.external';
 
 vi.mock('next/cache', () => ({
   revalidateTag: vi.fn(),
@@ -23,9 +24,7 @@ const workStore = vi.hoisted(() => ({
   current: undefined as { type: string; consumerWillServerCache?: boolean } | undefined,
 }));
 vi.mock('next/dist/server/app-render/work-unit-async-storage.external', async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import('next/dist/server/app-render/work-unit-async-storage.external')
-  >()),
+  ...(await importOriginal<typeof WorkUnitStorage>()),
   workUnitAsyncStorage: { getStore: () => workStore.current },
 }));
 
