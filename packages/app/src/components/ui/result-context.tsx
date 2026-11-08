@@ -220,65 +220,69 @@ export function ResultContext({
           {tcoBasis}
           {chipBasis}
         </dl>
-        {priceTable && (
-          <div className="mb-2">
-            <TcoPriceTableSlotsProvider
-              rowLabel={
-                costTier && (
-                  <span data-testid="result-context-cost-tier">
-                    {costTierControl ? (
-                      <>
-                        <span className="no-export inline-flex items-center align-middle">
-                          {costTierControl}
-                        </span>
-                        <span className="export-only hidden">{costTier}</span>
-                      </>
-                    ) : (
-                      costTier
-                    )}
-                  </span>
-                )
-              }
-              footnote={metaEnd}
-            >
-              {priceTable}
-            </TcoPriceTableSlotsProvider>
-          </div>
-        )}
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <dl className={cn('contents', !markers && '[&>:last-child]:after:content-none')}>
-            {dateValue && (
-              <div className={META_ITEM}>
-                <dt className="inline">
-                  {singleDate ? (locale === 'zh' ? '更新时间' : 'Updated') : `${dateLabel}:`}
-                </dt>{' '}
-                <dd className="inline tabular-nums">{dateValue}</dd>
-              </div>
-            )}
-            {source && (
-              <div className={META_ITEM}>
-                <dt className="sr-only">{labels.source}</dt>
-                <dd className="inline">
-                  {source}
-                  {deprecated && (locale === 'zh' ? ' (已弃用)' : ' (deprecated)')}
-                </dd>
-              </div>
-            )}
-            {costBasis && (
-              <div className={META_ITEM}>
-                <dt className="inline">{labels.cost}:</dt>{' '}
-                <dd className="inline" data-testid={costBasisTestId}>
-                  {costBasis}
-                </dd>
-              </div>
-            )}
-          </dl>
-          {markers && (
-            <div data-testid="result-context-markers" className="inline-flex items-center">
-              {markers}
+        <div
+          className={cn(priceTable && 'flex flex-wrap items-end justify-between gap-x-6 gap-y-2')}
+        >
+          {priceTable && (
+            <div className="max-w-full min-w-0">
+              <TcoPriceTableSlotsProvider
+                rowLabel={
+                  costTier && (
+                    <span data-testid="result-context-cost-tier">
+                      {costTierControl ? (
+                        <>
+                          <span className="no-export inline-flex items-center align-middle">
+                            {costTierControl}
+                          </span>
+                          <span className="export-only hidden">{costTier}</span>
+                        </>
+                      ) : (
+                        costTier
+                      )}
+                    </span>
+                  )
+                }
+                footnote={metaEnd}
+              >
+                {priceTable}
+              </TcoPriceTableSlotsProvider>
             </div>
           )}
-          {metaEnd && !priceTable && <div className="ml-auto">{metaEnd}</div>}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <dl className={cn('contents', !markers && '[&>:last-child]:after:content-none')}>
+              {dateValue && (
+                <div className={META_ITEM}>
+                  <dt className="inline">
+                    {singleDate ? (locale === 'zh' ? '更新时间' : 'Updated') : `${dateLabel}:`}
+                  </dt>{' '}
+                  <dd className="inline tabular-nums">{dateValue}</dd>
+                </div>
+              )}
+              {source && (
+                <div className={META_ITEM}>
+                  <dt className="sr-only">{labels.source}</dt>
+                  <dd className="inline">
+                    {source}
+                    {deprecated && (locale === 'zh' ? ' (已弃用)' : ' (deprecated)')}
+                  </dd>
+                </div>
+              )}
+              {costBasis && (
+                <div className={META_ITEM}>
+                  <dt className="inline">{labels.cost}:</dt>{' '}
+                  <dd className="inline" data-testid={costBasisTestId}>
+                    {costBasis}
+                  </dd>
+                </div>
+              )}
+            </dl>
+            {markers && (
+              <div data-testid="result-context-markers" className="inline-flex items-center">
+                {markers}
+              </div>
+            )}
+            {metaEnd && !priceTable && <div className="ml-auto">{metaEnd}</div>}
+          </div>
         </div>
       </div>
     );

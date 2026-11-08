@@ -233,8 +233,23 @@ describe('InferenceTcoBadges', () => {
           expect(source.right).to.be.at.most(width);
         });
         cy.get('[data-testid="result-context"] dd.tabular-nums').should(($date) => {
+          const doc = $date[0].ownerDocument;
+          const date = $date[0].getBoundingClientRect();
+          const source = doc
+            .querySelector('[data-testid="tco-prices-source"]')!
+            .getBoundingClientRect();
           expect($date[0].textContent).to.equal('Nov 7, 2026');
-          expect($date[0].getBoundingClientRect().top).to.be.greaterThan(table.bottom);
+          if (width >= 1440) {
+            const context = doc
+              .querySelector('[data-testid="result-context"]')!
+              .getBoundingClientRect();
+            const meta = $date[0].closest('dl')!.parentElement!.getBoundingClientRect();
+            expect(date.left).to.be.greaterThan(table.right);
+            expect(Math.abs(meta.right - context.right)).to.be.lessThan(1);
+            expect(Math.abs(source.bottom - date.bottom)).to.be.lessThan(3);
+          } else {
+            expect(date.top).to.be.at.least(source.bottom);
+          }
         });
       });
       cy.get('[data-testid="tco-prices-source"]').should('have.length', 1);
