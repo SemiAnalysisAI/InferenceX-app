@@ -135,6 +135,68 @@ describe('ScatterGraph', () => {
     });
   }
 
+  it('shows the zoom hint in the plot corner until the first zoom', () => {
+    mountWithProviders(
+      <div style={{ width: 1000 }}>
+        <ScatterGraph
+          chartId="zoom-hint"
+          modelLabel="DeepSeek R1"
+          data={[
+            createMockInferenceData({
+              hwKey: 'b200_sglang',
+              precision: Precision.FP4,
+              x: 20,
+              y: 80,
+            }),
+            createMockInferenceData({
+              hwKey: 'b200_sglang',
+              precision: Precision.FP4,
+              x: 60,
+              y: 30,
+            }),
+          ]}
+          xLabel="Interactivity"
+          yLabel="Throughput"
+          chartDefinition={defaultChartDef}
+          transitionDuration={0}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_sglang']),
+          hwTypesWithData: new Set(['b200_sglang']),
+          selectedPrecisions: [Precision.FP4],
+        },
+        unofficial: {},
+      },
+    );
+    cy.scatterPoints('#zoom-hint').should('have.length', 2);
+    cy.get('#zoom-hint [data-testid="chart-instructions"]')
+      .should('be.visible')
+      .and('have.text', 'Shift+Scroll to zoom · Drag to pan · Double-click to reset')
+      .should(($hint) => {
+        const hint = $hint[0].getBoundingClientRect();
+        const doc = $hint[0].ownerDocument;
+        const svg = doc.querySelector('#zoom-hint [data-testid="d3-chart-svg"]')!;
+        const xDomain = svg.querySelector('.x-axis > .domain')!.getBoundingClientRect();
+        const yDomain = svg.querySelector('.y-axis > .domain')!.getBoundingClientRect();
+        expect(hint.top).to.be.at.least(yDomain.top);
+        expect(hint.top - yDomain.top).to.be.lessThan(16);
+        expect(hint.right).to.be.at.most(xDomain.right);
+        expect(xDomain.right - hint.right).to.be.lessThan(20);
+        expect(hint.bottom).to.be.lessThan(xDomain.top);
+        expect(doc.elementFromPoint(hint.left + 4, hint.top + 4)).not.to.equal($hint[0]);
+      });
+    cy.get('#zoom-hint [data-testid="d3-chart-svg"]').trigger('wheel', {
+      deltaY: -120,
+      shiftKey: true,
+    });
+    cy.get('#zoom-hint [data-testid="chart-instructions"]')
+      .should('not.be.visible')
+      .and('have.attr', 'data-dismissed');
+  });
+
   it('shows the unofficial card for an overlay point drawn on an official point', () => {
     const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123';
     const shared = { precision: Precision.FP4, x: 20, y: 80 };
