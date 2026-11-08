@@ -175,6 +175,39 @@ function highlightBands(root: Element | null, focusId: string | null): void {
     .attr('data-focused', (band) => (focusId !== null && band.id === focusId ? 'true' : null));
 }
 
+const SERIES_FADED_OPACITY = '0.15';
+
+/**
+ * Legend hover: fade every line, point and band that is not `focusId`; null restores them.
+ * Returns the band a pinned point had focused, so the caller can put it back afterwards.
+ */
+export function isolateCollectiveXSeries(
+  root: Element | null,
+  focusId: string | null,
+): string | null {
+  if (!root) return null;
+  const chart = d3.select(root);
+  const pinned =
+    chart
+      .selectAll<SVGPathElement, { id: string }>('path.collectivex-range-band[data-focused]')
+      .data()[0]?.id ?? null;
+  const fade = (id: string) => (focusId === null || id === focusId ? null : SERIES_FADED_OPACITY);
+  chart.selectAll<SVGPathElement, unknown>('.line-path').style('opacity', function () {
+    return fade(this.dataset.lineKey ?? '');
+  });
+  chart
+    .selectAll<SVGCircleElement, CollectiveXChartPoint>('.point')
+    .style('opacity', (point) => fade(point.seriesId));
+  highlightBands(root, focusId);
+  return pinned;
+}
+
+/** Legend hover end: restore every series, and the band focus a pinned point had. */
+export function restoreCollectiveXSeries(root: Element | null, pinnedBandId: string | null): void {
+  isolateCollectiveXSeries(root, null);
+  highlightBands(root, pinnedBandId);
+}
+
 export function CollectiveXChart({
   chartId,
   series,
