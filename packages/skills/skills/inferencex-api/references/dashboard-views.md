@@ -162,7 +162,7 @@ Qwen3.5 workload-retirement coverage:
    MiniMax M3.1 Flash, Muse Spark Open, Qwen3.5, then
    Qwen3.8 Flash Next. This presentation order does not change `defaults.model`
    or the overview's model order.
-   GLM-5.3-Flash is an AgentX-only registration with raw key `glm5.3flash`,
+   GLM-5.3-Flash supports `8k/1k` and `agentic-traces` with raw key `glm5.3flash`,
    distinct from the historical GLM-5.2/5.3 bucket. The inference model selector
    permits selecting it only after the existing UI feature gate is enabled,
    placing it after GLM5.2/GLM5.3. It can be selected before published observations exist and preserves an
@@ -174,6 +174,13 @@ Qwen3.5 workload-retirement coverage:
    identities and returned data are unchanged. Do not interpret API registration
    as default UI visibility. Locked direct routes, saved selections and unofficial
    overlays cannot enable Flash; relocking removes it from the UI.
+   Use `i_seq=8k%2F1k` for fixed-sequence dashboard links, including
+   `unofficialruns=42434823430`; the read-only inference view uses
+   `model=GLM-5.3-Flash&sequence=8k%2F1k`.
+   Run 42434823430 (InferenceX PR #4914) is H200 FP8 MTP5 synthetic
+   throughput with golden acceptance length 3.60, not free-generation quality
+   evidence. Enabling the workload does not publish the run or promote it into
+   the curated overview, which remains AgentX-only for Flash.
    For models with `category=deprecated`, inference charts append `(Deprecated)`
    to the source attribution, or `(已弃用)` in Chinese. The suffix is also included
    in PNG exports and unofficial-run overlays; there are no deprecated background

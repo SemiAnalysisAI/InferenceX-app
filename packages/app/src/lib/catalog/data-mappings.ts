@@ -457,7 +457,9 @@ export function isSequenceDeprecatedForModel(model: Model, sequence: Sequence): 
 
 const MODEL_HIDDEN_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
   [Model.GLM_5_3_Flash]: new Set(
-    SEQUENCE_OPTIONS.filter((sequence) => sequence !== Sequence.AgenticTraces),
+    SEQUENCE_OPTIONS.filter(
+      (sequence) => sequence !== Sequence.AgenticTraces && sequence !== Sequence.EightK_OneK,
+    ),
   ),
   [Model.Muse_Spark_Open]: new Set(
     SEQUENCE_OPTIONS.filter((sequence) => sequence !== Sequence.AgenticTraces),
