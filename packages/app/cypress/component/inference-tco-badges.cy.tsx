@@ -274,6 +274,9 @@ describe('InferenceTcoBadges', () => {
         widths.push($cell[0].getBoundingClientRect().width);
       });
     }
-    cy.then(() => expect(widths[0]).to.equal(widths[1]));
+    cy.then(() => {
+      expect(widths[0]).to.equal(widths[1]);
+      expect(widths[0]).to.be.lessThan(320);
+    });
   });
 });

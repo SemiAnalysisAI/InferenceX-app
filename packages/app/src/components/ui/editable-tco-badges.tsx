@@ -280,7 +280,7 @@ export function TcoPriceTable({
                 scope="row"
                 className={cn(
                   TABLE_CELL,
-                  'text-left font-normal [&_[aria-haspopup]]:w-32 sm:[&_[aria-haspopup]]:w-52',
+                  'text-left font-normal [&_[data-slot=select-trigger]]:w-32 sm:[&_[data-slot=select-trigger]]:w-64',
                 )}
               >
                 {slots.rowLabel ?? rowLabel ?? t.row}
