@@ -18,7 +18,7 @@ const respond = (path: string) =>
 
 describe('next.config custom routes', () => {
   it.each(['/infx/inference', '/zh/infx/inference'])(
-    'temporarily redirects %s to DeepSeek V4.1 Flash and preserves query filters',
+    'temporarily redirects %s to Kimi K3.1 Pro and preserves query filters',
     async (path) => {
       for (const query of [
         '',
@@ -27,7 +27,7 @@ describe('next.config custom routes', () => {
         const response = await respond(`${path}${query}`);
         expect(response.status).toBe(307);
         expect(getRedirectUrl(response)).toBe(
-          `https://inferencex.semianalysis.com${path}/deepseek-v41-flash${query}`,
+          `https://inferencex.semianalysis.com${path}/kimi-k31-pro${query}`,
         );
       }
     },
@@ -48,6 +48,8 @@ describe('next.config custom routes', () => {
       for (const suffix of [
         '?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces',
         '/deepseek-v4',
+        '/deepseek-v41-flash',
+        '/kimi-k31-pro',
         '/kimi-k3',
       ]) {
         const response = await respond(`${path}${suffix}`);

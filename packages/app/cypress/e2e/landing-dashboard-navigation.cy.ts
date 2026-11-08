@@ -34,7 +34,7 @@ function interceptMinimaxM3RubinData(
   });
 }
 
-const TARGET = '/infx/inference/deepseek-v41-flash';
+const TARGET = '/infx/inference/kimi-k31-pro';
 
 describe('Muse Spark Open results', () => {
   beforeEach(() => {
@@ -409,7 +409,7 @@ describe('landing → full dashboard navigation', () => {
   it('commits exactly one navigation and one history entry on a cold dashboard load', () => {
     const writes: HistoryWrite[] = [];
 
-    cy.intercept({ url: /\/infx\/inference\/deepseek-v41-flash/ }, (req) => {
+    cy.intercept({ url: /\/infx\/inference\/kimi-k31-pro/ }, (req) => {
       if (req.headers['next-router-prefetch']) {
         req.reply({ statusCode: 404, body: '' });
         return;

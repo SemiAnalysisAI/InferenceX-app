@@ -6,15 +6,19 @@ these routes become available only after the corresponding app change deploys.
 Do not assume an installed skill proves server availability.
 
 The bare `/infx/inference` and `/zh/infx/inference` entry routes temporarily redirect to
-their `/deepseek-v41-flash` pages unless `g_model` explicitly selects a model. Other query
+their `/kimi-k31-pro` pages unless `g_model` explicitly selects a model. Other query
 parameters are preserved. This is a navigation default, not an API default:
-`/api/v1/views/inference` still requires `model`; pass `model=DeepSeek-V4.1-Flash&sequence=agentic-traces` to match
+`/api/v1/views/inference` still requires `model`; pass `model=Kimi-K3.1-Pro&sequence=agentic-traces` to match
 the landing page. Existing model-specific links and historical results remain available.
+Kimi K3.1 Pro is first in the shared model selector and `/api/v1/views/options` model list;
+the remaining models keep their relative order.
 
 `/infx/inference` 和 `/zh/infx/inference` 在未通过 `g_model` 指定模型时，会临时重定向到
-各自的 `/deepseek-v41-flash` 页面，并保留其他查询参数。这只改变页面入口；
-`/api/v1/views/inference` 仍要求显式传入 `model`，使用 `model=DeepSeek-V4.1-Flash&sequence=agentic-traces`
+各自的 `/kimi-k31-pro` 页面，并保留其他查询参数。这只改变页面入口；
+`/api/v1/views/inference` 仍要求显式传入 `model`，使用 `model=Kimi-K3.1-Pro&sequence=agentic-traces`
 可查询入口页面对应的模型。已有模型链接和历史结果不受影响。
+共享模型选择器和 `/api/v1/views/options` 返回的模型列表均将 Kimi K3.1 Pro 排在首位，
+其余模型的相对顺序不变。
 
 Inference places Scenario beside Cost Tier and TCO Basis below the plot on desktop
 and mobile. An empty selection keeps Scenario below the empty chart for recovery.

@@ -229,10 +229,10 @@ function modelsByCategory(cat: CategoryTag): ReadonlySet<Model> {
 
 // Selector order is independent of the overview registry order and selected defaults.
 const MODEL_SELECTOR_ORDER: readonly Model[] = [
+  Model.Kimi_K3_1_Pro,
   Model.DeepSeek_V4_1_Flash,
   Model.GLM_5_2,
   Model.GLM_5_3_Flash,
-  Model.Kimi_K3_1_Pro,
   Model.MiniMax_M3_1_Flash,
   Model.Muse_Spark_Open,
   Model.Qwen3_5,

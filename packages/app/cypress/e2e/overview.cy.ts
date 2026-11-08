@@ -292,7 +292,7 @@ describe('Overview page', () => {
     cy.go('back');
     cy.location('search').should('eq', '?tier=50&compare=hardware');
     cy.go('back');
-    cy.location('pathname').should('eq', '/infx/inference/deepseek-v41-flash');
+    cy.location('pathname').should('eq', '/infx/inference/kimi-k31-pro');
   });
 
   it('reveals deprecated and maintenance models via the toolbar toggle', () => {
