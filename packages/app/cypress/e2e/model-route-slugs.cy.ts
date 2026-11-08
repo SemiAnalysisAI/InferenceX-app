@@ -60,6 +60,55 @@ describe('GLM-5.3-Flash registration without published observations', () => {
   }
 
   for (const locale of ['', '/zh']) {
+    it(`renders unlocked Flash 8K/1K MTP overlays and preserves the workload on reload in ${locale || 'en'}`, () => {
+      cy.fixture('api/muse-spark-unofficial-run.json').then((run) => {
+        cy.intercept('GET', '/api/unofficial-run*', {
+          body: {
+            ...run,
+            runInfos: run.runInfos.map((info: Record<string, unknown>) => ({
+              ...info,
+              id: 42434823430,
+              url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/42434823430',
+            })),
+            benchmarks: run.benchmarks.map((row: Record<string, unknown>) => ({
+              ...row,
+              model: 'glm5.3flash',
+              hardware: 'h200',
+              precision: 'fp8',
+              spec_method: 'mtp',
+              benchmark_type: 'single_turn',
+              isl: 8192,
+              osl: 1024,
+              run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/42434823430',
+            })),
+            evaluations: [],
+          },
+        }).as('fixedFlashOverlay');
+      });
+      cy.intercept('GET', '/api/v1/availability/compact', { body: availabilityBody([]) });
+      cy.intercept('GET', '/api/v1/benchmarks*', { body: [] });
+      cy.visit(`${locale}/infx/inference/glm-5-3-flash?unofficialrun=42434823430&i_seq=8k%2F1k`, {
+        onBeforeLoad(win) {
+          visitOptions.onBeforeLoad(win);
+          win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
+        },
+      });
+      cy.wait('@fixedFlashOverlay');
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'GLM 5.3 Flash');
+      cy.get('[data-testid="chart-figure"]').should('contain.text', 'GLM 5.3 Flash 8K / 1K');
+      cy.get('[data-testid="scatter-graph"] .unofficial-overlay-pt').should(
+        'have.length.greaterThan',
+        0,
+      );
+      cy.reload();
+      cy.wait('@fixedFlashOverlay');
+      cy.get('[data-testid="chart-figure"]').should('contain.text', 'GLM 5.3 Flash 8K / 1K');
+      cy.get('[data-testid="scatter-graph"] .unofficial-overlay-pt').should(
+        'have.length.greaterThan',
+        0,
+      );
+    });
+
     for (const route of [
       '/infx/inference/glm-5-3-flash',
       '/infx/inference?g_model=GLM-5.3-Flash',

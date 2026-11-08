@@ -370,7 +370,10 @@ describe('GlobalFilterProvider context isolation', () => {
     });
     expect(availabilitySnapshot?.availableModels).not.toContain(Model.GLM_5_3_Flash);
     act(() => selectModel?.(Model.GLM_5_3_Flash));
-    expect(availabilitySnapshot?.availableSequences).toEqual([Sequence.AgenticTraces]);
+    expect(availabilitySnapshot?.availableSequences).toEqual([
+      Sequence.EightK_OneK,
+      Sequence.AgenticTraces,
+    ]);
   });
 
   it('offers Flash once its own database observations exist', () => {
@@ -389,18 +392,21 @@ describe('GlobalFilterProvider context isolation', () => {
     expect(availabilitySnapshot?.availableModels).not.toContain(Model.GLM_5_2);
   });
 
-  it('offers an unofficial Flash run while published availability is still loading', () => {
-    mocks.featureGateUnlocked = true;
-    mocks.availability.data = undefined;
-    mocks.unofficialAvailable = [
-      { model: Model.GLM_5_3_Flash, sequence: Sequence.AgenticTraces, precision: Precision.FP4 },
-    ];
-    mountProvider();
-    act(() => selectModel?.(Model.GLM_5_3_Flash));
-    expect(availabilitySnapshot?.availableModels).toContain(Model.GLM_5_3_Flash);
-    expect(availabilitySnapshot?.availableSequences).toEqual([Sequence.AgenticTraces]);
-    expect(selectionSnapshot?.effectiveSequence).toBe(Sequence.AgenticTraces);
-  });
+  it.each([Sequence.EightK_OneK, Sequence.AgenticTraces])(
+    'offers an unofficial Flash %s run while published availability is still loading',
+    (sequence) => {
+      mocks.featureGateUnlocked = true;
+      mocks.availability.data = undefined;
+      mocks.unofficialAvailable = [
+        { model: Model.GLM_5_3_Flash, sequence, precision: Precision.FP8 },
+      ];
+      mountProvider();
+      act(() => selectModel?.(Model.GLM_5_3_Flash));
+      expect(availabilitySnapshot?.availableModels).toContain(Model.GLM_5_3_Flash);
+      expect(availabilitySnapshot?.availableSequences).toEqual([sequence]);
+      expect(selectionSnapshot?.effectiveSequence).toBe(sequence);
+    },
+  );
 
   it('does not unlock Flash from observations, an unofficial run, or an explicit selection', () => {
     mocks.availability.data = indexRows([

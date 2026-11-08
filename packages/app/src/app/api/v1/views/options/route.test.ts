@@ -87,6 +87,17 @@ describe('GET /api/v1/views/options', () => {
     expect(agentic.isl).toBeNull();
   });
 
+  it('keeps Flash 8K/1K active independently of the non-Flash GLM retirement', async () => {
+    const res = await GET(request('/api/v1/views/options'));
+    const body = await res.json();
+    const flash = body.models.find((model: { name: string }) => model.name === 'GLM-5.3-Flash');
+    const nonFlash = body.models.find((model: { name: string }) => model.name === 'GLM-5.2');
+    expect(flash.deprecatedSequences).not.toContain('8k/1k');
+    expect(flash.deprecatedSequences).not.toContain('agentic-traces');
+    expect(flash.deprecatedSequences).toContain('1k/1k');
+    expect(nonFlash.deprecatedSequences).toContain('8k/1k');
+  });
+
   it('returns default models in selector order without changing the selected default', async () => {
     const res = await GET(request('/api/v1/views/options'));
     const body = await res.json();
