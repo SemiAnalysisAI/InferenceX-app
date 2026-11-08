@@ -221,6 +221,8 @@ describe('InferenceTcoBadges', () => {
       cy.get('[data-testid="inference-tco-badges"]').then(($table) => {
         const table = $table[0].getBoundingClientRect();
         expect(table.right).to.be.at.most(width);
+        const grid = $table[0].querySelector('table')!.getBoundingClientRect();
+        if (grid.width < width) expect(table.right - grid.right).to.be.closeTo(1, 0.5);
         cy.get('[data-testid="result-context"]').should(($context) => {
           expect(Math.abs(table.left - $context[0].getBoundingClientRect().left)).to.be.lessThan(1);
         });
@@ -245,4 +247,33 @@ describe('InferenceTcoBadges', () => {
       });
     });
   }
+
+  it('keeps the tier cell the same width whichever tier is selected', () => {
+    cy.viewport(1440, 400);
+    const widths: number[] = [];
+    for (const [metric, label] of [
+      ['y_tokensPerDollarH', 'Owning at large hyperscaler volume'],
+      ['y_tokensPerDollarUser', 'Custom'],
+    ] as const) {
+      mountWithProviders(
+        <ResultContext
+          locale="en"
+          layout="footer"
+          costTier={label}
+          costTierControl={<CostTierSelector footer />}
+          priceTable={<InferenceTcoBadges bases={BASES} values={VALUES} />}
+        />,
+        { inference: { selectedYAxisMetric: metric, userCosts: VALUES }, globalFilters: {} },
+      );
+      cy.get('[data-testid="cost-tier-selector"]')
+        .should('contain.text', label)
+        .should(($trigger) => {
+          expect($trigger[0].scrollWidth).to.be.at.most($trigger[0].clientWidth);
+        });
+      cy.get('[data-testid="inference-tco-badges"] tbody th').then(($cell) => {
+        widths.push($cell[0].getBoundingClientRect().width);
+      });
+    }
+    cy.then(() => expect(widths[0]).to.equal(widths[1]));
+  });
 });

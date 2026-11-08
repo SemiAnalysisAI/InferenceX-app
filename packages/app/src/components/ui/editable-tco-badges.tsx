@@ -246,7 +246,7 @@ export function TcoPriceTable({
     <div className={cn('max-w-full', className)}>
       <div
         data-testid={testId}
-        className="max-w-full overflow-x-auto rounded-md border border-border/60 text-muted-foreground"
+        className="w-fit max-w-full overflow-x-auto rounded-md border border-border/60 text-muted-foreground"
       >
         <table className="border-separate border-spacing-0 text-2xs tabular-nums">
           <thead>
@@ -280,7 +280,7 @@ export function TcoPriceTable({
                 scope="row"
                 className={cn(
                   TABLE_CELL,
-                  'text-left font-normal max-sm:[&_[aria-haspopup]]:max-w-36',
+                  'text-left font-normal [&_[aria-haspopup]]:w-32 sm:[&_[aria-haspopup]]:w-52',
                 )}
               >
                 {slots.rowLabel ?? rowLabel ?? t.row}
