@@ -31,14 +31,18 @@ and engine. Engine identity comes from recorded configuration. Missing metadata
 is not filled from a runtime SHA or hardware name. A cell published before server
 layouts were recorded cannot be told apart from a recorded layout at the same GPU
 count, so a newer cell with the same hardware, GPU count and concurrency supersedes
-it; older runs selected through Run context still show it. The GPU-count selector narrows
-the results table and clips; the chart and deployment detail retain every measured
-GPU count for the same workload. Workload-mix rows preserve each
+it; older runs selected through Run context still show it. The overview includes all
+GPU counts for the same workload, with no GPU-count selector. Workload-mix rows preserve each
 cohort separately rather than averaging across resolutions, durations or modes.
 
-`r_*` URL parameters record filters, hidden hardware, chart axes (`r_x`, `r_y`),
-cost basis (`r_basis`), Optimal only (`r_optimal`), the open deployment
-(`r_point`), deadline, cost tier, entered mode prices and utilization. `r_workload` uses a compact source point identifier;
+`r_*` URL parameters record filters, hidden hardware, the Y metric (`r_y`),
+Optimal only (`r_optimal`), the open deployment
+(`r_point`), deadline, cost tier, entered mode prices and utilization.
+The retired `r_gpus`, `r_x` and `r_basis` parameters are accepted but ignored by the
+UI and overview API: all GPU counts, median latency (`p50`) and participating GPUs
+are fixed. New share/export URLs omit these keys. Both GPU cost bases and P90
+remain available as evidence, not selectable chart settings.
+`r_workload` uses a compact source point identifier;
 canonical workload JSON stays inside the projection. Share includes the `r_`
 registry scope. `?unofficialrun=<id>` reads only that run through
 `namedRunPoints`. A stored run keeps its actual approval status. A run absent from
@@ -49,8 +53,8 @@ verified against `SHA256SUMS` and the manifest identity. Its entries are unappro
 have no `publishedAt` and no media, so the clip panel shows nothing for them and the
 banner says the run is unpublished. While selected, that run
 appears only in `overlayCells` and `overlayDeploymentCells`, even if approved; it
-leaves official cells, deployment cells and workload mix. `overlayCells` uses the
-selected GPU count for the table and clips; `overlayDeploymentCells` retains all
+leaves official cells, deployment cells and workload mix. `overlayCells` and
+`overlayDeploymentCells` retain all
 matching GPU counts for the chart and deployment detail. Clearing the selection cannot promote an
 unapproved source. Dismissal clears a workload selection absent from the approved
 choices and preserves valid approved selections. All comparison filters and sample requirements still apply.
@@ -74,11 +78,11 @@ The page follows the inference and AgentX two-level layout. The overview has fiv
 
 1. The header card (`DashboardSectionHeader` with the page title, cohort help and Share)
    holds one line naming the fixed model, workload and engine, and `ControlPanel`s for
-   Chart config (X and Y metric), Deployment (GPU count), Compare history and Run
+   Chart config (Y metric), Compare history and Run
    context. Compare history's Chip config
    picks up to four deployments and an optional date range; the chart then plots each one's
    runs in time order, labelled by run date, plus a named overlay run's matching
-   deployment as its own series, while the table, clips and cost caption keep
+   deployment as its own series, while the clips and cost caption keep
    the selected run. Run context reuses the inference run date
    picker and Run select: each official deployment shows its latest run on or before the
    selected run, and the run link opens its GitHub Actions run. Model, workload and engine
@@ -89,7 +93,7 @@ The page follows the inference and AgentX two-level layout. The overview has fiv
    the overview API's `format=csv`, legend toggle and zoom reset). The chart title sits in
    the chart caption so PNG exports carry it. The chart plots every measured deployment
    of the selected workload. X is
-   median (default) or P90 latency per clip; when every plotted deployment generates
+   always median latency per clip; when every plotted deployment generates
    clips of one length and frame rate, the axis title names both. Y is video-seconds
    per $1 TCO (default), videos per GPU-hour or GPU kJ per valid clip.
    `results-chart.ts` registers each metric with its label, unit and better direction.
@@ -97,7 +101,7 @@ The page follows the inference and AgentX two-level layout. The overview has fiv
    Optimal only hides dominated deployments. The sidebar legend toggles hardware,
    greys out roster hardware without a matched run, holds the deployment-label switch
    and a Reset filter action. Under the chart, a `ResultContext` footer like the
-   inference one selects the cost tier and GPU basis (a segmented toggle), names the
+   inference one selects the cost tier, states the fixed participating-GPU basis, names the
    update date and source, lists each plotted hardware's TCO $/chip/hr rate in a
    `TcoPriceTable` and links the price source. Hovering a point shows the shared
    compact hover card (`chartHoverCard`): hardware and engine, both axis values, GPUs,
@@ -105,13 +109,13 @@ The page follows the inference and AgentX two-level layout. The overview has fiv
    (`ChartPointDetails`): date, both axis values, concurrency, participating and
    allocated GPUs, valid clips, deployment, the other latency, cost, energy, power,
    runtime and the GitHub Actions run link. Unofficial points carry the run marker in
-   both. Its View telemetry action opens the deployment detail. The Representative
-   deployments table below is a sortable `DataTable` with one row per hardware and
-   unofficial run, showing the deployment with the most videos per participating
-   GPU-hour. It scrolls horizontally on narrow screens, and the hardware button in a
-   row opens the same detail.
+   both. Its View telemetry action opens the deployment detail. The representative
+   deployments table and its deadline input have been removed; the overview API
+   retains representative cells and deadline calculations for data consumers.
 3. The clip comparison card described in Synchronized clips.
-4. Always-open cards for How to read these results and the profit estimator. How to
+4. An always-open How to read these results card and a closed-by-default Advanced
+   disclosure containing the profit estimator. Expansion is local presentation state;
+   closing it preserves scenario inputs and does not change API calculations. How to
    read lists the measurements not yet collected. The profit estimator's mode prices
    and utilization sit in a Scenario `ControlPanel`. No placeholder chart, illustrative
    value or uncalibrated rating schema is shipped.
@@ -250,12 +254,11 @@ not a calibrated quality verdict or proof of a hardware-only effect.
 
 ## Cost and profit
 
-Both bases are kept: participating boards and allocated boards. The chart and
-table use the selected basis (`r_basis`, default participating); clip tiles and
+Both bases are kept as evidence: participating boards and allocated boards. The chart
+uses participating boards; clip tiles and
 the deployment detail show both. Video-seconds per $1 TCO is the reciprocal of
 cost per video-second. Videos per GPU-hour = valid clips × 3600 / (wall seconds ×
-the selected basis's GPU count), so the allocated basis halves it for a job that
-reserved eight boards and used four. An
+the participating GPU count). An
 allocation must be evidenced; participating count is never substituted for it.
 TCO per video = recorded GPU count × registry $/GPU-hour / measured clips/hour.
 Cost per video-second = hourly GPU cost / `videoSecondsPerHour`, the validated
@@ -303,15 +306,17 @@ official/unofficial source membership remain unchanged.
 中描述的共享标签缓存，只有发布后的首次读取需要等待存储。这只是加载方式的调整，
 不改变只读 API 的选择项、默认值、计算或正式／指定运行的来源归属。
 
-| Control                                                                                 | Read-only API coverage                                                                 |
-| --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Model, workload, resolution, duration, mode, steps, GPU count, engine, date             | `r_*` selection fields                                                                 |
-| Hardware visibility, named run (stored or read live)                                    | `r_hidden`, `unofficialrun`, separate overlay cells preserving approval                |
-| Deadline, cost tier, mode prices, utilization                                           | Same pure calculations in `resultProjection`                                           |
-| Chart axes, cost basis, Optimal only, open deployment                                   | `r_x`, `r_y`, `r_basis`, `r_optimal`, `r_point`; every axis value is in each cell      |
-| Deployment labels, detail tab, pinned point                                             | Presentation only                                                                      |
-| Clip transport, audio source, Difference, case navigation, History expand, theme, Share | Presentation only; published media metadata uses the existing read-only media contract |
-| Cohort help, prompt/source and hash disclosures, media link                             | Presentation only; existing history and published media reads provide their data       |
+| Control                                                                                 | Read-only API coverage                                                                           |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Model, workload, resolution, duration, mode, steps, engine, date                        | `r_*` selection fields                                                                           |
+| Hardware visibility, named run (stored or read live)                                    | `r_hidden`, `unofficialrun`, separate overlay cells preserving approval                          |
+| Deadline, cost tier, mode prices, utilization                                           | Same pure calculations in `resultProjection`                                                     |
+| Y metric, Optimal only, open deployment                                                 | `r_y`, `r_optimal`, `r_point`; every axis value is in each cell                                  |
+| Fixed X metric, GPU basis, all GPU counts                                               | `r_x`, `r_basis`, `r_gpus` accepted but ignored; resolved params are p50, participating and null |
+| Advanced disclosure                                                                     | Presentation only; closed by default, preserves scenario inputs                                  |
+| Deployment labels, detail tab, pinned point                                             | Presentation only                                                                                |
+| Clip transport, audio source, Difference, case navigation, History expand, theme, Share | Presentation only; published media metadata uses the existing read-only media contract           |
+| Cohort help, prompt/source and hash disclosures, media link                             | Presentation only; existing history and published media reads provide their data                 |
 
 Admin/publication handlers, private artifacts and credentials are excluded.
 Video results controls and the new disclosures/media link record `video_results_*`
@@ -328,14 +333,12 @@ browser playback and difference failure, bilingual layout and 390px overflow.
 生成参数、prompt、seed 和测量语义。较短 smoke、未完成及未匹配结果留在性能历史，不混入比较。
 历史记录保留尚无发布批准的存储结果；默认图表仅接纳发布回执与原始来源及 checkout 匹配的记录。
 发布批准与 full-sweep 或发布资格验收分开。
-页面沿用推理与 AgentX 的两级布局。概览页首将筛选分为基准测试配置（模型、工作负载、引擎）、图表配置（X/Y 指标）、
-部署（GPU 数量）、对比历史趋势和运行信息。对比历史趋势中的芯片配置最多可选 4 个部署，并可限定日期范围；图表随即按时间顺序绘制各部署的每次运行并标注运行日期，指定的叠加运行中匹配的部署单独成一组，表格、视频和成本说明仍按所选运行显示。运行信息沿用推理页的运行日期和运行选择器：每个正式部署显示其在所选运行或之前的最新运行，运行链接打开对应的 GitHub Actions 运行。图表绘制所选工作负载的全部实测部署：X 轴为单条视频中位延迟（默认）或 P90 延迟，所有部署生成的视频时长和帧率相同时，轴标题会注明这两项；
-Y 轴为每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时生成视频数或每条有效视频的 GPU 能耗；每种硬件及每个叠加运行
-各自绘制 Pareto 前沿。右侧图例可隐藏硬件，没有匹配运行的硬件显示为灰色，并提供部署标签开关和“重置筛选”。图表卡片使用 `ChartSection`，带有共享的图表按钮（PNG 导出、overview API `format=csv` 的 CSV、图例开关和缩放重置），图表标题放在图表说明中，导出的 PNG 也会带上标题。图表下方的 `ResultContext` 页脚与推理页一致，可切换成本层级和 GPU 口径（分段切换），并列出更新时间、来源、各硬件 TCO $/chip/hr 价格表（`TcoPriceTable`）及价格来源链接。
-图表下方的“代表性部署”是可排序的 `DataTable`，每种硬件及每个叠加运行一行，展示按参与计算的 GPU 折算后每 GPU 小时生成视频数最多的部署，窄屏可横向滚动。
-悬停数据点时显示共享的精简悬停卡片（`chartHoverCard`）：硬件与引擎、两个坐标轴的数值、GPU、部署和并发数。点击后打开共享的数据点详情面板（`ChartPointDetails`）：日期、两个坐标轴的数值、并发数、参与和分配的 GPU、有效视频数、部署、另一项延迟、成本、能耗、功率、Runtime 和 GitHub Actions 运行链接；非官方运行的数据点在两处都会标出运行编号。再点击“查看遥测”进入部署详情（`r_point`）；点击表格行中的硬件按钮则直接进入详情。详情页页首使用 `DashboardSectionHeader` 并带分享按钮。详情入口在 `history.state` 中做标记，
+页面沿用推理与 AgentX 的两级布局。概览页首将筛选分为基准测试配置（模型、工作负载、引擎）、图表配置（Y 指标）、对比历史趋势和运行信息。对比历史趋势中的芯片配置最多可选 4 个部署，并可限定日期范围；图表随即按时间顺序绘制各部署的每次运行并标注运行日期，指定的叠加运行中匹配的部署单独成一组，表格、视频和成本说明仍按所选运行显示。运行信息沿用推理页的运行日期和运行选择器：每个正式部署显示其在所选运行或之前的最新运行，运行链接打开对应的 GitHub Actions 运行。图表绘制所选工作负载的全部实测部署：X 轴固定为单条视频中位延迟，所有部署生成的视频时长和帧率相同时，轴标题会注明这两项；
+Y 轴可选每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时生成视频数或每条有效视频的 GPU 能耗；每种硬件及每个叠加运行
+各自绘制 Pareto 前沿。右侧图例可隐藏硬件，没有匹配运行的硬件显示为灰色，并提供部署标签开关和“重置筛选”。图表卡片使用 `ChartSection`，带有共享的图表按钮（PNG 导出、overview API `format=csv` 的 CSV、图例开关和缩放重置），图表标题放在图表说明中，导出的 PNG 也会带上标题。图表下方的 `ResultContext` 页脚与推理页一致，可切换成本层级，并标明固定使用的参与计算 GPU 口径，同时列出更新时间、来源、各硬件 TCO $/chip/hr 价格表（`TcoPriceTable`）及价格来源链接。
+悬停数据点时显示共享的精简悬停卡片（`chartHoverCard`）：硬件与引擎、两个坐标轴的数值、GPU、部署和并发数。点击后打开共享的数据点详情面板（`ChartPointDetails`）：日期、两个坐标轴的数值、并发数、参与和分配的 GPU、有效视频数、部署、另一项延迟、成本、能耗、功率、Runtime 和 GitHub Actions 运行链接；非官方运行的数据点在两处都会标出运行编号。再点击“查看遥测”进入部署详情（`r_point`）。详情页页首使用 `DashboardSectionHeader` 并带分享按钮。详情入口在 `history.state` 中做标记，
 刷新或前进后页内返回仍会弹出该条目，浏览器后退也会回到原滚动位置；概览在后台保持挂载，视频、已加载的性能历史和图表状态不会丢失。
-详情页分为遥测、有效性、来源三个标签页。未知、已筛除或已隐藏的 `r_point` 回到概览，结果加载后会从 URL 中移除，重新显示该硬件或分享时不会再打开它。“如何解读这些结果”和利润估算器始终展开，利润估算器的各模式价格和利用率放在“场景”控制面板中；性能历史需要读取已存储的 History 页面，因此默认折叠在带箭头的标题下，深链接时自动展开。尚未采集的指标在“如何解读”中列出，
+详情页分为遥测、有效性、来源三个标签页。未知、已筛除或已隐藏的 `r_point` 回到概览，结果加载后会从 URL 中移除，重新显示该硬件或分享时不会再打开它。“如何解读这些结果”始终展开；利润估算器位于默认收起的“高级选项”中，其各模式价格和利用率放在“场景”控制面板中；性能历史需要读取已存储的 History 页面，因此默认折叠在带箭头的标题下，深链接时自动展开。尚未采集的指标在“如何解读”中列出，
 不使用占位图表或示意数值。功率无效时不展示功率或能耗结论。默认保留四个硬件视频窗口；
 符合相同工作负载及样本门槛的已批准 H100 结果或明确指定的诊断运行会增加 H100 窗口，名称和成本沿用硬件注册表。
 
@@ -347,14 +350,14 @@ Difference 是相对明确绑定的官方 Diffusers 参考视频的浏览器 RGB
 每个有测量结果且未隐藏的硬件显示一张视频卡片，与图表图例一致；没有测量结果的硬件不显示卡片，有测量结果但没有已发布媒体的硬件显示空卡片。默认视频卡片保留硬件、GPU 数量、媒体及两种 TCO 口径；完整 prompt、seed、重复次数、
 运行、产物、Runtime 和媒体来源可在“Prompt 与来源”中查看。
 
-成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补；图表与结果表使用所选口径（`r_basis`），视频卡片和部署详情同时展示两种口径。每 GPU 小时生成视频数同样按所选口径的 GPU 数折算：作业分配 8 张、实际使用 4 张时，按分配口径计算的值减半。视频秒吞吐量、每视频秒成本及收入使用有效测量请求的实际解码视频时长，不包含 warmup；请求时长仅用于工作负载身份与筛选。
+成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补；图表固定使用参与计算的 GPU 口径，视频卡片和部署详情仍同时展示两种口径。代表性部署表，以及 GPU 数量、GPU 口径和 X 轴指标选择器，均已移除。界面与 overview API 始终包含全部 GPU 数量，X 轴固定为中位延迟；旧链接中的 `r_gpus`、`r_basis`、`r_x` 参数会被忽略。利润估算器位于默认收起的“高级选项”中；展开或收起都不会改变数据和计算结果，已填写的场景输入会保留。视频秒吞吐量、每视频秒成本及收入使用有效测量请求的实际解码视频时长，不包含 warmup；请求时长仅用于工作负载身份与筛选。
 任何有效测量请求缺少视频时长，或旧 History 投影没有 `videoSecondsPerHour` 时，上述指标及利润保持为空，不以请求时长代替。每条视频成本仍可在证据充分时计算。利润输入默认空白，属于用户
 场景假设；利用率只降低收入，不减少付费时长。模式未知时不套用 T2V/I2V/R2V 价格。
 页面与只读 API 以一次请求最多读取五页 History，共用选择和计算逻辑，`r_*` 参数可以分享，`?unofficialrun=` 只读取指定运行。
 已存储的运行保留其发布批准状态；不在 History 中的运行，通过 `/api/video-runs?run=<id>&format=live` 从其 GitHub 产物实时读取：
 只取每个原生 `h3-results` 配置的最新一次尝试，按显式字节区间读取 JSON 文档，并用 `SHA256SUMS` 和 manifest 身份校验。
 这类条目未经批准，没有 `publishedAt`，也不附带媒体，因此视频面板不显示它们，横幅会注明该运行尚未发布。
-指定运行单独放入 overlayCells 和 overlayDeploymentCells；选中期间，即使已批准也不进入正式结果、部署或工作负载构成。overlayCells 按所选 GPU 数筛选结果表和视频；overlayDeploymentCells 保留所有匹配的 GPU 数，用于图表和部署详情。
+指定运行单独放入 overlayCells 和 overlayDeploymentCells；选中期间，即使已批准也不进入正式结果、部署或工作负载构成。两者均保留所有匹配的 GPU 数，不再按 GPU 数量筛选。
 默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，
 或在没有匹配的已批准结果时作为回退。
 支持隐藏硬件及移除；清除叠加运行后不会将未批准数据转为正式结果。

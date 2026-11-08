@@ -28,7 +28,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { DatePicker } from '@/components/ui/date-picker';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
@@ -50,7 +49,6 @@ import {
   type VideoMode,
 } from './results';
 import {
-  RESULTS_X_METRIC_KEYS,
   RESULTS_X_METRICS,
   RESULTS_Y_METRIC_KEYS,
   RESULTS_Y_METRICS,
@@ -60,7 +58,6 @@ import {
 import VideoDeploymentDetail from './VideoDeploymentDetail';
 import VideoResultsChart, { VIDEO_RESULTS_CHART_ID } from './VideoResultsChart';
 import VideoCostContext from './VideoCostContext';
-import VideoResultsTable from './VideoResultsTable';
 import VideoResultsClips from './VideoResultsClips';
 import { resultsClipPoints } from './results-clips';
 import { ResultsBars, resultsNumber as n, type ResultBar } from './VideoResultsCharts';
@@ -69,11 +66,11 @@ import styles from './results.module.css';
 
 const STRINGS = {
   en: {
+    advanced: 'Advanced',
     title: 'VideoGenX',
     description:
       'Serving latency, cost and energy for one matched 20-clip video workload across hardware. Click a point to pin its measurements; View telemetry opens that deployment.',
     chartConfig: 'Chart config',
-    deployment: 'Deployment',
     runContext: 'Run context',
     compareHistory: 'Compare history',
     chipConfig: 'Chip config',
@@ -86,11 +83,8 @@ const STRINGS = {
     compareRangePlaceholder: 'Select date range',
     secondaryControls: 'More chart controls',
     changed: 'changed',
-    gpus: 'GPU count',
     date: 'Run date',
-    xAxis: 'X-axis metric',
     yAxis: 'Y-axis metric',
-    all: 'All',
     stepsUnit: 'steps',
     loading: 'Loading video results…',
     error: 'Could not load video results',
@@ -133,11 +127,11 @@ const STRINGS = {
     csv: 'Download CSV',
   },
   zh: {
+    advanced: '高级选项',
     title: 'VideoGenX',
     description:
       '在同一组匹配的 20 条视频工作负载上，比较各硬件的服务延迟、成本与能耗。点击数据点可固定显示其测量值，再点击“查看遥测”打开对应部署。',
     chartConfig: '图表配置',
-    deployment: '部署',
     runContext: '运行信息',
     compareHistory: '对比历史趋势',
     chipConfig: '芯片配置',
@@ -149,11 +143,8 @@ const STRINGS = {
     compareRangePlaceholder: '选择日期范围',
     secondaryControls: '更多图表设置',
     changed: '项已更改',
-    gpus: 'GPU 数量',
     date: '运行日期',
-    xAxis: 'X 轴指标',
     yAxis: 'Y 轴指标',
-    all: '全部',
     stepsUnit: '步',
     loading: '正在加载视频结果…',
     error: '无法加载视频结果',
@@ -402,33 +393,21 @@ export default function VideoDashboard({
           }))
         : [{ key, label: hardwareLabel(key), color: colorFor(key), value: null, secondary: null }];
     });
-  const metricSelector = (key: 'xMetric' | 'yMetric') => {
-    const [label, id, choices] =
-      key === 'xMetric'
-        ? [
-            s.xAxis,
-            'results-x-metric',
-            RESULTS_X_METRIC_KEYS.map((metric) => ({
-              value: metric,
-              label: resultsMetricLabel(RESULTS_X_METRICS[metric], locale),
-            })),
-          ]
-        : [
-            s.yAxis,
-            'results-y-metric',
-            RESULTS_Y_METRIC_KEYS.map((metric) => ({
-              value: metric,
-              label: resultsMetricLabel(RESULTS_Y_METRICS[metric], locale),
-            })),
-          ];
+  const metricSelector = () => {
+    const label = s.yAxis;
+    const id = 'results-y-metric';
+    const choices = RESULTS_Y_METRIC_KEYS.map((metric) => ({
+      value: metric,
+      label: resultsMetricLabel(RESULTS_Y_METRICS[metric], locale),
+    }));
     return (
       <div className="flex min-w-0 flex-col gap-1.5">
         <Label htmlFor={id}>{label}</Label>
         <SearchableSelect
           triggerId={id}
           triggerTestId={id}
-          value={state[key]}
-          onValueChange={(value) => update({ [key]: value })}
+          value={state.yMetric}
+          onValueChange={(value) => update({ yMetric: value as ResultsState['yMetric'] })}
           groups={[{ label: '', options: choices }]}
           placeholder={label}
           searchable={false}
@@ -438,9 +417,7 @@ export default function VideoDashboard({
   };
   const apiUrl = `/api/v1/views/video?view=overview&${resultsSearch(state)}`;
   const secondaryChanged = [
-    state.xMetric !== DEFAULT_RESULTS_STATE.xMetric,
     state.yMetric !== DEFAULT_RESULTS_STATE.yMetric,
-    state.gpuCount !== null,
     state.date !== null || state.run !== null,
     state.configs.length > 0,
   ].filter(Boolean).length;
@@ -524,31 +501,10 @@ export default function VideoDashboard({
                 >
                   <ControlPanel
                     legend={s.chartConfig}
-                    className={`${styles.chartConfig} sm:grid-cols-2`}
+                    className={styles.chartConfig}
                     data-testid="results-chart-config"
                   >
-                    {metricSelector('xMetric')}
-                    {metricSelector('yMetric')}
-                  </ControlPanel>
-                  <ControlPanel legend={s.deployment}>
-                    <div className="flex min-w-0 flex-col gap-1.5">
-                      <Label>{s.gpus}</Label>
-                      <SegmentedToggle
-                        role="group"
-                        value={state.gpuCount === null ? 'all' : String(state.gpuCount)}
-                        options={[null, ...options.gpuCounts.toSorted((a, b) => a - b)].map(
-                          (v) => ({
-                            value: v === null ? 'all' : String(v),
-                            label: v === null ? s.all : String(v),
-                          }),
-                        )}
-                        onValueChange={(value) =>
-                          update({ gpuCount: value === 'all' ? null : Number(value) })
-                        }
-                        ariaLabel={s.gpus}
-                        testId="results-gpus"
-                      />
-                    </div>
+                    {metricSelector()}
                   </ControlPanel>
                   <ControlPanel legend={s.compareHistory} data-testid="results-compare-history">
                     <div className="grid min-w-0 gap-3">
@@ -760,13 +716,6 @@ export default function VideoDashboard({
                   />
                 }
               />
-              <VideoResultsTable
-                rows={representatives}
-                state={state}
-                color={color}
-                onOpen={(cell) => openPoint(resultsPointKey(cell), 'table')}
-                onDeadlineChange={(deadlineSeconds) => update({ deadlineSeconds })}
-              />
             </div>
           </ChartSection>
           <Card>
@@ -809,82 +758,97 @@ export default function VideoDashboard({
               </ul>
             </section>
           </Card>
-          <Card>
-            <section
-              className="flex min-w-0 flex-col gap-4"
-              aria-labelledby="results-profit-title"
-              data-testid="results-profit"
-            >
-              <div>
-                <Heading as="h2" level="card" id="results-profit-title">
-                  {s.estimator}
-                </Heading>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {s.priceNote}. {s.priceDetail}
-                </p>
-              </div>
-              <ControlPanel legend={s.scenario} className="grid-cols-2 lg:grid-cols-4">
-                {(['t2v', 'i2v', 'r2v'] as VideoMode[]).map((mode) => (
-                  <div key={mode} className="flex min-w-0 flex-col gap-1.5">
-                    <Label htmlFor={`results-price-${mode}`}>
-                      {s.price} · {mode.toUpperCase()}
+          <details
+            className="group/advanced"
+            data-testid="results-advanced"
+            onToggle={(event) =>
+              track('video_results_advanced_toggled', { enabled: event.currentTarget.open })
+            }
+          >
+            <summary className="mb-2 flex cursor-pointer list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
+              <ChevronDown
+                aria-hidden="true"
+                className="size-5 text-muted-foreground transition-transform duration-200 group-open/advanced:rotate-180"
+              />
+              <h2 className="text-lg font-medium">{s.advanced}</h2>
+            </summary>
+            <Card>
+              <section
+                className="flex min-w-0 flex-col gap-4"
+                aria-labelledby="results-profit-title"
+                data-testid="results-profit"
+              >
+                <div>
+                  <Heading as="h3" level="card" id="results-profit-title">
+                    {s.estimator}
+                  </Heading>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {s.priceNote}. {s.priceDetail}
+                  </p>
+                </div>
+                <ControlPanel legend={s.scenario} className="grid-cols-2 lg:grid-cols-4">
+                  {(['t2v', 'i2v', 'r2v'] as VideoMode[]).map((mode) => (
+                    <div key={mode} className="flex min-w-0 flex-col gap-1.5">
+                      <Label htmlFor={`results-price-${mode}`}>
+                        {s.price} · {mode.toUpperCase()}
+                      </Label>
+                      <Input
+                        id={`results-price-${mode}`}
+                        type="number"
+                        min="0"
+                        step="0.005"
+                        placeholder="—"
+                        value={state.apiPrices[mode] ?? ''}
+                        data-testid={`results-price-${mode}`}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? null : e.target.valueAsNumber;
+                          if (value === null || (Number.isFinite(value) && value >= 0))
+                            update({ apiPrices: { ...state.apiPrices, [mode]: value } });
+                        }}
+                      />
+                    </div>
+                  ))}
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <Label htmlFor="results-utilization">
+                      {s.utilization} · {n(state.utilization * 100, 0)}%
                     </Label>
-                    <Input
-                      id={`results-price-${mode}`}
-                      type="number"
+                    <input
+                      id="results-utilization"
+                      type="range"
                       min="0"
-                      step="0.005"
-                      placeholder="—"
-                      value={state.apiPrices[mode] ?? ''}
-                      data-testid={`results-price-${mode}`}
-                      onChange={(e) => {
-                        const value = e.target.value === '' ? null : e.target.valueAsNumber;
-                        if (value === null || (Number.isFinite(value) && value >= 0))
-                          update({ apiPrices: { ...state.apiPrices, [mode]: value } });
-                      }}
+                      max="100"
+                      step="5"
+                      value={state.utilization * 100}
+                      className="h-9 accent-primary"
+                      data-testid="results-utilization"
+                      onChange={(e) => update({ utilization: Number(e.target.value) / 100 })}
                     />
                   </div>
-                ))}
-                <div className="flex min-w-0 flex-col gap-1.5">
-                  <Label htmlFor="results-utilization">
-                    {s.utilization} · {n(state.utilization * 100, 0)}%
-                  </Label>
-                  <input
-                    id="results-utilization"
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="5"
-                    value={state.utilization * 100}
-                    className="h-9 accent-primary"
-                    data-testid="results-utilization"
-                    onChange={(e) => update({ utilization: Number(e.target.value) / 100 })}
+                </ControlPanel>
+                {representatives.some(
+                  (c) => c.profit.participating !== null || c.profit.allocated !== null,
+                ) ? (
+                  <ResultsBars
+                    rows={profitBars}
+                    label={s.estimator}
+                    unit="$/GPU-hr"
+                    secondaryLabel={s.allocated}
                   />
-                </div>
-              </ControlPanel>
-              {representatives.some(
-                (c) => c.profit.participating !== null || c.profit.allocated !== null,
-              ) ? (
-                <ResultsBars
-                  rows={profitBars}
-                  label={s.estimator}
-                  unit="$/GPU-hr"
-                  secondaryLabel={s.allocated}
-                />
-              ) : (
-                <EmptyState
-                  bare
-                  className="min-h-15 rounded-lg border border-dashed text-xs"
-                  data-testid="results-empty"
-                >
-                  {s.empty}
-                </EmptyState>
-              )}
-              <p className="text-xs text-muted-foreground">
-                {s.participating} · {s.allocated}. {s.profitNote}
-              </p>
-            </section>
-          </Card>
+                ) : (
+                  <EmptyState
+                    bare
+                    className="min-h-15 rounded-lg border border-dashed text-xs"
+                    data-testid="results-empty"
+                  >
+                    {s.empty}
+                  </EmptyState>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {s.participating} · {s.allocated}. {s.profitNote}
+                </p>
+              </section>
+            </Card>
+          </details>
           <details
             className="group/history"
             data-testid="results-history"

@@ -54,6 +54,9 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
   .chartConfig {
+    grid-column: auto;
+  }
+  .runContext {
     grid-column: span 2;
   }
 }
