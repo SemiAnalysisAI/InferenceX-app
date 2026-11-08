@@ -3,6 +3,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { zoomEventFilter } from '@/hooks/useChartZoom';
 import { useIsCoarsePointer, useIsMobileViewport, useMediaQuery } from '@/hooks/useMediaQuery';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -267,21 +268,32 @@ export function D3ChartWrapper({
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg || !hintInPlot || hintDismissed) return;
-    // The hint goes once the reader's input actually moves the chart's zoom transform, so
-    // page scrolling, clicks and gestures the zoom ignores leave it in place. Window capture
-    // listeners still see a drag that d3-zoom stops from propagating.
+    // The hint goes once a zoom gesture on this chart actually moves its zoom transform, so
+    // page scrolling, clicks, gestures the zoom ignores and the chart's own setup leave it
+    // in place. Window capture listeners still see a drag that d3-zoom stops from propagating.
     const transform = () => {
       const zoom = Reflect.get(svg, '__zoom') as { k: number; x: number; y: number } | undefined;
-      return zoom ? `${zoom.k},${zoom.x},${zoom.y}` : '';
+      return zoom ? `${zoom.k},${zoom.x},${zoom.y}` : null;
     };
     let frame = 0;
     let timer = 0;
+    let dragging = false;
     const onInput = (event: Event) => {
-      if (event.type === 'mousemove' && !((event as MouseEvent).buttons & 1)) return;
-      if (frame) return;
+      const onChart = event.target instanceof Node && svg.contains(event.target);
+      if (event.type === 'mousedown') {
+        dragging = onChart && zoomEventFilter(event as MouseEvent);
+        return;
+      }
+      if (event.type === 'mouseup') {
+        dragging = false;
+        return;
+      }
+      if (event.type === 'mousemove' ? !dragging : !onChart || !zoomEventFilter(event)) return;
       const before = transform();
+      if (before === null || frame) return;
       const check = () => {
-        if (transform() !== before) setHintDismissed(true);
+        const after = transform();
+        if (after !== null && after !== before) setHintDismissed(true);
       };
       frame = requestAnimationFrame(() => {
         frame = 0;
@@ -291,7 +303,7 @@ export function D3ChartWrapper({
       window.clearTimeout(timer);
       timer = window.setTimeout(check, ZOOM_HINT_SETTLE_MS);
     };
-    const events = ['wheel', 'mousemove', 'touchmove', 'dblclick'] as const;
+    const events = ['wheel', 'mousedown', 'mousemove', 'mouseup', 'touchmove', 'dblclick'] as const;
     for (const type of events)
       window.addEventListener(type, onInput, { capture: true, passive: true });
     return () => {
