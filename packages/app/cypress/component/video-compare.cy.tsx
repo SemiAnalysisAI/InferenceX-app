@@ -104,7 +104,7 @@ const cost = (perVideo: number, perVideoSecond: number) => ({
   perHour: 1,
 });
 const readout = '[data-testid="video-results-readout"]';
-/** A readout cell's lines: its own value, then the pair's value when the pair has one. */
+/** A readout cell's lines: its own value, its context, then the pair's value when it has one. */
 const readoutLines = (metric: string) => cy.get(`${readout} [data-metric="${metric}"] dd`);
 const readoutValue = (metric: string, index = 0) => readoutLines(metric).eq(index);
 
@@ -631,8 +631,12 @@ describe('Video results clip stage', () => {
 
   it('reads out both sides against another GPU and names the unofficial one', () => {
     mountResultsClips(['b200', 'h100'], '/vgx', false, c1('b200').runId);
+    const energyThird = () =>
+      cy.get(`${readout} [data-metric]`).eq(2).should('have.attr', 'data-metric', 'energy');
+    energyThird();
     cy.get('[data-testid="video-results-compare-h100"]').click();
     cy.get(readout).should('have.attr', 'data-pair', 'lead');
+    energyThird();
     cy.get(`${readout} [data-readout-side="b200"]`)
       .should('contain', 'Unofficial run')
       .find('span')
@@ -645,9 +649,10 @@ describe('Video results clip stage', () => {
     readoutLines('wall').should('have.length', 2);
     readoutValue('speed').should('have.text', '2.15× faster');
     readoutValue('speed', 1).should('have.text', 'p50 77.9 s vs 167.3 s');
-    readoutValue('psnr', 1).should('have.text', 'H100 25 dB');
+    readoutValue('psnr', 2).should('have.text', 'H100 25 dB');
     readoutValue('participating').should('have.text', '$0.1');
-    readoutValue('participating', 1).should('have.text', 'H100 $0.3');
+    readoutValue('participating', 1).should('have.text', '$0.02 / video-s');
+    readoutValue('participating', 2).should('have.text', 'H100 $0.3');
   });
 
   /** A lossy B200 lead at p50 40 s against its lossless twin, if any; both clips take 120 s. */
@@ -691,8 +696,9 @@ describe('Video results clip stage', () => {
       cy.get(`${readout} [data-metric="${metric}"]`).invoke('text').should('not.match', /\d/u);
     }
     readoutValue('participating').should('have.text', '$0.04');
-    readoutValue('participating', 1).should('have.text', 'B200 lossless $0.1');
-    readoutValue('psnr', 1).should('have.text', 'B200 lossless 25 dB');
+    readoutValue('participating', 1).should('have.text', '$0.01 / video-s');
+    readoutValue('participating', 2).should('have.text', 'B200 lossless $0.1');
+    readoutValue('psnr', 2).should('have.text', 'B200 lossless 25 dB');
   });
 
   it('falls back to the sealed original when a web rendition cannot be played', () => {

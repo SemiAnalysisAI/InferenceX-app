@@ -149,10 +149,13 @@ type Metric = 'speed' | SideMetric | LosslessScore;
 
 const isLosslessScore = (metric: Metric): metric is LosslessScore => metric in LOSSLESS_SCORES;
 
-/** What each pair reads out, in order. A lossy pair leads with its trade against lossless. */
+/**
+ * What each pair reads out, in order. A lossy pair leads with its trade against lossless. Energy
+ * stays in the third of five columns, so switching the pair does not move it.
+ */
 const ROWS: Record<StageOption['kind'], readonly Metric[]> = {
   reference: ['wall', 'psnr', 'energy', 'participating', 'allocated'],
-  lead: ['wall', 'psnr', 'participating', 'allocated', 'energy', 'speed'],
+  lead: ['wall', 'psnr', 'energy', 'participating', 'allocated', 'speed'],
   twin: [
     'speed',
     'psnrLossless',
@@ -175,13 +178,14 @@ const display = (value: number | null | undefined, digits = 1) =>
 interface Reading {
   value: string;
   help?: string;
+  /** The line under the subject's value. */
+  sub?: string;
 }
 
 interface SideRead {
   /** The matched-noise rerun carries only its PSNR; every other value is not its own. */
   rerunHasIt?: true;
   read: (side: ReadoutSide, s: Strings) => Reading;
-  /** The line under the subject's value against the reference. */
   context?: (side: ReadoutSide, s: Strings) => string | undefined;
 }
 
@@ -248,26 +252,18 @@ const SIDE_METRICS: Record<SideMetric, SideRead> = {
 };
 
 /** One side's value of a per-side metric, with its context line. */
-function readSide(
-  metric: SideMetric,
-  side: ReadoutSide,
-  diagnostic: boolean,
-  s: Strings,
-): Reading & { context?: string } {
+function readSide(metric: SideMetric, side: ReadoutSide, diagnostic: boolean, s: Strings): Reading {
   const { rerunHasIt, read, context } = SIDE_METRICS[metric];
   if (diagnostic && !rerunHasIt)
-    return { value: '—', help: s.diagnosticMetric, context: s.diagnosticMetric };
-  return { ...read(side, s), context: context?.(side, s) };
+    return { value: '—', help: s.diagnosticMetric, sub: s.diagnosticMetric };
+  return { ...read(side, s), sub: context?.(side, s) };
 }
 
-interface Cell {
+interface Cell extends Reading {
   metric: Metric;
   label: string;
-  value: string;
-  sub?: string;
   /** The pair's own value, after its color dot. */
   pairValue?: string;
-  help?: string;
 }
 
 function cell(
@@ -306,13 +302,12 @@ function cell(
           sub: s[LOSSLESS_SCORES[metric]],
           help: s.pairedPending,
         };
-  const { context, ...own } = readSide(metric, a, diagnostic, s);
-  if (kind === 'reference') return { metric, label: s[metric], ...own, sub: context };
   return {
     metric,
     label: s[metric],
-    ...own,
-    pairValue: `${b.name} ${readSide(metric, b, diagnostic, s).value}`,
+    ...readSide(metric, a, diagnostic, s),
+    pairValue:
+      kind === 'reference' ? undefined : `${b.name} ${readSide(metric, b, diagnostic, s).value}`,
   };
 }
 
@@ -405,14 +400,14 @@ export default function VideoClipReadout({
             >
               <dt className="text-2xs text-muted-foreground">{item.label}</dt>
               <dd className="m-0 text-base font-medium break-words">{item.value}</dd>
+              {item.sub && (
+                <dd className="m-0 text-2xs break-words text-muted-foreground">{item.sub}</dd>
+              )}
               {item.pairValue && (
                 <dd className="m-0 flex min-w-0 items-center gap-1.5 text-2xs text-muted-foreground">
                   <SideDot color={b.pill.color} />
                   <span className="min-w-0 break-words">{item.pairValue}</span>
                 </dd>
-              )}
-              {item.sub && (
-                <dd className="m-0 text-2xs break-words text-muted-foreground">{item.sub}</dd>
               )}
             </div>
           ))}
