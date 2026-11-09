@@ -45,16 +45,16 @@ const runSchema: ApiSchema = {
   additionalProperties: true,
 };
 const runExample = {
-  campaign_slug: 'weka-amg-kimi-k3',
-  run_id: 'sa-k3-original-rdma2048-c150-m089',
-  series: 'recovered-c150',
-  concurrency: 150,
+  campaign_slug: 'weka-amg-kimi-k3-latest-3h',
+  run_id: 'cam-k3-kdadr-20261104-c128',
+  series: 'weka',
+  concurrency: 128,
   replicate: 1,
   metrics: {},
-  plot_metrics: { uncached_tps_gpu: 197.07388928550017 },
-  configuration: { gpu_memory_utilization: 0.89 },
+  plot_metrics: { uncached_tps_gpu: 655.2837 },
+  configuration: { benchmark_duration_seconds: 10800, trace_idle_gap_cap_seconds: 1200 },
   provenance: {},
-  health: { status: 'recovered_OBJECT_NOT_FOUND_1_key_2944_tokens' },
+  health: { qualification_code: 'metric-integrity', measurement_complete: true },
   cache_evidence: {},
   clean_backend_qualified: false,
   frontier_eligible: false,
@@ -68,7 +68,7 @@ const parameters = [
     type: 'string',
     description: text('Stored experiment campaign slug.', '已存储的实验 campaign slug。'),
     schema: stringSchema,
-    example: 'weka-amg-kimi-k3',
+    example: 'weka-amg-kimi-k3-latest-3h',
   },
 ];
 const errors = [
@@ -97,8 +97,8 @@ export const experimentOperations: readonly ApiOperation[] = [
     path: '/api/v1/experiments/{campaign}',
     summary: text('Experiment campaign and runs', '实验 campaign 与 run'),
     description: text(
-      'Branch-scoped experiment data stored separately from official benchmarks. Returns raw campaign metadata, published reference points and every experiment replicate, including health flags and source provenance. No GitHub workflow or numeric benchmark identities are invented. No query filters or server-side chart calculations. The inference UI experiment selector reuses i_tokens=total|uncached; these are UI controls, not parameters on this raw endpoint. Cache-Control: no-store. Public read; no authentication.',
-      '实验分支的数据独立于官方 benchmark 存储。返回原始 campaign 元数据、已发布的参考点、每次重复实验、健康状态和来源信息，不生成虚构的 GitHub workflow 或数值 benchmark ID。不支持查询筛选，不在服务端计算图表指标。推理界面的实验选择器复用 i_tokens=total|uncached；它们是界面控件，不是此原始数据接口的参数。Cache-Control: no-store。公开只读，无需认证。',
+      'Branch-scoped experiment data stored separately from official benchmarks. Returns raw campaign metadata, optional published reference points and every experiment replicate, including health flags and source provenance. The latest three-hour campaign contains 13 WEKA and 9 internal Mooncake runs with no one-hour reference points. C128 is flagged for metric integrity and C140/C180 for DRAM-cache recovery; all three remain stored but frontier-ineligible. The internal baseline retains four serving variants in configuration metadata. No GitHub workflow or numeric benchmark identities are invented. No query filters or server-side chart calculations. The inference UI experiment selector reuses i_tokens=total|uncached; these are UI controls, not parameters on this raw endpoint. Cache-Control: no-store. Public read; no authentication.',
+      '实验分支的数据独立于官方 benchmark 存储。返回原始 campaign 元数据、可选的已发布参考点、每次重复实验、健康状态和来源信息。最新三小时 campaign 包含 13 次 WEKA 和 9 次内部 Mooncake 运行，不含一小时参考点。C128 标记读取字节计数器完整性异常，C140/C180 标记 DRAM-cache 恢复；三者均保留，但不纳入无异常结果的 Pareto 前沿。内部基线的四种 serving 配置保留在 configuration 元数据中。不生成虚构的 GitHub workflow 或数值 benchmark ID。不支持查询筛选，不在服务端计算图表指标。推理界面的实验选择器复用 i_tokens=total|uncached；它们是界面控件，不是此原始数据接口的参数。Cache-Control: no-store。公开只读，无需认证。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -110,13 +110,13 @@ export const experimentOperations: readonly ApiOperation[] = [
         schema: objectSchema({ campaign: campaignSchema, runs: arraySchema(runSchema) }),
         example: {
           campaign: {
-            slug: 'weka-amg-kimi-k3',
-            title: 'Kimi-K3: WEKA AMG and Mooncake DRAM',
+            slug: 'weka-amg-kimi-k3-latest-3h',
+            title: 'Latest WEKA vs Internal Mooncake: 3-hour / 20-minute-idle comparison',
             description: 'Completed experimental comparison; health qualifications remain visible.',
             reference_points: [],
             comparison_notes: [],
             manifest_sha256: '<stored campaign manifest SHA-256>',
-            expected_run_count: 16,
+            expected_run_count: 22,
             complete: true,
           },
           runs: [runExample],
@@ -125,7 +125,7 @@ export const experimentOperations: readonly ApiOperation[] = [
       ...errors,
     ],
     responseShapeName: 'ExperimentCampaignResponse',
-    curlUrl: `${API_BASE_URL}/api/v1/experiments/weka-amg-kimi-k3`,
+    curlUrl: `${API_BASE_URL}/api/v1/experiments/weka-amg-kimi-k3-latest-3h`,
   },
   {
     id: 'get-experiment-run',
@@ -176,6 +176,6 @@ export const experimentOperations: readonly ApiOperation[] = [
       ...errors,
     ],
     responseShapeName: 'ExperimentRunDetail',
-    curlUrl: `${API_BASE_URL}/api/v1/experiments/weka-amg-kimi-k3/runs/${runExample.run_id}`,
+    curlUrl: `${API_BASE_URL}/api/v1/experiments/weka-amg-kimi-k3-latest-3h/runs/${runExample.run_id}`,
   },
 ];

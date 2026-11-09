@@ -23,6 +23,8 @@ export interface AggDataEntry {
     runId: string;
     replicate: number | null;
     frontierEligible: boolean;
+    qualificationCode?: string;
+    configurationVariant?: string;
     detailHref: string;
   };
   trendSource?: TrendSource;

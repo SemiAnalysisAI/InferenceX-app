@@ -31,7 +31,7 @@ export interface ResultContextProps {
   date?: string;
   dates?: readonly string[];
   dateRange?: { start: string; end: string };
-  source?: string;
+  source?: ReactNode;
   deprecated?: boolean;
   costBasis?: string;
   costBasisTestId?: string;

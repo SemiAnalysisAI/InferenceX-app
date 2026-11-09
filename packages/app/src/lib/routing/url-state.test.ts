@@ -1109,12 +1109,14 @@ describe('explicit experiment share links', () => {
 
   it('retains the campaign selector when sharing changed chart axes in English and Chinese', async () => {
     const { buildShareUrl, chartStateHref } = await import('@/lib/routing/url-state');
-    for (const path of ['/infx/inference', '/zh/infx/inference/kimi-k3']) {
-      setupWindow('?experiment=weka-amg-kimi-k3', path);
-      expect(new URL(buildShareUrl()).searchParams.get('experiment')).toBe('weka-amg-kimi-k3');
-      const changed = new URL(chartStateHref({ i_xmode: 'ttft' }));
-      expect(changed.searchParams.get('experiment')).toBe('weka-amg-kimi-k3');
-      expect(changed.searchParams.get('i_xmode')).toBe('ttft');
+    for (const campaign of ['weka-amg-kimi-k3', 'weka-amg-kimi-k3-latest-3h']) {
+      for (const path of ['/infx/inference', '/zh/infx/inference/kimi-k3']) {
+        setupWindow(`?experiment=${campaign}`, path);
+        expect(new URL(buildShareUrl()).searchParams.get('experiment')).toBe(campaign);
+        const changed = new URL(chartStateHref({ i_xmode: 'ttft' }));
+        expect(changed.searchParams.get('experiment')).toBe(campaign);
+        expect(changed.searchParams.get('i_xmode')).toBe('ttft');
+      }
     }
   });
 });

@@ -1,15 +1,15 @@
 # Experiment campaigns
 
-The experiment branch reuses the inference dashboard with an explicit `experiment=weka-amg-kimi-k3` selector. Data lives in separate `experiment_campaigns`, `experiment_runs` and payload tables in the child database. It does not create official benchmarks or synthetic GitHub Actions IDs.
+The experiment branch reuses the inference dashboard with an explicit campaign selector: `experiment=weka-amg-kimi-k3-latest-3h` for the latest three-hour comparison, or `experiment=weka-amg-kimi-k3` for the historical one-hour campaign. Data lives in separate `experiment_campaigns`, `experiment_runs` and payload tables in the child database. It does not create official benchmarks or synthetic GitHub Actions IDs.
 
 Read-only endpoints:
 
-- `/api/v1/experiments/{campaign}` returns raw `{campaign,runs}`, including all replicates and genuine published reference points.
+- `/api/v1/experiments/{campaign}` returns raw `{campaign,runs}`, including all runs, qualification flags and any explicitly stored reference points.
 - `/api/v1/experiments/{campaign}/runs/{runId}` returns one raw run with stored aggregate/trace projections and payload inventory.
 
 Both return no-store responses. Incomplete ingestion and missing identities return404; internal read failures return500. The UI adapts stored metrics through the existing chart transformation functions. String experiment identities must not be sent to numeric benchmark detail endpoints. The detail API is the raw-data drilldown when an existing numeric-ID detail component cannot be reused without changing identity semantics.
 
-The API registry generates English/Chinese reference and OpenAPI entries. The existing inferencex-skills package documents selectors, control coverage, source attribution and cache/normalization limitations in `references/experiments.md`. The experiment branch keeps published data and bespoke data distinct; C150's recovery flag and .89 allocation setting remain visible.
+The API registry generates English/Chinese reference and OpenAPI entries. The existing inferencex-skills package documents selectors, control coverage, source attribution and cache/normalization limitations in `references/experiments.md`. The experiment branch keeps the three-hour campaign separate from published one-hour measurements. Each run retains its qualification and serving configuration.
 
 ## Experiment deployment
 
@@ -27,12 +27,24 @@ The chart adapter uses a common comparison date to keep experimental repetitions
 
 ## Database refresh — November 9, 2026
 
-The existing child branch was reset to production `main` at 2026-11-09 15:48:52 UTC. Its database endpoint and no-expiry policy are retained. The experiment tables were recreated empty, and the preview reader role was restored with read-only access. The earlier 16 imported runs and payloads are no longer present; no three-hour results have been imported. The November 2 manifest and import receipt remain historical artifacts, not the current database inventory. An absent campaign returns 404 until a new import completes.
+The existing child branch was reset to production `main` at 2026-11-09 15:48:52 UTC. Its database endpoint and no-expiry policy are retained. The experiment tables were recreated empty, and the preview reader role was restored with read-only access. The earlier 16 imported runs and payloads were removed by this refresh. The subsequent three-hour import uses a new campaign slug; it does not restore the historical import. The November 2 manifest and import receipt remain historical artifacts, not the current database inventory. An absent campaign returns 404 until a new import completes.
+
+## Latest three-hour comparison
+
+Imported November 9, 2026 at 16:20 UTC: all 22 records and 66 compressed profile, server-metric and server-log payloads verified against the source artifacts. `packages/db/experiments/latest-import-receipt.json` records this import.
+
+`weka-amg-kimi-k3-latest-3h` defines 22 measurements: 13 latest WEKA AMG runs (C32, 40, 48, 56, 70, 96, 128, 140, 150, 180, 200, 220, 250) and nine internal B300 Mooncake runs (C32, 40, 48, 56, 70, 96, 128, 140, 150). All use a 10,800-second measurement and 1,200-second trace-idle cap with speculation disabled. The trace-idle cap is not a guarantee of 20 minutes of wall-clock idleness.
+
+The two series are **Latest WEKA AMG** (1,200 GiB FP8 KDA-state DRAM plus 8 TiB WEKA attention-KV storage) and **Internal Mooncake DRAM** (2,248 GiB DRAM over EFA). The internal line is the best measured envelope across four serving variants; the original variant, image, graph setting and SDK remain in run configuration metadata. C128 carries `health.qualification_code=metric-integrity`; C140/C180 carry `dram-recovery`. All three stay visible as triangles but are excluded from frontier candidates. The 19 clean points include dominated measurements.
+
+This campaign has no published reference points. Selecting it excludes all official rows from the chart rather than overlaying a different one-hour scenario. Both series use November 9 only as a curve-grouping date; actual run dates remain unchanged. `i_optimal=0&i_best=0` shows all measurements, including dominated and flagged points. Frontier computation itself is unchanged.
 
 ## Inference controls and API coverage
 
-Select `experiment=weka-amg-kimi-k3` on the existing Kimi-K3 Agentic Traces view. This selection permits the experiment's framework comparison and the existing token-basis control without changing the global feature gate. `i_tokens=uncached` selects normalized throughput; `i_tokens=total` (the default) selects total tokens. Other models/scenarios retain their usual gates. The raw campaign API has no `i_tokens` parameter: it exposes input/output throughput and theoretical cache reuse so the existing shared chart transformation computes either basis. Measured cache-hit ratios remain separate evidence fields.
+Select either recognized `experiment` campaign on the existing Kimi-K3 Agentic Traces view. This selection permits the experiment's framework comparison and the existing token-basis control without changing the global feature gate. `i_tokens=uncached` selects normalized throughput; `i_tokens=total` (the default) selects total tokens. Other models/scenarios retain their usual gates. The raw campaign API has no `i_tokens` parameter: it exposes input/output throughput and theoretical cache reuse so the existing shared chart transformation computes either basis. Measured cache-hit ratios remain separate evidence fields.
 
-The adapter preserves the archived P90 full-response interactivity by mapping its reciprocal to the chart's P90 ITL inputs; it does not substitute that value for other genuine percentiles. Published reference rows replace the corresponding current B300/vLLM Agentic Traces rows to avoid duplicate official points. All ten WEKA repetitions retain distinct experiment identities. While the selected campaign loads, chart rows remain empty rather than briefly populating an official-only legend. Legend visibility, tooltip placement and loading presentation do not alter the raw API payload.
+The adapter preserves the archived P90 full-response interactivity by mapping its reciprocal to the chart's P90 ITL inputs; it does not substitute that value for other genuine percentiles. For the historical one-hour campaign only, published reference rows replace corresponding current B300/vLLM Agentic Traces rows to avoid duplicates. Every measured repetition retains its own experiment identity. The latest three-hour campaign includes no official rows. While the selected campaign loads or is unavailable, chart rows remain empty rather than briefly populating an official-only legend. Legend visibility, tooltip placement and loading presentation do not alter the raw API payload.
 
 Inference share and axis links preserve the recognized experiment selector in both English and Chinese views. Experiment evidence actions use string-ID API detail links, including from legend tables; they do not fabricate GitHub Actions links or display the public-workflow reproducibility prompt for this campaign.
+
+For the latest three-hour campaign, the dashboard hides official workflow/date and historical-comparison controls. Its footer shows the actual measurement date range and links “Experiment measurements” to the campaign API. Published and historical campaign views retain their existing controls.

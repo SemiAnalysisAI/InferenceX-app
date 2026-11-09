@@ -103,7 +103,12 @@ async function main() {
     const stored =
       await sql`select run_id,record_sha256,clean_backend_qualified,frontier_eligible from experiment_runs where campaign_slug=${manifest.slug}`;
     assert.deepEqual(stored.map((r) => r.run_id).sort(), manifest.runs.map((r) => r.run_id).sort());
-    assert.equal(stored.filter((r) => !r.frontier_eligible).length, 1);
+    for (const expected of manifest.runs) {
+      const actual = stored.find((r) => r.run_id === expected.run_id);
+      assert.ok(actual);
+      assert.equal(actual.frontier_eligible, expected.frontier_eligible);
+      assert.equal(actual.clean_backend_qualified, expected.clean_backend_qualified);
+    }
     const chunks =
       await sql`select run_id,kind,count(*)::int as parts,sum(octet_length(data))::bigint as bytes, encode(sha256(string_agg(data,''::bytea order by part)),'hex') as payload_sha256 from experiment_payload_chunks where campaign_slug=${manifest.slug} group by run_id,kind`;
     for (const r of manifest.runs) {

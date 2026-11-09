@@ -20,6 +20,8 @@ export const FW_REGISTRY: Record<string, FwEntry> = {
   trt: { label: 'TRTLLM' },
   vllm: { label: 'vLLM' },
   'vllm-weka-amg': { label: 'vLLM · WEKA AMG' },
+  'vllm-weka-amg-latest': { label: 'Latest WEKA AMG' },
+  'vllm-mooncake-internal': { label: 'Internal Mooncake DRAM' },
   'vllm-mooncake-dram': { label: 'vLLM · Mooncake DRAM' },
   'vllm-mooncake-recovered': { label: 'vLLM · Mooncake C150 †' },
 };

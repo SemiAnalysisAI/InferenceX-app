@@ -1,23 +1,34 @@
 'use client';
 import { useClientSearchParams } from '@/hooks/useClientSearch';
 import { useQuery } from '@tanstack/react-query';
-import { WEKA_EXPERIMENT, type ExperimentResponse } from '@/lib/benchmarks/experiment-benchmarks';
+import {
+  isExperimentCampaign,
+  type ExperimentResponse,
+} from '@/lib/benchmarks/experiment-benchmarks';
 
+export function useExperimentCampaign(): string | null {
+  const value = useClientSearchParams().get('experiment');
+  return isExperimentCampaign(value) ? value : null;
+}
 export function useExperimentSelected(): boolean {
-  return useClientSearchParams().get('experiment') === WEKA_EXPERIMENT;
+  return useExperimentCampaign() !== null;
 }
 
 export function useExperiment(enabled = true) {
-  const selected = useExperimentSelected();
-  return useQuery({
-    queryKey: ['experiment', WEKA_EXPERIMENT],
+  const campaign = useExperimentCampaign();
+  const selected = campaign !== null && enabled;
+  const query = useQuery({
+    queryKey: ['experiment', campaign],
     queryFn: async ({ signal }): Promise<ExperimentResponse> => {
-      const response = await fetch(`/api/v1/experiments/${WEKA_EXPERIMENT}`, { signal });
+      const response = await fetch(`/api/v1/experiments/${encodeURIComponent(campaign!)}`, {
+        signal,
+      });
       if (!response.ok) throw new Error(`Experiment data unavailable (${response.status})`);
       return response.json();
     },
-    enabled: selected && enabled,
+    enabled: selected,
     staleTime: Infinity,
-    select: selected && enabled ? (data: ExperimentResponse) => data : () => undefined,
+    select: selected ? (data: ExperimentResponse) => data : () => undefined,
   });
+  return { ...query, selected };
 }

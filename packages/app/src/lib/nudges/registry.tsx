@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
-import { WEKA_EXPERIMENT } from '@/lib/benchmarks/experiment-benchmarks';
+import { isExperimentCampaign } from '@/lib/benchmarks/experiment-benchmarks';
 import { MOBILE_VIEWPORT_QUERY } from '@/hooks/useMediaQuery';
 import { isZhPathname, localePath } from '@/lib/i18n/i18n';
 import {
@@ -85,7 +85,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       {
         check: () =>
           typeof window === 'undefined' ||
-          new URLSearchParams(window.location.search).get('experiment') !== WEKA_EXPERIMENT,
+          !isExperimentCampaign(new URLSearchParams(window.location.search).get('experiment')),
       },
     ],
     priority: 10,

@@ -6,6 +6,32 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import type { AggDataEntry } from '@/components/inference/types';
 
 export const WEKA_EXPERIMENT = 'weka-amg-kimi-k3';
+export const LATEST_WEKA_EXPERIMENT = 'weka-amg-kimi-k3-latest-3h';
+export function isExperimentCampaign(value: string | null): boolean {
+  return value === WEKA_EXPERIMENT || value === LATEST_WEKA_EXPERIMENT;
+}
+
+export function experimentQualificationNote(
+  experiment: NonNullable<AggDataEntry['experiment']>,
+  locale: 'en' | 'zh',
+): string {
+  if (experiment.frontierEligible) return '';
+  if (experiment.qualificationCode === 'metric-integrity')
+    return locale === 'zh'
+      ? '读取字节计数器完整性异常；请求性能指标有效，但不纳入无异常结果的 Pareto 前沿。'
+      : 'Read-byte counter integrity flag; request performance remains valid, but this point is excluded from the clean frontier.';
+  if (experiment.qualificationCode === 'dram-recovery')
+    return locale === 'zh'
+      ? '测量期间发生可恢复的 DRAM cache 读取故障；不纳入无异常结果的 Pareto 前沿。'
+      : 'Recoverable DRAM-cache load failures during measurement; excluded from the clean frontier.';
+  if (experiment.campaign !== WEKA_EXPERIMENT)
+    return locale === 'zh'
+      ? '存在异常标记；不纳入无异常结果的 Pareto 前沿。'
+      : 'Flagged measurement; excluded from the clean frontier.';
+  return locale === 'zh'
+    ? '已恢复的 cache miss；不纳入无读取故障的 frontier；GPU-memory utilization 0.89。'
+    : 'Recovered cache miss; excluded from clean frontier; GPU-memory utilization 0.89.';
+}
 export interface ExperimentResponse {
   campaign: ExperimentCampaign;
   runs: ExperimentRun[];
@@ -81,7 +107,13 @@ function baseRow(): BenchmarkRow {
 export function experimentBenchmarkRows(data: ExperimentResponse): ExperimentBenchmarkRow[] {
   return data.runs.map((run) => ({
     ...baseRow(),
-    framework: FRAMEWORKS[run.series],
+    framework:
+      data.campaign.slug === LATEST_WEKA_EXPERIMENT
+        ? run.series === 'weka'
+          ? 'vllm-weka-amg-latest'
+          : 'vllm-mooncake-internal'
+        : FRAMEWORKS[run.series],
+    date: data.campaign.slug === LATEST_WEKA_EXPERIMENT ? '2026-11-09' : '2026-10-31',
     // A common comparison date keeps all repetitions in one displayed curve.
     // Tooltips retain each measurement's actual date from its source export.
     actualDate: typeof run.configuration.date === 'string' ? run.configuration.date : undefined,
@@ -103,6 +135,14 @@ export function experimentBenchmarkRows(data: ExperimentResponse): ExperimentBen
       runId: run.run_id,
       replicate: run.replicate,
       frontierEligible: run.frontier_eligible,
+      qualificationCode:
+        typeof run.health.qualification_code === 'string'
+          ? run.health.qualification_code
+          : undefined,
+      configurationVariant:
+        typeof run.configuration.configuration_variant === 'string'
+          ? run.configuration.configuration_variant
+          : undefined,
       detailHref: experimentDetailHref(data.campaign.slug, run.run_id),
     },
   }));
@@ -125,6 +165,8 @@ export function withExperimentRows(
   rows: BenchmarkRow[],
   data: ExperimentResponse,
 ): ExperimentBenchmarkRow[] {
+  // Three-hour experiments contain their own matched workload; never overlay one-hour published data.
+  if (data.campaign.slug === LATEST_WEKA_EXPERIMENT) return experimentBenchmarkRows(data);
   return [
     ...rows.filter(
       (row) =>

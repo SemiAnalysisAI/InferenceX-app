@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
-import { assertChildTarget } from './import.js';
+import { assertChildTarget, validateManifest, type InputManifest } from './import.js';
 import {
   getExperimentCampaign,
   getExperimentRuns,
@@ -19,6 +19,43 @@ const target = {
   expires_at: null,
 };
 describe('isolated experiment storage', () => {
+  it('accepts the two reviewed campaigns and rejects mixed scenarios or lost qualifications', async () => {
+    const latest = JSON.parse(
+      await readFile(
+        new URL('../../experiments/weka-amg-kimi-k3-latest-3h.manifest.json', import.meta.url),
+        'utf8',
+      ),
+    ) as InputManifest;
+    const historical = JSON.parse(
+      await readFile(
+        new URL('../../experiments/weka-amg-kimi-k3.manifest.json', import.meta.url),
+        'utf8',
+      ),
+    ) as InputManifest;
+    expect(() => validateManifest(latest)).not.toThrow();
+    expect(() => validateManifest(historical)).not.toThrow();
+    for (const mutate of [
+      (m: InputManifest) => {
+        m.reference_points = historical.reference_points;
+      },
+      (m: InputManifest) => {
+        m.runs[0].configuration.benchmark_duration_seconds = 3600;
+      },
+      (m: InputManifest) => {
+        m.runs[0].configuration.trace_idle_gap_cap_seconds = 300;
+      },
+      (m: InputManifest) => {
+        m.runs.find((r) => r.series === 'weka' && r.concurrency === 128)!.frontier_eligible = true;
+      },
+      (m: InputManifest) => {
+        m.runs[1].run_id = m.runs[0].run_id;
+      },
+    ]) {
+      const changed = structuredClone(latest);
+      mutate(changed);
+      expect(() => validateManifest(changed)).toThrow();
+    }
+  });
   it('rejects main, unrelated endpoints and database mismatches before opening a write connection', () => {
     const url =
       'postgresql://user:password@ep-empty-dream-aio1rvub.c-4.us-east-1.aws.neon.tech/neondb';

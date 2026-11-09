@@ -14,3 +14,6 @@ packages/app/src/lib/power/power-model.parity.json
 # The native H3 bundle fixture is a checksum-sealed copy of the InferenceX producer's
 # output: SHA256SUMS and the manifest bind every byte, so reformatting breaks the seal.
 packages/app/src/components/video-benchmark/fixtures/native-serving-bundle/
+
+# The imported campaign receipt binds the manifest bytes by SHA256.
+packages/db/experiments/weka-amg-kimi-k3-latest-3h.manifest.json

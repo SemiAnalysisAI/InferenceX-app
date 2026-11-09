@@ -54,6 +54,68 @@ const mouse = (type: string, x: number, y: number, buttons: number) =>
   });
 
 describe('ScatterGraph', () => {
+  it('renders flagged experiment measurements as disconnected triangles and keeps their evidence link', () => {
+    const experiment = {
+      campaign: 'weka-amg-kimi-k3-latest-3h',
+      runId: 'cam-k3-kdadr-20261104-c128',
+      replicate: 1,
+      frontierEligible: false,
+      qualificationCode: 'metric-integrity',
+      detailHref: '/api/v1/experiments/weka-amg-kimi-k3-latest-3h/runs/cam-k3-kdadr-20261104-c128',
+    };
+    const flagged = createMockInferenceData({
+      hwKey: 'b200_sglang',
+      precision: Precision.FP4,
+      x: 15,
+      y: 120,
+      conc: 128,
+      experiment,
+      id: undefined,
+    });
+    const clean = createMockInferenceData({
+      hwKey: 'b200_sglang',
+      precision: Precision.FP4,
+      x: 25,
+      y: 80,
+      conc: 96,
+    });
+    mountWithProviders(
+      <ScatterGraph
+        chartId="experiment-flags"
+        modelLabel="Kimi K3"
+        data={[clean, flagged]}
+        xLabel="Interactivity"
+        yLabel="Throughput"
+        chartDefinition={defaultChartDef}
+        transitionDuration={0}
+      />,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_sglang']),
+          hwTypesWithData: new Set(['b200_sglang']),
+          selectedPrecisions: [Precision.FP4],
+          hideNonOptimal: false,
+        },
+        unofficial: {},
+      },
+    );
+    cy.scatterPoints('#experiment-flags').should((points) => {
+      expect(visiblePoints(points)).to.have.length(2);
+      const flaggedPoint = points.find((p) => p.datum.experiment)!;
+      expect(flaggedPoint.shape).to.equal('triangle');
+    });
+    cy.scatterPoints('#experiment-flags').then((points) =>
+      clickScatterPoint(points.find((p) => p.datum.experiment?.runId === experiment.runId)!),
+    );
+    cy.contains('Read-byte counter integrity flag').should('be.visible');
+    cy.contains('a', 'Run evidence and configuration').should(
+      'have.attr',
+      'href',
+      experiment.detailHref,
+    );
+  });
+
   for (const overlay of [false, true]) {
     it(`dismisses pinned ${overlay ? 'unofficial' : 'official'} details outside the chart and on Escape`, () => {
       const data = [

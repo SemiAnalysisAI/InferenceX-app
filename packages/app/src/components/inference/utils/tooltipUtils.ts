@@ -1,3 +1,4 @@
+import { experimentQualificationNote } from '@/lib/benchmarks/experiment-benchmarks';
 import { getPointHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import {
   speculativeDecodingLabel,
@@ -1115,14 +1116,13 @@ export const buildPointDetails = (config: TooltipConfig): PointDetails => {
     modeledSystemPowerHTML(d, selectedYAxisMetric, locale) +
     rowsHTML(powerWithheldRows(d, locale)) +
     workerPowerHTML(d, locale);
-  const experimentNote =
-    d.experiment && !d.experiment.frontierEligible
-      ? `<div class="text-xs">${
-          locale === 'zh'
-            ? '已恢复的 cache miss；不纳入无读取故障的 frontier；GPU-memory utilization 0.89。'
-            : 'Recovered cache miss; excluded from clean frontier; GPU-memory utilization 0.89.'
-        }</div>`
-      : '';
+  const experimentNote = d.experiment
+    ? `<div class="text-xs">${escapeHtml(experimentQualificationNote(d.experiment, locale))}</div>${
+        d.experiment.configurationVariant
+          ? `<div class="text-xs">${escapeHtml(d.experiment.configurationVariant)}</div>`
+          : ''
+      }`
+    : '';
   const footer = d.image
     ? `<div class="pinned-image"><span>${t.image}</span><p>${escapeHtml(d.image.trim())}</p></div>`
     : '';

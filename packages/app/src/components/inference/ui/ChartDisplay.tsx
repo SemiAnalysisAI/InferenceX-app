@@ -139,6 +139,8 @@ import { ModelLogo } from '@/components/ui/model-logo';
 
 import ChartNotices from './ChartNotices';
 import { ExperimentNotice } from './ExperimentNotice';
+import { useExperimentCampaign } from '@/hooks/api/use-experiment';
+import { LATEST_WEKA_EXPERIMENT } from '@/lib/benchmarks/experiment-benchmarks';
 import { MetricExplanation } from './MetricExplanation';
 import { OptionInfo } from '@/components/ui/option-info';
 import ChartControls from './ChartControls';
@@ -345,6 +347,12 @@ export default function ChartDisplay({
     setPowerCompare,
   } = useInferenceActions();
   const powerXSurface = usePowerXSurface();
+  const experimentCampaign = useExperimentCampaign();
+  const latestExperiment =
+    experimentCampaign === LATEST_WEKA_EXPERIMENT &&
+    selectedModel === 'Kimi-K3' &&
+    selectedSequence === Sequence.AgenticTraces &&
+    !powerXSurface;
   const powerXT = usePowerXStrings();
   // URL-driven metric state differs between server and client; render PowerX chrome after mount.
   const [powerXMounted, setPowerXMounted] = useState(false);
@@ -404,12 +412,14 @@ export default function ChartDisplay({
     selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined;
 
   const [changelogOpened, setChangelogOpened] = useState(false);
-  const changelogsEnabled = shouldFetchComparisonChangelogs({
-    embedded,
-    changelogOpened,
-    selectedDateRange,
-    selectedDates,
-  });
+  const changelogsEnabled =
+    !latestExperiment &&
+    shouldFetchComparisonChangelogs({
+      embedded,
+      changelogOpened,
+      selectedDateRange,
+      selectedDates,
+    });
   const {
     changelogs,
     loading: changelogsLoading,
@@ -1137,6 +1147,16 @@ export default function ChartDisplay({
           ]
         : renderableGraphs.map((graph, graphIndex) => {
             const resolvedXLabel = xAxisLabel(graph.chartDefinition, locale);
+            const experimentDates = latestExperiment
+              ? graph.data
+                  .map((point) => point.actualDate)
+                  .filter((date): date is string => Boolean(date))
+                  .sort()
+              : [];
+            const experimentDateRange =
+              experimentDates.length > 0
+                ? { start: experimentDates[0], end: experimentDates.at(-1)! }
+                : undefined;
             const isTimelineMode = Boolean(
               selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
             );
@@ -1304,7 +1324,7 @@ export default function ChartDisplay({
                                 />
                               ) : undefined
                             }
-                            deprecated={isModelDeprecated(selectedModel)}
+                            deprecated={!latestExperiment && isModelDeprecated(selectedModel)}
                             precision={
                               embedded
                                 ? selectedPrecisions
@@ -1337,22 +1357,37 @@ export default function ChartDisplay({
                                 <ChipBasisCaption control={chipBasisControl} />
                               ) : undefined
                             }
-                            date={selectedRunDate}
-                            dates={selectedDates}
+                            date={latestExperiment ? undefined : selectedRunDate}
+                            dates={latestExperiment ? undefined : selectedDates}
                             dateRange={
-                              selectedDateRange.startDate && selectedDateRange.endDate
-                                ? {
-                                    start: selectedDateRange.startDate,
-                                    end: selectedDateRange.endDate,
-                                  }
-                                : undefined
+                              latestExperiment
+                                ? experimentDateRange
+                                : selectedDateRange.startDate && selectedDateRange.endDate
+                                  ? {
+                                      start: selectedDateRange.startDate,
+                                      end: selectedDateRange.endDate,
+                                    }
+                                  : undefined
                             }
                             source={
-                              isUnofficialRun
-                                ? locale === 'zh'
-                                  ? 'SemiAnalysis InferenceX™ + 非官方 overlays'
-                                  : 'SemiAnalysis InferenceX™ + unofficial overlays'
-                                : 'SemiAnalysis InferenceX™'
+                              latestExperiment ? (
+                                <a
+                                  className="underline"
+                                  href={`/api/v1/experiments/${LATEST_WEKA_EXPERIMENT}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {locale === 'zh' ? '实验测量' : 'Experiment measurements'}
+                                </a>
+                              ) : isUnofficialRun ? (
+                                locale === 'zh' ? (
+                                  'SemiAnalysis InferenceX™ + 非官方 overlays'
+                                ) : (
+                                  'SemiAnalysis InferenceX™ + unofficial overlays'
+                                )
+                              ) : (
+                                'SemiAnalysis InferenceX™'
+                              )
                             }
                             costBasis={
                               usesTokenSalePricing(selectedYAxisMetric) && tokenRevenuePricing
@@ -1701,7 +1736,12 @@ export default function ChartDisplay({
                   <ChartControls
                     scenarioInFooter={!powerXSurface}
                     showXAxisMode
-                    runContext={selectedGPUs.length === 0 ? <WorkflowInfoDisplay /> : undefined}
+                    hideGpuComparison={latestExperiment}
+                    runContext={
+                      !latestExperiment && selectedGPUs.length === 0 ? (
+                        <WorkflowInfoDisplay />
+                      ) : undefined
+                    }
                     powerXControls={
                       powerXLayout && powerXMounted
                         ? (slots) => (
@@ -1721,8 +1761,10 @@ export default function ChartDisplay({
                   <XAxisModeSelector />
                 </div>
               )}
-              {embedded && selectedGPUs.length === 0 && <WorkflowInfoDisplay />}
-              {selectedGPUs.length > 0 && (
+              {!latestExperiment && embedded && selectedGPUs.length === 0 && (
+                <WorkflowInfoDisplay />
+              )}
+              {!latestExperiment && selectedGPUs.length > 0 && (
                 <ComparisonChangelog
                   changelogs={changelogs}
                   selectedGPUs={selectedGPUs}

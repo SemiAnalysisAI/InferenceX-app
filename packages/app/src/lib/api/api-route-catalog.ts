@@ -1268,7 +1268,7 @@ export interface ApiContractSourceDigest {
 export const apiContractSourceDigests = [
   {
     source: 'src/lib/benchmarks/experiment-benchmarks.ts',
-    sourceSha256: '7508d7c703507eb0c6625a158734479a6c6ce51bdea3c1a324a8a28956df8e1a',
+    sourceSha256: '59512cdb8349adae4a86d16148c8f4a640386cf1ebc1b2703f00115e7a6e4176',
     reviewArea: {
       en: 'Experiment selector row adaptation, replicate identity and archived reference metrics.',
       zh: '实验选择器的数据转换、重复实验身份及已归档参考指标。',
@@ -1284,7 +1284,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api/experiment-documentation.ts',
-    sourceSha256: '4b7b81890eead29c9659ea173f1e0a1b38d23d5b8ece82921e71807a5bd39f45',
+    sourceSha256: '8e072f9f8b55434e85fd564b6b7f206a6fd0412cf5e5a6b6069278460761972e',
     reviewArea: {
       en: 'Experiment raw campaign and string-ID run detail contracts, provenance and no-store caching.',
       zh: '实验原始 campaign、字符串 run ID 详情、来源信息与 no-store 缓存约定。',
@@ -1293,7 +1293,7 @@ export const apiContractSourceDigests = [
 
   {
     source: '../constants/src/framework-aliases.ts',
-    sourceSha256: '345c214af25d29bcbfc0b636ec06527cecf0a30061339bace9b263ba3f457bc6',
+    sourceSha256: 'b94e2dbd829f3f82c2ae00a61a5a3ba0972bca4352d3b74e3445048848e64b0a',
     reviewArea: {
       en: 'Shared engine labels, family classification and dashboard/read-only view filter parity.',
       zh: '共享引擎标签、系列分类，以及仪表板与只读视图的筛选一致性。',

@@ -1,0 +1,569 @@
+{
+  "campaign": "weka-amg-kimi-k3-latest-3h",
+  "manifest_sha256": "76886fcbf4db2235129f7ebb131f719a1a7714b24f5e5ab893e52e3396091f8d",
+  "target": {
+    "purpose": "weka-amg-kimi-k3-isolated-import",
+    "project_id": "silent-pond-29172997",
+    "parent_branch_id": "br-restless-voice-ai2vkru2",
+    "child_branch_id": "br-odd-math-aif8e7ha",
+    "endpoint_host": "ep-empty-dream-aio1rvub-pooler.c-4.us-east-1.aws.neon.tech",
+    "database": "neondb",
+    "expires_at": null
+  },
+  "completed_at": "2026-11-09T16:20:19.015Z",
+  "runs": [
+    {
+      "run_id": "internal-c32-job-13001",
+      "status": "inserted"
+    },
+    {
+      "run_id": "internal-c40-job-12997",
+      "status": "inserted"
+    },
+    {
+      "run_id": "internal-c48-job-13021",
+      "status": "inserted"
+    },
+    {
+      "run_id": "internal-c56-job-13037",
+      "status": "inserted"
+    },
+    {
+      "run_id": "internal-c70-job-13041",
+      "status": "inserted"
+    },
+    {
+      "run_id": "internal-c96-job-13032",
+      "status": "inserted"
+    },
+    {
+      "run_id": "internal-c128-job-12999",
+      "status": "inserted"
+    },
+    {
+      "run_id": "internal-c140-job-12992",
+      "status": "inserted"
+    },
+    {
+      "run_id": "internal-c150-job-13043",
+      "status": "inserted"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c32",
+      "status": "inserted"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c40",
+      "status": "inserted"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c48",
+      "status": "inserted"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c56",
+      "status": "inserted"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c70",
+      "status": "inserted"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c96",
+      "status": "inserted"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c128",
+      "status": "inserted"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c140",
+      "status": "inserted"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c150",
+      "status": "inserted"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c180",
+      "status": "inserted"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c200",
+      "status": "inserted"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c220",
+      "status": "inserted"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c250",
+      "status": "inserted"
+    }
+  ],
+  "stored_count": 22,
+  "payloads": [
+    {
+      "run_id": "cam-k3-kdadr-20261104-c128",
+      "kind": "profile",
+      "parts": 11,
+      "bytes": "11053434",
+      "payload_sha256": "3b541ea9921d96d074908eb1b27001437d19f0d2b78acf6988473fae43b75053"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c128",
+      "kind": "server_log",
+      "parts": 2,
+      "bytes": "2034312",
+      "payload_sha256": "136a9556e64538428fef627c91af039d6801fc70fa2f68960f6cd6dd743aed2b"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c128",
+      "kind": "server_metrics",
+      "parts": 47,
+      "bytes": "48498972",
+      "payload_sha256": "3ace2430642b4f66977002434199cb1d5ecdf6e89d41069f7b7bd78f44bf745d"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c140",
+      "kind": "profile",
+      "parts": 11,
+      "bytes": "11001829",
+      "payload_sha256": "b999fb518e5f2bb3f5ab49d0b88e9acd54cdb18c7c0b2c965124c2d4691fb43a"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c140",
+      "kind": "server_log",
+      "parts": 2,
+      "bytes": "2020846",
+      "payload_sha256": "d903d9b0e6c1cfad0092a07c5919b33db8054dc2a45da4ae02acf5e7a19e7fe3"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c140",
+      "kind": "server_metrics",
+      "parts": 47,
+      "bytes": "48939732",
+      "payload_sha256": "9325d5f784f2c6131e2dc09ab5147c588178d359a9e279ad1c06deb709aa8891"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c150",
+      "kind": "profile",
+      "parts": 11,
+      "bytes": "11158049",
+      "payload_sha256": "7c3acfb0c514a3859cee31d7b0ee212c320a67aa648989861299d14b28e12e9f"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c150",
+      "kind": "server_log",
+      "parts": 2,
+      "bytes": "2034517",
+      "payload_sha256": "35ef2b7d9b3f79f7b8256194a04637261a006363c88249297ab6552b2615b154"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c150",
+      "kind": "server_metrics",
+      "parts": 48,
+      "bytes": "49472952",
+      "payload_sha256": "c3bc29fb6233884367e4bd0ef8e5fce5de6c3604c8bc0a14ce3bc2e444c9a08b"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c180",
+      "kind": "profile",
+      "parts": 11,
+      "bytes": "10701841",
+      "payload_sha256": "79b6c7d271824baad029da74d98bcbb6d44a4c2e655afcb8916ff4858e0fcaad"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c180",
+      "kind": "server_log",
+      "parts": 3,
+      "bytes": "2169643",
+      "payload_sha256": "f117c15c9d12056684ae40a3305d73df95df8f905dfd551d776f2c7bcdac082c"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c180",
+      "kind": "server_metrics",
+      "parts": 50,
+      "bytes": "51794782",
+      "payload_sha256": "19c6c1df0c0a6e8cbcbced8fb8a6053ad738ced855fa778dc9263f65124b63f2"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c200",
+      "kind": "profile",
+      "parts": 11,
+      "bytes": "10638010",
+      "payload_sha256": "48e3a5321a37ebfdb89b7e0dc10b5b086acf7ece988e68d9125118e1839d9c07"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c200",
+      "kind": "server_log",
+      "parts": 3,
+      "bytes": "2126873",
+      "payload_sha256": "124f7760751f4c950ce027897ac50416277d225e0b82547cdd1319db83b7133c"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c200",
+      "kind": "server_metrics",
+      "parts": 50,
+      "bytes": "52253375",
+      "payload_sha256": "763ec4734d8b1da0d9cdb8b8b5073d7ebe2a205bb51d9bff79c402f5d3d104a0"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c220",
+      "kind": "profile",
+      "parts": 11,
+      "bytes": "10530950",
+      "payload_sha256": "a0b2d9d1e73232c45dd5d638b650eddbd13324481b19d4ad2c580ba31575a401"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c220",
+      "kind": "server_log",
+      "parts": 3,
+      "bytes": "2153364",
+      "payload_sha256": "6ad52a050af6a3cd419364184d07e4c7eff4680f950599f15e6db10c75601283"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c220",
+      "kind": "server_metrics",
+      "parts": 51,
+      "bytes": "53370394",
+      "payload_sha256": "11277d360bb294daa560aa6606ecc0f098782ab84e97f9b5047f61198dcb451c"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c250",
+      "kind": "profile",
+      "parts": 11,
+      "bytes": "10568468",
+      "payload_sha256": "2e483e9cdbcd4043d89590c99380f14658ccef41b0ab20aaac6b54e9f72aacf0"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c250",
+      "kind": "server_log",
+      "parts": 3,
+      "bytes": "2200815",
+      "payload_sha256": "5ca45d4d02b2e7dc63abdf8555a09a2ce2142a60a53bd112e240d251228ab2c7"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c250",
+      "kind": "server_metrics",
+      "parts": 53,
+      "bytes": "54748804",
+      "payload_sha256": "8ecaa0157510e37738536586da6a96b19183a9dd1dd342698a95bf5a8ac3c1a6"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c32",
+      "kind": "profile",
+      "parts": 5,
+      "bytes": "5229663",
+      "payload_sha256": "c355ad23e1fd9dbc134fe0df772f90e5914e9b7bbdcf158888e71f712e58385d"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c32",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "874836",
+      "payload_sha256": "57c72efd6a92e93efbbfa3affbbb71e99ea8f8118f86fdec50d4344df5506295"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c32",
+      "kind": "server_metrics",
+      "parts": 37,
+      "bytes": "37962434",
+      "payload_sha256": "6ba48dc194069dbe933d4bb8834f9a8cabf8ffc210a6c81115480589ec27b0dc"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c40",
+      "kind": "profile",
+      "parts": 6,
+      "bytes": "6245248",
+      "payload_sha256": "0f34886968eb060f34de754726b5e0aa2fd46ef7028a86998d07cbd331a68596"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c40",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "975977",
+      "payload_sha256": "9516f867a51628a630bd1f460767c17239abd700db1b76b103216ed4cc5ecaa6"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c40",
+      "kind": "server_metrics",
+      "parts": 37,
+      "bytes": "38711101",
+      "payload_sha256": "28595645355016d909be2b5d316a4b7837366da40141d611f989e09a410c309e"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c48",
+      "kind": "profile",
+      "parts": 7,
+      "bytes": "7198040",
+      "payload_sha256": "a0d161abec094254a893de20227eac71a89a77e7fa5e0fe0db8616113671d409"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c48",
+      "kind": "server_log",
+      "parts": 2,
+      "bytes": "1137284",
+      "payload_sha256": "ebefde0894d50791247867586329af94d03ad2ee6c37e1656dda8f4bc518ca2c"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c48",
+      "kind": "server_metrics",
+      "parts": 39,
+      "bytes": "39939051",
+      "payload_sha256": "8f68169a9a659f4cac0f46645b3ed945c3b1219d3e418415f576c9c9a7c7ff96"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c56",
+      "kind": "profile",
+      "parts": 8,
+      "bytes": "7791781",
+      "payload_sha256": "f2c7f28d7f139743e3b33081751ea6677deafcfefb5fda908744856ecb089183"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c56",
+      "kind": "server_log",
+      "parts": 2,
+      "bytes": "1352428",
+      "payload_sha256": "a9d405cee96e287fd7722f3c2081ffb397ff8969683f86f177638a784f5bdd70"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c56",
+      "kind": "server_metrics",
+      "parts": 40,
+      "bytes": "41038451",
+      "payload_sha256": "a08de3c85beac619cc7bf74f865282816ece878989209801fdfc65b022ee066a"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c70",
+      "kind": "profile",
+      "parts": 9,
+      "bytes": "9006703",
+      "payload_sha256": "6b28729ff0805e1a2f33c91ab199c9f2cd2780d5b08312c6b5842aba5ba4f74e"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c70",
+      "kind": "server_log",
+      "parts": 2,
+      "bytes": "1625073",
+      "payload_sha256": "6054585477d75199d19f662b221f2e6884693b901d75b59b9924ebf484a6dab6"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c70",
+      "kind": "server_metrics",
+      "parts": 42,
+      "bytes": "43093397",
+      "payload_sha256": "a72d923850f6b2743b30b74b10097fba1dea578fce011141234e1fb4e2588c5d"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c96",
+      "kind": "profile",
+      "parts": 11,
+      "bytes": "10550171",
+      "payload_sha256": "b54c39b119afbdbf2117beede2edfa216ccd18aef64d9b5cbc2841ea3b83ccda"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c96",
+      "kind": "server_log",
+      "parts": 2,
+      "bytes": "1873057",
+      "payload_sha256": "ce4804bd71fd7ea471e33ff5efab1a3ece0d43dc12e95ee83e65e9cdd296263f"
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c96",
+      "kind": "server_metrics",
+      "parts": 44,
+      "bytes": "45720319",
+      "payload_sha256": "fc05441b78a5059e2a02469cb72ffeb345d807665819eb81e3d1b7bb1c28cb2d"
+    },
+    {
+      "run_id": "internal-c128-job-12999",
+      "kind": "profile",
+      "parts": 6,
+      "bytes": "6112749",
+      "payload_sha256": "e844a58206a2f8a2ab37472c9b8897b62630e339d4220c24187cd25c701865fb"
+    },
+    {
+      "run_id": "internal-c128-job-12999",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "182748",
+      "payload_sha256": "8e1095da4e8be504cdf54870bce55458005bdf5673c6809e617949255d11926d"
+    },
+    {
+      "run_id": "internal-c128-job-12999",
+      "kind": "server_metrics",
+      "parts": 12,
+      "bytes": "12530592",
+      "payload_sha256": "3f3e775e89be2f61d4273c24c76a2b666d8ae7a4c9c76acd920fa289a97be9d2"
+    },
+    {
+      "run_id": "internal-c140-job-12992",
+      "kind": "profile",
+      "parts": 6,
+      "bytes": "5839994",
+      "payload_sha256": "fbbb2895abb855d5a3d500a8d88c9faa0fd64e54c54231872e0fccee856afb46"
+    },
+    {
+      "run_id": "internal-c140-job-12992",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "181086",
+      "payload_sha256": "5e5a163f714fcf4f0b8d345e2eff7a8bb097fe3a614b049552e8b0706a931c0a"
+    },
+    {
+      "run_id": "internal-c140-job-12992",
+      "kind": "server_metrics",
+      "parts": 12,
+      "bytes": "12570014",
+      "payload_sha256": "c9da5a3cc86d6f241bd56a1e17c0669e713fdc0a9b08edaf2954d27709fc3372"
+    },
+    {
+      "run_id": "internal-c150-job-13043",
+      "kind": "profile",
+      "parts": 6,
+      "bytes": "5457093",
+      "payload_sha256": "0d9c2bd44b57c7b8a583263ad586fbbf16b66a46dc19608fe490c5aade651383"
+    },
+    {
+      "run_id": "internal-c150-job-13043",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "187651",
+      "payload_sha256": "223347dd204f6fd4024dd105c54f0a3f7d3d5f9567bd3789be69ad7d96ebea60"
+    },
+    {
+      "run_id": "internal-c150-job-13043",
+      "kind": "server_metrics",
+      "parts": 12,
+      "bytes": "12561603",
+      "payload_sha256": "ed2343e6ceec07876480a2795da38b8b912bcd831aaed046be540372ff5ae920"
+    },
+    {
+      "run_id": "internal-c32-job-13001",
+      "kind": "profile",
+      "parts": 5,
+      "bytes": "4803633",
+      "payload_sha256": "43f4cae219462f41a05ac69b7d69ac7d8bd81eaa03a175e49f42b4420411a8e2"
+    },
+    {
+      "run_id": "internal-c32-job-13001",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "128981",
+      "payload_sha256": "703d5d70f346f404249daac5da60efa85fbca6f0db9d0747a17ca2c753086a75"
+    },
+    {
+      "run_id": "internal-c32-job-13001",
+      "kind": "server_metrics",
+      "parts": 10,
+      "bytes": "10435013",
+      "payload_sha256": "902e587a5d78c84684a0d571bfe8431c9ceda19e11e88f69d0920174e526a49a"
+    },
+    {
+      "run_id": "internal-c40-job-12997",
+      "kind": "profile",
+      "parts": 6,
+      "bytes": "5595300",
+      "payload_sha256": "e2fec3acf636cb4789f67ad2e583498d21bd5eadbe27a0598f22a30ec2d83ca2"
+    },
+    {
+      "run_id": "internal-c40-job-12997",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "136297",
+      "payload_sha256": "27f37b33444d578f683b31f65eccf28ef0b892d30bc9383117576813bcddefa4"
+    },
+    {
+      "run_id": "internal-c40-job-12997",
+      "kind": "server_metrics",
+      "parts": 11,
+      "bytes": "10781538",
+      "payload_sha256": "5e38059a871044a3b1e215c40b6cca5e71d5c3b3d52f0213daddaec7b8a8fb9d"
+    },
+    {
+      "run_id": "internal-c48-job-13021",
+      "kind": "profile",
+      "parts": 7,
+      "bytes": "6581795",
+      "payload_sha256": "3b05337d888493583bdf2c26f23808198b39a389e3db6306597a4d336d8584a9"
+    },
+    {
+      "run_id": "internal-c48-job-13021",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "138205",
+      "payload_sha256": "eb718386d0a542e1e00d0203079bdded385a83c210bc1fadb847a5ecfc73477c"
+    },
+    {
+      "run_id": "internal-c48-job-13021",
+      "kind": "server_metrics",
+      "parts": 11,
+      "bytes": "11318861",
+      "payload_sha256": "543d69669f8a884411898806caf57cd316de0be3437c3174c431c3b24359a1fd"
+    },
+    {
+      "run_id": "internal-c56-job-13037",
+      "kind": "profile",
+      "parts": 4,
+      "bytes": "3518418",
+      "payload_sha256": "c6762253f1ffaa171719996fad9208adfffa93d756d6674aa1f58d16c6c20fe0"
+    },
+    {
+      "run_id": "internal-c56-job-13037",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "132638",
+      "payload_sha256": "9b090ba7b3e4b8cc45449b2749fe0de8ba86e24556eb2912a92b9b23f2b0730b"
+    },
+    {
+      "run_id": "internal-c56-job-13037",
+      "kind": "server_metrics",
+      "parts": 10,
+      "bytes": "9998095",
+      "payload_sha256": "98dd9c58b527de9ce221e694e21a39b2cb8fc8fc53e1cb9cba277864725bca98"
+    },
+    {
+      "run_id": "internal-c70-job-13041",
+      "kind": "profile",
+      "parts": 5,
+      "bytes": "4860167",
+      "payload_sha256": "407451576f9a5cb851c2930ef936e0104ef4390d4f624d3b925c329f4da2c04c"
+    },
+    {
+      "run_id": "internal-c70-job-13041",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "152238",
+      "payload_sha256": "3851632ee25d1fa1955fe2f9195b7f3aa5156436240ef6c7778b2c0756c586db"
+    },
+    {
+      "run_id": "internal-c70-job-13041",
+      "kind": "server_metrics",
+      "parts": 11,
+      "bytes": "10854777",
+      "payload_sha256": "b753460a0f94a4d91a9d608194974b496ccf91e85ec4816fa6ee58f3071b41b2"
+    },
+    {
+      "run_id": "internal-c96-job-13032",
+      "kind": "profile",
+      "parts": 7,
+      "bytes": "6993155",
+      "payload_sha256": "023392c74fc1d328d45b4de70c3dea5df8e7fe79a3fe7eee8b7e15a18e5e9837"
+    },
+    {
+      "run_id": "internal-c96-job-13032",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "180562",
+      "payload_sha256": "3d1724f107ce63b101d66c9e0a1b091eded5380fd468c2819b47df7109e99125"
+    },
+    {
+      "run_id": "internal-c96-job-13032",
+      "kind": "server_metrics",
+      "parts": 12,
+      "bytes": "12281207",
+      "payload_sha256": "19e77af00cba6c6d4ab76782bec6ece851fbde66305de5789dbc6d8cb954e5f5"
+    }
+  ]
+}

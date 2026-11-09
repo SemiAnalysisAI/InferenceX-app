@@ -1480,6 +1480,10 @@ const GPUGraph = React.memo(
                 series: (d) => `${d.date}_${d.hwKey}`,
               },
               selectedPrecisions,
+              getShapeKey: (d) =>
+                d.experiment?.frontierEligible === false
+                  ? 'triangle'
+                  : getShapeKeyForPrecision(d.precision, selectedPrecisions),
             },
             keyFn: (point) => `${point.date}:${scatterPointConfigId(point)}`,
           },
@@ -1558,12 +1562,16 @@ const GPUGraph = React.memo(
           onHoverStart: (sel, d) =>
             applyHoverState(
               sel.select('.visible-shape') as any,
-              getShapeKeyForPrecision(d.precision, selectedPrecisions),
+              d.experiment?.frontierEligible === false
+                ? 'triangle'
+                : getShapeKeyForPrecision(d.precision, selectedPrecisions),
             ),
           onHoverEnd: (sel, d) =>
             applyNormalState(
               sel.select('.visible-shape') as any,
-              getShapeKeyForPrecision(d.precision, selectedPrecisions),
+              d.experiment?.frontierEligible === false
+                ? 'triangle'
+                : getShapeKeyForPrecision(d.precision, selectedPrecisions),
             ),
           onPointClick: (d: InferenceData) => {
             const ruler = perfRulerRef.current;

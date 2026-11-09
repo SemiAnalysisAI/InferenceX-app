@@ -244,13 +244,11 @@ export function useChartData(
 
   const comparisonLoading = comparisonQueries.some((q) => q.isLoading);
 
-  const loading =
-    queryLoading ||
-    !allRows ||
-    experiment.isLoading ||
-    (comparisonDates.length > 0 && comparisonLoading);
-  const refreshing = !loading && (basePlaceholder || baseFetching);
-  const error = queryError?.message ?? experiment.error?.message ?? null;
+  const loading = experiment.selected
+    ? experiment.isLoading
+    : queryLoading || !allRows || (comparisonDates.length > 0 && comparisonLoading);
+  const refreshing = !experiment.selected && !loading && (basePlaceholder || baseFetching);
+  const error = (experiment.selected ? experiment.error?.message : queryError?.message) ?? null;
 
   const comparisonDataKey = comparisonQueries.map((q) => q.dataUpdatedAt).join(',');
 
@@ -297,12 +295,12 @@ export function useChartData(
 
   const rows = useMemo(
     () =>
-      experiment.isLoading
+      experiment.selected && !experiment.data
         ? []
         : experiment.data
           ? withExperimentRows(baselineRows, experiment.data)
           : baselineRows,
-    [baselineRows, experiment.data, experiment.isLoading],
+    [baselineRows, experiment.data, experiment.selected],
   );
 
   const { chartData, hardwareConfig: rawHardwareConfig } = useMemo(() => {

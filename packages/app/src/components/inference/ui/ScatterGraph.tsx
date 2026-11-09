@@ -3138,6 +3138,7 @@ const ScatterGraph = React.memo(
             pointLabelText(d, showPointLabels, useAdvancedLabels, showConcurrencyLabels),
           foreground: 'var(--foreground)',
           dataAttrs: {
+            'experiment-qualification': (d) => d.experiment?.qualificationCode ?? '',
             'hw-key': (d) => String(d.hwKey),
             precision: (d) => d.precision,
             'power-variant': (d) => d.powerVariant?.id ?? '',
@@ -3156,7 +3157,9 @@ const ScatterGraph = React.memo(
             },
           },
           getShapeKey: (d) =>
-            getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
+            d.experiment?.frontierEligible === false
+              ? 'triangle'
+              : getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
           underlay: CANVAS_UNDERLAY,
         },
         keyFn: buildPointId,

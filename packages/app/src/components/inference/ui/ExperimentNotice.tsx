@@ -2,7 +2,11 @@
 import { useExperiment } from '@/hooks/api/use-experiment';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
-import { experimentDetailHref } from '@/lib/benchmarks/experiment-benchmarks';
+import {
+  experimentDetailHref,
+  experimentQualificationNote,
+  LATEST_WEKA_EXPERIMENT,
+} from '@/lib/benchmarks/experiment-benchmarks';
 
 const STRINGS = {
   en: {
@@ -27,11 +31,30 @@ const STRINGS = {
   },
 };
 
+const LATEST_STRINGS = {
+  en: {
+    ...STRINGS.en,
+    title: 'Latest WEKA vs Internal Mooncake · 3 Hours / 20-Minute Trace-Idle Cap',
+    note: '13 latest-WEKA runs and 9 internal B300 Mooncake runs. WEKA uses 1,200 GiB FP8 KDA-state DRAM plus 8 TiB WEKA attention-KV storage; Mooncake uses 2,248 GiB DRAM over EFA. Speculation is off.',
+    limits:
+      'Lines show the clean frontier; triangles flag C128 (read-byte counter integrity) and C140/C180 (DRAM-cache recoveries). The internal baseline pools four serving variants, retained in run details. This three-hour scenario excludes the published one-hour curve. Different images, clusters/transports and cache contents prevent a backend-only comparison.',
+    flagged: 'flagged · outside clean frontier',
+  },
+  zh: {
+    ...STRINGS.zh,
+    title: '最新 WEKA 对比内部 Mooncake · 3 小时 / 20 分钟 trace-idle cap',
+    note: '包含 13 次最新 WEKA 运行和 9 次内部 B300 Mooncake 运行。WEKA 使用 1,200 GiB FP8 KDA-state DRAM 和 8 TiB WEKA attention-KV 存储；Mooncake 通过 EFA 使用 2,248 GiB DRAM。Speculation 均关闭。',
+    limits:
+      '连线表示无异常结果的 Pareto 前沿；三角形标记 C128（读取字节计数器完整性异常）及 C140/C180（DRAM-cache 恢复）。内部基线合并四种 serving 配置，详情保留各自配置。此三小时场景不叠加已发布的一小时曲线。镜像、集群/传输方式和缓存内容存在差异，不能将性能差异仅归因于后端。',
+    flagged: '存在异常标记 · 不纳入无异常结果的 Pareto 前沿',
+  },
+};
+
 export function ExperimentNotice({ enabled }: { enabled: boolean }) {
   const { data } = useExperiment(enabled);
   const locale = useLocale();
   if (!data) return null;
-  const t = STRINGS[locale];
+  const t = (data.campaign.slug === LATEST_WEKA_EXPERIMENT ? LATEST_STRINGS : STRINGS)[locale];
   return (
     <aside
       className="rounded-lg border border-border bg-card p-4 text-sm space-y-2"
@@ -61,7 +84,27 @@ export function ExperimentNotice({ enabled }: { enabled: boolean }) {
                 {run.series === 'weka' ? 'WEKA AMG' : 'Mooncake DRAM'} · C{run.concurrency}
                 {run.replicate ? ` · ${t.repeat} ${run.replicate}` : ''} · {run.run_id}
               </a>
-              {!run.frontier_eligible && <span> — {t.flagged}</span>}
+              {!run.frontier_eligible && (
+                <span
+                  title={experimentQualificationNote(
+                    {
+                      campaign: data.campaign.slug,
+                      runId: run.run_id,
+                      replicate: run.replicate,
+                      frontierEligible: false,
+                      detailHref: '',
+                      qualificationCode:
+                        typeof run.health.qualification_code === 'string'
+                          ? run.health.qualification_code
+                          : undefined,
+                    },
+                    locale,
+                  )}
+                >
+                  {' '}
+                  — {t.flagged}
+                </span>
+              )}
             </li>
           ))}
         </ul>
