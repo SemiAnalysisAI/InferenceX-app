@@ -68,6 +68,11 @@ const CHART_MARGIN = { top: 24, right: 30, bottom: 50, left: 64 };
 const GROWTH_TOLERANCE = 0.01;
 /** How close, in pixels, the pointer must be to a frontier point for the crosshair to show. */
 const CROSSHAIR_REACH_PX = 48;
+/**
+ * Earlier points crowd the plot on later dates, so they only answer a pointer right on the dot;
+ * elsewhere the crosshair stays on today's frontier and a click on empty plot dismisses a pin.
+ */
+const EARLIER_POINT_REACH_PX = 8;
 /** Shade under the current frontier: the theme's blue, the same in light and dark. */
 const FILL_COLOR = 'color-mix(in oklab, var(--secondary) 30%, var(--background))';
 /** Pseudo-series that carries the running record into the next date's pooled frontier. */
@@ -234,6 +239,9 @@ const FrontierChart = React.memo(
 
     // The point whose hover card is pinned open by a click, if any; a redraw releases it.
     const pinnedRef = useRef<string | null>(null);
+    // The chart's own hover card. React never restyles it, so a pinned card survives re-renders
+    // of the chart around it.
+    const cardRef = useRef<HTMLDivElement>(null);
     // The page-wide "click elsewhere" listener goes with the chart.
     useEffect(
       () => () => {
@@ -266,13 +274,13 @@ const FrontierChart = React.memo(
       ctx: RenderContext,
     ) => {
       const showTooltip = (event: PointerEvent, html: string) => {
-        const tooltip = ctx.tooltipElement;
-        const host = tooltip.offsetParent?.getBoundingClientRect();
-        tooltip.innerHTML = html;
-        tooltip.style.display = 'block';
-        tooltip.style.opacity = '1';
-        tooltip.style.left = `${event.clientX - (host?.left ?? 0) + 14}px`;
-        tooltip.style.top = `${event.clientY - (host?.top ?? 0) - 10}px`;
+        const card = cardRef.current;
+        if (!card) return;
+        const host = card.parentElement?.getBoundingClientRect();
+        card.innerHTML = html;
+        card.style.display = 'block';
+        card.style.left = `${event.clientX - (host?.left ?? 0) + 14}px`;
+        card.style.top = `${event.clientY - (host?.top ?? 0) - 10}px`;
       };
       // Every hover uses the dashboard's hover card: the series, what the point is, its value
       // and interactivity, then concurrency, precision, date, serving image and any regression.
@@ -302,8 +310,7 @@ const FrontierChart = React.memo(
         );
       };
       const hideTooltip = () => {
-        ctx.tooltipElement.style.opacity = '0';
-        ctx.tooltipElement.style.display = 'none';
+        if (cardRef.current) cardRef.current.style.display = 'none';
       };
       // Points are rebuilt on every redraw, so a tooltip could outlive the point it describes.
       hideTooltip();
@@ -623,10 +630,11 @@ const FrontierChart = React.memo(
         hideTooltip();
       };
       const hoverable = [
-        ...frontier.map((v) => ({ v, subtitle: configLabel(v.config) })),
+        ...frontier.map((v) => ({ v, subtitle: configLabel(v.config), reach: CROSSHAIR_REACH_PX })),
         ...[...pastById.values()].map((v) => ({
           v,
           subtitle: `${t.earlierPoint} · ${configLabel(v.config)}`,
+          reach: EARLIER_POINT_REACH_PX,
         })),
       ];
       const pointNear = (event: PointerEvent) => {
@@ -635,8 +643,10 @@ const FrontierChart = React.memo(
           return undefined;
         const distance = ({ v }: (typeof hoverable)[number]) =>
           Math.hypot(x(v.x) - pointerX, y(v.y) - pointerY);
-        const nearest = d3.least(hoverable, distance);
-        return nearest && distance(nearest) <= CROSSHAIR_REACH_PX ? nearest : undefined;
+        return d3.least(
+          hoverable.filter((point) => distance(point) <= point.reach),
+          distance,
+        );
       };
       const showCrosshair = (
         event: PointerEvent,
@@ -687,7 +697,7 @@ const FrontierChart = React.memo(
       d3.select(document).on(`click.${chartId}-pin`, (event: MouseEvent) => {
         const target = event.target as Node | null;
         if (!pinnedRef.current || !target) return;
-        if (svg?.contains(target) || ctx.tooltipElement.contains(target)) return;
+        if (svg?.contains(target) || cardRef.current?.contains(target)) return;
         pinnedRef.current = null;
         hideCrosshair();
       });
@@ -746,7 +756,7 @@ const FrontierChart = React.memo(
     const dataIdentity = `${history.dates.length}:${history.series.length}:${extent.x.join(',')}:${extent.y.join(',')}`;
 
     return (
-      <div role="group" aria-label={t.aria}>
+      <div role="group" aria-label={t.aria} className="relative">
         <D3Chart<{ x: number; y: number }>
           chartId={chartId}
           data={[
@@ -781,6 +791,11 @@ const FrontierChart = React.memo(
           noDataOverlay={plotOverlay}
           caption={caption}
           footer={footer}
+        />
+        <div
+          ref={cardRef}
+          className="pointer-events-none absolute z-50 hidden"
+          data-testid="frontier-hover-card"
         />
       </div>
     );
