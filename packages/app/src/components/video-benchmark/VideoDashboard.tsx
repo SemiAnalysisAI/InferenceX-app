@@ -512,7 +512,7 @@ export default function VideoDashboard({
     state.yMetric !== DEFAULT_RESULTS_STATE.yMetric,
     state.engine !== null || state.compareEngines,
     state.date !== null || state.run !== null,
-    compareConfigs.length > 0,
+    chipHistory,
   ].filter(Boolean).length;
   const model = deploymentCells[0]?.metadata.model ?? state.model ?? s.title;
   const csvUrl = `${apiUrl}&format=csv`;
@@ -714,7 +714,7 @@ export default function VideoDashboard({
                           selectedSuffix={locale === 'zh' ? ' 已选' : undefined}
                         />
                       </div>
-                      {compareConfigs.length > 0 && (
+                      {chipHistory && (
                         <div className="flex min-w-0 flex-col space-y-1.5">
                           <LabelWithTooltip
                             htmlFor="date-picker"
@@ -866,7 +866,7 @@ export default function VideoDashboard({
             <div className="flex min-w-0 flex-col gap-6" data-testid="video-results-chart-card">
               <VideoResultsChart
                 cells={deploymentCells}
-                history={compareConfigs.length > 0 ? projection.history : null}
+                history={chipHistory ? projection.history : null}
                 roster={roster}
                 state={state}
                 colorFor={colorFor}
