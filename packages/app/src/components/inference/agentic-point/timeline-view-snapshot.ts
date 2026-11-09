@@ -52,18 +52,21 @@ export function parseTimelineViewSnapshot(raw: string | null): TimelineViewSnaps
   };
 }
 
-function timelineSnapshotKey(pointId: number): string {
+function timelineSnapshotKey(pointId: number | string): string {
   return `${TIMELINE_VIEW_SNAPSHOT_PREFIX}${pointId}`;
 }
 
-export function saveTimelineViewSnapshot(pointId: number, snapshot: TimelineViewSnapshot): void {
+export function saveTimelineViewSnapshot(
+  pointId: number | string,
+  snapshot: TimelineViewSnapshot,
+): void {
   if (typeof window === 'undefined') return;
   try {
     window.sessionStorage.setItem(timelineSnapshotKey(pointId), JSON.stringify(snapshot));
   } catch {}
 }
 
-export function consumeTimelineViewSnapshot(pointId: number): TimelineViewSnapshot | null {
+export function consumeTimelineViewSnapshot(pointId: number | string): TimelineViewSnapshot | null {
   if (typeof window === 'undefined') return null;
   try {
     const key = timelineSnapshotKey(pointId);

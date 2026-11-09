@@ -6,8 +6,11 @@ Read-only endpoints:
 
 - `/api/v1/experiments/{campaign}` returns raw `{campaign,runs}`, including all runs, qualification flags and any explicitly stored reference points.
 - `/api/v1/experiments/{campaign}/runs/{runId}` returns one raw run with stored aggregate/trace projections and payload inventory.
+- `/api/v1/experiments/{campaign}/runs/{runId}/metrics` returns the per-point viewer projection: `run`, `aggregateStats`, `requestChartData`, `requestTimeline`, `serverMetrics` and `metricSourceSeries`.
 
-Both return no-store responses. Incomplete ingestion and missing identities return404; internal read failures return500. The UI adapts stored metrics through the existing chart transformation functions. String experiment identities must not be sent to numeric benchmark detail endpoints. The detail API is the raw-data drilldown when an existing numeric-ID detail component cannot be reused without changing identity semantics.
+All return no-store responses. Incomplete ingestion and missing identities return 404; internal read failures return 500. The metrics response supports gzip via `Accept-Encoding`. The UI adapts stored metrics through the existing chart transformation functions. String experiment identities must not be sent to numeric benchmark detail endpoints.
+
+Point actions open `/infx/inference/experiments/{campaign}/{runId}` (or its `/zh` sibling), which reuses the standard per-point metric charts and request timeline. Its read-only metrics API supplies the stored request and server-metric projections; missing measurements remain missing. The raw run endpoint remains available for programmatic inspection.
 
 The API registry generates English/Chinese reference and OpenAPI entries. The existing inferencex-skills package documents selectors, control coverage, source attribution and cache/normalization limitations in `references/experiments.md`. The experiment branch keeps the three-hour campaign separate from published one-hour measurements. Each run retains its qualification and serving configuration.
 
@@ -47,7 +50,7 @@ Select either recognized `experiment` campaign on the existing Kimi-K3 Agentic T
 
 The adapter preserves the archived P90 full-response interactivity by mapping its reciprocal to the chart's P90 ITL inputs; it does not substitute that value for other genuine percentiles. For the historical one-hour campaign only, published reference rows replace corresponding current B300/vLLM Agentic Traces rows to avoid duplicates. Every measured repetition retains its own experiment identity. The latest three-hour campaign includes no official rows. While the selected campaign loads or is unavailable, chart rows remain empty rather than briefly populating an official-only legend. Legend visibility, tooltip placement and loading presentation do not alter the raw API payload.
 
-Inference share and axis links preserve the recognized experiment selector in both English and Chinese views. Experiment evidence actions use string-ID API detail links, including from legend tables; they do not fabricate GitHub Actions links or display the public-workflow reproducibility prompt for this campaign.
+Inference share and axis links preserve the recognized experiment selector in both English and Chinese views. Experiment point actions, including legend-table links, open the normal per-point metrics viewer using campaign-scoped string IDs. They do not fabricate GitHub Actions links or display the public-workflow reproducibility prompt for this campaign.
 
 For the latest three-hour campaign, the dashboard hides official workflow/date and historical-comparison controls. Its footer shows the actual measurement date range and links “Experiment measurements” to the campaign API. Published and historical campaign views retain their existing controls.
 

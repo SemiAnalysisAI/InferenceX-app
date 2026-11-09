@@ -54,6 +54,14 @@ export const apiRouteCatalog = [
     sourceSha256: '815595dd5f55d4e59011e0020a3fc189276735f42cf7c208aed36e8cbc50315b',
   },
   {
+    source: 'src/app/api/v1/experiments/[campaign]/runs/[runId]/metrics/route.ts',
+    path: '/api/v1/experiments/{campaign}/runs/{runId}/metrics',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-experiment-run-metrics',
+    sourceSha256: '8b71f8e69df4e7c080ea4f445a50354e4bcbffbbb83c43ed4d95cffb75ea6fb6',
+  },
+  {
     source: 'src/app/api/v1/experiments/[campaign]/runs/[runId]/route.ts',
     path: '/api/v1/experiments/{campaign}/runs/{runId}',
     method: 'GET',
@@ -1267,8 +1275,16 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/lib/benchmarks/experiment-point-metrics.ts',
+    sourceSha256: '60cf392fd36cc0767e9e759ab536a53da9056b6d47a7bf79a11320366c0958ec',
+    reviewArea: {
+      en: 'Experiment per-point metric chart projection, request timeline, nullable server metrics and source series.',
+      zh: '实验单点指标图表投影、请求时间线、可空服务器指标与来源序列。',
+    },
+  },
+  {
     source: 'src/lib/benchmarks/experiment-benchmarks.ts',
-    sourceSha256: '59512cdb8349adae4a86d16148c8f4a640386cf1ebc1b2703f00115e7a6e4176',
+    sourceSha256: '59662c41aa85d51fe83b65941de0d8c7b02ab40d6fccb07808833af99813aca2',
     reviewArea: {
       en: 'Experiment selector row adaptation, replicate identity and archived reference metrics.',
       zh: '实验选择器的数据转换、重复实验身份及已归档参考指标。',
@@ -1284,10 +1300,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api/experiment-documentation.ts',
-    sourceSha256: '00c14c090b4ad3af977e6ad9774b942fab8b90f82c4e6a65bc36fe4ba669e466',
+    sourceSha256: 'bf4a2488a327c0d67fd519158f82e2463095074f13434fa8b19606176ddd8916',
     reviewArea: {
-      en: 'Experiment raw campaign and string-ID run detail contracts, provenance and no-store caching.',
-      zh: '实验原始 campaign、字符串 run ID 详情、来源信息与 no-store 缓存约定。',
+      en: 'Experiment campaign, string-ID run detail and metric-view contracts, provenance and no-store caching.',
+      zh: '实验 campaign、字符串 run ID 详情及指标视图、来源信息与 no-store 缓存约定。',
     },
   },
 

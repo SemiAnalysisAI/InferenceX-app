@@ -47,7 +47,7 @@ const FRAMEWORKS = {
 } as const;
 
 export function experimentDetailHref(campaign: string, runId: string): string {
-  return `/api/v1/experiments/${encodeURIComponent(campaign)}/runs/${encodeURIComponent(runId)}`;
+  return `/infx/inference/experiments/${encodeURIComponent(campaign)}/${encodeURIComponent(runId)}`;
 }
 
 function chartMetrics(point: Record<string, unknown>): Record<string, number> {

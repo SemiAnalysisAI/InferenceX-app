@@ -7,11 +7,12 @@ The isolated WEKA preview's `/infx/inference/kimi-k3` page and `/zh` sibling def
 ```sh
 curl -fsS "$EXPERIMENT_ORIGIN/api/v1/experiments/weka-amg-kimi-k3-latest-3h"
 curl -fsS "$EXPERIMENT_ORIGIN/api/v1/experiments/weka-amg-kimi-k3-latest-3h/runs/cam-k3-kdadr-20261104-c128"
+curl --compressed -fsS "$EXPERIMENT_ORIGIN/api/v1/experiments/weka-amg-kimi-k3-latest-3h/runs/cam-k3-kdadr-20261104-c128/metrics"
 ```
 
 The campaign response is `{campaign, runs}`. `campaign.reference_points` contains only explicitly selected published references; it is empty for the latest three-hour campaign. Each run has a string `run_id`, `series`, concurrency, replicate, raw `metrics`, `plot_metrics`, configuration, provenance, health, cache evidence, `clean_backend_qualified`, `frontier_eligible` and a record hash. Preserve every replicate and the exact source identity. Do not use these string IDs with numeric benchmark APIs or construct GitHub links from them.
 
-The detail response is a single run with stored `aggregate_stats`, `chart_series`, `request_timeline` and `payload_inventory`. Missing measurements remain missing. The inventory describes retained raw payloads; this endpoint does not download compressed raw chunks. Both routes are unauthenticated read-only, `Cache-Control: no-store`, with404 for absent runs/campaigns or incomplete campaign ingestion and500 for database read errors. There are no query filters. Calculations and chart controls reuse the dashboard transformation layer; the raw endpoints do not recompute metrics.
+The detail response is a single run with stored `aggregate_stats`, `chart_series`, `request_timeline` and `payload_inventory`. Missing measurements remain missing. The inventory describes retained raw payloads; this endpoint does not download compressed raw chunks. The metrics endpoint returns `{run, aggregateStats, requestChartData, requestTimeline, serverMetrics, metricSourceSeries}` for the standard per-point charts and request timeline. Its response supports gzip via `Accept-Encoding`; use `curl --compressed`. These routes are unauthenticated read-only, `Cache-Control: no-store`, with 404 for absent runs/campaigns or incomplete campaign ingestion and 500 for database read errors. There are no query filters. Calculations and chart controls reuse the dashboard transformation layer; the raw endpoints do not recompute metrics.
 
 The latest campaign `weka-amg-kimi-k3-latest-3h` contains 13 latest WEKA runs and nine internal B300 Mooncake runs, all with a three-hour measurement and 20-minute trace-idle cap. Never mix this workload with the original one-hour/five-minute-cap scenario. WEKA uses 1,200 GiB FP8 KDA-state DRAM plus 8 TiB WEKA attention-KV storage; the internal baseline uses 2,248 GiB DRAM over EFA. The baseline line pools four serving variants; preserve `configuration.configuration_variant`, image, SDK and graph settings rather than claiming one fixed configuration.
 
@@ -24,7 +25,7 @@ The historical `weka-amg-kimi-k3` selector remains supported for its original te
 - `experiment` selects a campaign in the existing inference view: raw coverage is the campaign endpoint.
 - Model/scenario, metric, percentile, hardware/precision and display filters continue using the dashboard's existing transformations. The preview entry link supplies display defaults without introducing separate formulas.
 - Replicate identity, series/policy labels, recovery flags and published references are stored fields in the campaign response.
-- Point detail and trace inspection are covered by the string-ID run detail endpoint.
+- Point detail and trace inspection use `/infx/inference/experiments/{campaign}/{runId}` (and its `/zh` sibling), backed by the string-ID metrics endpoint. The viewer reuses the normal metric charts and request timeline; the raw run endpoint remains available for programmatic inspection.
 - Chart zoom, tooltip placement and legend presentation do not change API data.
 - No sensitive environment values, local credentials or mutation APIs are exposed.
 
@@ -36,7 +37,7 @@ On the Kimi-K3 Agentic Traces view, `experiment=weka-amg-kimi-k3-latest-3h` (or 
 
 Archived P90 interactivity maps through reciprocal P90 ITL for numerical parity; other measured percentile values are retained. The latest three-hour selector excludes every official benchmark row and displays only its 22 measurements in two series. Set `i_optimal=0&i_best=0` to show all measured points; clean frontiers connect only eligible points. The historical one-hour selector replaces matching B300/vLLM rows with its eleven archived references and retains sixteen experiment rows. The actual shared chart transformations calculate the selected token basis and percentiles; no measurements are synthesized.
 
-English and Chinese inference share links preserve the recognized experiment selector. Legend-table and tooltip evidence actions lead to the experiment run API, not a fabricated GitHub Actions page. The campaign does not use the public-workflow reproducibility prompt.
+English and Chinese inference share links preserve the recognized experiment selector. Legend-table and tooltip point actions open the experiment per-point metrics viewer. Its campaign-scoped string identity does not imply a GitHub Actions run. The campaign does not use the public-workflow reproducibility prompt.
 
 The latest three-hour campaign hides official workflow/date and history-comparison controls. The chart footer shows the actual measurement date range and links to the raw campaign API; published views and the historical campaign retain their normal controls.
 

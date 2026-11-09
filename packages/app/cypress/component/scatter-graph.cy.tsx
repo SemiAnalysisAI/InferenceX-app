@@ -61,7 +61,8 @@ describe('ScatterGraph', () => {
       replicate: 1,
       frontierEligible: false,
       qualificationCode: 'metric-integrity',
-      detailHref: '/api/v1/experiments/weka-amg-kimi-k3-latest-3h/runs/cam-k3-kdadr-20261104-c128',
+      detailHref:
+        '/infx/inference/experiments/weka-amg-kimi-k3-latest-3h/cam-k3-kdadr-20261104-c128',
     };
     const flagged = createMockInferenceData({
       hwKey: 'b200_sglang',
@@ -109,11 +110,7 @@ describe('ScatterGraph', () => {
       clickScatterPoint(points.find((p) => p.datum.experiment?.runId === experiment.runId)!),
     );
     cy.contains('Read-byte counter integrity flag').should('be.visible');
-    cy.contains('a', 'Run evidence and configuration').should(
-      'have.attr',
-      'href',
-      experiment.detailHref,
-    );
+    cy.contains('a', 'View charts').should('have.attr', 'href', experiment.detailHref);
   });
 
   for (const overlay of [false, true]) {

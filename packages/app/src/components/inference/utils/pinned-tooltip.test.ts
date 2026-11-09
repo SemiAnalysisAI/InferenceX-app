@@ -401,7 +401,7 @@ describe('experiment point details', () => {
             replicate: null,
             frontierEligible: false,
             detailHref:
-              '/api/v1/experiments/weka-amg-kimi-k3/runs/sa-k3-original-rdma2048-c150-m089',
+              '/infx/inference/experiments/weka-amg-kimi-k3/sa-k3-original-rdma2048-c150-m089',
           },
         }),
         hasTrace: true,
@@ -410,9 +410,9 @@ describe('experiment point details', () => {
     );
     expect(details.links).toEqual([
       {
-        action: 'view-experiment',
-        label: 'Run evidence and configuration',
-        href: '/api/v1/experiments/weka-amg-kimi-k3/runs/sa-k3-original-rdma2048-c150-m089',
+        action: 'view-charts',
+        label: 'View charts',
+        href: '/infx/inference/experiments/weka-amg-kimi-k3/sa-k3-original-rdma2048-c150-m089',
       },
     ]);
     expect(text(details.html)).toContain(

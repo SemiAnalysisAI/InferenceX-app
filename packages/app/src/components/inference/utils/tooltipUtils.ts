@@ -757,8 +757,7 @@ export type PointDetailAction =
   | 'view-charts'
   | 'view-logs'
   | 'view-power-telemetry'
-  | 'view-power-trace'
-  | 'view-experiment';
+  | 'view-power-trace';
 
 export interface PointDetailLink {
   action: PointDetailAction;
@@ -801,8 +800,11 @@ const pointLinks = ({
   const pointId = point.id;
   if (point.experiment) {
     const identity = point.experiment;
-    const label = locale === 'zh' ? '运行证据与配置' : 'Run evidence and configuration';
-    links.push({ action: 'view-experiment', label, href: identity.detailHref });
+    links.push({
+      action: 'view-charts',
+      label: t.charts,
+      href: `${locale === 'zh' ? '/zh' : ''}${identity.detailHref}`,
+    });
   }
   const isAgentic = point.benchmark_type === 'agentic_traces';
   const showCharts = isAgentic && hasTraceData;

@@ -166,7 +166,7 @@ export function RequestTimelineView({
 }: {
   data: RequestTimeline;
   datasetSlug?: string | null;
-  pointId: number;
+  pointId: number | string;
 }) {
   const router = useRouter();
   const locale = useLocale();
