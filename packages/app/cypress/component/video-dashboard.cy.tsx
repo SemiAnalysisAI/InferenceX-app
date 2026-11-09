@@ -160,7 +160,7 @@ describe('VideoGenX results', () => {
     });
   }
 
-  it('ignores retired controls and keeps every named-run GPU count in the chart', () => {
+  it('ignores retired controls and plots every named-run GPU count on either X axis', () => {
     mount({
       search:
         '?unofficialrun=34341996789&r_gpus=3&r_basis=allocated&r_x=p90&r_y=videosPerGpuHour&r_optimal=0',
@@ -181,9 +181,8 @@ describe('VideoGenX results', () => {
     const overlay = '[data-hardware="b200"][data-overlay="true"]';
     cy.get('[data-testid="results-table"]').should('not.exist');
     cy.get('[data-testid="results-gpus"]').should('not.exist');
-    cy.get('[data-testid="results-x-metric"]').should('not.exist');
     cy.get('[data-testid="results-cost-basis"]').should('not.exist');
-    cy.get('[data-testid="video-results-chart"] .x-axis-label').should('contain', 'Median');
+    cy.get('[data-testid="video-results-chart"] .x-axis-label').should('contain', 'P90');
     points(overlay).should('have.length', 2);
     // Same latency on half the boards doubles videos per GPU-hour, so the 4-GPU cell is dominated.
     points(`${overlay}[data-optimal="false"]`).should('have.length', 1);
@@ -193,20 +192,46 @@ describe('VideoGenX results', () => {
         .sort((a, b) => a - b);
       expect(values[1]).to.be.closeTo(values[0] * 2, 1e-9);
     });
+    cy.get('[data-testid="results-x-metric"]').click();
+    cy.get('[data-testid="results-x-unmeasured"]')
+      .should('contain', 'Quality loss vs lossless (LPIPS)')
+      .and('contain', 'Peak GPU memory');
+    cy.contains('[data-select-option]', 'GPUs per deployment').click();
+    searchParam('r_x').should('equal', 'gpus');
+    cy.get('#video-results-chart-title').should('contain', 'vs. GPUs per deployment');
+    cy.get('[data-testid="video-results-chart"] .x-axis-label').should(
+      'have.text',
+      'GPUs per deployment',
+    );
+    points(overlay).should(($points) => {
+      const xs = [...$points].map(
+        (point) => (point as unknown as { __data__: { x: number } }).__data__.x,
+      );
+      expect(xs.toSorted()).to.deep.equal([2, 4]);
+    });
+    points(`${overlay}[data-optimal="false"]`).should('have.length', 1);
+    points().find('.point-label').should('not.exist');
     cy.get('@consoleError').should('not.be.calledWithMatch', /Cannot update a component/);
     cy.get('label[for="video-results-optimal"]').click();
     points(overlay).should('have.length', 1).and('have.attr', 'data-optimal', 'true');
     searchParam('r_optimal').should('equal', '1');
-    for (const key of ['r_gpus', 'r_basis', 'r_x']) searchParam(key).should('equal', null);
+    for (const key of ['r_gpus', 'r_basis']) searchParam(key).should('equal', null);
     points(overlay).trigger('mouseenter', { force: true });
     cy.get('[data-chart-tooltip="video-results-chart"] [data-hover-notice]').should(
       'have.text',
       '✕ #34341996789',
     );
+    cy.get('[data-chart-tooltip="video-results-chart"]').should('contain', 'Median s');
     points(overlay).trigger('mouseleave', { force: true });
     toggleHardware('b200');
     hardwarePoints('b200').should('not.exist');
     points(overlay).should('not.exist');
+  });
+
+  it('names the latency in the zh hover card, where the GPU axis title does not', () => {
+    mount({ pathname: '/zh/vgx', search: '?r_x=gpus&r_y=videosPerGpuHour' });
+    hardwarePoints('b200').first().trigger('mouseenter', { force: true });
+    cy.get('[data-chart-tooltip="video-results-chart"]').should('contain', '中位延迟 (s)');
   });
 
   it('shows a named unapproved run without an approved cohort and clears it without promotion', () => {
@@ -468,7 +493,7 @@ describe('VideoGenX results', () => {
 
   it('plots the selected Y metric with participating GPUs and median latency', () => {
     mount({
-      search: '?r_basis=allocated&r_x=p90',
+      search: '?r_basis=allocated',
       edit: (observation) => {
         observation.videoSecondsPerHour = 400;
       },
@@ -667,7 +692,6 @@ describe('VideoGenX results', () => {
       });
       cy.get('[data-testid="results-table"]').should('not.exist');
       cy.get('[data-testid="results-gpus"]').should('not.exist');
-      cy.get('[data-testid="results-x-metric"]').should('not.exist');
       cy.get('[data-testid="results-cost-basis"]').should('not.exist');
       cy.get('[data-testid="results-advanced"] > summary')
         .should('contain', pathname.startsWith('/zh') ? '高级选项' : 'Advanced')

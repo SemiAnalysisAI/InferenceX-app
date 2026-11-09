@@ -180,6 +180,55 @@ describe('resultsChartSeries', () => {
     ).toBe('sglang:c1');
   });
 
+  it('keeps the latency frontier and Best engine on the GPU axis', () => {
+    const b200 = (name: string, engine: string, gpus: number, p50: number, perHour: number) =>
+      deployment(name, gpus, p50, perHour, 200, {
+        hardwareKey: 'b200',
+        results: { engine } as ResultsEvidence,
+      });
+    // Ranked on GPU count, the 1-GPU vLLM-Omni deployment would win B200 and hide SGLang's 4-GPU one.
+    const deployments = cells([
+      b200('wide', 'sglang', 4, 30, 400),
+      b200('narrow', 'sglang', 1, 100, 120),
+      b200('vllm', 'vllm-omni', 1, 60, 200),
+    ]);
+    const plotted = (x: ResultsChartSelection['x']) =>
+      resultsChartSeries(deployments, selection({ x, optimal: true })).map((s) => [
+        s.key,
+        s.points.map((p) => `${p.cell.point.id} ${p.optimal}`).toSorted(),
+      ]);
+    expect(plotted('gpus')).toEqual(plotted('p50'));
+    const [gpus] = resultsChartSeries(deployments, selection({ x: 'gpus' }));
+    expect(gpus.frontier.map((p) => p.x)).toEqual([1, 4]);
+  });
+
+  it('joins deployments that share a GPU count in latency order, whatever the row order', () => {
+    const layout = (name: string, gpus: number, p50: number, kj: number, tp: number) =>
+      deployment(name, gpus, p50, 400, kj, {
+        server: { ...eligible.server!, tp, ulysses: gpus / tp },
+      });
+    const rows = [
+      layout('two', 2, 100, 50, 2),
+      layout('tp4', 4, 40, 120, 4),
+      layout('u4', 4, 60, 80, 1),
+      layout('eight', 8, 20, 200, 8),
+    ];
+    for (const order of [rows, rows.toReversed()]) {
+      const [gpus] = resultsChartSeries(cells(order), selection({ x: 'gpus', y: 'kjPerClip' }));
+      expect(ids(gpus.frontier)).toEqual(['two:c1', 'u4:c1', 'tp4:c1', 'eight:c1']);
+    }
+  });
+
+  it('ranks the GPU axis only among deployments with a recorded GPU count', () => {
+    const unplaced = deployment('unplaced', 1, 30, 400, 50, { participating: null });
+    const deployments = cells([unplaced, fast, mid]);
+    const [gpus] = resultsChartSeries(
+      deployments,
+      selection({ x: 'gpus', y: 'kjPerClip', optimal: true }),
+    );
+    expect(ids(gpus.points)).toEqual(['mid:c1', 'fast:c1']);
+  });
+
   it('never lets a faster lossy series become a GPU’s default line', () => {
     const run = (name: string, engine: string, p50: number, optimizations: string[]) =>
       deployment(name, 4, p50, 400 - p50, 200, {

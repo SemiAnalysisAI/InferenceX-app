@@ -13,3 +13,7 @@ export function zeroAnchoredDomain(values: readonly number[], pad: number): [num
   const hi = Math.max(0, ...values) * pad;
   return lo === hi ? [0, 1] : [lo, hi];
 }
+
+export function logDomain(values: readonly number[], pad: number): [number, number] {
+  return values.length === 0 ? [1, 10] : [Math.min(...values) / pad, Math.max(...values) * pad];
+}

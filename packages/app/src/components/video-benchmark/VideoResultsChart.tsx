@@ -1,6 +1,6 @@
 'use client';
 
-import { curveLinear } from 'd3';
+import { curveLinear, type ScaleContinuousNumeric } from 'd3';
 import { useMemo, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import ChartLegend, { type CommonLegendItemProps } from '@/components/ui/chart-legend';
@@ -13,7 +13,7 @@ import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { ShapeKey } from '@/lib/charts/chart-rendering';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
-import { zeroAnchoredDomain } from './chart-domain';
+import { logDomain, zeroAnchoredDomain } from './chart-domain';
 import { serverSplit } from './deployment';
 import { engineLabel, engineShape, engineSort } from './engines';
 import { isLossy, runtimeLabel } from './optimizations';
@@ -25,6 +25,7 @@ import {
   RESULTS_Y_METRIC_KEYS,
   RESULTS_Y_METRICS,
   comparesEngines,
+  plottedXMetric,
   resultsChartSeries,
   resultsClip,
   resultsHistorySeries,
@@ -191,8 +192,10 @@ export default function VideoResultsChart({
 }) {
   const locale = useLocale();
   const s = STRINGS[locale];
-  const x = RESULTS_X_METRICS[state.xMetric],
+  const xKey = plottedXMetric(state.xMetric, history !== null);
+  const x = RESULTS_X_METRICS[xKey],
     y = RESULTS_Y_METRICS[state.yMetric];
+  const labelsRepeatX = xKey === 'gpus';
   const clip = useMemo(() => resultsClip(history ?? cells), [history, cells]);
   const xLabel = resultsMetricLabel(x, locale, clip),
     yLabel = resultsMetricLabel(y, locale);
@@ -201,9 +204,10 @@ export default function VideoResultsChart({
     () =>
       (history ? resultsHistorySeries : resultsChartSeries)(history ?? cells, {
         ...resultsSelection(state),
+        x: xKey,
         hidden: [],
       }),
-    [history, cells, state],
+    [history, cells, state, xKey],
   );
   const series = useMemo(
     () => ranked.filter((item) => !state.hidden.includes(item.hardwareKey)),
@@ -273,7 +277,7 @@ export default function VideoResultsChart({
           getLabelText: (point) =>
             history ? (point.cell.metadata.date ?? '') : s.gpus(point.cell.point.participating),
           foreground: 'var(--foreground)',
-          hideLabels: !labels,
+          hideLabels: !labels || labelsRepeatX,
           dataAttrs: {
             hardware: (point) => point.hardwareKey,
             engine: (point) => point.engine ?? 'na',
@@ -284,10 +288,13 @@ export default function VideoResultsChart({
         },
       },
     ],
-    [lines, lineColors, lineDashes, plotted, labels, s, history, byEngine],
+    [lines, lineColors, lineDashes, plotted, labels, s, history, byEngine, labelsRepeatX],
   );
   const tooltip = useMemo<TooltipConfig<PlotPoint>>(() => {
-    const otherX = RESULTS_X_METRICS[RESULTS_X_METRIC_KEYS.find((key) => key !== state.xMetric)!];
+    const latencies = RESULTS_X_METRIC_KEYS.filter(
+      (key) => key !== xKey && !RESULTS_X_METRICS[key].rankOn,
+    ).map((key) => RESULTS_X_METRICS[key]);
+    const hoverLatency = RESULTS_X_METRICS[x.rankOn ?? xKey];
     const selection = { basis: state.costBasis, tier: state.costTier };
     const describe = ({ cell, overlay, x: xValue, y: yValue }: PlotPoint) => {
       const { point } = cell;
@@ -315,7 +322,12 @@ export default function VideoResultsChart({
           warning: d.warning,
           metrics: [
             { value: d.yValue, label: axisLabelUnit(yLabel) },
-            { value: d.xValue, label: axisLabelUnit(xLabel) },
+            {
+              value: n(hoverLatency.value(plot.cell, selection), hoverLatency.digits),
+              label:
+                hoverLatency.hoverLabel?.[locale] ??
+                axisLabelUnit(resultsMetricLabel(hoverLatency, locale, clip)),
+            },
           ],
           summary: [
             s.gpus(point.participating),
@@ -332,7 +344,6 @@ export default function VideoResultsChart({
         const { point } = cell;
         const d = describe(plot);
         const cost = cell.cost[state.costBasis];
-        const other = otherX.value(cell, selection);
         return (
           <ChartPointDetails
             title={d.title}
@@ -367,10 +378,10 @@ export default function VideoResultsChart({
                 ].join(' · '),
                 wide: true,
               },
-              {
-                label: resultsMetricLabel(otherX, locale, clip),
-                value: n(other, otherX.digits),
-              },
+              ...latencies.map((latency) => ({
+                label: resultsMetricLabel(latency, locale, clip),
+                value: n(latency.value(cell, selection), latency.digits),
+              })),
               {
                 label: s.meets(n(state.deadlineSeconds)),
                 value:
@@ -439,7 +450,7 @@ export default function VideoResultsChart({
         });
       },
     };
-  }, [locale, s, state, x, y, xLabel, yLabel, clip, history, onOpen]);
+  }, [locale, s, state, x, xKey, y, xLabel, yLabel, clip, history, onOpen]);
 
   const hidden = new Set(state.hidden);
   const measured = new Set(cells.map((cell) => cell.point.hardwareKey));
@@ -506,14 +517,25 @@ export default function VideoResultsChart({
       margin={{ top: 24, right: 28, bottom: 64, left: 72 }}
       watermark="logo"
       transitionDuration={0}
-      xScale={{
-        type: 'linear',
-        domain: zeroAnchoredDomain(
-          plotted.map((point) => point.x),
-          1.12,
-        ),
-        nice: true,
-      }}
+      xScale={
+        x.scale === 'log'
+          ? {
+              type: 'log',
+              domain: logDomain(
+                plotted.map((point) => point.x),
+                1.25,
+              ),
+              nice: false,
+            }
+          : {
+              type: 'linear',
+              domain: zeroAnchoredDomain(
+                plotted.map((point) => point.x),
+                1.12,
+              ),
+              nice: true,
+            }
+      }
       yScale={{
         type: 'linear',
         domain: zeroAnchoredDomain(
@@ -522,7 +544,20 @@ export default function VideoResultsChart({
         ),
         nice: true,
       }}
-      xAxis={{ label: xLabel, tickCount: 6 }}
+      xAxis={
+        x.scale === 'log'
+          ? {
+              label: xLabel,
+              tickValues: (scale) => {
+                const [lo, hi] = (scale as ScaleContinuousNumeric<number, number>).domain();
+                return [...new Set(plotted.map((point) => point.x))]
+                  .filter((value) => value >= lo && value <= hi)
+                  .toSorted((a, b) => a - b);
+              },
+              tickFormat: (value) => n(Number(value), x.digits),
+            }
+          : { label: xLabel, tickCount: 6 }
+      }
       yAxis={{ label: yLabel, tickCount: 6 }}
       layers={layers}
       tooltip={tooltip}
