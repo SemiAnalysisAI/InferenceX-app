@@ -272,9 +272,15 @@ describe('Video results clip stage', () => {
   });
 
   it('restores mute when the audible hardware is hidden or fails, and stacks Side by side on a phone', () => {
-    cy.viewport(390, 900);
+    cy.viewport(375, 900);
     mountResultsClips(['b200', 'h100'], '/zh/vgx', false, c1('b200').runId);
     cy.get('[data-side="a"]').should('contain', 'B200').and('contain', '非官方运行');
+    cy.get('[data-side="a"] [data-testid="video-results-pill"] b').should(($name) => {
+      expect($name.text()).to.contain('B200');
+      expect($name[0].scrollWidth, 'hardware name not truncated').to.be.at.most(
+        $name[0].clientWidth,
+      );
+    });
     cy.get('[aria-label="收听 B200"]').click();
     expectAudio('a');
     cy.contains('button', 'Toggle B200').click();

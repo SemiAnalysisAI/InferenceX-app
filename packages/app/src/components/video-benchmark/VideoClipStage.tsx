@@ -439,9 +439,19 @@ export default function VideoClipStage({
                   }
                 />
                 <b className="min-w-0 truncate font-semibold">{clip.label}</b>
-                {clip.meta && <span className="shrink-0 text-white/70">{clip.meta}</span>}
+                {/* The GPU count and tag start from a zero basis, so they take only the width the name leaves. */}
+                {clip.meta && (
+                  <span
+                    className={cn(
+                      'max-w-fit grow basis-0 truncate text-white/70',
+                      overlay && 'max-sm:hidden',
+                    )}
+                  >
+                    {clip.meta}
+                  </span>
+                )}
                 {clip.unofficial && (
-                  <span className="shrink-0 rounded bg-amber-400/20 px-1 text-amber-200">
+                  <span className="max-w-fit grow basis-0 truncate rounded bg-amber-400/20 px-1 text-amber-200">
                     {s.unofficial}
                   </span>
                 )}
