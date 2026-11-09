@@ -104,9 +104,9 @@ const cost = (perVideo: number, perVideoSecond: number) => ({
   perHour: 1,
 });
 const readout = '[data-testid="video-results-readout"]';
-/** A readout cell's own value, and the pair's value under it when the pair has one. */
-const readoutValue = (metric: string, index = 0) =>
-  cy.get(`${readout} [data-metric="${metric}"] dd`).eq(index);
+/** A readout cell's lines: its own value, then the pair's value when the pair has one. */
+const readoutLines = (metric: string) => cy.get(`${readout} [data-metric="${metric}"] dd`);
+const readoutValue = (metric: string, index = 0) => readoutLines(metric).eq(index);
 
 // These decoder fixtures are test inputs, never benchmark evidence.
 function mountResultsClips(
@@ -648,20 +648,34 @@ describe('Video results clip stage', () => {
     readoutValue('participating', 1).should('have.text', 'H100 $0.3');
   });
 
-  it('leads a lossy pair with its speed and never shows a score it has not measured', () => {
+  /** A lossy B200 lead at p50 40 s against its lossless twin, if any; both clips take 120 s. */
+  function mountLossyPair(twinP50: number | null) {
     const lossy: VideoPoint = {
       ...c1('b200'),
       id: `${c1('b200').id}-fbc`,
       p50: 40,
       results: { optimizations: ['first-block-cache'] } as unknown as ResultsEvidence,
     };
-    const twin: VideoPoint = { ...c1('b200'), p50: 112 };
+    const twins = twinP50 === null ? [] : [{ ...c1('b200'), p50: twinP50 }];
     mountResultsClips(['b200'], '/vgx', false, undefined, [], false, [], {
       leads: [lossy],
-      deployments: [lossy, twin],
+      deployments: [lossy, ...twins],
       costs: { [lossy.id]: { participating: cost(0.04, 0.01), allocated: null } },
     });
     cy.get('[data-testid="video-results-compare-twin"]').click();
+  }
+
+  it('shows a dash, not a pending score or stray times, where a lossy pair has nothing to compare', () => {
+    mountLossyPair(0);
+    readoutLines('speed').should('have.length', 1).and('have.text', '—');
+    mountLossyPair(null);
+    cy.get('[data-side="b"]').should('contain', 'no lossless config');
+    for (const metric of ['speed', 'psnrLossless', 'ssimLossless', 'lpipsLossless'])
+      readoutLines(metric).should('have.length', 1).and('have.text', '—');
+  });
+
+  it('leads a lossy pair with its speed and never shows a score it has not measured', () => {
+    mountLossyPair(112);
     cy.get(readout).should('have.attr', 'data-pair', 'twin');
     cy.get(`${readout} [data-metric]`).first().should('have.attr', 'data-metric', 'speed');
     readoutValue('speed').should('have.text', '2.80× faster');

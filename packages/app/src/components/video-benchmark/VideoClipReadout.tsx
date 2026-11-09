@@ -273,12 +273,8 @@ function readSide(
   return { ...read(side, s), context: context(side, s) };
 }
 
-const speedShort = (speed: Speed | null, s: Strings) =>
-  speed === null
-    ? s.notMeasured
-    : speed.direction === 'same'
-      ? s.speedShort.same
-      : s.speedShort[speed.direction](speed.times);
+const speedShort = (speed: Speed, s: Strings) =>
+  speed.direction === 'same' ? s.speedShort.same : s.speedShort[speed.direction](speed.times);
 
 const speedThan = (speed: Speed, name: string, s: Strings) =>
   speed.direction === 'same'
@@ -305,24 +301,30 @@ function cell(
 ): Cell {
   if (metric === 'speed') {
     if (diagnostic) return { metric, label: s.speed, value: '—', sub: s.diagnosticMetric };
+    const speed = speedVs(a.point?.p50 ?? null, b.point?.p50 ?? null);
+    // No ratio is coming without both p50s, so this is a dash, not "Not measured yet".
+    if (speed === null) return { metric, label: s.speed, value: '—' };
     const subject = display(a.point?.p50);
     const pair = display(b.point?.p50);
     return {
       metric,
       label: s.speed,
-      value: speedShort(speedVs(a.point?.p50 ?? null, b.point?.p50 ?? null), s),
+      value: speedShort(speed, s),
       sub: subject !== null && pair !== null ? s.p50Pair(subject, pair) : undefined,
       help: s.speedHelp,
     };
   }
   if (isLosslessScore(metric))
-    return {
-      metric,
-      label: s[metric],
-      value: s.notMeasured,
-      sub: s[LOSSLESS_SCORES[metric]],
-      help: s.pairedPending,
-    };
+    // Paired scores need the lossless twin; without one they will never be measured.
+    return b.point === null
+      ? { metric, label: s[metric], value: '—' }
+      : {
+          metric,
+          label: s[metric],
+          value: s.notMeasured,
+          sub: s[LOSSLESS_SCORES[metric]],
+          help: s.pairedPending,
+        };
   const { context, ...own } = readSide(metric, a, diagnostic, s);
   if (kind === 'reference') return { metric, label: s[metric], ...own, sub: context };
   const speed =
