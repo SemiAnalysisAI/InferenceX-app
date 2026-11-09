@@ -1,6 +1,9 @@
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
+import { losslessTwin } from './deployment';
 import type { VideoPoint } from './metrics';
+import { isLossy } from './optimizations';
 import { RESULTS_HARDWARE } from './results';
+import { resultsPointKey } from './results-chart';
 import { resultsClipGroups, type ResultsClipGroup, type ResultsClipSide } from './results-clips';
 
 /** Ways the comparison stage shows its two clips; Wipe is the default and is omitted from the URL. */
@@ -11,10 +14,12 @@ export interface StageState {
   /** `promptKey` of the shown prompt; null or unknown shows the first prompt. */
   prompt: string | null;
   view: StageView;
+  /** `resultsPointKey` of the chart point the stage plays; null or an undrawn point plays the default. */
+  clip: string | null;
 }
 
 /** The stage's own URL keys. VideoDashboard's `commit` rewrites every other `r_` key and keeps these. */
-const STAGE_PARAMS: readonly string[] = ['r_prompt', 'r_view'];
+const STAGE_PARAMS: readonly string[] = ['r_prompt', 'r_view', 'r_clip'];
 export const isStageParam = (key: string) => STAGE_PARAMS.includes(key);
 
 export function parseStage(search: string): StageState {
@@ -23,6 +28,7 @@ export function parseStage(search: string): StageState {
   return {
     prompt: params.get('r_prompt') || null,
     view: STAGE_VIEWS.find((item) => item === view) ?? 'wipe',
+    clip: params.get('r_clip') || null,
   };
 }
 
@@ -33,6 +39,8 @@ export function stageSearch(state: StageState, search: string): URLSearchParams 
   else params.delete('r_prompt');
   if (state.view === 'wipe') params.delete('r_view');
   else params.set('r_view', state.view);
+  if (state.clip) params.set('r_clip', state.clip);
+  else params.delete('r_clip');
   return params;
 }
 
@@ -65,17 +73,26 @@ export interface StageSubject {
 
 const SUBJECT_ORDER = ['b200', ...RESULTS_HARDWARE.filter((key) => key !== 'b200')];
 
+export const stagePointKey = (point: VideoPoint) => resultsPointKey({ point });
+
 /**
- * The clip the stage compares with its reference. A visible point of `namedRun` (the
- * `?unofficialrun=` overlay) comes first, with or without media, so the run the user loaded stays
- * on the stage. Otherwise the B200 lead, else the first visible roster hardware with a playable
- * clip. A preferred side still loading holds its place, so the stage does not jump once it
- * arrives. Without any playable clip, scored clips are next, then the first visible hardware, so
- * its empty state stays in view.
+ * Stored cells may have published clips; a live named run is read from GitHub without media.
+ * The chart draws the rest hollow. A stored cell without clips still gets the stage's empty state.
+ */
+export const mayHaveClips = (point: VideoPoint) => Boolean(point.publishedAt);
+
+/**
+ * The clip the stage plays. The chart point named by `clipKey` (`r_clip`) comes first. Then a
+ * visible point of `namedRun` (the `?unofficialrun=` overlay), with or without media, so the run
+ * the user loaded stays on the stage. Otherwise the B200 lead, else the first visible roster
+ * hardware with a playable clip. A preferred side still loading holds its place, so the stage
+ * does not jump once it arrives. Without any playable clip, scored clips are next, then the first
+ * visible hardware, so its empty state stays in view.
  */
 export function stageSubject(
   candidates: readonly StageCandidate[],
   namedRun?: string,
+  clipKey?: string | null,
 ): StageSubject | null {
   const ordered = SUBJECT_ORDER.flatMap((key) =>
     candidates
@@ -87,6 +104,8 @@ export function stageSubject(
         pending: side === undefined,
       })),
   );
+  const picked = clipKey && ordered.find((subject) => stagePointKey(subject.point) === clipKey);
+  if (picked) return picked;
   const named = ordered.filter((subject) => subject.point.runId === namedRun);
   const pool = named.length > 0 ? named : ordered;
   for (const subject of pool) {
@@ -95,4 +114,39 @@ export function stageSubject(
       return subject;
   }
   return pool.find((subject) => subject.groups.length > 0) ?? pool[0] ?? null;
+}
+
+/** What the stage's second side shows, and the point it plays; null for the reference. */
+export interface StageOption {
+  /** `reference`, `twin`, or the hardware key of another hardware's lead. */
+  value: string;
+  kind: 'reference' | 'lead' | 'twin';
+  /** Null for the reference, and for a twin the subject's run does not have. */
+  point: VideoPoint | null;
+}
+
+/**
+ * What the subject can be compared with: its Diffusers reference (the default), each other
+ * visible hardware's lead, and, for a lossy subject, its lossless twin from `deployments`.
+ */
+export function stageOptions(
+  subject: VideoPoint,
+  leads: readonly VideoPoint[],
+  deployments: readonly VideoPoint[],
+): StageOption[] {
+  return [
+    { value: 'reference', kind: 'reference', point: null },
+    ...leads
+      .filter((lead) => lead.hardwareKey !== subject.hardwareKey)
+      .map((lead) => ({ value: lead.hardwareKey ?? '', kind: 'lead' as const, point: lead })),
+    ...(isLossy(subject)
+      ? [{ value: 'twin', kind: 'twin' as const, point: losslessTwin(subject, deployments) }]
+      : []),
+  ];
+}
+
+/** Chart point keys of the stage's two sides; `baseline` is null for the reference. */
+export interface StagePair {
+  playing: string | null;
+  baseline: string | null;
 }

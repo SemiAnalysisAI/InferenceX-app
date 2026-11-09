@@ -34,11 +34,21 @@ const point = (hardwareKey: string, runId = 'official') =>
 describe('clip stage', () => {
   it('rewrites only its own URL keys and reads an unknown view as Wipe', () => {
     const search = stageSearch(
-      { prompt: 'crane', view: 'wipe' },
-      '?r_y=videosPerGpuHour&r_view=side',
+      { prompt: 'crane', view: 'wipe', clip: null },
+      '?r_y=videosPerGpuHour&r_view=side&r_clip=1:old',
     );
     expect(Object.fromEntries(search)).toEqual({ r_y: 'videosPerGpuHour', r_prompt: 'crane' });
-    expect(parseStage('?r_view=zoom&r_prompt=')).toEqual({ prompt: null, view: 'wipe' });
+    expect(parseStage('?r_view=zoom&r_prompt=')).toEqual({
+      prompt: null,
+      view: 'wipe',
+      clip: null,
+    });
+    const clip = stageSearch({ prompt: null, view: 'side', clip: '34341996789:abc:c1' }, '');
+    expect(parseStage(`?${clip}`)).toEqual({
+      prompt: null,
+      view: 'side',
+      clip: '34341996789:abc:c1',
+    });
   });
 
   it('leads with the named run, skips clipless hardware, and waits for a preferred side', () => {
@@ -51,6 +61,10 @@ describe('clip stage', () => {
     expect(stageSubject([unpublished, h200], 'named')?.point).toBe(unpublished.point);
     const namedH200 = { ...h200, point: point('h200', 'named') };
     expect(stageSubject([official, namedH200], 'named')?.point).toBe(namedH200.point);
+    // A clicked chart point outranks the named run.
+    expect(stageSubject([official, namedH200], 'named', 'official:b200')?.point).toBe(
+      official.point,
+    );
     expect(stageSubject([{ point: point('b200'), side: undefined }, h200])).toMatchObject({
       point: { hardwareKey: 'b200' },
       pending: true,
