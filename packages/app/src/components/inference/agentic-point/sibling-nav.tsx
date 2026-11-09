@@ -23,6 +23,8 @@ import { isZhPathname, ZH_PREFIX } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
+export type SiblingNavPoint = Omit<BenchmarkSibling, 'id'> & { id: number | string };
+
 const HW_LABELS: Record<string, string> = {
   b200: 'B200',
   b300: 'B300',
@@ -42,6 +44,7 @@ const MODEL_LABELS: Record<string, string> = {
   'glm5.1': 'GLM-5.1',
   gptoss120b: 'gpt-oss 120B',
   kimik2: 'Kimi K2',
+  kimik3: 'Kimi K3',
   'kimik2.5': 'Kimi K2.5',
   'kimik2.6': 'Kimi K2.6',
   llama70b: 'Llama 3.3 70B',
@@ -65,7 +68,7 @@ function frameworkLabel(fw: string) {
   return fw;
 }
 
-export function chipLabel(s: BenchmarkSibling): string {
+export function chipLabel(s: SiblingNavPoint): string {
   const usePrefill =
     !s.disagg &&
     (s.decode_tp <= 0 ||
@@ -166,7 +169,7 @@ const SIBLING_STRINGS = {
 const SORT_VALUES: SortMode[] = ['default', 'conc', 'parallelism', 'tput', 'requests'];
 
 const parallelRank = (
-  s: BenchmarkSibling,
+  s: SiblingNavPoint,
 ): [number, number, number, number, number, number, number, number] => {
   const usePrefill = !s.disagg && s.decode_tp <= 0 && s.prefill_tp > 0;
   return [
@@ -181,7 +184,7 @@ const parallelRank = (
   ];
 };
 
-function sortSiblings(siblings: BenchmarkSibling[], mode: SortMode): BenchmarkSibling[] {
+function sortSiblings(siblings: SiblingNavPoint[], mode: SortMode): SiblingNavPoint[] {
   if (mode === 'default') return siblings;
   const out = [...siblings];
   if (mode === 'conc') {
@@ -208,7 +211,29 @@ function sortSiblings(siblings: BenchmarkSibling[], mode: SortMode): BenchmarkSi
 const isSortMode = (v: string | null): v is SortMode =>
   v !== null && SORT_VALUES.includes(v as SortMode);
 
-export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: BenchmarkSibling[] }) {
+/** Keep a custom point route's query and fragment while changing only sibling sort. */
+export function siblingPointHref(href: string, mode: SortMode): string {
+  const hashAt = href.indexOf('#');
+  const hash = hashAt === -1 ? '' : href.slice(hashAt);
+  const withoutHash = hashAt === -1 ? href : href.slice(0, hashAt);
+  const queryAt = withoutHash.indexOf('?');
+  const path = queryAt === -1 ? withoutHash : withoutHash.slice(0, queryAt);
+  const params = new URLSearchParams(queryAt === -1 ? '' : withoutHash.slice(queryAt + 1));
+  if (mode === 'default') params.delete('sort');
+  else params.set('sort', mode);
+  const query = params.toString();
+  return `${path}${query ? `?${query}` : ''}${hash}`;
+}
+
+export function SiblingNav({
+  sku,
+  siblings,
+  pointHref,
+}: {
+  sku: Pick<BenchmarkSku, 'hardware' | 'framework' | 'model' | 'precision' | 'date'>;
+  siblings: SiblingNavPoint[];
+  pointHref?: (id: number | string) => string;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const locale = useLocale();
@@ -229,8 +254,8 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
   const prev = currentIdx > 0 ? sorted[currentIdx - 1] : null;
   const next = currentIdx !== -1 && currentIdx < sorted.length - 1 ? sorted[currentIdx + 1] : null;
 
-  const hrefFor = (id: number) =>
-    sortMode === 'default' ? `${agenticBase}/${id}` : `${agenticBase}/${id}?sort=${sortMode}`;
+  const hrefFor = (id: number | string, mode = sortMode) =>
+    siblingPointHref(pointHref?.(id) ?? `${agenticBase}/${id}`, mode);
 
   const currentId = siblings.find((s) => s.is_current)?.id;
 
@@ -259,11 +284,7 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
               setSortMode(mode);
               track('agentic_siblings_sorted', { mode });
               if (currentId !== undefined) {
-                const href =
-                  mode === 'default'
-                    ? `${agenticBase}/${currentId}`
-                    : `${agenticBase}/${currentId}?sort=${mode}`;
-                router.replace(href, { scroll: false });
+                router.replace(hrefFor(currentId, mode), { scroll: false });
               }
             }}
           >

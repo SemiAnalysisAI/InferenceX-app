@@ -33,6 +33,7 @@ import {
 } from './server-metric-cards';
 import type { ThroughputSeriesKey } from './time-series-math';
 import { useDetailView } from './use-detail-view';
+import { ExperimentSiblingNav } from './experiment-sibling-nav';
 
 const RequestTimelineView = dynamic(() =>
   import('./request-timeline').then((m) => m.RequestTimelineView),
@@ -147,8 +148,9 @@ export function ExperimentPointDetail({ campaign, runId }: { campaign: string; r
         <ArrowLeft className="size-4" />
         {t.back}
       </Link>
+      <ExperimentSiblingNav campaign={campaign} runId={runId} />
       <header className="space-y-1">
-        <h1 className="break-words text-xl font-semibold">{data?.run.config_name || runId}</h1>
+        <p className="break-words text-sm font-medium">{data?.run.config_name || runId}</p>
         {data && (
           <p className="text-sm text-muted-foreground">
             {data.run.series === 'weka' ? 'WEKA AMG' : 'Internal Mooncake DRAM'} · {t.concurrency}{' '}

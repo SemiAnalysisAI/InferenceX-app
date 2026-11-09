@@ -50,3 +50,5 @@ On this preview, the workload selector offers `experiment=published` for the pub
 Published mode uses existing benchmark APIs and initially selects B300/vLLM. It is not an experiment campaign called `published`, and does not restore the earlier bespoke one-hour import. Experimental mode uses the campaign API and its two series. Switching reloads the view with the appropriate series, resets stale filters, and retains axes/token basis; share URLs preserve the explicit selection. The raw API shapes are unchanged.
 
 Do not infer a universal published harness version: that field is absent from the benchmark API. Experimental run `configuration` supplies the exact harness, duration, trace-idle cap and system-idle cap. The 20-minute trace cap is distinct from actual wall-clock idle time.
+
+Per-point pages reuse the standard point navigator, including concurrency chips, sorting and previous/next controls. Navigation stays within the selected campaign and backend (13 WEKA or nine internal Mooncake points in the latest campaign); the campaign API supplies these identities and metrics.

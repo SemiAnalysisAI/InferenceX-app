@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { BenchmarkSibling } from '@/hooks/api/use-benchmark-siblings';
 
-import { chipLabel } from './sibling-nav';
+import { chipLabel, siblingPointHref } from './sibling-nav';
 
 function sibling(overrides: Partial<BenchmarkSibling> = {}): BenchmarkSibling {
   return {
@@ -85,5 +85,26 @@ describe('chipLabel', () => {
         }),
       ),
     ).toBe('1xTP8PP2/DCP2/PCP4+1xTP8/DCP8 · c=2');
+  });
+});
+
+describe('sibling point navigation', () => {
+  it('preserves ordinary numeric point routes', () => {
+    expect(siblingPointHref('/infx/inference/agentic/42', 'default')).toBe(
+      '/infx/inference/agentic/42',
+    );
+    expect(siblingPointHref('/zh/infx/inference/agentic/42', 'conc')).toBe(
+      '/zh/infx/inference/agentic/42?sort=conc',
+    );
+  });
+
+  it('preserves custom string identities, query parameters and hash while replacing sort', () => {
+    const href = '/infx/inference/experiments/latest/run%2F128?view=timeline&sort=tput#requests';
+    expect(siblingPointHref(href, 'conc')).toBe(
+      '/infx/inference/experiments/latest/run%2F128?view=timeline&sort=conc#requests',
+    );
+    expect(siblingPointHref(href, 'default')).toBe(
+      '/infx/inference/experiments/latest/run%2F128?view=timeline#requests',
+    );
   });
 });
