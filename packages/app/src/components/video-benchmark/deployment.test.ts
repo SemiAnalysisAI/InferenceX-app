@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { deploymentKey, isQueueing, layoutLabel, leadCell, sharedLayoutCells } from './deployment';
 import type { VideoPoint } from './metrics';
+import { resultsClipPoints } from './results-clips';
 import type { ResultsEvidence } from './results-evidence';
 
 const base: VideoPoint = {
@@ -124,6 +125,15 @@ describe('deployment', () => {
       results: { engine: 'sol-engine', optimizations: ['first-block-cache'] } as ResultsEvidence,
     };
     expect(leadCell([base, cached], 'h200', options)?.id).toBe('a');
+    // A named run owns its hardware's clip even when its only deployment is lossy.
+    const clips = resultsClipPoints(
+      [
+        { point: base, overlay: false },
+        { point: cached, overlay: true },
+      ],
+      options,
+    );
+    expect(clips.map((p) => p.id)).toEqual(['f']);
   });
   it('requires a known shared workload and layout at C1 for evidence comparisons', () => {
     const matching = { ...base, id: 'b', hardwareKey: 'b200' };

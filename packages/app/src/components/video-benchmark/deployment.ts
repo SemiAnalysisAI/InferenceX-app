@@ -109,19 +109,21 @@ export function sharedLayoutCells<T extends VideoPoint>(cells: T[]): T[] {
 /**
  * The cell that stands for a hardware in cards and comparisons: its most
  * efficient deployment (highest videos per participating
- * GPU-hour), lowest P50 on ties. Queued and lossy cells never lead, so a
- * hardware with only lossy cells has no lead; one whose cells all lack the rate
- * falls back to its first such deployment cell.
+ * GPU-hour), lowest P50 on ties. Queued cells never lead, and lossy cells lead
+ * only when `lossy` admits them, so by default a hardware with only lossy cells
+ * has no lead; one whose cells all lack the rate falls back to its first such
+ * deployment cell.
  */
 export function leadCell(
   cells: VideoPoint[],
   hardwareKey: string,
   options: MetricOptions,
+  { lossy = false }: { lossy?: boolean } = {},
 ): VideoPoint | undefined {
   let best: VideoPoint | undefined;
   let bestRate = Number.NEGATIVE_INFINITY;
   for (const p of cells) {
-    if (p.hardwareKey !== hardwareKey || isQueueing(p) || isLossy(p)) continue;
+    if (p.hardwareKey !== hardwareKey || isQueueing(p) || (!lossy && isLossy(p))) continue;
     const rate = metricValue(p, 'videosPerGpuHour', options) ?? Number.NEGATIVE_INFINITY;
     const faster = rate === bestRate && (p.p50 ?? Infinity) < (best?.p50 ?? Infinity);
     if (best === undefined || rate > bestRate || faster) {
