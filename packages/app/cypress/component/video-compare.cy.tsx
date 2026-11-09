@@ -361,6 +361,7 @@ describe('Video results clip stage', () => {
 
     cy.get('[data-testid="video-results-stage"]').click('right');
     load('[data-testid="video-results-start"]');
+    cy.get('[data-side="b"] [data-testid="video-results-pill"] b').click();
     cy.get('[data-testid="video-results-split"]').should('have.attr', 'aria-pressed', 'false');
     cy.get('[data-testid="video-results-stage"] video').each(($video) =>
       cy.wrap($video).should(($element) => {

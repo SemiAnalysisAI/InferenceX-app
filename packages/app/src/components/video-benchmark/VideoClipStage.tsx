@@ -304,10 +304,7 @@ export default function VideoClipStage({
         data-testid="video-results-start"
         aria-label={s.playBoth}
         className="pointer-events-auto grid size-12 place-items-center rounded-full bg-white text-black shadow-lg hover:bg-white/90"
-        onClick={(event) => {
-          event.stopPropagation();
-          togglePlay();
-        }}
+        onClick={togglePlay}
       >
         <Play aria-hidden="true" className="ml-0.5 size-5 fill-current" />
       </button>
@@ -336,7 +333,10 @@ export default function VideoClipStage({
           view === 'wipe' && !locked && 'cursor-ew-resize',
         )}
         onPointerMove={onPointerMove}
-        onClick={() => {
+        onClick={(event) => {
+          // Picture layers pass the pointer through, so only a click on the picture targets the
+          // stage itself; pills and controls keep theirs.
+          if (event.target !== event.currentTarget) return;
           // The split stays hidden until the first Play, so a click must not lock it unseen.
           if (view === 'wipe' && !idle) lock(!locked);
           else if (view === 'toggle') flip('click');
@@ -404,8 +404,7 @@ export default function VideoClipStage({
                         variant="outline"
                         size="sm"
                         className="pointer-events-auto border-white/30 bg-transparent text-white hover:bg-white/10"
-                        onClick={(event) => {
-                          event.stopPropagation();
+                        onClick={() => {
                           track('video_results_clips_retry', { source: clip.id });
                           setErrors((previous) => {
                             const next = new Set(previous);
@@ -466,10 +465,7 @@ export default function VideoClipStage({
                       'grid size-6 shrink-0 place-items-center rounded hover:bg-white/15',
                       audible === role ? 'text-amber-400' : 'text-white/70',
                     )}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      listen(role);
-                    }}
+                    onClick={() => listen(role)}
                   >
                     <Volume2 aria-hidden="true" className="size-3.5" />
                   </button>
@@ -519,10 +515,7 @@ export default function VideoClipStage({
                 'pointer-events-auto absolute top-1/2 left-0 grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white',
                 locked ? 'bg-white text-black' : 'bg-black/55 text-white',
               )}
-              onClick={(event) => {
-                event.stopPropagation();
-                lock(!locked);
-              }}
+              onClick={() => lock(!locked)}
               onKeyDown={(event) => {
                 if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
                 event.preventDefault();
@@ -555,8 +548,7 @@ export default function VideoClipStage({
                   'h-8 max-w-40 truncate px-3 text-xs font-semibold',
                   shown === role ? 'bg-white text-black' : 'text-white/70',
                 )}
-                onClick={(event) => {
-                  event.stopPropagation();
+                onClick={() => {
                   if (toggled !== role) flip('click');
                 }}
               >
