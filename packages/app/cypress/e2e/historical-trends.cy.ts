@@ -388,11 +388,16 @@ describe('Historical Trends — Chinese route', () => {
 
 describe('Historical frontier views', () => {
   beforeEach(() => {
-    cy.intercept('GET', '**/api/v1/benchmarks/history?*', {
-      fixture: 'api/benchmarks-history.json',
-    }).as('frontierHistory');
+    // The trend line loads compact trend rows; the frontier views load the full history only
+    // once one of them is opened.
+    cy.fixture<BenchmarkRow[]>('api/benchmarks-history.json').then((rows) => {
+      cy.intercept('GET', '**/api/v1/benchmarks/history/trends?*', {
+        body: compactTrendHistory(rows),
+      }).as('trendHistory');
+      cy.intercept('GET', '**/api/v1/benchmarks/history?*', { body: rows }).as('frontierHistory');
+    });
     cy.visit('/infx/historical?g_model=DeepSeek-R1-0528');
-    cy.wait('@frontierHistory');
+    cy.wait('@trendHistory');
     cy.get('[data-testid="historical-trend-figure"] svg').should('be.visible');
   });
 
@@ -480,7 +485,7 @@ describe('Historical frontier views', () => {
 
   it('labels the frontier views in Chinese', () => {
     cy.visit('/zh/infx/historical?g_model=DeepSeek-R1-0528');
-    cy.wait('@frontierHistory');
+    cy.wait('@trendHistory');
     cy.get('[data-testid="historical-view-frontier"]').should('have.text', '前沿').click();
     cy.get('[data-testid="historical-view-compare"]').should('have.text', '对比');
     cy.get('[data-testid="historical-view-software"]').should('have.text', '软件提升');
