@@ -1,7 +1,7 @@
 'use client';
 
 import * as d3 from 'd3';
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 
 import { placeLineLabels, renderLineLabels } from '@/components/inference/ui/line-label-layer';
 import { getChartWatermark } from '@/lib/catalog/data-mappings';
@@ -10,7 +10,8 @@ import { formatLargeNumber, logTickFormat } from '@/lib/charts/chart-rendering';
 import { D3Chart, type RenderContext } from '@/lib/d3-chart/D3Chart';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
-import { axisLabelUnit, chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import { axisLabelUnit, chartHoverCard, chartTooltipDismiss } from '@/lib/d3-chart/tooltip-shell';
+import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { escapeHtml } from '@/lib/shared/utils';
 
@@ -78,6 +79,8 @@ const STRINGS = {
     instructions: 'Scroll to zoom · Drag to pan · Double-click to reset',
     startingCurve: (date: string) => `Starting curve · ${date}`,
     earlierPoint: 'Earlier frontier point',
+    openRun: 'Open run',
+    dismiss: 'Click elsewhere to dismiss',
     conc: 'Concurrency',
     image: 'Image',
     unknown: 'unknown',
@@ -87,6 +90,8 @@ const STRINGS = {
     instructions: '滚轮缩放 · 拖动平移 · 双击重置',
     startingCurve: (date: string) => `起点曲线 · ${date}`,
     earlierPoint: '此前的前沿点',
+    openRun: '查看运行记录',
+    dismiss: '点击其他位置关闭',
     conc: '并发',
     image: '镜像',
     unknown: '未知',
@@ -227,6 +232,16 @@ const FrontierChart = React.memo(
       return result;
     }, [history, styles]);
 
+    // The point whose hover card is pinned open by a click, if any; a redraw releases it.
+    const pinnedRef = useRef<string | null>(null);
+    // The page-wide "click elsewhere" listener goes with the chart.
+    useEffect(
+      () => () => {
+        d3.select(document).on(`click.${chartId}-pin`, null);
+      },
+      [chartId],
+    );
+
     // The pooled frontier of the visible series on each date, for its earlier points.
     const pooledByDate = useMemo(
       () =>
@@ -261,20 +276,28 @@ const FrontierChart = React.memo(
       };
       // Every hover uses the dashboard's hover card: the series, what the point is, its value
       // and interactivity, then concurrency, precision, date, serving image and any regression.
-      const pointCard = (v: OwnedVertex, subtitle: string) => {
+      const pointCard = (v: OwnedVertex, subtitle: string, pinned = false) => {
         const style = styles.get(v.key);
         const note = regressions.get(v.key);
-        return chartHoverCard({
-          title: style?.label ?? v.key,
-          subtitle,
-          color: style?.color,
-          metrics: [
-            { value: formatLargeNumber(v.y), label: axisLabelUnit(yLabel) },
-            { value: v.x.toFixed(1), label: axisLabelUnit(xLabel) },
-          ],
-          summary: `${t.conc} ${v.conc} · ${v.precision.toUpperCase()} · ${formatDate(v.measured)}`,
-          body: `<div style="font-size: 11px; color: var(--muted-foreground);">${t.image} ${escapeHtml(shortImage(v.image, t.unknown))}${note ? `<br />${escapeHtml(note.text)}` : ''}</div>`,
-        });
+        const run =
+          pinned && v.runUrl?.startsWith('https://')
+            ? `<br /><a href="${escapeHtml(v.runUrl)}" target="_blank" rel="noopener noreferrer" style="color: var(--foreground); text-decoration: underline;">${t.openRun}</a>`
+            : '';
+        const card = chartHoverCard(
+          {
+            title: style?.label ?? v.key,
+            subtitle,
+            color: style?.color,
+            metrics: [
+              { value: formatLargeNumber(v.y), label: axisLabelUnit(yLabel) },
+              { value: v.x.toFixed(1), label: axisLabelUnit(xLabel) },
+            ],
+            summary: `${t.conc} ${v.conc} · ${v.precision.toUpperCase()} · ${formatDate(v.measured)}`,
+            body: `<div style="font-size: 11px; color: var(--muted-foreground);">${t.image} ${escapeHtml(shortImage(v.image, t.unknown))}${note ? `<br />${escapeHtml(note.text)}` : ''}${run}</div>`,
+          },
+          pinned ? { pinned: true, interactive: true } : {},
+        );
+        return pinned ? card.replace('>', `>${chartTooltipDismiss(t.dismiss)}`) : card;
       };
       const hideTooltip = () => {
         ctx.tooltipElement.style.opacity = '0';
@@ -282,6 +305,7 @@ const FrontierChart = React.memo(
       };
       // Points are rebuilt on every redraw, so a tooltip could outlive the point it describes.
       hideTooltip();
+      pinnedRef.current = null;
       const svg = ctx.layout.svg.node();
       const transform = svg ? d3.zoomTransform(svg) : d3.zoomIdentity;
       const x = transform.rescaleX(ctx.xScale as ContinuousScale) as unknown as Scale;
@@ -484,6 +508,7 @@ const FrontierChart = React.memo(
         .style('pointer-events', 'stroke')
         .attr('d', (d) => curve(d.vertices))
         .on('pointermove', (event: PointerEvent, d) => {
+          if (pinnedRef.current) return;
           const [pointerX] = d3.pointer(event, root.node());
           const nearest = d3.least(d.vertices, (v) => Math.abs(x(v.x) - pointerX))!;
           showTooltip(
@@ -494,7 +519,9 @@ const FrontierChart = React.memo(
             ),
           );
         })
-        .on('pointerleave', hideTooltip);
+        .on('pointerleave', () => {
+          if (!pinnedRef.current) hideTooltip();
+        });
 
       // The shaded ground left of the slowest point gets a faint dashed edge in its owner's color.
       root
@@ -541,11 +568,7 @@ const FrontierChart = React.memo(
         .attr('r', 3)
         .style('fill', (d) => dimmed(styles.get(d.key)!.color))
         .attr('stroke', 'var(--background)')
-        .attr('stroke-width', 1)
-        .on('pointerenter', (event: PointerEvent, d) =>
-          showTooltip(event, pointCard(d, `${t.earlierPoint} · ${configLabel(d.config)}`)),
-        )
-        .on('pointerleave', hideTooltip);
+        .attr('stroke-width', 1);
 
       const vertices = root
         .select('.fr-vertices')
@@ -573,9 +596,9 @@ const FrontierChart = React.memo(
         .attr('fill', (d) => styles.get(d.key)!.color)
         .attr('stroke', 'var(--background)')
         .attr('stroke-width', 1.5);
-      // Like the dashboard's other charts: near the curve, dashed rulers cross at the closest
-      // point and its hover card follows the pointer. Earlier points and starting curves keep
-      // their own hovers.
+      // Like the dashboard's other charts: near any point, today's frontier or an earlier one,
+      // dashed rulers cross at the closest point and its hover card follows the pointer. A click
+      // pins the card (with a link to the run) until the next click.
       const rulers = root
         .selectAll<SVGGElement, null>('g.fr-rulers')
         .data([null])
@@ -597,42 +620,75 @@ const FrontierChart = React.memo(
         rulers.style('display', 'none');
         hideTooltip();
       };
+      const hoverable = [
+        ...frontier.map((v) => ({ v, subtitle: configLabel(v.config) })),
+        ...[...pastById.values()].map((v) => ({
+          v,
+          subtitle: `${t.earlierPoint} · ${configLabel(v.config)}`,
+        })),
+      ];
+      const pointNear = (event: PointerEvent) => {
+        const [pointerX, pointerY] = d3.pointer(event, root.node());
+        if (pointerX < 0 || pointerX > ctx.width || pointerY < 0 || pointerY > ctx.height)
+          return undefined;
+        const distance = ({ v }: (typeof hoverable)[number]) =>
+          Math.hypot(x(v.x) - pointerX, y(v.y) - pointerY);
+        const nearest = d3.least(hoverable, distance);
+        return nearest && distance(nearest) <= CROSSHAIR_REACH_PX ? nearest : undefined;
+      };
+      const showCrosshair = (
+        event: PointerEvent,
+        { v, subtitle }: (typeof hoverable)[number],
+        pinned: boolean,
+      ) => {
+        rulers.style('display', null);
+        rulers
+          .select('.fr-ruler-x')
+          .attr('x1', x(v.x))
+          .attr('x2', x(v.x))
+          .attr('y1', 0)
+          .attr('y2', ctx.height);
+        rulers
+          .select('.fr-ruler-y')
+          .attr('x1', 0)
+          .attr('x2', ctx.width)
+          .attr('y1', y(v.y))
+          .attr('y2', y(v.y));
+        showTooltip(event, pointCard(v, subtitle, pinned));
+      };
       ctx.layout.svg
         .on('pointermove.frontier', (event: PointerEvent) => {
-          const target = event.target as Element | null;
-          if (target?.closest('.fr-start-hit, .fr-past')) {
+          if (pinnedRef.current) return;
+          if ((event.target as Element | null)?.closest('.fr-start-hit')) {
             rulers.style('display', 'none');
             return;
           }
-          const [pointerX, pointerY] = d3.pointer(event, root.node());
-          const inPlot =
-            pointerX >= 0 && pointerX <= ctx.width && pointerY >= 0 && pointerY <= ctx.height;
-          const nearest = inPlot
-            ? d3.least(frontier, (v) => Math.hypot(x(v.x) - pointerX, y(v.y) - pointerY))
-            : undefined;
-          if (
-            !nearest ||
-            Math.hypot(x(nearest.x) - pointerX, y(nearest.y) - pointerY) > CROSSHAIR_REACH_PX
-          ) {
-            hideCrosshair();
-            return;
-          }
-          rulers.style('display', null);
-          rulers
-            .select('.fr-ruler-x')
-            .attr('x1', x(nearest.x))
-            .attr('x2', x(nearest.x))
-            .attr('y1', 0)
-            .attr('y2', ctx.height);
-          rulers
-            .select('.fr-ruler-y')
-            .attr('x1', 0)
-            .attr('x2', ctx.width)
-            .attr('y1', y(nearest.y))
-            .attr('y2', y(nearest.y));
-          showTooltip(event, pointCard(nearest, configLabel(nearest.config)));
+          const near = pointNear(event);
+          if (near) showCrosshair(event, near, false);
+          else hideCrosshair();
         })
-        .on('pointerleave.frontier', hideCrosshair);
+        .on('click.frontier', (event: PointerEvent) => {
+          const near = pointNear(event);
+          if (near && pinnedRef.current !== vertexId(near.v)) {
+            pinnedRef.current = vertexId(near.v);
+            showCrosshair(event, near, true);
+            track('historical_frontier_point_pinned', { gpu: near.v.key });
+          } else if (pinnedRef.current) {
+            pinnedRef.current = null;
+            hideCrosshair();
+          }
+        })
+        .on('pointerleave.frontier', () => {
+          if (!pinnedRef.current) hideCrosshair();
+        });
+      // "Click elsewhere" means anywhere: a click outside the chart and its card unpins too.
+      d3.select(document).on(`click.${chartId}-pin`, (event: MouseEvent) => {
+        const target = event.target as Node | null;
+        if (!pinnedRef.current || !target) return;
+        if (svg?.contains(target) || ctx.tooltipElement.contains(target)) return;
+        pinnedRef.current = null;
+        hideCrosshair();
+      });
 
       // One badge per SKU, on the longest stretch it holds; short stretches keep their color.
       const onScreenLength = (path: readonly OwnedVertex[]) =>
