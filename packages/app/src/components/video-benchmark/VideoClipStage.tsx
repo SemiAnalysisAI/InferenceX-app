@@ -327,6 +327,8 @@ export default function VideoClipStage({
     track('video_results_frame_step', { direction: delta < 0 ? 'previous' : 'next' });
   };
   const zoomTo = (zoom: number) => {
+    // A drag still held would otherwise restore its starting zoom on the next move.
+    drag.current = null;
     setLens({ zoom, x: 0, y: 0 });
     track('video_results_zoom_changed', { zoom });
   };

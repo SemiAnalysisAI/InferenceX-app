@@ -537,15 +537,23 @@ describe('Video results clip stage', () => {
         [x, height * 0.75, { clientX: left + x, clientY: top + height * 0.75 }] as const;
       cy.wrap($stage)
         .trigger('pointerdown', ...at(width * 0.3))
-        .trigger('pointermove', ...at(width * 0.4))
-        .trigger('pointerup', ...at(width * 0.4))
-        .trigger('click', ...at(width * 0.4));
+        .trigger('pointermove', ...at(width * 0.4));
+      // Dragging a tenth of the width at 2× pans by 5% of the scaled side.
+      expectTransforms(['scale(2) translate(5%, 0%)', 'scale(2) translate(5%, 0%)']);
+      // Esc while the pointer is still down resets the zoom; the held drag must not restore it.
+      cy.wrap($stage)
+        .focus()
+        .type('{esc}')
+        .trigger('pointermove', ...at(width * 0.5));
+      nextFrames();
+      cy.get<HTMLVideoElement>(videos).then(($videos) =>
+        expect([...$videos].map((video) => video.style.transform)).to.deep.equal(['', '']),
+      );
+      cy.wrap($stage)
+        .trigger('pointerup', ...at(width * 0.5))
+        .trigger('click', ...at(width * 0.5));
     });
-    // Dragging a tenth of the width at 2× pans by 5% of the scaled side, and is not a lock.
-    expectTransforms(['scale(2) translate(5%, 0%)', 'scale(2) translate(5%, 0%)']);
     cy.get('[data-testid="video-results-split"]').should('have.attr', 'aria-pressed', 'false');
-    cy.get('[data-testid="video-results-stage"]').type('{esc}');
-    expectTransforms(['', '']);
 
     cy.get('[data-testid="video-results-swap"]').click();
     cy.get('[data-testid="video-results-pill"]').then(($pills) => {
