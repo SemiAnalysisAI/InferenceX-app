@@ -468,7 +468,8 @@ describe('Video results clip stage', () => {
   });
 
   it('shows PSNR without media for an unpublished named run', () => {
-    mountResultsClips(['b200'], '/vgx', false, c1('b200').runId, [], false, ['b200']);
+    // H200 has media, but the run the user loaded stays the subject.
+    mountResultsClips(['b200', 'h200'], '/vgx', false, c1('b200').runId, [], false, ['b200']);
     cy.get('[data-side="a"]')
       .should('contain', 'Media is not shown for an unpublished run.')
       .and('contain', 'Unofficial run')

@@ -275,8 +275,9 @@ export default function VideoResultsClips({
           };
         }),
         hidden,
+        unofficialRun,
       ),
-    [selected, revision, failed, hidden],
+    [selected, revision, failed, hidden, unofficialRun],
   );
   /** Web renditions that failed to load; their sides play the sealed original instead. */
   const [failedPreviews, setFailedPreviews] = useState<ReadonlySet<string>>(new Set());

@@ -66,14 +66,17 @@ export interface StageSubject {
 const SUBJECT_ORDER = ['b200', ...RESULTS_HARDWARE.filter((key) => key !== 'b200')];
 
 /**
- * The clip the stage compares with its reference: the B200 lead, else the first visible roster
- * hardware with a playable clip. A preferred side still loading holds its place, so the stage does
- * not jump once it arrives. Without any playable clip, an unpublished run's scored clips are next,
- * then the first visible hardware, so its empty state stays in view.
+ * The clip the stage compares with its reference. A visible point of `namedRun` (the
+ * `?unofficialrun=` overlay) comes first, with or without media, so the run the user loaded stays
+ * on the stage. Otherwise the B200 lead, else the first visible roster hardware with a playable
+ * clip. A preferred side still loading holds its place, so the stage does not jump once it
+ * arrives. Without any playable clip, scored clips are next, then the first visible hardware, so
+ * its empty state stays in view.
  */
 export function stageSubject(
   candidates: readonly StageCandidate[],
   hidden: ReadonlySet<string>,
+  namedRun?: string,
 ): StageSubject | null {
   const ordered = SUBJECT_ORDER.flatMap((key) =>
     hidden.has(key)
@@ -87,10 +90,12 @@ export function stageSubject(
             pending: side === undefined,
           })),
   );
-  for (const subject of ordered) {
+  const named = ordered.filter((subject) => subject.point.runId === namedRun);
+  const pool = named.length > 0 ? named : ordered;
+  for (const subject of pool) {
     if (subject.pending) return subject;
     if (subject.groups.some((group) => [...group.clips.values()].some((clip) => clip.url)))
       return subject;
   }
-  return ordered.find((subject) => subject.groups.length > 0) ?? ordered[0] ?? null;
+  return pool.find((subject) => subject.groups.length > 0) ?? pool[0] ?? null;
 }

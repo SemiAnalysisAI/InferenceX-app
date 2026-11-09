@@ -28,7 +28,8 @@ const side = (hardwareKey: string, records: CaseRecord[], media = true): Results
       : [],
   ),
 });
-const point = (hardwareKey: string) => ({ id: hardwareKey, hardwareKey }) as VideoPoint;
+const point = (hardwareKey: string, runId = 'official') =>
+  ({ id: hardwareKey, hardwareKey, runId }) as VideoPoint;
 
 describe('clip stage', () => {
   it('rewrites only its own URL keys and reads an unknown view as Wipe', () => {
@@ -40,23 +41,24 @@ describe('clip stage', () => {
     expect(parseStage('?r_view=zoom&r_prompt=')).toEqual({ prompt: null, view: 'wipe' });
   });
 
-  it('skips hidden and clipless hardware but waits for a preferred side still loading', () => {
+  it('leads with the named run, skips hidden and clipless hardware, and waits for a preferred side', () => {
+    const official = { point: point('b200'), side: side('b200', [record('crane')]) };
+    const clipless = { point: point('b200'), side: side('b200', [record('crane')], false) };
     const h200 = { point: point('h200'), side: side('h200', [record('crane')]) };
-    const unpublished = { point: point('b200'), side: side('b200', [record('crane')], false) };
-    expect(stageSubject([unpublished, h200], new Set())?.point.hardwareKey).toBe('h200');
-    expect(
-      stageSubject(
-        [{ point: point('b200'), side: side('b200', [record('crane')]) }, h200],
-        new Set(['b200']),
-      )?.point.hardwareKey,
-    ).toBe('h200');
+    expect(stageSubject([clipless, h200], new Set())?.point.hardwareKey).toBe('h200');
+    expect(stageSubject([official, h200], new Set(['b200']))?.point.hardwareKey).toBe('h200');
+    // The named run is the subject on any hardware, with or without media.
+    const unpublished = { ...clipless, point: point('b200', 'named') };
+    expect(stageSubject([unpublished, h200], new Set(), 'named')?.point).toBe(unpublished.point);
+    const namedH200 = { ...h200, point: point('h200', 'named') };
+    expect(stageSubject([official, namedH200], new Set(), 'named')?.point).toBe(namedH200.point);
     expect(
       stageSubject([{ point: point('b200'), side: undefined }, h200], new Set()),
     ).toMatchObject({
       point: { hardwareKey: 'b200' },
       pending: true,
     });
-    expect(stageSubject([unpublished], new Set())?.groups).toHaveLength(1);
+    expect(stageSubject([clipless], new Set())?.groups).toHaveLength(1);
   });
 
   it('keeps each take of a prompt addressable and falls back to the first prompt', () => {

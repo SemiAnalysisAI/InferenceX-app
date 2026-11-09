@@ -184,10 +184,11 @@ null when it fails. GPU-board energy excludes host, chassis and facility energy.
 source identity and matches prompt, seed, repetition and recorded generation
 configuration before showing clips together. Missing media does not erase numeric
 evidence. The clips play on a two-sided stage (`VideoClipStage`) under the chart: the
-subject on the left and its pair on the right. The subject is the B200 lead; when B200 is
-hidden or has no published clip, it is the first visible roster hardware with one. A
-preferred side that is still loading holds its place, so the stage does not jump when
-it arrives. The pair is the subject's sealed Diffusers reference. Pills name each side
+subject on the left and its pair on the right. A visible point of the run named by
+`?unofficialrun=` is the subject, with or without media. Otherwise the subject is the B200
+lead; when B200 is hidden or has no published clip, it is the first visible roster hardware
+with one. A preferred side that is still loading holds its place, so the stage does not
+jump when it arrives. The pair is the subject's sealed Diffusers reference. Pills name each side
 (hardware and GPU count, or the reference) and carry its speaker. Overlay subjects
 from `?unofficialrun=` use `overlayRunColor` and an Unofficial run tag.
 
@@ -398,7 +399,7 @@ Y 轴可选每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时�
 详情页分为遥测、有效性、来源三个标签页。未知、已筛除或已隐藏的 `r_point` 回到概览，结果加载后会从 URL 中移除，重新显示该硬件或分享时不会再打开它。“如何解读这些结果”始终展开；利润估算器位于默认收起的“高级选项”中，其各模式价格和利用率放在“场景”控制面板中；性能历史需要读取已存储的 History 页面，因此默认折叠在带箭头的标题下，深链接时自动展开。尚未采集的指标在“如何解读”中列出，
 不使用占位图表或示意数值。功率无效时不展示功率或能耗结论。
 
-视频对比只读取已存储产物，核对 prompt、seed、重复次数和生成配置后同步播放。视频在图表下方的双侧对比区（`VideoClipStage`）中播放：左侧为对比对象，右侧为与之配对的视频。默认对比对象为 B200 的代表部署；B200 被隐藏或没有已发布视频时，改用名单中第一个有视频且未隐藏的硬件。优先的硬件仍在加载时会先占住位置，加载完成后画面不会跳到别的硬件。配对视频是该对象已封存的 Diffusers 参考。每侧左上或右上的标签注明硬件与 GPU 数量（或参考），并带有扬声器按钮；`?unofficialrun=` 叠加运行使用 `overlayRunColor`，并标注“非官方运行”。
+视频对比只读取已存储产物，核对 prompt、seed、重复次数和生成配置后同步播放。视频在图表下方的双侧对比区（`VideoClipStage`）中播放：左侧为对比对象，右侧为与之配对的视频。通过 `?unofficialrun=` 指定的运行若有可见数据点，无论是否有视频，都以它为对比对象；否则默认对比对象为 B200 的代表部署，B200 被隐藏或没有已发布视频时，改用名单中第一个有视频且未隐藏的硬件。优先的硬件仍在加载时会先占住位置，加载完成后画面不会跳到别的硬件。配对视频是该对象已封存的 Diffusers 参考。每侧左上或右上的标签注明硬件与 GPU 数量（或参考），并带有扬声器按钮；`?unofficialrun=` 叠加运行使用 `overlayRunColor`，并标注“非官方运行”。
 对比区有四种视图：卷帘（默认）、并排、切换和差异。卷帘视图把两侧叠放，右侧画面从跟随指针移动的分界线处裁切；点击画面或分界线按钮可锁定，焦点在按钮上时可用 `←`/`→` 移动分界线。并排把两段视频左右排列，宽度小于 640px 时改为上下排列。切换一次只显示一侧：点击画面或按 `T` 切换，按住空格键可临时查看另一侧，松开后复原；在其他视图中，焦点位于对比区时按空格键播放或暂停。快捷键只作用于获得焦点的对比区，不监听整个页面；对比区内按钮上的空格键和回车键仍触发按钮本身。Prompt 用文字卡片排成一行（显示用例 ID 和 seed，目前没有封面图），prompt 原文显示在视图切换器旁边。`clip-stage.ts` 负责对比区自己的 URL 参数：`r_prompt`（用例 ID，第二次及之后的重复加 `~take`，相同初始噪声重跑加 `diag:` 前缀）和 `r_view`（卷帘视图时省略）。它只改写这两个参数，仪表板的 `commit` 改写结果参数时也会保留它们。这两个参数只是页面状态：overview API 请求由结果参数构成，不会携带它们。未知的 prompt 显示第一条，但参数仍留在 URL 中。切换 prompt 或对比对象会暂停并把两侧都回到开头，视图、分界线锁定和音源保持不变。
 卷帘、并排和切换视图优先播放 `previewUrl` 指向的网页转码版本，没有转码版本或转码版本加载失败时播放封存的原始视频；“差异”视图两侧都加载原始视频，PSNR 和视频文件链接始终使用原始视频。播放转码版本时，“Prompt 与来源”中会注明。首次点击播放前不请求任何视频媒体：视频以 `preload="none"` 渲染在待播放画面（prompt、两侧标签和播放按钮）之后，首次播放时在点击手势内改为 `preload="auto"` 再预热。浏览器只把 `preload` 视为提示，因此这只是尽力而为。
 同步播放由 `clip-sync.ts` 中的纯函数状态机驱动（暂停、加载、缓冲、播放、结束五个状态），`useClipGroup` 只负责采集每个视频的快照并执行返回的动作，`?unofficialrun=` 叠加视频走同一套逻辑。首次播放后每段视频完整下载；视频只有几秒长，因此先下载完整再播放，播放过程中不会卡顿。只要还有视频没有从当前时间缓冲到共享结尾（允许 50 毫秒误差）或 `readyState` 低于 3，控制条就显示“加载中 N%”（以最慢视频已缓冲的共享时长百分比计）。此时点击播放会进入加载状态，等全部视频加载完成后一起开始；拖动进度条和结束后重播同样经过加载状态。播放过程中若有视频停顿（未在 seek 且 `readyState` 低于 3，例如浏览器回收了缓冲），全部视频一起暂停并显示“缓冲中 N%”，等每个视频都至少缓冲了 1 秒后续数据或缓冲到结尾后，再从主视频的时间点一起恢复。开启音频时以有声视频为主，否则以第一个未停顿的视频为主；有声视频不会被 seek 去追赶其他视频。40 到 250 毫秒的偏差通过微调 playbackRate 纠正，超过 250 毫秒才 seek 一次，且该视频 seek 过程中不会重复触发。时间显示和进度条每秒最多刷新十次。
