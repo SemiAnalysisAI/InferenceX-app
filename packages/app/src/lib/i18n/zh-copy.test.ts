@@ -157,6 +157,9 @@ describe('zh copy — the tree obeys every mechanical rule', () => {
   });
 });
 
+const run = (rule: Rule, text: string) =>
+  rule.corpus === 'bilingual-file' ? rule.find(text) : segment(text, false).flatMap(rule.find);
+
 describe('zh copy — every rule still catches what it was written for', () => {
   interface Fixture {
     rule: string;
@@ -174,8 +177,6 @@ describe('zh copy — every rule still catches what it was written for', () => {
     .map((line) => JSON.parse(line) as Fixture);
 
   const byId = new Map(RULES.map((rule) => [rule.id, rule]));
-  const run = (rule: Rule, text: string) =>
-    rule.corpus === 'bilingual-file' ? rule.find(text) : segment(text, false).flatMap(rule.find);
 
   it('covers every rule', () => {
     const covered = new Set(fixtures.filter((f) => f.kind === 'regression').map((f) => f.rule));

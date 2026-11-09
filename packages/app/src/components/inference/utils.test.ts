@@ -216,30 +216,30 @@ describe('partitionChartDataByLimits', () => {
   });
 });
 
-describe('processOverlayChartData', () => {
-  const prefillEnergyPoint = (interactivity: number, medianTtft?: number) =>
-    pt({
-      date: '2026-09-01',
-      hw: 'b200',
-      hwKey: 'b200_dynamo-sglang',
-      framework: 'dynamo-sglang',
-      precision: 'fp4',
-      disagg: true,
-      power_valid: 1,
-      x: 0,
-      p90_ttft: 0,
-      median_ttft: medianTtft ?? 0,
-      median_intvty: interactivity,
-      median_e2el: 12,
-      rawMetricKeys: [
-        'median_intvty',
-        'median_e2el',
-        'prefill_joules_per_input_token',
-        ...(medianTtft === undefined ? [] : ['median_ttft']),
-      ],
-      measuredPrefillJPerInputToken: { y: 0.2, roof: false },
-    });
+const prefillEnergyPoint = (interactivity: number, medianTtft?: number) =>
+  pt({
+    date: '2026-09-01',
+    hw: 'b200',
+    hwKey: 'b200_dynamo-sglang',
+    framework: 'dynamo-sglang',
+    precision: 'fp4',
+    disagg: true,
+    power_valid: 1,
+    x: 0,
+    p90_ttft: 0,
+    median_ttft: medianTtft ?? 0,
+    median_intvty: interactivity,
+    median_e2el: 12,
+    rawMetricKeys: [
+      'median_intvty',
+      'median_e2el',
+      'prefill_joules_per_input_token',
+      ...(medianTtft === undefined ? [] : ['median_ttft']),
+    ],
+    measuredPrefillJPerInputToken: { y: 0.2, roof: false },
+  });
 
+describe('processOverlayChartData', () => {
   it('keeps prefill-energy overlays on Interactivity despite a stale legacy P90 override', () => {
     const result = processOverlayChartDataWithClipping(
       [prefillEnergyPoint(68, 1.5), prefillEnergyPoint(55, 2)],

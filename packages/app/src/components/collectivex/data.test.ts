@@ -247,29 +247,30 @@ function pct(value: number): CollectiveXPercentiles {
 
 describe('fitAlphaBeta', () => {
   const EP = 8;
-  function fitSeries(): CollectiveXSeries {
-    const point = (bytesPerGpu: number) => {
-      const latency = 10 + bytesPerGpu / (250 * 1e3);
-      const rate = (bytesPerGpu / latency) * 1e-3;
-      const component = {
-        latency_us: pct(latency),
-        activation_data_rate_gbps_at_latency_percentile: pct(rate),
-        payload_data_rate_gbps_at_latency_percentile: pct(rate),
-        payload_bytes: bytesPerGpu * EP,
-      };
-      return {
-        tokens_per_rank: bytesPerGpu / 1e4,
-        global_tokens: bytesPerGpu / 1e3,
-        components: {
-          pair_period: component,
-          dispatch: component,
-          stage: null,
-          combine: component,
-          roundtrip: component,
-        },
-        roundtrip_token_rate_at_latency_percentile: pct(1),
-      };
+  const point = (bytesPerGpu: number) => {
+    const latency = 10 + bytesPerGpu / (250 * 1e3);
+    const rate = (bytesPerGpu / latency) * 1e-3;
+    const component = {
+      latency_us: pct(latency),
+      activation_data_rate_gbps_at_latency_percentile: pct(rate),
+      payload_data_rate_gbps_at_latency_percentile: pct(rate),
+      payload_bytes: bytesPerGpu * EP,
     };
+    return {
+      tokens_per_rank: bytesPerGpu / 1e4,
+      global_tokens: bytesPerGpu / 1e3,
+      components: {
+        pair_period: component,
+        dispatch: component,
+        stage: null,
+        combine: component,
+        roundtrip: component,
+      },
+      roundtrip_token_rate_at_latency_percentile: pct(1),
+    };
+  };
+
+  function fitSeries(): CollectiveXSeries {
     return {
       series_id: 'fit-series',
       phase: 'decode',
@@ -544,42 +545,48 @@ describe('collectiveXKvBatchIsl', () => {
   });
 });
 
-describe('collectiveXKvChartPoints', () => {
-  const kase = (
-    rows: (Partial<CollectiveXKvRow> & { latency_p50?: number })[],
-    overrides = {},
-  ): CollectiveXKvRunCase => ({
-    case_id: 'gb200-nixl-kv-dsv4-rdma-xfer-ep2-paged-fp8',
-    label: 'gb200 · nixl · rdma · kv-dsv4 · fp8',
-    disposition: 'runnable',
-    sku: 'gb200',
-    vendor: 'nvidia',
-    backend: 'nixl',
-    fabric: 'rdma',
-    workload: 'kv-dsv4',
-    precision: 'fp8',
-    topology: {
-      ep_size: 2,
-      nodes: 2,
-      gpus_per_node: 1,
-      scale_up_domain: 72,
-      scale_up_transport: 'mnnvl',
-      scale_out_transport: 'rdma',
-      topology_class: 'gb200-kv-rdma',
-    },
-    outcome: 'success',
-    reason: null,
-    detail: null,
-    library_version: '1.5.0',
-    maturity: 'production',
-    network: 'infiniband',
-    transport: 'ucx',
-    rows: rows.map(kvRow),
-    run_id: '318',
-    run_index: 1,
-    ...overrides,
+const kase = (
+  rows: (Partial<CollectiveXKvRow> & { latency_p50?: number })[],
+  overrides = {},
+): CollectiveXKvRunCase => ({
+  case_id: 'gb200-nixl-kv-dsv4-rdma-xfer-ep2-paged-fp8',
+  label: 'gb200 · nixl · rdma · kv-dsv4 · fp8',
+  disposition: 'runnable',
+  sku: 'gb200',
+  vendor: 'nvidia',
+  backend: 'nixl',
+  fabric: 'rdma',
+  workload: 'kv-dsv4',
+  precision: 'fp8',
+  topology: {
+    ep_size: 2,
+    nodes: 2,
+    gpus_per_node: 1,
+    scale_up_domain: 72,
+    scale_up_transport: 'mnnvl',
+    scale_out_transport: 'rdma',
+    topology_class: 'gb200-kv-rdma',
+  },
+  outcome: 'success',
+  reason: null,
+  detail: null,
+  library_version: '1.5.0',
+  maturity: 'production',
+  network: 'infiniband',
+  transport: 'ucx',
+  rows: rows.map(kvRow),
+  run_id: '318',
+  run_index: 1,
+  ...overrides,
+});
+
+const mooncake = (rows: (Partial<CollectiveXKvRow> & { latency_p50?: number })[]) =>
+  kase(rows, {
+    case_id: 'gb200-mooncake-kv-dsv4-rdma-xfer-ep2-paged-fp8',
+    backend: 'mooncake',
   });
 
+describe('collectiveXKvChartPoints', () => {
   it('plots batch scaling at the ISL with the widest batch sweep', () => {
     const points = collectiveXKvChartPoints(
       [
@@ -816,11 +823,6 @@ describe('collectiveXKvChartPoints', () => {
   });
 
   describe('collectiveXKvRangeBands', () => {
-    const mooncake = (rows: (Partial<CollectiveXKvRow> & { latency_p50?: number })[]) =>
-      kase(rows, {
-        case_id: 'gb200-mooncake-kv-dsv4-rdma-xfer-ep2-paged-fp8',
-        backend: 'mooncake',
-      });
     const selection = { x: 'isl', y: 'latency', op: 'push' } as const;
 
     it('spans every library of a SKU and fabric, with the median as the line', () => {

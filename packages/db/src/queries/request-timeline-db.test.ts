@@ -227,15 +227,15 @@ describe('stored gzip timeline streaming', () => {
 });
 
 const sha256 = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex');
-describe('request timeline digests', () => {
-  const digestOf = async (traceReplayId: number): Promise<string | null> => {
-    const [row] = await sql`
-      select encode(request_timeline_sha256, 'hex') as sha256
-      from agentic_trace_replay where id = ${traceReplayId}
-    `;
-    return typeof row?.sha256 === 'string' ? row.sha256 : null;
-  };
+const digestOf = async (traceReplayId: number): Promise<string | null> => {
+  const [row] = await sql`
+    select encode(request_timeline_sha256, 'hex') as sha256
+    from agentic_trace_replay where id = ${traceReplayId}
+  `;
+  return typeof row?.sha256 === 'string' ? row.sha256 : null;
+};
 
+describe('request timeline digests', () => {
   it('keeps the digest of every write to the gzip column, whatever the writer sets', async () => {
     const [row] = await sql`select request_timeline_gz from agentic_trace_replay where id = 12`;
     const original = Buffer.from(row!.request_timeline_gz as Uint8Array);

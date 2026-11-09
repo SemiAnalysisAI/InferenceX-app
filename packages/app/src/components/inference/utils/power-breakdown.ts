@@ -756,9 +756,10 @@ export function stackedBandsAt(
   const mix = span > 0 ? Math.min(1, Math.max(0, (x - a.x) / span)) : 0;
   const stackA = stackPowerBands(a.entry, bands);
   const stackB = stackPowerBands(b.entry, bands);
+  const lerp = (from: number, to: number) => from + (to - from) * mix;
+
   return stackA.map((segment, index) => {
     const other = stackB[index];
-    const lerp = (from: number, to: number) => from + (to - from) * mix;
     return {
       key: segment.key,
       y0: lerp(segment.y0, other.y0),

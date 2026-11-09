@@ -298,6 +298,27 @@ describe('mapEvalRow', () => {
   });
 });
 
+function makeV2Row(overrides: Record<string, any> = {}): Record<string, any> {
+  return makeAggRow({
+    hw: 'B300',
+    framework: 'dynamo-trt',
+    is_multinode: true,
+    tp: 4,
+    ep: 1,
+    dp_attention: 'true',
+    prefill_tp: 4,
+    prefill_ep: 1,
+    prefill_dp_attention: 'true',
+    prefill_num_workers: 7,
+    decode_tp: 8,
+    decode_ep: 8,
+    decode_dp_attention: 'true',
+    decode_num_workers: 1,
+    conc: 3072,
+    ...overrides,
+  });
+}
+
 describe('mapAggEvalRow', () => {
   it('maps a valid agg row to EvalParams', () => {
     const tracker = createSkipTracker();
@@ -364,27 +385,6 @@ describe('mapAggEvalRow', () => {
   });
 
   describe('v2 schema (disagg / multinode)', () => {
-    function makeV2Row(overrides: Record<string, any> = {}): Record<string, any> {
-      return makeAggRow({
-        hw: 'B300',
-        framework: 'dynamo-trt',
-        is_multinode: true,
-        tp: 4,
-        ep: 1,
-        dp_attention: 'true',
-        prefill_tp: 4,
-        prefill_ep: 1,
-        prefill_dp_attention: 'true',
-        prefill_num_workers: 7,
-        decode_tp: 8,
-        decode_ep: 8,
-        decode_dp_attention: 'true',
-        decode_num_workers: 1,
-        conc: 3072,
-        ...overrides,
-      });
-    }
-
     it('reads prefill_*/decode_* instead of top-level tp/ep', () => {
       const tracker = createSkipTracker();
       const result = mapAggEvalRow(makeV2Row(), tracker);

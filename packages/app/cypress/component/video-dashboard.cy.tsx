@@ -105,6 +105,11 @@ const focusFirstControl = (focusable: boolean) =>
       expect($button[0].ownerDocument.activeElement === $button[0]).to.equal(focusable);
     });
 
+const engines = () =>
+  hardwarePoints('b200').then(($groups) => [
+    ...new Set([...$groups].map((group) => group.dataset.engine)),
+  ]);
+
 describe('VideoGenX results', () => {
   it('shows the loading state without reading History while the server streams the cohort', () => {
     readOnlyVideoRequests();
@@ -540,10 +545,6 @@ describe('VideoGenX results', () => {
             ]);
       },
     });
-    const engines = () =>
-      hardwarePoints('b200').then(($groups) => [
-        ...new Set([...$groups].map((group) => group.dataset.engine)),
-      ]);
     // A tie keeps the engine listed first; the cached Sol run never competes.
     engines().should('deep.equal', ['sglang']);
     cy.get('label[for="checkbox-b200"]').should('contain', 'B200 (SGLang)');

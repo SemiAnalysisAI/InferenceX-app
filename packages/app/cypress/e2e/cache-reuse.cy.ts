@@ -25,6 +25,22 @@ const firstRowCell = (header: string) =>
     return cy.get('[data-testid="cache-reuse-table"] tbody tr').first().find('td').eq(index);
   });
 
+const labelsInsideSegments = () =>
+  cy.get(SEGMENTS).then(($segments) => {
+    const segments = [...$segments].map(boxOf);
+    cy.get('[data-testid="cache-reuse-chart"] svg .cr-value').each(($label) => {
+      const label = boxOf($label[0]);
+      const inside = segments.some(
+        (s) =>
+          label.left >= s.left - 0.5 &&
+          label.right <= s.right + 0.5 &&
+          label.top >= s.top - 0.5 &&
+          label.bottom <= s.bottom + 0.5,
+      );
+      expect(inside, `"${$label.text()}" sits inside a segment`).to.equal(true);
+    });
+  });
+
 describe('Prefix Cache Reuse', () => {
   describe('official rows', () => {
     before(() => {
@@ -156,22 +172,6 @@ describe('Prefix Cache Reuse', () => {
   });
 
   describe('layout', () => {
-    const labelsInsideSegments = () =>
-      cy.get(SEGMENTS).then(($segments) => {
-        const segments = [...$segments].map(boxOf);
-        cy.get('[data-testid="cache-reuse-chart"] svg .cr-value').each(($label) => {
-          const label = boxOf($label[0]);
-          const inside = segments.some(
-            (s) =>
-              label.left >= s.left - 0.5 &&
-              label.right <= s.right + 0.5 &&
-              label.top >= s.top - 0.5 &&
-              label.bottom <= s.bottom + 0.5,
-          );
-          expect(inside, `"${$label.text()}" sits inside a segment`).to.equal(true);
-        });
-      });
-
     it('draws phone-width bars as rows, lowest concurrency first, labels inside', () => {
       cy.viewport(393, 852);
       interceptOverlayRun();

@@ -523,6 +523,12 @@ const runScopeKey = (r: BenchmarkRow): string =>
     r.metrics.dp ?? null,
   ]);
 
+// AgentX run reads already reconstruct the complete logical snapshot, including
+// explicit append-only ancestors. Filling from the current base would reinsert
+// removed topologies or points from a later run into a historical selection.
+const rowIdentityKey = (row: BenchmarkRow) =>
+  row.benchmark_type === 'agentic_traces' ? benchmarkCurveScope(row) : runScopeKey(row);
+
 /**
  * Merge run-scoped benchmark rows with the normal latest-per-config rows.
  *
@@ -536,13 +542,8 @@ export function mergeRunScopedRows(
   baseRows: BenchmarkRow[],
 ): BenchmarkRow[] {
   if (runRows.length === 0) return baseRows;
-  // AgentX run reads already reconstruct the complete logical snapshot, including
-  // explicit append-only ancestors. Filling from the current base would reinsert
-  // removed topologies or points from a later run into a historical selection.
-  const key = (row: BenchmarkRow) =>
-    row.benchmark_type === 'agentic_traces' ? benchmarkCurveScope(row) : runScopeKey(row);
-  const claimed = new Set(runRows.map(key));
-  return [...runRows, ...baseRows.filter((row) => !claimed.has(key(row)))];
+  const claimed = new Set(runRows.map(rowIdentityKey));
+  return [...runRows, ...baseRows.filter((row) => !claimed.has(rowIdentityKey(row)))];
 }
 
 /**

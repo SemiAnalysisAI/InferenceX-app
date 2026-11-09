@@ -109,6 +109,9 @@ export function CollectiveXSupportMatrices({
   const t = STRINGS[locale];
   const versions = useMemo(() => collectiveXKnownVersions(series), [series]);
 
+  const noteTextOf = (note: string | undefined): string | null =>
+    note ? COLLECTIVEX_KNOWN_FOOTNOTES[note][locale] : null;
+
   return (
     <Card data-testid="collectivex-support-matrices" className="min-w-0">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -128,8 +131,6 @@ export function CollectiveXSupportMatrices({
           const noteOrder = collectiveXKnownFootnoteOrder(mode);
           const noteNumberOf = (note: string | undefined): number | null =>
             note ? noteOrder.indexOf(note) + 1 : null;
-          const noteTextOf = (note: string | undefined): string | null =>
-            note ? COLLECTIVEX_KNOWN_FOOTNOTES[note][locale] : null;
           return (
             <section
               key={mode}

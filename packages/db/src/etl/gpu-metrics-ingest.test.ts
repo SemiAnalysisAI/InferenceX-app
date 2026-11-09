@@ -120,19 +120,19 @@ function writePowerAuditArtifact(
   return { artifactName, artifactDir };
 }
 
-describe('gpuMetricsArtifactHoldsTelemetry', () => {
-  function sidecarOnlyArtifact() {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-metrics-ingest-'));
-    roots.push(root);
-    const artifactName = 'power_audit_dsv41flash_conc4096_gb300';
-    const artifactDir = path.join(root, artifactName);
-    fs.mkdirSync(path.join(artifactDir, 'LOGS', 'power'), { recursive: true });
-    fs.writeFileSync(path.join(artifactDir, 'power_audit.json'), '{}');
-    fs.writeFileSync(path.join(artifactDir, 'gpu_metrics_identity.csv'), 'gpu_index,uuid\n');
-    fs.writeFileSync(path.join(artifactDir, 'LOGS', 'power', 'manifest.json'), '{}');
-    return { artifactName, artifactDir };
-  }
+function sidecarOnlyArtifact() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-metrics-ingest-'));
+  roots.push(root);
+  const artifactName = 'power_audit_dsv41flash_conc4096_gb300';
+  const artifactDir = path.join(root, artifactName);
+  fs.mkdirSync(path.join(artifactDir, 'LOGS', 'power'), { recursive: true });
+  fs.writeFileSync(path.join(artifactDir, 'power_audit.json'), '{}');
+  fs.writeFileSync(path.join(artifactDir, 'gpu_metrics_identity.csv'), 'gpu_index,uuid\n');
+  fs.writeFileSync(path.join(artifactDir, 'LOGS', 'power', 'manifest.json'), '{}');
+  return { artifactName, artifactDir };
+}
 
+describe('gpuMetricsArtifactHoldsTelemetry', () => {
   it('is false when the artifact holds only sidecars', () => {
     expect(gpuMetricsArtifactHoldsTelemetry(sidecarOnlyArtifact())).toBe(false);
   });

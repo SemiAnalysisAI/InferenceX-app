@@ -21,6 +21,10 @@ const PUBLISHED = Object.fromEntries(
 );
 const GB300_INPUT = '[data-testid="cost-input-gb300"]';
 
+const a = () => cy.get(`[data-testid="figure-a"] ${GB300_INPUT}`);
+
+const b = () => cy.get(`[data-testid="figure-b"] ${GB300_INPUT}`);
+
 describe('InferenceTcoBadges', () => {
   for (const count of [2, 12]) {
     it(`exports all ${count} prices without scrollbars in every PNG layout`, () => {
@@ -235,8 +239,6 @@ describe('InferenceTcoBadges', () => {
       );
     }
     mountWithProviders(<Harness />, { globalFilters: {} });
-    const a = () => cy.get(`[data-testid="figure-a"] ${GB300_INPUT}`);
-    const b = () => cy.get(`[data-testid="figure-b"] ${GB300_INPUT}`);
     a().clear().type('2.50');
     a().should('have.value', '2.50');
     b().should('have.value', '2.50');

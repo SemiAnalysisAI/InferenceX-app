@@ -32,14 +32,15 @@ beforeEach(async () => {
              (11, 1, 1, 'single_turn', '2026-09-12', 8192, 1024, 64, '{}');`);
 });
 
+const stored = () =>
+  db
+    .query<{ id: number; power_audit: unknown }>(
+      'SELECT id, power_audit FROM benchmark_results ORDER BY id',
+    )
+    .then((result) => result.rows.map((row) => [Number(row.id), row.power_audit]));
+
 describe('applyAgentxAudits', () => {
   const audit = { source: SOURCE, window_start_unix: START, window_end_unix: START + 1 };
-  const stored = () =>
-    db
-      .query<{ id: number; power_audit: unknown }>(
-        'SELECT id, power_audit FROM benchmark_results ORDER BY id',
-      )
-      .then((result) => result.rows.map((row) => [Number(row.id), row.power_audit]));
 
   it('writes only planned AgentX rows of the run that still lack provenance and reports them', async () => {
     await db.exec(`INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, status, created_at, date)

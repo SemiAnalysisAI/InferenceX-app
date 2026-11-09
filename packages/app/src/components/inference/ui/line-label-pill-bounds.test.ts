@@ -579,8 +579,9 @@ describe('pills keep clear of other series', () => {
   });
 });
 
+const measure = (text: string) => text.length * CHAR_WIDTH;
+
 describe('phone pill width budget', () => {
-  const measure = (text: string) => text.length * CHAR_WIDTH;
   const segments = [
     { className: 'll-gpu', text: 'GB300 NVL72', weight: '700' },
     { className: 'll-engine', text: ' (Dynamo vLLM)', weight: '400' },

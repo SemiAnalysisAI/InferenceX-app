@@ -412,14 +412,15 @@ const blob = (id: number) => ({
   uploadedAt: new Date(`2026-09-${String(id).padStart(2, '0')}T00:00:00Z`),
 });
 
+const uploadReceipt = (pathname: string) => ({
+  ...blob(10),
+  pathname,
+  url: `https://store.public.blob.vercel-storage.com/${pathname}`,
+});
+
 describe('rendition receipts', () => {
   const source = 'a'.repeat(64);
   const output = 'b'.repeat(64);
-  const receipt = (pathname: string) => ({
-    ...blob(10),
-    pathname,
-    url: `https://store.public.blob.vercel-storage.com/${pathname}`,
-  });
 
   it('resolves each original hash to its rendition MP4 from listed receipt paths alone', async () => {
     vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
@@ -427,17 +428,19 @@ describe('rendition receipts', () => {
     vi.mocked(list)
       .mockResolvedValueOnce({
         blobs: [
-          receipt(`h3-video-media/v1/renditions/${source}/web-h264-crf23/${output}.json`),
+          uploadReceipt(`h3-video-media/v1/renditions/${source}/web-h264-crf23/${output}.json`),
           // A second encode of the same original keeps the first listed receipt.
-          receipt(`h3-video-media/v1/renditions/${source}/web-h264-crf23/${'f'.repeat(64)}.json`),
+          uploadReceipt(
+            `h3-video-media/v1/renditions/${source}/web-h264-crf23/${'f'.repeat(64)}.json`,
+          ),
         ],
         hasMore: true,
         cursor: 'next',
       })
       .mockResolvedValueOnce({
         blobs: [
-          receipt(`h3-video-media/v1/renditions/${'c'.repeat(64)}/web-vp9/${output}.json`),
-          receipt(`h3-video-media/v1/renditions/${'d'.repeat(64)}/web-h264-crf23/short.json`),
+          uploadReceipt(`h3-video-media/v1/renditions/${'c'.repeat(64)}/web-vp9/${output}.json`),
+          uploadReceipt(`h3-video-media/v1/renditions/${'d'.repeat(64)}/web-h264-crf23/short.json`),
         ],
         hasMore: false,
         cursor: undefined,

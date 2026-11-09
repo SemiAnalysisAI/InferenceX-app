@@ -291,30 +291,35 @@ const FrontierChart = React.memo(
       [styles, regressions],
     );
 
+    const showTooltip = (event: PointerEvent, html: string) => {
+      const card = cardRef.current;
+      if (!card) return;
+      card.innerHTML = html;
+      card.style.display = 'block';
+      const root = document.documentElement;
+      const { left, top } = placeFloatingTooltip({
+        x: event.clientX,
+        y: event.clientY,
+        width: card.offsetWidth,
+        height: card.offsetHeight,
+        offset: 14,
+        placement: 'below',
+        viewportWidth: root.clientWidth || window.innerWidth,
+        viewportHeight: root.clientHeight || window.innerHeight,
+        headerBottom: stickyHeaderBottom(),
+      });
+      card.style.left = `${left}px`;
+      card.style.top = `${top}px`;
+    };
+
+    const hideTooltip = () => {
+      if (cardRef.current) cardRef.current.style.display = 'none';
+    };
+
     const draw = (
       zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
       ctx: RenderContext,
     ) => {
-      const showTooltip = (event: PointerEvent, html: string) => {
-        const card = cardRef.current;
-        if (!card) return;
-        card.innerHTML = html;
-        card.style.display = 'block';
-        const root = document.documentElement;
-        const { left, top } = placeFloatingTooltip({
-          x: event.clientX,
-          y: event.clientY,
-          width: card.offsetWidth,
-          height: card.offsetHeight,
-          offset: 14,
-          placement: 'below',
-          viewportWidth: root.clientWidth || window.innerWidth,
-          viewportHeight: root.clientHeight || window.innerHeight,
-          headerBottom: stickyHeaderBottom(),
-        });
-        card.style.left = `${left}px`;
-        card.style.top = `${top}px`;
-      };
       // Every hover uses the dashboard's hover card: the series, what the point is, its value
       // and interactivity, then concurrency, precision, date, serving image and any regression.
       const pointCard = (v: OwnedVertex, subtitle: string, pinned = false) => {
@@ -341,9 +346,6 @@ const FrontierChart = React.memo(
           },
           pinned ? { pinned: true, interactive: true } : {},
         );
-      };
-      const hideTooltip = () => {
-        if (cardRef.current) cardRef.current.style.display = 'none';
       };
       // Points are rebuilt on every redraw, so a tooltip could outlive the point it describes.
       hideTooltip();

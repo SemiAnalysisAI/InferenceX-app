@@ -60,20 +60,21 @@ describe('PointHitGrid at the plot edges', () => {
     [0, 0],
     [12, 30],
   ]) {
+    const around = (size: number) => [
+      -0.25,
+      0,
+      0.25,
+      RADIUS / 2,
+      RADIUS,
+      size / 2,
+      size - 0.25,
+      size,
+      size + 0.25,
+    ];
+
     it(`finds points one radius outside a ${width}x${height} plot from its edges`, () => {
       const { xs, ys } = edgePoints(width, height);
       const count = xs.length;
-      const around = (size: number) => [
-        -0.25,
-        0,
-        0.25,
-        RADIUS / 2,
-        RADIUS,
-        size / 2,
-        size - 0.25,
-        size,
-        size + 0.25,
-      ];
       for (const visibleFirst of [true, false]) {
         const interactive = Uint8Array.from(xs, (_, index) =>
           (index % 2 === 0) === visibleFirst ? 1 : 0,

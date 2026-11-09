@@ -239,15 +239,14 @@ const MODEL_SELECTOR_ORDER: readonly Model[] = [
   Model.Qwen3_8_Flash_Next,
 ];
 
+const rank = (model: Model) => {
+  const index = MODEL_SELECTOR_ORDER.indexOf(model);
+  return index === -1 ? MODEL_SELECTOR_ORDER.length : index;
+};
+
 export const MODEL_OPTIONS = (Object.keys(MODEL_CONFIG) as Model[])
   .filter((m) => MODEL_CONFIG[m].category !== 'hidden')
-  .sort((a, b) => {
-    const rank = (model: Model) => {
-      const index = MODEL_SELECTOR_ORDER.indexOf(model);
-      return index === -1 ? MODEL_SELECTOR_ORDER.length : index;
-    };
-    return rank(a) - rank(b);
-  });
+  .sort((a, b) => rank(a) - rank(b));
 
 export const DEFAULT_MODELS: ReadonlySet<Model> = modelsByCategory('default');
 

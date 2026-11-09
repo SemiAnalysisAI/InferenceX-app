@@ -187,8 +187,9 @@ const drag = (svg: SVGSVGElement, from: EventTarget) => {
   fire(window, new MouseEvent('mousemove', { bubbles: true, buttons: 1, clientX: 40 }));
 };
 
+const hint = () => container.querySelector<HTMLElement>('[data-testid="chart-instructions"]');
+
 describe('D3ChartWrapper zoom hint placement', () => {
-  const hint = () => container.querySelector<HTMLElement>('[data-testid="chart-instructions"]');
   it('overlays the zoom hint on the plot instead of taking a line under it', () => {
     const svgRef = renderWrapper();
     expect(hint()?.parentElement).toBe(svgRef.current?.parentElement);

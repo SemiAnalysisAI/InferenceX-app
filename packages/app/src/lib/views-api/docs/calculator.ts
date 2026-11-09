@@ -317,7 +317,7 @@ export const operations: ApiOperation[] = [
         'string',
         'Numeric GitHub workflow run id to pin the snapshot to.',
         '用于固定数据快照的 GitHub workflow 运行编号（数字）。',
-        { type: 'string', pattern: '^[1-9]\\d*$' },
+        { type: 'string', pattern: String.raw`^[1-9]\d*$` },
         '123456789',
       ),
       parameter(
