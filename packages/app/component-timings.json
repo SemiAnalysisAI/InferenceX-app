@@ -405,6 +405,10 @@
       ]
     },
     {
+      "spec": "cypress/component/chart-point-details.cy.tsx",
+      "duration": 900
+    },
+    {
       "spec": "cypress/component/chart-selectors.cy.tsx",
       "duration": 11928,
       "tests": [
