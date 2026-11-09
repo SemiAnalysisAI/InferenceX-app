@@ -74,7 +74,7 @@ const STRINGS = {
     engineNotRecorded: 'Engine not recorded',
     lossy: 'Lossy optimizations',
     lossyHelp:
-      'Adds dashed lines for runs that skip or approximate computation, such as cross-step caching or sparse attention. They never compete for a GPU’s default line. Quality scores against the same engine’s lossless output are not published yet.',
+      'Adds dashed lines for runs that skip or approximate computation, such as cross-step caching or sparse attention. They never compete for a GPU’s default line, and each brings the lossless line of the same run, engine and layout to compare with. Quality scores against the same engine’s lossless output are not published yet.',
     lossySeries: 'Lossy optimization lines',
   },
   zh: {
@@ -111,7 +111,7 @@ const STRINGS = {
     engineNotRecorded: '未记录引擎',
     lossy: '有损优化',
     lossyHelp:
-      '以虚线加入跳过或近似部分计算的运行，例如跨步 cache 或稀疏注意力。它们不参与每张 GPU 默认线的评选。与同一引擎无损输出对比的质量分尚未发布。',
+      '以虚线加入跳过或近似部分计算的运行，例如跨步 cache 或稀疏注意力。它们不参与每张 GPU 默认线的评选，并会带上同一运行、引擎和布局下的无损线作为对照。与同一引擎无损输出对比的质量分尚未发布。',
     lossySeries: '有损优化线',
   },
 };

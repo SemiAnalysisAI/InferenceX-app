@@ -72,6 +72,35 @@ export function evidenceComparisonKey(p: VideoPoint): string | null {
   return JSON.stringify([p.workloadKey, runtimeKey(p), ...layout]);
 }
 
+/** Run, hardware, engine and known server layout; null while any layout part is unrecorded. */
+function twinKey(p: VideoPoint): string | null {
+  const layout = [p.participating, p.server?.tp, p.server?.ulysses, p.replicas ?? 1];
+  if (layout.some((n) => typeof n !== 'number')) return null;
+  return JSON.stringify([p.runId, p.hardwareKey, p.results?.engine ?? null, ...layout]);
+}
+
+/**
+ * The lossless cell a lossy cell is compared with: same run, hardware, engine, GPU count
+ * and server layout, with no lossy optimization. A cell from another run or layout differs
+ * in more than the optimization, so it never pairs. The same concurrency comes first, then
+ * a cell whose optimizations the lossy cell also declares.
+ */
+export function losslessTwin<T extends VideoPoint>(
+  lossy: VideoPoint,
+  pool: readonly T[],
+): T | null {
+  const key = twinKey(lossy);
+  if (key === null || !isLossy(lossy)) return null;
+  const declared = optimizationsOf(lossy);
+  const rank = (p: T) =>
+    Number(p.concurrency !== lossy.concurrency) * 2 +
+    Number(!optimizationsOf(p).every((name) => declared.includes(name)));
+  let best: T | null = null;
+  for (const p of pool)
+    if (!isLossy(p) && twinKey(p) === key && (best === null || rank(p) < rank(best))) best = p;
+  return best;
+}
+
 /**
  * One lossless C1 cell per hardware on the known workload, runtime and deployment
  * layout that the most hardware share (ties keep the first in cell order), so a

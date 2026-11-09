@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { deploymentKey, isQueueing, layoutLabel, leadCell, sharedLayoutCells } from './deployment';
+import {
+  deploymentKey,
+  isQueueing,
+  layoutLabel,
+  leadCell,
+  losslessTwin,
+  sharedLayoutCells,
+} from './deployment';
 import type { VideoPoint } from './metrics';
 import { resultsClipPoints } from './results-clips';
 import type { ResultsEvidence } from './results-evidence';
@@ -37,6 +44,8 @@ const base: VideoPoint = {
   observedAt: null,
 };
 const options = { tier: 'h' } as const;
+const results = (optimizations: string[]) =>
+  ({ engine: 'sol-engine', optimizations }) as unknown as ResultsEvidence;
 
 describe('deployment', () => {
   it('keys a deployment by boards and model split, not by concurrency', () => {
@@ -159,5 +168,21 @@ describe('deployment', () => {
     expect(sharedLayoutCells([{ ...base, workloadKey: null }])).toEqual([]);
     expect(sharedLayoutCells([{ ...base, server: null }])).toEqual([]);
     expect(sharedLayoutCells([{ ...base, concurrency: 2, replicas: 2 }])).toEqual([]);
+  });
+  it('pairs a lossy cell only with its own run’s lossless cell on the same engine and layout', () => {
+    const lossy = { ...base, id: 'lossy', results: results(['cuda-graph', 'first-block-cache']) };
+    const twin = { ...base, id: 'twin', results: results(['cuda-graph']) };
+    const strangers: VideoPoint[] = [
+      { ...twin, id: 'other-run', runId: '2' },
+      { ...twin, id: 'other-split', server: { tp: 4, ulysses: 1, attention: null } },
+      { ...twin, id: 'other-count', participating: 8 },
+      { ...twin, id: 'other-engine', results: { ...twin.results!, engine: 'sglang' } },
+      { ...twin, id: 'also-lossy', results: results(['teacache']) },
+    ];
+    expect(losslessTwin(lossy, strangers)).toBeNull();
+    const elsewhere = { ...twin, id: 'c2', concurrency: 2 };
+    expect(losslessTwin(lossy, [...strangers, elsewhere, twin])?.id).toBe('twin');
+    expect(losslessTwin(lossy, [elsewhere])?.id).toBe('c2');
+    expect(losslessTwin(twin, [twin])).toBeNull();
   });
 });

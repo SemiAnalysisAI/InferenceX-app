@@ -258,6 +258,29 @@ describe('resultsChartSeries', () => {
       ['sol-engine', 'mystery-cache', true],
     ]);
   });
+
+  it('draws a lossy line’s lossless twin under Best engines, which never stands for its GPU', () => {
+    const run = (name: string, engine: string, p50: number, optimizations: string[]) =>
+      deployment(name, 4, p50, 400 - p50, 200, {
+        hardwareKey: 'b200',
+        server: { tp: 2, ulysses: 2, attention: null },
+        results: { engine, optimizations } as ResultsEvidence,
+      });
+    const points = [
+      run('stock', 'sglang', 20, []),
+      run('fused', 'sol-engine', 30, ['cuda-graph']),
+      run('cached', 'sol-engine', 10, ['cuda-graph', 'first-block-cache']),
+    ];
+    const state = { ...DEFAULT_RESULTS_STATE, lossy: true };
+    const drawn = resultsChartSeries(cells(points, state), selection({ lossy: true }));
+    expect(drawn.map((s) => [s.engine, s.lossy, Boolean(s.twin)])).toEqual([
+      ['sglang', false, false],
+      ['sol-engine', false, true],
+      ['sol-engine', true, false],
+    ]);
+    const charted = chartedCells(resultProjection(points, state), state);
+    expect(charted.map((c) => c.point.id).toSorted()).toEqual(['cached:c1', 'stock:c1']);
+  });
 });
 
 describe('resultsMetricLabel', () => {
