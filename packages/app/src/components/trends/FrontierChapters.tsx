@@ -11,14 +11,12 @@ import { shortImage, type FrontierChapter } from './frontier-history-core';
 const STRINGS = {
   en: {
     enters: (driver: string) => `${driver} enters`,
-    newConfig: (driver: string, configs: string) => `${driver}: new config ${configs}`,
-    update: (config: string, from: string, to: string) =>
-      `${config}: software update ${from} → ${to}`,
+    newConfig: (configs: string) => `New config: ${configs}`,
+    update: (config: string) => `${config}: software update`,
     rerun: (driver: string, grew: boolean) =>
       `${driver}: re-run ${grew ? 'improved' : 'regressed'}`,
-    regression: (driver: string, config: string) => `${driver}: ${config} regressed`,
-    regressionImage: (config: string, from: string, to: string) =>
-      `${config} regressed on ${to} (was ${from})`,
+    regression: (config: string) => `${config} regressed`,
+    images: (from: string, to: string) => `${from} → ${to}`,
     ground: (percent: string) => `${percent} ground covered`,
     peak: (grew: boolean, ratio: string, x: number, unit: string) =>
       `${grew ? 'up to' : 'down to'} ${ratio} at ${x} ${unit}`,
@@ -26,12 +24,11 @@ const STRINGS = {
   },
   zh: {
     enters: (driver: string) => `${driver} 首次出现`,
-    newConfig: (driver: string, configs: string) => `${driver}：新配置 ${configs}`,
-    update: (config: string, from: string, to: string) => `${config}：软件更新 ${from} → ${to}`,
+    newConfig: (configs: string) => `新配置：${configs}`,
+    update: (config: string) => `${config}：软件更新`,
     rerun: (driver: string, grew: boolean) => `${driver}：重新测试后${grew ? '提升' : '下降'}`,
-    regression: (driver: string, config: string) => `${driver}：${config} 性能下降`,
-    regressionImage: (config: string, from: string, to: string) =>
-      `${config} 换用 ${to} 后性能下降（此前为 ${from}）`,
+    regression: (config: string) => `${config} 性能下降`,
+    images: (from: string, to: string) => `${from} → ${to}`,
     ground: (percent: string) => `覆盖面积 ${percent}`,
     peak: (grew: boolean, ratio: string, x: number, unit: string) =>
       `${x} ${unit} 处${grew ? '最高达' : '降至'} ${ratio}`,
@@ -56,32 +53,26 @@ function useChapterText(props: Pick<ChapterProps, 'styles' | 'configLabel' | 'un
   const t = STRINGS[locale];
   return useMemo(() => {
     const label = (key: string) => props.styles.get(key)?.label ?? key;
-    const title = (chapter: FrontierChapter) => {
+    // The serving images are long, so only hovers (`withImages`) spell them out.
+    const title = (chapter: FrontierChapter, withImages = true) => {
       const driver = label(chapter.driver);
+      const images =
+        withImages && chapter.image
+          ? ` (${t.images(shortImage(chapter.image.from, t.unknown), shortImage(chapter.image.to, t.unknown))})`
+          : '';
       const grew = chapter.change === null || chapter.change > 1;
       switch (chapter.cause) {
         case 'new-series': {
           return t.enters(driver);
         }
         case 'new-config': {
-          return t.newConfig(driver, chapter.configs.map(props.configLabel).join(', '));
+          return t.newConfig(chapter.configs.map(props.configLabel).join(', '));
         }
         case 'software-update': {
-          return t.update(
-            props.configLabel(chapter.configs[0]),
-            shortImage(chapter.image?.from ?? null, t.unknown),
-            shortImage(chapter.image?.to ?? null, t.unknown),
-          );
+          return `${t.update(props.configLabel(chapter.configs[0]))}${images}`;
         }
         case 'regression': {
-          const config = props.configLabel(chapter.configs[0] ?? chapter.driver);
-          return chapter.image
-            ? t.regressionImage(
-                config,
-                shortImage(chapter.image.from, t.unknown),
-                shortImage(chapter.image.to, t.unknown),
-              )
-            : t.regression(driver, config);
+          return `${t.regression(props.configLabel(chapter.configs[0] ?? chapter.driver))}${images}`;
         }
         case 'rerun': {
           return t.rerun(driver, grew);
@@ -262,7 +253,7 @@ export function FrontierChapterNow({
           <span className="text-muted-foreground tabular-nums">
             {formatDate(dates[current.dateIndex])}
           </span>
-          <span className="font-medium"> · {text.title(current)}</span>
+          <span className="font-medium"> · {text.title(current, false)}</span>
           {text.ground(current) && (
             <span className="text-muted-foreground"> · {text.ground(current)}</span>
           )}

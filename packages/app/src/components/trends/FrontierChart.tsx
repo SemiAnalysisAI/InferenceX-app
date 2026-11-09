@@ -10,6 +10,7 @@ import { formatLargeNumber, logTickFormat } from '@/lib/charts/chart-rendering';
 import { D3Chart, type RenderContext } from '@/lib/d3-chart/D3Chart';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
+import { axisLabelUnit, chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { escapeHtml } from '@/lib/shared/utils';
 
@@ -64,6 +65,8 @@ export interface FrontierChartProps {
 const CHART_MARGIN = { top: 24, right: 30, bottom: 50, left: 64 };
 /** A point counts as growth only if it beats the previous frontier by more than this. */
 const GROWTH_TOLERANCE = 0.01;
+/** How close, in pixels, the pointer must be to a frontier point for the crosshair to show. */
+const CROSSHAIR_REACH_PX = 48;
 /** Shade under the current frontier: the theme's blue, the same in light and dark. */
 const FILL_COLOR = 'color-mix(in oklab, var(--secondary) 30%, var(--background))';
 /** Pseudo-series that carries the running record into the next date's pooled frontier. */
@@ -75,7 +78,6 @@ const STRINGS = {
     instructions: 'Scroll to zoom · Drag to pan · Double-click to reset',
     startingCurve: (date: string) => `Starting curve · ${date}`,
     earlierPoint: 'Earlier frontier point',
-    measured: 'Measured',
     conc: 'Concurrency',
     image: 'Image',
     unknown: 'unknown',
@@ -85,7 +87,6 @@ const STRINGS = {
     instructions: '滚轮缩放 · 拖动平移 · 双击重置',
     startingCurve: (date: string) => `起点曲线 · ${date}`,
     earlierPoint: '此前的前沿点',
-    measured: '测量日期',
     conc: '并发',
     image: '镜像',
     unknown: '未知',
@@ -252,21 +253,29 @@ const FrontierChart = React.memo(
       const showTooltip = (event: PointerEvent, html: string) => {
         const tooltip = ctx.tooltipElement;
         const host = tooltip.offsetParent?.getBoundingClientRect();
-        tooltip.innerHTML = `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width:180px">${html}</div>`;
+        tooltip.innerHTML = html;
         tooltip.style.display = 'block';
         tooltip.style.opacity = '1';
         tooltip.style.left = `${event.clientX - (host?.left ?? 0) + 14}px`;
         tooltip.style.top = `${event.clientY - (host?.top ?? 0) - 10}px`;
       };
-      // A series' regression note closes the hover of each of its points.
-      const regressionHtml = (key: string) => {
-        const note = regressions.get(key);
-        return note
-          ? `<div class="mt-1 border-t pt-1 text-muted-foreground" style="max-width:280px">${escapeHtml(note.text)}</div>`
-          : '';
+      // Every hover uses the dashboard's hover card: the series, what the point is, its value
+      // and interactivity, then concurrency, precision, date, serving image and any regression.
+      const pointCard = (v: OwnedVertex, subtitle: string) => {
+        const style = styles.get(v.key);
+        const note = regressions.get(v.key);
+        return chartHoverCard({
+          title: style?.label ?? v.key,
+          subtitle,
+          color: style?.color,
+          metrics: [
+            { value: formatLargeNumber(v.y), label: axisLabelUnit(yLabel) },
+            { value: v.x.toFixed(1), label: axisLabelUnit(xLabel) },
+          ],
+          summary: `${t.conc} ${v.conc} · ${v.precision.toUpperCase()} · ${formatDate(v.measured)}`,
+          body: `<div style="font-size: 11px; color: var(--muted-foreground);">${t.image} ${escapeHtml(shortImage(v.image, t.unknown))}${note ? `<br />${escapeHtml(note.text)}` : ''}</div>`,
+        });
       };
-      const imageHtml = (v: FrontierVertex) =>
-        `<div class="text-muted-foreground">${t.image} ${escapeHtml(shortImage(v.image, t.unknown))}</div>`;
       const hideTooltip = () => {
         ctx.tooltipElement.style.opacity = '0';
         ctx.tooltipElement.style.display = 'none';
@@ -477,14 +486,12 @@ const FrontierChart = React.memo(
         .on('pointermove', (event: PointerEvent, d) => {
           const [pointerX] = d3.pointer(event, root.node());
           const nearest = d3.least(d.vertices, (v) => Math.abs(x(v.x) - pointerX))!;
-          const style = styles.get(nearest.key);
           showTooltip(
             event,
-            `<div class="font-semibold" style="color:${style?.color ?? 'inherit'}">${style?.label ?? nearest.key}</div>
-            <div class="text-muted-foreground mb-1">${t.startingCurve(formatDate(d.date))} · ${configLabel(nearest.config)}</div>
-            <div>${xLabel}: ${nearest.x.toFixed(1)}</div>
-            <div class="font-medium">${yLabel}: ${formatLargeNumber(nearest.y)}</div>
-            ${imageHtml(nearest)}${regressionHtml(nearest.key)}`,
+            pointCard(
+              nearest,
+              `${t.startingCurve(formatDate(d.date))} · ${configLabel(nearest.config)}`,
+            ),
           );
         })
         .on('pointerleave', hideTooltip);
@@ -536,15 +543,7 @@ const FrontierChart = React.memo(
         .attr('stroke', 'var(--background)')
         .attr('stroke-width', 1)
         .on('pointerenter', (event: PointerEvent, d) =>
-          showTooltip(
-            event,
-            `<div class="font-semibold" style="color:${styles.get(d.key)!.color}">${styles.get(d.key)!.label}</div>
-            <div class="text-muted-foreground mb-1">${t.earlierPoint} · ${configLabel(d.config)}</div>
-            <div>${xLabel}: ${d.x.toFixed(1)}</div>
-            <div class="font-medium">${yLabel}: ${formatLargeNumber(d.y)}</div>
-            <div class="text-muted-foreground mt-1">${t.conc} ${d.conc} · ${d.precision.toUpperCase()} · ${t.measured} ${formatDate(d.measured)}</div>
-            ${imageHtml(d)}`,
-          ),
+          showTooltip(event, pointCard(d, `${t.earlierPoint} · ${configLabel(d.config)}`)),
         )
         .on('pointerleave', hideTooltip);
 
@@ -574,19 +573,66 @@ const FrontierChart = React.memo(
         .attr('fill', (d) => styles.get(d.key)!.color)
         .attr('stroke', 'var(--background)')
         .attr('stroke-width', 1.5);
-      vertices
-        .on('pointerenter', (event: PointerEvent, d) =>
-          showTooltip(
-            event,
-            `<div class="font-semibold" style="color:${styles.get(d.key)!.color}">${styles.get(d.key)!.label}</div>
-            <div class="text-muted-foreground mb-1">${configLabel(d.config)}</div>
-            <div>${xLabel}: ${d.x.toFixed(1)}</div>
-            <div class="font-medium">${yLabel}: ${formatLargeNumber(d.y)}</div>
-            <div class="text-muted-foreground mt-1">${t.conc} ${d.conc} · ${d.precision.toUpperCase()} · ${t.measured} ${formatDate(d.measured)}</div>
-            ${imageHtml(d)}${regressionHtml(d.key)}`,
-          ),
-        )
-        .on('pointerleave', hideTooltip);
+      // Like the dashboard's other charts: near the curve, dashed rulers cross at the closest
+      // point and its hover card follows the pointer. Earlier points and starting curves keep
+      // their own hovers.
+      const rulers = root
+        .selectAll<SVGGElement, null>('g.fr-rulers')
+        .data([null])
+        .join((enter) => {
+          const g = enter.append('g').attr('class', 'fr-rulers').style('pointer-events', 'none');
+          g.append('line').attr('class', 'fr-ruler-x');
+          g.append('line').attr('class', 'fr-ruler-y');
+          return g;
+        })
+        .style('display', 'none')
+        .raise();
+      rulers
+        .selectAll('line')
+        .attr('stroke', 'var(--foreground)')
+        .attr('stroke-width', 1)
+        .attr('stroke-dasharray', '4 4')
+        .attr('opacity', 0.8);
+      const hideCrosshair = () => {
+        rulers.style('display', 'none');
+        hideTooltip();
+      };
+      ctx.layout.svg
+        .on('pointermove.frontier', (event: PointerEvent) => {
+          const target = event.target as Element | null;
+          if (target?.closest('.fr-start-hit, .fr-past')) {
+            rulers.style('display', 'none');
+            return;
+          }
+          const [pointerX, pointerY] = d3.pointer(event, root.node());
+          const inPlot =
+            pointerX >= 0 && pointerX <= ctx.width && pointerY >= 0 && pointerY <= ctx.height;
+          const nearest = inPlot
+            ? d3.least(frontier, (v) => Math.hypot(x(v.x) - pointerX, y(v.y) - pointerY))
+            : undefined;
+          if (
+            !nearest ||
+            Math.hypot(x(nearest.x) - pointerX, y(nearest.y) - pointerY) > CROSSHAIR_REACH_PX
+          ) {
+            hideCrosshair();
+            return;
+          }
+          rulers.style('display', null);
+          rulers
+            .select('.fr-ruler-x')
+            .attr('x1', x(nearest.x))
+            .attr('x2', x(nearest.x))
+            .attr('y1', 0)
+            .attr('y2', ctx.height);
+          rulers
+            .select('.fr-ruler-y')
+            .attr('x1', 0)
+            .attr('x2', ctx.width)
+            .attr('y1', y(nearest.y))
+            .attr('y2', y(nearest.y));
+          showTooltip(event, pointCard(nearest, configLabel(nearest.config)));
+        })
+        .on('pointerleave.frontier', hideCrosshair);
 
       // One badge per SKU, on the longest stretch it holds; short stretches keep their color.
       const onScreenLength = (path: readonly OwnedVertex[]) =>
