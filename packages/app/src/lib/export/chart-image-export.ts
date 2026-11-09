@@ -378,6 +378,14 @@ export async function exportChartImage(
     for (const el of clone.querySelectorAll('.export-only')) {
       (el as HTMLElement).style.display = 'inline';
     }
+    // Export-only labels can widen the price table. Lay it out without a scroll viewport.
+    for (const wrapper of clone.querySelectorAll<HTMLElement>('[data-export-table]')) {
+      applyStyles(wrapper, { overflow: 'visible', width: 'fit-content', maxWidth: '100%' });
+      applyStyles(wrapper.querySelector('table'), { maxWidth: '100%' });
+      for (const cell of wrapper.querySelectorAll<HTMLElement>('th, td')) {
+        applyStyles(cell, { whiteSpace: 'normal', overflowWrap: 'anywhere' });
+      }
+    }
     for (const el of clone.querySelectorAll('[id$="-export"]')) {
       (el as HTMLElement).parentElement!.style.display = 'none';
     }

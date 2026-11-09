@@ -246,6 +246,7 @@ export function TcoPriceTable({
     <div className={cn('max-w-full', className)}>
       <div
         data-testid={testId}
+        data-export-table
         className="w-fit max-w-full overflow-x-auto rounded-md border border-border/60 text-muted-foreground"
       >
         <table className="border-separate border-spacing-0 text-2xs tabular-nums">
