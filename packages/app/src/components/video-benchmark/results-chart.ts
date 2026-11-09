@@ -242,6 +242,13 @@ export function resultsHistorySeries(
     .toSorted(seriesOrder);
 }
 
+/** A hardware's official cells and a named run's cells are ranked apart. */
+const channelKey = (hardwareKey: string | null, overlay: boolean) =>
+  `${hardwareKey}${overlay ? '-overlay' : ''}`;
+
+const seriesKey = ({ point, overlay }: Pick<ResultCell, 'point' | 'overlay'>) =>
+  `${point.hardwareKey}:${runtimeKey(point)}${overlay ? '-overlay' : ''}`;
+
 /**
  * Each hardware's lossless series with the largest frontier area, per run channel:
  * InferenceX's best-series rule, so one engine is the default line per hardware.
@@ -255,7 +262,7 @@ function bestPerHardware(
     maximizeY = RESULTS_Y_METRICS[selection.y].better === 'higher';
   const best = new Map<string, { item: ResultsChartSeries; area: number }>();
   for (const item of series.toSorted(seriesOrder)) {
-    const channel = `${item.hardwareKey}${item.overlay ? '-overlay' : ''}`;
+    const channel = channelKey(item.hardwareKey, item.overlay);
     const area = frontierArea(item.frontier, maximizeX, maximizeY);
     if (area > (best.get(channel)?.area ?? -1)) best.set(channel, { item, area });
   }
@@ -274,11 +281,7 @@ export function resultsChartSeries(
 ): ResultsChartSeries[] {
   const x = RESULTS_X_METRICS[selection.x],
     y = RESULTS_Y_METRICS[selection.y];
-  const groups = Map.groupBy(
-    plottedPoints(cells, selection),
-    ({ hardwareKey, point: { cell } }) =>
-      `${hardwareKey}:${runtimeKey(cell.point)}${cell.overlay ? '-overlay' : ''}`,
-  );
+  const groups = Map.groupBy(plottedPoints(cells, selection), ({ point }) => seriesKey(point.cell));
   const series = [...groups].map(([key, plotted]): ResultsChartSeries => {
     const points = plotted.map(({ point }) => point);
     const frontier = paretoFrontier(points, x.better, y.better);
@@ -308,10 +311,27 @@ export function resultsChartSeries(
 export function comparesEngines(series: readonly ResultsChartSeries[]): boolean {
   const engines = new Map<string, Set<string | null>>();
   for (const { hardwareKey, overlay, engine } of series) {
-    const channel = `${hardwareKey}${overlay ? '-overlay' : ''}`;
+    const channel = channelKey(hardwareKey, overlay);
     const seen = engines.get(channel) ?? new Set();
     if (seen.add(engine).size > 1) return true;
     engines.set(channel, seen);
   }
   return false;
+}
+
+/**
+ * Cells that may stand for their hardware in cards, profit bars and clips: those of
+ * a runtime the chart draws for that hardware and run channel, so they name the
+ * chart's engine. A channel the chart draws nothing for keeps every cell.
+ */
+export function chartedCells<T extends Pick<ResultCell, 'point' | 'overlay'>>(
+  cells: readonly T[],
+  series: readonly ResultsChartSeries[],
+): T[] {
+  const drawn = new Set(series.map((item) => item.key));
+  const channels = new Set(series.map((item) => channelKey(item.hardwareKey, item.overlay)));
+  return cells.filter(
+    (cell) =>
+      !channels.has(channelKey(cell.point.hardwareKey, cell.overlay)) || drawn.has(seriesKey(cell)),
+  );
 }

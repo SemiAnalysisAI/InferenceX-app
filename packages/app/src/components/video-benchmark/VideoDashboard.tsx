@@ -51,6 +51,7 @@ import {
   type VideoMode,
 } from './results';
 import {
+  chartedCells,
   comparesEngines,
   RESULTS_X_METRICS,
   RESULTS_Y_METRIC_KEYS,
@@ -361,6 +362,15 @@ export default function VideoDashboard({
     () => [...projection.deploymentCells, ...projection.overlayDeploymentCells],
     [projection],
   );
+  // Cards, profit bars and clips pick among the runtimes the chart draws, so they name its engine.
+  const charted = useMemo(
+    () =>
+      chartedCells(
+        cells,
+        resultsChartSeries(deploymentCells, { ...resultsSelection(state), hidden: [] }),
+      ),
+    [cells, deploymentCells, state],
+  );
   const engines = [
     ...new Set(
       deploymentCells.flatMap(({ metadata }) => (metadata.engine ? [metadata.engine] : [])),
@@ -431,7 +441,7 @@ export default function VideoDashboard({
     cell.overlay ? overlayRunColor(0) : colorFor(cell.point.hardwareKey ?? '');
   const representatives = roster.flatMap((key) =>
     [false, true].flatMap((overlay) => {
-      const choices = cells.filter((c) => c.point.hardwareKey === key && c.overlay === overlay);
+      const choices = charted.filter((c) => c.point.hardwareKey === key && c.overlay === overlay);
       const lead = leadCell(
         choices.map((c) => c.point),
         key,
@@ -816,7 +826,7 @@ export default function VideoDashboard({
           <Card>
             <VideoResultsClips
               initialSides={initialData?.sides}
-              points={resultsClipPoints(cells, { tier: state.costTier })}
+              points={resultsClipPoints(charted, { tier: state.costTier })}
               colorFor={(key) =>
                 representatives.some((c) => c.overlay && c.point.hardwareKey === key)
                   ? overlayRunColor(0)

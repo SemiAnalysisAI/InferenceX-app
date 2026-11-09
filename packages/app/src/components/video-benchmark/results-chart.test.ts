@@ -5,7 +5,9 @@ import type { VideoPoint } from './metrics';
 import { videoPoints } from './points';
 import { DEFAULT_RESULTS_STATE, resultProjection, type ResultsState } from './results';
 import type { ResultsEvidence } from './results-evidence';
+import { leadCell } from './deployment';
 import {
+  chartedCells,
   comparesEngines,
   RESULTS_X_METRICS,
   resultsChartSeries,
@@ -161,6 +163,27 @@ describe('resultsChartSeries', () => {
       ['vllm-omni', true],
     ]);
     expect(comparesEngines(compared)).toBe(true);
+    // Cards and clips stand for a GPU with the engine the chart draws, even when
+    // another engine rates more videos per GPU-hour.
+    const rated = cells([
+      b200('sglang', 'sglang', 30),
+      b200('vllm', 'vllm-omni', 40, { wallSeconds: 1 }),
+    ]);
+    const charted = chartedCells(rated, resultsChartSeries(rated, selection()));
+    expect(
+      leadCell(
+        rated.map((c) => c.point),
+        'b200',
+        { tier: 'h' },
+      )?.id,
+    ).toBe('vllm:c1');
+    expect(
+      leadCell(
+        charted.map((c) => c.point),
+        'b200',
+        { tier: 'h' },
+      )?.id,
+    ).toBe('sglang:c1');
   });
 
   it('never lets a faster lossy series become a GPU’s default line', () => {
