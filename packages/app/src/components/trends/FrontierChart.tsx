@@ -283,7 +283,10 @@ const FrontierChart = React.memo(
           pinned && v.runUrl?.startsWith('https://')
             ? `<br /><a href="${escapeHtml(v.runUrl)}" target="_blank" rel="noopener noreferrer" style="color: var(--foreground); text-decoration: underline;">${t.openRun}</a>`
             : '';
-        const card = chartHoverCard(
+        const dismiss = pinned
+          ? `<div style="margin-top: 6px;">${chartTooltipDismiss(t.dismiss)}</div>`
+          : '';
+        return chartHoverCard(
           {
             title: style?.label ?? v.key,
             subtitle,
@@ -293,11 +296,10 @@ const FrontierChart = React.memo(
               { value: v.x.toFixed(1), label: axisLabelUnit(xLabel) },
             ],
             summary: `${t.conc} ${v.conc} · ${v.precision.toUpperCase()} · ${formatDate(v.measured)}`,
-            body: `<div style="font-size: 11px; color: var(--muted-foreground);">${t.image} ${escapeHtml(shortImage(v.image, t.unknown))}${note ? `<br />${escapeHtml(note.text)}` : ''}${run}</div>`,
+            body: `<div style="font-size: 11px; color: var(--muted-foreground);">${t.image} ${escapeHtml(shortImage(v.image, t.unknown))}${note ? `<br />${escapeHtml(note.text)}` : ''}${run}</div>${dismiss}`,
           },
           pinned ? { pinned: true, interactive: true } : {},
         );
-        return pinned ? card.replace('>', `>${chartTooltipDismiss(t.dismiss)}`) : card;
       };
       const hideTooltip = () => {
         ctx.tooltipElement.style.opacity = '0';
