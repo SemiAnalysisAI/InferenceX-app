@@ -136,6 +136,8 @@ export const VIEW_QUERY_PARAMS = {
     'format',
     'frameworks',
     'gpus',
+    'groupBy',
+    'compare',
     'metric',
     'model',
     'precisions',

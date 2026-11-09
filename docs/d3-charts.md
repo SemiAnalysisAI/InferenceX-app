@@ -248,6 +248,122 @@ Upper boundaries use monotone interpolation between unique-X vertices, including
 
 There is no concurrency x-axis mode. GPU count varies across configurations, so the same concurrency is not a comparable load between them; `conc` stays a point attribute in tooltips, tables, CSV and the API. Exact topology quick filters (`pointTopologyKey`) select allocation and parallelism without filtering concurrency.
 
+## Frontier views (Historical)
+
+The Historical tab has three views built on the Pareto frontier (interactivity
+against the selected metric) over every snapshot date: **Frontier**, **Compare**
+and **Software gains**, beside Trend line and Improvement waterfall.
+`src/components/trends/frontier-history-core.ts` computes everything once per
+selection and is shared with `/api/v1/views/historical?chart=frontier`, so the
+charts and the API cannot disagree.
+
+### Data
+
+On each date a configuration contributes the best of its full sweeps from the last
+seven days, or its latest earlier full sweep, so a few bad nights do not dent the
+curve while a regression that lasts a week still shows. A sweep with fewer than 60%
+of the points of the configuration's median over its previous five sweeps is a
+partial run (it stopped early) and is skipped. Series are chips (`groupBy=gpu`) or
+vendors (`vendor`); the API also offers the legend's hardware and engine series
+(`config`).
+
+Ownership uses Pareto dominance without interpolation: a series owns interactivity
+_x_ when its best measured value at _x_ or faster is the best, resolved at 48
+log-spaced levels. Consecutive levels that change hands together form one overtake;
+reigns under seven days are flagged `brief`. Comparisons between curves (lead bars,
+software gain by interactivity, chapter peaks) instead read the drawn monotone
+curves, since a sparse sweep would otherwise score an interactivity with its next,
+much faster point.
+
+### Chart
+
+Axes span all dates, so the frontier moves instead of rescaling. Everything is drawn
+in one custom layer whose `displayIdentity` is the date index, so scrubbing and
+playback skip the data and metric phases.
+
+- A vendor picker at the top (All, or one vendor) narrows Frontier, Software gains and
+  Compare-by-chips to that vendor's chips, matching the API's `vendors=` filter.
+- **Frontier** draws the pooled frontier of the chips on screen as one path whose
+  stroke is a hard-stop gradient, one color per owner, so the line has exactly the
+  geometry of the shading under it. Each owner gets one label, on its longest stretch.
+- **Compare** and **Software gains** draw each selected series' own frontier. Chips
+  use the high-contrast palette whenever several of one vendor can share the chart
+  (they share a hue in the dashboard palette); vendors use their brand colors.
+- Each curve's starting frontier (the first frontier when pooled, otherwise each
+  series' first run) is drawn as a thin dashed line in its color dimmed, or neutral
+  for several pooled owners. Its points are cut to the interactivity range the
+  current curve spans, ending on the drawn curve at both edges, so it stays one
+  smooth line. Hovering a starting curve names the chip (or vendor), configuration
+  and serving image at the nearest point.
+- Whenever a single curve is on screen (the pooled frontier, or one selected series)
+  the ground under it is shaded in one flat shade of the theme's blue (`--secondary`,
+  the same in light and dark). The shade also covers the ground slower than the
+  slowest point, which that point dominates, so it meets the y axis; that stretch has
+  a faint dashed edge. Only the current curve is shaded, so a regression never shows
+  as covered ground. How the frontier grew shows through playback and the faded
+  earlier points below.
+- Every frontier point has a dashed ring; a point gets a solid ring when it beats the
+  best earlier frontier by more than 1%. Hovering a point shows its configuration,
+  concurrency, measurement date and serving image.
+- Once the frontier moves past a point, the point stays as a small faded dot in its
+  owner's color: every earlier point of the pooled frontier in Frontier, and of each
+  series' own frontier in Compare and Software gains. Its hover marks it as an earlier
+  frontier point.
+- The frontier follows each configuration's latest full sweeps, so a re-run that
+  measured lower replaces a better curve. A series whose frontier on the shown date
+  covers at least 10% less area than its best so far (`frontierRegressions`) gets a
+  `▼N%` badge on its line label, a note under the chart naming its best date, the
+  largest drop and the serving image that changed, and the same note in the hover of
+  its points and starting curve.
+
+### Timeline and chapters
+
+The date slider's track is split into chapters at each `frontierChapters` step (an
+area change of at least 10%), colored by the series that caused it. Hover names the
+cause from the data: a series entering, a configuration new to its frontier, a
+serving-image change, a re-run, or a regression (naming the image the configuration
+moved to when it changed). The line under the slider spells
+out the current chapter and playback pauses on each one. The range input sits on top
+of the segments with a transparent track, so they always line up with the thumb. The
+timeline starts at the first date any series on screen has data
+(`historyFromFirstData`). A collapsible table lists the measured points behind the
+curves on screen, with configuration, concurrency and run link.
+
+### Panels
+
+The view's controls (vendor picker, Compare's Vendors/Chips switch, series pills, and
+vendors that only have data at another precision) sit in the chart caption, after the
+title, costs and notices. Each view's paired panels sit directly under the chart and
+share one geometry (`frontier-panel-layout.ts`): the same height and margins, with
+headers aligned through a CSS subgrid, so their x axes line up.
+
+- **Compare**: lead bars show the leader-over-runner-up ratio at 12 interactivity
+  buckets on log2 axes fixed across all dates (diverging with two series, with NA
+  where only one reaches), and a timeline plots each series' frontier area
+  (`frontierAreas`), indexed to the leader on the first date. Vendors with data only
+  at an unselected precision are named with a one-click way to add it.
+- **Software gains** holds the hardware constant: it always groups by chip and plots
+  `softwareGains` (each chip's area over its own first-run area) over time, and
+  `softwareGainByInteractivity` (current over first-run frontier at the 12 buckets)
+  as grouped bars. A table under the panels lists the same ratios per selected chip,
+  one column per bucket, with an Average column (`averageSoftwareGain`, the geometric
+  mean of the ratios the chip reaches); it follows the playback date.
+- Under the Software gains panels and table, a **gain rate** panel shows the derivative
+  of Software gains, also grouped by chip.
+  `softwareGainRates` turns each chip's gain into compounded growth per month over a
+  trailing 30, 60 or 90 day window (needing half a window of history), plotted on
+  log(1 + rate) so spikes and slow months share an axis. The x axis is the calendar
+  date, with `commonSoftwareGainRate` (the all-chip median) dashed, or days since
+  each chip's first run (`daysSinceFirstRun`), which lines chips up by age to show
+  where gains saturate. A table gives gain so far, lifetime rate (`monthlyRate`),
+  current rate, the median, chip-specific (rate minus median) and the peak rate.
+
+The optional **Memes** switch is an easter egg: once per playback run, the first time
+another vendor takes part of the curve from NVIDIA, a small meme card appears in the
+top-right corner of the plot. Its component and `public/decorative/frontier-memes/`
+asset load only after it is turned on, and it follows the easter egg testing policy.
+Playback, shading and memes are presentation-only and have no API parameter.
+
 ## Axis Domains from Visible Data Only
 
 D3 axis domains are computed from only the visible (non-hidden) data points. Using all points (including toggled-off GPUs) would leave large blank areas when most GPUs are hidden, wasting chart space. This means axes rescale when toggling GPUs — intentional behavior that maximizes data density.
