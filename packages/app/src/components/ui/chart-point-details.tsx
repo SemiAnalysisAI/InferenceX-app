@@ -87,40 +87,43 @@ export function ChartPointDetails<A extends string = string>({
       ref={ref}
       data-testid="point-details-panel"
       aria-label={t.title}
-      className="flex w-full scroll-mt-20 flex-col rounded-lg border border-border/30 bg-background p-2 text-xs leading-5"
+      className="flex min-h-0 w-full scroll-mt-20 flex-col overflow-y-auto overscroll-contain rounded-lg [scrollbar-width:thin] border border-border/30 bg-background p-2 text-xs leading-5"
     >
-      {warning && <p className="mb-1 font-semibold text-destructive">{warning}</p>}
-      <div className="flex items-start gap-1.5">
-        {color && (
-          <span
-            aria-hidden
-            className="mt-1.5 size-2 shrink-0 rounded-full"
-            style={{ backgroundColor: color }}
-          />
-        )}
-        <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
-          <p className="text-sm font-semibold text-foreground">
-            {title}
-            {subtitle && (
-              <>
-                {' '}
-                <span className="font-normal text-muted-foreground">{subtitle}</span>
-              </>
-            )}
-          </p>
-          {date && <p className="tabular-nums text-muted-foreground">{date}</p>}
+      {/* The warning and title stay in the sticky chrome so neither scrolls away or is covered. */}
+      <div className="sticky -top-2 z-10 -mx-2 -mt-2 bg-background px-2 pt-2">
+        {warning && <p className="mb-1 font-semibold text-destructive">{warning}</p>}
+        <div className="flex items-start gap-1.5">
+          {color && (
+            <span
+              aria-hidden
+              className="mt-1.5 size-2 shrink-0 rounded-full"
+              style={{ backgroundColor: color }}
+            />
+          )}
+          <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2">
+            <p className="text-sm font-semibold text-foreground">
+              {title}
+              {subtitle && (
+                <>
+                  {' '}
+                  <span className="font-normal text-muted-foreground">{subtitle}</span>
+                </>
+              )}
+            </p>
+            {date && <p className="tabular-nums text-muted-foreground">{date}</p>}
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-2xs"
+            data-testid="point-details-close"
+            aria-label={t.close}
+            className="-mr-1 -mt-1 shrink-0 text-muted-foreground"
+            onClick={onClose}
+          >
+            <X />
+          </Button>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-2xs"
-          data-testid="point-details-close"
-          aria-label={t.close}
-          className="-mr-1 -mt-1 shrink-0 text-muted-foreground"
-          onClick={onClose}
-        >
-          <X />
-        </Button>
       </div>
       {(metrics.length > 0 || rows.length > 0) && (
         <div className="inferencex-pinned-tooltip">

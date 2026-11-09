@@ -391,10 +391,7 @@ export function D3ChartWrapper({
           className={cn(
             'relative mt-3 w-full',
             legendElement
-              ? cn(
-                  'lg:max-w-96 lg:shrink-0 lg:mt-[var(--chart-legend-top)]',
-                  hasDetails ? 'lg:self-start' : 'lg:self-stretch',
-                )
+              ? 'lg:max-w-96 lg:shrink-0 lg:mt-[var(--chart-legend-top)] lg:self-stretch'
               : 'max-w-96',
             legendElement &&
               (hasDetails
@@ -408,7 +405,19 @@ export function D3ChartWrapper({
             } as React.CSSProperties
           }
         >
-          {details}
+          {hasDetails && (
+            // Details fill the legend's slot (plot height beside a desktop legend, capped
+            // elsewhere) and scroll inside the panel instead of growing the chart row.
+            <div
+              data-slot="chart-details-frame"
+              className={cn(
+                'flex max-h-96 flex-col',
+                legendElement && 'lg:h-0 lg:max-h-none lg:min-h-full',
+              )}
+            >
+              {details}
+            </div>
+          )}
           <div
             className={
               hasDetails
