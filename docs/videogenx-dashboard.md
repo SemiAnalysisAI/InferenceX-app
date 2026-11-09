@@ -31,7 +31,7 @@ and runtime: the engine plus the optimizations its run configuration declares
 (`configuration.optimizations`). Both come from recorded configuration. Missing metadata
 is not filled from a runtime SHA or hardware name. A cell published before server
 layouts were recorded cannot be told apart from a recorded layout at the same GPU
-count, so a newer cell with the same hardware, GPU count and concurrency supersedes
+count, so a newer cell with the same hardware, runtime, GPU count and concurrency supersedes
 it; older runs selected through Run context still show it. The overview includes all
 GPU counts for the same workload, with no GPU-count selector. Workload-mix rows preserve each
 cohort separately rather than averaging across resolutions, durations or modes.

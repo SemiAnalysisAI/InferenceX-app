@@ -341,10 +341,16 @@ describe('dashboardCells', () => {
       hardware: string,
       engine: string,
       server: typeof observation.server,
-    ) => cell({ id, hardware, server, results: { engine } as ResultsEvidence });
+      optimizations: string[] = [],
+    ) => cell({ id, hardware, server, results: { engine, optimizations } as ResultsEvidence });
     const split = { tp: 1, ulysses: 4, attention: null };
     const result = dashboardCells(
       videoPoints([
+        // Nor is a stock cell an older layout of the same engine with caching.
+        pageOf('6', 'H100', [
+          served('h100-cached:c1', 'H100', 'sglang', split, ['first-block-cache']),
+        ]),
+        pageOf('5', 'H100', [served('h100-stock:c1', 'H100', 'sglang', null)]),
         pageOf('4', 'B200', [served('b200-vllm:c1', 'B200', 'vllm-omni', split)]),
         pageOf('3', 'B200', [served('b200-sglang:c1', 'B200', 'sglang', split)]),
         // An SGLang cell from before layouts were recorded is no older layout of vLLM-Omni.
@@ -355,6 +361,8 @@ describe('dashboardCells', () => {
     expect(result.cells.map((p) => p.id).toSorted()).toEqual([
       'b200-sglang:c1',
       'b200-vllm:c1',
+      'h100-cached:c1',
+      'h100-stock:c1',
       'h200-sglang:c1',
       'h200-vllm:c1',
     ]);
