@@ -3,7 +3,7 @@ import path from 'node:path';
 import { Socket } from 'node:net';
 import { describe, expect, it } from 'vitest';
 
-// patches/next@16.3.3.patch: Next's optimizer reads a local source image through a mocked request
+// Next 16.4.2 includes the image-optimizer fix: a local source image used a mocked request
 // that reused the browser's socket. If the browser cancelled the image (a navigation or a new
 // srcset pick), `send` saw the dead socket and dropped the file stream, so the optimization never
 // finished and every later request for that image width hung, holding the page `load` event.
