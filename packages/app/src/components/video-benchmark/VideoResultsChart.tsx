@@ -454,9 +454,9 @@ export default function VideoResultsChart({
   const legendLabel = (key: string) => {
     const engines = [
       ...new Set(
-        ranked
-          .filter((item) => item.hardwareKey === key && !item.lossy && item.engine !== null)
-          .map((item) => engineLabel(item.engine!)),
+        ranked.flatMap((item) =>
+          item.hardwareKey === key && !item.lossy && item.engine ? [engineLabel(item.engine)] : [],
+        ),
       ),
     ];
     return engines.length > 0
