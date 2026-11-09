@@ -1284,7 +1284,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api/experiment-documentation.ts',
-    sourceSha256: '5d73a4bff6cac5b0a20d6de9cccfed16dc77c45d50b4eb0a43294afa55831505',
+    sourceSha256: '00c14c090b4ad3af977e6ad9774b942fab8b90f82c4e6a65bc36fe4ba669e466',
     reviewArea: {
       en: 'Experiment raw campaign and string-ID run detail contracts, provenance and no-store caching.',
       zh: '实验原始 campaign、字符串 run ID 详情、来源信息与 no-store 缓存约定。',

@@ -337,7 +337,8 @@ function collectTabParams(): URLSearchParams {
     window.location.pathname
       .replace(/^\/zh(?=\/)/u, '')
       .startsWith(getDashboardRoute('inference').path) &&
-    isExperimentCampaign(liveParams.get('experiment'))
+    (isExperimentCampaign(liveParams.get('experiment')) ||
+      liveParams.get('experiment') === 'published')
   ) {
     filtered.set('experiment', liveParams.get('experiment')!);
   }

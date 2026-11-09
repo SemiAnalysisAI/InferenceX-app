@@ -52,3 +52,11 @@ Inference share and axis links preserve the recognized experiment selector in bo
 For the latest three-hour campaign, the dashboard hides official workflow/date and historical-comparison controls. Its footer shows the actual measurement date range and links “Experiment measurements” to the campaign API. Published and historical campaign views retain their existing controls.
 
 Run responses also expose optional nullable `config_name` and `perf_changelog` display metadata. Configuration names identify the serving setup and concurrency. The initial changelog is explicitly a placeholder: “Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending.” These editable labels are separate from the hashed source record; adding them does not change measurements, qualifications, source manifests, record hashes or retained payloads. A pending changelog does not imply a measured performance change.
+
+## Preview workload selector
+
+The branch-only workload selector separates **Published B300 baseline · 1 hour / 5-minute trace-idle cap** (`experiment=published`) from **AgentX 1.0.12 · 3 hours / 20-minute trace-idle cap** (`experiment=weka-amg-kimi-k3-latest-3h`). The selector is gated by `NEXT_PUBLIC_WEKA_PREVIEW`, derived from the isolated preview cache namespace. It does not appear on production.
+
+Published mode reads existing benchmark APIs and initially selects B300/vLLM. Experimental mode reads the stored campaign and selects the latest WEKA and internal Mooncake series. Switching reloads the page, resets stale workload-specific filters and retains the selected chart axes and token basis. Share links retain the explicit mode. These workloads are not comparable on the same curve; selecting published data does not reimport or display the earlier bespoke one-hour runs.
+
+The published B300 workload label follows the archived one-hour/five-minute comparison; its 11 stored points come from workflow `31893747354`. The published benchmark API does not expose a harness-version or trace-idle-cap field, so the selector does not assign one harness version to all published hardware. The three-hour campaign exposes `configuration.harness`, `benchmark_duration_seconds`, `trace_idle_gap_cap_seconds` and `system_idle_gap_cap_seconds` for every run. `experiment=published` is a UI mode, not a campaign slug accepted by the experiment API.

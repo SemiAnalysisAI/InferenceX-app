@@ -139,6 +139,7 @@ import { ModelLogo } from '@/components/ui/model-logo';
 
 import ChartNotices from './ChartNotices';
 import { ExperimentNotice } from './ExperimentNotice';
+import { ExperimentHarnessSelector } from './ExperimentHarnessSelector';
 import { useExperimentCampaign } from '@/hooks/api/use-experiment';
 import { LATEST_WEKA_EXPERIMENT } from '@/lib/benchmarks/experiment-benchmarks';
 import { MetricExplanation } from './MetricExplanation';
@@ -1700,6 +1701,13 @@ export default function ChartDisplay({
       data-powerx-surface={powerXLayout ? '' : undefined}
       className="flex flex-col gap-4"
     >
+      <ExperimentHarnessSelector
+        enabled={
+          selectedModel === 'Kimi-K3' &&
+          selectedSequence === Sequence.AgenticTraces &&
+          !powerXSurface
+        }
+      />
       <ExperimentNotice
         enabled={
           selectedModel === 'Kimi-K3' &&

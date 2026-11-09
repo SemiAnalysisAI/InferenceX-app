@@ -59,6 +59,10 @@ const SEO_REDIRECTS = [
 ].map((redirect) => ({ ...redirect, permanent: true }));
 
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_WEKA_PREVIEW:
+      process.env.CACHE_NAMESPACE === 'weka-amg-kimi-k3-20261109' ? '1' : '0',
+  },
   distDir: process.env.NEXT_DIST_DIR || '.next',
   allowedDevOrigins: allowedDevOriginsFromEnv(),
   transpilePackages: ['@semianalysisai/inferencex-constants'],

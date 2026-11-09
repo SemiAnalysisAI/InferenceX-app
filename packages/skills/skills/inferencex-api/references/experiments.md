@@ -41,3 +41,11 @@ English and Chinese inference share links preserve the recognized experiment sel
 The latest three-hour campaign hides official workflow/date and history-comparison controls. The chart footer shows the actual measurement date range and links to the raw campaign API; published views and the historical campaign retain their normal controls.
 
 Run responses may include nullable `config_name` and `perf_changelog` fields. These are editable display metadata, separate from measurements and hashed source records. The initial performance changelog explicitly says it is pending; do not interpret that placeholder as evidence of a performance change. Configuration names can summarize the serving setup and concurrency, while `configuration` retains the exact provenance. Source manifests, record hashes and payloads are unchanged by these labels.
+
+## Preview workload selection
+
+On this preview, the workload selector offers `experiment=published` for the published B300 baseline (one-hour measurement/five-minute trace-idle cap) and `experiment=weka-amg-kimi-k3-latest-3h` for AgentX 1.0.12 with three hours/20-minute trace-idle cap. Keep these scenarios in separate views and curves. The control is preview-only; production behavior is unchanged.
+
+Published mode uses existing benchmark APIs and initially selects B300/vLLM. It is not an experiment campaign called `published`, and does not restore the earlier bespoke one-hour import. Experimental mode uses the campaign API and its two series. Switching reloads the view with the appropriate series, resets stale filters, and retains axes/token basis; share URLs preserve the explicit selection. The raw API shapes are unchanged.
+
+Do not infer a universal published harness version: that field is absent from the benchmark API. Experimental run `configuration` supplies the exact harness, duration, trace-idle cap and system-idle cap. The 20-minute trace cap is distinct from actual wall-clock idle time.
