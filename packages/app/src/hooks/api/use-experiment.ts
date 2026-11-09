@@ -11,7 +11,11 @@ export function useExperimentCampaign(): string | null {
   return isExperimentCampaign(value) ? value : null;
 }
 export function useExperimentSelected(): boolean {
-  return useExperimentCampaign() !== null;
+  const campaign = useExperimentCampaign();
+  const value = useClientSearchParams().get('experiment');
+  return (
+    campaign !== null || (process.env.NEXT_PUBLIC_WEKA_PREVIEW === '1' && value === 'published')
+  );
 }
 
 export function useExperiment(enabled = true) {
