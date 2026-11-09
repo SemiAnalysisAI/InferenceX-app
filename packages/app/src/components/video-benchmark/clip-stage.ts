@@ -164,6 +164,20 @@ export function stageOptions(
   ];
 }
 
+/** The subject's speed against its pair, rounded to the two decimals the readout shows. */
+export type Speed = { direction: 'faster' | 'slower'; times: string } | { direction: 'same' };
+
+/**
+ * Compares seconds per clip: a subject taking 10 s against a pair taking 28 s is 2.80× faster.
+ * Null unless both times are positive, so a missing time never reads as a ratio.
+ */
+export function speedVs(subject: number | null, pair: number | null): Speed | null {
+  if (subject === null || pair === null || !(subject > 0) || !(pair > 0)) return null;
+  const times = (Math.max(subject, pair) / Math.min(subject, pair)).toFixed(2);
+  if (times === '1.00') return { direction: 'same' };
+  return { direction: subject < pair ? 'faster' : 'slower', times };
+}
+
 /** Chart point keys of the stage's two sides; `baseline` is null for the reference. */
 export interface StagePair {
   playing: string | null;
