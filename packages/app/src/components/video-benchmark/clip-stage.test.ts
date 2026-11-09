@@ -85,7 +85,7 @@ describe('clip stage', () => {
     expect(speedVs(10, 28)).toEqual({ direction: 'faster', times: '2.80' });
     expect(speedVs(28, 10)).toEqual({ direction: 'slower', times: '2.80' });
     expect(speedVs(7, 20)).toEqual({ direction: 'faster', times: '2.86' });
-    expect(speedVs(10, 10.04)).toEqual({ direction: 'same' });
+    expect(speedVs(10, 10.04)).toEqual({ direction: 'same', times: '1.00' });
     expect(speedVs(null, 28)).toBeNull();
     expect(speedVs(10, 0)).toBeNull();
   });

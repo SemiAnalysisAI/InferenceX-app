@@ -642,7 +642,9 @@ describe('Video results clip stage', () => {
     cy.get(`${readout} [data-readout-side="h100"]`).should('not.contain', 'Unofficial run');
     readoutValue('wall').should('have.text', '120 s');
     readoutValue('wall', 1).should('have.text', 'H100 120 s');
-    readoutValue('wall', 2).should('have.text', 'Same speed as H100');
+    readoutLines('wall').should('have.length', 2);
+    readoutValue('speed').should('have.text', '2.15× faster');
+    readoutValue('speed', 1).should('have.text', 'p50 77.9 s vs 167.3 s');
     readoutValue('psnr', 1).should('have.text', 'H100 25 dB');
     readoutValue('participating').should('have.text', '$0.1');
     readoutValue('participating', 1).should('have.text', 'H100 $0.3');
@@ -678,8 +680,12 @@ describe('Video results clip stage', () => {
     mountLossyPair(112);
     cy.get(readout).should('have.attr', 'data-pair', 'twin');
     cy.get(`${readout} [data-metric]`).first().should('have.attr', 'data-metric', 'speed');
+    cy.get(`${readout} [data-metric="speed"] dt`).should('have.text', 'Speed vs B200 lossless');
     readoutValue('speed').should('have.text', '2.80× faster');
-    readoutValue('speed', 1).should('have.text', 'p50 40 s vs 112 s lossless');
+    readoutValue('speed', 1).should('have.text', 'p50 40 s vs 112 s');
+    cy.get(`${readout} [data-metric="wall"] dt`).should('have.text', 'Wall time (this prompt)');
+    readoutValue('wall').should('have.text', '120 s');
+    readoutValue('wall', 1).should('have.text', 'B200 lossless 120 s');
     for (const metric of ['psnrLossless', 'ssimLossless', 'lpipsLossless']) {
       readoutValue(metric).should('have.text', 'Not measured yet');
       cy.get(`${readout} [data-metric="${metric}"]`).invoke('text').should('not.match', /\d/u);

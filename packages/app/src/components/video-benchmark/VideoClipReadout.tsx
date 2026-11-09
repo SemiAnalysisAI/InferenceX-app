@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { speedVs, type Speed, type StageOption } from './clip-stage';
+import { speedVs, type StageOption } from './clip-stage';
 import { layoutLabel } from './deployment';
 import type { VideoPoint } from './metrics';
 import { lossyLabel, optimizationsOf } from './optimizations';
@@ -18,21 +18,15 @@ const STRINGS = {
     official: (name: string) => `${name} official`,
     notMeasured: 'Not measured yet',
     diagnosticMetric: 'Not provided for this diagnostic.',
-    speed: 'Speed vs lossless',
-    speedShort: {
+    speed: (name: string) => `Speed vs ${name}`,
+    speedRatio: {
       faster: (x: string) => `${x}× faster`,
       slower: (x: string) => `${x}× slower`,
-      same: 'Same speed',
+      same: () => 'Same speed',
     },
-    speedThan: {
-      faster: (x: string, name: string) => `${x}× faster than ${name}`,
-      slower: (x: string, name: string) => `${x}× slower than ${name}`,
-      same: (name: string) => `Same speed as ${name}`,
-    },
-    p50Pair: (a: string, b: string) => `p50 ${a} s vs ${b} s lossless`,
+    p50Pair: (a: string, b: string) => `p50 ${a} s vs ${b} s`,
     speedHelp: 'Ratio of the two cells’ median latency per clip.',
-    wall: 'Wall time',
-    wallSub: 'Selected prompt',
+    wall: 'Wall time (this prompt)',
     psnr: 'PSNR vs reference',
     psnrLossless: 'PSNR vs lossless',
     ssimLossless: 'SSIM vs lossless',
@@ -81,21 +75,15 @@ const STRINGS = {
     official: (name: string) => `${name} 官方运行`,
     notMeasured: '尚未测量',
     diagnosticMetric: '此次重跑未提供该指标。',
-    speed: '相对无损对照的速度',
-    speedShort: {
-      faster: (x: string) => `快 ${x}×`,
-      slower: (x: string) => `慢 ${x}×`,
-      same: '速度相同',
+    speed: (name: string) => `速度（相对 ${name}）`,
+    speedRatio: {
+      faster: (x: string) => `加速 ${x}×`,
+      slower: (x: string) => `耗时为其 ${x} 倍`,
+      same: () => '速度相同',
     },
-    speedThan: {
-      faster: (x: string, name: string) => `比 ${name} 快 ${x}×`,
-      slower: (x: string, name: string) => `比 ${name} 慢 ${x}×`,
-      same: (name: string) => `与 ${name} 速度相同`,
-    },
-    p50Pair: (a: string, b: string) => `p50 ${a} s，无损对照 ${b} s`,
+    p50Pair: (a: string, b: string) => `p50 ${a} s 对比 ${b} s`,
     speedHelp: '两个测量单元单条视频中位延迟之比。',
-    wall: '出片时间',
-    wallSub: '所选 prompt',
+    wall: '出片时间（当前 prompt）',
     psnr: '相对参考的 PSNR',
     psnrLossless: '相对无损对照的 PSNR',
     ssimLossless: '相对无损对照的 SSIM',
@@ -164,7 +152,7 @@ const isLosslessScore = (metric: Metric): metric is LosslessScore => metric in L
 /** What each pair reads out, in order. A lossy pair leads with its trade against lossless. */
 const ROWS: Record<StageOption['kind'], readonly Metric[]> = {
   reference: ['wall', 'psnr', 'energy', 'participating', 'allocated'],
-  lead: ['wall', 'psnr', 'participating', 'allocated', 'energy'],
+  lead: ['wall', 'psnr', 'participating', 'allocated', 'energy', 'speed'],
   twin: [
     'speed',
     'psnrLossless',
@@ -194,7 +182,7 @@ interface SideRead {
   rerunHasIt?: true;
   read: (side: ReadoutSide, s: Strings) => Reading;
   /** The line under the subject's value against the reference. */
-  context: (side: ReadoutSide, s: Strings) => string | undefined;
+  context?: (side: ReadoutSide, s: Strings) => string | undefined;
 }
 
 const costRead = (basis: 'participating' | 'allocated'): SideRead => ({
@@ -215,7 +203,6 @@ const SIDE_METRICS: Record<SideMetric, SideRead> = {
       const seconds = display(clip?.record.seconds);
       return { value: seconds === null ? s.notMeasured : `${seconds} s` };
     },
-    context: (_, s) => s.wallSub,
   },
   psnr: {
     rerunHasIt: true,
@@ -270,16 +257,8 @@ function readSide(
   const { rerunHasIt, read, context } = SIDE_METRICS[metric];
   if (diagnostic && !rerunHasIt)
     return { value: '—', help: s.diagnosticMetric, context: s.diagnosticMetric };
-  return { ...read(side, s), context: context(side, s) };
+  return { ...read(side, s), context: context?.(side, s) };
 }
-
-const speedShort = (speed: Speed, s: Strings) =>
-  speed.direction === 'same' ? s.speedShort.same : s.speedShort[speed.direction](speed.times);
-
-const speedThan = (speed: Speed, name: string, s: Strings) =>
-  speed.direction === 'same'
-    ? s.speedThan.same(name)
-    : s.speedThan[speed.direction](speed.times, name);
 
 interface Cell {
   metric: Metric;
@@ -300,16 +279,18 @@ function cell(
   s: Strings,
 ): Cell {
   if (metric === 'speed') {
-    if (diagnostic) return { metric, label: s.speed, value: '—', sub: s.diagnosticMetric };
+    // Both pairs compare cell p50s, the deployment medians the chart plots; wall time is per prompt.
+    const label = s.speed(b.name);
+    if (diagnostic) return { metric, label, value: '—', sub: s.diagnosticMetric };
     const speed = speedVs(a.point?.p50 ?? null, b.point?.p50 ?? null);
     // No ratio is coming without both p50s, so this is a dash, not "Not measured yet".
-    if (speed === null) return { metric, label: s.speed, value: '—' };
+    if (speed === null) return { metric, label, value: '—' };
     const subject = display(a.point?.p50);
     const pair = display(b.point?.p50);
     return {
       metric,
-      label: s.speed,
-      value: speedShort(speed, s),
+      label,
+      value: s.speedRatio[speed.direction](speed.times),
       sub: subject !== null && pair !== null ? s.p50Pair(subject, pair) : undefined,
       help: s.speedHelp,
     };
@@ -327,16 +308,11 @@ function cell(
         };
   const { context, ...own } = readSide(metric, a, diagnostic, s);
   if (kind === 'reference') return { metric, label: s[metric], ...own, sub: context };
-  const speed =
-    kind === 'lead' && metric === 'wall' && !diagnostic
-      ? speedVs(a.clip?.record.seconds ?? null, b.clip?.record.seconds ?? null)
-      : null;
   return {
     metric,
     label: s[metric],
     ...own,
     pairValue: `${b.name} ${readSide(metric, b, diagnostic, s).value}`,
-    sub: speed ? speedThan(speed, b.name, s) : undefined,
   };
 }
 
