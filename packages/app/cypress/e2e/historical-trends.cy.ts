@@ -409,6 +409,7 @@ describe('Historical frontier views', () => {
         'Frontier',
         'Compare',
         'Software gains',
+        'Gain rate',
       ]);
     });
     cy.get('[data-testid="historical-view-frontier"]').click();
