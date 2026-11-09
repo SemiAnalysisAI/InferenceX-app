@@ -10,6 +10,11 @@ import { formatLargeNumber, logTickFormat } from '@/lib/charts/chart-rendering';
 import { D3Chart, type RenderContext } from '@/lib/d3-chart/D3Chart';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
+import {
+  CHART_TOOLTIP_Z_INDEX,
+  placeFloatingTooltip,
+  stickyHeaderBottom,
+} from '@/lib/d3-chart/tooltip-placement';
 import { axisLabelUnit, chartHoverCard, chartTooltipDismiss } from '@/lib/d3-chart/tooltip-shell';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -239,9 +244,26 @@ const FrontierChart = React.memo(
 
     // The point whose hover card is pinned open by a click, if any; a redraw releases it.
     const pinnedRef = useRef<string | null>(null);
-    // The chart's own hover card. React never restyles it, so a pinned card survives re-renders
-    // of the chart around it.
-    const cardRef = useRef<HTMLDivElement>(null);
+    // The chart's own hover card, on the shared tooltip layer of `document.body` so page chrome,
+    // overflow and transforms can't clip or cover it. React never restyles it, so a pinned card
+    // survives re-renders of the chart around it.
+    const cardRef = useRef<HTMLDivElement | null>(null);
+    useEffect(() => {
+      const card = document.createElement('div');
+      card.dataset.testid = 'frontier-hover-card';
+      Object.assign(card.style, {
+        position: 'fixed',
+        display: 'none',
+        pointerEvents: 'none',
+        zIndex: String(CHART_TOOLTIP_Z_INDEX),
+      });
+      document.body.append(card);
+      cardRef.current = card;
+      return () => {
+        card.remove();
+        cardRef.current = null;
+      };
+    }, []);
     // The page-wide "click elsewhere" listener goes with the chart.
     useEffect(
       () => () => {
@@ -276,11 +298,22 @@ const FrontierChart = React.memo(
       const showTooltip = (event: PointerEvent, html: string) => {
         const card = cardRef.current;
         if (!card) return;
-        const host = card.parentElement?.getBoundingClientRect();
         card.innerHTML = html;
         card.style.display = 'block';
-        card.style.left = `${event.clientX - (host?.left ?? 0) + 14}px`;
-        card.style.top = `${event.clientY - (host?.top ?? 0) - 10}px`;
+        const root = document.documentElement;
+        const { left, top } = placeFloatingTooltip({
+          x: event.clientX,
+          y: event.clientY,
+          width: card.offsetWidth,
+          height: card.offsetHeight,
+          offset: 14,
+          placement: 'below',
+          viewportWidth: root.clientWidth || window.innerWidth,
+          viewportHeight: root.clientHeight || window.innerHeight,
+          headerBottom: stickyHeaderBottom(),
+        });
+        card.style.left = `${left}px`;
+        card.style.top = `${top}px`;
       };
       // Every hover uses the dashboard's hover card: the series, what the point is, its value
       // and interactivity, then concurrency, precision, date, serving image and any regression.
@@ -756,7 +789,7 @@ const FrontierChart = React.memo(
     const dataIdentity = `${history.dates.length}:${history.series.length}:${extent.x.join(',')}:${extent.y.join(',')}`;
 
     return (
-      <div role="group" aria-label={t.aria} className="relative">
+      <div role="group" aria-label={t.aria}>
         <D3Chart<{ x: number; y: number }>
           chartId={chartId}
           data={[
@@ -791,11 +824,6 @@ const FrontierChart = React.memo(
           noDataOverlay={plotOverlay}
           caption={caption}
           footer={footer}
-        />
-        <div
-          ref={cardRef}
-          className="pointer-events-none absolute z-50 hidden"
-          data-testid="frontier-hover-card"
         />
       </div>
     );
