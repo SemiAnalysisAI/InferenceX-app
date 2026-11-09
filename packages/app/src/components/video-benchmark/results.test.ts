@@ -353,6 +353,14 @@ describe('VideoGenX results contract', () => {
     expect(shared.get('r_price_i2v')).toBe('0.1');
     expect(shared.has('r_price_r2v')).toBe(false);
     for (const key of ['r_gpus', 'r_x', 'r_basis']) expect(shared.has(key)).toBe(false);
+    expect(parseResultsState('r_compare=1&r_lossy=1')).toMatchObject({
+      compareEngines: true,
+      lossy: true,
+    });
+    expect(parseResultsState('r_engine=sglang&r_compare=1')).toMatchObject({
+      engine: 'sglang',
+      compareEngines: false,
+    });
     expect(
       parseResultsState(
         'r_api=NaN&r_deadline=-2&r_utilization=Infinity&r_x=p95&r_y=toString&r_basis=both&r_optimal=no&r_point=',
@@ -393,6 +401,29 @@ describe('VideoGenX results contract', () => {
       participating: null,
       allocated: null,
     });
+    // An engine only another workload measured is no choice for this cohort.
+    const sol = { ...c, id: 'fourth:c1', results: evidence({ engine: 'sol-engine' }) };
+    expect(resultProjection([a, b, c, sol], state()).options.engines).toEqual([
+      'sglang',
+      'vllm-omni',
+    ]);
+  });
+  it('offers each engine as its own chip config and ignores a key from before engines', () => {
+    const b200 = (id: string, engine: string) => ({
+      ...eligible,
+      id,
+      hardwareKey: 'b200',
+      results: evidence({ engine }),
+    });
+    const input = [b200('vllm:c1', 'vllm-omni'), b200('sglang:c1', 'sglang')];
+    const offered = resultProjection(input, state()).chipConfigs;
+    expect(offered.map(({ point }) => point.id)).toEqual(['sglang:c1', 'vllm:c1']);
+    // A share link from before engines named the same B200 4-GPU TP2 × Ulysses 2 deployment.
+    const stale = resultProjection(input, { ...state(), configs: ['b200:4g:tp2:u2'] });
+    expect(stale.state.configs).toEqual([]);
+    expect(stale.history).toEqual([]);
+    const chosen = resultProjection(input, { ...state(), configs: [offered[1].key] });
+    expect(ids(chosen.history)).toEqual(['vllm:c1']);
   });
   it.each([
     ['recorded results without an engine', evidence({ engine: null })],

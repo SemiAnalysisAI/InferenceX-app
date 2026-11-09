@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { deploymentKey, isQueueing, layoutLabel, leadCell, sharedLayoutCells } from './deployment';
 import type { VideoPoint } from './metrics';
+import { resultsClipPoints } from './results-clips';
+import type { ResultsEvidence } from './results-evidence';
 
 const base: VideoPoint = {
   id: 'a',
@@ -39,15 +41,15 @@ const options = { tier: 'h' } as const;
 describe('deployment', () => {
   it('keys a deployment by boards and model split, not by concurrency', () => {
     const c4: VideoPoint = { ...base, concurrency: 4 };
-    expect(deploymentKey(base)).toBe('4g:tp2:u2');
-    expect(deploymentKey(c4)).toBe('4g:tp2:u2');
+    expect(deploymentKey(base)).toBe('na:4g:tp2:u2');
+    expect(deploymentKey(c4)).toBe('na:4g:tp2:u2');
     expect(
       deploymentKey({
         ...base,
         server: { tp: 1, ulysses: 4, attention: null },
       }),
-    ).toBe('4g:tp1:u4');
-    expect(deploymentKey({ ...base, participating: null, server: null })).toBe('nag:tpna:una');
+    ).toBe('na:4g:tp1:u4');
+    expect(deploymentKey({ ...base, participating: null, server: null })).toBe('na:nag:tpna:una');
   });
   it('treats concurrency above the replica count as queueing, with one replica when unknown', () => {
     expect(isQueueing(base)).toBe(false);
@@ -93,7 +95,7 @@ describe('deployment', () => {
     ).toEqual(['a', 'b4']);
     expect(sharedLayoutCells([])).toEqual([]);
   });
-  it('leads with the most efficient non-queued deployment of the hardware', () => {
+  it('leads with the most efficient non-queued, lossless deployment of the hardware', () => {
     const eightBoards = {
       ...base,
       id: 'b',
@@ -116,6 +118,22 @@ describe('deployment', () => {
     expect(leadCell([base, tie], 'h200', options)?.id).toBe('d');
     const noRate = { ...base, id: 'e', wallSeconds: null };
     expect(leadCell([noRate], 'h200', options)?.id).toBe('e');
+    const cached = {
+      ...base,
+      id: 'f',
+      wallSeconds: 1000,
+      results: { engine: 'sol-engine', optimizations: ['first-block-cache'] } as ResultsEvidence,
+    };
+    expect(leadCell([base, cached], 'h200', options)?.id).toBe('a');
+    // A named run owns its hardware's clip even when its only deployment is lossy.
+    const clips = resultsClipPoints(
+      [
+        { point: base, overlay: false },
+        { point: cached, overlay: true },
+      ],
+      options,
+    );
+    expect(clips.map((p) => p.id)).toEqual(['f']);
   });
   it('requires a known shared workload and layout at C1 for evidence comparisons', () => {
     const matching = { ...base, id: 'b', hardwareKey: 'b200' };

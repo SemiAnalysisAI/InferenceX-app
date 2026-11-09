@@ -13,6 +13,7 @@ import {
 import { servingCells } from '@/components/video-benchmark/serving';
 import { namedRunPoints, videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState, resultProjection } from '@/components/video-benchmark/results';
+import { chartedCells } from '@/components/video-benchmark/results-chart';
 import { RESULT_CSV_COLUMNS, resultCsvRows } from '@/components/video-benchmark/results-csv';
 import { storedBundle, type StoredArtifact } from '@/components/video-benchmark/stored';
 import {
@@ -80,9 +81,7 @@ async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'comp
           'Content-Disposition': 'attachment; filename="videogenx-results.csv"',
         },
       });
-    const selected = resultsClipPoints([...projection.cells, ...projection.overlayCells], {
-      tier: state.costTier,
-    });
+    const selected = resultsClipPoints(chartedCells(projection, state), { tier: state.costTier });
     const stored = new Map<string, Promise<StoredArtifact | null>>();
     const reads = await Promise.allSettled(
       selected.map(async (point) => {

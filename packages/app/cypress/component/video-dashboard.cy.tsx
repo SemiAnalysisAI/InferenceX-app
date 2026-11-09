@@ -7,6 +7,7 @@ import type {
 import { videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState } from '@/components/video-benchmark/results';
 import type { ResultsEvidence } from '@/components/video-benchmark/results-evidence';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { servingArtifact } from '../support/video-artifacts';
 import { readOnlyVideoRequests, resultHistory } from '../support/video-results';
 
@@ -64,6 +65,8 @@ const openPoint = (hardware: string, overlay = false) => {
   cy.get('[data-testid="point-details-panel"] [data-action="view-telemetry"]').click();
 };
 const toggleHardware = (hardware: string) => cy.get(`label[for="checkbox-${hardware}"]`).click();
+const chooseEngine = (label: string) =>
+  cy.get('[data-testid="results-engine"]').contains('button', label).click();
 const searchParam = (key: string) =>
   cy.location('search').then((search) => new URLSearchParams(search).get(key));
 const plottedY = (hardware: string) =>
@@ -239,6 +242,28 @@ describe('VideoGenX results', () => {
     });
   });
 
+  it('shows a lossy named run’s clip, which leads no card, in the overlay color', () => {
+    mount({
+      search: '?unofficialrun=34341996789&r_y=videosPerGpuHour',
+      editPage: (page) => {
+        for (const entry of page.entries) {
+          const named = entry.runId === '34341996789';
+          if (named) entry.approved = false;
+          for (const observation of entry.sources[0].observations)
+            observation.results = {
+              ...evidence(observation),
+              optimizations: named ? ['first-block-cache'] : [],
+            };
+        }
+      },
+    });
+    cy.get('[data-testid="video-results-clip"][data-hardware="b200"]')
+      .should('contain', 'Unofficial run')
+      .find('.rounded-full')
+      .should('have.attr', 'style')
+      .and('contain', overlayRunColor(0));
+  });
+
   it('restores the approved workload after dismissing an explicitly selected named-only workload', () => {
     mount({
       search: '?unofficialrun=34341996789&r_y=videosPerGpuHour',
@@ -397,7 +422,7 @@ describe('VideoGenX results', () => {
     points().should('have.length', 3);
     cy.get('[data-testid="results-chip-config"]').click();
     cy.contains('[role="option"]', 'B200 · 4 GPU · TP2 × Ulysses 2').click();
-    searchParam('r_configs').should('equal', 'b200:4g:tp2:u2');
+    searchParam('r_configs').should('equal', 'b200:na:4g:tp2:u2');
     points().should('have.length', 1);
     points('[data-hardware="b200"]').should('contain', '2026-09-09');
     cy.get('[data-testid="results-compare-history"]').should('contain', 'Comparison date range');
@@ -463,6 +488,59 @@ describe('VideoGenX results', () => {
     searchParam('r_y').should('equal', 'kjPerClip');
     cy.get('#video-results-chart-title').should('contain', 'GPU energy per valid clip');
     plottedY('b200').should('be.closeTo', 301.1, 0.1);
+  });
+
+  it('plots each GPU’s best lossless engine and asks before showing two engines', () => {
+    // Every deployment also ran on vLLM-Omni with identical numbers and on Sol with caching.
+    mount({
+      editPage: (page) => {
+        for (const entry of page.entries)
+          for (const source of entry.sources)
+            source.observations = source.observations.flatMap((observation) => [
+              { ...observation, results: evidence(observation) },
+              {
+                ...observation,
+                id: `${observation.id}-vllm`,
+                results: { ...evidence(observation), engine: 'vllm-omni' },
+              },
+              {
+                ...observation,
+                id: `${observation.id}-sol`,
+                results: {
+                  ...evidence(observation),
+                  engine: 'sol-engine',
+                  optimizations: ['first-block-cache', 'sol-attn'],
+                },
+              },
+            ]);
+      },
+    });
+    const engines = () =>
+      hardwarePoints('b200').then(($groups) => [
+        ...new Set([...$groups].map((group) => group.dataset.engine)),
+      ]);
+    // A tie keeps the engine listed first; the cached Sol run never competes.
+    engines().should('deep.equal', ['sglang']);
+    cy.get('label[for="checkbox-b200"]').should('contain', 'B200 (SGLang)');
+    chooseEngine('All');
+    cy.get('[data-testid="engine-comparison-confirmation"]').contains('button', 'Cancel').click();
+    searchParam('r_compare').should('equal', null);
+    engines().should('deep.equal', ['sglang']);
+    chooseEngine('All');
+    cy.get('[data-testid="engine-comparison-confirmation"]')
+      .contains('button', 'I agree, show both')
+      .click();
+    searchParam('r_compare').should('equal', '1');
+    engines().should('deep.equal', ['sglang', 'vllm-omni']);
+    cy.get('label[for="checkbox-b200"]').should('contain', 'B200 (SGLang, vLLM-Omni)');
+    cy.get('[data-testid="results-lossy-key"]').should('not.exist');
+    cy.get('#video-results-lossy').click();
+    searchParam('r_lossy').should('equal', '1');
+    engines().should('deep.equal', ['sglang', 'vllm-omni', 'sol-engine']);
+    cy.get('[data-testid="results-lossy-key"]').should(
+      'contain',
+      'B200 (NVIDIA Sol Engine · FirstBlockCache + Sol-Attn)',
+    );
   });
 
   it('opens deployment telemetry from chart points, switches tabs and returns', () => {
