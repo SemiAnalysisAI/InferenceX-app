@@ -974,11 +974,10 @@ describe('GPU comparison with unofficial runs', () => {
       .and('not.contain.text', 'Unofficial run')
       .and('not.contain.text', 'Branch')
       .should(($panel) => {
-        // The warning lives in the sticky header, not under its negative-margin pull-up.
+        // The warning stays in the fixed header, outside the scrolling details body.
         const panel = $panel[0];
         const warning = panel.querySelector('p.text-destructive')!;
-        const header = warning.parentElement!;
-        expect(getComputedStyle(header).position).to.equal('sticky');
+        expect(warning.closest('[data-slot="point-details-body"]')).to.equal(null);
         expect(warning.getBoundingClientRect().top).to.be.at.least(
           panel.getBoundingClientRect().top,
         );

@@ -87,10 +87,10 @@ export function ChartPointDetails<A extends string = string>({
       ref={ref}
       data-testid="point-details-panel"
       aria-label={t.title}
-      className="flex min-h-0 w-full scroll-mt-20 flex-col overflow-y-auto overscroll-contain rounded-lg [scrollbar-width:thin] border border-border/30 bg-background p-2 text-xs leading-5"
+      className="flex min-h-0 w-full scroll-mt-20 flex-col overflow-hidden rounded-lg border border-border/30 bg-background p-2 text-xs leading-5"
     >
-      {/* The warning and title stay in the sticky chrome so neither scrolls away or is covered. */}
-      <div className="sticky -top-2 z-10 -mx-2 -mt-2 bg-background px-2 pt-2">
+      {/* The header and action row stay fixed; only the details between them scroll. */}
+      <div className="shrink-0">
         {warning && <p className="mb-1 font-semibold text-destructive">{warning}</p>}
         <div className="flex items-start gap-1.5">
           {color && (
@@ -125,54 +125,62 @@ export function ChartPointDetails<A extends string = string>({
           </Button>
         </div>
       </div>
-      {(metrics.length > 0 || rows.length > 0) && (
-        <div className="inferencex-pinned-tooltip">
-          {metrics.length > 0 && (
-            <dl className="pinned-metrics">
-              {metrics.map((metric) => (
-                <div key={metric.label}>
-                  <dt className="pinned-metric-label">{metric.label}</dt>
-                  <dd className="pinned-metric-value">{metric.value}</dd>
-                  {metric.exact && metric.exact !== metric.value && (
-                    <dd className="pinned-exact">{metric.exact}</dd>
-                  )}
-                </div>
-              ))}
-            </dl>
-          )}
-          {strip.length > 0 && (
-            <dl className="pinned-strip">
-              {strip.map((row, index) => (
-                <div key={`${row.label}-${index}`}>
-                  <dt>{row.label}</dt>
-                  <dd>{row.value}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-          {lines.length > 0 && (
-            <dl
-              className={cn(
-                'pinned-lines',
-                (metrics.length > 0 || strip.length > 0) && 'pinned-section',
-              )}
-            >
-              {lines.map((row, index) => (
-                <div
-                  key={`${row.label}-${index}`}
-                  className={cn('tooltip-line', row.wide && 'pinned-line-wide')}
-                >
-                  <dt>{row.label}</dt>
-                  <dd>{row.value}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-        </div>
-      )}
-      {children}
+      <div
+        data-slot="point-details-body"
+        className="-mx-2 min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 [scrollbar-width:thin]"
+      >
+        {(metrics.length > 0 || rows.length > 0) && (
+          <div className="inferencex-pinned-tooltip">
+            {metrics.length > 0 && (
+              <dl className="pinned-metrics">
+                {metrics.map((metric) => (
+                  <div key={metric.label}>
+                    <dt className="pinned-metric-label">{metric.label}</dt>
+                    <dd className="pinned-metric-value">{metric.value}</dd>
+                    {metric.exact && metric.exact !== metric.value && (
+                      <dd className="pinned-exact">{metric.exact}</dd>
+                    )}
+                  </div>
+                ))}
+              </dl>
+            )}
+            {strip.length > 0 && (
+              <dl className="pinned-strip">
+                {strip.map((row, index) => (
+                  <div key={`${row.label}-${index}`}>
+                    <dt>{row.label}</dt>
+                    <dd>{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            {lines.length > 0 && (
+              <dl
+                className={cn(
+                  'pinned-lines',
+                  (metrics.length > 0 || strip.length > 0) && 'pinned-section',
+                )}
+              >
+                {lines.map((row, index) => (
+                  <div
+                    key={`${row.label}-${index}`}
+                    className={cn('tooltip-line', row.wide && 'pinned-line-wide')}
+                  >
+                    <dt>{row.label}</dt>
+                    <dd>{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </div>
+        )}
+        {children}
+      </div>
       {links.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap gap-1 border-t border-border/50 pt-1.5">
+        <div
+          data-slot="point-details-actions"
+          className="mt-1.5 flex shrink-0 flex-wrap gap-1 border-t border-border/50 pt-1.5"
+        >
           {[...externalLinks, ...actions].map((link) => {
             const external = externalLinks.includes(link);
             return (

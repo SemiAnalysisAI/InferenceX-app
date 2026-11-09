@@ -864,7 +864,7 @@ describe('buildPointDetails', () => {
     expect(html).not.toContain('Untrack Over Time');
   });
 
-  it('tabulates median, P90 and P99 latency in axis units with dashes for missing fields', () => {
+  it('tabulates median and P90 latency without P99 in axis units with dashes for missing fields', () => {
     const data = pt({
       mean_ttft: 9,
       median_ttft: 0.31603,
@@ -882,14 +882,14 @@ describe('buildPointDetails', () => {
       total_generation_tokens: 100,
     });
     expect(latencyCells(tooltipConfig({ data }))).toEqual([
-      ['', 'Med', 'P90', 'P99'],
-      ['TTFT s', '0.32', '1.27', '—'],
-      ['E2EL s', '2.25', '20.5', '—'],
-      ['Interactivity tok/s/user', '220', '179', '150'],
-      ['Norm. interactivity tok/s/user', '—', '87.8', '—'],
+      ['', 'Med', 'P90'],
+      ['TTFT s', '0.32', '1.27'],
+      ['E2EL s', '2.25', '20.5'],
+      ['Interactivity tok/s/user', '220', '179'],
+      ['Norm. interactivity tok/s/user', '—', '87.8'],
     ]);
     const zh = latencyCells(tooltipConfig({ data, locale: 'zh' }));
-    expect(zh[0]).toEqual(['', '中位', 'P90', 'P99']);
+    expect(zh[0]).toEqual(['', '中位', 'P90']);
     expect(zh.map((cells) => cells[0])).toEqual([
       '',
       'TTFT s',

@@ -1063,17 +1063,17 @@ const latencyHTML = (d: InferenceData, locale: Locale): string => {
   const t = LATENCY_STRINGS[locale];
   const rows = (
     [
-      ['ttft', [d.median_ttft, d.p90_ttft, d.p99_ttft]],
-      ['e2eLatency', [d.median_e2el, d.p90_e2el, d.p99_e2el]],
-      ['interactivity', [d.median_intvty, d.p90_intvty, d.p99_intvty]],
-      ['e2eNormalizedInteractivity', [undefined, d.p90_e2e_norm_intvty, undefined]],
+      ['ttft', [d.median_ttft, d.p90_ttft]],
+      ['e2eLatency', [d.median_e2el, d.p90_e2el]],
+      ['interactivity', [d.median_intvty, d.p90_intvty]],
+      ['e2eNormalizedInteractivity', [undefined, d.p90_e2e_norm_intvty]],
     ] satisfies [XAxisKind, (number | undefined)[]][]
   )
     .map(([kind, values]) => [kind, values.map(latencyValue)] as const)
     .filter(([, cells]) => cells.some((cell) => cell !== '—'));
   if (rows.length === 0) return '';
   return `<table data-pinned-latency class="pinned-topology pinned-latency" aria-label="${t.caption}">
-      <thead><tr><th></th><th>${t.median}</th><th>P90</th><th>P99</th></tr></thead>
+      <thead><tr><th></th><th>${t.median}</th><th>P90</th></tr></thead>
       <tbody>${rows
         .map(([kind, cells]) => {
           const axis = X_AXIS_EXPLANATIONS[kind].name;
