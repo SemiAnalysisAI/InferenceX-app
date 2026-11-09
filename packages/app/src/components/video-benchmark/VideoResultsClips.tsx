@@ -35,7 +35,7 @@ import {
   type ResultsClipGroup,
   type ResultsClipSide,
 } from './results-clips';
-import { RESULTS_HARDWARE } from './results';
+import { RESULTS_HARDWARE, resultMetadata } from './results';
 import type { StoredArtifact } from './stored';
 import { videoClipSourceKey as sourceKey, type VideoInitialData } from './initial-data';
 import VideoClipStage, { type StageClip } from './VideoClipStage';
@@ -547,6 +547,8 @@ export default function VideoResultsClips({
             view={stage.view}
             selection={JSON.stringify([a.source, b.source, group?.key ?? null])}
             prompt={group?.prompt}
+            fps={resultMetadata(point).fps}
+            frames={point.frameCount}
             onPreviewError={(url) => setFailedPreviews((previous) => new Set([...previous, url]))}
           />
           <div

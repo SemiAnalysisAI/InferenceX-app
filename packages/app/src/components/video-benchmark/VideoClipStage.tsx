@@ -1,8 +1,19 @@
 'use client';
 
-import { Lock, MoveHorizontal, Play, Volume2 } from 'lucide-react';
+import {
+  ArrowLeftRight,
+  Lock,
+  MoveHorizontal,
+  Play,
+  Repeat,
+  ScanSearch,
+  StepBack,
+  StepForward,
+  Volume2,
+} from 'lucide-react';
 import {
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -11,10 +22,11 @@ import {
 } from 'react';
 import { Button } from '@/components/ui/button';
 import { InfoHelp } from '@/components/ui/option-info';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
-import { clipGroupActive } from './clip-sync';
+import { clipGroupActive, frameAt, frameTotal } from './clip-sync';
 import type { StageView } from './clip-stage';
 import { absoluteFrameDifference } from './results-clips';
 import { useClipGroup } from './use-clip-group';
@@ -42,6 +54,17 @@ const STRINGS = {
     buffering: (percent: number) => `Buffering ${percent}%`,
     downloading: (percent: number) => `Loading ${percent}%`,
     seconds: 's',
+    swap: 'Swap sides',
+    inspect: 'Inspect',
+    previousFrame: 'Previous frame',
+    nextFrame: 'Next frame',
+    previousFrameTitle: 'Previous frame (←)',
+    nextFrameTitle: 'Next frame (→)',
+    frame: (n: number, total: number) => `frame ${n} / ${total}`,
+    speed: 'Speed',
+    zoom: 'Zoom',
+    loop: 'Loop',
+    panHint: 'Drag to pan · Esc resets',
   },
   zh: {
     stage: (a: string, b: string) => `${a} 对比 ${b}`,
@@ -64,6 +87,17 @@ const STRINGS = {
     buffering: (percent: number) => `缓冲中 ${percent}%`,
     downloading: (percent: number) => `加载中 ${percent}%`,
     seconds: 's',
+    swap: '互换两侧',
+    inspect: '检查',
+    previousFrame: '上一帧',
+    nextFrame: '下一帧',
+    previousFrameTitle: '上一帧（←）',
+    nextFrameTitle: '下一帧（→）',
+    frame: (n: number, total: number) => `第 ${n} / ${total} 帧`,
+    speed: '播放速度',
+    zoom: '缩放',
+    loop: '循环播放',
+    panHint: '拖动画面平移 · 按 Esc 复位',
   },
 };
 
@@ -96,6 +130,10 @@ export interface VideoClipStageProps {
   selection: string;
   /** Prompt text on the idle frame shown before the first Play. */
   prompt?: string;
+  /** Frame rate both sides were generated at; null disables frame stepping. */
+  fps: number | null;
+  /** Recorded frame count of the generated clips, when known. */
+  frames: number | null;
   /** A side's web rendition failed to load; the caller drops it so the side plays the original. */
   onPreviewError: (previewUrl: string) => void;
 }
@@ -106,8 +144,8 @@ const OTHER = { a: 'b', b: 'a' } as const;
 /** Playback-time gap beyond which a Difference frame would compare different moments. */
 const DIFFERENCE_SYNC_SECONDS = 0.12;
 const SPLIT_STEP = 5;
-/** Real-time playback that stops at the shared end. */
-const PLAYBACK = { speed: 1, loop: false };
+const SPEEDS = [0.25, 0.5, 1] as const;
+const ZOOMS = [1, 2, 4] as const;
 
 export default function VideoClipStage({
   a,
@@ -115,6 +153,8 @@ export default function VideoClipStage({
   view,
   selection,
   prompt,
+  fps,
+  frames,
   onPreviewError,
 }: VideoClipStageProps) {
   const s = STRINGS[useLocale()];
@@ -131,9 +171,21 @@ export default function VideoClipStage({
   const [toggled, setToggled] = useState<Role>('a');
   const [peek, setPeek] = useState(false);
   const [differenceFailed, setDifferenceFailed] = useState(false);
+  const [playback, setPlayback] = useState({ speed: 1, loop: true });
+  /** Exchanges the sides' places on the stage; the subject and its pair keep their roles. */
+  const [swapped, setSwapped] = useState(false);
+  const [inspect, setInspect] = useState(false);
+  /** One zoom and pan, in percent of a side, applied to both sides and the Difference canvas. */
+  const [lens, setLens] = useState({ zoom: 1, x: 0, y: 0 });
+  const drag = useRef<{ x: number; y: number; width: number; height: number; from: typeof lens }>(
+    null,
+  );
+  /** A pan drag just ended, so the click that follows it is not a lock or flip. */
+  const dragged = useRef(false);
   const canvas = useRef<HTMLCanvasElement>(null);
   const pendingSplit = useRef<number | null>(null);
   const splitFrame = useRef(0);
+  const inspectId = useId();
 
   const playable = ROLES.filter((role) => clips[role].url && !errors.has(clips[role].url));
   const audible = playable.find((role) => clips[role].source === audio) ?? null;
@@ -146,7 +198,7 @@ export default function VideoClipStage({
         (previous) =>
           new Set([...previous, ...rejected.map((role) => latest.current[role as Role].url)]),
       ),
-    PLAYBACK,
+    playback,
   );
   const { videos, phase, time, buffered, ready, duration } = group;
   const both = playable.length === 2;
@@ -157,6 +209,13 @@ export default function VideoClipStage({
   /** The split stays hidden until the first Play, so before then it neither follows the pointer nor locks. */
   const wiping = view === 'wipe' && !idle;
   const original = view === 'diff';
+  const onLeft = (role: Role) => (role === 'a') !== swapped;
+  const total = fps !== null && fps > 0 && duration > 0 ? frameTotal(duration, fps, frames) : 0;
+  const clock = fps !== null && total > 0 ? { fps, total } : null;
+  const lensStyle =
+    lens.zoom > 1
+      ? { transform: `scale(${lens.zoom}) translate(${lens.x}%, ${lens.y}%)` }
+      : undefined;
 
   // A hidden or failed audio source restores mute; a prompt switch keeps the same source.
   useLayoutEffect(() => {
@@ -261,7 +320,48 @@ export default function VideoClipStage({
     setLocked(enabled);
     track('video_results_wipe_locked', { enabled });
   };
+  const stepFrame = (delta: -1 | 1) => {
+    if (!clock) return;
+    setDifferenceFailed(false);
+    group.stepFrames(delta, clock);
+    track('video_results_frame_step', { direction: delta < 0 ? 'previous' : 'next' });
+  };
+  const zoomTo = (zoom: number) => {
+    setLens({ zoom, x: 0, y: 0 });
+    track('video_results_zoom_changed', { zoom });
+  };
+  const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    dragged.current = false;
+    // Only the picture pans; a press on a pill or control keeps its own action.
+    if (lens.zoom === 1 || event.target !== event.currentTarget) return;
+    // Pan is a share of one side, which is the whole stage except in Side by side.
+    const side = event.currentTarget.querySelector('[data-side]')?.getBoundingClientRect();
+    if (!side || side.width === 0 || side.height === 0) return;
+    drag.current = {
+      x: event.clientX,
+      y: event.clientY,
+      width: side.width,
+      height: side.height,
+      from: lens,
+    };
+  };
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const start = drag.current;
+    if (start) {
+      const dx = event.clientX - start.x;
+      const dy = event.clientY - start.y;
+      if (Math.abs(dx) + Math.abs(dy) > 3) dragged.current = true;
+      // Keeps the scaled side covering the stage: at 2× it may shift by a quarter of its width.
+      const limit = ((start.from.zoom - 1) / (2 * start.from.zoom)) * 100;
+      const pan = (from: number, delta: number, size: number) =>
+        Math.min(limit, Math.max(-limit, from + (delta / size) * (100 / start.from.zoom)));
+      setLens({
+        zoom: start.from.zoom,
+        x: pan(start.from.x, dx, start.width),
+        y: pan(start.from.y, dy, start.height),
+      });
+      return;
+    }
     if (!wiping || locked) return;
     const rect = event.currentTarget.getBoundingClientRect();
     if (rect.width === 0) return;
@@ -289,16 +389,23 @@ export default function VideoClipStage({
     } else if (event.key.toLowerCase() === 't' && view === 'toggle') {
       event.preventDefault();
       flip('key');
-    } else if (event.key === 'Escape' && locked) {
+    } else if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && clock) {
       event.preventDefault();
-      lock(false);
+      stepFrame(event.key === 'ArrowLeft' ? -1 : 1);
+    } else if (event.key === 'Escape' && (locked || lens.zoom > 1)) {
+      event.preventDefault();
+      if (locked) lock(false);
+      if (lens.zoom > 1) zoomTo(1);
     }
+  };
+  const endDrag = () => {
+    drag.current = null;
   };
 
   const srcOf = (clip: StageClip) => (original || !clip.previewUrl ? clip.url : clip.previewUrl);
   /** Middle of the part of the stage a side shows, for its empty-state text. */
   const centerOf = (role: Role) =>
-    view === 'wipe' ? (role === 'a' ? split / 2 : split + (100 - split) / 2) : 50;
+    view === 'wipe' ? (onLeft(role) ? split / 2 : split + (100 - split) / 2) : 50;
   const progress =
     phase === 'buffering'
       ? s.buffering
@@ -340,12 +447,21 @@ export default function VideoClipStage({
             ? 'mx-auto aspect-video w-full max-w-[calc((100svh-10rem)*16/9)] overflow-hidden rounded-lg bg-black'
             : 'grid gap-3 min-[640px]:grid-cols-2',
           wiping && !locked && 'cursor-ew-resize',
+          lens.zoom > 1 && 'cursor-grab touch-none',
         )}
+        onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerLeave={endDrag}
+        onPointerCancel={endDrag}
         onClick={(event) => {
           // Picture layers pass the pointer through, so only a click on the picture targets the
           // stage itself; pills and controls keep theirs.
           if (event.target !== event.currentTarget) return;
+          if (dragged.current) {
+            dragged.current = false;
+            return;
+          }
           if (wiping) lock(!locked);
           else if (view === 'toggle') flip('click');
         }}
@@ -368,13 +484,19 @@ export default function VideoClipStage({
               className={cn(
                 'pointer-events-none',
                 overlay ? 'absolute inset-0' : 'relative aspect-video overflow-hidden rounded-lg',
+                // CSS order, not DOM order: moving a playing video element pauses it.
+                !overlay && (onLeft(role) ? 'order-1' : 'order-2'),
               )}
             >
               <div
                 className={cn('absolute inset-0 bg-black', hidden && 'invisible')}
                 style={
                   view === 'wipe' && role === 'b'
-                    ? { clipPath: `inset(0 0 0 ${split}%)` }
+                    ? {
+                        clipPath: onLeft(role)
+                          ? `inset(0 ${100 - split}% 0 0)`
+                          : `inset(0 0 0 ${split}%)`,
+                      }
                     : undefined
                 }
               >
@@ -388,6 +510,7 @@ export default function VideoClipStage({
                     preload={armed ? 'auto' : 'none'}
                     aria-label={clip.label}
                     className={cn('size-full object-contain', failed && 'invisible')}
+                    style={lensStyle}
                     onProgress={group.refresh}
                     onCanPlayThrough={group.refresh}
                     onLoadedMetadata={group.measure(role)}
@@ -432,7 +555,7 @@ export default function VideoClipStage({
                 data-testid="video-results-pill"
                 className={cn(
                   'pointer-events-auto absolute top-2 z-10 flex items-center gap-1.5 rounded-md bg-black/70 py-1 pr-1 pl-2 text-xs text-white',
-                  role === 'a' ? 'left-2' : 'right-2',
+                  onLeft(role) ? 'left-2' : 'right-2',
                   overlay ? 'max-w-[46%]' : 'max-w-[calc(100%-1rem)]',
                   audible === role && 'ring-2 ring-amber-400',
                   view === 'toggle' && shown !== role && 'opacity-45',
@@ -479,7 +602,7 @@ export default function VideoClipStage({
                   </button>
                 )}
               </div>
-              {role === 'a' && idle && idleFrame}
+              {onLeft(role) && idle && idleFrame}
             </div>
           );
         })}
@@ -490,6 +613,7 @@ export default function VideoClipStage({
               data-testid="video-results-difference"
               aria-label={s.differenceLabel}
               className="pointer-events-none absolute inset-0 size-full object-contain"
+              style={lensStyle}
             />
           ) : (
             <p
@@ -546,7 +670,7 @@ export default function VideoClipStage({
             aria-label={s.shown}
             className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 overflow-hidden rounded-lg bg-black/70"
           >
-            {ROLES.map((role) => (
+            {(swapped ? (['b', 'a'] as const) : ROLES).map((role) => (
               <button
                 key={role}
                 type="button"
@@ -564,6 +688,11 @@ export default function VideoClipStage({
               </button>
             ))}
           </div>
+        )}
+        {lens.zoom > 1 && (
+          <span className="pointer-events-none absolute right-2 bottom-2 z-10 rounded bg-black/70 px-1.5 py-0.5 font-mono text-2xs text-white">
+            {lens.zoom}×
+          </span>
         )}
       </div>
       <div className="flex flex-wrap items-center gap-3">
@@ -605,7 +734,123 @@ export default function VideoClipStage({
             {progress(Math.round(buffered * 100))}
           </span>
         )}
+        <Button
+          data-testid="video-results-swap"
+          variant="outline"
+          size="icon-xs"
+          aria-pressed={swapped}
+          aria-label={s.swap}
+          title={s.swap}
+          onClick={() => {
+            setSwapped(!swapped);
+            track('video_results_clips_swap', { enabled: !swapped });
+          }}
+        >
+          <ArrowLeftRight aria-hidden="true" />
+        </Button>
+        <Button
+          data-testid="video-results-inspect-toggle"
+          variant="outline"
+          size="sm"
+          aria-expanded={inspect}
+          aria-controls={inspectId}
+          onClick={() => {
+            setInspect(!inspect);
+            track('video_results_inspect_toggled', { enabled: !inspect });
+          }}
+        >
+          <ScanSearch aria-hidden="true" />
+          {s.inspect}
+        </Button>
       </div>
+      {inspect && (
+        <div
+          id={inspectId}
+          data-testid="video-results-inspect"
+          role="group"
+          aria-label={s.inspect}
+          className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg bg-muted/60 px-3 py-2 text-xs"
+        >
+          <div className="flex items-center gap-1.5">
+            <Button
+              data-testid="video-results-frame-previous"
+              variant="outline"
+              size="icon-xs"
+              aria-label={s.previousFrame}
+              title={s.previousFrameTitle}
+              disabled={!clock}
+              onClick={() => stepFrame(-1)}
+            >
+              <StepBack aria-hidden="true" />
+            </Button>
+            <Button
+              data-testid="video-results-frame-next"
+              variant="outline"
+              size="icon-xs"
+              aria-label={s.nextFrame}
+              title={s.nextFrameTitle}
+              disabled={!clock}
+              onClick={() => stepFrame(1)}
+            >
+              <StepForward aria-hidden="true" />
+            </Button>
+            <span
+              data-testid="video-results-frame"
+              className="min-w-28 font-mono text-muted-foreground"
+            >
+              {clock ? s.frame(frameAt(time, clock.fps, clock.total) + 1, clock.total) : '—'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">{s.speed}</span>
+            <SegmentedToggle
+              role="group"
+              ariaLabel={s.speed}
+              value={String(playback.speed)}
+              size="sm"
+              options={SPEEDS.map((speed) => ({
+                value: String(speed),
+                label: `${speed}×`,
+                testId: `video-results-speed-${speed}`,
+              }))}
+              onValueChange={(value) => {
+                const speed = Number(value);
+                setPlayback((current) => ({ ...current, speed }));
+                track('video_results_speed_changed', { speed });
+              }}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">{s.zoom}</span>
+            <SegmentedToggle
+              role="group"
+              ariaLabel={s.zoom}
+              value={String(lens.zoom)}
+              size="sm"
+              options={ZOOMS.map((zoom) => ({
+                value: String(zoom),
+                label: `${zoom}×`,
+                testId: `video-results-zoom-${zoom}`,
+              }))}
+              onValueChange={(value) => zoomTo(Number(value))}
+            />
+          </div>
+          <Button
+            data-testid="video-results-loop"
+            variant="outline"
+            size="sm"
+            aria-pressed={playback.loop}
+            onClick={() => {
+              setPlayback((current) => ({ ...current, loop: !current.loop }));
+              track('video_results_loop_toggled', { enabled: !playback.loop });
+            }}
+          >
+            <Repeat aria-hidden="true" />
+            {s.loop}
+          </Button>
+          {lens.zoom > 1 && <span className="text-muted-foreground">{s.panHint}</span>}
+        </div>
+      )}
     </div>
   );
 }

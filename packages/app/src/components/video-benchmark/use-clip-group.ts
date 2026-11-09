@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type SyntheticEvent } from 'react';
 import {
   clipGroupActive,
+  frameTime,
   stepClipGroup,
   type ClipEvent,
   type ClipGroup,
@@ -229,5 +230,10 @@ export function useClipGroup(
       return !pausing;
     },
     seek: (time: number) => show(dispatch({ type: 'seek', time })),
+    /** Pauses the group and moves every clip `frames` frames from the shown one. */
+    stepFrames: (frames: number, { fps, total }: { fps: number; total: number }) => {
+      const { time } = dispatch('pause');
+      show(dispatch({ type: 'seek', time: frameTime(time, frames, fps, total) }));
+    },
   };
 }

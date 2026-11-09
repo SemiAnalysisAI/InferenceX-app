@@ -136,6 +136,21 @@ function resume(
   return 'playing';
 }
 
+/** Frames the shared duration holds: the recorded count, unless the playable media is shorter. */
+export const frameTotal = (duration: number, fps: number, recorded: number | null) =>
+  Math.min(recorded ?? Infinity, Math.round(duration * fps));
+
+/** Zero-based frame shown at `time`; the epsilon keeps an exact frame boundary on its own frame. */
+export const frameAt = (time: number, fps: number, total: number) =>
+  Math.max(0, Math.min(total - 1, Math.floor(time * fps + 1e-6)));
+
+/**
+ * Seek target `frames` frames from the one shown at `time`. It lands mid-frame, so a browser that
+ * rounds the seek still shows the intended frame.
+ */
+export const frameTime = (time: number, frames: number, fps: number, total: number) =>
+  (Math.max(0, Math.min(total - 1, frameAt(time, fps, total) + frames)) + 0.5) / fps;
+
 export function stepClipGroup(group: ClipGroup, event: ClipEvent): ClipGroupStep {
   const { phase, clips, duration, speed } = group;
   const leader = leaderOf(group);
