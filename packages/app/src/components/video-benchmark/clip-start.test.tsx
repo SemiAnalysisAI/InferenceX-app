@@ -76,8 +76,10 @@ it('keeps playing when the prime from the play gesture settles after the buffere
   });
   act(() => video.dispatchEvent(new Event('loadedmetadata')));
   const button = container.querySelector<HTMLButtonElement>('[data-testid="video-results-play"]')!;
+  expect(video.preload, 'no media request before Play').toBe('none');
 
   act(() => button.click());
+  expect(video.preload).toBe('auto');
   expect(plays, 'the gesture primes the clip').toHaveLength(1);
   expect(pause).toHaveBeenCalledTimes(1);
   expect(button.getAttribute('aria-pressed')).toBe('true');

@@ -77,7 +77,11 @@ it.each([true, false])(
     expect(container.querySelector('video')?.getAttribute('src')).toBe(
       available ? '/retained.mp4' : undefined,
     );
-    if (available) expect(container.querySelector('video')?.getAttribute('preload')).toBe('auto');
+    if (available)
+      expect(
+        container.querySelector('video')?.getAttribute('preload'),
+        'no media before Play',
+      ).toBe('none');
     expect(container.querySelector('output')?.textContent).toBe(
       JSON.stringify({ official: 0, named: 3, loading: false, replay: true }),
     );
@@ -134,6 +138,7 @@ it('shows a newly read clip while another selected source is still pending', asy
     pending.resolve(Response.json(slow.stored));
     await pending.promise;
   });
-  expect(container.querySelectorAll('video')).toHaveLength(2);
+  expect(container.querySelectorAll('video')).toHaveLength(1);
+  expect(container.querySelector('video')?.getAttribute('src')).toBe('/123.mp4');
   expect(container.textContent).not.toContain('Loading retained clips');
 });

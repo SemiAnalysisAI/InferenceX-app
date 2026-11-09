@@ -35,7 +35,7 @@ function clipSnapshot(key: string, video: HTMLVideoElement): ClipSnapshot {
 
 /**
  * Drives the playable video elements registered under `keys` through `stepClipGroup`. The group
- * pauses whenever `selection` (the shown clips) changes, `audible` is the only unmuted clip, and
+ * pauses and rewinds whenever `selection` (the shown clips) changes, `audible` is the only unmuted clip, and
  * `onRejected` receives the clips whose play() failed for a reason other than group control.
  */
 export function useClipGroup(
@@ -170,7 +170,9 @@ export function useClipGroup(
 
   useEffect(() => {
     for (const [key, video] of videos.current) if (!keyList.split(',').includes(key)) video.pause();
-    show(dispatch('pause'));
+    dispatch('pause');
+    // A kept clip would otherwise hold its old time against a new clip at 0.
+    show(dispatch({ type: 'seek', time: 0 }));
   }, [selection]);
 
   useEffect(() => {
