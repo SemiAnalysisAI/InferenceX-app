@@ -445,6 +445,13 @@ export default function VideoDashboard({
       return first ? [first] : [];
     }),
   );
+  const clipPoints = resultsClipPoints(charted, { tier: state.costTier });
+  // A clip takes its run's color; a lossy named run owns its clip without leading a card.
+  const overlayClips = new Set(
+    charted
+      .filter((c) => c.overlay && clipPoints.includes(c.point))
+      .map((c) => c.point.hardwareKey),
+  );
   const profitBars: ResultBar[] = roster
     .filter((key) => !hidden.has(key))
     .flatMap((key) => {
@@ -820,12 +827,8 @@ export default function VideoDashboard({
           <Card>
             <VideoResultsClips
               initialSides={initialData?.sides}
-              points={resultsClipPoints(charted, { tier: state.costTier })}
-              colorFor={(key) =>
-                representatives.some((c) => c.overlay && c.point.hardwareKey === key)
-                  ? overlayRunColor(0)
-                  : colorFor(key)
-              }
+              points={clipPoints}
+              colorFor={(key) => (overlayClips.has(key) ? overlayRunColor(0) : colorFor(key))}
               hidden={hidden}
               options={{ tier: state.costTier }}
               costs={Object.fromEntries(

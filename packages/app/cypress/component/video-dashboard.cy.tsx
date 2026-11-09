@@ -7,6 +7,7 @@ import type {
 import { videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState } from '@/components/video-benchmark/results';
 import type { ResultsEvidence } from '@/components/video-benchmark/results-evidence';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { servingArtifact } from '../support/video-artifacts';
 import { readOnlyVideoRequests, resultHistory } from '../support/video-results';
 
@@ -239,6 +240,28 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="video-history-publication"]').each(($entry) => {
       expect($entry).to.contain('No matching approval receipt');
     });
+  });
+
+  it('shows a lossy named run’s clip, which leads no card, in the overlay color', () => {
+    mount({
+      search: '?unofficialrun=34341996789&r_y=videosPerGpuHour',
+      editPage: (page) => {
+        for (const entry of page.entries) {
+          const named = entry.runId === '34341996789';
+          if (named) entry.approved = false;
+          for (const observation of entry.sources[0].observations)
+            observation.results = {
+              ...evidence(observation),
+              optimizations: named ? ['first-block-cache'] : [],
+            };
+        }
+      },
+    });
+    cy.get('[data-testid="video-results-clip"][data-hardware="b200"]')
+      .should('contain', 'Unofficial run')
+      .find('.rounded-full')
+      .should('have.attr', 'style')
+      .and('contain', overlayRunColor(0));
   });
 
   it('restores the approved workload after dismissing an explicitly selected named-only workload', () => {

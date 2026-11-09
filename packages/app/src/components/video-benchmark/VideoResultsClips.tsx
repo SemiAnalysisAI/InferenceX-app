@@ -16,7 +16,6 @@ import {
   type ClipPhase,
   type ClipSnapshot,
 } from './clip-sync';
-import { comparablePoints } from './compare';
 import { hardwareLabel } from './hardware';
 import type { MetricOptions, VideoPoint } from './metrics';
 import {
@@ -253,9 +252,9 @@ export default function VideoResultsClips({
   initialSides = {},
 }: VideoResultsClipsProps) {
   const s = STRINGS[useLocale()];
+  // Callers pick one clip per hardware, which may be a lossy named run's.
   const selected = useMemo(
-    () =>
-      comparablePoints(points).filter((p) => RESULTS_HARDWARE.some((key) => p.hardwareKey === key)),
+    () => points.filter((p) => RESULTS_HARDWARE.some((key) => p.hardwareKey === key)),
     [points],
   );
   const cache = useRef(new Map<string, ResultsClipSide | null>(Object.entries(initialSides)));
