@@ -86,6 +86,11 @@ The choice stays local to each download menu. It does not resize the live chart,
 change benchmark data or share links, or affect CSV and MP4 export. The
 presentation-only choice has no read-only API parameter.
 
+Price tables keep horizontal scrolling on the live page. In the PNG clone,
+their scroll viewport is removed and cells may wrap to fit the capture width,
+so Auto, 16:9, and 1:1 images include every price without a scrollbar.
+This is presentation-only; API data and skills contracts are unchanged.
+
 PNG and replay MP4 link footers resolve background, foreground, and font from
 the active export context rather than choosing a separate light/dark palette.
 The footer retains the originating hostname and route and fits long links to
