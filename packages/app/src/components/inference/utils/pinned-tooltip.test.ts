@@ -388,3 +388,35 @@ describe('reader-facing fields', () => {
     ).toContain('TP 8 · EP ? · DP ? · DPA ? · PP ? · DCP ? · PCP ? · DWDP 1');
   });
 });
+
+describe('experiment point details', () => {
+  it('keeps string evidence links and the recovery qualification in the React detail panel', () => {
+    const details = buildPointDetails(
+      config({
+        data: point({
+          id: undefined,
+          experiment: {
+            campaign: 'weka-amg-kimi-k3',
+            runId: 'sa-k3-original-rdma2048-c150-m089',
+            replicate: null,
+            frontierEligible: false,
+            detailHref:
+              '/api/v1/experiments/weka-amg-kimi-k3/runs/sa-k3-original-rdma2048-c150-m089',
+          },
+        }),
+        hasTrace: true,
+        hasLog: true,
+      }),
+    );
+    expect(details.links).toEqual([
+      {
+        action: 'view-experiment',
+        label: 'Run evidence and configuration',
+        href: '/api/v1/experiments/weka-amg-kimi-k3/runs/sa-k3-original-rdma2048-c150-m089',
+      },
+    ]);
+    expect(text(details.html)).toContain(
+      'Recovered cache miss; excluded from clean frontier; GPU-memory utilization 0.89.',
+    );
+  });
+});

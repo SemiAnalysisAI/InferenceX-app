@@ -1,8 +1,12 @@
 # WEKA AMG / Kimi K3 experiment import
 
-This branch adds the isolated `weka-amg-kimi-k3` campaign to its dedicated Neon child database. It does not insert GitHub workflow IDs or modify published configs, benchmarks, materialized views, or availability.
+This branch supports the isolated `weka-amg-kimi-k3` campaign in its dedicated Neon child database. It does not insert GitHub workflow IDs or modify published configs, benchmarks, materialized views, or availability.
 
 The manifest retains ten WEKA observations (including existing repeats), six native Mooncake observations, and eleven separate published reference points. C150 is a completed measurement with a recovered missing cache object; its `clean_backend_qualified` and `frontier_eligible` fields are false. No missing-cache outcome is rerun or hidden. Actual dates come from the profiling export, and all point metrics preserve their original aggregate values. `plot_metrics` records the exact PNG normalization and reciprocal P90 full-response ITL.
+
+## Current database state
+
+On November 9, 2026, the child was refreshed from production `main`. The experiment schema is empty; the previous 16 runs and payloads were removed. No newer three-hour measurements have been imported. The committed manifest and `import-receipt.json` document the historical November 2 import and are preserved unchanged. Reapplying that manifest would restore the old one-hour campaign, not ingest the latest results.
 
 ## Prepare and import
 

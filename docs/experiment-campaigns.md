@@ -19,11 +19,15 @@ Vercel environment overrides are preview-only and scoped to this Git branch:
 
 - `DATABASE_READONLY_URL`: child database reader role.
 - `DATABASE_WRITE_URL` and `DATABASE_URL`: child database owner role, for authorized ingestion and administration.
-- `CACHE_NAMESPACE` and `BLOB_CACHE_PREFIX`: `weka-amg-kimi-k3-20261102`.
+- `CACHE_NAMESPACE` and `BLOB_CACHE_PREFIX`: `weka-amg-kimi-k3-20261109`.
 
 Credentials are deployment secrets and are not recorded here. These overrides must not replace production or other preview environments. The child retains inherited published data while the separate experiment tables store this campaign; its API does not read local artifact paths at runtime.
 
 The chart adapter uses a common comparison date to keep experimental repetitions together; tooltips retain each source measurement's actual date. The raw API preserves `configuration.date`, while published reference points retain their original source date. This display grouping does not change the measurements or their provenance.
+
+## Database refresh — November 9, 2026
+
+The existing child branch was reset to production `main` at 2026-11-09 15:48:52 UTC. Its database endpoint and no-expiry policy are retained. The experiment tables were recreated empty, and the preview reader role was restored with read-only access. The earlier 16 imported runs and payloads are no longer present; no three-hour results have been imported. The November 2 manifest and import receipt remain historical artifacts, not the current database inventory. An absent campaign returns 404 until a new import completes.
 
 ## Inference controls and API coverage
 
