@@ -295,9 +295,22 @@ has no playable media, and fails closed for unequal frame geometry or blocked
 cross-origin pixel access. Blob media sends `access-control-allow-origin: *` and every
 video sets `crossOrigin="anonymous"`. This preview is not a
 sealed PSNR result. Distilled and full-step workloads are not silently equated.
-Below the stage, the subject's wall time is the selected request's duration, PSNR is
-the per-clip sealed pair, energy is the cell's mean J/valid clip, and both modeled TCO
-bases are shown. A side without published media shows its reason (no matched clip,
+Below the stage, a readout (`VideoClipReadout`) describes the pair. Its first line names
+both sides with their GPU count, server layout and lossy optimizations, and tags the side
+from `?unofficialrun=` as the unofficial run, with its `overlayRunColor` dot; against its own
+GPU's official lead, the readout names that lead "B200 official". Against the
+Diffusers reference it shows the subject's wall time for the selected prompt (that
+request's duration), the clip's PSNR against the reference (the sealed pair), the cell's
+mean energy per valid clip, and modeled TCO per clip on the participating and allocated
+bases, each with its $/video-s. Against another GPU's lead it shows each side's wall time
+with their ratio, PSNR against the reference and TCO per clip; it never forms a cross-GPU
+quality score. A lossy subject against its lossless twin leads with speed, the ratio of the
+two cells' p50 written "N× faster" or "N× slower". PSNR, SSIM and LPIPS against lossless
+follow and read "Not measured yet" until paired scores are published; each side's PSNR
+against the reference, wall time, energy and cost stay. A value that was not measured reads
+"Not measured yet", never a placeholder number, and the matched-noise rerun shows only its
+PSNR. The readout has 5 columns from 1024 px and 2 below; `readoutFooter` places content
+under its rows. A side without published media shows its reason (no matched clip,
 unpublished run, no sealed reference pair) in place of the video, and a clip that
 fails to play offers Retry. The reference's recorded update/sigma-point counts, Diffusers
 revision and media link sit in Prompt & sources with the subject's run, artifact,
@@ -450,7 +463,7 @@ Y 轴可选每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时�
 默认静音。点击任一可播放一侧的扬声器按钮即只播放这一侧的声音，参考视频也可以；再次点击恢复静音。切换 prompt 时保留当前音源，隐藏音源或音源播放失败后恢复静音。从部署详情返回总览时，负责 `muted` 的 layout effect 会重新应用音源选择，因为 React 不会重新设置没有变化的 prop。音源选择只影响本地播放，不改变媒体、指标、URL 参数或只读 API 返回内容。
 “差异”视图是两侧视频在相同播放时刻（相差不超过 0.12 秒）的浏览器 RGB 差异预览，配对视频是明确绑定的官方 Diffusers 参考，与封存的全帧 PSNR 测量分别展示。不能根据硬件型号或步数推断参考身份。
 任一侧没有可播放的视频时显示“两侧都需要有视频”；帧尺寸不一致或无法跨域读取像素时显示不可用。Blob 媒体返回 `access-control-allow-origin: *`，所有视频都设置了 `crossOrigin="anonymous"`。蒸馏与完整步数分组保留。
-对比区下方显示对比对象的出片时间（所选请求的时长）、逐条视频 PSNR（已封存配对）、所选测量单元的平均 J/clip 以及两种 TCO 口径。没有已发布媒体的一侧在画面位置显示原因（没有匹配的视频、未发布的运行、暂无封存的参考配对），无法播放的视频提供“重试”。参考视频记录的更新次数和 sigma 点数、Diffusers 版本及视频文件链接，与对比对象的 prompt、seed、重复次数、
+对比区下方的读数区（`VideoClipReadout`）说明当前这一对视频。第一行列出两侧的名称、GPU 数量、服务器布局和有损优化项，并把来自 `?unofficialrun=` 的一侧标为非官方运行，色点使用 `overlayRunColor`；与同一 GPU 的官方代表部署对比时，读数区把后者称为“B200 官方运行”。与 Diffusers 参考对比时，显示对比对象在所选 prompt 下的出片时间（该请求的时长）、该视频相对参考的 PSNR（已封存配对）、所选测量单元每条有效视频的平均能耗，以及按参与 GPU 和分配 GPU 两种口径估算的每条视频 TCO 及对应的每视频秒成本。与其他 GPU 的代表部署对比时，显示两侧的出片时间及二者之比、相对参考的 PSNR 和每条视频 TCO，不构造跨 GPU 的质量分。有损对象与其无损对照对比时，先显示速度，即两个测量单元 p50 之比，写作“快 N×”或“慢 N×”；随后是相对无损对照的 PSNR、SSIM 和 LPIPS，配对评分发布前均显示“尚未测量”；两侧相对参考的 PSNR、出片时间、能耗和成本仍然保留。未测量的值显示“尚未测量”，不用占位数字代替；相同初始噪声重跑只显示其 PSNR。读数区在 1024px 及以上为 5 列，以下为 2 列；`readoutFooter` 用于在读数下方放置内容。没有已发布媒体的一侧在画面位置显示原因（没有匹配的视频、未发布的运行、暂无封存的参考配对），无法播放的视频提供“重试”。参考视频记录的更新次数和 sigma 点数、Diffusers 版本及视频文件链接，与对比对象的 prompt、seed、重复次数、
 运行、产物、Runtime 和媒体来源一起放在“Prompt 与来源”中。
 
 成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补；图表固定使用参与计算的 GPU 口径，对比区和部署详情仍同时展示两种口径。代表性部署表，以及 GPU 数量和 GPU 口径选择器，均已移除。界面与 overview API 始终包含全部 GPU 数量；旧链接中的 `r_gpus`、`r_basis` 参数会被忽略。利润估算器位于默认收起的“高级选项”中；展开或收起都不会改变数据和计算结果，已填写的场景输入会保留。视频秒吞吐量、每视频秒成本及收入使用有效测量请求的实际解码视频时长，不包含 warmup；请求时长仅用于工作负载身份与筛选。

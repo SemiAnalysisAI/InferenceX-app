@@ -544,13 +544,7 @@ export default function VideoDashboard({
   const clipCosts = useMemo(
     () =>
       Object.fromEntries(
-        [...projection.history, ...deploymentCells].map((cell) => [
-          cell.point.id,
-          {
-            participating: cell.cost.participating?.perVideoSecond ?? null,
-            allocated: cell.cost.allocated?.perVideoSecond ?? null,
-          },
-        ]),
+        [...projection.history, ...deploymentCells].map((cell) => [cell.point.id, cell.cost]),
       ),
     [projection.history, deploymentCells],
   );

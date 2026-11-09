@@ -3,11 +3,14 @@ import { useState } from 'react';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import type { VideoPoint } from '@/components/video-benchmark/metrics';
 import { dashboardCells, videoPoints } from '@/components/video-benchmark/points';
+import type { ResultCell } from '@/components/video-benchmark/results';
+import type { ResultsEvidence } from '@/components/video-benchmark/results-evidence';
 import VideoResultsClips from '@/components/video-benchmark/VideoResultsClips';
 import history from '../fixtures/api/video-history.json';
 import { servingArtifact } from '../support/video-artifacts';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
 import { verifiedQuality } from '@/components/video-benchmark/reference-quality';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 
 // Retained H100/H200/B200 C1/C2/C4 observations; clips come from synthetic stored artifacts.
 const points = videoPoints([history as unknown as VideoHistoryPage]);
@@ -95,6 +98,16 @@ const expectDifference = (check: (rgba: number[]) => void) =>
     check(rgba);
   });
 
+const cost = (perVideo: number, perVideoSecond: number) => ({
+  perVideo,
+  perVideoSecond,
+  perHour: 1,
+});
+const readout = '[data-testid="video-results-readout"]';
+/** A readout cell's own value, and the pair's value under it when the pair has one. */
+const readoutValue = (metric: string, index = 0) =>
+  cy.get(`${readout} [data-metric="${metric}"] dd`).eq(index);
+
 // These decoder fixtures are test inputs, never benchmark evidence.
 function mountResultsClips(
   keys = ['b200', 'h200'],
@@ -104,6 +117,16 @@ function mountResultsClips(
   previews: string[] = [],
   brokenPreview = false,
   unpublished: string[] = [],
+  {
+    leads,
+    deployments,
+    costs = {},
+  }: {
+    /** Replace the C1 leads of `keys`, which still serve the media. */
+    leads?: VideoPoint[];
+    deployments?: VideoPoint[];
+    costs?: Record<string, ResultCell['cost']>;
+  } = {},
 ) {
   const referenceMedia = { url: '', diagnosticUrl: '', previewUrl: '' };
   cy.fixture('video-results/reference.mp4', 'base64').then((encoded: string) => {
@@ -224,7 +247,7 @@ function mountResultsClips(
       },
     );
   }
-  const selectedPoints = keys.map(c1);
+  const selectedPoints = leads ?? keys.map(c1);
   function Clips() {
     const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
     return (
@@ -236,7 +259,12 @@ function mountResultsClips(
         <VideoResultsClips
           points={selectedPoints.filter((point) => !hidden.has(point.hardwareKey ?? ''))}
           colorFor={colorFor}
-          costs={{ [c1('b200').id]: { participating: 0.02, allocated: null } }}
+          deployments={deployments}
+          costs={{
+            [c1('b200').id]: { participating: cost(0.1, 0.02), allocated: null },
+            [c1('h100').id]: { participating: cost(0.3, 0.06), allocated: cost(0.6, 0.12) },
+            ...costs,
+          }}
           unofficialRun={unofficialRun}
         />
       </PathnameContext.Provider>
@@ -319,10 +347,9 @@ describe('Video results clip stage', () => {
       .should('have.attr', 'aria-pressed', 'true')
       .and('contain', 'Matched-noise rerun');
     cy.get('[data-side="a"]').should('contain', '4 GPU');
-    const facts = '[data-testid="video-results-facts"]';
-    cy.get(facts).should('contain', '30 dB');
-    for (const label of ['Wall time', 'J / clip', 'Participating', 'Allocated'])
-      cy.get(facts).contains('dt', label).next('dd').should('have.text', '—');
+    cy.get(readout).should('have.attr', 'data-pair', 'reference').and('contain', '30 dB');
+    for (const metric of ['wall', 'energy', 'participating', 'allocated'])
+      readoutValue(metric).should('have.text', '—');
     cy.get('@diagnostic-b200-url').then((url) => sideVideo('a').should('have.attr', 'src', url));
     cy.get('@diagnostic-reference-url').then((url) =>
       sideVideo('b').should('have.attr', 'src', url),
@@ -338,9 +365,16 @@ describe('Video results clip stage', () => {
       expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
     });
     cy.get('[data-prompt="drum-taps"]').click();
-    cy.get(facts).should('contain', '25 dB');
-    cy.get(facts).contains('dt', 'Wall time').next('dd').should('have.text', '120 s');
-    cy.get(facts).contains('dt', 'Participating').next('dd').should('have.text', '0.02');
+    readoutValue('psnr').should('have.text', '25 dB');
+    readoutValue('wall').should('have.text', '120 s');
+    readoutValue('energy').should('have.text', '301,088 J');
+    readoutValue('participating').should('have.text', '$0.1');
+    readoutValue('participating', 1).should('have.text', '$0.02 / video-s');
+    readoutValue('allocated').should('have.text', 'Not measured yet');
+    cy.get(`${readout} [data-testid="video-results-readout-pair"]`).should(
+      'contain',
+      '4 GPU · TP2 × Ulysses 2',
+    );
     cy.get('[data-testid="video-results-sources"]').should('contain', c1('b200').runId);
   });
 
@@ -361,7 +395,7 @@ describe('Video results clip stage', () => {
       .should('contain', 'A drummer taps a snare drum.')
       .and('contain', 'seed 11')
       .and('contain', 'take 1');
-    cy.get('[data-testid="video-results-facts"]').should('contain', '0.02');
+    readoutValue('participating').should('have.text', '$0.1');
 
     cy.get('[data-testid="video-results-stage"]').click('right');
     load('[data-testid="video-results-start"]');
@@ -590,9 +624,55 @@ describe('Video results clip stage', () => {
       .and('contain', 'Unofficial run')
       .find('video')
       .should('not.exist');
-    cy.get('[data-testid="video-results-facts"]').should('contain', '25 dB');
+    readoutValue('psnr').should('have.text', '25 dB');
     cy.get('[data-side="b"]').should('contain', 'No sealed reference pair for this clip.');
     cy.get('[data-testid="video-results-play"]').should('be.disabled');
+  });
+
+  it('reads out both sides against another GPU and names the unofficial one', () => {
+    mountResultsClips(['b200', 'h100'], '/vgx', false, c1('b200').runId);
+    cy.get('[data-testid="video-results-compare-h100"]').click();
+    cy.get(readout).should('have.attr', 'data-pair', 'lead');
+    cy.get(`${readout} [data-readout-side="b200"]`)
+      .should('contain', 'Unofficial run')
+      .find('span')
+      .first()
+      .should('have.attr', 'style')
+      .and('contain', overlayRunColor(0));
+    cy.get(`${readout} [data-readout-side="h100"]`).should('not.contain', 'Unofficial run');
+    readoutValue('wall').should('have.text', '120 s');
+    readoutValue('wall', 1).should('have.text', 'H100 120 s');
+    readoutValue('wall', 2).should('have.text', 'Same speed as H100');
+    readoutValue('psnr', 1).should('have.text', 'H100 25 dB');
+    readoutValue('participating').should('have.text', '$0.1');
+    readoutValue('participating', 1).should('have.text', 'H100 $0.3');
+  });
+
+  it('leads a lossy pair with its speed and never shows a score it has not measured', () => {
+    const lossy: VideoPoint = {
+      ...c1('b200'),
+      id: `${c1('b200').id}-fbc`,
+      p50: 40,
+      results: { optimizations: ['first-block-cache'] } as unknown as ResultsEvidence,
+    };
+    const twin: VideoPoint = { ...c1('b200'), p50: 112 };
+    mountResultsClips(['b200'], '/vgx', false, undefined, [], false, [], {
+      leads: [lossy],
+      deployments: [lossy, twin],
+      costs: { [lossy.id]: { participating: cost(0.04, 0.01), allocated: null } },
+    });
+    cy.get('[data-testid="video-results-compare-twin"]').click();
+    cy.get(readout).should('have.attr', 'data-pair', 'twin');
+    cy.get(`${readout} [data-metric]`).first().should('have.attr', 'data-metric', 'speed');
+    readoutValue('speed').should('have.text', '2.80× faster');
+    readoutValue('speed', 1).should('have.text', 'p50 40 s vs 112 s lossless');
+    for (const metric of ['psnrLossless', 'ssimLossless', 'lpipsLossless']) {
+      readoutValue(metric).should('have.text', 'Not measured yet');
+      cy.get(`${readout} [data-metric="${metric}"]`).invoke('text').should('not.match', /\d/u);
+    }
+    readoutValue('participating').should('have.text', '$0.04');
+    readoutValue('participating', 1).should('have.text', 'B200 lossless $0.1');
+    readoutValue('psnr', 1).should('have.text', 'B200 lossless 25 dB');
   });
 
   it('falls back to the sealed original when a web rendition cannot be played', () => {
