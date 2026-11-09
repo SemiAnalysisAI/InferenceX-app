@@ -5,6 +5,7 @@ import {
   booleanSchema,
   errorSchema,
   integerSchema,
+  nullableStringSchema,
   objectSchema,
   stringSchema,
   text,
@@ -25,7 +26,7 @@ const campaignSchema: ApiSchema = {
   }),
   additionalProperties: true,
 };
-const runSchema: ApiSchema = {
+const measuredRunSchema: ApiSchema = {
   ...objectSchema({
     campaign_slug: stringSchema,
     run_id: stringSchema,
@@ -44,11 +45,22 @@ const runSchema: ApiSchema = {
   }),
   additionalProperties: true,
 };
+const runSchema: ApiSchema = {
+  ...measuredRunSchema,
+  properties: {
+    ...measuredRunSchema.properties,
+    config_name: nullableStringSchema,
+    perf_changelog: nullableStringSchema,
+  },
+};
 const runExample = {
   campaign_slug: 'weka-amg-kimi-k3-latest-3h',
   run_id: 'cam-k3-kdadr-20261104-c128',
   series: 'weka',
   concurrency: 128,
+  config_name: 'b300-kimi-k3-vllm-weka-amg-e558388-kda-fp8-3h-idle1200-c128',
+  perf_changelog:
+    'Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending.',
   replicate: 1,
   metrics: {},
   plot_metrics: { uncached_tps_gpu: 655.2837 },
@@ -97,8 +109,8 @@ export const experimentOperations: readonly ApiOperation[] = [
     path: '/api/v1/experiments/{campaign}',
     summary: text('Experiment campaign and runs', '实验 campaign 与 run'),
     description: text(
-      'Branch-scoped experiment data stored separately from official benchmarks. Returns raw campaign metadata, optional published reference points and every experiment replicate, including health flags and source provenance. The latest three-hour campaign contains 13 WEKA and 9 internal Mooncake runs with no one-hour reference points. C128 is flagged for metric integrity and C140/C180 for DRAM-cache recovery; all three remain stored but frontier-ineligible. The internal baseline retains four serving variants in configuration metadata. No GitHub workflow or numeric benchmark identities are invented. No query filters or server-side chart calculations. The inference UI experiment selector reuses i_tokens=total|uncached; these are UI controls, not parameters on this raw endpoint. Cache-Control: no-store. Public read; no authentication.',
-      '实验分支的数据独立于官方 benchmark 存储。返回原始 campaign 元数据、可选的已发布参考点、每次重复实验、健康状态和来源信息。最新三小时 campaign 包含 13 次 WEKA 和 9 次内部 Mooncake 运行，不含一小时参考点。C128 标记读取字节计数器完整性异常，C140/C180 标记 DRAM-cache 恢复；三者均保留，但不纳入无异常结果的 Pareto 前沿。内部基线的四种 serving 配置保留在 configuration 元数据中。不生成虚构的 GitHub workflow 或数值 benchmark ID。不支持查询筛选，不在服务端计算图表指标。推理界面的实验选择器复用 i_tokens=total|uncached；它们是界面控件，不是此原始数据接口的参数。Cache-Control: no-store。公开只读，无需认证。',
+      'Branch-scoped experiment data stored separately from official benchmarks. Returns raw campaign metadata, optional published reference points and every experiment replicate, including health flags and source provenance. The latest three-hour campaign contains 13 WEKA and 9 internal Mooncake runs with no one-hour reference points. C128 is flagged for metric integrity and C140/C180 for DRAM-cache recovery; all three remain stored but frontier-ineligible. The internal baseline retains four serving variants in configuration metadata. Optional nullable config_name and perf_changelog fields hold editable display metadata: a descriptive configuration name and a performance changelog or explicitly pending placeholder. They do not modify measurements, source manifests or record hashes. No GitHub workflow or numeric benchmark identities are invented. No query filters or server-side chart calculations. The inference UI experiment selector reuses i_tokens=total|uncached; these are UI controls, not parameters on this raw endpoint. Cache-Control: no-store. Public read; no authentication.',
+      '实验分支的数据独立于官方 benchmark 存储。返回原始 campaign 元数据、可选的已发布参考点、每次重复实验、健康状态和来源信息。最新三小时 campaign 包含 13 次 WEKA 和 9 次内部 Mooncake 运行，不含一小时参考点。C128 标记读取字节计数器完整性异常，C140/C180 标记 DRAM-cache 恢复；三者均保留，但不纳入无异常结果的 Pareto 前沿。内部基线的四种 serving 配置保留在 configuration 元数据中。可选且可为 null 的 config_name 和 perf_changelog 是可编辑的展示元数据，分别保存描述性配置名称，以及性能变更说明或明确标为待补充的占位文本；这些字段不改变测量、来源 manifest 或记录哈希。不生成虚构的 GitHub workflow 或数值 benchmark ID。不支持查询筛选，不在服务端计算图表指标。推理界面的实验选择器复用 i_tokens=total|uncached；它们是界面控件，不是此原始数据接口的参数。Cache-Control: no-store。公开只读，无需认证。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -134,8 +146,8 @@ export const experimentOperations: readonly ApiOperation[] = [
     path: '/api/v1/experiments/{campaign}/runs/{runId}',
     summary: text('Experiment run metrics and traces', '实验 run 的指标与 trace'),
     description: text(
-      'Returns one stored experiment run with aggregate_stats, chart_series, request_timeline and payload_inventory. Trace projections preserve their stored shapes and missing measurements. Payload inventory identifies retained raw artifacts; this endpoint does not download raw compressed payload chunks. String run identity is scoped to the campaign; it is not a benchmark_result_id or GitHub Actions ID. Cache-Control: no-store. Public read; no authentication.',
-      '返回单次实验 run 及其 aggregate_stats、chart_series、request_timeline 和 payload_inventory。trace 投影保留存储时的数据结构与缺失测量。payload 清单标识保留的原始文件，此接口不下载压缩的原始数据块。字符串 run ID 仅在 campaign 内有效，不是 benchmark_result_id 或 GitHub Actions ID。Cache-Control: no-store。公开只读，无需认证。',
+      'Returns one stored experiment run with aggregate_stats, chart_series, request_timeline and payload_inventory. Optional nullable config_name and perf_changelog are additive display metadata, separate from the hashed source record. A pending changelog placeholder is not evidence of a measured performance change. Trace projections preserve their stored shapes and missing measurements. Payload inventory identifies retained raw artifacts; this endpoint does not download raw compressed payload chunks. String run identity is scoped to the campaign; it is not a benchmark_result_id or GitHub Actions ID. Cache-Control: no-store. Public read; no authentication.',
+      '返回单次实验 run 及其 aggregate_stats、chart_series、request_timeline 和 payload_inventory。可选且可为 null 的 config_name 和 perf_changelog 是附加展示元数据，与已计算哈希的来源记录分离。待补充的变更说明占位文本不代表实测性能变化。trace 投影保留存储时的数据结构与缺失测量。payload 清单标识保留的原始文件，此接口不下载压缩的原始数据块。字符串 run ID 仅在 campaign 内有效，不是 benchmark_result_id 或 GitHub Actions ID。Cache-Control: no-store。公开只读，无需认证。',
     ),
     audience: 'public',
     stability: 'beta',

@@ -18,6 +18,7 @@ const STRINGS = {
     repeat: 'repeat',
     flagged: 'recovered cache miss · outside clean frontier',
     api: 'Campaign data',
+    changelog: 'Performance changelog',
   },
   zh: {
     title: 'B300 Kimi K3 · 专项测试对比',
@@ -28,6 +29,7 @@ const STRINGS = {
     repeat: '重复运行',
     flagged: '已恢复的 cache miss · 不纳入无读取故障的 frontier',
     api: '测试数据 API',
+    changelog: '性能变更记录',
   },
 };
 
@@ -71,6 +73,11 @@ export function ExperimentNotice({ enabled }: { enabled: boolean }) {
         <summary className="cursor-pointer font-medium">
           {t.details} ({data.runs.length})
         </summary>
+        {data.runs[0]?.perf_changelog && (
+          <p className="mt-2 text-muted-foreground">
+            {t.changelog}: {data.runs[0].perf_changelog}
+          </p>
+        )}
         <ul className="mt-2 grid gap-1 md:grid-cols-2">
           {data.runs.map((run) => (
             <li key={run.run_id}>
@@ -82,7 +89,8 @@ export function ExperimentNotice({ enabled }: { enabled: boolean }) {
                 onClick={() => track('inference_experiment_run_open', { run_id: run.run_id })}
               >
                 {run.series === 'weka' ? 'WEKA AMG' : 'Mooncake DRAM'} · C{run.concurrency}
-                {run.replicate ? ` · ${t.repeat} ${run.replicate}` : ''} · {run.run_id}
+                {run.replicate ? ` · ${t.repeat} ${run.replicate}` : ''} ·{' '}
+                {run.config_name || run.run_id}
               </a>
               {!run.frontier_eligible && (
                 <span

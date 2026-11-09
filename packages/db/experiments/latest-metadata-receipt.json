@@ -1,0 +1,126 @@
+{
+  "campaign": "weka-amg-kimi-k3-latest-3h",
+  "target": {
+    "purpose": "weka-amg-kimi-k3-isolated-import",
+    "project_id": "silent-pond-29172997",
+    "parent_branch_id": "br-restless-voice-ai2vkru2",
+    "child_branch_id": "br-odd-math-aif8e7ha",
+    "endpoint_host": "ep-empty-dream-aio1rvub-pooler.c-4.us-east-1.aws.neon.tech",
+    "database": "neondb",
+    "expires_at": null
+  },
+  "completed_at": "2026-11-09T16:37:44.663Z",
+  "source_record_hashes_unchanged": true,
+  "runs": [
+    {
+      "run_id": "cam-k3-kdadr-20261104-c128",
+      "config_name": "b300-kimi-k3-vllm-weka-amg-e558388-kda-fp8-3h-idle1200-c128",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c140",
+      "config_name": "b300-kimi-k3-vllm-weka-amg-e558388-kda-fp8-3h-idle1200-c140",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c150",
+      "config_name": "b300-kimi-k3-vllm-weka-amg-e558388-kda-fp8-3h-idle1200-c150",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c180",
+      "config_name": "b300-kimi-k3-vllm-weka-amg-e558388-kda-fp8-3h-idle1200-c180",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c200",
+      "config_name": "b300-kimi-k3-vllm-weka-amg-e558388-kda-fp8-3h-idle1200-c200",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c220",
+      "config_name": "b300-kimi-k3-vllm-weka-amg-e558388-kda-fp8-3h-idle1200-c220",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c250",
+      "config_name": "b300-kimi-k3-vllm-weka-amg-e558388-kda-fp8-3h-idle1200-c250",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c32",
+      "config_name": "b300-kimi-k3-vllm-weka-amg-e558388-kda-fp8-3h-idle1200-c32",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c40",
+      "config_name": "b300-kimi-k3-vllm-weka-amg-e558388-kda-fp8-3h-idle1200-c40",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c48",
+      "config_name": "b300-kimi-k3-vllm-weka-amg-e558388-kda-fp8-3h-idle1200-c48",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c56",
+      "config_name": "b300-kimi-k3-vllm-weka-amg-e558388-kda-fp8-3h-idle1200-c56",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c70",
+      "config_name": "b300-kimi-k3-vllm-weka-amg-e558388-kda-fp8-3h-idle1200-c70",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "cam-k3-kdadr-20261104-c96",
+      "config_name": "b300-kimi-k3-vllm-weka-amg-e558388-kda-fp8-3h-idle1200-c96",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "internal-c128-job-12999",
+      "config_name": "b300-kimi-k3-vllm-mooncake-internal-direct-kv-3h-idle1200-c128",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "internal-c140-job-12992",
+      "config_name": "b300-kimi-k3-vllm-mooncake-internal-direct-kv-3h-idle1200-c140",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "internal-c150-job-13043",
+      "config_name": "b300-kimi-k3-vllm-mooncake-internal-stock-kv-3h-idle1200-c150",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "internal-c32-job-13001",
+      "config_name": "b300-kimi-k3-vllm-mooncake-internal-direct-kv-3h-idle1200-c32",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "internal-c40-job-12997",
+      "config_name": "b300-kimi-k3-vllm-mooncake-internal-direct-kv-3h-idle1200-c40",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "internal-c48-job-13021",
+      "config_name": "b300-kimi-k3-vllm-mooncake-internal-stock-kv-3h-idle1200-c48",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "internal-c56-job-13037",
+      "config_name": "b300-kimi-k3-vllm-mooncake-internal-stock-kv-no-graphs-3h-idle1200-c56",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "internal-c70-job-13041",
+      "config_name": "b300-kimi-k3-vllm-mooncake-internal-stock-q-kv-no-graphs-3h-idle1200-c70",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    },
+    {
+      "run_id": "internal-c96-job-13032",
+      "config_name": "b300-kimi-k3-vllm-mooncake-internal-stock-kv-3h-idle1200-c96",
+      "perf_changelog": "Manual import: 3-hour AgentX, 1,200s trace-idle cap. Performance changelog pending."
+    }
+  ]
+}

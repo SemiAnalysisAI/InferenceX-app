@@ -1276,7 +1276,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/experiments.ts',
-    sourceSha256: '7fea6203778a06e2c8743ab1e01fbd5d169c2ff3cb1a9fbb6435688bc0007bff',
+    sourceSha256: '2e1b6aea26391c9b77f44b9210747ece3932c9b78426d24831c4b95b11fddcf2',
     reviewArea: {
       en: 'Raw experiment fields, complete-ingest visibility and string run identity.',
       zh: '实验原始字段、完整导入可见性及字符串 run 身份。',
@@ -1284,7 +1284,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api/experiment-documentation.ts',
-    sourceSha256: '8e072f9f8b55434e85fd564b6b7f206a6fd0412cf5e5a6b6069278460761972e',
+    sourceSha256: '5d73a4bff6cac5b0a20d6de9cccfed16dc77c45d50b4eb0a43294afa55831505',
     reviewArea: {
       en: 'Experiment raw campaign and string-ID run detail contracts, provenance and no-store caching.',
       zh: '实验原始 campaign、字符串 run ID 详情、来源信息与 no-store 缓存约定。',

@@ -43,3 +43,6 @@ create table if not exists experiment_payload_chunks (
   primary key(campaign_slug,run_id,kind,part),
   foreign key(campaign_slug,run_id) references experiment_runs(campaign_slug,run_id)
 );
+-- Editable display metadata is separate from the checksum-sealed source record.
+alter table experiment_runs add column if not exists config_name text;
+alter table experiment_runs add column if not exists perf_changelog text;

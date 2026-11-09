@@ -39,3 +39,5 @@ Archived P90 interactivity maps through reciprocal P90 ITL for numerical parity;
 English and Chinese inference share links preserve the recognized experiment selector. Legend-table and tooltip evidence actions lead to the experiment run API, not a fabricated GitHub Actions page. The campaign does not use the public-workflow reproducibility prompt.
 
 The latest three-hour campaign hides official workflow/date and history-comparison controls. The chart footer shows the actual measurement date range and links to the raw campaign API; published views and the historical campaign retain their normal controls.
+
+Run responses may include nullable `config_name` and `perf_changelog` fields. These are editable display metadata, separate from measurements and hashed source records. The initial performance changelog explicitly says it is pending; do not interpret that placeholder as evidence of a performance change. Configuration names can summarize the serving setup and concurrency, while `configuration` retains the exact provenance. Source manifests, record hashes and payloads are unchanged by these labels.

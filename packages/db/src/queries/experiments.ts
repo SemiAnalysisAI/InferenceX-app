@@ -25,6 +25,8 @@ export interface ExperimentRun {
   clean_backend_qualified: boolean;
   frontier_eligible: boolean;
   record_sha256: string;
+  config_name?: string | null;
+  perf_changelog?: string | null;
 }
 export interface ExperimentRunDetail extends ExperimentRun {
   aggregate_stats: Record<string, unknown>;
@@ -42,7 +44,7 @@ export async function getExperimentCampaign(
   return (rows[0] as unknown as ExperimentCampaign) ?? null;
 }
 export async function getExperimentRuns(sql: DbClient, slug: string): Promise<ExperimentRun[]> {
-  return (await sql`select r.campaign_slug,r.run_id,r.series,r.concurrency,r.replicate,r.metrics,r.plot_metrics,r.configuration,r.provenance,r.health,r.cache_evidence,r.clean_backend_qualified,r.frontier_eligible,r.record_sha256 from experiment_runs r join experiment_campaigns c on c.slug=r.campaign_slug where r.campaign_slug=${slug} and c.complete=true order by r.series,r.concurrency,r.replicate,r.run_id`) as unknown as ExperimentRun[];
+  return (await sql`select r.campaign_slug,r.run_id,r.series,r.concurrency,r.replicate,r.metrics,r.plot_metrics,r.configuration,r.provenance,r.health,r.cache_evidence,r.clean_backend_qualified,r.frontier_eligible,r.record_sha256,r.config_name,r.perf_changelog from experiment_runs r join experiment_campaigns c on c.slug=r.campaign_slug where r.campaign_slug=${slug} and c.complete=true order by r.series,r.concurrency,r.replicate,r.run_id`) as unknown as ExperimentRun[];
 }
 export async function getExperimentRunDetail(
   sql: DbClient,
