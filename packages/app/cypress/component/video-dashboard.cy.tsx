@@ -669,6 +669,8 @@ describe('VideoGenX results', () => {
     playing().should('have.attr', 'data-hardware', 'h200');
     searchParam('r_clip').should('match', /^34342452354:/u);
 
+    // An official subject is never offered its own GPU.
+    cy.get('[data-testid="video-results-compare-h200"]').should('not.exist');
     cy.get('[data-testid="video-results-compare-b200"]').click();
     stagePill('b').should('contain', 'B200').and('contain', 'Unofficial run');
     points('[data-clip-role="baseline"]').should('have.attr', 'data-overlay', 'true');
@@ -682,6 +684,13 @@ describe('VideoGenX results', () => {
     );
     stagePill('a').should('contain', 'Unofficial run');
     searchParam('r_clip').should('match', new RegExp(`^${namedRun}:`, 'u'));
+    // The unofficial subject is offered the official lead on its own GPU.
+    cy.get('[data-testid="video-results-compare-reference"]').click();
+    cy.get('[data-testid="video-results-compare-b200"]').click();
+    stagePill('b').should('contain', 'B200').and('not.contain', 'Unofficial run');
+    points('[data-clip-role="baseline"]')
+      .should('have.attr', 'data-hardware', 'b200')
+      .and('have.attr', 'data-overlay', 'false');
   });
 
   it('falls back to the overview for an unknown or hidden deployment and drops its key', () => {

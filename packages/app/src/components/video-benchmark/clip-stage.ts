@@ -118,7 +118,7 @@ export function stageSubject(
 
 /** What the stage's second side shows, and the point it plays; null for the reference. */
 export interface StageOption {
-  /** `reference`, `twin`, or the hardware key of another hardware's lead. */
+  /** `reference`, `twin`, or the hardware key of the lead it plays. */
   value: string;
   kind: 'reference' | 'lead' | 'twin';
   /** Null for the reference, and for a twin the subject's run does not have. */
@@ -127,17 +127,20 @@ export interface StageOption {
 
 /**
  * What the subject can be compared with: its Diffusers reference (the default), each other
- * visible hardware's lead, and, for a lossy subject, its lossless twin from `deployments`.
+ * visible hardware's lead, `own` in place of its own hardware's lead, and, for a lossy
+ * subject, its lossless twin from `deployments`. Without `own` its hardware is not offered.
  */
 export function stageOptions(
   subject: VideoPoint,
   leads: readonly VideoPoint[],
   deployments: readonly VideoPoint[],
+  own: VideoPoint | null = null,
 ): StageOption[] {
   return [
     { value: 'reference', kind: 'reference', point: null },
     ...leads
-      .filter((lead) => lead.hardwareKey !== subject.hardwareKey)
+      .map((lead) => (lead.hardwareKey === subject.hardwareKey ? own : lead))
+      .filter((lead) => lead !== null)
       .map((lead) => ({ value: lead.hardwareKey ?? '', kind: 'lead' as const, point: lead })),
     ...(isLossy(subject)
       ? [{ value: 'twin', kind: 'twin' as const, point: losslessTwin(subject, deployments) }]

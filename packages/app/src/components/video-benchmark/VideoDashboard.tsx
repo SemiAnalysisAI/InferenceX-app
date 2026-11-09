@@ -509,6 +509,10 @@ export default function VideoDashboard({
   );
   // A lossy named run owns its clip without leading a card.
   const clipPoints = resultsClipPoints(charted, { tier: state.costTier });
+  const officialClipPoints = resultsClipPoints(
+    charted.filter((c) => !c.overlay),
+    { tier: state.costTier },
+  );
   const profitBars: ResultBar[] = roster
     .filter((key) => !hidden.has(key))
     .flatMap((key) => {
@@ -930,6 +934,7 @@ export default function VideoDashboard({
               points={clipPoints}
               drawn={drawnPoints}
               deployments={deploymentPoints}
+              officialLeads={officialClipPoints}
               onPairChange={onStagePair}
               colorFor={colorFor}
               costs={Object.fromEntries(

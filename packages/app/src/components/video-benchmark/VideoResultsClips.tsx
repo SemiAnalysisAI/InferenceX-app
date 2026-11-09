@@ -213,6 +213,8 @@ export interface VideoResultsClipsProps {
   drawn?: readonly VideoPoint[];
   /** Every deployment of the workload, where a lossy subject finds its lossless twin. */
   deployments?: readonly VideoPoint[];
+  /** One official lead per hardware, which a subject from `unofficialRun` is compared with. */
+  officialLeads?: readonly VideoPoint[];
   /** Hardware color; a side from `unofficialRun` takes the overlay color. */
   colorFor: (key: string) => string;
   costs?: Costs;
@@ -236,6 +238,7 @@ export default function VideoResultsClips({
   points,
   drawn = NO_POINTS,
   deployments = NO_POINTS,
+  officialLeads = NO_POINTS,
   colorFor,
   costs,
   unofficialRun,
@@ -274,10 +277,15 @@ export default function VideoResultsClips({
       ),
     [selected, picked, revision, failed, unofficialRun, stage.clip],
   );
-  const options = useMemo(
-    () => (subject ? stageOptions(subject.point, selected, deployments) : []),
-    [subject, selected, deployments],
-  );
+  const options = useMemo(() => {
+    if (!subject) return [];
+    // A candidate run is read against production: the official lead on its own GPU.
+    const own =
+      subject.point.runId === unofficialRun
+        ? (officialLeads.find((p) => p.hardwareKey === subject.point.hardwareKey) ?? null)
+        : null;
+    return stageOptions(subject.point, selected, deployments, own);
+  }, [subject, selected, deployments, officialLeads, unofficialRun]);
   const option = options.find((item) => item.value === against) ?? options[0];
   const other = option?.point ?? null;
   const wantedPoints = [
