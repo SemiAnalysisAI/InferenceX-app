@@ -523,7 +523,7 @@ export default function VideoResultsClips({
                 }))}
                 onValueChange={(value) => {
                   const next = options.find((item) => item.value === value);
-                  track('video_results_compare_changed', {
+                  track('video_results_compare_selected', {
                     against: next?.kind,
                     gpu: next?.point?.hardwareKey ?? null,
                   });
