@@ -324,7 +324,9 @@ export default function VideoResultsChart({
             { value: d.yValue, label: axisLabelUnit(yLabel) },
             {
               value: n(hoverLatency.value(plot.cell, selection), hoverLatency.digits),
-              label: axisLabelUnit(resultsMetricLabel(hoverLatency, locale, clip)),
+              label:
+                hoverLatency.hoverLabel?.[locale] ??
+                axisLabelUnit(resultsMetricLabel(hoverLatency, locale, clip)),
             },
           ],
           summary: [

@@ -228,6 +228,12 @@ describe('VideoGenX results', () => {
     points(overlay).should('not.exist');
   });
 
+  it('names the latency in the zh hover card, where the GPU axis title does not', () => {
+    mount({ pathname: '/zh/vgx', search: '?r_x=gpus&r_y=videosPerGpuHour' });
+    hardwarePoints('b200').first().trigger('mouseenter', { force: true });
+    cy.get('[data-chart-tooltip="video-results-chart"]').should('contain', '中位延迟 (s)');
+  });
+
   it('shows a named unapproved run without an approved cohort and clears it without promotion', () => {
     mount({
       search: '?unofficialrun=34341996789&r_y=videosPerGpuHour',

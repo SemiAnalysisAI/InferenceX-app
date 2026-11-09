@@ -184,7 +184,7 @@ const STRINGS = {
     date: '运行日期',
     xAxis: 'X 轴指标',
     xUnmeasured: '尚未测量',
-    xUnmeasuredMetrics: ['相对无损的质量损失（LPIPS）', 'GPU 峰值显存'],
+    xUnmeasuredMetrics: ['相对无损输出的质量损失（LPIPS）', 'GPU 峰值显存'],
     yAxis: 'Y 轴指标',
     stepsUnit: '步',
     loading: '正在加载视频结果…',

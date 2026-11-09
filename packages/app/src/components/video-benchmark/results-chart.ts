@@ -24,6 +24,8 @@ export interface ResultsChartMetric {
   label: { en: string; zh: string };
   /** The axis title once the plotted clip is known, so a latency names the clip it measures. */
   clipLabel?: (clip: ResultsClip) => { en: string; zh: string };
+  /** Its name under a hover-card value, which no axis title qualifies on the GPU axis. */
+  hoverLabel?: { en: string; zh: string };
   /** Empty when the label already names the unit. */
   unit: string;
   better: 'lower' | 'higher';
@@ -49,6 +51,7 @@ export const RESULTS_X_METRICS: Record<ResultsXMetric, ResultsChartMetric> = {
       en: `Median latency per ${seconds} s clip at ${fps} fps`,
       zh: `生成一段 ${seconds} 秒、${fps} fps 视频的中位延迟`,
     }),
+    hoverLabel: { en: 'Median s', zh: '中位延迟 (s)' },
     unit: 's',
     better: 'lower',
     digits: 1,
@@ -60,6 +63,7 @@ export const RESULTS_X_METRICS: Record<ResultsXMetric, ResultsChartMetric> = {
       en: `P90 latency per ${seconds} s clip at ${fps} fps`,
       zh: `生成一段 ${seconds} 秒、${fps} fps 视频的 P90 延迟`,
     }),
+    hoverLabel: { en: 'P90 s', zh: 'P90 延迟 (s)' },
     unit: 's',
     better: 'lower',
     digits: 1,
