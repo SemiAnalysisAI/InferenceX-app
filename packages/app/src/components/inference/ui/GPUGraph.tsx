@@ -538,9 +538,17 @@ const GPUGraph = React.memo(
             },
             dismissLabel: locale === 'zh' ? '关闭提示' : 'Dismiss notice',
           }),
-          paletteIdentity,
+          `${paletteIdentity}:${[...dismissedNotices].join(',')}`,
         ),
-      [chartId, knownIssueAnnotations, getCssColor, paletteIdentity, dismissNotice, locale],
+      [
+        chartId,
+        knownIssueAnnotations,
+        getCssColor,
+        paletteIdentity,
+        dismissNotice,
+        dismissedNotices,
+        locale,
+      ],
     );
 
     const xExtent = useMemo(() => {
