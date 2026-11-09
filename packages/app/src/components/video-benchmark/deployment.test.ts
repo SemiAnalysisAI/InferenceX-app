@@ -169,11 +169,12 @@ describe('deployment', () => {
     expect(sharedLayoutCells([{ ...base, server: null }])).toEqual([]);
     expect(sharedLayoutCells([{ ...base, concurrency: 2, replicas: 2 }])).toEqual([]);
   });
-  it('pairs a lossy cell only with its own run’s lossless cell on the same engine and layout', () => {
+  it('pairs a lossy cell only with its own run’s lossless cell on the same workload, engine and layout', () => {
     const lossy = { ...base, id: 'lossy', results: results(['cuda-graph', 'first-block-cache']) };
     const twin = { ...base, id: 'twin', results: results(['cuda-graph']) };
     const strangers: VideoPoint[] = [
       { ...twin, id: 'other-run', runId: '2' },
+      { ...twin, id: 'other-workload', workloadKey: 'other' },
       { ...twin, id: 'other-split', server: { tp: 4, ulysses: 1, attention: null } },
       { ...twin, id: 'other-count', participating: 8 },
       { ...twin, id: 'other-engine', results: { ...twin.results!, engine: 'sglang' } },
