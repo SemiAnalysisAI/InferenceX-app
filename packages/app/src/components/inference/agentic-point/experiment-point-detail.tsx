@@ -1,5 +1,7 @@
 'use client';
 
+import { InterTurnGapCard } from './inter-turn-gap-card';
+
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
@@ -243,6 +245,9 @@ export function ExperimentPointDetail({ campaign, runId }: { campaign: string; r
               <div className="grid grid-cols-1 gap-x-8 gap-y-10 lg:grid-cols-2">
                 <SequenceMetricCard metric="isl" timeline={phaseRequests} timelineLoading={false} />
                 <SequenceMetricCard metric="osl" timeline={phaseRequests} timelineLoading={false} />
+                {process.env.NEXT_PUBLIC_WEKA_PREVIEW === '1' && data.interTurnGaps && (
+                  <InterTurnGapCard data={data.interTurnGaps} phase={effectivePhase} />
+                )}
                 <RequestMetricOverTime
                   title={t.interactivity}
                   metric="interactivity"

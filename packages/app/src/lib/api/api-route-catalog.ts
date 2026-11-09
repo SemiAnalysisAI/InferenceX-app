@@ -1275,8 +1275,16 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/lib/benchmarks/inter-turn-gaps.ts',
+    sourceSha256: 'f06d7b6aef15eb873d01b5eb77ec5f7dbe76d4003e4691a9b5cd1c89443efb95',
+    reviewArea: {
+      en: 'Observed inter-turn gap definition, replay/session pairing, phase and invalid-pair exclusions.',
+      zh: '实测轮次间隔定义、回放与会话配对、阶段划分及无效配对排除规则。',
+    },
+  },
+  {
     source: 'src/lib/benchmarks/experiment-point-metrics.ts',
-    sourceSha256: '60cf392fd36cc0767e9e759ab536a53da9056b6d47a7bf79a11320366c0958ec',
+    sourceSha256: '8f6662e028cbb0d5b9d3122f23de537efaa50ab83044baf265f8ba45ff0ae9f5',
     reviewArea: {
       en: 'Experiment per-point metric chart projection, request timeline, nullable server metrics and source series.',
       zh: '实验单点指标图表投影、请求时间线、可空服务器指标与来源序列。',
@@ -1300,7 +1308,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api/experiment-documentation.ts',
-    sourceSha256: 'bf4a2488a327c0d67fd519158f82e2463095074f13434fa8b19606176ddd8916',
+    sourceSha256: 'bb30ec626eaa341ba48eb6b22c88cfe2d562b70aea106d1d8cab51c82b44f0c2',
     reviewArea: {
       en: 'Experiment campaign, string-ID run detail and metric-view contracts, provenance and no-store caching.',
       zh: '实验 campaign、字符串 run ID 详情及指标视图、来源信息与 no-store 缓存约定。',

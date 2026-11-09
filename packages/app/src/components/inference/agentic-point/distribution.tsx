@@ -58,13 +58,19 @@ export function Distribution({
   unit,
   width = 720,
   height = 260,
+  sampleKind = 'requests',
+  formatValue = fmtCount,
 }: {
   values: readonly number[];
   unit: string;
   width?: number;
   height?: number;
+  sampleKind?: 'requests' | 'gaps';
+  formatValue?: (value: number) => string;
 }) {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const sampleLabel = sampleKind === 'gaps' ? (locale === 'zh' ? '个间隔' : 'gaps') : t.requests;
   const W = width;
 
   const computed = useMemo(() => {
@@ -87,7 +93,7 @@ export function Distribution({
   const { counts, edges, lnMin, lnMax } = histogram;
 
   const legendEntries: ChartLegendEntry[] = GUIDES.map(({ label, q, color }) => ({
-    label: `${label} ${fmtCount(quantile(sorted, q))}`,
+    label: `${label} ${formatValue(quantile(sorted, q))}`,
     color,
     swatch: 'dashed-line',
   }));
@@ -112,7 +118,7 @@ export function Distribution({
   const yScale = (c: number) => PAD.top + (1 - Math.min(c, yMax) / yMax) * innerH;
   const barW = innerW / nBins;
 
-  const fmt = fmtCount;
+  const fmt = formatValue;
 
   const resolve = (fraction: number) => {
     const binIdx = Math.min(nBins - 1, Math.max(0, Math.floor(fraction * nBins)));
@@ -135,7 +141,7 @@ export function Distribution({
   return (
     <div className="w-full">
       <div className="mb-2 text-xs text-muted-foreground">
-        {sorted.length.toLocaleString()} {t.requests} · {t.range} {fmt(min)}–{fmt(max)} {unit} ·{' '}
+        {sorted.length.toLocaleString()} {sampleLabel} · {t.range} {fmt(min)}–{fmt(max)} {unit} ·{' '}
         {t.logScale}
       </div>
       <ChartHover pad={pad} width={W} height={H} resolve={resolve}>
@@ -255,7 +261,11 @@ export function Distribution({
       </ChartHover>
       {excluded > 0 && (
         <div className="mt-1 text-xs text-muted-foreground">
-          {t.excluded(excluded.toLocaleString(), unit)}
+          {sampleKind === 'gaps'
+            ? locale === 'zh'
+              ? `${excluded.toLocaleString()} 个零间隔已从对数轴和分位数中排除`
+              : `${excluded.toLocaleString()} zero-length gaps excluded from the log axis and percentiles`
+            : t.excluded(excluded.toLocaleString(), unit)}
         </div>
       )}
     </div>

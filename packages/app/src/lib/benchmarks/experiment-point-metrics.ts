@@ -1,3 +1,4 @@
+import { interTurnGaps, type InterTurnGaps } from './inter-turn-gaps';
 import type { ExperimentRunDetail } from '@semianalysisai/inferencex-db/queries/experiments';
 import { summarizeChartSeries } from '@semianalysisai/inferencex-db/etl/chart-series-summary';
 import type { ChartSeries } from '@semianalysisai/inferencex-db/etl/compute-chart-series';
@@ -19,6 +20,7 @@ export interface ExperimentPointMetricsResponse {
     | 'metrics'
     | 'plot_metrics'
   >;
+  interTurnGaps: InterTurnGaps | null;
   aggregateStats: Record<string, unknown>;
   requestChartData: RequestChartData | null;
   requestTimeline: RequestTimeline | null;
@@ -46,6 +48,8 @@ export function experimentPointMetrics(row: ExperimentRunDetail): ExperimentPoin
       metrics: row.metrics,
       plot_metrics: row.plot_metrics,
     },
+    interTurnGaps:
+      process.env.NEXT_PUBLIC_WEKA_PREVIEW === '1' && hasTimeline ? interTurnGaps(timeline) : null,
     aggregateStats: row.aggregate_stats,
     requestTimeline: hasTimeline ? timeline : null,
     requestChartData: hasTimeline
