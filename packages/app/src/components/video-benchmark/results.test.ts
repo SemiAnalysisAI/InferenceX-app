@@ -333,7 +333,7 @@ describe('VideoGenX results contract', () => {
       apiPrices: { t2v: 0, i2v: 0.1, r2v: null },
       utilization: 0.5,
       unofficialRun: '123',
-      xMetric: 'p50',
+      xMetric: 'gpus',
       yMetric: 'kjPerClip',
       costBasis: 'participating',
       optimal: false,
@@ -341,7 +341,7 @@ describe('VideoGenX results contract', () => {
     };
     expect(
       parseResultsState(
-        'r_model=MiniMaxAI%2FMiniMax-H3&r_workload=selected-source%3Ac1&r_resolution=1344%C3%97768&r_duration=8&r_mode=t2v&r_steps=50&r_gpus=4&r_engine=sglang&r_date=2026-10-18&r_run=456&r_configs=b200%3A4g%3Atp2%3Au2&r_from=2026-09-01&r_to=2026-10-18&r_hidden=mi355x&r_deadline=60&r_tier=r&r_api=0.02&r_price_t2v=0&r_price_i2v=0.1&r_utilization=0.5&unofficialrun=123&r_x=p90&r_y=kjPerClip&r_basis=allocated&r_optimal=0&r_point=123%3Aselected-source%3Ac1',
+        'r_model=MiniMaxAI%2FMiniMax-H3&r_workload=selected-source%3Ac1&r_resolution=1344%C3%97768&r_duration=8&r_mode=t2v&r_steps=50&r_gpus=4&r_engine=sglang&r_date=2026-10-18&r_run=456&r_configs=b200%3A4g%3Atp2%3Au2&r_from=2026-09-01&r_to=2026-10-18&r_hidden=mi355x&r_deadline=60&r_tier=r&r_api=0.02&r_price_t2v=0&r_price_i2v=0.1&r_utilization=0.5&unofficialrun=123&r_x=gpus&r_y=kjPerClip&r_basis=allocated&r_optimal=0&r_point=123%3Aselected-source%3Ac1',
       ),
     ).toEqual(selection);
     expect(parseResultsState(resultsSearch(selection))).toEqual(selection);
@@ -352,7 +352,7 @@ describe('VideoGenX results contract', () => {
     expect(shared.get('r_price_t2v')).toBe('0');
     expect(shared.get('r_price_i2v')).toBe('0.1');
     expect(shared.has('r_price_r2v')).toBe(false);
-    for (const key of ['r_gpus', 'r_x', 'r_basis']) expect(shared.has(key)).toBe(false);
+    for (const key of ['r_gpus', 'r_basis']) expect(shared.has(key)).toBe(false);
     expect(parseResultsState('r_compare=1&r_lossy=1')).toMatchObject({
       compareEngines: true,
       lossy: true,

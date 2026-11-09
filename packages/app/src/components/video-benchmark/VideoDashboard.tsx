@@ -28,7 +28,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
-import { SearchableSelect } from '@/components/ui/searchable-select';
+import { SearchableSelect, type SearchableSelectGroup } from '@/components/ui/searchable-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
@@ -53,6 +53,8 @@ import {
 import {
   chartedCells,
   comparesEngines,
+  plottedXMetric,
+  RESULTS_X_METRIC_KEYS,
   RESULTS_X_METRICS,
   RESULTS_Y_METRIC_KEYS,
   RESULTS_Y_METRICS,
@@ -105,6 +107,9 @@ const STRINGS = {
       confirm: 'I agree, show both',
     },
     date: 'Run date',
+    xAxis: 'X-axis metric',
+    xUnmeasured: 'Not measured yet',
+    xUnmeasuredMetrics: ['Quality loss vs lossless (LPIPS)', 'Peak GPU memory'],
     yAxis: 'Y-axis metric',
     stepsUnit: 'steps',
     loading: 'Loading video results…',
@@ -177,6 +182,9 @@ const STRINGS = {
       confirm: '我同意，同时显示',
     },
     date: '运行日期',
+    xAxis: 'X 轴指标',
+    xUnmeasured: '尚未测量',
+    xUnmeasuredMetrics: ['相对无损的质量损失（LPIPS）', 'GPU 峰值显存'],
     yAxis: 'Y 轴指标',
     stepsUnit: '步',
     loading: '正在加载视频结果…',
@@ -220,6 +228,36 @@ const STRINGS = {
   },
 };
 const subscribe = () => () => {};
+
+function MetricSelect({
+  id,
+  label,
+  value,
+  groups,
+  onValueChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  groups: SearchableSelectGroup[];
+  onValueChange: (value: string) => void;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <SearchableSelect
+        triggerId={id}
+        triggerTestId={id}
+        value={value}
+        onValueChange={onValueChange}
+        groups={groups}
+        placeholder={label}
+        searchable={false}
+      />
+    </div>
+  );
+}
+
 /** Marks a history entry this page pushed for a detail, so in-page Back pops it even after reload or Forward. */
 const DETAIL_ENTRY = 'videoResultsDetail';
 const onDetailEntry = () =>
@@ -466,30 +504,11 @@ export default function VideoDashboard({
           }))
         : [{ key, label: hardwareLabel(key), color: colorFor(key), value: null, secondary: null }];
     });
-  const metricSelector = () => {
-    const label = s.yAxis;
-    const id = 'results-y-metric';
-    const choices = RESULTS_Y_METRIC_KEYS.map((metric) => ({
-      value: metric,
-      label: resultsMetricLabel(RESULTS_Y_METRICS[metric], locale),
-    }));
-    return (
-      <div className="flex min-w-0 flex-col gap-1.5">
-        <Label htmlFor={id}>{label}</Label>
-        <SearchableSelect
-          triggerId={id}
-          triggerTestId={id}
-          value={state.yMetric}
-          onValueChange={(value) => update({ yMetric: value as ResultsState['yMetric'] })}
-          groups={[{ label: '', options: choices }]}
-          placeholder={label}
-          searchable={false}
-        />
-      </div>
-    );
-  };
+  const chipHistory = compareConfigs.length > 0;
+  const xMetric = plottedXMetric(state.xMetric, chipHistory);
   const apiUrl = `/api/v1/views/video?view=overview&${resultsSearch(state)}`;
   const secondaryChanged = [
+    state.xMetric !== DEFAULT_RESULTS_STATE.xMetric,
     state.yMetric !== DEFAULT_RESULTS_STATE.yMetric,
     state.engine !== null || state.compareEngines,
     state.date !== null || state.run !== null,
@@ -502,7 +521,7 @@ export default function VideoDashboard({
       <Heading as="h2" level="card" id="video-results-chart-title">
         {model} · {RESULTS_Y_METRICS[state.yMetric].label[locale]}
         <HeadingQualifier>
-          {s.vs} {RESULTS_X_METRICS[state.xMetric].label[locale]}
+          {s.vs} {RESULTS_X_METRICS[xMetric].label[locale]}
         </HeadingQualifier>
       </Heading>
     </div>
@@ -578,7 +597,57 @@ export default function VideoDashboard({
                     className={styles.chartConfig}
                     data-testid="results-chart-config"
                   >
-                    {metricSelector()}
+                    <MetricSelect
+                      id="results-x-metric"
+                      label={s.xAxis}
+                      value={xMetric}
+                      groups={[
+                        {
+                          label: '',
+                          options: RESULTS_X_METRIC_KEYS.filter(
+                            (metric) => plottedXMetric(metric, chipHistory) === metric,
+                          ).map((metric) => ({
+                            value: metric,
+                            label: resultsMetricLabel(RESULTS_X_METRICS[metric], locale),
+                          })),
+                        },
+                        {
+                          label: s.xUnmeasured,
+                          heading: (
+                            <span data-testid="results-x-unmeasured">
+                              {s.xUnmeasured}
+                              {s.xUnmeasuredMetrics.map((metric) => (
+                                <span key={metric} className="mt-1 block font-normal opacity-70">
+                                  {metric}
+                                </span>
+                              ))}
+                            </span>
+                          ),
+                          options: [],
+                        },
+                      ]}
+                      onValueChange={(value) => {
+                        track('video_results_x_metric_selected', { metric: value });
+                        update({ xMetric: value as ResultsState['xMetric'] });
+                      }}
+                    />
+                    <MetricSelect
+                      id="results-y-metric"
+                      label={s.yAxis}
+                      value={state.yMetric}
+                      groups={[
+                        {
+                          label: '',
+                          options: RESULTS_Y_METRIC_KEYS.map((metric) => ({
+                            value: metric,
+                            label: resultsMetricLabel(RESULTS_Y_METRICS[metric], locale),
+                          })),
+                        },
+                      ]}
+                      onValueChange={(value) =>
+                        update({ yMetric: value as ResultsState['yMetric'] })
+                      }
+                    />
                     {(options.engines.length > 1 || state.engine !== null) && (
                       <div className="flex min-w-0 flex-col gap-1.5">
                         <LabelWithTooltip label={s.engine} tooltip={s.engineHelp} />
