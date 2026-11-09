@@ -60,6 +60,8 @@ it('keeps playing when the prime from the play gesture settles after the buffere
         points={[point]}
         initialSides={{ [videoClipSourceKey(point)]: publishedResultsSide(fixture.stored, point) }}
         colorFor={() => 'black'}
+        against="reference"
+        onAgainstChange={() => {}}
       />,
     ),
   );

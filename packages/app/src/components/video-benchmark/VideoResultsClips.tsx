@@ -159,6 +159,12 @@ export interface VideoResultsClipsProps {
   initialSides?: VideoInitialData['sides'];
   /** The chart points the two sides play, for the chart's Playing and Baseline badges. */
   onPairChange?: (pair: StagePair) => void;
+  /**
+   * `StageOption.value` the reader picked; one the subject lacks shows the reference. Page state,
+   * so "See what changes" in the chart legend can pick the lossless twin.
+   */
+  against: string;
+  onAgainstChange: (value: string) => void;
   /** Under the readout rows; the quality explainer fills it. */
   readoutFooter?: ReactNode;
 }
@@ -178,6 +184,8 @@ export default function VideoResultsClips({
   unofficialRun,
   initialSides = {},
   onPairChange,
+  against,
+  onAgainstChange,
   readoutFooter,
 }: VideoResultsClipsProps) {
   const s = STRINGS[useLocale()];
@@ -188,8 +196,6 @@ export default function VideoResultsClips({
     [points],
   );
   const picked = stage.clip ? drawn.find((p) => stagePointKey(p) === stage.clip) : undefined;
-  /** `StageOption.value` the reader picked; one the subject lacks shows the reference. */
-  const [against, setAgainst] = useState('reference');
   const cache = useRef(new Map<string, ResultsClipSide | null>(Object.entries(initialSides)));
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -470,7 +476,7 @@ export default function VideoResultsClips({
                     against: next?.kind,
                     gpu: next?.point?.hardwareKey ?? null,
                   });
-                  setAgainst(value);
+                  onAgainstChange(value);
                 }}
               />
             </div>

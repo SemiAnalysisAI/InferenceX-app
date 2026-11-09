@@ -61,6 +61,8 @@ it.each([true, false])(
             points={[point]}
             initialSides={{ [videoClipSourceKey(point)]: available ? side : null }}
             colorFor={() => 'black'}
+            against="reference"
+            onAgainstChange={() => {}}
           />
         </>
       );
@@ -127,7 +129,14 @@ it('shows a newly read clip while another selected source is still pending', asy
   document.body.append(container);
   await act(async () => {
     root = createRoot(container!);
-    root.render(<VideoResultsClips points={points} colorFor={() => 'black'} />);
+    root.render(
+      <VideoResultsClips
+        points={points}
+        colorFor={() => 'black'}
+        against="reference"
+        onAgainstChange={() => {}}
+      />,
+    );
     await Promise.resolve();
   });
   expect(container.querySelectorAll('video')).toHaveLength(1);
@@ -158,7 +167,14 @@ it('shows the loading state on both sides while the subject is read', () => {
   document.body.append(container);
   act(() => {
     root = createRoot(container!);
-    root.render(<VideoResultsClips points={[point]} colorFor={() => 'black'} />);
+    root.render(
+      <VideoResultsClips
+        points={[point]}
+        colorFor={() => 'black'}
+        against="reference"
+        onAgainstChange={() => {}}
+      />,
+    );
   });
   for (const side of ['a', 'b'])
     expect(container.querySelector(`[data-side="${side}"]`)?.textContent).toContain(

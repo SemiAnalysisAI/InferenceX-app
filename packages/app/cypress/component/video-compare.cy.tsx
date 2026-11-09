@@ -257,6 +257,7 @@ function mountResultsClips(
   const selectedPoints = leads ?? keys.map(c1);
   function Clips() {
     const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
+    const [against, setAgainst] = useState('reference');
     return (
       <PathnameContext.Provider value={pathname}>
         <button onClick={() => setHidden(hidden.size > 0 ? new Set() : new Set(['b200']))}>
@@ -273,6 +274,8 @@ function mountResultsClips(
             ...costs,
           }}
           unofficialRun={unofficialRun}
+          against={against}
+          onAgainstChange={setAgainst}
         />
       </PathnameContext.Provider>
     );

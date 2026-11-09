@@ -287,6 +287,8 @@ export default function VideoDashboard({
   const [legendExpanded, setLegendExpanded] = useState(true);
   /** The chart points the clip stage plays, which the chart badges. */
   const [stagePair, setStagePair] = useState<StagePair>({ playing: null, baseline: null });
+  /** What the stage compares its subject with, by `StageOption.value`. */
+  const [against, setAgainst] = useState('reference');
   const onStagePair = useCallback(
     (pair: StagePair) =>
       setStagePair((previous) =>
@@ -943,6 +945,8 @@ export default function VideoDashboard({
               deployments={deploymentPoints}
               officialLeads={officialClipPoints}
               onPairChange={onStagePair}
+              against={against}
+              onAgainstChange={setAgainst}
               colorFor={colorFor}
               costs={clipCosts}
               unofficialRun={state.unofficialRun ?? undefined}

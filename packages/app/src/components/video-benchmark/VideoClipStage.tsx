@@ -27,7 +27,7 @@ import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 import { clipGroupActive, frameAt, frameClock } from './clip-sync';
-import type { StageView } from './clip-stage';
+import { STAGE_ID, type StageView } from './clip-stage';
 import { absoluteFrameDifference } from './results-clips';
 import { useClipGroup } from './use-clip-group';
 
@@ -455,7 +455,7 @@ export default function VideoClipStage({
   );
 
   return (
-    <div className="min-w-0 space-y-3">
+    <div id={STAGE_ID} className="min-w-0 scroll-mt-24 space-y-3">
       <div
         data-testid="video-results-stage"
         data-view={view}

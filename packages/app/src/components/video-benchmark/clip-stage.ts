@@ -48,6 +48,17 @@ export function writeStage(state: StageState) {
   replaceClientSearch(stageSearch(state, window.location.search));
 }
 
+/** Element id of the stage and its transport. */
+export const STAGE_ID = 'comparison-stage';
+
+/** Plays `point` on the stage in Wipe, then scrolls the stage into view once it has rendered. */
+export function showOnStage(point: VideoPoint) {
+  writeStage({ ...parseStage(window.location.search), clip: stagePointKey(point), view: 'wipe' });
+  requestAnimationFrame(() =>
+    document.querySelector(`#${STAGE_ID}`)?.scrollIntoView({ block: 'nearest' }),
+  );
+}
+
 /** A prompt's URL id: its case id, `~take` after the first take, `diag:` for the matched-noise rerun. */
 export function promptKey(group: ResultsClipGroup): string {
   const caseId = [...group.clips.values()][0]?.record.caseId ?? '';
