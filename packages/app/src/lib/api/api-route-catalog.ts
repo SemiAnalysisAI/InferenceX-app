@@ -1560,7 +1560,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results.ts',
-    sourceSha256: 'eeb33ba30b339221da30938341f8347df7451bdeb625b31f053ac4d5730049f6',
+    sourceSha256: '40d257c6cb14ebc7b252e12eb40bd3cb856428370228efdd39b425e6a317720b',
     reviewArea: {
       en: 'Shared VideoGenX results selectors, sample admission, dual GPU cost bases and modelled profit.',
       zh: 'VideoGenX 结果页共用的筛选、样本准入、两种 GPU 成本口径及估算利润。',
@@ -1648,7 +1648,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-clips.ts',
-    sourceSha256: '6f8205a834e6b2dda0f0b609ea175dbad18daa189eed9ed106e29771b6decf03',
+    sourceSha256: 'e236ca3ac18f6722d4b0816b177c829ecc4d18daf33904a99073e6e14f73cc0f',
     reviewArea: {
       en: 'Exact candidate/reference pairing, unscored reasons and per-clip quality projection shared by Results and the overview API, including PSNR without media for an unstored named run.',
       zh: 'Results 与 overview API 共用的精确候选/参考配对、未评分原因及逐条质量投影，包括未存储的指定运行在无媒体时的 PSNR。',
@@ -1712,7 +1712,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/deployment.ts',
-    sourceSha256: 'e95c5d2785b60ca717e76aca8bdce717fca478789fb87cd4ca831317863c7d68',
+    sourceSha256: 'cd3e9ce61fe83a07a7429b790905597dab229a498e190ad65b5d57633f8f6bfc',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',

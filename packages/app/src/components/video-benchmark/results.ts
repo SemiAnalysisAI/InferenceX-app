@@ -557,9 +557,11 @@ export function resultProjection(
       modes: values(metadata.map((m) => m.mode)),
       steps: values(metadata.map((m) => m.steps)),
       gpuCounts: values(available.map((p) => p.participating)),
-      engines: values(metadata.map((m) => m.engine)).toSorted(
-        (a, b) => engineSort(a) - engineSort(b),
-      ),
+      // The selected workload's engines, before the engine filter: another workload's
+      // engine would offer a choice this cohort cannot show.
+      engines: values(
+        available.filter((p) => p.workloadKey === workloadKey).map((p) => resultMetadata(p).engine),
+      ).toSorted((a, b) => engineSort(a) - engineSort(b)),
       dates: values(runs.map((r) => r.date)),
       workloads: [...workloads.values()]
         .filter((w) => !state.model || w.model === state.model)

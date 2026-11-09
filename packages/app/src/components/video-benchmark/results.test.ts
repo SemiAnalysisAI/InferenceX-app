@@ -401,6 +401,12 @@ describe('VideoGenX results contract', () => {
       participating: null,
       allocated: null,
     });
+    // An engine only another workload measured is no choice for this cohort.
+    const sol = { ...c, id: 'fourth:c1', results: evidence({ engine: 'sol-engine' }) };
+    expect(resultProjection([a, b, c, sol], state()).options.engines).toEqual([
+      'sglang',
+      'vllm-omni',
+    ]);
   });
   it('offers each engine as its own chip config and ignores a key from before engines', () => {
     const b200 = (id: string, engine: string) => ({
