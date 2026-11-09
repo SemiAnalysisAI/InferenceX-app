@@ -199,7 +199,7 @@ const STRINGS = {
     seconds: 's',
     compareWith: '对比',
     lossless: '无损',
-    twin: (hardware: string) => `${hardware} 无损版`,
+    twin: (hardware: string) => `${hardware} 无损对照`,
     noTwin: '该运行中没有引擎和服务器布局都相同的无损配置。',
   },
 };
