@@ -1160,10 +1160,12 @@ describe('ScatterGraph', () => {
       expect(panel.getBoundingClientRect().bottom, 'panel ends within the plot row').to.be.at.most(
         Math.max(svg.bottom, row.getBoundingClientRect().bottom) + 1,
       );
-      expect(panel.scrollHeight, 'details overflow').to.be.greaterThan(panel.clientHeight);
-      expect(getComputedStyle(panel).overflowY).to.equal('auto');
+      const body = panel.querySelector<HTMLElement>('[data-slot="point-details-body"]')!;
+      expect(body.scrollHeight, 'details overflow').to.be.greaterThan(body.clientHeight);
+      expect(getComputedStyle(body).overflowY).to.equal('auto');
+      expect(panel.scrollHeight, 'panel itself does not scroll').to.equal(panel.clientHeight);
     });
-    cy.get(`#${chartId} [data-testid="point-details-panel"]`).scrollTo('bottom');
+    cy.get(`#${chartId} [data-slot="point-details-body"]`).scrollTo('bottom');
     cy.get(`#${chartId} [data-testid="point-details-close"]`).should('be.visible').click();
     cy.get(`#${chartId} [data-testid="point-details-panel"]`).should('not.exist');
   });

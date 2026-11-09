@@ -173,8 +173,9 @@ Wrap tooltip HTML with `chartTooltipShell(body, options)` from `src/lib/d3-chart
 
 Beside a desktop legend, pinned details take the legend's slot at the legend's
 width and the plot's height; elsewhere they are capped at 24rem. Longer details
-scroll inside the panel with the title and close button kept in view, so pinning
-a point never grows the chart row. This is presentation-only with no API or
+scroll between a fixed header (warning, title and close button) and a fixed
+action row, so links such as the run, charts and logs stay visible and pinning a
+point never grows the chart row. The latency table shows median and P90 only. This is presentation-only with no API or
 `inferencex-skills` contract changes.
 
 Pinned details close on clicks outside the chart SVG, the tooltip and the
