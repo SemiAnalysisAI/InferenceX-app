@@ -1568,7 +1568,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-chart.ts',
-    sourceSha256: 'b979a1e8f27fcb4c52d53891a39732db3a893bf782766136404cd347d51073cf',
+    sourceSha256: '3643a1e3c3557a10c4c01545ebac189063ae9a9eb9d574efef60d8f30de276c3',
     reviewArea: {
       en: 'VideoGenX results chart axes, accepted r_x/r_y metric keys, GPU basis and deployment detail key.',
       zh: 'VideoGenX 结果图表的坐标轴、r_x/r_y 可接受的指标键、GPU 口径及部署详情键。',

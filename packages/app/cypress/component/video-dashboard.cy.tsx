@@ -64,6 +64,9 @@ const openPoint = (hardware: string, overlay = false) => {
     .click({ force: true });
   cy.get('[data-testid="point-details-panel"] [data-action="view-telemetry"]').click();
 };
+const playing = () => points('[data-clip-role="playing"]');
+const stagePill = (side: 'a' | 'b') =>
+  cy.get(`[data-side="${side}"] [data-testid="video-results-pill"]`);
 const toggleHardware = (hardware: string) => cy.get(`label[for="checkbox-${hardware}"]`).click();
 const chooseEngine = (label: string) =>
   cy.get('[data-testid="results-engine"]').contains('button', label).click();
@@ -623,6 +626,55 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="video-results-detail"]').should('not.exist');
     cy.go('forward');
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
+  });
+
+  it('plays a clicked point on the clip stage, keeping its details pinned', () => {
+    const namedRun = '90000000002';
+    mount({
+      search: `?unofficialrun=${namedRun}&r_y=videosPerGpuHour`,
+      editPage: (page) => {
+        const named = structuredClone(page.entries.find((entry) => entry.runId === '34341996789')!);
+        named.runId = namedRun;
+        named.artifact.id = 99992;
+        named.approved = false;
+        page.entries.unshift(named);
+        // Stored runs may have clips; H100's runs stand in for a live run without media.
+        for (const entry of page.entries)
+          if (!['34336635063', '34344378350'].includes(entry.runId))
+            entry.publishedAt = '2026-11-01T00:00:00.000Z';
+      },
+    });
+    playing().should('have.length', 1).and('have.attr', 'data-overlay', 'true');
+    hardwarePoints('h200').find('.visible-shape').click({ force: true });
+    playing().should('have.attr', 'data-hardware', 'h200');
+    stagePill('a').should('contain', 'H200');
+    searchParam('r_clip').should('match', /^34342452354:/u);
+    // The stage switch redraws the chart without closing the panel the click pinned.
+    cy.get('[data-testid="point-details-panel"]').should('contain', 'H200');
+
+    hardwarePoints('h100').should('have.attr', 'data-clips', 'false');
+    hardwarePoints('h100').find('.visible-shape').should('have.css', 'stroke-width', '1.5px');
+    hardwarePoints('h100').find('.visible-shape').click({ force: true });
+    cy.get('[data-testid="point-details-panel"]')
+      .should('contain', 'H100')
+      .find('[data-action="compare-below"]')
+      .should('not.exist');
+    playing().should('have.attr', 'data-hardware', 'h200');
+    searchParam('r_clip').should('match', /^34342452354:/u);
+
+    cy.get('[data-testid="video-results-compare-b200"]').click();
+    stagePill('b').should('contain', 'B200').and('contain', 'Unofficial run');
+    points('[data-clip-role="baseline"]').should('have.attr', 'data-overlay', 'true');
+
+    points('[data-hardware="b200"][data-overlay="true"] .visible-shape').click({ force: true });
+    playing().should('have.attr', 'data-overlay', 'true');
+    cy.get('[data-testid="video-results-chart"] [data-clip-badge="playing"] rect').should(
+      'have.attr',
+      'fill',
+      overlayRunColor(0),
+    );
+    stagePill('a').should('contain', 'Unofficial run');
+    searchParam('r_clip').should('match', new RegExp(`^${namedRun}:`, 'u'));
   });
 
   it('falls back to the overview for an unknown or hidden deployment and drops its key', () => {

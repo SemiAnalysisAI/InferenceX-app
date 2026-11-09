@@ -60,6 +60,7 @@ import {
   RESULTS_Y_METRICS,
   resultsChartSeries,
   resultsMetricLabel,
+  resultsPlotSeries,
   resultsPointKey,
   resultsSelection,
 } from './results-chart';
@@ -67,10 +68,10 @@ import { optimizationsOf, runtimeLabel } from './optimizations';
 import { EngineComparisonConfirmation } from '@/components/inference/ui/engine-comparison-confirmation';
 import { useEngineComparisonConsent } from '@/components/inference/hooks/use-engine-comparison-consent';
 import VideoDeploymentDetail from './VideoDeploymentDetail';
-import VideoResultsChart, { VIDEO_RESULTS_CHART_ID } from './VideoResultsChart';
+import VideoResultsChart, { VIDEO_RESULTS_CHART_ID, type ClipLink } from './VideoResultsChart';
 import VideoCostContext from './VideoCostContext';
 import VideoResultsClips from './VideoResultsClips';
-import { isStageParam } from './clip-stage';
+import { isStageParam, parseStage, writeStage, type StagePair } from './clip-stage';
 import { resultsClipPoints } from './results-clips';
 import { ResultsBars, resultsNumber as n, type ResultBar } from './VideoResultsCharts';
 import VideoHistory from './VideoHistory';
@@ -81,7 +82,7 @@ const STRINGS = {
     advanced: 'Advanced',
     title: 'VideoGenX',
     description:
-      'Serving latency, cost and energy for one matched 20-clip video workload across hardware. Click a point to pin its measurements; View telemetry opens that deployment.',
+      'Serving latency, cost and energy for one matched 20-clip video workload across hardware. Click a point to pin its measurements and play its clips below; hollow points have no clips. View telemetry opens that deployment.',
     chartConfig: 'Chart config',
     runContext: 'Run context',
     compareHistory: 'Compare history',
@@ -157,7 +158,7 @@ const STRINGS = {
     advanced: '高级选项',
     title: 'VideoGenX',
     description:
-      '在同一组匹配的 20 条视频工作负载上，比较各硬件的服务延迟、成本与能耗。点击数据点可固定显示其测量值，再点击“查看遥测”打开对应部署。',
+      '在同一组匹配的 20 条视频工作负载上，比较各硬件的服务延迟、成本与能耗。点击数据点可固定显示其测量值，并在下方播放其视频；空心点没有视频。点击“查看遥测”可打开对应部署。',
     chartConfig: '图表配置',
     runContext: '运行信息',
     compareHistory: '对比历史趋势',
@@ -284,6 +285,24 @@ export default function VideoDashboard({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [labels, setLabels] = useState(true);
   const [legendExpanded, setLegendExpanded] = useState(true);
+  /** The chart points the clip stage plays, which the chart badges. */
+  const [stagePair, setStagePair] = useState<StagePair>({ playing: null, baseline: null });
+  const onStagePair = useCallback(
+    (pair: StagePair) =>
+      setStagePair((previous) =>
+        previous.playing === pair.playing && previous.baseline === pair.baseline ? previous : pair,
+      ),
+    [],
+  );
+  const clipLink = useMemo<ClipLink>(
+    () => ({
+      ...stagePair,
+      onSelect: (key) => writeStage({ ...parseStage(location.search), clip: key }),
+      onReveal: () =>
+        document.querySelector('#comparison-clips')?.scrollIntoView({ block: 'nearest' }),
+    }),
+    [stagePair],
+  );
   const overviewScroll = useRef(0);
   const pendingAnchor = useRef<string | null>(null);
   useEffect(() => {
@@ -488,13 +507,8 @@ export default function VideoDashboard({
       return first ? [first] : [];
     }),
   );
+  // A lossy named run owns its clip without leading a card.
   const clipPoints = resultsClipPoints(charted, { tier: state.costTier });
-  // A clip takes its run's color; a lossy named run owns its clip without leading a card.
-  const overlayClips = new Set(
-    charted
-      .filter((c) => c.overlay && clipPoints.includes(c.point))
-      .map((c) => c.point.hardwareKey),
-  );
   const profitBars: ResultBar[] = roster
     .filter((key) => !hidden.has(key))
     .flatMap((key) => {
@@ -511,6 +525,18 @@ export default function VideoDashboard({
     });
   const chipHistory = compareConfigs.length > 0;
   const xMetric = plottedXMetric(state.xMetric, chipHistory);
+  // The stage plays only a point the chart draws; a lossy one finds its twin among every deployment.
+  const drawnPoints = useMemo(
+    () =>
+      resultsPlotSeries(deploymentCells, chipHistory ? projection.history : null, state)
+        .filter((item) => !hidden.has(item.hardwareKey))
+        .flatMap((item) => item.points.map(({ cell }) => cell.point)),
+    [deploymentCells, chipHistory, projection.history, state, hidden],
+  );
+  const deploymentPoints = useMemo(
+    () => [...deploymentCells, ...projection.history].map((cell) => cell.point),
+    [deploymentCells, projection.history],
+  );
   const apiUrl = `/api/v1/views/video?view=overview&${resultsSearch(state)}`;
   const secondaryChanged = [
     state.xMetric !== DEFAULT_RESULTS_STATE.xMetric,
@@ -881,6 +907,7 @@ export default function VideoDashboard({
                 onLegendExpandedChange={setLegendExpanded}
                 onUpdate={updateSeries}
                 onOpen={openPoint}
+                clipLink={clipLink}
                 heading={heading}
                 footer={
                   <VideoCostContext
@@ -901,7 +928,10 @@ export default function VideoDashboard({
             <VideoResultsClips
               initialSides={initialData?.sides}
               points={clipPoints}
-              colorFor={(key) => (overlayClips.has(key) ? overlayRunColor(0) : colorFor(key))}
+              drawn={drawnPoints}
+              deployments={deploymentPoints}
+              onPairChange={onStagePair}
+              colorFor={colorFor}
               costs={Object.fromEntries(
                 cells.map((c) => [
                   c.point.id,

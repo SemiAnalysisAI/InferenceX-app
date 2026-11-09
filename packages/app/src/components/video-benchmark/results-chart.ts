@@ -338,6 +338,21 @@ export function resultsChartSeries(
 }
 
 /**
+ * The series the results chart plots: Chip config runs when `history` is set, else the
+ * deployments. Hidden hardware stays in, so the legend can still name its engines.
+ */
+export const resultsPlotSeries = (
+  cells: readonly ResultCell[],
+  history: readonly ResultCell[] | null,
+  state: ResultsState,
+): ResultsChartSeries[] =>
+  (history ? resultsHistorySeries : resultsChartSeries)(history ?? cells, {
+    ...resultsSelection(state),
+    x: plottedXMetric(state.xMetric, history !== null),
+    hidden: [],
+  });
+
+/**
  * Ranks the cells the axis can place on `rankOn`, then moves each point to its
  * attribute value. A deployment the axis cannot place never ranks, so it cannot
  * dominate a sibling and then vanish.
