@@ -81,15 +81,15 @@ GPUs on a log scale, ticked at the measured counts. A GPU count describes a depl
 rather than measuring it, so its registry entry sets `rankOn: 'p50'`: each series keeps
 its median-latency frontier, and Optimal only and the Best engine match the median-latency
 view. A deployment without a recorded GPU count cannot be placed on that axis, so it does
-not rank there either. Point labels name GPU counts, so that axis hides them. Its hover card shows median
-latency in place of the GPU count already in the summary, and the details panel lists
-each latency not on the axis. Chip config history fixes every deployment's GPU count, so
-it offers only the latencies and plots median latency while `r_x=gpus` stays in the URL.
-Quality loss against lossless output (LPIPS) and peak GPU memory appear under "Not
-measured yet" and cannot be selected until that data exists. Named-run overlays use the
-same series and axes. A selection records `video_results_x_metric_selected`.
+not rank there either. Point labels name GPU counts, so that axis hides them. Its hover
+card shows median latency in place of the GPU count already in the summary, and the
+details panel lists each latency not on the axis. Chip config history fixes every
+deployment's GPU count, so it offers only the latencies and plots median latency while
+`r_x=gpus` stays in the URL. Quality loss against lossless output (LPIPS) and peak GPU
+memory appear under "Not measured yet" and cannot be selected until that data exists.
+Named-run overlays use the same series and axes.
 
-中文：图表配置中的 X 轴指标（`r_x`）可选单条视频中位延迟（`p50`，默认）、P90 延迟（`p90`）或每个部署的 GPU 数（`gpus`）。GPU 坐标轴按对数刻度绘制参与计算的 GPU 数，刻度只标在实测的数量上。GPU 数是部署的属性而不是测量值，因此注册表为它设置 `rankOn: 'p50'`：每组曲线沿用中位延迟下的 Pareto 前沿，「仅最优」和「最优」引擎与中位延迟视图一致。未记录 GPU 数的部署无法放到该坐标轴上，因此也不参与该坐标轴上的排名。数据点标签本来就写着 GPU 数，所以该坐标轴不显示标签；悬停卡片改为显示中位延迟，详情面板列出不在坐标轴上的各项延迟。芯片配置历史中每个部署的 GPU 数固定不变，因此只提供延迟选项并绘制中位延迟，URL 中仍保留 `r_x=gpus`。相对无损输出的质量损失（LPIPS）和 GPU 峰值显存列在“尚未测量”下，有数据之前不能选择。叠加运行使用同一套曲线和坐标轴。选择指标时记录 `video_results_x_metric_selected` 事件。
+中文：图表配置中的 X 轴指标（`r_x`）可选单条视频中位延迟（`p50`，默认）、P90 延迟（`p90`）或每个部署的 GPU 数（`gpus`）。GPU 坐标轴按对数刻度绘制参与计算的 GPU 数，刻度只标在实测的数量上。GPU 数是部署的属性而不是测量值，因此注册表为它设置 `rankOn: 'p50'`：每组曲线沿用中位延迟下的 Pareto 前沿，「仅最优」和「最优」引擎与中位延迟视图一致。未记录 GPU 数的部署无法放到该坐标轴上，因此也不参与该坐标轴上的排名。数据点标签本来就写着 GPU 数，所以该坐标轴不显示标签；悬停卡片改为显示中位延迟，详情面板列出不在坐标轴上的各项延迟。芯片配置历史中每个部署的 GPU 数固定不变，因此只提供延迟选项并绘制中位延迟，URL 中仍保留 `r_x=gpus`。相对无损输出的质量损失（LPIPS）和 GPU 峰值显存列在“尚未测量”下，有数据之前不能选择。叠加运行使用同一套曲线和坐标轴。
 
 ## Layout
 

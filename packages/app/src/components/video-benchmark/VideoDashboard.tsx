@@ -626,10 +626,9 @@ export default function VideoDashboard({
                           options: [],
                         },
                       ]}
-                      onValueChange={(value) => {
-                        track('video_results_x_metric_selected', { metric: value });
-                        update({ xMetric: value as ResultsState['xMetric'] });
-                      }}
+                      onValueChange={(value) =>
+                        update({ xMetric: value as ResultsState['xMetric'] })
+                      }
                     />
                     <MetricSelect
                       id="results-y-metric"
