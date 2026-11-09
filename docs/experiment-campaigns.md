@@ -23,6 +23,8 @@ Vercel environment overrides are preview-only and scoped to this Git branch:
 
 Credentials are deployment secrets and are not recorded here. These overrides must not replace production or other preview environments. The child retains inherited published data while the separate experiment tables store this campaign; its API does not read local artifact paths at runtime.
 
+On this isolated preview, `/infx/inference/kimi-k3` (and its `/zh` sibling) temporarily redirects to the latest three-hour campaign when no `experiment` selector is supplied. It defaults to normalized throughput with both series and all measurements visible. The redirect is enabled only by the preview's exact cache namespace. Explicit campaign links remain unchanged. The experiment client refetches on mount and window focus; its API remains no-store.
+
 The chart adapter uses a common comparison date to keep experimental repetitions together; tooltips retain each source measurement's actual date. The raw API preserves `configuration.date`, while published reference points retain their original source date. This display grouping does not change the measurements or their provenance.
 
 ## Database refresh — November 9, 2026

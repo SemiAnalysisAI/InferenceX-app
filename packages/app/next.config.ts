@@ -69,6 +69,15 @@ const nextConfig: NextConfig = {
   skipTrailingSlashRedirect: true,
   redirects() {
     return Promise.resolve([
+      // Only the isolated WEKA preview defaults its Kimi page to this campaign.
+      ...(process.env.CACHE_NAMESPACE === 'weka-amg-kimi-k3-20261109'
+        ? LOCALE_PREFIXES.map((prefix) => ({
+            source: `${prefix}/infx/inference/kimi-k3`,
+            missing: [{ type: 'query' as const, key: 'experiment' }],
+            destination: `${prefix}/infx/inference/kimi-k3?experiment=weka-amg-kimi-k3-latest-3h&i_seq=agentic-traces&i_tokens=uncached&i_metric=y_tpPerGpu&i_best=0&i_optimal=0&i_active=b300_vllm-weka-amg-latest,b300_vllm-mooncake-internal`,
+            permanent: false,
+          }))
+        : []),
       // Two rules: Vercel compiles an empty `:rest*` to a trailing slash, which loops.
       { source: '/:first((?!ingest/)[^/]+)/', destination: '/:first', permanent: true },
       {

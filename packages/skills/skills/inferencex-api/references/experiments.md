@@ -2,6 +2,8 @@
 
 The experiment deployment can expose independently ingested campaigns without inventing GitHub Actions run IDs or writing into official benchmark tables. Use the deployment's own origin; a side-branch campaign is not implicitly available on the production API.
 
+The isolated WEKA preview's `/infx/inference/kimi-k3` page and `/zh` sibling default to the latest three-hour campaign, normalized throughput, both series and all points when no explicit `experiment` selector is present. This preview-only redirect does not change the production page. Explicit campaign links retain their selection; client data refetches on mount and focus.
+
 ```sh
 curl -fsS "$EXPERIMENT_ORIGIN/api/v1/experiments/weka-amg-kimi-k3-latest-3h"
 curl -fsS "$EXPERIMENT_ORIGIN/api/v1/experiments/weka-amg-kimi-k3-latest-3h/runs/cam-k3-kdadr-20261104-c128"
@@ -20,7 +22,7 @@ The historical `weka-amg-kimi-k3` selector remains supported for its original te
 ## View/control coverage
 
 - `experiment` selects a campaign in the existing inference view: raw coverage is the campaign endpoint.
-- Model/scenario, metric, percentile, hardware/precision and display filters continue using the dashboard's existing transformations. The new route does not introduce separate formulas or defaults.
+- Model/scenario, metric, percentile, hardware/precision and display filters continue using the dashboard's existing transformations. The preview entry link supplies display defaults without introducing separate formulas.
 - Replicate identity, series/policy labels, recovery flags and published references are stored fields in the campaign response.
 - Point detail and trace inspection are covered by the string-ID run detail endpoint.
 - Chart zoom, tooltip placement and legend presentation do not change API data.

@@ -27,7 +27,8 @@ export function useExperiment(enabled = true) {
       return response.json();
     },
     enabled: selected,
-    staleTime: Infinity,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
     select: selected ? (data: ExperimentResponse) => data : () => undefined,
   });
   return { ...query, selected };
