@@ -234,9 +234,8 @@ function mountResultsClips(
         </button>
         <input aria-label="Notes" />
         <VideoResultsClips
-          points={selectedPoints}
+          points={selectedPoints.filter((point) => !hidden.has(point.hardwareKey ?? ''))}
           colorFor={colorFor}
-          hidden={hidden}
           costs={{ [c1('b200').id]: { participating: 0.02, allocated: null } }}
           unofficialRun={unofficialRun}
         />

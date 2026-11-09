@@ -41,24 +41,21 @@ describe('clip stage', () => {
     expect(parseStage('?r_view=zoom&r_prompt=')).toEqual({ prompt: null, view: 'wipe' });
   });
 
-  it('leads with the named run, skips hidden and clipless hardware, and waits for a preferred side', () => {
+  it('leads with the named run, skips clipless hardware, and waits for a preferred side', () => {
     const official = { point: point('b200'), side: side('b200', [record('crane')]) };
     const clipless = { point: point('b200'), side: side('b200', [record('crane')], false) };
     const h200 = { point: point('h200'), side: side('h200', [record('crane')]) };
-    expect(stageSubject([clipless, h200], new Set())?.point.hardwareKey).toBe('h200');
-    expect(stageSubject([official, h200], new Set(['b200']))?.point.hardwareKey).toBe('h200');
+    expect(stageSubject([clipless, h200])?.point.hardwareKey).toBe('h200');
     // The named run is the subject on any hardware, with or without media.
     const unpublished = { ...clipless, point: point('b200', 'named') };
-    expect(stageSubject([unpublished, h200], new Set(), 'named')?.point).toBe(unpublished.point);
+    expect(stageSubject([unpublished, h200], 'named')?.point).toBe(unpublished.point);
     const namedH200 = { ...h200, point: point('h200', 'named') };
-    expect(stageSubject([official, namedH200], new Set(), 'named')?.point).toBe(namedH200.point);
-    expect(
-      stageSubject([{ point: point('b200'), side: undefined }, h200], new Set()),
-    ).toMatchObject({
+    expect(stageSubject([official, namedH200], 'named')?.point).toBe(namedH200.point);
+    expect(stageSubject([{ point: point('b200'), side: undefined }, h200])).toMatchObject({
       point: { hardwareKey: 'b200' },
       pending: true,
     });
-    expect(stageSubject([clipless], new Set())?.groups).toHaveLength(1);
+    expect(stageSubject([clipless])?.groups).toHaveLength(1);
   });
 
   it('keeps each take of a prompt addressable and falls back to the first prompt', () => {

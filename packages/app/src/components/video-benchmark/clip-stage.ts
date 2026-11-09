@@ -75,20 +75,17 @@ const SUBJECT_ORDER = ['b200', ...RESULTS_HARDWARE.filter((key) => key !== 'b200
  */
 export function stageSubject(
   candidates: readonly StageCandidate[],
-  hidden: ReadonlySet<string>,
   namedRun?: string,
 ): StageSubject | null {
   const ordered = SUBJECT_ORDER.flatMap((key) =>
-    hidden.has(key)
-      ? []
-      : candidates
-          .filter((candidate) => candidate.point.hardwareKey === key)
-          .map(({ point, side }) => ({
-            point,
-            side: side ?? null,
-            groups: side ? resultsClipGroups([side]) : [],
-            pending: side === undefined,
-          })),
+    candidates
+      .filter((candidate) => candidate.point.hardwareKey === key)
+      .map(({ point, side }) => ({
+        point,
+        side: side ?? null,
+        groups: side ? resultsClipGroups([side]) : [],
+        pending: side === undefined,
+      })),
   );
   const named = ordered.filter((subject) => subject.point.runId === namedRun);
   const pool = named.length > 0 ? named : ordered;

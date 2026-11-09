@@ -19,7 +19,7 @@ import {
   writeStage,
 } from './clip-stage';
 import { hardwareLabel } from './hardware';
-import type { MetricOptions, VideoPoint } from './metrics';
+import type { VideoPoint } from './metrics';
 import {
   publishedResultsSide,
   resultsClipReference,
@@ -194,8 +194,6 @@ export interface VideoResultsClipsProps {
   /** One lead point per hardware; the stage shows one of them against its reference. */
   points: VideoPoint[];
   colorFor: (key: string) => string;
-  hidden: ReadonlySet<string>;
-  options?: MetricOptions;
   costs?: Costs;
   unofficialRun?: string;
   initialSides?: VideoInitialData['sides'];
@@ -209,7 +207,6 @@ const display = (value: number | null | undefined, digits = 1) =>
 export default function VideoResultsClips({
   points,
   colorFor,
-  hidden,
   costs,
   unofficialRun,
   initialSides = {},
@@ -274,10 +271,9 @@ export default function VideoResultsClips({
                 : undefined,
           };
         }),
-        hidden,
         unofficialRun,
       ),
-    [selected, revision, failed, hidden, unofficialRun],
+    [selected, revision, failed, unofficialRun],
   );
   /** Web renditions that failed to load; their sides play the sealed original instead. */
   const [failedPreviews, setFailedPreviews] = useState<ReadonlySet<string>>(new Set());

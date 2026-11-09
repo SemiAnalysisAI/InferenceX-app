@@ -901,8 +901,6 @@ export default function VideoDashboard({
               initialSides={initialData?.sides}
               points={clipPoints}
               colorFor={(key) => (overlayClips.has(key) ? overlayRunColor(0) : colorFor(key))}
-              hidden={hidden}
-              options={{ tier: state.costTier }}
               costs={Object.fromEntries(
                 cells.map((c) => [
                   c.point.id,
