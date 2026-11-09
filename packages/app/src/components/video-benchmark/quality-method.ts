@@ -1,5 +1,6 @@
-import { SUBJECT_ORDER, type StageCandidate } from './clip-stage';
-import type { VideoPoint } from './metrics';
+import { mayHaveClips, SUBJECT_ORDER, type StageCandidate } from './clip-stage';
+import { leadCell, losslessTwin } from './deployment';
+import type { MetricOptions, VideoPoint } from './metrics';
 import { isLossy } from './optimizations';
 import { resultsClipGroups, resultsClipReference } from './results-clips';
 
@@ -44,6 +45,43 @@ export function showMeTarget(leads: readonly StageCandidate[]): VideoPoint | nul
     if (!lead?.side || isLossy(lead.point)) continue;
     const groups = resultsClipGroups([lead.side]).filter((group) => !group.scope);
     if (groups.some((group) => resultsClipReference(group, new Set()) !== null)) return lead.point;
+  }
+  return null;
+}
+
+export interface LossyPair {
+  lossy: VideoPoint;
+  twin: VideoPoint;
+}
+
+/**
+ * The drawn lossy cell "See what changes" plays against its lossless twin. Both must be points
+ * that may have clips. The named run's cells come first, so an overlay pairs within its own run;
+ * then stage hardware order, and each hardware's lossy lead.
+ */
+export function seeChangesPair(
+  drawn: readonly VideoPoint[],
+  deployments: readonly VideoPoint[],
+  options: MetricOptions,
+  namedRun?: string | null,
+): LossyPair | null {
+  const pairs = drawn.flatMap((lossy) => {
+    if (!isLossy(lossy) || !mayHaveClips(lossy)) return [];
+    const twin = losslessTwin(lossy, deployments);
+    return twin && mayHaveClips(twin) ? [{ lossy, twin }] : [];
+  });
+  const named = pairs.filter((pair) => pair.lossy.runId === namedRun);
+  const pool = named.length > 0 ? named : pairs;
+  for (const key of SUBJECT_ORDER) {
+    const own = pool.filter((pair) => pair.lossy.hardwareKey === key);
+    const lead = leadCell(
+      own.map((pair) => pair.lossy),
+      key,
+      options,
+      { lossy: true },
+    );
+    const pick = own.find((pair) => pair.lossy === lead) ?? own[0];
+    if (pick) return pick;
   }
   return null;
 }

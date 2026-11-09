@@ -71,7 +71,9 @@ import VideoDeploymentDetail from './VideoDeploymentDetail';
 import VideoResultsChart, { VIDEO_RESULTS_CHART_ID, type ClipLink } from './VideoResultsChart';
 import VideoCostContext from './VideoCostContext';
 import VideoResultsClips from './VideoResultsClips';
-import { isStageParam, parseStage, writeStage, type StagePair } from './clip-stage';
+import { isStageParam, parseStage, showOnStage, writeStage, type StagePair } from './clip-stage';
+import { seeChangesPair } from './quality-method';
+import { LossyQualityHint } from './QualityMethod';
 import { resultsClipPoints } from './results-clips';
 import { ResultsBars, resultsNumber as n, type ResultBar } from './VideoResultsCharts';
 import VideoHistory from './VideoHistory';
@@ -542,6 +544,11 @@ export default function VideoDashboard({
     () => [...deploymentCells, ...projection.history].map((cell) => cell.point),
     [deploymentCells, projection.history],
   );
+  const lossyPair = useMemo(
+    () =>
+      seeChangesPair(drawnPoints, deploymentPoints, { tier: state.costTier }, state.unofficialRun),
+    [drawnPoints, deploymentPoints, state.costTier, state.unofficialRun],
+  );
   // A chart pick or a lossless twin may sit outside the cohort, so every cell lends its cost.
   const clipCosts = useMemo(
     () =>
@@ -922,6 +929,15 @@ export default function VideoDashboard({
                 onOpen={openPoint}
                 clipLink={clipLink}
                 heading={heading}
+                lossyNote={
+                  <LossyQualityHint
+                    pair={lossyPair}
+                    onSeeChanges={({ lossy }) => {
+                      setAgainst('twin');
+                      showOnStage(lossy);
+                    }}
+                  />
+                }
                 footer={
                   <VideoCostContext
                     state={state}

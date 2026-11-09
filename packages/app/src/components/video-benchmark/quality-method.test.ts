@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { CaseRecord } from './compare';
 import type { DiagnosticPair } from './diagnostic-quality';
 import type { VideoPoint } from './metrics';
-import { referencePsnrRange, showMeTarget } from './quality-method';
+import { referencePsnrRange, seeChangesPair, showMeTarget } from './quality-method';
 import type { ClipQuality } from './reference-quality';
 import type { ResultsClipSide } from './results-clips';
+import type { ResultsEvidence } from './results-evidence';
 
 const SLOTS = ['crane', 'dock', 'fog', 'gate', 'hill'];
 const record = (caseId: string, valid = true): CaseRecord => ({
@@ -96,5 +97,36 @@ describe('quality method', () => {
     expect(showMeTarget([h100, h200, lead('b200', '')])).toBe(h200.point);
     expect(showMeTarget([h100, lead('b200', '/reference.mp4', true)])).toBe(h100.point);
     expect(showMeTarget([lead('b200', '')])).toBeNull();
+  });
+
+  it('pairs a lossy cell with its own run’s twin, preferring the named run, only when both have clips', () => {
+    const cell = (id: string, runId: string, lossy: boolean, publishedAt: string | null = 'x') =>
+      ({
+        id,
+        runId,
+        hardwareKey: 'b200',
+        workloadKey: 'w',
+        concurrency: 1,
+        participating: 4,
+        replicas: 1,
+        server: { tp: 2, ulysses: 2, attention: null },
+        results: (lossy ? lossyResults : { engine: 'sglang' }) as unknown as ResultsEvidence,
+        publishedAt,
+      }) as unknown as VideoPoint;
+    const options = { tier: 'h' } as const;
+    const officialLossy = cell('official-lossy', 'official', true);
+    const officialTwin = cell('official-twin', 'official', false);
+    const namedLossy = cell('named-lossy', 'named', true);
+    const namedTwin = cell('named-twin', 'named', false);
+    // The named run's lossy cell never borrows the official run's twin.
+    expect(seeChangesPair([officialLossy, namedLossy], [officialTwin], options, 'named')).toEqual({
+      lossy: officialLossy,
+      twin: officialTwin,
+    });
+    expect(
+      seeChangesPair([officialLossy, namedLossy], [officialTwin, namedTwin], options, 'named'),
+    ).toEqual({ lossy: namedLossy, twin: namedTwin });
+    const liveTwin = cell('live-twin', 'named', false, null);
+    expect(seeChangesPair([namedLossy], [liveTwin], options, 'named')).toBeNull();
   });
 });

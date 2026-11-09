@@ -8,7 +8,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import type { StageCandidate } from './clip-stage';
 import { hardwareLabel } from './hardware';
 import type { VideoPoint } from './metrics';
-import { referencePsnrRange, showMeTarget } from './quality-method';
+import { referencePsnrRange, showMeTarget, type LossyPair } from './quality-method';
 
 const METHODOLOGY = {
   en: 'https://github.com/SemiAnalysisAI/InferenceX/blob/main/video-generation/README.md#reference-psnr',
@@ -46,6 +46,9 @@ const STRINGS = {
     showMe: 'Show me',
     showMeHelp: (hardware: string) => `Plays ${hardware} against the Diffusers reference in Wipe.`,
     methodology: 'Full methodology →',
+    lossyHint:
+      'Lossy configs trade some quality for speed. Scores against each config’s own lossless run are not published yet.',
+    seeChanges: 'See what changes ↓',
   },
   zh: {
     title: '质量评分方法',
@@ -76,6 +79,8 @@ const STRINGS = {
     showMe: '播放示例',
     showMeHelp: (hardware: string) => `以卷帘视图对比播放 ${hardware} 与 Diffusers 参考视频。`,
     methodology: '完整方法说明 →',
+    lossyHint: '有损配置以部分画质换取速度。各配置相对自身无损运行的评分尚未发布。',
+    seeChanges: '查看画面变化 ↓',
   },
 };
 
@@ -238,5 +243,43 @@ function Lane({ name, sub, lossy = false }: { name: string; sub: string; lossy?:
       <span className="block">{name}</span>
       <span className="block text-muted-foreground">{sub}</span>
     </div>
+  );
+}
+
+/**
+ * Under the legend's lossy lines: what lossy configs trade, and "See what changes", which plays
+ * `pair` on the stage. Without a pair with clips the button is absent and the note stays.
+ */
+export function LossyQualityHint({
+  pair,
+  onSeeChanges,
+}: {
+  pair: LossyPair | null;
+  onSeeChanges: (pair: LossyPair) => void;
+}) {
+  const s = STRINGS[useLocale()];
+  return (
+    <p
+      data-testid="video-results-lossy-hint"
+      className="no-export mt-2 text-xs text-muted-foreground"
+    >
+      {s.lossyHint}{' '}
+      {pair && (
+        <button
+          type="button"
+          data-testid="video-results-lossy-see-changes"
+          className="font-medium whitespace-nowrap text-primary hover:underline"
+          onClick={() => {
+            track('video_results_lossy_see_changes', {
+              gpu: pair.lossy.hardwareKey,
+              engine: pair.lossy.results?.engine ?? null,
+            });
+            onSeeChanges(pair);
+          }}
+        >
+          {s.seeChanges}
+        </button>
+      )}
+    </p>
   );
 }
