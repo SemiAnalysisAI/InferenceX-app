@@ -354,7 +354,9 @@ describe('Video results clip stage', () => {
       .and('contain', 'take 1');
     cy.get('[data-testid="video-results-facts"]').should('contain', '0.02');
 
+    cy.get('[data-testid="video-results-stage"]').click('right');
     load('[data-testid="video-results-start"]');
+    cy.get('[data-testid="video-results-split"]').should('have.attr', 'aria-pressed', 'false');
     cy.get('[data-testid="video-results-stage"] video').each(($video) =>
       cy.wrap($video).should(($element) => {
         const video = $element[0] as HTMLVideoElement;

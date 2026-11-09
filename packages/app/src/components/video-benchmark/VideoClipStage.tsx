@@ -337,7 +337,8 @@ export default function VideoClipStage({
         )}
         onPointerMove={onPointerMove}
         onClick={() => {
-          if (view === 'wipe') lock(!locked);
+          // The split stays hidden until the first Play, so a click must not lock it unseen.
+          if (view === 'wipe' && !idle) lock(!locked);
           else if (view === 'toggle') flip('click');
         }}
         onKeyDown={onKeyDown}
