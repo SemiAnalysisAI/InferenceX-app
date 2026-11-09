@@ -208,6 +208,10 @@ import {
   type KnownIssueAnnotation,
   createKnownIssueLayer,
 } from '@/components/inference/utils/knownIssueAnnotations';
+import {
+  chartNoticeKey,
+  useDismissedChartNotices,
+} from '@/components/inference/hooks/use-dismissed-chart-notices';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { bestSeriesPerSku, skuColumns } from '@/components/inference/utils/best-series-per-sku';
 import { legendChangelogsByHardware } from '@/components/inference/utils/legend-changelog';
@@ -1104,6 +1108,7 @@ const ScatterGraph = React.memo(
       showPowerEnvelope,
     ]);
 
+    const { dismissed: dismissedNotices, dismiss: dismissNotice } = useDismissedChartNotices();
     const knownIssueAnnotations = useMemo((): KnownIssueAnnotation[] => {
       const visibleOverlayPoints = processedOverlayData.filter((p) =>
         activeOverlayHwTypes.has(p.hwKey as string),
@@ -1139,8 +1144,9 @@ const ScatterGraph = React.memo(
           points: previewPoints.map((point) => ({ x: point.x, y: point.y })),
         });
       }
-      return annotations;
+      return annotations.filter((annotation) => !dismissedNotices.has(chartNoticeKey(annotation)));
     }, [
+      dismissedNotices,
       modelLabel,
       filteredData,
       processedOverlayData,
@@ -1834,6 +1840,8 @@ const ScatterGraph = React.memo(
       getCssColor,
       resolveColor,
       knownIssueAnnotations,
+      dismissNotice,
+      locale,
       presence,
       isPresencePending,
       showPowerTelemetry,
@@ -1849,6 +1857,8 @@ const ScatterGraph = React.memo(
       getCssColor,
       resolveColor,
       knownIssueAnnotations,
+      dismissNotice,
+      locale,
       presence,
       isPresencePending,
       showPowerTelemetry,
@@ -3550,6 +3560,11 @@ const ScatterGraph = React.memo(
               gpu: annotation.issue.hwKey,
               issue: annotation.issue.issueRef,
             }),
+          onDismiss: (annotation) => {
+            track('inference_chart_notice_dismissed', { notice: chartNoticeKey(annotation) });
+            current.dismissNotice(annotation);
+          },
+          dismissLabel: current.locale === 'zh' ? '关闭提示' : 'Dismiss notice',
         };
       });
 

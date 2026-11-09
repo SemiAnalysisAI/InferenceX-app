@@ -205,6 +205,55 @@ describe('renderKnownIssueAnnotations', () => {
   });
 });
 
+describe('renderKnownIssueAnnotations dismiss control', () => {
+  it('omits the close button when no dismiss handler is provided', () => {
+    renderKnownIssueAnnotations(g, defs, baseOptions({ annotations: [veraRubinPreview] }));
+    expect(g.select('[data-testid="chart-notice-dismiss"]').empty()).toBe(true);
+  });
+
+  it('renders one close button per box, outside the issue link, and reports the annotation', () => {
+    const onDismiss = vi.fn();
+    const onLinkClick = vi.fn();
+    renderKnownIssueAnnotations(
+      g,
+      defs,
+      baseOptions({
+        annotations: [gb300Annotation, veraRubinPreview],
+        onDismiss,
+        onLinkClick,
+        dismissLabel: 'Dismiss notice',
+      }),
+    );
+
+    const buttons = g.selectAll('[data-testid="chart-notice-dismiss"]').nodes() as SVGGElement[];
+    expect(buttons).toHaveLength(2);
+    for (const button of buttons) {
+      expect(button.closest('a')).toBeNull();
+      expect(button.getAttribute('role')).toBe('button');
+      expect(button.getAttribute('aria-label')).toBe('Dismiss notice');
+    }
+
+    buttons[1].dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(onDismiss).toHaveBeenCalledWith(veraRubinPreview);
+    buttons[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(onDismiss).toHaveBeenCalledWith(gb300Annotation);
+    expect(onLinkClick).not.toHaveBeenCalled();
+  });
+
+  it('keeps the close button inside its box', () => {
+    renderKnownIssueAnnotations(
+      g,
+      defs,
+      baseOptions({ annotations: [veraRubinPreview], onDismiss: vi.fn() }),
+    );
+    const rect = g.select('.known-issue-annotation rect');
+    const right = Number(rect.attr('x')) + Number(rect.attr('width'));
+    const hit = g.select('.known-issue-dismiss rect');
+    expect(Number(hit.attr('x')) + Number(hit.attr('width'))).toBeLessThanOrEqual(right);
+    expect(right).toBe(800 - 10);
+  });
+});
+
 describe('renderKnownIssueAnnotations on phone-width plots', () => {
   it('keeps an official-preview box inside a narrow plot', () => {
     const width = 240;

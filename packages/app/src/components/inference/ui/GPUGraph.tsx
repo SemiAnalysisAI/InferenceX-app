@@ -87,6 +87,10 @@ import {
   type KnownIssueAnnotation,
   createKnownIssueLayer,
 } from '@/components/inference/utils/knownIssueAnnotations';
+import {
+  chartNoticeKey,
+  useDismissedChartNotices,
+} from '@/components/inference/hooks/use-dismissed-chart-notices';
 import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/benchmarks/known-issues';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import {
@@ -459,6 +463,7 @@ const GPUGraph = React.memo(
     useDialogCloseTracking(fixedLogPointId !== null, 'gpu_timeseries_logs_closed');
     useDialogCloseTracking(powerTelemetryPoint !== null, 'inference_power_telemetry_closed');
 
+    const { dismissed: dismissedNotices, dismiss: dismissNotice } = useDismissedChartNotices();
     const knownIssueAnnotations = useMemo((): KnownIssueAnnotation[] => {
       const annotations: KnownIssueAnnotation[] = matchKnownConfigIssues(
         modelLabel,
@@ -499,8 +504,9 @@ const GPUGraph = React.memo(
           points: previewPoints.map((point) => ({ x: point.x, y: point.y })),
         });
       }
-      return annotations;
+      return annotations.filter((annotation) => !dismissedNotices.has(chartNoticeKey(annotation)));
     }, [
+      dismissedNotices,
       modelLabel,
       filteredData,
       officialPoints,
@@ -526,10 +532,15 @@ const GPUGraph = React.memo(
                 gpu: annotation.issue.hwKey,
                 issue: annotation.issue.issueRef,
               }),
+            onDismiss: (annotation) => {
+              track('inference_chart_notice_dismissed', { notice: chartNoticeKey(annotation) });
+              dismissNotice(annotation);
+            },
+            dismissLabel: locale === 'zh' ? '关闭提示' : 'Dismiss notice',
           }),
           paletteIdentity,
         ),
-      [chartId, knownIssueAnnotations, getCssColor, paletteIdentity],
+      [chartId, knownIssueAnnotations, getCssColor, paletteIdentity, dismissNotice, locale],
     );
 
     const xExtent = useMemo(() => {
