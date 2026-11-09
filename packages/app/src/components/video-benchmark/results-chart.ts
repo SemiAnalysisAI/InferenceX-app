@@ -28,10 +28,12 @@ export interface ResultsChartMetric {
   unit: string;
   better: 'lower' | 'higher';
   digits: number;
+  scale?: 'log';
+  rankOn?: ResultsXMetric;
   value: (cell: ResultCell, context: ResultsMetricContext) => number | null;
 }
 
-export const RESULTS_X_METRIC_KEYS = ['p50', 'p90'] as const;
+export const RESULTS_X_METRIC_KEYS = ['p50', 'p90', 'gpus'] as const;
 export const RESULTS_Y_METRIC_KEYS = [
   'videoSecondsPerDollar',
   'videosPerGpuHour',
@@ -62,6 +64,16 @@ export const RESULTS_X_METRICS: Record<ResultsXMetric, ResultsChartMetric> = {
     better: 'lower',
     digits: 1,
     value: (cell) => cell.point.p90,
+  },
+  gpus: {
+    label: { en: 'GPUs per deployment', zh: '每个部署的 GPU 数' },
+    unit: '',
+    better: 'lower',
+    digits: 0,
+    scale: 'log',
+    rankOn: 'p50',
+    value: ({ point }) =>
+      point.participating !== null && point.participating > 0 ? point.participating : null,
   },
 };
 
@@ -101,6 +113,9 @@ export const isResultsXMetric = (value: string | null): value is ResultsXMetric 
   value !== null && Object.hasOwn(RESULTS_X_METRICS, value);
 export const isResultsYMetric = (value: string | null): value is ResultsYMetric =>
   value !== null && Object.hasOwn(RESULTS_Y_METRICS, value);
+
+export const plottedXMetric = (x: ResultsXMetric, history: boolean): ResultsXMetric =>
+  (history && RESULTS_X_METRICS[x].rankOn) || x;
 
 export function resultsMetricLabel(
   metric: ResultsChartMetric,
@@ -281,6 +296,11 @@ export function resultsChartSeries(
 ): ResultsChartSeries[] {
   const x = RESULTS_X_METRICS[selection.x],
     y = RESULTS_Y_METRICS[selection.y];
+  if (x.rankOn)
+    return onAttributeAxis(
+      resultsChartSeries(cells, { ...selection, x: x.rankOn, optimal: false }),
+      selection,
+    );
   const groups = Map.groupBy(plottedPoints(cells, selection), ({ point }) => seriesKey(point.cell));
   const series = [...groups].map(([key, plotted]): ResultsChartSeries => {
     const points = plotted.map(({ point }) => point);
@@ -301,6 +321,26 @@ export function resultsChartSeries(
     ...(selection.compareEngines ? lossless : bestPerHardware(lossless, selection)),
     ...(selection.lossy ? series.filter((item) => item.lossy) : []),
   ].toSorted(seriesOrder);
+}
+
+function onAttributeAxis(
+  ranked: readonly ResultsChartSeries[],
+  selection: ResultsChartSelection,
+): ResultsChartSeries[] {
+  const x = RESULTS_X_METRICS[selection.x];
+  return ranked.map((item) => {
+    const points = item.points.flatMap((point) => {
+      const value = x.value(point.cell, selection);
+      return value === null ? [] : [{ ...point, x: value }];
+    });
+    const frontier = points.filter((point) => point.optimal).toSorted((a, b) => a.x - b.x);
+    return {
+      ...item,
+      points: selection.optimal ? frontier : points,
+      frontier,
+      measured: points.length,
+    };
+  });
 }
 
 /**

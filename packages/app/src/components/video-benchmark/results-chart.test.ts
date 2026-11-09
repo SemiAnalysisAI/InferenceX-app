@@ -180,6 +180,28 @@ describe('resultsChartSeries', () => {
     ).toBe('sglang:c1');
   });
 
+  it('keeps the latency frontier and Best engine on the GPU axis', () => {
+    const b200 = (name: string, engine: string, gpus: number, p50: number, perHour: number) =>
+      deployment(name, gpus, p50, perHour, 200, {
+        hardwareKey: 'b200',
+        results: { engine } as ResultsEvidence,
+      });
+    // Ranked on GPU count, the 1-GPU vLLM-Omni deployment would win B200 and hide SGLang's 4-GPU one.
+    const deployments = cells([
+      b200('wide', 'sglang', 4, 30, 400),
+      b200('narrow', 'sglang', 1, 100, 120),
+      b200('vllm', 'vllm-omni', 1, 60, 200),
+    ]);
+    const plotted = (x: ResultsChartSelection['x']) =>
+      resultsChartSeries(deployments, selection({ x, optimal: true })).map((s) => [
+        s.key,
+        s.points.map((p) => `${p.cell.point.id} ${p.optimal}`).toSorted(),
+      ]);
+    expect(plotted('gpus')).toEqual(plotted('p50'));
+    const [gpus] = resultsChartSeries(deployments, selection({ x: 'gpus' }));
+    expect(gpus.frontier.map((p) => p.x)).toEqual([1, 4]);
+  });
+
   it('never lets a faster lossy series become a GPU’s default line', () => {
     const run = (name: string, engine: string, p50: number, optimizations: string[]) =>
       deployment(name, 4, p50, 400 - p50, 200, {
