@@ -146,7 +146,7 @@ export interface ResultsChartPoint {
   cell: ResultCell;
   x: number;
   y: number;
-  /** On its series' Pareto frontier for the selected axes. */
+  /** On its series' Pareto frontier for the selected axes, or for `rankOn` when the x axis has one. */
   optimal: boolean;
 }
 
@@ -332,9 +332,15 @@ function onAttributeAxis(
   const x = RESULTS_X_METRICS[selection.x];
   const placed = cells.filter((cell) => x.value(cell, selection) !== null);
   const ranked = resultsChartSeries(placed, { ...selection, x: rankOn, optimal: false });
+  // More GPUs usually buy lower latency, so within one GPU count the slower
+  // deployment comes first and the line keeps the latency frontier's order.
+  const worseFirst = RESULTS_X_METRICS[rankOn].better === 'lower' ? -1 : 1;
   return ranked.map((item) => {
-    const points = item.points.map((point) => ({ ...point, x: x.value(point.cell, selection)! }));
-    const frontier = points.filter((point) => point.optimal).toSorted((a, b) => a.x - b.x);
+    const points = item.points
+      .toSorted((a, b) => worseFirst * (a.x - b.x))
+      .map((point) => ({ ...point, x: x.value(point.cell, selection)! }))
+      .toSorted((a, b) => a.x - b.x);
+    const frontier = points.filter((point) => point.optimal);
     return {
       ...item,
       points: selection.optimal ? frontier : points,

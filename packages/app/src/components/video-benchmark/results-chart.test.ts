@@ -202,6 +202,23 @@ describe('resultsChartSeries', () => {
     expect(gpus.frontier.map((p) => p.x)).toEqual([1, 4]);
   });
 
+  it('joins deployments that share a GPU count in latency order, whatever the row order', () => {
+    const layout = (name: string, gpus: number, p50: number, kj: number, tp: number) =>
+      deployment(name, gpus, p50, 400, kj, {
+        server: { ...eligible.server!, tp, ulysses: gpus / tp },
+      });
+    const rows = [
+      layout('two', 2, 100, 50, 2),
+      layout('tp4', 4, 40, 120, 4),
+      layout('u4', 4, 60, 80, 1),
+      layout('eight', 8, 20, 200, 8),
+    ];
+    for (const order of [rows, rows.toReversed()]) {
+      const [gpus] = resultsChartSeries(cells(order), selection({ x: 'gpus', y: 'kjPerClip' }));
+      expect(ids(gpus.frontier)).toEqual(['two:c1', 'u4:c1', 'tp4:c1', 'eight:c1']);
+    }
+  });
+
   it('ranks the GPU axis only among deployments with a recorded GPU count', () => {
     const unplaced = deployment('unplaced', 1, 30, 400, 50, { participating: null });
     const deployments = cells([unplaced, fast, mid]);
