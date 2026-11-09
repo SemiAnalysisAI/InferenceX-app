@@ -50,6 +50,13 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     seoName: 'DeepSeek R1',
   },
   {
+    slug: 'kimi-k31-pro',
+    displayName: 'Kimi-K3.1-Pro',
+    dbKeys: ['kimik3.1'],
+    label: 'Kimi K3.1 Pro 2.8T',
+    seoName: 'Kimi K3.1 Pro',
+  },
+  {
     slug: 'kimi-k3',
     displayName: 'Kimi-K3',
     dbKeys: ['kimik3'],

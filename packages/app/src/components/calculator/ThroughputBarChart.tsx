@@ -7,9 +7,15 @@ import * as d3 from 'd3';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import type { HardwareConfig } from '@/components/inference/types';
+import {
+  ChartPointDetails,
+  type ChartPointDetailsLink,
+  type ChartPointDetailsMetric,
+  type ChartPointDetailsRow,
+} from '@/components/ui/chart-point-details';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
-import { contrastColors } from '@/lib/d3-chart/contrast-colors';
+import { readableTextContrast } from '@/lib/d3-chart/contrast-colors';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   CustomLayerConfig,
@@ -17,13 +23,15 @@ import type {
   HorizontalBarLayerConfig,
   RenderContext,
 } from '@/lib/d3-chart/D3Chart/types';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
-import type { ContinuousScale } from '@/lib/d3-chart/types';
+import { setAttrIfChanged, widthTickCount } from '@/lib/d3-chart/chart-update';
+import type { ChartLayout, ContinuousScale } from '@/lib/d3-chart/types';
 import { getChartWatermark } from '@/lib/catalog/data-mappings';
 import type { Locale } from '@/lib/i18n/i18n';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
-import { escapeHtml, getDisplayLabel } from '@/lib/shared/utils';
+import { getDisplayLabel } from '@/lib/shared/utils';
 
 import type {
   BarMetric,
@@ -35,34 +43,46 @@ import type {
 
 const OVERLAY_STRINGS = {
   en: {
-    unofficialRun: 'UNOFFICIAL RUN',
-    branch: 'Branch:',
-    dismiss: 'Click elsewhere to dismiss',
+    unofficialRun: 'Unofficial run',
     viewRun: 'View workflow run',
+    viewRaw: 'View raw result on GitHub',
     clamped: 'Outside measured range — showing nearest data point',
-    parallelism: 'Parallelism:',
-    cost: 'Cost:',
-    concurrency: 'Concurrency:',
-    precision: 'Precision:',
-    disaggregated: 'Disaggregated:',
+    parallelism: 'Parallelism',
+    cost: 'Cost',
+    concurrency: 'Concurrency',
+    precision: 'Precision',
+    disaggregated: 'Disaggregated',
     yes: 'Yes',
+    no: 'No',
+    dpaTrue: 'True',
+    inputOutputTput: 'Input · output tok/s/chip',
+    inputOutputCost: 'Input · output cost',
+    inputOutputPower: 'Input · output tok/s/MW',
+    cacheHit: 'KV cache hit rate',
+    theoreticalCacheHit: 'Theoretical cache hit rate',
+    inputShare: 'Input token share',
   },
   zh: {
     unofficialRun: '非官方运行',
-    branch: '分支：',
-    dismiss: '点击其他区域关闭',
     viewRun: '查看工作流运行',
+    viewRaw: '在 GitHub 查看原始结果',
     clamped: '超出实测范围——显示最接近的数据点',
-    parallelism: '并行策略：',
-    cost: '成本：',
-    concurrency: '并发数：',
-    precision: '精度：',
-    disaggregated: '分离式：',
+    parallelism: '并行策略',
+    cost: '成本',
+    concurrency: '并发数',
+    precision: '精度',
+    disaggregated: '分离式',
     yes: '是',
+    no: '否',
+    dpaTrue: '是',
+    inputOutputTput: '输入 · 输出 tok/s/chip',
+    inputOutputCost: '输入 · 输出成本',
+    inputOutputPower: '输入 · 输出 tok/s/MW',
+    cacheHit: 'KV cache 命中率',
+    theoreticalCacheHit: '理论 Cache 命中率',
+    inputShare: '输入 token 占比',
   },
 } as const;
-
-export type OverlayTooltipStrings = (typeof OVERLAY_STRINGS)[keyof typeof OVERLAY_STRINGS];
 
 interface ThroughputBarChartProps {
   results: InterpolatedResult[];
@@ -78,6 +98,7 @@ interface ThroughputBarChartProps {
   onBarSelect: (resultKey: string) => void;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
+  footer?: React.ReactNode;
   colorResolver?: (hwKey: string) => string;
 }
 
@@ -144,6 +165,18 @@ export function getMetricLabel(
   }
 }
 
+const fixed = (value: number, digits: number) =>
+  value.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
+const formatSig3 = d3.format('.3r');
+const formatSig3Si = d3.format('.3s');
+const compact = (value: number) =>
+  Math.abs(value) >= 1000 ? formatSig3Si(value) : formatSig3(value);
+const formatTickSig3 = d3.format('.3~r');
+const formatTickSig3Si = d3.format('.3~s');
+const xTickFormat = (value: d3.AxisDomain) =>
+  Math.abs(Number(value)) >= 1000 ? formatTickSig3Si(Number(value)) : formatTickSig3(Number(value));
+
 export function getValueLabel(
   d: InterpolatedResult,
   barMetric: BarMetric,
@@ -152,15 +185,15 @@ export function getValueLabel(
 ): string {
   switch (barMetric) {
     case 'power': {
-      return `${getTpPerMwForType(d, costType).toFixed(0)} tok/s/MW`;
+      return `${compact(getTpPerMwForType(d, costType))} tok/s/MW`;
     }
     case 'cost': {
       return `$${getCostForType(d, costType).toFixed(3)}${getCostTypeLabel(costType)}`;
     }
     default: {
       return mode === 'interactivity_to_throughput'
-        ? `${getThroughputForType(d, costType).toFixed(1)} tok/s/chip`
-        : `${getThroughputForType(d, costType).toFixed(1)} tok/s/user`;
+        ? `${compact(getThroughputForType(d, costType))} tok/s/chip`
+        : `${compact(getThroughputForType(d, costType))} tok/s/user`;
     }
   }
 }
@@ -178,12 +211,17 @@ export function getCostProviderLabel(provider: CostProvider, locale: Locale = 'e
   }
   switch (provider) {
     case 'costh': {
-      return 'Owning at Large Hyperscaler Volume';
+      return 'Owning at large hyperscaler volume';
     }
     case 'costr': {
-      return 'Rent - 3 Year Commit';
+      return 'Rent – 3-year commit';
     }
   }
+}
+
+export interface ChartTitleParts {
+  title: string;
+  qualifier: string;
 }
 
 export function getChartTitle(
@@ -193,30 +231,37 @@ export function getChartTitle(
   costType: CostType,
   costProvider?: CostProvider,
   interactivityPercentile?: string,
-): string {
+): ChartTitleParts {
   const percentilePrefix = interactivityPercentile
     ? `${interactivityPercentile.toUpperCase()} `
     : '';
-  const targetLabel =
+  const qualifier =
     mode === 'interactivity_to_throughput'
-      ? `${targetValue} tok/s/user ${percentilePrefix}Interactivity`
-      : `${targetValue} tok/s/chip Throughput`;
+      ? `at ${targetValue} tok/s/user ${percentilePrefix}interactivity`
+      : `at ${targetValue} tok/s/chip throughput`;
 
   const tokenTypeLabel =
     costType === 'input' ? 'Input' : costType === 'output' ? 'Output' : 'Total';
 
   switch (barMetric) {
     case 'power': {
-      return `${tokenTypeLabel} Tokens per Provisioned All-in Megawatt at ${targetLabel}`;
+      return { title: `${tokenTypeLabel} tokens per provisioned all-in megawatt`, qualifier };
     }
     case 'cost': {
       const providerLabel = getCostProviderLabel(costProvider || 'costh');
-      return `Cost per Million ${tokenTypeLabel} Tokens (${providerLabel}) at ${targetLabel}`;
+      return {
+        title: `Cost per million ${tokenTypeLabel.toLowerCase()} tokens (${providerLabel})`,
+        qualifier,
+      };
     }
     default: {
-      return mode === 'interactivity_to_throughput'
-        ? `${tokenTypeLabel} Token Throughput per Chip at ${targetLabel}`
-        : `Interactivity at ${targetLabel}`;
+      return {
+        title:
+          mode === 'interactivity_to_throughput'
+            ? `${tokenTypeLabel} token throughput per chip`
+            : 'Interactivity',
+        qualifier,
+      };
     }
   }
 }
@@ -257,131 +302,191 @@ export function getCostTypeLabel(costType: CostType): string {
 
 export function getResultLabel(d: InterpolatedResult, hardwareConfig: HardwareConfig): string {
   const config = hardwareConfig[d.hwKey] || getHardwareConfig(d.hwKey);
-  const baseName = config ? getDisplayLabel(config) : d.hwKey;
   const parts: string[] = [];
+  const framework = config?.suffix?.replace(/^\((?<inner>.*)\)$/u, '$<inner>');
+  if (framework) parts.push(framework);
   if (d.precision) parts.push(d.precision.toUpperCase());
   if (d.isOverlay) parts.push(`✕ ${d.runLabel ?? 'unofficial'}`);
+  const baseName = config?.label ?? d.hwKey;
   return parts.length > 0 ? `${baseName} (${parts.join(' · ')})` : baseName;
 }
 
-export function generateTooltipHTML(
+export interface ThroughputPointDetails {
+  title: string;
+  note?: string;
+  subtitle: string;
+  warning?: string;
+  metrics: ChartPointDetailsMetric[];
+  summary: string;
+  rows: ChartPointDetailsRow[];
+  links: ChartPointDetailsLink<'run'>[];
+}
+
+function parallelismLabel(d: InterpolatedResult, dpaValue: string): string {
+  const nearest = d.nearestPoints[0];
+  const tp = nearest?.tp ?? 0;
+  const ep = nearest?.ep;
+  const dpa = nearest?.dp_attention ? ` · DPA ${dpaValue}` : '';
+  if (ep !== null && ep !== undefined && ep > 1 && tp === ep) {
+    return `${nearest?.dp_attention ? 'DEP' : 'TEP'}${tp}`;
+  }
+  if (ep !== null && ep !== undefined && ep > 1) return `TP ${tp} · EP ${ep}${dpa}`;
+  return `TP ${tp}${dpa}`;
+}
+
+export function getThroughputPointDetails(
   d: InterpolatedResult,
   hardwareConfig: HardwareConfig,
   mode: CalculatorMode,
   barMetric: BarMetric,
   costType: CostType,
   runUrl?: string,
-  isPinned?: boolean,
-  overlayStrings: OverlayTooltipStrings = OVERLAY_STRINGS.en,
   locale: Locale = 'en',
-): string {
-  const label = escapeHtml(getResultLabel(d, hardwareConfig));
+): ThroughputPointDetails {
+  const t = OVERLAY_STRINGS[locale];
+  const config = hardwareConfig[d.hwKey] || getHardwareConfig(d.hwKey);
   const costLabel = getCostTypeLabel(costType);
-  const costValue = getCostForType(d, costType);
-
-  const tokenTypePrefix = costType === 'input' ? 'Input ' : costType === 'output' ? 'Output ' : '';
-  const zhTokenTypePrefix = costType === 'input' ? '输入' : costType === 'output' ? '输出' : '';
-  const labelColon = locale === 'zh' ? '：' : ':';
-  const dpaValue = locale === 'zh' ? overlayStrings.yes : 'True';
-  const metricName =
-    barMetric === 'power'
-      ? 'tok/s/MW'
-      : barMetric === 'cost'
-        ? locale === 'zh'
-          ? '成本'
-          : 'Cost'
-        : mode === 'interactivity_to_throughput'
-          ? locale === 'zh'
-            ? `${zhTokenTypePrefix}吞吐量`
-            : `${tokenTypePrefix}Throughput`
-          : locale === 'zh'
-            ? '交互性'
-            : 'Interactivity';
-  const metricUnit =
-    barMetric === 'power'
-      ? 'tok/s/MW'
-      : barMetric === 'cost'
-        ? costLabel
-        : mode === 'interactivity_to_throughput'
-          ? 'tok/s/chip'
-          : 'tok/s/user';
-  const metricValue = getMetricValue(d, barMetric, costType);
-
-  const nearest = d.nearestPoints[0];
-  const tp = nearest?.tp ?? 0;
-  const ep = nearest?.ep;
-  const dpAttn = nearest?.dp_attention;
-  const precision = nearest?.precision ?? '';
-  const disagg = nearest?.disagg;
-
-  let parallelismHtml: string;
-  if (ep !== null && ep !== undefined && ep > 1 && tp === ep) {
-    parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.parallelism}</strong> ${dpAttn ? 'DEP' : 'TEP'}${tp}</div>`;
-  } else if (ep !== null && ep !== undefined && ep > 1) {
-    parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>TP${labelColon}</strong> ${tp}, <strong>EP${labelColon}</strong> ${ep}${dpAttn ? `, <strong>DPA${labelColon}</strong> ${dpaValue}` : ''}</div>`;
-  } else {
-    parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>TP${labelColon}</strong> ${tp}${dpAttn ? `, <strong>DPA${labelColon}</strong> ${dpaValue}` : ''}</div>`;
-  }
-
-  const metricDisplay =
-    barMetric === 'cost'
-      ? `$${metricValue.toFixed(3)}${metricUnit}`
-      : `${metricValue.toFixed(barMetric === 'power' ? 0 : 1)} ${metricUnit}`;
-
+  const precision = d.nearestPoints[0]?.precision ?? d.precision ?? '';
+  const throughput = {
+    value: fixed(getThroughputForType(d, costType), 1),
+    label: mode === 'interactivity_to_throughput' ? 'tok/s/chip' : 'tok/s/user',
+  };
+  const cost = {
+    value: `$${getCostForType(d, costType).toFixed(3)}`,
+    label: costLabel,
+  };
+  const power = {
+    value: fixed(getTpPerMwForType(d, costType), 0),
+    label: 'tok/s/MW',
+  };
+  const parallelism = parallelismLabel(d, t.dpaTrue);
   const effectiveRunUrl = d.isOverlay ? d.runUrl : runUrl;
-  const runLinkLabel = d.isOverlay
-    ? overlayStrings.viewRun
-    : locale === 'zh'
-      ? '在 GitHub 查看原始结果'
-      : 'View raw result on GitHub';
-  const runLinkHtml = effectiveRunUrl
-    ? `<div style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;"><a href="${escapeHtml(effectiveRunUrl)}" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-size: 11px; text-decoration: underline; cursor: pointer;">${runLinkLabel} &#8599;</a></div>`
-    : '';
+  return {
+    title: config ? getDisplayLabel(config) : d.hwKey,
+    subtitle: precision.toUpperCase(),
+    warning: d.isOverlay ? `✕ ${d.runLabel ?? t.unofficialRun}` : undefined,
+    metrics:
+      barMetric === 'cost'
+        ? [cost, throughput]
+        : barMetric === 'power'
+          ? [power, cost]
+          : [throughput, cost],
+    summary: [parallelism, `${t.concurrency} ~${d.concurrency}`].join(' · '),
+    rows: [
+      { label: t.cost, value: `${cost.value}${costLabel}` },
+      { label: 'tok/s/MW', value: power.value },
+      {
+        label: t.inputOutputTput,
+        value: `${fixed(d.inputTputValue, 1)} · ${fixed(d.outputTputValue, 1)}`,
+      },
+      {
+        label: t.inputOutputCost,
+        value: `$${d.costInput.toFixed(3)} · $${d.costOutput.toFixed(3)}`,
+      },
+      {
+        label: t.inputOutputPower,
+        value: `${fixed(d.inputTpPerMw, 0)} · ${fixed(d.outputTpPerMw, 0)}`,
+      },
+      ...(d.cacheHitRate === undefined ? [] : [{ label: t.cacheHit, value: pct(d.cacheHitRate) }]),
+      ...(d.theoreticalCacheHitRate === undefined
+        ? []
+        : [{ label: t.theoreticalCacheHit, value: pct(d.theoreticalCacheHitRate) }]),
+      ...(d.inputTokenShare === undefined
+        ? []
+        : [{ label: t.inputShare, value: pct(d.inputTokenShare) }]),
+      { label: t.concurrency, value: `~${d.concurrency}` },
+      ...(precision ? [{ label: t.precision, value: precision.toUpperCase() }] : []),
+      { label: t.parallelism, value: parallelism },
+      { label: t.disaggregated, value: d.nearestPoints[0]?.disagg ? t.yes : t.no },
+    ],
+    links: effectiveRunUrl
+      ? [
+          {
+            action: 'run',
+            label: d.isOverlay ? t.viewRun : t.viewRaw,
+            href: effectiveRunUrl,
+            external: true,
+          },
+        ]
+      : [],
+    note: d.clamped ? t.clamped : undefined,
+  };
+}
 
-  const clampedHtml = d.clamped
-    ? `<div style="color: var(--muted-foreground); font-size: 10px; font-style: italic; margin-bottom: 4px;">${overlayStrings.clamped}</div>`
-    : '';
-
-  const overlayBranchHtml =
-    d.isOverlay && d.runLabel
-      ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.branch}</strong> ${escapeHtml(d.runLabel)}</div>`
-      : '';
-  const overlayHeaderHtml = d.isOverlay
-    ? `<div style="color: var(--destructive, #ef4444); font-size: 11px; font-weight: 600; margin-bottom: 4px;">${overlayStrings.unofficialRun}</div>${overlayBranchHtml}`
-    : '';
-
-  return `
-    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); max-width: 320px; pointer-events: auto; user-select: ${isPinned ? 'text' : 'none'};">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${overlayStrings.dismiss}</div>` : ''}
-      ${overlayHeaderHtml}
-      <div style="color: var(--foreground); font-size: 13px; font-weight: 600; margin-bottom: 8px;">
-        ${label}
-      </div>
-      ${clampedHtml}
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>${metricName}${labelColon}</strong> ${metricDisplay}
-      </div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>${overlayStrings.cost}</strong> $${costValue.toFixed(3)}${costLabel}
-      </div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>tok/s/MW:</strong> ${getTpPerMwForType(d, costType).toFixed(0)}
-      </div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>${overlayStrings.concurrency}</strong> ~${d.concurrency}
-      </div>
-      ${precision ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.precision}</strong> ${escapeHtml(precision.toUpperCase())}</div>` : ''}
-      ${parallelismHtml}
-      ${disagg ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.disaggregated}</strong> ${overlayStrings.yes}</div>` : ''}
-      ${runLinkHtml}
-    </div>
-  `;
+export function generateTooltipHTML(details: ThroughputPointDetails, color: string): string {
+  return chartHoverCard({
+    title: details.title,
+    subtitle: details.subtitle,
+    color,
+    metrics: details.metrics,
+    summary: details.note ? `${details.summary} · ${details.note}` : details.summary,
+    warning: details.warning,
+  });
 }
 
 const getLabel = getResultLabel;
 
 function getColor(): string {
   return 'var(--foreground)';
+}
+
+const BAR_OPACITY = 0.85;
+const MIN_INSIDE_LABEL_CONTRAST = 5.5;
+const MIN_CLAMPED_LABEL_CONTRAST = 4.5;
+const TOP_AXIS_BAND_PX = 28;
+
+function renderTopAxis(
+  layout: ChartLayout,
+  xScale: d3.ScaleLinear<number, number>,
+  tickCount: number,
+) {
+  let axis = layout.g.select<SVGGElement>('.x-axis-top');
+  if (axis.empty()) {
+    axis = layout.g.append('g').attr('class', 'x-axis-top').style('pointer-events', 'none');
+    axis
+      .append('rect')
+      .attr('class', 'x-axis-top-band')
+      .attr('fill', 'var(--card)')
+      .attr('opacity', 0);
+    axis
+      .append('line')
+      .attr('class', 'x-axis-top-edge')
+      .attr('stroke', 'var(--chart-grid)')
+      .attr('opacity', 0);
+    axis.append('g').attr('class', 'x-axis-top-ticks');
+  }
+  const count = widthTickCount(layout.width, tickCount);
+  axis.attr('data-plot-top', layout.margin.top).attr('data-plot-height', layout.height);
+  axis
+    .select('.x-axis-top-band')
+    .attr('x', -layout.margin.left)
+    .attr('y', -TOP_AXIS_BAND_PX)
+    .attr('width', layout.width + layout.margin.left + layout.margin.right)
+    .attr('height', TOP_AXIS_BAND_PX + 4);
+  axis
+    .select('.x-axis-top-edge')
+    .attr('x1', -layout.margin.left)
+    .attr('x2', layout.width + layout.margin.right)
+    .attr('y1', 4.5)
+    .attr('y2', 4.5);
+  axis
+    .select<SVGGElement>('.x-axis-top-ticks')
+    .call(d3.axisTop(xScale).ticks(count).tickFormat(xTickFormat).tickSize(0).tickPadding(8))
+    .call((ticks) => ticks.select('.domain').remove());
+}
+
+function stickTopAxis(svg: SVGSVGElement | null | undefined) {
+  const axis = svg?.querySelector<SVGGElement>('.x-axis-top');
+  if (!svg || !axis) return;
+  const headerBottom =
+    document.querySelector('.vt-site-header')?.getBoundingClientRect().bottom ?? 0;
+  const plotTop = svg.getBoundingClientRect().top + Number(axis.dataset.plotTop);
+  const maxOffset = Math.max(0, Number(axis.dataset.plotHeight) - TOP_AXIS_BAND_PX);
+  const offset = Math.min(maxOffset, Math.max(0, headerBottom + TOP_AXIS_BAND_PX - plotTop));
+  setAttrIfChanged(axis, 'transform', `translate(0,${offset})`);
+  const opacity = offset > 0 ? '1' : '0';
+  for (const el of axis.querySelectorAll('.x-axis-top-band, .x-axis-top-edge'))
+    setAttrIfChanged(el, 'opacity', opacity);
 }
 
 function positionLabelPairs(
@@ -396,24 +501,29 @@ function positionLabelPairs(
   const overlayLabels = group.selectAll<SVGTextElement, InterpolatedResult>('.overlay-label');
 
   const maxWidths = new Map<string, number>();
+  const insideText = new Map<string, { color: string; ratio: number }>();
   valueLabels.each(function (d) {
     const text = d3.select(this).text();
     maxWidths.set(d.resultKey, measureTextWidth(text, '600 12px sans-serif'));
+    insideText.set(d.resultKey, readableTextContrast(getBarColor(d), BAR_OPACITY));
   });
   overlayLabels.each(function (d) {
     const text = d3.select(this).text();
     const prev = maxWidths.get(d.resultKey) ?? 0;
-    maxWidths.set(d.resultKey, Math.max(prev, measureTextWidth(text, '500 10px sans-serif')));
+    maxWidths.set(d.resultKey, Math.max(prev, measureTextWidth(text, '500 12px sans-serif')));
   });
 
   const apply = (sel: d3.Selection<SVGTextElement, InterpolatedResult, SVGGElement, unknown>) => {
     sel.each(function (d) {
       const barEnd = xScale(getMetricValue(d, barMetric, costType));
       const maxW = maxWidths.get(d.resultKey) ?? 0;
-      const fitsInside = barEnd > maxW + 24;
+      const inside = insideText.get(d.resultKey);
       const outsideX = Math.min(barEnd + 6, Math.max(0, chartWidth - maxW - 2));
+      const minRatio =
+        outsideX < barEnd + 6 ? MIN_CLAMPED_LABEL_CONTRAST : MIN_INSIDE_LABEL_CONTRAST;
+      const fitsInside = barEnd > maxW + 24 && (inside?.ratio ?? 0) >= minRatio;
       const clamped = !fitsInside && outsideX < barEnd + 6;
-      const fill = fitsInside ? contrastColors(getBarColor(d)) : 'var(--foreground)';
+      const fill = fitsInside && inside ? inside.color : 'var(--foreground)';
       const label = d3
         .select(this)
         .attr('x', fitsInside ? barEnd - 10 : outsideX)
@@ -453,6 +563,7 @@ export default function ThroughputBarChart({
   onBarSelect,
   legendElement,
   caption,
+  footer,
   colorResolver,
 }: ThroughputBarChartProps) {
   const chartRef = useRef<D3ChartHandle>(null);
@@ -468,7 +579,6 @@ export default function ThroughputBarChart({
     [colorResolver],
   );
 
-  const hoveredBarXRef = useRef(0);
   const selectedBarsRef = useRef(selectedBars);
   selectedBarsRef.current = selectedBars;
 
@@ -486,11 +596,13 @@ export default function ThroughputBarChart({
   }, [sortedResults.length]);
 
   const dynamicMargin = useMemo(() => {
-    if (sortedResults.length === 0) return { top: 20, right: 20, bottom: 60, left: 80 };
+    if (sortedResults.length === 0) {
+      return { top: TOP_AXIS_BAND_PX + 4, right: 32, bottom: 60, left: 80 };
+    }
     const labels = sortedResults.map((r) => getLabel(r, hardwareConfig));
     return {
-      top: 20,
-      right: 20,
+      top: TOP_AXIS_BAND_PX + 4,
+      right: 32,
       bottom: 60,
       left: computeLeftMargin(labels, { split: 'parens', minMargin: 80, padding: 12 }),
     };
@@ -498,7 +610,7 @@ export default function ThroughputBarChart({
 
   const maxBarValue = useMemo(() => {
     const max = d3.max(sortedResults, (d) => getMetricValue(d, barMetric, costType)) || 1;
-    return max * 1.15;
+    return max * 1.02;
   }, [sortedResults, barMetric, costType]);
 
   const yDomain = useMemo(
@@ -554,11 +666,14 @@ export default function ThroughputBarChart({
       axes: 'x' as const,
       scaleExtent: [0.1, 1] as [number, number],
       rescaleX: (xScale: ContinuousScale, transform: d3.ZoomTransform) =>
-        xScale.copy().domain([0, maxBarValue / transform.k]) as ContinuousScale,
+        xScale.copy().domain([0, xScale.domain()[1] / transform.k]) as ContinuousScale,
       customTransformStorage: (transform: d3.ZoomTransform) => d3.zoomIdentity.scale(transform.k),
     }),
     [maxBarValue],
   );
+
+  const isMobileViewport = useIsMobileViewport();
+  const xTickCount = isMobileViewport ? 4 : 6;
 
   const layers = useMemo(() => {
     const barLayer: HorizontalBarLayerConfig<InterpolatedResult> = {
@@ -570,7 +685,7 @@ export default function ThroughputBarChart({
         getX: (d) => getMetricValue(d, barMetric, costType),
         getColor: (d) => resolveBarColor(d),
         rx: 4,
-        opacity: 0.85,
+        opacity: BAR_OPACITY,
         keyFn: (d) => d.resultKey,
       },
     };
@@ -588,7 +703,7 @@ export default function ThroughputBarChart({
           .data(sortedResults, (d) => d.resultKey)
           .join('text')
           .attr('class', 'value-label')
-          .attr('y', (d) => (yScale(d.resultKey) ?? 0) + yScale.bandwidth() / 2 - 6)
+          .attr('y', (d) => (yScale(d.resultKey) ?? 0) + yScale.bandwidth() / 2 - 7)
           .attr('dy', '0.35em')
           .attr('font-size', '12px')
           .attr('font-weight', '600')
@@ -603,15 +718,15 @@ export default function ThroughputBarChart({
           .attr('class', 'overlay-label')
           .attr('y', (d) => (yScale(d.resultKey) ?? 0) + yScale.bandwidth() / 2 + 8)
           .attr('dy', '0.35em')
-          .attr('font-size', '10px')
+          .attr('font-size', '12px')
           .attr('font-weight', '500')
           .style('fill', 'var(--muted-foreground)')
           .style('pointer-events', 'none')
           .text((d) => {
             if (barMetric === 'cost') {
               return mode === 'interactivity_to_throughput'
-                ? `${getThroughputForType(d, costType).toFixed(1)} tok/s/chip`
-                : `${getThroughputForType(d, costType).toFixed(1)} tok/s/user`;
+                ? `${compact(getThroughputForType(d, costType))} tok/s/chip`
+                : `${compact(getThroughputForType(d, costType))} tok/s/user`;
             }
             const costLbl = getCostTypeLabel(costType);
             return `$${getCostForType(d, costType).toFixed(3)}${costLbl}`;
@@ -619,12 +734,17 @@ export default function ThroughputBarChart({
 
         const barColor = (d: InterpolatedResult) => resolveBarColor(d);
         positionLabelPairs(zoomGroup, xScale, ctx.width, barMetric, costType, barColor);
+        renderTopAxis(
+          ctx.layout,
+          (ctx.renderedXScale ?? xScale) as d3.ScaleLinear<number, number>,
+          xTickCount,
+        );
       },
       onDisplayUpdate: (zoomGroup, ctx) => {
         const baseXScale = ctx.xScale as d3.ScaleLinear<number, number>;
         const svgNode = ctx.layout.svg.node();
         const transform = svgNode ? d3.zoomTransform(svgNode) : d3.zoomIdentity;
-        const currentXScale = baseXScale.copy().domain([0, maxBarValue / transform.k]);
+        const currentXScale = baseXScale.copy().domain([0, baseXScale.domain()[1] / transform.k]);
         positionLabelPairs(
           zoomGroup,
           currentXScale,
@@ -633,42 +753,88 @@ export default function ThroughputBarChart({
           costType,
           resolveBarColor,
         );
+        renderTopAxis(ctx.layout, currentXScale, xTickCount);
       },
       onZoom: (zoomGroup, ctx) => {
         const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
         const barColor = (d: InterpolatedResult) => resolveBarColor(d);
         positionLabelPairs(zoomGroup, newXScale, ctx.width, barMetric, costType, barColor);
+        renderTopAxis(ctx.layout, newXScale, xTickCount);
       },
     };
 
     return [barLayer, labelLayer];
-  }, [sortedResults, barMetric, costType, mode, maxBarValue, paletteIdentity, resolveBarColor]);
+  }, [
+    sortedResults,
+    barMetric,
+    costType,
+    mode,
+    maxBarValue,
+    paletteIdentity,
+    resolveBarColor,
+    xTickCount,
+  ]);
 
-  const tooltipStateRef = useRef({ hardwareConfig, mode, barMetric, costType, runUrl, locale });
-  tooltipStateRef.current = { hardwareConfig, mode, barMetric, costType, runUrl, locale };
+  const tooltipStateRef = useRef({
+    hardwareConfig,
+    mode,
+    barMetric,
+    costType,
+    runUrl,
+    locale,
+    resolveBarColor,
+  });
+  tooltipStateRef.current = {
+    hardwareConfig,
+    mode,
+    barMetric,
+    costType,
+    runUrl,
+    locale,
+    resolveBarColor,
+  };
 
-  const tooltip = useMemo(
-    () => ({
+  const tooltip = useMemo(() => {
+    const pointDetails = (datum: InterpolatedResult) => {
+      const state = tooltipStateRef.current;
+      return getThroughputPointDetails(
+        datum,
+        state.hardwareConfig,
+        state.mode,
+        state.barMetric,
+        state.costType,
+        state.runUrl,
+        state.locale,
+      );
+    };
+    return {
       rulerType: 'vertical' as const,
-      content: (datum: InterpolatedResult, isPinned: boolean) => {
-        const state = tooltipStateRef.current;
-        return generateTooltipHTML(
-          datum,
-          state.hardwareConfig,
-          state.mode,
-          state.barMetric,
-          state.costType,
-          state.runUrl,
-          isPinned,
-          OVERLAY_STRINGS[state.locale],
-          state.locale,
+      content: (datum: InterpolatedResult) =>
+        generateTooltipHTML(pointDetails(datum), tooltipStateRef.current.resolveBarColor(datum)),
+      details: (datum: InterpolatedResult, _isOverlay: boolean, close: () => void) => {
+        const { note, summary: _summary, ...details } = pointDetails(datum);
+        return (
+          <ChartPointDetails
+            {...details}
+            date={note}
+            color={tooltipStateRef.current.resolveBarColor(datum)}
+            onClose={close}
+            onAction={(_action, event) => event.stopPropagation()}
+          />
         );
       },
-      getRulerX: () => hoveredBarXRef.current,
+      getRulerX: (datum: InterpolatedResult, xScale: unknown) => {
+        const state = tooltipStateRef.current;
+        const value = getMetricValue(datum, state.barMetric, state.costType);
+        return Math.max(0, (xScale as d3.ScaleLinear<number, number>)(value));
+      },
+      getRulerY: (datum: InterpolatedResult, yScale: unknown) => {
+        const band = yScale as d3.ScaleBand<string>;
+        return (band(datum.resultKey) ?? 0) + band.bandwidth() / 2;
+      },
       onHoverStart: (
         selection: d3.Selection<SVGRectElement, InterpolatedResult, SVGGElement, unknown>,
       ) => {
-        hoveredBarXRef.current = Number.parseFloat(selection.attr('width') || '0');
         const hasSelection = selectedBarsRef.current.size > 0;
         if (!hasSelection) {
           selection
@@ -692,9 +858,8 @@ export default function ThroughputBarChart({
         track('calculator_bar_selected', { gpu: datum.hwKey, precision: datum.precision });
       },
       attachToLayer: 0,
-    }),
-    [],
-  );
+    };
+  }, []);
 
   const yAxisConfig = useMemo(() => {
     const labelMap = new Map(sortedResults.map((r) => [r.resultKey, getLabel(r, hardwareConfig)]));
@@ -704,27 +869,17 @@ export default function ThroughputBarChart({
     };
   }, [sortedResults, hardwareConfig]);
 
-  const isMobileViewport = useIsMobileViewport();
   const xAxisConfig = useMemo(
-    () =>
-      isMobileViewport
-        ? {
-            tickCount: 4,
-            tickFormat: (d: d3.AxisDomain) => {
-              const n = Number(d);
-              return Math.abs(n) >= 1000 ? d3.format('~s')(n) : d3.format('~g')(n);
-            },
-          }
-        : { tickCount: 6 },
-    [isMobileViewport],
+    () => ({ tickCount: xTickCount, tickFormat: xTickFormat }),
+    [xTickCount],
   );
 
-  const onRender = useMemo(
+  const renderDecorations = useMemo(
     () => (ctx: RenderContext) => {
       const { layout, width, height } = ctx;
       let xLabelEl = layout.g.select<SVGTextElement>('.x-axis-label-calc');
       if (xLabelEl.empty()) {
-        xLabelEl = layout.g.append('text').attr('class', 'x-axis-label-calc');
+        xLabelEl = layout.g.append('text').attr('class', 'x-axis-label x-axis-label-calc');
       }
       xLabelEl
         .attr('x', width / 2)
@@ -744,6 +899,39 @@ export default function ThroughputBarChart({
     },
     [barMetric, mode, costType, locale, totalChipBasis],
   );
+  const onRender = useCallback(
+    (ctx: RenderContext) => {
+      renderDecorations(ctx);
+      stickTopAxis(ctx.layout.svg.node());
+    },
+    [renderDecorations],
+  );
+  const onExportRender = useCallback(
+    (ctx: RenderContext) => {
+      renderDecorations(ctx);
+      const topAxis = ctx.layout.g.select('.x-axis-top').attr('transform', null);
+      topAxis.selectAll('.x-axis-top-band, .x-axis-top-edge').attr('opacity', 0);
+    },
+    [renderDecorations],
+  );
+
+  useEffect(() => {
+    let frame = 0;
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        stickTopAxis(chartRef.current?.getSvgElement());
+      });
+    };
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+    };
+  }, []);
 
   useEffect(() => {
     const svgEl = chartRef.current?.getSvgElement();
@@ -787,14 +975,15 @@ export default function ThroughputBarChart({
       zoom={zoomConfig}
       instructions={
         locale === 'zh'
-          ? 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置 · 点击柱形进行选择'
-          : 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Click a bar to select'
+          ? 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置'
+          : 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset'
       }
       tooltip={tooltip}
       onRender={onRender}
-      onExportRender={onRender}
+      onExportRender={onExportRender}
       legendElement={legendElement}
       caption={caption}
+      footer={footer}
     />
   );
 }

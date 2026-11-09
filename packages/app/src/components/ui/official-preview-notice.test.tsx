@@ -12,7 +12,7 @@ import {
   VeraRubinOfficialPreviewNotice,
 } from '@/components/ui/official-preview-notice';
 
-const localeState = vi.hoisted(() => ({ pathname: '/inference' }));
+const localeState = vi.hoisted(() => ({ pathname: '/infx/inference' }));
 
 vi.mock('next/navigation', () => ({
   usePathname: () => localeState.pathname,
@@ -22,7 +22,7 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
-  localeState.pathname = '/inference';
+  localeState.pathname = '/infx/inference';
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -59,7 +59,7 @@ describe('official preview notices', () => {
     expect(notice?.getAttribute('aria-label')).toBe('InferenceX Official Preview');
     expect(notice?.textContent).toContain('TPU7x results are an official preview');
 
-    localeState.pathname = '/zh/inference';
+    localeState.pathname = '/zh/infx/inference';
     const zhNotice = renderNotice(<Tpuv7OfficialPreviewNotice />, 'tpuv7-official-preview-notice');
     expect(zhNotice?.textContent).toContain('TPU7x 结果为官方预览');
   });
@@ -82,7 +82,7 @@ describe('official preview notices', () => {
   });
 
   it('renders natural Simplified Chinese copy under /zh', () => {
-    localeState.pathname = '/zh/inference';
+    localeState.pathname = '/zh/infx/inference';
     const notice = renderNotice(
       <VeraRubinOfficialPreviewNotice />,
       'vera-rubin-official-preview-notice',
@@ -91,5 +91,16 @@ describe('official preview notices', () => {
     expect(notice?.getAttribute('aria-label')).toBe('InferenceX 官方预览');
     expect(notice?.textContent).toContain('Vera Rubin NVL72 结果为官方预览');
     expect(notice?.textContent).toContain('随着验证和发布工作的推进');
+  });
+
+  it('keeps the note semantics and full copy in the inline variant', () => {
+    const notice = renderNotice(
+      <VeraRubinOfficialPreviewNotice variant="inline" />,
+      'vera-rubin-official-preview-notice',
+    );
+    expect(notice?.tagName).toBe('P');
+    expect(notice?.getAttribute('role')).toBe('note');
+    expect(notice?.textContent).toContain('InferenceX Official Preview');
+    expect(notice?.textContent).toContain('Vera Rubin NVL72 results are an official preview');
   });
 });

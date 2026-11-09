@@ -260,7 +260,13 @@ describe('fitAlphaBeta', () => {
       return {
         tokens_per_rank: bytesPerGpu / 1e4,
         global_tokens: bytesPerGpu / 1e3,
-        components: { dispatch: component, stage: null, combine: component, roundtrip: component },
+        components: {
+          pair_period: component,
+          dispatch: component,
+          stage: null,
+          combine: component,
+          roundtrip: component,
+        },
         roundtrip_token_rate_at_latency_percentile: pct(1),
       };
     };

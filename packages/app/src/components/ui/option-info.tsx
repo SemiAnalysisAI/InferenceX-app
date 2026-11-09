@@ -17,28 +17,6 @@ import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 
-export function SelectedOptionInfo({
-  label,
-  value,
-  children,
-}: {
-  label: string;
-  value: string;
-  children: ReactNode;
-}) {
-  return (
-    <InfoHelp
-      label={label}
-      value={value}
-      variant="selected"
-      triggerTestId={`selected-option-help-${value}`}
-      contentTestId={`selected-option-help-content-${value}`}
-    >
-      {children}
-    </InfoHelp>
-  );
-}
-
 export function OptionInfo(props: Omit<InfoHelpProps, 'variant'>) {
   return <InfoHelp {...props} variant="option" />;
 }
@@ -54,7 +32,7 @@ interface InfoHelpProps {
   contentTestId?: string;
   ariaLabel?: string;
   align?: 'start' | 'center' | 'end';
-  variant?: 'inline' | 'option' | 'selected';
+  variant?: 'inline' | 'option';
   analyticsEvent?: 'selector_option_help_opened' | 'selector_help_opened';
 }
 
@@ -144,7 +122,6 @@ export function InfoHelp({
             'no-export group/info-help inline-flex shrink-0 cursor-help items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-none',
             variant === 'option' && 'size-11 md:size-8',
             variant === 'inline' && 'size-6 -my-0.5',
-            variant === 'selected' && 'pointer-events-auto h-full w-7',
             triggerClassName,
           )}
         >

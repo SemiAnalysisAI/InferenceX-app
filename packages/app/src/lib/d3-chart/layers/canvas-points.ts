@@ -13,16 +13,17 @@ import { PointHitGrid, hitAreaPath } from './canvas-point-hit';
 import { joinedDrawOrder } from './canvas-point-order';
 import {
   CANVAS_POINT_LAYER_CLASS,
+  CANVAS_UNDERLAY_ATTRIBUTE,
   POINT_HIT_AREA_CLASS,
   POINT_LABEL_ANCHOR_CLASS,
   POINTS_JOINED_ATTRIBUTE,
   canvasPointLayerOf,
   canvasPointLayers,
+  revealCanvasUnderlay,
 } from './canvas-point-registry';
 import { resolveShapeKey, syncPointLabel, type ScatterPointConfig } from './scatter-points';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const XHTML_NS = 'http://www.w3.org/1999/xhtml';
 const CSS_EASE_X1 = 0.25;
 const CSS_EASE_Y1 = 0.1;
 const CSS_EASE_X2 = 0.25;
@@ -32,6 +33,11 @@ const MARKER_SIZE = 20;
 const MARKER_HOVER_SCALE = 1.15;
 const NO_SLOT = 0;
 const NO_SHAPE = 255;
+export const CANVAS_POINT_SURFACE_CLASS = 'canvas-point-surface';
+const GRID_SELECTOR = '.grid-v, .grid-h';
+const SHAPE_SELECTOR = 'line, path, circle';
+const PAINT_URL = /^url\("?#(?<id>[^")]+)"?\)/u;
+const FILTER_OPACITY = /opacity\((?<amount>[\d.]+)(?<percent>%?)\)/u;
 
 export interface ScatterDatum {
   precision: string;
@@ -104,6 +110,67 @@ export function cssEase(progress: number): number {
   return cssEaseComponent(t, CSS_EASE_Y1, CSS_EASE_Y2);
 }
 
+function numberAttr(element: Element, name: string): number {
+  return Number(element.getAttribute(name) ?? 0);
+}
+
+function shapeGeometry(shape: Element): Path2D | null {
+  if (shape.localName === 'path') {
+    const d = shape.getAttribute('d');
+    return d ? new Path2D(d) : null;
+  }
+  const path = new Path2D();
+  if (shape.localName === 'circle') {
+    path.arc(
+      numberAttr(shape, 'cx'),
+      numberAttr(shape, 'cy'),
+      numberAttr(shape, 'r'),
+      0,
+      2 * Math.PI,
+    );
+  } else {
+    path.moveTo(numberAttr(shape, 'x1'), numberAttr(shape, 'y1'));
+    path.lineTo(numberAttr(shape, 'x2'), numberAttr(shape, 'y2'));
+  }
+  return path;
+}
+
+function filterOpacity(filter: string): number {
+  const match = FILTER_OPACITY.exec(filter)?.groups;
+  if (!match) return 1;
+  return Number(match.amount) / (match.percent ? 100 : 1);
+}
+
+function inheritedAlpha(element: Element, root: Element, cache: Map<Element, number>): number {
+  if (element === root) return 1;
+  let alpha = cache.get(element);
+  if (alpha !== undefined) return alpha;
+  const style = getComputedStyle(element);
+  alpha = style.display === 'none' ? 0 : Number(style.opacity || 1) * filterOpacity(style.filter);
+  if (alpha > 0 && element.parentElement) {
+    alpha *= inheritedAlpha(element.parentElement, root, cache);
+  }
+  cache.set(element, alpha);
+  return alpha;
+}
+
+function longestSeconds(value: string): number {
+  return Math.max(0, ...value.split(',').map(Number.parseFloat));
+}
+
+function longestTransitionMs(style: CSSStyleDeclaration): number {
+  return 1000 * (longestSeconds(style.transitionDuration) + longestSeconds(style.transitionDelay));
+}
+
+interface UnderlayFrame {
+  context: CanvasRenderingContext2D;
+  ratio: number;
+  svg: SVGSVGElement;
+  origin: DOMMatrix | null;
+  painted: Set<SVGElement>;
+  alphas: Map<Element, number>;
+}
+
 interface RedrawableLayer {
   readonly element: Element;
   invalidate: () => void;
@@ -141,8 +208,8 @@ export function ensureCanvasPointLayer<T extends ScatterDatum>(
 
 export class CanvasPointLayer<T extends ScatterDatum> {
   readonly element: CanvasPointLayerElement;
-  private readonly foreignObject: SVGForeignObjectElement;
   private readonly canvas: HTMLCanvasElement;
+  private surfaceObserver: MutationObserver | null = null;
   private readonly hitPath: SVGPathElement;
   private readonly labelLayer: SVGGElement;
   private context: CanvasRenderingContext2D | null | undefined;
@@ -192,6 +259,7 @@ export class CanvasPointLayer<T extends ScatterDatum> {
   private gridDirty = true;
   private hitPathDirty = false;
   private hoveredSlot = NO_SLOT;
+  private pinnedSlot = NO_SLOT;
   private pointerSlot = NO_SLOT;
   private handlers: PointPointerHandlers<T> | null = null;
 
@@ -202,25 +270,38 @@ export class CanvasPointLayer<T extends ScatterDatum> {
   private positionStart = -1;
   private positionAnimating = false;
   private frame: number | null = null;
+  private underlayShapes = new Set<SVGElement>();
+  private underlayUntil = 0;
+  private transitionHost: SVGSVGElement | null = null;
+  private readonly onTransition = (event: Event) => {
+    if (!this.touchesUnderlay(event.target as Node)) return;
+    const until =
+      performance.now() + longestTransitionMs(getComputedStyle(event.target as Element));
+    this.underlayUntil = Math.max(this.underlayUntil, until);
+    this.invalidate();
+  };
 
   constructor(document: Document) {
     this.element = document.createElementNS(SVG_NS, 'g');
     this.element.setAttribute('class', CANVAS_POINT_LAYER_CLASS);
     this.element.setAttribute(POINTS_JOINED_ATTRIBUTE, '0');
     this.element.scatterPoints = () => this.snapshot();
-    this.foreignObject = document.createElementNS(SVG_NS, 'foreignObject');
-    this.foreignObject.setAttribute('pointer-events', 'none');
-    this.canvas = document.createElementNS(XHTML_NS, 'canvas') as HTMLCanvasElement;
+    // The canvas is an HTML sibling placed under the SVG, not a <foreignObject> child. WebKit
+    // composites large canvases and paints composited foreignObject content without its SVG
+    // ancestors' transforms and clip, so Safari drew every point offset from the plot.
+    this.canvas = document.createElement('canvas');
+    this.canvas.className = CANVAS_POINT_SURFACE_CLASS;
+    this.canvas.setAttribute('aria-hidden', 'true');
     this.canvas.style.display = 'block';
+    this.canvas.style.position = 'absolute';
     this.canvas.style.pointerEvents = 'none';
-    this.foreignObject.append(this.canvas);
     this.hitPath = document.createElementNS(SVG_NS, 'path');
     this.hitPath.setAttribute('class', POINT_HIT_AREA_CLASS);
     this.hitPath.setAttribute('fill', 'transparent');
     this.hitPath.setAttribute('cursor', 'pointer');
     this.labelLayer = document.createElementNS(SVG_NS, 'g');
     this.labelLayer.setAttribute('class', 'point-label-layer');
-    this.element.append(this.foreignObject, this.hitPath, this.labelLayer);
+    this.element.append(this.hitPath, this.labelLayer);
   }
 
   join(
@@ -328,14 +409,81 @@ export class CanvasPointLayer<T extends ScatterDatum> {
     const ratio = globalThis.devicePixelRatio || 1;
     this.width = width;
     this.height = height;
-    this.foreignObject.setAttribute('width', String(width));
-    this.foreignObject.setAttribute('height', String(height));
     this.canvas.style.width = `${width}px`;
     this.canvas.style.height = `${height}px`;
     const pixelWidth = Math.max(1, Math.round(width * ratio));
     const pixelHeight = Math.max(1, Math.round(height * ratio));
     if (this.canvas.width !== pixelWidth) this.canvas.width = pixelWidth;
     if (this.canvas.height !== pixelHeight) this.canvas.height = pixelHeight;
+  }
+
+  /**
+   * Keeps the canvas directly under the SVG, aligned with this layer's plot origin. The SVG is
+   * made a positioned box so it paints above the canvas. The canvas is removed once this layer
+   * leaves the SVG.
+   */
+  private mountSurface(): boolean {
+    const svg = this.element.isConnected ? this.element.ownerSVGElement : null;
+    const host = svg?.parentElement;
+    if (!svg || !host) {
+      this.unmountSurface();
+      return false;
+    }
+    if (this.canvas.parentNode !== host || this.canvas.nextSibling !== svg) {
+      svg.before(this.canvas);
+      if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+      if (getComputedStyle(svg).position === 'static') svg.style.position = 'relative';
+    }
+    if (!this.surfaceObserver && typeof MutationObserver !== 'undefined') {
+      this.surfaceObserver = new MutationObserver((records) => {
+        if (!this.element.isConnected) this.unmountSurface();
+        else if (this.frame === null && this.underlayChanged(records)) this.invalidate();
+      });
+      this.surfaceObserver.observe(svg, { childList: true, subtree: true, attributes: true });
+      svg.addEventListener('transitionrun', this.onTransition);
+      this.transitionHost = svg;
+    }
+    const ctm = this.element.getCTM?.();
+    const svgBox = svg.getBoundingClientRect();
+    const hostBox = host.getBoundingClientRect();
+    const left = svgBox.left - hostBox.left - host.clientLeft + (ctm?.e ?? 0);
+    const top = svgBox.top - hostBox.top - host.clientTop + (ctm?.f ?? 0);
+    setStyleIfChanged(this.canvas, 'left', `${left}px`);
+    setStyleIfChanged(this.canvas, 'top', `${top}px`);
+    return true;
+  }
+
+  private unmountSurface(): void {
+    this.surfaceObserver?.disconnect();
+    this.surfaceObserver = null;
+    this.transitionHost?.removeEventListener('transitionrun', this.onTransition);
+    this.transitionHost = null;
+    for (const shape of this.underlayShapes) revealCanvasUnderlay(shape);
+    this.underlayShapes.clear();
+    this.canvas.remove();
+  }
+
+  private touchesUnderlay(node: Node | null): boolean {
+    if (!(node instanceof Element)) return false;
+    const selector = [GRID_SELECTOR, ...(this.config?.underlay ?? [])].join(', ');
+    return node.closest(selector) !== null || node.querySelector(selector) !== null;
+  }
+
+  private underlayChanged(records: MutationRecord[]): boolean {
+    for (const record of records) {
+      if (this.touchesUnderlay(record.target)) return true;
+      for (const node of record.addedNodes) if (this.touchesUnderlay(node)) return true;
+    }
+    for (const shape of this.underlayShapes) if (!shape.isConnected) return true;
+    return false;
+  }
+
+  /** Viewport position of the plot origin, which the hit grid and snapshots are relative to. */
+  private plotOrigin(): PointPosition {
+    const ctm = this.element.getScreenCTM?.();
+    if (ctm) return { x: ctm.e, y: ctm.f };
+    const bounds = this.canvas.getBoundingClientRect();
+    return { x: bounds.left, y: bounds.top };
   }
 
   private paletteSlots(palette: string[]): (color: string) => number {
@@ -487,6 +635,7 @@ export class CanvasPointLayer<T extends ScatterDatum> {
   }
 
   place(xScale: ContinuousScale, yScale: ContinuousScale): void {
+    this.mountSurface();
     for (let index = 0; index < this.count; index++) {
       const datum = this.data[index];
       const x = xScale(datum.x);
@@ -605,6 +754,14 @@ export class CanvasPointLayer<T extends ScatterDatum> {
     this.setHoveredSlot(NO_SLOT);
   }
 
+  pin(datum: T | null): void {
+    const index = datum === null ? -1 : this.data.indexOf(datum);
+    const slot = index >= 0 ? this.slots[index] : NO_SLOT;
+    if (this.pinnedSlot === slot) return;
+    this.pinnedSlot = slot;
+    this.invalidate();
+  }
+
   private setHoveredSlot(slot: number): void {
     if (this.hoveredSlot === slot) return;
     this.hoveredSlot = slot;
@@ -631,8 +788,8 @@ export class CanvasPointLayer<T extends ScatterDatum> {
   }
 
   private pointAt(event: MouseEvent): number {
-    const bounds = this.canvas.getBoundingClientRect();
-    return this.hitTest(event.clientX - bounds.left, event.clientY - bounds.top);
+    const origin = this.plotOrigin();
+    return this.hitTest(event.clientX - origin.x, event.clientY - origin.y);
   }
 
   private leavePointer(event: MouseEvent, handlers: PointPointerHandlers<T>): void {
@@ -671,7 +828,7 @@ export class CanvasPointLayer<T extends ScatterDatum> {
   }
 
   snapshot(): ScatterPointSnapshot<T>[] {
-    const bounds = this.canvas.getBoundingClientRect();
+    const origin = this.plotOrigin();
     const dataAttrs = Object.entries(this.config?.dataAttrs ?? {});
     return this.data.map((datum, index) => {
       const attrs: Record<string, string> = {};
@@ -685,8 +842,8 @@ export class CanvasPointLayer<T extends ScatterDatum> {
         datum,
         x: this.xs[index],
         y: this.ys[index],
-        clientX: bounds.left + this.xs[index],
-        clientY: bounds.top + this.ys[index],
+        clientX: origin.x + this.xs[index],
+        clientY: origin.y + this.ys[index],
         opacity: this.alpha[index],
         interactive: this.interactive[index] === 1,
         shape: SHAPE_ORDER[this.shape[index]],
@@ -726,7 +883,7 @@ export class CanvasPointLayer<T extends ScatterDatum> {
       );
     }
     this.draw();
-    if (animating) this.invalidate();
+    if (animating || time < this.underlayUntil) this.invalidate();
   }
 
   private advance(time: number): boolean {
@@ -786,45 +943,181 @@ export class CanvasPointLayer<T extends ScatterDatum> {
     });
   }
 
+  private visibleOpacity(index: number): number {
+    const margin = HIT_AREA_RADIUS + MARKER_SIZE;
+    const x = this.drawXs[index];
+    const y = this.drawYs[index];
+    if (x < -margin || x > this.width + margin || y < -margin || y > this.height + margin) return 0;
+    return this.shownAlpha[index] * (this.faded[index] ? FADED_OPACITY : 1);
+  }
+
+  private underlayPaint(
+    context: CanvasRenderingContext2D,
+    value: string,
+  ): string | CanvasGradient | null {
+    if (!value || value === 'none') return null;
+    const id = PAINT_URL.exec(value)?.groups?.id;
+    if (!id) return value;
+    const gradient = this.element.ownerDocument.querySelector(`#${CSS.escape(id)}`);
+    if (gradient?.localName !== 'linearGradient') return null;
+    const paint = context.createLinearGradient(
+      numberAttr(gradient, 'x1'),
+      numberAttr(gradient, 'y1'),
+      numberAttr(gradient, 'x2'),
+      numberAttr(gradient, 'y2'),
+    );
+    for (const stop of gradient.querySelectorAll('stop')) {
+      const offset = stop.getAttribute('offset') ?? '0';
+      const fraction = Number.parseFloat(offset) / (offset.endsWith('%') ? 100 : 1);
+      paint.addColorStop(Math.min(1, Math.max(0, fraction)), getComputedStyle(stop).stopColor);
+    }
+    return paint;
+  }
+
+  private paintShape(frame: UnderlayFrame, shape: SVGElement): void {
+    const { context, ratio, origin } = frame;
+    const alpha = inheritedAlpha(shape, frame.svg, frame.alphas);
+    const geometry = alpha > 0 ? shapeGeometry(shape) : null;
+    if (!geometry) return;
+    const style = getComputedStyle(shape);
+    const ctm = (shape as SVGGraphicsElement).getCTM?.();
+    const m = origin && ctm ? origin.multiply(ctm) : null;
+    if (m)
+      context.setTransform(
+        ratio * m.a,
+        ratio * m.b,
+        ratio * m.c,
+        ratio * m.d,
+        ratio * m.e,
+        ratio * m.f,
+      );
+    else context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.save();
+    const clipId = PAINT_URL.exec(style.clipPath)?.groups?.id;
+    const clipShape = clipId
+      ? shape.ownerDocument.querySelector(`#${CSS.escape(clipId)}`)?.querySelector(SHAPE_SELECTOR)
+      : null;
+    const clip = clipShape ? shapeGeometry(clipShape) : null;
+    if (clip) context.clip(clip);
+    const fill = shape.localName === 'line' ? null : this.underlayPaint(context, style.fill);
+    if (fill) {
+      context.globalAlpha = alpha * Number(style.fillOpacity || 1);
+      context.fillStyle = fill;
+      context.fill(geometry);
+    }
+    const stroke = this.underlayPaint(context, style.stroke);
+    const width = Number.parseFloat(style.strokeWidth);
+    if (stroke && width > 0) {
+      const dash = style.strokeDasharray;
+      context.globalAlpha = alpha * Number(style.strokeOpacity || 1);
+      context.strokeStyle = stroke;
+      context.lineWidth = width;
+      context.lineCap = (style.strokeLinecap || 'butt') as CanvasLineCap;
+      context.lineJoin = (style.strokeLinejoin || 'miter') as CanvasLineJoin;
+      context.miterLimit = Number(style.strokeMiterlimit || 4);
+      context.setLineDash(
+        dash && dash !== 'none' ? dash.split(/[\s,]+/u).map(Number.parseFloat) : [],
+      );
+      context.lineDashOffset = Number.parseFloat(style.strokeDashoffset) || 0;
+      context.stroke(geometry);
+    }
+    context.restore();
+  }
+
+  private paintUnderlay(frame: UnderlayFrame, selector: string): void {
+    for (const match of frame.svg.querySelectorAll<SVGElement>(selector)) {
+      const shapes = match.matches(SHAPE_SELECTOR)
+        ? [match]
+        : match.querySelectorAll<SVGElement>(SHAPE_SELECTOR);
+      for (const shape of shapes) {
+        if (frame.painted.has(shape) || shape.closest('clipPath, defs')) continue;
+        frame.painted.add(shape);
+        this.paintShape(frame, shape);
+      }
+    }
+  }
+
+  private hideUnderlay(painted: Set<SVGElement>): void {
+    for (const shape of this.underlayShapes) if (!painted.has(shape)) revealCanvasUnderlay(shape);
+    for (const shape of painted) {
+      if (this.underlayShapes.has(shape)) continue;
+      shape.setAttribute(CANVAS_UNDERLAY_ATTRIBUTE, '');
+      shape.style.setProperty('visibility', 'hidden');
+    }
+    this.underlayShapes = painted;
+    this.surfaceObserver?.takeRecords();
+  }
+
+  private drawHalos(context: CanvasRenderingContext2D, ratio: number, colors: string[]): void {
+    const halo = this.haloStyle;
+    if (!halo) return;
+    for (let index = 0; index < this.count; index++) {
+      const haloSlot = this.haloIndex[index];
+      const opacity = haloSlot === 0 ? 0 : this.visibleOpacity(index);
+      if (opacity <= 0) continue;
+      context.setTransform(
+        ratio,
+        0,
+        0,
+        ratio,
+        this.drawXs[index] * ratio,
+        this.drawYs[index] * ratio,
+      );
+      context.globalAlpha = opacity * halo.opacity;
+      context.strokeStyle = colors[haloSlot - 1];
+      context.lineWidth = halo.strokeWidth;
+      context.setLineDash(halo.dash);
+      context.beginPath();
+      context.arc(0, 0, halo.radius, 0, 2 * Math.PI);
+      context.stroke();
+      context.setLineDash([]);
+    }
+  }
+
   private draw(): void {
+    if (!this.mountSurface()) return;
     this.context ??= this.canvas.getContext('2d');
     const context = this.context;
-    if (!context) return;
+    const svg = this.element.ownerSVGElement;
+    if (!context || !svg) return;
     const ratio = this.canvas.width / Math.max(1, this.width);
     context.setTransform(1, 0, 0, 1, 0, 0);
     context.clearRect(0, 0, this.canvas.width, this.canvas.height);
     const colors = this.resolveColors();
+    const frame: UnderlayFrame = {
+      context,
+      ratio,
+      svg,
+      origin: this.element.getCTM?.()?.inverse() ?? null,
+      painted: new Set(),
+      alphas: new Map(),
+    };
+    this.paintUnderlay(frame, GRID_SELECTOR);
+    this.drawHalos(context, ratio, colors);
+    for (const selector of this.config?.underlay ?? []) this.paintUnderlay(frame, selector);
+    this.hideUnderlay(frame.painted);
     const marker = this.marker?.complete ? this.marker : null;
-    const halo = this.haloStyle;
     const hovered = this.indexBySlot.get(this.hoveredSlot) ?? -1;
-    const margin = HIT_AREA_RADIUS + MARKER_SIZE;
+    const pinned = this.indexBySlot.get(this.pinnedSlot) ?? -1;
     for (let index = 0; index < this.count; index++) {
-      const opacity = this.shownAlpha[index] * (this.faded[index] ? FADED_OPACITY : 1);
+      const opacity = this.visibleOpacity(index);
       if (opacity <= 0) continue;
-      const x = this.drawXs[index];
-      const y = this.drawYs[index];
-      if (x < -margin || x > this.width + margin || y < -margin || y > this.height + margin) {
-        continue;
-      }
-      context.setTransform(ratio, 0, 0, ratio, x * ratio, y * ratio);
+      context.setTransform(
+        ratio,
+        0,
+        0,
+        ratio,
+        this.drawXs[index] * ratio,
+        this.drawYs[index] * ratio,
+      );
       context.globalAlpha = opacity;
+      const enlarged = index === hovered || index === pinned;
       if (marker) {
-        const size = MARKER_SIZE * (index === hovered ? MARKER_HOVER_SCALE : 1);
+        const size = MARKER_SIZE * (enlarged ? MARKER_HOVER_SCALE : 1);
         context.drawImage(marker, -size / 2, -size / 2, size, size);
       } else {
         context.fillStyle = colors[this.colorIndex[index]];
-        context.fill(this.shapePath(SHAPE_ORDER[this.shape[index]], index === hovered));
-      }
-      const haloSlot = this.haloIndex[index];
-      if (haloSlot !== 0 && halo) {
-        context.globalAlpha = opacity * halo.opacity;
-        context.strokeStyle = colors[haloSlot - 1];
-        context.lineWidth = halo.strokeWidth;
-        context.setLineDash(halo.dash);
-        context.beginPath();
-        context.arc(0, 0, halo.radius, 0, 2 * Math.PI);
-        context.stroke();
-        context.setLineDash([]);
+        context.fill(this.shapePath(SHAPE_ORDER[this.shape[index]], enlarged));
       }
     }
     context.setTransform(1, 0, 0, 1, 0, 0);

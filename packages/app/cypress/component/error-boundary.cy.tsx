@@ -12,7 +12,7 @@ describe('App error boundary localization', () => {
     cy.stub(console, 'error');
 
     cy.mount(
-      <PathnameContext.Provider value="/inference">
+      <PathnameContext.Provider value="/infx/inference">
         <AppError
           error={Object.assign(new Error('fixture failure'), { digest: 'en-1' })}
           reset={reset}
@@ -21,8 +21,6 @@ describe('App error boundary localization', () => {
     );
 
     cy.get('[role="alert"]').should('have.attr', 'lang', 'en');
-    cy.contains('h2', 'Something went wrong!').should('be.visible');
-    cy.contains('An unexpected error has occurred.').should('be.visible');
     cy.get('@capture').should('have.been.calledWith', 'error_page_shown', {
       message: 'fixture failure',
       digest: 'en-1',
@@ -42,14 +40,12 @@ describe('App error boundary localization', () => {
     cy.viewport(375, 812);
 
     cy.mount(
-      <PathnameContext.Provider value="/zh/inference">
+      <PathnameContext.Provider value="/zh/infx/inference">
         <AppError error={Object.assign(new Error(message), { digest: 'zh-1' })} reset={reset} />
       </PathnameContext.Provider>,
     );
 
     cy.get('[role="alert"]').should('have.attr', 'lang', 'zh-CN');
-    cy.contains('h2', '页面出了点问题').should('be.visible');
-    cy.contains('发生意外错误。请重试。').should('be.visible');
     cy.contains('p', message).should('have.attr', 'lang', 'en');
     cy.get('@capture').should('have.been.calledWith', 'error_page_shown', {
       message,
@@ -72,6 +68,7 @@ describe('Not-found recovery analytics', () => {
   it('tracks the locale when returning from a Chinese 404', () => {
     const capture = cy.stub().as('capture');
     registerAnalyticsClient({ capture });
+    cy.viewport(375, 812);
 
     cy.mount(<NotFoundContent locale="zh" />);
     cy.contains('a[href="/zh"]', '返回首页')

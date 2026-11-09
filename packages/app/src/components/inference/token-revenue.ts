@@ -20,6 +20,10 @@ export function formatTokenPrice(value: number): string {
   return value.toLocaleString('en-US', { maximumFractionDigits: 6 });
 }
 
+export function formatTokenPriceLabel(value: number): string {
+  return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+}
+
 export function cachedInputPricePerMillion(pricing: TokenRevenuePricing): number {
   const explicit = pricing.cachedInputPerMillion;
   return typeof explicit === 'number' && Number.isFinite(explicit) && explicit >= 0

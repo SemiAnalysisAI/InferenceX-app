@@ -51,7 +51,7 @@ export function CollectiveXChangelog({ version }: { version: CollectiveXVersion 
             <div className="flex flex-wrap items-baseline gap-x-2">
               <span className="font-mono text-xs text-muted-foreground">{entry.date}</span>
               <a
-                className="font-semibold underline"
+                className="font-medium tabular-nums underline underline-offset-2"
                 href={entry.pr_link}
                 target="_blank"
                 rel="noreferrer"

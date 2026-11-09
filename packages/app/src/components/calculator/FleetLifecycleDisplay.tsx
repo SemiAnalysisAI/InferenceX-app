@@ -22,7 +22,9 @@ import {
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ControlPanel } from '@/components/ui/control-panel';
+import { RangeField } from '@/components/ui/range-field';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
+import { EmptyState } from '@/components/ui/empty-state';
 import ChartLegendItem from '@/components/ui/chart-legend-item';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import {
@@ -31,7 +33,6 @@ import {
   PrecisionSelector,
   ScenarioSelector,
 } from '@/components/ui/chart-selectors';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
@@ -60,41 +61,41 @@ const COST_PROVIDER_OPTIONS: {
 }[] = [
   {
     value: 'costh',
-    label: 'Owning at Large Hyperscaler Volume',
+    label: 'Owning at large hyperscaler volume',
     labelZh: '自有 · 超大规模云厂商批量采购',
   },
-  { value: 'costr', label: 'Rent - 3 Year Commit', labelZh: '租赁 - 3 年承诺' },
+  { value: 'costr', label: 'Rent – 3-year commit', labelZh: '租赁 - 3 年承诺' },
 ];
 
 const COST_TYPE_OPTIONS: { value: CostType; label: string }[] = [
-  { value: 'total', label: 'Total Tokens' },
-  { value: 'input', label: 'Input Tokens' },
-  { value: 'output', label: 'Output Tokens' },
+  { value: 'total', label: 'Total tokens' },
+  { value: 'input', label: 'Input tokens' },
+  { value: 'output', label: 'Output tokens' },
 ];
 
 const STRINGS = {
   en: {
-    title: 'Fleet Lifecycle',
+    title: 'Fleet lifecycle',
     description:
       'Pick the model, workload, and target interactivity. The projection below sizes a fixed fleet of each chip against a facility power budget and reads the full run history at this operating point — see the section itself for what the lines mean.',
-    benchmarkGroup: 'Benchmark Config',
-    chartGroup: 'Chart Config',
-    costProviderLabel: 'Cost Provider',
+    benchmarkGroup: 'Benchmark config',
+    chartGroup: 'Chart config',
+    costProviderLabel: 'Cost provider',
     costProviderTooltip:
       'The pricing tier used for the fleet cost line. Owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit. Locked rental terms (on demand through 2 year commit) are published in the SemiAnalysis AI Cloud TCO Model.',
     costProviderPlaceholder: 'Cost provider',
-    tokenTypeLabel: 'Token Type',
+    tokenTypeLabel: 'Token type',
     tokenTypeTooltip:
       'Whether the per-chip figures quoted in the table use total tokens, input tokens only, or output tokens only. Revenue always counts both streams.',
     tokenTypePlaceholder: 'Token type',
-    targetLabel: 'Target Interactivity (tok/s/user)',
+    targetLabel: 'Target interactivity (tok/s/user)',
     targetTooltip:
       'The interactivity operating point used for interpolation. Each chip\u2019s fleet serves this speed; every run date is read at it.',
-    targetAgenticLabel: (percentile: string) => `Target ${percentile} Interactivity (tok/s/user)`,
+    targetAgenticLabel: (percentile: string) => `Target ${percentile} interactivity (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
       `The ${percentile} interactivity operating point used for agentic workload interpolation. Each chip\u2019s fleet serves this speed; every run date is read at it.`,
     errorLoading: 'Error loading data. Please try a different selection.',
-    highContrast: 'High Contrast',
+    highContrast: 'High contrast',
     resetFilter: 'Reset filter',
   },
   zh: {
@@ -220,8 +221,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
   );
   const currentRange = ranges.interactivity;
 
-  const handleSliderChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = Number(event.target.value);
+  const handleSliderChange = useCallback((value: number) => {
     setRequestedTargetValue(value);
     setInputValue(String(value));
   }, []);
@@ -332,6 +332,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
           name: config.name,
           label: getDisplayLabel(config),
           color: resolveColor(key),
+          lineDasharray: 'none',
           title: config.gpu,
           hw: key,
           isActive: visibleHwKeys.has(key),
@@ -344,19 +345,13 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
     () =>
       locale === 'zh'
         ? COST_TYPE_LABELS_ZH
-        : { total: 'Total Tokens', input: 'Input Tokens', output: 'Output Tokens' },
+        : { total: 'Total tokens', input: 'Input tokens', output: 'Output tokens' },
     [locale],
   );
 
   if (!loading && error) {
     console.error(error);
-    return (
-      <Card>
-        <div className="flex items-center justify-center h-64 text-muted-foreground">
-          {t.errorLoading}
-        </div>
-      </Card>
-    );
+    return <EmptyState className="h-64">{t.errorLoading}</EmptyState>;
   }
 
   return (
@@ -420,9 +415,9 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
               <ControlPanel
                 legend={t.chartGroup}
                 data-testid="fleet-chart-panel"
-                className="grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
+                className="grid-cols-1 md:grid-cols-2 xl:grid-cols-4"
               >
-                <div className="flex min-w-0 flex-col space-y-1.5 lg:col-span-1">
+                <div className="flex min-w-0 flex-col space-y-1.5">
                   <LabelWithTooltip
                     htmlFor="fleet-cost"
                     label={t.costProviderLabel}
@@ -459,7 +454,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                   </div>
                 </div>
 
-                <div className="flex min-w-0 flex-col space-y-1.5 lg:col-span-1">
+                <div className="flex min-w-0 flex-col space-y-1.5">
                   <LabelWithTooltip
                     htmlFor="fleet-cost-type"
                     label={t.tokenTypeLabel}
@@ -494,7 +489,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                 {showsTcoBasis && (
                   <div className="flex min-w-0 max-w-48 flex-col space-y-1.5">
                     <LabelWithTooltip
-                      label={locale === 'zh' ? 'TCO 口径' : 'TCO Basis'}
+                      label={locale === 'zh' ? 'TCO 口径' : 'TCO basis'}
                       tooltip={
                         locale === 'zh'
                           ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'
@@ -506,7 +501,9 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                 )}
 
                 {!loading && hasData && (
-                  <div className="space-y-2 md:col-span-2 xl:col-span-3">
+                  <div
+                    className={`space-y-1.5 md:col-span-2 ${showsTcoBasis ? 'xl:col-span-1' : ''}`}
+                  >
                     <LabelWithTooltip
                       htmlFor="fleet-target"
                       label={
@@ -518,61 +515,29 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                           : t.targetTooltip
                       }
                     />
-                    <div className="flex items-center gap-4">
-                      <div className="min-w-0 flex-1">
-                        <input
-                          id="fleet-target"
-                          type="range"
-                          min={currentRange.min}
-                          max={currentRange.max}
-                          step={1}
-                          value={targetValue}
-                          onChange={handleSliderChange}
-                          onPointerUp={() =>
-                            track('fleet_target_slider_set', { mode, value: targetValue })
-                          }
-                          className="w-full h-2 appearance-none rounded-full bg-secondary cursor-pointer
-                        [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4
-                        [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full
-                        [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer
-                        [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4
-                        [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary
-                        [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
-                        />
-                        <div
-                          className="relative h-4 text-xs text-muted-foreground"
-                          style={{ marginLeft: 8, marginRight: 8 }}
-                        >
-                          {Array.from({ length: 6 }, (_, i) => (
-                            <span
-                              key={i}
-                              className="absolute -translate-x-1/2"
-                              style={{ left: `${(i / 5) * 100}%` }}
-                            >
-                              {Math.round(
-                                currentRange.min + (currentRange.max - currentRange.min) * (i / 5),
-                              )}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      <Input
-                        type="number"
-                        aria-label={
-                          isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
-                        }
-                        value={resolveCalculatorTargetInputValue(
+                    <RangeField
+                      label={
+                        isAgenticSequence ? t.targetAgenticLabel(percentileLabel) : t.targetLabel
+                      }
+                      min={currentRange.min}
+                      max={currentRange.max}
+                      value={targetValue}
+                      onSliderChange={handleSliderChange}
+                      onSliderCommit={() =>
+                        track('fleet_target_slider_set', { mode, value: targetValue })
+                      }
+                      input={{
+                        id: 'fleet-target',
+                        value: resolveCalculatorTargetInputValue(
                           inputValue,
                           targetValue,
                           isTargetInputFocused,
-                        )}
-                        onFocus={handleInputFocus}
-                        onChange={handleInputChange}
-                        onBlur={handleInputBlur}
-                        className="w-24 shrink-0"
-                        min={0}
-                      />
-                    </div>
+                        ),
+                        onFocus: handleInputFocus,
+                        onChange: handleInputChange,
+                        onBlur: handleInputBlur,
+                      }}
+                    />
                   </div>
                 )}
               </ControlPanel>
@@ -581,7 +546,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
             {!loading && legendItems.length > 0 && (
               <div
                 data-testid="fleet-legend"
-                className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-border pt-3"
+                className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-border/30 pt-3"
               >
                 <ul className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   {legendItems.map((item) => (

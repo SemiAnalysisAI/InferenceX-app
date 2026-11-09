@@ -1,11 +1,13 @@
 'use client';
 
-import { Suspense, useRef, useState, type ReactNode } from 'react';
+import { Suspense, useState, type ReactNode } from 'react';
 import Link from 'next/link';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Stat } from '@/components/ui/stat';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
 import { formatNumber } from '@/lib/agentic-workload-explorer/format';
-import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
 import {
   useTraceVersion,
   appendTraceVersion,
@@ -23,8 +25,9 @@ import {
   RangeToggle,
   type DayRange,
 } from '@/components/agentic-workload-explorer/range-toggle';
-import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { ChartActions, Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-href';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import type { Locale } from '@/lib/i18n/i18n';
@@ -32,19 +35,19 @@ import type { Locale } from '@/lib/i18n/i18n';
 const STRINGS = {
   en: {
     stats: 'Stats',
-    loadError: 'Failed to load web search data.',
-    totalSearches: 'Total Searches',
-    pctWithSearches: '% with Searches',
-    estCost: 'Est. Cost',
+    loadError: 'Failed to load web search data',
+    totalSearches: 'Total searches',
+    pctWithSearches: '% with searches',
+    estCost: 'Est. cost',
     requestsWithSearch: (n: string) => `${n} requests with search`,
     ofTotal: (a: string, b: string) => `${a} of ${b}`,
     perSearch: (cost: number) => `$${cost} per search`,
-    searchesOverTime: 'Searches Over Time',
+    searchesOverTime: 'Searches over time',
     searches: (n: string) => `${n} searches`,
-    searchesByModel: 'Searches by Model',
+    searchesByModel: 'Searches by model',
     models: (n: number) => `${n} model${n === 1 ? '' : 's'}`,
-    searchCostOverTime: 'Search Cost Over Time',
-    topSessions: 'Top Sessions',
+    searchCostOverTime: 'Search cost over time',
+    topSessions: 'Top sessions',
     sessions: (n: number) => `${n} session${n === 1 ? '' : 's'}`,
     noDailySearch: 'No daily search data available',
     noModelSearch: 'No model search data available',
@@ -52,14 +55,14 @@ const STRINGS = {
     noSessionData: 'No session data available',
     thRank: '#',
     thSession: 'Session',
-    thSearchCount: 'Search Count',
-    thRequestCount: 'Request Count',
-    thSearchesPerReq: 'Searches / Req',
+    thSearchCount: 'Search count',
+    thRequestCount: 'Request count',
+    thSearchesPerReq: 'Searches / req',
     tooltipSearches: (count: number, requests: number) =>
       `${count} searches (${requests} requests)`,
     tooltipCost: (cost: string, count: number) => `${cost} (${count} searches)`,
-    exportSearchesTitle: 'Web Searches Over Time',
-    exportCostTitle: 'Web Search Cost',
+    exportSearchesTitle: 'Web searches over time',
+    exportCostTitle: 'Web search cost',
     searchPctTooltip: "Share of this model's requests that searched",
   },
   zh: {
@@ -83,7 +86,7 @@ const STRINGS = {
     noDailyCost: '暂无每日成本数据',
     noSessionData: '暂无会话数据',
     thRank: '#',
-    thSession: 'Session',
+    thSession: '会话',
     thSearchCount: '搜索次数',
     thRequestCount: '请求数',
     thSearchesPerReq: '搜索 / 请求',
@@ -164,30 +167,6 @@ function shortenModel(model: string): string {
   return model.replace(/^claude-/u, '').replace(/-\d{8}$/u, '');
 }
 
-function SectionHeader({ label, detail }: { label: string; detail?: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="flex-1 h-px bg-border" />
-      {detail && <span className="text-3xs font-mono text-subtle">{detail}</span>}
-    </div>
-  );
-}
-
-function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
-  return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-        {label}
-      </div>
-      <div className="text-lg font-mono font-bold mt-0.5">{value}</div>
-      {detail && <div className="text-3xs font-mono text-muted-foreground mt-0.5">{detail}</div>}
-    </div>
-  );
-}
-
 function SearchesOverTimeChart({
   data,
   controls,
@@ -198,13 +177,12 @@ function SearchesOverTimeChart({
   locale: Locale;
 }) {
   const t = STRINGS[locale];
-  const svgRef = useRef<SVGSVGElement>(null);
   const labelEvery = Math.ceil(data.length / 7);
   if (data.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
+      <EmptyState bare className="py-8">
         {t.noDailySearch}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -219,29 +197,17 @@ function SearchesOverTimeChart({
 
   return (
     <Expandable title={t.exportSearchesTitle}>
-      <div className="rounded-md border border-border bg-surface p-3">
+      <Card>
         <div className="flex items-center justify-between gap-2 mb-2">
           {controls}
-          <ExportPngButton
-            locale={locale}
-            analyticsChart="web-searches-over-time"
-            onClick={() => {
-              if (svgRef.current)
-                exportSvgToPng(svgRef.current, {
-                  title: t.exportSearchesTitle,
-                  filename: 'web-searches-over-time.png',
-                  svgWidth: CHART_W,
-                  svgHeight: CHART_H,
-                });
-            }}
+          <ChartActions
+            fileName="web-searches-over-time"
+            onExportPng={() =>
+              track('agentic_workload_export_png', { chart: 'web-searches-over-time' })
+            }
           />
         </div>
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-          className="w-full"
-          style={{ maxHeight: 240 }}
-        >
+        <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ maxHeight: 240 }}>
           {yTicks.map((tick) => (
             <g key={`y-${tick}`}>
               {tick > 0 && (
@@ -292,7 +258,7 @@ function SearchesOverTimeChart({
                   rx={1}
                 >
                   <title>
-                    {formatSnapshotDate(d.day)}:{' '}
+                    {formatSnapshotDate(d.day, locale)}:{' '}
                     {t.tooltipSearches(d.searchCount, d.requestsWithSearch)}
                   </title>
                 </rect>
@@ -304,14 +270,14 @@ function SearchesOverTimeChart({
                     className="fill-muted-foreground"
                     style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
                   >
-                    {formatSnapshotDate(d.day)}
+                    {formatSnapshotDate(d.day, locale)}
                   </text>
                 )}
               </g>
             );
           })}
         </svg>
-      </div>
+      </Card>
     </Expandable>
   );
 }
@@ -345,14 +311,14 @@ function SearchesByModelChart({
 
   if (sorted.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
+      <EmptyState bare className="py-8">
         {t.noModelSearch}
-      </div>
+      </EmptyState>
     );
   }
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
+    <Card>
       <div className="space-y-1.5">
         {sorted.map((m) => {
           const pct = maxCount > 0 ? (m.searchCount / maxCount) * 100 : 0;
@@ -370,15 +336,15 @@ function SearchesByModelChart({
               </span>
               <div className="flex-1 h-4 bg-border/30 rounded-sm overflow-hidden relative">
                 <div
-                  className="h-full bg-indigo-500 rounded-sm"
+                  className="h-full bg-muted-foreground/60 rounded-sm"
                   style={{ width: m.searchCount > 0 ? `${Math.max(pct, 1)}%` : 0 }}
                 />
               </div>
-              <span className="text-2xs font-mono text-foreground shrink-0 w-[56px] text-right">
+              <span className="text-2xs font-mono tabular-nums whitespace-nowrap text-foreground shrink-0 min-w-14 text-right">
                 {formatNumber(m.searchCount)}
               </span>
               <span
-                className="text-3xs font-mono text-muted-foreground shrink-0 w-[56px] text-right"
+                className="text-3xs font-mono tabular-nums whitespace-nowrap text-muted-foreground shrink-0 min-w-14 text-right"
                 title={t.searchPctTooltip}
               >
                 {searchPct}%
@@ -387,19 +353,18 @@ function SearchesByModelChart({
           );
         })}
       </div>
-    </div>
+    </Card>
   );
 }
 
 function SearchCostChart({ daily, locale }: { daily: WebSearchDailyEntry[]; locale: Locale }) {
   const t = STRINGS[locale];
-  const svgRef = useRef<SVGSVGElement>(null);
   const data = daily.slice(-30);
   if (data.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
+      <EmptyState bare className="py-8">
         {t.noDailyCost}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -423,28 +388,14 @@ function SearchCostChart({ daily, locale }: { daily: WebSearchDailyEntry[]; loca
 
   return (
     <Expandable title={t.exportCostTitle}>
-      <div className="rounded-md border border-border bg-surface p-3">
+      <Card>
         <div className="flex items-center justify-end mb-2">
-          <ExportPngButton
-            locale={locale}
-            analyticsChart="web-search-cost"
-            onClick={() => {
-              if (svgRef.current)
-                exportSvgToPng(svgRef.current, {
-                  title: t.exportCostTitle,
-                  filename: 'web-search-cost.png',
-                  svgWidth: CHART_W,
-                  svgHeight: CHART_H,
-                });
-            }}
+          <ChartActions
+            fileName="web-search-cost"
+            onExportPng={() => track('agentic_workload_export_png', { chart: 'web-search-cost' })}
           />
         </div>
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-          className="w-full"
-          style={{ maxHeight: 240 }}
-        >
+        <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ maxHeight: 240 }}>
           {yTicks.map((tick) => (
             <g key={`y-${tick}`}>
               {tick > 0 && (
@@ -511,16 +462,12 @@ function SearchCostChart({ daily, locale }: { daily: WebSearchDailyEntry[]; loca
                 className="fill-muted-foreground"
                 style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
               >
-                {new Date(d.day).toLocaleDateString('en-US', {
-                  timeZone: 'UTC',
-                  month: 'short',
-                  day: 'numeric',
-                })}
+                {formatSnapshotDate(d.day, locale)}
               </text>
             );
           })}
         </svg>
-      </div>
+      </Card>
     </Expandable>
   );
 }
@@ -536,33 +483,23 @@ function WebSearchTopSessionsTable({
   const explorerHref = useExplorerHref();
   if (sessions.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
+      <EmptyState bare className="py-8">
         {t.noSessionData}
-      </div>
+      </EmptyState>
     );
   }
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
+    <Card>
       <div className="overflow-x-auto">
         <table className="w-full font-mono text-2xs">
           <thead>
-            <tr className="text-muted-foreground text-left border-b border-border">
-              <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow">
-                {t.thRank}
-              </th>
-              <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow">
-                {t.thSession}
-              </th>
-              <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-                {t.thSearchCount}
-              </th>
-              <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-                {t.thRequestCount}
-              </th>
-              <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-                {t.thSearchesPerReq}
-              </th>
+            <tr className="text-muted-foreground text-left border-b border-border/20">
+              <th className="py-1.5 px-2 font-medium text-xs">{t.thRank}</th>
+              <th className="py-1.5 px-2 font-medium text-xs">{t.thSession}</th>
+              <th className="py-1.5 px-2 font-medium text-xs text-right">{t.thSearchCount}</th>
+              <th className="py-1.5 px-2 font-medium text-xs text-right">{t.thRequestCount}</th>
+              <th className="py-1.5 px-2 font-medium text-xs text-right">{t.thSearchesPerReq}</th>
             </tr>
           </thead>
           <tbody>
@@ -570,17 +507,17 @@ function WebSearchTopSessionsTable({
               const ratio =
                 s.requestCount > 0 ? (s.searchCount / s.requestCount).toFixed(2) : '0.00';
               return (
-                <tr key={s.sessionId} className="border-b border-border/50 hover:bg-surface-hover">
+                <tr key={s.sessionId} className="border-b border-border/20 hover:bg-surface-hover">
                   <td className="py-1.5 px-2 text-muted-foreground">{i + 1}</td>
                   <td className="py-1.5 px-2">
                     <Link
                       href={explorerHref(`/sessions/${s.sessionId}/conversation`)}
-                      className="text-indigo-400 hover:text-indigo-300 underline underline-offset-2"
+                      className="text-brand underline underline-offset-2"
                     >
                       {s.sessionId.split('-')[0]}...
                     </Link>
                   </td>
-                  <td className="py-1.5 px-2 text-right font-bold">
+                  <td className="py-1.5 px-2 text-right font-medium">
                     {formatNumber(s.searchCount)}
                   </td>
                   <td className="py-1.5 px-2 text-right text-muted-foreground">
@@ -593,7 +530,7 @@ function WebSearchTopSessionsTable({
           </tbody>
         </table>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -631,24 +568,24 @@ function WebSearchPageContent() {
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="rounded-md border border-border bg-surface p-3">
+              <div key={i} className="rounded-xl border border-border/30 bg-card p-3">
                 <Skeleton className="h-3 w-20 mb-2" />
                 <Skeleton className="h-6 w-16" />
               </div>
             ))}
           </div>
         ) : error || !data ? (
-          <div className="text-sm font-mono text-muted-foreground text-center py-8">
-            {t.loadError}
-          </div>
+          <EmptyState>{t.loadError}</EmptyState>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            <StatCard
+          <dl className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <Stat
+              boxed
               label={t.totalSearches}
               value={formatNumber(data.stats.totalSearches)}
               detail={t.requestsWithSearch(formatNumber(data.stats.requestsWithSearch))}
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.pctWithSearches}
               value={`${data.stats.searchPct.toFixed(1)}%`}
               detail={t.ofTotal(
@@ -656,12 +593,13 @@ function WebSearchPageContent() {
                 formatNumber(data.stats.totalRequests),
               )}
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.estCost}
               value={formatDollars(data.stats.totalSearches * COST_PER_SEARCH)}
               detail={t.perSearch(COST_PER_SEARCH)}
             />
-          </div>
+          </dl>
         )}
       </div>
 

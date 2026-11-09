@@ -493,6 +493,16 @@ const evaluationsSchema = arraySchema(
     model: stringSchema,
     precision: stringSchema,
     spec_method: stringSchema,
+    spec_algorithm: {
+      ...nullableStringSchema,
+      description:
+        'Speculative algorithm recorded by a benchmark result for the same config and workflow run, or null when none was recorded.',
+    },
+    spec_draft_model: {
+      ...nullableStringSchema,
+      description:
+        'Draft model recorded alongside spec_algorithm ("native" for built-in heads), or null when none was recorded.',
+    },
     disagg: booleanSchema,
     is_multinode: booleanSchema,
     prefill_tp: integerSchema,
@@ -1047,8 +1057,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/benchmarks',
     summary: text('Read benchmark results', '读取基准结果'),
     description: text(
-      'Returns raw benchmark rows for a display model. Use date for an as-of snapshot, exact=true for that exact date, runId to constrain the latest lookup, or exactRun=true with a numeric runId for that run’s logical snapshot. An AgentX curve is scoped by model, hardware, framework, precision, and workload: a normal run replaces all prior topology, speculative-decoding, and offload variants in that curve. Explicit append-only runs may include the preceding same-image snapshot; producer IDs and URLs are preserved. TPU tooltips and point-detail headers omit GitHub run links; API run_url remains the original producer URL. Historical snapshots remain accessible. view=calculator returns a trimmed page-owned projection (measured power metrics and workers are removed; its allowlist may change). powerValid=strictV2 selects validated schema-v2 power measurements and cannot be combined with view=calculator. Omit powerValid to keep general benchmark results regardless of power validity.',
-      '返回指定展示模型的原始基准测试数据行。使用 date 可获取截至指定日期的快照；exact=true 仅返回该日期的数据；runId 用于限定最新结果的查询范围；将 exactRun=true 与数值型 runId 搭配使用，可获取该次运行对应的逻辑快照。AgentX 按模型、硬件、框架、精度和工作负载划分曲线；常规运行会整体替换同一曲线中此前的所有拓扑、推测解码和 offload 变体。显式标记为 append-only 的运行可继承此前使用相同镜像的快照，并保留各数据点来源运行的 ID 和 URL。TPU 提示框和数据点详情页头部不显示 GitHub 运行链接，API 的 run_url 仍保留来源运行的原始 URL。历史快照仍可查询。view=calculator 返回页面专用的裁剪投影（会移除实测功率指标和 workers，其允许列表可能变化）。powerValid=strictV2 仅返回采用 schema v2 且功率测量通过验证的数据行，不能与 view=calculator 组合使用。省略 powerValid 则保留常规基准测试结果，不按功率有效性筛选。',
+      'Returns raw benchmark rows for a display model. Use date for an as-of snapshot, exact=true for that exact date, runId to constrain the latest lookup, or exactRun=true with a numeric runId for that run’s logical snapshot. An AgentX curve is scoped by model, hardware, framework, precision, and workload: a normal run replaces all prior topology, speculative-decoding, and offload variants in that curve. Explicit append-only runs may include the preceding same-image snapshot; producer IDs and URLs are preserved. TPU tooltips and point-detail headers omit GitHub run links; API run_url remains the original producer URL. Official preview results published outside CI carry their source page as run_url, or null. Historical snapshots remain accessible. view=calculator returns a trimmed page-owned projection (measured power metrics and workers are removed; its allowlist may change). powerValid=strictV2 selects validated schema-v2 power measurements and cannot be combined with view=calculator. Omit powerValid to keep general benchmark results regardless of power validity.',
+      '返回指定展示模型的原始基准测试数据行。使用 date 可获取截至指定日期的快照；exact=true 仅返回该日期的数据；runId 用于限定最新结果的查询范围；将 exactRun=true 与数值型 runId 搭配使用，可获取该次运行对应的逻辑快照。AgentX 按模型、硬件、框架、精度和工作负载划分曲线；常规运行会整体替换同一曲线中此前的所有拓扑、推测解码和 offload 变体。显式标记为 append-only 的运行可继承此前使用相同镜像的快照，并保留各数据点来源运行的 ID 和 URL。TPU 提示框和数据点详情页头部不显示 GitHub 运行链接，API 的 run_url 仍保留来源运行的原始 URL。非 CI 发布的官方预览结果以其来源页面作为 run_url，或为 null。历史快照仍可查询。view=calculator 返回页面专用的裁剪投影（会移除实测功率指标和 workers，其允许列表可能变化）。powerValid=strictV2 仅返回采用 schema v2 且功率测量通过验证的数据行，不能与 view=calculator 组合使用。省略 powerValid 则保留常规基准测试结果，不按功率有效性筛选。',
     ),
     audience: 'public',
     stability: 'stable',
@@ -1058,8 +1068,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         true,
         'string',
-        'Display model name. GLM-5.3-Flash maps only to glm5.3flash, separately from GLM-5.2/5.3. Registration does not imply published observations or hardware qualification. Unofficial-run overlays are separate from published benchmark results. The web UI shows GLM-5.3-Flash only when its feature gate is enabled. This controls presentation, not access; read-only API model parameters and returned data are unaffected.',
-        '展示模型名称。GLM-5.3-Flash 仅对应 glm5.3flash，与 GLM-5.2/5.3 分开。注册模型不代表已有公开发布的实测数据，也不代表硬件已通过验证。非官方运行叠加数据与已发布的基准结果分开。网页界面仅在启用该功能开关后显示 GLM-5.3-Flash。该开关只控制界面显示，不用于访问控制；只读 API 的模型参数和返回数据不受其影响。',
+        'Display model name. GLM-5.3-Flash maps only to glm5.3flash, separately from GLM-5.2/5.3, and supports 8k/1k and agentic-traces. Registration does not imply published observations or hardware qualification. Unofficial-run overlays are separate from published benchmark results. The web UI shows GLM-5.3-Flash only when its feature gate is enabled. This controls presentation, not access; read-only API model parameters and returned data are unaffected.',
+        '展示模型名称。GLM-5.3-Flash 仅对应 glm5.3flash，与 GLM-5.2/5.3 分开，支持 8k/1k 和 agentic-traces。注册模型不代表已有公开发布的实测数据，也不代表硬件已通过验证。非官方运行叠加数据与已发布的基准结果分开。网页界面仅在启用该功能开关后显示 GLM-5.3-Flash。该开关只控制界面显示，不用于访问控制；只读 API 的模型参数和返回数据不受其影响。',
         { type: 'string', enum: SUPPORTED_BENCHMARK_MODELS },
         'DeepSeek-R1-0528',
       ),
@@ -1335,6 +1345,8 @@ export const apiOperations: readonly ApiOperation[] = [
           model: 'dsr1',
           precision: 'fp8',
           spec_method: 'none',
+          spec_algorithm: null,
+          spec_draft_model: null,
           disagg: false,
           is_multinode: false,
           prefill_tp: 8,
@@ -1960,8 +1972,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/collectivex/latest',
     summary: text('Read the latest CollectiveX dataset', '读取最新 CollectiveX 数据集'),
     description: text(
-      'Returns the versioned neutral dataset of the newest stored run. Each run is one uploaded CollectiveX results directory laid over the previous latest run (each uploaded case replaces the stored result of the same case) and holds at least one measured result: run_id is the upload time in epoch seconds (raised past the newest stored run when needed), run_attempt is 1, and run.source_sha is the collectivex/ commit the uploaded results were measured from. run.covered_skus lists only pools with a measured result. Runs are ingested when an operator uploads them, never on read. In series[].points[], components.*.latency_us, components.*.activation_data_rate_gbps_at_latency_percentile, components.*.payload_data_rate_gbps_at_latency_percentile and roundtrip_token_rate_at_latency_percentile carry p50, p90, p95 and p99; p90, p95 and p99 are null where the harness withheld a tail because too many samples were misaligned or host-stalled, while p50 is always a number. series[].library_version is the backend build the case ran (null where the result recorded none). Optional swap_blocks results contain verified copy latency in microseconds and payload GB/s (bytes counted once), with block_bytes, num_blocks, runtime provenance and skipped-point counts. Multi-pool sweeps preserve each GPU pool as an independent result.',
-      '返回最新已存储运行的带版本中立数据集。每次运行对应一次上传的 CollectiveX 结果目录，叠加在上一次最新运行之上（上传的 case 会替换该 case 已存储的结果），且至少包含一个已测量结果：run_id 为上传时间的 Unix 秒级时间戳（必要时递增至最新已存储运行之后），run_attempt 为 1，run.source_sha 为测量这些上传结果所用的 collectivex/ 提交。run.covered_skus 只列出有已测量结果的资源池。运行在运维人员上传时导入，读取时不会导入。 在 series[].points[] 中，components.*.latency_us、components.*.activation_data_rate_gbps_at_latency_percentile、components.*.payload_data_rate_gbps_at_latency_percentile 与 roundtrip_token_rate_at_latency_percentile 包含 p50、p90、p95 和 p99；若测试工具因过多样本未对齐或被主机阻塞而未发布尾部延迟，p90、p95 和 p99 为 null，p50 始终为数值。series[].library_version 为该 case 运行的后端构建版本（结果未记录时为 null）。可选的 swap_blocks 结果包含校验通过的复制延迟（微秒）和有效载荷 GB/s（字节数仅计算一次），并保留 block_bytes、num_blocks、运行环境来源及未测量组合数。多池扫描分别保留各 GPU 池的独立结果。',
+      'Returns the versioned neutral dataset of the newest stored run. Each run is one uploaded CollectiveX results directory laid over the previous latest run (each uploaded case replaces the stored result of the same case) and holds at least one measured result: run_id is the upload time in epoch seconds (raised past the newest stored run when needed), run_attempt is 1, and run.source_sha is the collectivex/ commit the uploaded results were measured from. run.covered_skus lists only pools with a measured result. Runs are ingested when an operator uploads them, never on read. In series[].points[], components.*.latency_us, components.*.activation_data_rate_gbps_at_latency_percentile, components.*.payload_data_rate_gbps_at_latency_percentile and roundtrip_token_rate_at_latency_percentile carry p50, p90, p95 and p99; p90, p95 and p99 are null where the harness withheld a tail because too many samples were misaligned or host-stalled, while p50 is always a number. series[].library_version is the backend build the case ran (null where the result recorded none). Optional swap_blocks results contain verified copy latency in microseconds and payload GB/s (bytes counted once), with block_bytes, num_blocks, runtime provenance and skipped-point counts. Multi-pool sweeps preserve each GPU pool as an independent result. Each series carries maturity (candidate when no serving engine can select the configuration), and components.pair_period is the chained steady-state period, the headline latency.',
+      '返回最新已存储运行的带版本中立数据集。每次运行对应一次上传的 CollectiveX 结果目录，叠加在上一次最新运行之上（上传的 case 会替换该 case 已存储的结果），且至少包含一个已测量结果：run_id 为上传时间的 Unix 秒级时间戳（必要时递增至最新已存储运行之后），run_attempt 为 1，run.source_sha 为测量这些上传结果所用的 collectivex/ 提交。run.covered_skus 只列出有已测量结果的资源池。运行在运维人员上传时导入，读取时不会导入。 在 series[].points[] 中，components.*.latency_us、components.*.activation_data_rate_gbps_at_latency_percentile、components.*.payload_data_rate_gbps_at_latency_percentile 与 roundtrip_token_rate_at_latency_percentile 包含 p50、p90、p95 和 p99；若测试工具因过多样本未对齐或被主机阻塞而未发布尾部延迟，p90、p95 和 p99 为 null，p50 始终为数值。series[].library_version 为该 case 运行的后端构建版本（结果未记录时为 null）。可选的 swap_blocks 结果包含校验通过的复制延迟（微秒）和有效载荷 GB/s（字节数仅计算一次），并保留 block_bytes、num_blocks、运行环境来源及未测量组合数。多池扫描分别保留各 GPU 池的独立结果。 每个序列带有 maturity（candidate 表示目前没有推理引擎可以选用该配置），components.pair_period 为连续成对的稳态周期，即主延迟指标。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2183,8 +2195,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/collectivex/runs/{runId}',
     summary: text('Read a CollectiveX run', '读取 CollectiveX 运行'),
     description: text(
-      'Returns one stored run as a versioned CollectiveX dataset. The run ID is the upload time in epoch seconds (raised past the newest stored run when needed), as listed by /api/v1/collectivex/runs. In series[].points[], components.*.latency_us, components.*.activation_data_rate_gbps_at_latency_percentile, components.*.payload_data_rate_gbps_at_latency_percentile and roundtrip_token_rate_at_latency_percentile carry p50, p90, p95 and p99; p90, p95 and p99 are null where the harness withheld a tail because too many samples were misaligned or host-stalled, while p50 is always a number.',
-      '以带版本的 CollectiveX 数据集返回一次已存储的运行。运行 ID 为上传时间的 Unix 秒级时间戳（必要时递增至最新已存储运行之后），与 /api/v1/collectivex/runs 列出的一致。 在 series[].points[] 中，components.*.latency_us、components.*.activation_data_rate_gbps_at_latency_percentile、components.*.payload_data_rate_gbps_at_latency_percentile 与 roundtrip_token_rate_at_latency_percentile 包含 p50、p90、p95 和 p99；若测试工具因过多样本未对齐或被主机阻塞而未发布尾部延迟，p90、p95 和 p99 为 null，p50 始终为数值。',
+      'Returns one stored run as a versioned CollectiveX dataset. The run ID is the upload time in epoch seconds (raised past the newest stored run when needed), as listed by /api/v1/collectivex/runs. In series[].points[], components.*.latency_us, components.*.activation_data_rate_gbps_at_latency_percentile, components.*.payload_data_rate_gbps_at_latency_percentile and roundtrip_token_rate_at_latency_percentile carry p50, p90, p95 and p99; p90, p95 and p99 are null where the harness withheld a tail because too many samples were misaligned or host-stalled, while p50 is always a number. Each series carries maturity (candidate when no serving engine can select the configuration), and components.pair_period is the chained steady-state period, the headline latency.',
+      '以带版本的 CollectiveX 数据集返回一次已存储的运行。运行 ID 为上传时间的 Unix 秒级时间戳（必要时递增至最新已存储运行之后），与 /api/v1/collectivex/runs 列出的一致。 在 series[].points[] 中，components.*.latency_us、components.*.activation_data_rate_gbps_at_latency_percentile、components.*.payload_data_rate_gbps_at_latency_percentile 与 roundtrip_token_rate_at_latency_percentile 包含 p50、p90、p95 和 p99；若测试工具因过多样本未对齐或被主机阻塞而未发布尾部延迟，p90、p95 和 p99 为 null，p50 始终为数值。 每个序列带有 maturity（candidate 表示目前没有推理引擎可以选用该配置），components.pair_period 为连续成对的稳态周期，即主延迟指标。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -3165,8 +3177,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/trace-server-metrics',
     summary: text('Read trace server metrics', '读取跟踪服务器指标'),
     description: text(
-      'Returns point metadata, including prefill/decode TP, EP, DP attention, worker counts, physical GPU counts and recipe_fingerprint for cache-reuse links, and chart-ready aggregate time series for cache usage, queue depth, prefill and decode throughput, and prompt-token sources. metricSources contains source descriptors; source-specific arrays are loaded by the point-detail UI only when selected.',
-      '返回数据点元数据（含 prefill/decode TP、EP、DP attention、worker 数、物理 GPU 数及 recipe_fingerprint，用于缓存复用链接），以及可直接用于图表的聚合时间序列，涵盖缓存使用率、队列深度、prefill/decode 吞吐量和 prompt token 来源。metricSources 包含各来源的描述信息；仅当用户在数据点详情界面选择某个来源时，才会加载该来源对应的数组。',
+      'Returns point metadata, including prefill/decode TP, EP, DP attention, worker counts, physical GPU counts and recipe_fingerprint for cache-reuse links, and chart-ready aggregate time series for cache usage, queue depth, prefill and decode throughput, and prompt-token sources. metricSources contains source descriptors; source-specific arrays are loaded by the point-detail UI only when selected. TokenSpeed exports device KV utilization and running/waiting request gauges; unavailable cache-hit and token-throughput measurements remain empty.',
+      '返回数据点元数据（含 prefill/decode TP、EP、DP attention、worker 数、物理 GPU 数及 recipe_fingerprint，用于缓存复用链接），以及可直接用于图表的聚合时间序列，涵盖缓存使用率、队列深度、prefill/decode 吞吐量和 prompt token 来源。metricSources 包含各来源的描述信息；仅当用户在数据点详情界面选择某个来源时，才会加载该来源对应的数组。TokenSpeed 提供设备 KV 使用率以及运行中和排队请求数；未提供的缓存命中率和 token 吞吐量指标保留为空。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -3403,6 +3415,21 @@ const quickstartText = {
   },
 } as const;
 
+/** Prose type labels and placeholder examples; schema type names stay as identifiers. */
+const PARAMETER_TEXT_ZH: Record<string, string> = {
+  'CSV list': 'CSV 列表',
+  'CSV number list': 'CSV 数字列表',
+  'CSV GPU list': 'CSV GPU 列表',
+  'CSV workload list': 'CSV 工作负载列表',
+  'comma-separated integers': '逗号分隔的整数',
+  'Exact key returned in serviceSources': 'serviceSources 中返回的完整键',
+};
+
+function localizeParameterText<T>(value: T, locale: ApiDocumentationLocale): T | string {
+  if (locale !== 'zh' || typeof value !== 'string') return value;
+  return PARAMETER_TEXT_ZH[value] ?? value;
+}
+
 function localizeOperation(
   operation: ApiOperation,
   locale: ApiDocumentationLocale,
@@ -3413,6 +3440,8 @@ function localizeOperation(
     description: operation.description[locale],
     parameters: operation.parameters.map((item) => ({
       ...item,
+      type: localizeParameterText(item.type, locale),
+      example: localizeParameterText(item.example, locale),
       description: item.description[locale],
     })),
     responses: operation.responses.map((item) => ({

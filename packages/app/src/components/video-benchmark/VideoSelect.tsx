@@ -14,23 +14,26 @@ export default function VideoSelect({
   value,
   onValueChange,
   options,
+  testId,
 }: {
   label: string;
   value: string;
   onValueChange: (value: string) => void;
   options: { value: string; label: string }[];
+  testId?: string;
 }) {
   const id = useId();
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <label htmlFor={id} className="text-xs font-medium text-muted-foreground">
+      <label htmlFor={id} className="text-sm font-medium">
         {label}
       </label>
       <Select value={value} onValueChange={onValueChange} disabled={options.length === 0}>
         <SelectTrigger
           id={id}
+          data-testid={testId}
           aria-label={label}
-          className="w-full focus-visible:ring-2 focus-visible:ring-ring"
+          className="w-full min-w-0 focus-visible:ring-2 focus-visible:ring-ring *:data-[slot=select-value]:block *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:truncate"
         >
           <SelectValue placeholder="—" />
         </SelectTrigger>

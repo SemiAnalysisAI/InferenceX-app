@@ -11,8 +11,8 @@ import {
 
 import { isMetricKey, metricCostTier } from '@/components/inference/metric-registry';
 import { publishedCostsForTier } from '@/components/inference/published-costs';
-import { Badge } from '@/components/ui/badge';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
+import { sourceLinkClassName } from '@/components/ui/result-context';
 import { ShareButton } from '@/components/ui/share-button';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
@@ -57,7 +57,7 @@ const POWER_VALUES = Object.fromEntries(
   ]),
 );
 
-function MetricBadges({
+export function MetricBadges({
   label,
   values,
 }: {
@@ -65,18 +65,19 @@ function MetricBadges({
   values: Record<string, string | number>;
 }) {
   return (
-    <p className="text-muted-foreground mb-2 flex flex-wrap gap-2 items-center">
-      {label}{' '}
+    <p className="mb-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-muted-foreground tabular-nums">
+      <span>{label}</span>
       {Object.entries(values).map(([base, value]) => (
-        <Badge key={base} variant="outline">
-          {HW_REGISTRY[base]?.badgeLabel ?? base.toUpperCase()}: {value}
-        </Badge>
+        <span key={base} className="whitespace-nowrap">
+          {HW_REGISTRY[base]?.badgeLabel ?? base.toUpperCase()}{' '}
+          <span className="font-medium text-foreground">{value}</span>
+        </span>
       ))}
     </p>
   );
 }
 
-function SourceLink({
+export function SourceLink({
   href,
   children,
   sourceLabel = 'Source:',
@@ -86,15 +87,26 @@ function SourceLink({
   sourceLabel?: string;
 }) {
   return (
-    <p className="text-muted-foreground">
-      <small>
-        {sourceLabel}{' '}
-        <Link target="_blank" className="underline hover:text-foreground" href={href}>
-          {children}
-          <ExternalLinkIcon />
-        </Link>
-      </small>
+    <p className="text-xs text-muted-foreground">
+      {sourceLabel}{' '}
+      <Link target="_blank" className="underline hover:text-foreground" href={href}>
+        {children}
+        <ExternalLinkIcon />
+      </Link>
     </p>
+  );
+}
+
+export function PricesSourceLink() {
+  const locale = useLocale();
+  return (
+    <span data-testid="tco-prices-source">
+      {locale === 'zh' ? '价格来源：' : 'Prices: '}
+      <Link target="_blank" className={sourceLinkClassName} href={TCO_SOURCE_URL}>
+        {TCO_SOURCE_TITLE}
+        <ExternalLinkIcon />
+      </Link>
+    </span>
   );
 }
 
@@ -143,8 +155,8 @@ function DisaggCaveat({
     )
   ) : locale === 'zh' ? (
     <>
-      <strong>注意：</strong>分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码芯片或预填充
-      芯片计算
+      <strong>注意：</strong>
+      {'分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码芯片或预填充芯片计算'}
       {NOUN_ZH[calculationNoun] ?? calculationNoun}
       ，而非按芯片总数计算。因此，与聚合配置进行
       {NOUN_ZH[comparisonNoun] ?? comparisonNoun}
@@ -161,48 +173,69 @@ function DisaggCaveat({
 
   return (
     <div
-      className={`overflow-hidden transition-all duration-200 ease-in-out ${
-        visible
-          ? chipBasis
-            ? 'max-h-96 opacity-100'
-            : 'max-h-20 opacity-100'
-          : 'max-h-0 opacity-0'
+      data-disagg-caveat=""
+      data-chip-basis={chipBasis?.value}
+      aria-hidden={visible ? undefined : true}
+      className={`grid transition-[grid-template-rows,opacity] duration-200 ease-in-out ${
+        visible ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
       }`}
     >
-      <div
-        className={`text-muted-foreground text-xs mt-2 border-l-2 pl-2 py-1 ${
-          totalBasis ? 'border-sky-500 bg-sky-500/5' : 'border-amber-500 bg-amber-500/5'
-        }`}
-      >
-        <p>{content}</p>
-        {chipBasis && !chipBasis.readOnly && visible && (
-          <ChipBasisToggle
-            value={chipBasis.value}
-            onValueChange={chipBasis.onChange}
-            source={chipBasis.source}
-            className="mt-1"
-          />
-        )}
+      <div className="min-h-0 overflow-hidden text-xs text-muted-foreground">
+        {/* Warning edge while the per-pool basis makes the comparison uneven; neutral once
+        every chip is the denominator. */}
+        <div
+          className={`mt-2 border-l-2 py-1 pl-2 ${totalBasis ? 'border-border' : 'border-warning/60'}`}
+        >
+          <p>{content}</p>
+          {chipBasis && !chipBasis.readOnly && visible && (
+            <ChipBasisToggle
+              value={chipBasis.value}
+              onValueChange={chipBasis.onChange}
+              source={chipBasis.source}
+              className="mt-1.5"
+            />
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function getCostValues(
+export interface MetricCostAssumptions {
+  values: Record<string, number>;
+  blankedBases: string[];
+  editable: boolean;
+  custom: boolean;
+}
+
+export function metricCostAssumptions(
   selectedYAxisMetric: string,
   tcoBasis: TcoBasis,
   userCosts: Record<string, number | undefined> | null | undefined,
-): Record<string, number> {
+): MetricCostAssumptions | null {
+  const custom = CUSTOM_COST_METRICS.has(selectedYAxisMetric);
+  if (!custom && !isCostMetric(selectedYAxisMetric)) return null;
   const key = selectedYAxisMetric.replace(/^y_/u, '');
   const tier = isMetricKey(key) ? metricCostTier(key) : undefined;
-  if (tier === 'custom' && userCosts) {
-    return Object.fromEntries(
-      Object.entries(userCosts).filter(
-        (entry): entry is [string, number] => typeof entry[1] === 'number',
-      ),
-    );
-  }
-  return publishedCostsForTier(tier ?? 'rental', tcoBasis);
+  const values =
+    tier === 'custom' && userCosts
+      ? Object.fromEntries(
+          Object.entries(userCosts).filter(
+            (entry): entry is [string, number] => typeof entry[1] === 'number',
+          ),
+        )
+      : publishedCostsForTier(tier ?? 'rental', tcoBasis);
+  return {
+    values,
+    blankedBases:
+      custom && userCosts
+        ? Object.entries(userCosts)
+            .filter(([, value]) => value === undefined)
+            .map(([base]) => base)
+        : [],
+    editable: custom || TOTAL_COST_METRICS.has(selectedYAxisMetric),
+    custom,
+  };
 }
 
 export function ChartShareActions() {
@@ -216,7 +249,7 @@ export function MetricAssumptionNotes({
   includePowerThroughputCaveat = true,
   tcoBasis = DEFAULT_TCO_BASIS,
   userCosts,
-  renderCostBadges,
+  omitCostValues = false,
   chipBasis,
   caveatsOnly = false,
 }: {
@@ -226,14 +259,11 @@ export function MetricAssumptionNotes({
   includePowerThroughputCaveat?: boolean;
   tcoBasis?: TcoBasis;
   userCosts?: Record<string, number | undefined> | null;
-  renderCostBadges?: (props: {
-    label: string;
-    values: Record<string, number>;
-    blankedBases?: string[];
-  }) => ReactNode;
+  omitCostValues?: boolean;
   /**
    * The chart's disaggregated throughput basis. When provided, every caveat on a
-   * metric that divides input or output throughput describes it and offers the toggle.
+   * metric that divides input or output throughput describes it, and offers the toggle
+   * unless the control is read-only (embeds, or a chart that hosts the toggle elsewhere).
    */
   chipBasis?: ChipBasisControl;
   /** Render only the disaggregated caveats, without sources or cost badges (embeds). */
@@ -262,8 +292,6 @@ export function MetricAssumptionNotes({
   const showPowerSource = includeAllPowerThroughputMetrics
     ? POWER_SOURCE_METRICS.has(selectedYAxisMetric)
     : selectedYAxisMetric === 'y_tpPerMw';
-  const showTotalCostSource = TOTAL_COST_METRICS.has(selectedYAxisMetric);
-  const showCustomCost = CUSTOM_COST_METRICS.has(selectedYAxisMetric);
   const showOutputCostSource = OUTPUT_COST_METRICS.has(selectedYAxisMetric);
   const showInputCostSource = INPUT_COST_METRICS.has(selectedYAxisMetric);
   const showInputThroughputCaveat = selectedYAxisMetric === 'y_inputTputPerGpu';
@@ -272,27 +300,13 @@ export function MetricAssumptionNotes({
   const isTokensPerDollar = selectedYAxisMetric.includes('TokensPerDollar');
   const showJouleSource = selectedYAxisMetric.startsWith('y_j');
 
-  const costValues =
-    showTotalCostSource || showOutputCostSource || showInputCostSource || showCustomCost
-      ? getCostValues(selectedYAxisMetric, tcoBasis, userCosts)
-      : null;
+  const costAssumptions = omitCostValues
+    ? null
+    : metricCostAssumptions(selectedYAxisMetric, tcoBasis, userCosts);
 
   const powerLabel = locale === 'zh' ? '全含功率/芯片：' : 'All in Power/Chip:';
   const costLabel = locale === 'zh' ? 'TCO $/chip/hr：' : 'TCO $/chip/hr:';
   const sourceLabel = locale === 'zh' ? '来源：' : 'Source:';
-  const editableCostBadges =
-    renderCostBadges && costValues && (showTotalCostSource || showCustomCost)
-      ? renderCostBadges({
-          label: costLabel,
-          values: filterToActive(costValues, { keepEmpty: showCustomCost }),
-          blankedBases:
-            showCustomCost && userCosts
-              ? Object.entries(userCosts)
-                  .filter(([, value]) => value === undefined)
-                  .map(([base]) => base)
-              : undefined,
-        })
-      : null;
 
   if (caveatsOnly && !CHIP_BASIS_METRICS.has(selectedYAxisMetric)) return null;
 
@@ -309,15 +323,13 @@ export function MetricAssumptionNotes({
           </SourceLink>
         </>
       )}
-      {!caveatsOnly && costValues && (
+      {!caveatsOnly && costAssumptions && (
         <>
-          {editableCostBadges ?? (
-            <MetricBadges
-              label={costLabel}
-              values={filterToActive(costValues, { keepEmpty: showCustomCost })}
-            />
-          )}
-          {!showCustomCost && (
+          <MetricBadges
+            label={costLabel}
+            values={filterToActive(costAssumptions.values, { keepEmpty: costAssumptions.custom })}
+          />
+          {!costAssumptions.custom && (
             <SourceLink href={TCO_SOURCE_URL} sourceLabel={sourceLabel}>
               {TCO_SOURCE_TITLE}
             </SourceLink>

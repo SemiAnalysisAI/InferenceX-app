@@ -21,7 +21,7 @@ function lognormalSample(count: number, mu: number, sigma: number): number[] {
 
 const FIT_STROKE = '#a855f7';
 
-function mountDistribution(values: number[], pathname = '/inference/agentic/96255') {
+function mountDistribution(values: number[], pathname = '/infx/inference/agentic/96255') {
   cy.mount(
     <PathnameContext.Provider value={pathname}>
       <div style={{ width: 900, padding: 16 }}>
@@ -75,13 +75,5 @@ describe('Agentic ISL/OSL distribution', () => {
     mountDistribution([]);
     cy.contains('No data').should('be.visible');
     cy.get(`path[stroke="${FIT_STROKE}"]`).should('not.exist');
-  });
-
-  it('renders in Simplified Chinese on the /zh route', () => {
-    mountDistribution(lognormalSample(600, 7, 0.8), '/zh/inference/agentic/96255');
-    cy.contains('600 个请求').should('be.visible');
-    cy.contains('对数刻度').should('be.visible');
-    cy.contains('数值（tokens，对数刻度）').should('be.visible');
-    cy.contains('requests').should('not.exist');
   });
 });

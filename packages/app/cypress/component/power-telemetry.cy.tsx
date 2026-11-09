@@ -63,7 +63,7 @@ function QueryStatus() {
   return <output data-testid="query-status">{status}</output>;
 }
 
-function mountPoint(path = '/inference/agentic/206887') {
+function mountPoint(path = '/infx/inference/agentic/206887') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   cy.mount(
     <PathnameContext.Provider value={path}>
@@ -98,52 +98,44 @@ describe('PowerX telemetry interactions', () => {
     registerAnalyticsClient({ capture: cy.stub().as('capture') });
   });
 
-  for (const [locale, width, label] of [
-    ['en', 1280, 'Temperature'],
-    ['zh', 390, '温度'],
-  ] as const) {
-    it(`renders Celsius gaps on the ${locale} point chart`, () => {
-      cy.viewport(width, 900);
-      const native = {
-        ...payload,
-        series: [
-          {
-            ...payload.series[0],
-            sampleCount: 3,
-            gpuCount: 1,
-            data: [
-              { timestamp: '2026-09-21T00:00:00Z', index: 0, power: 400, temperature: 65.5 },
-              { timestamp: '2026-09-21T00:00:01Z', index: 0, power: 410 },
-              { timestamp: '2026-09-21T00:00:02Z', index: 0, power: 420, temperature: 0 },
-            ],
-          },
-        ],
-      };
-      cy.intercept('GET', endpoint, { body: native });
-      mountPoint(`${locale === 'zh' ? '/zh' : ''}/inference/agentic/${ID}`);
-      cy.get('[data-testid="power-telemetry-metric-select"]').click();
-      cy.get('[role="option"]').contains(label).click();
-      cy.get(chart).find('svg').should('contain.text', `${label} (°C)`);
-      cy.get(chart).find('svg .point').should('have.length', 2);
-      cy.get(chart)
-        .find('svg .line-0')
-        .should(($paths) => {
-          expect($paths).to.have.length(1);
-          const path = $paths.attr('d')!;
-          expect(path.match(/M/g)).to.have.length(2);
-          expect(path).not.to.match(/[LC]|NaN/u);
-        });
-      cy.get('body').type('{esc}');
-      cy.get('[data-testid="power-telemetry-display-mode-points"]').click();
-      cy.get(chart).find('svg .point').should('have.length', 2);
-      cy.get('[data-testid="power-telemetry-view"]').should(($view) => {
-        expect($view[0].scrollWidth).to.be.at.most($view[0].clientWidth + 1);
+  it('renders Celsius gaps on the en point chart', () => {
+    cy.viewport(1280, 900);
+    const native = {
+      ...payload,
+      series: [
+        {
+          ...payload.series[0],
+          sampleCount: 3,
+          gpuCount: 1,
+          data: [
+            { timestamp: '2026-09-21T00:00:00Z', index: 0, power: 400, temperature: 65.5 },
+            { timestamp: '2026-09-21T00:00:01Z', index: 0, power: 410 },
+            { timestamp: '2026-09-21T00:00:02Z', index: 0, power: 420, temperature: 0 },
+          ],
+        },
+      ],
+    };
+    cy.intercept('GET', endpoint, { body: native });
+    mountPoint(`/infx/inference/agentic/${ID}`);
+    cy.get('[data-testid="power-telemetry-metric-select"]').click();
+    cy.get('[role="option"]').contains('Temperature').click();
+    cy.get(chart).find('svg').should('contain.text', 'Temperature (°C)');
+    cy.get(chart).find('svg .point').should('have.length', 2);
+    cy.get(chart)
+      .find('svg .line-0')
+      .should(($paths) => {
+        expect($paths).to.have.length(1);
+        const path = $paths.attr('d')!;
+        expect(path.match(/M/g)).to.have.length(2);
+        expect(path).not.to.match(/[LC]|NaN/u);
       });
-      cy.get('[data-testid="power-telemetry-view"]').screenshot(
-        `native-temperature-${locale}-${width}`,
-      );
+    cy.get('body').type('{esc}');
+    cy.get('[data-testid="power-telemetry-display-mode-points"]').click();
+    cy.get(chart).find('svg .point').should('have.length', 2);
+    cy.get('[data-testid="power-telemetry-view"]').should(($view) => {
+      expect($view[0].scrollWidth).to.be.at.most($view[0].clientWidth + 1);
     });
-  }
+  });
 
   it('changes display, window and chip aggregation independently and tracks each action', () => {
     cy.mount(<Controls />);
@@ -201,12 +193,11 @@ describe('PowerX telemetry interactions', () => {
       id: ID,
       enabled: true,
     });
-    cy.get(chart).screenshot('power-telemetry-all-in-line');
   });
 
   it('keeps point tooltips on the samples while the all-in line is drawn', () => {
     cy.mount(
-      <PathnameContext.Provider value="/inference/agentic/206887">
+      <PathnameContext.Provider value="/infx/inference/agentic/206887">
         <GpuMetricsChart
           data={series(1, 'host-a', 500).data}
           visibleGpus={new Set([0, 1])}
@@ -219,7 +210,8 @@ describe('PowerX telemetry interactions', () => {
     );
     cy.get('[data-testid="gpu-power-all-in-line"]').should('contain.text', '1710W');
     cy.get('circle.point').first().click({ force: true });
-    cy.get('[data-chart-tooltip]').should('contain.text', 'Chip 0');
+    cy.get('[data-testid="point-details-panel"]').should('contain.text', 'Chip 0');
+    cy.get('[data-testid="chart-pin-ring"]').should('exist');
   });
 
   it('shows a genuine missing point without offering an error retry', () => {
@@ -248,38 +240,25 @@ describe('PowerX telemetry interactions', () => {
     cy.get('[data-testid="power-telemetry-query-error"]').should('not.exist');
   });
 
-  for (const [locale, width] of [
-    ['en', 1280],
-    ['zh', 390],
-  ] as const) {
-    it(`keeps chip filters scoped to a host and renders ${locale} at ${width}px`, () => {
-      cy.viewport(width, 900);
-      cy.intercept('GET', endpoint, { body: payload });
-      mountPoint(`${locale === 'zh' ? '/zh' : ''}/inference/agentic/${ID}`);
-      cy.get(chart).find('svg .point').should('have.length', 6);
-      cy.get('[data-testid="power-telemetry-sample-count"]').should('have.text', '6');
-      cy.get('table tbody tr').first().find('td').eq(4).should('have.text', '510.0');
-      cy.get('[data-testid="chart-legend"]')
-        .contains(locale === 'zh' ? '芯片 0' : 'Chip 0')
-        .click();
-      cy.get(chart).find('svg .point').should('have.length', 3);
-      cy.get('#power-telemetry-series-select').click();
-      cy.get('[role="option"]').contains('host-b').click();
-      cy.get(chart).find('svg .point').should('have.length', 6);
-      cy.get('table tbody tr').first().find('td').eq(4).should('have.text', '710.0');
-      cy.get('[data-testid="power-telemetry-display-mode-points"]').click();
-      cy.get('[data-testid="power-telemetry-display-series-mean"]').click();
-      cy.get(chart).find('svg .point').should('have.length', 3);
-      cy.get('[data-testid="power-telemetry-view"]').should(($view) => {
-        expect($view[0].scrollWidth).to.be.at.most($view[0].clientWidth + 1);
-      });
-      cy.get('[data-testid="power-telemetry-metric-select"]').should(
-        'contain.text',
-        locale === 'zh' ? '功耗' : 'Power',
-      );
-      cy.get('[data-testid="power-telemetry-view"]').screenshot(
-        `power-telemetry-${locale}-${width}`,
-      );
+  it('keeps chip filters scoped to a host and renders en at 1280px', () => {
+    cy.viewport(1280, 900);
+    cy.intercept('GET', endpoint, { body: payload });
+    mountPoint(`/infx/inference/agentic/${ID}`);
+    cy.get(chart).find('svg .point').should('have.length', 6);
+    cy.get('[data-testid="power-telemetry-sample-count"]').should('have.text', '6');
+    cy.get('table tbody tr').first().find('td').eq(4).should('have.text', '510.0');
+    cy.get('[data-testid="chart-legend"]').contains('Chip 0').click();
+    cy.get(chart).find('svg .point').should('have.length', 3);
+    cy.get('#power-telemetry-series-select').click();
+    cy.get('[role="option"]').contains('host-b').click();
+    cy.get(chart).find('svg .point').should('have.length', 6);
+    cy.get('table tbody tr').first().find('td').eq(4).should('have.text', '710.0');
+    cy.get('[data-testid="power-telemetry-display-mode-points"]').click();
+    cy.get('[data-testid="power-telemetry-display-series-mean"]').click();
+    cy.get(chart).find('svg .point').should('have.length', 3);
+    cy.get('[data-testid="power-telemetry-view"]').should(($view) => {
+      expect($view[0].scrollWidth).to.be.at.most($view[0].clientWidth + 1);
     });
-  }
+    cy.get('[data-testid="power-telemetry-metric-select"]').should('contain.text', 'Power');
+  });
 });

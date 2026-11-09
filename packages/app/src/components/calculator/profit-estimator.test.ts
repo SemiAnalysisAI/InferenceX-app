@@ -275,7 +275,7 @@ describe('estimateProfitRows', () => {
 describe('formatProfitUsd', () => {
   it('uses fixed cents per chip-hour and compact units per GW-year', () => {
     expect(formatProfitUsd(2.3, 'chip-hour')).toBe('$2.30');
-    expect(formatProfitUsd(-0.456, 'chip-hour')).toBe('-$0.46');
+    expect(formatProfitUsd(-0.456, 'chip-hour')).toBe('−$0.46');
     expect(formatProfitUsd(2.3, 'chip-hour', 0)).toBe('$2.30');
     expect(formatProfitUsd(135.2e9, 'gw-year')).toBe('$135.2B');
     expect(formatProfitUsd(135.2e9, 'gw-year', 0)).toBe('$135B');
@@ -286,7 +286,7 @@ describe('formatProfitUsd', () => {
 describe('formatUsdCompact', () => {
   it('picks a unit per magnitude and keeps the sign ahead of the currency', () => {
     expect(formatUsdCompact(12_345_678_901)).toBe('$12.3B');
-    expect(formatUsdCompact(-2_500_000_000)).toBe('-$2.5B');
+    expect(formatUsdCompact(-2_500_000_000)).toBe('−$2.5B');
     expect(formatUsdCompact(4_200_000)).toBe('$4.2M');
     expect(formatUsdCompact(950_000)).toBe('$950.0k');
     expect(formatUsdCompact(12.34)).toBe('$12.3');

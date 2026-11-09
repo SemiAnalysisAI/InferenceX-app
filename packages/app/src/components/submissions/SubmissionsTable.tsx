@@ -12,9 +12,17 @@ import { track } from '@/lib/analytics/analytics';
 import { MODEL_PREFIX_MAPPING, getModelLabel } from '@/lib/catalog/data-mappings';
 import type { SubmissionSummaryRow } from '@/lib/submissions/submissions-types';
 import { getFrameworkLabel } from '@/lib/shared/utils';
+import { formatDisplayDate } from '@/lib/shared/display-date';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import {
+  TABLE_ACTION_STYLE,
+  TABLE_HEAD_CELL_STYLE,
+  TABLE_HEAD_ROW_STYLE,
+} from '@/components/ui/control-styles';
+import { SortIndicator } from '@/components/ui/data-table';
 import { InfoHelp } from '@/components/ui/option-info';
+import { SearchInput } from '@/components/ui/search-input';
+import { VendorDot } from '@/components/ui/vendor-dot';
 import {
   TooltipProvider,
   TooltipRoot,
@@ -35,37 +43,38 @@ import {
 
 const STRINGS = {
   en: {
-    searchPlaceholder: 'Search configs...',
+    searchPlaceholder: 'Search configs',
+    clearSearch: 'Clear search',
     colGpu: 'Chip',
     colModel: 'Model',
     colPrecision: 'Precision',
-    colSpecMethod: 'Spec Method',
+    colSpecMethod: 'Spec method',
     colFramework: 'Framework',
     colDate: 'Date',
     colDatapoints: 'Datapoints',
     colCompare: 'Compare',
-    noMatch: 'No matching submissions found.',
-    noData: 'No submission data available.',
+    noMatch: 'No matching submissions found',
+    noData: 'No submission data available',
     vsPrev: 'vs prev',
     vendorLabel: 'Vendor:',
     vendorTip: 'Chip manufacturer',
-    specMethodLabel: 'Spec Method:',
+    specMethodLabel: 'Spec method:',
     specMethodTip: 'Speculative decoding method (e.g. MTP, Eagle)',
     disaggLabel: 'Disaggregated:',
     disaggTip: 'Prefill and decode run on separate chip pools',
     multinodeLabel: 'Multinode:',
     multinodeTip: 'Config spans multiple physical nodes',
-    totalGpusLabel: 'Total Chips:',
-    totalGpusTip: 'Total physical Chips. When disaggregated, prefill + decode are separate pools',
-    prefillGpusLabel: 'Prefill Chips:',
+    totalGpusLabel: 'Total chips:',
+    totalGpusTip: 'Total physical chips. When disaggregated, prefill and decode are separate pools',
+    prefillGpusLabel: 'Prefill chips:',
     prefillGpusTip: 'Chips for the prefill (prompt processing) phase',
-    decodeGpusLabel: 'Decode Chips:',
+    decodeGpusLabel: 'Decode chips:',
     decodeGpusTip: 'Chips for the decode (token generation) phase',
     prefillTpEpLabel: 'Prefill TP/EP:',
     prefillTpEpTip: 'Tensor parallelism / Expert parallelism for prefill',
     decodeTpEpLabel: 'Decode TP/EP:',
     decodeTpEpTip: 'Tensor parallelism / Expert parallelism for decode',
-    aggregateGpusLabel: 'Aggregate Chips:',
+    aggregateGpusLabel: 'Aggregate chips:',
     aggregateGpusTip: 'Chips in the single aggregate inference engine',
     aggregateTpEpLabel: 'Aggregate TP/EP:',
     aggregateTpEpTip: 'Tensor parallelism / Expert parallelism for the aggregate inference engine',
@@ -75,7 +84,7 @@ const STRINGS = {
     concurrenciesTip: 'Distinct concurrency levels tested',
     imageLabel: 'Image:',
     imageTipChanged:
-      'Container image used for this benchmark configuration. The previous run of this config used a different image — shown on the left.',
+      'Container image used for this benchmark configuration. The previous run of this config used a different image, shown on the left.',
     imageTipDefault: 'Container image used for this benchmark configuration',
     showMorePre: 'Show ',
     showMorePost: ' more',
@@ -94,10 +103,11 @@ const STRINGS = {
     expandRow: 'Expand configuration details',
     collapseRow: 'Collapse configuration details',
     changedTo: 'changed to',
-    scrollHint: 'On smaller screens, swipe horizontally to see all columns.',
+    scrollHint: 'On smaller screens, swipe horizontally to see all columns',
   },
   zh: {
-    searchPlaceholder: '搜索配置……',
+    searchPlaceholder: '搜索配置',
+    clearSearch: '清除搜索',
     colGpu: '芯片',
     colModel: '模型',
     colPrecision: '精度',
@@ -106,8 +116,8 @@ const STRINGS = {
     colDate: '日期',
     colDatapoints: '数据点',
     colCompare: '对比',
-    noMatch: '未找到匹配的提交记录。',
-    noData: '暂无提交数据。',
+    noMatch: '未找到匹配的提交记录',
+    noData: '暂无提交数据',
     vsPrev: '与上次对比',
     vendorLabel: '厂商：',
     vendorTip: '芯片制造商',
@@ -136,7 +146,7 @@ const STRINGS = {
     concurrenciesLabel: '并发数：',
     concurrenciesTip: '测试的不同并发级别数',
     imageLabel: '镜像：',
-    imageTipChanged: '此基准测试配置使用的容器镜像。上一次运行使用了不同的镜像——显示在左侧。',
+    imageTipChanged: '此基准测试配置使用的容器镜像。上一次运行使用了不同的镜像，显示在左侧。',
     imageTipDefault: '此基准测试配置使用的容器镜像',
     showMorePre: '再显示 ',
     showMorePost: ' 条',
@@ -155,7 +165,7 @@ const STRINGS = {
     expandRow: '展开配置详情',
     collapseRow: '收起配置详情',
     changedTo: '更新为',
-    scrollHint: '在较小屏幕上可横向滑动查看全部列。',
+    scrollHint: '在较小屏幕上可横向滑动查看全部列',
   },
 } as const;
 
@@ -207,27 +217,29 @@ function SortHeader({
   sortKey,
   sortDir,
   onSort,
+  align = 'left',
 }: {
   label: string;
   field: SortKey;
   sortKey: SortKey;
   sortDir: SortDir;
   onSort: (field: SortKey) => void;
+  align?: 'left' | 'right';
 }) {
   return (
     <th
-      className="px-3 py-2 text-left text-xs font-medium text-muted-foreground select-none"
+      className={`${TABLE_HEAD_CELL_STYLE} px-3 py-2 select-none ${align === 'right' ? 'text-right' : 'text-left'}`}
       aria-sort={sortKey === field ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
     >
       <button
         type="button"
-        className="flex items-center gap-1 hover:text-foreground"
+        className={`group/sort inline-flex items-center gap-1 hover:text-foreground ${align === 'right' ? 'flex-row-reverse' : ''}`}
         onClick={() => onSort(field)}
       >
         {label}
-        {sortKey === field && (
-          <span className="text-foreground">{sortDir === 'asc' ? '↑' : '↓'}</span>
-        )}
+        <span className={sortKey === field ? 'text-foreground' : undefined}>
+          <SortIndicator dir={sortKey === field ? sortDir : null} />
+        </span>
       </button>
     </th>
   );
@@ -314,8 +326,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <Input
-        type="text"
+      <SearchInput
         value={search}
         onChange={(e) => handleSearchChange(e.target.value)}
         onBlur={() => {
@@ -327,13 +338,15 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
           }
         }}
         placeholder={t.searchPlaceholder}
-        className="max-w-sm"
+        aria-label={t.searchPlaceholder}
+        onClear={() => handleSearchChange('')}
+        clearLabel={t.clearSearch}
       />
       <p className="text-xs text-muted-foreground md:hidden">{t.scrollHint}</p>
-      <div className="overflow-x-auto rounded-md border border-border shadow-sm">
+      <div className="overflow-x-auto">
         <table className="w-full min-w-[980px] text-sm">
-          <thead className="bg-muted/50">
-            <tr>
+          <thead>
+            <tr className={TABLE_HEAD_ROW_STYLE}>
               <th className="w-8 px-2" />
               {(
                 [
@@ -353,17 +366,18 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
                   sortKey={sortKey}
                   sortDir={sortDir}
                   onSort={handleSort}
+                  align={field === 'total_datapoints' ? 'right' : 'left'}
                 />
               ))}
               <th
-                className="px-3 py-2 text-left text-xs font-medium text-muted-foreground select-none"
+                className={`${TABLE_HEAD_CELL_STYLE} px-3 py-2 text-left select-none`}
                 scope="col"
               >
                 {t.colCompare}
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border">
+          <tbody className="divide-y divide-border/50">
             {visibleRows.map((row) => {
               const key = submissionRowKey(row);
               const isExpanded = expandedRows.has(key);
@@ -444,10 +458,11 @@ function SubmissionRow({
 
   return (
     <>
-      <tr className="hover:bg-muted/30 cursor-pointer transition-colors" onClick={onToggle}>
-        <td className="px-2 py-2 text-muted-foreground">
+      <tr className="h-11 hover:bg-muted/30 cursor-pointer transition-colors" onClick={onToggle}>
+        <td className="px-2 py-1 text-muted-foreground">
           <button
             type="button"
+            className="flex size-7 items-center justify-center rounded-md hover:bg-muted hover:text-foreground"
             aria-expanded={isExpanded}
             aria-label={isExpanded ? t.collapseRow : t.expandRow}
             onClick={(event) => {
@@ -460,15 +475,13 @@ function SubmissionRow({
         </td>
         <td className="px-3 py-2 font-medium">
           <span className="flex items-center gap-1.5">
-            <span
-              className={`inline-block size-2 rounded-full ${vendor === 'NVIDIA' ? 'bg-green-500' : vendor === 'AMD' ? 'bg-red-500' : 'bg-gray-400'}`}
-            />
+            <VendorDot vendor={vendor} />
             {row.hardware.toUpperCase()}
           </span>
         </td>
         <td className="px-3 py-2">{getModelDisplayName(row.model)}</td>
         <td className="px-3 py-2 uppercase">{row.precision}</td>
-        <td className="px-3 py-2 uppercase">
+        <td className="min-w-32 px-3 py-2">
           {row.spec_method && row.spec_method !== 'none' ? (
             resolveFrameworkPartLabel(DB_MODEL_TO_DISPLAY[row.model], row.spec_method)
           ) : (
@@ -476,26 +489,20 @@ function SubmissionRow({
           )}
         </td>
         <td className="px-3 py-2">{getFrameworkLabel(row.framework)}</td>
-        <td className="px-3 py-2 tabular-nums">
-          {locale === 'zh'
-            ? new Intl.DateTimeFormat('zh-CN', { timeZone: 'UTC' }).format(
-                new Date(`${row.date}T00:00:00Z`),
-              )
-            : row.date}
-        </td>
-        <td className="px-3 py-2 tabular-nums">
+        <td className="px-3 py-2 tabular-nums">{formatDisplayDate(row.date, locale)}</td>
+        <td className="px-3 py-2 text-right tabular-nums">
           {row.total_datapoints.toLocaleString(numberLocale)}
         </td>
-        <td className="px-3 py-2">
+        <td className="px-3 py-1">
           {compareUrl && previousRun ? (
             <TooltipProvider>
               <TooltipRoot>
                 <TooltipTrigger asChild>
                   <Button
                     asChild
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2 gap-1"
+                    variant="ghost"
+                    size="2xs"
+                    className={`-ml-2.5 ${TABLE_ACTION_STYLE}`}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <a
@@ -522,7 +529,8 @@ function SubmissionRow({
                 <TooltipContent side="left" collisionPadding={10}>
                   <span>
                     {t.compareTipPre}
-                    {previousRun.date} → {row.date}
+                    {formatDisplayDate(previousRun.date, locale)} →{' '}
+                    {formatDisplayDate(row.date, locale)}
                     {t.compareTipPost}
                   </span>
                 </TooltipContent>
@@ -545,7 +553,7 @@ function SubmissionRow({
                 <DetailItem label={t.specMethodLabel} tip={t.specMethodTip}>
                   {row.spec_method && row.spec_method !== 'none'
                     ? resolveFrameworkPartLabel(DB_MODEL_TO_DISPLAY[row.model], row.spec_method)
-                    : 'none'}
+                    : '—'}
                 </DetailItem>
                 <DetailItem label={t.disaggLabel} tip={t.disaggTip}>
                   {row.disagg ? t.yes : t.no}
@@ -641,7 +649,8 @@ function SubmissionRow({
                       >
                         <GitCompare className="size-3.5" />
                         {t.compareTipPre}
-                        {previousRun.date} → {row.date}
+                        {formatDisplayDate(previousRun.date, locale)} →{' '}
+                        {formatDisplayDate(row.date, locale)}
                         {t.compareTipPost}
                       </a>
                     </Button>

@@ -1,14 +1,19 @@
-import { DollarSign, FileText, Percent, TrendingUp } from 'lucide-react';
 import Image from 'next/image';
 import type { CSSProperties, ReactNode } from 'react';
 
 import { ThemedFigureImage } from '@/components/blog/themed-figure-image';
+import { formatTokenPriceLabel } from '@/components/inference/token-revenue';
 import { JsonLd } from '@/components/seo/json-ld';
 import { Badge } from '@/components/ui/badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
-import { Heading } from '@/components/ui/heading';
-import { ResultContext } from '@/components/ui/result-context';
+import { Heading, HeadingQualifier } from '@/components/ui/heading';
+import {
+  ARTICLE_H2_CLASS,
+  READING_PAGE_CLASS,
+  READING_TOP_CLASS,
+} from '@/components/ui/reading-layout';
+import { ResultContext, sourceLinkClassName } from '@/components/ui/result-context';
 import { type Locale, localePath } from '@/lib/i18n/i18n';
 import {
   buildWhitepaperBreadcrumbJsonLd,
@@ -16,9 +21,9 @@ import {
   formatWhitepaperDate,
   WHITEPAPER_COPY,
   type Whitepaper,
-  type WhitepaperKpiIcon,
   whitepaperCopy,
   whitepaperIndexPath,
+  whitepaperTagLabel,
 } from '@/lib/content/whitepapers';
 import { cn } from '@/lib/shared/utils';
 
@@ -28,31 +33,9 @@ import {
   WhitepaperPdfButton,
   WhitepaperSourceLink,
 } from './whitepaper-links';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
-const ESTIMATOR_PATH = '/profit-estimator-per-gigawatt/kimi-k3/target/45';
-
-const KPI_NUMBER_CLASS = 'text-[#ba534b] dark:text-[#d97a70]';
-
-const KPI_ICONS: Record<WhitepaperKpiIcon, typeof DollarSign> = {
-  dollar: DollarSign,
-  trending: TrendingUp,
-  percent: Percent,
-};
-
-const HERO_GRID_STYLE: CSSProperties = {
-  backgroundImage:
-    'radial-gradient(circle at center, rgba(234, 235, 236, 0.16) 1px, transparent 1.2px), linear-gradient(rgba(234, 235, 236, 0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(234, 235, 236, 0.035) 1px, transparent 1px)',
-  backgroundSize: '28px 28px, 112px 112px, 112px 112px',
-  maskImage:
-    'linear-gradient(115deg, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.35) 55%, transparent 90%)',
-  WebkitMaskImage:
-    'linear-gradient(115deg, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.35) 55%, transparent 90%)',
-};
-
-const HERO_GLOW_STYLE: CSSProperties = {
-  background:
-    'radial-gradient(closest-side, rgba(247, 176, 65, 0.22), rgba(247, 176, 65, 0.06) 55%, transparent 100%)',
-};
+const ESTIMATOR_PATH = `${getDashboardRoute('profit-estimator-per-gigawatt').path}/kimi-k3/target/45`;
 
 const CHIP_SHADOW_STYLE: CSSProperties = {
   filter:
@@ -69,21 +52,18 @@ interface SectionProps {
 function Section({ id, title, children, className }: SectionProps) {
   return (
     <section className={cn('flex flex-col gap-5', className)} aria-labelledby={id}>
-      <Heading as="h2" level="section" id={id} className="scroll-mt-24 text-2xl">
+      <h2 id={id} className={ARTICLE_H2_CLASS}>
         {title}
-      </Heading>
+      </h2>
       {children}
     </section>
   );
 }
 
-function StepNumber({ children, className }: { children: ReactNode; className?: string }) {
+function StepNumber({ children }: { children: ReactNode }) {
   return (
     <span
-      className={cn(
-        'flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/40 bg-primary/10 font-mono text-xs font-semibold text-primary tabular-nums',
-        className,
-      )}
+      className="w-5 shrink-0 text-base leading-reading font-medium text-muted-foreground tabular-nums"
       aria-hidden="true"
     >
       {children}
@@ -108,7 +88,7 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
 
   const pdfCard = (
     <div
-      className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-card/60 p-5 backdrop-blur-[2px]"
+      className="flex flex-col gap-4 rounded-xl border border-border/30 bg-card p-5"
       data-testid="whitepaper-pdf-card"
     >
       <div className="flex items-start gap-4">
@@ -118,7 +98,7 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
           width={1275}
           height={1650}
           sizes="112px"
-          className="w-24 shrink-0 rounded-md border border-border/60 shadow-md shadow-black/20"
+          className="w-24 shrink-0 rounded-md border border-border/30 shadow-sm"
         />
         <div className="min-w-0 flex flex-col gap-1.5">
           <Heading as="h2" level="card">
@@ -143,27 +123,20 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
     <main className="relative" data-testid="whitepaper-detail-page">
       <JsonLd data={buildWhitepaperJsonLd(paper, locale)} />
       <JsonLd data={buildWhitepaperBreadcrumbJsonLd(paper, locale)} />
-      <div className="container mx-auto flex flex-col gap-10 px-4 pb-16 lg:gap-12 lg:px-8">
+      <div className={cn(READING_PAGE_CLASS, READING_TOP_CLASS, 'flex flex-col gap-10 lg:gap-12')}>
         <section
-          className="dark relative isolate overflow-hidden rounded-2xl border border-border/40 bg-[linear-gradient(135deg,#0b0c0e_0%,#131416_100%)] text-foreground lg:min-h-[420px]"
+          className="relative isolate overflow-hidden rounded-xl border border-border/30 bg-card text-foreground lg:min-h-[420px] dark:bg-[linear-gradient(135deg,#0b0c0e_0%,#131416_100%)]"
           data-testid="whitepaper-hero"
         >
-          <div className="pointer-events-none absolute inset-0 -z-10" style={HERO_GRID_STYLE} />
-          <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(15rem,36%)] xl:grid-cols-[minmax(0,1fr)_30rem]">
+          <div className="grid md:grid-cols-[minmax(0,1fr)_minmax(15rem,36%)]">
             <div className="flex flex-col gap-5 p-6 md:p-10 lg:gap-6 lg:py-12 lg:pl-12">
               <WhitepaperBackLink href={whitepaperIndexPath(locale)} label={t.backToIndex} />
               <header className="flex flex-col gap-4">
-                <Eyebrow as="p" wide>
-                  {copy.typeLabel}
-                </Eyebrow>
-                <Heading
-                  as="h1"
-                  level="display"
-                  className="text-3xl leading-tight md:text-4xl lg:text-5xl lg:leading-[1.08]"
-                >
+                <Eyebrow as="p">{copy.typeLabel}</Eyebrow>
+                <Heading as="h1" level="reading">
                   {copy.title}
                 </Heading>
-                <p className="max-w-prose text-base text-muted-foreground lg:text-lg">
+                <p className="max-w-measure text-base text-muted-foreground lg:text-lg">
                   {copy.subtitle}
                 </p>
               </header>
@@ -179,9 +152,7 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
               <ul className="flex flex-wrap gap-2" aria-label={t.tags}>
                 {paper.tags.map((tag) => (
                   <li key={tag}>
-                    <Badge variant="outline" className="border-border/60 text-muted-foreground">
-                      {tag}
-                    </Badge>
+                    <Badge variant="secondary">{whitepaperTagLabel(tag, locale)}</Badge>
                   </li>
                 ))}
               </ul>
@@ -199,19 +170,18 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
                 />
               </div>
             </div>
-            <div className="relative hidden min-h-[18rem] md:block" aria-hidden="true">
-              <div
-                className="absolute right-[-10%] top-1/2 aspect-square w-[130%] -translate-y-1/2"
-                style={HERO_GLOW_STYLE}
-              />
+            <div
+              className="relative hidden min-h-[18rem] overflow-hidden md:m-3 md:block md:rounded-lg md:bg-[linear-gradient(135deg,#0b0c0e_0%,#131416_100%)] md:dark:m-0 md:dark:rounded-none md:dark:bg-none"
+              aria-hidden="true"
+            >
               <Image
                 src={paper.chipImagePath}
                 alt=""
                 width={paper.chipImageWidth}
                 height={paper.chipImageHeight}
                 priority
-                sizes="(min-width: 1280px) 620px, (min-width: 768px) 42vw, 0px"
-                className="absolute bottom-[-9%] right-[-8%] w-[118%] max-w-none"
+                sizes="(min-width: 1152px) 1040px, (min-width: 768px) 80vw, 0px"
+                className="absolute inset-0 h-full w-full object-cover object-center"
                 style={CHIP_SHADOW_STYLE}
               />
             </div>
@@ -227,33 +197,22 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
             {t.keyNumbers}
           </h2>
           <dl className="grid gap-4 sm:grid-cols-3" data-testid="whitepaper-kpis">
-            {copy.kpis.map((kpi) => {
-              const Icon = KPI_ICONS[kpi.icon];
-              return (
-                <div
-                  key={kpi.label}
-                  data-testid="whitepaper-kpi"
-                  className="flex flex-col gap-3 rounded-2xl border border-border/50 bg-card/60 p-6 backdrop-blur-[2px] lg:p-7"
-                >
-                  <span className="flex size-9 items-center justify-center rounded-lg border border-border/50 bg-background/60 text-muted-foreground">
-                    <Icon aria-hidden="true" className="size-4" />
-                  </span>
-                  <dt className="order-3 text-base font-semibold text-foreground">{kpi.label}</dt>
-                  <dd
-                    className={cn(
-                      'order-2 text-4xl font-bold tracking-heading tabular-nums sm:text-5xl lg:text-6xl',
-                      KPI_NUMBER_CLASS,
-                    )}
-                  >
-                    {kpi.value}
-                  </dd>
-                  <dd className="order-4 text-sm leading-6 text-muted-foreground">{kpi.caption}</dd>
-                </div>
-              );
-            })}
+            {copy.kpis.map((kpi) => (
+              <div
+                key={kpi.label}
+                data-testid="whitepaper-kpi"
+                className="flex flex-col gap-2 rounded-xl border border-border/30 bg-card p-6"
+              >
+                <dt className="order-2 text-base font-medium text-foreground">{kpi.label}</dt>
+                <dd className="order-1 text-4xl font-medium text-foreground tabular-nums lg:text-5xl">
+                  {kpi.value}
+                </dd>
+                <dd className="order-3 text-sm leading-6 text-muted-foreground">{kpi.caption}</dd>
+              </div>
+            ))}
           </dl>
           <p
-            className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-border/40 bg-card/40 px-5 py-3.5 text-sm text-muted-foreground"
+            className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted-foreground"
             data-testid="whitepaper-comparison"
           >
             <span className="font-medium text-foreground">{copy.comparison.lead}:</span>
@@ -265,7 +224,7 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
                   </span>
                 )}
                 <span>
-                  <span className="font-semibold text-foreground tabular-nums">{item.value}</span>{' '}
+                  <span className="font-medium text-foreground tabular-nums">{item.value}</span>{' '}
                   {item.label}
                 </span>
               </span>
@@ -273,7 +232,7 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
           </p>
         </section>
 
-        <section className="flex flex-col gap-6" aria-labelledby="whitepaper-figures">
+        <section className="flex max-w-measure flex-col gap-6" aria-labelledby="whitepaper-figures">
           <h2 id="whitepaper-figures" className="sr-only scroll-mt-24">
             {t.figures}
           </h2>
@@ -284,74 +243,76 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
               <figure
                 key={figure.id}
                 id={figure.id}
-                className="flex flex-col gap-4 rounded-2xl border border-border/50 bg-card/60 p-5 backdrop-blur-[2px] md:p-7"
+                className="flex flex-col gap-4 rounded-xl border border-border/30 bg-card p-5 md:p-6"
                 data-testid="whitepaper-figure"
               >
-                <div className="flex flex-col gap-2">
-                  <Heading as="h3" level="card" className="text-balance">
-                    <img
-                      src={chart.modelLogoPath}
-                      alt=""
-                      aria-hidden="true"
-                      width={24}
-                      height={24}
-                      className="mr-2 inline-block size-6 shrink-0 object-contain align-[-0.3em]"
-                    />
-                    {copy.figureTitle}
-                  </Heading>
-                  <ResultContext
-                    locale={locale}
-                    costTier={figureCopy.costTier}
-                    utilization={chart.utilization}
-                    licenseFee={chart.licenseFee}
-                    date={paper.dataDate}
-                    source={chart.source}
+                <Heading as="h3" level="card" className="text-balance">
+                  <img
+                    src={chart.modelLogoPath}
+                    alt=""
+                    aria-hidden="true"
+                    width={24}
+                    height={24}
+                    className="mr-2 inline-block size-6 shrink-0 object-contain align-[-0.3em]"
                   />
-                  <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    {t.tcoBadgesLabel} <Badge variant="outline">{figure.tcoBadge}</Badge>
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    <small>
-                      {t.sourceLabel}{' '}
-                      <a
-                        href={chart.tcoSourceHref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline hover:text-foreground"
-                      >
-                        {chart.tcoSourceTitle}
-                        <ExternalLinkIcon />
-                      </a>
-                    </small>
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">{t.sellingPriceLabel}:</span>{' '}
-                    {t.sellingPrices(
-                      chart.sellingPrices.input,
-                      chart.sellingPrices.cached,
-                      chart.sellingPrices.output,
-                      chart.sellingPrices.source,
-                    )}
-                  </p>
+                  {copy.figureTitle}
+                  <HeadingQualifier>{copy.figureQualifier}</HeadingQualifier>
+                </Heading>
+                <div
+                  className="overflow-hidden rounded-lg border border-border/30"
+                  style={{ aspectRatio: `${figure.width} / ${figure.height}` }}
+                >
+                  <ThemedFigureImage
+                    srcLight={figure.srcLight}
+                    srcDark={figure.srcDark}
+                    alt={figureCopy.alt}
+                    loading={index === 0 ? 'eager' : 'lazy'}
+                    className="block h-auto w-full"
+                    fullSizeLabel={t.openFullSize}
+                  />
                 </div>
-                <div className="-mx-1 overflow-x-auto px-1 pb-1">
-                  <div
-                    className="min-w-[36rem] overflow-hidden rounded-lg border border-border/40 sm:min-w-0"
-                    style={{ aspectRatio: `${figure.width} / ${figure.height}` }}
-                  >
-                    <ThemedFigureImage
-                      srcLight={figure.srcLight}
-                      srcDark={figure.srcDark}
-                      alt={figureCopy.alt}
-                      loading={index === 0 ? 'eager' : 'lazy'}
-                      className="block h-full w-full object-cover"
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground sm:hidden" aria-hidden="true">
-                  {t.scrollHint}
-                </p>
-                <figcaption className="max-w-prose text-sm leading-6 text-muted-foreground">
+                <ResultContext
+                  layout="footer"
+                  locale={locale}
+                  costTier={figureCopy.costTier}
+                  utilization={chart.utilization}
+                  licenseFee={chart.licenseFee}
+                  tcoBasis={
+                    <>
+                      <div>
+                        <dt className="inline font-medium text-foreground">{t.tcoBadgesLabel}</dt>{' '}
+                        <dd className="inline">{figure.tcoBadge}</dd>
+                      </div>
+                      <div>
+                        <dt className="inline font-medium text-foreground">
+                          {t.sellingPriceLabel}
+                        </dt>{' '}
+                        <dd className="inline">
+                          {t.sellingPrices(
+                            formatTokenPriceLabel(chart.sellingPrices.input),
+                            formatTokenPriceLabel(chart.sellingPrices.cached),
+                            formatTokenPriceLabel(chart.sellingPrices.output),
+                            chart.sellingPrices.source,
+                          )}
+                        </dd>
+                      </div>
+                    </>
+                  }
+                  date={paper.dataDate}
+                  source={chart.source}
+                  markers={
+                    <a
+                      href={chart.tcoSourceHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={sourceLinkClassName}
+                    >
+                      {chart.tcoSourceTitle}
+                      <ExternalLinkIcon />
+                    </a>
+                  }
+                />
+                <figcaption className="max-w-measure text-sm leading-6 text-muted-foreground">
                   {figureCopy.caption}
                 </figcaption>
               </figure>
@@ -359,42 +320,39 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
           })}
         </section>
 
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-12 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,var(--container-measure))_18rem] lg:justify-between lg:gap-12 xl:grid-cols-[minmax(0,var(--container-measure))_20rem]">
           <div className="flex min-w-0 flex-col gap-12">
             <Section id="whitepaper-summary" title={t.summary}>
-              <p className="max-w-prose text-base leading-7 text-foreground/90">{copy.abstract}</p>
+              <p className="text-base leading-reading text-foreground">{copy.abstract}</p>
             </Section>
 
             <Section id="whitepaper-key-findings" title={t.keyFindings}>
-              <ol className="grid gap-4 sm:grid-cols-2">
+              <ol className="flex flex-col gap-4">
                 {copy.keyFindings.map((finding, index) => (
-                  <li
-                    key={finding}
-                    className="flex flex-col gap-3 rounded-2xl border border-border/50 bg-card/60 p-5 backdrop-blur-[2px] sm:last:odd:col-span-2"
-                  >
+                  <li key={finding} className="flex items-start gap-3">
                     <StepNumber>{index + 1}</StepNumber>
-                    <p className="text-base leading-7 text-foreground/90">{finding}</p>
+                    <p className="text-base leading-reading text-foreground">{finding}</p>
                   </li>
                 ))}
               </ol>
             </Section>
 
             <Section id="whitepaper-method" title={t.method}>
-              <ol className="flex flex-col divide-y divide-border/40 rounded-2xl border border-border/50 bg-card/60 backdrop-blur-[2px]">
+              <ol className="flex flex-col gap-4">
                 {copy.methodSteps.map((step, index) => (
-                  <li key={step} className="flex items-start gap-4 px-5 py-4">
-                    <StepNumber className="mt-0.5">{index + 1}</StepNumber>
-                    <p className="text-base leading-7 text-foreground/90">{step}</p>
+                  <li key={step} className="flex items-start gap-3">
+                    <StepNumber>{index + 1}</StepNumber>
+                    <p className="text-base leading-reading text-foreground">{step}</p>
                   </li>
                 ))}
               </ol>
             </Section>
 
             <Section id="whitepaper-assumptions" title={t.assumptions}>
-              <div className="overflow-x-auto rounded-2xl border border-border/50 bg-card/60 backdrop-blur-[2px]">
+              <div className="overflow-x-auto rounded-xl border border-border/30 bg-card">
                 <table className="w-full text-sm">
                   <thead className="text-left text-xs text-muted-foreground">
-                    <tr className="border-b border-border/50">
+                    <tr className="border-b border-border/30">
                       <th scope="col" className="px-5 py-3 font-medium">
                         {t.assumptionItem}
                       </th>
@@ -403,16 +361,16 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/40">
+                  <tbody className="divide-y divide-border/20">
                     {copy.assumptions.map((row) => (
                       <tr key={row.item}>
                         <th
                           scope="row"
-                          className="whitespace-nowrap px-5 py-3 text-left align-top font-medium text-foreground"
+                          className="whitespace-nowrap px-5 py-3 text-left align-top leading-6 font-medium text-foreground"
                         >
                           {row.item}
                         </th>
-                        <td className="px-5 py-3 leading-6 text-foreground/90">{row.value}</td>
+                        <td className="px-5 py-3 leading-6 text-foreground">{row.value}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -438,13 +396,8 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
 
           <aside className="flex flex-col gap-6 lg:sticky lg:top-24 lg:self-start">
             {pdfCard}
-            <nav
-              className="hidden flex-col gap-3 rounded-2xl border border-border/50 bg-card/60 p-5 backdrop-blur-[2px] lg:flex"
-              aria-label={t.onThisPage}
-            >
-              <Eyebrow as="p" tone="muted">
-                {t.onThisPage}
-              </Eyebrow>
+            <nav className="hidden flex-col gap-3 lg:flex" aria-label={t.onThisPage}>
+              <Eyebrow as="p">{t.onThisPage}</Eyebrow>
               <ol className="flex flex-col gap-1.5 text-sm">
                 {sectionIds.map((section) => (
                   <li key={section.id}>
@@ -462,19 +415,14 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
         </div>
 
         <section
-          className="flex flex-col items-start gap-5 rounded-2xl border border-primary/30 bg-primary/5 p-6 md:flex-row md:items-center md:justify-between md:p-8"
+          className="flex flex-col items-start gap-5 rounded-xl border border-border/30 bg-card p-6 md:flex-row md:items-center md:justify-between md:p-8"
           aria-labelledby="whitepaper-closing"
         >
-          <div className="flex items-start gap-4">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary/30 bg-primary/10 text-primary">
-              <FileText aria-hidden="true" className="size-5" />
-            </span>
-            <div className="flex flex-col gap-1.5">
-              <Heading as="h2" level="section" id="whitepaper-closing">
-                {t.closingHeading}
-              </Heading>
-              <p className="max-w-prose text-sm leading-6 text-muted-foreground">{t.closingBody}</p>
-            </div>
+          <div className="flex flex-col gap-1.5">
+            <Heading as="h2" level="section" id="whitepaper-closing">
+              {t.closingHeading}
+            </Heading>
+            <p className="max-w-measure text-sm leading-6 text-muted-foreground">{t.closingBody}</p>
           </div>
           <WhitepaperPdfButton
             href={paper.pdfPath}

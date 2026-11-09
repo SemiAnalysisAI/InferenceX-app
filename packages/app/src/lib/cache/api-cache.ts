@@ -10,6 +10,7 @@ import {
 } from 'node:zlib';
 
 import { revalidateTag, unstable_cache } from 'next/cache';
+import { after } from 'next/server';
 import { workAsyncStorage } from 'next/dist/server/app-render/work-async-storage.external';
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 import {
@@ -58,6 +59,30 @@ export const OPERATORX_CACHE_SCOPE = 'operatorx';
 export function operatorXCacheTag(): string {
   const namespace = cacheNamespace();
   return namespace ? `${OPERATORX_CACHE_SCOPE}:${namespace}` : OPERATORX_CACHE_SCOPE;
+}
+
+/**
+ * VideoGenX reads immutable Blob indexes and approval receipts that change only
+ * through an explicit publication (`POST /api/video-runs`). Projected History
+ * pages and published artifacts stay cached under this tag until that
+ * publication, or `/api/v1/invalidate?scope=video`, expires it. Their readers
+ * also set a short `revalidate` backstop for a read that races the purge.
+ */
+export const VIDEO_CACHE_SCOPE = 'video';
+
+/** Server data tag for VideoGenX reads, namespaced like the other scopes. */
+export function videoCacheTag(): string {
+  const namespace = cacheNamespace();
+  return namespace ? `${VIDEO_CACHE_SCOPE}:${namespace}` : VIDEO_CACHE_SCOPE;
+}
+
+/**
+ * Expire every cached VideoGenX read now. Its responses are private and never
+ * CDN cached, so there is no stale window worth keeping warm, and a publication
+ * must reach the next read on every instance.
+ */
+export function purgeVideo(): void {
+  revalidateTag(videoCacheTag(), { expire: 0 });
 }
 
 function cacheNamespace(): string {
@@ -120,6 +145,8 @@ interface CachedQueryOptions {
   revisioned?: boolean;
   /** Cache tag for the unstable_cache path (default 'db'). */
   tag?: string;
+  /** With `tag`: seconds after which an entry is refreshed even without a tag purge. */
+  revalidate?: number;
   shareDecodedResult?: boolean;
 }
 
@@ -232,6 +259,11 @@ function lastDecodedEntryUnpacker<T>(): (args: unknown[], entry: CachedEntry<T>)
 
 let blobGeneration: (() => Promise<string>) | undefined;
 
+function currentBlobGeneration(): Promise<string> {
+  blobGeneration ??= cachedQuery(() => Promise.resolve(randomUUID()), 'blob-generation');
+  return blobGeneration();
+}
+
 /**
  * Cache a function's result using unstable_cache (fast, local).
  * Set `blobOnly: true` for payloads that should live in Blob storage instead.
@@ -268,8 +300,9 @@ export function cachedQuery<T, Args extends unknown[]>(
     return async (...args: Args): Promise<T> => {
       const blobKey = blobKeyForArgs(keyPrefix, args);
       if (!blobEnabled()) return fn(...args);
-      blobGeneration ??= cachedQuery(() => Promise.resolve(randomUUID()), 'blob-generation');
-      const path = options.revisioned ? blobKey : `generation/${await blobGeneration()}/${blobKey}`;
+      const path = options.revisioned
+        ? blobKey
+        : `generation/${await currentBlobGeneration()}/${blobKey}`;
       const pending = inflight.get(path);
       if (pending) {
         const { json } = await pending;
@@ -295,6 +328,7 @@ export function cachedQuery<T, Args extends unknown[]>(
   if (options?.tag) {
     const tagged = unstable_cache(packed, [cacheKey(keyPrefix), fnSource], {
       tags: [options.tag],
+      revalidate: options.revalidate,
     });
     return async (...args: Args): Promise<T> => unpack(args, await tagged(...args));
   }
@@ -334,6 +368,9 @@ export function cachedDerivedData<T, Args extends unknown[]>(
   return cachedQuery(fn, `derived:${keyPrefix}`, options);
 }
 
+// Also absorbs clock skew between this function and Blob's upload timestamps.
+const STRAY_BLOB_MARGIN_MS = 60_000;
+
 /**
  * Purge the dashboard and CollectiveX caches and the configured Blob prefix.
  * OperatorX is excluded. Its data is independent of results ingests, and only
@@ -344,16 +381,18 @@ export function cachedDerivedData<T, Args extends unknown[]>(
  * and ISR page data are only marked stale, so visitors get the previous
  * payload once while it refreshes in the background. `immediate` drops every
  * layer at once, for corrections and retractions that must never be served again.
+ *
+ * Reads use generation-scoped Blob paths keyed by the `db` tag, so expiring the
+ * tags is enough. Blob deletion is garbage collection that runs after the
+ * response and only logs failures. It removes the generation that was current
+ * before the tags expired, then sweeps leftovers outside it (an interrupted
+ * purge, a late write to an old path, content-addressed blobs on an immediate
+ * purge) that are older than `STRAY_BLOB_MARGIN_MS`. The new generation, which
+ * warmup and visitors fill meanwhile, is never touched.
  */
-export async function purgeAll({
-  immediate = false,
-}: { immediate?: boolean } = {}): Promise<number> {
-  const deleted = await blobPurge(
-    '',
-    immediate
-      ? [`${OPERATORX_CACHE_SCOPE}/`]
-      : [`${OPERATORX_CACHE_SCOPE}/`, CONTENT_BLOB_KEY_PREFIX],
-  );
+export async function purgeAll({ immediate = false }: { immediate?: boolean } = {}): Promise<void> {
+  const oldGeneration = blobEnabled() ? await currentBlobGeneration() : null;
+  const strayCutoff = new Date(Date.now() - STRAY_BLOB_MARGIN_MS);
   const stale = immediate ? { expire: 0 } : 'max';
   revalidateTag(cacheTag(), { expire: 0 });
   revalidateTag(pageCacheTag(), stale);
@@ -362,7 +401,21 @@ export async function purgeAll({
   // CollectiveX responses are cached only under their own tag (no blobs), so
   // a full purge must drop that tag explicitly.
   purgeCollectiveX({ immediate });
-  return deleted;
+  if (oldGeneration === null) return;
+  after(async () => {
+    try {
+      await blobPurge(`generation/${oldGeneration}/`);
+      await blobPurge(
+        '',
+        immediate
+          ? [`${OPERATORX_CACHE_SCOPE}/`]
+          : [`${OPERATORX_CACHE_SCOPE}/`, CONTENT_BLOB_KEY_PREFIX],
+        strayCutoff,
+      );
+    } catch (error) {
+      console.error('[api-cache] blob purge failed', error);
+    }
+  });
 }
 
 /**
@@ -735,8 +788,7 @@ export function cachedJsonResponse<Args extends unknown[]>(
   };
   return async (request: Request, ...args: Args): Promise<Response> => {
     if (!blobEnabled()) return cachedJson(request, await load(...args), options);
-    blobGeneration ??= cachedQuery(() => Promise.resolve(randomUUID()), 'blob-generation');
-    const path = `generation/${await blobGeneration()}/${blobKeyForArgs(keyPrefix, args)}.${suffix}`;
+    const path = `generation/${await currentBlobGeneration()}/${blobKeyForArgs(keyPrefix, args)}.${suffix}`;
     let flight = inflight.get(path);
     if (!flight) {
       flight = fill(path, args).finally(() => inflight.delete(path));

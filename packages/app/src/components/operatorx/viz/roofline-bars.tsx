@@ -3,9 +3,10 @@
 import { color, type ScaleBand, type ScaleContinuousNumeric } from 'd3';
 
 import type { CustomLayerConfig } from '@/lib/d3-chart/D3Chart';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { RooflineSummary, RooflineSummaryBar } from '@/lib/operatorx/roofline-summary';
-import { OpxChart, esc, tooltipHtml } from '../charts/kit';
+import { OpxChart } from '../charts/kit';
 import { EmptyChart } from '../charts/empty';
 import { hardwareLabel } from '../compare/hardware';
 import type { ComparisonModel } from '../compare/model';
@@ -13,8 +14,8 @@ import type { ComparisonModel } from '../compare/model';
 const STRINGS = {
   en: {
     title: 'Median (fill) and best (outline)',
-    individual: 'Each accelerator uses its own compute-bound cases.',
-    noData: 'No compute-bound measurements for this precision.',
+    individual: 'Each accelerator uses its own compute-bound cases',
+    noData: 'No compute-bound measurements for this precision',
     empty: 'No shared compute-bound cases. Try selecting fewer accelerators or another precision.',
     missing: 'A compute or bandwidth reference is unavailable for',
     median: 'Median',
@@ -22,12 +23,11 @@ const STRINGS = {
     cases: 'cases',
     absolute: 'Achieved throughput (TFLOPS)',
     normalized: 'Share of peak compute (%)',
-    inspect: 'Click for the best case’s kernel timeline',
   },
   zh: {
     title: '中位数（填充）与最佳值（轮廓）',
-    individual: '各加速器使用各自的计算受限用例。',
-    noData: '此精度没有计算受限的实测用例。',
+    individual: '各加速器使用各自的计算受限用例',
+    noData: '此精度没有计算受限的实测用例',
     empty: '没有共同的计算受限用例。请减少所选加速器，或切换精度。',
     missing: '以下硬件缺少计算峰值或带宽参考值',
     median: '中位数',
@@ -35,7 +35,6 @@ const STRINGS = {
     cases: '个用例',
     absolute: '实测吞吐量（TFLOPS）',
     normalized: '计算峰值占比（%）',
-    inspect: '点击查看最佳用例的 kernel 时间线',
   },
 };
 
@@ -69,7 +68,8 @@ export function RooflineBars({
   model: ComparisonModel;
   summary: RooflineSummary;
 }) {
-  const strings = STRINGS[useLocale()];
+  const locale = useLocale();
+  const strings = STRINGS[locale];
   const format = (value: number) =>
     summary.normalized
       ? `${(value * 100).toFixed(1)}%`
@@ -168,7 +168,7 @@ export function RooflineBars({
       {summary.bars.length === 0 ? (
         <EmptyChart>
           {summary.missingReferences.length > 0
-            ? `${strings.missing}: ${summary.missingReferences.map(hardwareLabel).join(', ')}.`
+            ? `${strings.missing}: ${summary.missingReferences.map(hardwareLabel).join(', ')}`
             : summary.sharedOnly
               ? strings.empty
               : strings.noData}
@@ -209,15 +209,14 @@ export function RooflineBars({
             attachToLayer: 0,
             rulerType: 'none',
             content: (d) =>
-              tooltipHtml({
+              chartHoverCard({
                 title: hardwareLabel(d.hardware),
                 color: model.colors[d.hardware],
-                rows: [
-                  esc(`${strings.median}: ${format(d.median)}`),
-                  esc(`${strings.best}: ${format(d.best)}`),
-                  esc(`${d.n} ${strings.cases}`),
+                metrics: [
+                  { value: format(d.median), label: strings.median },
+                  { value: format(d.best), label: strings.best },
                 ],
-                footer: strings.inspect,
+                summary: `${d.n} ${strings.cases}`,
               }),
           }}
         />

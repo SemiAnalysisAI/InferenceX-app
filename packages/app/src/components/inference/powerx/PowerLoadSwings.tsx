@@ -228,12 +228,12 @@ export function PowerLoadSwings({
         </label>
       </div>
       {isPhone ? (
-        // Eleven columns cannot fit a phone: one card per trace with a two-column stat grid.
-        <ul className="space-y-2" data-testid="powerx-load-swings-cards">
+        // Eleven columns cannot fit a phone, so each trace gets its own row with a two-column stat grid.
+        <ul className="divide-y divide-border/30" data-testid="powerx-load-swings-cards">
           {rows.map((row) => (
             <li
               key={row.trace.key}
-              className="rounded-lg border border-border/60 p-3 text-xs tabular-nums"
+              className="py-3 text-xs tabular-nums"
               data-testid="powerx-load-swings-row"
             >
               <p className="text-sm">{traceName(row)}</p>
@@ -245,7 +245,7 @@ export function PowerLoadSwings({
                   </div>
                 ))}
               </dl>
-              <p className="no-export mt-2 border-t border-border/60 pt-2 text-muted-foreground">
+              <p className="no-export mt-2 text-muted-foreground">
                 {downloads(row.trace.point.id)}
               </p>
             </li>
@@ -257,22 +257,22 @@ export function PowerLoadSwings({
             className="w-full min-w-[64rem] text-left text-xs tabular-nums"
             data-testid="powerx-load-swings-table"
           >
-            <thead className="sticky top-0 bg-background">
+            <thead className="sticky top-0 bg-card">
               <tr>
                 <th className="p-2">{t.trace}</th>
-                <th className="p-2">
+                <th className="p-2 text-right">
                   {t.peak}
                   <PowerBasisPill tag="gpu" />
                 </th>
-                <th className="p-2">{t.min}</th>
-                <th className="p-2">{t.idle}</th>
-                <th className="p-2">{t.mean}</th>
-                <th className="p-2">{t.p5p95}</th>
-                <th className="p-2">{t.d1}</th>
-                <th className="p-2">{t.d5}</th>
-                <th className="p-2">{t.up}</th>
-                <th className="p-2">{t.down}</th>
-                <th className="p-2">{t.volatility}</th>
+                <th className="p-2 text-right">{t.min}</th>
+                <th className="p-2 text-right">{t.idle}</th>
+                <th className="p-2 text-right">{t.mean}</th>
+                <th className="p-2 text-right">{t.p5p95}</th>
+                <th className="p-2 text-right">{t.d1}</th>
+                <th className="p-2 text-right">{t.d5}</th>
+                <th className="p-2 text-right">{t.up}</th>
+                <th className="p-2 text-right">{t.down}</th>
+                <th className="p-2 text-right">{t.volatility}</th>
                 <th className="p-2 no-export">{t.downloads}</th>
               </tr>
             </thead>
@@ -281,7 +281,7 @@ export function PowerLoadSwings({
                 <tr key={row.trace.key} data-testid="powerx-load-swings-row">
                   <th className="p-2 align-top font-normal whitespace-nowrap">{traceName(row)}</th>
                   {statCells(row).map((cell) => (
-                    <td key={cell.key} className="p-2 align-top whitespace-nowrap">
+                    <td key={cell.key} className="p-2 text-right align-top whitespace-nowrap">
                       {cell.value}
                     </td>
                   ))}

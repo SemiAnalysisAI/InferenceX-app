@@ -19,6 +19,12 @@ import {
 } from './ScatterGraph.test-harness';
 import { pointLabelText } from './point-label';
 
+vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  measureTextWidth: (text: string, font: string) =>
+    text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
+}));
+
 const datedPoint = (date: string, x: number, y: number) => ({
   ...point('h100', 'fp8', x, y, 8),
   date,
@@ -166,10 +172,10 @@ describe('ScatterGraph toggle decoration', () => {
     expect(rebuildCount()).toBe(buildsAfterMount);
     expect(container.querySelector('.canvas-point-layer')).toBe(layer);
     expect(scatterPoints(container)[0].attrs['has-trace']).toBe('true');
-    dispatchAtPoint(container, 'click', target);
+    for (let click = 0; click < 2; click++) dispatchAtPoint(container, 'click', target);
 
     expect(document.querySelector('[data-action="view-charts"]')?.getAttribute('href')).toBe(
-      '/inference/agentic/42',
+      '/infx/inference/agentic/42',
     );
     unmount();
   });

@@ -22,7 +22,7 @@ tags:
 
 This is the cadence that matters. GLM-5 dropped, and within a quarter AMD shipped an upstream SGLang kernel ([sgl-project/sglang PR #21511](https://github.com/sgl-project/sglang/pull/21511)) along with other optimizations plus the matching InferenceX recipes ([InferenceX PR #1440](https://github.com/SemiAnalysisAI/InferenceX/pull/1440)) that flipped the FP8 single-node cost curve on the model. Speed is the moat.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=GLM-5&i_prec=fp8&g_rundate=2026-05-20&i_active=b200_sglang%2Cb200_sglang_mtp%2Cmi355x_sglang%2Cmi355x_sglang_mtp&i_metric=y_costh&i_linelabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_model=GLM-5&i_prec=fp8&g_rundate=2026-05-20&i_active=b200_sglang%2Cb200_sglang_mtp%2Cmi355x_sglang%2Cmi355x_sglang_mtp&i_metric=y_costh&i_linelabel=1">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 
@@ -140,7 +140,7 @@ The common measured ranges are approximately 18.052–90.435 tok/s/user with MTP
   caption="GLM-5 FP8 8k/1k. Cost per million total tokens vs interactivity. B200 SGLang and MI355X SGLang, both with and without MTP. Labels denote GPU count per config."
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_model=GLM-5&i_prec=fp8&g_rundate=2026-05-20&i_active=b200_sglang%2Cb200_sglang_mtp%2Cmi355x_sglang%2Cmi355x_sglang_mtp&i_metric=y_costh&i_linelabel=1), pre-filtered to GLM-5 FP8 on B200 and MI355X SGLang for the snapshot as of 2026-05-20.
+[Live chart](https://inferencex.semianalysis.com/infx/inference?g_model=GLM-5&i_prec=fp8&g_rundate=2026-05-20&i_active=b200_sglang%2Cb200_sglang_mtp%2Cmi355x_sglang%2Cmi355x_sglang_mtp&i_metric=y_costh&i_linelabel=1), pre-filtered to GLM-5 FP8 on B200 and MI355X SGLang for the snapshot as of 2026-05-20.
 
 ## What's Next for MI355X on GLM-5
 
@@ -153,7 +153,7 @@ This result is single-node, aggregated, FP8 only. Two gaps still need closing:
 
 This recipe loop moved fast because [Anush Elangovan](https://x.com/AnushElangovan), [HaiShaw](https://github.com/HaiShaw), and the broader AMD AI team landed both the upstream SGLang TileLang fused MLA + FP8 KV kernel in a 14-week window after GLM-5 dropped. The SGLang maintainers reviewed and shipped the kernel within days of submission. Speed of the upstream-to-benchmark loop is the moat.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=GLM-5&i_prec=fp8&g_rundate=2026-05-20&i_active=b200_sglang%2Cb200_sglang_mtp%2Cmi355x_sglang%2Cmi355x_sglang_mtp&i_metric=y_costh&i_linelabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_model=GLM-5&i_prec=fp8&g_rundate=2026-05-20&i_active=b200_sglang%2Cb200_sglang_mtp%2Cmi355x_sglang%2Cmi355x_sglang_mtp&i_metric=y_costh&i_linelabel=1">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 

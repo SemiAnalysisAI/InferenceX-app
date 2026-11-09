@@ -40,7 +40,13 @@ await publishVideoResults({
   post,
   runId: env.H3_RUN_ID,
   mergeRunId: env.H3_MERGE_RUN_ID || null,
-  onStored: (run, artifact, sources) => {
-    console.log(`Stored video run ${run}, artifact ${artifact}, ${sources} executions`);
+  onStored: (run, artifact, sources, quality) => {
+    const pairs =
+      quality === null
+        ? 'no quality yet'
+        : quality === 'failed'
+          ? 'quality attachment failed'
+          : `${quality} reference pairs`;
+    console.log(`Stored video run ${run}, artifact ${artifact}, ${sources} executions, ${pairs}`);
   },
 });

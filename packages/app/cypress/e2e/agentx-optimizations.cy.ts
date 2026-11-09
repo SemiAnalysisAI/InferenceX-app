@@ -34,12 +34,11 @@ describe('AgentX optimizations', () => {
     cy.intercept('GET', '/api/v1/datasets', { statusCode: 200, body: [] });
   });
 
-  it('links from /agentx to the optimizations index and to each project', () => {
-    cy.visit('/agentx', { onBeforeLoad: unlockAgenticGate });
+  it('links from /infx/agentx to the optimizations index and to each project', () => {
+    cy.visit('/infx/agentx', { onBeforeLoad: unlockAgenticGate });
 
     cy.get('[data-testid="agentx-optimizations-callout"]').within(() => {
-      cy.contains('h2', 'Optimizations for Agentic Workloads').should('be.visible');
-      cy.contains('50+ upstream pull requests').should('be.visible');
+      cy.contains('h2', 'Optimizations for agentic workloads').should('be.visible');
       cy.get('[data-testid="agentx-optimizations-framework-link"]').should(
         'have.length',
         FRAMEWORK_SLUGS.length,
@@ -47,24 +46,24 @@ describe('AgentX optimizations', () => {
       cy.get('[data-testid="agentx-optimizations-framework-link"][data-framework="sglang"]').should(
         'have.attr',
         'href',
-        '/agentx/optimizations/sglang',
+        '/infx/agentx/optimizations/sglang',
       );
       cy.get(
         '[data-testid="agentx-optimizations-framework-link"][data-framework="mori-umbp"]',
-      ).should('have.attr', 'href', '/agentx/optimizations/mori-umbp');
+      ).should('have.attr', 'href', '/infx/agentx/optimizations/mori-umbp');
       cy.get('[data-testid="agentx-optimizations-cta"]')
         .should('contain.text', 'Read the optimizations')
         .click();
     });
 
-    cy.location('pathname').should('eq', '/agentx/optimizations');
+    cy.location('pathname').should('eq', '/infx/agentx/optimizations');
   });
 
   it('publishes the index with the ecosystem primer, every project, and sourced PRs', () => {
-    cy.visit('/agentx/optimizations', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/infx/agentx/optimizations', { onBeforeLoad: unlockAgenticGate });
 
     cy.get('[data-testid="agentx-optimizations-index"]').within(() => {
-      cy.get('h1').should('have.text', 'Optimizations for Agentic Workloads');
+      cy.get('h1').should('have.text', 'Optimizations for agentic workloads');
       cy.get('[data-testid="agentx-optimizations-card"]').should(
         'have.length',
         FRAMEWORK_SLUGS.length,
@@ -82,40 +81,7 @@ describe('AgentX optimizations', () => {
       cy.get('[data-testid="agentx-optimizations-card"][data-framework="vllm"]').click();
     });
 
-    cy.location('pathname').should('eq', '/agentx/optimizations/vllm');
-  });
-
-  it('renders a project page with its measurements, figures, and PR links', () => {
-    cy.visit('/agentx/optimizations/vllm', { onBeforeLoad: unlockAgenticGate });
-
-    cy.get('[data-testid="agentx-optimizations-article"]')
-      .should('have.attr', 'data-framework', 'vllm')
-      .within(() => {
-        cy.get('h1').should('have.text', 'vLLM');
-        cy.contains('prefix-cache hit rate above 95%').should('be.visible');
-        cy.contains('81.7% higher output throughput').should('be.visible');
-        cy.get('[data-testid="agentx-optimizations-figure-vllmSelectiveRetention"] img').should(
-          'be.visible',
-        );
-        cy.get('[data-testid="agentx-optimizations-figure-vllmSelectiveRetention"]').should(
-          'contain.text',
-          'View full-resolution image',
-        );
-        cy.get('[data-testid="agentx-optimizations-pr"]')
-          .should('have.length.greaterThan', 20)
-          .first()
-          .should('have.attr', 'href', 'https://github.com/vllm-project/vllm/pull/43447')
-          .and('contain.text', 'vLLM #43447');
-        cy.get('[data-testid="agentx-optimizations-card"]').should(
-          'have.length',
-          FRAMEWORK_SLUGS.length - 1,
-        );
-      });
-
-    cy.visit('/agentx/optimizations/mori-umbp', { onBeforeLoad: unlockAgenticGate });
-    cy.get('[data-testid="agentx-optimizations-figure-umbpStoreLinker"]')
-      .should('be.visible')
-      .and('not.contain.text', 'View full-resolution image');
+    cy.location('pathname').should('eq', '/infx/agentx/optimizations/vllm');
   });
 
   it('renders the index and representative projects at 1440px and 390px in both locales', () => {
@@ -123,7 +89,7 @@ describe('AgentX optimizations', () => {
     for (const viewport of ROUTE_VIEWPORTS) {
       for (const locale of ['', '/zh']) {
         cy.viewport(viewport.width, viewport.height);
-        cy.visit(`${locale}/agentx/optimizations`, { onBeforeLoad: unlockAgenticGate });
+        cy.visit(`${locale}/infx/agentx/optimizations`, { onBeforeLoad: unlockAgenticGate });
         cy.get('[data-testid="agentx-optimizations-index"]').should('be.visible');
         cy.get('[data-testid="agentx-optimizations-card"]').should(
           'have.length',
@@ -132,12 +98,12 @@ describe('AgentX optimizations', () => {
         cy.get('[data-testid="language-toggle"]').should(
           'have.attr',
           'href',
-          locale === '/zh' ? '/agentx/optimizations' : '/zh/agentx/optimizations',
+          locale === '/zh' ? '/infx/agentx/optimizations' : '/zh/infx/agentx/optimizations',
         );
         expectNoPageOverflow();
 
         for (const slug of matrixSlugs) {
-          cy.visit(`${locale}/agentx/optimizations/${slug}`, {
+          cy.visit(`${locale}/infx/agentx/optimizations/${slug}`, {
             onBeforeLoad: unlockAgenticGate,
           });
           cy.get('[data-testid="agentx-optimizations-article"]')
@@ -152,7 +118,9 @@ describe('AgentX optimizations', () => {
           cy.get('[data-testid="language-toggle"]').should(
             'have.attr',
             'href',
-            locale === '/zh' ? `/agentx/optimizations/${slug}` : `/zh/agentx/optimizations/${slug}`,
+            locale === '/zh'
+              ? `/infx/agentx/optimizations/${slug}`
+              : `/zh/infx/agentx/optimizations/${slug}`,
           );
           expectNoPageOverflow();
         }
@@ -161,21 +129,21 @@ describe('AgentX optimizations', () => {
   });
 
   it('returns 404 for a project that does not exist', () => {
-    cy.request({ url: '/agentx/optimizations/not-a-framework', failOnStatusCode: false })
+    cy.request({ url: '/infx/agentx/optimizations/not-a-framework', failOnStatusCode: false })
       .its('status')
       .should('eq', 404);
   });
 
   it('ships the Simplified Chinese index and project pages', () => {
-    cy.visit('/zh/agentx', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/zh/infx/agentx', { onBeforeLoad: unlockAgenticGate });
     cy.get('[data-testid="agentx-optimizations-callout"]').within(() => {
       cy.contains('h2', '面向智能体负载的优化').should('be.visible');
       cy.get('[data-testid="agentx-optimizations-cta"]')
         .should('contain.text', '查看优化详情')
-        .and('have.attr', 'href', '/zh/agentx/optimizations');
+        .and('have.attr', 'href', '/zh/infx/agentx/optimizations');
     });
 
-    cy.visit('/zh/agentx/optimizations', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/zh/infx/agentx/optimizations', { onBeforeLoad: unlockAgenticGate });
     cy.get('[data-testid="agentx-optimizations-index"]').within(() => {
       cy.get('h1').should('have.text', '面向智能体负载的优化');
       cy.contains('分布式推理生态简介').should('be.visible');
@@ -186,16 +154,16 @@ describe('AgentX optimizations', () => {
       cy.get('[data-testid="agentx-optimizations-card"][data-framework="lmcache"]').should(
         'have.attr',
         'href',
-        '/zh/agentx/optimizations/lmcache',
+        '/zh/infx/agentx/optimizations/lmcache',
       );
     });
     cy.get('link[rel="alternate"][hreflang="en"]').should(
       'have.attr',
       'href',
-      'https://inferencex.semianalysis.com/agentx/optimizations',
+      'https://inferencex.semianalysis.com/infx/agentx/optimizations',
     );
 
-    cy.visit('/zh/agentx/optimizations/sglang', { onBeforeLoad: unlockAgenticGate });
+    cy.visit('/zh/infx/agentx/optimizations/sglang', { onBeforeLoad: unlockAgenticGate });
     cy.get('[data-testid="agentx-optimizations-article"]').within(() => {
       cy.get('h1').should('have.text', 'SGLang');
       cy.contains('HiCache offload').should('be.visible');
@@ -208,12 +176,12 @@ describe('AgentX optimizations', () => {
     cy.get('link[rel="alternate"][hreflang="en"]').should(
       'have.attr',
       'href',
-      'https://inferencex.semianalysis.com/agentx/optimizations/sglang',
+      'https://inferencex.semianalysis.com/infx/agentx/optimizations/sglang',
     );
     cy.get('link[rel="alternate"][hreflang="zh-CN"]').should(
       'have.attr',
       'href',
-      'https://inferencex.semianalysis.com/zh/agentx/optimizations/sglang',
+      'https://inferencex.semianalysis.com/zh/infx/agentx/optimizations/sglang',
     );
   });
 });

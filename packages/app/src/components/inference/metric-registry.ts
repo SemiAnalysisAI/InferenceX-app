@@ -1,6 +1,6 @@
 import type { ChartDefinition } from './types';
 import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
-import type { TokenMetricType } from '@/lib/benchmarks/supplemental-benchmarks';
+import type { TokenMetricType } from '@/lib/benchmarks/token-metric-support';
 import { POWER_BASIS_FIELDS } from '@/lib/power/power-basis';
 
 export type RooflineDirection = 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
@@ -12,21 +12,21 @@ export const COST_TIER_LABELS: Record<
   { option: string; optionZh: string; label: string; labelZh: string }
 > = {
   hyperscaler: {
-    option: 'Owning at Large Hyperscaler Volume',
+    option: 'Owning at large hyperscaler volume',
     optionZh: '自有 · 超大规模云厂商批量采购',
-    label: 'Owning at Large Hyperscaler Volume',
+    label: 'Owning at large hyperscaler volume',
     labelZh: '自有 · 超大规模云厂商批量采购',
   },
   rental: {
-    option: 'Rent - 3 Year Commit',
+    option: 'Rent – 3-year commit',
     optionZh: '租赁 - 3 年承诺',
-    label: 'Rent - 3 Year Commit',
+    label: 'Rent – 3-year commit',
     labelZh: '租赁 - 3 年承诺',
   },
   custom: {
-    option: 'Custom User Values',
+    option: 'Custom user values',
     optionZh: '自定义值',
-    label: 'Custom User Values',
+    label: 'Custom user values',
     labelZh: '自定义值',
   },
 };
@@ -240,7 +240,7 @@ export const METRIC_REGISTRY = {
     field: 'powerUser.y',
     label: 'Token Throughput per All in Utility MW (tok/s/MW)',
     labelZh: '每全电源配置兆瓦 token 吞吐量（tok/s/MW）',
-    title: 'Token Throughput per All in Utility MW (Custom User Values)',
+    title: 'Token Throughput per All in Utility MW (Custom user values)',
     titleZh: '每全电源配置兆瓦 token 吞吐量（自定义值）',
     polarity: 'higher',
     source: 'custom',
@@ -789,7 +789,7 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
     gated: true,
   },
   {
-    label: 'Custom User Values',
+    label: 'Custom user values',
     labelZh: '自定义值',
     metrics: ['y_tokensPerDollarUser', 'y_costUser', 'y_powerUser'],
   },

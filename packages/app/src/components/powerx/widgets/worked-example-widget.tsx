@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 
+import { Stat } from '@/components/ui/stat';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import {
   buildLadder,
@@ -104,7 +105,7 @@ export function WorkedExampleWidget({ locale, alt }: WidgetProps) {
           value: ladder.gpusPerMw,
           format: (value) => Math.round(value).toLocaleString('en-US'),
         },
-        tdp: { value: ladder.percentOfTdp, format: (value) => `${value.toFixed(0)} %` },
+        tdp: { value: ladder.percentOfTdp, format: (value) => `${value.toFixed(0)}%` },
         facility: { value: ladder.facilityWatts, format: watts },
         allIn: { value: ladder.allInWatts, format: watts },
       }
@@ -143,19 +144,21 @@ export function WorkedExampleWidget({ locale, alt }: WidgetProps) {
           )}
         >
           {(Object.keys(t.rows) as RowKey[]).map((key) => (
-            <div key={key} className="min-w-0">
-              <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <GrammarSwatch
-                  kind={ROW_KIND[key]}
-                  color={ROW_KIND[key] === 'rated' ? 'var(--muted-foreground)' : color}
-                />
-                {t.rows[key][0]}
-              </dt>
-              <dd className="mt-1 font-mono text-xl font-semibold text-foreground tabular-nums">
-                <Readout value={values[key].value} format={values[key].format} />
-              </dd>
-              <dd className="text-xs text-muted-foreground">{t.rows[key][1]}</dd>
-            </div>
+            <Stat
+              key={key}
+              size="lg"
+              label={
+                <span className="flex items-center gap-1.5">
+                  <GrammarSwatch
+                    kind={ROW_KIND[key]}
+                    color={ROW_KIND[key] === 'rated' ? 'var(--muted-foreground)' : color}
+                  />
+                  {t.rows[key][0]}
+                </span>
+              }
+              value={<Readout value={values[key].value} format={values[key].format} />}
+              detail={t.rows[key][1]}
+            />
           ))}
         </dl>
       )}

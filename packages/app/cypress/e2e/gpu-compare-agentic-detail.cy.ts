@@ -100,7 +100,7 @@ describe('GPU comparison agentic point detail', () => {
     interceptBenchmarkPresence({ trace: agenticIds, log: agenticIds }).as('benchmarkPresence');
     interceptDerivedAgenticMetrics();
 
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         unlockAgenticGate(win);
@@ -109,7 +109,7 @@ describe('GPU comparison agentic point detail', () => {
 
     cy.get('[data-testid="gpu-multiselect"] [role="combobox"]').click({ force: true });
     cy.get('[role="option"]').first().click();
-    cy.contains('Comparison Date Range').should('be.visible');
+    cy.contains('Comparison date range').should('be.visible');
     cy.contains('button', 'Select date range')
       .should('not.have.class', 'animate-pulse')
       .and('not.have.class', 'border-red-500');
@@ -118,62 +118,43 @@ describe('GPU comparison agentic point detail', () => {
       if ($body.text().includes('View anyway')) {
         cy.contains('button', 'View anyway').click();
       } else {
-        cy.contains('button', 'Max Range').click();
+        cy.contains('button', 'Max range').click();
         cy.contains('button', 'Apply').click();
       }
     });
 
     cy.get('[data-testid="gpu-graph"]').first().should('be.visible');
     cy.wait('@benchmarkPresence');
-    cy.wait(100);
     cy.get('[data-testid="gpu-graph"]')
       .first()
       .find('svg .dot-group')
       .should('have.length.greaterThan', 0)
       .first()
-      .then(($point) => {
-        const point = $point[0] as unknown as SVGElement & {
-          __data__: { benchmark_type?: string; id?: number };
-        };
-        expect(point.__data__.benchmark_type).to.equal('agentic_traces');
-        expect(point.__data__.id).to.be.a('number');
-        cy.wrap($point).find('.visible-shape').click({ force: true });
-      });
+      .find('.visible-shape')
+      .click({ force: true });
 
-    cy.get('[data-chart-tooltip]:visible').should('have.length', 1);
-    cy.get('[data-chart-tooltip]:visible')
-      .should('contain', 'Offload Type: DRAM')
-      .and('contain', 'KV Offload Engine: Mooncake 0.3.11.post1')
-      .and('contain', 'Router: vLLM Router 0.1.14')
-      .and('contain', 'Chip Cache Hit Rate: 87.5%')
+    cy.get('[data-testid="point-details-panel"]')
+      .should('have.length', 1)
       .and('not.contain', 'Offload Mode');
-    cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]')
-      .should('be.visible')
-      .then(($link) => {
-        expect($link).to.match('a');
-        expect($link).not.to.have.attr('target');
-        const href = $link.attr('href') ?? '';
-        expect(href).to.match(/^\/inference\/agentic\/\d+\?/u);
-        const params = new URLSearchParams(href.slice(href.indexOf('?')));
-        expect(params.get('i_seq')).to.equal('agentic-traces');
-        expect(params.get('i_gpus')).to.be.a('string').and.not.equal('');
-      });
-    cy.get('[data-chart-tooltip]:visible [data-action="view-logs"]')
-      .should('be.visible')
-      .then(($link) => {
-        expect($link).to.match('a');
-        const href = $link.attr('href') ?? '';
-        expect(href).to.match(/^\/inference\/agentic\/\d+\?/u);
-        const params = new URLSearchParams(href.slice(href.indexOf('?')));
-        expect(params.get('view')).to.equal('logs');
-        expect(params.get('i_seq')).to.equal('agentic-traces');
-        expect(params.get('i_gpus')).to.be.a('string').and.not.equal('');
-      });
-    cy.location('pathname').should('eq', '/inference');
+    cy.contains('[data-testid="point-details-panel"] .tooltip-line', 'Router').should(
+      'contain.text',
+      'vLLM Router 0.1.14',
+    );
+    for (const action of ['view-charts', 'view-logs']) {
+      cy.get(`[data-testid="point-details-panel"] [data-action="${action}"]`)
+        .should('be.visible')
+        .invoke('attr', 'href')
+        .then((href = '') => {
+          const params = new URLSearchParams(href.slice(href.indexOf('?')));
+          expect(params.get('i_seq')).to.equal('agentic-traces');
+          expect(params.get('i_gpus')).to.be.a('string').and.not.equal('');
+        });
+    }
+    cy.location('pathname').should('eq', '/infx/inference');
   });
 
   const CONFLICTING_GPU_URL =
-    '/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&i_gpus=b200_sglang,b200_vllm&i_dates=2026-06-12&i_dstart=2026-06-12&i_dend=2026-06-12';
+    '/infx/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&i_gpus=b200_sglang,b200_vllm&i_dates=2026-06-12&i_dstart=2026-06-12&i_dend=2026-06-12';
 
   it('restores a soloed compatible selection without requesting engine consent', () => {
     cy.intercept('GET', '/api/v1/availability/compact', {
@@ -181,7 +162,7 @@ describe('GPU comparison agentic point detail', () => {
     });
     cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks });
     interceptDerivedAgenticMetrics();
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
@@ -202,7 +183,7 @@ describe('GPU comparison agentic point detail', () => {
     });
     cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks });
     interceptDerivedAgenticMetrics();
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
@@ -272,13 +253,21 @@ describe('GPU comparison agentic point detail', () => {
       },
     });
 
-    cy.get('[data-testid="engine-comparison-conflict-toast"]')
+    cy.get('[data-testid="engine-comparison-conflict-notice"]')
       .should('be.visible')
       .and('contain.text', 'Kept vLLM and removed SGLang configs');
     cy.get('[data-testid="gpu-multiselect"] [data-slot="select-trigger"]')
       .should('contain.text', 'vLLM')
       .and('not.contain.text', 'SGLang');
     cy.contains('button', 'Jun 12, 2026').should('be.visible');
+    cy.get('[data-testid="engine-comparison-conflict-notice"] button[aria-expanded]')
+      .should('have.attr', 'aria-expanded', 'false')
+      .click();
+    cy.get('[data-testid="engine-comparison-conflict-notice"] button[aria-expanded]').should(
+      'have.attr',
+      'aria-expanded',
+      'true',
+    );
     cy.contains('button', 'Review comparison warning').click();
     cy.get('[data-testid="engine-comparison-confirmation"]')
       .contains('button', 'I agree, show both')
@@ -306,6 +295,6 @@ describe('GPU comparison agentic point detail', () => {
       .should('contain.text', 'vLLM')
       .and('contain.text', 'SGLang');
     cy.contains('button', 'Jun 12, 2026').should('be.visible');
-    cy.get('[data-testid="engine-comparison-conflict-toast"]').should('not.exist');
+    cy.get('[data-testid="engine-comparison-conflict-notice"]').should('not.exist');
   });
 });

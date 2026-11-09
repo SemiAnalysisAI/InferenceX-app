@@ -33,8 +33,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'enum',
     description: text(
-      'Rolling date-range preset for the aggregation, matching the /reliability dashboard presets.',
-      '聚合使用的滚动时间范围预设，与 /reliability 页面的预设一致。',
+      'Rolling date-range preset for the aggregation, matching the /infx/reliability dashboard presets.',
+      '聚合使用的滚动时间范围预设，与 /infx/reliability 页面的预设一致。',
     ),
     schema: { type: 'string', enum: RELIABILITY_RANGE_ENUM, default: 'last-3-months' },
     example: 'last-7-days',
@@ -152,8 +152,8 @@ export const operations: ApiOperation[] = [
     path: '/api/v1/views/reliability',
     summary: text('Get the reliability chart view', '获取可靠性图表视图'),
     description: text(
-      'Returns the aggregated benchmark-run success rates per hardware that the /reliability dashboard chart renders, bucketed by a rolling date-range preset. Success rates are percentages rounded to 2 decimal places; generatedFrom reports the first and last dates in the underlying run stats.',
-      '返回 /reliability 页面图表渲染的各硬件基准运行成功率聚合结果，按滚动时间范围预设分桶。成功率为百分比，保留 2 位小数；generatedFrom 给出底层运行统计数据的最早与最晚日期。',
+      'Returns the aggregated benchmark-run success rates per hardware that the /infx/reliability dashboard chart renders, bucketed by a rolling date-range preset. Success rates are percentages rounded to 2 decimal places; generatedFrom reports the first and last dates in the underlying run stats.',
+      '返回 /infx/reliability 页面图表渲染的各硬件基准运行成功率聚合结果，按滚动时间范围预设分桶。成功率为百分比，保留 2 位小数；generatedFrom 给出底层运行统计数据的最早与最晚日期。',
     ),
     audience: 'public',
     stability: 'beta',

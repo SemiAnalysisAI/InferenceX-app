@@ -88,7 +88,6 @@ describe('WhitepaperIndexContent', () => {
     expect(html).toContain('data-testid="whitepaper-index-page"');
     expect(html).toContain('data-testid="whitepaper-card"');
     expect(html).toContain('data-testid="whitepaper-card-kpis"');
-    expect(html).toContain(WHITEPAPER_COPY.en.indexEyebrow);
     expect(html).toContain(WHITEPAPER_COPY.en.indexTitle);
     expect(html).toContain(en.title);
     expect(html.includes(coverImagePath) || html.includes(encodeURIComponent(coverImagePath))).toBe(
@@ -109,7 +108,6 @@ describe('WhitepaperIndexContent', () => {
     const html = renderToStaticMarkup(<WhitepaperIndexContent locale="zh" />);
     const { zh } = paper();
 
-    expect(html).toContain(WHITEPAPER_COPY.zh.indexEyebrow);
     expect(html).toContain(WHITEPAPER_COPY.zh.indexTitle);
     expect(html).toContain(WHITEPAPER_COPY.zh.readSummary);
     expect(html).toContain(zh.title);

@@ -8,7 +8,7 @@ import { ModelLogo } from '@/components/ui/model-logo';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { NewBadge } from '@/components/ui/new-badge';
-import { CaptionField, captionControlTriggerClassName } from '@/components/ui/result-context';
+import { CaptionField } from '@/components/ui/result-context';
 import {
   Select,
   SelectContent,
@@ -33,30 +33,31 @@ import {
   sequenceKind,
 } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 
 const STRINGS = {
   en: {
     model: 'Model',
     modelTooltip: 'The language model being benchmarked.',
-    newModel: 'NEW',
+    newModel: 'New',
     islOsl: 'ISL / OSL',
     islOslTooltip:
       'Input Sequence Length / Output Sequence Length. Defines the number of input and output tokens for the benchmark (e.g., 1K/8K means 1,024 input tokens and 8,192 output tokens).',
     scenario: 'Scenario',
     scenarioTooltip:
-      'Benchmark scenario. Fixed Sequence Length runs use a defined input/output token count (ISL/OSL). The Agentic scenario replays real agentic workloads with variable inputs/outputs.',
-    agenticScenarioTooltip: 'Realistic Long Context Multi Turn Agentic Workload with Sub Agents.',
-    agenticScenarioLearnMore: 'Learn More Here',
-    latencyPercentile: 'Latency Percentile',
+      'Benchmark scenario. Fixed sequence length runs use a defined input/output token count (ISL/OSL). The agentic scenario replays real agentic workloads with variable inputs/outputs.',
+    agenticScenarioTooltip: 'Realistic long-context, multi-turn agentic workload with sub-agents',
+    agenticScenarioLearnMore: 'Learn more',
+    latencyPercentile: 'Latency percentile',
     latencyPercentileTooltip:
       'Percentile of the latency distribution used for the chart x-axis on agentic runs.',
     precision: 'Precision',
     precisionTooltip:
       "Numerical precision used for model weights. Lower precision like 'FP4' uses less memory and increases throughput but may slightly reduce accuracy compared to higher precisions like 'FP8'.",
-    fixedSequenceLength: 'Fixed Sequence Length',
+    fixedSequenceLength: 'Fixed sequence length',
     deprecatedSequenceLabel: (label: string) => `${label} (deprecated)`,
-    experimentalSupport: 'Experimental Support (WIP)',
-    maintenanceMode: 'Maintenance Mode',
+    experimentalSupport: 'Experimental support (WIP)',
+    maintenanceMode: 'Maintenance mode',
     maintenanceReason: 'Updated at a lower priority because these models are irrelevant.',
     deprecated: 'Deprecated',
     deprecatedModelReason: 'Model is no longer actively benchmarked.',
@@ -74,7 +75,7 @@ const STRINGS = {
     scenarioTooltip:
       '基准测试场景。Fixed Sequence Length 使用预设的输入/输出 token 数（ISL/OSL）。Agentic 场景回放具有可变输入/输出的真实智能体工作负载。',
     agenticScenarioTooltip: '真实的长上下文、多轮、带子智能体（sub-agent）的智能体工作负载。',
-    agenticScenarioLearnMore: '点此了解更多',
+    agenticScenarioLearnMore: '了解更多',
     latencyPercentile: '延迟分位数',
     latencyPercentileTooltip: '用于智能体运行图表 X 轴的延迟分布分位数。',
     precision: '精度',
@@ -373,7 +374,7 @@ export function ScenarioSelector({
         <p>
           {t.agenticScenarioTooltip}{' '}
           <a
-            href={locale === 'zh' ? '/zh/agentx' : '/agentx'}
+            href={locale === 'zh' ? `/zh${AGENTX_ROUTE.path}` : AGENTX_ROUTE.path}
             className="underline underline-offset-2"
             data-testid="scenario-agentic-info-link"
             onClick={() => track('selector_scenario_agentx_link')}
@@ -393,8 +394,8 @@ export function ScenarioSelector({
 
   const select = (
     <SearchableSelect
-      showSelectedHelp={variant !== 'caption'}
-      className={variant === 'caption' ? captionControlTriggerClassName : undefined}
+      size={variant === 'caption' ? 'sm' : undefined}
+      className={variant === 'caption' ? 'w-auto max-w-full text-xs' : undefined}
       value={value}
       initialLabel={scenarioLabel(value)}
       contentClassName="min-w-[min(16rem,var(--radix-popover-content-available-width))]"
@@ -418,13 +419,16 @@ export function ScenarioSelector({
     />
   );
 
+  // The chart footer's controls row: a standard small control whose label is only read by
+  // screen readers and printed in exported images, like the cost tier and TCO basis beside it.
   if (variant === 'caption') {
     return (
       <CaptionField
         label={t.scenario}
         value={scenarioLabel(value)}
+        hideLabel
         control={
-          <div className="flex items-center gap-1">
+          <span className="inline-flex items-center gap-0.5">
             {select}
             <InfoHelp
               label={scenarioLabel(value)}
@@ -434,7 +438,7 @@ export function ScenarioSelector({
             >
               {toScenarioOption(value).help}
             </InfoHelp>
-          </div>
+          </span>
         }
         controlId={id}
         testId="result-context-scenario"
@@ -525,6 +529,8 @@ export function PrecisionSelector({
         <MultiSelect
           key={isOnlySelectedPrecision ? 'fixed' : 'selectable'}
           disabled={isOnlySelectedPrecision}
+          plainSelectedText={isOnlySelectedPrecision}
+          className={isOnlySelectedPrecision ? 'disabled:opacity-100' : undefined}
           options={availablePrecisions.map((p) => ({
             value: p,
             label: getPrecisionLabel(p as Precision),

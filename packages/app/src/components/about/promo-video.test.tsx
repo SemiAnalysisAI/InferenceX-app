@@ -93,6 +93,6 @@ describe('PromoVideo', () => {
     locale = 'zh';
     renderUi(<PromoVideo />);
     expect(video().getAttribute('aria-label')).toBe('播放 InferenceX 概览视频');
-    expect(container.textContent).toContain('您的浏览器无法播放此视频。');
+    expect(container.textContent).toContain('您的浏览器无法播放此视频');
   });
 });

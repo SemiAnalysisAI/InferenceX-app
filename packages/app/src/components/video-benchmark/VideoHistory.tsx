@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { ChevronRight } from 'lucide-react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Heading } from '@/components/ui/heading';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
@@ -12,17 +13,15 @@ import type { VideoHistoryEntry, VideoHistoryPage } from './history';
 
 const STRINGS = {
   en: {
-    title: 'Performance history',
-    intro:
-      'Stored H3 evidence, including older runs without publication approval. Each entry keeps its original execution and artifact identity.',
+    intro: 'Each entry keeps its original execution and artifact identity.',
     note: 'Recorded observations only; no matched version baseline has been selected. Media validity does not establish perceptual quality or serving capacity.',
     order:
       'Newest stored index first. Execution time is shown separately; re-exporting a result does not make it a new measurement.',
     loading: 'Loading stored results…',
-    error: 'Could not load stored history.',
+    error: 'Could not load stored history',
     retry: 'Retry',
     older: 'More stored results',
-    empty: 'No matching entries among the loaded results.',
+    empty: 'No matching entries among the loaded results',
     loaded: 'Filters apply to loaded entries. Load more stored results to search older pages.',
     all: 'All',
     hardware: 'Hardware',
@@ -60,18 +59,17 @@ const STRINGS = {
     metricNote:
       'Latency and throughput cover submission to downloaded media. Energy uses the recorded generation window and participating GPU boards; lower is better. Failed attempts remain in the recorded measurement window.',
     samples: 'Valid latency samples',
-    replay: 'Retained-data replay for local verification; no new measurements or publication.',
+    replay: 'Local replay · unpublished. Original retained evidence; no new measurement.',
   },
   zh: {
-    title: '性能历史',
-    intro: '查看已存储的 H3 结果，包括尚无发布批准记录的旧运行；每条记录保留原始执行与产物标识。',
+    intro: '每条记录保留原始执行与产物标识。',
     note: '当前仅展示观测值，尚未选择匹配的版本基线。媒体有效性不代表感知质量或服务容量已通过验收。',
     order: '按索引存储时间从新到旧排列。执行时间单独列出；重新导出不代表重新测量。',
     loading: '正在加载已存储结果…',
-    error: '无法加载性能历史。',
+    error: '无法加载性能历史',
     retry: '重试',
     older: '更多已存储结果',
-    empty: '已加载的结果中暂无匹配记录。',
+    empty: '已加载的结果中暂无匹配记录',
     loaded: '筛选仅作用于已加载的记录；查看更早页面请加载更多已存储结果。',
     all: '全部',
     hardware: '硬件',
@@ -80,7 +78,7 @@ const STRINGS = {
     published: '存储时间',
     publication: '发布批准',
     approved: '已批准用于仪表板',
-    unapproved: '暂无匹配的发布批准回执',
+    unapproved: '未找到匹配的发布批准回执',
     execution: '原始执行时间',
     source: '原始运行',
     sourceSha: '源码 SHA',
@@ -108,7 +106,7 @@ const STRINGS = {
     metricNote:
       '延迟与吞吐量涵盖提交到媒体下载完成。能耗使用记录的生成时间窗口，按参与计算的 GPU 板卡统计，越低越好；失败尝试的耗时仍计入对应测量窗口。',
     samples: '有效延迟样本数',
-    replay: '本地验证使用保留数据回放，未重新测量或发布。',
+    replay: '本地回放 · 未发布。使用原始保留数据，未重新测量。',
   },
 };
 const STATUS: Record<string, { en: string; zh: string }> = {
@@ -141,6 +139,7 @@ const filter = (key: string, value: string, setter: (value: string) => void) => 
 export default function VideoHistory() {
   const locale = useLocale();
   const s = STRINGS[locale];
+  const queryId = useId();
   const status = (value: string | null) =>
     value ? (STATUS[value]?.[locale] ?? value) : s.unavailable;
   const [entries, setEntries] = useState<VideoHistoryEntry[]>([]);
@@ -151,6 +150,8 @@ export default function VideoHistory() {
   const [hardware, setHardware] = useState('');
   const [concurrency, setConcurrency] = useState('');
   const [query, setQuery] = useState('');
+  // Activity re-runs the mount effect when the overview is revealed; loaded pages must survive it.
+  const firstPageLoaded = useRef(false);
   async function load(page: number, signal?: AbortSignal) {
     setLoading(true);
     setError(false);
@@ -169,6 +170,7 @@ export default function VideoHistory() {
           : [...old, ...data.entries.filter((entry) => !old.some((item) => item.id === entry.id))],
       );
       setNextPage(data.nextPage);
+      if (page === 1) firstPageLoaded.current = true;
       setReplay(response.headers.get('x-videogenx-replay') === '1');
     } catch {
       if (!signal?.aborted) setError(true);
@@ -177,13 +179,20 @@ export default function VideoHistory() {
     }
   }
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    setHardware(params.get('history-hardware') ?? '');
-    setConcurrency(params.get('history-concurrency') ?? '');
-    setQuery(params.get('history-query') ?? '');
+    const read = () => {
+      const params = new URLSearchParams(location.search);
+      setHardware(params.get('history-hardware') ?? '');
+      setConcurrency(params.get('history-concurrency') ?? '');
+      setQuery(params.get('history-query') ?? '');
+    };
+    read();
+    window.addEventListener('popstate', read);
     const controller = new AbortController();
-    void load(1, controller.signal);
-    return () => controller.abort();
+    if (!firstPageLoaded.current) void load(1, controller.signal);
+    return () => {
+      window.removeEventListener('popstate', read);
+      controller.abort();
+    };
   }, []);
   const observations = entries.flatMap((entry) =>
     entry.sources.flatMap((source) => source.observations),
@@ -208,14 +217,11 @@ export default function VideoHistory() {
   });
   return (
     <section className="min-w-0 space-y-4" data-testid="video-history">
-      <div className="space-y-2">
-        <Heading as="h1" level="section">
-          {s.title}
-        </Heading>
-        <p className="text-sm text-muted-foreground">{s.intro}</p>
-        <p className="text-xs text-muted-foreground">{s.order}</p>
+      <div className="space-y-1 text-xs text-muted-foreground">
+        <p>{s.intro}</p>
+        <p>{s.order}</p>
         {replay && (
-          <p role="note" className="text-sm">
+          <p role="note" className="text-sm text-foreground">
             {s.replay}
           </p>
         )}
@@ -249,22 +255,27 @@ export default function VideoHistory() {
               .map((value) => ({ value: String(value), label: `C${value}` })),
           ]}
         />
-        <label className="space-y-1 text-sm">
-          <span>{s.workload}</span>
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <label htmlFor={queryId} className="text-sm font-medium">
+            {s.workload}
+          </label>
           <Input
+            id={queryId}
             value={query}
             onChange={(event) => filter('query', event.target.value, setQuery)}
           />
-        </label>
+        </div>
       </div>
       <p className="text-xs text-muted-foreground">{s.loaded}</p>
       <p className="text-sm text-muted-foreground">{s.note}</p>
-      {!loading && !error && visible.length === 0 && <p role="status">{s.empty}</p>}
+      {!loading && !error && visible.length === 0 && (
+        <EmptyState role="status">{s.empty}</EmptyState>
+      )}
       {visible.map((entry) => (
         <Card key={entry.id} className="min-w-0 space-y-4 p-4" data-testid="video-history-entry">
           <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
             <a
-              className="text-primary underline"
+              className="text-brand underline underline-offset-2"
               href={`https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${entry.runId}`}
               target="_blank"
               rel="noreferrer"
@@ -278,13 +289,19 @@ export default function VideoHistory() {
           <p className="text-xs text-muted-foreground" data-testid="video-history-publication">
             {s.publication}: {entry.approved === true ? s.approved : s.unapproved}
           </p>
-          {entry.error && <p role="alert">{entry.error}</p>}
+          {entry.error && (
+            <p role="alert" className="break-words text-sm text-destructive">
+              {entry.error}
+            </p>
+          )}
           {entry.sources.map((source) => (
             <div key={source.id} className="min-w-0 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-sm">
-                  <strong>{source.kind === 'fidelity' ? s.fidelity : s.observation}</strong> ·{' '}
-                  {s.source} #{source.id}
+                  <span className="font-medium">
+                    {source.kind === 'fidelity' ? s.fidelity : s.observation}
+                  </span>{' '}
+                  · {s.source} #{source.id}
                   {source.hardware && ` · ${source.hardware}`}
                   <p className="text-xs text-muted-foreground">
                     {s.execution}: {date(source.observedAt)}
@@ -307,32 +324,32 @@ export default function VideoHistory() {
                 )}
               </p>
               {source.error && (
-                <p role="alert" className="break-words text-sm">
+                <p role="alert" className="break-words text-sm text-destructive">
                   {source.error}
                 </p>
               )}
               {source.observations.length > 0 && (
                 <div className="max-w-full overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="p-2">{s.hardware} / C</th>
-                        <th className="p-2">{s.counts}</th>
-                        <th className="p-2">{s.status}</th>
-                        <th className="p-2">
+                  <table className="w-full text-left text-sm [&_td:not(:first-child)]:text-right [&_th:not(:first-child)]:text-right">
+                    <thead className="text-xs text-muted-foreground">
+                      <tr>
+                        <th className="px-2 pb-2 font-medium">{s.hardware} / C</th>
+                        <th className="px-2 pb-2 font-medium">{s.counts}</th>
+                        <th className="px-2 pb-2 font-medium">{s.status}</th>
+                        <th className="px-2 pb-2 font-medium">
                           {s.latency}
                           <br />
                           {s.p50} / {s.p90}
                         </th>
-                        <th className="p-2">{s.throughput}</th>
-                        <th className="p-2">{s.energy}</th>
+                        <th className="px-2 pb-2 font-medium">{s.throughput}</th>
+                        <th className="px-2 pb-2 font-medium">{s.energy}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {source.observations.map((point) => (
                         <tr
                           key={point.id}
-                          className="border-b border-border/40 align-top"
+                          className="border-t border-border/40 align-top tabular-nums"
                           data-testid="video-history-observation"
                         >
                           <th className="p-2 font-normal">
@@ -345,7 +362,7 @@ export default function VideoHistory() {
                           </th>
                           <td className="whitespace-nowrap p-2">
                             {fmt(point.valid)} / {fmt(point.completed)} / {fmt(point.scheduled)}
-                            <p className="text-xs">
+                            <p className="text-xs text-muted-foreground">
                               {s.failed}: {fmt(point.failed)}
                             </p>
                           </td>
@@ -362,8 +379,14 @@ export default function VideoHistory() {
                   </table>
                 </div>
               )}
-              <details className="text-xs text-muted-foreground">
-                <summary className="cursor-pointer">{s.details}</summary>
+              <details className="group text-xs text-muted-foreground">
+                <summary className="flex w-fit cursor-pointer list-none items-center gap-1.5 hover:text-foreground [&::-webkit-details-marker]:hidden">
+                  <ChevronRight
+                    aria-hidden="true"
+                    className="size-3.5 transition-transform group-open:rotate-90"
+                  />
+                  {s.details}
+                </summary>
                 <div className="space-y-2 break-words pt-2">
                   <p>{s.missing}</p>
                   <p>{s.metricNote}</p>
@@ -378,17 +401,21 @@ export default function VideoHistory() {
           ))}
         </Card>
       ))}
-      {loading && <p role="status">{s.loading}</p>}
+      {loading && (
+        <p role="status" className="text-sm text-muted-foreground">
+          {s.loading}
+        </p>
+      )}
       {error && (
-        <div role="alert" className="space-y-2">
+        <div role="alert" className="space-y-2 text-sm">
           <p>{s.error}</p>
-          <Button variant="outline" onClick={() => void load(nextPage ?? 1)}>
+          <Button variant="outline" size="sm" onClick={() => void load(nextPage ?? 1)}>
             {s.retry}
           </Button>
         </div>
       )}
       {nextPage && !loading && !error && (
-        <Button variant="outline" onClick={() => void load(nextPage)}>
+        <Button variant="outline" size="sm" onClick={() => void load(nextPage)}>
           {s.older}
         </Button>
       )}

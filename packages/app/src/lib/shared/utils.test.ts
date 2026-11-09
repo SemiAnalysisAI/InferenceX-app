@@ -21,7 +21,7 @@ describe('cn merging of custom typography tokens', () => {
   it('resolves conflicts between named tracking tokens and built-ins (last wins)', () => {
     expect(cn('tracking-eyebrow', 'tracking-tight')).toBe('tracking-tight');
     expect(cn('tracking-tight', 'tracking-eyebrow')).toBe('tracking-eyebrow');
-    expect(cn('tracking-eyebrow', 'tracking-eyebrow-wide')).toBe('tracking-eyebrow-wide');
+    expect(cn('tracking-eyebrow', 'tracking-heading')).toBe('tracking-heading');
   });
 
   it('resolves conflicts between micro size tokens and the standard scale', () => {

@@ -27,6 +27,7 @@ type GlossaryTranslation = Pick<
   | 'significance'
   | 'benchmarkContext'
   | 'measurement'
+  | 'figure'
 >;
 
 const translations: Readonly<Record<string, GlossaryTranslation>> = {
@@ -1872,6 +1873,23 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     measurement: {
       label: '每用户 100 tok/s、FP8 8k1k 下的成本',
       value: '每百万 token 0.181 美元，B200 为 0.222 美元，B300 为 0.276 美元',
+    },
+    figure: {
+      images: [
+        {
+          src: '/images/glossary/tpuv7-ironwood-package-photo.webp',
+          width: 780,
+          height: 835,
+          alt: '放在展示台上的 TPUv7 Ironwood 封装照片，下方刻有 Ironwood 字样。',
+        },
+        {
+          src: '/images/glossary/tpuv7-ironwood-package.webp',
+          width: 2000,
+          height: 1279,
+          alt: '同一张照片的标注版：两个计算 die 之间是 die-to-die 边界，两侧各有四个 HBM3E 堆栈，die 上方是 ICI SerDes chiplet，顶部两角各有一个 dummy die。',
+        },
+      ],
+      caption: '来源：SemiAnalysis，[Google](https://docs.cloud.google.com/tpu/docs/tpu7x)',
     },
   },
   mxu: {

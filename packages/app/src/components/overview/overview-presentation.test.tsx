@@ -223,7 +223,7 @@ describe('OverviewPresentationSurface', () => {
     );
     expect(surface()?.dataset.presenting).toBe('true');
     expect(fullscreenElement).toBe(surface());
-    expect(fetch).toHaveBeenCalledWith('/api/v1/overview?tier=75&compare=30d', {
+    expect(fetch).toHaveBeenCalledWith('/api/v1/overview?tier=75', {
       headers: { Accept: 'application/json' },
     });
   });
@@ -233,11 +233,11 @@ describe('OverviewPresentationSurface', () => {
     act(() => toggle()?.click());
 
     act(() => {
-      window.history.replaceState({}, '', '/inference');
+      window.history.replaceState({}, '', '/infx/inference');
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
 
-    expect(window.location.pathname).toBe('/inference');
+    expect(window.location.pathname).toBe('/infx/inference');
     expect(window.location.search).toBe('');
   });
 
@@ -304,7 +304,7 @@ describe('OverviewPresentationSurface', () => {
 
     expect(requested).toHaveLength(1);
     expect(requested[0]).not.toContain('present=1');
-    expect(window.location.search).toBe('?present=1');
+    expect(window.location.search).toBe('?compare=hardware&present=1');
     expect(surface()?.dataset.presenting).toBe('true');
     expect(fullscreenElement).toBe(surface());
   });

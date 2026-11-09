@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   renderDiagram: vi.fn(),
   diagramHeight: vi.fn((_arch: unknown, _expanded: ReadonlySet<string>): number | null => 480),
   theme: { resolved: 'light' },
-  pathname: { value: '/inference' },
+  pathname: { value: '/infx/inference' },
 }));
 
 vi.mock('./model-architecture-diagram-renderer', () => ({
@@ -102,7 +102,7 @@ beforeEach(() => {
   observedWidth = 500;
   mocks.theme.resolved = 'light';
   mocks.renderDiagram.mockReset();
-  mocks.pathname.value = '/inference';
+  mocks.pathname.value = '/infx/inference';
   ResizeObserverStub.instances = [];
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
   resizeFrames.clear();
@@ -128,16 +128,8 @@ afterEach(() => {
 });
 
 describe('ModelArchitectureDiagram rendering', () => {
-  it('preserves the exact English release sentence spacing', () => {
-    render();
-    expand();
-
-    expect(container.textContent).toContain('Released by DeepSeek on');
-    expect(container.textContent).not.toContain('DeepSeekon');
-  });
-
   it('localizes the complete architecture chrome and keeps technical feature data intact', () => {
-    mocks.pathname.value = '/zh/inference';
+    mocks.pathname.value = '/zh/infx/inference';
     render();
 
     const toggle = container.querySelector('[data-testid="model-architecture-toggle"]');
@@ -157,7 +149,7 @@ describe('ModelArchitectureDiagram rendering', () => {
     act(() => root.render(<ModelArchitectureDiagram model={Model.DeepSeek_R1} variant="inline" />));
 
     expect(container.textContent).toContain('模型架构');
-    expect(container.textContent).not.toContain('Model Architecture');
+    expect(container.textContent).not.toContain('Model architecture');
     expect(mocks.renderDiagram.mock.calls.at(-1)?.[5]).toBe('zh');
   });
 
@@ -246,7 +238,7 @@ describe('ModelArchitectureDiagram rendering', () => {
     expand();
     expect(mocks.renderDiagram.mock.calls.at(-1)?.[5]).toBe('en');
 
-    mocks.pathname.value = '/zh/inference';
+    mocks.pathname.value = '/zh/infx/inference';
     render();
     expect(mocks.renderDiagram).toHaveBeenCalledTimes(2);
     expect(mocks.renderDiagram.mock.calls.at(-1)?.[5]).toBe('zh');

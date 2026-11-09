@@ -13,6 +13,7 @@ export enum Model {
   Qwen3_8_27B_Eager = 'Qwen3.8-27B-Eager',
   Kimi_K2_5 = 'Kimi-K2.5',
   Kimi_K3 = 'Kimi-K3',
+  Kimi_K3_1_Pro = 'Kimi-K3.1-Pro',
   MiniMax_M2_5 = 'MiniMax-M2.5',
   MiniMax_M3 = 'MiniMax-M3',
   MiniMax_M3_1_Flash = 'MiniMax-M3.1-Flash',
@@ -96,10 +97,17 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     openRouterModelId: 'deepseek/deepseek-v4.1-flash',
     logo: 'deepseek-color.svg',
   },
+  [Model.Kimi_K3_1_Pro]: {
+    label: 'Kimi K3.1 Pro 2.8T',
+    prefix: 'kimik3.1',
+    category: 'default',
+    openRouterModelId: 'moonshotai/kimi-k3.1-pro',
+    logo: 'kimi-color.svg',
+  },
   [Model.Kimi_K3]: {
     label: 'Kimi K3 2.8T',
     prefix: 'kimik3',
-    category: 'default',
+    category: 'deprecated',
     openRouterModelId: 'moonshotai/kimi-k3',
     logo: 'kimi-color.svg',
   },
@@ -221,7 +229,7 @@ function modelsByCategory(cat: CategoryTag): ReadonlySet<Model> {
 
 // Selector order is independent of the overview registry order and selected defaults.
 const MODEL_SELECTOR_ORDER: readonly Model[] = [
-  Model.Kimi_K3,
+  Model.Kimi_K3_1_Pro,
   Model.DeepSeek_V4_1_Flash,
   Model.GLM_5_2,
   Model.GLM_5_3_Flash,
@@ -449,7 +457,9 @@ export function isSequenceDeprecatedForModel(model: Model, sequence: Sequence): 
 
 const MODEL_HIDDEN_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
   [Model.GLM_5_3_Flash]: new Set(
-    SEQUENCE_OPTIONS.filter((sequence) => sequence !== Sequence.AgenticTraces),
+    SEQUENCE_OPTIONS.filter(
+      (sequence) => sequence !== Sequence.AgenticTraces && sequence !== Sequence.EightK_OneK,
+    ),
   ),
   [Model.Muse_Spark_Open]: new Set(
     SEQUENCE_OPTIONS.filter((sequence) => sequence !== Sequence.AgenticTraces),
@@ -479,6 +489,11 @@ export function isBestPerSkuDefaultOff(
 const MODEL_TCO_BASIS_SELECTOR: Partial<Record<Model, ReadonlySet<Sequence>>> = {
   [Model.Qwen3_5]: new Set([Sequence.EightK_OneK, Sequence.AgenticTraces]),
   [Model.Kimi_K3]: new Set([Sequence.EightK_OneK, Sequence.AgenticTraces]),
+  // Muse Spark Open exposes only Agentic Traces, where its TPUv7 results live.
+  [Model.Muse_Spark_Open]: new Set([Sequence.AgenticTraces]),
+  // GLM-5.2 and GLM-5.3 Flash have TPUv7 results on Agentic Traces only.
+  [Model.GLM_5_2]: new Set([Sequence.AgenticTraces]),
+  [Model.GLM_5_3_Flash]: new Set([Sequence.AgenticTraces]),
 };
 
 export function showsTcoBasisSelector(

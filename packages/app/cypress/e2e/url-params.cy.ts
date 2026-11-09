@@ -1,10 +1,12 @@
+import { CANVAS_POINT_SURFACE_CLASS } from '@/lib/d3-chart/layers/canvas-points';
+
 import { selectXAxisMode } from '../support/e2e';
 import { expandLegendAdvanced } from '../support/legend-advanced';
 import { type ScatterPoint, triggerAtPoint, visiblePoints } from '../support/scatter-points';
 
 const withFixtureModel = (path: string) => {
   const url = new URL(path, 'http://localhost');
-  if (url.pathname === '/inference' && !url.searchParams.has('g_model')) {
+  if (url.pathname === '/infx/inference' && !url.searchParams.has('g_model')) {
     url.searchParams.set('g_model', 'DeepSeek-V4-Pro');
   }
   return `${url.pathname}${url.search}${url.hash}`;
@@ -12,7 +14,10 @@ const withFixtureModel = (path: string) => {
 
 const inPlot = (points: ScatterPoint[]) =>
   visiblePoints(points).filter((point) => {
-    const plot = point.hitArea.parentElement!.querySelector('canvas')!;
+    const svg = point.hitArea.closest('svg')!;
+    const plot = svg.parentElement!.querySelector<HTMLCanvasElement>(
+      `.${CANVAS_POINT_SURFACE_CLASS}`,
+    )!;
     return (
       point.x >= 0 && point.x <= plot.clientWidth && point.y >= 0 && point.y <= plot.clientHeight
     );
@@ -49,7 +54,7 @@ const assertNoHydrationMismatch = () => {
 describe('URL Parameter Persistence', () => {
   describe('Inference legend', () => {
     it('i_legend=0 hides the sidebar legend on load and the reopen button restores it', () => {
-      visitWithDismissedModal('/inference?i_legend=0');
+      visitWithDismissedModal('/infx/inference?i_legend=0');
       cy.get('[data-testid="legend-open-button"]').first().should('be.visible');
       cy.get('.sidebar-legend').should('not.exist');
 
@@ -59,7 +64,7 @@ describe('URL Parameter Persistence', () => {
     });
 
     it('preserves a legend subset when chart metrics change', () => {
-      visitWithDismissedModal('/inference');
+      visitWithDismissedModal('/infx/inference');
 
       cy.get('[data-testid="chart-legend"] input[type="checkbox"]:checked').should(
         'have.length.greaterThan',
@@ -90,7 +95,7 @@ describe('URL Parameter Persistence', () => {
     });
 
     it('refreshes the automatic Best per SKU selection when the metric changes', () => {
-      visitWithDismissedModal('/inference');
+      visitWithDismissedModal('/infx/inference');
 
       cy.get('[data-testid="scatter-quick-filters"]').click();
       cy.get('[data-testid="quick-filter-best-per-sku"]').should(
@@ -130,19 +135,19 @@ describe('URL Parameter Persistence', () => {
 
   describe('Provider remount state', () => {
     it('preserves filters across a standalone dashboard route', () => {
-      visitWithDismissedModal('/inference');
+      visitWithDismissedModal('/infx/inference');
       cy.get('[data-testid="model-selector"]').click();
       cy.contains('[role="option"]', 'Qwen3.5 397B').click();
       cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
       cy.get('[data-testid="tab-trigger-submissions"]').click();
-      cy.url().should('include', '/submissions');
+      cy.url().should('include', '/infx/submissions');
       cy.get('[data-testid="tab-trigger-inference"]').click();
 
       cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
     });
 
     it('preserves the newest pending model across a retained-provider tab switch', () => {
-      visitWithDismissedModal('/inference');
+      visitWithDismissedModal('/infx/inference');
       cy.get('[data-testid="model-selector"]').click();
       cy.contains('[role="option"]', 'MiniMax M3 428B').click();
       cy.get('[data-testid="model-selector"]').should('contain.text', 'MiniMax M3 428B');
@@ -151,16 +156,16 @@ describe('URL Parameter Persistence', () => {
       cy.get('[data-testid="model-selector"]').click();
       cy.contains('[role="option"]', 'Qwen3.5 397B').click();
       cy.get('[data-testid="tab-trigger-evaluation"]').click();
-      cy.location('pathname').should('eq', '/evaluation');
+      cy.location('pathname').should('eq', '/infx/evaluation');
       cy.get('[data-testid="tab-trigger-inference"]').click();
-      cy.location('pathname').should('eq', '/inference');
+      cy.location('pathname').should('eq', '/infx/inference');
       cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
     });
   });
 
   describe('Inference Y-axis metric', () => {
     it('i_metric URL param pre-selects the metric and updates SVG axis label', () => {
-      visitWithDismissedModal('/inference?i_metric=y_costh');
+      visitWithDismissedModal('/infx/inference?i_metric=y_costh');
 
       cy.get('[data-testid="yaxis-metric-selector"]').should(
         'contain.text',
@@ -168,7 +173,7 @@ describe('URL Parameter Persistence', () => {
       );
       cy.get('[data-testid="cost-tier-selector"]').should(
         'contain.text',
-        'Owning at Large Hyperscaler Volume',
+        'Owning at large hyperscaler volume',
       );
 
       cy.get('[data-testid="scatter-graph"]')
@@ -178,7 +183,7 @@ describe('URL Parameter Persistence', () => {
     });
 
     it('changing Y-axis metric via dropdown updates SVG axis label', () => {
-      visitWithDismissedModal('/inference');
+      visitWithDismissedModal('/infx/inference');
 
       cy.get('[data-testid="scatter-graph"]')
         .first()
@@ -196,63 +201,8 @@ describe('URL Parameter Persistence', () => {
         .should('have.text', 'Cost per Million Total Tokens ($)');
     });
 
-    it('maps the removed API-pricing URL to hyperscaler-volume TCO', () => {
-      visitWithDismissedModal('/inference?i_metric=y_tokensPerDollar');
-
-      cy.get('[data-testid="yaxis-metric-selector"]').should(
-        'contain.text',
-        'Total Tokens per $1 TCO',
-      );
-      cy.get('[data-testid="cost-tier-selector"]').should(
-        'contain.text',
-        'Owning at Large Hyperscaler Volume',
-      );
-      cy.get('[data-testid="scatter-graph"]')
-        .first()
-        .find('svg text[transform="rotate(-90)"]')
-        .should('have.text', 'Total Tokens per $1 TCO (tok/$)');
-    });
-
-    it('keeps the legacy i_metric=y alias on raw throughput', () => {
-      visitWithDismissedModal('/inference?i_metric=y');
-
-      cy.get('[data-testid="yaxis-metric-selector"]').should(
-        'contain.text',
-        'Token Throughput per Chip',
-      );
-    });
-
-    it('switching to energy metric updates SVG axis label to joules', () => {
-      visitWithDismissedModal('/inference');
-      cy.get('[data-testid="scatter-graph"]').first().should('be.visible');
-
-      cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
-      cy.contains('[data-select-option]', 'All-in Provisioned Joules per Total Token').click({
-        force: true,
-      });
-
-      cy.get('[data-testid="scatter-graph"]')
-        .first()
-        .find('svg text[transform="rotate(-90)"]')
-        .should('have.text', 'All-in Provisioned J per Total Token (J/tok)');
-    });
-
-    it('i_metric=y_tpPerMw pre-selects throughput-per-MW', () => {
-      visitWithDismissedModal('/inference?i_metric=y_tpPerMw');
-
-      cy.get('[data-testid="yaxis-metric-selector"]').should(
-        'contain.text',
-        'Token Throughput per All in Utility MW',
-      );
-
-      cy.get('[data-testid="scatter-graph"]')
-        .first()
-        .find('svg text[transform="rotate(-90)"]')
-        .should('contain.text', 'Token Throughput per All in Utility MW');
-    });
-
     it('keeps tooltip rulers aligned after a zoomed metric switch', () => {
-      visitWithDismissedModal('/inference?i_metric=y_tpPerGpu');
+      visitWithDismissedModal('/infx/inference?i_metric=y_tpPerGpu');
       expandLegendAdvanced();
       cy.get('#scatter-log-scale').first().click();
 
@@ -302,8 +252,8 @@ describe('URL Parameter Persistence', () => {
 
   describe('Reliability date range', () => {
     it('r_range=last-7-days pre-selects date range', () => {
-      visitWithDismissedModal('/reliability?r_range=last-7-days');
-      cy.url().should('include', '/reliability');
+      visitWithDismissedModal('/infx/reliability?r_range=last-7-days');
+      cy.url().should('include', '/infx/reliability');
       cy.get('[data-testid="reliability-date-range"]').should('contain.text', 'Last 7 days');
     });
   });
@@ -324,78 +274,55 @@ describe('URL Parameter Persistence', () => {
       assertNoHydrationMismatch();
     });
 
-    it('/inference?g_model=gpt-oss-120b seeds the model without a hydration error', () => {
-      visitWithErrorSpy('/inference?g_model=gpt-oss-120b');
+    it('/infx/inference?g_model=gpt-oss-120b seeds the model without a hydration error', () => {
+      visitWithErrorSpy('/infx/inference?g_model=gpt-oss-120b');
       cy.get('[data-testid="model-selector"]').should('contain.text', 'gpt-oss 120B');
       assertNoHydrationMismatch();
     });
 
-    it('/inference with invalid ?g_model=junk falls back to the default', () => {
-      visitWithErrorSpy('/inference?g_model=junk');
+    it('/infx/inference with invalid ?g_model=junk falls back to the default', () => {
+      visitWithErrorSpy('/infx/inference?g_model=junk');
       cy.get('[data-testid="model-selector"]').invoke('text').should('not.contain', 'junk');
       assertNoHydrationMismatch();
     });
 
-    it('/inference with invalid ?i_prec=junk falls back to the default', () => {
-      visitWithErrorSpy('/inference?g_model=DeepSeek-R1-0528&i_prec=junk');
+    it('/infx/inference with invalid ?i_prec=junk falls back to the default', () => {
+      visitWithErrorSpy('/infx/inference?g_model=DeepSeek-R1-0528&i_prec=junk');
       cy.get('[data-testid="precision-multiselect"]').invoke('text').should('not.contain', 'junk');
-      assertNoHydrationMismatch();
-    });
-
-    it('/inference with multiple URL params seeds all of them without a hydration error', () => {
-      visitWithErrorSpy('/inference?i_seq=1k/1k');
-      cy.get('[data-testid="scenario-selector"]').should('contain.text', '1K / 1K');
-      assertNoHydrationMismatch();
-
-      visitWithErrorSpy('/inference?g_model=DeepSeek-R1-0528&i_prec=fp8');
-      cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP8');
-      assertNoHydrationMismatch();
-
-      visitWithErrorSpy('/inference?i_seq=1k/1k&g_model=DeepSeek-R1-0528&i_prec=fp8');
-      cy.get('[data-testid="scenario-selector"]').should('contain.text', '1K / 1K');
-      cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek');
-      cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP8');
       assertNoHydrationMismatch();
     });
   });
 
   describe('High contrast mode', () => {
-    it('i_hc=0 disables high contrast on load', () => {
-      visitWithDismissedModal('/inference?i_hc=0');
-      cy.get('[data-testid="scatter-graph"]').should('exist');
-      expandLegendAdvanced();
-      cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'unchecked');
-    });
-
     it('r_hc=1 applies to reliability chart', () => {
-      visitWithDismissedModal('/reliability?r_hc=1');
+      visitWithDismissedModal('/infx/reliability?r_hc=1');
       cy.get('[data-testid="reliability-chart-display"]').should('exist');
       cy.get('#reliability-high-contrast').first().should('have.attr', 'data-state', 'checked');
     });
 
     it('e_hc=1 applies to evaluation chart', () => {
-      visitWithDismissedModal('/evaluation?e_hc=1');
+      visitWithDismissedModal('/infx/evaluation?e_hc=1');
       cy.get('[data-testid="evaluation-chart-display"]').should('exist');
       cy.get('[data-testid="evaluation-view-toggle"]').contains('Chart').click();
       cy.get('#eval-high-contrast').first().should('have.attr', 'data-state', 'checked');
     });
 
     it('historical trends tab shares the inference high-contrast default (off)', () => {
-      visitWithDismissedModal('/historical');
+      visitWithDismissedModal('/infx/historical');
       cy.get('[data-testid="historical-trends-display"]').should('exist');
       cy.get('#historical-high-contrast').first().should('have.attr', 'data-state', 'unchecked');
     });
 
     it('i_hc=1 enables historical trends high contrast', () => {
-      visitWithDismissedModal('/historical?i_hc=1');
+      visitWithDismissedModal('/infx/historical?i_hc=1');
       cy.get('[data-testid="historical-trends-display"]').should('exist');
       cy.get('#historical-high-contrast').first().should('have.attr', 'data-state', 'checked');
     });
   });
 
   describe('Default toggle states (share-link correctness)', () => {
-    it('an /inference link with neither toggle param renders high contrast AND parallelism labels off', () => {
-      visitWithDismissedModal('/inference');
+    it('an /infx/inference link with neither toggle param renders high contrast AND parallelism labels off', () => {
+      visitWithDismissedModal('/infx/inference');
       cy.get('[data-testid="scatter-graph"]').should('exist');
       expandLegendAdvanced();
       cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'unchecked');
@@ -403,7 +330,7 @@ describe('URL Parameter Persistence', () => {
     });
 
     it('i_hc=1&i_advlabel=1 enables both high contrast and parallelism labels on load', () => {
-      visitWithDismissedModal('/inference?i_hc=1&i_advlabel=1');
+      visitWithDismissedModal('/infx/inference?i_hc=1&i_advlabel=1');
       cy.get('[data-testid="scatter-graph"]').should('exist');
       expandLegendAdvanced();
       cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'checked');

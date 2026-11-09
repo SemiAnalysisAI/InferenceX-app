@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { VideoHistoryObservation, VideoHistoryPage } from './history';
-import { dashboardCells, latestVideoCells, videoPoints } from './points';
+import { dashboardCells, latestVideoCells, namedRunPoints, videoPoints } from './points';
 
 const observation: VideoHistoryObservation = {
   id: 'sha:c1',
@@ -25,6 +25,7 @@ const observation: VideoHistoryObservation = {
   allocated: 4,
   replicas: null,
   wallSeconds: 3013.4,
+  videoSecondsPerHour: 192,
   durationSeconds: 8,
   frameCount: 192,
   avgPowerW: 2727.5,
@@ -89,6 +90,30 @@ const page: VideoHistoryPage = {
 };
 
 describe('videoPoints', () => {
+  it.each([true, false, undefined])(
+    'preserves approval %s and provenance for one exact named run',
+    (approved) => {
+      const history = structuredClone(page);
+      for (const entry of history.entries) entry.approved = approved;
+      const other = structuredClone(history.entries[0]);
+      other.runId = '999';
+      for (const item of other.sources)
+        for (const row of item.observations) row.id = `other:${row.id}`;
+      history.entries.unshift(other);
+      const named = namedRunPoints([history], '34342452354');
+      expect(named.map((point) => point.id)).toEqual(['sha:c1', 'sha:c2']);
+      expect(named[0]).toMatchObject({
+        approved,
+        runId: '34342452354',
+        artifactId: 10107476604,
+        p50: 150.6,
+        videoSecondsPerHour: 192,
+        publishedAt: '2026-09-10T00:00:00Z',
+      });
+      if (approved !== true) expect(videoPoints([history])).toEqual([]);
+    },
+  );
+
   it('keeps a legacy stored source in History without turning it into an official chart point', () => {
     const legacy = structuredClone(page);
     delete legacy.entries[0].approved;
@@ -113,6 +138,12 @@ describe('videoPoints', () => {
       server: { tp: 2, ulysses: 2, attention: 'auto' },
       observedAt: '2026-09-09T10:00:00Z',
     });
+    const versioned = structuredClone(page);
+    versioned.entries[0].sources[0].observations[0].workloadKey =
+      '{"plan":{"model_id":"m","schema_version":2},"semantics":null}';
+    expect(videoPoints([versioned])[0].workloadKey).toBe(
+      '{"plan":{"model_id":"m"},"semantics":null}',
+    );
   });
   it('sorts by HW_REGISTRY order, then concurrency', () => {
     const b200 = {
@@ -187,6 +218,21 @@ describe('videoPoints', () => {
       ['again:c1', 140],
       ['sha:c2', 150.6],
     ]);
+  });
+  it('lets a newer recorded layout supersede a cell published before layouts were recorded', () => {
+    const entry = (runId: string, id: string, server: VideoHistoryObservation['server']) => ({
+      ...page.entries[0],
+      id: `${runId}.1`,
+      runId,
+      sources: [{ ...source, id: runId, observations: [{ ...observation, id, server }] }],
+    });
+    const points = videoPoints([
+      {
+        ...page,
+        entries: [entry('5', 'recorded:c1', observation.server), entry('4', 'legacy:c1', null)],
+      },
+    ]);
+    expect(latestVideoCells(points).map((p) => p.id)).toEqual(['recorded:c1']);
   });
 });
 

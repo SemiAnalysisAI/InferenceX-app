@@ -36,10 +36,29 @@ export function notifyClientSearchChange(href: string): void {
   window.dispatchEvent(new CustomEvent(CLIENT_SEARCH_CHANGE_EVENT, { detail: search }));
 }
 
-export function replaceClientSearch(searchParams: URLSearchParams): void {
+function searchHref(searchParams: URLSearchParams): string {
   const search = searchParams.toString();
-  const href = `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash}`;
+  return `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash}`;
+}
+
+export function replaceClientSearch(searchParams: URLSearchParams): void {
+  const href = searchHref(searchParams);
   History.prototype.replaceState.call(window.history, window.history.state, '', href);
+  notifyClientSearchChange(href);
+}
+
+/** `entryState` is merged into the copied Next.js history state, so it survives reload and Forward. */
+export function pushClientSearch(
+  searchParams: URLSearchParams,
+  entryState: Record<string, unknown>,
+): void {
+  const href = searchHref(searchParams);
+  History.prototype.pushState.call(
+    window.history,
+    { ...window.history.state, ...entryState },
+    '',
+    href,
+  );
   notifyClientSearchChange(href);
 }
 

@@ -73,9 +73,14 @@ and the repository root `.vercelignore` assumes that layout. It defines no cron 
 deploys, so they are not marked immutable. Optimized images (`/_next/image`) are served as
 WebP with a one-day `minimumCacheTTL`. `src/proxy.ts` runs only for API requests from the
 `inferencex-cli` and `inferencex-skill` user agents, embed pages, legacy Inference power links,
-gated saved model selections, model-route aliases and retired profit percentiles, and compare
-share links with query state. Its `config.matcher` must stay a static literal, so its list of model
-aliases has to change whenever `COMPARE_MODEL_ALIASES` does (`proxy.test.ts` checks this).
+gated saved model selections, model-route aliases and retired profit percentiles, compare
+share links with query state, and dashboard paths from before the `/infx` and `/opx` split. Those
+old paths (`/inference`, `/agentx`, `/operatorx`, and the rest) get one 308 to the path in
+`dashboard-routes.ts`, keeping the `/zh` prefix, subpath and query. The table lives in
+`lib/routing/legacy-dashboard-redirect.ts` and is built from each route's `legacyPath`. Bare `/infx`
+goes to the Inference tab. Its `config.matcher` must stay a static literal, so its list of model
+aliases has to change whenever `COMPARE_MODEL_ALIASES` does, and its list of old first segments
+whenever a `legacyPath` does (`proxy.test.ts` checks both).
 
 `patches/next@16.3.3.patch` (root `patchedDependencies`) fixes the self-hosted image optimizer
 used by `next start`, including CI. Unpatched, Next reads a local source image through a mocked
@@ -127,6 +132,7 @@ before writing to the production database.
 | `NEON_PROJECT_ID`                 | with `NEON_API_KEY`                                      | Neon project that holds those branches.                                                                                                     | Same as `NEON_API_KEY`                                                                                                                                                                                                                              |
 | `VERCEL_INVALIDATE_SECRET`        | yes, for cache invalidation outside the `staging` target | Bearer token for `/api/v1/invalidate`. It must equal the app's runtime `INVALIDATE_SECRET`.                                                 | `apply-run-overrides`, `backfill-server-log-files`, `cache-refresh`, `ingest-collectivex`, `ingest-operatorx`, `ingest-results`, `recompute-agentic-metrics`, `sync-run-from-public-db`                                                             |
 | `VERCEL_PROTECTION_BYPASS_SECRET` | optional                                                 | Deployment Protection bypass sent with requests to `APP_URL` and by the cache scripts.                                                      | `apply-run-overrides`, `backfill-server-log-files`, `cache-refresh`, `h3-media`, `ingest-collectivex`, `ingest-operatorx`, `ingest-results` on the `production` target, `recompute-agentic-metrics`, `sync-run-from-public-db`, `warm-after-deploy` |
+| `BLOB_READ_WRITE_TOKEN`           | yes, by `h3-media`                                       | Writes H3 web renditions and their receipts. Must name the production app's Blob store.                                                     | `h3-media`                                                                                                                                                                                                                                          |
 | `VERCEL_STAGING_BYPASS_SECRET`    | yes, for the `staging` and `neon-branch` targets         | Vercel automation bypass for the staging and preview deployments.                                                                           | `ingest-results`, `stage-results`, `sync-staging-database`                                                                                                                                                                                          |
 
 Values reach scripts only through step `env:`, never by inline expression in a `run:`

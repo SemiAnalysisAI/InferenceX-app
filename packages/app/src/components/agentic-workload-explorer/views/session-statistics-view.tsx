@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { ChevronDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ExpandableChart } from '@/components/agentic-workload-explorer/expandable-chart';
 import {
@@ -38,16 +39,16 @@ import { track } from '@/lib/analytics/analytics';
 
 const STRINGS = {
   en: {
-    apiCacheHitRate: 'API Cache Hit Rate',
+    apiCacheHitRate: 'API cache hit rate',
     apiCacheHitRateSub: 'As reported by the API across every request in this session',
-    theoreticalCacheHitRate: 'Theoretical Upper Bound Cache Hit Rate',
-    theoreticalCacheHitRateSub: 'Assuming Infinite Cache TTL & Infinitely Large Cache',
-    cacheRead: 'Cache Read',
-    cacheWrite: 'Cache Write',
+    theoreticalCacheHitRate: 'Theoretical upper bound cache hit rate',
+    theoreticalCacheHitRateSub: 'Assuming infinite cache TTL & infinitely large cache',
+    cacheRead: 'Cache read',
+    cacheWrite: 'Cache write',
     output: 'Output',
-    distribution: 'Distribution',
+    distribution: 'distribution',
     noData: 'No data',
-    tokenStatistics: 'Token Statistics',
+    tokenStatistics: 'Token statistics',
     requestsInRange: (n: number, min: string, max: string) =>
       `${n} request${n > 1 ? 's' : ''} in range ${min}–${max}`,
     turn: (n: number) => `turn ${n}`,
@@ -62,8 +63,8 @@ const STRINGS = {
     colType: 'Type',
     colModel: 'Model',
     colInput: 'Input',
-    colCacheRead: 'Cache Read',
-    colCacheWrite: 'Cache Write',
+    colCacheRead: 'Cache read',
+    colCacheWrite: 'Cache write',
     colOutput: 'Output',
     colCost: 'Cost',
     colTTFT: 'TTFT',
@@ -75,7 +76,7 @@ const STRINGS = {
     ttft: 'TTFT',
     tpot: 'TPOT',
     interactivity: 'Interactivity',
-    prefillSpeed: 'Prefill Speed',
+    prefillSpeed: 'Prefill speed',
     axisLabelTTFT: 'Time to first token',
     axisLabelTPOT: 'Time per output token (ms)',
     axisLabelInteractivity: 'Output tok/s/user',
@@ -354,7 +355,7 @@ export default function StatisticsPage() {
                     }}
                   />
                   {selectedIdx !== null && selectedBucket && (
-                    <div className="mt-3 border border-border rounded-md p-2 bg-muted/30 max-h-48 overflow-y-auto">
+                    <div className="mt-3 border border-border/30 rounded-md p-2 bg-muted/30 max-h-48 overflow-y-auto">
                       <p className="text-3xs text-muted-foreground mb-1.5 font-medium">
                         {t.requestsInRange(
                           selectedBucket.entries.length,
@@ -388,10 +389,7 @@ export default function StatisticsPage() {
                                   <>
                                     <span>{t.turn(turnInfo.turn)}</span>
                                     {turnInfo.kind === 'subagent_group' ? (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-3xs px-1 py-0 border-purple-500/30 text-purple-400"
-                                      >
+                                      <Badge variant="outline" className="text-3xs px-1 py-0">
                                         {turnInfo.label}
                                       </Badge>
                                     ) : (
@@ -514,7 +512,7 @@ export default function StatisticsPage() {
                       <TableCell className="text-right font-mono text-xs">
                         {row.ttftMs === null ? '—' : formatDuration(row.ttftMs)}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs text-sky-500">
+                      <TableCell className="text-right font-mono text-xs text-muted-foreground">
                         {(() => {
                           const ps = computePrefillSpeed(row.cacheRead, row.cacheWrite, row.ttftMs);
                           return ps === null ? '—' : formatPrefillSpeedCompact(ps);
@@ -539,7 +537,7 @@ export default function StatisticsPage() {
                   <Fragment key={row.turn}>
                     <TableRow
                       id={`turn-${row.turn}`}
-                      className="cursor-pointer bg-purple-500/5 hover:bg-purple-500/10"
+                      className="cursor-pointer bg-muted/30 hover:bg-muted/50"
                       onClick={() => {
                         track('agentic_workload_statistics_group_toggled', { turn: row.turn });
                         toggleGroup(row.turn);
@@ -551,18 +549,16 @@ export default function StatisticsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Badge
-                            variant="outline"
-                            className="text-xs border-purple-500/30 text-purple-400"
-                          >
+                          <Badge variant="outline" className="text-xs">
                             {row.label}
                           </Badge>
                           <span className="text-xs text-muted-foreground">
                             {t.nReq(row.requestCount)}
                           </span>
-                          <span className="text-xs text-muted-foreground">
-                            {isExpanded ? '▲' : '▼'}
-                          </span>
+                          <ChevronDown
+                            className={`size-3.5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                            aria-hidden="true"
+                          />
                         </div>
                       </TableCell>
                       <TableCell className="font-mono text-xs">{row.model || '—'}</TableCell>
@@ -584,7 +580,7 @@ export default function StatisticsPage() {
                       <TableCell className="text-right font-mono text-xs">
                         {row.ttftMs === null ? '—' : formatDuration(row.ttftMs)}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs text-sky-500">
+                      <TableCell className="text-right font-mono text-xs text-muted-foreground">
                         {(() => {
                           const ps = computePrefillSpeed(row.cacheRead, row.cacheWrite, row.ttftMs);
                           return ps === null ? '—' : formatPrefillSpeedCompact(ps);
@@ -607,7 +603,7 @@ export default function StatisticsPage() {
                         const childGap =
                           (new Date(child.timestamp).getTime() - new Date(prevTs).getTime()) / 1000;
                         return (
-                          <TableRow key={`${row.turn}-sub-${ci}`} className="bg-purple-500/5">
+                          <TableRow key={`${row.turn}-sub-${ci}`} className="bg-muted/30">
                             <TableCell />
                             <TableCell className="font-mono text-xs">
                               {formatUTC(child.timestamp)}
@@ -638,7 +634,7 @@ export default function StatisticsPage() {
                             <TableCell className="text-right font-mono text-xs">
                               {child.ttftMs === null ? '—' : formatDuration(child.ttftMs)}
                             </TableCell>
-                            <TableCell className="text-right font-mono text-xs text-sky-500">
+                            <TableCell className="text-right font-mono text-xs text-muted-foreground">
                               {(() => {
                                 const ps = computePrefillSpeed(
                                   child.cacheRead,
@@ -693,7 +689,7 @@ export default function StatisticsPage() {
                 <TableCell className="text-right font-mono text-xs">
                   {totals.ttftCount > 0 ? formatDuration(totals.ttftMs / totals.ttftCount) : '—'}
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs text-sky-500">
+                <TableCell className="text-right font-mono text-xs text-muted-foreground">
                   {(() => {
                     const avgTtft = totals.ttftCount > 0 ? totals.ttftMs / totals.ttftCount : null;
                     const ps = computePrefillSpeed(totals.cacheRead, totals.cacheWrite, avgTtft);
@@ -735,15 +731,11 @@ function CacheHitRateCard({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-          {label}
-        </CardTitle>
+        <CardTitle className="text-xs font-medium text-muted-foreground">{label}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="text-3xl font-mono font-bold tabular-nums text-foreground">
-          {value.toFixed(1)}%
-        </div>
-        <div className="mt-1 text-3xs font-mono text-subtle">{subLabel}</div>
+        <div className="text-3xl font-medium tabular-nums text-foreground">{value.toFixed(1)}%</div>
+        <div className="mt-1 text-3xs font-mono text-muted-foreground">{subLabel}</div>
       </CardContent>
     </Card>
   );

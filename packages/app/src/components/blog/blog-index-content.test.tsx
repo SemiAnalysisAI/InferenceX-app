@@ -58,7 +58,6 @@ describe('BlogIndexContent', () => {
     expect(html).toContain('data-testid="blog-featured-post"');
     expect(html).toContain('href="/blog/newest"');
     expect(html.match(/data-testid="blog-post-card"/gu)).toHaveLength(POSTS.length - 1);
-    expect(html).toContain('InferenceX Research');
     expect(html).toContain('href="/glossary"');
     expect(html).not.toContain('opengraph-image');
     expect(html).toContain('4 min read');
@@ -82,10 +81,9 @@ describe('BlogIndexContent', () => {
     const tile = html.slice(html.indexOf('data-testid="blog-thumbnail-tile"'));
     const tileInner = tile.slice(0, tile.indexOf('<div class="flex flex-1'));
     expect(tileInner).not.toContain('Title old');
-    expect(tileInner).toContain('>nvidia<');
+    expect(tileInner).toContain('>NVIDIA<');
     expect(tileInner).toContain('4 min read');
     expect(html).toContain('data-layout="figure"');
-    expect(html).toContain('class="grid items-start');
   });
 
   it('lays the featured card out as a single text column when the post has no figure', () => {
@@ -116,7 +114,9 @@ describe('BlogIndexContent', () => {
     expect(html.match(/data-testid="blog-post-card"/gu)).toHaveLength(2);
     expect(html).toContain('href="/blog?tag=agentx"');
     expect(html).toContain('aria-current="page"');
-    expect(html).toContain('Tagged');
+    expect(html).toContain('Tagged “NVIDIA”');
+    expect(html).toContain('>AgentX<');
+    expect(html).not.toContain('>agentx<');
   });
 
   it('accepts any casing in the tag query', () => {

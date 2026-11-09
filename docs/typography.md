@@ -6,14 +6,16 @@ How text is sized and spaced in the app, and the ratchet gate that keeps it that
 
 Defined in the `@theme` block of `packages/app/src/app/globals.css`:
 
-| Token                     | Class                   | Value                             | Use for                                           |
-| ------------------------- | ----------------------- | --------------------------------- | ------------------------------------------------- |
-| `--text-2xs`              | `text-2xs`              | 0.6875rem (11px)                  | Micro labels one step below `text-xs`             |
-| `--text-3xs`              | `text-3xs`              | 0.625rem (10px)                   | Densest labels: table meta, tooltips, log gutters |
-| `--text-dialog-title`     | `text-dialog-title`     | 1.375rem (22px), 30px line height | Centered announcement dialog headings             |
-| `--tracking-eyebrow`      | `tracking-eyebrow`      | 0.16em                            | Uppercase eyebrow/kicker labels                   |
-| `--tracking-eyebrow-wide` | `tracking-eyebrow-wide` | 0.2em                             | Extra-wide uppercase labels                       |
-| `--tracking-heading`      | `tracking-heading`      | -0.04em                           | Tightened display/hero headings                   |
+| Token                 | Class               | Value                             | Use for                                            |
+| --------------------- | ------------------- | --------------------------------- | -------------------------------------------------- |
+| `--text-2xs`          | `text-2xs`          | 0.6875rem (11px)                  | Micro labels one step below `text-xs`              |
+| `--text-3xs`          | `text-3xs`          | 0.625rem (10px)                   | Densest labels: table meta, tooltips, log gutters  |
+| `--text-dialog-title` | `text-dialog-title` | 1.375rem (22px), 30px line height | Centered announcement dialog headings              |
+| `--text-title`        | `text-title`        | 1.75rem (28px), 36px line height  | Desktop size of the dashboard page title           |
+| `--container-measure` | `max-w-measure`     | 45rem (720px)                     | The one column for text and media on reading pages |
+| `--leading-reading`   | `leading-reading`   | 1.65 (1.8 under `:lang(zh)`)      | Body text line height on reading pages             |
+| `--tracking-eyebrow`  | `tracking-eyebrow`  | 0.16em                            | Easter-egg theme decorations only (no app UI)      |
+| `--tracking-heading`  | `tracking-heading`  | -0.04em                           | Display headings at `text-4xl` and larger only     |
 
 Rules of thumb:
 
@@ -21,13 +23,23 @@ Rules of thumb:
 - Never write `text-[11px]`, `text-[0.65rem]`, `tracking-[0.16em]`, etc. — the gate (below) blocks new arbitrary font sizes and letter-spacing values. `tracking-[0.1em]` is exactly `tracking-widest`; use the built-in.
 - The micro size tokens deliberately define **no paired line-height**: the arbitrary values they replaced set only `font-size` and inherited line-height, and dense tables depend on that. Don't add `--text-2xs--line-height` without re-checking those surfaces.
 - The custom tracking tokens are registered with tailwind-merge in `src/lib/shared/utils.ts` (`extendTailwindMerge`); if you add a token, add it there too or `cn()` will keep conflicting classes.
+- Labels, kickers and legends are sentence case: `text-xs font-medium text-muted-foreground`, normal tracking. No `uppercase` + wide tracking recipes, and mono only for code, IDs, hashes, commands and numeric meta.
+- Headings use weight 500 or 600 at most. Hierarchy comes from size and color.
 
 ## Components
 
-- `<Heading>` (`src/components/ui/heading.tsx`) — cva-based visual heading levels (`display`, `page`, `section`, `card`, `label`) with the rendered tag chosen via `as`, so outline and visual size stay independent. New pages should use it instead of retyping size/weight/tracking recipes; existing headings migrate file-by-file as pages get touched — no sweep.
-- `<Eyebrow>` (`src/components/ui/eyebrow.tsx`) — the uppercase mono kicker label (`tone="brand" | "muted"`, `wide` for 0.2em tracking).
+- `<Heading>` (`src/components/ui/heading.tsx`) — cva-based visual heading levels (`display`, `reading`, `page`, `title`, `section`, `card`, `label`) with the rendered tag chosen via `as`, so outline and visual size stay independent. `display`, `reading`, `page` and `title` are `font-semibold`, `section` and `card` are `font-medium`. `reading` (30px, 36px from `sm`, 48px from `lg`, tight leading) is the one H1 of every reading page. `title` (20px, 24px from `md`, 28px from `lg`) is the one visible page title of a dashboard tab, set by `DashboardSectionHeader` in the tab's header card. Chart card titles stay at `card`, and the `TabIntro` explainer below the results is supporting text at `card` with `text-sm` body, even though it keeps the SEO `<h1>`. Negative `tracking-heading` applies only where the size reaches `text-4xl`.
+- `<Eyebrow>` (`src/components/ui/eyebrow.tsx`) — a small sentence-case label above a heading (`text-xs font-medium text-muted-foreground`). It does not uppercase, so pass sentence-case text. Delete eyebrows that only restate the heading.
+- `<Card>` (`src/components/ui/card.tsx`) — a solid surface: `bg-card`, `border-border/30` hairline, `rounded-xl`, no blur or translucency. Do not nest a bordered panel directly inside a Card just to group. Use spacing and a label instead. Charts sit on the page or on the Card they belong to, never in a Card that only adds a border.
+- `<Stat>` (`src/components/ui/stat.tsx`): a labelled figure (`dt` label, `dd` value, optional `detail` line) for stat rows. Wrap rows in a `<dl>`. `size` picks the value size (`sm` base, `md` lg, `lg` 2xl) and `boxed` puts each stat on its own card tile. `valueFirst` puts the figure above a `text-sm` label for facts like "11 / per-point telemetry charts". Values are `font-medium tabular-nums whitespace-nowrap`. Use it instead of a local `StatCard`.
+- `<EmptyState>` (`src/components/ui/empty-state.tsx`): the message for a section, table or chart with nothing to show, and for loading or missing notices in its place. Optional `title` and `action`. `bare` drops the card surface when it already sits inside a card or chart.
+- `<VendorDot>` (`src/components/ui/vendor-dot.tsx`): the vendor-colored dot that identifies a chip. NVIDIA and AMD get their brand colors, other vendors a neutral dot.
 
-Blog/article typography is owned by `@tailwindcss/typography` (`prose`) and is out of scope — don't migrate MDX content styles to these tokens.
+Radii follow one ladder, so corners nest: page and section surfaces (Card, dialogs, the mobile menu) are `rounded-xl`, panels inside them (`ControlPanel`, legends, notices) are `rounded-lg`, controls (buttons, selects, inputs, segmented containers, badges) are `rounded-md`, and items inside a control or menu (segments via `SEGMENT_RADIUS_STYLE`, popover menu rows, select chips) are `rounded-sm`. Siblings of one kind share a radius, and a child is never rounder than its parent.
+
+Blog/article typography is owned by `@tailwindcss/typography` (`prose`) via `BLOG_PROSE_CLASS`, and is out of scope for MDX content migration. Reading pages (blog, whitepapers, about, glossary, quotes, land acknowledgement, AgentX articles, hardware) share one layout. Text and media share one 45rem (720px) column. Pages without a sidebar wrap in `ARTICLE_PAGE_CLASS` from `src/components/ui/reading-layout.ts`, which centres that column. Pages with a sidebar wrap in `READING_PAGE_CLASS` (72rem frame) and use `lg:grid-cols-[minmax(0,var(--container-measure))_<sidebar>] lg:justify-between`, so the column sits under the header and the sidebar on the right. Set body text with `READING_TEXT_CLASS` (`max-w-measure`, 16px, `leading-reading`, `text-foreground`; about 85-90 Latin or 45 CJK characters per line). Muted color is only for an explicit lead or dek. Article headings use `ARTICLE_H2_CLASS` (24px, 28px from `md`, semibold, with 40px or more above it) and `ARTICLE_H3_CLASS` (18px semibold), and `BLOG_PROSE_CLASS` matches that scale. Figures, tables, media, code blocks, pager cards and rules all fill the same column, through `READING_SECTION_CLASS` for section breaks; only the page header rule spans the container. Code blocks use the card surface with a 1px border and `rounded-lg`, and only the `CopyableCodeBlock` header strip is grey. Previous and next links use `PagerCard`. `px-5` keeps 20px side margins on phones.
+
+Every reading page adds `READING_TOP_CLASS` to its frame, so the H1 or back link sits the same distance below the site header (about 45px on phones and 61px on desktop). Inline links in body text use `READING_LINK_CLASS` (accent text, 1px underline 3px below the baseline at 40% accent, full accent on hover, paragraph weight). `BLOG_PROSE_CLASS` applies the same style to MDX links. Standalone calls to action and navigation links keep their own styles. Tags on article and whitepaper cards use the borderless `secondary` badge, and blog tags render through `blogTagLabel` (`src/lib/blog/blog-tag-label.ts`) so slugs stay in URLs while pills, eyebrows and filters show display labels.
 
 ### Form controls and panels
 
@@ -35,7 +47,7 @@ Use the shared `Button`, `Input`, `SelectTrigger`, `MultiSelect`, and `Searchabl
 
 - Regular controls: 44px below `md`, 36px from `md` upward. Compact (`size="sm"`) buttons/selects stay 44px on phones and become 32px on desktop.
 - Control labels and selected values: `text-sm`. Editable inputs/search fields: `text-base md:text-sm` to keep phone input text readable. Helper text and dense table metadata may stay `text-xs`; do not enlarge chart ticks, code, or data rows mechanically.
-- `Label` uses a 20px line height so wrapped labels do not collide. `ControlPanel` supplies a semantic fieldset/legend, common padding, border, background and group-heading typography. Pass layout classes (columns, spans, width) rather than restating its spacing and colors.
+- `Label` uses a 20px line height so wrapped labels do not collide. `ControlPanel` supplies a semantic fieldset/legend with no border, background or padding. The legend is a sentence-case `text-xs font-medium text-muted-foreground` label with 8px below it, so panels can sit inside a Card without stacking boxes. Pass layout classes (columns, spans, width) rather than restating its spacing and colors.
 - Segmented controls use the 44px phone hit areas with the original rounded border and inset segment spacing. Use `role="group"` for value filters (`aria-pressed`) and the existing tab semantics for chart/table switches. Use the shared `MultiSelect` combobox for any group that permits multiple selected values and has a long or data-driven option list (for example kernel modes or throughput series). Small fixed groups that are meant to be fast (Quick Filters: two to three options each) render every option as a visible `aria-pressed` toggle instead, so one tap selects without opening a dropdown. Preserve each group’s empty/all or minimum-selection rule; reserve segmented buttons for a single selected value. Chart legends and independent settings are separate controls, not multi-choice filter groups.
 - Avoid local `h-7`, `h-8`, `text-xs` and dark-fill overrides on regular form controls. Compact chart toolbars may use the explicit small variant. Multi-select triggers use **minimum** heights so selected chips can wrap without losing data.
 

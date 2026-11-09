@@ -141,6 +141,8 @@ export interface AggDataEntry {
   kv_p2p_transfer?: string;
   router_name?: string;
   router_version?: string;
+  spec_algorithm?: string;
+  spec_draft_model?: string;
   server_gpu_cache_hit_rate?: number;
   server_external_cache_hit_rate?: number;
   server_cpu_cache_hit_rate?: number;

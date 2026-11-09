@@ -48,7 +48,7 @@ const responseSchema = objectSchema(
         }),
       ),
       description:
-        'Models in selector order within each category. This presentation order does not change defaults.model.',
+        'Models in selector order within each category, with Kimi-K3.1-Pro first. The bare inference page opens Kimi-K3.1-Pro; this navigation default does not change defaults.model or remove the inference API requirement for an explicit model.',
     },
     sequences: arraySchema(
       objectSchema({
@@ -127,6 +127,14 @@ const responseExample = {
   apiVersion: 'v1',
   params: { format: 'json' },
   models: [
+    {
+      name: 'Kimi-K3',
+      dbKeys: ['kimik3'],
+      category: 'deprecated',
+      releaseDate: '2026-07-27',
+      compareSlug: 'kimi-k3',
+      deprecatedSequences: ['1k/1k', '1k/8k'],
+    },
     {
       name: 'DeepSeek-V4-Pro',
       dbKeys: ['dsv4'],

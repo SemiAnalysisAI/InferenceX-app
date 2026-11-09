@@ -63,7 +63,7 @@ describe('ChartLegend in an enclosing controls panel', () => {
             onCheckedChange: onHighContrast,
           },
         ]}
-        actions={[{ id: 'embedded-reset', label: 'Reset filter', onClick: onReset }]}
+        reset={{ id: 'embedded-reset', onClick: onReset, disabled: false }}
       />,
     );
     cy.get('[data-testid="legend-open-button"], [data-testid="legend-close-button"]').should(
@@ -196,14 +196,14 @@ function ChartLegendWrapper({
             ]
           : undefined
       }
-      actions={[
-        ...(itemsWithHandler.some((i) => !i.isActive)
-          ? [{ id: 'reset-filter', label: 'Reset filter', onClick: () => setLegendItems(items) }]
-          : []),
-        ...(inChart
-          ? [{ id: 'quick-filters', label: 'Quick Filters', onClick: onQuickFilters }]
-          : []),
-      ]}
+      reset={{
+        id: 'reset-filter',
+        disabled: itemsWithHandler.every((i) => i.isActive),
+        onClick: () => setLegendItems(items),
+      }}
+      actions={
+        inChart ? [{ id: 'quick-filters', label: 'Quick Filters', onClick: onQuickFilters }] : []
+      }
     />
   );
 
@@ -262,10 +262,6 @@ describe('ChartLegend (sidebar variant)', () => {
         'React render phases',
       ).not.to.include('nested-update');
     });
-  });
-
-  it('renders no search input (removed from the sidebar panel)', () => {
-    cy.get('.sidebar-legend input[type="text"]').should('not.exist');
   });
 
   it('fits the longest single-line name with a compact, aligned points-button column', () => {
@@ -397,36 +393,6 @@ describe('ChartLegend (sidebar variant)', () => {
         });
     });
 
-    it(`fits a short list and keeps actions with the close button at ${width}px`, () => {
-      cy.viewport(width, 900);
-      cy.mount(<ChartLegendWrapper inChart onQuickFilters={cy.stub().as('quickFilters')} />);
-      cy.get('[data-testid="chart-legend"]')
-        .scrollIntoView()
-        .should(($legend) => {
-          const panel = $legend[0].getBoundingClientRect();
-          const list = $legend.find('ul')[0].getBoundingClientRect();
-          const controls = $legend
-            .find('[data-testid="legend-display-controls"]')[0]
-            .getBoundingClientRect();
-          expect(panel.height).to.be.lessThan(280);
-          expect(controls.top - list.bottom).to.be.lessThan(16);
-          expect(panel.right).to.be.at.most(width);
-        });
-      cy.get('[data-testid="legend-toolbar"]').within(() => {
-        cy.get('[data-testid="quick-filters"]').click();
-        cy.get('[data-testid="legend-close-button"]').should('be.visible');
-      });
-      cy.get('@quickFilters').should('have.been.calledOnce');
-      cy.get('.sidebar-legend label').contains('NVIDIA H100 SXM').click();
-      cy.get('[data-testid="legend-toolbar"] [data-testid="reset-filter"]').click();
-      cy.get('.sidebar-legend input[type="checkbox"]').should('be.checked');
-      cy.get('[data-testid="legend-advanced-toggle"]').click();
-      cy.get('[data-testid="log-scale"]').click().should('have.attr', 'aria-checked', 'true');
-      cy.get('[data-testid="legend-close-button"]').click();
-      cy.get('[data-testid="legend-open-button"]').click();
-      cy.get('[data-testid="log-scale"]').should('have.attr', 'aria-checked', 'true');
-    });
-
     for (const grouped of [false, true]) {
       it(`scrolls a long ${grouped ? 'grouped' : 'flat'} list without hiding controls at ${width}px`, () => {
         const items = Array.from({ length: 40 }, (_, index) => ({
@@ -449,6 +415,21 @@ describe('ChartLegend (sidebar variant)', () => {
             expect(panel.height).to.be.at.most(width < 1024 ? 384 : 575);
             expect(scroller.scrollHeight).to.be.greaterThan(scroller.clientHeight);
             expect(controls.bottom).to.be.at.most(panel.bottom);
+            if (width < 1024) {
+              const viewport = scroller.getBoundingClientRect();
+              const lastWhole = Math.max(
+                ...[...scroller.querySelectorAll('li')]
+                  .map((row) => row.getBoundingClientRect().bottom)
+                  .filter((bottom) => bottom <= viewport.bottom),
+              );
+              const strip = $legend
+                .find('[data-testid="legend-overflow-strip"]')[0]
+                .getBoundingClientRect();
+              expect(viewport.bottom - lastWhole).to.be.closeTo(0, 0.5);
+              expect(strip.top).to.be.closeTo(viewport.bottom, 0.5);
+              expect(strip.height).to.be.closeTo(14, 0.5);
+              expect(controls.top).to.be.at.least(strip.bottom);
+            }
           });
         cy.get('.sidebar-legend label').contains('Run 40 —').scrollIntoView().click();
         cy.get('#checkbox-series-39').should('not.be.checked');
@@ -462,17 +443,78 @@ describe('ChartLegend (sidebar variant)', () => {
     }
   }
 
-  it('clicking a legend item toggles its active state', () => {
-    cy.get('.sidebar-legend label').first().click();
-    cy.contains('Reset filter').should('be.visible');
+  it('keeps the column stretched but sizes a short list panel to its content at 1280px', () => {
+    cy.viewport(1280, 900);
+    cy.mount(<ChartLegendWrapper inChart onQuickFilters={cy.stub().as('quickFilters')} />);
+    cy.get('[data-testid="chart-legend"]')
+      .scrollIntoView()
+      .should(($legend) => {
+        const panel = $legend[0].getBoundingClientRect();
+        const list = $legend.find('ul')[0].getBoundingClientRect();
+        const controls = $legend
+          .find('[data-testid="legend-display-controls"]')[0]
+          .getBoundingClientRect();
+        const column = $legend[0]
+          .closest('[data-slot="chart-legend-wrapper"]')!
+          .getBoundingClientRect();
+        const stretched = $legend[0].parentElement!.getBoundingClientRect();
+        expect(stretched.bottom).to.be.closeTo(column.bottom, 1);
+        expect(getComputedStyle($legend[0].parentElement!).backgroundColor).to.equal(
+          'rgba(0, 0, 0, 0)',
+        );
+        expect(panel.bottom).to.be.lessThan(column.bottom - 16);
+        expect(controls.top - list.bottom).to.be.lessThan(16);
+        expect(panel.right).to.be.at.most(1280);
+      });
+    cy.get('[data-testid="legend-toolbar"]').within(() => {
+      cy.get('[data-testid="quick-filters"]').click();
+      cy.get('[data-testid="legend-close-button"]').should('be.visible');
+    });
+    cy.get('@quickFilters').should('have.been.calledOnce');
+    cy.get('.sidebar-legend label').contains('NVIDIA H100 SXM').click();
+    cy.get('[data-testid="legend-toolbar"] [data-testid="reset-filter"]').click();
+    cy.get('.sidebar-legend input[type="checkbox"]').should('be.checked');
+    cy.get('[data-testid="legend-advanced-toggle"]').click();
+    cy.get('[data-testid="log-scale"]').click().should('have.attr', 'aria-checked', 'true');
+    cy.get('[data-testid="legend-close-button"]').click();
+    cy.get('[data-testid="legend-open-button"]').click();
+    cy.get('[data-testid="log-scale"]').should('have.attr', 'aria-checked', 'true');
   });
 
-  it('reset filter restores all items', () => {
+  it('clicking a legend item enables Reset filter', () => {
+    cy.contains('button', 'Reset filter').should('be.disabled');
     cy.get('.sidebar-legend label').first().click();
-    cy.contains('Reset filter').should('be.visible');
-    cy.contains('Reset filter').click();
-    cy.contains('Reset filter').should('not.exist');
+    cy.contains('button', 'Reset filter').should('be.enabled');
   });
+
+  it('reset filter restores all items and stays in the header disabled', () => {
+    cy.get('.sidebar-legend label').first().click();
+    cy.contains('button', 'Reset filter').click();
+    cy.get('.sidebar-legend input[type="checkbox"]').should('be.checked');
+    cy.get('[data-testid="legend-toolbar"]')
+      .contains('button', 'Reset filter')
+      .should('be.visible')
+      .and('be.disabled');
+  });
+
+  for (const width of [390, 1280]) {
+    it(`keeps the header row above the first item with the toggle right-aligned at ${width}px`, () => {
+      cy.viewport(width, 900);
+      cy.mount(<ChartLegendWrapper />);
+      cy.get('[data-testid="chart-legend"]').should(($legend) => {
+        const panel = $legend[0].getBoundingClientRect();
+        const toolbar = $legend.find('[data-testid="legend-toolbar"]')[0].getBoundingClientRect();
+        const reset = $legend.find('[data-testid="reset-filter"]')[0].getBoundingClientRect();
+        const toggle = $legend
+          .find('[data-testid="legend-close-button"]')[0]
+          .getBoundingClientRect();
+        const firstItem = $legend.find('ul > li')[0].getBoundingClientRect();
+        expect(firstItem.top, 'items start below the header').to.be.at.least(toolbar.bottom);
+        expect(reset.left, 'reset on the left').to.be.lessThan(toggle.left);
+        expect(panel.right - toggle.right, 'toggle right-aligned').to.be.lessThan(8);
+      });
+    });
+  }
 
   it('close button hides the panel and the reopen button restores it', () => {
     cy.get('.sidebar-legend').should('exist');
@@ -482,10 +524,6 @@ describe('ChartLegend (sidebar variant)', () => {
     cy.get('[data-testid="legend-open-button"]').click();
     cy.get('.sidebar-legend').should('exist');
     cy.get('[data-testid="legend-open-button"]').should('not.exist');
-  });
-
-  it('renders no points-table icon when items have no onShowPoints handler', () => {
-    cy.get('[data-testid^="legend-points-"]').should('not.exist');
   });
 
   it('renders an exportable key explaining the agentic offload halo', () => {
@@ -501,7 +539,7 @@ describe('ChartLegend (sidebar variant)', () => {
 
     cy.get('[data-testid="offload-halo-key"]')
       .should('be.visible')
-      .and('contain.text', 'KV offload ON')
+      .and('contain.text', 'KV offload on')
       .and('not.contain.text', 'Dashed halo:')
       .and('not.have.class', 'no-export');
     cy.get('[data-testid="offload-halo-key"] circle[stroke-dasharray="3 2"]').should('exist');
@@ -611,7 +649,7 @@ describe('ChartLegend points-table icon + dialog', () => {
     cy.get('[data-testid="legend-points-row"]').should('have.length', 2);
     cy.get('a[data-testid="legend-points-row"]')
       .first()
-      .should('have.attr', 'href', '/inference/agentic/206860');
+      .should('have.attr', 'href', '/infx/inference/agentic/206860');
     cy.get('a[data-testid="legend-points-row"]').first().should('contain.text', '4');
     cy.get('[data-testid="legend-points-dialog"]').should('contain.text', 'Offload');
   });

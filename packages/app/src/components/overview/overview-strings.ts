@@ -4,18 +4,23 @@ export type OverviewLocale = 'en' | 'zh';
 
 export const OVERVIEW_STRINGS = {
   en: {
-    title: 'Agentic Inference Costs',
+    title: 'Agentic inference costs',
     scopeMetric: 'Hyperscaler cost',
     scopeDirection: '↓ Lower is better',
     scopeAria: 'Hyperscaler cost per one million total tokens. Lower is better.',
     sourcePrefix: 'Source: InferenceX & ',
     sourceLinkText: TCO_SOURCE_TITLE,
+    controlsGroup: 'Benchmark config',
     tierNavLabel: 'SLO',
     tierUnit: 'tok/s/user',
     engineScopeNavLabel: 'Engine scope',
     engineScopeOptions: {
-      all: 'All Platforms',
-      community: 'Open Source Community Engines (vLLM/SGLang)',
+      all: 'All platforms',
+      community: 'Open-source community engines (vLLM/SGLang)',
+    },
+    engineScopeShortOptions: {
+      all: 'All platforms',
+      community: 'Open-source (vLLM/SGLang)',
     },
     comparisonNavLabel: 'Compare',
     comparisonOptions: {
@@ -34,10 +39,10 @@ export const OVERVIEW_STRINGS = {
       'Cost per million total tokens from each platform’s best observed serving envelope for the scenario shown with each model.',
     historyCaption: (days: number) =>
       `Current cost and change versus the latest validated platform result ${days}–${days * 2} days earlier.`,
-    modelHeader: 'Model · Scenario',
+    modelHeader: 'Model · scenario',
     scenarioLabels: {
       single_turn_8k1k: '8K/1K',
-      agentx: 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)',
+      agentx: 'Long-context multi-turn realistic agentic scenario (AgentX)',
     },
     scenarioLabelsShort: {
       single_turn_8k1k: '8K/1K',
@@ -77,6 +82,7 @@ export const OVERVIEW_STRINGS = {
     historyCellStateLegend: (days: number) =>
       `Platforms without a valid ${days}-day comparison show current cost only.`,
     referenceHeader: 'Reference',
+    noResultsRow: 'No results at this SLO',
     modelScopeNavLabel: 'Inactive models',
     modelScopeShow: 'Show deprecated & maintenance-mode models',
     modelScopeHide: 'Hide deprecated & maintenance-mode models',
@@ -109,7 +115,7 @@ export const OVERVIEW_STRINGS = {
     loadingStatus: 'Loading the selected comparison…',
     navigationError:
       'Could not load the selected comparison. Showing the last successfully loaded data.',
-    emptyState: 'No overview results match this selection.',
+    emptyState: 'No overview results match this selection',
   },
   zh: {
     title: '智能体推理成本',
@@ -118,12 +124,17 @@ export const OVERVIEW_STRINGS = {
     scopeAria: '每百万总 token 的超大规模云厂商（hyperscaler）成本，越低越好。',
     sourcePrefix: '来源：InferenceX 与 ',
     sourceLinkText: TCO_SOURCE_TITLE,
+    controlsGroup: '基准测试配置',
     tierNavLabel: 'SLO',
     tierUnit: 'tok/s/user',
     engineScopeNavLabel: '引擎范围',
     engineScopeOptions: {
       all: '所有平台',
       community: '开源社区引擎（vLLM/SGLang）',
+    },
+    engineScopeShortOptions: {
+      all: '所有平台',
+      community: '开源（vLLM/SGLang）',
     },
     comparisonNavLabel: '对比方式',
     comparisonOptions: {
@@ -181,6 +192,7 @@ export const OVERVIEW_STRINGS = {
     historicalEvenAria: (baselineDate: string) => `与该平台 ${baselineDate} 的结果成本基本持平`,
     historyCellStateLegend: (days: number) => `缺少有效 ${days} 天对比的平台仅显示当前成本。`,
     referenceHeader: '基准',
+    noResultsRow: '此 SLO 下暂无结果',
     modelScopeNavLabel: '非活跃模型',
     modelScopeShow: '显示已弃用与维护模式模型',
     modelScopeHide: '隐藏已弃用与维护模式模型',
@@ -208,7 +220,7 @@ export const OVERVIEW_STRINGS = {
     categoryBadgeTitle: '目前已不再对该模型进行持续基准测试。',
     loadingStatus: '正在加载所选对比…',
     navigationError: '无法加载所选对比，当前显示的是上次成功加载的数据。',
-    emptyState: '没有符合当前筛选条件的总览结果。',
+    emptyState: '没有符合当前筛选条件的总览结果',
   },
 } as const;
 

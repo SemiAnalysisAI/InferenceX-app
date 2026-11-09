@@ -4,6 +4,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 
 import { Heading } from '@/components/ui/heading';
+import { blogTagLabel } from '@/lib/blog/blog-tag-label';
 import type { Locale } from '@/lib/i18n/i18n';
 
 import { BLOG_COPY, blogIndexPath } from './blog-copy';
@@ -56,6 +57,7 @@ export function BlogIndexPosts({
       {showFeatured && (
         <BlogFeaturedPost
           {...featured}
+          locale={locale}
           labels={{ eyebrow: t.featured, read: t.readArticle, tags: t.tags }}
         />
       )}
@@ -64,7 +66,7 @@ export function BlogIndexPosts({
         <div className="flex flex-col gap-4 border-t border-border/40 pt-6">
           <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
             <Heading as="h2" level="section" id="blog-list-heading" className="scroll-mt-24">
-              {activeTag ? t.taggedHeading(activeTag) : t.allPosts}
+              {activeTag ? t.taggedHeading(blogTagLabel(activeTag, locale)) : t.allPosts}
             </Heading>
             <p className="text-sm text-muted-foreground tabular-nums" data-testid="blog-post-count">
               {t.count(filtered.length)}
@@ -72,6 +74,7 @@ export function BlogIndexPosts({
           </div>
           {topTags.length > 0 && (
             <BlogTagFilter
+              locale={locale}
               primary={topTags}
               more={moreTags}
               activeTag={activeTag}
@@ -82,9 +85,9 @@ export function BlogIndexPosts({
         </div>
 
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-start gap-3 rounded-2xl border border-dashed border-border/60 p-8">
+          <div className="flex flex-col items-start gap-3 rounded-xl border border-dashed border-border/50 p-8">
             <p className="text-muted-foreground">
-              {activeTag ? t.emptyTag(activeTag) : t.emptyAll}
+              {activeTag ? t.emptyTag(blogTagLabel(activeTag, locale)) : t.emptyAll}
             </p>
             {activeTag && (
               <BlogTagLink tag="" clear basePath={basePath}>
@@ -93,12 +96,15 @@ export function BlogIndexPosts({
             )}
           </div>
         ) : (
-          <div
-            className="grid items-start gap-6 md:grid-cols-2 xl:grid-cols-3"
-            data-testid="blog-post-grid"
-          >
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3" data-testid="blog-post-grid">
             {grid.map((card, index) => (
-              <BlogPostCard key={card.slug} {...card} tagsLabel={t.tags} priority={index < 3} />
+              <BlogPostCard
+                key={card.slug}
+                {...card}
+                locale={locale}
+                tagsLabel={t.tags}
+                priority={index < 3}
+              />
             ))}
           </div>
         )}

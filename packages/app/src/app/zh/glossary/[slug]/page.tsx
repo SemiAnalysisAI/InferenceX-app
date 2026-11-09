@@ -1,9 +1,19 @@
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { GlossaryFigure } from '@/components/glossary/glossary-figure';
 import { JsonLd } from '@/components/seo/json-ld';
-import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
+import { PagerCard } from '@/components/ui/pager-card';
+import {
+  ARTICLE_H2_CLASS,
+  READING_PAGE_CLASS,
+  READING_SECTION_CLASS,
+  READING_TEXT_CLASS,
+  READING_TOP_CLASS,
+} from '@/components/ui/reading-layout';
 import { getPostBySlug } from '@/lib/blog/blog';
 import {
   GLOSSARY_CATEGORY_LABELS_ZH,
@@ -18,6 +28,7 @@ import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 import { clampMetaDescription } from '@/lib/seo/meta-text';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 import { analyticsPlacement } from '@/lib/analytics/placement';
+import { cn } from '@/lib/shared/utils';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -118,201 +129,166 @@ export default async function ZhGlossaryTermPage({ params }: Props) {
   return (
     <main className="relative" {...analyticsPlacement('glossary')}>
       <JsonLd data={jsonLd} />
-      <div className="container mx-auto px-4 lg:px-8">
-        <article className="mx-auto max-w-5xl">
-          <Card className="overflow-hidden p-0">
-            <header className="relative border-b border-border/50 px-5 py-8 md:px-10 md:py-12">
-              <div
-                aria-hidden="true"
-                className="absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-brand/70 to-transparent"
-              />
-              <Link
-                href="/zh/glossary"
-                className="group inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-brand"
+      <div className={cn(READING_PAGE_CLASS, READING_TOP_CLASS)}>
+        <article className="flex flex-col gap-10">
+          <header className="border-b border-border/30 pb-8">
+            <Link
+              href="/zh/glossary"
+              className="inline-flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft aria-hidden="true" className="size-4" />
+              AI 推理术语表
+            </Link>
+            <p className="mt-8 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-muted-foreground">
+              <span>{GLOSSARY_CATEGORY_LABELS_ZH[entry.category]}</span>
+              {entry.abbreviation && <span className="font-mono">{entry.abbreviation}</span>}
+            </p>
+            <Heading as="h1" level="reading" className="mt-3 max-w-measure">
+              {entry.term}
+            </Heading>
+            {entry.aliases && entry.aliases.length > 0 && (
+              <p className="mt-4 text-sm text-muted-foreground">
+                也称为 {entry.aliases.join('、')}
+              </p>
+            )}
+          </header>
+
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,var(--container-measure))_16rem] lg:justify-between lg:gap-16">
+            <div className="min-w-0">
+              <section
+                aria-labelledby="plain-language-heading"
+                className="rounded-xl border border-border/30 bg-card p-5 md:p-6"
               >
-                <span
-                  aria-hidden="true"
-                  className="transition-transform group-hover:-translate-x-0.5"
+                <p
+                  id="plain-language-heading"
+                  className="text-xs font-medium text-muted-foreground"
                 >
-                  ←
-                </span>
-                AI 推理术语表
-              </Link>
-              <div className="mt-8 flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-brand/25 bg-brand/8 px-3 py-1 text-xs font-semibold tracking-eyebrow text-brand uppercase">
-                  {GLOSSARY_CATEGORY_LABELS_ZH[entry.category]}
-                </span>
-                {entry.abbreviation && (
-                  <span className="font-mono text-xs tracking-eyebrow text-muted-foreground uppercase">
-                    {entry.abbreviation}
-                  </span>
-                )}
-              </div>
-              <h1 className="mt-4 max-w-4xl text-4xl font-bold tracking-heading text-balance md:text-6xl">
-                {entry.term}
-              </h1>
-              {entry.aliases && entry.aliases.length > 0 && (
-                <p className="mt-4 text-sm text-muted-foreground">
-                  也称为 {entry.aliases.join('、')}
+                  先用大白话
                 </p>
-              )}
-            </header>
+                <p className="mt-3 text-xl leading-relaxed font-medium text-pretty md:text-2xl">
+                  {entry.plainEnglish}
+                </p>
+              </section>
 
-            <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_16rem]">
-              <div className="px-5 py-8 md:px-10 md:py-12">
-                <section
-                  aria-labelledby="plain-language-heading"
-                  className="rounded-xl border border-brand/20 bg-brand/6 p-5 md:p-6"
-                >
-                  <p
-                    id="plain-language-heading"
-                    className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase"
-                  >
-                    先用大白话
+              <section aria-labelledby="technical-definition-heading" className="mt-12">
+                <h2 id="technical-definition-heading" className={ARTICLE_H2_CLASS}>
+                  技术定义
+                </h2>
+                <p className={cn(READING_TEXT_CLASS, 'mt-4')}>{entry.definition}</p>
+              </section>
+
+              {entry.figure && <GlossaryFigure figure={entry.figure} />}
+
+              {entry.measurement && (
+                <div className="mt-8 border-l-2 border-border pl-4">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {entry.measurement.label}
                   </p>
-                  <p className="mt-3 text-xl leading-relaxed font-medium text-pretty md:text-2xl">
-                    {entry.plainEnglish}
+                  <p className="mt-1 font-mono text-sm leading-relaxed text-foreground">
+                    {entry.measurement.value}
                   </p>
-                </section>
-
-                <section aria-labelledby="technical-definition-heading" className="mt-8 max-w-3xl">
-                  <h2
-                    id="technical-definition-heading"
-                    className="text-xl font-semibold tracking-tight"
-                  >
-                    技术定义
-                  </h2>
-                  <p className="mt-3 leading-7 text-muted-foreground">{entry.definition}</p>
-                </section>
-
-                {entry.measurement && (
-                  <div className="mt-8 border-l-2 border-brand bg-brand/6 px-5 py-4">
-                    <p className="text-xs font-semibold tracking-eyebrow text-muted-foreground uppercase">
-                      {entry.measurement.label}
-                    </p>
-                    <p className="mt-1 font-mono text-sm leading-relaxed text-foreground">
-                      {entry.measurement.value}
-                    </p>
-                  </div>
-                )}
-
-                <div className="mt-10 max-w-3xl space-y-10 border-t border-border/50 pt-10">
-                  <section aria-labelledby="engineering-details">
-                    <h2 id="engineering-details" className="text-xl font-semibold tracking-tight">
-                      工程细节
-                    </h2>
-                    <p className="mt-3 leading-7 text-muted-foreground">{entry.explanation}</p>
-                  </section>
-                  <section aria-labelledby="why-it-matters">
-                    <h2 id="why-it-matters" className="text-xl font-semibold tracking-tight">
-                      为什么重要
-                    </h2>
-                    <p className="mt-3 leading-7 text-muted-foreground">{entry.significance}</p>
-                  </section>
-                  <section aria-labelledby="reading-inferencex">
-                    <h2 id="reading-inferencex" className="text-xl font-semibold tracking-tight">
-                      如何在 InferenceX 中解读
-                    </h2>
-                    <p className="mt-3 leading-7 text-muted-foreground">{entry.benchmarkContext}</p>
-                  </section>
                 </div>
-              </div>
+              )}
 
-              <aside className="border-t border-border/50 bg-muted/10 px-5 py-8 lg:border-t-0 lg:border-l lg:px-6 lg:py-12">
-                <p className="font-mono text-xs font-semibold tracking-eyebrow text-muted-foreground uppercase">
-                  相关术语
-                </p>
-                <nav aria-label="相关术语" className="mt-4 flex flex-col">
-                  {relatedTerms.map((related) => (
-                    <Link
-                      key={related.slug}
-                      href={`/zh/glossary/${related.slug}`}
-                      className="group border-b border-border/40 py-3 text-sm font-medium transition-colors last:border-b-0 hover:text-brand focus-visible:outline-none"
-                    >
-                      <span className="flex items-center justify-between gap-3">
-                        {related.term}
-                        <span
-                          aria-hidden="true"
-                          className="text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-brand"
-                        >
-                          →
-                        </span>
-                      </span>
-                    </Link>
-                  ))}
-                </nav>
-              </aside>
+              <div className={cn(READING_SECTION_CLASS, 'mt-12 space-y-12')}>
+                <section aria-labelledby="engineering-details">
+                  <h2 id="engineering-details" className={ARTICLE_H2_CLASS}>
+                    工程细节
+                  </h2>
+                  <p className={cn(READING_TEXT_CLASS, 'mt-4')}>{entry.explanation}</p>
+                </section>
+                <section aria-labelledby="why-it-matters">
+                  <h2 id="why-it-matters" className={ARTICLE_H2_CLASS}>
+                    为什么重要
+                  </h2>
+                  <p className={cn(READING_TEXT_CLASS, 'mt-4')}>{entry.significance}</p>
+                </section>
+                <section aria-labelledby="reading-inferencex">
+                  <h2 id="reading-inferencex" className={ARTICLE_H2_CLASS}>
+                    如何在 InferenceX 中解读
+                  </h2>
+                  <p className={cn(READING_TEXT_CLASS, 'mt-4')}>{entry.benchmarkContext}</p>
+                </section>
+              </div>
             </div>
-          </Card>
+
+            <aside className="lg:sticky lg:top-24 lg:self-start">
+              <p className="text-xs font-medium text-muted-foreground">相关术语</p>
+              <nav aria-label="相关术语" className="mt-3 flex flex-col">
+                {relatedTerms.map((related) => (
+                  <Link
+                    key={related.slug}
+                    href={`/zh/glossary/${related.slug}`}
+                    className="group flex items-center justify-between gap-3 border-b border-border/20 py-2.5 text-sm transition-colors last:border-b-0 hover:text-brand focus-visible:outline-none"
+                  >
+                    {related.term}
+                    <ArrowRight
+                      aria-hidden="true"
+                      className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-brand"
+                    />
+                  </Link>
+                ))}
+              </nav>
+            </aside>
+          </div>
 
           {relatedArticles.length > 0 && (
-            <section aria-labelledby="further-reading" className="mt-4">
-              <Card>
-                <div className="flex flex-col gap-2 border-b border-border/50 pb-5 md:flex-row md:items-end md:justify-between">
-                  <div>
-                    <p className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase">
-                      参考资料
-                    </p>
-                    <h2 id="further-reading" className="mt-2 text-2xl font-semibold tracking-tight">
-                      在真实基准中理解这一概念
-                    </h2>
-                  </div>
-                  <Link href="/zh/blog" className="text-sm text-muted-foreground hover:text-brand">
-                    全部文章 →
+            <section aria-labelledby="further-reading" className={READING_SECTION_CLASS}>
+              <div className="flex max-w-measure flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+                <h2 id="further-reading" className={ARTICLE_H2_CLASS}>
+                  在真实基准中理解这一概念
+                </h2>
+                <Link
+                  href="/zh/blog"
+                  className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                >
+                  全部文章
+                  <ArrowRight aria-hidden="true" className="size-4" />
+                </Link>
+              </div>
+              <div className="mt-4 max-w-measure divide-y divide-border/20">
+                {relatedArticles.map((article) => (
+                  <Link
+                    key={article.slug}
+                    href={`/zh/blog/${article.slug}`}
+                    className="group grid gap-2 py-4 focus-visible:outline-none md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-6"
+                  >
+                    <div>
+                      <h3 className="font-medium leading-snug group-hover:text-brand">
+                        {article.title}
+                      </h3>
+                      <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
+                        {article.subtitle}
+                      </p>
+                    </div>
+                    <ArrowRight
+                      aria-hidden="true"
+                      className="hidden size-4 text-muted-foreground transition-colors group-hover:text-foreground md:block"
+                    />
                   </Link>
-                </div>
-                <div className="divide-y divide-border/40">
-                  {relatedArticles.map((article) => (
-                    <Link
-                      key={article.slug}
-                      href={`/zh/blog/${article.slug}`}
-                      className="group grid gap-2 py-5 focus-visible:outline-none md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-6"
-                    >
-                      <div>
-                        <h3 className="font-semibold leading-snug group-hover:text-brand group-hover:underline">
-                          {article.title}
-                        </h3>
-                        <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
-                          {article.subtitle}
-                        </p>
-                      </div>
-                      <span
-                        aria-hidden="true"
-                        className="hidden text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-brand md:block"
-                      >
-                        →
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              </Card>
+                ))}
+              </div>
             </section>
           )}
 
-          <nav aria-label="术语表翻页" className="mt-4 grid gap-4 sm:grid-cols-2">
+          <nav aria-label="术语表翻页" className="grid gap-4 sm:grid-cols-2">
             {adjacent.previous ? (
-              <Link
+              <PagerCard
                 href={`/zh/glossary/${adjacent.previous.slug}`}
-                className="rounded-xl border border-border/40 bg-background/20 p-5 backdrop-blur-[2px] transition-colors hover:border-brand/40 hover:bg-brand/5 focus-visible:outline-none"
-              >
-                <span className="text-xs tracking-eyebrow text-muted-foreground uppercase">
-                  ← 上一条
-                </span>
-                <span className="mt-2 block font-semibold">{adjacent.previous.term}</span>
-              </Link>
+                direction="prev"
+                label="上一条"
+                title={adjacent.previous.term}
+              />
             ) : (
-              <div />
+              <div aria-hidden="true" className="hidden sm:block" />
             )}
             {adjacent.next && (
-              <Link
+              <PagerCard
                 href={`/zh/glossary/${adjacent.next.slug}`}
-                className="rounded-xl border border-border/40 bg-background/20 p-5 text-right backdrop-blur-[2px] transition-colors hover:border-brand/40 hover:bg-brand/5 focus-visible:outline-none"
-              >
-                <span className="text-xs tracking-eyebrow text-muted-foreground uppercase">
-                  下一条 →
-                </span>
-                <span className="mt-2 block font-semibold">{adjacent.next.term}</span>
-              </Link>
+                direction="next"
+                label="下一条"
+                title={adjacent.next.term}
+              />
             )}
           </nav>
         </article>

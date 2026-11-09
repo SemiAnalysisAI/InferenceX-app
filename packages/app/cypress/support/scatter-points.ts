@@ -80,3 +80,20 @@ export function clickScatterPoint(point: ScatterPoint): void {
   triggerAtPoint(point, 'mousemove');
   triggerAtPoint(point, 'click');
 }
+
+export function hoverTopmostAt(doc: Document, clientX: number, clientY: number): void {
+  const win = doc.defaultView!;
+  const init = { clientX, clientY, view: win };
+  const hit = doc.elementFromPoint(clientX, clientY);
+  expect(hit, 'element under the pointer').to.not.equal(null);
+  for (let node = hit; node; node = node.parentElement) {
+    node.dispatchEvent(new win.MouseEvent('mouseenter', init));
+  }
+  hit!.dispatchEvent(new win.MouseEvent('mousemove', { ...init, bubbles: true }));
+}
+
+export function hoverTopmostOver(target: Element): void {
+  target.scrollIntoView({ block: 'center' });
+  const box = target.getBoundingClientRect();
+  hoverTopmostAt(target.ownerDocument, box.left + box.width / 2, box.top + box.height / 2);
+}

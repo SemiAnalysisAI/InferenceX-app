@@ -81,27 +81,18 @@ async function main(): Promise<void> {
         readTraceProfileChunks(sql, id),
       );
 
-      let stats: AggregateStats;
-      const storedVersion = row.aggregate_stats?.version;
-      if (
-        !flags.force &&
-        storedVersion !== undefined &&
-        storedVersion >= 9 &&
-        storedVersion < STATS_VERSION
-      ) {
-        stats = mergeProfileStatsUpgrade(row.aggregate_stats!, profileStats);
-      } else {
-        const [serverRow] = await sql<{ server_metrics_json_gz: Buffer | null }[]>`
-          select server_metrics_json_gz
-          from agentic_trace_replay
-          where id = ${id}
-        `;
-        const serverStats = await computeAggregateStats({
-          profileBlob: null,
-          serverBlob: serverRow?.server_metrics_json_gz ?? null,
-        });
-        stats = mergeProfileStatsUpgrade(serverStats, profileStats);
-      }
+      // A stats-version upgrade may change server metric interpretation as well as
+      // profile calculations. Re-read both before marking the bundle current.
+      const [serverRow] = await sql<{ server_metrics_json_gz: Buffer | null }[]>`
+        select server_metrics_json_gz
+        from agentic_trace_replay
+        where id = ${id}
+      `;
+      const serverStats = await computeAggregateStats({
+        profileBlob: null,
+        serverBlob: serverRow?.server_metrics_json_gz ?? null,
+      });
+      const stats = mergeProfileStatsUpgrade(serverStats, profileStats);
 
       retainPopulatedFields(row.aggregate_stats, stats, [
         'isl',

@@ -150,7 +150,7 @@ export interface OptimizationsOverview {
 
 export const OPTIMIZATIONS_OVERVIEW: OptimizationsOverview = {
   eyebrow: 'AgentX industry impact',
-  title: 'Optimizations for Agentic Workloads',
+  title: 'Optimizations for agentic workloads',
   lead: 'The most useful thing AgentX produced in its first months was not the open-source datasets. It was 50+ upstream pull requests from AgentX partners, optimizing real-world agentic workloads with AgentX as the north star.',
   intro: [
     'AgentX replays real agentic traffic, so it benchmarks more than raw prefill and decode kernels. It exercises the whole path end to end: KV-cache lifecycle, hybrid-attention cache correctness, CPU KV offload, transfer progress, routing affinity, incremental tokenization, request serialization, and scheduler bookkeeping. Every one of those costs is already paid by every production agentic deployment, and none of them is visible in a single-turn 8k/1k scenario.',
@@ -249,8 +249,8 @@ export const OPTIMIZATIONS_OVERVIEW: OptimizationsOverview = {
     transfer: 'Transfer engine',
   },
   ui: {
-    backToAgentX: '← Back to AgentX',
-    backToOverview: '← All AgentX optimizations',
+    backToAgentX: 'Back to AgentX',
+    backToOverview: 'All AgentX optimizations',
     prsLabel: 'Upstream pull requests',
     referencesLabel: 'References',
     readMore: 'Read the optimizations',

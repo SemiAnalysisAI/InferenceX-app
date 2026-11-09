@@ -69,7 +69,7 @@ describe('getInferenceModelBySlug', () => {
     expect(getInferenceModelBySlug('glm-5-3')?.model).toBe(Model.GLM_5_2);
     expect(getInferenceModelBySlug('glm-5-3-flash')?.model).toBe(Model.GLM_5_3_Flash);
     for (const locale of ['', '/zh']) {
-      expect(inferenceModelForPathname(`${locale}/inference/glm-5-3-flash`)).toBe(
+      expect(inferenceModelForPathname(`${locale}/infx/inference/glm-5-3-flash`)).toBe(
         Model.GLM_5_3_Flash,
       );
     }
@@ -112,7 +112,7 @@ describe('inferenceModelSlugForModel / inferenceModelPath', () => {
   it('round-trips every registry entry', () => {
     for (const entry of INFERENCE_MODEL_SLUGS) {
       expect(inferenceModelSlugForModel(entry.model)).toBe(entry.slug);
-      expect(inferenceModelPath(entry.slug)).toBe(`/inference/${entry.slug}`);
+      expect(inferenceModelPath(entry.slug)).toBe(`/infx/inference/${entry.slug}`);
     }
   });
 
@@ -123,35 +123,39 @@ describe('inferenceModelSlugForModel / inferenceModelPath', () => {
 
 describe('inferenceModelForPathname', () => {
   it('pins the model on English model pages', () => {
-    expect(inferenceModelForPathname('/inference/kimi-k3')).toBe(Model.Kimi_K3);
-    expect(inferenceModelForPathname('/inference/minimax-m3/')).toBe(Model.MiniMax_M3);
+    expect(inferenceModelForPathname('/infx/inference/kimi-k3')).toBe(Model.Kimi_K3);
+    expect(inferenceModelForPathname('/infx/inference/minimax-m3/')).toBe(Model.MiniMax_M3);
   });
 
   it('pins the model on /zh model pages', () => {
-    expect(inferenceModelForPathname('/zh/inference/kimi-k3')).toBe(Model.Kimi_K3);
+    expect(inferenceModelForPathname('/zh/infx/inference/kimi-k3')).toBe(Model.Kimi_K3);
   });
 
   it('resolves alias segments (pre-redirect client render)', () => {
-    expect(inferenceModelForPathname('/inference/Kimi-K3')).toBe(Model.Kimi_K3);
-    expect(inferenceModelForPathname('/inference/deepseek-v4-pro')).toBe(Model.DeepSeek_V4_Pro);
-    expect(inferenceModelForPathname('/inference/Kimi-K2.5')).toBe(Model.Kimi_K2_5);
+    expect(inferenceModelForPathname('/infx/inference/Kimi-K3')).toBe(Model.Kimi_K3);
+    expect(inferenceModelForPathname('/infx/inference/deepseek-v4-pro')).toBe(
+      Model.DeepSeek_V4_Pro,
+    );
+    expect(inferenceModelForPathname('/infx/inference/Kimi-K2.5')).toBe(Model.Kimi_K2_5);
   });
 
   it('ignores query strings and hashes', () => {
-    expect(inferenceModelForPathname('/inference/kimi-k3?i_seq=8k%2F1k#chart')).toBe(Model.Kimi_K3);
+    expect(inferenceModelForPathname('/infx/inference/kimi-k3?i_seq=8k%2F1k#chart')).toBe(
+      Model.Kimi_K3,
+    );
   });
 
   it('returns null off the model pages', () => {
-    expect(inferenceModelForPathname('/inference')).toBeNull();
-    expect(inferenceModelForPathname('/zh/inference')).toBeNull();
-    expect(inferenceModelForPathname('/inference/agentic')).toBeNull();
-    expect(inferenceModelForPathname('/inference/agentic/some-point')).toBeNull();
-    expect(inferenceModelForPathname('/inference/logs')).toBeNull();
-    expect(inferenceModelForPathname('/inference/kimi-k3/extra')).toBeNull();
+    expect(inferenceModelForPathname('/infx/inference')).toBeNull();
+    expect(inferenceModelForPathname('/zh/infx/inference')).toBeNull();
+    expect(inferenceModelForPathname('/infx/inference/agentic')).toBeNull();
+    expect(inferenceModelForPathname('/infx/inference/agentic/some-point')).toBeNull();
+    expect(inferenceModelForPathname('/infx/inference/logs')).toBeNull();
+    expect(inferenceModelForPathname('/infx/inference/kimi-k3/extra')).toBeNull();
     expect(inferenceModelForPathname('/compare/kimi-k3-gb200-vs-mi355x')).toBeNull();
     expect(inferenceModelForPathname('/')).toBeNull();
     expect(inferenceModelForPathname('/zh')).toBeNull();
-    expect(inferenceModelForPathname('/inference/%E4%B8%8D%E5%AD%98%E5%9C%A8')).toBeNull();
+    expect(inferenceModelForPathname('/infx/inference/%E4%B8%8D%E5%AD%98%E5%9C%A8')).toBeNull();
   });
 
   it('returns null when usePathname yields no pathname (bare test renders)', () => {
@@ -163,26 +167,30 @@ describe('inferenceModelForPathname', () => {
 
 describe('inferenceModelRouteForSelection', () => {
   it('rewrites model subroutes to the newly selected model', () => {
-    expect(inferenceModelRouteForSelection('/inference/kimi-k3', Model.DeepSeek_V4_Pro)).toBe(
-      '/inference/deepseek-v4',
+    expect(inferenceModelRouteForSelection('/infx/inference/kimi-k3', Model.DeepSeek_V4_Pro)).toBe(
+      '/infx/inference/deepseek-v4',
     );
-    expect(inferenceModelRouteForSelection('/zh/inference/kimi-k3', Model.DeepSeek_V4_Pro)).toBe(
-      '/zh/inference/deepseek-v4',
-    );
+    expect(
+      inferenceModelRouteForSelection('/zh/infx/inference/kimi-k3', Model.DeepSeek_V4_Pro),
+    ).toBe('/zh/infx/inference/deepseek-v4');
   });
 
-  it('moves the base /inference page onto the model subroute', () => {
-    expect(inferenceModelRouteForSelection('/inference', Model.Kimi_K3)).toBe('/inference/kimi-k3');
-    expect(inferenceModelRouteForSelection('/zh/inference', Model.Kimi_K3)).toBe(
-      '/zh/inference/kimi-k3',
+  it('moves the base /infx/inference page onto the model subroute', () => {
+    expect(inferenceModelRouteForSelection('/infx/inference', Model.Kimi_K3)).toBe(
+      '/infx/inference/kimi-k3',
+    );
+    expect(inferenceModelRouteForSelection('/zh/infx/inference', Model.Kimi_K3)).toBe(
+      '/zh/infx/inference/kimi-k3',
     );
   });
 
   it('leaves every other surface alone', () => {
     expect(inferenceModelRouteForSelection('/', Model.Kimi_K3)).toBeNull();
     expect(inferenceModelRouteForSelection('/overview', Model.Kimi_K3)).toBeNull();
-    expect(inferenceModelRouteForSelection('/inference/agentic', Model.Kimi_K3)).toBeNull();
-    expect(inferenceModelRouteForSelection('/inference/agentic/point-1', Model.Kimi_K3)).toBeNull();
+    expect(inferenceModelRouteForSelection('/infx/inference/agentic', Model.Kimi_K3)).toBeNull();
+    expect(
+      inferenceModelRouteForSelection('/infx/inference/agentic/point-1', Model.Kimi_K3),
+    ).toBeNull();
     expect(
       inferenceModelRouteForSelection('/compare/kimi-k3-h100-vs-h200', Model.Kimi_K3),
     ).toBeNull();
@@ -191,8 +199,8 @@ describe('inferenceModelRouteForSelection', () => {
   });
 
   it('keeps the same path when the selection already matches', () => {
-    expect(inferenceModelRouteForSelection('/inference/kimi-k3', Model.Kimi_K3)).toBe(
-      '/inference/kimi-k3',
+    expect(inferenceModelRouteForSelection('/infx/inference/kimi-k3', Model.Kimi_K3)).toBe(
+      '/infx/inference/kimi-k3',
     );
   });
 });

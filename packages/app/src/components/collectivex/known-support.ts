@@ -47,10 +47,6 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     en: 'ROCm-only library; no CUDA path exists.',
     zh: '仅支持 ROCm 的库，不存在 CUDA 路径。',
   },
-  'gb-only': {
-    en: 'Requires an MNNVL one-sided NVLink domain; only the GB rack-scale SKUs have one.',
-    zh: '需要 MNNVL 单边 NVLink 域，仅 GB 机柜级 SKU 具备。',
-  },
   'uccl-pollara-degraded': {
     en: "UCCL's CPU-proxy RDMA is functional on the Pollara fabric but ~13x under its upstream-documented bandwidth (~6 GB/s vs 82 GB/s), invariant to GPU-memory registration mode and traffic class — an ionic-driver-level suspect. Numbers at that deficit would misrepresent the SKU.",
     zh: 'UCCL 的 CPU 代理 RDMA 在 Pollara 网络上可运行，但带宽仅为上游文档值的约 1/13（约 6 GB/s 对 82 GB/s），与 GPU 内存注册方式和流量类别无关，疑似 ionic 驱动层问题。该水平的数据无法公正代表此 SKU。',
@@ -119,6 +115,10 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     en: 'Cross-node IBGDA fails during NVSHMEM setup — re-confirmed on a fresh node pair 2026-08-28: ibv_reg_dmabuf_mr returns a null MR before the downstream ibv_create_ah failure, with nvidia_peermem loaded; the live suspect is the stale libmlx5 in the container image (an image bump, not a host fix).',
     zh: '跨节点 IBGDA 在 NVSHMEM 建立阶段失败——2026-08-28 在新节点对上复验：ibv_reg_dmabuf_mr 返回空 MR，随后才是 ibv_create_ah 失败，且 nvidia_peermem 已加载；当前疑点是容器镜像中过旧的 libmlx5（需镜像升级而非主机修复）。',
   },
+  'flashinfer-one-nvlink-domain': {
+    en: "FlashInfer's one-sided workspace needs every rank inside one NVLink domain, so on single-node NVLink pools it runs EP8 only.",
+    zh: 'FlashInfer 的单边工作区要求所有 rank 位于同一 NVLink 域内，因此在单节点 NVLink 集群上只能运行 EP8。',
+  },
   'no-ll-kernels': {
     en: 'The library has no low-latency kernels.',
     zh: '该库没有低延迟 Kernel。',
@@ -152,28 +152,28 @@ const NORMAL: KnownMatrix = {
     mori: off('amd-only'),
     'uccl-ep': bothWork,
     'nccl-ep': cell(works, worksWith('nccl-v02-gin')),
-    'flashinfer-ep': off('gb-only'),
+    'flashinfer-ep': cell(works, na('flashinfer-one-nvlink-domain')),
   },
   h200: {
     'deepep-v2': bothWork,
     mori: off('amd-only'),
     'uccl-ep': cell(works, worksWith('uccl-h200-rdma-recv-ring')),
     'nccl-ep': cell(works, worksWith('nccl-v02-gin')),
-    'flashinfer-ep': off('gb-only'),
+    'flashinfer-ep': cell(works, na('flashinfer-one-nvlink-domain')),
   },
   b200: {
     'deepep-v2': bothWork,
     mori: off('amd-only'),
     'uccl-ep': bothWork,
     'nccl-ep': cell(works, worksWith('nccl-v02-gin')),
-    'flashinfer-ep': off('gb-only'),
+    'flashinfer-ep': cell(works, na('flashinfer-one-nvlink-domain')),
   },
   b300: {
     'deepep-v2': cell(works, worksWith('b300-efa-deepep-aws-fork')),
     mori: off('amd-only'),
     'uccl-ep': off('uccl-not-brought-up'),
     'nccl-ep': cell(works, worksWith('nccl-v02-gin')),
-    'flashinfer-ep': off('gb-only'),
+    'flashinfer-ep': cell(works, na('flashinfer-one-nvlink-domain')),
   },
   gb200: {
     'deepep-v2': bothWork,
@@ -194,21 +194,21 @@ const NORMAL: KnownMatrix = {
     mori: bothWork,
     'uccl-ep': bothWork,
     'nccl-ep': off('nvidia-only'),
-    'flashinfer-ep': off('gb-only'),
+    'flashinfer-ep': off('nvidia-only'),
   },
   mi325x: {
     'deepep-v2': off('nvidia-only'),
     mori: bothWork,
     'uccl-ep': bothWork,
     'nccl-ep': off('nvidia-only'),
-    'flashinfer-ep': off('gb-only'),
+    'flashinfer-ep': off('nvidia-only'),
   },
   mi355x: {
     'deepep-v2': off('nvidia-only'),
     mori: cell(works, broken('mi355x-ainic-a77')),
     'uccl-ep': cell(works, broken('uccl-pollara-degraded')),
     'nccl-ep': off('nvidia-only'),
-    'flashinfer-ep': off('gb-only'),
+    'flashinfer-ep': off('nvidia-only'),
   },
 };
 

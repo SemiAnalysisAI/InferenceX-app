@@ -65,7 +65,7 @@ function PanelsHarness({
 }) {
   const [extra, setExtra] = useState<InferenceData[]>([]);
   return (
-    <PathnameContext.Provider value="/inference">
+    <PathnameContext.Provider value="/infx/inference">
       <div style={{ width: '100%', maxWidth: 1120, padding: 12, boxSizing: 'border-box' }}>
         {added.length > 0 && (
           <button type="button" data-testid="add-source" onClick={() => setExtra(added)}>

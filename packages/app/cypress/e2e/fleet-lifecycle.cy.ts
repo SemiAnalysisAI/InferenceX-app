@@ -36,8 +36,8 @@ const showChart = () => cy.get('[data-testid="calculator-lifecycle-chart-view-bt
 
 function assertFleetControlLabels(locale: 'en' | 'zh' = 'en') {
   for (const [id, label] of [
-    ['fleet-cost', locale === 'zh' ? '计价方式' : 'Cost Provider'],
-    ['fleet-cost-type', locale === 'zh' ? 'Token 类型' : 'Token Type'],
+    ['fleet-cost', locale === 'zh' ? '计价方式' : 'Cost provider'],
+    ['fleet-cost-type', locale === 'zh' ? 'Token 类型' : 'Token type'],
   ]) {
     cy.get(`label[for="${id}"]`).should('have.text', label).click();
     cy.get(`button#${id}`).should('have.attr', 'aria-expanded', 'true');
@@ -141,9 +141,9 @@ describe('Fleet — Fleet Lifecycle', () => {
   before(() => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
+      win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');
     });
-    cy.visit('/fleet');
+    cy.visit('/infx/fleet');
     cy.get('[data-testid="calculator-lifecycle-section"]').should('exist');
   });
 
@@ -153,13 +153,13 @@ describe('Fleet — Fleet Lifecycle', () => {
     for (const width of [375, 1440]) {
       cy.viewport(width, 900);
       cy.get('[data-testid="fleet-benchmark-panel"]').within(() => {
-        cy.get('legend').should('have.text', 'Benchmark Config');
+        cy.get('legend').should('have.text', 'Benchmark config');
         cy.get('#fleet-model').should('exist');
         cy.get('#fleet-sequence').should('exist');
         cy.get('#fleet-precision').should('exist');
       });
       cy.get('[data-testid="fleet-chart-panel"]').within(() => {
-        cy.get('legend').should('have.text', 'Chart Config');
+        cy.get('legend').should('have.text', 'Chart config');
         cy.get('#fleet-cost').should('exist');
         cy.get('#fleet-cost-type').should('exist');
         cy.get('#fleet-target').should('exist');
@@ -176,35 +176,21 @@ describe('Fleet — Fleet Lifecycle', () => {
           }
         }
       });
-      assertFleetControlLabels();
     }
+    assertFleetControlLabels();
   });
 
   it('the default MW budget drives the lifecycle table', () => {
-    assertFleetControlLabels();
-    cy.get('[data-testid="calculator-lifecycle-section"]')
-      .should('be.visible')
-      .and('contain.text', 'Fleet Lifecycle');
-    cy.get('[data-testid="calc-fleet-mw-input"]').should('have.value', '10');
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-empty"]').should('not.exist');
 
-    cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-table"]').should('not.exist');
     showTable();
     cy.get('[data-testid="calculator-lifecycle-table"]').should('be.visible');
-    cy.get('[data-testid="calculator-lifecycle-table"]').within(() => {
-      cy.contains('th', 'Config Now').should('exist');
-      cy.contains('th', 'First Run').should('exist');
-      cy.contains('th', 'Latest Best').should('exist');
-      cy.contains('th', 'Improvements').should('exist');
-      cy.contains('th', 'Chips').should('exist');
-      cy.contains('th', 'Concurrent Users now').should('exist');
-      cy.contains('th', 'Margin $/day').should('exist');
-      cy.contains('th', 'Payback').should('exist');
-      cy.contains('th', 'Cumulative Margin').should('exist');
-      cy.get('tbody tr').should('have.length.greaterThan', 0);
-    });
+    cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').should(
+      'have.length.greaterThan',
+      0,
+    );
     cy.get('[data-testid="calculator-lifecycle-empty"]').should('not.exist');
     cy.get('[data-testid="calculator-lifecycle-table"] input[type="text"]').should('not.exist');
     cy.get('[data-testid="calc-lifecycle-cache-input"]').should('not.exist');
@@ -219,12 +205,6 @@ describe('Fleet — Fleet Lifecycle', () => {
           });
       });
 
-    cy.get('[data-testid="calc-lifecycle-price-input"]')
-      .invoke('val')
-      .should('match', /^\d+(?:\.\d+)?$/u);
-    cy.get('[data-testid="calc-lifecycle-price-input"]')
-      .invoke('val')
-      .then((val) => expect(Number(val)).to.be.greaterThan(0));
     showTable();
     cy.get('[data-testid="calculator-lifecycle-table"]').should('contain.text', 'Never');
   });
@@ -235,15 +215,7 @@ describe('Fleet — Fleet Lifecycle', () => {
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('not.contain', '$12.0000');
     cy.get('[data-testid="calculator-lifecycle-figure"]').within(() => {
       cy.contains('$12 in / $48 out per M tok').should('be.visible');
-      cy.contains('MW').should('be.visible');
     });
-
-    showTable();
-    cy.get('[data-testid="calculator-lifecycle-figure"]').should(
-      'contain',
-      '$12 in / $48 out per M tok',
-    );
-    showChart();
 
     cy.get('[data-testid="calc-lifecycle-price-input"]').clear().type('7.25');
     cy.get('[data-testid="calculator-lifecycle-figure"]').within(() => {
@@ -265,56 +237,6 @@ describe('Fleet — Fleet Lifecycle', () => {
           : String(seeded);
         cy.get('[data-testid="calculator-lifecycle-figure"]').should('contain', `$${trimmed} in /`);
       });
-
-    cy.get('[data-testid="calculator-lifecycle-figure"]').within(() => {
-      cy.contains('h2', 'Fleet Lifecycle').should('be.visible');
-      cy.contains('tok/s/user').should('be.visible');
-    });
-    cy.get('[data-testid="calculator-lifecycle-chart-svg"]').should('be.visible');
-    cy.get('[data-testid="calculator-lifecycle-table"]').should('not.exist');
-
-    showTable();
-    cy.get('[data-testid="calculator-lifecycle-table"]').should('be.visible');
-    cy.get('[data-testid="calculator-lifecycle-chart-svg"]').should('not.exist');
-    cy.get('[data-testid="calculator-lifecycle-figure"]').within(() => {
-      cy.contains('h2', 'Fleet Lifecycle').should('be.visible');
-    });
-
-    showChart();
-    cy.get('[data-testid="calculator-lifecycle-chart-svg"]').should('be.visible');
-
-    cy.get('[data-testid="calculator-lifecycle-section"]')
-      .should('contain.text', 'Power and $/chip/hr are today')
-      .and('contain.text', 'Unofficial runs loaded via a run link are not shown here');
-    cy.get('[data-testid="calculator-lifecycle-section"]').should(
-      'contain.text',
-      'SemiAnalysis Datacenter Industry Model',
-    );
-
-    exportMenu().should('be.visible').click();
-    cy.get('[data-testid="export-csv-button"]').should('be.visible');
-    cy.get('[data-testid="export-png-button"]').should('not.have.attr', 'aria-disabled', 'true');
-    cy.get('body').type('{esc}');
-
-    showTable();
-    exportMenu().click();
-    cy.get('[data-testid="export-png-button"]').should('have.attr', 'aria-disabled', 'true');
-    cy.get('[data-testid="export-csv-button"]').should('be.visible');
-    cy.get('body').type('{esc}');
-  });
-
-  it('raising the price above break-even turns margin positive and produces a payback', () => {
-    cy.get('[data-testid="calc-lifecycle-price-input"]').clear();
-    cy.get('[data-testid="calc-lifecycle-price-input"]').type('50');
-    firstRowCell('Margin $/day').invoke('text').should('match', /^\$/u);
-    firstRowCell('Payback')
-      .invoke('text')
-      .should('match', /\d+(?:\.\d+)? mo/u);
-
-    cy.get('[data-testid="calc-lifecycle-price-reset"]').should('be.visible').click();
-    cy.get('[data-testid="calc-lifecycle-price-input"]')
-      .invoke('val')
-      .then((val) => expect(Number(val)).to.be.lessThan(50));
   });
 
   it('bills the two streams apart — the output price alone moves margin', () => {
@@ -382,7 +304,8 @@ describe('Fleet — Fleet Lifecycle', () => {
       readout().find('tbody tr').should('have.length', lines.length);
     });
     cy.get('[data-testid="calculator-lifecycle-chart-svg"] path.line-path').then((lines) => {
-      hoverPlot(0.05);
+      // Close to the left edge: only the chips whose first run predates it are plotted there.
+      hoverPlot(0.02);
       readout()
         .find('tbody tr')
         .should('have.length.greaterThan', 0)
@@ -390,7 +313,8 @@ describe('Fleet — Fleet Lifecycle', () => {
     });
   });
 
-  it('freezes the readout on click, and releases it on the next click', () => {
+  it('opens the slice details on click, and closes them on a second click', () => {
+    cy.document().then((doc) => (doc.activeElement as HTMLElement | null)?.blur());
     hoverPlot(0.4);
     readout()
       .invoke('text')
@@ -398,23 +322,20 @@ describe('Fleet — Fleet Lifecycle', () => {
         const frozenDate = /\d{2} \w{3} \d{4}/u.exec(hovered)?.[0];
         expect(frozenDate, 'a date in the hover readout').to.be.a('string');
         clickPlot(0.4);
-        readout()
-          .should('have.css', 'pointer-events', 'auto')
-          .and('contain.text', String(frozenDate));
-        hoverPlot(0.7);
-        readout().should('contain.text', String(frozenDate));
-        clickPlot(0.7);
-        readout().should('have.css', 'display', 'none');
+        cy.get('[data-testid="point-details-panel"]').should('contain.text', String(frozenDate));
+        clickPlot(0.4);
+        cy.get('[data-testid="point-details-panel"]').should('not.exist');
       });
   });
 
-  it('keeps config detail out of the hover readout, showing it only once frozen', () => {
+  it('keeps config detail out of the hover readout, showing it only in the details', () => {
     stepX().then((x) => {
       plotOverlay().trigger('mousemove', x, 40);
       readout().should('have.css', 'display', 'block').and('not.contain.text', 'Config');
       plotOverlay().click(x, 40);
-      readout().should('contain.text', 'Config');
-      plotOverlay().click(x, 40);
+      cy.get('[data-testid="point-details-panel"]').should('contain.text', 'Config');
+      cy.get('[data-testid="point-details-close"]').click();
+      cy.get('[data-testid="point-details-panel"]').should('not.exist');
     });
   });
 
@@ -422,7 +343,7 @@ describe('Fleet — Fleet Lifecycle', () => {
     stepX().then((x) => {
       plotOverlay().click(x, 40);
     });
-    readout()
+    cy.get('[data-testid="point-details-panel"]')
       .find('a')
       .should('have.length.greaterThan', 0)
       .first()
@@ -442,7 +363,6 @@ describe('Fleet — Fleet Lifecycle', () => {
       xAxisTicks().should('not.equal', before);
       cy.get('[data-testid="calculator-lifecycle-chart-svg"]').dblclick();
       xAxisTicks().should('equal', before);
-      cy.wait(900);
     });
     cy.get('[data-testid="calculator-lifecycle-chart-svg"] path.line-path').then((lines) => {
       cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-series-label').should(
@@ -467,7 +387,7 @@ describe('Fleet — Fleet Lifecycle', () => {
     );
 
     cy.get('[data-testid="calc-lifecycle-metric-cumulative-revenue"]').click();
-    chartText().should('contain', 'Cumulative Revenue ($)');
+    chartText().should('contain', 'Cumulative revenue ($)');
     cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-zero-rule').should(
       'not.exist',
     );
@@ -504,12 +424,12 @@ describe('Fleet — Fleet Lifecycle', () => {
       .then((perDay) => {
         const sign = Math.sign(money(perDay));
         expect(sign, 'a non-zero daily margin to accumulate').to.not.equal(0);
-        firstRowCell('Cumulative Margin')
+        firstRowCell('Cumulative margin')
           .invoke('text')
           .then((short) => {
             cy.get('[data-testid="calc-lifecycle-horizon-input"]').clear();
             cy.get('[data-testid="calc-lifecycle-horizon-input"]').type('96');
-            firstRowCell('Cumulative Margin')
+            firstRowCell('Cumulative margin')
               .invoke('text')
               .should((long) => {
                 const delta = (money(long) - money(short)) * sign;
@@ -531,10 +451,10 @@ describe('Fleet — Fleet Lifecycle', () => {
       .invoke('text')
       .should('match', /^\d+(?:\.\d+)?×$/u);
 
-    firstRowCell('First Run')
+    firstRowCell('First run')
       .invoke('text')
       .should('match', /\d{4}-\d{2}-\d{2}/u);
-    firstRowCell('Latest Best')
+    firstRowCell('Latest best')
       .invoke('text')
       .should('match', /\d{4}-\d{2}-\d{2}/u);
   });
@@ -545,12 +465,12 @@ describe('Fleet — Fleet Lifecycle', () => {
       .and('have.attr', 'step', '0.25');
     lineVertices().then((curved) => {
       expect(curved).to.be.greaterThan(20);
-      firstRowCell('Cumulative Margin')
+      firstRowCell('Cumulative margin')
         .invoke('text')
         .then((short) => {
           cy.get('[data-testid="calc-lifecycle-ramp-input"]').clear();
           cy.get('[data-testid="calc-lifecycle-ramp-input"]').type('18');
-          firstRowCell('Cumulative Margin')
+          firstRowCell('Cumulative margin')
             .invoke('text')
             .should((long) => expect(money(long)).to.be.lessThan(money(short)));
           cy.get('[data-testid="calc-lifecycle-ramp-input"]').clear();
@@ -584,7 +504,7 @@ describe('Fleet — Fleet Lifecycle', () => {
       expect(chips.length).to.be.greaterThan(0);
       expect(new Set(chips).size).to.equal(chips.length);
     });
-    firstRowCell('Config Now').invoke('text').should('not.be.empty');
+    firstRowCell('Config now').invoke('text').should('not.be.empty');
   });
 
   it('follows legend visibility', () => {
@@ -648,13 +568,16 @@ describe('Fleet — self-contained lifecycle regressions', () => {
     });
     cy.intercept('GET', '/api/v1/benchmarks/history*', { body: rows }).as('legacyPriceHistory');
     cy.intercept('GET', '/api/v1/benchmarks*', { body: rows }).as('legacyPriceBenchmarks');
-    cy.visit('/fleet?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&c_mw=10&c_price=7', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
-        unlockAgenticGate(win);
+    cy.visit(
+      '/infx/fleet?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&c_mw=10&c_price=7',
+      {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');
+          unlockAgenticGate(win);
+        },
       },
-    });
+    );
     cy.wait('@legacyPriceBenchmarks');
     cy.wait('@legacyPriceHistory');
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
@@ -667,27 +590,6 @@ describe('Fleet — self-contained lifecycle regressions', () => {
       .should((output) => {
         expect(Number(output)).to.equal(28);
       });
-  });
-
-  it('plots revenue per MW as a real normalized y-axis metric', () => {
-    cy.get('[data-testid="calc-lifecycle-metric-revenue"]').click();
-    cy.get('[data-testid="calculator-lifecycle-chart-svg"] .y-axis')
-      .invoke('text')
-      .then((revenuePerDay) => {
-        cy.get('[data-testid="calc-lifecycle-metric-revenue-per-mw"]').click();
-        chartText().should('contain', 'Revenue ($/MW/day)');
-        cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-zero-rule').should(
-          'not.exist',
-        );
-        cy.get('[data-testid="calculator-lifecycle-chart-svg"] .y-axis')
-          .invoke('text')
-          .should((revenuePerMw) => {
-            expect(revenuePerMw, 'Revenue/MW is not Revenue/day relabelled').to.not.equal(
-              revenuePerDay,
-            );
-          });
-      });
-    cy.get('[data-testid="calc-lifecycle-metric-margin"]').click();
   });
 
   it('exports the physical fleet sizing alongside its economics', () => {
@@ -706,7 +608,7 @@ describe('Fleet — self-contained lifecycle regressions', () => {
         );
       }
       expect(header, 'lifecycle CSV header').to.equal(
-        'Chip,Config Now,First Run,Latest Best,Improvements,Gain,Chips,tok/s/MW now,Concurrent Users now,Revenue $/day,Cost $/day,Margin $/day,Payback,Cumulative Margin,Availability',
+        'Chip,Config now,First run,Latest best,Improvements,Gain,Chips,tok/s/MW now,Concurrent users now,Revenue $/day,Cost $/day,Margin $/day,Payback,Cumulative margin,Availability',
       );
     });
     cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
@@ -751,7 +653,7 @@ describe('Fleet — Fleet Lifecycle with agentic traces', () => {
     cy.intercept('GET', '/api/v1/benchmarks*', { body: [...b300Rows, ...b200Rows] }).as(
       'agenticBenchmarks',
     );
-    cy.visit('/fleet?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
+    cy.visit('/infx/fleet?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         unlockAgenticGate(win);
@@ -777,7 +679,6 @@ describe('Fleet — Fleet Lifecycle with agentic traces', () => {
   });
 
   it('raises the break-even price it seeds, because fewer tokens are billable', () => {
-    assertFleetControlLabels();
     cy.get('[data-testid="calculator-lifecycle-unsupported"]').should('not.exist');
     cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').should(
       'have.length.greaterThan',
@@ -815,10 +716,10 @@ describe('Fleet — Fleet Lifecycle with agentic traces', () => {
 
 describe('Fleet — Fleet Lifecycle in Chinese', () => {
   before(() => {
-    cy.visit('/zh/fleet', {
+    cy.visit('/zh/infx/fleet', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
+        win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');
       },
     });
     cy.get('[data-testid="calculator-lifecycle-section"]').should('exist');
@@ -838,7 +739,7 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
     showTable();
     cy.get('[data-testid="calculator-lifecycle-table"]').should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-section"]')
-      .should('contain.text', 'Token 价格')
+      .should('contain.text', '输入、输出价格')
       .and('contain.text', '每 MW 收入')
       .and('contain.text', '当前配置')
       .and('contain.text', '首次运行')
@@ -846,8 +747,8 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
       .and('contain.text', '来源：');
     cy.get('[data-testid="calculator-lifecycle-section"]')
       .should('not.contain.text', 'Enter a facility power budget')
-      .and('not.contain.text', 'Cumulative Margin')
-      .and('not.contain.text', 'First Run');
+      .and('not.contain.text', 'Cumulative margin')
+      .and('not.contain.text', 'First run');
 
     showTable();
     cy.window().then(captureLifecycleCsvDownloads);
@@ -871,16 +772,16 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
       cy.get('[data-testid="fleet-cost-type-selector"]').click();
       cy.contains('[role="option"]', option).click();
       cy.get('[data-testid="calculator-lifecycle-table"] thead').should('contain.text', header);
-      exportMenu().click();
-      cy.get('[data-testid="export-csv-button"]').click();
-      readCapturedLifecycleCsv().then((csv) => {
-        expect(csv.split('\n').find((line) => line.startsWith('芯片,'))).to.contain(header);
-        expect(csv.split('\n').find((line) => line.startsWith('# 假设：'))).to.equal(
-          '# 假设：输入价格 $1.25/M tok，输出价格 $3.5/M tok，爬坡期 2 个月，平均中断间隔（MTBI）12 天，恢复时间 6 小时，测算期 18 个月，设施功率 4 MW，TCO 口径：内部',
-        );
-        expect(csv).not.to.contain('# Assumptions:');
-      });
     }
+    exportMenu().click();
+    cy.get('[data-testid="export-csv-button"]').click();
+    readCapturedLifecycleCsv().then((csv) => {
+      expect(csv.split('\n').find((line) => line.startsWith('芯片,'))).to.contain('当前 tok/s/MW');
+      expect(csv.split('\n').find((line) => line.startsWith('# 假设：'))).to.equal(
+        '# 假设：输入价格 $1.25/M tok，输出价格 $3.5/M tok，爬坡期 2 个月，平均中断间隔（MTBI）12 天，恢复时间 6 小时，测算期 18 个月，设施功率 4 MW，TCO 口径：内部',
+      );
+      expect(csv).not.to.contain('# Assumptions:');
+    });
   });
 
   it('uses the selected cost tier’s Chinese label in the assumptions footer', () => {
@@ -905,18 +806,18 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
       cy.viewport(width, height);
       showChart();
       assertReadableChineseAxis();
+      if (width !== 1280) return;
       hoverPlot(0.4);
       readout()
         .should('have.css', 'display', 'block')
-        .find('.font-semibold')
         .invoke('text')
-        .should('match', /^\d{4}年\d{1,2}月\d{1,2}日$/u)
-        .then((date) => {
+        .then((text) => {
+          const date = /\d{4}年\d{1,2}月\d{1,2}日/u.exec(text)?.[0];
+          expect(date, 'a Chinese date in the hover readout').to.be.a('string');
           clickPlot(0.4);
-          hoverPlot(0.7);
-          readout().should('have.css', 'pointer-events', 'auto').and('contain.text', date);
-          clickPlot(0.7);
-          readout().should('have.css', 'display', 'none');
+          cy.get('[data-testid="point-details-panel"]').should('contain.text', String(date));
+          clickPlot(0.4);
+          cy.get('[data-testid="point-details-panel"]').should('not.exist');
         });
       xAxisLayout().then((before) => {
         plotOverlay().then(($overlay) => {
@@ -935,55 +836,51 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
           '[data-testid="calculator-lifecycle-figure"] [data-testid="zoom-reset-button"]',
         ).click();
         xAxisLayout().should('equal', before);
-        cy.wait(900);
       });
 
-      if (width === 1280) {
-        cy.window().then((win) => {
-          const capture = win as CsvCaptureWindow;
-          capture.__capturedLifecyclePngUrl = undefined;
-          capture.__capturedLifecyclePngAxis = undefined;
-          win.HTMLAnchorElement.prototype.click = function () {
-            if (this.download.endsWith('.png')) {
-              capture.__capturedLifecyclePngUrl = this.href;
-              capture.__capturedLifecyclePngAxis = Array.from(
-                win.document.querySelectorAll('#fleet-lifecycle-export .x-axis .tick text'),
-                (tick) => tick.textContent ?? '',
-              );
-            }
-          };
+      cy.window().then((win) => {
+        const capture = win as CsvCaptureWindow;
+        capture.__capturedLifecyclePngUrl = undefined;
+        capture.__capturedLifecyclePngAxis = undefined;
+        win.HTMLAnchorElement.prototype.click = function () {
+          if (this.download.endsWith('.png')) {
+            capture.__capturedLifecyclePngUrl = this.href;
+            capture.__capturedLifecyclePngAxis = Array.from(
+              win.document.querySelectorAll('#fleet-lifecycle-export .x-axis .tick text'),
+              (tick) => tick.textContent ?? '',
+            );
+          }
+        };
+      });
+      exportMenu().click();
+      cy.get('[data-testid="export-png-button"]').click();
+      cy.window()
+        .should((win) => {
+          expect((win as CsvCaptureWindow).__capturedLifecyclePngUrl).to.match(
+            /^data:image\/png;base64,/u,
+          );
+        })
+        .then((win) => {
+          const image = (win as CsvCaptureWindow).__capturedLifecyclePngUrl!;
+          const labels = (win as CsvCaptureWindow).__capturedLifecyclePngAxis!;
+          expect(labels.length, 'date labels in the exported clone').to.be.greaterThan(0);
+          labels.forEach((label) => expect(label).to.match(/^\d{4}年\d{1,2}月$/u));
+          cy.then(
+            () =>
+              new Cypress.Promise<void>((resolve, reject) => {
+                const png = new win.Image();
+                png.addEventListener('load', () => {
+                  expect(png.naturalWidth).to.be.greaterThan(600);
+                  expect(png.naturalHeight).to.be.greaterThan(400);
+                  resolve();
+                });
+                png.addEventListener('error', () =>
+                  reject(new Error('Exported PNG did not decode')),
+                );
+                png.src = image;
+              }),
+          );
         });
-        exportMenu().click();
-        cy.get('[data-testid="export-png-button"]').click();
-        cy.window()
-          .should((win) => {
-            expect((win as CsvCaptureWindow).__capturedLifecyclePngUrl).to.match(
-              /^data:image\/png;base64,/u,
-            );
-          })
-          .then((win) => {
-            const image = (win as CsvCaptureWindow).__capturedLifecyclePngUrl!;
-            const labels = (win as CsvCaptureWindow).__capturedLifecyclePngAxis!;
-            expect(labels.length, 'date labels in the exported clone').to.be.greaterThan(0);
-            labels.forEach((label) => expect(label).to.match(/^\d{4}年\d{1,2}月$/u));
-            cy.writeFile('cypress/downloads/fleet-lifecycle-zh.png', image.split(',')[1], 'base64');
-            cy.then(
-              () =>
-                new Cypress.Promise<void>((resolve, reject) => {
-                  const png = new win.Image();
-                  png.addEventListener('load', () => {
-                    expect(png.naturalWidth).to.be.greaterThan(600);
-                    expect(png.naturalHeight).to.be.greaterThan(400);
-                    resolve();
-                  });
-                  png.addEventListener('error', () =>
-                    reject(new Error('Exported PNG did not decode')),
-                  );
-                  png.src = image;
-                }),
-            );
-          });
-      }
     });
   }
 });

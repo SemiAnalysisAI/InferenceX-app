@@ -1,11 +1,19 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
+import {
+  CompareCatalogLink,
+  CompareCatalogLinks,
+  CompareModelSection,
+  ComparePairGrid,
+} from '@/components/compare/compare-catalog';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
+import { ModelLogo } from '@/components/ui/model-logo';
+import { type Model } from '@/lib/catalog/data-mappings';
 import { PUBLIC_COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
 import { formatModelListZh } from '@/lib/compare/compare-ssr-zh';
 import { zhAlternates } from '@/lib/i18n/i18n';
@@ -58,32 +66,18 @@ export default async function ComparePrecisionIndexPageZh() {
       <JsonLd data={jsonLd} />
       <section>
         <Card>
-          <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">芯片精度对比</h1>
-          <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
+          <Heading as="h1" level="page">
+            芯片精度对比
+          </Heading>
+          <p className="mt-4 max-w-3xl text-base text-muted-foreground">
             共 {totalUrls.toLocaleString()} 组精度对比，涵盖 {formatModelListZh(modelsWithPairs)}
             。查看 FP4、FP8、BF16、INT4
             等精度格式如何影响同一芯片的吞吐量、成本和交互性；每个页面均展示推理图表和插值对比表。
           </p>
-          <div className="mt-6 flex flex-wrap gap-3" data-testid="compare-precision-index-links">
-            <Link
-              href="/zh/compare"
-              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
-            >
-              芯片对比
-              <span aria-hidden="true" className="text-lg lg:text-xl">
-                →
-              </span>
-            </Link>
-            <Link
-              href="/zh/compare-per-dollar"
-              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
-            >
-              每美元性能
-              <span aria-hidden="true" className="text-lg lg:text-xl">
-                →
-              </span>
-            </Link>
-          </div>
+          <CompareCatalogLinks testId="compare-precision-index-links">
+            <CompareCatalogLink href="/zh/compare">芯片对比</CompareCatalogLink>
+            <CompareCatalogLink href="/zh/compare-per-dollar">每美元性能</CompareCatalogLink>
+          </CompareCatalogLinks>
         </Card>
       </section>
 
@@ -100,45 +94,39 @@ export default async function ComparePrecisionIndexPageZh() {
         }
 
         return (
-          <section key={model.slug} id={model.slug}>
-            <Card className="flex flex-col gap-4">
-              <div>
-                <h2 className="text-xl lg:text-2xl font-bold tracking-tight">{model.label}</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  在 {model.label} 上共有 {pairs.length} 组精度对比，均有基准测试数据。
-                </p>
-              </div>
-              {[...gpuGroups.entries()].map(([gpu, gpuPairs]) => {
+          <CompareModelSection
+            key={model.slug}
+            id={model.slug}
+            title={
+              <>
+                <ModelLogo model={model.displayName as Model} className="size-6" />
+                {model.label}
+              </>
+            }
+            summary={`在 ${model.label} 上共有 ${pairs.length} 组精度对比，均有基准测试数据`}
+          >
+            <ComparePairGrid>
+              {[...gpuGroups.entries()].flatMap(([gpu, gpuPairs]) => {
                 const meta = HW_REGISTRY[gpu];
                 const gpuLabel = meta?.label ?? gpu.toUpperCase();
                 const archLine = `${meta?.vendor ?? ''} · ${meta?.arch ?? ''}`;
-                return (
-                  <div key={`${model.slug}__${gpu}`} className="flex flex-col gap-3">
-                    <div>
-                      <h3 className="text-base font-semibold">{gpuLabel}</h3>
-                      <p className="text-xs text-muted-foreground mt-1">{archLine}</p>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {gpuPairs.map(({ gpu: g, precA, precB }) => {
-                        const slug = canonicalPrecisionCompareSlug(model.slug, g, precA, precB);
-                        const label = `${gpuLabel} — ${precisionDisplayLabel(precA)} 与 ${precisionDisplayLabel(precB)}`;
-                        return (
-                          <ComparePairCardLink
-                            key={slug}
-                            href={`/zh/compare-precision/${slug}`}
-                            slug={slug}
-                            label={label}
-                            archLine={archLine}
-                            locale="zh"
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
+                return gpuPairs.map(({ gpu: g, precA, precB }) => {
+                  const slug = canonicalPrecisionCompareSlug(model.slug, g, precA, precB);
+                  const label = `${gpuLabel} — ${precisionDisplayLabel(precA)} 与 ${precisionDisplayLabel(precB)}`;
+                  return (
+                    <ComparePairCardLink
+                      key={slug}
+                      href={`/zh/compare-precision/${slug}`}
+                      slug={slug}
+                      label={label}
+                      archLine={archLine}
+                      locale="zh"
+                    />
+                  );
+                });
               })}
-            </Card>
-          </section>
+            </ComparePairGrid>
+          </CompareModelSection>
         );
       })}
     </>

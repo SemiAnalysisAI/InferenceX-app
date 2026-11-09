@@ -46,7 +46,7 @@ AgentX 头几个月产出的最有价值的东西，并不是首批测试结果�
   caption="来源：SemiAnalysis"
 />
 
-开源是 InferenceX 的核心原则，因此我们开放的部分比多数把“开源”挂在嘴边的项目都要多：开放的前端、通过易用 REST API 提供服务的公开数据库（**已有多家一线 AI 实验室的容量规划团队在使用**）、公开的 GitHub Actions CI 溯源信息、[运行日志](https://inferencex.semianalysis.com/inference/agentic/440193?i_seq=agentic-traces&i_xmode=interactivity&view=logs)，以及每一个数据点的精度验证。关键在于，我们的测试配置主要跟随 [recipes.vllm.ai](http://recipes.vllm.ai) 和 [SGLang cookbook](https://docs.sglang.io/cookbook/intro) 使用上游镜像，衡量的是客户实际能拿到的性能，而不是针对 benchmark 特调过的镜像。
+开源是 InferenceX 的核心原则，因此我们开放的部分比多数把“开源”挂在嘴边的项目都要多：开放的前端、通过易用 REST API 提供服务的公开数据库（**已有多家一线 AI 实验室的容量规划团队在使用**）、公开的 GitHub Actions CI 溯源信息、[运行日志](https://inferencex.semianalysis.com/infx/inference/agentic/440193?i_seq=agentic-traces&i_xmode=interactivity&view=logs)，以及每一个数据点的精度验证。关键在于，我们的测试配置主要跟随 [recipes.vllm.ai](http://recipes.vllm.ai) 和 [SGLang cookbook](https://docs.sglang.io/cookbook/intro) 使用上游镜像，衡量的是客户实际能拿到的性能，而不是针对 benchmark 特调过的镜像。
 
 三到四周后，我们会发布一篇 AgentX 更新文章，涵盖针对 agentic 工作负载的进一步优化，以及 AMD 和 NVIDIA 的最新性能结果。需要理解的是，agentic 工作负载的画像变化很快，InferenceX 会持续快速跟进，测试真正有代表性的工作负载。
 
@@ -114,7 +114,7 @@ DeepSeek V4 Pro 0813 是一款来自中国、极受欢迎的前沿开放权重�
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/b5aee8b4-d11a-48d8-823c-1ca53412e689_2048x1253.png"
-  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&i_seq=agentic-traces&g_runid=32433563482&i_xmode=interactivity&i_label=0&i_e2e_xmetric=)"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-08-21&i_seq=agentic-traces&g_runid=32433563482&i_xmode=interactivity&i_label=0&i_e2e_xmetric=)"
 />
 
 总体而言，**同时关注每用户每秒 token 数**（TPS，也就是交互性）**和 TTFT 很重要，因为这两者往往此消彼长**。例如上图中，某些 SKU 在还算不错的交互性下拿到了很高的吞吐量，但 TTFT 严重恶化。多高的 p90 TTFT 算“可接受”，很大程度上取决于应用场景。对多数服务 agentic 工作负载的生产系统而言，p90 TTFT 通常在 200–5,000ms 之间。超过 5–10s 就已经在“在线推理”的边界上了。曲线上超高吞吐的那一段仍有实际用途——在延迟不重要、追求系统利用率峰值的场景里（批处理、*超*长时间运行的 agent 等）。
@@ -134,7 +134,7 @@ AMD 的分布式推理（DI）团队在过去半年里于 8k1k 场景上取得�
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/6254047b-173b-4b1b-9f43-2057eb720b05_2048x1200.png"
-  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=mi355x_atom%2Cmi355x_mori-sglang&i_vendor=AMD&i_linelabel=0&i_metric=y_tpPerGpu)"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=mi355x_atom%2Cmi355x_mori-sglang&i_vendor=AMD&i_linelabel=0&i_metric=y_tpPerGpu)"
 />
 
 在端到端延迟上，ATOM MI355X 胜过 B200 vLLM（但并未胜过 B300 或 B200 SGLang）。问题在于，除了阿里巴巴内部一个小型广告业务部门之外，中国和西方的多数 AI 实验室都不愿在生产中使用 ATOM——它缺失的功能太多。阿里巴巴主力的 Qwen 大模型团队在生产中并不使用 ATOM。
@@ -180,14 +180,14 @@ AMD 的分布式推理（DI）团队在过去半年里于 8k1k 场景上取得�
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/512c6225-5816-493e-839d-e4f539e5b1c4_2048x1215.png"
-  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_metric=y_tpPerGpu&i_xmode=interactivity&i_linelabel=0&i_best=0&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-trt)"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_metric=y_tpPerGpu&i_xmode=interactivity&i_linelabel=0&i_best=0&i_active=gb200_dynamo-vllm%2Cgb300_dynamo-trt)"
 />
 
 按 TCO 归一化后，B300 vLLM 与 B200 vLLM 的聚合式性能相当接近，主要差别在于 B300 凭借比 B200 多 50% 的 HBM 容量，能“挤”出额外的吞吐量。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/939b9197-321d-4869-ba13-f0b800343b7b_2048x1300.png"
-  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=b200_vllm%2Cb300_vllm)"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=b200_vllm%2Cb300_vllm)"
 />
 
 我们可以用 AgentX 新增的服务端指标可视化进一步观察这个差异。
@@ -198,7 +198,7 @@ AMD 的分布式推理（DI）团队在过去半年里于 8k1k 场景上取得�
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/f86888c4-c1a7-47b0-a580-d1a74876cb9c_2048x898.png"
-  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference/agentic/439522)"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/infx/inference/agentic/439522)"
 />
 
 在 B200、并发 196（其余参数不变）的情况下，HBM 缓存命中率只有 73%，需要更多依赖 DRAM，offload 缓存命中率接近 20%。此时 HBM KV cache 工作集规模为 2200 万 token，大约是 B300 的一半。
@@ -209,21 +209,21 @@ DRAM KV offload 通常实现为写穿（write-through）缓存，也就是写入
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/70a7a7c7-7918-459c-a4e0-f7fc1edca816_2048x887.png"
-  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference/agentic/439967)"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/infx/inference/agentic/439967)"
 />
 
 H200 SGLang FP8 能在低并发下服务 DeepSeek v4，从每美元性能看甚至可以和 B200/MI355X SGLang 一较高下。但受限于 HBM 容量，它在高吞吐场景下无法与更新的 SKU 竞争。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/770b205f-12a1-4d34-81a7-fb235742d005_2048x1305.png"
-  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=b200_sglang%2Ch200_dynamo-sglang%2Cmi355x_sglang)"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_active=b200_sglang%2Ch200_dynamo-sglang%2Cmi355x_sglang)"
 />
 
 此外，随着用户数增加，高并发下对 DRAM KV offload 的依赖会带来无法接受的延迟。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/91dfd9ca-d13d-43e9-a57e-3be0fcc4a5cf_2048x1315.png"
-  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=h200_dynamo-sglang&i_optimal=0)"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=h200_dynamo-sglang&i_optimal=0)"
 />
 
 总体来看，MI355X 相对主要竞争对手 B200 和 B300 表现尚可。在曲线上低吞吐 / 低延迟那一段两者最为接近，因为那里只用到张量并行和较为基础的 kernel。AMD 需要优化 MI355X 上的 DEP kernel，才能在高吞吐场景下更有竞争力——尤其是它的 HBM 还是 B200 的 1.5 倍。
@@ -232,7 +232,7 @@ H200 SGLang FP8 能在低并发下服务 DeepSeek v4，从每美元性能看甚�
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/29cfd340-d61b-46c4-8d87-e081d937b80c_2048x1303.png"
-  caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=b200_vllm%2Cb300_vllm%2Cmi355x_atom%2Cmi355x_vllm&i_label=0)"
+  caption="来源：[InferenceX](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-08-21&g_runid=32433563482&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=b200_vllm%2Cb300_vllm%2Cmi355x_atom%2Cmi355x_vllm&i_label=0)"
 />
 
 ## Kimi K3：2.8 万亿参数
@@ -277,7 +277,7 @@ Hopper 很难承接 Kimi K3 的 AgentX 工作负载：一方面 Kimi 模型体�
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/5179bd8e-c147-46c8-aeb4-b347049b28a7_2048x1303.png"
-  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=ttft)"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=ttft)"
 />
 
 B300 TRT-LLM TP2 拿下了 M3 的桂冠。曲线上缺少 DP-attention 的数据点，因为在 M3 上这种做法并不划算——KV cache 局部性会变成路由约束，后文会进一步说明。以并发 40 的 GB200 为例，TP4/EP4/DPA 的吞吐量只有纯 TP4 的 0.60 倍，而 p90 TTFT 高出 3 倍以上。并发 32 时缓存命中率仅 28.8%，理论值则是 96.0%。每个 DP rank 独占缓存池的四分之一，一个 30 万 token 的会话一旦落到错误的 rank 上，就要全部重算。M3 的前沿曲线上没有出现任何带 EP 的 decode 配置，可能是因为并发还不足以让所有专家的负载均衡起来。
@@ -292,7 +292,7 @@ B300 TRT-LLM TP2 拿下了 M3 的桂冠。曲线上缺少 DP-attention 的数据
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/2b40624a-223c-44db-a403-0be563b2af82_2048x1298.png"
-  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_hc=1&i_active=mi355x_vllm)"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=interactivity&i_best=0&i_hc=1&i_active=mi355x_vllm)"
 />
 
 NVIDIA 所有 Pareto 最优点在并发 20 以上都启用了 KV offload，而 AMD 的 Pareto 最优点没有一个使用 DRAM KV offload。在其他模型上，AMD 使用 KV offload 的比例也低于 NVIDIA。原因是 AMD vLLM 上 CPU KVCache offload 所需的 GPU 到 CPU 传输效率极低：`hipMemcpyBatchAsync` API 直到 ROCm 7.14 才提供。没有它，vLLM 原生的 Simple CPUOffloading 只能做串行 memcpy，无法把多次拷贝合并成更大的消息。
@@ -303,14 +303,14 @@ NVIDIA 所有 Pareto 最优点在并发 20 以上都启用了 KV offload，而 A
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/729199d9-66c0-42b5-b1b8-f228503c1585_2048x1289.png"
-  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=b200_trt%2Cb200_vllm%2Cb300_trt%2Cb300_vllm&i_hc=1&i_label=0)"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference?g_model=MiniMax-M3&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_active=b200_trt%2Cb200_vllm%2Cb300_trt%2Cb300_vllm&i_hc=1&i_label=0)"
 />
 
 ## Qwen3.5 397B
 
 Qwen3.5 397B 每隔几层就用 GatedDeltaNet 替代常规注意力。GatedDeltaNet 由 MIT / NVIDIA Research 提出，其状态存储需求在理论上是常数，而常规注意力是线性增长的，因此相比同等规模的稠密注意力模型，它的存储需求更低。与 Nemotron 那样惨败的端到端模型训练研究不同，NVIDIA Research 在 GDN、LatentMoE 这类被前沿模型采用的基础研究上做得非常出色。
 
-注意，该模型原生最大上下文长度为 262k token，因此我们使用[截断后的数据集](https://inferencex.semianalysis.com/agentx/cc-traces-weka-062126-256k)。这模拟的是在上下文上限较小的模型上频繁触顶、频繁压缩上下文的工作负载，也就是用户实际使用这类模型的方式。
+注意，该模型原生最大上下文长度为 262k token，因此我们使用[截断后的数据集](https://inferencex.semianalysis.com/infx/agentx/cc-traces-weka-062126-256k)。这模拟的是在上下文上限较小的模型上频繁触顶、频繁压缩上下文的工作负载，也就是用户实际使用这类模型的方式。
 
 在 SGLang 对 SGLang 的对比中，Qwen3.5 397B 是 NVIDIA 的强势领地：90 tok/s/user 时性能领先 20 倍以上。在 Qwen3.5 SGLang 上，AMD 目前完全没有竞争力。
 
@@ -318,7 +318,7 @@ Qwen3.5 397B 每隔几层就用 GatedDeltaNet 替代常规注意力。GatedDelta
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/519a7cd0-ac51-4a5c-9c45-ba7c41f6d058_2048x1300.png"
-  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_hc=1)"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_hc=1)"
 />
 
 我们再次看到 NVIDIA 以牺牲 TTFT 为代价过度优化交互性，TRT-LLM 尤其明显。上图中所有 NVIDIA SGLang 提交的 p90 TTFT 都远低于 TRT-LLM。
@@ -327,7 +327,7 @@ Qwen3.5 397B 每隔几层就用 GatedDeltaNet 替代常规注意力。GatedDelta
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/cc2cf6c7-aa58-4a76-a0a2-ee0457d9243c_2048x1298.png"
-  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=interactivity&i_hc=1&i_best=0&i_prec=fp4%2Cfp8&i_active=b300_sglang%2Ch100_sglang%2Ch200_sglang)"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=interactivity&i_hc=1&i_best=0&i_prec=fp4%2Cfp8&i_active=b300_sglang%2Ch100_sglang%2Ch200_sglang)"
 />
 
 ## GLM 5.3
@@ -342,7 +342,7 @@ GLM 5.3 在 GLM5.2 744B 基础上做了额外的后训练，是一款前沿级�
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/4a21d140-b588-4b33-941d-7c8090ac42b5_2048x1286.png"
-  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_model=GLM-5.2&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_prec=fp4&i_active=b200_sglang%2Cb300_sglang%2Cgb200_dynamo-sglang%2Cgb300_dynamo-trt%2Cmi355x_atom%2Cmi355x_sglang)"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference?g_model=GLM-5.2&i_seq=agentic-traces&i_xmode=ttft&i_best=0&i_prec=fp4&i_active=b200_sglang%2Cb300_sglang%2Cgb200_dynamo-sglang%2Cgb300_dynamo-trt%2Cmi355x_atom%2Cmi355x_sglang)"
 />
 
 看 ATOM 的话，在 p90 E2E 归一化交互性的部分区间内，AMD 的每美元性能优于 GB300 NVL72 SGLang，甚至优于 TRTLLM。这一结果值得肯定，也再次期待 AMD 把这些优化移植到 SGLang。同时我们也期待 NVIDIA 在接下来几周里尽快优化 GB300 NVL72。
@@ -838,12 +838,12 @@ AIPerf 还能识别“辅助（auxiliary）”请求，即与流中其他请求�
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/058757ed-531f-4cfb-a1ad-a06b1499ecbd_1360x612.png"
-  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference/agentic/439239)"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference/agentic/439239)"
 />
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/43184e50-b71a-4a48-a569-98d6906cb259_2048x1167.png"
-  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference?g_rundate=2026-08-13&g_runid=31723588108&i_seq=agentic-traces&i_xmode=interactivity&g_model=MiniMax-M3&i_best=0&i_active=b200_vllm)"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-08-13&g_runid=31723588108&i_seq=agentic-traces&i_xmode=interactivity&g_model=MiniMax-M3&i_best=0&i_active=b200_vllm)"
 />
 
 最后值得讨论的是：评估 agentic 工作负载时应该看哪些指标。我们认为交互性（TPS，每秒 token 数）和首 token 延迟（TTFT）依然重要，它们也是评估 SLO 的行业标准。查看 AgentX 结果时，*必须*把 TPS 和 TTFT 放在一起看，因为有些推理优化会以牺牲一者为代价改善另一者。
@@ -895,11 +895,11 @@ warmup 结束后开始性能采集，持续一小时，所有指标都严格在�
 
 ## agentic 工作负载详细遥测数据探索教程
 
-AgentX 需要的不只是新的基准测试 harness 和数据集。[我们还花了一些时间重建 InferenceX 可视化的部分模块，让 agentic 结果更易于探索和理解。](https://inferencex.semianalysis.com/inference/agentic/439903)一个 AgentX 数据点代表着数千条请求，跨越不断增长的对话、子智能体、warmup 阶段、缓存状态和动态变化的在途负载。因此，Pareto 曲线上的单个点会掩盖大量有用信息。正如我们反复强调的：推理服务从来没有一刀切的方案。
+AgentX 需要的不只是新的基准测试 harness 和数据集。[我们还花了一些时间重建 InferenceX 可视化的部分模块，让 agentic 结果更易于探索和理解。](https://inferencex.semianalysis.com/infx/inference/agentic/439903)一个 AgentX 数据点代表着数千条请求，跨越不断增长的对话、子智能体、warmup 阶段、缓存状态和动态变化的在途负载。因此，Pareto 曲线上的单个点会掩盖大量有用信息。正如我们反复强调的：推理服务从来没有一刀切的方案。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/46159be7-8b5b-49d7-990f-2ce1cf1217d0_1110x687.png"
-  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/inference/agentic/439903)"
+  caption="来源：[SemiAnalysis InferenceX](https://inferencex.semianalysis.com/infx/inference/agentic/439903)"
 />
 
 其中一项重要改动是曲线本身的构建方式。在之前版本的 InferenceX 中，启用和未启用投机解码的配置常常被画成两条独立曲线；现在我们不再这样做。前端会合并允许启用的推理优化，为每个模型、SKU 和推理引擎组合展示可获得的最佳曲线。因此，同一条曲线上的不同点可能使用了不同的优化技术和配置，包括投机解码、分离式服务或 KV cache offload。

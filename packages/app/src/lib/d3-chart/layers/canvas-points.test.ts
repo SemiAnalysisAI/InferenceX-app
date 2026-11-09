@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import * as d3 from 'd3';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PointHitGrid, hitAreaPath } from './canvas-point-hit';
 import { joinedDrawOrder } from './canvas-point-order';
@@ -15,6 +15,17 @@ import {
   key,
   mountLayer,
 } from './canvas-points-test-utils';
+
+// Layers schedule a draw on every change. A real jsdom frame from one test can fire in the next
+// after Path2D is unstubbed, so every test queues frames by hand.
+beforeEach(() => {
+  installFrames();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 function seeded(seed: number) {
   let state = seed;
@@ -297,7 +308,6 @@ describe('CanvasPointLayer', () => {
     frames.run(1300);
     expect(drawnX()).toEqual([15]);
     expect(frames.pending()).toBe(false);
-    vi.unstubAllGlobals();
     svg.remove();
   });
 
@@ -325,7 +335,7 @@ describe('CanvasPointLayer', () => {
     });
     frames.run(0);
     const alphas = calls.filter((call) => call[0] === 'set:globalAlpha').map((call) => call[1]);
-    expect(alphas).toEqual([0.5, 0.45, 0.1, 1]);
+    expect(alphas).toEqual([0.45, 0.5, 0.1, 1]);
     expect(calls.filter((call) => call[0] === 'set:strokeStyle')).toEqual([
       ['set:strokeStyle', 'green'],
     ]);
@@ -337,7 +347,6 @@ describe('CanvasPointLayer', () => {
       'red',
       'blue',
     ]);
-    vi.unstubAllGlobals();
     svg.remove();
   });
 
@@ -361,7 +370,6 @@ describe('CanvasPointLayer', () => {
     expect(alphas).toHaveLength(1);
     expect(alphas[0]).toBeCloseTo(1 - cssEase(0.5), 6);
     expect(frames.pending()).toBe(false);
-    vi.unstubAllGlobals();
     svg.remove();
   });
 });

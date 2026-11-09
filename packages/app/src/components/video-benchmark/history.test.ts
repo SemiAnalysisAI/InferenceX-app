@@ -98,7 +98,8 @@ describe('video history projection', () => {
     ]);
   });
   it('carries GPU counts, wall time, clip shape, board power and server layout per cell', () => {
-    const entry = videoHistoryEntry(saved(), null);
+    const artifact = saved();
+    const entry = videoHistoryEntry(artifact, null);
     const c1 = entry.sources[0].observations[0];
     expect(c1).toMatchObject({
       participating: 2,
@@ -112,6 +113,12 @@ describe('video history projection', () => {
       enforcedLimitW: null,
       server: { tp: 1, ulysses: 2, attention: null },
     });
+    expect(c1.videoSecondsPerHour).toBeCloseTo(133.75, 10);
+    const run = new Map(artifact.sources[0].documents).get('gpu/c1/baseline/run.json');
+    Object.assign(at(run, 'records', 1, 'media', 'video')!, { duration_seconds: null });
+    expect(
+      videoHistoryEntry(artifact, null).sources[0].observations[0].videoSecondsPerHour,
+    ).toBeNull();
   });
   it('preserves failed cells and null power without inventing zero-valued performance', () => {
     const artifact = saved();

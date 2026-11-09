@@ -17,7 +17,7 @@ import {
 } from './video-storage';
 
 /** Bump when projected entries can change, so snapshots written by older code are ignored. */
-export const VIDEO_HISTORY_PROJECTION = 1;
+export const VIDEO_HISTORY_PROJECTION = 2;
 const BUILD_BATCH = 8;
 const HISTORY = `${PREFIX}/runs/history/`;
 const SNAPSHOTS = `${HISTORY}v${VIDEO_HISTORY_PROJECTION}/`;
@@ -87,6 +87,12 @@ async function historyState() {
   return { indexes, receipts, snapshots, latest };
 }
 
+/** Every stored artifact index, newest first. */
+export async function storedIndexes(): Promise<StoredIndex[]> {
+  const { indexes } = await historyState();
+  return indexes;
+}
+
 async function readRecords(latest: ListBlobResultBlob | undefined) {
   if (!latest) return new Map<string, HistoryRecord>();
   const response = await fetch(latest.url, { signal: AbortSignal.timeout(30000) });
@@ -107,47 +113,74 @@ function current(
   );
 }
 
+/** `complete` is false when the index or its approval receipt could not be read. */
 async function projectIndex({
   runId,
   artifact,
   publishedAt,
-}: StoredIndex): Promise<VideoHistoryEntry> {
+}: StoredIndex): Promise<{ entry: VideoHistoryEntry; complete: boolean }> {
   try {
     const saved = await readStoredArtifact(runId, artifact);
     if (!saved) throw new Error('Published artifact unavailable');
+    let complete = true;
     const approved = await readVideoPublication(runId, artifact, saved)
       .then((receipt) => receipt !== null)
-      .catch(() => false);
-    return { ...videoHistoryEntry(saved, publishedAt), approved };
+      .catch(() => {
+        complete = false;
+        return false;
+      });
+    return { entry: { ...videoHistoryEntry(saved, publishedAt), approved }, complete };
   } catch (error) {
     return {
-      id: `${runId}.${artifact.id}`,
-      runId,
-      publishedAt,
-      artifact,
-      approved: false,
-      sources: [],
-      error: error instanceof Error ? error.message : String(error),
+      entry: {
+        id: `${runId}.${artifact.id}`,
+        runId,
+        publishedAt,
+        artifact,
+        approved: false,
+        sources: [],
+        error: error instanceof Error ? error.message : String(error),
+      },
+      complete: false,
     };
   }
+}
+
+export interface PublishedVideoHistory {
+  page: VideoHistoryPage;
+  /** False when storage is off or an index or approval read failed, so the read must not be retained. */
+  complete: boolean;
 }
 
 /**
  * Read `pages` History pages from `page` with one index listing and one snapshot read. Indexes the
  * snapshot does not cover are projected from their stored artifact. This path never writes.
  */
-export async function publishedVideoHistory(page: number, pages = 1): Promise<VideoHistoryPage> {
-  if (!videoStorageEnabled()) return { schemaVersion: 1, entries: [], nextPage: null };
+export async function publishedVideoHistory(
+  page: number,
+  pages = 1,
+): Promise<PublishedVideoHistory> {
+  if (!videoStorageEnabled())
+    return { page: { schemaVersion: 1, entries: [], nextPage: null }, complete: false };
   const { indexes, receipts, latest } = await historyState();
   const records = await readRecords(latest).catch(() => new Map<string, HistoryRecord>());
   const end = (page - 1 + pages) * VIDEO_HISTORY_PAGE_SIZE;
-  const entries = await Promise.all(
+  const projected = await Promise.all(
     indexes.slice((page - 1) * VIDEO_HISTORY_PAGE_SIZE, end).map((index) => {
       const record = records.get(index.pathname);
-      return current(record, index, receipts) ? record.entry : projectIndex(index);
+      return current(record, index, receipts)
+        ? { entry: record.entry, complete: true }
+        : projectIndex(index);
     }),
   );
-  return { schemaVersion: 1, entries, nextPage: end < indexes.length ? page + pages : null };
+  return {
+    page: {
+      schemaVersion: 1,
+      entries: projected.map(({ entry }) => entry),
+      nextPage: end < indexes.length ? page + pages : null,
+    },
+    complete: projected.every(({ complete }) => complete),
+  };
 }
 
 /**

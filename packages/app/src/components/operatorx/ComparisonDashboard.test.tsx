@@ -23,7 +23,7 @@ const state = vi.hoisted(() => ({
   loading: false,
 }));
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/operatorx' }));
+vi.mock('next/navigation', () => ({ usePathname: () => '/opx' }));
 vi.mock('@/hooks/api/use-operatorx', () => ({
   useOperatorXComparison: (_op: string, workload: string | null) => ({
     data: state.loading ? undefined : state.views.get(workload),
@@ -45,7 +45,7 @@ vi.mock('./viz', () => ({
   VISUALIZATIONS: [
     {
       id: 'probe',
-      title: 'Probe',
+      title: { en: 'Probe', zh: 'Probe' },
       ops: ['gemm'],
       Component: ({ model }) => {
         state.models.push(model);
@@ -146,7 +146,7 @@ beforeEach(() => {
   state.models = [];
   state.detail = null;
   state.loading = false;
-  window.history.replaceState(null, '', '/operatorx');
+  window.history.replaceState(null, '', '/opx');
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -198,6 +198,16 @@ describe('ComparisonDashboard live state', () => {
     expect(state.models.at(-1)!.hardware).toEqual([second]);
 
     act(() => state.models.at(-1)!.toggle(first));
+    expect(state.models.at(-1)!.hardware).toEqual([first, second]);
+  });
+
+  it('resets the legend filter to every GPU the charts show', () => {
+    const [first, second] = state.models.at(-1)!.available;
+
+    act(() => state.models.at(-1)!.toggle(first));
+    expect(state.models.at(-1)!.hardware).toEqual([second]);
+
+    act(() => state.models.at(-1)!.reset());
     expect(state.models.at(-1)!.hardware).toEqual([first, second]);
   });
 

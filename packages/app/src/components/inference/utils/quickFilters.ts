@@ -30,6 +30,7 @@ export const FRAMEWORK_FAMILIES = [
   { key: 'sglang', label: 'SGLang' },
   { key: 'trt', label: 'TRTLLM' },
   { key: 'atom', label: 'ATOM' },
+  { key: 'tokenspeed', label: 'TokenSpeed' },
 ] as const;
 
 const FRAMEWORK_FAMILY_ORDER = FRAMEWORK_FAMILIES.map((f) => f.key);

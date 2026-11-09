@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { NUDGE_SLOTS } from './inline-slot';
 import { isDismissed, markDismissed, markShown } from './persistence';
 
 import {
@@ -24,7 +25,7 @@ describe('NUDGE_REGISTRY integrity', () => {
 
   it('every entry has a valid type', () => {
     for (const nudge of NUDGE_REGISTRY) {
-      expect(['toast', 'modal', 'banner', 'coach-mark']).toContain(nudge.type);
+      expect(['toast', 'modal', 'banner', 'coach-mark', 'inline']).toContain(nudge.type);
     }
   });
 
@@ -93,7 +94,7 @@ describe('NUDGE_REGISTRY integrity', () => {
   });
 
   it('keeps internal action destinations in the active Chinese route tree', () => {
-    const location = { pathname: '/zh/inference', href: '' };
+    const location = { pathname: '/zh/infx/inference', href: '' };
     vi.stubGlobal('window', { location });
 
     const reproducibility = NUDGE_REGISTRY.find((nudge) => nudge.id === 'reproducibility');
@@ -106,27 +107,27 @@ describe('NUDGE_REGISTRY integrity', () => {
     );
     if (banner?.type !== 'banner') throw new Error('Missing launch banner');
     banner.content.onLinkClick?.();
-    expect(location.href).toBe('/zh/ubenchx/core-memory-profiles');
+    expect(location.href).toBe('/zh/ubx/core-memory-profiles');
 
     const operatorxBanner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'operatorx-banner');
     if (operatorxBanner?.type !== 'banner') throw new Error('Missing OperatorX banner');
     operatorxBanner.content.onLinkClick?.();
-    expect(location.href).toBe('/zh/operatorx');
+    expect(location.href).toBe('/zh/opx');
 
     location.href = '';
     const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
     if (modal?.type !== 'modal') throw new Error('Missing TPUv7 launch modal');
     modal.content.primaryAction?.onClick();
     expect(location.href).toBe(
-      '/zh/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8',
+      '/zh/infx/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8',
     );
   });
 
   it('splits the landing banner into comparable A/B arms', () => {
     const arms = NUDGE_REGISTRY.filter((nudge) => nudge.variant);
     expect(arms.map((arm) => [arm.variant, arm.content.href])).toEqual([
-      ['ubenchx', '/ubenchx/core-memory-profiles'],
-      ['operatorx', '/operatorx'],
+      ['ubenchx', '/ubx/core-memory-profiles'],
+      ['operatorx', '/opx'],
     ]);
     for (const arm of arms) {
       // Same slot, same dismissal, same event names: only the destination differs.
@@ -146,22 +147,32 @@ describe('NUDGE_REGISTRY integrity', () => {
     }
   });
 
-  it.each(['', '/zh'])('offers both launch models in the %s route tree', (prefix) => {
+  it.each(['', '/zh'])('offers all four launch models in the %s route tree', (prefix) => {
     const location = { pathname: prefix || '/', href: '' };
     vi.stubGlobal('window', { location });
     const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
-    expect(modal?.content.title).toBe('TPUv7 prelimary results across multiple models');
+    expect(modal?.content.title).toBe('TPUv7 preliminary results across multiple models');
     expect(modal?.content.titleZh).toBe('TPUv7 多模型初步结果');
-    expect(modal?.content.description).toBe('AgentX Preview Submissions');
+    expect(modal?.content.description).toBe('AgentX preview submissions');
     expect(modal?.content.descriptionZh).toBe('AgentX 预览版提交结果');
     expect(modal?.content.primaryAction?.label).toBe('Qwen3.5');
     modal?.content.primaryAction?.onClick();
     expect(location.href).toBe(
-      `${prefix}/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8`,
+      `${prefix}/infx/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8`,
     );
     expect(modal?.content.secondaryAction?.label).toBe('Kimi K3');
     modal?.content.secondaryAction?.onClick();
-    expect(location.href).toBe(`${prefix}/inference/kimi-k3`);
+    expect(location.href).toBe(`${prefix}/infx/inference/kimi-k3`);
+    expect(modal?.content.additionalActions?.map((action) => action.label)).toEqual([
+      'GLM5.3',
+      'Muse Spark',
+    ]);
+    modal?.content.additionalActions?.[0].onClick();
+    expect(location.href).toBe(
+      `${prefix}/infx/inference/glm-5-3?g_model=GLM-5.2&i_seq=agentic-traces&i_prec=fp8`,
+    );
+    modal?.content.additionalActions?.[1].onClick();
+    expect(location.href).toBe(`${prefix}/infx/inference/muse-spark-open`);
   });
 
   it('centers the TPUv7 launch modal on the landing page', () => {
@@ -211,6 +222,17 @@ describe('NUDGE_REGISTRY integrity', () => {
     for (const nudge of NUDGE_REGISTRY.filter((n) => n.type === 'coach-mark')) {
       expect(typeof nudge.content.anchor?.resolve).toBe('function');
     }
+  });
+
+  it('renders chart guidance inline in its chart card instead of as a floating toast', () => {
+    const slots = Object.fromEntries(
+      NUDGE_REGISTRY.filter((n) => n.type === 'inline').map((n) => [n.id, n.content.slot]),
+    );
+    expect(slots).toEqual({
+      'gradient-label': NUDGE_SLOTS.inferenceLegend,
+      'filter-hint': NUDGE_SLOTS.inferenceLegend,
+      'eval-samples': NUDGE_SLOTS.evaluationTable,
+    });
   });
 
   it('does not register the retired agentic point callout', () => {

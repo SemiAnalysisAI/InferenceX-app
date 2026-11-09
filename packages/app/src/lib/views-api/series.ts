@@ -402,7 +402,7 @@ export function buildInferenceSeries(
       gpu: hwKey.split('_')[0],
       framework: sample.framework ?? '',
       specMethod: sample.spec_decoding ?? 'none',
-      label: hardwareLegendLabel(hwKey, sample.model),
+      label: hardwareLegendLabel(hwKey, sample.model, allPoints),
       vendor: GPU_VENDORS[hwKey.split('_')[0]],
       deployment: deployments.size === 1 ? [...deployments][0] : 'mixed',
       kvOffload: kept.some((point) =>
@@ -464,7 +464,7 @@ export function buildInferenceSeries(
             gpu: point.hwKey.split('_')[0],
             framework: point.framework ?? '',
             specMethod: point.spec_decoding ?? 'none',
-            label: hardwareLegendLabel(point.hwKey, point.model),
+            label: hardwareLegendLabel(point.hwKey, point.model, [point]),
             vendor: GPU_VENDORS[point.hwKey.split('_')[0]],
             deployment: pointDeploymentMode(point),
             kvOffload: isKvOffloadEnabled(point),

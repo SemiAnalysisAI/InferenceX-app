@@ -1,0 +1,49 @@
+import type { Metadata } from 'next';
+
+import { AgenticCatalogHero } from '@/components/inference/agentic-catalog/agentic-catalog-hero';
+import { AgenticCatalogList } from '@/components/inference/agentic-catalog/agentic-catalog-list';
+import { JsonLd } from '@/components/seo/json-ld';
+import { getAgenticCatalogGroups } from '@/lib/agentx/agentic-catalog';
+import { enAlternates } from '@/lib/i18n/i18n';
+import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { socialMetadata } from '@/lib/seo/social-metadata';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
+
+const TITLE = 'AgentX Telemetry';
+const DESCRIPTION =
+  'Every AgentX benchmark run with per-request telemetry, grouped by model and serving stack, with point-detail charts, request timelines and cache behavior.';
+
+export const metadata: Metadata = {
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: enAlternates(`${getDashboardRoute('inference').path}/agentic`),
+  ...socialMetadata({
+    title: `${TITLE} | InferenceX`,
+    description: DESCRIPTION,
+    url: `${SITE_URL}${getDashboardRoute('inference').path}/agentic`,
+    locale: 'en',
+  }),
+};
+
+export const revalidate = 86400;
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'CollectionPage',
+  name: `${TITLE} | InferenceX`,
+  description: DESCRIPTION,
+  url: `${SITE_URL}${getDashboardRoute('inference').path}/agentic`,
+  inLanguage: 'en',
+  isPartOf: { '@type': 'WebSite', name: 'InferenceX', url: SITE_URL },
+};
+
+export default async function AgenticTelemetryCatalogPage() {
+  const groups = await getAgenticCatalogGroups();
+  return (
+    <>
+      <JsonLd data={jsonLd} />
+      <AgenticCatalogHero locale="en" />
+      <AgenticCatalogList groups={groups} locale="en" />
+    </>
+  );
+}

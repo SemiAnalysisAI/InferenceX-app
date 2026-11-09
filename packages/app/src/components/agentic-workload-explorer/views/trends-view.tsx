@@ -6,7 +6,7 @@ import {
   appendTraceVersion,
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
-import { formatDuration, formatNumber } from '@/lib/agentic-workload-explorer/format';
+import { bucketLabel, formatDuration, formatNumber } from '@/lib/agentic-workload-explorer/format';
 import {
   ChartSkeleton,
   SkeletonSectionHeader,
@@ -16,21 +16,19 @@ import {
   buildColorMap,
   formatAxisNumber,
   formatAxisPercent,
-  SectionHeader,
-  StatCard,
   TrendsLineChart,
   TrendsStackedChart,
   type LineSeries,
   type StackedDayPoint,
 } from '@/components/agentic-workload-explorer/trends-charts';
-import {
-  HARNESS_LABELS,
-  HARNESSES,
-  type Harness,
-} from '@semianalysisai/inferencex-db/proxytrace/shared/harness';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
+import { Stat } from '@/components/ui/stat';
+import { EmptyState } from '@/components/ui/empty-state';
+import { HARNESSES, type Harness } from '@semianalysisai/inferencex-db/proxytrace/shared/harness';
+import { harnessLabel } from '@/lib/agentic-workload-explorer/harness-label';
 import {
   LAST_DAY_ISO,
-  PREV_DAY_LABEL,
+  prevDayLabel,
   SNAPSHOT_NOW_MS,
 } from '@/lib/agentic-workload-explorer/snapshot';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -42,35 +40,35 @@ const STRINGS = {
     description:
       'Behavior over time — model mix, cache/context trends, a compaction-rate heuristic, CLI version adoption, and E2E latency, all from one cached daily rollup.',
     stats: 'Stats',
-    modelsTracked: 'Models Tracked',
-    cacheHitLabel: (date: string) => `Cache Hit (${date})`,
-    compactionRateLabel: 'Compaction Rate (final 7d avg)',
+    modelsTracked: 'Models tracked',
+    cacheHitLabel: (date: string) => `Cache hit (${date})`,
+    compactionRateLabel: 'Compaction rate (final 7d avg)',
     compactionPerSession: (v: string) => `${v}/session`,
-    harnessVersionsSeen: 'Harness Versions Seen',
-    e2eLatencyP50Label: (date: string) => `E2E Latency p50 (${date})`,
+    harnessVersionsSeen: 'Harness versions seen',
+    e2eLatencyP50Label: (date: string) => `E2E latency p50 (${date})`,
     ttftP50Label: (date: string) => `TTFT p50 (${date})`,
-    modelMix: '1 · Model Mix',
-    cacheHitRateTrend: '2 · Cache Hit-Rate Trend',
-    contextGrowth: '3 · Context Growth',
-    compactionRateProxy: '4 · Compaction-Rate Proxy',
-    cliVersionMix: '5 · CLI-Version Mix',
-    latencyTrend: '6 · Latency Trend',
-    modelMixTitle: 'Model Mix Over Time',
+    modelMix: '1 · Model mix',
+    cacheHitRateTrend: '2 · Cache hit-rate trend',
+    contextGrowth: '3 · Context growth',
+    compactionRateProxy: '4 · Compaction-rate proxy',
+    cliVersionMix: '5 · CLI-version mix',
+    latencyTrend: '6 · Latency trend',
+    modelMixTitle: 'Model mix over time',
     modelMixSubtext: (metric: string) => `Daily ${metric} share by model — full history`,
-    cacheHitTitle: 'Cache Hit-Rate Trend',
+    cacheHitTitle: 'Cache hit-rate trend',
     cacheHitSubtext: 'cache_read / (cache_read + input) — full history',
-    contextGrowthTitle: 'Context Growth',
+    contextGrowthTitle: 'Context growth',
     contextGrowthSubtext: 'Avg (input + cache_read) tokens per request — full history',
-    compactionTitle: 'Compaction-Like Context Resets',
+    compactionTitle: 'Compaction-like context resets',
     compactionSubtext: 'Candidate rate per day (heuristic — see explanation above)',
     compactionExplanation: (dropPct: number, gapMin: number, minPrev: string, windowDays: number) =>
       `Heuristic, not a ground-truth signal: Anthropic doesn't mark compaction in any traced field. A "candidate" is a request whose cache_read_input_tokens drops to ≤${dropPct}% of the previous request in the same session (with total context shrinking too), excluding the first request of a session and gaps ≥${gapMin} min (those are session starts / idle restarts, not compaction). Requires ≥${minPrev} prior cache-read tokens so the drop is measured against a real context, not noise. Computed over a trailing ${windowDays}-day window.`,
-    cliVersionMixTitle: 'CLI-Version Mix Over Time',
+    cliVersionMixTitle: 'CLI-version mix over time',
     cliVersionMixSubtextAll:
       'Daily new-session share by harness — pick a harness to see its versions',
     cliVersionMixSubtextByHarness: (label: string) =>
       `Daily new-session share by ${label} version — full history`,
-    latencyTitle: 'E2E Latency / TTFT Trend',
+    latencyTitle: 'E2E latency / TTFT trend',
     latencySubtext: (windowDays: number) =>
       `p50 / p95 duration_ms, p50 TTFT (streaming only) — trailing ${windowDays}d`,
     failedToLoad: 'Failed to load trends data',
@@ -78,22 +76,22 @@ const STRINGS = {
     overall: 'Overall',
     candidatesPerReq: 'Candidates / 1,000 requests',
     candidatesPerSession: 'Candidates / active session',
-    e2eLatencyP50: 'E2E Latency p50',
-    e2eLatencyP95: 'E2E Latency p95',
+    e2eLatencyP50: 'E2E latency p50',
+    e2eLatencyP95: 'E2E latency p95',
     ttftP50Streaming: 'TTFT p50 (streaming)',
     noDataInWindow: 'No data in this window',
-    toggleRequests: 'REQUESTS',
-    toggleTokens: 'TOKENS',
-    toggleShare: 'SHARE',
-    toggleCount: 'COUNT',
-    toggleOverall: 'OVERALL',
-    togglePerModel: 'PER-MODEL',
-    togglePer1kReq: 'PER 1K REQ',
-    togglePerSession: 'PER SESSION',
-    toggleAll: 'ALL',
+    toggleRequests: 'Requests',
+    toggleTokens: 'Tokens',
+    toggleShare: 'Share',
+    toggleCount: 'Count',
+    toggleOverall: 'Overall',
+    togglePerModel: 'Per model',
+    togglePer1kReq: 'Per 1K req',
+    togglePerSession: 'Per session',
+    toggleAll: 'All',
     toggle30d: '30D',
     toggle90d: '90D',
-    toggleAllHarnesses: 'ALL HARNESSES',
+    toggleAllHarnesses: 'All harnesses',
   },
   zh: {
     description:
@@ -113,7 +111,8 @@ const STRINGS = {
     cliVersionMix: '5 · CLI 版本组合',
     latencyTrend: '6 · 延迟趋势',
     modelMixTitle: '模型组合随时间变化',
-    modelMixSubtext: (metric: string) => `每日${metric}按模型占比 — 完整历史`,
+    modelMixSubtext: (metric: string) =>
+      `每日${metric === 'requests' ? '请求数' : ' token '}按模型占比 — 完整历史`,
     cacheHitTitle: 'Cache 命中率趋势',
     cacheHitSubtext: 'cache_read / (cache_read + input) — 完整历史',
     contextGrowthTitle: '上下文增长',
@@ -333,7 +332,9 @@ export default function TrendsPage() {
 }
 
 function TrendsPageContent() {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const prevDay = prevDayLabel(locale);
   const { apiParam: traceVersionParam } = useTraceVersion();
   const [windowChoice, setWindowChoice] = useState<WindowChoice>('90d');
   const [modelMetric, setModelMetric] = useState<'requests' | 'tokens'>('requests');
@@ -487,7 +488,10 @@ function TrendsPageContent() {
     for (const row of harnessVersions) {
       if (cutoff !== null && dayTime(row.day) < cutoff) continue;
       if (cliHarness !== 'all' && row.harness !== cliHarness) continue;
-      const key = cliHarness === 'all' ? HARNESS_LABELS[row.harness] : (row.version ?? 'unknown');
+      const key =
+        cliHarness === 'all'
+          ? harnessLabel(row.harness, locale)
+          : bucketLabel(row.version ?? 'unknown', locale);
       const bucket = byDay.get(row.day) ?? {};
       bucket[key] = (bucket[key] ?? 0) + row.sessionCount;
       byDay.set(row.day, bucket);
@@ -495,17 +499,18 @@ function TrendsPageContent() {
     return [...byDay.entries()]
       .map(([day, values]) => ({ day, values }))
       .toSorted((a, b) => dayTime(a.day) - dayTime(b.day));
-  }, [harnessVersions, cutoff, cliHarness]);
+  }, [harnessVersions, cutoff, cliHarness, locale]);
 
   const allCliVersions = useMemo(() => {
     const set = new Set<string>();
     for (const row of cliDays) for (const k of Object.keys(row.values)) set.add(k);
+    const unknown = bucketLabel('unknown', locale);
     return [...set].toSorted((a, b) => {
-      if (a === 'unknown') return 1;
-      if (b === 'unknown') return -1;
+      if (a === unknown) return 1;
+      if (b === unknown) return -1;
       return a.localeCompare(b, undefined, { numeric: true });
     });
-  }, [cliDays]);
+  }, [cliDays, locale]);
   const cliColorMap = useMemo(() => buildColorMap(allCliVersions), [allCliVersions]);
   const harnessVersionCount = useMemo(
     () => new Set(harnessVersions?.map((r) => `${r.harness} ${r.version}`)).size,
@@ -576,13 +581,15 @@ function TrendsPageContent() {
         <>
           <div>
             <SectionHeader label={t.stats} />
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-              <StatCard label={t.modelsTracked} value={String(allModelsFull.length)} />
-              <StatCard
-                label={t.cacheHitLabel(PREV_DAY_LABEL)}
+            <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+              <Stat boxed label={t.modelsTracked} value={String(allModelsFull.length)} />
+              <Stat
+                boxed
+                label={t.cacheHitLabel(prevDay)}
                 value={latestCacheHit === null ? '—' : `${latestCacheHit.toFixed(1)}%`}
               />
-              <StatCard
+              <Stat
+                boxed
                 label={t.compactionRateLabel}
                 value={compactionRecent ? `${compactionRecent.perThousand.toFixed(1)}/1k req` : '—'}
                 detail={
@@ -591,27 +598,27 @@ function TrendsPageContent() {
                     : undefined
                 }
               />
-              <StatCard label={t.harnessVersionsSeen} value={String(harnessVersionCount)} />
-              <StatCard
-                label={t.e2eLatencyP50Label(PREV_DAY_LABEL)}
+              <Stat boxed label={t.harnessVersionsSeen} value={String(harnessVersionCount)} />
+              <Stat
+                boxed
+                label={t.e2eLatencyP50Label(prevDay)}
                 value={latestLatencyP50 ? formatDuration(latestLatencyP50.durationP50) : '—'}
               />
-              <StatCard
-                label={t.ttftP50Label(PREV_DAY_LABEL)}
+              <Stat
+                boxed
+                label={t.ttftP50Label(prevDay)}
                 value={
                   latestLatencyP50 && latestLatencyP50.streamingSampleCount > 0
                     ? formatDuration(latestLatencyP50.ttftP50)
                     : '—'
                 }
               />
-            </div>
+            </dl>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-                {t.modelMix}
-              </div>
+              <div className="text-xs font-medium text-muted-foreground">{t.modelMix}</div>
               <div className="flex items-center gap-2">
                 <ToggleGroup
                   value={modelMetric}
@@ -648,9 +655,7 @@ function TrendsPageContent() {
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-                {t.cacheHitRateTrend}
-              </div>
+              <div className="text-xs font-medium text-muted-foreground">{t.cacheHitRateTrend}</div>
               <ToggleGroup
                 value={cacheHitPerModel ? 'per-model' : 'overall'}
                 onChange={(v) => setCacheHitPerModel(v === 'per-model')}
@@ -673,9 +678,7 @@ function TrendsPageContent() {
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-                {t.contextGrowth}
-              </div>
+              <div className="text-xs font-medium text-muted-foreground">{t.contextGrowth}</div>
               <ToggleGroup
                 value={contextPerModel ? 'per-model' : 'overall'}
                 onChange={(v) => setContextPerModel(v === 'per-model')}
@@ -698,7 +701,7 @@ function TrendsPageContent() {
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
+              <div className="text-xs font-medium text-muted-foreground">
                 {t.compactionRateProxy}
               </div>
               <ToggleGroup
@@ -711,7 +714,7 @@ function TrendsPageContent() {
                 trackEvent="agentic_workload_trends_compaction_denom_changed"
               />
             </div>
-            <div className="mb-2 text-3xs font-mono text-subtle leading-relaxed">
+            <div className="mb-2 text-3xs font-mono text-muted-foreground leading-relaxed">
               {t.compactionExplanation(
                 Math.round((1 - data.meta.compactionCliffDropRatio) * 100),
                 Math.round(data.meta.compactionIdleGapMs / 60_000),
@@ -732,16 +735,14 @@ function TrendsPageContent() {
 
           <div>
             <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-                {t.cliVersionMix}
-              </div>
+              <div className="text-xs font-medium text-muted-foreground">{t.cliVersionMix}</div>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <ToggleGroup
                   value={cliHarness}
                   onChange={setCliHarness}
                   options={[
                     { key: 'all' as const, label: t.toggleAllHarnesses },
-                    ...HARNESSES.map((h) => ({ key: h, label: HARNESS_LABELS[h].toUpperCase() })),
+                    ...HARNESSES.map((h) => ({ key: h, label: harnessLabel(h, locale) })),
                   ]}
                   trackEvent="agentic_workload_trends_cli_harness_changed"
                 />
@@ -761,7 +762,7 @@ function TrendsPageContent() {
               subtext={
                 cliHarness === 'all'
                   ? t.cliVersionMixSubtextAll
-                  : t.cliVersionMixSubtextByHarness(HARNESS_LABELS[cliHarness])
+                  : t.cliVersionMixSubtextByHarness(harnessLabel(cliHarness, locale))
               }
               days={cliDays}
               seriesKeys={allCliVersions}
@@ -774,9 +775,7 @@ function TrendsPageContent() {
           </div>
 
           <div>
-            <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground mb-1">
-              {t.latencyTrend}
-            </div>
+            <div className="text-xs font-medium text-muted-foreground mb-1">{t.latencyTrend}</div>
             <TrendsLineChart
               title={t.latencyTitle}
               subtext={t.latencySubtext(data.meta.latencyWindowDays)}
@@ -788,9 +787,7 @@ function TrendsPageContent() {
           </div>
         </>
       ) : (
-        <div className="text-sm font-mono text-muted-foreground text-center py-8">
-          {t.failedToLoad}
-        </div>
+        <EmptyState>{t.failedToLoad}</EmptyState>
       )}
     </div>
   );

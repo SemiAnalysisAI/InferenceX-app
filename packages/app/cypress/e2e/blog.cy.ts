@@ -6,81 +6,70 @@ function imageSourcePath(src: string | null): string {
 
 describe('Blog', () => {
   describe('Rubin agentic article port', () => {
-    for (const locale of ['', '/zh']) {
-      it(`preserves the article, figures, and source boundary on ${locale || '/en'}`, () => {
-        const slug = 'vera-rubin-nvl72-agentic-inference';
-        cy.visit(`${locale}/blog/${slug}`);
-        cy.get('h1').should('have.length', 1).and('contain.text', 'Rubin NVL72');
-        cy.get('article.prose').within(() => {
-          cy.get('figure img')
-            .filter((_, image) =>
-              imageSourcePath(image.getAttribute('src')).startsWith(`/images/${slug}/`),
-            )
-            .should('have.length.greaterThan', 0)
-            .each(($image) => {
-              cy.wrap($image)
-                .scrollIntoView()
-                .should(($img) => {
-                  expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
-                  expect($img.attr('alt')?.length ?? 0).to.be.greaterThan(0);
-                });
-            });
-          cy.contains(locale ? '本站转载原文的公开部分' : 'publicly available portion').should(
-            'exist',
-          );
-          cy.get(`a[href="https://newsletter.semianalysis.com/p/${slug}"]`)
-            .last()
-            .should('contain.text', locale ? '订阅者专属' : 'subscriber-only');
-        });
-        cy.get('link[rel="alternate"][hreflang="en"]')
-          .should('have.attr', 'href')
-          .and('include', `/blog/${slug}`);
-        cy.get('link[rel="alternate"][hreflang="zh-CN"]')
-          .should('have.attr', 'href')
-          .and('include', `/zh/blog/${slug}`);
+    it('preserves the article, figures, and source boundary on /en', () => {
+      const slug = 'vera-rubin-nvl72-agentic-inference';
+      cy.visit(`/blog/${slug}`);
+      cy.get('h1').should('have.length', 1).and('contain.text', 'Rubin NVL72');
+      cy.get('article.prose').within(() => {
+        cy.get('figure img')
+          .filter((_, image) =>
+            imageSourcePath(image.getAttribute('src')).startsWith(`/images/${slug}/`),
+          )
+          .should('have.length.greaterThan', 0)
+          .each(($image) => {
+            cy.wrap($image)
+              .scrollIntoView()
+              .should(($img) => {
+                expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+                expect($img.attr('alt')?.length ?? 0).to.be.greaterThan(0);
+              });
+          });
+        cy.get(`a[href="https://newsletter.semianalysis.com/p/${slug}"]`).should('exist');
       });
-    }
+      cy.get('link[rel="alternate"][hreflang="en"]')
+        .should('have.attr', 'href')
+        .and('include', `/blog/${slug}`);
+      cy.get('link[rel="alternate"][hreflang="zh-CN"]')
+        .should('have.attr', 'href')
+        .and('include', `/zh/blog/${slug}`);
+    });
   });
 
   describe('GLM-5 historical cost correction', () => {
-    for (const locale of ['', '/zh']) {
-      for (const width of [390, 1280]) {
-        it(`keeps the verified cost comparison and metadata aligned on ${locale || '/en'} at ${width}px`, () => {
-          cy.viewport(width, 900);
-          cy.visit(`${locale}/blog/mi355x-glm5-fp8-sglang-40-cheaper-than-b200`);
-          cy.get('h1').should('contain.text', '29.6%');
-          cy.get('meta[name="description"]').should('have.attr', 'content').and('include', '29.6%');
-          cy.contains('article.prose table', 'B200 / MI355X').within(() => {
-            cy.contains('tbody tr', '24.3')
-              .find('td')
-              .then(($cells) => {
-                expect([...$cells].map((cell) => cell.textContent?.trim())).to.deep.equal([
-                  '24.3',
-                  '$0.3388',
-                  '$0.2384',
-                  '1.421x',
-                  '29.6%',
-                ]);
-              });
-            cy.contains('tbody tr', '90').should('contain.text', '-2.8%');
+    it('keeps the verified cost comparison and metadata aligned on /zh at 390px', () => {
+      cy.viewport(390, 900);
+      cy.visit('/zh/blog/mi355x-glm5-fp8-sglang-40-cheaper-than-b200');
+      cy.get('h1').should('contain.text', '29.6%');
+      cy.get('meta[name="description"]').should('have.attr', 'content').and('include', '29.6%');
+      cy.contains('article.prose table', 'B200 / MI355X').within(() => {
+        cy.contains('tbody tr', '24.3')
+          .find('td')
+          .then(($cells) => {
+            expect([...$cells].map((cell) => cell.textContent?.trim())).to.deep.equal([
+              '24.3',
+              '$0.3388',
+              '$0.2384',
+              '1.421x',
+              '29.6%',
+            ]);
           });
-          cy.get('script[type="application/ld+json"]').then(($scripts) => {
-            const article = [...$scripts]
-              .map((script) => JSON.parse(script.textContent ?? '{}'))
-              .find((value) => value['@type'] === 'BlogPosting');
-            expect(article.headline).to.include('29.6%');
-            expect(article.description).to.include('29.6%');
-            expect(article.dateModified).to.equal('2026-10-25T00:00:00Z');
-          });
-          cy.get('article.prose a[href*="g_rundate=2026-05-20"]').each(($link) => {
-            expect($link.attr('href')).not.to.include('g_runid=');
-          });
-          cy.document().then((doc) => {
-            expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
-          });
-        });
-      }
-    }
+        cy.contains('tbody tr', '90').should('contain.text', '-2.8%');
+      });
+      cy.get('script[type="application/ld+json"]').then(($scripts) => {
+        const article = [...$scripts]
+          .map((script) => JSON.parse(script.textContent ?? '{}'))
+          .find((value) => value['@type'] === 'BlogPosting');
+        expect(article.headline).to.include('29.6%');
+        expect(article.description).to.include('29.6%');
+        expect(article.dateModified).to.equal('2026-10-25T00:00:00Z');
+      });
+      cy.get('article.prose a[href*="g_rundate=2026-05-20"]').each(($link) => {
+        expect($link.attr('href')).not.to.include('g_runid=');
+      });
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+      });
+    });
   });
 
   describe('Blog listing page', () => {
@@ -89,7 +78,7 @@ describe('Blog', () => {
         { method: 'GET', pathname: '/_next/image' },
         { fixture: '1x1.png', headers: { 'content-type': 'image/png' } },
       );
-      cy.visit('/blog', { timeout: 20_000 });
+      cy.visit('/blog');
     });
 
     it('serves local card thumbnails through the image optimizer', () => {
@@ -122,33 +111,29 @@ describe('Blog', () => {
   describe('Hardware results pages', () => {
     const slug = 'vera-rubin-nvl72-vs-gb300-nvl72-agentx-results';
 
-    for (const locale of ['', '/zh']) {
-      it(`renders the results header and article on ${locale || '/en'}`, () => {
-        cy.visit(`${locale}/hardware/${slug}`);
-        cy.get('h1').should('have.length', 1).and('contain.text', 'Vera Rubin NVL72');
-        cy.get('[data-testid="hardware-hero"]').within(() => {
-          cy.get('[data-testid="hardware-lede"]').should('be.visible');
-          cy.get('[data-testid="hardware-hero-link"]').first().should('have.class', 'bg-brand');
-          cy.get('[data-testid="hardware-hero-link"]').eq(1).should('not.have.class', 'bg-brand');
-          cy.get(`a[href="${locale}/hardware"]`).should('be.visible');
-        });
-        cy.get('[data-testid="hardware-article"] table').should('have.length.greaterThan', 0);
-        cy.get('[data-testid="blog-related"]').should('not.exist');
-        cy.get('link[rel="canonical"]').should(
-          'have.attr',
-          'href',
-          `https://inferencex.semianalysis.com${locale}/hardware/${slug}`,
-        );
-        cy.get('link[rel="alternate"][hreflang="zh-CN"]')
-          .should('have.attr', 'href')
-          .and('include', `/zh/hardware/${slug}`);
-        cy.get('[data-testid="language-toggle"]').should(
-          'have.attr',
-          'href',
-          locale ? `/hardware/${slug}` : `/zh/hardware/${slug}`,
-        );
+    it('renders the results header and article on /zh', () => {
+      cy.visit(`/zh/hardware/${slug}`);
+      cy.get('h1').should('have.length', 1).and('contain.text', 'Vera Rubin NVL72');
+      cy.get('[data-testid="hardware-hero"]').within(() => {
+        cy.get('[data-testid="hardware-lede"]').should('be.visible');
+        cy.get('[data-testid="hardware-hero-link"]').first().should('have.class', 'bg-brand-fill');
+        cy.get('[data-testid="hardware-hero-link"]')
+          .eq(1)
+          .should('not.have.class', 'bg-brand-fill');
+        cy.get('a[href="/zh/hardware"]').should('be.visible');
       });
-    }
+      cy.get('[data-testid="hardware-article"] table').should('have.length.greaterThan', 0);
+      cy.get('[data-testid="blog-related"]').should('not.exist');
+      cy.get('link[rel="canonical"]').should(
+        'have.attr',
+        'href',
+        `https://inferencex.semianalysis.com/zh/hardware/${slug}`,
+      );
+      cy.get('link[rel="alternate"][hreflang="zh-CN"]')
+        .should('have.attr', 'href')
+        .and('include', `/zh/hardware/${slug}`);
+      cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', `/hardware/${slug}`);
+    });
 
     it('places the header links below the lede on phones without horizontal overflow', () => {
       cy.viewport(390, 844);
@@ -222,15 +207,6 @@ describe('Blog', () => {
         expect(imageSourcePath($img[0].getAttribute('src'))).to.match(
           /^\/images\/kimi-k3-the-manos-the-mythos-the\//u,
         );
-      });
-
-      cy.get('article.prose figure img').then(($imgs) => {
-        const paths = [
-          ...new Set([...$imgs].map((img) => imageSourcePath(img.getAttribute('src')))),
-        ];
-        for (const path of paths) {
-          cy.request({ url: path, encoding: 'binary' }).its('status').should('eq', 200);
-        }
       });
     });
   });

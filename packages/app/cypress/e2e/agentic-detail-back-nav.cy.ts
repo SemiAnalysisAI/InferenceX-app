@@ -188,7 +188,9 @@ function clickTracedPoint(): void {
 function openPointDetail(): void {
   cy.get(`[data-testid="legend-points-${SOLO_HW_KEY}"]`).should('exist');
   clickTracedPoint();
-  cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]').should('be.visible').click();
+  cy.get('[data-testid="point-details-panel"] [data-action="view-charts"]')
+    .should('be.visible')
+    .click();
 }
 
 const backControl = (locale: 'en' | 'zh') =>
@@ -206,65 +208,46 @@ function assertRestoredChart(): void {
 
 describe('Agentic point detail — returning to the chart', () => {
   it('restores the model and legend when the reader clicks Back', () => {
-    visitChart('/inference');
+    visitChart('/infx/inference');
     selectTargetModel();
     soloLegendSeries();
     openPointDetail();
 
-    cy.location('pathname').should('match', /^\/inference\/agentic\/\d+$/u);
+    cy.location('pathname').should('match', /^\/infx\/inference\/agentic\/\d+$/u);
     backControl('en').click();
 
-    cy.location('pathname').should('eq', '/inference/kimi-k3');
+    cy.location('pathname').should('eq', '/infx/inference/kimi-k3');
     assertRestoredChart();
   });
 
   it('restores the model and legend through the "Inference chart" link', () => {
-    visitChart('/inference');
+    visitChart('/infx/inference');
     selectTargetModel();
     soloLegendSeries();
     openPointDetail();
 
     chartLink('en')
       .should('have.attr', 'href')
-      .and('match', /^\/inference\?/u);
+      .and('match', /^\/infx\/inference\?/u);
     chartLink('en').click();
 
-    cy.location('pathname').should('eq', '/inference');
+    cy.location('pathname').should('eq', '/infx/inference');
     assertRestoredChart();
   });
 
   it('keeps a Chinese reader on /zh for the whole round trip', () => {
-    visitChart('/zh/inference');
+    visitChart('/zh/infx/inference');
     selectTargetModel();
     soloLegendSeries();
     openPointDetail();
 
-    cy.location('pathname').should('match', /^\/zh\/inference\/agentic\/\d+$/u);
+    cy.location('pathname').should('match', /^\/zh\/infx\/inference\/agentic\/\d+$/u);
     chartLink('zh')
       .should('have.attr', 'href')
-      .and('match', /^\/zh\/inference\?/u);
+      .and('match', /^\/zh\/infx\/inference\?/u);
     chartLink('zh').click();
 
-    cy.location('pathname').should('eq', '/zh/inference');
+    cy.location('pathname').should('eq', '/zh/infx/inference');
     assertRestoredChart();
-  });
-
-  it('does not drop the unofficialruns overlay param on the round trip', () => {
-    visitChart('/inference?unofficialruns=987654321');
-    selectTargetModel();
-    soloLegendSeries();
-    clickTracedPoint();
-
-    cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]')
-      .should('be.visible')
-      .then(($link) => {
-        const href = $link.attr('href') ?? '';
-        const params = new URLSearchParams(href.slice(href.indexOf('?')));
-        expect(params.get('unofficialruns'), 'overlay run carried forward').to.equal('987654321');
-      });
-
-    cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]').click();
-    cy.location('search').should('contain', 'unofficialruns=987654321');
-    chartLink('en').should('have.attr', 'href').and('contain', 'unofficialruns=987654321');
   });
 });

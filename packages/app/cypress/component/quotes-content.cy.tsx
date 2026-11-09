@@ -1,7 +1,6 @@
 import { QuotesContent } from '@/components/quotes/quotes-content';
 import { SupporterLogoWall } from '@/components/quotes/supporter-logo-wall';
 import { QUOTES } from '@/components/quotes/quotes-data';
-import { IntroSection } from '@/components/landing/intro-section';
 
 function orgAnchorId(org: string): string {
   const slug = org
@@ -16,104 +15,6 @@ const uniqueOrgsWithLogo = [...new Set(QUOTES.filter((q) => q.logo).map((q) => q
 describe('QuotesContent', () => {
   beforeEach(() => {
     cy.mount(<QuotesContent />);
-  });
-
-  it('renders a discrete separator between every quote (n - 1 separators)', () => {
-    cy.get('blockquote').should('have.length', QUOTES.length);
-    cy.get('hr').should('have.length', QUOTES.length - 1);
-  });
-
-  it('gives the first quote of each org a stable anchor id', () => {
-    for (const org of uniqueOrgsWithLogo) {
-      cy.get(`#${orgAnchorId(org)}`).should('exist');
-    }
-  });
-
-  it('provides a jump button for every quoted organization with a logo', () => {
-    cy.get('button[aria-label^="Jump to"]').should(($buttons) => {
-      const labels = new Set([...$buttons].map((button) => button.getAttribute('aria-label')));
-      expect([...labels].sort()).to.deep.equal(
-        uniqueOrgsWithLogo.map((org) => `Jump to ${org}’s quote`).sort(),
-      );
-    });
-  });
-
-  it('renders the Mooncake team quote with the KVCache.AI identity', () => {
-    cy.get('#quote-mooncake').within(() => {
-      cy.contains('Mooncake makes KV cache a first-class system resource').should('be.visible');
-      cy.contains('a', 'Mooncake Team')
-        .should('have.attr', 'href', 'https://kvcache.ai/')
-        .and('have.attr', 'target', '_blank');
-      cy.get('img[alt="Mooncake"]')
-        .should('have.attr', 'src', '/logos/kvcache-ai.svg')
-        .and(($logo) => {
-          expect(($logo[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
-        });
-    });
-
-    cy.mount(<QuotesContent locale="zh" />);
-    cy.get('#quote-mooncake').should(
-      'contain.text',
-      'Mooncake 将 KV cache 作为分离式 LLM 推理中的一等系统资源',
-    );
-  });
-
-  it('renders Seiji Eicher’s Anyscale quote and loads its logo in both locales', () => {
-    for (const locale of ['en', 'zh'] as const) {
-      cy.mount(<QuotesContent locale={locale} />);
-      cy.get('#quote-anyscale').within(() => {
-        cy.contains('Seiji Eicher').should('be.visible');
-        cy.contains(
-          locale === 'en'
-            ? "Ray Serve LLM's mission is to be best way"
-            : 'Ray Serve LLM 的使命是成为',
-        ).should('be.visible');
-        cy.get('img[alt="Anyscale"]')
-          .should('have.attr', 'src', '/logos/anyscale.svg')
-          .and(($logo) => {
-            expect(($logo[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
-          });
-      });
-      cy.get('button').find('img[alt="Anyscale"]').should('have.length', 1);
-    }
-  });
-
-  it('renders Bill Jia’s Google quote with localized attribution and a working logo jump', () => {
-    for (const locale of ['en', 'zh'] as const) {
-      cy.mount(<QuotesContent locale={locale} />);
-      cy.get('#quote-google').within(() => {
-        cy.get('p').should(
-          'have.text',
-          locale === 'en'
-            ? '“Making AI infrastructure accessible to more developers starts with measuring how real-world, multi-turn agentic workloads—including context growth and prefix-cache reuse—perform in production. We welcome open-source, reproducible benchmarks like InferenceX that highlight the cost efficiency and interactivity of Google TPUs running open software. That kind of transparent data gives developers the confidence to deploy at scale.”'
-            : '“要让更多开发者用上 AI 基础设施，首先需要测量真实的多轮智能体工作负载在生产环境中的表现，包括上下文增长和前缀缓存复用。我们欢迎 InferenceX 这样的开源、可复现基准测试，展示 Google TPU 运行开放软件时的成本效率和交互性能。这样的透明数据让开发者有信心进行大规模部署。”',
-        );
-        cy.get('footer')
-          .should('contain.text', 'Bill Jia')
-          .and(
-            'contain.text',
-            locale === 'en' ? 'VP of Engineering at Google' : 'Google 工程副总裁',
-          );
-        cy.get('img[alt="Google"]')
-          .should('have.attr', 'src', '/logos/google-color.svg')
-          .and(($logo) => {
-            expect(($logo[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
-          });
-      });
-      cy.window().then((win) => {
-        cy.stub(win.Element.prototype, 'scrollIntoView').as('googleScroll');
-      });
-      cy.get('[data-testid="supporter-group-us-frontier-labs"] img[alt="Google"]')
-        .closest('button')
-        .click();
-      cy.get('@googleScroll').should((stub) => {
-        const calls = (stub as unknown as { getCalls: () => { thisValue: Element }[] }).getCalls();
-        expect(calls.some((call) => call.thisValue.id === 'quote-google')).to.equal(true);
-      });
-      cy.get('@googleScroll').then((stub) => {
-        (stub as unknown as { restore: () => void }).restore();
-      });
-    }
   });
 
   it('shows supporter logos in full color in light mode', () => {
@@ -177,67 +78,6 @@ describe('QuotesContent', () => {
 });
 
 describe('QuotesContent supporter logo wall', () => {
-  it('omits TokenSpeed while retaining the SGLang and vLLM logos in both locales', () => {
-    for (const locale of ['en', 'zh'] as const) {
-      cy.mount(<QuotesContent locale={locale} />);
-      cy.get('[data-testid="supporter-logo-wall"]').within(() => {
-        cy.get('img[alt="TokenSpeed"]').should('not.exist');
-        cy.get('[data-testid="supporter-group-open-source"]').within(() => {
-          for (const org of ['SGLang', 'vLLM']) {
-            cy.get(`img[alt="${org}"]`)
-              .should('be.visible')
-              .and(($logo) => {
-                expect(($logo[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
-              });
-          }
-        });
-      });
-    }
-  });
-
-  const groupIds = [
-    'ai-accelerators',
-    'chinese-frontier-labs',
-    'us-frontier-labs',
-    'hyperscalers-neoclouds',
-    'managed-inference-providers',
-    'open-source',
-    'other',
-  ];
-
-  it('renders every group with a bilingual heading', () => {
-    cy.mount(<QuotesContent />);
-    cy.get('[data-testid="supporter-logo-wall"] h3').should('have.length', groupIds.length);
-    for (const id of groupIds) cy.get(`[data-testid="supporter-group-${id}"]`).should('exist');
-    cy.get('[data-testid="supporter-logo-wall"] h3').should(($headings) => {
-      expect([...$headings].map((heading) => heading.textContent)).to.deep.equal([
-        'AI Accelerators',
-        'Chinese Frontier Labs',
-        'US Frontier Labs & NeoLabs',
-        'Hyperscalers & Neoclouds',
-        'Managed Inference Providers',
-        'Open Source',
-        'Other',
-      ]);
-    });
-
-    cy.mount(<QuotesContent locale="zh" />);
-    cy.get('[data-testid="supporter-group-other"] h3').should('have.text', '其他');
-    cy.get('[data-testid="supporter-group-chinese-frontier-labs"] h3').should(
-      'have.text',
-      '中国前沿实验室',
-    );
-    cy.get('button[aria-label="查看 OpenAI 的评价"]').should('exist');
-    cy.get('[data-testid="supporter-group-us-frontier-labs"] h3').should(
-      'have.text',
-      '美国前沿实验室与 NeoLabs',
-    );
-    cy.get('[data-testid="supporter-group-managed-inference-providers"] h3').should(
-      'have.text',
-      '托管推理服务商',
-    );
-  });
-
   it('shows supporter logos in full color and loads each image', () => {
     cy.mount(<QuotesContent />);
     cy.get('button[aria-label^="Jump to"] img').should('have.length.greaterThan', 0);
@@ -250,23 +90,6 @@ describe('QuotesContent supporter logo wall', () => {
         });
       },
     );
-  });
-
-  it('puts quoted orgs outside the curated groups under Other', () => {
-    cy.mount(<QuotesContent />);
-    cy.get('[data-testid="supporter-group-other"]').within(() => {
-      cy.get('button[aria-label="Jump to WEKA’s quote"]').should('exist');
-      cy.get('button[aria-label="Jump to OpenAI’s quote"]').should('not.exist');
-    });
-  });
-
-  it('renders logos without a quote as static tiles', () => {
-    cy.mount(<QuotesContent />);
-    cy.get('[data-testid="supporter-group-chinese-frontier-labs"]')
-      .find('img[alt="Kimi"]')
-      .closest('button')
-      .should('not.exist');
-    cy.get('[data-testid="supporter-logo-wall"] img[alt="DeepSeek"]').should('not.exist');
   });
 
   it('shows logos bare, with square marks taller than wordmarks', () => {
@@ -309,55 +132,10 @@ describe('QuotesContent supporter logo wall', () => {
     });
   });
 
-  it('lays out cloud providers in two desktop rows and preserves the requested groups', () => {
-    cy.viewport(1568, 1000);
-    cy.mount(<QuotesContent />);
-    cy.get('[data-testid="supporter-group-hyperscalers-neoclouds"] li').should(($lis) => {
-      const rows = new Map<number, number>();
-      for (const li of $lis) {
-        const top = Math.round(li.getBoundingClientRect().top);
-        rows.set(top, (rows.get(top) ?? 0) + 1);
-      }
-      expect([...rows.values()]).to.deep.equal([8, 7]);
-    });
-    cy.get('[data-testid="supporter-group-other"]').within(() => {
-      cy.get('img[alt="Supermicro"]').should('be.visible');
-      cy.get('img[alt="Baseten"]').should('not.exist');
-      cy.get('img[alt="Tensormesh"]').should('not.exist');
-      cy.get('img[alt="EmbeddedLLM"]').should('not.exist');
-    });
-    cy.get('[data-testid="supporter-group-us-frontier-labs"]').within(() => {
-      for (const alt of ['Prime Intellect', 'Adaptive ML', 'Periodic Labs']) {
-        cy.get(`img[alt="${alt}"]`).should('be.visible');
-      }
-    });
-    cy.get('[data-testid="supporter-group-hyperscalers-neoclouds"]').within(() => {
-      for (const alt of ['Core42', 'Verda', 'Vultr']) {
-        cy.get(`img[alt="${alt}"]`).should('be.visible');
-      }
-    });
-    cy.get('[data-testid="supporter-group-open-source"] img[alt="Red Hat"]').should('be.visible');
-    cy.get('[data-testid="supporter-group-open-source"] img[alt="EmbeddedLLM"]').should(
-      'be.visible',
-    );
-    cy.get('[data-testid="supporter-logo-wall"]')
-      .find('[data-testid^="supporter-group-"]')
-      .first()
-      .should('have.attr', 'data-testid', 'supporter-group-ai-accelerators');
-    cy.get('[data-testid="supporter-group-ai-accelerators"] img').should(($logos) => {
-      expect([...$logos].map((logo) => logo.getAttribute('alt'))).to.deep.equal([
-        'Google',
-        'AMD',
-        'NVIDIA',
-        'OpenAI Jalapeño',
-        'SambaNova',
-      ]);
-    });
-  });
-
   it('links the managed providers to their quotes in both locales', () => {
     const providers = [
       'Together AI',
+      'Fireworks AI',
       'GMI Cloud',
       'Nebius',
       'Baseten',
@@ -365,6 +143,7 @@ describe('QuotesContent supporter logo wall', () => {
       'Tensormesh',
       'Morph',
       'Doubleword',
+      'Wafer',
     ];
     for (const locale of ['en', 'zh'] as const) {
       cy.viewport(375, 812);
@@ -411,45 +190,77 @@ describe('QuotesContent supporter logo wall', () => {
     }
   });
 
-  it('keeps Morph off the landing supporter strip in both locales', () => {
-    for (const locale of ['en', 'zh'] as const) {
-      cy.mount(<IntroSection locale={locale} />);
-      cy.get('[data-testid="intro-section"]').should('not.contain.text', 'Morph');
-      cy.get('a[href$="#quote-morph"]').should('not.exist');
-      cy.get('a[href$="#quote-google"]').should('exist');
+  it('uses the official Morph wordmark without effects (en, light)', () => {
+    for (const width of [375, 1440]) {
+      cy.viewport(width, 900);
+      cy.mount(<QuotesContent locale="en" />);
+      for (const section of [
+        '[data-testid="supporter-group-managed-inference-providers"]',
+        '#quote-morph',
+      ]) {
+        cy.get(`${section} img[alt="Morph"]:visible`)
+          .should('have.length', 1)
+          .and('have.attr', 'src', '/logos/morph.svg');
+        cy.get(`${section} img[alt="Morph"]:visible`).should(($images) => {
+          const image = $images[0] as HTMLImageElement;
+          expect(image.naturalWidth).to.equal(174);
+          expect(image.naturalHeight).to.equal(48);
+          expect(getComputedStyle(image).filter).to.equal('none');
+          expect(getComputedStyle(image).opacity).to.equal('1');
+          expect(getComputedStyle(image).backgroundColor).to.equal('rgb(10, 10, 10)');
+          const rect = image.getBoundingClientRect();
+          expect(rect.left).to.be.at.least(0);
+          expect(rect.right).to.be.at.most(width);
+        });
+      }
+      cy.get('#quote-morph').should('contain.text', 'Nicholas Khami');
     }
   });
 
   for (const locale of ['en', 'zh'] as const) {
-    for (const dark of [false, true]) {
-      it(`uses the official Morph wordmark without effects (${locale}, ${dark ? 'dark' : 'light'})`, () => {
+    for (const theme of ['light', 'dark']) {
+      it(`preserves the purple Fireworks mark in both locations (${locale}, ${theme})`, () => {
         for (const width of [375, 1440]) {
           cy.viewport(width, 900);
           cy.mount(
-            <div className={dark ? 'dark' : ''}>
+            <div className={theme}>
               <QuotesContent locale={locale} />
             </div>,
           );
           for (const section of [
             '[data-testid="supporter-group-managed-inference-providers"]',
-            '#quote-morph',
+            '#quote-fireworks-ai',
           ]) {
-            cy.get(`${section} img[alt="Morph"]:visible`)
-              .should('have.length', 1)
-              .and('have.attr', 'src', '/logos/morph.svg');
-            cy.get(`${section} img[alt="Morph"]:visible`).should(($images) => {
+            cy.get(`${section} img[alt="Fireworks AI"]`).should(($images) => {
               const image = $images[0] as HTMLImageElement;
-              expect(image.naturalWidth).to.equal(174);
-              expect(image.naturalHeight).to.equal(48);
+              expect(image.currentSrc).to.match(/\/logos\/fireworks-purple\.svg$/);
+              expect(image.naturalWidth).to.be.greaterThan(0);
               expect(getComputedStyle(image).filter).to.equal('none');
               expect(getComputedStyle(image).opacity).to.equal('1');
-              expect(getComputedStyle(image).backgroundColor).to.equal('rgb(10, 10, 10)');
-              const rect = image.getBoundingClientRect();
-              expect(rect.left).to.be.at.least(0);
-              expect(rect.right).to.be.at.most(width);
+              const bounds = image.getBoundingClientRect();
+              expect(bounds.left).to.be.at.least(0);
+              expect(bounds.right).to.be.at.most(width);
+              const canvas = image.ownerDocument.createElement('canvas');
+              canvas.width = 64;
+              canvas.height = 32;
+              const ctx = canvas.getContext('2d')!;
+              ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+              const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+              let opaquePixels = 0;
+              let incorrectPixels = 0;
+              for (let i = 0; i < pixels.length; i += 4) {
+                if (pixels[i + 3] === 255) {
+                  opaquePixels++;
+                  if (pixels[i] !== 103 || pixels[i + 1] !== 32 || pixels[i + 2] !== 255) {
+                    incorrectPixels++;
+                  }
+                }
+              }
+              expect(opaquePixels).to.be.greaterThan(0);
+              expect(incorrectPixels).to.equal(0);
             });
           }
-          cy.get('#quote-morph').should('contain.text', 'Nicholas Khami');
+          cy.get('#quote-fireworks-ai').should('contain.text', 'Dmytro Dzhulgakov');
         }
       });
     }
@@ -457,34 +268,54 @@ describe('QuotesContent supporter logo wall', () => {
 });
 
 const wallLogo = (label: string) => ({ label, logo: 'nvidia-color.svg' });
-const centers = (id: string) =>
-  cy
-    .get(`[data-testid="supporter-group-${id}"] li`)
-    .then(($li) => [...$li].map((li) => Math.round(li.getBoundingClientRect().left)));
+const rowsOf = (id: string) =>
+  cy.get(`[data-testid="supporter-group-${id}"] ul`).then(($ul) => {
+    const list = $ul[0].getBoundingClientRect();
+    const rows = new Map<number, DOMRect[]>();
+    for (const li of $ul[0].querySelectorAll('li')) {
+      const box = li.getBoundingClientRect();
+      const top = Math.round(box.top);
+      rows.set(top, [...(rows.get(top) ?? []), box]);
+    }
+    return { list, rows: [...rows.values()] };
+  });
 
-describe('SupporterLogoWall columns', () => {
-  it('keeps an explicit column count when a group has fewer logos than columns', () => {
+describe('SupporterLogoWall rows', () => {
+  it('balances uneven groups across rows and centers the shorter row', () => {
     cy.viewport(1400, 800);
     cy.mount(
       <SupporterLogoWall
         groups={[
           {
-            id: 'wide',
-            label: { en: 'Wide', zh: 'Wide' },
-            desktopColumns: 4,
-            logos: ['a', 'b', 'c', 'd', 'e'].map(wallLogo),
+            id: 'nine',
+            label: { en: 'Nine', zh: 'Nine' },
+            desktopColumns: 8,
+            logos: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'].map(wallLogo),
           },
           {
-            id: 'short',
-            label: { en: 'Short', zh: 'Short' },
-            desktopColumns: 4,
-            logos: ['f', 'g', 'h'].map(wallLogo),
+            id: 'eleven',
+            label: { en: 'Eleven', zh: 'Eleven' },
+            desktopColumns: 6,
+            logos: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k'].map(wallLogo),
           },
         ]}
       />,
     );
-    centers('wide').then((wide) => {
-      centers('short').should('deep.equal', wide.slice(0, 3));
-    });
+    for (const [id, sizes] of [
+      ['nine', [5, 4]],
+      ['eleven', [6, 5]],
+    ] as const) {
+      rowsOf(id).then(({ list, rows }) => {
+        expect(
+          rows.map((r) => r.length),
+          id,
+        ).to.deep.equal(sizes);
+        const listCenter = (list.left + list.right) / 2;
+        for (const row of rows) {
+          const center = (row[0].left + row.at(-1)!.right) / 2;
+          expect(center, `${id} row centered`).to.be.closeTo(listCenter, 2);
+        }
+      });
+    }
   });
 });

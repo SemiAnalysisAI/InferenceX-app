@@ -2,18 +2,19 @@
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 
+import { Button } from '@/components/ui/button';
 import { track } from '@/lib/analytics/analytics';
 import { isZhPathname } from '@/lib/i18n/i18n';
 
 const STRINGS = {
   en: {
-    title: 'Something went wrong!',
-    description: 'An unexpected error has occurred.',
+    title: 'Something went wrong',
+    description: 'An unexpected error has occurred',
     retry: 'Try again',
   },
   zh: {
     title: '页面出了点问题',
-    description: '发生意外错误。请重试。',
+    description: '发生意外错误',
     retry: '重试',
   },
 } as const;
@@ -38,26 +39,26 @@ export default function Error({
     <div
       role="alert"
       lang={locale === 'zh' ? 'zh-CN' : 'en'}
-      className="flex grow flex-col items-center justify-center px-4 text-center text-foreground"
+      className="flex grow flex-col items-center justify-center px-4 py-24 text-center text-foreground md:py-32"
     >
-      <h2 className="text-4xl font-bold mb-4">{t.title}</h2>
-      <p className="text-lg mb-4">{t.description}</p>
+      <h2 className="mb-2 text-2xl font-semibold">{t.title}</h2>
+      <p className="mb-4 text-sm text-muted-foreground">{t.description}</p>
       <p
         lang={locale === 'zh' ? 'en' : undefined}
-        className="text-md mb-8 max-w-full break-words text-red-500"
+        className="mb-8 max-w-full break-words font-mono text-xs text-muted-foreground"
       >
         {error.message}
       </p>
-      <button
+      <Button
         type="button"
-        className="min-h-11 rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"
+        variant="outline"
         onClick={() => {
           track('error_page_retry', { locale });
           reset();
         }}
       >
         {t.retry}
-      </button>
+      </Button>
     </div>
   );
 }

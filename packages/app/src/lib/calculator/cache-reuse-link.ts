@@ -7,9 +7,10 @@ import { getHardwareKey } from '@/lib/charts/chart-utils';
 import { PRECISION_OPTIONS, Sequence } from '@/lib/catalog/data-mappings';
 import { localePath, type Locale } from '@/lib/i18n/i18n';
 import { withChartState } from '@/lib/routing/url-state';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export function cacheReuseHref(locale: Locale, point?: PointMeta): string {
-  const href = withChartState(localePath('/cache-reuse', locale));
+  const href = withChartState(localePath(getDashboardRoute('cache-reuse').path, locale));
   if (!point) return href;
   const [path, search = ''] = href.split('?');
   const params = new URLSearchParams(search);

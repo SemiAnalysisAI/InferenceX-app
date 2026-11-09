@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { getAllPosts, getPostBySlug } from '../blog/blog';
@@ -7,6 +10,7 @@ import {
   getAllGlossaryEntries,
   getGlossaryEntry,
   getRelatedGlossaryEntries,
+  type GlossaryFigureImage,
 } from './glossary';
 import {
   GLOSSARY_CATEGORY_LABELS_ZH,
@@ -202,6 +206,49 @@ describe('glossary navigation', () => {
         previous: sorted[index - 1] ?? null,
         next: sorted[index + 1] ?? null,
       });
+    }
+  });
+});
+
+/** Pixel size of a lossy (VP8) or extended (VP8X) WebP file. */
+function webpSize(file: Buffer): [number, number] {
+  expect(file.toString('ascii', 0, 4)).toBe('RIFF');
+  expect(file.toString('ascii', 8, 12)).toBe('WEBP');
+  const chunk = file.toString('ascii', 12, 16);
+  if (chunk === 'VP8X') return [file.readUIntLE(24, 3) + 1, file.readUIntLE(27, 3) + 1];
+  expect(chunk).toBe('VP8 ');
+  // The VP8 frame header keeps each dimension in the low 14 bits.
+  const dimension = (offset: number) => file.readUInt16LE(offset) % 2 ** 14;
+  return [dimension(26), dimension(28)];
+}
+
+const imageIdentity = ({ src, width, height }: GlossaryFigureImage) => [src, width, height];
+
+describe('glossary figures', () => {
+  it('points at WebPs in public/ whose sizes match the declared dimensions', () => {
+    const images = getAllGlossaryEntries().flatMap((entry) => entry.figure?.images ?? []);
+    expect(images.length).toBeGreaterThanOrEqual(1);
+    for (const image of images) {
+      expect(image.src).toMatch(/^\/images\/glossary\/[a-z0-9-]+\.webp$/u);
+      const file = readFileSync(path.join(process.cwd(), 'public', image.src));
+      expect(webpSize(file), image.src).toEqual([image.width, image.height]);
+      expect(image.alt.length, image.src).toBeGreaterThan(40);
+    }
+  });
+
+  it('shows the same images on the Chinese page with translated alt text and caption', () => {
+    for (const entry of getAllGlossaryEntries()) {
+      const zh = getZhGlossaryEntry(entry.slug)?.figure;
+      if (!entry.figure) {
+        expect(zh, entry.slug).toBeUndefined();
+        continue;
+      }
+      expect(zh, entry.slug).toBeDefined();
+      expect(zh?.images.map(imageIdentity)).toEqual(entry.figure.images.map(imageIdentity));
+      entry.figure.images.forEach((image, index) => {
+        expect(zh?.images[index]?.alt, image.src).not.toBe(image.alt);
+      });
+      expect(zh?.caption).not.toBe(entry.figure.caption);
     }
   });
 });

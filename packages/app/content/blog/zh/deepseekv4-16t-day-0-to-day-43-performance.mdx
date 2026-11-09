@@ -68,7 +68,7 @@ ROCm 在 DeepSeek v4 发布的头几天同样表现不佳。不过，在 HaiShaw
   caption="来源：SemiAnalysis - InferenceX GitHub"
 />
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?preset=dsv4-launch">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?preset=dsv4-launch">
   点击查看完整的 DeepSeekV4 InferenceX 仪表板 →
 </DashboardCTA>
 
@@ -118,7 +118,7 @@ InferenceX 团队非常感谢 vLLM 社区维护者和 Inferact 持续投入的�
   caption="来源：InferenceX"
 />
 
-[实时图表](https://inferencex.semianalysis.com/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-04-27&g_runid=25016676395&i_hc=1&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Cb300_vllm%2Cgb200_dynamo-vllm%2Ch200_vllm%2Cmi355x_atom%2Cmi355x_sglang)
+[实时图表](https://inferencex.semianalysis.com/infx/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-04-27&g_runid=25016676395&i_hc=1&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Cb300_vllm%2Cgb200_dynamo-vllm%2Ch200_vllm%2Cmi355x_atom%2Cmi355x_sglang)
 
 下图展示了 SGLang 第 0 天的性能表现：
 
@@ -128,7 +128,7 @@ InferenceX 团队非常感谢 vLLM 社区维护者和 Inferact 持续投入的�
   caption="来源：InferenceX"
 />
 
-[实时图表](https://inferencex.semianalysis.com/inference?i_hc=1&g_model=DeepSeek-V4-Pro&g_rundate=2026-04-25&i_prec=fp4%2Cfp8&g_runid=24943464864&i_active=b200_sglang%2Cb300_sglang%2Cmi355x_sglang)
+[实时图表](https://inferencex.semianalysis.com/infx/inference?i_hc=1&g_model=DeepSeek-V4-Pro&g_rundate=2026-04-25&i_prec=fp4%2Cfp8&g_runid=24943464864&i_active=b200_sglang%2Cb300_sglang%2Cmi355x_sglang)
 
 现在让我们深入了解每组第 0 天结果的细节。
 
@@ -140,7 +140,7 @@ InferenceX 团队非常感谢 vLLM 社区维护者和 Inferact 持续投入的�
   caption="来源：InferenceX"
 />
 
-[实时图表](https://inferencex.semianalysis.com/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-04-27&g_runid=25016676395&i_prec=fp4%2Cfp8&i_hc=1&i_legend=0&i_active=b200_vllm%2Cgb200_dynamo-vllm)
+[实时图表](https://inferencex.semianalysis.com/infx/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-04-27&g_runid=25016676395&i_prec=fp4%2Cfp8&i_hc=1&i_legend=0&i_active=b200_vllm%2Cgb200_dynamo-vllm)
 
 vLLM 和 Nvidia 非常快速地在 [srt-slurm](https://github.com/NVIDIA/srt-slurm/pull/71) 中交付了他们的 GB200 分布式推理 Dynamo vLLM 配方。分离式推理（disaggregated inference）和宽专家并行（WideEP）是能够显著提升每美元性能的推理优化技术——读者可以在我们的 [InferenceX V2 文章](https://newsletter.semianalysis.com/p/inferencex-v2-nvidia-blackwell-vs)中了解更多。该配方本身较为基础：prefill 使用 eager 模式，通过 NIXL 进行 KV cache 传输。我们独立复现了该配方，在使用较低交互性配置时，实现了比 B200 运行最高 5 倍的性能提升。
 
@@ -154,7 +154,7 @@ vLLM 和 Nvidia 非常快速地在 [srt-slurm](https://github.com/NVIDIA/srt-slu
   caption="来源：InferenceX"
 />
 
-[实时图表](https://inferencex.semianalysis.com/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-04-27&g_runid=25016676395&i_prec=fp4%2Cfp8&i_hc=1&i_legend=0&i_active=b300_sglang%2Cb300_sglang_mtp)
+[实时图表](https://inferencex.semianalysis.com/infx/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-04-27&g_runid=25016676395&i_prec=fp4%2Cfp8&i_hc=1&i_legend=0&i_active=b300_sglang%2Cb300_sglang_mtp)
 
 DeepSeek v4 的首个 MTP 支持在第 3 天由 SGLang 交付。使用 MTP 在较高交互性下带来了吞吐量的大幅提升。关于 MTP 及其如何惠及内存受限的小批量解码，可参阅我们的 [InferenceX V2 文章](https://newsletter.semianalysis.com/p/inferencex-v2-nvidia-blackwell-vs)。
 
@@ -170,7 +170,7 @@ DeepSeek v4 的首个 MTP 支持在第 3 天由 SGLang 交付。使用 MTP 在�
   caption="来源：InferenceX"
 />
 
-[实时图表](https://inferencex.semianalysis.com/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-04-25&i_hc=1&i_legend=0&g_runid=24943464864&i_prec=fp4%2Cfp8&i_gpus=mi355x_atom%2Cmi355x_sglang&i_dstart=2026-04-25&i_dend=2026-04-26&i_active=mi355x_sglang)
+[实时图表](https://inferencex.semianalysis.com/infx/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-04-25&i_hc=1&i_legend=0&g_runid=24943464864&i_prec=fp4%2Cfp8&i_gpus=mi355x_atom%2Cmi355x_sglang&i_dstart=2026-04-25&i_dend=2026-04-26&i_active=mi355x_sglang)
 
 ### AMD ATOM 推理引擎的失望表现
 
@@ -215,7 +215,7 @@ _MI355X DeepSeek V4 Pro 性能从第 0 天起的改进过程。来源：SemiAnal
   caption="来源：InferenceX"
 />
 
-[实时图表](https://inferencex.semianalysis.com/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-04-25&i_legend=0&g_runid=24943464864&i_prec=fp4%2Cfp8&i_gpus=mi355x_sglang%2Ch200_sglang&i_dstart=2026-04-25&i_dend=2026-05-27&i_dates=2026-05-02%2C2026-05-03%2C2026-05-04%2C2026-05-08%2C2026-05-10%2C2026-05-19%2C2026-05-21&i_active=mi355x_sglang)
+[实时图表](https://inferencex.semianalysis.com/infx/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-04-25&i_legend=0&g_runid=24943464864&i_prec=fp4%2Cfp8&i_gpus=mi355x_sglang%2Ch200_sglang&i_dstart=2026-04-25&i_dend=2026-05-27&i_dates=2026-05-02%2C2026-05-03%2C2026-05-04%2C2026-05-08%2C2026-05-10%2C2026-05-19%2C2026-05-21&i_active=mi355x_sglang)
 
 上方图表显示了从 4 月 25 日第 0 天发布的 FP8 构建到 5 月 27 日发布的 FP4 构建之间，吞吐量 Pareto 最优前沿的攀升。性能提升几乎完全来自 AMD 用真正的 AITER、Triton、TileLang 和 FlyDSL kernel 替换 PyTorch 原生 fallback 路径。
 
@@ -233,7 +233,7 @@ _MI355X DeepSeek V4 Pro 性能从第 0 天起的改进过程。来源：SemiAnal
   caption="ATOM 从左下角的单个数据点发展到完整前沿。H200 作为参考。来源：InferenceX"
 />
 
-[实时图表](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-31&g_runid=26696268345&g_model=DeepSeek-V4-Pro&i_gpus=mi355x_atom%2Ch200_sglang&i_dstart=2026-04-26&i_dend=2026-05-14&i_prec=fp4%2Cfp8&i_active=mi355x_atom&i_dates=2026-05-02)
+[实时图表](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-31&g_runid=26696268345&g_model=DeepSeek-V4-Pro&i_gpus=mi355x_atom%2Ch200_sglang&i_dstart=2026-04-26&i_dend=2026-05-14&i_prec=fp4%2Cfp8&i_active=mi355x_atom&i_dates=2026-05-02)
 
 ATOM 也取得了巨大进步，从单个 conc=1 数据点扩展到在整个 Pareto 前沿提供可观的吞吐量，部分数据点甚至超越了 H200。第一个提升来自 [AITER fix #2916](https://github.com/ROCm/aiter/pull/2916)，该修复纠正了导致 mHC 崩溃的设备分配 bug，使 ATOM 得以恢复该 AITER kernel。接着，FP4 专家迁移到了 AITER 的 fused MoE kernel（移除了 Triton override），稀疏注意力的 OOM 问题被清除，eager 模式和单序列限制得以解除。批处理支持也已实现，将并发扫描从 conc=1 扩展到 conc 1–512，性能大幅改善。
 
@@ -249,7 +249,7 @@ ATOM 也取得了巨大进步，从单个 conc=1 数据点扩展到在整个 Par
   caption="来源：InferenceX"
 />
 
-[实时图表](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-29&g_model=DeepSeek-V4-Pro&g_runid=26649066318&i_gpus=b300_sglang%2Cb300_trt%2Cb300_vllm&i_active=b300_sglang%2Cb300_trt&i_dstart=2026-04-24&i_dend=2026-05-18&i_dates=2026-04-25%2C2026-04-26%2C2026-04-27%2C2026-04-28%2C2026-04-29%2C2026-05-03%2C2026-05-05)
+[实时图表](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-29&g_model=DeepSeek-V4-Pro&g_runid=26649066318&i_gpus=b300_sglang%2Cb300_trt%2Cb300_vllm&i_active=b300_sglang%2Cb300_trt&i_dstart=2026-04-24&i_dend=2026-05-18&i_dates=2026-04-25%2C2026-04-26%2C2026-04-27%2C2026-04-28%2C2026-04-29%2C2026-05-03%2C2026-05-05)
 
 对于 B300 上的 SGLang，DeepGEMM MegaMoE 的结果显示不到一周内实现了 3 倍性能提升，这得益于分组 FP4 MoE GEMM（将专家保持驻留并执行一次 mega-dispatch 而非逐专家 kernel 调度），以及从 EP8 调优至 EP4。
 
@@ -276,7 +276,7 @@ _GB300 NVL72 DeepSeek V4 Pro 性能随时间的改进。来源：SemiAnalysis In
   caption="来源：InferenceX"
 />
 
-[实时图表](https://inferencex.semianalysis.com/inference?i_hc=1&g_model=DeepSeek-V4-Pro&g_rundate=2026-06-08&g_runid=27099659001&i_prec=fp4%2Cfp8&i_gpus=gb300_dynamo-sglang%2Cgb300_dynamo-sglang_mtp&i_active=gb300_dynamo-sglang&i_dates=2026-04-30%2C2026-05-07%2C2026-05-11%2C2026-05-20%2C2026-05-22%2C2026-05-28%2C2026-06-02%2C2026-06-03%2C2026-06-08&i_dstart=2026-04-30&i_dend=2026-06-08)
+[实时图表](https://inferencex.semianalysis.com/infx/inference?i_hc=1&g_model=DeepSeek-V4-Pro&g_rundate=2026-06-08&g_runid=27099659001&i_prec=fp4%2Cfp8&i_gpus=gb300_dynamo-sglang%2Cgb300_dynamo-sglang_mtp&i_active=gb300_dynamo-sglang&i_dates=2026-04-30%2C2026-05-07%2C2026-05-11%2C2026-05-20%2C2026-05-22%2C2026-05-28%2C2026-06-02%2C2026-06-03%2C2026-06-08&i_dstart=2026-04-30&i_dend=2026-06-08)
 
 GB300 SGLang MTP 最显著的改进出现在 6 月 2 日，源自 W4A4 (MXFP4) MegaMoE 的实现。相比 5 月 7 日使用的非 MTP 实现，6 月 2 日版本的主要改进完全来自 GB300 解码拓扑的重构，而非触及 kernel 或精度。第 0 天的测试配置在多数数据点上以窄 EP=8 运行，由一到两个 prefill worker 供给，并发上限为 16,384；5 月 20 日的运行将解码扩展到 EP=16，prefill 扩展到每个解码 worker 对应四到十二个 prefill worker，并将并发推到了 21,504。
 
@@ -294,7 +294,7 @@ GB300 SGLang MTP 最显著的改进出现在 6 月 2 日，源自 W4A4 (MXFP4) M
   caption="来源：InferenceX"
 />
 
-[实时图表](https://inferencex.semianalysis.com/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-06-05&g_runid=27002889438&i_metric=y_tpPerMw&i_gpus=b200_vllm&i_dates=2026-04-28&i_dstart=2026-04-27&i_dend=2026-06-05&i_hc=1&i_linelabel=1)
+[实时图表](https://inferencex.semianalysis.com/infx/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-06-05&g_runid=27002889438&i_metric=y_tpPerMw&i_gpus=b200_vllm&i_dates=2026-04-28&i_dstart=2026-04-27&i_dend=2026-06-05&i_hc=1&i_linelabel=1)
 
 每全电源配置兆瓦 token 数是评估机群规模投资回报的最佳指标：它比单纯的每 GPU token 吞吐量承载更多信息，因为它反映了 PUE 和数据中心开销。由于 B200 的全电源配置功率大约固定在 2.17 kW/GPU，从约 300k 到约 500k tok/s/MW 的约 1.7 倍跃升反映的是纯软件优化收益。
 
@@ -312,7 +312,7 @@ GB300 SGLang MTP 最显著的改进出现在 6 月 2 日，源自 W4A4 (MXFP4) M
   caption="来源：InferenceX"
 />
 
-[实时图表](https://inferencex.semianalysis.com/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-06-05&g_runid=27002889438&i_active=b300_sglang_mtp%2Cgb300_dynamo-sglang%2Cgb300_dynamo-sglang_mtp%2Cmi355x_sglang_mtp&i_linelabel=1)
+[实时图表](https://inferencex.semianalysis.com/infx/inference?g_model=DeepSeek-V4-Pro&g_rundate=2026-06-05&g_runid=27002889438&i_active=b300_sglang_mtp%2Cgb300_dynamo-sglang%2Cgb300_dynamo-sglang_mtp%2Cmi355x_sglang_mtp&i_linelabel=1)
 
 开启 MTP 后，GB300 在我们分析的所有交互性水平上都无可匹敌。GB300 每百万输出 token 的成本在 50 tok/s/user 下达到 $0.156（假设 8k token 输入、1k token 输出）。欲了解更多关于我们如何计算总拥有成本（TCO）的信息，请参阅我们的 [TCO 模型](https://semianalysis.com/ai-cloud-tco-model/)。
 
@@ -322,7 +322,7 @@ GB300 SGLang MTP 最显著的改进出现在 6 月 2 日，源自 W4A4 (MXFP4) M
   caption="来源：InferenceX TCO 计算器"
 />
 
-[实时 TCO 计算器视图](https://inferencex.semianalysis.com/calculator?g_rundate=2026-06-08&g_model=DeepSeek-V4-Pro&g_runid=27099659001)
+[实时 TCO 计算器视图](https://inferencex.semianalysis.com/infx/calculator?g_rundate=2026-06-08&g_model=DeepSeek-V4-Pro&g_runid=27099659001)
 
 机架级优势本质上是一个纵向扩展（scale-up）的故事。NVL72 将 72 个 GPU 置于单个 NVLink 域中，使服务栈能够以足够宽的专家并行运行，让 DeepSeek V4 的 MoE dispatch/combine all-to-all 完全运行在 NVLink 上而无需溢出到较慢的横向扩展（scale-out）网络，同时在更多 rank 之间分摊专家权重加载。
 
@@ -338,7 +338,7 @@ B200 和 B300 的 8 GPU NVLink 岛通过 InfiniBand 横向扩展会更早遇到�
   caption="来源：InferenceX"
 />
 
-[实时图表](https://inferencex.semianalysis.com/inference?i_hc=1&g_model=DeepSeek-V4-Pro&g_rundate=2026-06-05&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Cmi355x_vllm&g_runid=27002889438)
+[实时图表](https://inferencex.semianalysis.com/infx/inference?i_hc=1&g_model=DeepSeek-V4-Pro&g_rundate=2026-06-05&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Cmi355x_vllm&g_runid=27002889438)
 
 ## DeepSeek v4 的下一步
 
@@ -527,7 +527,7 @@ DeepSeek V4 的发布还包含了一个新的融合 MoE kernel，实现了 MoE �
 
 在详细讨论了性能基准测试之后，让我们来讨论在 H200 和 GB200 NVL72 上运行 DeepSeek v4 的总拥有成本和每 token 成本。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?preset=dsv4-launch">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?preset=dsv4-launch">
   点击查看完整的 DeepSeekV4 InferenceX 仪表板 →
 </DashboardCTA>
 

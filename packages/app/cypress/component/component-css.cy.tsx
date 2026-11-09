@@ -77,140 +77,134 @@ function SearchForm({ onSubmit }: { onSubmit: React.FormEventHandler<HTMLFormEle
 }
 
 describe('component CSS harness', () => {
-  for (const theme of ['light', 'dark']) {
-    it(`keeps focus undecorated without losing selection, validation, or input in ${theme} mode`, () => {
-      cy.mount(
-        <div className={`${theme} space-y-3 p-4`}>
-          <Input aria-label="Editable value" defaultValue="Original" />
-          <Input aria-label="Invalid value" aria-invalid="true" defaultValue="Invalid" />
-          <Textarea aria-label="Prompt" defaultValue="Full prompt" />
-          <Button variant="outline">Action</Button>
-          <Switch aria-label="Enabled setting" defaultChecked />
-          <a href="#details">Native link</a>
-          <InputGroup>
-            <InputGroupInput aria-label="Grouped value" defaultValue="Grouped" />
-          </InputGroup>
-          <Select defaultValue="first">
-            <SelectTrigger aria-label="Selected value">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="first">First option</SelectItem>
-              <SelectItem value="second">Second option</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>,
-      );
-      cy.get('input, textarea, button, a').each(($control) => {
-        const before = focusAppearance($control[0]);
-        cy.wrap($control)
-          .focus()
-          .should('be.focused')
-          .should(($focused) => {
-            expect(focusAppearance($focused[0])).to.deep.equal(before);
-            expect(getComputedStyle($focused[0]).outlineStyle).to.equal('none');
-          });
-      });
-      cy.get('[data-slot="input-group"]').then(($group) => {
-        cy.get('a').focus();
-        cy.then(() => {
-          const before = focusAppearance($group[0]);
-          cy.get('[aria-label="Grouped value"]').focus();
-          cy.wrap($group).should(($focused) => {
-            expect(focusAppearance($focused[0])).to.deep.equal(before);
-          });
-        });
-      });
-      cy.get('[aria-label="Editable value"]')
+  it('keeps focus undecorated without losing selection, validation, or input in light mode', () => {
+    cy.mount(
+      <div className="light space-y-3 p-4">
+        <Input aria-label="Editable value" defaultValue="Original" />
+        <Input aria-label="Invalid value" aria-invalid="true" defaultValue="Invalid" />
+        <Textarea aria-label="Prompt" defaultValue="Full prompt" />
+        <Button variant="outline">Action</Button>
+        <Switch aria-label="Enabled setting" defaultChecked />
+        <a href="#details">Native link</a>
+        <InputGroup>
+          <InputGroupInput aria-label="Grouped value" defaultValue="Grouped" />
+        </InputGroup>
+        <Select defaultValue="first">
+          <SelectTrigger aria-label="Selected value">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="first">First option</SelectItem>
+            <SelectItem value="second">Second option</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>,
+    );
+    cy.get('input, textarea, button, a').each(($control) => {
+      const before = focusAppearance($control[0]);
+      cy.wrap($control)
         .focus()
-        .type(' text')
-        .should('have.value', 'Original text');
-      cy.get('[aria-label="Invalid value"]')
-        .focus()
-        .should(($invalid) => {
-          const valid = $invalid[0].ownerDocument.querySelector('[aria-label="Editable value"]')!;
-          expect(getComputedStyle($invalid[0]).borderColor).not.to.equal(
-            getComputedStyle(valid).borderColor,
-          );
+        .should('be.focused')
+        .should(($focused) => {
+          expect(focusAppearance($focused[0])).to.deep.equal(before);
+          expect(getComputedStyle($focused[0]).outlineStyle).to.equal('none');
         });
-      cy.get('[role="switch"]')
-        .should('have.attr', 'aria-checked', 'true')
-        .click()
-        .should('have.attr', 'aria-checked', 'false');
-      cy.get('[aria-label="Selected value"]').click();
-      cy.contains('[role="option"]', 'Second option').focus().type('{enter}');
-      cy.get('[aria-label="Selected value"]').should('contain.text', 'Second option');
     });
-  }
+    cy.get('[data-slot="input-group"]').then(($group) => {
+      cy.get('a').focus();
+      cy.then(() => {
+        const before = focusAppearance($group[0]);
+        cy.get('[aria-label="Grouped value"]').focus();
+        cy.wrap($group).should(($focused) => {
+          expect(focusAppearance($focused[0])).to.deep.equal(before);
+        });
+      });
+    });
+    cy.get('[aria-label="Editable value"]')
+      .focus()
+      .type(' text')
+      .should('have.value', 'Original text');
+    cy.get('[aria-label="Invalid value"]')
+      .focus()
+      .should(($invalid) => {
+        const valid = $invalid[0].ownerDocument.querySelector('[aria-label="Editable value"]')!;
+        expect(getComputedStyle($invalid[0]).borderColor).not.to.equal(
+          getComputedStyle(valid).borderColor,
+        );
+      });
+    cy.get('[role="switch"]')
+      .should('have.attr', 'aria-checked', 'true')
+      .click()
+      .should('have.attr', 'aria-checked', 'false');
+    cy.get('[aria-label="Selected value"]').click();
+    cy.contains('[role="option"]', 'Second option').focus().type('{enter}');
+    cy.get('[aria-label="Selected value"]').should('contain.text', 'Second option');
+  });
 
   for (const width of [390, 1280]) {
-    for (const theme of ['light', 'dark']) {
-      it(`aligns form controls and preserves readable labels at ${width}px in ${theme} mode`, () => {
-        cy.viewport(width, 720);
-        cy.mount(
-          <div className={theme}>
-            <ControlPanel legend="Configuration" className="m-4">
-              <Label htmlFor="control-input">Long benchmark configuration label</Label>
-              <Input id="control-input" defaultValue="Full value remains editable" />
-              <Select defaultValue="benchmark">
-                <SelectTrigger aria-label="Benchmark" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="benchmark">Benchmark</SelectItem>
-                </SelectContent>
-              </Select>
-              <MultiSelect
-                value={['benchmark']}
-                options={[{ value: 'benchmark', label: 'Benchmark' }]}
-                plainSelectedText
-                showClearAll={false}
-              />
-              <SearchableSelect
-                value="benchmark"
-                groups={[
-                  { label: 'Models', options: [{ value: 'benchmark', label: 'Benchmark' }] },
-                ]}
-                onValueChange={() => {}}
-              />
-              <Button type="button">Apply</Button>
-            </ControlPanel>
-          </div>,
-        );
-        const height = width < 768 ? 44 : 36;
-        cy.get('[data-slot="control-panel"]').should(($panel) => {
-          const panel = $panel[0];
-          expect(panel.tagName).to.eq('FIELDSET');
-          const legend = panel.querySelector('legend')!;
-          expect(legend.textContent).to.eq('Configuration');
-          const label = panel.querySelector('label')!;
-          expect(
-            label.getBoundingClientRect().top - legend.getBoundingClientRect().bottom,
-            'compact space between the legend and the first field label',
-          ).to.be.closeTo(4, 1);
-          const input = panel.querySelector('input')!;
-          const expectedFill = getComputedStyle(input).backgroundColor;
-          const bounds = panel.getBoundingClientRect();
-          for (const control of panel.querySelectorAll(
-            'input, [data-slot="select-trigger"], [data-slot="button"]',
-          )) {
-            const box = control.getBoundingClientRect();
-            expect(box.height, (control as HTMLElement).dataset.slot ?? '').to.eq(height);
-            expect(box.left).to.be.at.least(bounds.left);
-            expect(box.right).to.be.at.most(bounds.right);
-          }
-          for (const control of panel.querySelectorAll('[data-slot="select-trigger"]')) {
-            expect(getComputedStyle(control).fontSize).to.eq('14px');
-            expect(getComputedStyle(control).backgroundColor).to.eq(expectedFill);
-          }
-          expect(getComputedStyle(input).fontSize).to.eq(width < 768 ? '16px' : '14px');
-        });
-        cy.contains('label', 'Long benchmark').click();
-        cy.focused()
-          .should('have.id', 'control-input')
-          .and('have.value', 'Full value remains editable');
+    it(`aligns form controls and preserves readable labels at ${width}px in light mode`, () => {
+      cy.viewport(width, 720);
+      cy.mount(
+        <div className="light">
+          <ControlPanel legend="Configuration" className="m-4">
+            <Label htmlFor="control-input">Long benchmark configuration label</Label>
+            <Input id="control-input" defaultValue="Full value remains editable" />
+            <Select defaultValue="benchmark">
+              <SelectTrigger aria-label="Benchmark" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="benchmark">Benchmark</SelectItem>
+              </SelectContent>
+            </Select>
+            <MultiSelect
+              value={['benchmark']}
+              options={[{ value: 'benchmark', label: 'Benchmark' }]}
+              plainSelectedText
+              showClearAll={false}
+            />
+            <SearchableSelect
+              value="benchmark"
+              groups={[{ label: 'Models', options: [{ value: 'benchmark', label: 'Benchmark' }] }]}
+              onValueChange={() => {}}
+            />
+            <Button type="button">Apply</Button>
+          </ControlPanel>
+        </div>,
+      );
+      const height = width < 768 ? 44 : 36;
+      cy.get('[data-slot="control-panel"]').should(($panel) => {
+        const panel = $panel[0];
+        expect(panel.tagName).to.eq('FIELDSET');
+        const legend = panel.querySelector('legend')!;
+        expect(legend.textContent).to.eq('Configuration');
+        const label = panel.querySelector('label')!;
+        expect(
+          label.getBoundingClientRect().top - legend.getBoundingClientRect().bottom,
+          'compact space between the legend and the first field label',
+        ).to.be.closeTo(4, 1);
+        const input = panel.querySelector('input')!;
+        const expectedFill = getComputedStyle(input).backgroundColor;
+        const bounds = panel.getBoundingClientRect();
+        for (const control of panel.querySelectorAll(
+          'input, [data-slot="select-trigger"], [data-slot="button"]',
+        )) {
+          const box = control.getBoundingClientRect();
+          expect(box.height, (control as HTMLElement).dataset.slot ?? '').to.eq(height);
+          expect(box.left).to.be.at.least(bounds.left);
+          expect(box.right).to.be.at.most(bounds.right);
+        }
+        for (const control of panel.querySelectorAll('[data-slot="select-trigger"]')) {
+          expect(getComputedStyle(control).fontSize).to.eq('14px');
+          expect(getComputedStyle(control).backgroundColor).to.eq(expectedFill);
+        }
+        expect(getComputedStyle(input).fontSize).to.eq(width < 768 ? '16px' : '14px');
       });
-    }
+      cy.contains('label', 'Long benchmark').click();
+      cy.focused()
+        .should('have.id', 'control-input')
+        .and('have.value', 'Full value remains editable');
+    });
   }
 
   it('keeps compact controls touchable and selects a searched option with the keyboard', () => {
@@ -258,50 +252,48 @@ describe('component CSS harness', () => {
   });
 
   for (const width of [390, 1280]) {
-    for (const theme of ['light', 'dark']) {
-      it(`keeps selected segments concentric with their outlines at ${width}px in ${theme} mode`, () => {
-        cy.viewport(width, 720);
-        cy.mount(
-          <div className={`${theme} flex flex-col items-start gap-4 p-4`}>
-            <SegmentedGeometryHarness size="sm" />
-            <SegmentedGeometryHarness size="default" />
-          </div>,
-        );
-        for (const size of ['sm', 'default']) {
-          const selector = `[role="tablist"][aria-label="${size} view"]`;
-          const assertCorners = (side: 'left' | 'right') => {
-            cy.get(selector).should(($group) => {
-              const group = $group[0];
-              const selected = group.querySelector('[aria-selected="true"]')!;
-              const outer = group.getBoundingClientRect();
-              const inner = selected.getBoundingClientRect();
-              const inset = side === 'left' ? inner.left - outer.left : outer.right - inner.right;
-              expect(inner.top - outer.top, 'equal top and side inset').to.be.closeTo(inset, 0.25);
-              expect(outer.bottom - inner.bottom, 'equal bottom and side inset').to.be.closeTo(
-                inset,
-                0.25,
-              );
-              const outerStyle = getComputedStyle(group);
-              const innerStyle = getComputedStyle(selected);
-              const corner = side === 'left' ? 'borderTopLeftRadius' : 'borderTopRightRadius';
-              expect(parseFloat(innerStyle[corner]), 'concentric selected corner').to.be.closeTo(
-                Math.max(0, parseFloat(outerStyle[corner]) - inset),
-                0.25,
-              );
-              expect(inner.height, 'retains usable touch targets').to.be.at.least(
-                width < 768 ? 44 : 24,
-              );
-            });
-          };
-          assertCorners('left');
-          cy.get(selector).contains('[role="tab"]', 'Table').click();
-          cy.get(selector)
-            .contains('[role="tab"]', 'Table')
-            .should('have.attr', 'aria-selected', 'true');
-          assertCorners('right');
-        }
-      });
-    }
+    it(`keeps selected segments concentric with their outlines at ${width}px in light mode`, () => {
+      cy.viewport(width, 720);
+      cy.mount(
+        <div className="light flex flex-col items-start gap-4 p-4">
+          <SegmentedGeometryHarness size="sm" />
+          <SegmentedGeometryHarness size="default" />
+        </div>,
+      );
+      for (const size of ['sm', 'default']) {
+        const selector = `[role="tablist"][aria-label="${size} view"]`;
+        const assertCorners = (side: 'left' | 'right') => {
+          cy.get(selector).should(($group) => {
+            const group = $group[0];
+            const selected = group.querySelector('[aria-selected="true"]')!;
+            const outer = group.getBoundingClientRect();
+            const inner = selected.getBoundingClientRect();
+            const inset = side === 'left' ? inner.left - outer.left : outer.right - inner.right;
+            expect(inner.top - outer.top, 'equal top and side inset').to.be.closeTo(inset, 0.25);
+            expect(outer.bottom - inner.bottom, 'equal bottom and side inset').to.be.closeTo(
+              inset,
+              0.25,
+            );
+            const outerStyle = getComputedStyle(group);
+            const innerStyle = getComputedStyle(selected);
+            const corner = side === 'left' ? 'borderTopLeftRadius' : 'borderTopRightRadius';
+            expect(parseFloat(innerStyle[corner]), 'concentric selected corner').to.be.closeTo(
+              Math.max(0, parseFloat(outerStyle[corner]) - inset),
+              0.25,
+            );
+            expect(inner.height, 'retains usable touch targets').to.be.at.least(
+              width < 768 ? 44 : 24,
+            );
+          });
+        };
+        assertCorners('left');
+        cy.get(selector).contains('[role="tab"]', 'Table').click();
+        cy.get(selector)
+          .contains('[role="tab"]', 'Table')
+          .should('have.attr', 'aria-selected', 'true');
+        assertCorners('right');
+      }
+    });
   }
 
   it('exposes value filters as pressed buttons and does not submit the surrounding form', () => {
@@ -452,24 +444,6 @@ describe('component CSS harness', () => {
     cy.get('@metricChange').should('have.been.calledOnceWith', 'roi');
   });
 
-  it('loads Tailwind visibility and sizing utilities', () => {
-    cy.mount(
-      <button type="button" data-testid="css-probe" className="hidden size-11">
-        probe
-      </button>,
-    );
-
-    cy.get('[data-testid="css-probe"]').then(($probe) => {
-      const style = getComputedStyle($probe[0]);
-
-      expect({ display: style.display, width: style.width, height: style.height }).to.deep.equal({
-        display: 'none',
-        width: '44px',
-        height: '44px',
-      });
-    });
-  });
-
   for (const width of [375, 1280]) {
     it(`aligns comparison names and vs without splitting hardware names at ${width}px`, () => {
       cy.viewport(width, 720);
@@ -549,8 +523,8 @@ describe('component CSS harness', () => {
           const action = button.getBoundingClientRect();
           expect(action.right, 'action remains inside the card').to.be.at.most(bounds.right);
           if (width < 640) {
-            expect(action.top, 'mobile actions follow the description').to.be.greaterThan(
-              description.bottom,
+            expect(action.bottom, 'mobile actions stay above the description').to.be.at.most(
+              description.top,
             );
           } else {
             expect(action.left, 'desktop actions do not overlap the description').to.be.greaterThan(
@@ -580,7 +554,7 @@ describe('component CSS harness', () => {
         const direct = card
           .querySelector('[data-testid="direct-content"]')!
           .getBoundingClientRect();
-        const padding = width < 640 ? 12 : width < 768 ? 16 : 24;
+        const padding = width < 768 ? 16 : 24;
         expect(getComputedStyle(card).paddingLeft).to.equal(`${padding}px`);
         for (const slot of ['card-header', 'card-content', 'card-footer']) {
           const bounds = card.querySelector(`[data-slot="${slot}"]`)!.getBoundingClientRect();

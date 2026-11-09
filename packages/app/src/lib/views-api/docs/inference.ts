@@ -161,7 +161,7 @@ const parameters: readonly ApiParameter[] = [
     'frameworks',
     text('Comma-separated framework families.', '逗号分隔的推理框架系列。'),
     'vllm,sglang',
-    ['atom', 'sglang', 'trt', 'vllm'],
+    ['atom', 'sglang', 'tokenspeed', 'trt', 'vllm'],
   ),
   listParam(
     'deployment',
@@ -336,7 +336,11 @@ const seriesSchema = objectSchema(
     gpu: stringSchema,
     framework: stringSchema,
     specMethod: stringSchema,
-    label: stringSchema,
+    label: {
+      ...stringSchema,
+      description:
+        'Chart display label. If any point in a plain SGLang/vLLM series has router_name=smg, the entire series is labeled SMG SGLang/SMG vLLM. Canonical framework and hwKey are unchanged.',
+    },
     vendor: stringSchema,
     deployment: stringSchema,
     kvOffload: booleanSchema,
@@ -364,7 +368,11 @@ const tableRowSchema = objectSchema(
     gpu: stringSchema,
     framework: stringSchema,
     specMethod: stringSchema,
-    label: stringSchema,
+    label: {
+      ...stringSchema,
+      description:
+        'Point-specific chart display label, including SMG SGLang/SMG vLLM when this point has router_name=smg. Canonical framework and hwKey are unchanged.',
+    },
     vendor: stringSchema,
     deployment: stringSchema,
     kvOffload: booleanSchema,
@@ -854,8 +862,8 @@ export const operations: ApiOperation[] = [
     path: '/api/v1/views/inference',
     summary: text('Get the main inference chart view', '获取主推理图表视图'),
     description: text(
-      'Returns the chart-ready series the /inference scatter chart renders: per hardware config, x/y points at each measured concurrency for the selected metric, sequence, precisions and x-axis mode, with boundary and best-per-SKU flags computed by the same code the dashboard runs. Filters mirror the dashboard quick filters (gpus, vendors, framework families, deployment, spec). Use optimal=true for boundary points or best=true for the best series per GPU SKU. Measured-power boundaries follow the higher-power outer envelope: frontier.direction describes that boundary, while metric.direction remains the optimization direction used by best-per-SKU selection. All in Measured watts and energy support single_turn and AgentX rows with validated telemetry and supported topology; AgentX uses the power model’s agentic workload state without independent workload calibration. All in Measured adds tableRows with every GPU-valid observation in the selected scope and best-series selection (SKUs with no rankable estimate keep their rows), before optimal or axis clipping; unavailable estimates have y=null and a reason. series and count remain numeric chart points.',
-      '返回 /inference 散点图所用的序列：按硬件配置分组，在所选指标、序列、精度与 x 轴模式下给出各并发档位的 x/y 数据点，并复用仪表板代码计算边界与 best-per-SKU 标记。筛选参数与仪表板快捷筛选一致（gpus、vendors、框架系列、部署模式、投机解码）。设置 optimal=true 可只保留边界点，best=true 可只保留每个 GPU SKU 的最优曲线。实测功耗使用较高功耗侧的外包络：frontier.direction 描述这一边界，metric.direction 则保留 best-per-SKU 选择所用的优化方向。整体实测功耗及能耗支持遥测已验证、拓扑受支持的 single_turn 和 AgentX 数据；AgentX 采用功耗模型的智能体工作负载状态，尚未针对该工作负载单独校准。整体实测指标另返回 tableRows，保留当前筛选范围和最优曲线选择内所有 GPU 遥测有效的观测点（没有可排名估算的 SKU 保留其全部观测点），不按 optimal 或坐标轴显示范围裁剪；估算不可用时 y 为 null，并给出原因。series 和 count 仍仅包含可绘制的数值点。',
+      'Returns the chart-ready series the /infx/inference scatter chart renders: per hardware config, x/y points at each measured concurrency for the selected metric, sequence, precisions and x-axis mode, with boundary and best-per-SKU flags computed by the same code the dashboard runs. Filters mirror the dashboard quick filters (gpus, vendors, framework families, deployment, spec). Use optimal=true for boundary points or best=true for the best series per GPU SKU. Measured-power boundaries follow the higher-power outer envelope: frontier.direction describes that boundary, while metric.direction remains the optimization direction used by best-per-SKU selection. All in Measured watts and energy support single_turn and AgentX rows with validated telemetry and supported topology; AgentX uses the power model’s agentic workload state without independent workload calibration. All in Measured adds tableRows with every GPU-valid observation in the selected scope and best-series selection (SKUs with no rankable estimate keep their rows), before optimal or axis clipping; unavailable estimates have y=null and a reason. series and count remain numeric chart points.',
+      '返回 /infx/inference 散点图所用的序列：按硬件配置分组，在所选指标、序列、精度与 x 轴模式下给出各并发档位的 x/y 数据点，并复用仪表板代码计算边界与 best-per-SKU 标记。筛选参数与仪表板快捷筛选一致（gpus、vendors、框架系列、部署模式、投机解码）。设置 optimal=true 可只保留边界点，best=true 可只保留每个 GPU SKU 的最优曲线。实测功耗使用较高功耗侧的外包络：frontier.direction 描述这一边界，metric.direction 则保留 best-per-SKU 选择所用的优化方向。整体实测功耗及能耗支持遥测已验证、拓扑受支持的 single_turn 和 AgentX 数据；AgentX 采用功耗模型的智能体工作负载状态，尚未针对该工作负载单独校准。整体实测指标另返回 tableRows，保留当前筛选范围和最优曲线选择内所有 GPU 遥测有效的观测点（没有可排名估算的 SKU 保留其全部观测点），不按 optimal 或坐标轴显示范围裁剪；估算不可用时 y 为 null，并给出原因。series 和 count 仍仅包含可绘制的数值点。',
     ),
     audience: 'public',
     stability: 'beta',

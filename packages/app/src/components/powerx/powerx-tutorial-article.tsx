@@ -22,7 +22,7 @@ const STRINGS = {
 const TUTORIAL_PROSE_CLASS = cn(
   BLOG_PROSE_CLASS,
   'prose-p:text-base prose-p:leading-7 prose-li:my-1',
-  'prose-h2:mt-24 prose-h2:mb-6 prose-h2:text-3xl prose-h2:font-semibold prose-h2:tracking-tight sm:prose-h2:text-4xl',
+  'prose-h2:mt-24 prose-h2:mb-6 prose-h2:text-3xl prose-h2:font-semibold sm:prose-h2:text-4xl',
   'prose-table:my-6 prose-td:align-top [&_td:first-child]:whitespace-nowrap',
   '[&>details]:max-w-[72ch] [&>details]:border-t [&>details]:border-border/60 [&>details:last-of-type]:border-b',
   '[&>details>summary]:flex [&>details>summary]:min-h-11 [&>details>summary]:cursor-pointer [&>details>summary]:list-none [&>details>summary]:items-baseline [&>details>summary]:justify-between [&>details>summary]:gap-4 [&>details>summary]:py-3 [&>details>summary]:text-base [&>details>summary]:font-medium [&>details>summary]:text-foreground [&>details>summary::-webkit-details-marker]:hidden',
@@ -57,7 +57,7 @@ export function PowerXTutorialArticle({ locale, meta, content }: PowerXTutorialA
           {t.back}
         </PowerXTutorialLink>
         <p
-          className="motion-enter mt-10 font-mono text-xs font-semibold tracking-eyebrow-wide text-brand uppercase"
+          className="motion-enter mt-10 text-xs font-medium text-muted-foreground"
           style={heroStep(0)}
         >
           {t.eyebrow}

@@ -119,6 +119,18 @@ Every INSERT uses `ON CONFLICT DO UPDATE` or `DO NOTHING`. This means:
 The unique constraints match natural keys (for benchmarks, workflow/config/scenario,
 concurrency, offload mode, and the nullable recipe fingerprint), not surrogate keys.
 
+### Results Published Outside CI
+
+The database is the source of truth for every result. Results measured outside our CI
+(OpenAI's Jalapeño points and CoreWeave's July Vera Rubin NVL72 curve) exist only there, each
+snapshot as its own `workflow_runs` row with a fixed negative `github_run_id` (-1 to -3), so
+snapshots never share a run and the benchmark natural key cannot fold one snapshot's points into
+another's. Results from our own runs, including private-repo runs such as the TPU7x sweeps, are
+ingested from their GitHub run. A snapshot's `html_url` is its source page, and the benchmark
+queries return it as `run_url` without the GitHub `/attempts/N` suffix. A source that publishes
+only output throughput omits `tput_per_gpu`, and the dashboard then offers only output-token
+metrics for those points.
+
 ### AgentX Curve Replacement Scope
 
 For `agentic_traces`, a curve is identified by model, hardware, framework, precision,
@@ -242,7 +254,11 @@ Benchmark point backfills use the same complete point selector as audited point 
 `metricsMerge`, top-level `metricsRemove`, and `offloadMode`. Setting `offloadMode`
 updates both the first-class column and `metrics.offload_mode`; for example, a missed CPU
 KV offload annotation can set `offloadMode: 'on'` and merge `kv_offloading` plus backend
-metadata in one correction. Unrelated metrics remain unchanged.
+metadata in one correction. Unrelated metrics remain unchanged. Setting `specMethod`
+moves the point to the config that differs only in its speculative decoding method and
+adds that method's availability row, dropping the old method's row once no point uses
+it. `SPEC_METHOD_BACKFILLS` (`spec-method-backfills.ts`) uses it for AgentX points the
+matrix labeled `mtp` whose server never drafted.
 
 When extending an already-applied identity-changing correction, record its old
 `set` as `previousSet`. The recovery command accepts that declared prior patch
@@ -268,6 +284,37 @@ number, it follows the purge path's conservative fallback and matches the exact 
 point across attempts; the log records the applied backfill ID. Changelog corrections are
 likewise applied to artifact metadata before `appendOnly`/`evalsOnly` run semantics are
 resolved and before the changelog is upserted.
+
+### Audited Framework Reassignments
+
+A sweep can serve one framework while its matrix entry declares another. The Qwen3.5
+TPU v7 AgentX xPyD run 40744397059 ran every engine behind the llm-d router but was
+declared as `vllm`, so its points were grouped with plain vLLM instead of `llmd-vllm`
+like the GB200 llm-d sweeps. Register such a run in `RUN_FRAMEWORK_OVERRIDES` in
+`packages/db/src/etl/run-framework-overrides.ts` (re-exported by `run-overrides.ts`; it
+is a separate dependency-free module because the mappers, which the app bundles for the
+unofficial-run route, read it at mapping time) with a stable `id`, a `reason`, the `githubRunId`,
+the canonical declared framework (`from`), and the canonical served framework (`to`,
+which must be a registered `FW_REGISTRY` key). Validation rejects aliases, unregistered
+targets, duplicate selectors, and purged runs.
+
+The benchmark and eval mappers substitute `to` for `from` before any config is
+resolved, so every ingest path (CI, GCS backup, re-ingest) stores benchmark rows, eval
+rows, and availability under the served framework, and changelog config keys are
+rewritten (`qwen3.5-fp8-tpuv7-vllm-agentic-xpyd-mtp` becomes
+`qwen3.5-fp8-tpuv7-llmd-vllm-agentic-xpyd-mtp`) so the changelog keeps matching the
+corrected series. Point purges and backfills for the same run must therefore name the
+served framework in their selectors.
+
+`bun run admin:db:apply-overrides` moves rows an earlier ingest stored under `from`:
+for each affected config it upserts the config that differs only in framework, repoints
+the run's benchmark and eval rows in one transaction, inserts the served-framework
+availability rows, deletes declared-framework availability rows that no remaining
+successful row supports, rewrites the run's changelog config keys, and refreshes
+`latest_benchmarks`. Unique constraints make a collision with an existing destination
+row fail the transaction rather than merging two points. The orphaned source configs
+are left in place; they are harmless and a future ingest of the same run resolves
+straight to the served-framework config.
 
 ### Syncing Public Runs Into a Downstream Database
 
@@ -435,6 +482,22 @@ also unioned back into the window rather than dropped. Only after that volume-we
 aggregation is the semantic `[0, 1]` bound applied as a guard against residual counter timing
 skew. Older rows without the component rate series retain the stored-ratio fallback.
 
+### Speculative Decoding Algorithm and Draft Model
+
+`configs.spec_method` is the matrix label (`mtp`, `draft_model`, `none`) and says neither
+which algorithm a server ran nor what drafted. InferenceX results carry `spec_algorithm`
+(`mtp`, `dspark`, `dflash`, `eagle3`, in the golden AL identity vocabulary) and
+`spec_draft_model` (the drafter's repo, or `native` when the served checkpoint drafts for
+itself). Ingest stores both in `metrics`, and the AgentX tooltip shows them, for example
+"DFlash (RadixArk/Muse-Spark-Open-DFlash2)" or "DSpark (native)". Points without them fall
+back to the label.
+
+`db:backfill-spec-algorithm` fills both for stored AgentX points from their server logs
+(`etl/server-log-speculation.ts`): vLLM's and ATOM's `SpeculativeConfig`, SGLang's
+`server_args`, TensorRT-LLM's speculative config, and TileRT's `num_mtp`. Engines often name
+the served checkpoint, or a directory inside `/model`, as the draft model, so only a separate
+drafter's name (DSpark, DFlash, EAGLE, NextN, MTP or draft) is reported as one.
+
 ### Server-Log Artifact Bundles
 
 Server-log artifacts are stored as filename-keyed bundles rather than as a hard-coded list of
@@ -506,7 +569,7 @@ becomes `ς` instead of `σ`, and newer engines lower letters PostgreSQL 17 leav
 query therefore asks for every code point with the same PostgreSQL lowercase as each term
 character. Regenerate the table if the database's PostgreSQL major version or locale changes.
 
-`SERVER_LOG_BLOCKS=1` makes ingest write blocks next to the text columns.
+`SERVER_LOG_BLOCKS=1` makes ingest write blocks next to the text columns; `ingest-results.yml` sets it.
 `bun run admin:db:compact-server-logs` (`--log-id`, `--limit`, `--dry-run`, `--concurrency`) converts
 existing files, reading each file's text in ranges of 64 blocks. `--concurrency N` compacts N files at
 once on N connections; each file is its own transaction, so an interrupted run resumes by rerunning.
@@ -895,8 +958,8 @@ and every writer compares the decoded blob with those rows before storing it.
 `gpu_metric_samples` stays the source of truth. Edit samples only through ingest,
 which restamps `ingested_at`.
 
-Ingest writes the blob in the sample transaction when `GPU_SAMPLE_BLOBS=1`; leave it
-unset until migration 022 is applied on the target. Run
+Ingest writes the blob in the sample transaction when `GPU_SAMPLE_BLOBS=1`, which
+`ingest-results.yml` sets; apply migration 022 on a target before ingesting into it. Run
 `bun run admin:db:backfill-gpu-sample-blobs --yes` once after migration 022 and after
 bumping `GPU_SAMPLE_BLOB_FORMAT_VERSION` (`--run-id ID`, `--limit N` and `--force`
 narrow or redo it). `bun run admin:db:verify-gpu-sample-blobs --limit N` compares
@@ -917,9 +980,12 @@ dispatched merge ingests it also sends `ingest-results-completed` to `BENCHMARK_
 
 A dispatched ingest whose artifacts come from the dispatching run first polls that run every 10 s
 until GitHub reports it completed, for at most 300 s, and then proceeds either way.
-`admin:db:prepare:ci` downloads the planned artifacts eight at a time, starting them in name order,
-and starts no new download after one fails its three attempts. `admin:db:verify` runs after cache
-invalidation, warmup and the PowerX check, so its whole-database counts never delay fresh data.
+`admin:db:prepare:ci` downloads the planned artifacts eight at a time, largest first, and starts no
+new download after one fails its three attempts. It skips `job_event*` and `al_gate*` artifacts and
+server logs without a same-suffix `bmk_` artifact, since ingest never reads them. `admin:db:verify`
+runs after cache invalidation, warmup and the PowerX check, so its whole-database counts never delay
+fresh data. The invalidate request is capped at 120 s per curl attempt so a slow blob purge cannot
+hold the job for minutes.
 
 ### PowerX publication receipts
 

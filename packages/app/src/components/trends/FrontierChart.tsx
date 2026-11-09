@@ -52,6 +52,8 @@ export interface FrontierChartProps {
    */
   variant?: 'pooled' | 'each';
   caption?: React.ReactNode;
+  /** Result context under the chart: cost tier, TCO prices, date and source. */
+  footer?: React.ReactNode;
   /** Series whose current curve sits well below their best, keyed by series key. */
   regressions?: ReadonlyMap<string, FrontierRegressionNote>;
   /** Rendered over the plot area (not the legend), e.g. the meme card. */
@@ -169,6 +171,7 @@ const FrontierChart = React.memo(
     variant = 'pooled',
     regressions = NO_REGRESSIONS,
     caption,
+    footer,
     plotOverlay,
     legendElement,
   }: FrontierChartProps) => {
@@ -673,6 +676,7 @@ const FrontierChart = React.memo(
           legendElement={legendElement}
           noDataOverlay={plotOverlay}
           caption={caption}
+          footer={footer}
         />
       </div>
     );

@@ -35,14 +35,14 @@ describe('model page locale paths', () => {
     expect(modelDetailHref('deepseek-r1', 'zh')).toBe('/zh/model/deepseek-r1');
     expect(modelAliasDestination('deepseek-r1', 'zh')).toBe('/zh/model/deepseek-r1');
     expect(modelDashboardHref('g_model=DeepSeek-R1-0528', 'zh')).toBe(
-      '/zh/inference?g_model=DeepSeek-R1-0528',
+      '/zh/infx/inference?g_model=DeepSeek-R1-0528',
     );
     expect(modelEnglishArticleHref('deepseek-r1')).toBe('/model/deepseek-r1');
   });
 
   it('links each model page to its dedicated inference benchmark page', () => {
-    expect(modelInferenceHref('kimi-k3', 'en')).toBe('/inference/kimi-k3');
-    expect(modelInferenceHref('kimi-k3', 'zh')).toBe('/zh/inference/kimi-k3');
+    expect(modelInferenceHref('kimi-k3', 'en')).toBe('/infx/inference/kimi-k3');
+    expect(modelInferenceHref('kimi-k3', 'zh')).toBe('/zh/infx/inference/kimi-k3');
     expect(modelInferenceHref('not-a-model', 'en')).toBeNull();
   });
 });

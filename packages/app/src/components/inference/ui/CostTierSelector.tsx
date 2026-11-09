@@ -38,9 +38,9 @@ import { cn } from '@/lib/shared/utils';
 
 const STRINGS = {
   en: {
-    costTier: 'Cost Tier',
+    costTier: 'Cost tier',
     costTierTooltip:
-      'The $/chip/hr pricing basis behind cost and tokens-per-dollar metrics. InferenceX publishes Owning at Large Hyperscaler Volume and Rent - 3 Year Commit; the shorter rental terms are priced in the SemiAnalysis AI Cloud TCO Model.',
+      'The $/chip/hr pricing basis behind cost and tokens-per-dollar metrics. InferenceX publishes Owning at large hyperscaler volume and Rent – 3-year commit; the shorter rental terms are priced in the SemiAnalysis AI Cloud TCO Model.',
   },
   zh: {
     costTier: '成本层级',
@@ -57,9 +57,11 @@ export function selectedCostTier(selectedYAxisMetric: string): CostTier | undefi
 export function CostTierSelector({
   className,
   allowCustom = true,
+  footer = false,
 }: {
   className?: string;
   allowCustom?: boolean;
+  footer?: boolean;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -146,7 +148,7 @@ export function CostTierSelector({
         searchable={false}
         trackPrefix="cost_tier"
         size="sm"
-        className={captionControlTriggerClassName}
+        className={footer ? 'w-auto max-w-full text-xs' : captionControlTriggerClassName}
         contentClassName="w-80"
         groups={[{ label: '', options }]}
       />

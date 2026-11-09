@@ -19,6 +19,12 @@ import {
   scatterPoints,
 } from './ScatterGraph.test-harness';
 
+vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  measureTextWidth: (text: string, font: string) =>
+    text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
+}));
+
 const measurements = (offset: number, runUrl?: string): InferenceData[] => [
   { ...point('h100', 'fp8', 10, 900 + offset, 1), power_tier: 'legacy', run_url: runUrl },
   { ...point('h100', 'fp8', 20, 200 + offset, 2), power_tier: 'legacy', run_url: runUrl },

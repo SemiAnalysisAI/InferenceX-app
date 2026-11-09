@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useImperativeHandle, useRef } from 'react';
+import React, { useEffect, useImperativeHandle, useRef } from 'react';
 
 import { D3ChartWrapper } from '@/components/ui/d3-chart-wrapper';
 import { useChartTooltipHandlers } from '@/hooks/useChartTooltipHandlers';
 import { useChartZoom } from '@/hooks/useChartZoom';
 import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
 
-import { DEFAULT_CHART_MARGIN } from '../chart-setup';
+import { DEFAULT_CHART_MARGIN, defaultChartHeight } from '../chart-setup';
+import { clearPinRing } from '../pin-ring';
 
 import type { BuiltScale } from './scale-builders';
 import type { D3ChartHandle, D3ChartProps } from './types';
@@ -17,7 +18,7 @@ function D3ChartInner<T>(
   {
     chartId,
     data,
-    height = 600,
+    height = defaultChartHeight,
     margin = DEFAULT_CHART_MARGIN,
     watermark,
     testId,
@@ -62,6 +63,7 @@ function D3ChartInner<T>(
 
   const {
     pinnedPoint,
+    pinnedPointRef,
     pinnedPointIsOverlay,
     pinTooltip,
     dismissTooltip,
@@ -78,7 +80,7 @@ function D3ChartInner<T>(
       hideTooltip: () => {
         hideTooltipElements(tooltipRef, svgRef);
       },
-      getPinnedPoint: () => pinnedPoint,
+      getPinnedPoint: () => pinnedPointRef.current,
       getPinnedPointIsOverlay: () => pinnedPointIsOverlay,
       isPinned,
       pinTooltip: pinTooltip as (point: unknown, isOverlay?: boolean) => void,
@@ -86,8 +88,19 @@ function D3ChartInner<T>(
       getTooltipElement: () => tooltipRef.current,
       getScales: () => scalesRef.current,
     }),
-    [dismissTooltip, hideTooltipElements, pinnedPoint, pinnedPointIsOverlay, isPinned, pinTooltip],
+    [
+      dismissTooltip,
+      hideTooltipElements,
+      pinnedPointRef,
+      pinnedPointIsOverlay,
+      isPinned,
+      pinTooltip,
+    ],
   );
+
+  useEffect(() => {
+    if (!pinnedPoint) clearPinRing(svgRef.current);
+  }, [pinnedPoint]);
 
   useD3ChartRenderer(
     {
@@ -126,12 +139,19 @@ function D3ChartInner<T>(
       zoomTransformRef,
       isPinned,
       pinTooltip,
+      pinnedPointRef,
       dismissTooltip,
       hideTooltipElements,
       createRulers,
       attachHandlers,
     },
   );
+
+  const closeDetails = () => dismissTooltip();
+  const details =
+    pinnedPoint !== null && tooltipConfig?.details
+      ? tooltipConfig.details(pinnedPoint, pinnedPointIsOverlay, closeDetails)
+      : null;
 
   return (
     <D3ChartWrapper
@@ -142,6 +162,8 @@ function D3ChartInner<T>(
       dimensions={dimensions}
       plotTop={margin.top}
       pinnedPoint={pinnedPoint}
+      details={details}
+      onDetailsClose={closeDetails}
       isPinned={isPinned}
       dismissTooltip={dismissTooltip}
       hideTooltipElements={hideTooltipElements}

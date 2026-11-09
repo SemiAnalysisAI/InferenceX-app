@@ -17,7 +17,7 @@ import {
   applyOverviewRowScope,
   assembleOverviewHistoricalPageData,
   assembleOverviewPageData,
-  buildOverviewModelSummary,
+  buildOverviewModelSummary as buildSummary,
   OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
   OVERVIEW_DEFAULT_ROW_SCOPE,
   overviewRowHasAnyCost,
@@ -39,6 +39,11 @@ import {
 } from './overview-data';
 
 let nextId = 1;
+
+// These fixtures exercise frontier math at 50, independently of the page's default SLO.
+const buildOverviewModelSummary = (
+  ...[model, rows, tier = 50, ...rest]: Parameters<typeof buildSummary>
+) => buildSummary(model, rows, tier, ...rest);
 
 const JULY_2026_HYPERSCALER_TCO = {
   b200: 1.73,
@@ -156,14 +161,14 @@ describe('overview engine scope and scenario selection', () => {
   });
 
   it.each([
-    [undefined, 'hardware'],
+    [undefined, '30d'],
     ['hardware', 'hardware'],
     ['7d', '7d'],
     ['30d', '30d'],
     ['60d', '60d'],
     ['90d', '90d'],
     [['30d'], '30d'],
-    ['unknown', 'hardware'],
+    ['unknown', '30d'],
   ] as const)('resolves comparison mode %j to %s', (raw, expected) => {
     expect(resolveOverviewComparisonMode(raw)).toBe(expected);
   });
@@ -1215,16 +1220,17 @@ describe('overview platform selection', () => {
 });
 
 describe('tier-parameterized overview', () => {
-  it('resolves the tier query value and falls back to 50', () => {
+  it('resolves the tier query value and falls back to 100', () => {
     expect(resolveOverviewTier('100')).toBe(100);
+    expect(resolveOverviewTier('50')).toBe(50);
     expect(resolveOverviewTier(['75', '30'])).toBe(75);
-    expect(resolveOverviewTier('40')).toBe(50);
-    expect(resolveOverviewTier('')).toBe(50);
-    expect(resolveOverviewTier(undefined)).toBe(50);
+    expect(resolveOverviewTier('40')).toBe(100);
+    expect(resolveOverviewTier('')).toBe(100);
+    expect(resolveOverviewTier(undefined)).toBe(100);
   });
 
-  it('stamps the displayed tier on the page and defaults to 50, down to empty models', () => {
-    expect(assembleOverviewPageData({}).tier).toBe(50);
+  it('stamps the displayed tier on the page and defaults to 100, down to empty models', () => {
+    expect(assembleOverviewPageData({}).tier).toBe(100);
     const page = assembleOverviewPageData({}, 75);
     expect(page.tier).toBe(75);
     expect(page.models[0]?.platforms[0]?.read.tier).toBe(75);
@@ -1297,7 +1303,7 @@ describe('tier-parameterized overview', () => {
         tier,
       ).models.find((m) => m.model === Model.Qwen3_5 && m.scenario === 'single_turn_8k1k')!;
 
-    const at50 = headlinePairOf(page(), 'mi355x-vs-b200');
+    const at50 = headlinePairOf(page(50), 'mi355x-vs-b200');
     expect(at50?.candidate.precision).toBe(Precision.FP4);
     expect(at50?.candidate.read.value).toBe(9000);
     expect(at50?.baseline.precision).toBe(Precision.FP8);
@@ -1315,12 +1321,13 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
   it('serves every matrix cell state through the real builder', () => {
     const page = assembleOverviewPageData(
       overviewRowsFixture as unknown as Record<string, BenchmarkRow[]>,
+      50,
     );
 
     expect(page.models.map((m) => `${m.model}/${m.scenario}`)).toEqual([
       `${Model.Muse_Spark_Open}/agentx`,
       `${Model.DeepSeek_V4_1_Flash}/agentx`,
-      `${Model.Kimi_K3}/agentx`,
+      `${Model.Kimi_K3_1_Pro}/agentx`,
       `${Model.MiniMax_M3_1_Flash}/agentx`,
       `${Model.GLM_5_2}/agentx`,
       `${Model.Qwen3_5}/agentx`,
@@ -1450,6 +1457,7 @@ describe('overview model scope', () => {
     expect(page.modelScope).toBe('default');
     expect(page.models.some((m) => m.model === Model.MiniMax_M3)).toBe(false);
     expect(page.models.some((m) => m.model === Model.DeepSeek_V4_Pro)).toBe(false);
+    expect(page.models.some((m) => m.model === Model.Kimi_K3)).toBe(false);
     expect(page.models.some((m) => m.model === Model.MiniMax_M3_1_Flash)).toBe(true);
   });
 
@@ -1460,9 +1468,11 @@ describe('overview model scope', () => {
       ...DEFAULT_MODELS,
       ...MAINTENANCE_MODELS,
       Model.DeepSeek_V4_Pro,
+      Model.Kimi_K3,
       Model.MiniMax_M3,
       ...[...DEPRECATED_MODELS].filter(
-        (model) => model !== Model.MiniMax_M3 && model !== Model.DeepSeek_V4_Pro,
+        (model) =>
+          model !== Model.MiniMax_M3 && model !== Model.DeepSeek_V4_Pro && model !== Model.Kimi_K3,
       ),
     ]);
     expect(page.modelScope).toBe('all');
@@ -1476,6 +1486,7 @@ describe('overview model scope', () => {
     expect(categoryOf(Model.GLM_5)).toBe('deprecated');
     expect(categoryOf(Model.GptOss)).toBe('deprecated');
     expect(categoryOf(Model.MiniMax_M3)).toBe('deprecated');
+    expect(categoryOf(Model.Kimi_K3)).toBe('deprecated');
   });
 
   it('forwards the model scope through the historical assembler', () => {
@@ -1486,9 +1497,11 @@ describe('overview model scope', () => {
       ...DEFAULT_MODELS,
       ...MAINTENANCE_MODELS,
       Model.DeepSeek_V4_Pro,
+      Model.Kimi_K3,
       Model.MiniMax_M3,
       ...[...DEPRECATED_MODELS].filter(
-        (model) => model !== Model.MiniMax_M3 && model !== Model.DeepSeek_V4_Pro,
+        (model) =>
+          model !== Model.MiniMax_M3 && model !== Model.DeepSeek_V4_Pro && model !== Model.Kimi_K3,
       ),
     ]);
     expect(page.modelScope).toBe('all');

@@ -1,4 +1,4 @@
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ChevronRight } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { MinecraftSplash } from '@/components/minecraft/minecraft-splash';
@@ -10,9 +10,11 @@ import {
 } from '@/lib/compare/compare-agentx';
 
 import { CompareIndexTrackedLink } from './compare-index-tracked-link';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 const MODEL_LOGOS: Record<string, string> = {
   'muse-spark-open': '/logos/muse-mascot.webp',
+  'kimi-k31-pro': '/logos/kimi-color.svg',
   'kimi-k3': '/logos/kimi-color.svg',
   'deepseek-v41-flash': '/logos/deepseek-color.svg',
   'deepseek-v4': '/logos/deepseek-color.svg',
@@ -91,12 +93,12 @@ const VENDOR_MARKS: readonly {
   },
   {
     name: 'AMD',
-    viewBox: '-0.04 9.1 24.08 5.8',
-    width: 71,
-    height: 17,
+    viewBox: '18.2 9.06 5.88 5.88',
+    width: 22,
+    height: 22,
     paths: [
       {
-        d: 'M18.324 9.137l1.559 1.56h2.556v2.557L24 14.814V9.137zM2 9.52l-2 4.96h1.309l.37-.982H3.9l.408.982h1.338L3.432 9.52zm4.209 0v4.955h1.238v-3.092l1.338 1.562h.188l1.338-1.556v3.091h1.238V9.52H10.47l-1.592 1.845L7.287 9.52zm6.283 0v4.96h2.057c1.979 0 2.88-1.046 2.88-2.472 0-1.36-.937-2.488-2.747-2.488zm1.237.91h.792c1.17 0 1.63.711 1.63 1.57 0 .728-.372 1.572-1.616 1.572h-.806zm-10.985.273l.791 1.932H2.008zm17.137.307l-1.604 1.603v2.25h2.246l1.604-1.607h-2.246z',
+        d: 'M18.324 9.137l1.559 1.56h2.556v2.557L24 14.814V9.137zM19.881 11.01l-1.604 1.603v2.25h2.246l1.604-1.607h-2.246z',
         fill: 'currentColor',
       },
     ],
@@ -374,6 +376,7 @@ const VENDOR_MARKS: readonly {
 ] as const;
 
 const LANDING_HIDDEN_LEDGER_MODELS: ReadonlySet<string> = new Set([
+  'muse-spark-open',
   'deepseek-v4',
   'qwen-3-8-flash-next',
   'qwen-3-5',
@@ -388,8 +391,9 @@ const LANDING_HARDWARE_RESULTS = [
     vendor: 'Huawei',
     title: 'Huawei Ascend 950PR',
     titleZh: '华为 Ascend 950PR',
-    subtitle: 'UbenchX',
-    href: '/ubenchx/core-memory-profiles',
+    subtitle: 'Core and memory profiles · uBenchX',
+    subtitleZh: '核心与内存性能剖析 · uBenchX',
+    href: '/ubx/core-memory-profiles',
     model: 'ascend950pr',
     analyticsEvent: 'landing_huawei_results_clicked',
     isNew: true,
@@ -397,11 +401,11 @@ const LANDING_HARDWARE_RESULTS = [
   {
     id: 'tpu-kimi-k3',
     vendor: 'Google',
-    title: 'TPU Kimi K3 Submission',
-    titleZh: 'TPU Kimi K3 提交结果',
-    subtitle: '2.8 Trillion parameters AgentX',
-    subtitleZh: '2.8 万亿参数 AgentX',
-    href: '/inference/kimi-k3',
+    title: 'Google TPU',
+    titleZh: 'Google TPU',
+    subtitle: 'Kimi K3 · 2.8T parameters · AgentX',
+    subtitleZh: 'Kimi K3 · 2.8 万亿参数 · AgentX',
+    href: `${getDashboardRoute('inference').path}/kimi-k3`,
     model: 'kimi-k3',
     analyticsEvent: 'landing_tpu_results_clicked',
     isNew: true,
@@ -409,11 +413,11 @@ const LANDING_HARDWARE_RESULTS = [
   {
     id: 'rubin-glm-5-3',
     vendor: 'NVIDIA',
-    title: 'Vera Rubin NVL72 GLM 5.3 Submission',
-    titleZh: 'Vera Rubin NVL72 GLM 5.3 提交结果',
-    subtitle: '744 Billion parameters AgentX',
-    subtitleZh: '7440 亿参数 AgentX',
-    href: '/inference/glm-5-3',
+    title: 'Vera Rubin NVL72',
+    titleZh: 'Vera Rubin NVL72',
+    subtitle: 'GLM 5.3 · 744B parameters · AgentX',
+    subtitleZh: 'GLM 5.3 · 7440 亿参数 · AgentX',
+    href: `${getDashboardRoute('inference').path}/glm-5-3`,
     model: 'glm-5-3',
     analyticsEvent: 'landing_rubin_results_clicked',
   },
@@ -423,7 +427,7 @@ const LANDING_HARDWARE_RESULTS = [
     title: 'OpenAI Jalapeño',
     titleZh: 'OpenAI Jalapeño',
     subtitle: 'DeepSeek R1 · 8K/1K · FP4',
-    href: '/inference/deepseek-r1?i_seq=8k%2F1k&i_prec=fp4&i_xmode=e2e',
+    href: `${getDashboardRoute('inference').path}/deepseek-r1?i_seq=8k%2F1k&i_prec=fp4&i_xmode=e2e`,
     model: 'deepseek-r1',
     analyticsEvent: 'landing_jalapeno_results_clicked',
   },
@@ -432,27 +436,41 @@ const LANDING_HARDWARE_RESULTS = [
     vendor: 'MiniMax',
     title: 'MiniMax M3.1 Flash',
     titleZh: 'MiniMax M3.1 Flash',
-    subtitle: 'AgentX',
-    href: '/inference/minimax-m31-flash',
+    subtitle: '428B parameters · AgentX',
+    subtitleZh: '4280 亿参数 · AgentX',
+    href: `${getDashboardRoute('inference').path}/minimax-m31-flash`,
     model: 'minimax-m31-flash',
     analyticsEvent: 'landing_minimax_m31_flash_results_clicked',
   },
 ] as const;
 
+const MODEL_SIZE_SUFFIX = /\s(?<amount>\d+(?:\.\d+)?)(?<unit>[BT])$/;
+
+function ledgerTitle(label: string): string {
+  return label.replace(MODEL_SIZE_SUFFIX, '');
+}
+
+function ledgerSubtitle(label: string, locale: 'en' | 'zh'): string {
+  const size = MODEL_SIZE_SUFFIX.exec(label)?.groups;
+  if (!size) return 'AgentX';
+  const { amount, unit } = size;
+  if (locale === 'en') return `${amount}${unit} parameters · AgentX`;
+  const zh = unit === 'T' ? `${amount} 万亿` : `${Number(amount) * 10} 亿`;
+  return `${zh}参数 · AgentX`;
+}
+
 const STRINGS = {
   en: {
-    eyebrow: 'AgentX / live results',
-    title: 'Compare Realistic Agentic Inference Perf',
+    title: 'Compare realistic agentic inference performance',
     description:
-      'Long Context Multi Turn Inference Performance. Compare Across Google TPUv7 Ironwood, OpenAI Jalapeño, MI355X, GB300 NVL72, GB200 NVL72, B200, H200, H100, RTX Pro, and soon TPUv8i, SambaNova SN50, Rubin NVL72, MI455X UALoE72',
-    revenueCalculator: 'Token Revenue Calculator',
+      'Long-context, multi-turn inference performance on Google TPUv7 Ironwood, OpenAI Jalapeño, MI355X, GB300 NVL72, GB200 NVL72, B200, H200, H100 and RTX Pro. TPUv8i, SambaNova SN50, Rubin NVL72 and MI455X UALoE72 are next.',
+    revenueCalculator: 'Token revenue calculator',
     dashboard: 'Dashboard',
     ledgerTitle: 'Models with AgentX results',
     modelAction: 'View results',
-    newModel: 'NEW',
+    newModel: 'New',
   },
   zh: {
-    eyebrow: 'AgentX｜最新结果',
     title: '真实智能体工作负载下的推理性能对比',
     description:
       '比较不同硬件平台在长上下文、多轮智能体工作负载下的推理性能，覆盖 Google TPUv7 Ironwood、OpenAI Jalapeño、MI355X、GB300 NVL72、GB200 NVL72、B200、H200、H100 和 RTX Pro，即将支持 TPUv8i、SambaNova SN50、Rubin NVL72 与 MI455X UALoE72。',
@@ -485,23 +503,20 @@ export function AgentXCompareHero({
     <section data-testid="compare-agentx-primary">
       <Card className="overflow-hidden p-0 md:p-0">
         <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(19rem,0.85fr)]">
-          <div className="flex flex-col justify-center px-6 py-5 md:px-8 md:py-6 lg:px-10 lg:py-7">
-            <p className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase">
-              {t.eyebrow}
-            </p>
+          <div className="flex flex-col justify-center p-6 md:p-8 lg:p-10">
             <div className="relative">
-              <Heading className="mt-3 max-w-2xl text-2xl/[1.8rem] font-semibold tracking-tight text-foreground lg:text-[2.4rem]/[2.4rem]">
+              <Heading className="max-w-2xl text-3xl font-semibold text-foreground lg:text-4xl lg:tracking-heading">
                 {t.title}
               </Heading>
               {surface === 'landing' && <MinecraftSplash />}
             </div>
-            <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground lg:text-lg">
+            <p className="mt-4 max-w-3xl text-base leading-7 text-muted-foreground">
               {t.description}
             </p>
             <div
               aria-hidden="true"
               data-testid="compare-agentx-vendor-marks"
-              className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-foreground"
+              className="mt-6 grid grid-cols-3 items-center gap-x-4 gap-y-3 text-foreground sm:flex sm:flex-wrap sm:gap-x-6 sm:gap-y-2"
             >
               {VENDOR_MARKS.filter((mark) => surface === 'landing' || mark.name !== 'Huawei').map(
                 (mark) => (
@@ -511,7 +526,7 @@ export function AgentXCompareHero({
                     viewBox={mark.viewBox}
                     width={mark.width}
                     height={mark.height}
-                    className="shrink-0"
+                    className="h-auto max-w-full shrink-0"
                   >
                     {mark.gradients ? (
                       <defs>
@@ -538,14 +553,14 @@ export function AgentXCompareHero({
                 ),
               )}
             </div>
-            <div className="mt-5 flex flex-wrap gap-3">
+            <div className="mt-6 flex flex-wrap gap-3">
               <CompareIndexTrackedLink
                 data-testid="compare-agentx-revenue-calculator-link"
-                href={`${prefix}/profit-estimator-per-gigawatt`}
+                href={`${prefix}${getDashboardRoute('profit-estimator-per-gigawatt').path}`}
                 analyticsEvent="compare_agentx_revenue_calculator_clicked"
                 analyticsSurface={surface}
                 appNavigation
-                className="group motion-press inline-flex min-h-11 items-center gap-2 rounded-md bg-brand px-5 py-2.5 font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
+                className="group motion-press inline-flex min-h-11 items-center gap-2 rounded-md bg-brand-fill px-5 py-2.5 font-medium text-primary-foreground transition-colors hover:bg-brand-fill/90 max-[479px]:w-full max-[479px]:justify-center"
               >
                 {t.revenueCalculator}
                 <ArrowRight
@@ -557,10 +572,10 @@ export function AgentXCompareHero({
                 data-testid="compare-agentx-dashboard-link"
                 href={agentxDashboardHref(locale, FEATURED_AGENTX_MODELS[0])}
                 analyticsEvent="compare_agentx_dashboard_clicked"
-                analyticsTarget="kimi-k3"
+                analyticsTarget={FEATURED_AGENTX_MODELS[0].slug}
                 analyticsSurface={surface}
                 appNavigation
-                className="group motion-press inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-5 py-2.5 font-semibold text-foreground transition-colors hover:bg-muted"
+                className="group motion-press inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-5 py-2.5 font-medium text-foreground transition-colors hover:bg-muted max-[479px]:w-full max-[479px]:justify-center"
               >
                 {t.dashboard}
                 <ArrowRight
@@ -571,9 +586,9 @@ export function AgentXCompareHero({
             </div>
           </div>
 
-          <div className="border-t border-border/70 bg-muted/15 lg:border-t-0 lg:border-l">
+          <div className="border-t border-border/30 bg-muted/20 lg:border-t-0 lg:border-l">
             {surface === 'landing' && (
-              <div className="divide-y divide-border/70 border-b border-border/70">
+              <div className="divide-y divide-border/20 border-b border-border/20">
                 {LANDING_HARDWARE_RESULTS.map((result) => {
                   const mark = VENDOR_MARKS.find((vendor) => vendor.name === result.vendor);
                   return (
@@ -585,7 +600,7 @@ export function AgentXCompareHero({
                       analyticsTarget={result.model}
                       analyticsSurface={surface}
                       appNavigation
-                      className="group flex min-h-14 items-center justify-between gap-4 px-5 py-2.5 transition-colors hover:bg-brand/5 focus-visible:outline-none"
+                      className="group flex min-h-14 items-center justify-between gap-4 px-5 py-3 transition-colors hover:bg-muted/60 focus-visible:outline-none"
                     >
                       <span className="flex min-w-0 items-center gap-3">
                         {result.vendor === 'MiniMax' ? (
@@ -615,36 +630,39 @@ export function AgentXCompareHero({
                           </svg>
                         )}
                         <span className="min-w-0">
-                          <span className="flex items-center gap-1.5 text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
-                            <span className="min-w-0">
-                              {locale === 'zh' ? result.titleZh : result.title}
-                            </span>
+                          <span className="block text-sm font-medium leading-tight text-foreground">
+                            {locale === 'zh' ? result.titleZh : result.title}
                             {'isNew' in result && result.isNew && (
-                              <NewBadge data-new-badge={`landing-${result.id}`} flashing>
+                              <NewBadge
+                                data-new-badge={`landing-${result.id}`}
+                                flashing
+                                className="ml-2 align-[-0.125em]"
+                              >
                                 {t.newModel}
                               </NewBadge>
                             )}
                           </span>
-                          <span className="mt-1 block font-mono text-3xs tracking-eyebrow text-brand uppercase">
+                          <span className="mt-1 block text-xs text-muted-foreground">
                             {locale === 'zh' && 'subtitleZh' in result
                               ? result.subtitleZh
                               : result.subtitle}
                           </span>
                         </span>
                       </span>
-                      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground">
-                        {t.modelAction}
+                      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-brand">
+                        <span className="max-sm:sr-only">{t.modelAction}</span>
                         <ArrowRight
                           aria-hidden="true"
-                          className="size-3.5 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5"
+                          className="size-3.5 max-sm:hidden motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5"
                         />
+                        <ChevronRight aria-hidden="true" className="size-5 sm:hidden" />
                       </span>
                     </CompareIndexTrackedLink>
                   );
                 })}
               </div>
             )}
-            <nav aria-label={t.ledgerTitle} className="divide-y divide-border/70">
+            <nav aria-label={t.ledgerTitle} className="divide-y divide-border/20">
               {ledgerModels.map((model) => (
                 <CompareIndexTrackedLink
                   key={model.slug}
@@ -654,7 +672,7 @@ export function AgentXCompareHero({
                   analyticsTarget={model.slug}
                   analyticsSurface={surface}
                   appNavigation
-                  className="group flex min-h-14 items-center justify-between gap-4 px-5 py-2.5 transition-colors hover:bg-brand/5 focus-visible:outline-none"
+                  className="group flex min-h-14 items-center justify-between gap-4 px-5 py-3 transition-colors hover:bg-muted/60 focus-visible:outline-none"
                 >
                   <span className="flex min-w-0 items-center gap-3">
                     {MODEL_LOGOS[model.slug] && (
@@ -669,23 +687,29 @@ export function AgentXCompareHero({
                       />
                     )}
                     <span className="min-w-0">
-                      <span className="flex items-center gap-1.5 text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
-                        <span className="min-w-0">{model.label}</span>
+                      <span className="block text-sm font-medium leading-tight text-foreground">
+                        {ledgerTitle(model.label)}
                         {isNewAgentxModel(model) && (
-                          <NewBadge data-new-badge="agentx-ledger">{t.newModel}</NewBadge>
+                          <NewBadge
+                            data-new-badge="agentx-ledger"
+                            className="ml-2 align-[-0.125em]"
+                          >
+                            {t.newModel}
+                          </NewBadge>
                         )}
                       </span>
-                      <span className="mt-1 block font-mono text-3xs tracking-eyebrow text-brand uppercase">
-                        AgentX
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {ledgerSubtitle(model.label, locale)}
                       </span>
                     </span>
                   </span>
-                  <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground">
-                    {t.modelAction}
+                  <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-brand">
+                    <span className="max-sm:sr-only">{t.modelAction}</span>
                     <ArrowRight
                       aria-hidden="true"
-                      className="size-3.5 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5"
+                      className="size-3.5 max-sm:hidden motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5"
                     />
+                    <ChevronRight aria-hidden="true" className="size-5 sm:hidden" />
                   </span>
                 </CompareIndexTrackedLink>
               ))}

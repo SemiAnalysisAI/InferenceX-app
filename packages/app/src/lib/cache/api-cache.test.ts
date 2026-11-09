@@ -5,11 +5,18 @@ import {
   gunzipSync,
   gzipSync,
 } from 'node:zlib';
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/cache', () => ({
   revalidateTag: vi.fn(),
   unstable_cache: vi.fn((fn: (...args: any[]) => any, _keys: string[], _opts: unknown) => fn),
+}));
+
+const afterTasks = vi.hoisted(() => ({ pending: [] as (() => Promise<unknown>)[] }));
+vi.mock('next/server', () => ({
+  after: (task: () => Promise<unknown>) => {
+    afterTasks.pending.push(task);
+  },
 }));
 
 const workStore = vi.hoisted(() => ({
@@ -42,6 +49,7 @@ import {
   cachedQuery,
   purgeAll,
   purgeCollectiveX,
+  purgeVideo,
   cachedJson,
   cachedJsonResponse,
   cachedGzipJson,
@@ -64,7 +72,7 @@ const originalCacheNamespace = process.env.CACHE_NAMESPACE;
 beforeEach(() => {
   vi.clearAllMocks();
   delete process.env.CACHE_NAMESPACE;
-  workStore.current = undefined;
+  afterTasks.pending = [];
   generation.value = 'g1';
   mockUnstableCache.mockImplementation(((fn: unknown, keys: string[]) =>
     keys[0] === 'blob-generation'
@@ -429,13 +437,11 @@ describe('cachedQuery', () => {
 });
 
 describe('purgeAll', () => {
+  const runAfterTasks = () => Promise.all(afterTasks.pending.map((task) => task()));
+
   it('expires route data now but only marks page data and CDN responses stale', async () => {
-    mockBlobPurge.mockResolvedValue(15);
+    await purgeAll();
 
-    const deleted = await purgeAll();
-
-    expect(deleted).toBe(15);
-    expect(mockBlobPurge).toHaveBeenCalled();
     // The CDN's background refresh must read fresh data, never a stale server entry.
     expect(mockRevalidateTag).toHaveBeenCalledWith('db', { expire: 0 });
     expect(mockRevalidateTag).toHaveBeenCalledWith('db-page', 'max');
@@ -446,8 +452,6 @@ describe('purgeAll', () => {
   });
 
   it('drops every layer outright when asked to purge immediately', async () => {
-    mockBlobPurge.mockResolvedValue(0);
-
     await purgeAll({ immediate: true });
 
     expect(mockRevalidateTag).toHaveBeenCalledWith('db', { expire: 0 });
@@ -459,47 +463,121 @@ describe('purgeAll', () => {
     expect(mockRevalidateTag).not.toHaveBeenCalledWith(expect.anything(), 'max');
   });
 
-  it('marks the CollectiveX tag stale too — the blob purge removed its entries', async () => {
-    mockBlobPurge.mockResolvedValue(1);
-
+  it('marks the CollectiveX tag stale too', async () => {
     await purgeAll();
 
     expect(mockRevalidateTag).toHaveBeenCalledWith('collectivex', 'max');
   });
 
-  it('keeps the OperatorX CDN tag and Blob subtree — results ingests do not change OperatorX', async () => {
-    mockBlobPurge.mockResolvedValue(0);
+  it('schedules no blob work when Blob is not configured', async () => {
+    mockBlobEnabled.mockReturnValueOnce(false);
 
     await purgeAll();
 
-    expect(mockBlobPurge).toHaveBeenCalledWith('', ['operatorx/', 'content/']);
-    expect(mockRevalidateTag).not.toHaveBeenCalledWith('operatorx', expect.anything());
+    expect(mockRevalidateTag).toHaveBeenCalledWith('db', { expire: 0 });
+    expect(afterTasks.pending).toHaveLength(0);
   });
 
-  it('keeps content-addressed blobs except when purging immediately', async () => {
-    mockBlobPurge.mockResolvedValue(0);
+  describe('with Blob configured', () => {
+    beforeEach(() => {
+      mockBlobEnabled.mockReturnValue(true);
+      mockBlobPurge.mockResolvedValue(0);
+      // Expiring the db tag is what rolls the generation for later readers.
+      mockRevalidateTag.mockImplementation((tag) => {
+        if (tag === 'db') generation.value = 'g2';
+      });
+    });
 
-    await purgeAll({ immediate: true });
+    afterEach(() => {
+      mockRevalidateTag.mockReset();
+      mockBlobPurge.mockReset();
+    });
 
-    expect(mockBlobPurge).toHaveBeenCalledWith('', ['operatorx/']);
-  });
+    it('deletes the generation that was current before the tags expired, never the new one', async () => {
+      await purgeAll();
+      await runAfterTasks();
 
-  it('returns 0 when no blobs were deleted', async () => {
-    mockBlobPurge.mockResolvedValue(0);
+      const prefixes = mockBlobPurge.mock.calls.map(([prefix]) => prefix);
+      expect(prefixes[0]).toBe('generation/g1/');
+      expect(prefixes).not.toContain('generation/g2/');
+    });
 
-    const deleted = await purgeAll();
-    expect(deleted).toBe(0);
+    it('sweeps leftovers only when they predate the purge by the skew margin', async () => {
+      const before = Date.now();
+
+      await purgeAll();
+      await runAfterTasks();
+
+      const [prefix, keep, cutoff] = mockBlobPurge.mock.calls[1]!;
+      expect(prefix).toBe('');
+      expect(keep).toEqual(['operatorx/', 'content/']);
+      expect((cutoff as Date).getTime()).toBeLessThanOrEqual(before - 60_000 + 1000);
+      expect((cutoff as Date).getTime()).toBeGreaterThanOrEqual(before - 60_000 - 1000);
+    });
+
+    it('sweeps content-addressed blobs too when purging immediately, keeping only OperatorX', async () => {
+      await purgeAll({ immediate: true });
+      await runAfterTasks();
+
+      expect(mockBlobPurge.mock.calls[1]![1]).toEqual(['operatorx/']);
+    });
+
+    it('expires tags and resolves before the blob purge runs, even if it never settles', async () => {
+      mockBlobPurge.mockReturnValue(new Promise(() => {}));
+
+      await purgeAll();
+
+      expect(mockBlobPurge).not.toHaveBeenCalled();
+      expect(mockRevalidateTag).toHaveBeenCalledWith('db', { expire: 0 });
+      expect(afterTasks.pending).toHaveLength(1);
+      void runAfterTasks();
+      expect(mockBlobPurge).toHaveBeenCalledExactlyOnceWith('generation/g1/');
+    });
+
+    it('logs a failed blob purge instead of throwing', async () => {
+      const error = new Error('rate limited');
+      mockBlobPurge.mockRejectedValue(error);
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await purgeAll({ immediate: true });
+      expect(mockRevalidateTag).toHaveBeenCalledWith('db', { expire: 0 });
+      await expect(runAfterTasks()).resolves.toBeDefined();
+
+      expect(consoleError).toHaveBeenCalledWith(expect.any(String), error);
+      consoleError.mockRestore();
+    });
+
+    it('keeps the OperatorX CDN tag, since results ingests do not change OperatorX', async () => {
+      await purgeAll();
+
+      expect(mockRevalidateTag).not.toHaveBeenCalledWith('operatorx', expect.anything());
+    });
   });
 
   it('invalidates only the configured cache namespace', async () => {
     process.env.CACHE_NAMESPACE = 'staging';
-    mockBlobPurge.mockResolvedValue(0);
 
     await purgeAll();
 
     expect(mockRevalidateTag).toHaveBeenCalledWith('db:staging', { expire: 0 });
     expect(mockRevalidateTag).toHaveBeenCalledWith('db-page:staging', 'max');
     expect(mockRevalidateTag).toHaveBeenCalledWith('db-cdn:staging', 'max');
+  });
+});
+
+describe('purgeVideo', () => {
+  it('expires the video tag at once — its responses are private and never CDN cached', () => {
+    purgeVideo();
+
+    expect(mockBlobPurge).not.toHaveBeenCalled();
+    expect(mockRevalidateTag).toHaveBeenCalledExactlyOnceWith('video', { expire: 0 });
+  });
+
+  it('isolates the video tag by namespace', () => {
+    process.env.CACHE_NAMESPACE = 'staging';
+    purgeVideo();
+
+    expect(mockRevalidateTag).toHaveBeenCalledExactlyOnceWith('video:staging', { expire: 0 });
   });
 });
 

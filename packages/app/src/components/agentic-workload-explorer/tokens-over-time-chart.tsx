@@ -11,22 +11,26 @@ import { formatNumber } from '@/lib/agentic-workload-explorer/format';
 import { BrushBar, useBrush } from '@/components/agentic-workload-explorer/brush-bar';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 
 const STRINGS = {
   en: {
-    sectionTitle: 'Tokens Over Time',
+    sectionTitle: 'Tokens over time',
     noData: 'No request data available',
     requests: (n: number) => `${n} request${n === 1 ? '' : 's'}`,
-    cachedTokens: 'Cached Tokens',
-    uncachedTokens: 'Uncached Tokens',
-    apiHitRateLabel: 'API Cache Hit Rate',
+    cachedTokens: 'Cached tokens',
+    uncachedTokens: 'Uncached tokens',
+    apiHitRateLabel: 'API cache hit rate',
     apiHitRateTooltip:
       'Cache hits as reported by the API, summed across every request in this view.',
-    hashHitRateLabel: 'Theoretical Upper Bound Cache Hit Rate',
-    hashHitRateSubLabel: 'Assuming Infinite Cache TTL & Infinitely Large Cache',
+    hashHitRateLabel: 'Theoretical upper bound cache hit rate',
+    hashHitRateSubLabel: 'Assuming infinite cache TTL & infinitely large cache',
     hashHitRateTooltip:
       "Hash-block prefix matches against the whole session's chain — the highest hit rate achievable with no eviction and unlimited capacity.",
-    resetZoom: 'Reset Zoom',
+    resetZoom: 'Reset zoom',
     turnLabel: (n: number) => `turn ${n}`,
     cached: 'cached',
     uncached: 'uncached',
@@ -205,21 +209,15 @@ export function TokensOverTimeChart({
   }
 
   if (points.length === 0) {
-    return (
-      <div className="rounded-md border border-border bg-surface p-12 text-center font-mono text-xs text-muted-foreground">
-        {t.noData}
-      </div>
-    );
+    return <EmptyState className="py-12">{t.noData}</EmptyState>;
   }
 
   return (
     <div className="space-y-4">
-      <div className="sticky -top-5 z-20 -mx-2 space-y-2 border-b border-border bg-background/95 px-2 pb-2 pt-5 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div className="sticky -top-5 z-20 -mx-2 space-y-2 border-b border-border/20 bg-background/95 px-2 pb-2 pt-5 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="flex items-center gap-3">
-          <span className="font-mono text-3xs font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-            {t.sectionTitle}
-          </span>
-          <div className="h-px flex-1 bg-border" />
+          <span className="text-xs font-medium text-muted-foreground">{t.sectionTitle}</span>
+          <div className="h-px flex-1 bg-border/30" />
         </div>
         <div className="flex items-center gap-4">
           <span className="font-mono text-3xs text-muted-foreground">
@@ -258,19 +256,20 @@ export function TokensOverTimeChart({
         </div>
       </div>
 
-      <div ref={containerRef} className="relative rounded-md border border-border bg-surface p-4">
+      <div ref={containerRef} className="relative rounded-xl border border-border/30 bg-card p-4">
         <div className="mb-1 flex items-center justify-end">
           {brush.isActive && (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="2xs"
               onClick={() => {
                 brush.reset();
                 track('agentic_workload_tokens_zoom_reset');
               }}
-              className="rounded-md border border-border bg-surface px-2 py-0.5 font-mono text-3xs uppercase tracking-wider text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground"
             >
               {t.resetZoom}
-            </button>
+            </Button>
           )}
         </div>
         <svg
@@ -400,16 +399,16 @@ function HitRateTile({
 }) {
   return (
     <div
-      className="flex items-baseline gap-3 rounded-md border border-border bg-surface px-2.5 py-1.5"
+      className="flex items-baseline gap-3 rounded-md border border-border/30 bg-card px-2.5 py-1.5"
       title={tooltip}
     >
       <div className="min-w-0 flex-1">
-        <div className="truncate font-mono text-3xs font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-          {label}
-        </div>
-        {subLabel && <div className="truncate font-mono text-3xs text-subtle">{subLabel}</div>}
+        <div className="truncate text-xs font-medium text-muted-foreground">{label}</div>
+        {subLabel && (
+          <div className="truncate font-mono text-3xs text-muted-foreground">{subLabel}</div>
+        )}
       </div>
-      <span className="shrink-0 font-mono text-sm font-bold tabular-nums text-foreground">
+      <span className="shrink-0 font-mono text-sm font-medium tabular-nums text-foreground">
         {value.toFixed(1)}%
       </span>
     </div>
@@ -422,44 +421,19 @@ function ChartTooltip({ data, mode, t }: { data: TooltipState; mode: TokenSplitM
   const { point } = data;
   const split = mode === 'hash' ? point.hash : point.api;
   return (
-    <div
-      className="pointer-events-none fixed z-50 rounded-md border border-border bg-surface p-2.5 shadow-lg"
-      style={{ left: data.x + 12, top: data.y - 10 }}
-    >
-      <div className="space-y-1 font-mono text-2xs">
-        <div className="flex items-center gap-2 font-bold text-foreground">
-          <span>{t.turnLabel(point.turn)}</span>
-          <span className="rounded-sm border border-border px-1.5 py-0.5 text-3xs font-normal text-muted-foreground">
-            {mode === 'hash' ? 'hash' : 'api'}
-          </span>
-          {point.subagentLabel && (
-            <span className="rounded-sm border border-border px-1.5 py-0.5 text-3xs font-normal text-muted-foreground">
-              {point.subagentLabel}
-            </span>
-          )}
-        </div>
-        <div className="text-muted-foreground">@ {formatElapsedMMSS(point.elapsedMs)}</div>
-        <div className="flex items-center gap-2 text-foreground">
-          <span
-            className="inline-block h-2 w-2 rounded-sm"
-            style={{ backgroundColor: COLOR_CACHED }}
-          />
-          <span className="text-muted-foreground">{t.cached}</span>
-          <span className="ml-auto tabular-nums">{formatNumber(split.cached)}</span>
-        </div>
-        <div className="flex items-center gap-2 text-foreground">
-          <span
-            className="inline-block h-2 w-2 rounded-sm"
-            style={{ backgroundColor: COLOR_UNCACHED }}
-          />
-          <span className="text-muted-foreground">{t.uncached}</span>
-          <span className="ml-auto tabular-nums">{formatNumber(split.uncached)}</span>
-        </div>
-        <div className="flex items-center gap-2 border-t border-border pt-1 text-foreground">
-          <span className="text-muted-foreground">{t.total}</span>
-          <span className="ml-auto font-bold tabular-nums">{formatNumber(split.total)}</span>
-        </div>
-      </div>
-    </div>
+    <FloatingTooltip x={data.x} y={data.y}>
+      <ChartHoverCardBody
+        title={t.turnLabel(point.turn)}
+        subtitle={[mode === 'hash' ? 'hash' : 'api', point.subagentLabel]
+          .filter(Boolean)
+          .join(' · ')}
+        metrics={[
+          { value: formatNumber(split.cached), label: t.cached, color: COLOR_CACHED },
+          { value: formatNumber(split.uncached), label: t.uncached, color: COLOR_UNCACHED },
+          { value: formatNumber(split.total), label: t.total },
+        ]}
+        summary={`@ ${formatElapsedMMSS(point.elapsedMs)}`}
+      />
+    </FloatingTooltip>
   );
 }

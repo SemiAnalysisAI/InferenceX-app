@@ -119,8 +119,8 @@ describe('errors page refresh failure', () => {
     expect(normalizedText(alert)).toContain('Reload failed · showing previously loaded data');
     expect(normalizedText(alert)).toContain('refresh gateway timeout');
 
-    const totalErrorsLabel = [...container.querySelectorAll('div')].find(
-      (element) => normalizedText(element) === 'Total Errors',
+    const totalErrorsLabel = [...container.querySelectorAll('dt')].find(
+      (element) => normalizedText(element) === 'Total errors',
     );
     expect(normalizedText(totalErrorsLabel?.parentElement ?? null)).toContain('42');
     expect(normalizedText(container)).toContain('stale-model-visible');

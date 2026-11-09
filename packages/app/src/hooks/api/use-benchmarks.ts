@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { fetchBenchmarks, type BenchmarkRow } from '@/lib/api/api';
-import { withSupplementalBenchmarks } from '@/lib/benchmarks/supplemental-benchmarks';
 
 export function benchmarkQueryOptions(
   model: string,
@@ -29,11 +28,8 @@ export function benchmarkQueryOptions(
         : []),
       ...(scope ? (['scope', scope] as const) : []),
     ] as const,
-    queryFn: async ({ signal }: { signal: AbortSignal }) =>
-      withSupplementalBenchmarks(
-        await fetchBenchmarks(model, canonicalDate, exact, signal, runId, exactRun, view),
-        { model, date: canonicalDate, exact, runId, view },
-      ),
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchBenchmarks(model, canonicalDate, exact, signal, runId, exactRun, view),
     enabled: enabled && Boolean(model),
     ...(initialData ? { initialData } : {}),
     ...(keepPreviousForModel

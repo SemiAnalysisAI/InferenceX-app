@@ -236,7 +236,7 @@ async function main(): Promise<void> {
               : await retryArtifactOperation(`downloading ${pair.serverLogs.name}`, () =>
                   downloadArtifact(pair.serverLogs, tempDir),
                 );
-          const root = serverLogArtifactRoot(serverLogDir, pair.serverLogs.name);
+          const root = await serverLogArtifactRoot(serverLogDir, pair.serverLogs.name);
           const logFiles = root ? listServerLogFilePaths(root) : [];
           if (logFiles.length === 0) {
             emptyArtifacts++;

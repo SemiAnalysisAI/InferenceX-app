@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-function setupWindow(search = '', pathname = '/inference', hash = '') {
+function setupWindow(search = '', pathname = '/infx/inference', hash = '') {
   const location = {
     search,
     pathname,
@@ -184,7 +184,11 @@ describe('readUrlParams', () => {
   });
 
   it('reads share-link params without rewriting the address bar', async () => {
-    const { history } = setupWindow('?g_model=test&eval=42', '/zh/evaluation', '#sample-detail');
+    const { history } = setupWindow(
+      '?g_model=test&eval=42',
+      '/zh/infx/evaluation',
+      '#sample-detail',
+    );
     const pristine = vi.fn();
     vi.stubGlobal('History', { prototype: { replaceState: pristine } });
     const { readUrlParams } = await import('@/lib/routing/url-state');
@@ -213,7 +217,7 @@ describe('refreshUrlParams', () => {
     expect(readUrlParams().g_model).toBeUndefined();
 
     location.search = '?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces';
-    location.pathname = '/inference';
+    location.pathname = '/infx/inference';
     const refreshed = refreshUrlParams();
 
     expect(refreshed.g_model).toBe('Qwen-3.5-397B-A17B');
@@ -222,7 +226,7 @@ describe('refreshUrlParams', () => {
   });
 
   it('keeps existing params when the new URL omits them', async () => {
-    const { location } = setupWindow('?g_model=Kimi-K3&i_seq=agentic-traces', '/inference');
+    const { location } = setupWindow('?g_model=Kimi-K3&i_seq=agentic-traces', '/infx/inference');
     const { refreshUrlParams } = await import('@/lib/routing/url-state');
 
     location.search = '?i_seq=8k/1k';
@@ -233,20 +237,20 @@ describe('refreshUrlParams', () => {
   });
 
   it('flushes a pending filter before a retained provider refreshes on navigation', async () => {
-    const { location } = setupWindow('?g_model=Kimi-K3', '/inference');
+    const { location } = setupWindow('?g_model=Kimi-K3', '/infx/inference');
     const { readUrlParams, refreshUrlParams, writeUrlParams } =
       await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'Qwen-3.5-397B-A17B' });
     location.search = '';
-    location.pathname = '/evaluation';
+    location.pathname = '/infx/evaluation';
     refreshUrlParams();
 
     expect(readUrlParams().g_model).toBe('Qwen-3.5-397B-A17B');
   });
 
   it('tracks explicit navigation intent separately from serialized state', async () => {
-    const { location } = setupWindow('', '/inference');
+    const { location } = setupWindow('', '/infx/inference');
     const { hasExplicitUrlParam, refreshUrlParams, writeUrlParams } =
       await import('@/lib/routing/url-state');
 
@@ -319,7 +323,7 @@ describe('writeUrlParams + buildShareUrl', () => {
     vi.unstubAllGlobals();
   });
 
-  it.each(['/inference', '/zh/inference'])(
+  it.each(['/infx/inference', '/zh/infx/inference'])(
     'keeps the selected legacy model in share links from %s',
     async (pathname) => {
       setupWindow('', pathname);
@@ -336,7 +340,7 @@ describe('writeUrlParams + buildShareUrl', () => {
   );
 
   it('does not add the inference navigation default to other tabs', async () => {
-    setupWindow('', '/historical');
+    setupWindow('', '/infx/historical');
     const { buildShareUrl } = await import('@/lib/routing/url-state');
     const { setInferenceNavigationModel } =
       await import('@/lib/routing/inference-navigation-state');
@@ -345,7 +349,7 @@ describe('writeUrlParams + buildShareUrl', () => {
   });
 
   it('stores params and includes them in share URL after flush', async () => {
-    setupWindow('', '/inference');
+    setupWindow('', '/infx/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'test-model' });
@@ -356,7 +360,7 @@ describe('writeUrlParams + buildShareUrl', () => {
   });
 
   it('keeps an explicit tokens-per-dollar metric, whose default status depends on i_power', async () => {
-    setupWindow('', '/inference');
+    setupWindow('', '/infx/inference');
     const { writeUrlParams, buildShareUrl, DEFAULT_Y_AXIS_METRIC } =
       await import('@/lib/routing/url-state');
 
@@ -369,7 +373,7 @@ describe('writeUrlParams + buildShareUrl', () => {
   });
 
   it('removes params that match their default value', async () => {
-    setupWindow('', '/inference');
+    setupWindow('', '/infx/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'DeepSeek-V4-Pro' });
@@ -380,7 +384,7 @@ describe('writeUrlParams + buildShareUrl', () => {
   });
 
   it('removes the revenue source instead of emitting an empty query param off-metric', async () => {
-    setupWindow('?i_revenue=openrouter', '/inference');
+    setupWindow('?i_revenue=openrouter', '/infx/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ i_revenue: 'normalized' });
@@ -390,7 +394,7 @@ describe('writeUrlParams + buildShareUrl', () => {
   });
 
   it('removes params with undefined value', async () => {
-    setupWindow('?g_model=custom', '/inference');
+    setupWindow('?g_model=custom', '/infx/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: undefined as any });
@@ -401,7 +405,7 @@ describe('writeUrlParams + buildShareUrl', () => {
   });
 
   it('keeps an explicit i_seq=8k/1k in the share URL (no longer stripped as a default)', async () => {
-    setupWindow('', '/inference');
+    setupWindow('', '/infx/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ i_seq: '8k/1k' });
@@ -411,7 +415,7 @@ describe('writeUrlParams + buildShareUrl', () => {
   });
 
   it('still strips i_seq when it is empty (the no-selection case)', async () => {
-    setupWindow('', '/inference');
+    setupWindow('', '/infx/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ i_seq: '' });
@@ -421,7 +425,7 @@ describe('writeUrlParams + buildShareUrl', () => {
   });
 
   it('batches multiple params in a single debounce window', async () => {
-    setupWindow('', '/inference');
+    setupWindow('', '/infx/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'a' });
@@ -434,7 +438,7 @@ describe('writeUrlParams + buildShareUrl', () => {
   });
 
   it('flushes pending writes synchronously when buildShareUrl is called', async () => {
-    setupWindow('', '/inference');
+    setupWindow('', '/infx/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'immediate' });
@@ -443,7 +447,7 @@ describe('writeUrlParams + buildShareUrl', () => {
   });
 
   it('flushes pending writes synchronously for a remounted provider', async () => {
-    setupWindow('', '/inference');
+    setupWindow('', '/infx/inference');
     const { readUrlParams, writeUrlParams } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'Kimi-K3', i_seq: 'agentic-traces' });
@@ -455,7 +459,7 @@ describe('writeUrlParams + buildShareUrl', () => {
   });
 
   it('does not restore an initial param after the user resets it to default', async () => {
-    setupWindow('?g_model=Kimi-K3', '/inference');
+    setupWindow('?g_model=Kimi-K3', '/infx/inference');
     const { readUrlParams, writeUrlParams } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'DeepSeek-V4-Pro' });
@@ -497,8 +501,8 @@ describe('buildShareUrl tab filtering', () => {
     vi.unstubAllGlobals();
   });
 
-  it('includes only inference-tab params when on /inference', async () => {
-    setupWindow('', '/inference');
+  it('includes only inference-tab params when on /infx/inference', async () => {
+    setupWindow('', '/infx/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'x', i_seq: 'y', r_range: 'last-7-days' });
@@ -510,8 +514,8 @@ describe('buildShareUrl tab filtering', () => {
     expect(url).not.toContain('r_range');
   });
 
-  it('includes only evaluation-tab params when on /evaluation', async () => {
-    setupWindow('', '/evaluation');
+  it('includes only evaluation-tab params when on /infx/evaluation', async () => {
+    setupWindow('', '/infx/evaluation');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'x', e_bench: 'mmlu', i_seq: 'y' });
@@ -523,8 +527,8 @@ describe('buildShareUrl tab filtering', () => {
     expect(url).not.toContain('i_seq');
   });
 
-  it('includes only reliability-tab params when on /reliability', async () => {
-    setupWindow('', '/reliability');
+  it('includes only reliability-tab params when on /infx/reliability', async () => {
+    setupWindow('', '/infx/reliability');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ r_range: 'last-7-days', g_model: 'x' });
@@ -535,8 +539,8 @@ describe('buildShareUrl tab filtering', () => {
     expect(url).not.toContain('g_model');
   });
 
-  it('includes global, inference and c_ params when on /calculator', async () => {
-    setupWindow('', '/calculator');
+  it('includes global, inference and c_ params when on /infx/calculator', async () => {
+    setupWindow('', '/infx/calculator');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
     writeUrlParams({
@@ -558,7 +562,10 @@ describe('buildShareUrl tab filtering', () => {
     expect(url).not.toContain('r_range');
   });
 
-  for (const pathname of ['/profit-estimator', '/zh/profit-estimator-per-gigawatt/kimi-k3']) {
+  for (const pathname of [
+    '/infx/profit-estimator',
+    '/zh/infx/profit-estimator-per-gigawatt/kimi-k3',
+  ]) {
     it(`shares the profit target but never a percentile on ${pathname}`, async () => {
       setupWindow('', pathname);
       const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
@@ -574,7 +581,7 @@ describe('buildShareUrl tab filtering', () => {
   }
 
   it('drops c_ivtarget from the share link once the target returns to the model default', async () => {
-    setupWindow('?c_ivtarget=24', '/profit-estimator');
+    setupWindow('?c_ivtarget=24', '/infx/profit-estimator');
     const { readUrlParams, writeUrlParams, buildShareUrl } =
       await import('@/lib/routing/url-state');
     expect(readUrlParams().c_ivtarget).toBe('24');
@@ -582,26 +589,29 @@ describe('buildShareUrl tab filtering', () => {
     writeUrlParams({ c_ivtarget: '' });
     await vi.advanceTimersByTimeAsync(200);
 
-    expect(buildShareUrl()).toBe('https://example.com/profit-estimator');
+    expect(buildShareUrl()).toBe('https://example.com/infx/profit-estimator');
   });
 
   it('refreshes route state and clears stale values on a fresh estimator navigation', async () => {
-    const { location } = setupWindow('', '/profit-estimator/deepseek-v4/target/24/percentile/p75');
+    const { location } = setupWindow(
+      '',
+      '/infx/profit-estimator/deepseek-v4/target/24/percentile/p75',
+    );
     const { readUrlParams, refreshUrlParamsOnNavigation, buildShareUrl } =
       await import('@/lib/routing/url-state');
     expect(readUrlParams()).toMatchObject({ c_ivtarget: '24' });
     expect(readUrlParams().i_pctl).toBeUndefined();
-    location.pathname = '/profit-estimator/kimi-k3';
+    location.pathname = '/infx/profit-estimator/kimi-k3';
     refreshUrlParamsOnNavigation(location.pathname);
     expect(readUrlParams().c_ivtarget).toBeUndefined();
     expect(readUrlParams().i_pctl).toBeUndefined();
-    expect(buildShareUrl()).toBe('https://example.com/profit-estimator/kimi-k3');
+    expect(buildShareUrl()).toBe('https://example.com/infx/profit-estimator/kimi-k3');
   });
 
   it('updates the visible path with pending filters and preserves hash and unrelated queries', async () => {
     const { history } = setupWindow(
       '?utm_campaign=test',
-      '/profit-estimator/deepseek-v4',
+      '/infx/profit-estimator/deepseek-v4',
       '#chart',
     );
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
@@ -610,10 +620,10 @@ describe('buildShareUrl tab filtering', () => {
     expect(history.replaceState).toHaveBeenLastCalledWith(
       history.state,
       '',
-      '/profit-estimator/deepseek-v4/target/24?utm_campaign=test#chart',
+      '/infx/profit-estimator/deepseek-v4/target/24?utm_campaign=test#chart',
     );
     expect(buildShareUrl()).toBe(
-      'https://example.com/profit-estimator/deepseek-v4/target/24#chart',
+      'https://example.com/infx/profit-estimator/deepseek-v4/target/24#chart',
     );
   });
 
@@ -630,7 +640,7 @@ describe('buildShareUrl tab filtering', () => {
   });
 
   it('does not rehydrate over an edit queued during a client-owned profit route write', async () => {
-    const { location, history } = setupWindow('', '/profit-estimator/deepseek-v4');
+    const { location, history } = setupWindow('', '/infx/profit-estimator/deepseek-v4');
     const state = await import('@/lib/routing/url-state');
     let firstWrite = true;
     const nativeReplace = vi.fn((_state, _title, href: string) => {
@@ -658,7 +668,7 @@ describe('buildShareUrl tab filtering', () => {
     });
     await vi.advanceTimersByTimeAsync(150);
     expect(location.pathname).toBe(
-      '/profit-estimator/deepseek-v4/target/24/tco-basis/external/run/123/precision/fp8',
+      '/infx/profit-estimator/deepseek-v4/target/24/tco-basis/external/run/123/precision/fp8',
     );
     expect(history.replaceState).not.toHaveBeenCalled();
     expect(nativeReplace).toHaveBeenCalledTimes(2);
@@ -677,27 +687,27 @@ describe('buildShareUrl tab filtering', () => {
   });
 
   it('uses the localized dashboard route to select its share scope', async () => {
-    setupWindow('', '/zh/evaluation', '#samples');
+    setupWindow('', '/zh/infx/evaluation', '#samples');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'x', e_bench: 'mmlu', i_seq: '8k/1k' });
     await vi.advanceTimersByTimeAsync(200);
 
     expect(buildShareUrl()).toBe(
-      'https://example.com/zh/evaluation?g_model=x&e_bench=mmlu#samples',
+      'https://example.com/zh/infx/evaluation?g_model=x&e_bench=mmlu#samples',
     );
   });
 
   it('omits query string when no non-default params exist', async () => {
-    setupWindow('', '/inference');
+    setupWindow('', '/infx/inference');
     const { buildShareUrl } = await import('@/lib/routing/url-state');
 
     const url = buildShareUrl();
     expect(url).not.toContain('?');
   });
 
-  it('includes i_active on /inference but not e_active or r_active', async () => {
-    setupWindow('', '/inference');
+  it('includes i_active on /infx/inference but not e_active or r_active', async () => {
+    setupWindow('', '/infx/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ i_active: 'h100,b200', e_active: 'h100', r_active: 'dsr1' });
@@ -709,8 +719,8 @@ describe('buildShareUrl tab filtering', () => {
     expect(url).not.toContain('r_active');
   });
 
-  it('includes e_active on /evaluation but not i_active or r_active', async () => {
-    setupWindow('', '/evaluation');
+  it('includes e_active on /infx/evaluation but not i_active or r_active', async () => {
+    setupWindow('', '/infx/evaluation');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ i_active: 'x', e_active: 'h100,b200', r_active: 'y' });
@@ -722,8 +732,8 @@ describe('buildShareUrl tab filtering', () => {
     expect(url).not.toContain('r_active');
   });
 
-  it('includes r_active on /reliability but not i_active or e_active', async () => {
-    setupWindow('', '/reliability');
+  it('includes r_active on /infx/reliability but not i_active or e_active', async () => {
+    setupWindow('', '/infx/reliability');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ i_active: 'x', e_active: 'y', r_active: 'dsr1,llama70b' });
@@ -748,7 +758,7 @@ describe('buildShareUrl unofficialrun handling', () => {
   });
 
   it('includes a single unofficial-run id from the live URL under the plural key', async () => {
-    setupWindow('?unofficialruns=111', '/inference');
+    setupWindow('?unofficialruns=111', '/infx/inference');
     const { buildShareUrl } = await import('@/lib/routing/url-state');
 
     const url = buildShareUrl();
@@ -756,7 +766,7 @@ describe('buildShareUrl unofficialrun handling', () => {
   });
 
   it('includes a comma-separated list of run ids verbatim', async () => {
-    setupWindow('?unofficialruns=111,222,333', '/inference');
+    setupWindow('?unofficialruns=111,222,333', '/infx/inference');
     const { buildShareUrl } = await import('@/lib/routing/url-state');
 
     const url = buildShareUrl();
@@ -764,7 +774,7 @@ describe('buildShareUrl unofficialrun handling', () => {
   });
 
   it('canonicalizes the singular alias "unofficialrun" to plural "unofficialruns"', async () => {
-    setupWindow('?unofficialrun=111,222', '/inference');
+    setupWindow('?unofficialrun=111,222', '/infx/inference');
     const { buildShareUrl } = await import('@/lib/routing/url-state');
 
     const url = buildShareUrl();
@@ -773,7 +783,7 @@ describe('buildShareUrl unofficialrun handling', () => {
   });
 
   it('preserves unofficialruns alongside other in-memory share params', async () => {
-    setupWindow('?unofficialruns=111&g_model=DeepSeek-V4-Pro', '/inference');
+    setupWindow('?unofficialruns=111&g_model=DeepSeek-V4-Pro', '/infx/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'DeepSeek-R1-0528' });
@@ -785,7 +795,7 @@ describe('buildShareUrl unofficialrun handling', () => {
   });
 
   it('is absent from the share URL when no unofficial run is in the address bar', async () => {
-    setupWindow('', '/inference');
+    setupWindow('', '/infx/inference');
     const { buildShareUrl } = await import('@/lib/routing/url-state');
 
     const url = buildShareUrl();
@@ -793,7 +803,7 @@ describe('buildShareUrl unofficialrun handling', () => {
   });
 
   it('skips empty unofficialruns values', async () => {
-    setupWindow('?unofficialruns=', '/inference');
+    setupWindow('?unofficialruns=', '/infx/inference');
     const { buildShareUrl } = await import('@/lib/routing/url-state');
 
     const url = buildShareUrl();
@@ -813,7 +823,7 @@ describe('currentChartSearch', () => {
   });
 
   it('returns the inference params a share link would carry', async () => {
-    setupWindow('', '/inference');
+    setupWindow('', '/infx/inference');
     const { currentChartSearch, writeUrlParams } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'Kimi-K3', i_active: 'gb200_dynamo-vllm', i_seq: 'agentic-traces' });
@@ -825,7 +835,7 @@ describe('currentChartSearch', () => {
   });
 
   it('resolves the tab through the /zh prefix and any trailing segments', async () => {
-    setupWindow('', '/zh/inference/agentic/440106');
+    setupWindow('', '/zh/infx/inference/agentic/440106');
     const { currentChartSearch, writeUrlParams } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'Kimi-K3', r_range: 'all-time' });
@@ -836,7 +846,7 @@ describe('currentChartSearch', () => {
   });
 
   it('is empty when every value is at its default', async () => {
-    setupWindow('', '/inference');
+    setupWindow('', '/infx/inference');
     const { currentChartSearch, writeUrlParams } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'DeepSeek-V4-Pro', r_range: 'last-3-months' });
@@ -864,7 +874,7 @@ describe('rememberChartStateInUrl', () => {
   });
 
   it('writes the chart state into the current history entry', async () => {
-    const { history } = setupWindow('', '/inference');
+    const { history } = setupWindow('', '/infx/inference');
     const { rememberChartStateInUrl, writeUrlParams } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'Kimi-K3', i_active: 'gb200_dynamo-vllm' });
@@ -874,34 +884,34 @@ describe('rememberChartStateInUrl', () => {
     const [state] = history.replaceState.mock.calls[0] as [unknown, string, string];
     const url = (history.replaceState.mock.calls[0] as [unknown, string, string])[2];
     expect(state).toEqual({ __NA: 1 });
-    expect(url.startsWith('/inference?')).toBe(true);
+    expect(url.startsWith('/infx/inference?')).toBe(true);
     const params = new URLSearchParams(url.slice(url.indexOf('?')));
     expect(params.get('g_model')).toBe('Kimi-K3');
     expect(params.get('i_active')).toBe('gb200_dynamo-vllm');
   });
 
   it('keeps the pathname and hash intact', async () => {
-    const { history } = setupWindow('', '/zh/inference', '#chart');
+    const { history } = setupWindow('', '/zh/infx/inference', '#chart');
     const { rememberChartStateInUrl, writeUrlParams } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'Kimi-K3' });
     rememberChartStateInUrl();
 
     const url = (history.replaceState.mock.calls[0] as [unknown, string, string])[2];
-    expect(url).toBe('/zh/inference?g_model=Kimi-K3#chart');
+    expect(url).toBe('/zh/infx/inference?g_model=Kimi-K3#chart');
   });
 
   it('leaves a default-only chart on a bare path rather than an empty query', async () => {
-    const { history } = setupWindow('', '/inference');
+    const { history } = setupWindow('', '/infx/inference');
     const { rememberChartStateInUrl } = await import('@/lib/routing/url-state');
 
     expect(rememberChartStateInUrl()).toBe('');
     const url = (history.replaceState.mock.calls[0] as [unknown, string, string])[2];
-    expect(url).toBe('/inference');
+    expect(url).toBe('/infx/inference');
   });
 
   it('carries an unofficial run overlay across the navigation', async () => {
-    const { history } = setupWindow('?unofficialruns=987654321', '/inference');
+    const { history } = setupWindow('?unofficialruns=987654321', '/infx/inference');
     const { rememberChartStateInUrl, writeUrlParams } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'Kimi-K3' });
@@ -933,37 +943,37 @@ describe('withChartState', () => {
   });
 
   it('appends the chart state to an in-app href', async () => {
-    setupWindow('', '/inference');
+    setupWindow('', '/infx/inference');
     const { withChartState, writeUrlParams } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'Kimi-K3', i_active: 'gb200_dynamo-vllm' });
-    const href = withChartState('/inference/agentic/440106');
+    const href = withChartState('/infx/inference/agentic/440106');
 
-    expect(href.startsWith('/inference/agentic/440106?')).toBe(true);
+    expect(href.startsWith('/infx/inference/agentic/440106?')).toBe(true);
     expect(new URLSearchParams(href.slice(href.indexOf('?'))).get('g_model')).toBe('Kimi-K3');
   });
 
   it('merges into an href that already has a query', async () => {
-    setupWindow('', '/inference');
+    setupWindow('', '/infx/inference');
     const { withChartState, writeUrlParams } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'Kimi-K3' });
-    const href = withChartState('/inference?view=timeline');
+    const href = withChartState('/infx/inference?view=timeline');
 
-    expect(href).toBe('/inference?view=timeline&g_model=Kimi-K3');
+    expect(href).toBe('/infx/inference?view=timeline&g_model=Kimi-K3');
   });
 
   it('returns the href untouched when there is no state to carry', async () => {
-    setupWindow('', '/inference');
+    setupWindow('', '/infx/inference');
     const { withChartState } = await import('@/lib/routing/url-state');
 
-    expect(withChartState('/inference/agentic/440106')).toBe('/inference/agentic/440106');
+    expect(withChartState('/infx/inference/agentic/440106')).toBe('/infx/inference/agentic/440106');
   });
 
   it('returns the href untouched without a window (SSR)', async () => {
     vi.stubGlobal('window', undefined);
     const { withChartState } = await import('@/lib/routing/url-state');
-    expect(withChartState('/inference')).toBe('/inference');
+    expect(withChartState('/infx/inference')).toBe('/infx/inference');
   });
 });
 
@@ -985,21 +995,21 @@ describe('refreshUrlParamsOnNavigation', () => {
     expect(refreshUrlParamsOnNavigation('/')).toBe(true);
 
     location.search = '?g_model=Kimi-K3&i_active=gb200_dynamo-vllm';
-    location.pathname = '/inference';
-    expect(refreshUrlParamsOnNavigation('/inference')).toBe(true);
+    location.pathname = '/infx/inference';
+    expect(refreshUrlParamsOnNavigation('/infx/inference')).toBe(true);
     expect(readUrlParams().g_model).toBe('Kimi-K3');
     expect(readUrlParams().i_active).toBe('gb200_dynamo-vllm');
   });
 
   it('does not re-import the URL for a component mounting later on the same path', async () => {
-    const { location } = setupWindow('?g_model=Kimi-K3', '/inference');
+    const { location } = setupWindow('?g_model=Kimi-K3', '/infx/inference');
     const { readUrlParams, refreshUrlParamsOnNavigation } = await import('@/lib/routing/url-state');
 
-    expect(refreshUrlParamsOnNavigation('/inference')).toBe(true);
+    expect(refreshUrlParamsOnNavigation('/infx/inference')).toBe(true);
     expect(readUrlParams().g_model).toBe('Kimi-K3');
 
     location.search = '?g_model=Kimi-K3';
-    expect(refreshUrlParamsOnNavigation('/inference')).toBe(false);
+    expect(refreshUrlParamsOnNavigation('/infx/inference')).toBe(false);
   });
 });
 
@@ -1015,7 +1025,7 @@ describe('rememberChartStateInUrl — params this module does not own', () => {
   });
 
   it('keeps unrelated query params on the entry it rewrites', async () => {
-    const { history } = setupWindow('?utm_source=twitter', '/inference');
+    const { history } = setupWindow('?utm_source=twitter', '/infx/inference');
     const { rememberChartStateInUrl, writeUrlParams } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'Kimi-K3' });
@@ -1028,7 +1038,7 @@ describe('rememberChartStateInUrl — params this module does not own', () => {
   });
 
   it('collapses the singular unofficialrun spelling onto the canonical plural', async () => {
-    const { history } = setupWindow('?unofficialrun=987654321', '/inference');
+    const { history } = setupWindow('?unofficialrun=987654321', '/infx/inference');
     const { rememberChartStateInUrl } = await import('@/lib/routing/url-state');
 
     rememberChartStateInUrl();
@@ -1052,10 +1062,10 @@ describe('buildShareUrl on the video dashboard', () => {
   });
 
   it('shares the live v_ params and nothing else', async () => {
-    setupWindow('?v_y=kjPerVideo&v_optimal=0&history-hardware=H200&i_metric=y_x', '/video');
+    setupWindow('?v_y=kjPerVideo&v_optimal=0&history-hardware=H200&i_metric=y_x', '/vgx');
     const { buildShareUrl } = await import('@/lib/routing/url-state');
     const url = new URL(buildShareUrl());
-    expect(url.pathname).toBe('/video');
+    expect(url.pathname).toBe('/vgx');
     expect(url.searchParams.get('v_y')).toBe('kjPerVideo');
     expect(url.searchParams.get('v_optimal')).toBe('0');
     expect(url.searchParams.has('history-hardware')).toBe(false);
@@ -1063,8 +1073,33 @@ describe('buildShareUrl on the video dashboard', () => {
   });
 
   it('keeps live v_ params out of inference share links', async () => {
-    setupWindow('?v_y=kjPerVideo', '/inference');
+    setupWindow('?v_y=kjPerVideo', '/infx/inference');
     const { buildShareUrl } = await import('@/lib/routing/url-state');
     expect(buildShareUrl()).not.toContain('v_y');
+  });
+});
+
+describe('VideoGenX results share state', () => {
+  it('does not carry reliability state into the VideoGenX r_ scope', async () => {
+    vi.resetModules();
+    const { location } = setupWindow('?r_range=last-month', '/infx/reliability');
+    const { buildShareUrl } = await import('@/lib/routing/url-state');
+    location.pathname = '/zh/vgx';
+    location.search =
+      '?r_workload=source%3Ac1&r_gpus=4&r_deadline=60&r_price_t2v=0.08&unofficialrun=123';
+    const url = new URL(buildShareUrl());
+    expect(url.pathname).toBe('/zh/vgx');
+    expect(url.searchParams.get('r_workload')).toBe('source:c1');
+    expect(url.searchParams.get('r_gpus')).toBe('4');
+    expect(url.searchParams.get('r_deadline')).toBe('60');
+    expect(url.searchParams.get('r_price_t2v')).toBe('0.08');
+    expect(url.searchParams.get('unofficialruns')).toBe('123');
+    expect(url.searchParams.has('r_range')).toBe(false);
+  });
+
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 });

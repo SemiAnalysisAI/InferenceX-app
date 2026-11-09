@@ -11,6 +11,12 @@ vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
 
 import { D3ChartWrapper } from './d3-chart-wrapper';
 
+vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  measureTextWidth: (text: string, font: string) =>
+    text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
+}));
+
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
 }
@@ -51,7 +57,7 @@ function renderWrapper(pinned: boolean) {
       />,
     ),
   );
-  return { tooltipRef, dismissTooltip, hideTooltipElements };
+  return { svgRef, tooltipRef, dismissTooltip, hideTooltipElements };
 }
 
 const tooltip = () => document.querySelector<HTMLElement>('[data-chart-tooltip="sheet-chart"]');
@@ -100,5 +106,68 @@ describe('D3ChartWrapper mobile detail sheet', () => {
     renderWrapper(false);
     expect(tooltip()?.dataset.sheet).toBeUndefined();
     expect(backdrop()).toBeNull();
+  });
+
+  it.each([false, true])('dismisses outside the plot with a mouse (narrow=%s)', (narrow) => {
+    stubMatchMedia({ [MOBILE_VIEWPORT_QUERY]: narrow, [COARSE_POINTER_QUERY]: false });
+    const { dismissTooltip, hideTooltipElements } = renderWrapper(true);
+    act(() => document.body.click());
+    expect(dismissTooltip).toHaveBeenCalledTimes(1);
+    expect(hideTooltipElements).toHaveBeenCalledTimes(1);
+  });
+
+  it('dismisses on desktop Escape without consuming other keys', () => {
+    stubMatchMedia({ [MOBILE_VIEWPORT_QUERY]: false });
+    const { dismissTooltip, hideTooltipElements } = renderWrapper(true);
+    act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' })));
+    expect(dismissTooltip).not.toHaveBeenCalled();
+    act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+    expect(dismissTooltip).toHaveBeenCalledTimes(1);
+    expect(hideTooltipElements).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves tooltip interactions and chart point handlers that stop propagation', () => {
+    stubMatchMedia({ [MOBILE_VIEWPORT_QUERY]: false });
+    const { svgRef, tooltipRef, dismissTooltip } = renderWrapper(true);
+    const link = document.createElement('button');
+    tooltipRef.current!.append(link);
+    const action = vi.fn();
+    link.addEventListener('click', action);
+    act(() => link.click());
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(dismissTooltip).not.toHaveBeenCalled();
+
+    const point = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    svgRef.current!.append(point);
+    point.addEventListener('click', (event) => event.stopPropagation());
+    act(() => point.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(dismissTooltip).not.toHaveBeenCalled();
+
+    act(() => svgRef.current!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(dismissTooltip).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes before an outside control stops bubbling without blocking its action', () => {
+    stubMatchMedia({ [MOBILE_VIEWPORT_QUERY]: false });
+    const { dismissTooltip } = renderWrapper(true);
+    const outside = document.createElement('button');
+    container.append(outside);
+    const action = vi.fn((event: Event) => event.stopPropagation());
+    outside.addEventListener('click', action);
+    act(() => outside.click());
+    expect(dismissTooltip).toHaveBeenCalledTimes(1);
+    expect(action).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not install dismissal handlers for hover cards and removes them on unpin', () => {
+    stubMatchMedia({ [MOBILE_VIEWPORT_QUERY]: false });
+    const pinned = renderWrapper(true);
+    const unpinned = renderWrapper(false);
+    act(() => {
+      document.body.click();
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
+    expect(pinned.dismissTooltip).not.toHaveBeenCalled();
+    expect(unpinned.dismissTooltip).not.toHaveBeenCalled();
   });
 });

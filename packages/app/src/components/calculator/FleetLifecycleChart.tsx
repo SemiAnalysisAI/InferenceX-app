@@ -3,6 +3,7 @@
 import * as d3 from 'd3';
 import React, { useCallback, useMemo, useRef } from 'react';
 
+import { ChartPointDetails } from '@/components/ui/chart-point-details';
 import { formatLargeNumber } from '@/lib/charts/chart-rendering';
 import { getChartWatermark } from '@/lib/catalog/data-mappings';
 import type { AnyScale } from '@/lib/d3-chart/chart-update';
@@ -14,6 +15,7 @@ import {
   type RenderContext,
   type ScaleConfig,
 } from '@/lib/d3-chart/D3Chart';
+import { chartTooltipShell, chartTooltipTitle } from '@/lib/d3-chart/tooltip-shell';
 import { escapeHtml } from '@/lib/shared/utils';
 import { useLocale } from '@/lib/i18n/use-locale';
 
@@ -100,6 +102,7 @@ interface FleetLifecycleChartProps {
   instructions: string;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
+  footer?: React.ReactNode;
 }
 
 const safeKey = (key: string) => key.replaceAll(/[|_\s]/gu, '-');
@@ -117,6 +120,7 @@ const FleetLifecycleChart = React.memo(
     instructions,
     legendElement,
     caption,
+    footer,
   }: FleetLifecycleChartProps) => {
     const locale = useLocale();
     const dateFormats = DATE_FORMATS[locale];
@@ -411,101 +415,136 @@ const FleetLifecycleChart = React.memo(
 
     const sliceDate = useMemo(() => d3.timeFormat(dateFormats.tooltip), [dateFormats]);
 
-    const wasFrozen = useRef(false);
-
-    const handleRender = useCallback((ctx: RenderContext) => {
-      ctx.layout.svg.on(
-        'click.lifecycle-freeze',
-        () => {
-          wasFrozen.current = chartRef.current?.isPinned() ?? false;
-        },
-        { capture: true },
-      );
-    }, []);
-
-    const tooltipConfig = useMemo(
-      () => ({
+    const tooltipConfig = useMemo(() => {
+      const valueHeader =
+        metric === 'revenue'
+          ? labels.revenuePerDay
+          : metric === 'revenuePerMw'
+            ? labels.revenuePerMw
+            : metric === 'cumulativeRevenue'
+              ? labels.cumulativeRevenue
+              : metric === 'marginPerMw'
+                ? labels.marginPerMw
+                : labels.marginPerDay;
+      const sliceAt = (d: HoverSlice) => {
+        const month = (d.x - anchorMs) / MS_PER_MONTH;
+        const readings: SliceReading[] = [];
+        for (const entry of data) {
+          const reading = readingAt(entry, month);
+          if (reading) readings.push(reading);
+        }
+        readings.sort((a, b) => b.value - a.value);
+        const tolerance = sliceSpacing * STEP_MATCH_SLICES;
+        const steps = stepsOnAxis
+          .filter((step) => Math.abs(step.x - d.x) <= tolerance)
+          .flatMap((step) => {
+            const entry = bySafeKey.get(step.seriesKey);
+            const info = entry?.stepInfo.get(step.month);
+            return entry && info ? [{ entry, info }] : [];
+          });
+        return { date: sliceDate(new Date(d.x)), readings, steps };
+      };
+      return {
         rulerType: 'vertical' as const,
         proximityHover: true,
         getDataX: (d: HoverSlice) => d.x,
-        content: (d: HoverSlice, isPinned: boolean) => {
-          const month = (d.x - anchorMs) / MS_PER_MONTH;
-          const readings: SliceReading[] = [];
-          for (const entry of data) {
-            const reading = readingAt(entry, month);
-            if (reading) readings.push(reading);
-          }
-          readings.sort((a, b) => b.value - a.value);
-
-          const valueHeader =
-            metric === 'revenue'
-              ? labels.revenuePerDay
-              : metric === 'revenuePerMw'
-                ? labels.revenuePerMw
-                : metric === 'cumulativeRevenue'
-                  ? labels.cumulativeRevenue
-                  : metric === 'marginPerMw'
-                    ? labels.marginPerMw
-                    : labels.marginPerDay;
+        content: (d: HoverSlice) => {
+          const { date, readings } = sliceAt(d);
           const rows = readings
             .map(
               (r) =>
-                `<tr><td class="pr-3 whitespace-nowrap" style="color: ${escapeHtml(r.color)}">${escapeHtml(r.label)}</td>
-                <td class="pr-3 text-right tabular-nums font-medium">${money(r.value)}</td>
-                <td class="text-right tabular-nums text-muted-foreground">${money(r.cumulative)}</td></tr>`,
+                `<tr><td style="padding: 1px 12px 1px 0; white-space: nowrap;"><span style="display: inline-block; width: 8px; height: 8px; border-radius: 9999px; background: ${escapeHtml(r.color)}; margin-right: 6px;"></span>${escapeHtml(r.label)}</td><td style="padding: 1px 12px 1px 0; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; color: var(--foreground);">${money(r.value)}</td><td style="text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted-foreground);">${money(r.cumulative)}</td></tr>`,
             )
             .join('');
-
-          const tolerance = sliceSpacing * STEP_MATCH_SLICES;
-          const steps = isPinned
-            ? stepsOnAxis
-                .filter((step) => Math.abs(step.x - d.x) <= tolerance)
-                .flatMap((step) => {
-                  const entry = bySafeKey.get(step.seriesKey);
-                  const info = entry?.stepInfo.get(step.month);
-                  if (!entry || !info) return [];
-                  const factor = info.factor > 1.005 ? ` (${info.factor.toFixed(2)}x)` : '';
-                  const links = info.runUrls
-                    .map(
-                      (url, i) =>
-                        `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="text-primary underline mr-2">${escapeHtml(labels.runLink)}${
-                          info.runUrls.length > 1 ? ` ${i + 1}` : ''
-                        }</a>`,
-                    )
-                    .join('');
-                  return [
-                    `<div class="mt-1">
-                  <span style="color: ${escapeHtml(entry.color)}">${escapeHtml(entry.label)}</span>
-                  <span class="text-muted-foreground"> ${escapeHtml(labels.config)}: ${escapeHtml(info.config)}${escapeHtml(factor)} · ${escapeHtml(labels.date)} ${escapeHtml(info.date)}</span>${links ? ` ${links}` : ''}
-                </div>`,
-                  ];
-                })
-                .join('')
-            : '';
-
-          return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 240px; user-select: ${isPinned ? 'text' : 'none'};">
-            <div class="font-semibold mb-1">${escapeHtml(sliceDate(new Date(d.x)))}</div>
-            ${
+          return chartTooltipShell(
+            `${chartTooltipTitle(escapeHtml(date))}${
               rows
-                ? `<table class="w-full"><thead><tr class="text-muted-foreground font-normal">
-                    <th></th>
-                    <th class="pr-3 text-right font-normal">${escapeHtml(valueHeader)}</th>
-                    <th class="text-right font-normal">${escapeHtml(labels.cumulative)}</th>
-                  </tr></thead><tbody>${rows}</tbody></table>`
+                ? `<table style="width: 100%; font-size: 11px; line-height: 15px; border-collapse: collapse;"><thead><tr style="color: var(--muted-foreground);"><th></th><th style="padding-right: 12px; text-align: right; font-weight: 400;">${escapeHtml(valueHeader)}</th><th style="text-align: right; font-weight: 400;">${escapeHtml(labels.cumulative)}</th></tr></thead><tbody>${rows}</tbody></table>`
                 : ''
-            }
-            ${steps}
-          </div>`;
+            }`,
+            { minWidth: 220, maxWidth: 320 },
+          );
+        },
+        details: (d: HoverSlice, _isOverlay: boolean, close: () => void) => {
+          const { date, readings, steps } = sliceAt(d);
+          return (
+            <ChartPointDetails title={date} metrics={[]} onClose={close}>
+              {readings.length > 0 && (
+                <table className="mt-3 w-full text-xs">
+                  <thead>
+                    <tr className="text-muted-foreground">
+                      <th />
+                      <th className="pr-3 text-right font-normal">{valueHeader}</th>
+                      <th className="text-right font-normal">{labels.cumulative}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {readings.map((r) => (
+                      <tr key={r.label}>
+                        <td className="py-0.5 pr-3 whitespace-nowrap">
+                          <span
+                            aria-hidden
+                            className="mr-1.5 inline-block size-2 rounded-full"
+                            style={{ backgroundColor: r.color }}
+                          />
+                          {r.label}
+                        </td>
+                        <td className="pr-3 text-right font-semibold tabular-nums whitespace-nowrap text-foreground">
+                          {money(r.value)}
+                        </td>
+                        <td className="text-right tabular-nums whitespace-nowrap text-muted-foreground">
+                          {money(r.cumulative)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {steps.length > 0 && (
+                <ul className="mt-2.5 space-y-1.5 border-t border-border/50 pt-2.5">
+                  {steps.map(({ entry, info }) => (
+                    <li key={`${entry.key}-${info.date}`}>
+                      <span className="font-medium" style={{ color: entry.color }}>
+                        {entry.label}
+                      </span>{' '}
+                      <span className="text-muted-foreground">
+                        {labels.config}: {info.config}
+                        {info.factor > 1.005 ? ` (${info.factor.toFixed(2)}x)` : ''} · {labels.date}{' '}
+                        {info.date}
+                      </span>
+                      {info.runUrls.map((url, i) => (
+                        <a
+                          key={url}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-2 font-medium text-foreground underline decoration-muted-foreground/50 underline-offset-4 hover:decoration-foreground"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          {labels.runLink}
+                          {info.runUrls.length > 1 ? ` ${i + 1}` : ''} ↗
+                        </a>
+                      ))}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </ChartPointDetails>
+          );
         },
         getRulerX: (d: HoverSlice, xScale: any) => xScale(d.x),
-        onPointClick: () => {
-          if (!wasFrozen.current) return;
-          chartRef.current?.dismissTooltip();
-          chartRef.current?.hideTooltip();
-        },
-      }),
-      [anchorMs, bySafeKey, data, labels, metric, readingAt, sliceDate, sliceSpacing, stepsOnAxis],
-    );
+      };
+    }, [
+      anchorMs,
+      bySafeKey,
+      data,
+      labels,
+      metric,
+      readingAt,
+      sliceDate,
+      sliceSpacing,
+      stepsOnAxis,
+    ]);
 
     const xAxisConfig = useMemo<AxisConfig>(
       () => ({
@@ -561,9 +600,9 @@ const FleetLifecycleChart = React.memo(
         zoom={zoomConfig}
         instructions={instructions}
         tooltip={tooltipConfig}
-        onRender={handleRender}
         legendElement={legendElement}
         caption={caption}
+        footer={footer}
       />
     );
   },

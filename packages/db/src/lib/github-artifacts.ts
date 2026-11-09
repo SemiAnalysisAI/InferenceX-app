@@ -9,13 +9,14 @@ export interface ArtifactMeta {
   archive_download_url: string;
   created_at: string;
   expired?: boolean;
+  size_in_bytes?: number;
 }
 
 export const RUNNER_SUFFIX_RE = /_[a-zA-Z][a-zA-Z0-9.-]*_\d+$/u;
 
 export function listRunArtifacts(repo: string, runId: string): ArtifactMeta[] {
   const json = execSync(
-    `gh api "repos/${repo}/actions/runs/${runId}/artifacts" --paginate --jq '.artifacts[]'`,
+    `gh api "repos/${repo}/actions/runs/${runId}/artifacts?per_page=100" --paginate --jq '.artifacts[]'`,
     { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 },
   );
   const out: ArtifactMeta[] = [];

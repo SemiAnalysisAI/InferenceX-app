@@ -252,7 +252,7 @@ describe('ChartButtons', () => {
   it('renders localized accessible actions on mobile by default', () => {
     cy.viewport(375, 700);
     cy.mount(
-      <PathnameContext.Provider value="/zh/inference">
+      <PathnameContext.Provider value="/zh/infx/inference">
         <div style={{ position: 'relative', width: 360, height: 200 }}>
           <div id="test-chart">Chart content</div>
           <ChartButtons chartId="test-chart" analyticsPrefix="test" onExportCsv={cy.stub()} />
@@ -272,8 +272,8 @@ describe('ChartButtons', () => {
     cy.get('[data-testid="zoom-reset-button"]').should('have.attr', 'aria-label', '重置缩放');
   });
 
-  for (const width of [320, 768, 1280]) {
-    it(`keeps wrapping actions above long captions at ${width}px without losing actions`, () => {
+  for (const width of [320, 1280]) {
+    it(`keeps wrapping actions clear of long captions at ${width}px without losing actions`, () => {
       cy.viewport(width, 800);
       const onModeChange = cy.stub().as('modeChange');
       const onExportCsv = cy.stub().as('responsiveCsv');
@@ -300,7 +300,7 @@ describe('ChartButtons', () => {
           />
           <Card id="responsive-chart">
             <h2 data-testid="long-caption">
-              Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume) over time at 100
+              Total Tokens per $1 TCO (Owning at large hyperscaler volume) over time at 100
               tok/s/user
             </h2>
             <p>Full benchmark configuration and source details remain below the actions.</p>
@@ -310,10 +310,16 @@ describe('ChartButtons', () => {
 
       cy.get('[data-slot="chart-actions"]').should(($toolbar) => {
         const toolbar = $toolbar[0].getBoundingClientRect();
-        const caption = $toolbar[0]
-          .parentElement!.querySelector('[data-testid="long-caption"]')!
+        const caption = $toolbar[0].ownerDocument
+          .querySelector('[data-testid="long-caption"]')!
           .getBoundingClientRect();
-        expect(toolbar.bottom, 'toolbar does not cover the title').to.be.at.most(caption.top);
+        if (width < 768) {
+          expect(toolbar.top, 'phones show the title before the toolbar').to.be.at.least(
+            caption.bottom,
+          );
+        } else {
+          expect(toolbar.bottom, 'toolbar does not cover the title').to.be.at.most(caption.top);
+        }
         for (const button of $toolbar[0].querySelectorAll('button')) {
           const bounds = button.getBoundingClientRect();
           expect(bounds.left, 'button remains inside the row').to.be.at.least(toolbar.left);

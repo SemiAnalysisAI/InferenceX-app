@@ -34,7 +34,7 @@ export const dynamic = 'force-dynamic';
  * GET /api/v1/views/reliability
  *
  * Aggregated benchmark-run success rates per hardware over a date-range
- * preset — the same numbers the `/reliability` dashboard chart renders,
+ * preset — the same numbers the `/infx/reliability` dashboard chart renders,
  * computed by the shared `aggregateByDateRange` (components/reliability).
  *
  * Query params:

@@ -46,10 +46,10 @@ describe('navigateInApp', () => {
     const router = { push: vi.fn() };
     const { event, preventDefault } = makeEvent();
 
-    navigateInApp(event, router, '/inference/kimi-k3');
+    navigateInApp(event, router, '/infx/inference/kimi-k3');
     expect(preventDefault).toHaveBeenCalledTimes(1);
     expect(router.push).toHaveBeenCalledTimes(1);
-    expect(router.push).toHaveBeenCalledWith('/inference/kimi-k3');
+    expect(router.push).toHaveBeenCalledWith('/infx/inference/kimi-k3');
 
     vi.advanceTimersByTime(5000);
     expect(router.push).toHaveBeenCalledTimes(1);
@@ -69,7 +69,7 @@ describe('navigateInApp', () => {
       overrides as Partial<MouseEvent<HTMLAnchorElement>>,
     );
 
-    navigateInApp(event, router, '/inference/kimi-k3');
+    navigateInApp(event, router, '/infx/inference/kimi-k3');
     vi.advanceTimersByTime(5000);
 
     expect(preventDefault).not.toHaveBeenCalled();
@@ -115,13 +115,13 @@ describe('pathname change pageview signalling', () => {
   });
 
   it('marks a model switch as exactly one pageview', () => {
-    replaceClientPathname('/inference/kimi-k3', [], { pageview: true });
+    replaceClientPathname('/infx/inference/kimi-k3', [], { pageview: true });
     expect(pathnameEvents.filter(isPageviewPathnameChange)).toHaveLength(1);
   });
 
   it('marks router model switches as a pageview only when requested', () => {
-    replaceRouterPathname('/inference/kimi-k3', [], { pageview: true });
-    replaceRouterPathname('/inference/kimi-k3/b200');
+    replaceRouterPathname('/infx/inference/kimi-k3', [], { pageview: true });
+    replaceRouterPathname('/infx/inference/kimi-k3/b200');
     expect(pathnameEvents).toHaveLength(2);
     expect(pathnameEvents.filter(isPageviewPathnameChange)).toHaveLength(1);
   });

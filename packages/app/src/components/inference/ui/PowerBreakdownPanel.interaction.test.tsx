@@ -449,22 +449,32 @@ describe('PowerChipCompare legend highlight', () => {
     expect(segments('server')).toHaveLength(2);
     expect(segments('facility')).toHaveLength(2);
     // Each chip's segments repeat the plot in that chip's colour; a layer made of several
-    // parts lists them in its title.
+    // parts lists them in its hover card.
+    const hoverCard = (segment: HTMLElement) => {
+      mouse(segment, 'mouseover');
+      const text =
+        document.querySelector('[data-testid="power-chip-compare-hover-card"]')?.textContent ?? '';
+      mouse(segment, 'mouseout');
+      return text;
+    };
     const gpuSegment = segments('gpu')[0];
     expect(gpuSegment.style.backgroundColor).toContain('90%');
     expect(gpuSegment.style.backgroundColor).toContain('var(--b200_');
     expect(gpuSegment.style.backgroundImage).toBe('');
-    expect(gpuSegment.getAttribute('title')).toMatch(/^GPU: \d+ W$/u);
+    expect(hoverCard(gpuSegment)).toMatch(/GPU · Measured[\d,]+W\/GPU/u);
     const serverSegment = segments('server')[0];
     expect(serverSegment.style.backgroundImage).toContain('repeating-linear-gradient(135deg');
     expect(serverSegment.style.backgroundImage).toContain('var(--b200_');
-    const serverTitle = serverSegment.getAttribute('title') ?? '';
-    expect(serverTitle).toMatch(/^Server parts: \d+ W · /u);
-    expect(serverTitle).toContain('NICs');
-    expect(serverTitle).toContain('NVSwitch');
-    expect(serverTitle).not.toContain('PSU loss');
-    expect(segments('fansPsu')[0].getAttribute('title')).toContain('PSU loss');
-    expect(segments('network')[0].getAttribute('title')).toMatch(/^Network share: \d+ W$/u);
+    const serverCard = hoverCard(serverSegment);
+    expect(serverCard).toMatch(/Server parts · Modeled \(hatched\)[\d,]+W\/GPU/u);
+    expect(serverCard).toContain('NICs');
+    expect(serverCard).toContain('NVSwitch');
+    expect(serverCard).not.toContain('PSU loss');
+    expect(hoverCard(segments('fansPsu')[0])).toContain('PSU loss');
+    const networkCard = hoverCard(segments('network')[0]);
+    expect(networkCard).toContain('Network share');
+    expect(networkCard).not.toMatch(/\d W · /u);
+    expect(document.querySelector('[data-testid="power-chip-compare-hover-card"]')).toBeNull();
     mouse(item, 'mouseover');
     for (const segment of segments('server')) {
       expect(segment.dataset.emphasis).toBe('highlighted');

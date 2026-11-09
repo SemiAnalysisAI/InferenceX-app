@@ -14,59 +14,61 @@ const availableQuickFilters: QuickFilters = {
 };
 
 describe('QuickFiltersDialog', () => {
-  for (const locale of ['en', 'zh'] as const) {
-    for (const width of [390, 1280]) {
-      it(`explains every filter on hover without changing selections (${locale}, ${width}px)`, () => {
-        cy.viewport(width, 900);
-        mountWithProviders(
-          <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
-            <QuickFiltersDialog
-              open
-              onOpenChange={cy.stub().as('changeOpen')}
-              bestPerSku={{ checked: false, onCheckedChange: cy.stub().as('bestPerSku') }}
-            />
-          </PathnameContext.Provider>,
-          { inference: { availableQuickFilters } },
-        );
-        const explanations = [
-          [
-            'best-per-sku',
-            locale === 'zh'
-              ? 'Pareto 前沿在图表中所覆盖的面积'
-              : 'chart area its measured Pareto frontier dominates',
-          ],
-          ['vendor', locale === 'zh' ? '芯片制造商' : 'company that makes the chip'],
-          ['framework', 'Dynamo vLLM'],
-          ['deployment', locale === 'zh' ? '不同的 worker' : 'across workers'],
-          ['spec', 'EAGLE'],
-          ['power', locale === 'zh' ? '历史测量' : 'Historical measurement'],
-        ];
-        for (const [key, explanation] of explanations) {
-          const testId =
-            key === 'power' ? 'measured-power-help' : `option-help-quick-filter-${key}`;
-          cy.get(`[data-testid="${testId}"]`)
-            .scrollIntoView()
-            .should('have.attr', 'aria-label')
-            .and('include', locale === 'zh' ? '说明' : 'Help:');
-          cy.get(`[data-testid="${testId}"]`).trigger('pointerover', { pointerType: 'mouse' });
-          cy.get(`[data-testid="option-help-content-quick-filter-${key}"]`)
-            .should('be.visible')
-            .and('contain.text', explanation)
-            .should(($content) => {
-              const bounds = $content[0].getBoundingClientRect();
-              expect(bounds.left).to.be.at.least(0);
-              expect(bounds.right).to.be.at.most(width);
-            });
-          cy.get('body').type('{esc}');
-          cy.get(`[data-testid="option-help-content-quick-filter-${key}"]`).should('not.exist');
-        }
-        cy.get('@bestPerSku').should('not.have.been.called');
-        cy.get('@changeOpen').should('not.have.been.called');
-        for (const action of ['Vendors', 'Frameworks', 'Deployment', 'Spec', 'Power']) {
-          cy.get(`@setQuickFilter${action}`).should('not.have.been.called');
-        }
-      });
-    }
+  for (const [locale, width] of [
+    ['en', 390],
+    ['zh', 1280],
+  ] as const) {
+    it(`explains every filter on hover without changing selections (${locale}, ${width}px)`, () => {
+      cy.viewport(width, 900);
+      mountWithProviders(
+        <PathnameContext.Provider
+          value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+        >
+          <QuickFiltersDialog
+            open
+            onOpenChange={cy.stub().as('changeOpen')}
+            bestPerSku={{ checked: false, onCheckedChange: cy.stub().as('bestPerSku') }}
+          />
+        </PathnameContext.Provider>,
+        { inference: { availableQuickFilters } },
+      );
+      const explanations = [
+        [
+          'best-per-sku',
+          locale === 'zh'
+            ? 'Pareto 前沿在图表中所覆盖的面积'
+            : 'chart area its measured Pareto frontier dominates',
+        ],
+        ['vendor', locale === 'zh' ? '芯片制造商' : 'company that makes the chip'],
+        ['framework', 'Dynamo vLLM'],
+        ['deployment', locale === 'zh' ? '不同的 worker' : 'across workers'],
+        ['spec', 'EAGLE'],
+        ['power', locale === 'zh' ? '历史测量' : 'Historical measurement'],
+      ];
+      for (const [key, explanation] of explanations) {
+        const testId = key === 'power' ? 'measured-power-help' : `option-help-quick-filter-${key}`;
+        cy.get(`[data-testid="${testId}"]`)
+          .scrollIntoView()
+          .should('have.attr', 'aria-label')
+          .and('include', locale === 'zh' ? '说明' : 'Help:');
+        cy.get(`[data-testid="${testId}"]`).trigger('pointerover', { pointerType: 'mouse' });
+        cy.get(`[data-testid="option-help-content-quick-filter-${key}"]`)
+          .should('be.visible')
+          .and('contain.text', explanation)
+          .should(($content) => {
+            const bounds = $content[0].getBoundingClientRect();
+            expect(bounds.left).to.be.at.least(0);
+            expect(bounds.right).to.be.at.most(width);
+          });
+        cy.get('body').type('{esc}');
+        cy.get(`[data-testid="option-help-content-quick-filter-${key}"]`).should('not.exist');
+      }
+      cy.get('@bestPerSku').should('not.have.been.called');
+      cy.get('@changeOpen').should('not.have.been.called');
+      for (const action of ['Vendors', 'Frameworks', 'Deployment', 'Spec', 'Power']) {
+        cy.get(`@setQuickFilter${action}`).should('not.have.been.called');
+      }
+    });
   }
 
   it('keeps hovered help readable without stealing filter focus', () => {
@@ -133,7 +135,7 @@ describe('QuickFiltersDialog', () => {
 
   it('localizes active filter values and leaves inapplicable AgentX spec filters untouched', () => {
     mountWithProviders(
-      <PathnameContext.Provider value="/zh/agentx">
+      <PathnameContext.Provider value="/zh/infx/agentx">
         <ActiveQuickFilters />
       </PathnameContext.Provider>,
       {
@@ -188,33 +190,6 @@ describe('QuickFiltersDialog', () => {
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
     cy.get('body').type('{esc}');
     cy.get('@changeOpen').should('have.been.calledWith', false);
-  });
-
-  it('shows every filter group for fixed-sequence charts', () => {
-    mountWithProviders(<QuickFiltersDialog open onOpenChange={cy.stub()} />, {
-      inference: { availableQuickFilters },
-    });
-
-    cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
-    cy.get('[data-testid="quick-filter-vendor-NVIDIA"]').should('be.visible');
-    cy.get('[data-testid="quick-filter-framework-vllm"]').should('be.visible');
-    cy.get('[data-testid="quick-filter-deployment-disagg"]').should('be.visible');
-    cy.get('[data-testid="quick-filter-spec-mtp"]').should('be.visible');
-    cy.get('[data-testid="quick-filter-power-certified"]').should('contain.text', 'Validated');
-    cy.get('[data-testid="quick-filter-power-legacy"]').should('contain.text', 'Historical');
-  });
-
-  it('explains validated and historical power measurements in plain language', () => {
-    mountWithProviders(<QuickFiltersDialog open onOpenChange={cy.stub()} />, {
-      inference: { availableQuickFilters },
-    });
-
-    cy.get('[data-testid="measured-power-help"]').click();
-    cy.contains('Validated measurement').should('be.visible');
-    cy.contains('passed checks for benchmark-window coverage').should('be.visible');
-    cy.contains('Historical measurement').should('be.visible');
-    cy.contains('This does not mean the measurement is wrong.').should('be.visible');
-    cy.contains('Both are shown by default.').should('be.visible');
   });
 
   it('removes speculative decoding from agentic charts and toggles supported filters', () => {

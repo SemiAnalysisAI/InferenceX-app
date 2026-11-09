@@ -127,8 +127,9 @@ export function FrontierTimeline({
 }: ChapterProps & { label: string }) {
   const text = useChapterText({ styles, configLabel, unit });
   const [hovered, setHovered] = useState<number | null>(null);
-  const last = Math.max(1, dates.length - 1);
-  const position = (index: number) => (index / last) * 100;
+  // The slider's range ends on the last real date, so a single snapshot has nowhere to seek.
+  const last = Math.max(0, dates.length - 1);
+  const position = (index: number) => (last === 0 ? 0 : (index / last) * 100);
   // Several series can step on the same date; they share one segment and one tooltip.
   const byDate = new Map<number, FrontierChapter[]>();
   for (const chapter of chapters)

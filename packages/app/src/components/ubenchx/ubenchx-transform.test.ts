@@ -7,4 +7,5 @@ it('spaces binary-size labels independently of dense sample clusters', () => {
   ]);
   expect(sizeAxisTicks(4096, 4096)).toEqual([4096]);
   expect(() => sizeAxisTicks(0, 1024)).toThrow('Invalid');
+  expect(sizeAxisTicks(8, 17179869184, 4)).toEqual([8, 2048, 524288, 134217728, 17179869184]);
 });

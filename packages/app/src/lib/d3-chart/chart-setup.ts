@@ -10,6 +10,10 @@ import {
 
 export const DEFAULT_CHART_MARGIN = { top: 24, right: 10, bottom: 40, left: 60 };
 
+export function defaultChartHeight(width: number): number {
+  return width > 0 && width < 640 ? Math.round(Math.min(600, Math.max(380, width * 1.2))) : 600;
+}
+
 export function setupChartStructure(
   svgElement: SVGSVGElement,
   config: ChartSetupConfig,

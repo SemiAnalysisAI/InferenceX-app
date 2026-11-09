@@ -144,6 +144,8 @@ export interface HiddenVendorNote {
 }
 
 type FrontierViewProps = Omit<FrontierChartProps, 'dateIndex' | 'variant'> & {
+  /** View switcher and export buttons, shown at the top of the card. */
+  toolbar?: React.ReactNode;
   section: FrontierSection;
   /** Compare only: vendors or chips side by side. The other views always show chips. */
   grouping: FrontierGrouping;
@@ -218,6 +220,7 @@ function useDateFormatter(locale: 'en' | 'zh') {
  * and a data table, plus each view's own controls and panels.
  */
 export default function FrontierView({
+  toolbar,
   section,
   grouping,
   onGroupingChange,
@@ -347,9 +350,13 @@ export default function FrontierView({
       return;
     }
     // A run starts at the beginning (Replay, or dragged back to the start); pausing and
-    // resuming mid-way stays in the same run.
+    // resuming mid-way stays in the same run. A new run drops any pause left over from the
+    // last chapter or meme of the previous one.
     if (dateIndex >= last) setDateIndex(0);
-    if (dateIndex >= last || dateIndex === 0) memeShownThisRun.current = false;
+    if (dateIndex >= last || dateIndex === 0) {
+      memeShownThisRun.current = false;
+      holdUntil.current = 0;
+    }
     setPlaying(true);
     track('historical_frontier_played', { date: history.dates[dateIndex] });
   };
@@ -514,6 +521,7 @@ export default function FrontierView({
 
   return (
     <Card className="relative" data-testid="frontier-view">
+      {toolbar}
       <FrontierChart
         {...chartProps}
         caption={

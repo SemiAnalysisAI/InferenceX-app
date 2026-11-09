@@ -9,11 +9,12 @@ import { track } from '@/lib/analytics/analytics';
 import type { HardwareConfig } from '@/components/inference/types';
 import { Card } from '@/components/ui/card';
 import { ChipBasisNote } from '@/components/ui/chip-basis-note';
-import { CollapsibleSection } from '@/components/ui/collapsible-section';
+import { Heading } from '@/components/ui/heading';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
+import { sourceLinkClassName } from '@/components/ui/result-context';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { getGpuSpecs, getHardwareConfig } from '@/lib/catalog/constants';
 import { readUrlParams, writeUrlParams } from '@/lib/routing/url-state';
@@ -39,25 +40,25 @@ interface CostTargetPanelProps {
 
 const STRINGS = {
   en: {
-    toggleSection: 'Expand or fold this section',
-    costCapTitle: 'Interactivity Within a Cost Target',
+    costCapTitle: 'Interactivity within a cost target',
     costCapDescription:
       'Set a cost ceiling per million tokens and find the highest interactivity each chip can serve without exceeding it.',
-    costCapLabel: 'Cost Target ($/M tok)',
+    costCapLabel: 'Cost target ($/M tok)',
+    costCapShortLabel: 'Cost ($/M tok)',
     costCapTooltip:
       'Maximum acceptable cost per million tokens (at the selected pricing tier and token type). The answer is the highest interactivity whose interpolated cost stays at or below this ceiling.',
     costCapPlaceholder: 'e.g. 0.50',
-    mwLabel: 'Facility Power (MW)',
+    mwLabel: 'Facility power (MW)',
+    mwShortLabel: 'Power (MW)',
     mwTooltip:
       'Optional facility power budget in megawatts. When set, the answer is also expressed as concurrent users on a fleet sized to this budget, using all-in power per chip (host, networking, cooling) from the SemiAnalysis Datacenter Industry Model, not bare TDP.',
     mwPlaceholder: 'e.g. 10',
     colGpu: 'Chip',
-    colMaxInteractivity: 'Max Interactivity (tok/s/user)',
+    colMaxInteractivity: 'Max interactivity (tok/s/user)',
     colTputAtIv: 'Throughput (tok/s/chip)',
-    colUsers: 'Concurrent Users',
+    colUsers: 'Concurrent users',
     notReachable: 'Not reachable',
-    costCapEmpty: 'Enter a cost target to find the serveable interactivity per chip.',
-    costCapNoGpus: 'No chips are visible to evaluate — enable hardware in the chart legend.',
+    costCapNoGpus: 'No chips are visible to evaluate. Enable hardware in the chart legend.',
     note: 'Note:',
     disaggFleet:
       ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report input and output throughput per prefill chip and per decode chip rather than per chip overall, so the interactivity a cost ceiling permits inherits that per-pool basis on the Input and Output token types. On Total it is per chip overall for both kinds.',
@@ -68,15 +69,16 @@ const STRINGS = {
     source: 'Source: ',
   },
   zh: {
-    toggleSection: '展开或折叠此板块',
     costCapTitle: '成本上限下的交互性',
     costCapDescription:
       '设定每百万 token 的成本上限，查看每款芯片在不超支前提下可提供的最高交互性。',
     costCapLabel: '成本上限 ($/M tok)',
+    costCapShortLabel: '成本 ($/M tok)',
     costCapTooltip:
       '每百万 token 的最高可接受成本（按所选定价层级和 token 类型）。结果为插值成本不超过该上限的最高交互性。',
     costCapPlaceholder: '如 0.50',
     mwLabel: '设施功率 (MW)',
+    mwShortLabel: '功率 (MW)',
     mwTooltip:
       '可选的设施功率预算（兆瓦）。设置后，结果会同时换算为按该预算确定规模的集群可服务的并发用户数；芯片数量按每芯片全含功率（主机、网络、散热）计算，数据来自 SemiAnalysis Datacenter Industry Model，而非裸 TDP。',
     mwPlaceholder: '如 10',
@@ -85,7 +87,6 @@ const STRINGS = {
     colTputAtIv: '吞吐量 (tok/s/chip)',
     colUsers: '并发用户数',
     notReachable: '无法达到',
-    costCapEmpty: '输入成本上限，以查看每款芯片可服务的交互性。',
     costCapNoGpus: '当前无可见芯片可评估。请在图表图例中启用硬件。',
     note: '注：',
     disaggFleet:
@@ -134,7 +135,11 @@ export default function CostTargetPanel({
   const { tcoBasis, chipBasis } = useGlobalFilterSelection();
   const { setChipBasis } = useGlobalFilterActions();
   const chipBasisControl = useMemo(
-    () => ({ value: chipBasis, onChange: setChipBasis, source: 'calculator_costcap' }),
+    () => ({
+      value: chipBasis,
+      onChange: setChipBasis,
+      source: 'calculator_costcap',
+    }),
     [chipBasis, setChipBasis],
   );
   const locale = useLocale();
@@ -145,7 +150,9 @@ export default function CostTargetPanel({
 
   const handleCostCapChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setCostCapInput(e.target.value);
-    writeUrlParams({ c_costcap: parsePositive(e.target.value) ? e.target.value : '' });
+    writeUrlParams({
+      c_costcap: parsePositive(e.target.value) ? e.target.value : '',
+    });
   }, []);
 
   const handleCostCapBlur = useCallback(() => {
@@ -263,25 +270,31 @@ export default function CostTargetPanel({
     return columns;
   }, [hardwareConfig, t, mw]);
 
+  const hasRows = costCap !== null && costCapRows.length > 0;
+
   return (
     <TooltipProvider delayDuration={0}>
       <section data-testid="calculator-costcap-section">
         <Card>
-          <CollapsibleSection
-            title={t.costCapTitle}
-            toggleLabel={t.toggleSection}
-            testId="calculator-costcap-collapse"
-            onToggle={(open) =>
-              track('calculator_section_toggled', { section: 'costcap', enabled: open })
-            }
-          >
-            <div className="flex flex-col gap-4">
-              <p className="text-muted-foreground text-sm">{t.costCapDescription}</p>
-              <div className="flex flex-wrap gap-4">
-                <div className="flex flex-col space-y-1.5 max-w-48">
+          <Heading as="h2" level="card" className="mb-2">
+            {t.costCapTitle}
+          </Heading>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
+              <div className="min-w-0 text-sm text-muted-foreground">
+                <p>{t.costCapDescription}</p>
+                {costCap !== null && !hasRows && (
+                  <p className="mt-1" data-testid="calculator-costcap-empty">
+                    {t.costCapNoGpus}
+                  </p>
+                )}
+              </div>
+              <div className="grid shrink-0 grid-cols-2 gap-4 sm:flex sm:flex-wrap">
+                <div className="flex min-w-0 flex-col space-y-1.5 sm:max-w-48">
                   <LabelWithTooltip
                     htmlFor="calc-costcap"
                     label={t.costCapLabel}
+                    shortLabel={t.costCapShortLabel}
                     tooltip={t.costCapTooltip}
                   />
                   <Input
@@ -294,13 +307,14 @@ export default function CostTargetPanel({
                     value={costCapInput}
                     onChange={handleCostCapChange}
                     onBlur={handleCostCapBlur}
-                    className="w-32"
+                    className="w-full sm:w-32"
                   />
                 </div>
-                <div className="flex flex-col space-y-1.5 max-w-48">
+                <div className="flex min-w-0 flex-col space-y-1.5 sm:max-w-48">
                   <LabelWithTooltip
                     htmlFor="calc-costcap-mw"
                     label={t.mwLabel}
+                    shortLabel={t.mwShortLabel}
                     tooltip={t.mwTooltip}
                   />
                   <Input
@@ -313,18 +327,20 @@ export default function CostTargetPanel({
                     value={mwInput}
                     onChange={(e) => onMwInputChange(e.target.value)}
                     onBlur={() => track('calculator_costcap_mw_set', { mw: mwInput })}
-                    className="w-32"
+                    className="w-full sm:w-32"
                   />
                 </div>
               </div>
-              {costCap && costCapRows.length > 0 ? (
-                <>
-                  <DataTable
-                    data={costCapRows}
-                    columns={costCapColumns}
-                    testId="calculator-costcap-table"
-                    analyticsPrefix="calculator_costcap_table"
-                  />
+            </div>
+            {hasRows && (
+              <>
+                <DataTable
+                  data={costCapRows}
+                  columns={costCapColumns}
+                  testId="calculator-costcap-table"
+                  analyticsPrefix="calculator_costcap_table"
+                />
+                <div>
                   <ChipBasisNote
                     visible={hasDisagg}
                     testId="calculator-costcap-disagg-note"
@@ -333,39 +349,33 @@ export default function CostTargetPanel({
                     chipBasis={chipBasisControl}
                     showToggle={costType !== 'total'}
                   />
-                  <p className="text-xs text-muted-foreground mt-3">
+                  <p className="mt-2 text-xs text-muted-foreground">
                     {t.assumptions(getCostProviderLabel(costProvider))}
                   </p>
-                  <p className="text-muted-foreground mt-1">
-                    <small>
-                      {t.source}
-                      <Link
-                        target="_blank"
-                        className="underline hover:text-foreground"
-                        href="https://semianalysis.com/datacenter-industry-model/"
-                      >
-                        SemiAnalysis Datacenter Industry Model
-                        <ExternalLinkIcon />
-                      </Link>
-                      {' & '}
-                      <Link
-                        target="_blank"
-                        className="underline hover:text-foreground"
-                        href="https://semianalysis.com/ai-cloud-tco-model/"
-                      >
-                        SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model
-                        <ExternalLinkIcon />
-                      </Link>
-                    </small>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t.source}
+                    <Link
+                      target="_blank"
+                      className={sourceLinkClassName}
+                      href="https://semianalysis.com/datacenter-industry-model/"
+                    >
+                      SemiAnalysis Datacenter Industry Model
+                      <ExternalLinkIcon />
+                    </Link>
+                    {' & '}
+                    <Link
+                      target="_blank"
+                      className={sourceLinkClassName}
+                      href="https://semianalysis.com/ai-cloud-tco-model/"
+                    >
+                      SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model
+                      <ExternalLinkIcon />
+                    </Link>
                   </p>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground" data-testid="calculator-costcap-empty">
-                  {costCap ? t.costCapNoGpus : t.costCapEmpty}
-                </p>
-              )}
-            </div>
-          </CollapsibleSection>
+                </div>
+              </>
+            )}
+          </div>
         </Card>
       </section>
     </TooltipProvider>

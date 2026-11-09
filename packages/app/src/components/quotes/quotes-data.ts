@@ -597,6 +597,28 @@ export const QUOTES: Quote[] = [
     logo: 'doubleword.png',
     link: 'https://www.doubleword.ai/',
   },
+  {
+    text: "Serving inference at scale across heterogeneous clouds and hardware means constantly trading off throughput, latency, and cost. InferenceX's open, reproducible benchmarks make those trade-offs visible across accelerators and serving stacks. Benchmarks often fixate on a synthetic workload that doesn't match real-world scenarios. AgentX uses real traces that capture realistic agentic workload patterns and thus provides representative results for the community.",
+    textZh:
+      '在异构云和硬件上大规模提供推理服务，意味着要不断在吞吐量、延迟和成本之间权衡。InferenceX 的开放、可复现基准测试让这些权衡在不同加速器和推理服务栈之间清晰可见。基准测试往往局限于与真实场景不符的合成工作负载，而 AgentX 使用真实轨迹，捕捉了真实的智能体工作负载模式，因此能为社区提供具有代表性的结果。',
+    name: 'Dmytro Dzhulgakov',
+    title: 'Co-Founder & CTO, Fireworks AI',
+    titleZh: 'Fireworks AI 联合创始人兼首席技术官',
+    org: 'Fireworks AI',
+    logo: 'fireworks-purple.svg',
+    link: 'https://fireworks.ai/',
+  },
+  {
+    text: "Wafer serves frontier open models on AMD Instinct and NVIDIA GPUs, and our agents keep retuning kernels, engines, and serving configs for each accelerator after a deployment goes live. Choosing the right hardware for a workload takes honest, apples-to-apples data across vendors. InferenceX™ gives the community exactly that, with open, reproducible, continuously updated benchmarks across MI355X, B200, GB300, and more, so anyone can see what each chip delivers on real workloads. As AMD's software stack improves week over week, InferenceX makes that progress visible to everyone.",
+    textZh:
+      'Wafer 在 AMD Instinct 和 NVIDIA GPU 上提供前沿开源模型推理服务，部署上线后，我们的智能体仍会针对每种加速器持续调优内核、推理引擎和服务配置。要为工作负载选对硬件，需要跨厂商、真实可比的数据。InferenceX™ 正是为社区提供了这样的数据：在 MI355X、B200、GB300 等平台上开放、可复现、持续更新的基准测试，让任何人都能看到每款芯片在真实工作负载上的实际表现。随着 AMD 软件栈逐周改进，InferenceX 让这些进展对所有人清晰可见。',
+    name: 'Emilio Andere',
+    title: 'Co-Founder & CEO, Wafer',
+    titleZh: 'Wafer 联合创始人兼首席执行官',
+    org: 'Wafer',
+    logo: 'wafer.svg',
+    link: 'https://www.wafer.ai/',
+  },
 ];
 
 export const CAROUSEL_ORGS = [

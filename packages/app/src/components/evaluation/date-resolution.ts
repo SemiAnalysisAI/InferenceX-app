@@ -1,5 +1,5 @@
 /**
- * Pure evaluation-date resolution shared by the `/evaluation` dashboard
+ * Pure evaluation-date resolution shared by the `/infx/evaluation` dashboard
  * context and the read-only views API (`/api/v1/views/evaluation`).
  *
  * Extracted from `EvaluationContext.tsx` so server route handlers can reuse

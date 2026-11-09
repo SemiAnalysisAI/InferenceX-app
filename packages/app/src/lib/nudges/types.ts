@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode } from 'react';
 
+import type { NudgeSlot } from './inline-slot';
 import type { LandingBannerVariant } from './landing-banner';
 
 export type NudgeTrigger =
@@ -58,7 +59,6 @@ export interface NudgeAnchor {
 
 export interface NudgeContent {
   icon: ComponentType<{ className?: string }>;
-  iconClassName?: string;
   title: string;
   titleZh?: string;
   description: string;
@@ -73,13 +73,13 @@ export interface NudgeContent {
   hideDismissButton?: boolean;
   primaryAction?: NudgeAction;
   secondaryAction?: NudgeAction;
-  containerClassName?: string;
+  additionalActions?: NudgeAction[];
   centered?: boolean;
-  actionClassName?: string;
   badge?: string;
   badgeZh?: string;
 
   anchor?: NudgeAnchor;
+  slot?: NudgeSlot;
 
   href?: string;
   onLinkClick?: () => void;
@@ -94,7 +94,7 @@ export interface NudgeAnalyticsOverrides {
   properties?: Record<string, string>;
 }
 
-export type NudgeType = 'toast' | 'modal' | 'banner' | 'coach-mark';
+export type NudgeType = 'toast' | 'modal' | 'banner' | 'coach-mark' | 'inline';
 
 export type NudgeScope = 'dashboard' | 'landing' | 'evaluation' | 'agentic-detail';
 

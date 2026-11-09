@@ -1,11 +1,13 @@
 'use client';
 
-import { Suspense, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Suspense, useMemo, useState, type ReactNode } from 'react';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Stat } from '@/components/ui/stat';
 import { PricingCoverageCard } from '@/components/agentic-workload-explorer/pricing-coverage';
 import { formatDollars, formatNumber, truncateHash } from '@/lib/agentic-workload-explorer/format';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
-import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
 import {
   useTraceVersion,
   appendTraceVersion,
@@ -28,42 +30,44 @@ import {
   RangeToggle,
   type DayRange,
 } from '@/components/agentic-workload-explorer/range-toggle';
-import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { ChartActions, Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { TOKEN_SERIES_COLORS } from '@/components/agentic-workload-explorer/series-colors';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 
 const STRINGS = {
   en: {
     summary: 'Summary',
-    pricingCoverage: 'Pricing Coverage',
-    dailyCost: 'Daily Cost',
-    costByModel: 'Cost by Model',
-    costByClient: 'Cost by Client',
-    costComposition: 'Cost Composition',
-    totalCost: 'Total Cost',
-    avgPerSession: 'Avg / Session',
-    avgPerRequest: 'Avg / Request',
-    fastModeCost: 'Fast Mode Cost',
-    regularCost: 'Regular Cost',
+    pricingCoverage: 'Pricing coverage',
+    dailyCost: 'Daily cost',
+    costByModel: 'Cost by model',
+    costByClient: 'Cost by client',
+    costComposition: 'Cost composition',
+    totalCost: 'Total cost',
+    avgPerSession: 'Avg / session',
+    avgPerRequest: 'Avg / request',
+    fastModeCost: 'Fast mode cost',
+    regularCost: 'Regular cost',
     pctOfTotal: (pct: string) => `${pct}% of total`,
     unpricedModels: (n: number) => `${n} unpriced model${n === 1 ? '' : 's'}`,
     dailyCostDetail: (total: string, avg: string) => `${total} total · ${avg} / day avg`,
     modelCount: (n: number) => `${n} model${n === 1 ? '' : 's'}`,
     clientCount: (n: number) => `${n} client${n === 1 ? '' : 's'}`,
-    errorLoading: 'Failed to load cost data.',
+    errorLoading: 'Failed to load cost data',
     noDailyCostData: 'No daily cost data available',
     noModelCostData: 'No model cost data available',
     noClientCostData: 'No client cost data available',
-    exportTitle: 'Daily Cost',
+    exportTitle: 'Daily cost',
     thRank: '#',
-    thApiKeyHash: 'API Key Hash',
-    thTotalCost: 'Total Cost',
+    thApiKeyHash: 'API key hash',
+    thTotalCost: 'Total cost',
     thRequests: 'Requests',
     thSessions: 'Sessions',
-    thLastActive: 'Last Active',
+    thLastActive: 'Last active',
     segInput: 'Input',
-    segCacheRead: 'Cache Read',
-    segCacheWrite: 'Cache Write',
+    segCacheRead: 'Cache read',
+    segCacheWrite: 'Cache write',
     segOutput: 'Output',
     tooltipRequests: (count: number) => `${count} requests`,
   },
@@ -84,13 +88,13 @@ const STRINGS = {
     dailyCostDetail: (total: string, avg: string) => `合计 ${total} · 日均 ${avg}`,
     modelCount: (n: number) => `${n} 个模型`,
     clientCount: (n: number) => `${n} 个客户端`,
-    errorLoading: '无法加载成本数据。',
+    errorLoading: '无法加载成本数据',
     noDailyCostData: '暂无每日成本数据',
     noModelCostData: '暂无模型成本数据',
     noClientCostData: '暂无客户端成本数据',
     exportTitle: '每日成本',
     thRank: '#',
-    thApiKeyHash: 'API Key Hash',
+    thApiKeyHash: 'API key 哈希',
     thTotalCost: '总成本',
     thRequests: '请求数',
     thSessions: '会话数',
@@ -158,30 +162,6 @@ function truncateModel(model: string, maxLen = 32): string {
   return `${model.slice(0, maxLen - 1)}...`;
 }
 
-function SectionHeader({ label, detail }: { label: string; detail?: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="flex-1 h-px bg-border" />
-      {detail && <span className="text-3xs font-mono text-subtle">{detail}</span>}
-    </div>
-  );
-}
-
-function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
-  return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-        {label}
-      </div>
-      <div className="text-lg font-mono font-bold mt-0.5">{value}</div>
-      {detail && <div className="text-3xs font-mono text-muted-foreground mt-0.5">{detail}</div>}
-    </div>
-  );
-}
-
 function DailyCostChart({
   data,
   controls,
@@ -192,13 +172,12 @@ function DailyCostChart({
   t: Strings;
 }) {
   const locale = useLocale();
-  const svgRef = useRef<SVGSVGElement>(null);
   const labelEvery = Math.ceil(data.length / 7);
   if (data.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
+      <EmptyState bare className="py-8">
         {t.noDailyCostData}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -213,29 +192,15 @@ function DailyCostChart({
 
   return (
     <Expandable title={t.exportTitle}>
-      <div className="rounded-md border border-border bg-surface p-3">
+      <Card>
         <div className="flex items-center justify-between gap-2 mb-2">
           {controls}
-          <ExportPngButton
-            locale={locale}
-            analyticsChart="daily-cost"
-            onClick={() => {
-              if (svgRef.current)
-                exportSvgToPng(svgRef.current, {
-                  title: t.exportTitle,
-                  filename: 'daily-cost.png',
-                  svgWidth: CHART_W,
-                  svgHeight: CHART_H,
-                });
-            }}
+          <ChartActions
+            fileName="daily-cost"
+            onExportPng={() => track('agentic_workload_export_png', { chart: 'daily-cost' })}
           />
         </div>
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-          className="w-full"
-          style={{ maxHeight: 240 }}
-        >
+        <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ maxHeight: 240 }}>
           {yTicks.map((tv) => (
             <g key={`y-${tv}`}>
               {tv > 0 && (
@@ -286,7 +251,7 @@ function DailyCostChart({
                   rx={1}
                 >
                   <title>
-                    {formatSnapshotDate(d.day)}: {formatDollars(d.cost)} (
+                    {formatSnapshotDate(d.day, locale)}: {formatDollars(d.cost)} (
                     {t.tooltipRequests(d.requestCount)})
                   </title>
                 </rect>
@@ -298,14 +263,14 @@ function DailyCostChart({
                     className="fill-muted-foreground"
                     style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
                   >
-                    {formatSnapshotDate(d.day)}
+                    {formatSnapshotDate(d.day, locale)}
                   </text>
                 )}
               </g>
             );
           })}
         </svg>
-      </div>
+      </Card>
     </Expandable>
   );
 }
@@ -316,9 +281,9 @@ function ModelCostChart({ byModel, t }: { byModel: ModelCost[]; t: Strings }) {
 
   if (sorted.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
+      <EmptyState bare className="py-8">
         {t.noModelCostData}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -336,11 +301,11 @@ function ModelCostChart({ byModel, t }: { byModel: ModelCost[]; t: Strings }) {
             </span>
             <div className="flex-1 h-4 bg-border/30 rounded-sm overflow-hidden relative">
               <div
-                className="h-full bg-violet-500 rounded-sm"
+                className="h-full bg-muted-foreground/60 rounded-sm"
                 style={{ width: `${Math.max(pct, 1)}%` }}
               />
             </div>
-            <span className="text-2xs font-mono text-foreground shrink-0 w-[64px] text-right">
+            <span className="text-2xs font-mono tabular-nums whitespace-nowrap text-foreground shrink-0 min-w-16 text-right">
               {formatDollars(m.totalCost)}
             </span>
           </div>
@@ -355,10 +320,10 @@ function MixBar({ breakdown, t }: { breakdown: CostBreakdown; t: Strings }) {
   if (total === 0) return null;
 
   const segments = [
-    { label: t.segInput, value: breakdown.input, color: 'bg-sky-500', hex: '#0ea5e9' },
-    { label: t.segCacheRead, value: breakdown.cacheRead, color: 'bg-emerald-500', hex: '#10b981' },
-    { label: t.segCacheWrite, value: breakdown.cacheWrite, color: 'bg-amber-500', hex: '#f59e0b' },
-    { label: t.segOutput, value: breakdown.output, color: 'bg-violet-500', hex: '#8b5cf6' },
+    { label: t.segInput, value: breakdown.input, color: TOKEN_SERIES_COLORS.input },
+    { label: t.segCacheRead, value: breakdown.cacheRead, color: TOKEN_SERIES_COLORS.cacheRead },
+    { label: t.segCacheWrite, value: breakdown.cacheWrite, color: TOKEN_SERIES_COLORS.cacheWrite },
+    { label: t.segOutput, value: breakdown.output, color: TOKEN_SERIES_COLORS.output },
   ].filter((s) => s.value > 0);
 
   return (
@@ -367,8 +332,7 @@ function MixBar({ breakdown, t }: { breakdown: CostBreakdown; t: Strings }) {
         {segments.map((s) => (
           <div
             key={s.label}
-            className={`${s.color} transition-all`}
-            style={{ width: `${(s.value / total) * 100}%` }}
+            style={{ width: `${(s.value / total) * 100}%`, backgroundColor: s.color }}
             title={`${s.label}: ${formatDollars(s.value)} (${((s.value / total) * 100).toFixed(1)}%)`}
           />
         ))}
@@ -376,7 +340,7 @@ function MixBar({ breakdown, t }: { breakdown: CostBreakdown; t: Strings }) {
       <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5">
         {segments.map((s) => (
           <div key={s.label} className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-sm ${s.color}`} />
+            <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: s.color }} />
             <span className="text-3xs font-mono text-muted-foreground">
               {s.label} {formatDollars(s.value)} ({((s.value / total) * 100).toFixed(1)}%)
             </span>
@@ -388,13 +352,14 @@ function MixBar({ breakdown, t }: { breakdown: CostBreakdown; t: Strings }) {
 }
 
 function ClientCostTable({ byClient, t }: { byClient: ClientCost[]; t: Strings }) {
+  const locale = useLocale();
   const sorted = [...byClient].toSorted((a, b) => b.totalCost - a.totalCost);
 
   if (sorted.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
+      <EmptyState bare className="py-8">
         {t.noClientCostData}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -402,37 +367,25 @@ function ClientCostTable({ byClient, t }: { byClient: ClientCost[]; t: Strings }
     <div className="overflow-x-auto">
       <table className="w-full font-mono text-2xs">
         <thead>
-          <tr className="text-muted-foreground text-left border-b border-border">
-            <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow">
-              {t.thRank}
-            </th>
-            <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow">
-              {t.thApiKeyHash}
-            </th>
-            <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-              {t.thTotalCost}
-            </th>
-            <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-              {t.thRequests}
-            </th>
-            <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-              {t.thSessions}
-            </th>
-            <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-              {t.thLastActive}
-            </th>
+          <tr className="text-muted-foreground text-left border-b border-border/20">
+            <th className="py-1.5 px-2 font-medium text-xs">{t.thRank}</th>
+            <th className="py-1.5 px-2 font-medium text-xs">{t.thApiKeyHash}</th>
+            <th className="py-1.5 px-2 font-medium text-xs text-right">{t.thTotalCost}</th>
+            <th className="py-1.5 px-2 font-medium text-xs text-right">{t.thRequests}</th>
+            <th className="py-1.5 px-2 font-medium text-xs text-right">{t.thSessions}</th>
+            <th className="py-1.5 px-2 font-medium text-xs text-right">{t.thLastActive}</th>
           </tr>
         </thead>
         <tbody>
           {sorted.map((u, i) => (
-            <tr key={u.apiKeyHash} className="border-b border-border/50 hover:bg-surface-hover">
+            <tr key={u.apiKeyHash} className="border-b border-border/20 hover:bg-surface-hover">
               <td className="py-1.5 px-2 text-muted-foreground">{i + 1}</td>
               <td className="py-1.5 px-2">
-                <span className="text-subtle" title={u.apiKeyHash}>
+                <span className="text-muted-foreground" title={u.apiKeyHash}>
                   {truncateHash(u.apiKeyHash, 8)}
                 </span>
               </td>
-              <td className="py-1.5 px-2 text-right font-bold">{formatDollars(u.totalCost)}</td>
+              <td className="py-1.5 px-2 text-right font-medium">{formatDollars(u.totalCost)}</td>
               <td className="py-1.5 px-2 text-right text-muted-foreground">
                 {formatNumber(u.requestCount)}
               </td>
@@ -440,7 +393,7 @@ function ClientCostTable({ byClient, t }: { byClient: ClientCost[]; t: Strings }
                 {formatNumber(u.sessionCount)}
               </td>
               <td className="py-1.5 px-2 text-right text-muted-foreground">
-                {formatSnapshotTime(u.lastActive)}
+                {formatSnapshotTime(u.lastActive, locale)}
               </td>
             </tr>
           ))}
@@ -500,28 +453,29 @@ function CostsPageContent() {
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="rounded-md border border-border bg-surface p-3">
+              <div key={i} className="rounded-xl border border-border/30 bg-card p-3">
                 <Skeleton className="h-3 w-20 mb-2" />
                 <Skeleton className="h-6 w-16" />
               </div>
             ))}
           </div>
         ) : error || !data ? (
-          <div className="text-sm font-mono text-muted-foreground text-center py-8">
-            {t.errorLoading}
-          </div>
+          <EmptyState>{t.errorLoading}</EmptyState>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            <StatCard label={t.totalCost} value={formatDollars(data.summary.totalCost)} />
-            <StatCard
+          <dl className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <Stat boxed label={t.totalCost} value={formatDollars(data.summary.totalCost)} />
+            <Stat
+              boxed
               label={t.avgPerSession}
               value={formatDollars(data.summary.avgCostPerSession)}
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.avgPerRequest}
               value={`$${data.summary.avgCostPerRequest.toFixed(4)}`}
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.fastModeCost}
               value={formatDollars(data.summary.fastModeCost)}
               detail={t.pctOfTotal(
@@ -530,7 +484,8 @@ function CostsPageContent() {
                   : '0',
               )}
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.regularCost}
               value={formatDollars(data.summary.regularCost)}
               detail={t.pctOfTotal(
@@ -539,7 +494,7 @@ function CostsPageContent() {
                   : '0',
               )}
             />
-          </div>
+          </dl>
         )}
       </div>
 
@@ -571,10 +526,10 @@ function CostsPageContent() {
 
           <div>
             <SectionHeader label={t.costByModel} detail={t.modelCount(data.byModel.length)} />
-            <div className="rounded-md border border-border bg-surface p-3 space-y-4">
+            <div className="rounded-xl border border-border/30 bg-card p-3 space-y-4">
               <ModelCostChart byModel={data.byModel} t={t} />
               <div>
-                <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground mb-1.5">
+                <div className="text-xs font-medium text-muted-foreground mb-1.5">
                   {t.costComposition}
                 </div>
                 <MixBar breakdown={data.costBreakdown} t={t} />
@@ -584,9 +539,9 @@ function CostsPageContent() {
 
           <div>
             <SectionHeader label={t.costByClient} detail={t.clientCount(data.byClient.length)} />
-            <div className="rounded-md border border-border bg-surface p-3">
+            <Card>
               <ClientCostTable byClient={data.byClient} t={t} />
-            </div>
+            </Card>
           </div>
         </>
       )}

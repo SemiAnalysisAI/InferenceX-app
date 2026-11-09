@@ -1,8 +1,9 @@
+import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 import { JsonLd } from '@/components/seo/json-ld';
-import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
 import { toModel } from '@/lib/compare/compare-enum-coerce';
 import type { Locale } from '@/lib/i18n/i18n';
 import { formatParamCount, getModelArchitecture } from '@/lib/catalog/model-architectures';
@@ -13,6 +14,7 @@ import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 import ModelDeveloperLogo from './ModelDeveloperLogo';
 import { ModelIndexLink } from './ModelIndexLink';
 import { MODEL_PAGE_COPY, modelDetailHref } from './model-page-copy';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 
 export default function ModelIndexContent({ locale }: { locale: Locale }) {
   const t = MODEL_PAGE_COPY[locale];
@@ -47,21 +49,23 @@ export default function ModelIndexContent({ locale }: { locale: Locale }) {
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
         <Card>
           <header>
-            <p className="text-sm text-muted-foreground mb-2">
+            <p className="mb-2 text-sm text-muted-foreground">
               <Link
-                href={`${localePrefix}/inference`}
+                href={`${localePrefix}${getDashboardRoute('inference').path}`}
                 className="hover:text-foreground transition-colors"
               >
                 {t.inferenceDashboard}
               </Link>{' '}
               / {t.modelBreadcrumb}
             </p>
-            <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">{t.indexTitle}</h1>
-            <p className="mt-3 text-base lg:text-lg text-muted-foreground">{t.indexDescription}</p>
+            <Heading as="h1" level="page" className="text-balance">
+              {t.indexTitle}
+            </Heading>
+            <p className="mt-3 max-w-3xl text-base text-muted-foreground">{t.indexDescription}</p>
           </header>
           <ul
             data-testid="model-index-list"
-            className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3 list-none p-0"
+            className="-mx-3 mt-6 grid list-none grid-cols-1 gap-x-4 gap-y-1 p-0 md:grid-cols-2"
           >
             {pages.map(({ slug, page }) => {
               const model = toModel(page.entry.displayName);
@@ -88,10 +92,10 @@ export default function ModelIndexContent({ locale }: { locale: Locale }) {
                     slug={slug}
                     locale={locale}
                     data-testid={`model-index-link-${slug}`}
-                    className="group h-full rounded-lg border border-border/50 bg-muted/30 px-4 py-3 flex flex-col gap-2 transition-[border-color,background-color,box-shadow] hover:border-brand/45 hover:bg-brand/5 hover:shadow-sm focus-visible:outline-none"
+                    className="group flex h-full flex-col gap-2 rounded-lg px-3 py-3 transition-colors hover:bg-muted/60 focus-visible:outline-none"
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <span className="flex items-center gap-2 text-base font-semibold group-hover:text-primary transition-colors">
+                      <span className="flex items-center gap-2 text-base font-medium">
                         <ModelDeveloperLogo
                           developer={page.meta.developer}
                           locale={locale}
@@ -99,29 +103,21 @@ export default function ModelIndexContent({ locale }: { locale: Locale }) {
                         />
                         {page.meta.title}
                       </span>
-                      <span className="text-sm shrink-0 text-muted-foreground group-hover:text-foreground transition-colors">
-                        →
-                      </span>
+                      <ArrowRight
+                        aria-hidden="true"
+                        className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
+                      />
                     </div>
                     {arch && (
-                      <span className="flex flex-wrap items-center gap-1.5">
-                        <Badge variant="outline" className="text-xs py-0">
-                          {architectureLabel}
-                        </Badge>
-                        <Badge variant="outline" className="text-xs py-0">
-                          {arch.attentionType === 'AlternatingSinkGQA'
-                            ? attentionLabel
-                            : attentionLabel}
-                        </Badge>
-                        <Badge variant="outline" className="text-xs py-0">
-                          {formatParamCount(arch.totalParams)}
-                        </Badge>
+                      <span className="text-xs tabular-nums text-muted-foreground">
+                        {architectureLabel} · {attentionLabel} ·{' '}
+                        {formatParamCount(arch.totalParams)}
                       </span>
                     )}
-                    <span className="text-sm text-muted-foreground line-clamp-3">
+                    <span className="line-clamp-3 text-sm text-muted-foreground">
                       {page.meta.description}
                     </span>
-                    <span className="text-xs text-muted-foreground mt-auto">
+                    <span className="mt-auto text-xs text-muted-foreground">
                       {page.meta.developer} &middot; {t.released} {page.meta.releaseDate}
                     </span>
                   </ModelIndexLink>

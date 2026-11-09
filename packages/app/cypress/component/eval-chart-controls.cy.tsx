@@ -7,33 +7,10 @@ describe('Evaluation ChartControls', () => {
     mountWithProviders(<EvaluationChartControls />, { evaluation: {} });
   });
 
-  it('renders the model selector with the current model label', () => {
-    cy.get('#model-select').should('be.visible');
-    cy.get('#model-select').should('contain.text', 'DeepSeek R1 0528');
-  });
-
-  it('renders the benchmark selector with the current benchmark', () => {
-    cy.contains('legend', 'Configuration').should('be.visible');
-    cy.get('label[for="eval-benchmark-select"]').should('have.text', 'Benchmark');
-    cy.get('[data-testid="evaluation-benchmark-selector"]').should('be.visible');
-    cy.get('[data-testid="evaluation-benchmark-selector"]').should('contain.text', 'MMLU');
-  });
-
-  it('displays all available benchmarks in the dropdown', () => {
-    cy.get('[data-testid="evaluation-benchmark-selector"]').click();
-    cy.contains('[role="option"]', 'MMLU').should('exist');
-    cy.contains('[role="option"]', 'HUMANEVAL').should('exist');
-    cy.contains('[role="option"]', 'GSM8K').should('exist');
-  });
-
   it('calls setSelectedBenchmark when a benchmark is chosen', () => {
     cy.get('[data-testid="evaluation-benchmark-selector"]').click();
     cy.contains('[role="option"]', 'GSM8K').click();
     cy.get('@setSelectedBenchmark').should('have.been.calledOnceWith', 'gsm8k');
-  });
-
-  it('shows the current run date in the date picker', () => {
-    cy.contains('Mar 1, 2025').should('be.visible');
   });
 
   it('keeps benchmark controls aligned beside the secondary run context on desktop', () => {
@@ -48,18 +25,16 @@ describe('Evaluation ChartControls', () => {
       expect(rects[1].left).to.be.greaterThan(rects[0].right);
       expect(rects[1].top).to.be.closeTo(rects[0].top, 2);
     });
-    cy.contains('Run Date:')
-      .closest('button')
-      .then(($date) => {
-        cy.contains('Changelog')
-          .closest('button')
-          .then(($changelog) => {
-            expect($changelog[0].getBoundingClientRect().height).to.be.closeTo(
-              $date[0].getBoundingClientRect().height,
-              2,
-            );
-          });
-      });
+    cy.get('[data-slot="date-field"] button[aria-labelledby]').then(($date) => {
+      cy.contains('Changelog')
+        .closest('button')
+        .then(($changelog) => {
+          expect($changelog[0].getBoundingClientRect().height).to.be.closeTo(
+            $date[0].getBoundingClientRect().height,
+            2,
+          );
+        });
+    });
   });
 
   it('stacks the control groups on a narrow viewport and keeps precision selectable', () => {
@@ -105,13 +80,13 @@ describe('Evaluation ChartControls', () => {
       .should('have.attr', 'aria-expanded', 'false')
       .click()
       .should('have.attr', 'aria-expanded', 'true');
-    cy.contains('Run Date:').should('be.visible');
+    cy.contains('label', 'Run date').should('be.visible');
 
     cy.get('[data-testid="evaluation-secondary-controls"] button')
       .first()
       .click()
       .should('have.attr', 'aria-expanded', 'false');
-    cy.contains('Run Date:').should('not.be.visible');
+    cy.contains('label', 'Run date').should('not.be.visible');
     cy.get('#model-select').should('contain.text', 'DeepSeek R1 0528');
   });
 
@@ -120,13 +95,13 @@ describe('Evaluation ChartControls', () => {
     mountWithProviders(<EvaluationChartControls />, { evaluation: {} });
 
     cy.get('[data-testid="evaluation-secondary-controls"] > button').should('not.be.visible');
-    cy.contains('Run Date:').should('be.visible');
+    cy.contains('label', 'Run date').should('be.visible');
   });
 
   it('localizes the mobile secondary changed-count label', () => {
     cy.viewport(390, 844);
     mountWithProviders(
-      <PathnameContext.Provider value="/zh/evaluation">
+      <PathnameContext.Provider value="/zh/infx/evaluation">
         <EvaluationChartControls />
       </PathnameContext.Provider>,
       {

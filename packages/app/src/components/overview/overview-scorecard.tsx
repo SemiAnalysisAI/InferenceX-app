@@ -1,7 +1,19 @@
 'use client';
 
-import { type ComponentPropsWithoutRef, useEffect, useRef } from 'react';
+import { type ComponentPropsWithoutRef, type CSSProperties, useEffect, useRef } from 'react';
 
+import { track } from '@/lib/analytics/analytics';
+
+import { buttonVariants } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { SEGMENTED_CONTAINER_STYLE, SEGMENT_RADIUS_STYLE } from '@/components/ui/control-styles';
+import { Label } from '@/components/ui/label';
 import { ModelLogo } from '@/components/ui/model-logo';
 import {
   OVERVIEW_DEFAULT_HISTORY_WINDOW,
@@ -97,40 +109,48 @@ function missingReasonCopy(platform: OverviewPlatformResult, strings: OverviewSt
 }
 
 const RAW_SOURCE_LINK_CLASS =
-  'inline-flex min-h-11 items-center rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none';
+  "relative inline-flex items-center rounded-sm underline decoration-dotted underline-offset-4 after:absolute after:inset-x-0 after:-inset-y-3 after:content-[''] hover:decoration-solid focus-visible:outline-none xl:after:hidden";
 
 function CellMissing({ hardware, reason }: { hardware: string; reason: string }) {
   return (
     <div
       data-testid="overview-pair-missing"
       data-hardware={hardware}
-      className="min-w-0 space-y-0.5 text-sm text-muted-foreground"
+      title={reason === '' ? undefined : reason}
+      className="text-sm text-muted-foreground"
     >
       <span>{'—'}</span>
-      {reason === '' ? null : (
-        <div className="min-w-0 text-2xs leading-tight font-normal text-muted-foreground/70">
-          {reason}
-        </div>
-      )}
+      {reason === '' ? null : <span className="sr-only">{reason}</span>}
     </div>
+  );
+}
+
+function isPlatformBlank(platform: OverviewPlatformResult): boolean {
+  return (
+    platform.missingReason !== null || platform.read.value === null || platform.costPerMtok === null
+  );
+}
+
+function NoResultsRow({ text }: { text: string }) {
+  return (
+    <p data-testid="overview-row-no-results" className="text-sm text-muted-foreground">
+      {text}
+    </p>
   );
 }
 
 const COST_DELTA_NEUTRAL_BAND = 0.05;
 const COST_DELTA_SATURATION = 0.5;
 const COST_DELTA_CLASS = {
-  cheaper: 'text-emerald-900 dark:text-emerald-200',
-  pricier: 'text-red-900 dark:text-red-200',
+  cheaper: 'text-[color-mix(in_oklch,var(--success)_60%,var(--foreground))]',
+  pricier: 'text-[color-mix(in_oklch,var(--destructive)_60%,var(--foreground))]',
   even: 'text-muted-foreground',
   'no-baseline': 'text-muted-foreground',
 } as const;
-const COST_DELTA_HUE = {
-  cheaper: '16 185 129',
-  pricier: '239 68 68',
-  even: '148 163 184',
-  'no-baseline': '148 163 184',
+const COST_DELTA_TOKEN = {
+  cheaper: '--success',
+  pricier: '--destructive',
 } as const;
-const COST_DELTA_NEUTRAL_ALPHA = '0.10';
 
 type CostDeltaPolarity = keyof typeof COST_DELTA_CLASS;
 
@@ -212,9 +232,9 @@ function comparisonAria(
       );
 }
 
-function costDeltaAlpha(pct: number): string {
+function costDeltaAlpha(pct: number): number {
   const strength = Math.min(Math.abs(pct), COST_DELTA_SATURATION) / COST_DELTA_SATURATION;
-  return (0.08 + strength * 0.32).toFixed(2);
+  return 0.08 + strength * 0.24;
 }
 
 export function costDeltaCellStyle(
@@ -230,11 +250,13 @@ export function costDeltaCellStyle(
     referenceCost,
   );
   if (comparison === null) return undefined;
-  const { pct } = comparison;
   const polarity = comparisonPolarity(comparison);
-  const alpha =
-    pct === null || polarity === 'even' ? COST_DELTA_NEUTRAL_ALPHA : costDeltaAlpha(pct);
-  return { backgroundColor: `rgb(${COST_DELTA_HUE[polarity]} / ${alpha})` };
+  if (polarity === 'no-baseline' || polarity === 'even' || comparison.pct === null)
+    return undefined;
+  const mix = Math.round(costDeltaAlpha(comparison.pct) * 100);
+  return {
+    backgroundColor: `color-mix(in oklch, var(${COST_DELTA_TOKEN[polarity]}) ${mix}%, transparent)`,
+  };
 }
 
 function CostDeltaBadge({
@@ -271,11 +293,21 @@ function CostDeltaBadge({
       data-cost-polarity={polarity}
       data-history-status={comparisonMode === 'hardware' ? undefined : status}
       title={aria}
-      className={`inline-flex translate-y-px items-center whitespace-nowrap rounded-sm px-1 py-0.5 text-3xs font-semibold tabular-nums ${
-        phoneRow ? 'col-start-2 justify-self-start' : 'xl:col-start-2 xl:justify-self-end'
+      className={`inline-flex items-center whitespace-nowrap rounded-sm px-1 py-0.5 text-xs font-medium tabular-nums ${
+        phoneRow
+          ? 'col-start-2 justify-self-start'
+          : pct === null
+            ? 'self-center'
+            : 'xl:col-start-2 xl:justify-self-end'
       } ${COST_DELTA_CLASS[polarity]}`}
     >
-      <span aria-hidden="true">{pct === null ? '∞' : formatters.percent.format(pct)}</span>
+      {pct === null ? (
+        <span aria-hidden="true" className="text-base leading-none">
+          ∞
+        </span>
+      ) : (
+        <span aria-hidden="true">{formatters.percent.format(pct)}</span>
+      )}
       <span className="sr-only">{aria}</span>
     </span>
   );
@@ -304,8 +336,8 @@ function CellValue({
   referenceLabel: string;
   phoneRow?: boolean;
 }) {
-  const { value, config, evidenceDate, evidenceTopologies } = member.read;
-  if (member.missingReason !== null || value === null || member.costPerMtok === null) {
+  const { config, evidenceDate, evidenceTopologies } = member.read;
+  if (isPlatformBlank(member) || member.costPerMtok === null) {
     return <CellMissing hardware={member.hardware} reason={missingReasonCopy(member, strings)} />;
   }
   const precisionLabel = config?.precision.toUpperCase() ?? member.precision?.toUpperCase() ?? null;
@@ -360,7 +392,9 @@ function CellValue({
         className={
           phoneRow
             ? 'grid grid-cols-[max-content_minmax(0,1fr)] items-baseline gap-x-1.5 gap-y-0.5'
-            : 'flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 xl:grid xl:grid-cols-[minmax(max-content,1fr)_3.5rem]'
+            : comparison?.pct === null
+              ? 'flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5'
+              : 'flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 xl:grid xl:grid-cols-[minmax(max-content,1fr)_3.5rem]'
         }
       >
         <span
@@ -410,7 +444,7 @@ function CellValue({
         )}
       </div>
       {member.precision === null ? null : (
-        <div className="min-w-0 text-2xs leading-tight font-normal uppercase tracking-wider text-foreground/80">
+        <div className="min-w-0 text-2xs leading-tight font-normal text-muted-foreground">
           {config === null ? (
             member.precision.toUpperCase()
           ) : phoneRow && stackPrefix !== null && decodeLabel !== null ? (
@@ -481,7 +515,7 @@ function ModelName({ model, strings }: { model: OverviewModelSummary; strings: O
             data-testid="overview-model-category-badge"
             data-category={model.category}
             title={strings.categoryBadgeTitle}
-            className="ml-1.5 inline-block rounded-sm border border-border/60 px-1 py-px align-middle text-3xs font-medium uppercase tracking-wide text-muted-foreground"
+            className="ml-1.5 inline-block rounded-sm border border-border/60 px-1 align-middle text-3xs font-medium text-muted-foreground"
           >
             {badge}
             <span className="sr-only normal-case">{strings.categoryBadgeTitle}</span>
@@ -515,6 +549,23 @@ interface SurfaceProps {
   referenceHardware: OverviewReferenceHardware;
 }
 
+const HEADER_EDGE_COVER =
+  'relative after:absolute after:inset-x-0 after:top-full after:hidden after:h-0.5 after:bg-inherit [@container_scroll-state(stuck:top)]:after:block';
+
+function referenceBandStyle(
+  platforms: readonly OverviewPlatformResult[],
+  comparisonMode: OverviewComparisonMode,
+  referenceHardware: OverviewReferenceHardware,
+): CSSProperties | undefined {
+  const index = platforms.findIndex((platform) => platform.hardware === referenceHardware);
+  if (comparisonMode !== 'hardware' || index === -1) return undefined;
+  const start = `${(index / platforms.length) * 100}%`;
+  const end = `${((index + 1) / platforms.length) * 100}%`;
+  return {
+    backgroundImage: `linear-gradient(to right, transparent ${start}, var(--border) ${start}, var(--border) calc(${start} + 1px), var(--ref-fill) calc(${start} + 1px), var(--ref-fill) calc(${end} - 1px), var(--border) calc(${end} - 1px), var(--border) ${end}, transparent ${end})`,
+  };
+}
+
 export function DesktopOverviewMatrix({
   models,
   locale,
@@ -540,16 +591,19 @@ export function DesktopOverviewMatrix({
             <col key={platform.hardware} className="w-[15.6%]" />
           ))}
         </colgroup>
-        <thead className="sticky top-14 z-10 bg-card">
-          <tr className="border-b border-border/50 text-sm uppercase tracking-wider text-muted-foreground">
-            <th scope="col" className="bg-card px-4 py-2 text-left font-semibold lg:px-6">
+        <thead className="sticky top-14 z-20 bg-card [container-type:scroll-state]">
+          <tr className="text-xs text-muted-foreground">
+            <th
+              scope="col"
+              className={`h-10 bg-card px-4 text-left font-medium shadow-[inset_0_-1px_0_var(--border),0_6px_6px_-6px_rgb(0_0_0/0.25)] lg:px-6 ${HEADER_EDGE_COVER}`}
+            >
               {strings.modelHeader}
             </th>
             {platforms.map((platform) => (
               <th
                 key={platform.hardware}
                 scope="col"
-                className={`px-3 py-2 text-left font-semibold ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted' : 'bg-card'}`}
+                className={`h-10 px-3 text-left ${HEADER_EDGE_COVER} ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-[color-mix(in_srgb,var(--muted)_15%,var(--card))] font-semibold text-foreground shadow-[inset_0_-1px_0_var(--border),inset_1px_0_0_var(--border),inset_-1px_0_0_var(--border),0_6px_6px_-6px_rgb(0_0_0/0.25)] after:shadow-[inset_1px_0_0_var(--border),inset_-1px_0_0_var(--border)] dark:bg-[color-mix(in_srgb,var(--muted)_50%,var(--card))]' : 'bg-card font-medium shadow-[inset_0_-1px_0_var(--border),0_6px_6px_-6px_rgb(0_0_0/0.25)]'}`}
               >
                 {comparisonMode === 'hardware' && platform.hardware === referenceHardware
                   ? `${platform.hardwareLabel} · ${strings.referenceHeader}`
@@ -563,13 +617,14 @@ export function DesktopOverviewMatrix({
             const referenceCost =
               model.platforms.find((platform) => platform.hardware === referenceHardware)
                 ?.costPerMtok ?? null;
+            const rowBlank = model.platforms.every(isPlatformBlank);
             return (
               <tr
                 key={`${model.model}-${model.scenario}`}
                 data-testid="overview-desktop-model"
                 data-model={model.model}
                 data-scenario={model.scenario}
-                className="border-b border-border/50 align-top last:border-b-0"
+                className="border-b border-border/50 last:border-b-0"
               >
                 <th scope="row" className="px-4 py-2.5 text-left align-top font-normal lg:px-6">
                   <ModelName model={model} strings={strings} />
@@ -581,36 +636,46 @@ export function DesktopOverviewMatrix({
                         model.modelLabel,
                         strings.scenarioLabels[model.scenario],
                       )}
-                      className="mt-1 text-xs"
+                      className="mt-1 text-xs xl:min-h-6"
                     >
                       {strings.detailLink}
                     </OverviewDetailLink>
                   )}
                 </th>
-                {model.platforms.map((platform) => (
+                {rowBlank ? (
                   <td
-                    key={platform.hardware}
-                    style={costDeltaCellStyle(
-                      platform,
-                      comparisonMode,
-                      referenceHardware,
-                      referenceCost,
-                    )}
-                    className={`px-3 py-2.5 align-top ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted/30' : ''}`}
+                    colSpan={model.platforms.length}
+                    style={referenceBandStyle(model.platforms, comparisonMode, referenceHardware)}
+                    className="px-3 py-2.5 align-top [--ref-fill:color-mix(in_srgb,var(--muted)_15%,transparent)] dark:[--ref-fill:color-mix(in_srgb,var(--muted)_50%,transparent)]"
                   >
-                    <PlatformCell
-                      locale={locale}
-                      model={model}
-                      platform={platform}
-                      formatters={formatters}
-                      strings={strings}
-                      comparisonMode={comparisonMode}
-                      referenceHardware={referenceHardware}
-                      referenceCost={referenceCost}
-                      referenceLabel={referenceLabel}
-                    />
+                    <NoResultsRow text={strings.noResultsRow} />
                   </td>
-                ))}
+                ) : (
+                  model.platforms.map((platform) => (
+                    <td
+                      key={platform.hardware}
+                      style={costDeltaCellStyle(
+                        platform,
+                        comparisonMode,
+                        referenceHardware,
+                        referenceCost,
+                      )}
+                      className={`px-3 py-2.5 align-top ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted/15 shadow-[inset_1px_0_0_var(--border),inset_-1px_0_0_var(--border)] dark:bg-muted/50' : ''}`}
+                    >
+                      <PlatformCell
+                        locale={locale}
+                        model={model}
+                        platform={platform}
+                        formatters={formatters}
+                        strings={strings}
+                        comparisonMode={comparisonMode}
+                        referenceHardware={referenceHardware}
+                        referenceCost={referenceCost}
+                        referenceLabel={referenceLabel}
+                      />
+                    </td>
+                  ))
+                )}
               </tr>
             );
           })}
@@ -641,44 +706,48 @@ export function MobileOverviewList({
               data-testid="overview-mobile-model"
               data-model={model.model}
               data-scenario={model.scenario}
-              className="space-y-2 px-4 py-3.5"
+              className="space-y-1 px-4 py-3"
             >
               <ModelName model={model} strings={strings} />
-              <div className="grid grid-cols-1">
-                {model.platforms.map((platform) => (
-                  <div
-                    key={platform.hardware}
-                    data-testid="overview-mobile-platform-row"
-                    data-hardware={platform.hardware}
-                    style={costDeltaCellStyle(
-                      platform,
-                      comparisonMode,
-                      referenceHardware,
-                      referenceCost,
-                    )}
-                    className="grid min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] gap-x-3 border-b border-border/30 py-1.5 last:border-b-0"
-                  >
-                    <span
-                      data-testid="overview-mobile-hardware"
-                      className="pt-0.5 text-xs font-medium text-muted-foreground"
+              {model.platforms.every(isPlatformBlank) ? (
+                <NoResultsRow text={strings.noResultsRow} />
+              ) : (
+                <div className="grid grid-cols-1">
+                  {model.platforms.map((platform) => (
+                    <div
+                      key={platform.hardware}
+                      data-testid="overview-mobile-platform-row"
+                      data-hardware={platform.hardware}
+                      style={costDeltaCellStyle(
+                        platform,
+                        comparisonMode,
+                        referenceHardware,
+                        referenceCost,
+                      )}
+                      className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)] items-baseline gap-x-3 border-b border-border/30 py-1 last:border-b-0"
                     >
-                      {platform.hardwareLabel}
-                    </span>
-                    <PlatformCell
-                      locale={locale}
-                      model={model}
-                      platform={platform}
-                      formatters={formatters}
-                      strings={strings}
-                      comparisonMode={comparisonMode}
-                      referenceHardware={referenceHardware}
-                      referenceCost={referenceCost}
-                      referenceLabel={referenceLabel}
-                      phoneRow
-                    />
-                  </div>
-                ))}
-              </div>
+                      <span
+                        data-testid="overview-mobile-hardware"
+                        className="whitespace-nowrap text-xs font-medium text-muted-foreground"
+                      >
+                        {platform.hardwareLabel}
+                      </span>
+                      <PlatformCell
+                        locale={locale}
+                        model={model}
+                        platform={platform}
+                        formatters={formatters}
+                        strings={strings}
+                        comparisonMode={comparisonMode}
+                        referenceHardware={referenceHardware}
+                        referenceCost={referenceCost}
+                        referenceLabel={referenceLabel}
+                        phoneRow
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
               {comparisonMode === 'hardware' && (
                 <OverviewDetailLink
                   href={detailHref(locale, model)}
@@ -687,7 +756,7 @@ export function MobileOverviewList({
                     model.modelLabel,
                     strings.scenarioLabels[model.scenario],
                   )}
-                  className="min-h-11 w-full justify-between"
+                  className="min-h-11 text-sm"
                 >
                   {strings.detailLink}
                 </OverviewDetailLink>
@@ -778,16 +847,50 @@ export function OverviewEngineScopeSwitcher({
   strings: OverviewStrings;
 }) {
   const options: OverviewEngineScope[] = ['community', 'all'];
-  const optionClass =
-    'inline-flex min-h-11 w-full items-center rounded-md border border-border/60 px-3 py-1.5 text-left leading-snug focus-visible:outline-none sm:w-auto';
+  const optionClass = `inline-flex min-h-11 min-w-0 items-center ${SEGMENT_RADIUS_STYLE} px-2 py-1 text-left text-sm font-medium leading-snug focus-visible:outline-none md:min-h-6 md:py-0.5`;
+  const navigation = useOverviewNavigation();
+  const optionHref = (option: OverviewEngineScope) =>
+    overviewEngineScopeHref(
+      locale,
+      option,
+      tier,
+      comparisonMode,
+      referenceHardware,
+      modelScope,
+      rowScope,
+      hardwareRowScope,
+    );
   return (
     <nav
       data-testid="overview-engine-scope-switcher"
       aria-label={strings.engineScopeNavLabel}
-      className="flex min-w-0 flex-col items-start gap-1 text-xs sm:flex-row sm:items-center sm:gap-2"
+      className="flex w-full min-w-0 flex-col items-start gap-1.5 text-xs sm:w-auto"
     >
-      <span className="shrink-0 text-muted-foreground">{strings.engineScopeNavLabel}</span>
-      <div className="flex w-full min-w-0 flex-col gap-1 sm:w-auto sm:flex-row">
+      <Label>{strings.engineScopeNavLabel}</Label>
+      <Select
+        value={engineScope}
+        onValueChange={(next: OverviewEngineScope) => {
+          if (next === engineScope) return;
+          track('overview_selector_changed', { control: 'engine', value: next });
+          navigation.push(optionHref(next), ['engine']);
+        }}
+      >
+        <SelectTrigger
+          aria-label={strings.engineScopeNavLabel}
+          className="h-auto min-h-11 w-full whitespace-normal text-left sm:hidden"
+          data-testid="overview-engine-scope-select"
+        >
+          <SelectValue>{strings.engineScopeShortOptions[engineScope]}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option} value={option}>
+              {strings.engineScopeShortOptions[option]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <div className={`${SEGMENTED_CONTAINER_STYLE} max-sm:hidden`}>
         {options.map((option) =>
           option === engineScope ? (
             <ActiveSwitcherOption
@@ -795,7 +898,7 @@ export function OverviewEngineScopeSwitcher({
               control="engine"
               data-overview-engine-scope={option}
               aria-current="true"
-              className={`${optionClass} bg-muted font-semibold text-foreground`}
+              className={`${optionClass} bg-muted font-medium text-foreground dark:bg-input`}
             >
               {strings.engineScopeOptions[option]}
             </ActiveSwitcherOption>
@@ -803,16 +906,7 @@ export function OverviewEngineScopeSwitcher({
             <OverviewNavLink
               key={option}
               data-overview-engine-scope={option}
-              href={overviewEngineScopeHref(
-                locale,
-                option,
-                tier,
-                comparisonMode,
-                referenceHardware,
-                modelScope,
-                rowScope,
-                hardwareRowScope,
-              )}
+              href={optionHref(option)}
               analytics={{ control: 'engine', value: option }}
               searchKeys={['engine']}
               className={`${optionClass} text-muted-foreground transition-colors hover:text-foreground`}
@@ -868,21 +962,21 @@ export function OverviewComparisonSwitcher({
     href: overviewHref(locale, tier, engineScope, window, referenceHardware, modelScope),
   }));
   const optionClass =
-    'relative inline-flex min-h-11 min-w-[130px] items-center justify-center whitespace-nowrap border-b-2 px-4 py-2 text-sm font-semibold transition-colors duration-200 focus-visible:outline-none sm:min-w-[140px]';
+    'relative inline-flex min-h-11 min-w-32 items-center justify-center whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors duration-200 focus-visible:outline-none sm:min-w-36';
   const inactiveOptionClass =
-    'border-transparent text-muted-foreground hover:border-muted-foreground/30';
+    'border-transparent text-muted-foreground hover:border-muted-foreground/30 hover:text-foreground';
   return (
     <nav
       data-testid="overview-comparison-switcher"
       aria-label={strings.comparisonNavLabel}
-      className="flex flex-wrap justify-center gap-x-1 gap-y-1.5 sm:gap-x-1.5"
+      className="flex flex-wrap justify-start gap-x-1 gap-y-1.5 sm:gap-x-1.5"
     >
       {comparisonMode === 'hardware' ? (
         <ActiveSwitcherOption
           control="comparison"
           data-overview-comparison="hardware"
           aria-current="true"
-          className={`${optionClass} border-sky-800 text-sky-800 dark:border-primary dark:text-primary`}
+          className={`${optionClass} border-brand text-foreground`}
         >
           <span className="inline-flex items-center gap-0.5">
             <span>{locale === 'zh' ? '对比 ' : 'vs '}</span>
@@ -936,7 +1030,7 @@ export function OverviewComparisonSwitcher({
           control="comparison"
           data-overview-comparison={comparisonMode}
           aria-current="true"
-          className={`${optionClass} border-sky-800 text-sky-800 dark:border-primary dark:text-primary`}
+          className={`${optionClass} border-brand text-foreground`}
         >
           <span className="inline-flex items-center gap-0.5">
             <span>{locale === 'zh' ? '对比 ' : 'vs '}</span>
@@ -954,15 +1048,11 @@ export function OverviewComparisonSwitcher({
 
 type OverviewScopeToggleVariant = 'section' | 'toolbar';
 
-const SCOPE_CHIP_CLASS =
-  'inline-flex min-h-11 items-center whitespace-nowrap rounded-md border border-border/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground';
+const SCOPE_CHIP_CLASS = buttonVariants({ variant: 'outline', size: 'xs' });
 
 function ScopeChipCount({ count }: { count: number }) {
   return (
-    <span
-      aria-hidden="true"
-      className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-muted px-1.5 py-0.5 text-3xs leading-none tabular-nums"
-    >
+    <span aria-hidden="true" className="tabular-nums text-muted-foreground">
       {count}
     </span>
   );

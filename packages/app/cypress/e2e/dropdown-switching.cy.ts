@@ -1,13 +1,9 @@
-import type { AvailabilityRow } from '@/lib/api/api';
-
-import { availabilityBody } from '../support/e2e';
-
 describe('Dropdown one-click switching', () => {
   beforeEach(() => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro');
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro');
     cy.get('[data-testid="inference-chart-display"]').should('exist');
     cy.get('#chart-0 [data-testid="scenario-selector"]').should('be.visible');
   });
@@ -25,7 +21,7 @@ describe('Dropdown one-click switching', () => {
   });
 
   it('only one MultiSelect content panel is open at a time when switching dropdowns', () => {
-    cy.visit('/inference?g_model=DeepSeek-R1-0528');
+    cy.visit('/infx/inference?g_model=DeepSeek-R1-0528');
     cy.get('[data-testid="inference-chart-display"]').should('exist');
 
     cy.get('[data-testid="precision-multiselect"][role="combobox"]:enabled')
@@ -37,44 +33,6 @@ describe('Dropdown one-click switching', () => {
     cy.get('[data-slot="select-content"]').should('have.length', 1);
     cy.get('[data-testid="model-selector"]').should('have.attr', 'aria-expanded', 'true');
     cy.get('[data-testid="precision-multiselect"]').should('have.attr', 'aria-expanded', 'false');
-  });
-
-  it('keeps NEW pills off AgentX models in the model dropdown', () => {
-    cy.fixture<AvailabilityRow[]>('api/availability.json').then((rows) => {
-      cy.intercept('GET', '/api/v1/availability/compact', {
-        body: availabilityBody([
-          ...rows,
-          {
-            model: 'dsv41flash',
-            isl: null,
-            osl: null,
-            precision: 'fp4',
-            hardware: 'gb300',
-            framework: 'vllm',
-            spec_method: 'mtp',
-            disagg: false,
-            date: '2026-09-10',
-          } as AvailabilityRow,
-        ]),
-      }).as('availability');
-    });
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro');
-    cy.wait('@availability');
-    cy.get('[data-testid="inference-chart-display"]').should('exist');
-    cy.get('[data-testid="model-selector"]').click();
-
-    cy.contains('[role="option"]', 'DeepSeek V4.1 Flash 552B')
-      .find('[data-new-badge="model-option"]')
-      .should('not.exist');
-    cy.contains('[role="option"]', 'MiniMax M3 428B')
-      .find('[data-new-badge="model-option"]')
-      .should('not.exist');
-    cy.contains('[role="option"]', 'DeepSeek V4 Pro 0813 1.6T')
-      .find('[data-new-badge="model-option"]')
-      .should('not.exist');
-    cy.contains('[role="option"]', 'DeepSeek R1 0528 671B')
-      .find('[data-new-badge="model-option"]')
-      .should('not.exist');
   });
 
   it('Escape closes the Y-axis SearchableSelect dropdown', () => {

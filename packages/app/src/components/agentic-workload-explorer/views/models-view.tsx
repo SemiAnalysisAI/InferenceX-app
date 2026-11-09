@@ -1,15 +1,21 @@
 'use client';
 
-import { Suspense, useMemo, useRef } from 'react';
+import { Suspense, useMemo } from 'react';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Stat } from '@/components/ui/stat';
 import { formatNumber } from '@/lib/agentic-workload-explorer/format';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
-import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
-import { CHART_COLORS } from '@/components/agentic-workload-explorer/trends-charts';
+import {
+  CHART_COLORS,
+  TOKEN_SERIES_COLORS,
+} from '@/components/agentic-workload-explorer/series-colors';
 import {
   useTraceVersion,
   appendTraceVersion,
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import type {
@@ -18,32 +24,32 @@ import type {
   ModelTimeSeries,
 } from '@/lib/agentic-workload-explorer/api-types';
 import { formatSnapshotDate } from '@/lib/agentic-workload-explorer/snapshot';
-import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { ChartActions, Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 
 const STRINGS = {
   en: {
     stats: 'Stats',
-    modelsUsed: 'Models Used',
-    totalTokens: 'Total Tokens',
-    fastModePct: 'Fast Mode % (tokens)',
-    cacheHitRatio: 'Cache Hit Ratio',
+    modelsUsed: 'Models used',
+    totalTokens: 'Total tokens',
+    fastModePct: 'Fast mode % (tokens)',
+    cacheHitRatio: 'Cache hit ratio',
     failedToLoad: 'Failed to load model data',
-    tokenDistByModel: 'Token Distribution by Model',
+    tokenDistByModel: 'Token distribution by model',
     input: 'input',
     cacheRead: 'cache_read',
     cacheWrite: 'cache_write',
     output: 'output',
     inputTooltip: (n: string) => `Input: ${n}`,
-    cacheReadTooltip: (n: string) => `Cache Read: ${n}`,
-    cacheWriteTooltip: (n: string) => `Cache Write: ${n}`,
+    cacheReadTooltip: (n: string) => `Cache read: ${n}`,
+    cacheWriteTooltip: (n: string) => `Cache write: ${n}`,
     outputTooltip: (n: string) => `Output: ${n}`,
-    fastModeAnalysis: 'Fast Mode Analysis',
+    fastModeAnalysis: 'Fast mode analysis',
     regular: 'regular',
     fast: 'fast',
     regularTooltip: (n: string) => `Regular: ${n}`,
     fastTooltip: (n: string) => `Fast: ${n}`,
     regFastDetail: (reg: string, fast: string) => `${reg} reg / ${fast} fast`,
-    modelUsageOverTime: 'Model Usage Over Time',
+    modelUsageOverTime: 'Model usage over time',
     noTimeSeriesData: 'No time series data',
     requestsPerDay: 'Requests per day',
     requestsTooltip: (model: string, count: number, day: string) =>
@@ -51,7 +57,7 @@ const STRINGS = {
     inOut: (inp: string, out: string) => `${inp} in / ${out} out`,
     fastOfTotal: (fast: string, total: string) => `${fast} fast of ${total} tokens`,
     readEligible: (read: string, eligible: string) => `${read} read / ${eligible} eligible`,
-    exportModelUsage: 'Model Usage Over Time',
+    exportModelUsage: 'Model usage over time',
   },
   zh: {
     stats: '统计',
@@ -61,28 +67,28 @@ const STRINGS = {
     cacheHitRatio: 'Cache 命中率',
     failedToLoad: '加载模型数据失败',
     tokenDistByModel: '按模型的 Token 分布',
-    input: 'input',
-    cacheRead: 'cache_read',
-    cacheWrite: 'cache_write',
-    output: 'output',
-    inputTooltip: (n: string) => `Input: ${n}`,
-    cacheReadTooltip: (n: string) => `Cache Read: ${n}`,
-    cacheWriteTooltip: (n: string) => `Cache Write: ${n}`,
-    outputTooltip: (n: string) => `Output: ${n}`,
+    input: '输入',
+    cacheRead: '缓存读取',
+    cacheWrite: '缓存写入',
+    output: '输出',
+    inputTooltip: (n: string) => `输入：${n}`,
+    cacheReadTooltip: (n: string) => `缓存读取：${n}`,
+    cacheWriteTooltip: (n: string) => `缓存写入：${n}`,
+    outputTooltip: (n: string) => `输出：${n}`,
     fastModeAnalysis: 'Fast Mode 分析',
     regular: '常规',
-    fast: 'fast',
-    regularTooltip: (n: string) => `Regular: ${n}`,
-    fastTooltip: (n: string) => `Fast: ${n}`,
-    regFastDetail: (reg: string, fast: string) => `${reg} reg / ${fast} fast`,
+    fast: 'Fast',
+    regularTooltip: (n: string) => `常规：${n}`,
+    fastTooltip: (n: string) => `Fast：${n}`,
+    regFastDetail: (reg: string, fast: string) => `常规 ${reg} / Fast ${fast}`,
     modelUsageOverTime: '模型使用趋势',
     noTimeSeriesData: '暂无时序数据',
     requestsPerDay: '每日请求数',
     requestsTooltip: (model: string, count: number, day: string) =>
       `${model}: ${count} 次请求（${day}）`,
-    inOut: (inp: string, out: string) => `${inp} in / ${out} out`,
-    fastOfTotal: (fast: string, total: string) => `${fast} fast / ${total} token`,
-    readEligible: (read: string, eligible: string) => `${read} read / ${eligible} 可用`,
+    inOut: (inp: string, out: string) => `输入 ${inp} / 输出 ${out}`,
+    fastOfTotal: (fast: string, total: string) => `${total} token 中 ${fast} 为 Fast Mode`,
+    readEligible: (read: string, eligible: string) => `读取 ${read} / 可用 ${eligible}`,
     exportModelUsage: '模型使用趋势',
   },
 };
@@ -97,29 +103,6 @@ function buildModelColorMap(models: string[]): Record<string, string> {
     map[models[i]] = CHART_COLORS[i % CHART_COLORS.length];
   }
   return map;
-}
-
-function SectionHeader({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="flex-1 h-px bg-border" />
-    </div>
-  );
-}
-
-function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
-  return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-        {label}
-      </div>
-      <div className="text-lg font-mono font-bold mt-1">{value}</div>
-      {detail && <div className="text-3xs font-mono text-muted-foreground mt-0.5">{detail}</div>}
-    </div>
-  );
 }
 
 function TokenDistribution({
@@ -161,22 +144,26 @@ function TokenDistribution({
   }, [sorted]);
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
+    <Card>
       <SectionHeader label={s.tokenDistByModel} />
       <div className="space-y-2 mt-3">
         <div className="flex items-center gap-4 text-3xs font-mono text-muted-foreground mb-2">
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-2.5 h-2.5 rounded-sm bg-sky-500" /> {s.input}
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-500" /> {s.cacheRead}
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-2.5 h-2.5 rounded-sm bg-amber-500" /> {s.cacheWrite}
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-2.5 h-2.5 rounded-sm bg-violet-500" /> {s.output}
-          </span>
+          {(
+            [
+              ['input', s.input],
+              ['cacheRead', s.cacheRead],
+              ['cacheWrite', s.cacheWrite],
+              ['output', s.output],
+            ] as const
+          ).map(([key, label]) => (
+            <span key={key} className="flex items-center gap-1">
+              <span
+                className="inline-block w-2.5 h-2.5 rounded-sm"
+                style={{ backgroundColor: TOKEN_SERIES_COLORS[key] }}
+              />{' '}
+              {label}
+            </span>
+          ))}
         </div>
         {sorted.map((m) => {
           const input = Number(m.inputTokens);
@@ -202,47 +189,56 @@ function TokenDistribution({
               </div>
               <div className="flex-1 min-w-0">
                 <div
-                  className="flex h-5 rounded overflow-hidden"
+                  className="flex h-5 rounded-sm overflow-hidden"
                   style={{ width: `${Math.max(barWidth, 2)}%` }}
                 >
                   {pctInput > 0 && (
                     <div
-                      className="bg-sky-500 h-full"
-                      style={{ width: `${pctInput}%` }}
+                      className="h-full"
+                      style={{ width: `${pctInput}%`, backgroundColor: TOKEN_SERIES_COLORS.input }}
                       title={s.inputTooltip(formatNumber(input))}
                     />
                   )}
                   {pctCacheRead > 0 && (
                     <div
-                      className="bg-emerald-500 h-full"
-                      style={{ width: `${pctCacheRead}%` }}
+                      className="h-full"
+                      style={{
+                        width: `${pctCacheRead}%`,
+                        backgroundColor: TOKEN_SERIES_COLORS.cacheRead,
+                      }}
                       title={s.cacheReadTooltip(formatNumber(cacheRead))}
                     />
                   )}
                   {pctCacheWrite > 0 && (
                     <div
-                      className="bg-amber-500 h-full"
-                      style={{ width: `${pctCacheWrite}%` }}
+                      className="h-full"
+                      style={{
+                        width: `${pctCacheWrite}%`,
+                        backgroundColor: TOKEN_SERIES_COLORS.cacheWrite,
+                      }}
                       title={s.cacheWriteTooltip(formatNumber(cacheWrite))}
                     />
                   )}
                   {pctOutput > 0 && (
                     <div
-                      className="bg-violet-500 h-full"
-                      style={{ width: `${pctOutput}%` }}
+                      className="h-full"
+                      style={{
+                        width: `${pctOutput}%`,
+                        backgroundColor: TOKEN_SERIES_COLORS.output,
+                      }}
                       title={s.outputTooltip(formatNumber(output))}
                     />
                   )}
                 </div>
               </div>
-              <div className="w-16 shrink-0 text-right text-3xs font-mono text-muted-foreground">
+              <div className="min-w-16 shrink-0 whitespace-nowrap text-right text-3xs font-mono tabular-nums text-muted-foreground">
                 {formatNumber(total)}
               </div>
             </div>
           );
         })}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -278,7 +274,7 @@ function FastModeAnalysis({
   if (fastModels.length === 0) return null;
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
+    <Card>
       <SectionHeader label={s.fastModeAnalysis} />
       <div className="space-y-3 mt-3">
         <div className="flex items-center gap-4 text-3xs font-mono text-muted-foreground mb-1">
@@ -286,7 +282,7 @@ function FastModeAnalysis({
             <span className="inline-block w-2.5 h-2.5 rounded-sm bg-muted" /> {s.regular}
           </span>
           <span className="flex items-center gap-1">
-            <span className="inline-block w-2.5 h-2.5 rounded-sm bg-amber-500" /> {s.fast}
+            <span className="inline-block w-2.5 h-2.5 rounded-sm bg-primary" /> {s.fast}
           </span>
         </div>
         {fastModels.map((m) => {
@@ -316,7 +312,7 @@ function FastModeAnalysis({
               </div>
               <div className="flex-1 min-w-0">
                 <div
-                  className="flex h-5 rounded overflow-hidden"
+                  className="flex h-5 rounded-sm overflow-hidden"
                   style={{ width: `${Math.max(barScale, 2)}%` }}
                 >
                   {regularPct > 0 && (
@@ -328,21 +324,21 @@ function FastModeAnalysis({
                   )}
                   {fastPct > 0 && (
                     <div
-                      className="bg-amber-500 h-full"
+                      className="bg-primary h-full"
                       style={{ width: `${fastPct}%` }}
                       title={s.fastTooltip(formatNumber(fastTokens))}
                     />
                   )}
                 </div>
               </div>
-              <div className="w-36 shrink-0 text-right text-3xs font-mono text-muted-foreground">
+              <div className="min-w-36 shrink-0 whitespace-nowrap text-right text-3xs font-mono tabular-nums text-muted-foreground">
                 {s.regFastDetail(formatNumber(regularTokens), formatNumber(fastTokens))}
               </div>
             </div>
           );
         })}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -405,7 +401,6 @@ function ModelUsageChart({
   strings: (typeof STRINGS)[keyof typeof STRINGS];
 }) {
   const locale = useLocale();
-  const svgRef = useRef<SVGSVGElement>(null);
   const { days, maxY, yTicks } = useMemo(() => {
     const dayMap = new Map<string, Record<string, number>>();
     for (const entry of timeSeries) {
@@ -435,12 +430,12 @@ function ModelUsageChart({
 
   if (days.length === 0) {
     return (
-      <div className="rounded-md border border-border bg-surface p-3">
+      <Card>
         <SectionHeader label={s.modelUsageOverTime} />
         <div className="flex items-center justify-center h-40 text-2xs font-mono text-muted-foreground">
           {s.noTimeSeriesData}
         </div>
-      </div>
+      </Card>
     );
   }
 
@@ -453,21 +448,12 @@ function ModelUsageChart({
   const labelInterval = Math.max(1, Math.floor(days.length / 6));
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
+    <Card>
       <div className="flex items-center justify-between mb-2">
         <SectionHeader label={s.modelUsageOverTime} />
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            track('agentic_workload_model_usage_export');
-            if (svgRef.current)
-              exportSvgToPng(svgRef.current, {
-                title: s.exportModelUsage,
-                filename: 'model-usage-over-time.png',
-                svgWidth: CHART_W,
-                svgHeight: CHART_H,
-              });
-          }}
+        <ChartActions
+          fileName="model-usage-over-time"
+          onExportPng={() => track('agentic_workload_model_usage_export')}
         />
       </div>
 
@@ -483,7 +469,7 @@ function ModelUsageChart({
         ))}
       </div>
 
-      <svg ref={svgRef} viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full">
+      <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full">
         {yTicks.map((t) => (
           <g key={`y-${t}`}>
             {t > 0 && (
@@ -542,7 +528,7 @@ function ModelUsageChart({
                 rx={1}
               >
                 <title>
-                  {s.requestsTooltip(shortenModel(model), count, formatSnapshotDate(day))}
+                  {s.requestsTooltip(shortenModel(model), count, formatSnapshotDate(day, locale))}
                 </title>
               </rect>,
             );
@@ -586,7 +572,7 @@ function ModelUsageChart({
           {s.requestsPerDay}
         </text>
       </svg>
-    </div>
+    </Card>
   );
 }
 
@@ -665,30 +651,34 @@ function ModelsPageContent() {
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-md border border-border bg-surface p-3">
+              <div key={i} className="rounded-xl border border-border/30 bg-card p-3">
                 <Skeleton className="h-3 w-20 mb-2" />
                 <Skeleton className="h-6 w-16" />
               </div>
             ))}
           </div>
         ) : data ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <StatCard
+          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <Stat
+              boxed
               label={t.modelsUsed}
               value={String(data.tokensByModel.length)}
               detail={allModels.map(shortenModel).join(', ')}
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.totalTokens}
               value={formatNumber(totalTokens)}
               detail={t.inOut(formatNumber(totalInput), formatNumber(totalOutput))}
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.fastModePct}
               value={`${fastModePct}%`}
               detail={t.fastOfTotal(formatNumber(totalFastTokens), formatNumber(totalTokens))}
             />
-            <StatCard
+            <Stat
+              boxed
               label={t.cacheHitRatio}
               value={`${cacheHitRatio}%`}
               detail={t.readEligible(
@@ -696,11 +686,9 @@ function ModelsPageContent() {
                 formatNumber(totalCacheRead + totalInput),
               )}
             />
-          </div>
+          </dl>
         ) : (
-          <div className="text-sm font-mono text-muted-foreground text-center py-8">
-            {t.failedToLoad}
-          </div>
+          <EmptyState>{t.failedToLoad}</EmptyState>
         )}
       </div>
 

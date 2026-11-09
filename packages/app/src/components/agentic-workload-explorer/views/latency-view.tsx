@@ -1,13 +1,20 @@
 'use client';
 
-import { Suspense, useRef, useState } from 'react';
+import { Suspense, useState } from 'react';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Stat } from '@/components/ui/stat';
+import { Button } from '@/components/ui/button';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
 import {
   formatNumber,
   formatDuration,
+  formatExplorerDateTime,
   formatPrefillSpeed,
   formatPrefillSpeedCompact,
+  formatZoneLabel,
 } from '@/lib/agentic-workload-explorer/format';
 import { useModelFilter } from '@/hooks/agentic-workload-explorer/use-model-filter';
 import { ModelFilter } from '@/components/agentic-workload-explorer/model-filter';
@@ -19,10 +26,14 @@ import type {
   GraphHistogram,
   PerformancePercentileStats,
 } from '@/lib/agentic-workload-explorer/api-types';
-import { SNAPSHOT_RANGE_LABEL } from '@/lib/agentic-workload-explorer/snapshot';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
-import { Expandable, ExpandTrigger } from '@/components/agentic-workload-explorer/expandable-chart';
+import {
+  ChartActions,
+  Expandable,
+  ExpandTrigger,
+} from '@/components/agentic-workload-explorer/expandable-chart';
 
 interface StreamingStats {
   p50: number;
@@ -102,52 +113,55 @@ const SVG_FONT_SIZE = '9px';
 const STRINGS = {
   en: {
     stats: 'Stats',
-    failedToLoad: 'Failed to load latency data.',
-    e2eMedian: 'E2E Median (p50)',
-    e2eP95: 'E2E P95',
-    e2eP99: 'E2E P99',
+    failedToLoad: 'Failed to load latency data',
+    e2eMedian: 'E2E median (p50)',
+    e2eP95: 'E2E p95',
+    e2eP99: 'E2E p99',
     noE2eDistribution: 'No E2E latency distribution data available',
     noData: 'No data available',
     noHourlyData: 'No hourly E2E latency data available',
     noModelData: 'No model E2E latency data available',
     requests: 'requests',
     streaming: 'Streaming',
-    nonStreaming: 'Non-Streaming',
+    nonStreaming: 'Non-streaming',
     medianP50: 'Median (p50)',
     p95: 'P95',
     average: 'Average',
     requestsLabel: 'Requests',
     hideSmall: 'Hide n<5',
-    exportPng: 'Export PNG',
     colorScale: 'Color scale:',
+    hoverRead: 'read',
+    hoverWrite: 'write',
+    hoverOutput: 'output',
+    hoverCacheTotal: 'cache total',
     global: 'Global',
     local: 'Local',
-    cacheHeatmapLabel: 'Cache Read × Write → p90 E2E Latency',
+    cacheHeatmapLabel: 'Cache read × write → p90 E2E latency',
     cacheHeatmapDetail: 'heatmap',
-    facetedLabel: 'Cache × Output → p90 E2E Latency',
+    facetedLabel: 'Cache × output → p90 E2E latency',
     facetedDetail: 'faceted by output tokens',
-    cacheTtftLabel: 'Cache Read × Write → p90 TTFT',
+    cacheTtftLabel: 'Cache read × write → p90 TTFT',
     cacheTtftDetail: 'streaming requests only',
-    cachePrefillLabel: 'Cache Read × Write → p90 Prefill Speed',
+    cachePrefillLabel: 'Cache read × write → p90 prefill speed',
     cachePrefillDetail: 'streaming requests with cache · input tok/s/query',
-    interactivityHeatmapLabel: 'Cache Total × Output → p90 Interactivity',
+    interactivityHeatmapLabel: 'Cache total × output → p90 interactivity',
     interactivityHeatmapDetail: 'output tok/s/user · streaming requests',
-    cacheReadLabel: 'Cache Read vs E2E Latency',
+    cacheReadLabel: 'Cache read vs E2E latency',
     cacheReadDetail: 'cache_write < 4k tokens',
-    e2eDistLabel: 'E2E Latency Distribution',
+    e2eDistLabel: 'E2E latency distribution',
     samples: (n: string) => `${n} samples`,
-    ttftDistLabel: 'TTFT Distribution',
+    ttftDistLabel: 'TTFT distribution',
     streamingSamples: (n: string) => `${n} streaming samples`,
-    tpotDistLabel: 'TPOT Distribution',
-    prefillDistLabel: 'Prefill Speed Distribution',
+    tpotDistLabel: 'TPOT distribution',
+    prefillDistLabel: 'Prefill speed distribution',
     prefillDistDetail: (n: string) => `${n} streaming samples · input tok/s/query`,
-    interactDistLabel: 'Interactivity Distribution',
+    interactDistLabel: 'Interactivity distribution',
     interactDistDetail: (n: string) => `${n} streaming samples · output tok/s/user`,
-    hourlyLabel: 'E2E Latency Over Time',
+    hourlyLabel: 'E2E latency over time',
     hourlyDetail: 'final 48h, hourly',
-    modelLabel: 'E2E Latency by Model',
+    modelLabel: 'E2E latency by model',
     modelDetail: (count: number) => `${count} model${count === 1 ? '' : 's'}`,
-    streamVsNonLabel: 'Streaming vs Non-Streaming',
+    streamVsNonLabel: 'Streaming vs non-streaming',
     cacheReadAxisTitle: 'cache_read tokens',
     cacheWriteAxisTitle: 'cache_write tokens',
     outputTokensAxis: 'output tokens',
@@ -158,8 +172,6 @@ const STRINGS = {
     perFacetScale: 'per-facet scale',
     facetFooter: (scaleLabel: string) =>
       `x: cache_read · y: cache_write · color: p90 E2E latency (s) · ${scaleLabel}`,
-    pngTitle: 'Cache Read × Write → p90 E2E Latency',
-    pngDetail: (n: number, range: string) => `${n} buckets · snapshot ${range}`,
     outputLabels: {
       0: '0–1k out',
       1000: '1k–5k out',
@@ -169,7 +181,7 @@ const STRINGS = {
   },
   zh: {
     stats: '统计',
-    failedToLoad: '延迟数据加载失败。',
+    failedToLoad: '延迟数据加载失败',
     e2eMedian: '端到端中位数 (p50)',
     e2eP95: '端到端 P95',
     e2eP99: '端到端 P99',
@@ -185,22 +197,25 @@ const STRINGS = {
     average: '平均值',
     requestsLabel: '请求数',
     hideSmall: '隐藏 n<5',
-    exportPng: '导出 PNG',
     colorScale: '色标：',
+    hoverRead: '读取',
+    hoverWrite: '写入',
+    hoverOutput: '输出',
+    hoverCacheTotal: '缓存总量',
     global: '全局',
     local: '局部',
-    cacheHeatmapLabel: 'Cache Read × Write → p90 端到端延迟',
+    cacheHeatmapLabel: '缓存读取 × 写入 → p90 端到端延迟',
     cacheHeatmapDetail: '热力图',
-    facetedLabel: 'Cache × Output → p90 端到端延迟',
+    facetedLabel: '缓存 × 输出 → p90 端到端延迟',
     facetedDetail: '按 output token 分面',
-    cacheTtftLabel: 'Cache Read × Write → p90 TTFT',
+    cacheTtftLabel: '缓存读取 × 写入 → p90 TTFT',
     cacheTtftDetail: '仅限流式请求',
-    cachePrefillLabel: 'Cache Read × Write → p90 Prefill Speed',
+    cachePrefillLabel: '缓存读取 × 写入 → p90 Prefill 速度',
     cachePrefillDetail: '含缓存的流式请求 · input tok/s/query',
-    interactivityHeatmapLabel: 'Cache Total × Output → p90 Interactivity',
+    interactivityHeatmapLabel: '缓存总量 × 输出 → p90 交互性',
     interactivityHeatmapDetail: 'output tok/s/user · 流式请求',
-    cacheReadLabel: 'Cache Read vs 端到端延迟',
-    cacheReadDetail: 'cache_write < 4k tokens',
+    cacheReadLabel: '缓存读取 vs 端到端延迟',
+    cacheReadDetail: 'cache_write < 4k token',
     e2eDistLabel: '端到端延迟分布',
     samples: (n: string) => `${n} 个样本`,
     ttftDistLabel: 'TTFT 分布',
@@ -215,18 +230,16 @@ const STRINGS = {
     modelLabel: '按模型的端到端延迟',
     modelDetail: (count: number) => `${count} 个模型`,
     streamVsNonLabel: '流式 vs 非流式',
-    cacheReadAxisTitle: 'cache_read tokens',
-    cacheWriteAxisTitle: 'cache_write tokens',
-    outputTokensAxis: 'output tokens',
-    cacheReadWriteAxis: 'cacheRead + cacheWrite tokens',
+    cacheReadAxisTitle: '缓存读取 token（cache_read）',
+    cacheWriteAxisTitle: '缓存写入 token（cache_write）',
+    outputTokensAxis: '输出 token',
+    cacheReadWriteAxis: '缓存读取 + 写入 token',
     p90E2eLatencyAxis: 'p90 端到端延迟 (s)',
-    cacheReadBarAxisLabel: 'cache_read tokens (cache_write < 4k)',
+    cacheReadBarAxisLabel: '缓存读取 token（cache_write < 4k）',
     sharedScale: '统一色标',
     perFacetScale: '分面色标',
     facetFooter: (scaleLabel: string) =>
-      `x: cache_read · y: cache_write · color: p90 端到端延迟 (s) · ${scaleLabel}`,
-    pngTitle: 'Cache Read × Write → p90 端到端延迟',
-    pngDetail: (n: number, range: string) => `${n} 个 bucket · 快照 ${range}`,
+      `x：缓存读取 · y：缓存写入 · 颜色：p90 端到端延迟 (s) · ${scaleLabel}`,
     outputLabels: {
       0: '0–1k 输出',
       1000: '1k–5k 输出',
@@ -274,30 +287,6 @@ function truncateModel(model: string, maxLen = 28): string {
   return `${model.slice(0, maxLen - 1)}...`;
 }
 
-function SectionHeader({ label, detail }: { label: string; detail?: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="flex-1 h-px bg-border" />
-      {detail && <span className="text-3xs font-mono text-subtle">{detail}</span>}
-    </div>
-  );
-}
-
-function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
-  return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-        {label}
-      </div>
-      <div className="text-lg font-mono font-bold mt-0.5">{value}</div>
-      {detail && <div className="text-3xs font-mono text-muted-foreground mt-0.5">{detail}</div>}
-    </div>
-  );
-}
-
 function DistributionHistogram({
   distribution,
   stats,
@@ -310,9 +299,9 @@ function DistributionHistogram({
 
   if (bins.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
+      <EmptyState bare className="py-8">
         {t.noE2eDistribution}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -334,7 +323,7 @@ function DistributionHistogram({
   const xTicks = generateTicks(minVal, maxVal, 6);
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
+    <Card>
       <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ maxHeight: 240 }}>
         <line
           x1={MARGIN.left}
@@ -429,7 +418,7 @@ function DistributionHistogram({
           </div>
         ))}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -449,7 +438,9 @@ function GenericDistributionHistogram({
 
   if (bins.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">{t.noData}</div>
+      <EmptyState bare className="py-8">
+        {t.noData}
+      </EmptyState>
     );
   }
 
@@ -470,7 +461,7 @@ function GenericDistributionHistogram({
   ];
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
+    <Card>
       <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ maxHeight: 240 }}>
         <line
           x1={MARGIN.left}
@@ -553,17 +544,18 @@ function GenericDistributionHistogram({
           </div>
         ))}
       </div>
-    </div>
+    </Card>
   );
 }
 
 function HourlyLatencyChart({ hourly }: { hourly: LatencyData['hourly'] }) {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
   if (hourly.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
+      <EmptyState bare className="py-8">
         {t.noHourlyData}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -578,23 +570,21 @@ function HourlyLatencyChart({ hourly }: { hourly: LatencyData['hourly'] }) {
   const p50Points = hourly.map((h, i) => `${sx(i)},${sy(h.p50)}`).join(' ');
   const p95Points = hourly.map((h, i) => `${sx(i)},${sy(h.p95)}`).join(' ');
 
+  const labelStep = Math.max(1, Math.ceil(hourly.length / 6));
   const xLabels: { idx: number; label: string }[] = [];
-  for (let i = 0; i < hourly.length; i++) {
-    if (i % 6 === 0) {
-      const d = new Date(hourly[i].hour);
-      const label = d.toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        hour12: true,
-        timeZoneName: 'short',
-      });
-      xLabels.push({ idx: i, label });
-    }
+  for (let i = 0; i < hourly.length; i += labelStep) {
+    const label = formatExplorerDateTime(
+      hourly[i].hour,
+      locale,
+      { month: 'short', day: 'numeric', hour: 'numeric', hour12: true },
+      { axisTick: true },
+    );
+    xLabels.push({ idx: i, label });
   }
+  const timeZone = formatZoneLabel(hourly[0].hour);
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
+    <Card>
       <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ maxHeight: 240 }}>
         {yTicks.map((tick) => (
           <g key={`y-${tick}`}>
@@ -664,7 +654,7 @@ function HourlyLatencyChart({ hourly }: { hourly: LatencyData['hourly'] }) {
         ))}
       </svg>
 
-      <div className="flex gap-x-4 mt-1.5">
+      <div className="flex items-center gap-x-4 mt-1.5">
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: '#06b6d4' }} />
           <span className="text-3xs font-mono text-muted-foreground">p50</span>
@@ -673,8 +663,9 @@ function HourlyLatencyChart({ hourly }: { hourly: LatencyData['hourly'] }) {
           <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: '#f59e0b' }} />
           <span className="text-3xs font-mono text-muted-foreground">p95</span>
         </div>
+        <span className="ml-auto text-3xs font-mono text-muted-foreground">{timeZone}</span>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -684,9 +675,9 @@ function ModelLatencyChart({ byModel }: { byModel: LatencyData['byModel'] }) {
 
   if (sorted.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
+      <EmptyState bare className="py-8">
         {t.noModelData}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -720,7 +711,7 @@ function ModelLatencyChart({ byModel }: { byModel: LatencyData['byModel'] }) {
               />
             </div>
             <span
-              className="text-2xs font-mono text-foreground shrink-0 w-[80px] text-right"
+              className="text-2xs font-mono tabular-nums whitespace-nowrap text-foreground shrink-0 min-w-28 text-right"
               title={`p50: ${formatDuration(m.p50)}, p95: ${formatDuration(m.p95)}`}
             >
               {formatDuration(m.p50)} / {formatDuration(m.p95)}
@@ -752,24 +743,22 @@ function StreamingComparison({ stats }: { stats: LatencyStats }) {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-      <div className="rounded-md border border-border bg-surface p-3">
-        <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground mb-2">
-          {t.streaming}
-        </div>
+      <Card>
+        <div className="text-xs font-medium text-muted-foreground mb-2">{t.streaming}</div>
         <div className="space-y-1.5">
           <div className="flex justify-between">
             <span className="text-2xs font-mono text-muted-foreground">{t.medianP50}</span>
-            <span className="text-2xs font-mono font-bold">{formatDuration(streaming.p50)}</span>
+            <span className="text-2xs font-mono font-medium">{formatDuration(streaming.p50)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-2xs font-mono text-muted-foreground">{t.p95}</span>
-            <span className="text-2xs font-mono font-bold">{formatDuration(streaming.p95)}</span>
+            <span className="text-2xs font-mono font-medium">{formatDuration(streaming.p95)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-2xs font-mono text-muted-foreground">{t.average}</span>
-            <span className="text-2xs font-mono font-bold">{formatDuration(streaming.avg)}</span>
+            <span className="text-2xs font-mono font-medium">{formatDuration(streaming.avg)}</span>
           </div>
-          <div className="h-px bg-border my-1" />
+          <div className="h-px bg-border/30 my-1" />
           <div className="flex justify-between">
             <span className="text-2xs font-mono text-muted-foreground">{t.requestsLabel}</span>
             <span className="text-2xs font-mono text-foreground">
@@ -777,26 +766,30 @@ function StreamingComparison({ stats }: { stats: LatencyStats }) {
             </span>
           </div>
         </div>
-      </div>
+      </Card>
 
-      <div className="rounded-md border border-border bg-surface p-3">
-        <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground mb-2">
-          {t.nonStreaming}
-        </div>
+      <Card>
+        <div className="text-xs font-medium text-muted-foreground mb-2">{t.nonStreaming}</div>
         <div className="space-y-1.5">
           <div className="flex justify-between">
             <span className="text-2xs font-mono text-muted-foreground">{t.medianP50}</span>
-            <span className="text-2xs font-mono font-bold">{formatDuration(nonStreaming.p50)}</span>
+            <span className="text-2xs font-mono font-medium">
+              {formatDuration(nonStreaming.p50)}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-2xs font-mono text-muted-foreground">{t.p95}</span>
-            <span className="text-2xs font-mono font-bold">{formatDuration(nonStreaming.p95)}</span>
+            <span className="text-2xs font-mono font-medium">
+              {formatDuration(nonStreaming.p95)}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-2xs font-mono text-muted-foreground">{t.average}</span>
-            <span className="text-2xs font-mono font-bold">{formatDuration(nonStreaming.avg)}</span>
+            <span className="text-2xs font-mono font-medium">
+              {formatDuration(nonStreaming.avg)}
+            </span>
           </div>
-          <div className="h-px bg-border my-1" />
+          <div className="h-px bg-border/30 my-1" />
           <div className="flex justify-between">
             <span className="text-2xs font-mono text-muted-foreground">{t.requestsLabel}</span>
             <span className="text-2xs font-mono text-foreground">
@@ -804,7 +797,7 @@ function StreamingComparison({ stats }: { stats: LatencyStats }) {
             </span>
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
@@ -845,15 +838,10 @@ function CacheHeatmap({
 }) {
   const t = STRINGS[useLocale()];
   const [hovered, setHovered] = useState<HeatmapCell | null>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
   const [hideSmall, setHideSmall] = useState(true);
 
   if (data.length === 0) {
-    return (
-      <div className="rounded-md border border-border bg-surface p-4 text-center text-xs text-muted-foreground">
-        {t.noData}
-      </div>
-    );
+    return <EmptyState>{t.noData}</EmptyState>;
   }
 
   const readBuckets = [...new Set(data.map((d) => d.readBucket))].toSorted((a, b) => a - b);
@@ -871,90 +859,34 @@ function CacheHeatmap({
   const svgW = LABEL_W + readBuckets.length * CELL + 80;
   const svgH = LABEL_H + writeBuckets.length * CELL + 30;
 
-  function exportPng() {
-    const svg = svgRef.current;
-    if (!svg) return;
-
-    const titleHeight = 40;
-    const padding = 16;
-    const serializer = new XMLSerializer();
-    const svgStr = serializer.serializeToString(svg);
-    const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const img = new Image();
-    img.addEventListener('load', () => {
-      const scale = 2;
-      const canvasW = (svgW + padding * 2) * scale;
-      const canvasH = (svgH + titleHeight + padding * 2) * scale;
-      const canvas = document.createElement('canvas');
-      canvas.width = canvasW;
-      canvas.height = canvasH;
-      const ctx = canvas.getContext('2d')!;
-      ctx.scale(scale, scale);
-
-      ctx.fillStyle = '#0a0a0a';
-      ctx.fillRect(0, 0, canvasW, canvasH);
-
-      ctx.fillStyle = '#ededed';
-      ctx.font = 'bold 14px monospace';
-      ctx.fillText(t.pngTitle, padding, padding + 20);
-      ctx.fillStyle = '#666';
-      ctx.font = '10px monospace';
-      ctx.fillText(t.pngDetail(data.length, SNAPSHOT_RANGE_LABEL), padding, padding + 34);
-
-      ctx.drawImage(img, padding, titleHeight + padding, svgW, svgH);
-      URL.revokeObjectURL(url);
-
-      const a = document.createElement('a');
-      a.download = 'cache-heatmap.png';
-      a.href = canvas.toDataURL('image/png');
-      a.click();
-    });
-    img.src = url;
-  }
-
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center justify-end mb-2 gap-2">
-        <button
+    <Card>
+      <div className="flex items-center mb-2 gap-2">
+        <Button
           type="button"
+          variant="outline"
+          size="xs"
+          aria-pressed={hideSmall}
           onClick={() => {
             setHideSmall((h) => !h);
             track('agentic_workload_latency_heatmap_hide_small_toggled', { enabled: !hideSmall });
           }}
-          className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
-            hideSmall
-              ? 'bg-foreground text-background border-foreground'
-              : 'border-border text-subtle hover:text-foreground hover:bg-surface-hover'
-          }`}
         >
           {t.hideSmall}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            track('agentic_workload_latency_heatmap_export_png');
-            exportPng();
-          }}
-          className="px-2 py-0.5 text-3xs font-mono rounded border border-border text-subtle hover:text-foreground hover:bg-surface-hover transition-colors"
-        >
-          {t.exportPng}
-        </button>
-        <ExpandTrigger />
+        </Button>
+        <ChartActions
+          fileName="cache-heatmap"
+          onExportPng={() => track('agentic_workload_latency_heatmap_export_png')}
+        />
       </div>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${svgW} ${svgH}`}
-        className="w-full"
-        style={{ maxHeight: 400 }}
-      >
+      <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full" style={{ maxHeight: 400 }}>
         {readBuckets.map((rb, i) => (
           <text
             key={`xl-${rb}`}
             x={LABEL_W + i * CELL + CELL / 2}
             y={writeBuckets.length * CELL + LABEL_H + 14}
             textAnchor="middle"
-            fill="var(--muted)"
+            fill="var(--muted-foreground)"
             fontSize="8px"
             fontFamily={SVG_FONT}
           >
@@ -968,7 +900,7 @@ function CacheHeatmap({
             x={LABEL_W - 6}
             y={LABEL_H + j * CELL + CELL / 2 + 3}
             textAnchor="end"
-            fill="var(--muted)"
+            fill="var(--muted-foreground)"
             fontSize="8px"
             fontFamily={SVG_FONT}
           >
@@ -993,7 +925,7 @@ function CacheHeatmap({
                   fill={interpolateHeat(norm)}
                   fillOpacity={isHovered ? 1 : 0.85}
                   rx={3}
-                  stroke={isHovered ? 'var(--fg)' : 'none'}
+                  stroke={isHovered ? 'var(--foreground)' : 'none'}
                   strokeWidth={isHovered ? 1.5 : 0}
                   style={{ cursor: 'pointer' }}
                   onMouseEnter={() => setHovered(cell)}
@@ -1021,7 +953,7 @@ function CacheHeatmap({
           x={LABEL_W + (readBuckets.length * CELL) / 2}
           y={writeBuckets.length * CELL + LABEL_H + 26}
           textAnchor="middle"
-          fill="var(--muted)"
+          fill="var(--muted-foreground)"
           fontSize="10px"
           fontFamily={SVG_FONT}
         >
@@ -1032,7 +964,7 @@ function CacheHeatmap({
           x={10}
           y={LABEL_H + (writeBuckets.length * CELL) / 2}
           textAnchor="middle"
-          fill="var(--muted)"
+          fill="var(--muted-foreground)"
           fontSize="10px"
           fontFamily={SVG_FONT}
           transform={`rotate(-90, 10, ${LABEL_H + (writeBuckets.length * CELL) / 2})`}
@@ -1053,7 +985,7 @@ function CacheHeatmap({
         <text
           x={LABEL_W + readBuckets.length * CELL + 30}
           y={LABEL_H + 8}
-          fill="var(--muted)"
+          fill="var(--muted-foreground)"
           fontSize="7px"
           fontFamily={SVG_FONT}
         >
@@ -1062,7 +994,7 @@ function CacheHeatmap({
         <text
           x={LABEL_W + readBuckets.length * CELL + 30}
           y={LABEL_H + writeBuckets.length * CELL}
-          fill="var(--muted)"
+          fill="var(--muted-foreground)"
           fontSize="7px"
           fontFamily={SVG_FONT}
         >
@@ -1073,16 +1005,16 @@ function CacheHeatmap({
       {hovered && (
         <div className="mt-2 flex items-center gap-4 text-3xs font-mono text-muted-foreground px-1">
           <span>
-            read: {formatBucketLabel(hovered.readBucket)}+ · write:{' '}
+            {t.hoverRead}: {formatBucketLabel(hovered.readBucket)}+ · {t.hoverWrite}:{' '}
             {formatBucketLabel(hovered.writeBucket)}+
           </span>
-          <span className="font-bold text-foreground">
+          <span className="font-medium text-foreground">
             p90: {formatValue ? formatValue(hovered.p90) : `${(hovered.p90 / 1000).toFixed(2)}s`}
           </span>
           <span>n={hovered.count}</span>
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -1101,11 +1033,7 @@ function InteractivityHeatmap({
   const [hideSmall, setHideSmall] = useState(true);
 
   if (data.length === 0) {
-    return (
-      <div className="rounded-md border border-border bg-surface p-4 text-center text-xs text-muted-foreground">
-        {t.noData}
-      </div>
-    );
+    return <EmptyState>{t.noData}</EmptyState>;
   }
 
   const cacheBuckets = [...new Set(data.map((d) => d.cacheTotalBucket))].toSorted((a, b) => a - b);
@@ -1146,24 +1074,22 @@ function InteractivityHeatmap({
   }
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center justify-end mb-2">
-        <button
+    <Card>
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <Button
           type="button"
+          variant="outline"
+          size="xs"
+          aria-pressed={hideSmall}
           onClick={() => {
             setHideSmall((h) => !h);
             track('agentic_workload_latency_interactivity_hide_small_toggled', {
               enabled: !hideSmall,
             });
           }}
-          className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
-            hideSmall
-              ? 'bg-foreground text-background border-foreground'
-              : 'border-border text-subtle hover:text-foreground hover:bg-surface-hover'
-          }`}
         >
           {t.hideSmall}
-        </button>
+        </Button>
         <ExpandTrigger />
       </div>
       <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full" style={{ maxHeight: 400 }}>
@@ -1173,7 +1099,7 @@ function InteractivityHeatmap({
             x={LABEL_W + i * CELL + CELL / 2}
             y={outputBuckets.length * CELL + LABEL_H + 14}
             textAnchor="middle"
-            fill="var(--muted)"
+            fill="var(--muted-foreground)"
             fontSize="8px"
             fontFamily={SVG_FONT}
           >
@@ -1187,7 +1113,7 @@ function InteractivityHeatmap({
             x={LABEL_W - 6}
             y={LABEL_H + j * CELL + CELL / 2 + 3}
             textAnchor="end"
-            fill="var(--muted)"
+            fill="var(--muted-foreground)"
             fontSize="8px"
             fontFamily={SVG_FONT}
           >
@@ -1212,7 +1138,7 @@ function InteractivityHeatmap({
                   fill={interpolate(norm)}
                   fillOpacity={isHov ? 1 : 0.85}
                   rx={3}
-                  stroke={isHov ? 'var(--fg)' : 'none'}
+                  stroke={isHov ? 'var(--foreground)' : 'none'}
                   strokeWidth={isHov ? 1.5 : 0}
                   style={{ cursor: 'pointer' }}
                   onMouseEnter={() => setHovered(cell)}
@@ -1239,7 +1165,7 @@ function InteractivityHeatmap({
           x={LABEL_W + (cacheBuckets.length * CELL) / 2}
           y={outputBuckets.length * CELL + LABEL_H + 26}
           textAnchor="middle"
-          fill="var(--muted)"
+          fill="var(--muted-foreground)"
           fontSize="10px"
           fontFamily={SVG_FONT}
         >
@@ -1250,7 +1176,7 @@ function InteractivityHeatmap({
           x={10}
           y={LABEL_H + (outputBuckets.length * CELL) / 2}
           textAnchor="middle"
-          fill="var(--muted)"
+          fill="var(--muted-foreground)"
           fontSize="10px"
           fontFamily={SVG_FONT}
           transform={`rotate(-90, 10, ${LABEL_H + (outputBuckets.length * CELL) / 2})`}
@@ -1271,7 +1197,7 @@ function InteractivityHeatmap({
         <text
           x={LABEL_W + cacheBuckets.length * CELL + 30}
           y={LABEL_H + 8}
-          fill="var(--muted)"
+          fill="var(--muted-foreground)"
           fontSize="7px"
           fontFamily={SVG_FONT}
         >
@@ -1280,7 +1206,7 @@ function InteractivityHeatmap({
         <text
           x={LABEL_W + cacheBuckets.length * CELL + 30}
           y={LABEL_H + outputBuckets.length * CELL}
-          fill="var(--muted)"
+          fill="var(--muted-foreground)"
           fontSize="7px"
           fontFamily={SVG_FONT}
         >
@@ -1291,16 +1217,16 @@ function InteractivityHeatmap({
       {hovered && (
         <div className="mt-2 flex items-center gap-4 text-3xs font-mono text-muted-foreground px-1">
           <span>
-            cache total: {formatBucketLabel(hovered.cacheTotalBucket)}+ · output:{' '}
+            {t.hoverCacheTotal}: {formatBucketLabel(hovered.cacheTotalBucket)}+ · {t.hoverOutput}:{' '}
             {formatBucketLabel(hovered.outputBucket)}+
           </span>
-          <span className="font-bold text-foreground">
+          <span className="font-medium text-foreground">
             p90: {hovered.p90Interactivity.toFixed(1)} output tok/s/user
           </span>
           <span>n={hovered.count}</span>
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -1311,11 +1237,7 @@ function FacetedHeatmap({ data }: { data: HeatmapByOutputCell[] }) {
   const [hideSmall, setHideSmall] = useState(true);
 
   if (data.length === 0) {
-    return (
-      <div className="rounded-md border border-border bg-surface p-4 text-center text-xs text-muted-foreground">
-        {t.noData}
-      </div>
-    );
+    return <EmptyState>{t.noData}</EmptyState>;
   }
 
   const outputBuckets = [...new Set(data.map((d) => d.outputBucket))].toSorted((a, b) => a - b);
@@ -1343,50 +1265,39 @@ function FacetedHeatmap({ data }: { data: HeatmapByOutputCell[] }) {
   const facetH = LABEL_H + writeBuckets.length * CELL + 24;
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center justify-end mb-2 gap-2">
-        <button
+    <Card>
+      <div className="flex flex-wrap items-center mb-2 gap-2">
+        <Button
           type="button"
+          variant="outline"
+          size="xs"
+          aria-pressed={hideSmall}
           onClick={() => {
             setHideSmall((h) => !h);
             track('agentic_workload_latency_faceted_hide_small_toggled', { enabled: !hideSmall });
           }}
-          className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
-            hideSmall
-              ? 'bg-foreground text-background border-foreground'
-              : 'border-border text-subtle hover:text-foreground hover:bg-surface-hover'
-          }`}
         >
           {t.hideSmall}
-        </button>
-        <span className="text-3xs font-mono text-muted-foreground">{t.colorScale}</span>
-        <div className="flex items-center border border-border rounded-md p-0.5">
-          <button
-            type="button"
-            onClick={() => {
-              setGlobalScale(true);
-              track('agentic_workload_latency_faceted_scale_changed', { scale: 'global' });
+        </Button>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">{t.colorScale}</span>
+          <SegmentedToggle
+            role="group"
+            ariaLabel={t.colorScale}
+            value={globalScale ? 'global' : 'local'}
+            onValueChange={(scale) => {
+              setGlobalScale(scale === 'global');
+              track('agentic_workload_latency_faceted_scale_changed', { scale });
             }}
-            className={`px-2 py-0.5 text-3xs font-mono rounded-sm transition-colors ${
-              globalScale ? 'bg-surface-hover text-foreground' : 'text-subtle hover:text-foreground'
-            }`}
-          >
-            {t.global}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setGlobalScale(false);
-              track('agentic_workload_latency_faceted_scale_changed', { scale: 'local' });
-            }}
-            className={`px-2 py-0.5 text-3xs font-mono rounded-sm transition-colors ${
-              globalScale ? 'text-subtle hover:text-foreground' : 'bg-surface-hover text-foreground'
-            }`}
-          >
-            {t.local}
-          </button>
+            options={[
+              { value: 'global', label: t.global },
+              { value: 'local', label: t.local },
+            ]}
+          />
         </div>
-        <ExpandTrigger />
+        <div className="ml-auto flex items-center">
+          <ExpandTrigger />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1397,7 +1308,7 @@ function FacetedHeatmap({ data }: { data: HeatmapByOutputCell[] }) {
 
           return (
             <div key={ob}>
-              <div className="text-3xs font-mono font-bold text-center mb-1 text-muted-foreground">
+              <div className="text-3xs font-mono font-medium text-center mb-1 text-muted-foreground">
                 {t.outputLabels[ob] || `${formatBucketLabel(ob)}+ out`}
               </div>
               <svg viewBox={`0 0 ${facetW} ${facetH}`} className="w-full">
@@ -1407,7 +1318,7 @@ function FacetedHeatmap({ data }: { data: HeatmapByOutputCell[] }) {
                     x={LABEL_W + i * CELL + CELL / 2}
                     y={writeBuckets.length * CELL + LABEL_H + 12}
                     textAnchor="middle"
-                    fill="var(--subtle)"
+                    fill="var(--muted-foreground)"
                     fontSize="6px"
                     fontFamily={SVG_FONT}
                   >
@@ -1420,7 +1331,7 @@ function FacetedHeatmap({ data }: { data: HeatmapByOutputCell[] }) {
                     x={LABEL_W - 4}
                     y={LABEL_H + j * CELL + CELL / 2 + 2}
                     textAnchor="end"
-                    fill="var(--subtle)"
+                    fill="var(--muted-foreground)"
                     fontSize="6px"
                     fontFamily={SVG_FONT}
                   >
@@ -1438,7 +1349,7 @@ function FacetedHeatmap({ data }: { data: HeatmapByOutputCell[] }) {
                           y={LABEL_H + j * CELL + 1}
                           width={CELL - 2}
                           height={CELL - 2}
-                          fill="var(--surface)"
+                          fill="var(--border-alt)"
                           rx={2}
                         />
                       );
@@ -1458,7 +1369,7 @@ function FacetedHeatmap({ data }: { data: HeatmapByOutputCell[] }) {
                           fill={interpolateHeat(norm)}
                           fillOpacity={isHovered ? 1 : 0.85}
                           rx={2}
-                          stroke={isHovered ? 'var(--fg)' : 'none'}
+                          stroke={isHovered ? 'var(--foreground)' : 'none'}
                           strokeWidth={isHovered ? 1 : 0}
                           style={{ cursor: 'pointer' }}
                           onMouseEnter={() => setHovered(cell)}
@@ -1490,28 +1401,24 @@ function FacetedHeatmap({ data }: { data: HeatmapByOutputCell[] }) {
         <span>{t.facetFooter(globalScale ? t.sharedScale : t.perFacetScale)}</span>
         {hovered && (
           <span>
-            read: {formatBucketLabel(hovered.readBucket)}+ · write:{' '}
-            {formatBucketLabel(hovered.writeBucket)}+ · output:{' '}
+            {t.hoverRead}: {formatBucketLabel(hovered.readBucket)}+ · {t.hoverWrite}:{' '}
+            {formatBucketLabel(hovered.writeBucket)}+ · {t.hoverOutput}:{' '}
             {t.outputLabels[hovered.outputBucket] || formatBucketLabel(hovered.outputBucket)} ·{' '}
-            <span className="font-bold text-foreground">
+            <span className="font-medium text-foreground">
               p90: {(hovered.p90 / 1000).toFixed(2)}s
             </span>{' '}
             · n={hovered.count}
           </span>
         )}
       </div>
-    </div>
+    </Card>
   );
 }
 
 function CacheReadLatencyChart({ data }: { data: CacheReadBucket[] }) {
   const t = STRINGS[useLocale()];
   if (data.length === 0) {
-    return (
-      <div className="rounded-md border border-border bg-surface p-4 text-center text-xs text-muted-foreground">
-        {t.noData}
-      </div>
-    );
+    return <EmptyState>{t.noData}</EmptyState>;
   }
 
   const maxP90 = Math.max(...data.map((d) => d.p90));
@@ -1523,7 +1430,7 @@ function CacheReadLatencyChart({ data }: { data: CacheReadBucket[] }) {
   const gap = (PLOT_W - barW * data.length) / (data.length + 1);
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
+    <Card>
       <svg viewBox={`0 0 ${CHART_W} ${CHART_H + 20}`} className="w-full" style={{ maxHeight: 260 }}>
         {Array.from({ length: yTicks + 1 }, (_, i) => {
           const val = i * yStep;
@@ -1542,7 +1449,7 @@ function CacheReadLatencyChart({ data }: { data: CacheReadBucket[] }) {
                 x={MARGIN.left - 6}
                 y={y + 3}
                 textAnchor="end"
-                fill="var(--muted)"
+                fill="var(--muted-foreground)"
                 fontSize={SVG_FONT_SIZE}
                 fontFamily={SVG_FONT}
               >
@@ -1572,7 +1479,7 @@ function CacheReadLatencyChart({ data }: { data: CacheReadBucket[] }) {
                 x={x + barW / 2}
                 y={baseY + 14}
                 textAnchor="middle"
-                fill="var(--muted)"
+                fill="var(--muted-foreground)"
                 fontSize={SVG_FONT_SIZE}
                 fontFamily={SVG_FONT}
               >
@@ -1582,7 +1489,7 @@ function CacheReadLatencyChart({ data }: { data: CacheReadBucket[] }) {
                 x={x + barW / 2}
                 y={baseY + 26}
                 textAnchor="middle"
-                fill="var(--subtle)"
+                fill="var(--muted-foreground)"
                 fontSize="7px"
                 fontFamily={SVG_FONT}
               >
@@ -1592,7 +1499,7 @@ function CacheReadLatencyChart({ data }: { data: CacheReadBucket[] }) {
                 x={x + barW / 2}
                 y={baseY - p90H - 4}
                 textAnchor="middle"
-                fill="var(--muted)"
+                fill="var(--muted-foreground)"
                 fontSize="8px"
                 fontFamily={SVG_FONT}
               >
@@ -1609,7 +1516,7 @@ function CacheReadLatencyChart({ data }: { data: CacheReadBucket[] }) {
           x={MARGIN.left + PLOT_W / 2}
           y={CHART_H + 16}
           textAnchor="middle"
-          fill="var(--muted)"
+          fill="var(--muted-foreground)"
           fontSize="10px"
           fontFamily={SVG_FONT}
         >
@@ -1620,7 +1527,7 @@ function CacheReadLatencyChart({ data }: { data: CacheReadBucket[] }) {
           x={12}
           y={MARGIN.top + PLOT_H / 2}
           textAnchor="middle"
-          fill="var(--muted)"
+          fill="var(--muted-foreground)"
           fontSize="10px"
           fontFamily={SVG_FONT}
           transform={`rotate(-90, 12, ${MARGIN.top + PLOT_H / 2})`}
@@ -1628,7 +1535,7 @@ function CacheReadLatencyChart({ data }: { data: CacheReadBucket[] }) {
           {t.p90E2eLatencyAxis}
         </text>
       </svg>
-    </div>
+    </Card>
   );
 }
 
@@ -1678,26 +1585,25 @@ function LatencyPageContent() {
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="rounded-md border border-border bg-surface p-3">
+              <div key={i} className="rounded-xl border border-border/30 bg-card p-3">
                 <Skeleton className="h-3 w-20 mb-2" />
                 <Skeleton className="h-6 w-16" />
               </div>
             ))}
           </div>
         ) : error || !data ? (
-          <div className="text-sm font-mono text-muted-foreground text-center py-8">
-            {t.failedToLoad}
-          </div>
+          <EmptyState>{t.failedToLoad}</EmptyState>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            <StatCard
+          <dl className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <Stat
+              boxed
               label={t.e2eMedian}
               value={formatDuration(data.stats.p50)}
               detail={`avg ${formatDuration(data.stats.avg)}`}
             />
-            <StatCard label={t.e2eP95} value={formatDuration(data.stats.p95)} />
-            <StatCard label={t.e2eP99} value={formatDuration(data.stats.p99)} />
-          </div>
+            <Stat boxed label={t.e2eP95} value={formatDuration(data.stats.p95)} />
+            <Stat boxed label={t.e2eP99} value={formatDuration(data.stats.p99)} />
+          </dl>
         )}
       </div>
 
@@ -1857,9 +1763,9 @@ function LatencyPageContent() {
 
           <div>
             <SectionHeader label={t.modelLabel} detail={t.modelDetail(data.byModel.length)} />
-            <div className="rounded-md border border-border bg-surface p-3">
+            <Card>
               <ModelLatencyChart byModel={data.byModel} />
-            </div>
+            </Card>
           </div>
 
           <div>

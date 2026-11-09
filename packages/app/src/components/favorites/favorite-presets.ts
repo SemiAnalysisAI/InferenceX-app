@@ -117,7 +117,7 @@ export function findConfigChangeDates(
 export const FAVORITE_PRESETS: FavoritePreset[] = [
   {
     id: 'kimi-k3-launch',
-    title: 'Kimi K3 — First Look',
+    title: 'Kimi K3 — first look',
     titleZh: 'Kimi K3 — 首发基准测试',
     description:
       'First benchmarks of Kimi K3 across every available chip. New configurations appear here as they come online.',
@@ -135,7 +135,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
   },
   {
     id: 'minimax-m3-launch',
-    title: 'MiniMax M3 — First Look',
+    title: 'MiniMax M3 — first look',
     titleZh: 'MiniMax M3 — 首发基准测试',
     description:
       'First benchmarks of MiniMax M3 across every available chip. New configurations appear here as they come online.',
@@ -154,7 +154,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
   },
   {
     id: 'dsv4-launch',
-    title: 'DeepSeek V4 Pro — First Look',
+    title: 'DeepSeek V4 Pro — first look',
     description:
       'First benchmarks of DeepSeek V4 Pro across every available chip. New configurations appear here as they come online.',
     tags: ['DeepSeek', 'V4-Pro'],
@@ -171,7 +171,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
   },
   {
     id: 'dsv4-launch-nvidia',
-    title: 'DeepSeek V4 Pro — NVIDIA First Look',
+    title: 'DeepSeek V4 Pro — NVIDIA first look',
     description:
       'First benchmarks of DeepSeek V4 Pro on NVIDIA chips. New configurations appear here as they come online.',
     tags: ['DeepSeek', 'V4-Pro', 'NVIDIA'],
@@ -188,7 +188,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
   },
   {
     id: 'gb200-vs-b200',
-    title: 'GB200 NVL72 vs B200 — Multi vs Single Node',
+    title: 'GB200 NVL72 vs B200 — multi vs single node',
     titleZh: 'GB200 NVL72 vs B200 — 多节点 vs 单节点',
     description: 'GB200 NVL72 Dynamo TRTLLM vs B200 Dynamo TRTLLM on DeepSeek R1 (8k/1k) at FP4.',
     descriptionZh:
@@ -241,7 +241,7 @@ export const FAVORITE_PRESETS: FavoritePreset[] = [
   },
   {
     id: 'h100-vs-gb300-disagg',
-    title: 'H100 vs GB300 Disagg — DeepSeek',
+    title: 'H100 vs GB300 disagg — DeepSeek',
     titleZh: 'H100 vs GB300 分离式推理 — DeepSeek',
     description: 'H100 FP8 disagg vs GB300 FP8 disagg vs GB300 FP4 disagg on DeepSeek R1 (8k/1k).',
     descriptionZh:

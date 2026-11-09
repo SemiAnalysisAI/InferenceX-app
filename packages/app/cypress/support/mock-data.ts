@@ -305,6 +305,8 @@ export function createMockEvaluationChartData(
     configId: 1,
     hwKey: 'b200_trt' as any,
     hardware: 'b200',
+    hwLabel: 'B200',
+    engineLabel: 'TRTLLM',
     configLabel: 'B200 (TRTLLM)',
     score: 87.5,
     scoreError: 1.2,
@@ -380,7 +382,7 @@ export function createMockEvaluationContext(
   };
 }
 
-export function createMockReliabilityData(
+function createMockReliabilityData(
   overrides?: Partial<ModelSuccessRateData & { modelLabel: string }>,
 ): ModelSuccessRateData & { modelLabel: string } {
   return {

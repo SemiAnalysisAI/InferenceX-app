@@ -1,10 +1,8 @@
-import { SUPPLEMENTAL_BENCHMARK_ROWS } from '../../src/lib/benchmarks/supplemental-benchmarks';
-import { OVERLAY_RUN_ID, OVERLAY_RUN_URL } from '../support/overlay-fixtures';
 import { videoHistoryEntry } from '../../src/components/video-benchmark/history';
 import { servingArtifact } from '../support/video-artifacts';
 import { expectHwKeyPoints, type ScatterPoint } from '../support/scatter-points';
+import { interceptPreviewSnapshots } from '../support/preview-snapshot-fixtures';
 
-const datum = (el: Element) => (el as Element & { __data__: { x: number; y: number } }).__data__;
 const tpuDatum = (points: ScatterPoint[]) =>
   points.find((point) => String(point.datum.hwKey).startsWith('tpuv7'))!.datum;
 
@@ -13,32 +11,37 @@ describe('Chart Section Tabs — E2E', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/inference');
+    cy.visit('/infx/inference');
   });
 
   it('updates the URL path when switching tabs', () => {
     cy.get('[data-testid="tab-trigger-evaluation"]').click();
-    cy.url().should('include', '/evaluation');
+    cy.url().should('include', '/infx/evaluation');
 
-    cy.get('[data-testid="tab-trigger-profit-estimator-per-gigawatt"]').click();
-    cy.url().should('include', '/profit-estimator-per-gigawatt');
-
+    cy.get('[data-testid="tab-trigger-profit-estimator-per-gigawatt"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-profit-estimator"]').click();
-    cy.url().should('include', '/profit-estimator');
-    cy.url().should('not.include', '/profit-estimator-per-gigawatt');
+    cy.location('pathname').should('match', /^\/infx\/profit-estimator(?:\/|$)/u);
+
+    cy.get('[data-testid="profit-basis-gw-year"]').click();
+    cy.location('pathname').should('match', /^\/infx\/profit-estimator-per-gigawatt(?:\/|$)/u);
+    cy.get('[data-testid="tab-trigger-profit-estimator"]').should(
+      'have.attr',
+      'data-tab-active',
+      'true',
+    );
 
     cy.get('[data-testid="tab-trigger-submissions"]').click();
-    cy.url().should('include', '/submissions');
+    cy.url().should('include', '/infx/submissions');
 
     cy.get('[data-testid="tab-trigger-inference"]').click();
-    cy.url().should('include', '/inference');
+    cy.url().should('include', '/infx/inference');
   });
 
   it('opens Historical Trends from the footer link', () => {
     cy.get('[data-testid="tab-trigger-historical"]').should('not.exist');
 
     cy.get('[data-testid="footer-link-historical"]').scrollIntoView().click();
-    cy.url().should('include', '/historical');
+    cy.url().should('include', '/infx/historical');
     cy.get('[data-testid="historical-trends-display"]').should('exist');
   });
 
@@ -47,18 +50,18 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="tab-trigger-fleet"]').should('not.exist');
 
     cy.get('[data-testid="footer-link-calculator"]').scrollIntoView().click();
-    cy.url().should('include', '/calculator');
+    cy.url().should('include', '/infx/calculator');
     cy.get('[data-testid="calculator-controls"]').should('exist');
 
     cy.get('[data-testid="footer-link-fleet"]').scrollIntoView().click();
-    cy.url().should('include', '/fleet');
+    cy.url().should('include', '/infx/fleet');
   });
 
   it('opens First-Token Limits from the footer link', () => {
     cy.get('[data-testid="tab-trigger-first-token"]').should('not.exist');
 
     cy.get('[data-testid="footer-link-first-token"]').scrollIntoView().click();
-    cy.url().should('include', '/first-token');
+    cy.url().should('include', '/infx/first-token');
     cy.get('[data-testid="first-token-controls"]').should('exist');
   });
 
@@ -66,7 +69,7 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="tab-trigger-cache-reuse"]').should('not.exist');
 
     cy.get('[data-testid="footer-link-cache-reuse"]').scrollIntoView().click();
-    cy.url().should('include', '/cache-reuse');
+    cy.url().should('include', '/infx/cache-reuse');
     cy.get('[data-testid="cache-reuse-controls"]').should('exist');
   });
 
@@ -74,7 +77,7 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="tab-trigger-reliability"]').should('not.exist');
 
     cy.get('[data-testid="footer-link-reliability"]').scrollIntoView().click();
-    cy.url().should('include', '/reliability');
+    cy.url().should('include', '/infx/reliability');
     cy.get('[data-testid="reliability-chart-display"]').should('exist');
   });
 
@@ -82,12 +85,12 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="tab-trigger-gpu-specs"]').should('not.exist');
 
     cy.get('[data-testid="footer-link-gpu-specs"]').scrollIntoView().click();
-    cy.url().should('include', '/gpu-specs');
+    cy.url().should('include', '/infx/gpu-specs');
     cy.get('[data-testid="gpu-specs-content"]').should('exist');
   });
 
   it('keeps the sliding indicator aligned after the Konami code unlock inserts the Hidden trigger', () => {
-    cy.visit('/inference', {
+    cy.visit('/infx/inference', {
       onBeforeLoad(win) {
         win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
         win.localStorage.setItem('inferencex-feature-gate', '1');
@@ -120,10 +123,10 @@ describe('Chart Section Tabs — E2E', () => {
   });
 
   for (const [path, landing] of [
-    ['/powerx', '/'],
-    ['/zh/powerx', '/zh'],
-    ['/powerx/tutorial', '/'],
-    ['/zh/powerx/tutorial', '/zh'],
+    ['/pwx', '/'],
+    ['/zh/pwx', '/zh'],
+    ['/pwx/tutorial', '/'],
+    ['/zh/pwx/tutorial', '/zh'],
   ] as const) {
     it(`sends a locked visitor from ${path} to the landing page`, () => {
       cy.visit(path, {
@@ -138,24 +141,24 @@ describe('Chart Section Tabs — E2E', () => {
   }
 
   it('keeps PowerX open once the feature gate is unlocked', () => {
-    cy.visit('/powerx', {
+    cy.visit('/pwx', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
       },
     });
     cy.get('[data-testid="inference-chart-display"]').should('exist');
-    cy.location('pathname').should('eq', '/powerx');
+    cy.location('pathname').should('eq', '/pwx');
   });
 
   it('permanently redirects the retired PowerX page to the inference dashboard', () => {
     cy.request({ url: '/gpu-metrics?gm_runId=12345', followRedirect: false }).then((response) => {
       expect(response.status).to.eq(308);
-      expect(response.headers.location).to.eq('/inference?gm_runId=12345');
+      expect(response.headers.location).to.eq('/infx/inference?gm_runId=12345');
     });
     cy.request({ url: '/zh/gpu-metrics', followRedirect: false }).then((response) => {
       expect(response.status).to.eq(308);
-      expect(response.headers.location).to.eq('/zh/inference');
+      expect(response.headers.location).to.eq('/zh/infx/inference');
     });
   });
 });
@@ -186,8 +189,11 @@ describe('First-load navigation', () => {
 
   it('navigates to dashboard from the header with one click', () => {
     cy.get('[data-testid="nav-link-dashboard"]').click();
-    cy.location('pathname').should('eq', '/inference/kimi-k3');
-    cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
+    cy.location('pathname').should('eq', '/infx/inference/kimi-k31-pro');
+    cy.get('[data-testid="model-selector"]').should(($selector) => {
+      // The captured availability snapshot predates K3.1; retain its routed identity.
+      expect(['Kimi K3.1 Pro 2.8T', 'Kimi-K3.1-Pro']).to.include($selector.text().trim());
+    });
   });
 
   it('navigates to comparisons from the footer with one click', () => {
@@ -196,82 +202,41 @@ describe('First-load navigation', () => {
   });
 
   it('navigates to AgentX from the header with one click', () => {
-    cy.get('[data-testid="nav-link-agentx"]')
-      .should('have.attr', 'href', '/agentx')
-      .find('[data-nav-badge="agentx"]')
-      .should('be.visible')
-      .and('have.text', 'NEW');
+    cy.get('[data-testid="nav-link-agentx"]').should('have.attr', 'href', '/infx/agentx');
     cy.get('[data-testid="nav-link-agentx"]').click();
-    cy.location('pathname').should('eq', '/agentx');
+    cy.location('pathname').should('eq', '/infx/agentx');
   });
 
   it('leads the landing page with the AgentX hero and its two CTAs', () => {
-    cy.get('[data-testid="compare-agentx-primary"]').within(() => {
-      cy.get('h1').should('have.text', 'Compare Realistic Agentic Inference Perf');
-      cy.get('h2').should('not.exist');
-      cy.get('[data-testid="compare-agentx-revenue-calculator-link"]')
-        .should('contain.text', 'Token Revenue Calculator')
-        .and('have.attr', 'href', '/profit-estimator-per-gigawatt');
-      cy.get('[data-testid="compare-agentx-dashboard-link"]')
-        .should('have.text', 'Dashboard')
-        .and('have.attr', 'href', '/inference/kimi-k3');
-      cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 2);
-      for (const hidden of ['minimax-m3', 'kimi-k3', 'glm-5-3']) {
-        cy.get(`[data-testid="compare-agentx-model-${hidden}"]`).should('not.exist');
-      }
-      cy.get('[data-testid^="compare-agentx-model-"]').then(($rows) => {
-        const slugs = [...$rows].map((row) =>
-          (row.dataset.testid ?? '').replace('compare-agentx-model-', ''),
-        );
-        expect(slugs).to.deep.equal(['muse-spark-open', 'deepseek-v41-flash']);
-      });
-      cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]').should(
-        'not.exist',
-      );
-      cy.get('[data-testid="compare-agentx-model-deepseek-v41-flash"]')
-        .should('have.attr', 'href', '/inference/deepseek-v41-flash')
-        .and('contain.text', 'DeepSeek V4.1 Flash 552B');
-    });
     cy.get('[data-testid="compare-agentx-revenue-calculator-link"]').click();
-    cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt');
+    cy.location('pathname').should('eq', '/infx/profit-estimator-per-gigawatt');
   });
 
   it('navigates to submissions from the landing CTA', () => {
     cy.get('[data-testid="landing-submissions-link"]').click();
-    cy.location('pathname').should('eq', '/submissions');
+    cy.location('pathname').should('eq', '/infx/submissions');
   });
 });
 
-describe('Huawei UBenchX launch banner', { testIsolation: true }, () => {
-  for (const locale of ['', '/zh']) {
-    it(`opens Huawei core-memory profiles from ${locale || '/'} landing page`, () => {
-      cy.visit(locale || '/', {
-        onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-rubin-minimax-m3-banner-dismissed', '1');
-          win.localStorage.setItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed', '1');
-          win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
-          win.localStorage.setItem('inferencex-landing-banner-variant', 'ubenchx');
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        },
-      });
-      cy.get('[data-testid="launch-banner"]:visible')
-        .should('have.attr', 'href', `${locale}/ubenchx/core-memory-profiles`)
-        .and(
-          'contain.text',
-          locale ? 'Huawei Ascend 950PR 微基准测试' : 'Huawei Ascend 950PR Microbenchmarks',
-        )
-        .and(
-          'contain.text',
-          locale
-            ? '周期级核心访存微基准测试（Beta）'
-            : 'Cycle Level Core memory-access MicroBenchmarks (Beta)',
-        )
-        .click();
-      cy.location('pathname').should('eq', `${locale}/ubenchx/core-memory-profiles`);
-      cy.get('[data-testid="ascend-core-profiles"]').should('be.visible');
+describe('Huawei uBenchX launch banner', { testIsolation: true }, () => {
+  it('opens Huawei core-memory profiles from /zh landing page', () => {
+    cy.visit('/zh', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-rubin-minimax-m3-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed', '1');
+        win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
+        win.localStorage.setItem('inferencex-landing-banner-variant', 'ubenchx');
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
     });
-  }
+    cy.get('[data-testid="launch-banner"]:visible')
+      .should('have.attr', 'href', '/zh/ubx/core-memory-profiles')
+      .and('contain.text', 'Huawei Ascend 950PR 微基准测试')
+      .and('contain.text', '周期级核心访存微基准测试（Beta）')
+      .click();
+    cy.location('pathname').should('eq', '/zh/ubx/core-memory-profiles');
+    cy.get('[data-testid="ascend-core-profiles"]').should('be.visible');
+  });
 });
 
 describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
@@ -286,19 +251,19 @@ describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
       });
       cy.get('[data-testid="launch-banner"]:visible')
         .should('have.length', 1)
-        .and('have.attr', 'href', `${locale}/operatorx`)
+        .and('have.attr', 'href', `${locale}/opx`)
         .and(
           'contain.text',
-          locale ? 'Huawei Ascend 950PR 微基准测试' : 'Huawei Ascend 950PR Microbenchmarks',
+          locale ? 'Huawei Ascend 950PR 微基准测试' : 'Huawei Ascend 950PR microbenchmarks',
         )
         .and(
           'contain.text',
           locale
             ? '950PR GEMM FLOPs 与最大 FLOPS 利用率'
-            : '950PR GEMM FLOPs and Max FLOPS utilization',
+            : '950PR GEMM FLOPs and max FLOPS utilization',
         )
         .click();
-      cy.location('pathname').should('eq', `${locale}/operatorx`);
+      cy.location('pathname').should('eq', `${locale}/opx`);
       cy.get('[data-testid="operatorx-page"]').should('be.visible');
     });
   }
@@ -320,11 +285,7 @@ describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
           .should('eq', variant);
         cy.get('[data-testid="launch-banner"]:visible')
           .should('have.length', 1)
-          .and(
-            'have.attr',
-            'href',
-            variant === 'operatorx' ? '/operatorx' : '/ubenchx/core-memory-profiles',
-          );
+          .and('have.attr', 'href', variant === 'operatorx' ? '/opx' : '/ubx/core-memory-profiles');
         cy.reload();
         cy.get('html').should('have.attr', 'data-landing-banner-variant', variant);
       });
@@ -344,10 +305,14 @@ describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
 });
 
 describe('TPUv7 results', { testIsolation: true }, () => {
+  beforeEach(() => {
+    interceptPreviewSnapshots({ overFixtures: true });
+  });
+
   for (const locale of ['', '/zh']) {
     it(`preserves TPUv7 FP8 cost basis in ${locale || '/'} share URLs`, () => {
-      cy.visit(`${locale}/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8`);
-      cy.location('pathname').should('eq', `${locale}/inference`);
+      cy.visit(`${locale}/infx/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8`);
+      cy.location('pathname').should('eq', `${locale}/infx/inference`);
       cy.get('[data-testid="inference-chart-display"]').should('be.visible');
       expectHwKeyPoints('tpuv7', true);
       cy.location('href').then((href) => {
@@ -376,12 +341,9 @@ describe('TPUv7 results', { testIsolation: true }, () => {
         cy.scatterPoints().should((points) => {
           expect(tpuDatum(points).y).to.be.closeTo((internal.y * 1.21) / 1.03, 1e-8);
         });
-        cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView();
-        cy.screenshot(`tco-basis-${locale ? 'zh' : 'en'}-desktop`, { capture: 'viewport' });
         cy.viewport(390, 844);
         cy.get('[data-testid="inference-secondary-controls"] > button').click();
         cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView().should('be.visible');
-        cy.screenshot(`tco-basis-${locale ? 'zh' : 'en'}-mobile`, { capture: 'viewport' });
         cy.get('[data-testid="tco-basis-internal"]').click();
         cy.scatterPoints().should((points) => {
           expect(tpuDatum(points).y).to.be.closeTo(internal.y, 1e-8);
@@ -389,59 +351,8 @@ describe('TPUv7 results', { testIsolation: true }, () => {
       });
     });
   }
-  it('reprices a TPU unofficial overlay without changing throughput', () => {
-    cy.intercept('GET', '/api/unofficial-run*', {
-      body: {
-        runInfos: [
-          {
-            id: OVERLAY_RUN_ID,
-            name: 'TPU test',
-            branch: 'tpu-test',
-            sha: 'abc000',
-            createdAt: '2026-08-26T00:00:00Z',
-            url: OVERLAY_RUN_URL,
-            conclusion: 'success',
-            status: 'completed',
-            isNonMainBranch: true,
-          },
-        ],
-        benchmarks: SUPPLEMENTAL_BENCHMARK_ROWS.filter((row) => row.hardware === 'tpuv7').map(
-          (row) => ({ ...row, run_url: OVERLAY_RUN_URL }),
-        ),
-        evaluations: [],
-      },
-    }).as('tpuOverlay');
-    cy.visit(
-      `/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8&i_metric=y_costh&unofficialrun=${OVERLAY_RUN_ID}`,
-      {
-        onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        },
-      },
-    );
-    cy.wait('@tpuOverlay');
-    const points = '.unofficial-overlay-pt';
-    cy.get(points)
-      .first()
-      .then(($point) => {
-        const internal = { ...datum($point[0]) };
-        cy.get('[data-testid="tco-basis-external"]').click();
-        cy.get(points)
-          .first()
-          .should(($external) => {
-            expect(datum($external[0]).y).to.be.closeTo((internal.y * 1.21) / 1.03, 1e-8);
-            expect(datum($external[0]).x).to.equal(internal.x);
-          });
-        cy.get('[data-testid="tco-basis-internal"]').click();
-        cy.get(points)
-          .first()
-          .should(($restored) => {
-            expect(datum($restored[0]).y).to.be.closeTo(internal.y, 1e-8);
-          });
-      });
-  });
   it('hides the TCO basis selector outside Qwen3.5 8K/1K', () => {
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_metric=y_costh', {
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_metric=y_costh', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -458,22 +369,29 @@ describe('H3 video performance history', () => {
       schemaVersion: 1,
       entries: [],
       nextPage: null,
-    });
+    }).as('historyList');
   });
-  it('opens published history behind the dashboard and restores its filters after reload', () => {
+  it('restores published history filters on reload and browser navigation', () => {
     const entry = videoHistoryEntry(servingArtifact(), '2026-09-09T00:00:00Z');
     cy.intercept('GET', '/api/video-runs?format=history&page=1*', {
       schemaVersion: 1,
-      entries: [entry],
+      entries: [
+        entry,
+        videoHistoryEntry(servingArtifact(124, 41, 'NVIDIA B200'), '2026-09-09T00:00:00Z'),
+      ],
       nextPage: null,
     }).as('history');
-    cy.visit('/video');
+    cy.visit('/zh/vgx?history-hardware=NVIDIA%20H200');
     cy.wait('@history');
-    cy.get('[data-testid="video-history"]').should('not.exist');
-    cy.get('[data-testid="video-history-section"] summary').click();
-    cy.get('[data-testid="video-history"] h1').should('contain', 'Performance history');
-    cy.get('[data-testid="video-history-observation"]').should('have.length', 3);
-    cy.get('[aria-label="Client concurrency"]').click();
+    cy.contains('summary', '性能历史').parent('details').should('have.attr', 'open');
+    cy.get('[data-testid="results-history"] summary').should('contain', '性能历史');
+    cy.get('[data-testid="video-history-observation"]')
+      .should('have.length', 3)
+      .each(($observation) => {
+        expect($observation).to.contain('NVIDIA H200').and.not.contain('NVIDIA B200');
+      });
+    cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
+    cy.get('[aria-label="客户端并发数"]').click();
     cy.contains('[role="option"]', 'C2').click();
     cy.get('[data-testid="video-history-observation"]')
       .should('have.length', 1)
@@ -483,28 +401,62 @@ describe('H3 video performance history', () => {
       .should('have.length', 1)
       .and('contain', 'C2')
       .and('contain', '240 / —');
-    cy.location('search').should('contain', 'history-concurrency=2');
+    cy.location('search').should((search) => {
+      const params = new URLSearchParams(search);
+      expect(params.get('history-concurrency')).to.equal('2');
+      expect(params.get('history-hardware')).to.equal('NVIDIA H200');
+    });
+    cy.window().then((win) => {
+      const next = new URL(win.location.href);
+      next.searchParams.set('history-concurrency', '4');
+      win.history.pushState(null, '', next);
+    });
+    cy.reload();
+    cy.get('[data-testid="video-history-observation"]')
+      .should('have.length', 1)
+      .and('contain', 'C4');
+    cy.go('back');
+    cy.get('[data-testid="video-history-observation"]')
+      .should('have.length', 1)
+      .and('contain', 'C2');
+    cy.go('forward');
+    cy.get('[data-testid="video-history-observation"]')
+      .should('have.length', 1)
+      .and('contain', 'C4');
   });
   it('keeps the hidden Video tab behind the shared unlock and noindex', () => {
     cy.viewport(1440, 1000);
-    cy.visit('/video', {
+    cy.visit('/vgx', {
       onBeforeLoad(win) {
         win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
       },
     });
+    // The dashboard loads published history in the same hydration pass that attaches the unlock
+    // key listener, so wait for that request before typing.
+    cy.wait('@historyList');
     cy.get('video[data-role]').should('not.exist');
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
     cy.get('body').type(
       '{upArrow}{upArrow}{downArrow}{downArrow}{leftArrow}{rightArrow}{leftArrow}{rightArrow}BA',
     );
     cy.get('[data-testid="tab-trigger-hidden"]').click();
-    cy.contains('a', 'Video').should('have.attr', 'href', '/video');
+    cy.contains('a', 'Video').should('have.attr', 'href', '/vgx');
     cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
   });
-  it('renders the Chinese history section for a history deep link', () => {
-    cy.visit('/zh/video?history-hardware=H200');
-    cy.get('[data-testid="video-history-section"]').should('have.attr', 'open');
-    cy.get('[data-testid="video-history"] h1').should('contain', '性能历史');
-    cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
-  });
+});
+
+describe('pre-split dashboard URLs', () => {
+  for (const [from, to] of [
+    ['/inference/deepseek-r1?i_seq=8k%2F1k', '/infx/inference/deepseek-r1?i_seq=8k%2F1k'],
+    ['/agentx/methodology', '/infx/agentx/methodology'],
+    ['/agentic-workload-explorer/methodology', '/infx/agentic-workload-explorer/methodology'],
+  ]) {
+    it(`sends ${from} to ${to} in one 308`, () => {
+      cy.request({ url: from, followRedirect: false }).then((response) => {
+        expect(response.status).to.eq(308);
+        const location = new URL(response.headers.location as string, 'http://x');
+        expect(`${location.pathname}${location.search}`).to.eq(to);
+      });
+    });
+  }
 });

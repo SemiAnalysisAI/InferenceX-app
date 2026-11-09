@@ -32,7 +32,7 @@ This model architecture design is naturally codesigned for parameter offloading:
 
 Our DeepSeek-V4.1-Flash configuration uses roughly 189 GiB of memory for Engram. We replace it with a memory-mapped (mmap) file and measure serving performance with offload to SSD.
 
-Later on in our report, we will show our Engram offloading experiments along with [the official InferenceX agentic inference serving results on Engram models like DeepSeekv4.1 Flash across all 6 NVIDIA GPU SKUs along with MI355X.](https://inferencex.semianalysis.com/inference/deepseek-v41-flash) Unsurprisingly, the CUDA Moat is still mogging MI355X on the ultra popular DeepSeekV4.1 Flash model.
+Later on in our report, we will show our Engram offloading experiments along with [the official InferenceX agentic inference serving results on Engram models like DeepSeekv4.1 Flash across all 6 NVIDIA GPU SKUs along with MI355X.](https://inferencex.semianalysis.com/infx/inference/deepseek-v41-flash) Unsurprisingly, the CUDA Moat is still mogging MI355X on the ultra popular DeepSeekV4.1 Flash model.
 
 **We also show how even on high capacity HBM SKUs, offloading emgrams to DRAM could result in even better performance for most of the pareto than keeping the emgram in HBM.**
 
@@ -135,7 +135,7 @@ Engram’s table is large, but each lookup is small. DeepSeek-V4.1-Flash request
 <Figure
   src="/images/engrams-embedding-entendre-codesign/figure-11.png"
   alt="DeepSeek-V4.1-Flash AgentX performance per dollar"
-  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference/deepseek-v41-flash)"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/infx/inference/deepseek-v41-flash)"
 />
 
 Currently as of Day 7 since Model Release, MI355X is still 2-4x worse performance per dollar compared to B200 even when normalized by Mi355X’s lower TCO. [Our full total cost of ownership breakdown comes from our AI Cloud TCO Model along with monthly market surveys of over 100+ gpu clouds & gpu cloud customers.](https://semianalysis.com/ai-cloud-tco-model/)
@@ -143,7 +143,7 @@ Currently as of Day 7 since Model Release, MI355X is still 2-4x worse performanc
 <Figure
   src="/images/engrams-embedding-entendre-codesign/figure-12.png"
   alt="DeepSeek-V4.1-Flash cross-vendor serving results"
-  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference/deepseek-v41-flash)"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/infx/inference/deepseek-v41-flash)"
 />
 
 On the Day 0 release of DeepSeekv4.1 Flash, NVIDIA vLLM works out of the box with zero issues across all 6 SKUs: H100, H200, B200, B300, GB200, GB300! This was thanks to the amazing work by the NVIDIA & Interact teams! In comparison, AMD vLLM did not work on day 0 for DeepSeekv4.1 Flash.
@@ -151,7 +151,7 @@ On the Day 0 release of DeepSeekv4.1 Flash, NVIDIA vLLM works out of the box wit
 <Figure
   src="/images/engrams-embedding-entendre-codesign/figure-13.png"
   alt="Day-zero NVIDIA and AMD serving comparison"
-  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference/deepseek-v41-flash)"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/infx/inference/deepseek-v41-flash)"
 />
 
 AMD’s vLLM documentation points to using vllm/vllm-openai-rocm:deepseekv41-flash-0909, but from hour 0 of the model release to hour 23, AMD has not publicly released the image. AMD claims, “SPEED IS THE MOAT,” yet it has still not released it by the 23rd hour. We wish that, going forward, the AMD team has a better process for hour 0 model releases.
@@ -175,7 +175,7 @@ The power of the CUDA MOAT is NVIDIA’s collaboration with its massive 6 millio
 <Figure
   src="/images/engrams-embedding-entendre-codesign/figure-16.png"
   alt="Day-zero performance per dollar across hardware"
-  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference/deepseek-v41-flash)"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/infx/inference/deepseek-v41-flash)"
 />
 
 Overall, AMD did make significant improvements but the performance per dollar is still currently 2-4x worse than B200.
@@ -183,7 +183,7 @@ Overall, AMD did make significant improvements but the performance per dollar is
 <Figure
   src="/images/engrams-embedding-entendre-codesign/figure-17.png"
   alt="AMD performance progress relative to B200"
-  caption="Source: [InferenceX](https://inferencex.semianalysis.com/inference/deepseek-v41-flash)"
+  caption="Source: [InferenceX](https://inferencex.semianalysis.com/infx/inference/deepseek-v41-flash)"
 />
 
 ## AgentX Engram DRAM Offloading Improving Performance

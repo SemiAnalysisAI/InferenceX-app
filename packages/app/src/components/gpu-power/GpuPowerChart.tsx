@@ -6,6 +6,8 @@ import React, { useMemo } from 'react';
 import { buildTelemetryData, type ParsedPoint } from './chart-data';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import { ChartPointDetails } from '@/components/ui/chart-point-details';
 import type { RenderContext } from '@/lib/d3-chart/D3Chart/types';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -30,31 +32,26 @@ import {
 
 const STRINGS = {
   en: {
-    empty: 'No Chip metrics data to display.',
-    instructions:
-      'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Click a point to pin tooltip',
+    empty: 'No chip metrics data to display',
+    instructions: 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
     seconds: 'Time (s)',
-    dismiss: 'Click elsewhere to dismiss',
     chip: 'Chip',
-    power: 'Power',
-    temp: 'Temp',
-    utilization: 'Chip Util',
+    sampledAt: 'Sampled at',
     rollingSuffix: (windowS: number) => `${windowS} s rolling avg`,
+    smoothing: 'Smoothing',
     meanChips: 'Mean of visible chips',
     meanCount: (n: number) => `${n} chips`,
     rightAxis: 'right axis',
     allIn: 'All-in provisioned',
   },
   zh: {
-    empty: '暂无可显示的芯片指标数据。',
-    instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
+    empty: '暂无可显示的芯片指标数据',
+    instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置',
     seconds: '时间（秒）',
-    dismiss: '点击其他区域关闭',
     chip: '芯片',
-    power: '功耗',
-    temp: '温度',
-    utilization: '芯片利用率',
+    sampledAt: '采样时间',
     rollingSuffix: (windowS: number) => `${windowS} 秒滚动平均`,
+    smoothing: '平滑',
     meanChips: '可见芯片均值',
     meanCount: (n: number) => `${n} 个芯片`,
     rightAxis: '右轴',
@@ -329,11 +326,53 @@ const GpuMetricsChart = React.memo(
 
     if (allPoints.length === 0) {
       return (
-        <div className="flex items-center justify-center min-h-[600px]">
+        <div className="flex min-h-150 items-center justify-center">
           <p className="text-muted-foreground text-sm">{t.empty}</p>
         </div>
       );
     }
+
+    const describePoint = (d: ParsedPoint) => {
+      const overlayAt = overlay && hasOverlay ? nearestSample(overlaySamples, d.ms) : null;
+      const raw = d.raw;
+      return {
+        title:
+          d.gpuIndex === MEAN_INDEX
+            ? `${t.meanChips}${d.count ? ` · ${t.meanCount(d.count)}` : ''}`
+            : `${t.chip} ${d.gpuIndex}`,
+        color: colorFor(d.gpuIndex),
+        time: `${d.seconds.toFixed(1)}${locale === 'zh' ? ' 秒' : 's'}`,
+        value: d.value.toFixed(1),
+        overlay:
+          overlay && overlayAt
+            ? {
+                value:
+                  overlayAt.value >= 100 ? overlayAt.value.toFixed(0) : overlayAt.value.toFixed(1),
+                label: overlay.label,
+                unit: overlay.unit,
+              }
+            : null,
+        summary: [
+          rolling && t.rollingSuffix(display.windowS),
+          raw?.power !== undefined && `${raw.power.toFixed(1)} W`,
+          raw?.temperature !== undefined && `${raw.temperature}\u00B0C`,
+          raw?.gpuUtil !== undefined && `${raw.gpuUtil}%`,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        rows: [
+          ...(rolling ? [{ label: t.smoothing, value: t.rollingSuffix(display.windowS) }] : []),
+          ...(raw ? [{ label: t.sampledAt, value: raw.timestamp }] : []),
+          ...ALL_METRIC_OPTIONS.flatMap((metric) => {
+            const reading = raw?.[metric.key];
+            if (reading === undefined || !Number.isFinite(reading)) return [];
+            const unit =
+              metric.unit === '%' || metric.unit === '°C' ? metric.unit : ` ${metric.unit}`;
+            return [{ label: getGpuMetricLabel(metric, locale), value: `${reading}${unit}` }];
+          }),
+        ],
+      };
+    };
 
     return (
       <D3Chart<ParsedPoint>
@@ -466,45 +505,54 @@ const GpuMetricsChart = React.memo(
         }}
         tooltip={{
           rulerType: 'crosshair',
-          content: (d: ParsedPoint, isPinned: boolean) => {
-            const color = colorFor(d.gpuIndex);
-            const sep = locale === 'zh' ? '：' : ':';
-            const title =
-              d.gpuIndex === MEAN_INDEX
-                ? `${t.meanChips}${d.count ? ` · ${t.meanCount(d.count)}` : ''}`
-                : `${t.chip} ${d.gpuIndex}`;
-            const overlayAt = hasOverlay ? nearestSample(overlaySamples, d.ms) : null;
-            const overlayRow =
-              overlay && overlayAt
-                ? `<div class="mt-1" style="color: ${overlay.color}">${overlay.label}${sep} ${
-                    overlayAt.value >= 100 ? overlayAt.value.toFixed(0) : overlayAt.value.toFixed(1)
-                  } ${overlay.unit}</div>`
-                : '';
-            return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 160px; user-select: ${isPinned ? 'text' : 'none'}">
-              ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
-              <div class="font-semibold mb-1" style="color: ${color}">${title}</div>
-              <div class="text-muted-foreground">${d.seconds.toFixed(1)}${locale === 'zh' ? ' 秒' : 's'}</div>
-              <div class="mt-1 font-medium">${getGpuMetricLabel(metricConfig, locale)}${sep} ${d.value.toFixed(1)} ${metricConfig.unit}</div>
-              ${rolling ? `<div class="text-muted-foreground">${t.rollingSuffix(display.windowS)}</div>` : ''}
-              ${
-                d.raw
-                  ? `${
-                      d.raw.power === undefined
-                        ? ''
-                        : `<div class="text-muted-foreground">${t.power}${sep} ${d.raw.power.toFixed(1)} W</div>`
-                    }${
-                      d.raw.temperature === undefined
-                        ? ''
-                        : `<div class="text-muted-foreground">${t.temp}${sep} ${d.raw.temperature}\u00B0C</div>`
-                    }${
-                      d.raw.gpuUtil === undefined
-                        ? ''
-                        : `<div class="text-muted-foreground">${t.utilization}${sep} ${d.raw.gpuUtil}%</div>`
-                    }`
-                  : ''
-              }
-              ${overlayRow}
-            </div>`;
+          content: (d: ParsedPoint) => {
+            const point = describePoint(d);
+            return chartHoverCard(
+              {
+                title: point.title,
+                subtitle: point.time,
+                color: point.color,
+                metrics: [
+                  { value: point.value, label: metricConfig.unit },
+                  ...(point.overlay
+                    ? [
+                        {
+                          value: point.overlay.value,
+                          label: `${point.overlay.label} (${point.overlay.unit})`,
+                        },
+                      ]
+                    : []),
+                ],
+                summary: point.summary || undefined,
+              },
+              { pinned: false },
+            );
+          },
+          details: (d: ParsedPoint, _isOverlay: boolean, close: () => void) => {
+            const point = describePoint(d);
+            return (
+              <ChartPointDetails
+                title={point.title}
+                color={point.color}
+                date={point.time}
+                metrics={[
+                  {
+                    value: point.value,
+                    label: `${getGpuMetricLabel(metricConfig, locale)} (${metricConfig.unit})`,
+                  },
+                  ...(point.overlay
+                    ? [
+                        {
+                          value: point.overlay.value,
+                          label: `${point.overlay.label} (${point.overlay.unit})`,
+                        },
+                      ]
+                    : []),
+                ]}
+                rows={point.rows}
+                onClose={close}
+              />
+            );
           },
           getRulerX: (d, xScale) => (xScale as d3.ScaleLinear<number, number>)(d.seconds),
           getRulerY: (d, yScale) => yScale(d.value),

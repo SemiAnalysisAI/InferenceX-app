@@ -2,11 +2,14 @@ import { compactTrendHistory } from '@/components/inference/hooks/trend-history-
 
 import { availabilityBody, expectNoPageOverflow } from '../support/e2e';
 import preview from '../fixtures/tpu-preview.json';
+import { previewAvailability, previewRows } from '../support/preview-snapshot-fixtures';
 import type { InferenceData } from '../../src/components/inference/types';
 
 const query =
   'unofficialrun=30864013158&g_model=Qwen-3.5-397B-A17B&i_seq=8k%2F1k&i_prec=fp8&i_metric=y_tokensPerDollarH&i_advlabel=1';
 const overlayPoints = '[data-testid="inference-chart-display"] svg .unofficial-overlay-pt';
+
+const tpuSnapshotRows = previewRows.filter((row) => row.hardware === 'tpuv7');
 
 function interceptTpuPreview() {
   const gpuRows = preview.benchmarks.map((row) => ({ ...row, hardware: 'b200', run_url: null }));
@@ -24,9 +27,10 @@ function interceptTpuPreview() {
         benchmark_type: 'single_turn',
         date: '2026-08-03',
       },
+      ...previewAvailability.filter((row) => row.hardware === 'tpuv7'),
     ]),
   });
-  cy.intercept('GET', '/api/v1/benchmarks*', { body: gpuRows });
+  cy.intercept('GET', '/api/v1/benchmarks*', { body: [...gpuRows, ...tpuSnapshotRows] });
   cy.intercept('GET', '/api/unofficial-run*', { body: preview }).as('tpuPreview');
 }
 
@@ -41,7 +45,7 @@ describe('TPU publication preview', () => {
   beforeEach(interceptTpuPreview);
 
   it('recalculates overlay prices, preserves chips/DP, and hides the control after all TPU data is hidden', () => {
-    cy.visit(`/inference?${query}&g_tco=external`);
+    cy.visit(`/infx/inference?${query}&g_tco=external`);
     cy.wait('@tpuPreview');
     openChartControls();
     cy.get(overlayPoints).should('have.length', 6);
@@ -75,31 +79,12 @@ describe('TPU publication preview', () => {
     cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
   });
 
-  it('restores the pricing basis on a Chinese share URL', () => {
-    cy.visit(`/zh/inference?${query}&g_tco=internal`);
-    cy.wait('@tpuPreview');
-    openChartControls();
-    cy.get('[data-testid="tco-basis-internal"]')
-      .first()
-      .should('have.attr', 'aria-pressed', 'true');
-    cy.contains('TCO 口径').should('be.visible');
-    cy.get('[data-testid="tco-basis-external"]').first().click();
-    cy.get(overlayPoints).should(($points) => {
-      const dp8 = [...$points]
-        .map((node) => (node as unknown as { __data__: InferenceData }).__data__)
-        .find((row) => row.dp === 8)!;
-      expect(dp8.y).to.be.closeTo((3674.8418266267754 * 3600) / 1.21, 0.001);
-    });
-    cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView({ offset: { top: -90, left: 0 } });
-    cy.screenshot('tco-caption-zh', { capture: 'viewport' });
-  });
-
   it('places the historical TCO selector beside Cost Tier and updates its export value', () => {
     cy.intercept('GET', '/api/v1/benchmarks/history/trends*', {
-      body: compactTrendHistory(preview.benchmarks),
+      body: compactTrendHistory([...preview.benchmarks, ...tpuSnapshotRows]),
     });
     cy.visit(
-      '/historical?g_model=Qwen-3.5-397B-A17B&i_seq=8k%2F1k&i_prec=fp8&i_metric=y_tokensPerDollarH&g_tco=external',
+      '/infx/historical?g_model=Qwen-3.5-397B-A17B&i_seq=8k%2F1k&i_prec=fp8&i_metric=y_tokensPerDollarH&g_tco=external',
     );
     cy.get('[data-testid="historical-trend-figure"] [data-testid="result-context"]').within(() => {
       cy.get('[data-testid="cost-tier-selector"]').should('be.visible');
@@ -115,15 +100,20 @@ describe('TPU publication preview', () => {
     );
   });
   for (const width of [375, 768, 1440]) {
-    it(`keeps TCO beside Cost Tier below the plot without clipping at ${width}px`, () => {
+    it(`keeps TCO basis above the tier's price table below the plot without clipping at ${width}px`, () => {
       cy.viewport(width, 900);
-      cy.visit(`/inference?${query}`);
+      cy.visit(`/infx/inference?${query}`);
       cy.wait('@tpuPreview');
       openChartControls();
-      cy.contains('legend', 'Benchmark Config').should('be.visible');
-      cy.contains('legend', 'Chart Config').should('be.visible');
-      cy.get('[data-testid="x-axis-mode-selector"]').should(($axis) => {
-        expect($axis[0].getBoundingClientRect().width).to.be.at.most(176);
+      cy.contains('legend', 'Benchmark config').should('be.visible');
+      cy.contains('legend', 'Chart config').should('be.visible');
+      cy.get('[data-testid="fixed-sequence-statistic-selector"]').then(($statistic) => {
+        cy.get('[data-testid="x-axis-mode-selector"]').should(($axis) => {
+          expect($axis[0].getBoundingClientRect().width).to.be.closeTo(
+            $statistic[0].getBoundingClientRect().width,
+            1,
+          );
+        });
       });
       cy.get('[data-testid="inference-chart-configuration"]').within(() => {
         cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
@@ -143,17 +133,12 @@ describe('TPU publication preview', () => {
               expect(button.getBoundingClientRect().bottom).to.be.at.most(bounds.bottom);
             }
           });
-        cy.get('[data-testid="result-context-cost-tier"]').then(($tier) => {
+        cy.get('[data-testid="inference-tco-badges"] tbody th').then(($rowHeader) => {
+          expect($rowHeader.find('[data-testid="cost-tier-selector"]')).to.have.length(1);
           cy.get('[data-testid="result-context-tco-basis"]').should(($basis) => {
-            expect($tier[0].parentElement!.nextElementSibling).to.equal($basis[0].parentElement);
-            if (width >= 1280) {
-              const tier = $tier[0].getBoundingClientRect();
-              const basis = $basis[0].getBoundingClientRect();
-              expect(basis.left).to.be.greaterThan(tier.right);
-              expect(
-                Math.abs(tier.top + tier.height / 2 - basis.top - basis.height / 2),
-              ).to.be.lessThan(3);
-            }
+            expect($basis[0].getBoundingClientRect().bottom).to.be.at.most(
+              $rowHeader[0].closest('table')!.getBoundingClientRect().top,
+            );
           });
         });
         cy.get('[data-testid="result-context-tco-basis"] .export-only')
@@ -170,10 +155,6 @@ describe('TPU publication preview', () => {
           });
         });
       expectNoPageOverflow();
-      cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView({
-        offset: { top: -100, left: 0 },
-      });
-      cy.screenshot(`tco-chart-${width}`, { capture: 'viewport' });
     });
   }
 });

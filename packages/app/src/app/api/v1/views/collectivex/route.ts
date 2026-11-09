@@ -115,21 +115,29 @@ export function GET(request: NextRequest) {
     const operation = parseEnumParam(
       s.get('operation'),
       'operation',
-      ['roundtrip', 'dispatch', 'combine'],
-      'roundtrip',
+      ['pair_period', 'roundtrip', 'dispatch', 'combine'],
+      // Runs older than the chained family carry no pair period: default to the round trip there.
+      combined.some((item) => item.points.some((point) => point.components.pair_period !== null))
+        ? 'pair_period'
+        : 'roundtrip',
     );
     const percentile = parseEnumParam(
       s.get('percentile'),
       'percentile',
       ['p50', 'p95', 'p99'],
-      'p99',
+      'p50',
     );
-    const yAxis = parseEnumParam(
+    const requestedYAxis = parseEnumParam(
       s.get('yAxis'),
       'yAxis',
       ['latency', 'tokens-per-second', 'activation-rate', 'payload-rate'],
       'latency',
     );
+    // Token rate exists for the round trip only; fold to latency as the EP chart does.
+    const yAxis =
+      requestedYAxis === 'tokens-per-second' && operation !== 'roundtrip'
+        ? 'latency'
+        : requestedYAxis;
     const sku = s.get('sku') ?? 'all',
       backend = s.get('backend') ?? 'all';
     const active = (key: string, id: string) => !s.has(key) || s.get(key)!.split(',').includes(id);

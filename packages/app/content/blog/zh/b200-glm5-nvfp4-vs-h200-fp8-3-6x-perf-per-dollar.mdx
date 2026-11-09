@@ -20,7 +20,7 @@ tags:
 
 这 3.65 倍的提升在峰值处可清晰分解。在 80 tok/s/user 时，**B200 SGLang FP8 + MTP 的性价比是 H200 SGLang FP8 + MTP 的 1.22 倍**——这是在相同精度和相同 EAGLE 方案下，仅靠 Blackwell 世代硬件 + 软件带来的提升。**将 B200 的权重从 `zai-org/GLM-5-FP8` 切换为 `nvidia/GLM-5-NVFP4` 再叠加 2.98 倍**——这是仅靠精度切换带来的提升，得益于 FlashInfer 的 TRT-LLM 稀疏 MLA kernel——该 kernel 已在 [sgl-project/sglang #21783](https://github.com/sgl-project/sglang/pull/21783) 中被设为 sm100/sm103 的默认后端。1.22 × 2.98 ≈ 3.65。在不同运行区间，两个因素的贡献比例会互换——世代因素在低交互性时贡献更大（50 tok/s/user 时为 1.36x），精度因素在高交互性时贡献更大（84 tok/s/user 时为 3.07x）——但组合提升始终保持稳定。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-25&g_model=GLM-5&g_runid=26381101926&i_prec=fp4%2Cfp8&i_active=b200_sglang_mtp%2Ch200_sglang_mtp&i_linelabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-25&g_model=GLM-5&g_runid=26381101926&i_prec=fp4%2Cfp8&i_active=b200_sglang_mtp%2Ch200_sglang_mtp&i_linelabel=1">
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 
@@ -37,13 +37,13 @@ NVIDIA 还发布了量化权重版本 [`nvidia/GLM-5-NVFP4`](https://huggingface
 
 ## 纸面规格
 
-在介绍具体方案之前，先看硬件。H200 SXM（Hopper）和 B200 SXM（Blackwell）相隔一代。下方雷达图（chart）将每个轴归一化到 [`/gpu-specs`](/gpu-specs) 中所有 NVIDIA + AMD SKU 的最大值——因此 H200 和 B200 的多边形在 GB200/GB300 NVL72 设定上限的轴上显得较小（特别是 Scale-up Domain Memory 和 Scale-up Domain Memory Bandwidth，它们随 72-GPU NVLink 域的机架级规模而扩展）。
+在介绍具体方案之前，先看硬件。H200 SXM（Hopper）和 B200 SXM（Blackwell）相隔一代。下方雷达图（chart）将每个轴归一化到 [`/infx/gpu-specs`](/infx/gpu-specs) 中所有 NVIDIA + AMD SKU 的最大值——因此 H200 和 B200 的多边形在 GB200/GB300 NVL72 设定上限的轴上显得较小（特别是 Scale-up Domain Memory 和 Scale-up Domain Memory Bandwidth，它们随 72-GPU NVLink 域的机架级规模而扩展）。
 
 <Figure
   srcLight="/images/b200-glm5-nvfp4-vs-h200-fp8-3-6x-perf-per-dollar/specs-radar-light.png"
   srcDark="/images/b200-glm5-nvfp4-vs-h200-fp8-3-6x-perf-per-dollar/specs-radar-dark.png"
-  alt="雷达图对比 H200 SXM 和 B200 SXM 在显存、显存带宽、FP4/FP8/BF16 TFLOP/s、Scale-up 带宽、Scale-up Domain Memory 和 Scale-up Domain Memory Bandwidth 上的表现。各轴归一化至 /gpu-specs 中所有 GPU 的最大值。"
-  caption="H200 SXM 与 B200 SXM 的 InferenceX /gpu-specs 雷达图对比。各轴归一化至该指标的跨厂商最大值（例如 FP4 最大值为 GB300 NVL72 的 15 PFLOP/s/GPU，因此 B200 的 9 PFLOP/s 显示约 60%；Scale-up Domain Memory 和带宽最大值由 GB200/GB300 NVL72 的 72-GPU NVLink 域设定，因此 H200 和 B200 的 8-GPU 域均显示较低）。H200 在 FP4 轴上为 0%，因为 Hopper 没有 FP4 张量核心。"
+  alt="雷达图对比 H200 SXM 和 B200 SXM 在显存、显存带宽、FP4/FP8/BF16 TFLOP/s、Scale-up 带宽、Scale-up Domain Memory 和 Scale-up Domain Memory Bandwidth 上的表现。各轴归一化至 /infx/gpu-specs 中所有 GPU 的最大值。"
+  caption="H200 SXM 与 B200 SXM 的 InferenceX /infx/gpu-specs 雷达图对比。各轴归一化至该指标的跨厂商最大值（例如 FP4 最大值为 GB300 NVL72 的 15 PFLOP/s/GPU，因此 B200 的 9 PFLOP/s 显示约 60%；Scale-up Domain Memory 和带宽最大值由 GB200/GB300 NVL72 的 72-GPU NVLink 域设定，因此 H200 和 B200 的 8-GPU 域均显示较低）。H200 在 FP4 轴上为 0%，因为 Hopper 没有 FP4 张量核心。"
 />
 
 本次基准测试中两款 SKU 的绝对值：
@@ -150,7 +150,7 @@ B200 NVFP4 相对 H200 的性价比提升在 **80 tok/s/user 时达到峰值 3.6
   caption="GLM-5（744B / 40B 激活参数），ISL 8192 / OSL 1024。H200 和 B200 均使用 SGLang v0.5.12 及基于 EAGLE 的 MTP。标签标注了每个配置的 GPU 数量（FP4 前沿为 TP=4 的 4 GPU 加上右端一个 TP=8 / 8 GPU 数据点；FP8 曲线为 TP=8 的 8 GPU）。"
 />
 
-[在线图表](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-25&g_model=GLM-5&g_runid=26381101926&i_prec=fp4%2Cfp8&i_active=b200_sglang_mtp%2Ch200_sglang_mtp&i_linelabel=1)，已预筛选为 2026-05-25 测试中 H200 + B200 上的 GLM-5 SGLang MTP。[在线成本视图](https://inferencex.semianalysis.com/inference?g_rundate=2026-05-25&g_model=GLM-5&g_runid=26381101926&i_prec=fp4%2Cfp8&i_active=b200_sglang_mtp%2Ch200_sglang_mtp&i_metric=y_costh&i_linelabel=1)展示相同对比的成本维度。
+[在线图表](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-25&g_model=GLM-5&g_runid=26381101926&i_prec=fp4%2Cfp8&i_active=b200_sglang_mtp%2Ch200_sglang_mtp&i_linelabel=1)，已预筛选为 2026-05-25 测试中 H200 + B200 上的 GLM-5 SGLang MTP。[在线成本视图](https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-25&g_model=GLM-5&g_runid=26381101926&i_prec=fp4%2Cfp8&i_active=b200_sglang_mtp%2Ch200_sglang_mtp&i_metric=y_costh&i_linelabel=1)展示相同对比的成本维度。
 
 ## GLM-5 在 Blackwell 上的后续进展
 
@@ -164,7 +164,7 @@ B200 NVFP4 相对 H200 的性价比提升在 **80 tok/s/user 时达到峰值 3.6
 
 本轮方案优化进展迅速，得益于 [SGLang 与 NVIDIA 的协作](https://github.com/sgl-project/sglang/issues/19380)在大约一个季度内完成了 Blackwell 上 no-MTP/MTP 和 Agg/Disagg 的所有 Functional 和 Baseline Perf 行——FlashInfer 中的 NVFP4 IMA 修复、sm100/sm103 上的稀疏 MLA 默认配置、IndexCache、GLM-5 的基于 EAGLE 的 MTP——而 InferenceX 方案循环在上游稳定后一周内即完成了 H200 MTP 兄弟方案的接入。感谢 SGLang 维护者、FlashInfer 团队、NVIDIA SGLang 协作线程以及在[跟踪 issue](https://github.com/sgl-project/sglang/issues/19380) 上提交 PR 的所有人。上游到基准测试的闭环速度就是护城河。
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-25&g_model=GLM-5&g_runid=26381101926&i_prec=fp4%2Cfp8&i_active=b200_sglang_mtp%2Ch200_sglang_mtp&i_linelabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/infx/inference?g_rundate=2026-05-25&g_model=GLM-5&g_runid=26381101926&i_prec=fp4%2Cfp8&i_active=b200_sglang_mtp%2Ch200_sglang_mtp&i_linelabel=1">
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 

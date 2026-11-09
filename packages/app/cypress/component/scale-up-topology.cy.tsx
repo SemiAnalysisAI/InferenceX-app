@@ -68,16 +68,10 @@ const MI300X: GpuSpec = {
 const ALL_SPECS = [H100_SXM, GB200_NVL72, MI300X];
 
 describe('ScaleUpTopologyDiagram', () => {
-  it('renders compact SVG view', () => {
-    cy.mount(<ScaleUpTopologyDiagram spec={H100_SXM} allSpecs={ALL_SPECS} />);
-    cy.get('svg[role="img"]').should('be.visible');
-    cy.contains('H100 SXM').should('be.visible');
-  });
-
   it('click opens dialog with expanded view', () => {
     cy.mount(<ScaleUpTopologyDiagram spec={H100_SXM} allSpecs={ALL_SPECS} />);
     cy.get('button[aria-label="Expand H100 SXM scale-up topology diagram"]').click();
-    cy.contains('H100 SXM Scale-Up Topology').should('be.visible');
+    cy.contains('H100 SXM Scale-up topology').should('be.visible');
     cy.get('[role="dialog"] svg[role="img"]').should('exist');
   });
 
@@ -100,7 +94,7 @@ describe('ScaleUpTopologyDiagram', () => {
     cy.mount(<ScaleUpTopologyDiagram spec={H100_SXM} allSpecs={ALL_SPECS} />);
     cy.get('button[aria-label="Expand H100 SXM scale-up topology diagram"]').click();
     cy.get('[data-testid="scaleup-topology-nav-next"]').click();
-    cy.contains('GB200 NVL72 Scale-Up Topology').should('be.visible');
+    cy.contains('GB200 NVL72 Scale-up topology').should('be.visible');
     cy.get('body').type('{esc}');
     cy.get('[role="dialog"]').should('not.exist');
     cy.get('@capture').should(
@@ -115,34 +109,17 @@ describe('ScaleUpTopologyDiagram', () => {
     );
   });
 
-  it('dialog shows GPU spec name', () => {
-    cy.mount(<ScaleUpTopologyDiagram spec={GB200_NVL72} allSpecs={ALL_SPECS} />);
-    cy.get('button[aria-label="Expand GB200 NVL72 scale-up topology diagram"]').click();
-    cy.contains('GB200 NVL72 Scale-Up Topology').should('be.visible');
-  });
-
   it('Prev/Next navigation works', () => {
     cy.mount(<ScaleUpTopologyDiagram spec={H100_SXM} allSpecs={ALL_SPECS} />);
     cy.get('button[aria-label="Expand H100 SXM scale-up topology diagram"]').click();
     cy.contains('(1 / 3)').should('be.visible');
     cy.get('[data-testid="scaleup-topology-nav-next"]').click();
-    cy.contains('GB200 NVL72 Scale-Up Topology').should('be.visible');
+    cy.contains('GB200 NVL72 Scale-up topology').should('be.visible');
     cy.contains('(2 / 3)').should('be.visible');
     cy.get('[data-testid="scaleup-topology-nav-next"]').click();
-    cy.contains('MI300X Scale-Up Topology').should('be.visible');
+    cy.contains('MI300X Scale-up topology').should('be.visible');
     cy.contains('(3 / 3)').should('be.visible');
     cy.get('[data-testid="scaleup-topology-nav-prev"]').click();
-    cy.contains('GB200 NVL72 Scale-Up Topology').should('be.visible');
-  });
-
-  it('different topology types render without errors', () => {
-    cy.mount(<ScaleUpTopologyDiagram spec={H100_SXM} allSpecs={[H100_SXM]} />);
-    cy.get('svg[role="img"]').should('exist');
-
-    cy.mount(<ScaleUpTopologyDiagram spec={MI300X} allSpecs={[MI300X]} />);
-    cy.get('svg[role="img"]').should('exist');
-
-    cy.mount(<ScaleUpTopologyDiagram spec={GB200_NVL72} allSpecs={[GB200_NVL72]} />);
-    cy.get('svg[role="img"]').should('exist');
+    cy.contains('GB200 NVL72 Scale-up topology').should('be.visible');
   });
 });

@@ -1,7 +1,7 @@
 'use client';
 
 import { track } from '@/lib/analytics/analytics';
-import { type ReactNode, useMemo, useRef } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import * as d3 from 'd3';
 
 import { getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
@@ -10,6 +10,7 @@ import { D3Chart, type LayerConfig } from '@/lib/d3-chart/D3Chart';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
 import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 
 import { useReliabilityContext } from '@/components/reliability/ReliabilityContext';
 import type { ModelSuccessRateData } from '@/components/reliability/types';
@@ -18,6 +19,8 @@ import { type Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Button } from '@/components/ui/button';
+import { ChartPointDetails } from '@/components/ui/chart-point-details';
+import { EmptyState } from '@/components/ui/empty-state';
 
 type ChartItem = ModelSuccessRateData & { modelLabel: string };
 
@@ -25,36 +28,36 @@ const BASE_MARGIN = { top: 24, right: 24, bottom: 40 };
 
 const TOOLTIP_STRINGS = {
   en: {
-    dismiss: 'Click elsewhere to dismiss',
-    successRate: 'Success Rate:',
-    successful: 'Successful:',
-    totalRuns: 'Total Runs:',
+    successRate: 'success rate',
+    successful: 'successful',
+    totalRuns: 'total runs',
   },
   zh: {
-    dismiss: '点击其他区域关闭',
-    successRate: '成功率：',
-    successful: '成功次数：',
-    totalRuns: '总运行次数：',
+    successRate: '成功率',
+    successful: '成功次数',
+    totalRuns: '总运行次数',
   },
 } as const;
 
+const reliabilityMetrics = (data: ChartItem, locale: Locale) => {
+  const t = TOOLTIP_STRINGS[locale];
+  return [
+    { value: `${data.successRate.toFixed(2)}%`, label: t.successRate },
+    { value: String(data.n_success), label: t.successful },
+    { value: String(data.total), label: t.totalRuns },
+  ];
+};
+
 const generateReliabilityTooltipContent = (
   data: ChartItem,
-  isPinned: boolean,
+  color: string,
   locale: Locale = 'en',
-): string => {
-  const t = TOOLTIP_STRINGS[locale];
-  const modelLabel = getHardwareConfig(data.model).label;
-  return `
-    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
-      <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">${modelLabel}</div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${t.successRate}</strong> ${data.successRate.toFixed(2)}%</div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${t.successful}</strong> ${data.n_success}</div>
-      <div style="color: var(--muted-foreground); font-size: 11px;"><strong>${t.totalRuns}</strong> ${data.total}</div>
-    </div>
-  `;
-};
+): string =>
+  chartHoverCard({
+    title: getHardwareConfig(data.model).label,
+    color,
+    metrics: reliabilityMetrics(data, locale),
+  });
 
 function positionLabelPairs(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -101,32 +104,34 @@ function positionLabelPairs(
 
 const RELIABILITY_STRINGS = {
   en: {
-    highContrast: 'High Contrast',
-    resetFilter: 'Reset filter',
-    xAxis: 'Success Rate (%)',
+    highContrast: 'High contrast',
+    xAxis: 'Success rate (%)',
     loading: 'Loading reliability data…',
-    loadError: 'Failed to load reliability data.',
+    loadError: 'Failed to load reliability data',
     retry: 'Retry',
-    noData: 'No reliability data available for this date range.',
-    instructions:
-      'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Hover for details',
+    noData: 'No reliability data available for this date range',
+    instructions: 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
     runCount: (success: number, total: number) => `${success}/${total} runs`,
   },
   zh: {
     highContrast: '高对比度',
-    resetFilter: '重置筛选',
     xAxis: '成功率（%）',
     loading: '正在加载可靠性数据……',
-    loadError: '可靠性数据加载失败。',
+    loadError: '可靠性数据加载失败',
     retry: '重试',
-    noData: '所选时间范围内暂无可靠性数据。',
-    instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置 · 悬停查看详情',
+    noData: '所选时间范围内暂无可靠性数据',
+    instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置',
     runCount: (success: number, total: number) => `${success}/${total} 次运行`,
   },
 } as const;
 
-export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode }) {
-  const hoveredBarXRef = useRef(0);
+export default function ReliabilityBarChartD3({
+  caption,
+  footer,
+}: {
+  caption?: ReactNode;
+  footer?: ReactNode;
+}) {
   const {
     loading,
     error,
@@ -257,9 +262,23 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
   const tooltipConfig = useMemo(
     () => ({
       rulerType: 'vertical' as const,
-      content: (datum: ChartItem, isPinned: boolean) =>
-        generateReliabilityTooltipContent(datum, isPinned, locale),
-      getRulerX: () => hoveredBarXRef.current,
+      content: (datum: ChartItem) =>
+        generateReliabilityTooltipContent(datum, getCssColor(resolveColor(datum.model)), locale),
+      details: (datum: ChartItem, _isOverlay: boolean, close: () => void) => (
+        <ChartPointDetails
+          title={getHardwareConfig(datum.model).label}
+          color={getCssColor(resolveColor(datum.model))}
+          metrics={reliabilityMetrics(datum, locale)}
+          onClose={close}
+        />
+      ),
+      getRulerX: (
+        datum: ChartItem,
+        scale:
+          | d3.ScaleBand<string>
+          | d3.ScaleLinear<number, number>
+          | d3.ScaleLogarithmic<number, number>,
+      ) => (scale as d3.ScaleLinear<number, number>)(datum.successRate),
       getRulerY: (
         datum: ChartItem,
         scale: d3.ScaleLinear<number, number> | d3.ScaleLogarithmic<number, number>,
@@ -268,7 +287,6 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
         return (bandScale(datum.modelLabel) ?? 0) + bandScale.bandwidth() / 2;
       },
       onHoverStart: (selection: d3.Selection<SVGRectElement, ChartItem, SVGGElement, unknown>) => {
-        hoveredBarXRef.current = Number.parseFloat(selection.attr('width') || '0');
         selection.attr('stroke', 'var(--foreground)').attr('stroke-width', 1.5);
       },
       onHoverEnd: (selection: d3.Selection<SVGRectElement, ChartItem, SVGGElement, unknown>) => {
@@ -276,7 +294,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
       },
       attachToLayer: 0,
     }),
-    [locale],
+    [locale, getCssColor, resolveColor],
   );
 
   const dynamicHeight = useMemo(() => {
@@ -377,30 +395,29 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
   const isEmpty = loading || error || chartData.length === 0;
 
   const emptyOverlay = isEmpty ? (
-    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-background/60 backdrop-blur-[2px] z-10">
+    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-card/60 backdrop-blur-[2px]">
       {error ? (
-        <div
+        <EmptyState
           data-testid="reliability-error"
           role="alert"
-          className="flex flex-col items-center gap-2 rounded-md border border-border bg-background/90 px-4 py-3 shadow-sm"
+          action={
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                track('reliability_retry_clicked');
+                void refetch();
+              }}
+            >
+              {legendT.retry}
+            </Button>
+          }
         >
-          <p className="text-sm font-medium text-muted-foreground">{legendT.loadError}</p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              track('reliability_retry_clicked');
-              void refetch();
-            }}
-          >
-            {legendT.retry}
-          </Button>
-        </div>
+          {legendT.loadError}
+        </EmptyState>
       ) : (
-        <p className="rounded-md border border-border bg-background/90 px-4 py-2 text-sm font-medium text-muted-foreground shadow-sm">
-          {loading ? legendT.loading : legendT.noData}
-        </p>
+        <EmptyState role="status">{loading ? legendT.loading : legendT.noData}</EmptyState>
       )}
     </div>
   ) : null;
@@ -419,6 +436,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
         grabCursor
         clipContent={false}
         caption={caption}
+        footer={footer}
         noDataOverlay={emptyOverlay}
         instructions={legendT.instructions}
         xScale={xScaleConfig}
@@ -449,20 +467,14 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
                 },
               },
             ]}
-            actions={
-              enabledModels.size < modelsWithData.size
-                ? [
-                    {
-                      id: 'reliability-reset-filter',
-                      label: legendT.resetFilter,
-                      onClick: () => {
-                        selectAllModels();
-                        track('reliability_filter_reset');
-                      },
-                    },
-                  ]
-                : []
-            }
+            reset={{
+              id: 'reliability-reset-filter',
+              disabled: enabledModels.size >= modelsWithData.size,
+              onClick: () => {
+                selectAllModels();
+                track('reliability_filter_reset');
+              },
+            }}
             enableTooltips={true}
           />
         }

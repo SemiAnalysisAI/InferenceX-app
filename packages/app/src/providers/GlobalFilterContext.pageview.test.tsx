@@ -121,57 +121,57 @@ afterEach(() => {
 
 describe('GlobalFilterProvider model path sync pageviews', () => {
   it('canonicalizes a bare route without a pageview as flags settle and non-model filters change', () => {
-    mountAt('/calculator', Model.Kimi_K3);
+    mountAt('/infx/calculator', Model.Kimi_K3);
     expect(sequenceResolved).toBe(false);
 
     settleAvailability(Model.Kimi_K3);
     expect(sequenceResolved).toBe(true);
     act(() => actions?.setTcoBasis('external'));
 
-    expect(window.location.pathname).toBe('/calculator/kimi-k3');
+    expect(window.location.pathname).toBe('/infx/calculator/kimi-k3');
     expect(pathnameEvents).toHaveLength(1);
     expect(pageviews()).toHaveLength(0);
   });
 
   it('does not count the bare profit estimator settling onto its slug as a pageview', () => {
-    mountAt('/profit-estimator', Model.DeepSeek_V4_Pro);
+    mountAt('/infx/profit-estimator', Model.DeepSeek_V4_Pro);
     settleAvailability(Model.DeepSeek_V4_Pro);
 
-    expect(window.location.pathname).toBe('/profit-estimator/deepseek-v4');
+    expect(window.location.pathname).toBe('/infx/profit-estimator/deepseek-v4');
     expect(pageviews()).toHaveLength(0);
   });
 
   it('records exactly one pageview when the user switches the model', () => {
-    mountAt('/calculator/kimi-k3', Model.Kimi_K3);
+    mountAt('/infx/calculator/kimi-k3', Model.Kimi_K3);
     settleAvailability(Model.Kimi_K3);
     expect(pathnameEvents).toHaveLength(0);
 
     act(() => actions?.setSelectedModel(Model.DeepSeek_R1));
     act(() => actions?.setTcoBasis('external'));
 
-    expect(window.location.pathname).toBe('/calculator/deepseek-r1');
+    expect(window.location.pathname).toBe('/infx/calculator/deepseek-r1');
     expect(pathnameEvents).toHaveLength(1);
     expect(pageviews()).toHaveLength(1);
   });
 
   it('records a pageview when the user moves a bare route onto another model', () => {
-    mountAt('/zh/historical');
+    mountAt('/zh/infx/historical');
     settleAvailability();
     expect(pathnameEvents).toHaveLength(0);
 
     act(() => actions?.setSelectedModel(Model.Kimi_K3));
 
-    expect(window.location.pathname).toBe('/zh/historical/kimi-k3');
+    expect(window.location.pathname).toBe('/zh/infx/historical/kimi-k3');
     expect(pageviews()).toHaveLength(1);
   });
 
   it('does not count programmatic model corrections as pageviews', () => {
-    mountAt('/historical/kimi-k3', Model.Kimi_K3);
+    mountAt('/infx/historical/kimi-k3', Model.Kimi_K3);
     settleAvailability(Model.Kimi_K3);
 
     act(() => actions?.setSelectedModel(Model.DeepSeek_R1, { userSelection: false }));
 
-    expect(window.location.pathname).toBe('/historical/deepseek-r1');
+    expect(window.location.pathname).toBe('/infx/historical/deepseek-r1');
     expect(pathnameEvents).toHaveLength(1);
     expect(pageviews()).toHaveLength(0);
   });

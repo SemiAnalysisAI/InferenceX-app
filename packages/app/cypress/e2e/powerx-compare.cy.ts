@@ -139,7 +139,7 @@ describe('AgentX All in Measured chart and table', () => {
       let csvBlob: Blob | undefined;
       // Later loads rebuild the URL from these params, so each load names the view it expects.
       const chartUrl = (overrides: Record<string, string> = {}) =>
-        `${locale === 'zh' ? '/zh' : ''}/powerx?${new URLSearchParams({
+        `${locale === 'zh' ? '/zh' : ''}/pwx?${new URLSearchParams({
           g_model: 'Kimi-K3',
           i_seq: 'agentic-traces',
           i_prec: 'fp4',
@@ -167,11 +167,6 @@ describe('AgentX All in Measured chart and table', () => {
         .first()
         .find('.unofficial-overlay-pt')
         .should('have.length', 1);
-      cy.get('header').invoke('css', 'visibility', 'hidden');
-      cy.get('[data-testid="chart-figure"]')
-        .first()
-        .scrollIntoView()
-        .screenshot(`agentic-all-in-${locale}-chart`, { overwrite: true });
       cy.get('[data-testid="inference-table-view-btn"]').first().click();
       cy.get('[data-testid="chart-figure"]')
         .first()
@@ -189,9 +184,6 @@ describe('AgentX All in Measured chart and table', () => {
             );
           }
         });
-      cy.get('[data-testid="chart-figure"]')
-        .first()
-        .screenshot(`agentic-all-in-${locale}-table`, { overwrite: true });
       if (locale === 'zh') {
         cy.get('[data-testid="inference-results-table"]')
           .first()
@@ -207,11 +199,7 @@ describe('AgentX All in Measured chart and table', () => {
               );
             });
           });
-        cy.get('[data-testid="chart-figure"]')
-          .first()
-          .screenshot('agentic-all-in-zh-table-status', { overwrite: true });
       }
-      cy.get('header').invoke('css', 'visibility', '');
       cy.get('[data-testid="export-button"]').first().click();
       cy.get('[data-testid="export-csv-button"]').click();
       cy.then(() => csvBlob!.text()).then((csv) => {

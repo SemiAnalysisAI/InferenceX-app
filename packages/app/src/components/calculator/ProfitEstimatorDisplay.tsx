@@ -2,18 +2,14 @@
 
 import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
-import {
-  DISPLAY_MODEL_TO_DB,
-  HW_REGISTRY,
-  TCO_SOURCE_TITLE,
-  TCO_SOURCE_URL,
-} from '@semianalysisai/inferencex-constants';
-import { Info, Plus, X } from 'lucide-react';
+import { DISPLAY_MODEL_TO_DB, HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { useTheme } from 'next-themes';
 import { isDarkTheme } from '@/lib/themes/themes';
+import { profitChartQualifier, profitChartTitle } from '@/lib/calculator/profit-chart-heading';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 import ProfitEstimatorChart from '@/components/calculator/ProfitEstimatorChart';
 import {
@@ -29,7 +25,11 @@ import {
   useGlobalFilterRun,
   useGlobalFilterSelection,
 } from '@/providers/GlobalFilterContext';
-import { cachedInputPricePerMillion, formatTokenPrice } from '@/components/inference/token-revenue';
+import {
+  cachedInputPricePerMillion,
+  formatTokenPrice,
+  formatTokenPriceLabel,
+} from '@/components/inference/token-revenue';
 import { COST_TIER_LABELS, type CostTier } from '@/components/inference/metric-registry';
 import type { TokenRevenuePricing } from '@/components/inference/types';
 import ComparisonChangelog from '@/components/inference/ui/ComparisonChangelog';
@@ -38,18 +38,20 @@ import {
   makeRunComparisonEntry,
 } from '@/components/inference/utils/comparisonEntry';
 import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
-import ChartLegendItem from '@/components/ui/chart-legend-item';
-import { ChartShareActions } from '@/components/ui/chart-display-helpers';
+import ChartLegend from '@/components/ui/chart-legend';
+import { ChartShareActions, PricesSourceLink } from '@/components/ui/chart-display-helpers';
 import { ModelSelector } from '@/components/ui/chart-selectors';
 import { ControlPanel } from '@/components/ui/control-panel';
+import { DisclosureToggle } from '@/components/ui/disclosure-toggle';
+import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
+import { EmptyState } from '@/components/ui/empty-state';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
-import { EditableTcoBadges } from '@/components/ui/editable-tco-badges';
+import { TcoPriceTable } from '@/components/ui/editable-tco-badges';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
-import { Heading } from '@/components/ui/heading';
+import { Heading, HeadingQualifier } from '@/components/ui/heading';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
@@ -58,8 +60,10 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { InfoHelp } from '@/components/ui/option-info';
 import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/tco-model-dialog';
 import { CaptionPercentInput } from '@/components/ui/caption-percent-input';
-import { captionControlTriggerClassName, ResultContext } from '@/components/ui/result-context';
+import { RangeField } from '@/components/ui/range-field';
+import { ResultContext, sourceLinkClassName } from '@/components/ui/result-context';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ALL_IN_MEASURED_NOTE, POWER_BASIS_LABELS } from '@/lib/power/power-basis';
@@ -67,6 +71,7 @@ import { AIR_COOLED_SYSTEM_PUE, LIQUID_COOLED_RACK_PUE } from '@/lib/power/facil
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { useHeldHeight } from '@/hooks/useHeldHeight';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
@@ -82,7 +87,9 @@ import {
   Sequence,
   type Model,
 } from '@/lib/catalog/data-mappings';
-import { modelRoutesForTab, type ModelRouteTab } from '@/lib/routing/model-routes';
+import { modelRoutesForTab } from '@/lib/routing/model-routes';
+import { profitRouteForTab, type ProfitRouteTab } from '@/lib/routing/profit-estimator-routes';
+import { rememberChartStateInUrl } from '@/lib/routing/url-state';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn, getDisplayLabel } from '@/lib/shared/utils';
@@ -134,7 +141,11 @@ const COST_PROVIDER_TIER: Record<ProfitCostProvider, CostTier> = {
   custom: 'custom',
 };
 
-const COST_PROVIDER_OPTIONS: { value: ProfitCostProvider; label: string; labelZh: string }[] = [
+const COST_PROVIDER_OPTIONS: {
+  value: ProfitCostProvider;
+  label: string;
+  labelZh: string;
+}[] = [
   ...(['costh', 'costr'] as const).map((value) => ({
     value,
     label: COST_TIER_LABELS[COST_PROVIDER_TIER[value]].option,
@@ -187,11 +198,24 @@ function priceSourceOptions(
 const STRINGS = {
   en: {
     title: {
-      'gw-year': 'Revenue & Profit Estimator per GigaWatt (Beta)',
-      'chip-hour': 'Revenue & Profit Estimator (Beta)',
+      'gw-year': 'Revenue & profit estimator per gigawatt',
+      'chip-hour': 'Revenue & profit estimator',
     },
-    benchmarkGroup: 'Benchmark Config',
-    powerLabel: 'Power Estimation',
+    betaQualifier: 'Beta',
+    description:
+      'Estimated revenue, compute cost, model license fee and operator profit for each chip from measured throughput at a target interactivity, per GPU-hour or per gigawatt-year',
+    chartGroup: 'Chart config',
+    basisLabel: 'Estimate basis',
+    basisTooltip:
+      'Per GPU-hour shows what one chip earns and costs in an hour. Per gigawatt counts how many of each chip one gigawatt of all-in utility power runs for a year, so chips with different power draw share one budget.',
+    basisOptions: {
+      'chip-hour': 'Per GPU-hour',
+      'gw-year': 'Per gigawatt',
+    } satisfies Record<ProfitBasis, string>,
+    benchmarkGroup: 'Benchmark config',
+    secondaryControls: 'More chart controls',
+    changed: 'changed',
+    powerLabel: 'Power estimation',
     powerTooltip:
       'All in Measured uses the best power-valid curve at the selected target. Compare both uses that same curve for both bars when available. Pricing, utilization and unit costs stay the same.',
     powerOptions: {
@@ -207,58 +231,52 @@ const STRINGS = {
     powerPreview: `${ALL_IN_MEASURED_NOTE.en} Host power follows the AgentX workload state, including whether KV cache offload is on.`,
     powerDetails: `GPU power is interpolated between the same throughput points. Includes PUE ${AIR_COOLED_SYSTEM_PUE} (air-cooled chassis) or ${LIQUID_COOLED_RACK_PUE} (liquid-cooled NVL72) and 10% headroom. Aggregate multinode hosts use the measured deployment mean. NVL72 trays share one modeled rack equally and use measured Grace-socket power when the run has validated socket telemetry (otherwise modeled Grace power); the two are not interpolated together. Full-chassis extrapolation fills an eight-GPU server with replicas of the measured 1/2/4-GPU workload at the same per-GPU power and throughput; it does not measure a partly idle server.`,
     csvPowerHeaders: ['Power basis', 'Power model revision'],
-    pricingGroup: 'Pricing Config',
-    costProviderLabel: 'Cost Provider',
+    pricingGroup: 'Pricing config',
+    costProviderLabel: 'Cost provider',
     costProviderTooltip:
       'The TCO tier used for the compute-expense segment: owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit, in $/GPU/hr from the SemiAnalysis AI Cloud TCO Model. Custom lets you type your own $/GPU/hr per chip. Locked rental terms (on demand through 2 year commit) are published in the TCO model.',
     customCostLabel: (gpu: string) => `${gpu} $/GPU/hr`,
     costProviderPlaceholder: 'Cost provider',
-    priceSourceLabel: 'Token Price',
+    priceSourceLabel: 'Token price',
     priceSourceTooltip:
       "Where the sale price per million tokens comes from. OpenRouter reads the public catalog price for this model; the lab's list price is its published API rate, offered where third-party hosts undercut it; Custom lets you type your own input and output prices.",
     priceSourcePlaceholder: 'Token price',
     inputPriceLabel: 'Input $/M tok',
     outputPriceLabel: 'Output $/M tok',
     cachedPriceLabel: 'Cached input $/M tok',
-    targetAgenticLabel: (percentile: string) => `Target ${percentile} Interactivity (tok/s/user)`,
+    targetAgenticLabel: (percentile: string) => `Target ${percentile} interactivity (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
       `The ${percentile} interactivity operating point used for agentic workload interpolation.`,
-    cacheHitLabel: 'Cache Hit Rates',
+    cacheHitLabel: 'Cache hit rates',
     cacheHitTooltip:
-      'Which cache hit rate to use for cached-input pricing. Actual uses the server-measured rate from the benchmark run. Theroticial Roofline (default) uses the infinite-cache rate computed from the trace, representing the maximum reuse potential with unbounded cache capacity.',
+      'Which cache hit rate to use for cached-input pricing. Actual uses the server-measured rate from the benchmark run. Theoretical roofline (default) uses the infinite-cache rate computed from the trace, representing the maximum reuse potential with unbounded cache capacity.',
     cacheHitOptions: {
       actual: 'Actual',
-      theoretical: 'Theroticial Roofline',
+      theoretical: 'Theoretical roofline',
     } satisfies Record<CacheHitMode, string>,
     utilizationLabel: 'Utilization (%)',
     utilizationTooltip:
       'Utilization % factors in the swings & dips of token traffic throughout day & night in addition to efficiency losses of scaling out large scale deployments.',
-    labCutLabel: 'Model License Fee (%)',
+    labCutLabel: 'Model license fee (%)',
     labCutTooltip:
       'Share of revenue paid to the model lab as a license fee on every token sold. It is owed even when compute alone exceeds revenue, so the operator can show a loss.',
     errorLoading: 'Error loading data. Please try a different selection.',
-    resetFilter: 'Reset filter',
+    utilizationShort: 'Utilization',
+    labCutShort: 'License fee',
+    highContrast: 'High contrast',
     pricingLoading: 'Loading OpenRouter pricing…',
     pricingUnavailable: (modelId: string | null) =>
       modelId
-        ? `OpenRouter has no price for ${modelId}. Switch Token Price to Custom to enter one.`
-        : 'This model has no OpenRouter listing. Switch Token Price to Custom to enter a price.',
-    chartTitle: {
-      'gw-year': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} Revenue & Profit Estimates per GigaWatt Per Year at ${percentile} ${target} tok/s/user Interactivity (Beta)`,
-      'chip-hour': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} Revenue & Profit Estimates per Chip per Hour at ${percentile} ${target} tok/s/user Interactivity (Beta)`,
-    },
-    sellingPriceLabel: 'Selling Price per Million Tokens',
+        ? `OpenRouter has no price for ${modelId}. Switch Token price to Custom to enter one.`
+        : 'This model has no OpenRouter listing. Switch Token price to Custom to enter a price.',
+    sellingPriceLabel: 'Selling price per million tokens',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
-      `Input: $${input} · Cached Input: $${cached} · Output: $${output} (${source})`,
-    tcoBadgesLabel: 'TCO $/chip/hr:',
+      `Input: $${input} · Cached input: $${cached} · Output: $${output} (${source})`,
     sourceLabel: 'Source:',
     formulaTitle: {
-      'gw-year': 'Revenue per GigaWatt Formula',
-      'chip-hour': 'Revenue per Chip-Hour Formula',
+      'gw-year': 'Revenue per gigawatt formula',
+      'chip-hour': 'Revenue per chip-hour formula',
     },
-    formulaToggle: 'Toggle formula notes',
     captionFormula: {
       'gw-year': (util: number, labCut: number) =>
         `Revenue = $/GPU/hr × GPU-hours per GW-year × ${util}% utilization. GPU-hours = (1,000,000 kW ÷ all-in kW per GPU) × 8,760 h. Model license fee = ${labCut}% of revenue. Profit = revenue − TCO − license fee. Margin above each bar is profit ÷ revenue.`,
@@ -291,24 +309,37 @@ const STRINGS = {
       ],
     },
     compareHistory: 'Compare history',
-    gpuConfig: 'Chip Config',
+    gpuConfig: 'Chip config',
     gpuConfigTooltip: `Select up to ${PROFIT_HISTORY_MAX_GPUS} chip configurations to compare how their estimated revenue and profit have moved over time. Each config is priced again on every compared date (the ends of the date range, plus any date or run added from the Config Changelog below) using the run measured then, so software updates show up as a change in the bar.`,
-    gpuConfigPlaceholder: 'Select Chip Config',
-    comparisonDateRange: 'Comparison Date Range',
+    gpuConfigPlaceholder: 'Select chip config',
+    comparisonDateRange: 'Comparison date range',
     comparisonDateRangeTooltip:
       'Select the start and end dates for the historical comparison. The chart adds a bar for each selected chip config at both dates, next to its bar for the run date shown above. Dates in between can be added one at a time from the Config Changelog.',
     dateRangePlaceholder: 'Select date range',
     historyNote: (dates: string) =>
-      `Compare history: lighter bars are the same chip configs priced on ${dates}, using the same target, prices, and TCO tier.`,
-    historyNoData: (entries: string) => `No estimate at the target on ${entries}.`,
+      `Compare history: lighter bars are the same chip configs priced on ${dates}, using the same target, prices, and TCO tier`,
+    historyNoData: (entries: string) => `No estimate at the target on ${entries}`,
     csvDateHeader: 'Run date',
   },
   zh: {
     title: {
-      'gw-year': '每吉瓦收入与利润估算器（Beta）',
-      'chip-hour': '收入与利润估算器（Beta）',
+      'gw-year': '每吉瓦收入与利润估算器',
+      'chip-hour': '收入与利润估算器',
     },
+    betaQualifier: 'Beta',
+    description:
+      '基于目标交互性下的实测吞吐量，按每 GPU 小时或每吉瓦年估算各芯片的收入、算力支出、模型许可费与运营方利润',
+    chartGroup: '图表配置',
+    basisLabel: '估算口径',
+    basisTooltip:
+      '每 GPU 小时口径展示单颗芯片一小时的收入与成本。每吉瓦口径按一吉瓦全电源配置功率一年可运行的芯片数量折算，让功耗不同的芯片在同一功率预算下比较。',
+    basisOptions: {
+      'chip-hour': '每 GPU 小时',
+      'gw-year': '每吉瓦',
+    } satisfies Record<ProfitBasis, string>,
     benchmarkGroup: '基准测试配置',
+    secondaryControls: '更多图表设置',
+    changed: '项已更改',
     powerLabel: '功耗估算方式',
     powerTooltip:
       '整体实测功耗在选定目标下采用功耗有效的最优曲线。对比两种估算方式时，若实测估算可用，两根柱子采用同一条曲线。价格、利用率和单位成本保持不变。',
@@ -343,10 +374,10 @@ const STRINGS = {
       `用于智能体工作负载插值的 ${percentile} 交互性操作点。`,
     cacheHitLabel: 'Cache 命中率',
     cacheHitTooltip:
-      '缓存输入定价使用的 cache 命中率。Actual 使用基准测试运行中服务端实测的命中率。Theroticial Roofline（默认）使用 trace 计算的无限缓存理论命中率，代表缓存容量无限时的最大复用潜力。',
+      '缓存输入定价所用的 cache 命中率。“实测”使用基准测试运行中服务端实测的命中率。“理论上限”（默认）使用由 trace 计算的无限缓存命中率，代表缓存容量不受限时的最大复用潜力。',
     cacheHitOptions: {
-      actual: 'Actual',
-      theoretical: 'Theroticial Roofline',
+      actual: '实测',
+      theoretical: '理论上限',
     } satisfies Record<CacheHitMode, string>,
     utilizationLabel: '利用率 (%)',
     utilizationTooltip:
@@ -355,28 +386,22 @@ const STRINGS = {
     labCutTooltip:
       '每售出一个 token 以许可费形式支付给模型实验室的收入比例。即使算力支出已超过收入也需支付，因此运营方可能亏损。',
     errorLoading: '加载数据出错，请尝试其他选择。',
-    resetFilter: '重置筛选',
+    utilizationShort: '利用率',
+    labCutShort: '许可费',
+    highContrast: '高对比度',
     pricingLoading: '正在加载 OpenRouter 价格…',
     pricingUnavailable: (modelId: string | null) =>
       modelId
         ? `OpenRouter 没有 ${modelId} 的价格。请将 Token 售价切换为自定义并输入价格。`
         : '该模型没有 OpenRouter 条目。请将 Token 售价切换为自定义并输入价格。',
-    chartTitle: {
-      'gw-year': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} 每吉瓦每年收入与利润估算（${percentile} 交互性 ${target} tok/s/user）（Beta）`,
-      'chip-hour': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} 每芯片每小时收入与利润估算（${percentile} 交互性 ${target} tok/s/user）（Beta）`,
-    },
     sellingPriceLabel: '每百万 token 售价',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
       `输入：$${input} · 缓存输入：$${cached} · 输出：$${output}（${source}）`,
-    tcoBadgesLabel: 'TCO $/chip/hr：',
     sourceLabel: '来源：',
     formulaTitle: {
       'gw-year': '每吉瓦收入公式',
       'chip-hour': '每芯片小时收入公式',
     },
-    formulaToggle: '展开或收起公式说明',
     captionFormula: {
       'gw-year': (util: number, labCut: number) =>
         `收入 = $/GPU/hr × 每吉瓦年 GPU 小时数 × ${util}% 利用率。GPU 小时数 = (1,000,000 kW ÷ 每 GPU 全电源配置 kW) × 8,760 h。模型许可费 = 收入的 ${labCut}%。利润 = 收入 − TCO − 许可费。柱形上方的利润率 = 利润 ÷ 收入。`,
@@ -417,45 +442,40 @@ const STRINGS = {
       '选择历史对比的起止日期。图表会在上方所示运行日期的柱形旁，为所选芯片配置在这两个日期各增加一根柱形。范围内的其他日期可在配置变更日志中逐个添加。',
     dateRangePlaceholder: '选择日期范围',
     historyNote: (dates: string) =>
-      `对比历史趋势：较浅的柱形为同一芯片配置在 ${dates} 的估价，目标、价格与 TCO 层级保持一致。`,
-    historyNoData: (entries: string) => `${entries} 在目标交互性下无法估算。`,
+      `对比历史趋势：较浅的柱形为同一芯片配置在 ${dates} 的估价，目标、价格与 TCO 层级保持一致`,
+    historyNoData: (entries: string) => `${entries} 在目标交互性下无法估算`,
     csvDateHeader: '运行日期',
   },
 } as const;
 
 function InfoFold({
   title,
-  toggleLabel,
   children,
   testId,
 }: {
   title: string;
-  toggleLabel: string;
   children: React.ReactNode;
   testId: string;
 }) {
   const [open, setOpen] = useState(false);
+  const bodyId = useId();
   return (
     <div className="py-1 text-xs" data-testid={testId}>
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-label={toggleLabel}
-        className="flex w-full items-center gap-1.5 text-left text-foreground cursor-pointer"
+      <DisclosureToggle
+        open={open}
+        aria-controls={bodyId}
         onClick={() => {
           setOpen((prev) => !prev);
           track('profit_formula_toggled', { enabled: !open });
         }}
       >
-        <Info className="size-3.5 text-muted-foreground" aria-hidden />
-        <span className="flex-1">{title}</span>
-        {open ? (
-          <X className="size-3.5 text-muted-foreground" aria-hidden />
-        ) : (
-          <Plus className="size-3.5 text-muted-foreground" aria-hidden />
-        )}
-      </button>
-      {open && <div className="mt-2 text-muted-foreground">{children}</div>}
+        {title}
+      </DisclosureToggle>
+      {open && (
+        <div id={bodyId} className="mt-2 text-muted-foreground">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -464,7 +484,7 @@ function blurOnWheel(event: React.WheelEvent<HTMLInputElement>): void {
   event.currentTarget.blur();
 }
 
-export const PROFIT_BASIS_TAB: Record<ProfitBasis, ModelRouteTab> = {
+export const PROFIT_BASIS_TAB: Record<ProfitBasis, ProfitRouteTab> = {
   'chip-hour': 'profit-estimator',
   'gw-year': 'profit-estimator-per-gigawatt',
 };
@@ -528,6 +548,7 @@ function ProfitEstimatorInner({
   const t = STRINGS[locale];
   const chartStrings = profitEstimatorChartStrings(locale);
   const { setUrlParam, getUrlParam } = useUrlState();
+  const router = useRouter();
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown();
   const { resolvedTheme } = useTheme();
   const { interceptLocked: interceptLockedTier, dialog: tcoModelDialog } =
@@ -597,6 +618,7 @@ function ProfitEstimatorInner({
     const value = getUrlParam('c_chmode');
     setCacheHitMode(value === 'actual' ? 'actual' : DEFAULT_CACHE_HIT_MODE);
   }, [getUrlParam]);
+  const isMobile = useIsMobileViewport();
   const utilization = usePercentField(DEFAULT_UTILIZATION_PCT, 'profit_utilization_set');
   const labCut = usePercentField(
     profitModelDefaults(selectedModel).labCutPct,
@@ -621,6 +643,7 @@ function ProfitEstimatorInner({
 
   const {
     hardwareConfig,
+    ranges,
     getResults,
     loading: throughputLoading,
     error,
@@ -641,7 +664,10 @@ function ProfitEstimatorInner({
   );
 
   const [selectedGPUs, setSelectedGPUs] = useState<string[]>([]);
-  const [selectedDateRange, setSelectedDateRange] = useState({ startDate: '', endDate: '' });
+  const [selectedDateRange, setSelectedDateRange] = useState({
+    startDate: '',
+    endDate: '',
+  });
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [historyHydrated, setHistoryHydrated] = useState(false);
   useEffect(() => {
@@ -870,12 +896,29 @@ function ProfitEstimatorInner({
     (base: string, raw: string) => {
       if (costProvider !== 'custom') {
         enterCustomCosts();
-        track('profit_cost_provider_changed', { provider: 'custom', via: 'tco_badge' });
+        track('profit_cost_provider_changed', {
+          provider: 'custom',
+          via: 'tco_badge',
+        });
       }
       setCustomCosts((prev) => ({ ...prev, [base]: raw }));
     },
     [costProvider, enterCustomCosts],
   );
+  const handleCustomCostReset = useCallback(() => {
+    setCustomCosts((prev) => {
+      const next = { ...prev };
+      for (const base of customCostBases) {
+        next[base] = String(getGpuSpecs(base, tcoBasis)[CUSTOM_COST_SEED]);
+      }
+      return next;
+    });
+    setCostProvider(CUSTOM_COST_SEED);
+    track('profit_cost_provider_changed', {
+      provider: CUSTOM_COST_SEED,
+      via: 'tco_reset',
+    });
+  }, [customCostBases, tcoBasis]);
   const handleCustomCostCommit = useCallback((base: string, raw: string) => {
     track('profit_custom_cost_set', { gpu: base, value: raw });
   }, []);
@@ -915,7 +958,12 @@ function ProfitEstimatorInner({
   ]);
 
   const assumptions = useMemo(
-    () => ({ utilizationPct: utilization.value, labCutPct: labCut.value, basis, powerBasis }),
+    () => ({
+      utilizationPct: utilization.value,
+      labCutPct: labCut.value,
+      basis,
+      powerBasis,
+    }),
     [utilization.value, labCut.value, basis, powerBasis],
   );
 
@@ -1001,7 +1049,12 @@ function ProfitEstimatorInner({
     [visibilityIntent, selectionKey, legendHwKeys],
   );
   const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
-  const { resolveColor } = useThemeColors({ highContrast: false, activeKeys: visibleKeysArray });
+  const [highContrast, setHighContrast] = useState(false);
+  const [isLegendExpanded, setIsLegendExpanded] = useState(true);
+  const { resolveColor } = useThemeColors({
+    highContrast,
+    activeKeys: visibleKeysArray,
+  });
 
   const historyRanks = useMemo(
     () => profitHistoryDateRanks(fullEstimate.rows),
@@ -1035,6 +1088,11 @@ function ProfitEstimatorInner({
     if (Number.isFinite(parsed) && parsed > 0) setTargetValue(parsed);
   }, []);
 
+  const handleTargetSlide = useCallback((value: number) => {
+    setTargetValue(value);
+    setTargetRaw(String(value));
+  }, []);
+
   const handleTargetBlur = useCallback(() => {
     const parsed = Number.parseFloat(targetRaw);
     const next = Number.isFinite(parsed) && parsed > 0 ? parsed : targetValue;
@@ -1050,6 +1108,18 @@ function ProfitEstimatorInner({
       track('profit_model_selected', { model: value });
     },
     [setSelectedModel],
+  );
+
+  const handleBasisChange = useCallback(
+    (next: ProfitBasis) => {
+      if (next === basis) return;
+      rememberChartStateInUrl();
+      const pathname = profitRouteForTab(window.location.pathname, PROFIT_BASIS_TAB[next]);
+      if (pathname === null) return;
+      track('profit_basis_changed', { basis: next });
+      router.push(`${pathname}${window.location.search}${window.location.hash}`, { scroll: false });
+    },
+    [basis, router],
   );
 
   const toggleGpuVisibility = useCallback(
@@ -1145,8 +1215,19 @@ function ProfitEstimatorInner({
         label: HW_REGISTRY[base]?.badgeLabel ?? base.toUpperCase(),
         value:
           costProvider === 'custom' ? (customCosts[base] ?? '') : String(costPerGpuHourFor(base)),
+        overridden:
+          costProvider === 'custom' &&
+          parseCustomCostInput(customCosts[base]) !== getGpuSpecs(base, tcoBasis)[CUSTOM_COST_SEED],
       }));
-  }, [legendHwKeys, visibleHwKeys, availableHwKeys, costPerGpuHourFor, costProvider, customCosts]);
+  }, [
+    legendHwKeys,
+    visibleHwKeys,
+    availableHwKeys,
+    costPerGpuHourFor,
+    costProvider,
+    customCosts,
+    tcoBasis,
+  ]);
 
   const costProviderControl = (
     <span className="inline-flex items-center gap-0.5" data-testid="profit-cost-selector">
@@ -1160,7 +1241,7 @@ function ProfitEstimatorInner({
         searchable={false}
         trackPrefix="profit_cost_provider"
         size="sm"
-        className={captionControlTriggerClassName}
+        className="w-auto max-w-full text-xs"
         contentClassName="w-80"
         groups={[
           {
@@ -1188,7 +1269,10 @@ function ProfitEstimatorInner({
   );
 
   const utilizationControl = (
-    <span className="inline-flex items-center gap-0.5" data-testid="profit-utilization-control">
+    <span className="inline-flex items-center gap-1" data-testid="profit-utilization-control">
+      <label htmlFor="profit-utilization" className="font-medium text-foreground">
+        {t.utilizationShort}
+      </label>
       <CaptionPercentInput
         id="profit-utilization"
         testId="profit-utilization-input"
@@ -1208,7 +1292,10 @@ function ProfitEstimatorInner({
     </span>
   );
   const labCutControl = (
-    <span className="inline-flex items-center gap-0.5" data-testid="profit-lab-cut-control">
+    <span className="inline-flex items-center gap-1" data-testid="profit-lab-cut-control">
+      <label htmlFor="profit-lab-cut" className="font-medium text-foreground">
+        {t.labCutShort}
+      </label>
       <CaptionPercentInput
         id="profit-lab-cut"
         testId="profit-lab-cut-input"
@@ -1256,120 +1343,109 @@ function ProfitEstimatorInner({
   const caption = useMemo(() => {
     if (!pricing) return null;
     return (
-      <div className="mb-2 pr-12" data-testid="profit-caption">
-        <Heading as="h2" level="card">
-          <ModelLogo model={selectedModel} className="mr-2 size-6 align-[-0.3em]" />
-          {t.chartTitle[basis](
+      <div className="mb-2 md:pr-12" data-testid="profit-caption">
+        <Heading as="h2" level="card" logo={<ModelLogo model={selectedModel} className="size-6" />}>
+          {profitChartTitle(
+            locale,
+            basis,
             getModelLabel(selectedModel),
             getSequenceLabel(Sequence.AgenticTraces, locale),
-            percentileLabel,
-            targetValue,
           )}
+          <HeadingQualifier>
+            {profitChartQualifier(locale, percentileLabel, targetValue)}
+          </HeadingQualifier>
         </Heading>
         {powerControlsEnabled && (
           <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-power-note">
             {t.powerLabel}: {t.powerOptions[powerBasis]}
           </p>
         )}
-        <ResultContext
-          locale={locale}
-          costTier={costTier}
-          costTierControl={costProviderControl}
-          utilization={`${assumptions.utilizationPct}%`}
-          utilizationControl={utilizationControl}
-          utilizationControlId="profit-utilization"
-          licenseFee={`${assumptions.labCutPct}%`}
-          licenseFeeControl={labCutControl}
-          licenseFeeControlId="profit-lab-cut"
-          date={selectedRunDate}
-          source="SemiAnalysis InferenceX™"
-        />
         {historyActive && (
           <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-history-note">
             {t.historyNote(
               history.comparisonDates.map(historyEntryLabel).join(locale === 'zh' ? '、' : ', '),
             )}
-            {historyMissing.length > 0 && <> {t.historyNoData(historyMissing.join(', '))}</>}
+            {historyMissing.length > 0 && <> · {t.historyNoData(historyMissing.join(', '))}</>}
           </p>
         )}
-        <EditableTcoBadges
-          label={t.tcoBadgesLabel}
-          items={tcoBadges}
-          onChange={handleCustomCostChange}
-          onCommit={handleCustomCostCommit}
-          inputLabel={t.customCostLabel}
-          testId="profit-tco-badges"
-          badgeTestId="profit-tco-badge"
-          inputIdPrefix="profit-custom-cost"
-          className="text-xs"
-        />
-        {costProvider !== 'custom' && (
-          <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-tco-source">
-            <small>
-              {t.sourceLabel}{' '}
-              <Link
-                target="_blank"
-                className="underline hover:text-foreground"
-                href={TCO_SOURCE_URL}
-              >
-                {TCO_SOURCE_TITLE}
-                <ExternalLinkIcon />
-              </Link>
-            </small>
-          </p>
-        )}
-        <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-selling-prices">
-          <span className="font-medium text-foreground">{t.sellingPriceLabel}:</span>{' '}
-          {t.sellingPrices(
-            formatTokenPrice(pricing.inputPerMillion),
-            formatTokenPrice(cachedInputPricePerMillion(pricing)),
-            formatTokenPrice(pricing.outputPerMillion),
-            priceSourceLabel,
-          )}
-          {effectivePriceSource === 'list' && listPricing && (
-            <>
-              {' '}
-              <Link
-                target="_blank"
-                className="underline hover:text-foreground"
-                href={listPricing.sourceUrl}
-                data-testid="profit-list-price-source"
-              >
-                {t.sourceLabel} {listPricing.vendor}
-                <ExternalLinkIcon />
-              </Link>
-            </>
-          )}
-        </p>
       </div>
     );
   }, [
     pricing,
     powerBasis,
     powerControlsEnabled,
-    hardwareConfig,
-    effectivePriceSource,
-    listPricing,
     selectedModel,
     locale,
     percentileLabel,
     targetValue,
-    costTier,
-    costProvider,
-    assumptions.utilizationPct,
-    assumptions.labCutPct,
     basis,
-    selectedRunDate,
-    tcoBadges,
-    costProviderControl,
-    handleCustomCostChange,
-    handleCustomCostCommit,
-    priceSourceLabel,
     t,
     historyActive,
     history.comparisonDates,
+    historyEntryLabel,
     historyMissing,
   ]);
+
+  const footer = pricing ? (
+    <div className="mt-3" data-testid="profit-footer">
+      <ResultContext
+        locale={locale}
+        layout="footer"
+        costTier={costTier}
+        costTierControl={costProviderControl}
+        utilization={`${assumptions.utilizationPct}%`}
+        utilizationControl={utilizationControl}
+        utilizationControlId="profit-utilization"
+        licenseFee={`${assumptions.labCutPct}%`}
+        licenseFeeControl={labCutControl}
+        licenseFeeControlId="profit-lab-cut"
+        priceTable={
+          tcoBadges.length > 0 ? (
+            <TcoPriceTable
+              items={tcoBadges}
+              editable
+              onChange={handleCustomCostChange}
+              onCommit={handleCustomCostCommit}
+              inputLabel={t.customCostLabel}
+              onReset={
+                tcoBadges.some((item) => item.overridden) ? handleCustomCostReset : undefined
+              }
+              resetTestId="profit-tco-reset"
+              testId="profit-tco-badges"
+              cellTestId="profit-tco-badge"
+              inputIdPrefix="profit-custom-cost"
+            />
+          ) : undefined
+        }
+        date={selectedRunDate}
+        source="SemiAnalysis InferenceX™"
+        metaEnd={costProvider === 'custom' ? undefined : <PricesSourceLink />}
+      />
+      <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-selling-prices">
+        <span className="font-medium text-foreground">{t.sellingPriceLabel}:</span>{' '}
+        {t.sellingPrices(
+          formatTokenPriceLabel(pricing.inputPerMillion),
+          formatTokenPriceLabel(cachedInputPricePerMillion(pricing)),
+          formatTokenPriceLabel(pricing.outputPerMillion),
+          priceSourceLabel,
+        )}
+        {effectivePriceSource === 'list' && listPricing && (
+          <>
+            {' '}
+            <Link
+              target="_blank"
+              className={sourceLinkClassName}
+              href={listPricing.sourceUrl}
+              data-testid="profit-list-price-source"
+            >
+              {t.sourceLabel} {listPricing.vendor}
+              <ExternalLinkIcon />
+            </Link>
+          </>
+        )}
+      </p>
+    </div>
+  ) : null;
 
   const exportFileName =
     basis === 'gw-year'
@@ -1432,30 +1508,110 @@ function ProfitEstimatorInner({
 
   if (!loading && error) {
     console.error(error);
-    return (
-      <Card>
-        <div className="flex items-center justify-center h-64 text-muted-foreground">
-          {t.errorLoading}
-        </div>
-      </Card>
-    );
+    return <EmptyState className="h-64">{t.errorLoading}</EmptyState>;
   }
+
+  const secondaryCount =
+    (cacheHitMode === DEFAULT_CACHE_HIT_MODE ? 0 : 1) +
+    (powerBasis === 'provisioned' ? 0 : 1) +
+    (priceSource === defaultPriceSource(selectedModel) ? 0 : 1) +
+    (selectedGPUs.length > 0 ? 1 : 0) +
+    (selectedDateRange.startDate && selectedDateRange.endDate ? 1 : 0);
+
+  const benchmarkExtras = (
+    <>
+      <div className="flex min-w-0 flex-col space-y-1.5">
+        <LabelWithTooltip
+          htmlFor="profit-cache-hit"
+          label={t.cacheHitLabel}
+          tooltip={t.cacheHitTooltip}
+        />
+        <div data-testid="profit-cache-hit-selector">
+          <MultiSelect
+            triggerId="profit-cache-hit"
+            options={Object.entries(t.cacheHitOptions).map(([value, label]) => ({
+              value,
+              label,
+            }))}
+            value={[cacheHitMode]}
+            onChange={(values) => {
+              const next = values[0];
+              if (next !== 'actual' && next !== 'theoretical') return;
+              setCacheHitMode(next);
+              setUrlParam('c_chmode', next === DEFAULT_CACHE_HIT_MODE ? '' : next);
+              track('profit_cache_hit_mode_changed', { mode: next });
+            }}
+            open={openDropdown === 'cacheHit'}
+            onOpenChange={handleDropdownOpenChange('cacheHit')}
+            minSelections={1}
+            maxSelections={1}
+            showClearAll={false}
+            searchable={false}
+            plainSelectedText
+            showSelectionSummary={false}
+          />
+        </div>
+      </div>
+      {powerControlsEnabled && (
+        <div className="flex min-w-0 flex-col space-y-1.5">
+          <LabelWithTooltip
+            htmlFor="profit-power"
+            label={t.powerLabel}
+            tooltip={`${t.powerTooltip} ${t.powerPreview} ${t.powerDetails}`}
+          />
+          <div data-testid="profit-power-selector">
+            <MultiSelect
+              triggerId="profit-power"
+              options={Object.entries(t.powerOptions).map(([value, label]) => ({
+                value,
+                label,
+              }))}
+              value={[powerBasis]}
+              onChange={(values) => {
+                const next = values[0];
+                if (next !== 'provisioned' && next !== 'modeled' && next !== 'compare') return;
+                setPowerBasis(next);
+                setUrlParam('c_power', next === 'provisioned' ? '' : next);
+                track('profit_power_basis_changed', { basis: next });
+              }}
+              open={openDropdown === 'power'}
+              onOpenChange={handleDropdownOpenChange('power')}
+              minSelections={1}
+              maxSelections={1}
+              showClearAll={false}
+              searchable={false}
+              plainSelectedText
+              showSelectionSummary={false}
+            />
+          </div>
+        </div>
+      )}
+    </>
+  );
 
   return (
     <div ref={rootRef} className="flex flex-col gap-4">
       <section ref={controlsRef} data-testid="profit-controls">
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
-            <DashboardSectionHeader title={t.title[basis]} actions={<ChartShareActions />} />
+            <DashboardSectionHeader
+              title={t.title[basis]}
+              qualifier={t.betaQualifier}
+              description={t.description}
+              actions={<ChartShareActions />}
+            />
 
             <TooltipProvider delayDuration={0}>
-              <div className="grid min-w-0 items-start gap-4 xl:grid-cols-4">
+              <div className="grid min-w-0 items-stretch gap-x-6 gap-y-4 xl:grid-cols-12">
                 <ControlPanel
                   legend={t.benchmarkGroup}
                   data-testid="profit-benchmark-panel"
                   className={cn(
-                    'grid-cols-1 items-end md:grid-cols-3 xl:[&_label]:min-h-10 xl:[&_label]:items-start',
-                    effectivePriceSource === 'custom' ? 'xl:col-span-4' : 'xl:col-span-3',
+                    'grid-cols-1 items-start md:grid-cols-[minmax(0,4fr)_minmax(0,6fr)_minmax(0,3fr)]',
+                    // Four benchmark columns fit only on a full row; beside the pricing panel a
+                    // fourth column wraps the target label to three lines and the rows misalign.
+                    powerControlsEnabled && effectivePriceSource === 'custom' && 'xl:grid-cols-4',
+                    effectivePriceSource === 'custom' ? 'xl:col-span-12' : 'xl:col-span-8',
                   )}
                 >
                   <div className="min-w-0">
@@ -1475,76 +1631,83 @@ function ProfitEstimatorInner({
                       label={t.targetAgenticLabel(percentileLabel)}
                       tooltip={t.targetAgenticTooltip(percentileLabel)}
                     />
-                    <Input
-                      id="profit-target"
-                      data-testid="profit-target-input"
-                      type="number"
-                      onWheel={blurOnWheel}
-                      inputMode="decimal"
-                      min={1}
-                      step={1}
-                      value={targetRaw}
-                      onChange={handleTargetChange}
-                      onBlur={handleTargetBlur}
+                    <RangeField
+                      label={t.targetAgenticLabel(percentileLabel)}
+                      min={ranges.interactivity.min}
+                      max={ranges.interactivity.max}
+                      value={targetValue}
+                      onSliderChange={handleTargetSlide}
+                      onSliderCommit={() =>
+                        track('profit_target_set', { mode, value: targetValue })
+                      }
+                      compact
+                      input={{
+                        id: 'profit-target',
+                        'data-testid': 'profit-target-input',
+                        onWheel: blurOnWheel,
+                        inputMode: 'decimal',
+                        min: 1,
+                        value: targetRaw,
+                        onChange: handleTargetChange,
+                        onBlur: handleTargetBlur,
+                      }}
                     />
                   </div>
-                  <div className="flex min-w-0 flex-col space-y-1.5">
-                    <LabelWithTooltip
-                      htmlFor="profit-cache-hit"
-                      label={t.cacheHitLabel}
-                      tooltip={t.cacheHitTooltip}
-                    />
-                    <div data-testid="profit-cache-hit-selector">
-                      <MultiSelect
-                        triggerId="profit-cache-hit"
-                        options={Object.entries(t.cacheHitOptions).map(([value, label]) => ({
-                          value,
-                          label,
-                        }))}
-                        value={[cacheHitMode]}
-                        onChange={(values) => {
-                          const next = values[0];
-                          if (next !== 'actual' && next !== 'theoretical') return;
-                          setCacheHitMode(next);
-                          setUrlParam('c_chmode', next === DEFAULT_CACHE_HIT_MODE ? '' : next);
-                          track('profit_cache_hit_mode_changed', { mode: next });
-                        }}
-                        open={openDropdown === 'cacheHit'}
-                        onOpenChange={handleDropdownOpenChange('cacheHit')}
-                        minSelections={1}
-                        maxSelections={1}
-                        showClearAll={false}
-                        searchable={false}
-                        plainSelectedText
-                        showSelectionSummary={false}
-                      />
-                    </div>
-                  </div>
-                  {powerControlsEnabled && (
+                  {!isMobile && <div className="hidden md:contents">{benchmarkExtras}</div>}
+                </ControlPanel>
+                <MobileControlSection
+                  label={t.secondaryControls}
+                  count={secondaryCount}
+                  countLabel={t.changed}
+                  testId="profit-secondary-controls"
+                >
+                  {isMobile && (
+                    <div className="grid min-w-0 gap-3 md:hidden">{benchmarkExtras}</div>
+                  )}
+                  <ControlPanel
+                    legend={t.pricingGroup}
+                    data-testid="profit-pricing-panel"
+                    className={cn(
+                      'grid-cols-1 items-start',
+                      effectivePriceSource === 'custom'
+                        ? 'xl:col-span-12 xl:grid-cols-4'
+                        : cn('xl:col-span-4', showsTcoBasis && 'sm:grid-cols-2'),
+                    )}
+                  >
                     <div className="flex min-w-0 flex-col space-y-1.5">
                       <LabelWithTooltip
-                        htmlFor="profit-power"
-                        label={t.powerLabel}
-                        tooltip={`${t.powerTooltip} ${t.powerPreview} ${t.powerDetails}`}
+                        htmlFor="profit-price-source"
+                        label={t.priceSourceLabel}
+                        tooltip={t.priceSourceTooltip}
                       />
-                      <div data-testid="profit-power-selector">
+                      <div data-testid="profit-price-source-selector">
                         <MultiSelect
-                          triggerId="profit-power"
-                          options={Object.entries(t.powerOptions).map(([value, label]) => ({
-                            value,
-                            label,
-                          }))}
-                          value={[powerBasis]}
+                          triggerId="profit-price-source"
+                          options={priceSourceOptions(listPricing?.vendor ?? null).map(
+                            (option) => ({
+                              value: option.value,
+                              label: locale === 'zh' ? option.labelZh : option.label,
+                            }),
+                          )}
+                          value={[effectivePriceSource]}
                           onChange={(values) => {
                             const next = values[0];
-                            if (next !== 'provisioned' && next !== 'modeled' && next !== 'compare')
-                              return;
-                            setPowerBasis(next);
-                            setUrlParam('c_power', next === 'provisioned' ? '' : next);
-                            track('profit_power_basis_changed', { basis: next });
+                            if (!next) return;
+                            if (next === 'custom' && pricing) {
+                              setCustomInputPrice(formatTokenPrice(pricing.inputPerMillion));
+                              setCustomCachedPrice(
+                                formatTokenPrice(cachedInputPricePerMillion(pricing)),
+                              );
+                              setCustomOutputPrice(formatTokenPrice(pricing.outputPerMillion));
+                            }
+                            setPriceSource(next as PriceSource);
+                            track('profit_price_source_changed', {
+                              source: next,
+                            });
                           }}
-                          open={openDropdown === 'power'}
-                          onOpenChange={handleDropdownOpenChange('power')}
+                          open={openDropdown === 'priceSource'}
+                          onOpenChange={handleDropdownOpenChange('priceSource')}
+                          placeholder={t.priceSourcePlaceholder}
                           minSelections={1}
                           maxSelections={1}
                           showClearAll={false}
@@ -1554,187 +1717,170 @@ function ProfitEstimatorInner({
                         />
                       </div>
                     </div>
-                  )}
-                </ControlPanel>
-                <ControlPanel
-                  legend={t.pricingGroup}
-                  data-testid="profit-pricing-panel"
-                  className={cn(
-                    'grid-cols-1 items-end xl:[&_label]:min-h-10 xl:[&_label]:items-start',
-                    effectivePriceSource === 'custom' && 'xl:col-span-4 xl:grid-cols-4',
-                  )}
-                >
-                  <div className="flex min-w-0 flex-col space-y-1.5">
-                    <LabelWithTooltip
-                      htmlFor="profit-price-source"
-                      label={t.priceSourceLabel}
-                      tooltip={t.priceSourceTooltip}
-                    />
-                    <div data-testid="profit-price-source-selector">
-                      <MultiSelect
-                        triggerId="profit-price-source"
-                        options={priceSourceOptions(listPricing?.vendor ?? null).map((option) => ({
-                          value: option.value,
-                          label: locale === 'zh' ? option.labelZh : option.label,
-                        }))}
-                        value={[effectivePriceSource]}
-                        onChange={(values) => {
-                          const next = values[0];
-                          if (!next) return;
-                          if (next === 'custom' && pricing) {
-                            setCustomInputPrice(formatTokenPrice(pricing.inputPerMillion));
-                            setCustomCachedPrice(
-                              formatTokenPrice(cachedInputPricePerMillion(pricing)),
-                            );
-                            setCustomOutputPrice(formatTokenPrice(pricing.outputPerMillion));
+                    {effectivePriceSource === 'custom' && (
+                      <div
+                        data-testid="profit-custom-prices"
+                        className="grid min-w-0 items-end gap-4 md:grid-cols-3 xl:col-span-3"
+                      >
+                        <div className="flex min-w-0 flex-col space-y-1.5">
+                          <Label htmlFor="profit-input-price">{t.inputPriceLabel}</Label>
+                          <Input
+                            id="profit-input-price"
+                            data-testid="profit-input-price"
+                            type="number"
+                            onWheel={blurOnWheel}
+                            inputMode="decimal"
+                            min={0}
+                            step={0.01}
+                            value={customInputPrice}
+                            onChange={(e) => setCustomInputPrice(e.target.value)}
+                            onBlur={() =>
+                              track('profit_custom_price_set', {
+                                stream: 'input',
+                                value: customInputPrice,
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="flex min-w-0 flex-col space-y-1.5">
+                          <Label htmlFor="profit-cached-price">{t.cachedPriceLabel}</Label>
+                          <Input
+                            id="profit-cached-price"
+                            data-testid="profit-cached-price"
+                            type="number"
+                            onWheel={blurOnWheel}
+                            inputMode="decimal"
+                            min={0}
+                            step={0.001}
+                            value={customCachedPrice}
+                            onChange={(e) => setCustomCachedPrice(e.target.value)}
+                            onBlur={() =>
+                              track('profit_custom_price_set', {
+                                stream: 'cached',
+                                value: customCachedPrice,
+                              })
+                            }
+                          />
+                        </div>
+                        <div className="flex min-w-0 flex-col space-y-1.5">
+                          <Label htmlFor="profit-output-price">{t.outputPriceLabel}</Label>
+                          <Input
+                            id="profit-output-price"
+                            data-testid="profit-output-price"
+                            type="number"
+                            onWheel={blurOnWheel}
+                            inputMode="decimal"
+                            min={0}
+                            step={0.01}
+                            value={customOutputPrice}
+                            onChange={(e) => setCustomOutputPrice(e.target.value)}
+                            onBlur={() =>
+                              track('profit_custom_price_set', {
+                                stream: 'output',
+                                value: customOutputPrice,
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {showsTcoBasis && (
+                      <div className="flex min-w-0 max-w-48 flex-col space-y-1.5">
+                        <LabelWithTooltip
+                          label={locale === 'zh' ? 'TCO 口径' : 'TCO basis'}
+                          tooltip={
+                            locale === 'zh'
+                              ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'
+                              : 'External customer pricing or internal owner cost; currently affects only TPUv7.'
                           }
-                          setPriceSource(next as PriceSource);
-                          track('profit_price_source_changed', { source: next });
-                        }}
-                        open={openDropdown === 'priceSource'}
-                        onOpenChange={handleDropdownOpenChange('priceSource')}
-                        placeholder={t.priceSourcePlaceholder}
-                        minSelections={1}
-                        maxSelections={1}
-                        showClearAll={false}
-                        searchable={false}
-                        plainSelectedText
-                        showSelectionSummary={false}
-                      />
-                    </div>
-                  </div>
-                  {effectivePriceSource === 'custom' && (
-                    <div
-                      data-testid="profit-custom-prices"
-                      className="grid min-w-0 items-end gap-4 md:grid-cols-3 xl:col-span-3"
+                        />
+                        <TcoBasisToggle source="profit" className="md:h-9" />
+                      </div>
+                    )}
+                  </ControlPanel>
+                  <div className="grid min-w-0 items-stretch gap-x-6 gap-y-4 xl:col-span-12 xl:flex">
+                    <ControlPanel
+                      legend={t.chartGroup}
+                      data-testid="profit-chart-panel"
+                      className="xl:w-fit xl:shrink-0"
                     >
                       <div className="flex min-w-0 flex-col space-y-1.5">
-                        <Label htmlFor="profit-input-price">{t.inputPriceLabel}</Label>
-                        <Input
-                          id="profit-input-price"
-                          data-testid="profit-input-price"
-                          type="number"
-                          onWheel={blurOnWheel}
-                          inputMode="decimal"
-                          min={0}
-                          step={0.01}
-                          value={customInputPrice}
-                          onChange={(e) => setCustomInputPrice(e.target.value)}
-                          onBlur={() =>
-                            track('profit_custom_price_set', {
-                              stream: 'input',
-                              value: customInputPrice,
-                            })
-                          }
+                        <LabelWithTooltip label={t.basisLabel} tooltip={t.basisTooltip} />
+                        <SegmentedToggle<ProfitBasis>
+                          role="group"
+                          value={basis}
+                          options={(['chip-hour', 'gw-year'] as const).map((value) => ({
+                            value,
+                            label: t.basisOptions[value],
+                            badge: value === 'gw-year' ? t.betaQualifier : undefined,
+                            testId: `profit-basis-${value}`,
+                          }))}
+                          onValueChange={handleBasisChange}
+                          ariaLabel={t.basisLabel}
+                          testId="profit-basis-toggle"
+                          className="w-fit self-start md:h-9"
                         />
                       </div>
-                      <div className="flex min-w-0 flex-col space-y-1.5">
-                        <Label htmlFor="profit-cached-price">{t.cachedPriceLabel}</Label>
-                        <Input
-                          id="profit-cached-price"
-                          data-testid="profit-cached-price"
-                          type="number"
-                          onWheel={blurOnWheel}
-                          inputMode="decimal"
-                          min={0}
-                          step={0.001}
-                          value={customCachedPrice}
-                          onChange={(e) => setCustomCachedPrice(e.target.value)}
-                          onBlur={() =>
-                            track('profit_custom_price_set', {
-                              stream: 'cached',
-                              value: customCachedPrice,
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="flex min-w-0 flex-col space-y-1.5">
-                        <Label htmlFor="profit-output-price">{t.outputPriceLabel}</Label>
-                        <Input
-                          id="profit-output-price"
-                          data-testid="profit-output-price"
-                          type="number"
-                          onWheel={blurOnWheel}
-                          inputMode="decimal"
-                          min={0}
-                          step={0.01}
-                          value={customOutputPrice}
-                          onChange={(e) => setCustomOutputPrice(e.target.value)}
-                          onBlur={() =>
-                            track('profit_custom_price_set', {
-                              stream: 'output',
-                              value: customOutputPrice,
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                  )}
+                    </ControlPanel>
+                    <ControlPanel
+                      legend={t.compareHistory}
+                      data-testid="profit-history-panel"
+                      className="xl:flex-1"
+                    >
+                      <div
+                        className={cn(
+                          'grid min-w-0 gap-3',
+                          selectedGPUs.length > 0 && 'md:grid-cols-2',
+                        )}
+                      >
+                        <div className="flex min-w-0 flex-col space-y-1.5">
+                          <LabelWithTooltip
+                            htmlFor="profit-history-gpu"
+                            label={t.gpuConfig}
+                            tooltip={t.gpuConfigTooltip}
+                          />
+                          <div data-testid="profit-history-gpu-multiselect" className="min-w-0">
+                            <MultiSelect
+                              triggerId="profit-history-gpu"
+                              options={historyChipOptions}
+                              value={selectedGPUs}
+                              onChange={handleHistoryGpuChange}
+                              open={openDropdown === 'history-gpu'}
+                              onOpenChange={handleDropdownOpenChange('history-gpu')}
+                              placeholder={t.gpuConfigPlaceholder}
+                              maxSelections={PROFIT_HISTORY_MAX_GPUS}
+                              searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
+                              noResultsLabel={locale === 'zh' ? '无结果' : undefined}
+                              clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
+                              selectedSuffix={locale === 'zh' ? ' 已选' : undefined}
+                            />
+                          </div>
+                        </div>
 
-                  {showsTcoBasis && (
-                    <div className="flex min-w-0 max-w-48 flex-col space-y-1.5">
-                      <LabelWithTooltip
-                        label={locale === 'zh' ? 'TCO 口径' : 'TCO Basis'}
-                        tooltip={
-                          locale === 'zh'
-                            ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'
-                            : 'External customer pricing or internal owner cost; currently affects only TPUv7.'
-                        }
-                      />
-                      <TcoBasisToggle source="profit" className="md:h-9" />
-                    </div>
-                  )}
-                </ControlPanel>
+                        {selectedGPUs.length > 0 && (
+                          <div
+                            className="flex min-w-0 flex-col space-y-1.5"
+                            data-testid="profit-history-date-range"
+                          >
+                            <LabelWithTooltip
+                              htmlFor="profit-history-dates"
+                              label={t.comparisonDateRange}
+                              tooltip={t.comparisonDateRangeTooltip}
+                            />
+                            <DateRangePicker
+                              dateRange={selectedDateRange}
+                              onChange={handleHistoryDateRangeChange}
+                              placeholder={t.dateRangePlaceholder}
+                              availableDates={historyAvailableDates}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </ControlPanel>
+                  </div>
+                </MobileControlSection>
               </div>
-
-              <ControlPanel legend={t.compareHistory} data-testid="profit-history-panel">
-                <div
-                  className={cn('grid min-w-0 gap-3', selectedGPUs.length > 0 && 'md:grid-cols-2')}
-                >
-                  <div className="flex min-w-0 flex-col space-y-1.5">
-                    <LabelWithTooltip
-                      htmlFor="profit-history-gpu"
-                      label={t.gpuConfig}
-                      tooltip={t.gpuConfigTooltip}
-                    />
-                    <div data-testid="profit-history-gpu-multiselect" className="min-w-0">
-                      <MultiSelect
-                        triggerId="profit-history-gpu"
-                        options={historyChipOptions}
-                        value={selectedGPUs}
-                        onChange={handleHistoryGpuChange}
-                        open={openDropdown === 'history-gpu'}
-                        onOpenChange={handleDropdownOpenChange('history-gpu')}
-                        placeholder={t.gpuConfigPlaceholder}
-                        maxSelections={PROFIT_HISTORY_MAX_GPUS}
-                        searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
-                        noResultsLabel={locale === 'zh' ? '无结果' : undefined}
-                        clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
-                        selectedSuffix={locale === 'zh' ? ' 已选' : undefined}
-                      />
-                    </div>
-                  </div>
-
-                  {selectedGPUs.length > 0 && (
-                    <div
-                      className="flex min-w-0 flex-col space-y-1.5"
-                      data-testid="profit-history-date-range"
-                    >
-                      <LabelWithTooltip
-                        htmlFor="profit-history-dates"
-                        label={t.comparisonDateRange}
-                        tooltip={t.comparisonDateRangeTooltip}
-                      />
-                      <DateRangePicker
-                        dateRange={selectedDateRange}
-                        onChange={handleHistoryDateRangeChange}
-                        placeholder={t.dateRangePlaceholder}
-                        availableDates={historyAvailableDates}
-                      />
-                    </div>
-                  )}
-                </div>
-              </ControlPanel>
             </TooltipProvider>
 
             {selectedGPUs.length > 0 && (
@@ -1757,31 +1903,6 @@ function ProfitEstimatorInner({
                 />
               </div>
             )}
-
-            {!loading && legendItems.length > 0 && (
-              <div
-                data-testid="profit-legend"
-                className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-border pt-3"
-              >
-                <ul className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  {legendItems.map((item) => (
-                    <ChartLegendItem key={item.hw} {...item} sidebarMode />
-                  ))}
-                </ul>
-                {visibleHwKeys.size < legendHwKeys.length && (
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    data-testid="profit-reset-filter"
-                    onClick={handleResetGpus}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    {t.resetFilter}
-                  </Button>
-                )}
-              </div>
-            )}
           </div>
         </Card>
       </section>
@@ -1796,14 +1917,14 @@ function ProfitEstimatorInner({
         <Card>
           {pricingNotice && (
             <div
-              className="mb-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+              className="mb-3 rounded-md border border-border/30 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
               data-testid="profit-pricing-notice"
             >
               {pricingNotice}
             </div>
           )}
           {pricing ? (
-            <figure data-testid="profit-figure" className="relative rounded-lg">
+            <figure data-testid="profit-figure" className="relative min-w-0">
               <ChartButtons
                 chartId="profit-estimator-chart"
                 analyticsPrefix="profit_estimator"
@@ -1813,7 +1934,7 @@ function ProfitEstimatorInner({
                   precisions: selectedPrecisions,
                   gpuCount: selectedGPUs.length,
                 })}
-                className="absolute top-0 right-0 z-10 mb-0"
+                className="md:absolute md:top-0 md:right-0 md:z-10 md:mb-0"
                 hideZoomReset
                 onExportCsv={handleExportCsv}
                 exportFileName={exportFileName}
@@ -1824,13 +1945,46 @@ function ProfitEstimatorInner({
                 colorResolver={colorForRow}
                 assumptions={assumptions}
                 caption={caption}
+                footer={footer}
+                legendElement={
+                  legendItems.length > 0 ? (
+                    <div data-testid="profit-legend" className="contents">
+                      <ChartLegend
+                        variant="sidebar"
+                        legendItems={legendItems}
+                        isLegendExpanded={isLegendExpanded}
+                        onExpandedChange={(expanded) => {
+                          setIsLegendExpanded(expanded);
+                          track('profit_legend_expanded', {
+                            enabled: expanded,
+                          });
+                        }}
+                        switches={[
+                          {
+                            id: 'profit-high-contrast',
+                            label: t.highContrast,
+                            checked: highContrast,
+                            onCheckedChange: (checked: boolean) => {
+                              setHighContrast(checked);
+                              track('profit_high_contrast_toggled', {
+                                enabled: checked,
+                              });
+                            },
+                          },
+                        ]}
+                        reset={{
+                          id: 'profit-reset-filter',
+                          disabled: visibleHwKeys.size >= legendHwKeys.length,
+                          onClick: handleResetGpus,
+                        }}
+                        enableTooltips={true}
+                      />
+                    </div>
+                  ) : undefined
+                }
               />
               <div className="mt-1">
-                <InfoFold
-                  title={t.formulaTitle[basis]}
-                  toggleLabel={t.formulaToggle}
-                  testId="profit-formula-notes"
-                >
+                <InfoFold title={t.formulaTitle[basis]} testId="profit-formula-notes">
                   {t.captionFormula[basis](assumptions.utilizationPct, assumptions.labCutPct)}
                 </InfoFold>
               </div>

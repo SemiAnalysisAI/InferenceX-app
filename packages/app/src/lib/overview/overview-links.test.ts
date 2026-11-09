@@ -68,7 +68,7 @@ function summary(overrides: Partial<OverviewModelSummary> = {}): OverviewModelSu
 describe('buildOverviewDashboardHref', () => {
   it('pins model, run, workload and exact configuration on the English route', () => {
     expect(buildOverviewDashboardHref('en', summary(), config())).toBe(
-      `/inference?${PINNED_QUERY}`,
+      `/infx/inference?${PINNED_QUERY}`,
     );
   });
 
@@ -80,7 +80,7 @@ describe('buildOverviewDashboardHref', () => {
     );
 
     expect(href).toBe(
-      '/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-07-18&g_runid=26714221123' +
+      '/infx/inference?g_model=Qwen-3.5-397B-A17B&g_rundate=2026-07-18&g_runid=26714221123' +
         '&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_costh' +
         '&i_gpus=gb200_dynamo-trt-disagg_mtp&i_spec=mtp&i_disagg=disagg' +
         '&i_optimal=1&i_advlabel=1',
@@ -174,7 +174,7 @@ describe('buildOverviewHistoryDashboardHref', () => {
       'https://inferencex.local',
     );
 
-    expect(href.pathname).toBe('/inference');
+    expect(href.pathname).toBe('/infx/inference');
     expect(Object.fromEntries(href.searchParams)).toMatchObject({
       g_model: Model.Qwen3_5,
       g_rundate: '2026-07-18',
@@ -205,7 +205,7 @@ describe('buildOverviewHistoryDashboardHref', () => {
       'https://inferencex.local',
     );
 
-    expect(href.pathname).toBe('/zh/inference');
+    expect(href.pathname).toBe('/zh/infx/inference');
     expect(href.searchParams.get('i_gpus')).toBe('b200_sglang_mtp');
     expect(href.searchParams.get('i_prec')).toBe('fp4');
     expect(href.searchParams.get('i_dates')).toBe('2026-07-18,2026-06-10');
@@ -215,27 +215,27 @@ describe('buildOverviewHistoryDashboardHref', () => {
 describe('detailHref', () => {
   it('keeps the model drilldown precision-neutral because headline pairs may differ', () => {
     expect(detailHref('en', summary())).toBe(
-      '/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k%2F1k&i_metric=y_costh&i_optimal=1',
+      '/infx/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k%2F1k&i_metric=y_costh&i_optimal=1',
     );
   });
 
   it('opens AgentX rows in the Agentic Traces dashboard scenario', () => {
     expect(detailHref('en', summary({ model: Model.GLM_5_2, scenario: 'agentx' }))).toBe(
-      '/inference?g_model=GLM-5.2&i_seq=agentic-traces&i_metric=y_costh&i_optimal=1',
+      '/infx/inference?g_model=GLM-5.2&i_seq=agentic-traces&i_metric=y_costh&i_optimal=1',
     );
   });
 });
 
 describe('overviewHref', () => {
   it.each([
-    ['en', 50, 'community', '/overview'],
-    ['en', 50, 'all', '/overview?engine=all'],
-    ['en', 100, 'community', '/overview?tier=100'],
-    ['en', 100, 'all', '/overview?tier=100&engine=all'],
-    ['zh', 50, 'community', '/zh/overview'],
-    ['zh', 50, 'all', '/zh/overview?engine=all'],
-    ['zh', 100, 'community', '/zh/overview?tier=100'],
-    ['zh', 100, 'all', '/zh/overview?tier=100&engine=all'],
+    ['en', 50, 'community', '/overview?tier=50'],
+    ['en', 50, 'all', '/overview?tier=50&engine=all'],
+    ['en', 100, 'community', '/overview'],
+    ['en', 100, 'all', '/overview?engine=all'],
+    ['zh', 50, 'community', '/zh/overview?tier=50'],
+    ['zh', 50, 'all', '/zh/overview?tier=50&engine=all'],
+    ['zh', 100, 'community', '/zh/overview'],
+    ['zh', 100, 'all', '/zh/overview?engine=all'],
   ] as const)(
     'builds the canonical %s URL for tier %s and engine scope %s',
     (locale, tier, engineScope, expected) => {
@@ -244,27 +244,29 @@ describe('overviewHref', () => {
   );
 
   it('omits default values and always emits tier before engine', () => {
-    expect(overviewHref('en', 50, 'community')).toBe('/overview');
+    expect(overviewHref('en', 50, 'community')).toBe('/overview?tier=50');
     expect(overviewHref('en', 30, 'all')).toBe('/overview?tier=30&engine=all');
   });
 
   it('adds historical comparison last and omits the default comparison mode', () => {
-    expect(overviewHref('en', 50, 'community', 'hardware')).toBe('/overview');
-    expect(overviewHref('en', 50, 'community', '30d')).toBe('/overview?compare=30d');
-    expect(overviewHref('en', 100, 'all', '30d')).toBe('/overview?tier=100&engine=all&compare=30d');
-    expect(overviewHref('zh', 100, 'all', '30d')).toBe(
-      '/zh/overview?tier=100&engine=all&compare=30d',
+    expect(overviewHref('en', 50, 'community', 'hardware')).toBe(
+      '/overview?tier=50&compare=hardware',
     );
+    expect(overviewHref('en', 50, 'community', '30d')).toBe('/overview?tier=50');
+    expect(overviewHref('en', 100, 'all', '30d')).toBe('/overview?engine=all');
+    expect(overviewHref('zh', 100, 'all', '30d')).toBe('/zh/overview?engine=all');
   });
 
   it('omits the B200 default reference and preserves a non-default reference in every mode', () => {
-    expect(overviewHref('en', 50, 'community', 'hardware', 'b200')).toBe('/overview');
-    expect(overviewHref('en', 50, 'community', 'hardware', 'b300')).toBe('/overview?ref=b300');
-    expect(overviewHref('en', 100, 'all', '30d', 'b300')).toBe(
-      '/overview?tier=100&engine=all&ref=b300&compare=30d',
+    expect(overviewHref('en', 50, 'community', 'hardware', 'b200')).toBe(
+      '/overview?tier=50&compare=hardware',
     );
+    expect(overviewHref('en', 50, 'community', 'hardware', 'b300')).toBe(
+      '/overview?tier=50&ref=b300&compare=hardware',
+    );
+    expect(overviewHref('en', 100, 'all', '30d', 'b300')).toBe('/overview?engine=all&ref=b300');
     expect(overviewHref('zh', 50, 'community', '30d', 'b300')).toBe(
-      '/zh/overview?ref=b300&compare=30d',
+      '/zh/overview?tier=50&ref=b300',
     );
   });
 });
@@ -307,8 +309,8 @@ describe('overview switch links', () => {
   });
 
   it.each([
-    ['en', 100, 'community', '/overview?tier=100'],
-    ['en', 100, 'all', '/overview?tier=100&engine=all'],
+    ['en', 100, 'community', '/overview'],
+    ['en', 100, 'all', '/overview?engine=all'],
     ['zh', 30, 'all', '/zh/overview?tier=30&engine=all'],
   ] as const)(
     'preserves engine scope when changing tiers',
@@ -320,21 +322,19 @@ describe('overview switch links', () => {
   );
 
   it('preserves historical comparison when changing tiers', () => {
-    expect(overviewTierHref('en', 75, 'all', '30d')).toBe(
-      '/overview?tier=75&engine=all&compare=30d',
-    );
+    expect(overviewTierHref('en', 75, 'all', '30d')).toBe('/overview?tier=75&engine=all');
   });
 
   it('preserves the selected reference when changing tiers', () => {
     expect(overviewTierHref('en', 75, 'all', 'hardware', 'b300')).toBe(
-      '/overview?tier=75&engine=all&ref=b300',
+      '/overview?tier=75&engine=all&ref=b300&compare=hardware',
     );
   });
 
   it.each([
-    ['en', 'all', 50, '/overview?engine=all'],
-    ['en', 'all', 100, '/overview?tier=100&engine=all'],
-    ['zh', 'community', 100, '/zh/overview?tier=100'],
+    ['en', 'all', 50, '/overview?tier=50&engine=all'],
+    ['en', 'all', 100, '/overview?engine=all'],
+    ['zh', 'community', 100, '/zh/overview'],
   ] as const)(
     'preserves tier when changing engine scope',
     (locale, engineScope, tier, expected) => {
@@ -345,38 +345,38 @@ describe('overview switch links', () => {
   );
 
   it('preserves historical comparison when changing engine scope', () => {
-    expect(overviewEngineScopeHref('en', 'all', 50, '30d')).toBe(
-      '/overview?engine=all&compare=30d',
-    );
+    expect(overviewEngineScopeHref('en', 'all', 50, '30d')).toBe('/overview?tier=50&engine=all');
   });
 
   it('preserves the selected reference when changing engine scope', () => {
     expect(overviewEngineScopeHref('en', 'all', 50, 'hardware', 'gb300')).toBe(
-      '/overview?engine=all&ref=gb300',
+      '/overview?tier=50&engine=all&ref=gb300&compare=hardware',
     );
   });
 });
 
 describe('overview model scope links', () => {
   it('appends models=all last and omits the default scope', () => {
-    expect(overviewHref('en', 50, 'community', 'hardware', 'b200', 'default')).toBe('/overview');
+    expect(overviewHref('en', 50, 'community', 'hardware', 'b200', 'default')).toBe(
+      '/overview?tier=50&compare=hardware',
+    );
     expect(overviewHref('en', 50, 'community', 'hardware', 'b200', 'all')).toBe(
-      '/overview?models=all',
+      '/overview?tier=50&compare=hardware&models=all',
     );
     expect(overviewHref('en', 100, 'all', '30d', 'b300', 'all')).toBe(
-      '/overview?tier=100&engine=all&ref=b300&compare=30d&models=all',
+      '/overview?engine=all&ref=b300&models=all',
     );
     expect(overviewHref('zh', 50, 'community', 'hardware', 'b200', 'all')).toBe(
-      '/zh/overview?models=all',
+      '/zh/overview?tier=50&compare=hardware&models=all',
     );
   });
 
   it('preserves the model scope when changing tiers and engine scope', () => {
     expect(overviewTierHref('en', 75, 'community', 'hardware', 'b200', 'all')).toBe(
-      '/overview?tier=75&models=all',
+      '/overview?tier=75&compare=hardware&models=all',
     );
     expect(overviewEngineScopeHref('en', 'all', 50, 'hardware', 'b200', 'all')).toBe(
-      '/overview?engine=all&models=all',
+      '/overview?tier=50&engine=all&compare=hardware&models=all',
     );
   });
 
@@ -394,34 +394,34 @@ describe('overview model scope links', () => {
 describe('overview row scope links', () => {
   it('leaves the canonical 30-day URL untouched and appends rows=changed last', () => {
     expect(overviewHref('en', 50, 'community', '30d', 'b200', 'default', 'all')).toBe(
-      '/overview?compare=30d',
+      '/overview?tier=50',
     );
     expect(overviewHref('en', 50, 'community', '30d', 'b200', 'default', 'changed')).toBe(
-      '/overview?compare=30d&rows=changed',
+      '/overview?tier=50&rows=changed',
     );
     expect(overviewHref('en', 100, 'all', '30d', 'b300', 'all', 'changed')).toBe(
-      '/overview?tier=100&engine=all&ref=b300&compare=30d&models=all&rows=changed',
+      '/overview?engine=all&ref=b300&models=all&rows=changed',
     );
     expect(overviewHref('zh', 50, 'community', '30d', 'b200', 'default', 'changed')).toBe(
-      '/zh/overview?compare=30d&rows=changed',
+      '/zh/overview?tier=50&rows=changed',
     );
   });
 
   it('keeps the row scope on the URL in hardware mode, where it is dormant', () => {
     expect(overviewHref('en', 50, 'community', 'hardware', 'b200', 'default', 'changed')).toBe(
-      '/overview?rows=changed',
+      '/overview?tier=50&compare=hardware&rows=changed',
     );
     expect(overviewHref('en', 75, 'community', 'hardware', 'b200', 'all', 'changed')).toBe(
-      '/overview?tier=75&models=all&rows=changed',
+      '/overview?tier=75&compare=hardware&models=all&rows=changed',
     );
   });
 
   it('preserves the row scope when changing tiers and engine scope', () => {
     expect(overviewTierHref('en', 75, 'community', '30d', 'b200', 'default', 'changed')).toBe(
-      '/overview?tier=75&compare=30d&rows=changed',
+      '/overview?tier=75&rows=changed',
     );
     expect(overviewEngineScopeHref('en', 'all', 50, '30d', 'b200', 'default', 'changed')).toBe(
-      '/overview?engine=all&compare=30d&rows=changed',
+      '/overview?tier=50&engine=all&rows=changed',
     );
   });
 
@@ -444,41 +444,41 @@ describe('overview row scope links', () => {
 describe('overview hardware row scope links', () => {
   it('leaves the canonical URL untouched and appends hwrows=priced last', () => {
     expect(overviewHref('en', 50, 'community', 'hardware', 'b200', 'default', 'all', 'all')).toBe(
-      '/overview',
+      '/overview?tier=50&compare=hardware',
     );
     expect(
       overviewHref('en', 50, 'community', 'hardware', 'b200', 'default', 'all', 'priced'),
-    ).toBe('/overview?hwrows=priced');
+    ).toBe('/overview?tier=50&compare=hardware&hwrows=priced');
     expect(overviewHref('en', 100, 'all', 'hardware', 'b300', 'all', 'all', 'priced')).toBe(
-      '/overview?tier=100&engine=all&ref=b300&models=all&hwrows=priced',
+      '/overview?engine=all&ref=b300&compare=hardware&models=all&hwrows=priced',
     );
     expect(
       overviewHref('zh', 50, 'community', 'hardware', 'b200', 'default', 'all', 'priced'),
-    ).toBe('/zh/overview?hwrows=priced');
+    ).toBe('/zh/overview?tier=50&compare=hardware&hwrows=priced');
   });
 
   it('keeps the hardware row scope on the URL in history mode, where it is dormant', () => {
     expect(overviewHref('en', 50, 'community', '30d', 'b200', 'default', 'all', 'priced')).toBe(
-      '/overview?compare=30d&hwrows=priced',
+      '/overview?tier=50&hwrows=priced',
     );
   });
 
   it('writes both row scopes at once, so a URL rebuilt from page data keeps them', () => {
     expect(overviewHref('en', 50, 'community', '30d', 'b200', 'default', 'changed', 'priced')).toBe(
-      '/overview?compare=30d&rows=changed&hwrows=priced',
+      '/overview?tier=50&rows=changed&hwrows=priced',
     );
     expect(
       overviewHref('en', 50, 'community', 'hardware', 'b200', 'default', 'changed', 'priced'),
-    ).toBe('/overview?rows=changed&hwrows=priced');
+    ).toBe('/overview?tier=50&compare=hardware&rows=changed&hwrows=priced');
   });
 
   it('preserves the hardware row scope when changing tiers and engine scope', () => {
     expect(
       overviewTierHref('en', 75, 'community', 'hardware', 'b200', 'default', 'all', 'priced'),
-    ).toBe('/overview?tier=75&hwrows=priced');
+    ).toBe('/overview?tier=75&compare=hardware&hwrows=priced');
     expect(
       overviewEngineScopeHref('en', 'all', 50, 'hardware', 'b200', 'default', 'all', 'priced'),
-    ).toBe('/overview?engine=all&hwrows=priced');
+    ).toBe('/overview?tier=50&engine=all&compare=hardware&hwrows=priced');
   });
 
   it('lets each mode keep its own filter across a tab switch', () => {

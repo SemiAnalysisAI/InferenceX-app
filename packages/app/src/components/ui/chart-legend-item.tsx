@@ -1,6 +1,7 @@
 import { Plus, Table2, X } from 'lucide-react';
 import React from 'react';
 
+import { legendSwatchDasharray } from '@/lib/charts/framework-dash';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 
@@ -50,7 +51,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
   name,
   label,
   color,
-  lineDasharray,
+  lineDasharray: requestedDasharray,
   title,
   isActive,
   onClick,
@@ -69,6 +70,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
   idScope,
 }) => {
   const locale = useLocale();
+  const lineDasharray = legendSwatchDasharray(requestedDasharray);
   const t = STRINGS[locale];
   const id = `checkbox-${idScope ? `${idScope}-` : ''}${hw || name}`;
   const isLongText = (label ?? '').length > 8;
@@ -177,7 +179,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
               : isLegendExpanded
                 ? 'whitespace-nowrap'
                 : 'whitespace-normal',
-            sidebarMode && !isActive && 'opacity-40',
+            sidebarMode && !isActive && 'opacity-50',
           )}
         >
           {label}

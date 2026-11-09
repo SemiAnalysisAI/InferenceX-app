@@ -1,7 +1,9 @@
 import { costPerGpuHour, type CostTier } from './hardware';
+import type { ResultsEvidence } from './results-evidence';
 
 /** One stored serving cell (hardware × client concurrency) flattened for the dashboard. */
 export interface VideoPoint {
+  results?: ResultsEvidence | null;
   id: string;
   runId: string;
   artifactId: number;
@@ -29,6 +31,8 @@ export interface VideoPoint {
   p50: number | null;
   p90: number | null;
   wallSeconds: number | null;
+  /** Valid decoded output seconds per measurement wall-hour; absent in older projections. */
+  videoSecondsPerHour?: number | null;
   durationSeconds: number | null;
   frameCount: number | null;
   /** GPU-board kJ per valid clip over the recorded generation window; null when power is invalid. */
@@ -83,8 +87,8 @@ export const COST_TIERS: readonly CostTier[] = ['h', 'r'];
 
 /** Same tier names the inference calculator uses for HW_REGISTRY costh/costr. */
 export const TIER_LABELS: Record<CostTier, { en: string; zh: string }> = {
-  h: { en: 'Owning at Large Hyperscaler Volume', zh: 'Hyperscaler 自有设备' },
-  r: { en: 'Rent - 3 Year Commit', zh: '租赁 - 3 年承诺' },
+  h: { en: 'Owning at large hyperscaler volume', zh: 'Hyperscaler 自有设备' },
+  r: { en: 'Rent – 3-year commit', zh: '租赁 - 3 年承诺' },
 };
 
 export const VIDEO_METRICS: Record<MetricId, MetricDefinition> = {

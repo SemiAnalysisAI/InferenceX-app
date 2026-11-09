@@ -31,9 +31,23 @@ import {
 } from '@/lib/catalog/data-mappings';
 
 describe('model selector ordering', () => {
+  it('puts Kimi K3.1 Pro first without reordering the other default models', () => {
+    expect(MODEL_OPTIONS.filter(isModelDefault)).toEqual([
+      Model.Kimi_K3_1_Pro,
+      Model.DeepSeek_V4_1_Flash,
+      Model.GLM_5_2,
+      Model.GLM_5_3_Flash,
+      Model.MiniMax_M3_1_Flash,
+      Model.Muse_Spark_Open,
+      Model.Qwen3_5,
+      Model.Qwen3_8_Flash_Next,
+    ]);
+  });
+
   it('keeps non-default models in their existing order and excludes hidden models', () => {
     expect(MODEL_OPTIONS.filter((model) => !isModelDefault(model))).toEqual([
       Model.DeepSeek_V4_Pro,
+      Model.Kimi_K3,
       Model.Kimi_K2_5,
       Model.MiniMax_M3,
       Model.DeepSeek_R1,
@@ -50,6 +64,13 @@ describe('model selector ordering', () => {
 });
 
 describe('getModelAndSequence', () => {
+  it('recognizes the GLM Flash fixed-sequence overlay without using the non-Flash bucket', () => {
+    expect(getModelAndSequence('bmk_glm5.3flash_8k1k_fp8_sglang')).toEqual({
+      model: Model.GLM_5_3_Flash,
+      sequence: Sequence.EightK_OneK,
+    });
+  });
+
   it.each(['fp8', 'fp4', 'nvfp4'])(
     'keeps Flash %s artifacts out of the older GLM buckets',
     (precision) => {
@@ -93,6 +114,18 @@ describe('getModelAndSequence', () => {
   it('parses artifact name with kimik2.5 model prefix', () => {
     const result = getModelAndSequence('results_kimik2.5_1k1k');
     expect(result).toEqual({ model: Model.Kimi_K2_5, sequence: Sequence.OneK_OneK });
+  });
+
+  it('keeps kimik3.1 artifacts out of the kimik3 bucket', () => {
+    expect(
+      getModelAndSequence(
+        'bmk_agentic_kimik3.1_tp8_conc16_kvdram-hicache_spec-draft_model_fp4_sglang',
+      ),
+    ).toEqual({ model: Model.Kimi_K3_1_Pro, sequence: Sequence.AgenticTraces });
+    expect(getModelAndSequence('bmk_agentic_kimik3_tp8_conc16_fp4_vllm')).toEqual({
+      model: Model.Kimi_K3,
+      sequence: Sequence.AgenticTraces,
+    });
   });
 
   it('prefers the specific glm5.2 prefix over the glm5 family prefix', () => {
@@ -227,8 +260,8 @@ describe('isModelDeprecated', () => {
     expect(isModelDeprecated(Model.Kimi_K2_5)).toBe(true);
   });
 
-  it('keeps Kimi K3 active', () => {
-    expect(isModelDeprecated(Model.Kimi_K3)).toBe(false);
+  it('marks Kimi K3 deprecated', () => {
+    expect(isModelDeprecated(Model.Kimi_K3)).toBe(true);
   });
 
   it('keeps GLM-5.2 active', () => {
@@ -342,6 +375,15 @@ describe('showsTcoBasisSelector', () => {
         expect(showsTcoBasisSelector(model, sequence)).toBe(
           sequence === Sequence.EightK_OneK || sequence === Sequence.AgenticTraces,
         );
+      }
+    },
+  );
+
+  it.each([Model.Muse_Spark_Open, Model.GLM_5_2, Model.GLM_5_3_Flash])(
+    'shows the selector for %s only on AgentX',
+    (model) => {
+      for (const sequence of Object.values(Sequence)) {
+        expect(showsTcoBasisSelector(model, sequence)).toBe(sequence === Sequence.AgenticTraces);
       }
     },
   );
@@ -473,10 +515,18 @@ describe('getEvalBenchmarkLabel', () => {
 });
 
 describe('isSequenceHiddenForModel', () => {
-  it.each([Model.Muse_Spark_Open, Model.GLM_5_3_Flash])('only offers AgentX for %s', (model) => {
+  it.each([Model.Muse_Spark_Open])('only offers AgentX for %s', (model) => {
     expect(
       SEQUENCE_OPTIONS.filter((sequence) => !isSequenceHiddenForModel(model, sequence)),
     ).toEqual([Sequence.AgenticTraces]);
+  });
+  it('offers GLM Flash 8K/1K and AgentX without exposing other fixed sequences', () => {
+    expect(
+      SEQUENCE_OPTIONS.filter(
+        (sequence) => !isSequenceHiddenForModel(Model.GLM_5_3_Flash, sequence),
+      ),
+    ).toEqual([Sequence.EightK_OneK, Sequence.AgenticTraces]);
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.GLM_5_3_Flash)).toBe('default');
   });
   it('hides 8K/1K for GLM-5.2 / GLM-5.3 and keeps Agentic coding', () => {
     expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.EightK_OneK)).toBe(true);

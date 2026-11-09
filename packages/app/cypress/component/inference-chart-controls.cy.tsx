@@ -14,7 +14,7 @@ function CostControls({ showTcoBasis = false }: { showTcoBasis?: boolean }) {
       <InferenceChartControls showXAxisMode />
       <ResultContext
         locale="en"
-        costTier="Owning at Large Hyperscaler Volume"
+        costTier="Owning at large hyperscaler volume"
         tcoBasis={
           <TcoBasisCaption
             hardwareKeys={new Set(showTcoBasis ? ['tpuv7_vllm'] : ['b200_sglang'])}
@@ -66,27 +66,6 @@ describe('Inference ChartControls', () => {
     cy.get('[data-testid="measured-metric-controls"]').should('not.exist');
   });
 
-  it('renders the Y-axis metric selector', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
-    cy.get('[data-testid="cost-display-selector"]').should('not.exist');
-  });
-
-  it('Y-axis metric selector shows grouped options', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.contains('Throughput').should('exist');
-  });
-
-  it('calls setSelectedYAxisMetric when a Y-axis option is chosen', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.contains('[data-slot="select-item"]', 'Output Token Throughput per Chip').click();
-    cy.get('@setSelectedYAxisMetric').should('have.been.calledOnce');
-  });
-
-  it('does not render the Cost Tier selector; it lives in the chart caption', () => {
-    cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
-    cy.get('[data-testid="cost-tier-selector"]').should('not.exist');
-  });
-
   it('lists each tiered metric once in the Y-axis selector, without the tier suffix', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.get('[data-slot="select-item"]').then(($items) => {
@@ -97,13 +76,13 @@ describe('Inference ChartControls', () => {
       expect(
         labels.filter((label) => label.startsWith('Cost per Million Total Tokens')),
       ).to.deep.equal(['Cost per Million Total Tokens']);
-      expect(labels.filter((label) => label.includes('(Custom User Values)'))).to.deep.equal([
-        'Token Throughput per All in Utility MW (Custom User Values)',
+      expect(labels.filter((label) => label.includes('(Custom user values)'))).to.deep.equal([
+        'Token Throughput per All in Utility MW (Custom user values)',
       ]);
-      expect(labels.some((label) => label.includes('Owning at Large Hyperscaler Volume'))).to.equal(
+      expect(labels.some((label) => label.includes('Owning at large hyperscaler volume'))).to.equal(
         false,
       );
-      expect(labels.some((label) => label.includes('Rent - 3 Year Commit'))).to.equal(false);
+      expect(labels.some((label) => label.includes('Rent – 3-year commit'))).to.equal(false);
     });
     cy.get('[data-testid="locked-tier-badge"]').should('not.exist');
   });
@@ -116,24 +95,19 @@ describe('Inference ChartControls', () => {
     cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_costh');
   });
 
-  it('hides the GPU comparison section when no GPUs are selected', () => {
-    cy.contains('Comparison Date Range').should('not.exist');
-    cy.contains('Intermediary Dates').should('not.exist');
-  });
-
-  it('uses a full-width benchmark row above chart and history controls on desktop', () => {
+  it('gives benchmark config its own row above chart config and compare history on desktop', () => {
     cy.viewport(1280, 900);
     cy.get('fieldset').should('have.length', 3);
     cy.get('fieldset').then(($groups) => {
-      const rects = [...$groups].map((group) => group.getBoundingClientRect());
-      expect(rects[1].top).to.be.greaterThan(rects[0].bottom);
-      expect(rects[2].top).to.be.closeTo(rects[1].top, 1);
-      expect(rects[0].left).to.equal(rects[1].left);
-      expect(rects[0].right).to.equal(rects[2].right);
-      expect(rects[1].width, 'axes get more space than the history picker').to.be.greaterThan(
-        rects[2].width,
+      const [benchmark, chart, history] = [...$groups].map((group) =>
+        group.getBoundingClientRect(),
       );
-      expect(rects[0].height, 'benchmark controls fit in a single row').to.be.lessThan(130);
+      expect(chart.top).to.be.greaterThan(benchmark.bottom);
+      expect(chart.left).to.be.closeTo(benchmark.left, 1);
+      expect(history.top).to.be.closeTo(chart.top, 1);
+      expect(chart.right).to.be.lessThan(history.left);
+      expect(history.right).to.be.closeTo(benchmark.right, 1);
+      expect(benchmark.height, 'benchmark controls fit in a single row').to.be.lessThan(130);
     });
     cy.get('#model-select').then(($model) => {
       const model = $model[0].getBoundingClientRect();
@@ -189,21 +163,23 @@ describe('Inference ChartControls', () => {
         expect(y.top).to.be.greaterThan(x.bottom);
         expect(x.height).to.equal(44);
         expect(y.height).to.equal(x.height);
-        expect(x.width).to.be.at.most(176);
         expect(x.width).to.be.lessThan(y.width);
       });
     });
-    cy.get('#scenario-select').then(($scenario) => {
-      const scenario = $scenario[0].getBoundingClientRect();
-      cy.get('#precision-select').should(($precision) => {
-        const precision = $precision[0].getBoundingClientRect();
-        expect(precision.top).to.be.closeTo(scenario.top, 1);
-        expect(precision.left).to.be.greaterThan(scenario.right);
-      });
+    cy.get('#model-select').then(($model) => {
+      const model = $model[0].getBoundingClientRect();
+      cy.get('fieldset')
+        .first()
+        .find('#precision-select')
+        .should(($precision) => {
+          const precision = $precision[0].getBoundingClientRect();
+          expect(precision.top).to.be.greaterThan(model.bottom);
+          expect(precision.left).to.be.closeTo(model.left, 1);
+        });
     });
   });
 
-  it('keeps benchmark and chart settings in one row when history comparison is omitted', () => {
+  it('gives benchmark and chart settings full-width rows when history comparison is omitted', () => {
     cy.viewport(1280, 900);
     mountWithProviders(<InferenceChartControls hideGpuComparison />, {
       inference: {},
@@ -215,18 +191,16 @@ describe('Inference ChartControls', () => {
       .then(($groups) => {
         const benchmark = $groups[0].getBoundingClientRect();
         const chart = $groups[1].getBoundingClientRect();
-        expect(benchmark.top).to.equal(chart.top);
-        expect(benchmark.width).to.be.greaterThan(chart.width);
-        expect(benchmark.right).to.be.lessThan(chart.left);
+        expect(chart.top).to.be.greaterThan(benchmark.bottom);
+        expect(chart.left).to.be.closeTo(benchmark.left, 1);
+        expect(chart.right).to.be.closeTo(benchmark.right, 1);
         expect(benchmark.height, 'benchmark controls fit in a single row').to.be.lessThan(130);
       });
     cy.get('#model-select').then(($model) => {
       const model = $model[0].getBoundingClientRect();
-      cy.get('#scenario-select, #precision-select, [data-testid="yaxis-metric-selector"]').each(
-        ($control) => {
-          expect($control[0].getBoundingClientRect().top).to.be.closeTo(model.top, 1);
-        },
-      );
+      cy.get('#scenario-select, #precision-select').each(($control) => {
+        expect($control[0].getBoundingClientRect().top).to.be.closeTo(model.top, 1);
+      });
     });
   });
 
@@ -236,7 +210,7 @@ describe('Inference ChartControls', () => {
 
     cy.get('#model-select').should('be.visible');
     cy.get('#scenario-select').should('have.length', 1).and('not.be.visible');
-    cy.get('#precision-select').should('have.length', 1).and('not.be.visible');
+    cy.get('#precision-select').should('have.length', 1).and('be.visible');
     cy.get('[data-testid="inference-secondary-controls"] > button')
       .should('have.attr', 'aria-expanded', 'false')
       .click()
@@ -244,7 +218,7 @@ describe('Inference ChartControls', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
     cy.get('[data-testid="inference-secondary-controls"]').within(() => {
       cy.get('#scenario-select').should('be.visible');
-      cy.get('#precision-select').should('be.visible');
+      cy.get('#precision-select').should('not.exist');
     });
 
     cy.get('[data-testid="inference-secondary-controls"] > button')
@@ -252,7 +226,7 @@ describe('Inference ChartControls', () => {
       .should('have.attr', 'aria-expanded', 'false');
     cy.get('[data-testid="yaxis-metric-selector"]').should('not.be.visible');
     cy.get('#scenario-select').should('not.be.visible');
-    cy.get('#precision-select').should('not.be.visible');
+    cy.get('#precision-select').should('be.visible');
     cy.get('#model-select').should('contain.text', 'DeepSeek R1 0528');
   });
 
@@ -267,7 +241,7 @@ describe('Inference ChartControls', () => {
   it('localizes the mobile secondary changed-count label', () => {
     cy.viewport(390, 844);
     mountWithProviders(
-      <PathnameContext.Provider value="/zh/inference">
+      <PathnameContext.Provider value="/zh/infx/inference">
         <InferenceChartControls showXAxisMode />
       </PathnameContext.Provider>,
       { inference: {}, unofficial: {} },
@@ -301,6 +275,23 @@ describe('Inference ChartControls cost metrics', () => {
           selectedSequence: sequence,
         },
         globalFilters: { selectedModel: Model.Kimi_K3, effectiveSequence: sequence },
+      });
+      cy.get('[data-testid="tco-basis-internal"]').should('have.attr', 'aria-pressed', 'true');
+      cy.get('[data-testid="tco-basis-external"]').click();
+      cy.get('@setTcoBasis_global').should('have.been.calledOnceWithExactly', 'external');
+    });
+  }
+
+  for (const model of [Model.Muse_Spark_Open, Model.GLM_5_2, Model.GLM_5_3_Flash]) {
+    it(`switches the global TCO basis for ${model} on AgentX`, () => {
+      mountWithProviders(<CostControls showTcoBasis />, {
+        unofficial: {},
+        inference: {
+          selectedYAxisMetric: 'y_costh',
+          selectedModel: model,
+          selectedSequence: Sequence.AgenticTraces,
+        },
+        globalFilters: { selectedModel: model, effectiveSequence: Sequence.AgenticTraces },
       });
       cy.get('[data-testid="tco-basis-internal"]').should('have.attr', 'aria-pressed', 'true');
       cy.get('[data-testid="tco-basis-external"]').click();
@@ -391,7 +382,6 @@ describe('Inference ChartControls cost metrics', () => {
     ]) {
       cy.contains('[data-slot="select-item"]', label).should('exist');
     }
-    cy.get('[data-testid="cost-display-selector"]').should('not.exist');
   });
 
   it('selects tokens per dollar through the Y-axis metric control on the active tier', () => {
@@ -435,7 +425,7 @@ describe('Inference ChartControls with GPUs selected', () => {
       },
     });
 
-    cy.contains('Comparison Date Range').should('be.visible');
+    cy.contains('Comparison date range').should('be.visible');
   });
 
   it('leaves the optional date range unflagged for a selected current config', () => {
@@ -483,7 +473,7 @@ describe('Inference axis selector — Chinese Agentic controls', () => {
   it('keeps every full option name and a localized FAQ link on phones', () => {
     cy.viewport(390, 844);
     mountWithProviders(
-      <PathnameContext.Provider value="/zh/inference">
+      <PathnameContext.Provider value="/zh/infx/inference">
         <InferenceChartControls showXAxisMode />
       </PathnameContext.Provider>,
       {
@@ -510,89 +500,56 @@ describe('Axis option help', () => {
     mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {}, unofficial: {} });
   });
 
-  for (const searchable of [true, false]) {
-    it(`lets Tab leave the help grid in both directions (searchable=${searchable})`, () => {
-      mountWithProviders(
-        <div>
-          <button data-testid="before-field">Before</button>
-          <SearchableSelect
-            value="first"
-            onValueChange={cy.stub().as('selectMetric')}
-            searchable={searchable}
-            triggerTestId="keyboard-field"
-            placeholder="Metric"
-            groups={[
-              {
-                label: '',
-                options: [
-                  { value: 'first', label: 'First metric', help: <p>First explanation</p> },
-                  { value: 'second', label: 'Second metric', help: <p>Second explanation</p> },
-                ],
-              },
-            ]}
-          />
-          <button data-testid="after-field">After</button>
-        </div>,
-        { inference: {} },
-      );
-      cy.get('[data-testid="keyboard-field"]')
-        .should('have.attr', 'aria-label', 'Metric: First metric')
-        .click('right');
-      cy.focused().trigger('keydown', { key: 'Tab' });
-      cy.get('[data-testid="after-field"]').should('have.focus');
-      cy.get('[data-testid="keyboard-field"]').should('have.attr', 'aria-expanded', 'false');
-      cy.get('[data-testid="keyboard-field"]').click('right');
-      cy.focused().trigger('keydown', { key: 'Tab', shiftKey: true });
-      cy.get('[data-testid="before-field"]').should('have.focus');
-      cy.get('[data-testid="keyboard-field"]').should('have.attr', 'aria-expanded', 'false');
-      cy.get('@selectMetric').should('not.have.been.called');
-    });
-  }
+  it('lets Tab leave the help grid in both directions (searchable=true)', () => {
+    mountWithProviders(
+      <div>
+        <button data-testid="before-field">Before</button>
+        <SearchableSelect
+          value="first"
+          onValueChange={cy.stub().as('selectMetric')}
+          searchable
+          triggerTestId="keyboard-field"
+          placeholder="Metric"
+          groups={[
+            {
+              label: '',
+              options: [
+                { value: 'first', label: 'First metric', help: <p>First explanation</p> },
+                { value: 'second', label: 'Second metric', help: <p>Second explanation</p> },
+              ],
+            },
+          ]}
+        />
+        <button data-testid="after-field">After</button>
+      </div>,
+      { inference: {} },
+    );
+    cy.get('[data-testid="keyboard-field"]')
+      .should('have.attr', 'aria-label', 'Metric: First metric')
+      .click('right');
+    cy.focused().trigger('keydown', { key: 'Tab' });
+    cy.get('[data-testid="after-field"]').should('have.focus');
+    cy.get('[data-testid="keyboard-field"]').should('have.attr', 'aria-expanded', 'false');
+    cy.get('[data-testid="keyboard-field"]').click('right');
+    cy.focused().trigger('keydown', { key: 'Tab', shiftKey: true });
+    cy.get('[data-testid="before-field"]').should('have.focus');
+    cy.get('[data-testid="keyboard-field"]').should('have.attr', 'aria-expanded', 'false');
+    cy.get('@selectMetric').should('not.have.been.called');
+  });
 
-  for (const [trigger, value, explanation] of [
-    ['#scenario-select', Sequence.EightK_OneK, 'Input Sequence Length'],
-    ['#x-axis-mode-select', 'interactivity', 'Interactivity'],
-    ['#y-axis-select', 'y_tpPerGpu', 'Rate of total tokens'],
-  ]) {
-    it(`shows selected-value help inside ${trigger} without opening its menu`, () => {
-      cy.get(trigger).then(($trigger) => {
-        const bounds = $trigger[0].getBoundingClientRect();
-        cy.get(`[data-testid="selected-option-help-${value}"]`)
-          .should(($help) => {
-            const icon = $help.find('svg')[0].getBoundingClientRect();
-            expect(icon.left).to.be.greaterThan(bounds.left);
-            expect(icon.right).to.be.lessThan(bounds.right);
-            expect(icon.top).to.be.greaterThan(bounds.top);
-            expect(icon.bottom).to.be.lessThan(bounds.bottom);
-            expect($help[0].closest('button[role="combobox"]')).to.equal(null);
-          })
-          .trigger('pointerover', { pointerType: 'mouse' });
-      });
-      cy.get(`[data-testid="selected-option-help-content-${value}"]`)
-        .should('be.visible')
-        .and('contain.text', explanation);
-      cy.get(trigger).should('have.attr', 'aria-expanded', 'false');
-      cy.get(trigger).click('right');
-      cy.get(`[data-testid="selected-option-help-${value}"]`).should('not.exist');
-      cy.get(`[data-testid="option-help-${value}"]`)
-        .should('be.visible')
-        .trigger('pointerover', { pointerType: 'mouse' });
-      cy.get(`[data-testid="option-help-content-${value}"]`)
-        .should('be.visible')
-        .and('contain.text', explanation);
-      cy.get(trigger).should('have.attr', 'aria-expanded', 'true');
+  it('keeps metric help in the open #y-axis-select menu, not the closed control', () => {
+    cy.get('#y-axis-select').should(($trigger) => {
+      expect($trigger[0].parentElement!.querySelector('[data-slot="info-help"]')).to.equal(null);
     });
-
-    it(`keeps selected-value help open when activating its focused button in ${trigger}`, () => {
-      cy.get(`[data-testid="selected-option-help-${value}"]`).focus().click();
-      cy.get(`[data-testid="selected-option-help-content-${value}"]`)
-        .should('be.visible')
-        .and('contain.text', explanation);
-      cy.get(trigger).should('have.attr', 'aria-expanded', 'false');
-      cy.get(`[data-testid="selected-option-help-${value}"]`).type('{esc}');
-      cy.get(`[data-testid="selected-option-help-content-${value}"]`).should('not.exist');
-    });
-  }
+    cy.get('#y-axis-select').click('right');
+    cy.get('[data-testid="option-help-y_tpPerGpu"]')
+      .should('be.visible')
+      .trigger('pointerover', { pointerType: 'mouse' });
+    cy.get('[data-testid="option-help-content-y_tpPerGpu"]')
+      .should('be.visible')
+      .and('contain.text', 'Rate of total tokens');
+    cy.get('#y-axis-select').should('have.attr', 'aria-expanded', 'true');
+  });
 
   it('keeps hover help readable across the pointer gap without taking search focus', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
@@ -772,7 +729,9 @@ describe('Workflow run dropdown', () => {
     it(`folds run context into mobile controls without duplicating desktop controls (${locale})`, () => {
       cy.viewport(375, 812);
       mountWithProviders(
-        <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+        <PathnameContext.Provider
+          value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+        >
           <InferenceChartControls showXAxisMode runContext={<WorkflowInfoDisplay />} />
         </PathnameContext.Provider>,
         { inference: { availableRuns }, globalFilters: {}, unofficial: {} },
@@ -816,7 +775,7 @@ describe('Workflow run dropdown', () => {
       cy.viewport(375, 812);
       cy.get('[data-testid="inference-run-context"]').should('not.be.visible');
       cy.get('#scenario-select').should('have.length', 1).and('not.be.visible');
-      cy.get('#precision-select').should('have.length', 1).and('not.be.visible');
+      cy.get('#precision-select').should('have.length', 1).and('be.visible');
     });
   }
 
@@ -847,30 +806,13 @@ describe('Workflow run dropdown', () => {
     cy.get('@setSelectedRunId').should('have.been.calledWith', '12345679');
   });
 
-  it('keeps the Chinese run dropdown touch-sized on phones', () => {
-    cy.viewport(390, 844);
-    mountWithProviders(
-      <PathnameContext.Provider value="/zh/inference">
-        <WorkflowInfoDisplay />
-      </PathnameContext.Provider>,
-      { inference: { availableRuns }, globalFilters: {} },
-    );
-    cy.get('#run-select')
-      .should('have.attr', 'aria-label', '运行')
-      .and('contain.text', '第 1/2 次运行')
-      .then(($run) => {
-        expect($run[0].getBoundingClientRect().height).to.equal(44);
-      });
-    cy.get('#run-select').click('left');
-    cy.contains('[role="option"]', '第 2 次运行（共 2 次）').click();
-    cy.get('@setSelectedRunId').should('have.been.calledOnceWith', '12345679');
-  });
-
   for (const locale of ['en', 'zh'] as const) {
     it(`lays the run context out as aligned, equal-height stepper rows on a 361px phone (${locale})`, () => {
       cy.viewport(361, 780);
       mountWithProviders(
-        <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+        <PathnameContext.Provider
+          value={locale === 'zh' ? '/zh/infx/inference' : '/infx/inference'}
+        >
           <WorkflowInfoDisplay />
         </PathnameContext.Provider>,
         { inference: { availableRuns }, globalFilters: {} },

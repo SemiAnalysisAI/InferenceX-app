@@ -18,11 +18,11 @@ import { track } from '@/lib/analytics/analytics';
 
 const STRINGS = {
   en: {
-    title: 'Raw Request Trace',
+    title: 'Raw request trace',
     description: 'Click a request to expand its details',
-    requestHeaders: 'Request Headers',
-    requestBody: 'Request Body',
-    responseBody: 'Response Body',
+    requestHeaders: 'Request headers',
+    requestBody: 'Request body',
+    responseBody: 'Response body',
     error: 'Error',
   },
   zh: {
@@ -36,7 +36,8 @@ const STRINGS = {
 };
 
 export default function RawTracePage() {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const { requests } = useSession();
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
 
@@ -52,7 +53,7 @@ export default function RawTracePage() {
           return (
             <div
               key={req.id}
-              className="rounded-md border border-border bg-surface overflow-hidden"
+              className="rounded-xl border border-border/30 bg-card overflow-hidden"
             >
               <button
                 onClick={() => {
@@ -73,10 +74,7 @@ export default function RawTracePage() {
                   </Badge>
                   <span className="font-mono text-xs">{req.model || 'unknown'}</span>
                   {has1MContext(req.requestHeaders) && (
-                    <Badge
-                      variant="outline"
-                      className="text-xs py-0 h-5 border-sky-500/30 text-sky-400 font-mono"
-                    >
+                    <Badge variant="outline" className="text-xs py-0 h-5 font-mono">
                       1M
                     </Badge>
                   )}
@@ -109,13 +107,11 @@ export default function RawTracePage() {
                       req.cacheWriteTokens,
                       req.ttftMs,
                     );
-                    return ps === null ? null : (
-                      <span className="text-sky-500">{formatPrefillSpeed(ps)}</span>
-                    );
+                    return ps === null ? null : <span>{formatPrefillSpeed(ps)}</span>;
                   })()}
                   {req.tpotMs !== null && <span>{formatInteractivity(req.tpotMs)}</span>}
                   {req.durationMs !== null && <span>E2E {formatDuration(req.durationMs)}</span>}
-                  <span>{formatSnapshotTime(req.timestamp)}</span>
+                  <span>{formatSnapshotTime(req.timestamp, locale)}</span>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="14"
@@ -134,8 +130,8 @@ export default function RawTracePage() {
               </button>
 
               {isExpanded && (
-                <div className="border-t border-border px-4 py-3 space-y-4">
-                  <div role="separator" className="h-px w-full shrink-0 bg-border" />
+                <div className="border-t border-border/20 px-4 py-3 space-y-4">
+                  <div role="separator" className="h-px w-full shrink-0 bg-border/30" />
                   {req.requestHeaders && (
                     <div>
                       <h4 className="text-xs font-medium text-muted-foreground mb-2">

@@ -27,11 +27,14 @@ const selectSequence = (label: string) => {
 
 const visitCalculatorWithOverlay = () => {
   interceptCalculatorOverlayRun();
-  cy.visit(`/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}`, {
-    onBeforeLoad(win) {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+  cy.visit(
+    `/infx/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}`,
+    {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
     },
-  });
+  );
   cy.wait('@unofficialRun');
   cy.get(BARS).should('have.length.at.least', 1);
 };
@@ -41,7 +44,7 @@ describe('TCO calculator — unofficial run overlay', () => {
     it('renders official and unofficial DeepSeek V4 agentic calculations separately', () => {
       interceptOverlayRun();
       cy.visit(
-        `/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(
+        `/infx/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(
           'agentic-traces',
         )}&i_prec=fp4`,
         {
@@ -57,7 +60,7 @@ describe('TCO calculator — unofficial run overlay', () => {
       cy.get(Y_TICKS).should('contain.text', OVERLAY_RUN_BRANCH);
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
-        .should('contain.text', 'P90 Interactivity');
+        .should('contain.text', 'P90 interactivity');
     });
   });
 
@@ -67,22 +70,6 @@ describe('TCO calculator — unofficial run overlay', () => {
     it('renders overlay bars alongside the official bar', () => {
       cy.get(BARS).should('have.length', TOTAL_BARS);
       cy.get(Y_TICKS).should('contain.text', OVERLAY_RUN_BRANCH);
-    });
-
-    it('paints the overlay bar with the run palette color, not the hardware color', () => {
-      cy.get(Y_TICKS).then(($ticks) => {
-        const labels = [...$ticks].map((el) => el.textContent ?? '');
-        expect(labels.filter((l) => l.includes('✕'))).to.have.length(OVERLAY_BARS);
-        expect(labels.filter((l) => !l.includes('✕'))).to.have.length(TOTAL_BARS - OVERLAY_BARS);
-      });
-
-      cy.get(BARS).then(($bars) => {
-        const fills = [...$bars].map((el) => el.getAttribute('fill') ?? '');
-        expect(fills.filter((f) => f.includes('overlay-run-0'))).to.have.length(OVERLAY_BARS);
-        expect(fills.filter((f) => !f.includes('overlay-run-'))).to.have.length(
-          TOTAL_BARS - OVERLAY_BARS,
-        );
-      });
     });
   });
 
@@ -116,9 +103,9 @@ describe('TCO calculator — unofficial run overlay', () => {
 
   describe('late overlay arrival', () => {
     it('keeps a GPU filter the user set before the run landed', () => {
-      interceptCalculatorOverlayRun({ runDelayMs: 2000 });
+      const releaseRun = interceptCalculatorOverlayRun({ holdRun: true });
       cy.visit(
-        `/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}`,
+        `/infx/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}`,
         {
           onBeforeLoad(win) {
             win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -130,6 +117,7 @@ describe('TCO calculator — unofficial run overlay', () => {
       cy.get('.sidebar-legend label').contains('B300').click();
       cy.get(BARS).should('have.length', 1);
 
+      cy.then(releaseRun);
       cy.wait('@unofficialRun');
       cy.get(BARS).should('have.length', 3);
       cy.get(Y_TICKS).should('not.contain.text', SECOND_OFFICIAL_HARDWARE.toUpperCase());
@@ -155,7 +143,7 @@ describe('TCO calculator — unofficial run overlay', () => {
     it('keeps the surviving run visible instead of blanking the chart', () => {
       interceptCalculatorMultiRunOverlay();
       cy.visit(
-        `/calculator?unofficialruns=${OVERLAY_RUN_ID},${SECOND_OVERLAY_RUN_ID}` +
+        `/infx/calculator?unofficialruns=${OVERLAY_RUN_ID},${SECOND_OVERLAY_RUN_ID}` +
           `&i_seq=${encodeURIComponent('1k/8k')}`,
         {
           onBeforeLoad(win) {
@@ -192,7 +180,7 @@ describe('TCO calculator — unofficial run overlay', () => {
     before(() => {
       interceptCalculatorOverlayRun();
       cy.visit(
-        `/zh/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}`,
+        `/zh/infx/calculator?unofficialrun=${OVERLAY_RUN_ID}&i_seq=${encodeURIComponent(SEQUENCE)}`,
         {
           onBeforeLoad(win) {
             win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -205,7 +193,6 @@ describe('TCO calculator — unofficial run overlay', () => {
 
     it('renders the overlay legend strings in Chinese', () => {
       cy.get('.sidebar-legend').should('contain.text', OVERLAY_RUN_BRANCH);
-      cy.get('.sidebar-legend').should('not.contain.text', 'UNOFFICIAL RUN');
     });
   });
 

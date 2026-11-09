@@ -8,7 +8,13 @@ import type { D3ChartProps, RenderContext } from './D3Chart/types';
 import { chartExportSources, type ChartExportScales } from './export-registry';
 import { getDomainAwareChartWatermark } from '@/lib/runtime/unofficial-domain';
 import type { ContinuousScale } from './types';
-import { CANVAS_POINT_LAYER_SELECTOR, canvasPointLayerOf } from './layers/canvas-point-registry';
+import {
+  CANVAS_POINT_LAYER_SELECTOR,
+  CANVAS_UNDERLAY_ATTRIBUTE,
+  canvasPointLayerOf,
+  revealCanvasUnderlay,
+} from './layers/canvas-point-registry';
+import { setDotHovered, showPinRing } from './pin-ring';
 
 export function renderChartForExport(
   source: SVGSVGElement,
@@ -24,13 +30,13 @@ export function renderChartForExport(
   originals.forEach((node, index) => {
     if (copies[index]) d3.select(copies[index]).datum(d3.select(node).datum());
   });
-  snapshot((props, scales) => {
+  snapshot((props, scales, pinned) => {
     const layers = props.layers.map((layer) => {
       if (layer.type !== 'scatter' || !layer.canvas) return layer;
       const points = canvasPointLayerOf<(typeof layer.data)[number]>(source);
       return points ? { ...layer, data: points.orderedLike(layer.data, layer.keyFn) } : layer;
     });
-    renderExportChart(target, width, height, { ...props, layers }, scales);
+    renderExportChart(target, width, height, { ...props, layers }, scales, pinned);
   });
 }
 
@@ -47,9 +53,13 @@ function renderExportChart<T>(
   height: number,
   props: D3ChartProps<T>,
   visibleScales: ChartExportScales,
+  pinned: unknown,
 ) {
   const { xAxis, yAxis, layers, clipContent = true } = props;
   namespaceExportIds(target);
+  for (const shape of target.querySelectorAll<SVGElement>(`[${CANVAS_UNDERLAY_ATTRIBUTE}]`)) {
+    revealCanvasUnderlay(shape);
+  }
   const layout = setupChartStructure(target, {
     chartId: `${props.chartId}-png`,
     containerWidth: width,
@@ -105,6 +115,21 @@ function renderExportChart<T>(
   }
   for (const layer of layers) renderLayer(layer, group, xScale, yScale, layout, ctx, 'export');
   raiseInOrder(group, ['.dot-group', '.point', '.line-label']);
+  const host = group.node();
+  if (pinned && host && props.tooltip?.getRulerX) {
+    showPinRing(
+      host,
+      props.tooltip.getRulerX(pinned as T, xScale as ContinuousScale),
+      props.tooltip.getRulerY?.(pinned as T, yScale as ContinuousScale),
+    );
+    setDotHovered(
+      group
+        .selectAll<SVGGElement, unknown>('.dot-group')
+        .filter((d) => d === pinned)
+        .node(),
+      true,
+    );
+  }
   props.onExportRender?.(ctx);
   namespaceExportIds(target);
 }

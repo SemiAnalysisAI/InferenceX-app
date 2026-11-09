@@ -2,6 +2,8 @@
 
 import { useMemo } from 'react';
 
+import type { ChipBasisControl } from '@/components/ui/chip-basis-note';
+import { CaptionField } from '@/components/ui/result-context';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics/analytics';
 import type { ChipBasis } from '@/lib/benchmarks/chip-basis';
@@ -13,11 +15,13 @@ const LABELS = {
     pool: 'Per prefill/decode chip',
     total: 'Per total chip',
     aria: 'Disaggregated throughput denominator',
+    caption: 'Chip basis',
   },
   zh: {
     pool: '按预填充/解码芯片',
     total: '按芯片总数',
     aria: '分离式配置吞吐量的分母口径',
+    caption: '芯片口径',
   },
 } as const;
 
@@ -59,6 +63,31 @@ export function ChipBasisToggle({
       size="sm"
       className={cn('w-fit', className)}
       buttonClassName="text-xs"
+    />
+  );
+}
+
+/**
+ * The chip basis as a chart footer control: the toggle with a visually hidden label, and
+ * the selected basis as text in exported images.
+ */
+export function ChipBasisCaption({ control }: { control: ChipBasisControl }) {
+  const labels = LABELS[useLocale()];
+  return (
+    <CaptionField
+      label={labels.caption}
+      value={labels[control.value]}
+      testId="result-context-chip-basis"
+      hideLabel
+      control={
+        control.readOnly ? undefined : (
+          <ChipBasisToggle
+            value={control.value}
+            onValueChange={control.onChange}
+            source={control.source}
+          />
+        )
+      }
     />
   );
 }

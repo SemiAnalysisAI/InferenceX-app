@@ -12,6 +12,7 @@ import { Heading } from '@/components/ui/heading';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import ChartLegend from '@/components/ui/chart-legend';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { collectiveXRunDasharray } from './data';
@@ -54,12 +55,11 @@ const STRINGS = {
       'Host transfers use one-way link bandwidth per GPU. Same-GPU copies use HBM bandwidth ÷ 2 (read + write); warm-cache points can exceed that HBM reference. Actual throughput also depends on host memory and placement.',
     yLatency: 'Latency',
     yBandwidth: 'Payload bandwidth',
-    noData: 'No measured swap-block points match this selection.',
+    noData: 'No measured swap-block points match this selection',
     samples: 'samples',
     verified: 'Correctness verified',
     skipped: 'combinations excluded by the payload budget',
-    instructions:
-      'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
+    instructions: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
   },
   zh: {
     heading: (
@@ -86,20 +86,13 @@ const STRINGS = {
       '主机与 GPU 之间的传输按每个 GPU 的单向链路带宽计算。同一 GPU 内的复制按 HBM 带宽 ÷ 2（读 + 写）计算；缓存命中的数据点可能高于这一 HBM 参考线。实际吞吐量还受主机内存和内存放置位置影响。',
     yLatency: '延迟',
     yBandwidth: '有效载荷带宽',
-    noData: '当前筛选条件下没有实测块交换数据。',
+    noData: '当前筛选条件下没有实测块交换数据',
     samples: '个样本',
     verified: '正确性校验通过',
     skipped: '个组合因超出有效载荷预算而未测量',
-    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
+    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置',
   },
 } as const;
-const escapeHtml = (value: string) =>
-  value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
 
 export function CollectiveXSwapSection({
   datasets,
@@ -160,9 +153,9 @@ export function CollectiveXSwapSection({
   return (
     <Card data-testid="collectivex-swap-section" className="min-w-0 overflow-hidden">
       <Heading level="card">{t.heading}</Heading>
-      <p className="text-sm text-muted-foreground">{t.description}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{t.description}</p>
       {skipped > 0 && (
-        <p className="text-xs text-muted-foreground">
+        <p className="mt-1 text-xs text-muted-foreground">
           {skipped} {t.skipped}
         </p>
       )}
@@ -333,7 +326,18 @@ export function CollectiveXSwapSection({
           attachToLayer: 1,
           rulerType: 'crosshair',
           content: (p) =>
-            `<div class="rounded-md border bg-background p-3 text-xs shadow-md"><strong>${escapeHtml(p.device)} · ${t.blocks(p.row.num_blocks)}</strong><div>${formatSwapBytes(p.x)}</div><div>${t.payload}: ${formatSwapBytes(p.row.payload_bytes)}</div><div>${percentile}: ${p.y.toFixed(3)} ${metric === 'bandwidth' ? 'GB/s' : 'µs'}</div><div>${p.row.sample_count} ${t.samples} · ${t.verified}</div></div>`,
+            chartHoverCard({
+              title: p.device,
+              subtitle: `${t.blocks(p.row.num_blocks)} · ${formatSwapBytes(p.x)}`,
+              color: color(p),
+              metrics: [
+                {
+                  value: p.y.toFixed(3),
+                  label: `${percentile} (${metric === 'bandwidth' ? 'GB/s' : 'µs'})`,
+                },
+              ],
+              summary: `${t.payload}: ${formatSwapBytes(p.row.payload_bytes)} · ${p.row.sample_count} ${t.samples} · ${t.verified}`,
+            }),
           getRulerX: (p, scale) => (scale as d3.ScaleLogarithmic<number, number>)(p.x),
           getRulerY: (p, scale) => scale(p.y),
         }}
@@ -356,7 +360,15 @@ export function CollectiveXSwapSection({
             variant="sidebar"
             isLegendExpanded={expanded}
             onExpandedChange={setExpanded}
-            disableActiveSort
+            onItemRemove={toggle}
+            reset={{
+              id: 'collectivex-swap-reset-filter',
+              disabled: series.every((p) => !hidden.has(p.seriesId)),
+              onClick: () => {
+                setHidden(new Set());
+                track('collectivex_swap_filter_reset');
+              },
+            }}
             legendItems={series.map((p) => ({
               name: p.seriesId,
               label: `${p.device} · ${t.blocks(p.row.num_blocks)}`,

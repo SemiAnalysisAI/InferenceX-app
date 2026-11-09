@@ -28,8 +28,27 @@ export interface GlossaryEntry {
     label: string;
     value: string;
   };
+  figure?: GlossaryFigure;
   relatedTerms: readonly string[];
   articleSlugs: readonly string[];
+}
+
+/** One image in a glossary figure. */
+export interface GlossaryFigureImage {
+  /** Path under `public/`. */
+  src: string;
+  width: number;
+  height: number;
+  alt: string;
+}
+
+/**
+ * Images shown side by side, at equal height, under the technical definition.
+ * `caption` accepts inline `[label](https://…)` links.
+ */
+export interface GlossaryFigure {
+  images: readonly GlossaryFigureImage[];
+  caption: string;
 }
 
 const INFERENCEMAX = 'inferencemax-open-source-inference-benchmarking';
@@ -1227,11 +1246,11 @@ const entries = [
     definition:
       'Total tokens per dollar divides total tokens produced per chip-hour by the modeled all-in infrastructure cost per chip-hour.',
     explanation:
-      'The Owning at Large Hyperscaler Volume and Rent - 3 Year Commit variants use their corresponding TCO hourly rates. Historical Trends interpolates the matching total, input, or output throughput and then applies the hourly-cost multiplier.',
+      'The owned (large hyperscaler volume) and 3-year rental commit variants use their corresponding TCO hourly rates. Historical Trends interpolates the matching total, input, or output throughput and then applies the hourly-cost multiplier.',
     significance:
       'The metric measures hardware and software cost efficiency, so comparisons must use the same model, workload, interactivity target, token type, and infrastructure cost basis.',
     benchmarkContext:
-      'InferenceX exposes separate total-token axes for Owning at Large Hyperscaler Volume and Rent - 3 Year Commit costs. The Owning at Large Hyperscaler Volume axis is the dashboard default y-axis. Token Revenue per GPU Hour is the separate metric that uses normalized or OpenRouter token sale prices.',
+      'InferenceX exposes separate total-token axes for owned (large hyperscaler volume) and 3-year rental commit costs. The owned large hyperscaler volume axis is the dashboard default y-axis. Token Revenue per GPU Hour is the separate metric that uses normalized or OpenRouter token sale prices.',
     measurement: { label: 'Typical unit', value: 'tokens per $1 TCO (tok/$)' },
     relatedTerms: [
       'cost-per-million-tokens',
@@ -2620,6 +2639,23 @@ const entries = [
     measurement: {
       label: 'Cost at 100 tok/s/user, FP8 8k1k',
       value: '$0.181 per million tokens vs $0.222 (B200) and $0.276 (B300)',
+    },
+    figure: {
+      images: [
+        {
+          src: '/images/glossary/tpuv7-ironwood-package-photo.webp',
+          width: 780,
+          height: 835,
+          alt: 'Photo of the TPUv7 Ironwood package on its display stand, with Ironwood engraved below it.',
+        },
+        {
+          src: '/images/glossary/tpuv7-ironwood-package.webp',
+          width: 2000,
+          height: 1279,
+          alt: 'The same photo annotated: two compute dies split by the die-to-die boundary, four HBM3E stacks on each side, the ICI SerDes chiplet above the dies, and a dummy die at each top corner.',
+        },
+      ],
+      caption: 'Source: SemiAnalysis, [Google](https://docs.cloud.google.com/tpu/docs/tpu7x)',
     },
     relatedTerms: ['tpu', 'mxu', 'sparsecore', 'ici', 'fp8', 'performance-per-dollar'],
     articleSlugs: [TPU_IRONWOOD],

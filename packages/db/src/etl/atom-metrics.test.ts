@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CHART_METRIC_KEYS,
   computeChartSeries,
-  computeChartSeriesFromMetricPhases,
+  computeChartDataFromMetricPhases,
   type MetricsMap,
   type RawMetric,
 } from './compute-chart-series';
@@ -149,8 +149,8 @@ describe('ATOM server metrics', () => {
     const keys = new Set([...CHART_METRIC_KEYS, ...AGGREGATE_SERVER_METRIC_KEYS]);
     const parsed = await collectMetricPhases<RawMetric>(blob(original, warmup), keys, 1);
     expect(parsed.complete).toBe(false);
-    expect(computeChartSeriesFromMetricPhases(parsed.metrics, parsed.warmupMetrics)).toEqual(
-      computeChartSeriesFromMetricPhases(original, warmup),
+    expect(computeChartDataFromMetricPhases(parsed.metrics, parsed.warmupMetrics)).toEqual(
+      computeChartDataFromMetricPhases(original, warmup),
     );
     expect(extractServerMetricSamples(JSON.stringify({ metrics: parsed.metrics }))).toEqual(
       extractServerMetricSamples(JSON.stringify({ metrics: original })),

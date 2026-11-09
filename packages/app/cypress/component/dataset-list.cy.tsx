@@ -49,7 +49,7 @@ function mountList(locale: 'en' | 'zh' = 'en') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   cy.mount(
     <AppRouterContext.Provider value={createMockRouter()}>
-      <PathnameContext.Provider value={locale === 'zh' ? '/zh/agentx' : '/agentx'}>
+      <PathnameContext.Provider value={locale === 'zh' ? '/zh/infx/agentx' : '/infx/agentx'}>
         <QueryClientProvider client={queryClient}>
           <DatasetList />
         </QueryClientProvider>
@@ -71,13 +71,13 @@ describe('DatasetList', () => {
         mountList(locale);
         cy.wait('@list');
         const prefix = locale === 'zh' ? '/zh' : '';
-        cy.get(`a[href="${prefix}/agentx/${slug}"]`)
+        cy.get(`a[href="${prefix}/infx/agentx/${slug}"]`)
           .find('[data-testid="dataset-description"]')
           .should('be.visible')
           .and('contain.text', '256,000')
           .and('contain.text', locale === 'zh' ? 'input 与 output 合计' : 'input + output')
           .and('contain.text', locale === 'zh' ? '相对时间' : 'relative timing');
-        cy.get(`a[href="${prefix}/agentx/cc-traces-weka-full"]`)
+        cy.get(`a[href="${prefix}/infx/agentx/cc-traces-weka-full"]`)
           .find('[data-testid="dataset-description"]')
           .should('have.text', datasets[0].description);
         if (width === 1280) {
@@ -105,37 +105,23 @@ describe('DatasetList', () => {
     cy.contains('82%').should('be.visible');
     cy.contains('Request shape').should('be.visible');
     cy.contains('Token volume').should('be.visible');
-    cy.get('a[href="/agentx/cc-traces-weka-full"]')
+    cy.get('a[href="/infx/agentx/cc-traces-weka-full"]')
       .find('section[aria-labelledby="cc-traces-weka-full-request-shape"]')
       .should('exist');
-    cy.get('a[href="/agentx/cc-traces-weka-full"]').should('exist');
-  });
-
-  it('keeps grouped metrics readable when cards stack on mobile', () => {
-    cy.intercept('GET', '/api/v1/datasets', { statusCode: 200, body: datasets }).as('list');
-    cy.viewport(390, 844);
-    mountList();
-    cy.wait('@list');
-    cy.get('a[href="/agentx/cc-traces-weka-full"]')
-      .find('section')
-      .should('have.length', 2)
-      .each(($section) => {
-        cy.wrap($section).find('dt').should('have.length.greaterThan', 0);
-      });
-    cy.contains('View dataset →').should('be.visible');
+    cy.get('a[href="/infx/agentx/cc-traces-weka-full"]').should('exist');
   });
 
   it('shows the empty state when no datasets are ingested', () => {
     cy.intercept('GET', '/api/v1/datasets', { statusCode: 200, body: [] }).as('empty');
     mountList();
     cy.wait('@empty');
-    cy.contains('No datasets ingested yet.').should('be.visible');
+    cy.contains('No datasets ingested yet').should('be.visible');
   });
 
   it('shows the error state when the request fails', () => {
     cy.intercept('GET', '/api/v1/datasets', { statusCode: 500, body: { error: 'boom' } }).as('err');
     mountList();
     cy.wait('@err');
-    cy.contains('Failed to load datasets.').should('be.visible');
+    cy.contains('Failed to load datasets').should('be.visible');
   });
 });

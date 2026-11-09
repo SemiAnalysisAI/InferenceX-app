@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { Button } from '@/components/ui/button';
 import { ExpandableChart } from '@/components/agentic-workload-explorer/expandable-chart';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
@@ -32,7 +33,7 @@ const COHORT_LABELS = {
 const STRINGS = {
   en: {
     heading: 'Session reuse',
-    description: 'Observed conversation activity and returns after long gaps.',
+    description: 'Observed conversation activity and returns after long gaps',
     exportCsv: 'Export CSV',
     exportJson: 'Export JSON',
     windowDesc: (start: string, end: string, asOf: string, days: number) =>
@@ -48,14 +49,14 @@ const STRINGS = {
     cutoffsLabel: 'Cutoffs (days)',
     apply: 'Apply',
     coverageCohort: 'Coverage cohort',
-    cutoffsError: 'Enter comma-separated whole days from 1 to 28.',
+    cutoffsError: 'Enter comma-separated whole days from 1 to 28',
     noEligible:
       'No eligible sessions have enough follow-up in this trace-version scope. Try All versions or return after more history is recorded.',
     chartCoverageTitle: 'Conversation age versus call volume',
-    chartCoverageSubtitle: 'Session counts and call counts have different denominators.',
+    chartCoverageSubtitle: 'Session counts and call counts have different denominators',
     legendSessionSpan: 'Session span within window',
     legendCallsWithin: 'Calls within window',
-    noCohortSessions: 'No eligible sessions in this cohort.',
+    noCohortSessions: 'No eligible sessions in this cohort',
     chartCohortTitle: 'Call-age coverage by cohort',
     chartCohortSubtitle:
       'Proxy cohorts overlap; they are not one-shot, multi-shot or deep-research task labels.',
@@ -98,7 +99,7 @@ const STRINGS = {
   },
   zh: {
     heading: 'Session 复用',
-    description: '对话活动观测与长间隔后回访情况。',
+    description: '对话活动观测与长间隔后回访情况',
     exportCsv: '导出 CSV',
     exportJson: '导出 JSON',
     windowDesc: (start: string, end: string, asOf: string, days: number) =>
@@ -114,14 +115,14 @@ const STRINGS = {
     cutoffsLabel: '截止天数',
     apply: '应用',
     coverageCohort: '覆盖群组',
-    cutoffsError: '请输入 1 到 28 的逗号分隔整数天数。',
+    cutoffsError: '请输入 1 到 28 的逗号分隔整数天数',
     noEligible:
       '当前 trace version 范围内没有足够跟踪期的 session。请尝试选择“全部版本”，或等待更多历史数据积累后再查看。',
     chartCoverageTitle: '对话时长与调用量',
-    chartCoverageSubtitle: 'Session 计数与调用计数的分母不同。',
+    chartCoverageSubtitle: 'Session 计数与调用计数的分母不同',
     legendSessionSpan: 'Session 跨度（窗口内）',
     legendCallsWithin: '调用次数（窗口内）',
-    noCohortSessions: '该群组内无符合条件的 session。',
+    noCohortSessions: '该群组内无符合条件的 session',
     chartCohortTitle: '按群组的调用时长覆盖',
     chartCohortSubtitle: '代理群组存在重叠，并非一次性、多次或深度研究任务标签。',
     cohortNote:
@@ -140,11 +141,11 @@ const STRINGS = {
     dataTableSummary: '数据表与定义',
     thCohort: '群组',
     thDays: '天数',
-    thSessions: 'Sessions',
+    thSessions: 'Session 数',
     thCalls: '调用',
-    thSessionsWithin: '窗口内 sessions',
+    thSessionsWithin: '窗口内 session 数',
     thCallsWithin: '窗口内调用',
-    thSessionsReturning: '间隔后回访的 sessions',
+    thSessionsReturning: '间隔后回访的 session 数',
     dataTableNote:
       'Session 时长为首次到末次成功调用的间隔。调用时长以该 session 首次调用为起点。回访间隔为相邻调用之间的时间差，不设 30 分钟空闲截断。这些指标均非字节存储量的度量。',
     xAxisLabel: '距首次调用的天数',
@@ -156,14 +157,13 @@ const STRINGS = {
     tooltipCohort: (label: string, days: number, n: string, d: string, p: string) =>
       `${label} · ${days} 天: ${n} / ${d} 次调用 (${p})`,
     tooltipReturn: (label: string, days: number, n: string, d: string) =>
-      `${label} · 间隔超过 ${days} 天: ${n} / ${d} sessions`,
-    barSessions: 'Sessions',
+      `${label} · 间隔超过 ${days} 天: ${n} / ${d} 个 session`,
+    barSessions: 'Session',
     barCalls: '调用',
   },
 } as const;
 const COLORS = ['#0ea5e9', '#10b981', '#a855f7', '#f59e0b'];
-const BUTTON =
-  'rounded border border-border px-2 py-1 text-3xs font-mono text-muted-foreground hover:bg-surface-hover hover:text-foreground';
+const FIELD = 'h-11 rounded-md border border-input bg-background px-2.5 text-xs font-mono md:h-8';
 const W = 900,
   H = 285,
   L = 48,
@@ -463,31 +463,35 @@ export function SessionReuseView({ data }: { data: SessionReusePayload & { cache
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-sm font-mono font-bold">{t.heading}</h1>
+          <h1 className="text-sm font-mono font-medium">{t.heading}</h1>
           <p className="mt-1 text-xs text-muted-foreground">{t.description}</p>
         </div>
         <div className="flex gap-2">
-          <button
-            className={BUTTON}
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
             onClick={() => {
               track('agentic_workload_session_reuse_export', { format: 'csv' });
               download(sessionReuseCsv(selected), 'text/csv;charset=utf-8', 'session-reuse.csv');
             }}
           >
             {t.exportCsv}
-          </button>
-          <button
-            className={BUTTON}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
             onClick={() => {
               track('agentic_workload_session_reuse_export', { format: 'json' });
               download(JSON.stringify(selected, null, 2), 'application/json', 'session-reuse.json');
             }}
           >
             {t.exportJson}
-          </button>
+          </Button>
         </div>
       </div>
-      <div className="rounded-md border border-border bg-surface p-3 text-xs text-muted-foreground space-y-1">
+      <div className="rounded-xl border border-border/30 bg-card p-3 text-xs text-muted-foreground space-y-1">
         <p>
           {t.windowDesc(
             date(data.window.cohortStart),
@@ -514,7 +518,7 @@ export function SessionReuseView({ data }: { data: SessionReusePayload & { cache
         </p>
       </div>
       <form onSubmit={apply} className="flex flex-wrap items-center gap-2">
-        <label htmlFor="reuse-days" className="text-3xs font-mono text-muted-foreground">
+        <label htmlFor="reuse-days" className="text-xs text-muted-foreground">
           {t.cutoffsLabel}
         </label>
         <input
@@ -522,12 +526,12 @@ export function SessionReuseView({ data }: { data: SessionReusePayload & { cache
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           aria-describedby={error ? 'reuse-error' : undefined}
-          className="w-64 rounded border border-border bg-background px-2 py-1 text-xs font-mono"
+          className={`w-64 ${FIELD}`}
         />
-        <button className={BUTTON} type="submit">
+        <Button variant="outline" size="xs" type="submit">
           {t.apply}
-        </button>
-        <label htmlFor="reuse-cohort" className="ml-2 text-3xs font-mono text-muted-foreground">
+        </Button>
+        <label htmlFor="reuse-cohort" className="ml-2 text-xs text-muted-foreground">
           {t.coverageCohort}
         </label>
         <select
@@ -538,7 +542,7 @@ export function SessionReuseView({ data }: { data: SessionReusePayload & { cache
             track('agentic_workload_session_reuse_cohort_changed', { cohort: next });
             setCohort(next);
           }}
-          className="rounded border border-border bg-background px-2 py-1 text-xs font-mono"
+          className={FIELD}
         >
           {data.cohorts.map((c) => (
             <option key={c.key} value={c.key}>
@@ -547,13 +551,13 @@ export function SessionReuseView({ data }: { data: SessionReusePayload & { cache
           ))}
         </select>
         {error && (
-          <p id="reuse-error" role="alert" className="text-xs text-rose-500">
+          <p id="reuse-error" role="alert" className="text-xs text-destructive">
             {error}
           </p>
         )}
       </form>
       {all.sessions === 0 ? (
-        <div className="rounded-md border border-border p-6 text-xs text-muted-foreground">
+        <div className="rounded-md border border-border/30 p-6 text-xs text-muted-foreground">
           {t.noEligible}
         </div>
       ) : (
@@ -587,10 +591,10 @@ export function SessionReuseView({ data }: { data: SessionReusePayload & { cache
         </>
       )}
       <div className="flex items-center gap-2">
-        <h2 className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
+        <h2 className="text-xs font-medium text-muted-foreground">
           {t.activityHeader(data.window.activityDays)}
         </h2>
-        <div className="h-px bg-border flex-1" />
+        <div className="h-px bg-border/30 flex-1" />
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {(
@@ -601,9 +605,11 @@ export function SessionReuseView({ data }: { data: SessionReusePayload & { cache
             [t.callsPerCredentialCalendarDay, data.activity.callsPerCredentialCalendarDay],
           ] as const
         ).map(([label, value]) => (
-          <div key={label} className="rounded-md border border-border bg-surface p-3">
+          <div key={label} className="rounded-xl border border-border/30 bg-card p-3">
             <div className="text-3xs font-mono text-muted-foreground">{label}</div>
-            <div className="text-lg font-mono font-bold mt-1">{number(value as number | null)}</div>
+            <div className="text-lg font-medium mt-1 tabular-nums">
+              {number(value as number | null)}
+            </div>
           </div>
         ))}
       </div>
@@ -616,7 +622,7 @@ export function SessionReuseView({ data }: { data: SessionReusePayload & { cache
           number(data.activity.p90ActiveDayCalls),
         )}
       </p>
-      <details className="rounded-md border border-border p-3">
+      <details className="rounded-md border border-border/30 p-3">
         <summary className="cursor-pointer text-xs font-mono">{t.dataTableSummary}</summary>
         <div className="overflow-x-auto mt-3">
           <table className="w-full text-3xs font-mono text-left">
@@ -631,7 +637,7 @@ export function SessionReuseView({ data }: { data: SessionReusePayload & { cache
                   t.thCallsWithin,
                   t.thSessionsReturning,
                 ].map((h) => (
-                  <th key={h} className="p-2 border-b border-border">
+                  <th key={h} className="p-2 border-b border-border/20">
                     {h}
                   </th>
                 ))}
@@ -650,7 +656,7 @@ export function SessionReuseView({ data }: { data: SessionReusePayload & { cache
                       p.callsWithin,
                       p.sessionsReturningAfterGap,
                     ].map((v, i) => (
-                      <td key={i} className="p-2 border-b border-border">
+                      <td key={i} className="p-2 border-b border-border/20">
                         {typeof v === 'number' ? number(v) : v}
                       </td>
                     ))}

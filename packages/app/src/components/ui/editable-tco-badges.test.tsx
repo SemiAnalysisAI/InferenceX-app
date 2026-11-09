@@ -3,7 +3,11 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { EditableTcoBadges } from '@/components/ui/editable-tco-badges';
+import {
+  EditableTcoBadges,
+  TcoPriceTable,
+  TcoPriceTableSlotsProvider,
+} from '@/components/ui/editable-tco-badges';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -51,7 +55,7 @@ describe('EditableTcoBadges', () => {
     expect(inputs[0].type).toBe('number');
     expect(inputs[0].getAttribute('aria-label')).toBe('GB300 $/chip/hr');
     expect(inputs[0].id).toBe('cost-input-gb300');
-    expect(container.querySelector('label[for="cost-input-gb300"]')?.textContent).toBe('GB300:');
+    expect(container.querySelector('label[for="cost-input-gb300"]')?.textContent).toBe('GB300');
     expect(inputs[1].value).toBe('');
     expect(container.querySelector('[data-testid="badges"]')?.textContent).toContain(
       'TCO $/chip/hr:',
@@ -89,5 +93,75 @@ describe('EditableTcoBadges', () => {
     const inputs = [...container.querySelectorAll<HTMLInputElement>('[data-testid="badge"] input')];
     expect(inputs[0].style.width).toBe('5.5ch');
     expect(inputs[1].style.width).toBe('2.5ch');
+  });
+});
+
+describe('TcoPriceTable', () => {
+  function renderTable(items: typeof ITEMS) {
+    act(() =>
+      root.render(
+        <TcoPriceTable
+          items={items}
+          editable
+          testId="table"
+          cellTestId="cell"
+          inputIdPrefix="cost-input"
+        />,
+      ),
+    );
+  }
+
+  it('keeps the focused cell mounted while its chip drops out of the items', () => {
+    renderTable(ITEMS);
+    const input = container.querySelector<HTMLInputElement>('[data-testid="cost-input-gb300"]');
+    if (!input) throw new Error('missing input');
+    act(() => input.focus());
+    renderTable(ITEMS.slice(1));
+    expect(container.querySelector('[data-testid="cost-input-gb300"]')).toBe(input);
+    expect(document.activeElement).toBe(input);
+    renderTable(ITEMS);
+    expect(container.querySelector('[data-testid="cost-input-gb300"]')).toBe(input);
+    act(() => input.blur());
+    renderTable(ITEMS.slice(1));
+    expect(container.querySelector('[data-testid="cost-input-gb300"]')).toBeNull();
+  });
+
+  it('shows the default row label and no footnote outside a chart footer', () => {
+    act(() =>
+      root.render(
+        <TcoPriceTable items={ITEMS} testId="table" cellTestId="cell" inputIdPrefix="cost" />,
+      ),
+    );
+    expect(container.querySelector('tbody th')?.textContent).toBe('TCO');
+    expect(container.querySelector('[data-testid="table"]')?.nextElementSibling).toBeNull();
+  });
+
+  it('takes its row label and footnote from the footer, with Reset beside the footnote', () => {
+    act(() =>
+      root.render(
+        <TcoPriceTableSlotsProvider
+          rowLabel={<span data-testid="tier">Rent – 3-year commit</span>}
+          footnote={<span data-testid="source">Prices: model</span>}
+        >
+          <TcoPriceTable
+            items={ITEMS}
+            editable
+            onReset={() => {}}
+            resetTestId="reset"
+            testId="table"
+            cellTestId="cell"
+            inputIdPrefix="cost"
+          />
+        </TcoPriceTableSlotsProvider>,
+      ),
+    );
+    expect(container.querySelector('tbody th')?.textContent).toBe('Rent – 3-year commit');
+    const footnote = container.querySelector('[data-testid="table"]')?.nextElementSibling;
+    expect([...(footnote?.children ?? [])].map((el) => (el as HTMLElement).dataset.testid)).toEqual(
+      ['source', 'reset'],
+    );
+    expect(container.querySelector('[data-testid="reset"]')?.classList.contains('no-export')).toBe(
+      true,
+    );
   });
 });

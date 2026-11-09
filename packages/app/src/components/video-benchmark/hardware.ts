@@ -1,7 +1,7 @@
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { at, text, type Json } from './bundle';
 
-/** `h` = Owning at Large Hyperscaler Volume, `r` = Rent - 3 Year Commit (HW_REGISTRY costh/costr). */
+/** `h` = Owning at large hyperscaler volume, `r` = Rent – 3-year commit (HW_REGISTRY costh/costr). */
 export type CostTier = 'h' | 'r';
 
 /** Registry keys that can appear as a whole token in an artifact GPU name, longest first. */

@@ -40,8 +40,12 @@ function row(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   } as BenchmarkRow;
 }
 
-function frontier(hardware: string, totals: [number, number, number, number]): BenchmarkRow[] {
-  return [30, 50, 75, 100].map((intvty, index) =>
+function frontier(
+  hardware: string,
+  totals: [number, number, number, number],
+  interactivity: [number, number, number, number] = [30, 50, 75, 100],
+): BenchmarkRow[] {
+  return interactivity.map((intvty, index) =>
     row({
       hardware,
       conc: index + 1,
@@ -72,11 +76,43 @@ describe('buildRankingsViewEntries', () => {
     );
     expect(entries).toHaveLength(1);
     expect(entries[0].scenario).toBe('single_turn_8k1k');
+    expect(entries[0].tier).toBe(50);
     expect(entries[0].rows.map((r) => [r.rank, r.hardware, r.value])).toEqual([
       [1, 'b200', 1000],
       [2, 'mi355x', 800],
     ]);
     expect(entries[0].rows[0].unit).toBe('tokens_per_second_per_gpu');
+  });
+
+  it('leaves the standard tier when another tier ranks more chips', () => {
+    const entries = buildRankingsViewEntries(
+      entryFor('fastest-gpu', 'qwen-3-5'),
+      [
+        ...frontier('b200', [1400, 1000, 700, 500], [80, 100, 105, 110]),
+        ...frontier('mi355x', [1100, 800, 500, 300], [90, 100, 105, 110]),
+      ],
+      'single_turn_8k1k',
+    );
+    expect(entries[0].tier).toBe(100);
+    expect(entries[0].rows.map((r) => [r.rank, r.hardware, r.value])).toEqual([
+      [1, 'b200', 1000],
+      [2, 'mi355x', 800],
+    ]);
+  });
+
+  it('ranks at the standard 125 tier, interpolated between runs', () => {
+    const entries = buildRankingsViewEntries(
+      entryFor('fastest-gpu', 'qwen-3-5'),
+      [
+        ...frontier('b200', [1400, 1000, 700, 500], [110, 120, 130, 140]),
+        ...frontier('mi355x', [1100, 800, 500, 300], [120, 150, 175, 200]),
+        ...frontier('b300', [1600, 1200, 900, 600], [60, 80, 100, 130]),
+      ],
+      'single_turn_8k1k',
+    );
+    expect(entries[0].tier).toBe(125);
+    expect(entries[0].rows.map((r) => r.hardware).toSorted()).toEqual(['b200', 'b300', 'mi355x']);
+    for (const ranked of entries[0].rows) expect(ranked.value).toBeGreaterThan(0);
   });
 
   it('follows the curated overview scenarios when no scenario is given', () => {
@@ -104,7 +140,7 @@ describe('rankingsViewCsvRows', () => {
       ROWS,
       'single_turn_8k1k',
     );
-    const csvRows = rankingsViewCsvRows('cheapest-gpu', 50, entries);
+    const csvRows = rankingsViewCsvRows('cheapest-gpu', entries);
     expect(csvRows).toHaveLength(2);
     expect(csvRows[0]).toMatchObject({
       kind: 'cheapest-gpu',

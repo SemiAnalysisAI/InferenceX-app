@@ -3,8 +3,8 @@ import { assertShareLinkParams } from '../support/share-link';
 
 describe('Framework Line Label', () => {
   it('defaults on and persists independently of Line Labels through share links', () => {
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro');
-    cy.get('[data-testid="scatter-graph"]', { timeout: 60000 }).should('be.visible');
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro');
+    cy.get('[data-testid="scatter-graph"]').should('be.visible');
     expandLegendAdvanced();
     cy.get('#scatter-framework-label').should('have.attr', 'data-state', 'checked');
     cy.get('.line-label .ll-engine').should('have.length.greaterThan', 0);
@@ -18,9 +18,8 @@ describe('Framework Line Label', () => {
       });
     });
     assertShareLinkParams({ i_frameworklabel: '0' });
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_frameworklabel=0');
-    cy.reload();
-    cy.get('[data-testid="scatter-graph"]', { timeout: 60000 }).should('be.visible');
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro&i_frameworklabel=0');
+    cy.get('[data-testid="scatter-graph"]').should('be.visible');
     expandLegendAdvanced();
     cy.get('#scatter-framework-label').should('have.attr', 'data-state', 'unchecked');
     cy.get('.line-label .ll-engine').should('not.exist');

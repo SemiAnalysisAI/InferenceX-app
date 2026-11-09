@@ -166,7 +166,7 @@ describe('tool analytics without a cached snapshot', () => {
     await flushMicrotasks();
 
     expect(requestCount('/api/v1/agentic-workload-explorer/tool-analytics')).toBe(2);
-    expect(container.textContent).toContain('Total Tool Calls');
+    expect(container.textContent).toContain('Total tool calls');
     expect(container.textContent).toContain('Workflow patterns are not available in this snapshot');
     button('Reload workflow patterns');
     expect(requestCount('/api/v1/agentic-workload-explorer/tool-analytics/sequences')).toBe(1);

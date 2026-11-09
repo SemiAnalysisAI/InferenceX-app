@@ -282,7 +282,7 @@ describe('OverviewNavigationProvider', () => {
     expect(readProbe('tier')).toBe('75');
 
     stub.mockClear();
-    window.history.replaceState({}, '', '/inference');
+    window.history.replaceState({}, '', '/infx/inference');
     act(() => {
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
@@ -427,7 +427,7 @@ describe('OverviewNavigationProvider', () => {
     renderProvider(pageData(50), '/overview?compare=30d');
     act(() => selectRowScope?.());
 
-    expect(fetch).toHaveBeenCalledWith('/api/v1/overview?compare=30d', {
+    expect(fetch).toHaveBeenCalledWith('/api/v1/overview', {
       headers: { Accept: 'application/json' },
     });
     expect(readProbe('pending')).toBe('pending');
@@ -486,8 +486,8 @@ describe('OverviewNavigationProvider', () => {
   it('does not refetch when the URL already matches the prerendered controls', () => {
     const { stub } = deferredFetch();
 
-    window.history.replaceState({}, '', '/overview?tier=50&ref=b300');
-    renderProvider(pageData(50), '/overview');
+    window.history.replaceState({}, '', '/overview?tier=100&ref=b300');
+    renderProvider({ ...pageData(100), comparisonMode: '30d' }, '/overview');
 
     expect(stub).not.toHaveBeenCalled();
     expect(readProbe('reference')).toBe('b300');

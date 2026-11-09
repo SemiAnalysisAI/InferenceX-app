@@ -2,7 +2,6 @@ import 'cypress-axe';
 
 import type { AvailabilityRow } from '@/lib/api/api';
 import { compactAvailability } from '@/lib/benchmarks/compact-availability';
-import { withSupplementalAvailability } from '@/lib/benchmarks/supplemental-benchmarks';
 
 import { registerScatterPointsQuery } from './scatter-points';
 
@@ -98,7 +97,7 @@ export function interceptBenchmarkPresence({
 }
 
 export function availabilityBody(rows: readonly AvailabilityRow[]) {
-  return compactAvailability(withSupplementalAvailability([...rows]));
+  return compactAvailability([...rows]);
 }
 
 export function expectNoPageOverflow(): void {
@@ -111,12 +110,15 @@ export function expectNoPageOverflow(): void {
 }
 
 export function openXAxisMenu(): void {
+  cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value');
   cy.get('[data-testid="inference-secondary-controls"] > button').then(($toggle) => {
     if ($toggle.is(':visible') && $toggle.attr('aria-expanded') !== 'true') {
       cy.wrap($toggle).click();
     }
   });
-  cy.get('[data-testid="x-axis-mode-selector"]').click();
+  // Centered so the sticky header cannot cover it, and on the chevron so the selected option's
+  // help icon does not take the click.
+  cy.get('[data-testid="x-axis-mode-selector"]').click('right', { scrollBehavior: 'center' });
 }
 
 export function selectXAxisMode(

@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/v1/views/gpu-specs
  *
- * Static chip specifications behind the `/gpu-specs` page (`lib/catalog/gpu-specs.ts`:
+ * Static chip specifications behind the `/infx/gpu-specs` page (`lib/catalog/gpu-specs.ts`:
  * `GPU_SPECS`) plus the chartable metric metadata (`GPU_CHART_METRICS`).
  * No database read — the payload is compiled-in.
  *

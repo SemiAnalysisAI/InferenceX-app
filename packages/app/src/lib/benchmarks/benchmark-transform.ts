@@ -262,7 +262,7 @@ export function rowToAggDataEntry(
   // rows (transformed live from raw artifacts) carry no id, so `Number(undefined)`
   // is NaN — collapse any non-persisted value to undefined so downstream link /
   // fetch sites (guarded by isPersistedBenchmarkId) skip it cleanly rather than
-  // emitting `?ids=NaN` or an `/inference/agentic/NaN` link.
+  // emitting `?ids=NaN` or an `/infx/inference/agentic/NaN` link.
   const numericId = typeof row.id === 'number' ? row.id : Number(row.id);
   const entry: AggDataEntry = {
     rawMetricKeys: Object.keys(m),
@@ -430,6 +430,8 @@ export function rowToAggDataEntry(
     kv_p2p_transfer: stringMetric('kv_p2p_transfer'),
     router_name: stringMetric('router_name'),
     router_version: stringMetric('router_version'),
+    spec_algorithm: stringMetric('spec_algorithm'),
+    spec_draft_model: stringMetric('spec_draft_model'),
     server_gpu_cache_hit_rate: m.server_gpu_cache_hit_rate,
     server_external_cache_hit_rate: m.server_external_cache_hit_rate,
     server_cpu_cache_hit_rate: m.server_cpu_cache_hit_rate,

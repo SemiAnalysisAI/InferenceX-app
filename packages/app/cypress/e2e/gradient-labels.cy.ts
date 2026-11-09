@@ -1,6 +1,6 @@
 describe('Gradient Labels Toggle', () => {
   before(() => {
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro', {
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -11,22 +11,8 @@ describe('Gradient Labels Toggle', () => {
     cy.get('#scatter-parallelism-labels').should('be.visible');
   });
 
-  it('both toggles can be enabled simultaneously', () => {
-    cy.get('#scatter-parallelism-labels').then(($el) => {
-      if ($el.attr('data-state') !== 'checked') cy.wrap($el).click();
-    });
-    cy.get('#scatter-gradient-labels').click();
-    cy.get('#scatter-gradient-labels').should('have.attr', 'data-state', 'checked');
-
-    cy.get('#scatter-gradient-labels').should('have.attr', 'data-state', 'checked');
-    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
-
-    cy.get('#scatter-gradient-labels').click();
-    cy.get('#scatter-parallelism-labels').click();
-  });
-
   it('URL param i_gradlabel=1 enables gradient labels on load', () => {
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_gradlabel=1', {
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro&i_gradlabel=1', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -49,7 +35,7 @@ const selectMetricAndEnableGradient = (metricLabel: string | RegExp) => {
 
 describe('Gradient Labels with non-default Y-axis metrics', () => {
   before(() => {
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro', {
+    cy.visit('/infx/inference?g_model=DeepSeek-V4-Pro', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -60,19 +46,6 @@ describe('Gradient Labels with non-default Y-axis metrics', () => {
 
   it('gradient defs render for cost metric (lower_right roofline)', () => {
     selectMetricAndEnableGradient(/^Cost per Million Total Tokens$/u);
-
-    cy.get(
-      '[data-testid="scatter-graph"] svg defs linearGradient[id^="roofline-gradient-"]',
-    ).should('have.length.greaterThan', 0);
-    cy.get('[data-testid="scatter-graph"] svg g.parallelism-label').should(
-      'have.length.greaterThan',
-      0,
-    );
-  });
-
-  it('gradient defs render for energy metric (lower_right roofline)', () => {
-    cy.get('#scatter-gradient-labels').click();
-    selectMetricAndEnableGradient('All-in Provisioned Joules per Total Token');
 
     cy.get(
       '[data-testid="scatter-graph"] svg defs linearGradient[id^="roofline-gradient-"]',

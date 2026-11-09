@@ -1,4 +1,3 @@
-import { Card } from '@/components/ui/card';
 import type { DashboardRouteKey } from '@/lib/routing/dashboard-routes';
 import { TAB_INTRO_ZH, TAB_META_ZH } from '@/lib/routing/tab-meta-zh';
 
@@ -12,16 +11,14 @@ export function ZhTabIntro({
   intro?: string;
 }) {
   return (
-    <Card data-testid="zh-tab-intro">
-      <h1 className="text-xl lg:text-2xl font-bold tracking-tight">
-        {title ?? TAB_META_ZH[tab].title}
-      </h1>
+    <header data-testid="zh-tab-intro" className="py-2">
+      <h1 className="text-xl font-semibold lg:text-2xl">{title ?? TAB_META_ZH[tab].title}</h1>
       <p className="mt-2 text-sm lg:text-base text-muted-foreground">
         {intro ?? TAB_INTRO_ZH[tab]}
       </p>
       <p className="mt-2 text-xs text-muted-foreground">
         图表中的模型、芯片、框架与指标名称均沿用业界通用英文名称。
       </p>
-    </Card>
+    </header>
   );
 }

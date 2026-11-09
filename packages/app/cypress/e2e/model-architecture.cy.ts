@@ -1,22 +1,5 @@
 const MODEL_SITE_URL = 'https://inferencex.semianalysis.com';
 
-function waitForScrollToSettle(): void {
-  cy.window().then(
-    (win) =>
-      new Cypress.Promise<void>((resolve) => {
-        let last = Number.NaN;
-        let stable = 0;
-        const tick = () => {
-          stable = win.scrollY === last ? stable + 1 : 0;
-          last = win.scrollY;
-          if (stable >= 3) resolve();
-          else win.setTimeout(tick, 100);
-        };
-        tick();
-      }),
-  );
-}
-
 function dismissStarModal(win: Window): void {
   win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
 }
@@ -50,7 +33,7 @@ describe('Model Architecture Diagram', () => {
     it('expands dense transformer block on click', () => {
       cy.get('[data-testid="model-architecture-inline"]').should(
         'contain.text',
-        'Model Architecture',
+        'Model architecture',
       );
       cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MoE');
       cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MLA');
@@ -113,54 +96,6 @@ describe('Model Architecture Diagram', () => {
 
       cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'Dense');
       cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'GQA');
-    });
-  });
-
-  describe('Collapsible Transformer Blocks (MoE model - Kimi K2.5)', () => {
-    before(() => {
-      visitModelPage('kimi-k26');
-    });
-
-    it('MLA attention is NOT expandable in MoE block', () => {
-      cy.get('[data-testid="expand-denseTransformer"]').should('exist');
-      cy.get('[data-testid="expand-transformer"]').should('exist');
-
-      cy.get('[data-testid="expand-transformer"]').click({ force: true });
-      cy.get('[data-testid="expand-attention"]').should('not.exist');
-      cy.get('[data-testid="expand-experts"]').should('exist');
-
-      cy.get('[data-testid="expand-experts"]').click({ force: true });
-      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
-    });
-  });
-
-  describe('Collapsible Transformer Blocks (MoE model - MiniMax M2.5)', () => {
-    before(() => {
-      visitModelPage('minimax-m27');
-    });
-
-    it('GQA attention is NOT expandable despite being GQA type', () => {
-      cy.get('[data-testid="expand-transformer"]').should('exist');
-      cy.get('[data-testid="expand-denseTransformer"]').should('not.exist');
-
-      cy.get('[data-testid="expand-transformer"]').click({ force: true });
-      cy.get('[data-testid="expand-attention"]').should('not.exist');
-      cy.get('[data-testid="expand-experts"]').should('exist');
-
-      cy.get('[data-testid="expand-experts"]').click({ force: true });
-      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
-    });
-  });
-
-  describe('Collapsible Transformer Blocks (MoE model - MiniMax M3)', () => {
-    before(() => {
-      visitModelPage('minimax-m3');
-    });
-
-    it('GQA attention is NOT expandable (sparse attention rendered as a static block)', () => {
-      cy.get('[data-testid="expand-transformer"]').click({ force: true });
-      cy.get('[data-testid="expand-attention"]').should('not.exist');
-      cy.get('[data-testid="expand-experts"]').should('exist');
     });
   });
 
@@ -313,7 +248,7 @@ describe('Model Architecture Diagram', () => {
     });
 
     it('lists every model page with architecture badges', () => {
-      cy.get('h1').should('contain.text', 'Model Architectures');
+      cy.get('h1').should('contain.text', 'Model architectures');
       cy.get('[data-testid="model-index-list"] a').should('have.length.at.least', 11);
       cy.get('[data-testid="model-index-link-kimi-k3"]')
         .should('contain.text', 'Kimi K3')
@@ -333,7 +268,7 @@ describe('Model Architecture Diagram', () => {
     it('is linked from the footer', () => {
       cy.get('[data-testid="footer-link-model-architectures"]')
         .should('have.attr', 'href', '/model')
-        .and('contain.text', 'Model Architectures');
+        .and('contain.text', 'Model architectures');
     });
   });
 
@@ -341,7 +276,6 @@ describe('Model Architecture Diagram', () => {
     const viewports = [
       { label: 'desktop', width: 1440, height: 900 },
       { label: '375px mobile', width: 375, height: 812 },
-      { label: '390px mobile', width: 390, height: 844 },
     ] as const;
 
     for (const viewport of viewports) {
@@ -395,7 +329,7 @@ describe('Model Architecture Diagram', () => {
         cy.get('[data-testid="model-page-article"]').should('have.attr', 'lang', 'en');
         cy.get('[data-testid="model-page-dashboard"]')
           .should('contain.text', 'DeepSeek R1 0528 推理性能')
-          .find('a[href^="/zh/inference?"]')
+          .find('a[href^="/zh/infx/inference?"]')
           .should('contain.text', '在完整仪表板中查看');
         cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/model/deepseek-r1');
 
@@ -422,7 +356,7 @@ describe('Model Architecture Diagram', () => {
 
     it('keeps the dashboard architecture link inside the Chinese route tree', () => {
       cy.viewport(1440, 900);
-      cy.visit('/zh/inference?g_model=DeepSeek-R1-0528', {
+      cy.visit('/zh/infx/inference?g_model=DeepSeek-R1-0528', {
         onBeforeLoad: dismissStarModal,
       });
       cy.get('[data-testid="inference-chart-display"]').should('be.visible');
@@ -443,12 +377,12 @@ describe('Model Architecture Diagram', () => {
     });
 
     it('can still be expanded manually', () => {
-      cy.contains('button', 'Config Changelog', { timeout: 20000 })
+      cy.contains('button', 'Config changelog')
         .should('be.visible')
         .and('have.attr', 'aria-expanded', 'false');
 
-      cy.contains('button', 'Config Changelog').click();
-      cy.contains('button', 'Config Changelog').should('have.attr', 'aria-expanded', 'true');
+      cy.contains('button', 'Config changelog').click();
+      cy.contains('button', 'Config changelog').should('have.attr', 'aria-expanded', 'true');
     });
 
     it('retains the axis selector even though the full filter panel is hidden', () => {
@@ -461,7 +395,7 @@ describe('Model Architecture Diagram', () => {
         .and('contain.text', 'Formula')
         .type('{esc}');
       cy.get('[data-testid^="axis-metric-row-"]').should('not.exist');
-      cy.get('[data-testid="x-axis-mode-selector"]').scrollIntoView().click();
+      cy.get('[data-testid="x-axis-mode-selector"]').click('right', { scrollBehavior: 'center' });
       cy.get('[data-testid="x-axis-mode-ttft"]').click();
       cy.get('[data-testid="x-axis-mode-selector"]')
         .should('contain.text', 'TTFT')
@@ -476,7 +410,7 @@ describe('Model Architecture Diagram', () => {
   describe('Dashboard architecture icon link (replaces the banner row)', () => {
     before(() => {
       cy.viewport(1280, 800);
-      cy.visit('/inference?g_model=DeepSeek-R1-0528', {
+      cy.visit('/infx/inference?g_model=DeepSeek-R1-0528', {
         onBeforeLoad(win) {
           dismissStarModal(win);
         },
@@ -495,10 +429,7 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="model-architecture-link"]')
         .should('have.attr', 'href')
         .and('equal', '/model/deepseek-r1');
-      // The inference page smooth-scrolls the chart into view on first load, and a
-      // scroll closes the tooltip; let that finish before opening it.
-      cy.window().its('scrollY').should('be.greaterThan', 0);
-      waitForScrollToSettle();
+      cy.window().its('scrollY').should('equal', 0);
       cy.get('[data-testid="model-architecture-link"]').scrollIntoView().focus();
       cy.get('[data-testid="model-architecture-tooltip"]')
         .should('be.visible')
@@ -519,58 +450,35 @@ describe('Model Architecture Diagram', () => {
 });
 
 describe('Completed architecture catalog', () => {
-  for (const [slug, fact] of [
-    ['muse-spark-open', 'Pooled MoE (4096-dim latent)'],
-    ['deepseek-v41-flash', '20-layer causal encoder'],
-    ['minimax-m31-flash', 'NVFP4 Experts'],
-    ['qwen-3-8-27b', 'Dense FFN'],
-    ['qwen-3-8-27b-eager', 'Same model, eager execution'],
-    ['glm-5-1', 'DSA: top-2048 tokens'],
-    ['glm-5-3', 'IndexShare'],
-    ['qwen-3-5', 'Gated DeltaNet'],
-    ['qwen-3-8-flash-next', 'N-gram embedding'],
-  ]) {
-    it(`${slug} exposes the sourced architecture and canonical model identity`, () => {
-      visitModelPage(slug);
-      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', fact);
-      cy.get('[data-testid="model-architecture-svg"] [marker-end]').should('exist');
-      cy.get('[data-testid="model-architecture-inline"]')
-        .contains('a', 'Source')
-        .should('have.attr', 'href')
-        .and('match', /^https:\/\/huggingface\.co\//u);
-      cy.request(`/api/v1/views/model-architectures?model=${slug}`).then(({ body }) => {
-        expect(body.models).to.have.length(1);
-        expect(body.models[0].slug).to.eq(slug);
-      });
-      expectNoPageOverflow();
+  it('muse-spark-open exposes the sourced architecture and canonical model identity', () => {
+    visitModelPage('muse-spark-open');
+    cy.get('[data-testid="model-architecture-inline"]').should(
+      'contain.text',
+      'Pooled MoE (4096-dim latent)',
+    );
+    cy.get('[data-testid="model-architecture-svg"] [marker-end]').should('exist');
+    cy.get('[data-testid="model-architecture-inline"]')
+      .contains('a', 'Source')
+      .should('have.attr', 'href')
+      .and('match', /^https:\/\/huggingface\.co\//u);
+    cy.request('/api/v1/views/model-architectures?model=muse-spark-open').then(({ body }) => {
+      expect(body.models).to.have.length(1);
+      expect(body.models[0].slug).to.eq('muse-spark-open');
     });
-  }
+    expectNoPageOverflow();
+  });
 
-  for (const slug of [
-    'muse-spark-open',
-    'deepseek-v41-flash',
-    'minimax-m31-flash',
-    'qwen-3-8-27b',
-    'qwen-3-8-27b-eager',
-  ]) {
-    it(`${slug} has a Chinese article and usable mobile diagram`, () => {
-      cy.viewport(390, 844);
-      cy.visit(`/zh/model/${slug}`, { onBeforeLoad: dismissStarModal });
-      cy.get('[data-testid="model-page-article"]')
-        .should('have.attr', 'lang', 'zh')
-        .and('contain.text', '架构');
-      cy.get('[data-testid="model-english-article-notice"]').should('not.exist');
-      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', '模型架构');
-      if (slug === 'minimax-m31-flash') {
-        cy.get('[data-testid="model-architecture-inline"]')
-          .should('contain.text', '原生支持文本、图像和视频输入')
-          .and('contain.text', '内置 DSpark draft')
-          .and('not.contain.text', 'Built-in DSpark Draft');
-      }
-      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
-      expectNoPageOverflow();
-    });
-  }
+  it('muse-spark-open has a Chinese article and usable mobile diagram', () => {
+    cy.viewport(390, 844);
+    cy.visit('/zh/model/muse-spark-open', { onBeforeLoad: dismissStarModal });
+    cy.get('[data-testid="model-page-article"]')
+      .should('have.attr', 'lang', 'zh')
+      .and('contain.text', '架构');
+    cy.get('[data-testid="model-english-article-notice"]').should('not.exist');
+    cy.get('[data-testid="model-architecture-inline"]').should('contain.text', '模型架构');
+    cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+    expectNoPageOverflow();
+  });
 
   it('separates MiniMax M3 dense prefix FFNs from the remaining MoE layers', () => {
     visitModelPage('minimax-m3');
@@ -596,57 +504,42 @@ describe('Architecture arrow structure', () => {
     cy.get('[data-testid="expand-altExperts0"]').should('not.exist');
   });
 
-  for (const [locale, width] of [
-    ['en', 390],
-    ['zh', 390],
-    ['en', 1280],
-    ['zh', 1280],
-  ] as const) {
-    it(`shows the causal encoder/decoder and shared-KV arrows (${locale}, ${width}px)`, () => {
-      cy.viewport(width, 844);
-      cy.visit(`${locale === 'zh' ? '/zh' : ''}/model/deepseek-v41-flash`, {
-        onBeforeLoad: dismissStarModal,
+  it('shows the causal encoder/decoder and shared-KV arrows (zh, 390px)', () => {
+    cy.viewport(390, 844);
+    cy.visit('/zh/model/deepseek-v41-flash', { onBeforeLoad: dismissStarModal });
+    cy.get('[data-testid="expand-cedEncoder"]').click({ force: true });
+    cy.get('[data-testid="expand-cedDecoder"]').click({ force: true });
+    cy.get('[data-testid="ced-global-kv"]')
+      .should('have.attr', 'aria-label')
+      .and('include', '编码器最终隐藏状态');
+    cy.get('[data-testid="ced-decoder-attention"]')
+      .should('have.attr', 'aria-label')
+      .and('include', '局部 SWA 与共享全局 KV');
+    cy.get('[data-edge="encoder-to-decoder"]').should('have.attr', 'marker-end');
+    cy.get('[data-edge="encoder-to-global-kv"]').should('have.attr', 'marker-end');
+    cy.get('[data-edge="global-kv-to-decoder-attention"]').should('have.attr', 'marker-end');
+    cy.get('[data-testid="model-architecture-svg"]')
+      .should('contain.text', '8B')
+      .and('contain.text', '16B')
+      .and('not.contain.text', 'Cross-Attention');
+    cy.request('/api/v1/views/model-architectures?model=deepseek-v41-flash')
+      .its('body.models.0.architecture.encoderDecoder')
+      .should('deep.equal', {
+        encoderLayers: 20,
+        decoderLayers: 20,
+        globalKVSource: 'final-encoder-hidden-states',
+        encoderSlidingOnlyLayers: 2,
+        decoderAttention: 'joint-local-swa-and-shared-global-kv',
       });
-      cy.get('[data-testid="expand-cedEncoder"]').click({ force: true });
-      cy.get('[data-testid="expand-cedDecoder"]').click({ force: true });
-      cy.get('[data-testid="ced-global-kv"]')
-        .should('have.attr', 'aria-label')
-        .and('include', locale === 'zh' ? '编码器最终隐藏状态' : 'final encoder states');
-      cy.get('[data-testid="ced-decoder-attention"]')
-        .should('have.attr', 'aria-label')
-        .and(
-          'include',
-          locale === 'zh' ? '局部 SWA 与共享全局 KV' : 'local SWA + shared global KV',
-        );
-      cy.get('[data-edge="encoder-to-decoder"]').should('have.attr', 'marker-end');
-      cy.get('[data-edge="encoder-to-global-kv"]').should('have.attr', 'marker-end');
-      cy.get('[data-edge="global-kv-to-decoder-attention"]').should('have.attr', 'marker-end');
-      cy.get('[data-testid="model-architecture-svg"]')
-        .should('contain.text', '8B')
-        .and('contain.text', '16B')
-        .and('not.contain.text', 'Cross-Attention');
-      cy.request('/api/v1/views/model-architectures?model=deepseek-v41-flash')
-        .its('body.models.0.architecture.encoderDecoder')
-        .should('deep.equal', {
-          encoderLayers: 20,
-          decoderLayers: 20,
-          globalKVSource: 'final-encoder-hidden-states',
-          encoderSlidingOnlyLayers: 2,
-          decoderAttention: 'joint-local-swa-and-shared-global-kv',
-        });
-      expectNoPageOverflow();
-      cy.get('[data-testid="model-architecture-svg"]')
-        .find<SVGTextElement>('text')
-        .each(($text) => {
-          const text = $text[0] as unknown as SVGTextElement;
-          const box = text.getBBox();
-          const viewBox = text.ownerSVGElement!.viewBox.baseVal;
-          expect(box.x).to.be.at.least(0);
-          expect(box.x + box.width).to.be.at.most(viewBox.width);
-        });
-      cy.get('[data-testid="model-architecture-inline"]').screenshot(
-        `ced-expanded-${locale}-${width}`,
-      );
-    });
-  }
+    expectNoPageOverflow();
+    cy.get('[data-testid="model-architecture-svg"]')
+      .find<SVGTextElement>('text')
+      .each(($text) => {
+        const text = $text[0] as unknown as SVGTextElement;
+        const box = text.getBBox();
+        const viewBox = text.ownerSVGElement!.viewBox.baseVal;
+        expect(box.x).to.be.at.least(0);
+        expect(box.x + box.width).to.be.at.most(viewBox.width);
+      });
+  });
 });

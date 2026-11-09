@@ -36,7 +36,7 @@ export const metricsFor = (intvty: number, tput: number, e2el: number): Record<s
 
 export const DOMINATED_CONFIG: [number, number, number, number] = [6, 60, 5000, 40];
 
-export const AGENTIC_FIXTURE_FIRST_ID = 900000;
+const AGENTIC_FIXTURE_FIRST_ID = 900000;
 let idCursor = AGENTIC_FIXTURE_FIRST_ID;
 export const b300Rows = (
   runUrl: string | null,
@@ -231,7 +231,9 @@ export const singleTurnAvailability = [
   },
 ];
 
-export const interceptCalculatorOverlayRun = ({ runDelayMs }: { runDelayMs?: number } = {}) => {
+export const interceptCalculatorOverlayRun = ({ holdRun = false }: { holdRun?: boolean } = {}) => {
+  const held = Promise.withResolvers<void>();
+  if (!holdRun) held.resolve();
   cy.intercept('GET', '/api/v1/availability/compact', {
     body: availabilityBody(singleTurnAvailability),
   }).as('availability');
@@ -246,41 +248,45 @@ export const interceptCalculatorOverlayRun = ({ runDelayMs }: { runDelayMs?: num
       }),
     ],
   }).as('benchmarks');
-  cy.intercept('GET', '/api/unofficial-run*', {
-    delay: runDelayMs,
-    body: {
-      runInfos: [
-        {
-          id: OVERLAY_RUN_ID,
-          name: OVERLAY_RUN_BRANCH,
-          branch: OVERLAY_RUN_BRANCH,
-          sha: 'abc000',
-          createdAt: `${SINGLE_TURN_DATE}T00:00:00Z`,
-          url: OVERLAY_RUN_URL,
-          conclusion: 'success',
-          status: 'completed',
-          isNonMainBranch: true,
+  cy.intercept('GET', '/api/unofficial-run*', (req) =>
+    held.promise.then(() =>
+      req.reply({
+        body: {
+          runInfos: [
+            {
+              id: OVERLAY_RUN_ID,
+              name: OVERLAY_RUN_BRANCH,
+              branch: OVERLAY_RUN_BRANCH,
+              sha: 'abc000',
+              createdAt: `${SINGLE_TURN_DATE}T00:00:00Z`,
+              url: OVERLAY_RUN_URL,
+              conclusion: 'success',
+              status: 'completed',
+              isNonMainBranch: true,
+            },
+          ],
+          benchmarks: [
+            ...singleTurnRows(OVERLAY_RUN_URL, { tputScale: 1.3 }),
+            ...singleTurnRows(OVERLAY_RUN_URL, { hardware: OVERLAY_ONLY_HARDWARE, tputScale: 0.8 }),
+            ...singleTurnRows(OVERLAY_RUN_URL, { model: OTHER_MODEL_DB_KEY, tputScale: 5 }),
+            ...singleTurnRows(OVERLAY_RUN_URL, {
+              tputScale: 1.1,
+              isl: OVERLAY_ONLY_ISL,
+              osl: OVERLAY_ONLY_OSL,
+            }),
+            ...singleTurnRows(OVERLAY_RUN_URL, {
+              hardware: OVERLAY_ONLY_HARDWARE,
+              tputScale: 0.9,
+              isl: OVERLAY_ONLY_ISL,
+              osl: OVERLAY_ONLY_OSL,
+            }),
+          ],
+          evaluations: [],
         },
-      ],
-      benchmarks: [
-        ...singleTurnRows(OVERLAY_RUN_URL, { tputScale: 1.3 }),
-        ...singleTurnRows(OVERLAY_RUN_URL, { hardware: OVERLAY_ONLY_HARDWARE, tputScale: 0.8 }),
-        ...singleTurnRows(OVERLAY_RUN_URL, { model: OTHER_MODEL_DB_KEY, tputScale: 5 }),
-        ...singleTurnRows(OVERLAY_RUN_URL, {
-          tputScale: 1.1,
-          isl: OVERLAY_ONLY_ISL,
-          osl: OVERLAY_ONLY_OSL,
-        }),
-        ...singleTurnRows(OVERLAY_RUN_URL, {
-          hardware: OVERLAY_ONLY_HARDWARE,
-          tputScale: 0.9,
-          isl: OVERLAY_ONLY_ISL,
-          osl: OVERLAY_ONLY_OSL,
-        }),
-      ],
-      evaluations: [],
-    },
-  }).as('unofficialRun');
+      }),
+    ),
+  ).as('unofficialRun');
+  return held.resolve;
 };
 
 export const SECOND_OVERLAY_RUN_ID = '29682242848';
