@@ -39,7 +39,7 @@ import { RESULTS_HARDWARE, resultMetadata, type ResultCell } from './results';
 import type { StoredArtifact } from './stored';
 import { videoClipSourceKey as sourceKey, type VideoInitialData } from './initial-data';
 import VideoClipReadout from './VideoClipReadout';
-import VideoClipStage, { type StageClip } from './VideoClipStage';
+import VideoClipStage, { SideDot, type StageClip } from './VideoClipStage';
 
 const STRINGS = {
   en: {
@@ -452,13 +452,13 @@ export default function VideoResultsClips({
                   value: item.value,
                   label: optionLabel(item),
                   icon: (
-                    <span
-                      aria-hidden="true"
-                      className="size-2 shrink-0 rounded-full"
-                      style={
+                    <SideDot
+                      color={
                         item.kind === 'reference'
-                          ? { border: '1.5px solid currentColor' }
-                          : { background: item.point ? colorOf(item.point) : (a.color ?? '') }
+                          ? null
+                          : item.point
+                            ? colorOf(item.point)
+                            : a.color
                       }
                     />
                   ),

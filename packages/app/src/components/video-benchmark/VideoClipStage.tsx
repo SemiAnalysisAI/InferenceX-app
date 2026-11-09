@@ -120,6 +120,17 @@ export interface StageClip {
   unofficial?: boolean;
 }
 
+/** A side's color dot; the reference has no color, so its dot is outlined. */
+export function SideDot({ color }: { color: string | null }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="size-2 shrink-0 rounded-full"
+      style={color ? { background: color } : { border: '1.5px solid currentColor' }}
+    />
+  );
+}
+
 export interface VideoClipStageProps {
   /** Subject, on the left (or top). */
   a: StageClip;
@@ -573,12 +584,7 @@ export default function VideoClipStage({
                   !playable.includes(role) && 'pr-2',
                 )}
               >
-                <span
-                  className="size-2 shrink-0 rounded-full"
-                  style={
-                    clip.color ? { background: clip.color } : { border: '1.5px solid currentColor' }
-                  }
-                />
+                <SideDot color={clip.color} />
                 <b className="min-w-0 truncate font-semibold">{clip.label}</b>
                 {/* The GPU count and tag start from a zero basis, so they take only the width the name leaves. */}
                 {clip.meta && (

@@ -8,7 +8,7 @@ import type { VideoPoint } from './metrics';
 import { lossyLabel, optimizationsOf } from './optimizations';
 import type { ResultCell } from './results';
 import type { ResultsClip } from './results-clips';
-import type { StageClip } from './VideoClipStage';
+import { SideDot, type StageClip } from './VideoClipStage';
 
 const STRINGS = {
   en: {
@@ -189,47 +189,88 @@ interface Reading {
   help?: string;
 }
 
-/** One side's value of a per-side metric; the matched-noise rerun has only its own PSNR. */
-function readSide(metric: SideMetric, side: ReadoutSide, diagnostic: boolean, s: Strings): Reading {
-  if (metric === 'psnr') {
-    const { clip } = side;
-    if (clip === undefined) return { value: PENDING };
-    const quality = clip?.quality;
-    if (quality) {
-      const psnr = display(quality.psnrDb, 2);
-      return {
-        value:
-          quality.status === 'identical'
-            ? s.exactMatch
-            : quality.status === 'incompatible'
-              ? s.incompatibleShort
-              : psnr === null
-                ? s.notMeasured
-                : `${psnr} dB`,
-        help:
-          quality.status === 'incompatible' ? s.incompatible : s.psnrMeasured(quality.totalFrames),
-      };
-    }
-    if (clip?.unscored)
-      return {
-        value: s.unscored[clip.unscored.reason],
-        help: s.unscoredNote[clip.unscored.reason](clip.unscored.fields),
-      };
-    return { value: s.notMeasured, help: s.psnrNote };
-  }
-  if (diagnostic) return { value: '—', help: s.diagnosticMetric };
-  if (metric === 'wall') {
-    if (side.clip === undefined) return { value: PENDING };
-    const seconds = display(side.clip?.record.seconds);
-    return { value: seconds === null ? s.notMeasured : `${seconds} s` };
-  }
-  if (metric === 'energy') {
-    const kj = side.point?.energyKj ?? null;
-    const joules = display(kj === null ? null : kj * 1000, 0);
-    return { value: joules === null ? s.notMeasured : `${joules} J`, help: s.energyNote };
-  }
-  const cost = display(side.cost?.[metric]?.perVideo, 4);
-  return { value: cost === null ? s.notMeasured : `$${cost}`, help: s.costHelp };
+interface SideRead {
+  /** The matched-noise rerun carries only its PSNR; every other value is not its own. */
+  rerunHasIt?: true;
+  read: (side: ReadoutSide, s: Strings) => Reading;
+  /** The line under the subject's value against the reference. */
+  context: (side: ReadoutSide, s: Strings) => string | undefined;
+}
+
+const costRead = (basis: 'participating' | 'allocated'): SideRead => ({
+  read: ({ cost }, s) => {
+    const perVideo = display(cost?.[basis]?.perVideo, 4);
+    return { value: perVideo === null ? s.notMeasured : `$${perVideo}`, help: s.costHelp };
+  },
+  context: ({ cost }, s) => {
+    const perSecond = display(cost?.[basis]?.perVideoSecond, 4);
+    return perSecond === null ? undefined : s.perVideoSecond(perSecond);
+  },
+});
+
+const SIDE_METRICS: Record<SideMetric, SideRead> = {
+  wall: {
+    read: ({ clip }, s) => {
+      if (clip === undefined) return { value: PENDING };
+      const seconds = display(clip?.record.seconds);
+      return { value: seconds === null ? s.notMeasured : `${seconds} s` };
+    },
+    context: (_, s) => s.wallSub,
+  },
+  psnr: {
+    rerunHasIt: true,
+    read: ({ clip }, s) => {
+      if (clip === undefined) return { value: PENDING };
+      const quality = clip?.quality;
+      if (quality) {
+        const psnr = display(quality.psnrDb, 2);
+        return {
+          value:
+            quality.status === 'identical'
+              ? s.exactMatch
+              : quality.status === 'incompatible'
+                ? s.incompatibleShort
+                : psnr === null
+                  ? s.notMeasured
+                  : `${psnr} dB`,
+          help:
+            quality.status === 'incompatible'
+              ? s.incompatible
+              : s.psnrMeasured(quality.totalFrames),
+        };
+      }
+      if (clip?.unscored)
+        return {
+          value: s.unscored[clip.unscored.reason],
+          help: s.unscoredNote[clip.unscored.reason](clip.unscored.fields),
+        };
+      return { value: s.notMeasured, help: s.psnrNote };
+    },
+    context: (_, s) => s.higherCloser,
+  },
+  energy: {
+    read: ({ point }, s) => {
+      const kj = point?.energyKj ?? null;
+      const joules = display(kj === null ? null : kj * 1000, 0);
+      return { value: joules === null ? s.notMeasured : `${joules} J`, help: s.energyNote };
+    },
+    context: (_, s) => s.energySub,
+  },
+  participating: costRead('participating'),
+  allocated: costRead('allocated'),
+};
+
+/** One side's value of a per-side metric, with its context line. */
+function readSide(
+  metric: SideMetric,
+  side: ReadoutSide,
+  diagnostic: boolean,
+  s: Strings,
+): Reading & { context?: string } {
+  const { rerunHasIt, read, context } = SIDE_METRICS[metric];
+  if (diagnostic && !rerunHasIt)
+    return { value: '—', help: s.diagnosticMetric, context: s.diagnosticMetric };
+  return { ...read(side, s), context: context(side, s) };
 }
 
 const speedShort = (speed: Speed | null, s: Strings) =>
@@ -282,32 +323,19 @@ function cell(
       sub: s[LOSSLESS_SCORES[metric]],
       help: s.pairedPending,
     };
-  const own = { metric, label: s[metric], ...readSide(metric, a, diagnostic, s) };
-  if (kind === 'reference') return { ...own, sub: referenceContext(metric, a, diagnostic, s) };
+  const { context, ...own } = readSide(metric, a, diagnostic, s);
+  if (kind === 'reference') return { metric, label: s[metric], ...own, sub: context };
   const speed =
     kind === 'lead' && metric === 'wall' && !diagnostic
       ? speedVs(a.clip?.record.seconds ?? null, b.clip?.record.seconds ?? null)
       : null;
   return {
+    metric,
+    label: s[metric],
     ...own,
     pairValue: `${b.name} ${readSide(metric, b, diagnostic, s).value}`,
     sub: speed ? speedThan(speed, b.name, s) : undefined,
   };
-}
-
-/** Against the reference, the second line explains the subject's value instead of a pair's. */
-function referenceContext(
-  metric: SideMetric,
-  a: ReadoutSide,
-  diagnostic: boolean,
-  s: Strings,
-): string | undefined {
-  if (metric === 'psnr') return s.higherCloser;
-  if (diagnostic) return s.diagnosticMetric;
-  if (metric === 'wall') return s.wallSub;
-  if (metric === 'energy') return s.energySub;
-  const perSecond = display(a.cost?.[metric]?.perVideoSecond, 4);
-  return perSecond === null ? undefined : s.perVideoSecond(perSecond);
 }
 
 /** The pill's name, the side's layout and lossy optimizations, and its unofficial tag. */
@@ -332,7 +360,7 @@ function PairSide({
       className="inline-flex min-w-0 flex-wrap items-center gap-x-1.5"
       data-readout-side={pill.id}
     >
-      <Dot color={pill.color} />
+      <SideDot color={pill.color} />
       <b className="font-medium">{side.name}</b>
       {meta && <span className="text-muted-foreground">{meta}</span>}
       {pill.unofficial && (
@@ -347,25 +375,13 @@ function PairSide({
   );
 }
 
-function Dot({ color }: { color: string | null }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="size-2 shrink-0 rounded-full"
-      style={color ? { background: color } : { border: '1.5px solid currentColor' }}
-    />
-  );
-}
-
 export interface VideoClipReadoutProps {
   kind: StageOption['kind'];
-  /** The subject. */
   a: ReadoutSide;
   /** Its pair: the reference, another hardware's lead (or its own GPU's official lead), or the lossless twin. */
   b: ReadoutSide;
   /** The matched-noise rerun carries PSNR only; the cell's time, energy and cost are not its own. */
   diagnostic: boolean;
-  /** Sits under the rows. */
   footer?: ReactNode;
 }
 
@@ -413,7 +429,7 @@ export default function VideoClipReadout({
               <dd className="m-0 text-base font-medium break-words">{item.value}</dd>
               {item.pairValue && (
                 <dd className="m-0 flex min-w-0 items-center gap-1.5 text-2xs text-muted-foreground">
-                  <Dot color={b.pill.color} />
+                  <SideDot color={b.pill.color} />
                   <span className="min-w-0 break-words">{item.pairValue}</span>
                 </dd>
               )}
