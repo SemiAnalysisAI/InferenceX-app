@@ -41,16 +41,11 @@ const FrontierMemeOverlay = dynamic(() => import('./frontier-memes/FrontierMemeO
 });
 
 /** The Historical views built on the frontier history. */
-export type FrontierSection = 'frontier' | 'compare' | 'software' | 'gainRate';
+export type FrontierSection = 'frontier' | 'compare' | 'software';
 /** What a series is in Frontier and Compare: one chip, or every chip of a vendor. */
 export type FrontierGrouping = 'gpu' | 'vendor';
 
-export const FRONTIER_SECTIONS: readonly FrontierSection[] = [
-  'frontier',
-  'compare',
-  'software',
-  'gainRate',
-];
+export const FRONTIER_SECTIONS: readonly FrontierSection[] = ['frontier', 'compare', 'software'];
 
 export const isFrontierSection = (view: string): view is FrontierSection =>
   (FRONTIER_SECTIONS as readonly string[]).includes(view);
@@ -95,8 +90,6 @@ const STRINGS = {
       `Each ${grouping === 'gpu' ? "chip's" : "vendor's"} own frontier side by side, with who leads and by how much.`,
     softwareHint:
       'The hardware is held constant: each chip against its own first run, so every gain is software, serving configuration or precision.',
-    gainRateHint:
-      'The slope of Software gains: how fast each chip is still improving on the same hardware. Rates falling toward zero show where software gains saturate.',
     pick: (grouping: FrontierGrouping) => (grouping === 'gpu' ? 'Chips shown' : 'Vendors shown'),
     hidden: (vendor: string, chips: string, precision: string) =>
       `${vendor} (${chips}) only has ${precision} data for this model and scenario.`,
@@ -133,8 +126,6 @@ const STRINGS = {
       `并排展示各${grouping === 'gpu' ? '芯片' : '厂商'}自身的前沿，以及谁领先、领先多少。`,
     softwareHint:
       '硬件保持不变：每款芯片都与自身的首次测试对比，因此各项提升都来自软件、部署配置或精度。',
-    gainRateHint:
-      '软件提升的斜率：每款芯片在同一硬件上仍在以多快的速度提升。速度向零回落，说明软件提升趋于饱和。',
     pick: (grouping: FrontierGrouping) => (grouping === 'gpu' ? '显示的芯片' : '显示的厂商'),
     hidden: (vendor: string, chips: string, precision: string) =>
       `${vendor}（${chips}）在该模型与场景下仅有 ${precision} 数据。`,
@@ -191,7 +182,7 @@ function defaultSelection(
     .filter(([key, areas]) => candidates.has(key) && (areas[last] ?? 0) > 0)
     .toSorted((a, b) => b[1][last] - a[1][last])
     .map(([key]) => key);
-  if (section === 'software' || section === 'gainRate') return ranked.slice(0, 3);
+  if (section === 'software') return ranked.slice(0, 3);
   return grouping === 'vendor' ? ranked : ranked.slice(0, 2);
 }
 
@@ -494,9 +485,7 @@ export default function FrontierView({
           ? t.frontierHint(vendor)
           : section === 'compare'
             ? t.compareHint(grouping)
-            : section === 'software'
-              ? t.softwareHint
-              : t.gainRateHint}
+            : t.softwareHint}
       </p>
       {perSeries && (
         <div role="group" aria-label={t.pick(grouping)} className="flex flex-wrap gap-1.5">
@@ -651,19 +640,17 @@ export default function FrontierView({
             xLabel={chartProps.xLabel}
             formatDate={formatDate}
           />
-        </div>
-      )}
-
-      {section === 'gainRate' && (
-        <div className={PANEL_GRID_CLASS}>
-          <FrontierGainRate
-            history={history}
-            dateIndex={dateIndex}
-            keys={selected}
-            styles={styles}
-            formatDate={formatDate}
-            onSeek={seekFromPanel}
-          />
+          {/* How fast each chip's software gain is still growing: where gains saturate. */}
+          <div className="min-w-0 pt-4 lg:col-span-2">
+            <FrontierGainRate
+              history={history}
+              dateIndex={dateIndex}
+              keys={selected}
+              styles={styles}
+              formatDate={formatDate}
+              onSeek={seekFromPanel}
+            />
+          </div>
         </div>
       )}
 

@@ -409,7 +409,6 @@ describe('Historical frontier views', () => {
         'Frontier',
         'Compare',
         'Software gains',
-        'Gain rate',
       ]);
     });
     cy.get('[data-testid="historical-view-frontier"]').click();
@@ -454,8 +453,8 @@ describe('Historical frontier views', () => {
     cy.get('[data-testid="frontier-series-b200"]').should('exist');
   });
 
-  it('plots the rate of software gain by date and by chip age', () => {
-    cy.get('[data-testid="historical-view-gainRate"]').click();
+  it('plots the rate of software gain by date and by chip age under Software gains', () => {
+    cy.get('[data-testid="historical-view-software"]').click();
     cy.get('[data-testid="frontier-gain-rate"] svg path').should('have.length.greaterThan', 0);
     cy.get('[data-testid="frontier-gain-rate-table"]').within(() => {
       cy.contains('th', 'Current rate').should('exist');

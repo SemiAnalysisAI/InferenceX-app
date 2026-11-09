@@ -7,10 +7,11 @@ export const PANEL_MARGIN = { top: 16, right: 16, bottom: 36, left: 56 } as cons
 
 /**
  * A panel spans two rows of its parent grid (header, chart) through `subgrid`, so headers of
- * different lengths still start both charts at the same height.
+ * different lengths still start both charts at the same height. Its one column may shrink
+ * below a chart drawn at an earlier, wider size, so the chart can measure the new width.
  */
 export const PANEL_SECTION_CLASS =
-  'grid grid-rows-[auto_1fr] gap-2 lg:row-span-2 lg:grid-rows-subgrid';
+  'grid grid-cols-[minmax(0,1fr)] grid-rows-[auto_1fr] gap-2 lg:row-span-2 lg:grid-rows-subgrid';
 export const PANEL_HEADER_CLASS = 'flex flex-col gap-1';
 
 /**
