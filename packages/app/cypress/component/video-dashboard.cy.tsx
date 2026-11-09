@@ -651,6 +651,13 @@ describe('VideoGenX results', () => {
     searchParam('r_clip').should('match', /^34342452354:/u);
     // The stage switch redraws the chart without closing the panel the click pinned.
     cy.get('[data-testid="point-details-panel"]').should('contain', 'H200');
+    // Hidden hardware stops playing; the stage falls back to the named run until it returns.
+    cy.get('[data-testid="point-details-close"]').click();
+    toggleHardware('h200');
+    stagePill('a').should('contain', 'B200').and('contain', 'Unofficial run');
+    playing().should('have.attr', 'data-hardware', 'b200').and('have.attr', 'data-overlay', 'true');
+    toggleHardware('h200');
+    playing().should('have.attr', 'data-hardware', 'h200');
 
     hardwarePoints('h100').should('have.attr', 'data-clips', 'false');
     hardwarePoints('h100').find('.visible-shape').should('have.css', 'stroke-width', '1.5px');
