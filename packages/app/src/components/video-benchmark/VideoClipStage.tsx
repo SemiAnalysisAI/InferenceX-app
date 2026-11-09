@@ -26,7 +26,7 @@ import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
-import { clipGroupActive, frameAt, frameTotal } from './clip-sync';
+import { clipGroupActive, frameAt, frameClock } from './clip-sync';
 import type { StageView } from './clip-stage';
 import { absoluteFrameDifference } from './results-clips';
 import { useClipGroup } from './use-clip-group';
@@ -177,11 +177,18 @@ export default function VideoClipStage({
   const [inspect, setInspect] = useState(false);
   /** One zoom and pan, in percent of a side, applied to both sides and the Difference canvas. */
   const [lens, setLens] = useState({ zoom: 1, x: 0, y: 0 });
-  const drag = useRef<{ x: number; y: number; width: number; height: number; from: typeof lens }>(
-    null,
-  );
-  /** A pan drag just ended, so the click that follows it is not a lock or flip. */
-  const dragged = useRef(false);
+  /**
+   * One pan gesture. `from` is the lens it started on while the pointer is held; `moved` outlives
+   * the release, so the click that ends a pan is not a lock or flip.
+   */
+  const drag = useRef<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    from: typeof lens | null;
+    moved: boolean;
+  }>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const pendingSplit = useRef<number | null>(null);
   const splitFrame = useRef(0);
@@ -210,8 +217,7 @@ export default function VideoClipStage({
   const wiping = view === 'wipe' && !idle;
   const original = view === 'diff';
   const onLeft = (role: Role) => (role === 'a') !== swapped;
-  const total = fps !== null && fps > 0 && duration > 0 ? frameTotal(duration, fps, frames) : 0;
-  const clock = fps !== null && total > 0 ? { fps, total } : null;
+  const clock = frameClock(duration, fps, frames);
   const lensStyle =
     lens.zoom > 1
       ? { transform: `scale(${lens.zoom}) translate(${lens.x}%, ${lens.y}%)` }
@@ -327,14 +333,17 @@ export default function VideoClipStage({
     group.stepFrames(delta, clock);
     if (!repeat) track('video_results_frame_step', { direction: delta < 0 ? 'previous' : 'next' });
   };
+  const release = () => {
+    if (drag.current) drag.current.from = null;
+  };
   const zoomTo = (zoom: number) => {
     // A drag still held would otherwise restore its starting zoom on the next move.
-    drag.current = null;
+    release();
     setLens({ zoom, x: 0, y: 0 });
     track('video_results_zoom_changed', { zoom });
   };
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    dragged.current = false;
+    drag.current = null;
     // Only the picture pans; a press on a pill or control keeps its own action.
     if (lens.zoom === 1 || event.target !== event.currentTarget) return;
     // Pan is a share of one side, which is the whole stage except in Side by side.
@@ -346,22 +355,24 @@ export default function VideoClipStage({
       width: side.width,
       height: side.height,
       from: lens,
+      moved: false,
     };
   };
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const start = drag.current;
-    if (start) {
+    const from = start?.from;
+    if (start && from) {
       const dx = event.clientX - start.x;
       const dy = event.clientY - start.y;
-      if (Math.abs(dx) + Math.abs(dy) > 3) dragged.current = true;
+      if (Math.abs(dx) + Math.abs(dy) > 3) start.moved = true;
       // Keeps the scaled side covering the stage: at 2× it may shift by a quarter of its width.
-      const limit = ((start.from.zoom - 1) / (2 * start.from.zoom)) * 100;
-      const pan = (from: number, delta: number, size: number) =>
-        Math.min(limit, Math.max(-limit, from + (delta / size) * (100 / start.from.zoom)));
+      const limit = ((from.zoom - 1) / (2 * from.zoom)) * 100;
+      const pan = (offset: number, delta: number, size: number) =>
+        Math.min(limit, Math.max(-limit, offset + (delta / size) * (100 / from.zoom)));
       setLens({
-        zoom: start.from.zoom,
-        x: pan(start.from.x, dx, start.width),
-        y: pan(start.from.y, dy, start.height),
+        zoom: from.zoom,
+        x: pan(from.x, dx, start.width),
+        y: pan(from.y, dy, start.height),
       });
       return;
     }
@@ -400,9 +411,6 @@ export default function VideoClipStage({
       if (locked) lock(false);
       if (lens.zoom > 1) zoomTo(1);
     }
-  };
-  const endDrag = () => {
-    drag.current = null;
   };
 
   const srcOf = (clip: StageClip) => (original || !clip.previewUrl ? clip.url : clip.previewUrl);
@@ -454,15 +462,15 @@ export default function VideoClipStage({
         )}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerLeave={endDrag}
-        onPointerCancel={endDrag}
+        onPointerUp={release}
+        onPointerLeave={release}
+        onPointerCancel={release}
         onClick={(event) => {
           // Picture layers pass the pointer through, so only a click on the picture targets the
           // stage itself; pills and controls keep theirs.
           if (event.target !== event.currentTarget) return;
-          if (dragged.current) {
-            dragged.current = false;
+          if (drag.current?.moved) {
+            drag.current = null;
             return;
           }
           if (wiping) lock(!locked);

@@ -136,9 +136,14 @@ function resume(
   return 'playing';
 }
 
-/** Frames the shared duration holds: the recorded count, unless the playable media is shorter. */
-export const frameTotal = (duration: number, fps: number, recorded: number | null) =>
-  Math.min(recorded ?? Infinity, Math.round(duration * fps));
+/**
+ * The frames the shared duration holds, or null without a frame rate or playable media. The total
+ * is the recorded count, unless the playable media is shorter; a playable clip shows at least one.
+ */
+export const frameClock = (duration: number, fps: number | null, recorded: number | null) =>
+  fps !== null && fps > 0 && duration > 0
+    ? { fps, total: Math.max(1, Math.min(recorded ?? Infinity, Math.round(duration * fps))) }
+    : null;
 
 /** Zero-based frame shown at `time`; the epsilon keeps an exact frame boundary on its own frame. */
 export const frameAt = (time: number, fps: number, total: number) =>
