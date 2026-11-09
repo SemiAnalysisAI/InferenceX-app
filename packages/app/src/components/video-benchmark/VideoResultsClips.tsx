@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronRight } from 'lucide-react';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { InfoHelp } from '@/components/ui/option-info';
@@ -15,6 +15,7 @@ import {
   pairedGroup,
   parseStage,
   promptKey,
+  showOnStage,
   STAGE_VIEWS,
   stageOptions,
   stagePointKey,
@@ -38,6 +39,7 @@ import {
 import { RESULTS_HARDWARE, resultMetadata, type ResultCell } from './results';
 import type { StoredArtifact } from './stored';
 import { videoClipSourceKey as sourceKey, type VideoInitialData } from './initial-data';
+import QualityMethod from './QualityMethod';
 import VideoClipReadout from './VideoClipReadout';
 import VideoClipStage, { SideDot, type StageClip } from './VideoClipStage';
 
@@ -165,8 +167,6 @@ export interface VideoResultsClipsProps {
    */
   against: string;
   onAgainstChange: (value: string) => void;
-  /** Under the readout rows; the quality explainer fills it. */
-  readoutFooter?: ReactNode;
 }
 
 const NO_POINTS: readonly VideoPoint[] = [];
@@ -186,7 +186,6 @@ export default function VideoResultsClips({
   onPairChange,
   against,
   onAgainstChange,
-  readoutFooter,
 }: VideoResultsClipsProps) {
   const s = STRINGS[useLocale()];
   const stage = parseStage(useClientSearch());
@@ -508,7 +507,15 @@ export default function VideoResultsClips({
               cost: other ? costs?.[other.id] : undefined,
             }}
             diagnostic={diagnostic}
-            footer={readoutFooter}
+            footer={
+              <QualityMethod
+                leads={selected.map((lead) => ({ point: lead, side: sideOf(lead) }))}
+                onShowMe={(target) => {
+                  onAgainstChange('reference');
+                  showOnStage(target);
+                }}
+              />
+            }
           />
           <details
             data-testid="video-results-sources"

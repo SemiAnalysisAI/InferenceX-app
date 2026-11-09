@@ -98,7 +98,8 @@ export interface StageSubject {
   pending: boolean;
 }
 
-const SUBJECT_ORDER = ['b200', ...RESULTS_HARDWARE.filter((key) => key !== 'b200')];
+/** Hardware the stage prefers, in order: B200 first, then the roster. */
+export const SUBJECT_ORDER = ['b200', ...RESULTS_HARDWARE.filter((key) => key !== 'b200')];
 
 export const stagePointKey = (point: VideoPoint) => resultsPointKey({ point });
 

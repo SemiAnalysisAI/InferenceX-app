@@ -1,0 +1,49 @@
+import { SUBJECT_ORDER, type StageCandidate } from './clip-stage';
+import type { VideoPoint } from './metrics';
+import { isLossy } from './optimizations';
+import { resultsClipGroups, resultsClipReference } from './results-clips';
+
+/** Reference PSNR spread of the scored lossless clips the stage loaded. */
+export interface ReferencePsnrRange {
+  min: number;
+  max: number;
+  clips: number;
+  /** Hardware keys with at least one scored clip, in lead order. */
+  hardware: string[];
+}
+
+/**
+ * The PSNR range of lossless clips against the Diffusers reference, over the visible leads'
+ * loaded clips. A lossy lead, the matched-noise rerun, and an identical, incompatible or unscored
+ * pair carry no finite score of a lossless CI clip, so none counts. Null until one clip does.
+ */
+export function referencePsnrRange(leads: readonly StageCandidate[]): ReferencePsnrRange | null {
+  const scores: number[] = [];
+  const hardware: string[] = [];
+  for (const { point, side } of leads) {
+    if (!side || isLossy(point)) continue;
+    const before = scores.length;
+    for (const group of resultsClipGroups([side])) {
+      // An identical or incompatible pair has no PSNR.
+      const psnr = group.scope ? null : group.clips.get(side.hardwareKey)?.quality?.psnrDb;
+      if (typeof psnr === 'number' && Number.isFinite(psnr)) scores.push(psnr);
+    }
+    if (scores.length > before) hardware.push(side.hardwareKey);
+  }
+  if (scores.length === 0) return null;
+  return { min: Math.min(...scores), max: Math.max(...scores), clips: scores.length, hardware };
+}
+
+/**
+ * The lead "Show me" plays against its Diffusers reference: B200's, else the first lead in stage
+ * order whose loaded clips have a playable reference pair. A lossy lead is no lossless example.
+ */
+export function showMeTarget(leads: readonly StageCandidate[]): VideoPoint | null {
+  for (const key of SUBJECT_ORDER) {
+    const lead = leads.find(({ point }) => point.hardwareKey === key);
+    if (!lead?.side || isLossy(lead.point)) continue;
+    const groups = resultsClipGroups([lead.side]).filter((group) => !group.scope);
+    if (groups.some((group) => resultsClipReference(group, new Set()) !== null)) return lead.point;
+  }
+  return null;
+}
