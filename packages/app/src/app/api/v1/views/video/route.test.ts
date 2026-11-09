@@ -11,6 +11,7 @@ import { metricValue } from '@/components/video-benchmark/metrics';
 import { listedVideoCells, plotVideoPoints } from '@/components/video-benchmark/plot';
 import { dashboardCells, namedRunPoints, videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState, resultProjection } from '@/components/video-benchmark/results';
+import { chartedCells } from '@/components/video-benchmark/results-chart';
 import { servingFixture } from '@/components/video-benchmark/serving.fixture';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
 import { verifiedQuality } from '@/components/video-benchmark/reference-quality';
@@ -237,14 +238,13 @@ describe('published VideoGenX dashboard projection', () => {
     expect(body.clipQuality.groups[0].clips[0].quality.releaseQualified).toBe(false);
     expect(body.clipQuality.groups[0].clips[0].quality.candidate.run_id).toBe('123');
     expect(body.clipQuality.groups[0].clips[0].quality.psnrDb).toBe(25);
+    const state = parseResultsState('unofficialrun=123');
     const projection = resultProjection(
       videoPoints([history]),
-      parseResultsState('unofficialrun=123'),
+      state,
       namedRunPoints([history], '123'),
     );
-    const uiPoints = resultsClipPoints([...projection.cells, ...projection.overlayCells], {
-      tier: 'h',
-    });
+    const uiPoints = resultsClipPoints(chartedCells(projection, state), { tier: 'h' });
     expect(uiPoints.map((point) => point.runId)).toEqual(['123']);
     expect(body.clipQuality.groups).toEqual(
       resultsClipEvidence(uiPoints.map((point) => publishedResultsSide(named.stored, point))),
@@ -253,6 +253,39 @@ describe('published VideoGenX dashboard projection', () => {
     const cleared = await clearedResponse.json();
     expect(cleared.clipQuality.groups[0].clips[0].quality.candidate.run_id).toBe('124');
     expect(cleared.clipQuality.groups[0].clips[0].quality.psnrDb).toBe(35);
+  });
+
+  it('scores the clip of the engine the chart draws when two engines share a GPU', async () => {
+    const official = referenceQualityFixture(20, '124', 8, '4'.repeat(64));
+    const mediaPath = official.attachment.pairs[0].candidate.media_path;
+    official.stored.sources[0].assets = [[mediaPath, { url: '/124.mp4', downloadUrl: '/124.mp4' }]];
+    const entry = { ...videoHistoryEntry(official.stored, null), approved: true };
+    const [source0] = entry.sources;
+    // vLLM-Omni rates more videos per GPU-hour but is slower at the same cost per
+    // video-second, so the chart draws SGLang.
+    source0.observations = source0.observations.flatMap((o) => [
+      { ...o, results: { ...o.results!, engine: 'sglang' } },
+      {
+        ...o,
+        id: `${o.id}-vllm`,
+        p50: o.p50! + 10,
+        wallSeconds: 1,
+        results: { ...o.results!, engine: 'vllm-omni' },
+      },
+    ]);
+    source.mockImplementation((req: NextRequest) =>
+      Response.json(
+        req.nextUrl.searchParams.get('format') === 'history'
+          ? { schemaVersion: 1, nextPage: null, entries: [entry] }
+          : official.stored,
+      ),
+    );
+    const response = await GET(request('view=overview'));
+    const body = await response.json();
+    const clips = body.clipQuality.groups.flatMap((group: { clips: { pointId: string }[] }) =>
+      group.clips.map((clip) => clip.pointId),
+    );
+    expect(clips).toEqual([source0.observations[0].id]);
   });
 
   it('overlays an unstored named run from its live artifact read without approving it', async () => {

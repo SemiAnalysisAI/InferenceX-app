@@ -8,18 +8,19 @@ import { storedBundle, type StoredArtifact } from './stored';
 import type { ClipQuality, UnscoredClip } from './reference-quality';
 import type { DiagnosticPair } from './diagnostic-quality';
 
-/** A named result owns its hardware's clip, even when the official result is newer or faster. */
+/**
+ * A named result owns its hardware's clip, even when the official result is newer,
+ * faster or exact while the named run is lossy; a lossless named cell still comes first.
+ */
 export function resultsClipPoints(
   cells: readonly Pick<ResultCell, 'point' | 'overlay'>[],
   options: MetricOptions,
 ): VideoPoint[] {
   return RESULTS_HARDWARE.flatMap((key) => {
     const choices = cells.filter((cell) => cell.point.hardwareKey === key);
-    const named = leadCell(
-      choices.filter((cell) => cell.overlay).map((cell) => cell.point),
-      key,
-      options,
-    );
+    const namedPoints = choices.filter((cell) => cell.overlay).map((cell) => cell.point);
+    const named =
+      leadCell(namedPoints, key, options) ?? leadCell(namedPoints, key, options, { lossy: true });
     const lead =
       named ??
       leadCell(

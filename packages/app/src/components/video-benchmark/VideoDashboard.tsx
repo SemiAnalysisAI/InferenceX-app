@@ -27,6 +27,7 @@ import { Heading, HeadingQualifier } from '@/components/ui/heading';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
@@ -34,7 +35,8 @@ import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { RUN_CONTEXT_GRID, RunField } from '@/components/inference/ui/WorkflowInfoDisplay';
 import { hardwareLabel } from './hardware';
-import { layoutLabel, leadCell } from './deployment';
+import { compareDeployments, layoutLabel, leadCell, runtimeKey } from './deployment';
+import { engineLabel, engineSort } from './engines';
 import { useVideoPoints } from './use-video-points';
 import type { VideoInitialData } from './initial-data';
 import {
@@ -49,12 +51,19 @@ import {
   type VideoMode,
 } from './results';
 import {
+  chartedCells,
+  comparesEngines,
   RESULTS_X_METRICS,
   RESULTS_Y_METRIC_KEYS,
   RESULTS_Y_METRICS,
+  resultsChartSeries,
   resultsMetricLabel,
   resultsPointKey,
+  resultsSelection,
 } from './results-chart';
+import { optimizationsOf, runtimeLabel } from './optimizations';
+import { EngineComparisonConfirmation } from '@/components/inference/ui/engine-comparison-confirmation';
+import { useEngineComparisonConsent } from '@/components/inference/hooks/use-engine-comparison-consent';
 import VideoDeploymentDetail from './VideoDeploymentDetail';
 import VideoResultsChart, { VIDEO_RESULTS_CHART_ID } from './VideoResultsChart';
 import VideoCostContext from './VideoCostContext';
@@ -83,6 +92,18 @@ const STRINGS = {
     compareRangePlaceholder: 'Select date range',
     secondaryControls: 'More chart controls',
     changed: 'changed',
+    engine: 'Engine',
+    all: 'All',
+    bestEngine: 'Best',
+    engineHelp:
+      'Best shows the lossless engine with the largest Pareto frontier area on each GPU. All shows every engine. Lossy optimizations are never ranked.',
+    engineComparison: {
+      title: 'Show two engines on the same GPU?',
+      description:
+        'By continuing to display two serving engines on the same GPU, I agree not to use this comparison to start engine drama on Twitter, XHS or other forums.',
+      cancel: 'Cancel',
+      confirm: 'I agree, show both',
+    },
     date: 'Run date',
     yAxis: 'Y-axis metric',
     stepsUnit: 'steps',
@@ -143,6 +164,18 @@ const STRINGS = {
     compareRangePlaceholder: '选择日期范围',
     secondaryControls: '更多图表设置',
     changed: '项已更改',
+    engine: '引擎',
+    all: '全部',
+    bestEngine: '最优',
+    engineHelp:
+      '「最优」显示每张 GPU 上 Pareto 前沿面积最大的无损引擎，「全部」显示所有引擎。有损优化不参与评选。',
+    engineComparison: {
+      title: '在同一 GPU 上显示两个引擎？',
+      description:
+        '继续在同一 GPU 上显示两个引擎，即表示我同意不利用这组对比在 Twitter、小红书或其他论坛上挑起引擎之间的争论。',
+      cancel: '取消',
+      confirm: '我同意，同时显示',
+    },
     date: '运行日期',
     yAxis: 'Y 轴指标',
     stepsUnit: '步',
@@ -191,9 +224,6 @@ const subscribe = () => () => {};
 const DETAIL_ENTRY = 'videoResultsDetail';
 const onDetailEntry = () =>
   (window.history.state as Record<string, unknown> | null)?.[DETAIL_ENTRY] === true;
-
-const cellLabel = (cell: ResultCell) =>
-  `${hardwareLabel(cell.point.hardwareKey ?? '')}${cell.overlay ? ` · #${cell.point.runId}` : ''}`;
 
 export default function VideoDashboard({
   initialData,
@@ -286,6 +316,28 @@ export default function VideoDashboard({
     [points, state, namedPoints],
   );
   const { options, roster } = projection;
+  const consent = useEngineComparisonConsent('video-results');
+  /** Asks before a change first puts two engines on one GPU, as the InferenceX charts do. */
+  const updateSeries = (patch: Partial<ResultsState>) => {
+    const plotted = (next: ResultsState) => {
+      const p = resultProjection(points, { ...next, hidden: [] }, namedPoints);
+      return resultsChartSeries(
+        [...p.deploymentCells, ...p.overlayDeploymentCells],
+        resultsSelection(next),
+      );
+    };
+    const current = latest.current;
+    if (
+      consent.accepted ||
+      comparesEngines(plotted(current)) ||
+      !comparesEngines(plotted({ ...current, ...patch }))
+    ) {
+      update(patch);
+      return;
+    }
+    consent.request(() => update(patch));
+    track('video_results_engine_comparison_opened');
+  };
   const dayRuns = projection.runs.filter((run) => run.date === projection.run?.date);
   const hidden = useMemo(() => new Set(state.hidden), [state.hidden]);
   const shown = (cell: ResultCell) => !hidden.has(cell.point.hardwareKey ?? '');
@@ -310,11 +362,24 @@ export default function VideoDashboard({
     () => [...projection.deploymentCells, ...projection.overlayDeploymentCells],
     [projection],
   );
+  // Cards, profit bars and clips pick among the runtimes the chart draws, so they name its engine.
+  const allCharted = useMemo(() => chartedCells(projection, state), [projection, state]);
+  const charted = allCharted.filter(shown);
   const engines = [
     ...new Set(
       deploymentCells.flatMap(({ metadata }) => (metadata.engine ? [metadata.engine] : [])),
     ),
-  ];
+  ].toSorted((a, b) => engineSort(a) - engineSort(b));
+  // With two engines shown, a per-hardware pick (profit bar) names the engine it picked.
+  const cellLabel = (cell: ResultCell) =>
+    [
+      hardwareLabel(cell.point.hardwareKey ?? ''),
+      engines.length > 1 && cell.metadata.engine ? engineLabel(cell.metadata.engine) : null,
+      cell.overlay ? `#${cell.point.runId}` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  const compareConfigs = projection.state.configs;
   // Chip Config plots earlier runs, so their popovers open cells outside the as-of set.
   const detailPool = [...deploymentCells, ...projection.history];
   const detailCell =
@@ -331,9 +396,10 @@ export default function VideoDashboard({
           .filter(
             (cell) =>
               cell.point.hardwareKey === detailCell.point.hardwareKey &&
+              runtimeKey(cell.point) === runtimeKey(detailCell.point) &&
               cell.overlay === detailCell.overlay,
           )
-          .toSorted((a, b) => (a.point.participating ?? 0) - (b.point.participating ?? 0));
+          .toSorted((a, b) => compareDeployments(a.point, b.point));
   // Left in the URL, a dead key would reopen its detail once its hardware is shown again.
   const deadPoint = state.point !== null && !loading && !error && detailCell === undefined;
   useEffect(() => {
@@ -369,7 +435,7 @@ export default function VideoDashboard({
     cell.overlay ? overlayRunColor(0) : colorFor(cell.point.hardwareKey ?? '');
   const representatives = roster.flatMap((key) =>
     [false, true].flatMap((overlay) => {
-      const choices = cells.filter((c) => c.point.hardwareKey === key && c.overlay === overlay);
+      const choices = charted.filter((c) => c.point.hardwareKey === key && c.overlay === overlay);
       const lead = leadCell(
         choices.map((c) => c.point),
         key,
@@ -378,6 +444,13 @@ export default function VideoDashboard({
       const first = choices.find((c) => c.point.id === lead?.id);
       return first ? [first] : [];
     }),
+  );
+  const clipPoints = resultsClipPoints(charted, { tier: state.costTier });
+  // A clip takes its run's color; a lossy named run owns its clip without leading a card.
+  const overlayClips = new Set(
+    charted
+      .filter((c) => c.overlay && clipPoints.includes(c.point))
+      .map((c) => c.point.hardwareKey),
   );
   const profitBars: ResultBar[] = roster
     .filter((key) => !hidden.has(key))
@@ -418,8 +491,9 @@ export default function VideoDashboard({
   const apiUrl = `/api/v1/views/video?view=overview&${resultsSearch(state)}`;
   const secondaryChanged = [
     state.yMetric !== DEFAULT_RESULTS_STATE.yMetric,
+    state.engine !== null || state.compareEngines,
     state.date !== null || state.run !== null,
-    state.configs.length > 0,
+    compareConfigs.length > 0,
   ].filter(Boolean).length;
   const model = deploymentCells[0]?.metadata.model ?? state.model ?? s.title;
   const csvUrl = `${apiUrl}&format=csv`;
@@ -475,7 +549,7 @@ export default function VideoDashboard({
                         className="mt-1 block text-xs font-medium"
                         data-testid="results-workload-summary"
                       >
-                        {[workloadLabel, ...engines].join(' · ')}
+                        {[workloadLabel, ...engines.map(engineLabel)].join(' · ')}
                       </span>
                     )}
                   </>
@@ -505,6 +579,32 @@ export default function VideoDashboard({
                     data-testid="results-chart-config"
                   >
                     {metricSelector()}
+                    {(options.engines.length > 1 || state.engine !== null) && (
+                      <div className="flex min-w-0 flex-col gap-1.5">
+                        <LabelWithTooltip label={s.engine} tooltip={s.engineHelp} />
+                        <SegmentedToggle
+                          role="group"
+                          value={state.compareEngines ? 'all' : (state.engine ?? 'best')}
+                          options={[
+                            { value: 'best', label: s.bestEngine },
+                            { value: 'all', label: s.all },
+                            ...options.engines.map((engine) => ({
+                              value: engine,
+                              label: engineLabel(engine),
+                            })),
+                          ]}
+                          onValueChange={(value) => {
+                            track('video_results_engine_selected', { engine: value });
+                            updateSeries({
+                              engine: value === 'best' || value === 'all' ? null : value,
+                              compareEngines: value === 'all',
+                            });
+                          }}
+                          ariaLabel={s.engine}
+                          testId="results-engine"
+                        />
+                      </div>
+                    )}
                   </ControlPanel>
                   <ControlPanel legend={s.compareHistory} data-testid="results-compare-history">
                     <div className="grid min-w-0 gap-3">
@@ -519,9 +619,15 @@ export default function VideoDashboard({
                           triggerTestId="results-chip-config"
                           options={projection.chipConfigs.map(({ key, point }) => ({
                             value: key,
-                            label: `${hardwareLabel(point.hardwareKey ?? '')} · ${layoutLabel(point, locale)}`,
+                            label: [
+                              hardwareLabel(point.hardwareKey ?? ''),
+                              runtimeLabel(point.results?.engine ?? null, optimizationsOf(point)),
+                              layoutLabel(point, locale),
+                            ]
+                              .filter(Boolean)
+                              .join(' · '),
                           }))}
-                          value={state.configs}
+                          value={compareConfigs}
                           onChange={(configs) => {
                             track('video_results_chip_config_selected', {
                               configs: configs.join(','),
@@ -540,7 +646,7 @@ export default function VideoDashboard({
                           selectedSuffix={locale === 'zh' ? ' 已选' : undefined}
                         />
                       </div>
-                      {state.configs.length > 0 && (
+                      {compareConfigs.length > 0 && (
                         <div className="flex min-w-0 flex-col space-y-1.5">
                           <LabelWithTooltip
                             htmlFor="date-picker"
@@ -692,7 +798,7 @@ export default function VideoDashboard({
             <div className="flex min-w-0 flex-col gap-6" data-testid="video-results-chart-card">
               <VideoResultsChart
                 cells={deploymentCells}
-                history={state.configs.length > 0 ? projection.history : null}
+                history={compareConfigs.length > 0 ? projection.history : null}
                 roster={roster}
                 state={state}
                 colorFor={colorFor}
@@ -700,7 +806,7 @@ export default function VideoDashboard({
                 onLabelsChange={setLabels}
                 legendExpanded={legendExpanded}
                 onLegendExpandedChange={setLegendExpanded}
-                onUpdate={update}
+                onUpdate={updateSeries}
                 onOpen={openPoint}
                 heading={heading}
                 footer={
@@ -721,12 +827,8 @@ export default function VideoDashboard({
           <Card>
             <VideoResultsClips
               initialSides={initialData?.sides}
-              points={resultsClipPoints(cells, { tier: state.costTier })}
-              colorFor={(key) =>
-                representatives.some((c) => c.overlay && c.point.hardwareKey === key)
-                  ? overlayRunColor(0)
-                  : colorFor(key)
-              }
+              points={clipPoints}
+              colorFor={(key) => (overlayClips.has(key) ? overlayRunColor(0) : colorFor(key))}
               hidden={hidden}
               options={{ tier: state.costTier }}
               costs={Object.fromEntries(
@@ -889,6 +991,18 @@ export default function VideoDashboard({
           </footer>
         </div>
       </Activity>
+      <EngineComparisonConfirmation
+        copy={s.engineComparison}
+        open={consent.open}
+        onCancel={() => {
+          consent.cancel();
+          track('video_results_engine_comparison_cancelled');
+        }}
+        onConfirm={() => {
+          consent.confirm();
+          track('video_results_engine_comparison_accepted');
+        }}
+      />
     </div>
   );
 }

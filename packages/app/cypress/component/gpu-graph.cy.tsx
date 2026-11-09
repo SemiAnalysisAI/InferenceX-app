@@ -972,7 +972,17 @@ describe('GPU comparison with unofficial runs', () => {
     cy.get('[data-testid="point-details-panel"]')
       .should('contain.text', '✕ feat/power-sweep')
       .and('not.contain.text', 'Unofficial run')
-      .and('not.contain.text', 'Branch');
+      .and('not.contain.text', 'Branch')
+      .should(($panel) => {
+        // The warning lives in the sticky header, not under its negative-margin pull-up.
+        const panel = $panel[0];
+        const warning = panel.querySelector('p.text-destructive')!;
+        const header = warning.parentElement!;
+        expect(getComputedStyle(header).position).to.equal('sticky');
+        expect(warning.getBoundingClientRect().top).to.be.at.least(
+          panel.getBoundingClientRect().top,
+        );
+      });
     cy.get('[data-testid="point-details-panel"] [data-pinned-tokens]').should(
       'contain.text',
       '75,000',

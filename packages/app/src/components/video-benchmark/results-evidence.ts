@@ -6,6 +6,8 @@ export interface ResultsEvidence {
   manifestHash: string;
   verified: boolean;
   engine: string | null;
+  /** Runtime optimization keys the run configuration declared; absent on older History. */
+  optimizations?: string[];
   mode: string | null;
   attempted: number | null;
   notStarted: number | null;
@@ -99,6 +101,13 @@ export function resultsEvidence(
       text(at(cell.run, 'configuration', 'runtime')) ||
       text(at(cell.spec, 'baseline', 'engine')) ||
       null,
+    optimizations: [
+      ...new Set(
+        rows(at(cell.run, 'configuration', 'optimizations'))
+          .map(text)
+          .filter(Boolean),
+      ),
+    ].toSorted(),
     mode:
       text(at(cell.run, 'plan', 'generation', 'mode')) ||
       text(at(cell.run, 'plan', 'mode')) ||

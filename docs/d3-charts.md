@@ -171,6 +171,12 @@ HTML strings bypass React entirely. D3 writes them into a tooltip div that is po
 
 Wrap tooltip HTML with `chartTooltipShell(body, options)` from `src/lib/d3-chart/tooltip-shell.ts` (or put `chartTooltipShellStyle(options)` on your own wrapper) instead of writing the popover background, border, radius, padding and shadow inline. Options cover pinned text selection, a custom border, min and max width, pointer events for links, and scrolling for long content. `chartTooltipTitle(label, color?)` renders the heading with a series dot, and `chartTooltipDismiss(text)` renders the pinned hint.
 
+Beside a desktop legend, pinned details take the legend's slot at the legend's
+width and the plot's height; elsewhere they are capped at 24rem. Longer details
+scroll inside the panel with the title and close button kept in view, so pinning
+a point never grows the chart row. This is presentation-only with no API or
+`inferencex-skills` contract changes.
+
 Pinned details close on clicks outside the chart SVG, the tooltip and the
 details panel, or on Escape, in desktop and mobile layouts. The shared wrapper
 listens in capture phase so outside controls that stop bubbling still dismiss the

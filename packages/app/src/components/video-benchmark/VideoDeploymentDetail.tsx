@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { layoutLabel } from './deployment';
+import { runtimeLabel } from './optimizations';
 import { costPerGpuHour, hardwareLabel } from './hardware';
 import { TIER_LABELS } from './metrics';
 import type { ResultCell, ResultsState } from './results';
@@ -228,7 +229,7 @@ export default function VideoDeploymentDetail({
   onPsnr,
 }: {
   cell: ResultCell;
-  /** Deployments of the same hardware and run channel across every GPU count. */
+  /** Deployments of the same hardware, runtime and run channel across every GPU count. */
   siblings: ResultCell[];
   gpuCounts: number[];
   workloadLabel: string;
@@ -243,6 +244,7 @@ export default function VideoDeploymentDetail({
   const s = STRINGS[locale];
   const { point, evidence } = cell;
   const hardware = hardwareLabel(point.hardwareKey ?? '');
+  const engine = runtimeLabel(cell.metadata.engine, cell.metadata.optimizations) ?? s.notRecorded;
   const powerEvidence =
     evidence?.powerValid === true
       ? s.validPower
@@ -276,7 +278,7 @@ export default function VideoDeploymentDetail({
             title={
               <span className="inline-flex flex-wrap items-center gap-2">
                 <span className={styles.dot} style={{ background: color }} />
-                {[hardware, cell.metadata.model, cell.metadata.engine ?? s.notRecorded].join(' · ')}
+                {[hardware, cell.metadata.model, engine].join(' · ')}
               </span>
             }
             description={[
@@ -327,7 +329,7 @@ export default function VideoDeploymentDetail({
             rows={[
               [s.gpus, s.gpuDetail(n(point.participating, 0), n(point.allocated, 0))],
               [s.concurrency, n(point.concurrency, 0)],
-              [s.engine, cell.metadata.engine ?? s.notRecorded],
+              [s.engine, engine],
               [s.runtime, code(point.runtime.slice(0, 12))],
               [s.workload, workloadLabel],
               [s.valid, `${n(point.valid, 0)} / ${n(point.scheduled, 0)}`],
