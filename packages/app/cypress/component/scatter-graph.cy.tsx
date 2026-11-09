@@ -380,6 +380,7 @@ describe('ScatterGraph', () => {
       .and('contain.text', 'CPU 24.2%')
       .and('contain.text', 'theoretical 97.3%')
       .find('[data-hover-cache-bar]')
+      .scrollIntoView()
       .should('be.visible');
     cy.get('[data-pinned-tokens]')
       .should('contain.text', '566,443,844')
@@ -1078,6 +1079,93 @@ describe('ScatterGraph', () => {
     });
     cy.viewport(1440, 900);
     assertDesktopAlignment();
+  });
+
+  it('keeps pinned details inside the plot-height legend slot and scrolls them', () => {
+    cy.viewport(1440, 900);
+    const chartId = 'test-scatter-details-scroll';
+    const rich = {
+      precision: Precision.FP4,
+      benchmark_type: 'agentic_traces',
+      framework: 'sglang',
+      disagg: true,
+      is_multinode: true,
+      physicalChips: 64,
+      conc: 384,
+      prefill_tp: 8,
+      prefill_ep: 8,
+      prefill_num_workers: 3,
+      num_prefill_gpu: 24,
+      decode_tp: 32,
+      decode_ep: 32,
+      decode_dp_attention: true,
+      decode_num_workers: 1,
+      num_decode_gpu: 32,
+      kv_offloading: 'dram',
+      kv_offload_backend: 'hicache',
+      server_gpu_cache_hit_rate: 0.067,
+      server_cpu_cache_hit_rate: 0.903,
+      theoretical_cache_hit_rate: 0.969,
+      total_prompt_tokens: 566443844,
+      total_generation_tokens: 4180360,
+    };
+    const data = [
+      createMockInferenceData({ hwKey: 'b200_trt', x: 64, y: 320, ...rich }),
+      createMockInferenceData({ hwKey: 'h100', x: 32, y: 210, ...rich }),
+    ];
+
+    mountWithProviders(
+      <div style={{ width: 1200 }}>
+        <ScatterGraph
+          chartId={chartId}
+          modelLabel="DeepSeek R1"
+          data={data}
+          xLabel="Interactivity"
+          yLabel="Throughput / Chip (tok/s)"
+          chartDefinition={defaultChartDef}
+          transitionDuration={0}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_trt', 'h100']),
+          hwTypesWithData: new Set(['b200_trt', 'h100']),
+          selectedPrecisions: [Precision.FP4],
+        },
+        unofficial: {},
+      },
+    );
+
+    cy.get('.sidebar-legend').should('exist');
+    let legendWidth = 0;
+    cy.get(`#${chartId} [data-slot="chart-legend-wrapper"]`).then(($slot) => {
+      legendWidth = $slot[0].getBoundingClientRect().width;
+    });
+    let rowHeight = 0;
+    cy.get(`#${chartId} [data-slot="chart-legend-wrapper"]`).then(($slot) => {
+      rowHeight = $slot[0].parentElement!.getBoundingClientRect().height;
+    });
+    cy.scatterPoints(`#${chartId}`).then((points) => clickScatterPoint(points[0]));
+    cy.get(`#${chartId} [data-testid="point-details-panel"]`).should(($panel) => {
+      const panel = $panel[0];
+      const slot = panel.closest('[data-slot="chart-legend-wrapper"]')!;
+      const row = slot.parentElement!;
+      const svg = row.querySelector('svg')!.getBoundingClientRect();
+      expect(row.getBoundingClientRect().height, 'row does not grow').to.be.closeTo(rowHeight, 1);
+      expect(slot.getBoundingClientRect().width, 'slot keeps legend width').to.be.closeTo(
+        legendWidth,
+        1,
+      );
+      expect(panel.getBoundingClientRect().bottom, 'panel ends within the plot row').to.be.at.most(
+        Math.max(svg.bottom, row.getBoundingClientRect().bottom) + 1,
+      );
+      expect(panel.scrollHeight, 'details overflow').to.be.greaterThan(panel.clientHeight);
+      expect(getComputedStyle(panel).overflowY).to.equal('auto');
+    });
+    cy.get(`#${chartId} [data-testid="point-details-panel"]`).scrollTo('bottom');
+    cy.get(`#${chartId} [data-testid="point-details-close"]`).should('be.visible').click();
+    cy.get(`#${chartId} [data-testid="point-details-panel"]`).should('not.exist');
   });
 
   it('renders line labels for both official and overlay (unofficial) rooflines', () => {

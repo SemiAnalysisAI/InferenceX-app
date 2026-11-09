@@ -87,10 +87,10 @@ export function ChartPointDetails<A extends string = string>({
       ref={ref}
       data-testid="point-details-panel"
       aria-label={t.title}
-      className="flex w-full scroll-mt-20 flex-col rounded-lg border border-border/30 bg-background p-2 text-xs leading-5"
+      className="flex min-h-0 w-full scroll-mt-20 flex-col overflow-y-auto overscroll-contain rounded-lg [scrollbar-width:thin] border border-border/30 bg-background p-2 text-xs leading-5"
     >
       {warning && <p className="mb-1 font-semibold text-destructive">{warning}</p>}
-      <div className="flex items-start gap-1.5">
+      <div className="sticky -top-2 z-10 -mx-2 -mt-2 flex items-start gap-1.5 bg-background px-2 pt-2">
         {color && (
           <span
             aria-hidden
