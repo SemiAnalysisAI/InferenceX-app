@@ -24,14 +24,18 @@ export interface ResultsChartMetric {
   label: { en: string; zh: string };
   /** The axis title once the plotted clip is known, so a latency names the clip it measures. */
   clipLabel?: (clip: ResultsClip) => { en: string; zh: string };
+  /** Its name under a hover-card value, which no axis title qualifies on the GPU axis. */
+  hoverLabel?: { en: string; zh: string };
   /** Empty when the label already names the unit. */
   unit: string;
   better: 'lower' | 'higher';
   digits: number;
+  scale?: 'log';
+  rankOn?: ResultsXMetric;
   value: (cell: ResultCell, context: ResultsMetricContext) => number | null;
 }
 
-export const RESULTS_X_METRIC_KEYS = ['p50', 'p90'] as const;
+export const RESULTS_X_METRIC_KEYS = ['p50', 'p90', 'gpus'] as const;
 export const RESULTS_Y_METRIC_KEYS = [
   'videoSecondsPerDollar',
   'videosPerGpuHour',
@@ -47,6 +51,7 @@ export const RESULTS_X_METRICS: Record<ResultsXMetric, ResultsChartMetric> = {
       en: `Median latency per ${seconds} s clip at ${fps} fps`,
       zh: `生成一段 ${seconds} 秒、${fps} fps 视频的中位延迟`,
     }),
+    hoverLabel: { en: 'Median s', zh: '中位延迟 (s)' },
     unit: 's',
     better: 'lower',
     digits: 1,
@@ -58,10 +63,21 @@ export const RESULTS_X_METRICS: Record<ResultsXMetric, ResultsChartMetric> = {
       en: `P90 latency per ${seconds} s clip at ${fps} fps`,
       zh: `生成一段 ${seconds} 秒、${fps} fps 视频的 P90 延迟`,
     }),
+    hoverLabel: { en: 'P90 s', zh: 'P90 延迟 (s)' },
     unit: 's',
     better: 'lower',
     digits: 1,
     value: (cell) => cell.point.p90,
+  },
+  gpus: {
+    label: { en: 'GPUs per deployment', zh: '每个部署的 GPU 数' },
+    unit: '',
+    better: 'lower',
+    digits: 0,
+    scale: 'log',
+    rankOn: 'p50',
+    value: ({ point }) =>
+      point.participating !== null && point.participating > 0 ? point.participating : null,
   },
 };
 
@@ -102,6 +118,9 @@ export const isResultsXMetric = (value: string | null): value is ResultsXMetric 
 export const isResultsYMetric = (value: string | null): value is ResultsYMetric =>
   value !== null && Object.hasOwn(RESULTS_Y_METRICS, value);
 
+export const plottedXMetric = (x: ResultsXMetric, history: boolean): ResultsXMetric =>
+  (history && RESULTS_X_METRICS[x].rankOn) || x;
+
 export function resultsMetricLabel(
   metric: ResultsChartMetric,
   locale: 'en' | 'zh',
@@ -131,7 +150,7 @@ export interface ResultsChartPoint {
   cell: ResultCell;
   x: number;
   y: number;
-  /** On its series' Pareto frontier for the selected axes. */
+  /** On its series' Pareto frontier for the selected axes, or for `rankOn` when the x axis has one. */
   optimal: boolean;
 }
 
@@ -281,6 +300,7 @@ export function resultsChartSeries(
 ): ResultsChartSeries[] {
   const x = RESULTS_X_METRICS[selection.x],
     y = RESULTS_Y_METRICS[selection.y];
+  if (x.rankOn) return onAttributeAxis(cells, selection, x.rankOn);
   const groups = Map.groupBy(plottedPoints(cells, selection), ({ point }) => seriesKey(point.cell));
   const series = [...groups].map(([key, plotted]): ResultsChartSeries => {
     const points = plotted.map(({ point }) => point);
@@ -301,6 +321,37 @@ export function resultsChartSeries(
     ...(selection.compareEngines ? lossless : bestPerHardware(lossless, selection)),
     ...(selection.lossy ? series.filter((item) => item.lossy) : []),
   ].toSorted(seriesOrder);
+}
+
+/**
+ * Ranks the cells the axis can place on `rankOn`, then moves each point to its
+ * attribute value. A deployment the axis cannot place never ranks, so it cannot
+ * dominate a sibling and then vanish.
+ */
+function onAttributeAxis(
+  cells: readonly ResultCell[],
+  selection: ResultsChartSelection,
+  rankOn: ResultsXMetric,
+): ResultsChartSeries[] {
+  const x = RESULTS_X_METRICS[selection.x];
+  const placed = cells.filter((cell) => x.value(cell, selection) !== null);
+  const ranked = resultsChartSeries(placed, { ...selection, x: rankOn, optimal: false });
+  // More GPUs usually buy lower latency, so within one GPU count the slower
+  // deployment comes first and the line keeps the latency frontier's order.
+  const worseFirst = RESULTS_X_METRICS[rankOn].better === 'lower' ? -1 : 1;
+  return ranked.map((item) => {
+    const points = item.points
+      .toSorted((a, b) => worseFirst * (a.x - b.x))
+      .map((point) => ({ ...point, x: x.value(point.cell, selection)! }))
+      .toSorted((a, b) => a.x - b.x);
+    const frontier = points.filter((point) => point.optimal);
+    return {
+      ...item,
+      points: selection.optimal ? frontier : points,
+      frontier,
+      measured: points.length,
+    };
+  });
 }
 
 /**
