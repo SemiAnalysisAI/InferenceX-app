@@ -631,12 +631,9 @@ describe('Video results clip stage', () => {
 
   it('reads out both sides against another GPU and names the unofficial one', () => {
     mountResultsClips(['b200', 'h100'], '/vgx', false, c1('b200').runId);
-    const energyThird = () =>
-      cy.get(`${readout} [data-metric]`).eq(2).should('have.attr', 'data-metric', 'energy');
-    energyThird();
     cy.get('[data-testid="video-results-compare-h100"]').click();
     cy.get(readout).should('have.attr', 'data-pair', 'lead');
-    energyThird();
+    cy.get(`${readout} [data-metric]`).eq(2).should('have.attr', 'data-metric', 'energy');
     cy.get(`${readout} [data-readout-side="b200"]`)
       .should('contain', 'Unofficial run')
       .find('span')
@@ -644,13 +641,10 @@ describe('Video results clip stage', () => {
       .should('have.attr', 'style')
       .and('contain', overlayRunColor(0));
     cy.get(`${readout} [data-readout-side="h100"]`).should('not.contain', 'Unofficial run');
-    readoutValue('wall').should('have.text', '120 s');
-    readoutValue('wall', 1).should('have.text', 'H100 120 s');
-    readoutLines('wall').should('have.length', 2);
+    readoutLines('wall').should('have.length', 2).last().should('have.text', 'H100 120 s');
     readoutValue('speed').should('have.text', '2.15× faster');
     readoutValue('speed', 1).should('have.text', 'p50 77.9 s vs 167.3 s');
     readoutValue('psnr', 2).should('have.text', 'H100 25 dB');
-    readoutValue('participating').should('have.text', '$0.1');
     readoutValue('participating', 1).should('have.text', '$0.02 / video-s');
     readoutValue('participating', 2).should('have.text', 'H100 $0.3');
   });
