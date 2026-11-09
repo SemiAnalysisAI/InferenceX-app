@@ -77,33 +77,33 @@ describe('InferenceTcoBadges', () => {
       let png = '';
       let captureCount = 0;
       cy.window().then((win) => {
-        cy.stub(win.HTMLAnchorElement.prototype, 'click').callsFake(
-          function (this: HTMLAnchorElement) {
-            if (!this.download.endsWith('.png')) return;
-            png = this.href;
-            captureCount++;
-            const root = win.document.querySelector('#price-export-export')!;
-            const wrapper = root.querySelector<HTMLElement>('[data-testid="export-prices"]')!;
-            expect(win.getComputedStyle(wrapper).overflowX, 'no exported scroll viewport').to.eq(
-              'visible',
-            );
-            expect(wrapper.scrollWidth, 'all columns fit').to.be.at.most(wrapper.clientWidth + 1);
-            expect(wrapper.querySelectorAll('td')).to.have.length(count);
-            expect(wrapper.querySelector('tbody th')!.textContent).to.contain(
-              'Owning at large hyperscaler volume',
-            );
-            const frame = root.getBoundingClientRect();
-            for (const cell of wrapper.querySelectorAll('th, td')) {
-              const bounds = cell.getBoundingClientRect();
-              expect(bounds.left).to.be.at.least(frame.left);
-              expect(bounds.right).to.be.at.most(frame.right);
-              expect(bounds.bottom).to.be.at.most(frame.bottom);
-            }
-            expect(root.querySelector('[data-testid="tco-prices-source"]')!.textContent).to.contain(
-              'SemiAnalysis Market',
-            );
-          },
-        );
+        cy.stub(win.HTMLAnchorElement.prototype, 'click').callsFake(function (
+          this: HTMLAnchorElement,
+        ) {
+          if (!this.download.endsWith('.png')) return;
+          png = this.href;
+          captureCount++;
+          const root = win.document.querySelector('#price-export-export')!;
+          const wrapper = root.querySelector<HTMLElement>('[data-testid="export-prices"]')!;
+          expect(win.getComputedStyle(wrapper).overflowX, 'no exported scroll viewport').to.eq(
+            'visible',
+          );
+          expect(wrapper.scrollWidth, 'all columns fit').to.be.at.most(wrapper.clientWidth + 1);
+          expect(wrapper.querySelectorAll('td')).to.have.length(count);
+          expect(wrapper.querySelector('tbody th')!.textContent).to.contain(
+            'Owning at large hyperscaler volume',
+          );
+          const frame = root.getBoundingClientRect();
+          for (const cell of wrapper.querySelectorAll('th, td')) {
+            const bounds = cell.getBoundingClientRect();
+            expect(bounds.left).to.be.at.least(frame.left);
+            expect(bounds.right).to.be.at.most(frame.right);
+            expect(bounds.bottom).to.be.at.most(frame.bottom);
+          }
+          expect(root.querySelector('[data-testid="tco-prices-source"]')!.textContent).to.contain(
+            'SemiAnalysis Market',
+          );
+        });
       });
       ['auto', '16:9', '1:1'].forEach((ratio, index) => {
         cy.get('[data-testid="export-button"]').click();
