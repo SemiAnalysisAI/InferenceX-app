@@ -257,7 +257,11 @@ describe('Video results clip stage', () => {
     expectAudio(null);
     speaker('a').click();
     expectAudio('a');
+    pointAt(0);
     cy.get('[data-testid="video-results-play"]').click();
+    cy.get(WIPE_MEDIA).should(($media) =>
+      expect(splitOf($media), 'split ignores the pointer before the first Play').to.equal(50),
+    );
     speaker('b').click();
     expectAudio('b');
     sideVideo('b').should(($video) =>

@@ -147,6 +147,8 @@ export default function VideoClipStage({
   const overlay = view !== 'side';
   /** Before the first Play: the idle frame replaces the split until there is a picture to split. */
   const idle = !armed && playable.length > 0;
+  /** The split stays hidden until the first Play, so before then it neither follows the pointer nor locks. */
+  const wiping = view === 'wipe' && !idle;
   const original = view === 'diff';
 
   // A hidden or failed audio source restores mute; a prompt switch keeps the same source.
@@ -253,7 +255,7 @@ export default function VideoClipStage({
     track('video_results_wipe_locked', { enabled });
   };
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (view !== 'wipe' || locked) return;
+    if (!wiping || locked) return;
     const rect = event.currentTarget.getBoundingClientRect();
     if (rect.width === 0) return;
     pendingSplit.current = Math.min(
@@ -330,15 +332,14 @@ export default function VideoClipStage({
           overlay
             ? 'mx-auto aspect-video w-full max-w-[calc((100svh-10rem)*16/9)] overflow-hidden rounded-lg bg-black'
             : 'grid gap-3 min-[640px]:grid-cols-2',
-          view === 'wipe' && !locked && 'cursor-ew-resize',
+          wiping && !locked && 'cursor-ew-resize',
         )}
         onPointerMove={onPointerMove}
         onClick={(event) => {
           // Picture layers pass the pointer through, so only a click on the picture targets the
           // stage itself; pills and controls keep theirs.
           if (event.target !== event.currentTarget) return;
-          // The split stays hidden until the first Play, so a click must not lock it unseen.
-          if (view === 'wipe' && !idle) lock(!locked);
+          if (wiping) lock(!locked);
           else if (view === 'toggle') flip('click');
         }}
         onKeyDown={onKeyDown}
@@ -499,7 +500,7 @@ export default function VideoClipStage({
             </InfoHelp>
           </div>
         )}
-        {view === 'wipe' && !idle && (
+        {wiping && (
           <div
             className="pointer-events-none absolute inset-y-0 z-10 w-0"
             style={{ left: `${split}%` }}
