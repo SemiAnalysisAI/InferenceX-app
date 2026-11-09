@@ -34,6 +34,10 @@ export interface ClipGroup {
   audible: string | null;
   /** Shared playable duration, 0 while unknown. */
   duration: number;
+  /** Base playbackRate: every clip runs at it and drift nudges centre on it. */
+  speed: number;
+  /** At the shared end, rewind every clip together and play on instead of ending. */
+  loop: boolean;
 }
 
 export type ClipAction =
@@ -62,7 +66,7 @@ export const BUFFER_MARGIN_SECONDS = 1;
 export const LOADED_SLACK_SECONDS = 0.05;
 /** Drift that starts a playbackRate nudge on a follower. */
 export const NUDGE_SECONDS = 0.04;
-/** Drift at which a nudged follower returns to rate 1. */
+/** Drift at which a nudged follower returns to the base speed. */
 const SETTLE_SECONDS = 0.01;
 /** Drift beyond which a follower is seeked once instead of nudged. */
 export const SEEK_SECONDS = 0.25;
@@ -106,9 +110,9 @@ function bufferedShare({ clips, duration }: ClipGroup) {
   return Math.max(0, Math.min(1, slowest / end));
 }
 
-function resetRates(clips: readonly ClipSnapshot[], actions: ClipAction[]) {
+function resetRates({ clips, speed }: ClipGroup, actions: ClipAction[]) {
   for (const clip of clips)
-    if (clip.playbackRate !== 1) actions.push({ type: 'rate', key: clip.key, rate: 1 });
+    if (clip.playbackRate !== speed) actions.push({ type: 'rate', key: clip.key, rate: speed });
 }
 
 /** Seeks followers that drifted while paused, then starts all clips once each passes the waiting phase's rule. */
@@ -127,12 +131,13 @@ function resume(
   }
   const ready = waiting === 'loading' ? loaded : hasDataAhead;
   if (aligning || !group.clips.every((clip) => ready(clip, group.duration))) return waiting;
+  resetRates(group, actions);
   actions.push({ type: 'play-all' });
   return 'playing';
 }
 
 export function stepClipGroup(group: ClipGroup, event: ClipEvent): ClipGroupStep {
-  const { phase, clips, duration } = group;
+  const { phase, clips, duration, speed } = group;
   const leader = leaderOf(group);
   const actions: ClipAction[] = [];
   const result = (next: ClipPhase, time = leader?.currentTime ?? 0): ClipGroupStep => ({
@@ -147,7 +152,7 @@ export function stepClipGroup(group: ClipGroup, event: ClipEvent): ClipGroupStep
 
   if (typeof event === 'object') {
     if (active) actions.push({ type: 'pause-all' });
-    resetRates(clips, actions);
+    resetRates(group, actions);
     for (const clip of clips)
       if (clip.readyState >= 1) actions.push({ type: 'seek', key: clip.key, time: event.time });
     return result(active ? 'loading' : 'paused', event.time);
@@ -157,7 +162,7 @@ export function stepClipGroup(group: ClipGroup, event: ClipEvent): ClipGroupStep
     case 'pause': {
       if (event === 'hide' ? phase !== 'playing' : !active) return result(phase);
       actions.push({ type: 'pause-all' });
-      resetRates(clips, actions);
+      resetRates(group, actions);
       return result('paused');
     }
     case 'play': {
@@ -179,25 +184,30 @@ export function stepClipGroup(group: ClipGroup, event: ClipEvent): ClipGroupStep
         (duration > 0 && leader.currentTime >= duration - END_EPSILON)
       ) {
         actions.push({ type: 'pause-all' });
-        resetRates(clips, actions);
+        resetRates(group, actions);
+        if (group.loop) {
+          for (const clip of clips) actions.push({ type: 'seek', key: clip.key, time: 0 });
+          return result('loading', 0);
+        }
         return result('ended', duration > 0 ? duration : leader.currentTime);
       }
       if (clips.some(stalled)) {
         actions.push({ type: 'pause-all' });
-        resetRates(clips, actions);
+        resetRates(group, actions);
         return result('buffering');
       }
-      if (leader.playbackRate !== 1) actions.push({ type: 'rate', key: leader.key, rate: 1 });
+      if (leader.playbackRate !== speed)
+        actions.push({ type: 'rate', key: leader.key, rate: speed });
       for (const clip of clips) {
         if (clip === leader) continue;
         const drift = clip.currentTime - leader.currentTime;
         const size = Math.abs(drift);
-        let rate = 1;
+        let rate = speed;
         if (size > SEEK_SECONDS) {
           if (!clip.seeking)
             actions.push({ type: 'seek', key: clip.key, time: leader.currentTime });
-        } else if (size > NUDGE_SECONDS || (clip.playbackRate !== 1 && size > SETTLE_SECONDS)) {
-          rate = drift > 0 ? 1 - NUDGE_RATE : 1 + NUDGE_RATE;
+        } else if (size > NUDGE_SECONDS || (clip.playbackRate !== speed && size > SETTLE_SECONDS)) {
+          rate = speed * (drift > 0 ? 1 - NUDGE_RATE : 1 + NUDGE_RATE);
         }
         if (clip.playbackRate !== rate) actions.push({ type: 'rate', key: clip.key, rate });
       }

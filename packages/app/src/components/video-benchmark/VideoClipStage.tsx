@@ -106,6 +106,8 @@ const OTHER = { a: 'b', b: 'a' } as const;
 /** Playback-time gap beyond which a Difference frame would compare different moments. */
 const DIFFERENCE_SYNC_SECONDS = 0.12;
 const SPLIT_STEP = 5;
+/** Real-time playback that stops at the shared end. */
+const PLAYBACK = { speed: 1, loop: false };
 
 export default function VideoClipStage({
   a,
@@ -135,11 +137,16 @@ export default function VideoClipStage({
 
   const playable = ROLES.filter((role) => clips[role].url && !errors.has(clips[role].url));
   const audible = playable.find((role) => clips[role].source === audio) ?? null;
-  const group = useClipGroup(playable, audible, selection, (rejected) =>
-    setErrors(
-      (previous) =>
-        new Set([...previous, ...rejected.map((role) => latest.current[role as Role].url)]),
-    ),
+  const group = useClipGroup(
+    playable,
+    audible,
+    selection,
+    (rejected) =>
+      setErrors(
+        (previous) =>
+          new Set([...previous, ...rejected.map((role) => latest.current[role as Role].url)]),
+      ),
+    PLAYBACK,
   );
   const { videos, phase, time, buffered, ready, duration } = group;
   const both = playable.length === 2;
