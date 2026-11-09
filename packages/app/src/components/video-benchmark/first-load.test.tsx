@@ -142,3 +142,27 @@ it('shows a newly read clip while another selected source is still pending', asy
   expect(container.querySelector('video')?.getAttribute('src')).toBe('/123.mp4');
   expect(container.textContent).not.toContain('Loading retained clips');
 });
+
+it('shows the loading state on both sides while the subject is read', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => new Promise<Response>(() => {})),
+  );
+  const fixture = referenceQualityFixture(20);
+  const point = namedRunPoints(
+    [{ schemaVersion: 1, entries: [videoHistoryEntry(fixture.stored, null)], nextPage: null }],
+    fixture.stored.runId,
+  ).find((candidate) => candidate.cell === 'c1')!;
+  container = document.createElement('div');
+  document.body.append(container);
+  act(() => {
+    root = createRoot(container!);
+    root.render(<VideoResultsClips points={[point]} colorFor={() => 'black'} hidden={new Set()} />);
+  });
+  for (const side of ['a', 'b'])
+    expect(container.querySelector(`[data-side="${side}"]`)?.textContent).toContain(
+      'Loading retained clips',
+    );
+});

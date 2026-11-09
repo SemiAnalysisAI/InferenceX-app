@@ -315,7 +315,7 @@ export default function VideoResultsClips({
     color: null,
     url: reference?.url ?? '',
     previewUrl: preview(reference?.previewUrl),
-    empty: s.noReference,
+    empty: subject?.pending ? s.loading : s.noReference,
   };
   return (
     <section
