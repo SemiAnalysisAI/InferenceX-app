@@ -73,6 +73,17 @@ PNG 宽高比（自动 / 16:9 / 1:1）是下载菜单中仅用于图片导出的
 会在离屏副本中重新布局图表，并为标题和来源页脚预留空间，不拉伸截图或添加边条。页面图表、官方及非官方
 数据、CSV/MP4 导出、分享链接和只读 API 响应均不变。API 客户端自行设置图片尺寸。
 
+## Dismissible chart notices
+
+Official-preview and known-issue boxes on inference charts have a close
+button. Dismissal is stored per notice in the reader's browser and applies to
+every chart. This is presentation-only: points, series, selectors, defaults and
+read-only API responses are unchanged, and no API parameter represents it.
+
+推理图表上的 Official Preview 与已知问题提示框提供关闭按钮。关闭状态按提示保存在读者浏览器中，
+并对所有图表生效。此功能只影响展示：数据点、序列、选择器、默认值和只读 API 响应均不变，也没有对应的
+API 参数。
+
 ## TCO basis
 
 Use `tcoBasis=internal` (the default) or `tcoBasis=external` in cost-aware

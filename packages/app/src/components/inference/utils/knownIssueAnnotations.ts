@@ -37,6 +37,10 @@ export interface AnnotationRenderOptions {
   mutedForeground: string;
   rightInset?: number;
   onLinkClick?: (annotation: KnownIssueAnnotation) => void;
+  /** When set, each box gets a close button that calls this with its annotation. */
+  onDismiss?: (annotation: KnownIssueAnnotation) => void;
+  /** Accessible label for the close button. */
+  dismissLabel?: string;
   /** Group that holds the arrows, so they sit below its line labels. Defaults to the annotation layer. */
   arrowParent?: d3.Selection<SVGGElement, unknown, null, undefined>;
 }
@@ -105,6 +109,8 @@ const SWATCH_R = 4;
 const SWATCH_SPACE = 14;
 const ARROW_STANDOFF = 9;
 const MIN_ARROW_LEN = 24;
+const DISMISS_SPACE = 16;
+const DISMISS_HALF = 3.5;
 
 function fitTextToWidth(
   target:
@@ -234,7 +240,8 @@ export function renderKnownIssueAnnotations(
     }
 
     const boxRight = width - BOX_RIGHT_GAP - (opts.rightInset ?? 0);
-    const maxTextW = Math.max(0, boxRight - 2 - PAD_X * 2);
+    const dismissSpace = opts.onDismiss ? DISMISS_SPACE : 0;
+    const maxTextW = Math.max(0, boxRight - 2 - PAD_X * 2 - dismissSpace);
     const line1Font = chartFont(LINE1_SIZE, 600);
     const line2Font = chartFont(LINE2_SIZE);
     let w1 = measureTextWidth(label, line1Font) + SWATCH_SPACE;
@@ -249,7 +256,7 @@ export function renderKnownIssueAnnotations(
       w2 = measureTextWidth(summary, line2Font);
       if (w2 > maxTextW) w2 = fitTextToWidth(detailTspan, summary, maxTextW, line2Font);
     }
-    const boxW = Math.max(w1, w2) + PAD_X * 2;
+    const boxW = Math.max(w1, w2) + PAD_X * 2 + dismissSpace;
     const boxH = PAD_Y * 2 + LINE1_H + LINE2_H;
     const bx = Math.max(2, boxRight - boxW);
     const by = yCursor;
@@ -274,6 +281,51 @@ export function renderKnownIssueAnnotations(
       .attr('fill', color);
     text1.attr('x', bx + PAD_X + SWATCH_SPACE).attr('y', by + PAD_Y + LINE1_H - 4);
     text2.attr('x', bx + PAD_X).attr('y', by + PAD_Y + LINE1_H + LINE2_H - 4);
+
+    if (opts.onDismiss) {
+      const onDismiss = opts.onDismiss;
+      const cx = bx + boxW - PAD_X - DISMISS_HALF;
+      const cy = by + PAD_Y + LINE1_H / 2;
+      const button = layer
+        .append('g')
+        .attr('class', 'known-issue-dismiss')
+        .attr('data-testid', 'chart-notice-dismiss')
+        .attr('role', 'button')
+        .attr('tabindex', 0)
+        .attr('aria-label', opts.dismissLabel ?? 'Dismiss notice')
+        .attr('cursor', 'pointer')
+        .on('mousedown pointerdown touchstart dblclick', (event: Event) => event.stopPropagation())
+        .on('click', (event: MouseEvent) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onDismiss(annotation);
+        })
+        .on('keydown', (event: KeyboardEvent) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          event.stopPropagation();
+          onDismiss(annotation);
+        });
+      button.append('title').text(opts.dismissLabel ?? 'Dismiss notice');
+      button
+        .append('rect')
+        .attr('x', cx - 7)
+        .attr('y', cy - 7)
+        .attr('width', 14)
+        .attr('height', 14)
+        .attr('rx', 3)
+        .attr('fill', 'transparent');
+      button
+        .append('path')
+        .attr(
+          'd',
+          `M ${cx - DISMISS_HALF} ${cy - DISMISS_HALF} L ${cx + DISMISS_HALF} ${cy + DISMISS_HALF} M ${cx + DISMISS_HALF} ${cy - DISMISS_HALF} L ${cx - DISMISS_HALF} ${cy + DISMISS_HALF}`,
+        )
+        .attr('stroke', opts.mutedForeground)
+        .attr('stroke-width', 1.5)
+        .attr('stroke-linecap', 'round')
+        .attr('pointer-events', 'none');
+    }
 
     const bottomY = by + boxH;
     const onScreen = points
