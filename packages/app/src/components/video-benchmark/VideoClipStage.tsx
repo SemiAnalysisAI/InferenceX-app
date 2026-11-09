@@ -320,11 +320,12 @@ export default function VideoClipStage({
     setLocked(enabled);
     track('video_results_wipe_locked', { enabled });
   };
-  const stepFrame = (delta: -1 | 1) => {
+  /** A held arrow key repeats the step about 30 times a second; only its first press is tracked. */
+  const stepFrame = (delta: -1 | 1, repeat = false) => {
     if (!clock) return;
     setDifferenceFailed(false);
     group.stepFrames(delta, clock);
-    track('video_results_frame_step', { direction: delta < 0 ? 'previous' : 'next' });
+    if (!repeat) track('video_results_frame_step', { direction: delta < 0 ? 'previous' : 'next' });
   };
   const zoomTo = (zoom: number) => {
     // A drag still held would otherwise restore its starting zoom on the next move.
@@ -393,7 +394,7 @@ export default function VideoClipStage({
       flip('key');
     } else if ((event.key === 'ArrowLeft' || event.key === 'ArrowRight') && clock) {
       event.preventDefault();
-      stepFrame(event.key === 'ArrowLeft' ? -1 : 1);
+      stepFrame(event.key === 'ArrowLeft' ? -1 : 1, event.repeat);
     } else if (event.key === 'Escape' && (locked || lens.zoom > 1)) {
       event.preventDefault();
       if (locked) lock(false);
