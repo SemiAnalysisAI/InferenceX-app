@@ -227,6 +227,7 @@ function useDateFormatter(locale: 'en' | 'zh') {
  */
 export default function FrontierView({
   toolbar,
+  footer,
   section,
   grouping,
   onGroupingChange,
@@ -663,6 +664,8 @@ export default function FrontierView({
         configLabel={chartProps.configLabel}
         yLabel={chartProps.yLabel}
       />
+      {/* Cost tier, TCO prices, date and source close the card, after the chart and tables. */}
+      {footer && <div className="px-1 pt-4">{footer}</div>}
     </Card>
   );
 }
