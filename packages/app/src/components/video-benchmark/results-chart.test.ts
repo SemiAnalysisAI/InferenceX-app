@@ -202,6 +202,16 @@ describe('resultsChartSeries', () => {
     expect(gpus.frontier.map((p) => p.x)).toEqual([1, 4]);
   });
 
+  it('ranks the GPU axis only among deployments with a recorded GPU count', () => {
+    const unplaced = deployment('unplaced', 1, 30, 400, 50, { participating: null });
+    const deployments = cells([unplaced, fast, mid]);
+    const [gpus] = resultsChartSeries(
+      deployments,
+      selection({ x: 'gpus', y: 'kjPerClip', optimal: true }),
+    );
+    expect(ids(gpus.points)).toEqual(['mid:c1', 'fast:c1']);
+  });
+
   it('never lets a faster lossy series become a GPU’s default line', () => {
     const run = (name: string, engine: string, p50: number, optimizations: string[]) =>
       deployment(name, 4, p50, 400 - p50, 200, {

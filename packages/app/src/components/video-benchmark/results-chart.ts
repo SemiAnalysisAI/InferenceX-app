@@ -296,11 +296,7 @@ export function resultsChartSeries(
 ): ResultsChartSeries[] {
   const x = RESULTS_X_METRICS[selection.x],
     y = RESULTS_Y_METRICS[selection.y];
-  if (x.rankOn)
-    return onAttributeAxis(
-      resultsChartSeries(cells, { ...selection, x: x.rankOn, optimal: false }),
-      selection,
-    );
+  if (x.rankOn) return onAttributeAxis(cells, selection, x.rankOn);
   const groups = Map.groupBy(plottedPoints(cells, selection), ({ point }) => seriesKey(point.cell));
   const series = [...groups].map(([key, plotted]): ResultsChartSeries => {
     const points = plotted.map(({ point }) => point);
@@ -323,16 +319,21 @@ export function resultsChartSeries(
   ].toSorted(seriesOrder);
 }
 
+/**
+ * Ranks the cells the axis can place on `rankOn`, then moves each point to its
+ * attribute value. A deployment the axis cannot place never ranks, so it cannot
+ * dominate a sibling and then vanish.
+ */
 function onAttributeAxis(
-  ranked: readonly ResultsChartSeries[],
+  cells: readonly ResultCell[],
   selection: ResultsChartSelection,
+  rankOn: ResultsXMetric,
 ): ResultsChartSeries[] {
   const x = RESULTS_X_METRICS[selection.x];
+  const placed = cells.filter((cell) => x.value(cell, selection) !== null);
+  const ranked = resultsChartSeries(placed, { ...selection, x: rankOn, optimal: false });
   return ranked.map((item) => {
-    const points = item.points.flatMap((point) => {
-      const value = x.value(point.cell, selection);
-      return value === null ? [] : [{ ...point, x: value }];
-    });
+    const points = item.points.map((point) => ({ ...point, x: x.value(point.cell, selection)! }));
     const frontier = points.filter((point) => point.optimal).toSorted((a, b) => a.x - b.x);
     return {
       ...item,
