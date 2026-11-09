@@ -102,7 +102,13 @@ function useChapterText(props: Pick<ChapterProps, 'styles' | 'configLabel' | 'un
       }
       return parts.join(' · ');
     };
-    return { title, detail };
+    /** Just the area change, for the one-line summary under the slider. */
+    const ground = (chapter: FrontierChapter) => {
+      if (chapter.change === null) return null;
+      const percent = Math.round((chapter.change - 1) * 100);
+      return t.ground(`${percent > 0 ? '+' : '−'}${Math.abs(percent)}%`);
+    };
+    return { title, detail, ground };
   }, [t, props.styles, props.configLabel, props.unit]);
 }
 
@@ -257,7 +263,9 @@ export function FrontierChapterNow({
             {formatDate(dates[current.dateIndex])}
           </span>
           <span className="font-medium"> · {text.title(current)}</span>
-          <span className="text-muted-foreground"> · {text.detail(current)}</span>
+          {text.ground(current) && (
+            <span className="text-muted-foreground"> · {text.ground(current)}</span>
+          )}
         </p>
       ))}
     </div>

@@ -30,38 +30,26 @@ import {
 const STRINGS = {
   en: {
     gainTitle: 'Software gain on the same chip',
-    gainHelp:
-      "Each chip's frontier area against its own first run (1x). The hardware never changes, so every step up is software, serving configuration or precision.",
     gain: (name: string, ratio: string, date: string) =>
       `${name}: ${ratio} the ground of its first run (${date})`,
     barsTitle: 'Gain at each interactivity vs first run',
-    barsHelp: 'How much more each chip delivers now than on its first run, at the same speed.',
     na: 'NA',
     noData: (name: string) => `${name} does not reach this interactivity on both dates`,
     pick: 'Pick at least one chip.',
     tableTitle: 'Gain by interactivity',
-    tableHelp:
-      'Each selected chip now against its first run, at each interactivity. Average is the geometric mean of the levels both curves reach.',
-    columns: (unit: string) => `Columns are interactivity in ${unit}.`,
     chip: 'Chip',
     since: 'First run',
     average: 'Average',
   },
   zh: {
     gainTitle: '同一芯片上的软件提升',
-    gainHelp:
-      '各芯片的前沿覆盖面积相对其首次测试（1x）的倍数。硬件始终不变，每一次提升都来自软件、部署配置或精度。',
     gain: (name: string, ratio: string, date: string) =>
       `${name}：覆盖面积为首次测试（${date}）的 ${ratio}`,
     barsTitle: '各交互性水平上相对首次测试的提升',
-    barsHelp: '在相同交互性下，各芯片当前比首次测试多交付多少。',
     na: '无数据',
     noData: (name: string) => `${name} 在两个日期中未同时覆盖该交互性`,
     pick: '请至少选择一款芯片。',
     tableTitle: '各交互性水平上的提升',
-    tableHelp:
-      '每款所选芯片当前相对其首次测试在各交互性水平上的倍数。平均值为两条曲线均覆盖的各水平的几何平均。',
-    columns: (unit: string) => `各列为交互性（${unit}）。`,
     chip: '芯片',
     since: '首次测试',
     average: '平均',
@@ -110,7 +98,6 @@ export function FrontierSoftwareGain({
     <section className={PANEL_SECTION_CLASS}>
       <div className={PANEL_HEADER_CLASS}>
         <h3 className="text-sm font-semibold">{t.gainTitle}</h3>
-        <p className="text-xs text-muted-foreground">{t.gainHelp}</p>
       </div>
       {/* The list sits under the chart, so this chart starts level with its neighbour. */}
       <div className="flex flex-col gap-2">
@@ -180,7 +167,6 @@ export function FrontierSoftwareGainBars({
     <section className={PANEL_SECTION_CLASS}>
       <div className={PANEL_HEADER_CLASS}>
         <h3 className="text-sm font-semibold">{t.barsTitle}</h3>
-        <p className="text-xs text-muted-foreground">{t.barsHelp}</p>
       </div>
       <div ref={setContainerRef} className="w-full" data-testid="frontier-software-bars">
         {width > 0 && (
@@ -281,9 +267,8 @@ export function FrontierSoftwareGainTable({
   dateIndex,
   keys,
   styles,
-  xLabel,
   formatDate,
-}: Omit<SoftwareProps, 'onSeek'>) {
+}: Omit<SoftwareProps, 'onSeek' | 'xLabel'>) {
   const t = STRINGS[useLocale()];
   const buckets = useMemo(() => comparisonBuckets(history, FRONTIER_COMPARISON_BUCKETS), [history]);
   const rows = useMemo(
@@ -344,9 +329,6 @@ export function FrontierSoftwareGainTable({
     <section className={`${PANEL_SECTION_CLASS} min-w-0 lg:col-span-2`}>
       <div className={PANEL_HEADER_CLASS}>
         <h3 className="text-sm font-semibold">{t.tableTitle}</h3>
-        <p className="text-xs text-muted-foreground">
-          {t.tableHelp} {t.columns(xLabel)}
-        </p>
       </div>
       <DataTable
         data={rows}

@@ -29,8 +29,6 @@ type RateAxis = 'date' | 'age';
 const STRINGS = {
   en: {
     title: 'Rate of software gain',
-    help: (days: number) =>
-      `How fast each chip's software gain is growing: its compounded change per month over the trailing ${days} days. A line falling toward 0% means that chip's software gains are saturating.`,
     window: 'Window',
     days: (days: number) => `${days}d`,
     axis: 'X axis',
@@ -38,15 +36,9 @@ const STRINGS = {
     byAge: 'Days since first run',
     ageLabel: 'Days since first run',
     common: 'All-chip median',
-    commonHelp:
-      'Dashed: the median rate across every chip on the chart. Gains every chip gets at once (a framework release, a shared kernel) move it; a chip far above or below it is improving for its own reasons.',
-    ageHelp:
-      'Each chip from its own first run, so chips launched at different times line up by age. The all-chip median is a calendar measure and is hidden here.',
     pick: 'Pick at least one chip.',
     noRate: 'Not enough history yet: a rate needs at least half the window.',
     tableTitle: 'Gain rate by chip',
-    tableHelp:
-      'Rates are compounded per month. Chip-specific is the chip minus the all-chip median on the same date: a first split between optimisations every chip gets and ones only this chip gets.',
     chip: 'Chip',
     age: 'Days since first run',
     gain: 'Gain so far',
@@ -60,8 +52,6 @@ const STRINGS = {
   },
   zh: {
     title: '软件提升速度',
-    help: (days: number) =>
-      `各芯片软件提升的增长速度：过去 ${days} 天内按月复合计算的变化。曲线向 0% 回落，说明该芯片的软件提升正趋于饱和。`,
     window: '窗口',
     days: (days: number) => `${days} 天`,
     axis: 'X 轴',
@@ -69,15 +59,9 @@ const STRINGS = {
     byAge: '距首次测试天数',
     ageLabel: '距首次测试天数',
     common: '全部芯片中位数',
-    commonHelp:
-      '虚线：图中全部芯片提升速度的中位数。所有芯片同时获得的提升（框架版本更新、通用 kernel）会推动它；明显高于或低于它的芯片，提升来自自身原因。',
-    ageHelp:
-      '每款芯片都从自身首次测试算起，不同时间发布的芯片按“年龄”对齐。全部芯片中位数按日历计算，此视图中隐藏。',
     pick: '请至少选择一款芯片。',
     noRate: '历史数据不足：计算速度至少需要半个窗口的数据。',
     tableTitle: '各芯片的提升速度',
-    tableHelp:
-      '速度均按月复合计算。芯片特有 = 该芯片速度减去同日全部芯片中位数，用于初步区分所有芯片共享的优化与该芯片独有的优化。',
     chip: '芯片',
     age: '距首次测试天数',
     gain: '累计提升',
@@ -206,7 +190,6 @@ export function FrontierGainRate({
       <section className="flex flex-col gap-2">
         <div className={PANEL_HEADER_CLASS}>
           <h3 className="text-sm font-semibold">{t.title}</h3>
-          <p className="text-xs text-muted-foreground">{t.help(windowDays)}</p>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-1">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium">{t.window}</span>
@@ -252,9 +235,6 @@ export function FrontierGainRate({
           locale={locale}
           onSeek={onSeek}
         />
-        <p className="text-xs text-muted-foreground">
-          {axis === 'date' ? t.commonHelp : t.ageHelp}
-        </p>
         {rows.every((row) => row.current === null) && (
           <p className="text-xs text-muted-foreground">{t.noRate}</p>
         )}
@@ -578,7 +558,6 @@ function GainRateTable({
     <section className="flex flex-col gap-2">
       <div className={PANEL_HEADER_CLASS}>
         <h3 className="text-sm font-semibold">{t.tableTitle}</h3>
-        <p className="text-xs text-muted-foreground">{t.tableHelp}</p>
       </div>
       <DataTable
         data={[...rows]}

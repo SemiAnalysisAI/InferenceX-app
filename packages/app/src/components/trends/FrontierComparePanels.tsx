@@ -35,8 +35,6 @@ const STRINGS = {
     even: 'even',
     needTwo: 'Pick at least two to compare.',
     areaTitle: 'Ground covered over time',
-    areaHelp: (base: string, date: string) =>
-      `Area under each frontier: the metric summed across every interactivity it reaches, so bigger is better. 1x is ${base} on ${date}.`,
     leads: (leader: string, ratio: string, runnerUp: string) =>
       `${leader} covers ${ratio} the ground of ${runnerUp}`,
     was: (ratio: string, date: string) => `, from ${ratio} on ${date}`,
@@ -51,8 +49,6 @@ const STRINGS = {
     even: '持平',
     needTwo: '请至少选择两项进行比较。',
     areaTitle: '前沿覆盖面积随时间的变化',
-    areaHelp: (base: string, date: string) =>
-      `每条前沿曲线下的面积：所选指标在其覆盖的全部交互性上的累计，越大越好。以 ${base} 在 ${date} 的面积为 1x。`,
     leads: (leader: string, ratio: string, runnerUp: string) =>
       `${leader} 的覆盖面积是 ${runnerUp} 的 ${ratio}`,
     was: (ratio: string, date: string) => `（${date} 时为 ${ratio}）`,
@@ -285,11 +281,6 @@ export function FrontierAreaTimeline({
     <section className={PANEL_SECTION_CLASS}>
       <div className={PANEL_HEADER_CLASS}>
         <h3 className="text-sm font-semibold">{t.areaTitle}</h3>
-        {base && (
-          <p className="text-xs text-muted-foreground">
-            {t.areaHelp(label(base.key), formatDate(history.dates[firstData]))}
-          </p>
-        )}
         {summary && <p className="text-sm font-medium">{summary}</p>}
       </div>
       <IndexedTimeline

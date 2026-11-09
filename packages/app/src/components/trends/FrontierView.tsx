@@ -67,8 +67,8 @@ interface RegressionText {
   /** Ground lost against the best, e.g. `15%`. */
   drop: string;
   bestDate: string;
-  peak: { drop: string; x: number } | null;
-  image: { config: string; from: string; to: string } | null;
+  /** Serving image before and after, when it changed. */
+  image: { from: string; to: string } | null;
 }
 
 const STRINGS = {
@@ -82,30 +82,13 @@ const STRINGS = {
     compareBy: 'Compare',
     chips: 'Chips',
     vendors: 'Vendors',
-    frontierHint: (vendor: string | null) =>
-      vendor
-        ? `The best result at every interactivity across ${vendor} chips, colored by the chip that holds it.`
-        : 'The best result at every interactivity, colored by the chip that holds it.',
-    compareHint: (grouping: FrontierGrouping) =>
-      `Each ${grouping === 'gpu' ? "chip's" : "vendor's"} own frontier side by side, with who leads and by how much.`,
-    softwareHint:
-      'The hardware is held constant: each chip against its own first run, so every gain is software, serving configuration or precision.',
     pick: (grouping: FrontierGrouping) => (grouping === 'gpu' ? 'Chips shown' : 'Vendors shown'),
     hidden: (vendor: string, chips: string, precision: string) =>
       `${vendor} (${chips}) only has ${precision} data for this model and scenario.`,
     include: (precision: string) => `Include ${precision}`,
-    startKey:
-      "Dashed line: each curve's first run. Where it sits outside today's curve, a later run measured lower. Hover a line for details.",
     regressionsTitle: 'Below their best',
-    regression: ({ name, drop, bestDate, peak, image }: RegressionText) =>
-      [
-        `${name} covers ${drop} less ground than at its best (${bestDate})${
-          peak ? `, and is ${peak.drop} lower at ${peak.x} tok/s/user` : ''
-        }.`,
-        image ? `${image.config} changed serving image from ${image.from} to ${image.to}.` : '',
-      ]
-        .filter(Boolean)
-        .join(' '),
+    regression: ({ name, drop, bestDate, image }: RegressionText) =>
+      `${name}: −${drop} vs. best (${bestDate})${image ? ` · ${image.from} → ${image.to}` : ''}`,
     unknown: 'unknown',
   },
   zh: {
@@ -118,25 +101,13 @@ const STRINGS = {
     compareBy: '对比',
     chips: '芯片',
     vendors: '厂商',
-    frontierHint: (vendor: string | null) =>
-      vendor
-        ? `${vendor} 各芯片在每个交互性水平上的最优结果，按占据该区段的芯片着色。`
-        : '各交互性水平上的最优结果，按占据该区段的芯片着色。',
-    compareHint: (grouping: FrontierGrouping) =>
-      `并排展示各${grouping === 'gpu' ? '芯片' : '厂商'}自身的前沿，以及谁领先、领先多少。`,
-    softwareHint:
-      '硬件保持不变：每款芯片都与自身的首次测试对比，因此各项提升都来自软件、部署配置或精度。',
     pick: (grouping: FrontierGrouping) => (grouping === 'gpu' ? '显示的芯片' : '显示的厂商'),
     hidden: (vendor: string, chips: string, precision: string) =>
       `${vendor}（${chips}）在该模型与场景下仅有 ${precision} 数据。`,
     include: (precision: string) => `加入 ${precision}`,
-    startKey:
-      '虚线：各曲线的首次测试结果。若虚线位于当前曲线之外，说明之后的测试结果更低。悬停可查看详情。',
     regressionsTitle: '低于自身最佳水平',
-    regression: ({ name, drop, bestDate, peak, image }: RegressionText) =>
-      `${name} 的覆盖面积比最佳时（${bestDate}）少 ${drop}${
-        peak ? `，在 ${peak.x} tok/s/user 处低 ${peak.drop}` : ''
-      }。${image ? `${image.config} 的 serving 镜像由 ${image.from} 改为 ${image.to}。` : ''}`,
+    regression: ({ name, drop, bestDate, image }: RegressionText) =>
+      `${name}：比最佳（${bestDate}）低 ${drop}${image ? ` · ${image.from} → ${image.to}` : ''}`,
     unknown: '未知',
   },
 };
@@ -392,7 +363,6 @@ export default function FrontierView({
   };
 
   const label = useCallback((key: string) => styles.get(key)?.label ?? key, [styles]);
-  const { configLabel } = chartProps;
   const regressionNotes = useMemo(() => {
     const percent = (ratio: number) => `${Math.round((1 - ratio) * 100)}%`;
     const describe = (r: FrontierRegression) =>
@@ -400,20 +370,14 @@ export default function FrontierView({
         name: label(r.key),
         drop: percent(r.change),
         bestDate: formatDate(r.bestDate),
-        peak: r.peak && { drop: percent(r.peak.ratio), x: Math.round(r.peak.x) },
-        image:
-          r.config && r.image
-            ? {
-                config: configLabel(r.config),
-                from: shortImage(r.image.from, t.unknown),
-                to: shortImage(r.image.to, t.unknown),
-              }
-            : null,
+        image: r.image
+          ? { from: shortImage(r.image.from, t.unknown), to: shortImage(r.image.to, t.unknown) }
+          : null,
       });
     return new Map<string, FrontierRegressionNote>(
       regressions.map((r) => [r.key, { badge: `▼${percent(r.change)}`, text: describe(r) }]),
     );
-  }, [regressions, label, configLabel, formatDate, t]);
+  }, [regressions, label, formatDate, t]);
   const memeContext = useMemo(
     () =>
       memeOvertake && {
@@ -481,13 +445,6 @@ export default function FrontierView({
           </div>
         )}
       </div>
-      <p className="text-sm text-muted-foreground">
-        {section === 'frontier'
-          ? t.frontierHint(vendor)
-          : section === 'compare'
-            ? t.compareHint(grouping)
-            : t.softwareHint}
-      </p>
       {perSeries && (
         <div role="group" aria-label={t.pick(grouping)} className="flex flex-wrap gap-1.5">
           {[...styles].map(([key, style]) => {
@@ -592,11 +549,6 @@ export default function FrontierView({
           </div>
         </div>
       )}
-      {perSeries && (
-        <p className="px-1 pt-2 text-xs text-muted-foreground" data-testid="frontier-start-key">
-          {t.startKey}
-        </p>
-      )}
 
       {section === 'compare' && (
         <div className={PANEL_GRID_CLASS}>
@@ -638,7 +590,6 @@ export default function FrontierView({
             dateIndex={dateIndex}
             keys={selected}
             styles={styles}
-            xLabel={chartProps.xLabel}
             formatDate={formatDate}
           />
           {/* How fast each chip's software gain is still growing: where gains saturate. */}
