@@ -264,9 +264,16 @@ export default function FrontierView({
   );
 
   const [selected, setSelected] = useState<string[]>([]);
+  // The default picks apply when the view, the grouping or the chips on offer change. Styles
+  // and history are rebuilt on unrelated changes (high contrast, a legend toggle), and that
+  // must not throw away a comparison the user put together.
+  const selectionScope = `${section}|${grouping}|${[...styles.keys()].join(',')}`;
+  const appliedScope = useRef<string | null>(null);
   useEffect(() => {
+    if (appliedScope.current === selectionScope) return;
+    appliedScope.current = selectionScope;
     setSelected(defaultSelection(fullHistory, new Set(styles.keys()), section, grouping));
-  }, [fullHistory, styles, section, grouping]);
+  }, [selectionScope, fullHistory, styles, section, grouping]);
   const visibleKeys = useMemo(
     () => (perSeries ? selected : [...styles.keys()]),
     [perSeries, selected, styles],
@@ -279,9 +286,12 @@ export default function FrontierView({
     [perSeries, selected, styles],
   );
   // The timeline opens on the first date the series on screen have data, not an empty stretch.
+  // With every pill cleared, the timeline still spans the chips on offer rather than the whole
+  // model history.
   const history = useMemo(
-    () => historyFromFirstData(fullHistory, visibleKeys),
-    [fullHistory, visibleKeys],
+    () =>
+      historyFromFirstData(fullHistory, visibleKeys.length > 0 ? visibleKeys : [...styles.keys()]),
+    [fullHistory, visibleKeys, styles],
   );
   // Frontier explains steps of the pooled curve; the other views each selected series.
   const chapters = useMemo(
