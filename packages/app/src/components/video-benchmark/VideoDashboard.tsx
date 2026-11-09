@@ -363,14 +363,8 @@ export default function VideoDashboard({
     [projection],
   );
   // Cards, profit bars and clips pick among the runtimes the chart draws, so they name its engine.
-  const charted = useMemo(
-    () =>
-      chartedCells(
-        cells,
-        resultsChartSeries(deploymentCells, { ...resultsSelection(state), hidden: [] }),
-      ),
-    [cells, deploymentCells, state],
-  );
+  const allCharted = useMemo(() => chartedCells(projection, state), [projection, state]);
+  const charted = allCharted.filter(shown);
   const engines = [
     ...new Set(
       deploymentCells.flatMap(({ metadata }) => (metadata.engine ? [metadata.engine] : [])),

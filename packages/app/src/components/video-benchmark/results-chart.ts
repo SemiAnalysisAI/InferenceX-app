@@ -322,15 +322,23 @@ export function comparesEngines(series: readonly ResultsChartSeries[]): boolean 
 /**
  * Cells that may stand for their hardware in cards, profit bars and clips: those of
  * a runtime the chart draws for that hardware and run channel, so they name the
- * chart's engine. A channel the chart draws nothing for keeps every cell.
+ * chart's engine. A channel the chart draws nothing for keeps every cell. The page,
+ * its server seed and the overview API all pick clips from these cells.
  */
-export function chartedCells<T extends Pick<ResultCell, 'point' | 'overlay'>>(
-  cells: readonly T[],
-  series: readonly ResultsChartSeries[],
-): T[] {
+export function chartedCells(
+  projection: Record<
+    'cells' | 'overlayCells' | 'deploymentCells' | 'overlayDeploymentCells',
+    readonly ResultCell[]
+  >,
+  state: ResultsState,
+): ResultCell[] {
+  const series = resultsChartSeries(
+    [...projection.deploymentCells, ...projection.overlayDeploymentCells],
+    { ...resultsSelection(state), hidden: [] },
+  );
   const drawn = new Set(series.map((item) => item.key));
   const channels = new Set(series.map((item) => channelKey(item.hardwareKey, item.overlay)));
-  return cells.filter(
+  return [...projection.cells, ...projection.overlayCells].filter(
     (cell) =>
       !channels.has(channelKey(cell.point.hardwareKey, cell.overlay)) || drawn.has(seriesKey(cell)),
   );

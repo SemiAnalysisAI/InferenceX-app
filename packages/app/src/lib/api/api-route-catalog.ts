@@ -213,7 +213,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-video-view',
-    sourceSha256: '34c25a612db39d3c6a2a21d7d90c04771e11b7e17f86dfa6036c562964430864',
+    sourceSha256: '41949ba9fc40dabcfd203b39d79d275b56f123b992c4436a5d21f70524ce5b35',
   },
   {
     source: 'src/app/api/v1/views/operatorx/route.ts',
@@ -1568,7 +1568,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-chart.ts',
-    sourceSha256: '4c4800e79c2fc3f43c08d2d44e7f864bb135c62d46ef8f99bf9a005ae2448624',
+    sourceSha256: 'a077d5692f4f409e093aeaf4c0f48b11c02c4aa43b46f95cba6a70c5369bb563',
     reviewArea: {
       en: 'VideoGenX results chart axes, accepted r_x/r_y metric keys, GPU basis and deployment detail key.',
       zh: 'VideoGenX 结果图表的坐标轴、r_x/r_y 可接受的指标键、GPU 口径及部署详情键。',
