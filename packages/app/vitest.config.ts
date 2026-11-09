@@ -9,7 +9,7 @@ export default defineConfig({
     isolate: false,
     runner: 'src/test/file-isolation-runner.ts',
     sequence: { sequencer: EnvironmentGroupedSequencer },
-    experimental: { fsModuleCache: true },
+    fsModuleCache: true,
     setupFiles: ['src/test/setup-local-storage.ts'],
     // test:unit loads the root .env; extra source repos there must not change the lookups tests assert.
     env: { INFERENCEX_SOURCE_REPOS: '' },

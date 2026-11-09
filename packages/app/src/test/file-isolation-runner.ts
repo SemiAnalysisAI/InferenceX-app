@@ -1,8 +1,7 @@
 import 'next/dist/server/node-environment-baseline.js';
 
-import { vi } from 'vitest';
-import { builtinEnvironments } from 'vitest/environments';
-import { VitestTestRunner } from 'vitest/runners';
+import { TestRunner, vi } from 'vitest';
+import { builtinEnvironments } from 'vitest/runtime';
 
 interface WorkerBaseline {
   env: Map<string, string>;
@@ -91,10 +90,10 @@ async function isolateFromPreviousFile(environmentOptions: Record<string, unknow
   }
 }
 
-export default class FileIsolationRunner extends VitestTestRunner {
-  #previousImportSource?: Parameters<VitestTestRunner['importFile']>[1];
+export default class FileIsolationRunner extends TestRunner {
+  #previousImportSource?: Parameters<TestRunner['importFile']>[1];
 
-  async importFile(...args: Parameters<VitestTestRunner['importFile']>): Promise<unknown> {
+  async importFile(...args: Parameters<TestRunner['importFile']>): Promise<unknown> {
     const source = args[1];
     if (this.#previousImportSource === undefined || this.#previousImportSource === 'collect')
       await isolateFromPreviousFile(this.config.environmentOptions ?? {});

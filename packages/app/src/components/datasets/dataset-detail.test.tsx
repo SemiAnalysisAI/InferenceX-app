@@ -270,12 +270,13 @@ describe('DatasetDetail conversation search', () => {
   it('passes the active locale to application-owned number formatting', () => {
     testState.locale = 'zh';
     const localeCalls: (Intl.LocalesArgument | undefined)[] = [];
-    vi.spyOn(Number.prototype, 'toLocaleString').mockImplementation(
-      function (this: number, locales) {
-        localeCalls.push(locales);
-        return String(this.valueOf());
-      },
-    );
+    vi.spyOn(Number.prototype, 'toLocaleString').mockImplementation(function (
+      this: number,
+      locales,
+    ) {
+      localeCalls.push(locales);
+      return String(this.valueOf());
+    });
     const container = document.createElement('div');
     const root = createRoot(container);
 

@@ -2029,27 +2029,26 @@ describe('ChartDisplay responsive status notes', () => {
         }
       | undefined;
     cy.window().then((win) => {
-      cy.stub(win.HTMLAnchorElement.prototype, 'click').callsFake(
-        function (this: HTMLAnchorElement) {
-          if (!this.download.endsWith('.png')) return;
-          exportedPng = this.href;
-          const root = win.document.querySelector('#chart-0-export')!;
-          const note = root.querySelector<HTMLElement>('[data-testid="atom-engine-footnote"]');
-          if (!note) return;
-          exportedNote = {
-            text: note.textContent,
-            excluded: Boolean(note.closest('.no-export')),
-            bounds: note.getBoundingClientRect(),
-            plotBottom: root
-              .querySelector('svg[data-testid="d3-chart-svg"]')!
-              .getBoundingClientRect().bottom,
-            rootBottom: root.getBoundingClientRect().bottom,
-            removedNotes: root.querySelectorAll(
-              '[data-testid="agentic-optimization-note"], [data-testid="cache-reuse-link"]',
-            ).length,
-          };
-        },
-      );
+      cy.stub(win.HTMLAnchorElement.prototype, 'click').callsFake(function (
+        this: HTMLAnchorElement,
+      ) {
+        if (!this.download.endsWith('.png')) return;
+        exportedPng = this.href;
+        const root = win.document.querySelector('#chart-0-export')!;
+        const note = root.querySelector<HTMLElement>('[data-testid="atom-engine-footnote"]');
+        if (!note) return;
+        exportedNote = {
+          text: note.textContent,
+          excluded: Boolean(note.closest('.no-export')),
+          bounds: note.getBoundingClientRect(),
+          plotBottom: root.querySelector('svg[data-testid="d3-chart-svg"]')!.getBoundingClientRect()
+            .bottom,
+          rootBottom: root.getBoundingClientRect().bottom,
+          removedNotes: root.querySelectorAll(
+            '[data-testid="agentic-optimization-note"], [data-testid="cache-reuse-link"]',
+          ).length,
+        };
+      });
     });
     cy.get('[data-testid="export-button"]').first().click();
     cy.get('[data-testid="png-aspect-ratio"]').select(ratio);

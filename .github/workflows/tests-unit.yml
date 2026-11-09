@@ -116,12 +116,12 @@ jobs:
         run: bun install --frozen-lockfile
         env:
           CYPRESS_INSTALL_BINARY: '0'
-      # Only the app suite enables Vitest's fsModuleCache.
+      # Only the app suite restores Vitest's fsModuleCache.
       - name: Cache Vitest module transforms
         if: ${{ matrix.name == 'app' }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: node_modules/.experimental-vitest-cache
+          path: node_modules/.vitest-cache
           key: ${{ runner.os }}-vitest-modules-${{ hashFiles('bun.lock') }}-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-vitest-modules-${{ hashFiles('bun.lock') }}-
