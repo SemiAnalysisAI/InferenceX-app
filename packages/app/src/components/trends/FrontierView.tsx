@@ -34,6 +34,7 @@ import {
   type FrontierOvertake,
   type FrontierRegression,
 } from './frontier-history-core';
+import { PANEL_GRID_CLASS } from './frontier-panel-layout';
 
 const FrontierMemeOverlay = dynamic(() => import('./frontier-memes/FrontierMemeOverlay'), {
   ssr: false,
@@ -608,7 +609,7 @@ export default function FrontierView({
       )}
 
       {section === 'compare' && (
-        <div className="grid gap-x-6 gap-y-2 px-1 pt-6 lg:grid-cols-2">
+        <div className={PANEL_GRID_CLASS}>
           <FrontierLeadBars
             history={history}
             dateIndex={dateIndex}
@@ -626,7 +627,7 @@ export default function FrontierView({
         </div>
       )}
       {section === 'software' && (
-        <div className="grid gap-x-6 gap-y-2 px-1 pt-6 lg:grid-cols-2">
+        <div className={PANEL_GRID_CLASS}>
           <FrontierSoftwareGain
             history={history}
             dateIndex={dateIndex}
@@ -654,7 +655,7 @@ export default function FrontierView({
       )}
 
       {section === 'gainRate' && (
-        <div className="grid gap-x-6 gap-y-2 px-1 pt-6 lg:grid-cols-2">
+        <div className={PANEL_GRID_CLASS}>
           <FrontierGainRate
             history={history}
             dateIndex={dateIndex}

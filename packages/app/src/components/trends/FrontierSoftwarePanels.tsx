@@ -341,7 +341,7 @@ export function FrontierSoftwareGainTable({
 
   if (keys.length === 0) return null;
   return (
-    <section className={`${PANEL_SECTION_CLASS} lg:col-span-2`}>
+    <section className={`${PANEL_SECTION_CLASS} min-w-0 lg:col-span-2`}>
       <div className={PANEL_HEADER_CLASS}>
         <h3 className="text-sm font-semibold">{t.tableTitle}</h3>
         <p className="text-xs text-muted-foreground">

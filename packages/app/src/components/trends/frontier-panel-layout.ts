@@ -13,6 +13,13 @@ export const PANEL_SECTION_CLASS =
   'grid grid-rows-[auto_1fr] gap-2 lg:row-span-2 lg:grid-rows-subgrid';
 export const PANEL_HEADER_CLASS = 'flex flex-col gap-1';
 
+/**
+ * The grid the panels sit in: two equal columns that never grow to fit a wide child, such as a
+ * table spanning both, so the paired charts always split the width evenly.
+ */
+export const PANEL_GRID_CLASS =
+  'grid gap-x-6 gap-y-2 px-1 pt-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]';
+
 /** Horizontal room an x-axis date label gets on a panel, so labels never crowd each other. */
 const DATE_LABEL_PX = 72;
 /** Horizontal room an interactivity label (at most three digits) gets on a bar panel. */
