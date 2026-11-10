@@ -203,8 +203,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '比较范围结束日期 YYYY-MM-DD，不得早于 start。历史视图将其用作含终点的数据范围。',
   ],
   target: [
-    'Positive operating-point target, tok/s/user in interactivity-to-throughput mode. Both profit views use model-specific defaults: Kimi K3 60, GLM-5.2/5.3 135, MiniMax M3 115, DeepSeek V4 Pro 170 and DeepSeek V4.1 Flash 150 tok/s/user. Dashboard links use /<model>/target/<value> route segments; this API continues to accept the target query parameter. These are editable SKU-coverage assumptions, not OpenRouter P90-equivalent measurements.',
-    '正数工作点目标；交互性转吞吐量模式下单位为 tok/s/user。两个利润视图按模型设置默认值：Kimi K3 为 60、GLM-5.2/5.3 为 135、MiniMax M3 为 115、DeepSeek V4 Pro 为 170、DeepSeek V4.1 Flash 为 150 tok/s/user。仪表板链接通过 /<model>/target/<value> 路径片段传递目标值；本 API 仍使用 target 查询参数。这些默认值是用于扩大 SKU 覆盖范围的可修改假设，并非与 OpenRouter P90 等价的实测值。',
+    'Positive operating-point target, tok/s/user in interactivity-to-throughput mode. Both profit views use model-specific defaults: Kimi K3 60, GLM-5.2/5.3 135, MiniMax M3 115, DeepSeek V4 Pro 170, DeepSeek V4.1 Flash 150 and Muse Spark 1.3/Open 100 tok/s/user. Dashboard links use /<model>/target/<value> route segments; this API continues to accept the target query parameter. These are editable operating-point assumptions, not hosted API P90-equivalent measurements.',
+    '正数工作点目标；交互性转吞吐量模式下单位为 tok/s/user。两个利润视图按模型设置默认值：Kimi K3 为 60、GLM-5.2/5.3 为 135、MiniMax M3 为 115、DeepSeek V4 Pro 为 170、DeepSeek V4.1 Flash 为 150、Muse Spark 1.3/Open 为 100 tok/s/user。仪表板链接通过 /<model>/target/<value> 路径片段传递目标值；本 API 仍使用 target 查询参数。这些默认值是可修改的工作点假设，并非与托管 API P90 等价的实测值。',
   ],
   costProvider: [
     'costh = owning, costr = renting. Profit views additionally accept custom with customCosts. No costn provider.',
@@ -251,8 +251,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'JSON 对象，将硬件键映射为有限非负千瓦/芯片功率假设。',
   ],
   priceSource: [
-    'Profit: list, openrouter or custom. Inference/history: normalized or openrouter. Returned pricing records the prices actually used.',
-    '利润视图支持 list、openrouter、custom；推理和历史视图支持 normalized、openrouter。响应 pricing 记录实际使用的价格。',
+    'Profit: list, openrouter or custom. Inference/history: normalized or openrouter. Returned pricing records the prices actually used. Muse-Spark-Open defaults to list: Muse Spark 1.3 rates published at https://vercel.com/ai-gateway/models/muse-spark-1.3 ($1.25 input, $0.15 cached input and $4.25 output per million tokens). It prices Open checkpoint measurements, not Meta production costs or profits; the default 30% labCut is an editable assumption, not actual license terms.',
+    '利润视图支持 list、openrouter、custom；推理和历史视图支持 normalized、openrouter。响应 pricing 记录实际使用的价格。Muse-Spark-Open 默认使用 list，即 https://vercel.com/ai-gateway/models/muse-spark-1.3 公布的 Muse Spark 1.3 价格：每百万 token 输入 $1.25、缓存输入 $0.15、输出 $4.25。估算使用 Open checkpoint 的实测数据，并非 Meta 生产环境成本或利润；默认 30% labCut 为可修改的假设，并非实际许可条款。',
   ],
   inputPrice: [
     'Custom uncached input USD/million tokens, default 1.',

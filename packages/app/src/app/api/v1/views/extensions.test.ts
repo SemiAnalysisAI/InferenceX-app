@@ -379,6 +379,7 @@ describe('new dashboard projections', () => {
     [Model.MiniMax_M3, 'minimaxm3', 115],
     [Model.DeepSeek_V4_Pro, 'dsv4', 170],
     [Model.DeepSeek_V4_1_Flash, 'dsv41flash', 150],
+    [Model.Muse_Spark_Open, 'musespark', 100],
   ] as const)(
     'prices supported agentic model %s at its default through both public profit views',
     async (model, dbKey, target) => {
@@ -415,6 +416,19 @@ describe('new dashboard projections', () => {
         expect(body.params).toMatchObject({ model, sequence: 'agentic-traces', target });
         expect(hardwareKeys(body.data)).toEqual(['b200_sglang']);
         expect(body.data.rows[0].profit).toBeTypeOf('number');
+        if (model === Model.Muse_Spark_Open) {
+          const listResponse = await handler(req(view, `model=${encodeURIComponent(model)}`));
+          expect(listResponse.status).toBe(200);
+          const listBody = await listResponse.json();
+          expect(listBody.params).toMatchObject({ target: 100, priceSource: 'list', labCut: 30 });
+          expect(listBody.pricing).toEqual({
+            source: 'normalized',
+            inputPerMillion: 1.25,
+            cachedInputPerMillion: 0.15,
+            outputPerMillion: 4.25,
+          });
+          expect(listBody.data.rows[0].profit).toBeTypeOf('number');
+        }
 
         const overridden = await handler(req(view, `${query}&target=35`));
         expect(overridden.status).toBe(200);
@@ -427,48 +441,55 @@ describe('new dashboard projections', () => {
     ['profit-estimator', profit],
     ['profit-estimator-per-gigawatt', gw],
   ] as const)(
-    '%s applies the new default to official and unofficial runs',
+    '%s applies model defaults to official and unofficial runs',
     async (view, handler) => {
-      const low = agenticRow({
-        metrics: {
-          ...agenticRow().metrics,
-          p90_itl: 1 / 20,
-          tput_per_gpu: 9000,
-          input_tput_per_gpu: 8100,
-          output_tput_per_gpu: 900,
-        },
-      });
-      const high = agenticRow({
-        id: 2,
-        conc: 2,
-        metrics: {
-          ...low.metrics,
-          p90_itl: 1 / 250,
-          tput_per_gpu: 6000,
-          input_tput_per_gpu: 5400,
-          output_tput_per_gpu: 600,
-        },
-      });
-      mocks.benchmarks.mockImplementation(() => Response.json([low, high]));
-      const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/456';
-      mocks.unofficial.mockImplementation(() =>
-        Response.json({
-          benchmarks: [
-            { ...low, id: 456, hardware: 'b300', run_url: runUrl },
-            { ...high, id: 457, hardware: 'b300', run_url: runUrl },
-          ],
-          evaluations: [],
-        }),
-      );
+      for (const [model, dbKey, target] of [
+        ['DeepSeek-V4-Pro', 'dsv4', 170],
+        ['Muse-Spark-Open', 'musespark', 100],
+      ] as const) {
+        const low = agenticRow({
+          model: dbKey,
+          metrics: {
+            ...agenticRow().metrics,
+            p90_itl: 1 / 20,
+            tput_per_gpu: 9000,
+            input_tput_per_gpu: 8100,
+            output_tput_per_gpu: 900,
+          },
+        });
+        const high = agenticRow({
+          model: dbKey,
+          id: 2,
+          conc: 2,
+          metrics: {
+            ...low.metrics,
+            p90_itl: 1 / 250,
+            tput_per_gpu: 6000,
+            input_tput_per_gpu: 5400,
+            output_tput_per_gpu: 600,
+          },
+        });
+        mocks.benchmarks.mockImplementation(() => Response.json([low, high]));
+        const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/456';
+        mocks.unofficial.mockImplementation(() =>
+          Response.json({
+            benchmarks: [
+              { ...low, id: 456, hardware: 'b300', run_url: runUrl },
+              { ...high, id: 457, hardware: 'b300', run_url: runUrl },
+            ],
+            evaluations: [],
+          }),
+        );
 
-      const response = await handler(
-        req(view, 'model=DeepSeek-V4-Pro&priceSource=custom&unofficialrun=456'),
-      );
-      expect(response.status).toBe(200);
-      const body = await response.json();
-      expect(body.params.target).toBe(170);
-      expect(hardwareKeys(body.data)).toEqual(['b200_sglang']);
-      expect(hardwareKeys(body.overlays)).toEqual(['b300_sglang']);
+        const response = await handler(
+          req(view, `model=${model}&priceSource=list&unofficialrun=456`),
+        );
+        expect(response.status).toBe(200);
+        const body = await response.json();
+        expect(body.params.target).toBe(target);
+        expect(hardwareKeys(body.data)).toEqual(['b200_sglang']);
+        expect(hardwareKeys(body.overlays)).toEqual(['b300_sglang']);
+      }
     },
   );
   it.each([

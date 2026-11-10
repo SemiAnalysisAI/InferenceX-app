@@ -75,6 +75,18 @@ export interface ProfitModelDefaults {
  * list prices and a 0% fee because their weights ship under the MIT license.
  */
 const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
+  [Model.Muse_Spark_Open]: {
+    // Editable scenario target, not a P90 measurement of Meta's hosted endpoint.
+    interactivity: 100,
+    labCutPct: DEFAULT_LAB_CUT_PCT,
+    listPricing: {
+      vendor: 'Meta (Vercel AI Gateway)',
+      inputPerMillion: 1.25,
+      cachedInputPerMillion: 0.15,
+      outputPerMillion: 4.25,
+      sourceUrl: 'https://vercel.com/ai-gateway/models/muse-spark-1.3',
+    },
+  },
   [Model.DeepSeek_V4_Pro]: {
     interactivity: 170,
     labCutPct: 0,

@@ -33,6 +33,7 @@ const PROFIT_ESTIMATOR_MODELS: readonly Model[] = [
   Model.MiniMax_M3,
   Model.DeepSeek_V4_Pro,
   Model.DeepSeek_V4_1_Flash,
+  Model.Muse_Spark_Open,
 ];
 const MODEL_ROUTE_TAB_MODELS: Partial<Record<ModelRouteTab, readonly Model[]>> = {
   'profit-estimator': PROFIT_ESTIMATOR_MODELS,
