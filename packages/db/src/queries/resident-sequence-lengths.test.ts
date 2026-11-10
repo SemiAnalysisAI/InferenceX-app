@@ -7,7 +7,10 @@ import {
 
 import type { DbClient } from '../connection.js';
 import { STATS_VERSION, sequenceLengthSketchColumns } from './agentic-shared';
-import { getResidentSequenceLengthSketches } from './resident-sequence-lengths.js';
+import {
+  getResidentSequenceLengthSketches,
+  mergeResidentSequenceLengthSketches,
+} from './resident-sequence-lengths.js';
 
 const A = { isl: buildTokenLengthSketch([10, 20, 0]), osl: buildTokenLengthSketch([1, 2]) };
 const B = { isl: buildTokenLengthSketch([1_000, 70_000]), osl: buildTokenLengthSketch([100]) };
@@ -80,5 +83,26 @@ describe('getResidentSequenceLengthSketches', () => {
     expect(values).toHaveLength(2);
     expect(values[1]).toEqual([[2]]);
     expect(warn.mock.calls[0]![0]).toContain('benchmark ids 2');
+  });
+});
+
+describe('mergeResidentSequenceLengthSketches', () => {
+  it('adds the points of each database and merges their sketches', () => {
+    expect(
+      mergeResidentSequenceLengthSketches([
+        { ...A, coveredPoints: 1, requestedPoints: 2 },
+        { ...B, coveredPoints: 1, requestedPoints: 1 },
+      ]),
+    ).toEqual({
+      isl: mergeTokenLengthSketches([A.isl, B.isl]),
+      osl: mergeTokenLengthSketches([A.osl, B.osl]),
+      coveredPoints: 2,
+      requestedPoints: 3,
+    });
+  });
+
+  it('returns a single database unchanged', () => {
+    const only = { ...A, coveredPoints: 1, requestedPoints: 2 };
+    expect(mergeResidentSequenceLengthSketches([only])).toEqual(only);
   });
 });

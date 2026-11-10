@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
 
-import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
+import { getReadDbs } from '@semianalysisai/inferencex-db/lib/payload-db';
 
 import { getChangelogDatesInRange } from '@semianalysisai/inferencex-db/queries/workflow-info';
 
@@ -14,9 +15,10 @@ export const dynamic = 'force-dynamic';
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 
 async function loadWorkflowChangelogs(from: string, to: string, benchmarkType?: 'agentic_traces') {
+  const dbs = await getReadDbs();
   const dates = benchmarkType
-    ? await getChangelogDatesInRange(getDb(), from, to, benchmarkType)
-    : await getChangelogDatesInRange(getDb(), from, to);
+    ? await getChangelogDatesInRange(dbs, from, to, benchmarkType)
+    : await getChangelogDatesInRange(dbs, from, to);
   return { dates };
 }
 

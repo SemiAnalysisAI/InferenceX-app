@@ -1,5 +1,7 @@
-import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
+import { readEachDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 
+import { mergeAvailabilityRows } from '@semianalysisai/inferencex-db/queries/across-dbs';
 import {
   type AvailabilityRow,
   getAvailabilityData,
@@ -13,10 +15,10 @@ import {
   COMPARE_MODEL_SLUGS,
 } from '@/lib/compare/compare-slug';
 
-export const getCachedAvailability = cachedQuery(() => {
-  if (FIXTURES_MODE) return Promise.resolve(loadFixture<AvailabilityRow[]>('availability'));
+export const getCachedAvailability = cachedQuery(async () => {
+  if (FIXTURES_MODE) return loadFixture<AvailabilityRow[]>('availability');
 
-  return getAvailabilityData(getDb());
+  return mergeAvailabilityRows(await readEachDb(getAvailabilityData));
 }, 'availability');
 
 export function buildDbKeyToSlugMap(): Map<string, string> {

@@ -348,6 +348,33 @@ The `Sync Runs From Public Database` workflow (`sync-run-from-public-db.yml`) ru
 the dispatched `run-ids`, migrates the target first, then invalidates and warms `APP_URL`. It
 does not run in `SemiAnalysisAI/InferenceX-app`, whose database is the source.
 
+### Reading the Public Database From a Downstream Deployment
+
+Instead of syncing, a downstream deployment can read the public database directly: set
+`PUBLIC_DATABASE_READONLY_URL` on the app. Its own database then holds only the runs it ingests,
+and every read combines the two into the answer one database holding every run would give.
+Setup is in [Deployment configuration](./deployment-configuration.md#showing-public-results-on-a-downstream-deployment).
+
+- `bun run admin:db:migrate --yes --downstream` migrates the downstream database and makes its
+  runs, benchmarks, and evals take ids from `DOWNSTREAM_ID_START` (10^12) up, so ids never
+  collide in combined responses and an id alone says which database holds a log, trace, eval
+  sample, or GPU telemetry. It refuses a database that already holds lower ids; one filled by
+  the sync must be rebuilt with only its own runs. Until the ids are reserved, the app refuses
+  to read the public database rather than route a downstream id to a public row.
+- Latest results take each curve from whichever database has its newest run, ranked as
+  `latest_benchmarks` ranks runs (`queries/across-dbs.ts`). An as-of view is bounded by the
+  selected run's start time in both databases. History, availability, evaluations,
+  reliability, submissions, latest images, workflow info, changelogs, datasets, trace and log
+  availability, and the agentic catalog are combined the same way.
+- Eval rows of a config the public database lacks get a `config_id` above 2^31, so they never
+  group with a public config.
+- A run held by both databases, such as one promoted to public, appears once in run lists and
+  latest results but counts twice in reliability, submissions, and history.
+- Public ingests invalidate only the public site. `Cache Refresh` runs hourly in any
+  repository with the `PUBLIC_DATABASE_READONLY_URL` secret, so new public results reach the
+  downstream site within the hour.
+- Append-only runs extend curves only within their own database.
+
 ### Connection drivers and policy
 
 | Connection                      | Library                  | Use case                             |

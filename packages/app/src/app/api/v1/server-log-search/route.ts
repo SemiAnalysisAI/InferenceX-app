@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { getPayloadDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 import {
   searchServerLogs,
   ServerLogSearchTimeoutError,
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     return cachedJson(request, {
       id,
       query,
-      ...(await searchServerLogs(getDb(), id, query, limit)),
+      ...(await searchServerLogs(await getPayloadDb(id), id, query, limit)),
     });
   } catch (error) {
     if (error instanceof ServerLogSearchTimeoutError) {

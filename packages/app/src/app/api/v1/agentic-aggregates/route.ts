@@ -1,4 +1,4 @@
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { readRecordFromPayloadDbs } from '@semianalysisai/inferencex-db/lib/payload-db';
 
 import {
   getAgenticAggregates,
@@ -24,7 +24,8 @@ export const dynamic = 'force-dynamic';
 export const CACHE_KEY_PREFIX = `agentic-aggregates-v${STATS_VERSION}`;
 
 const getCachedAgenticAggregates = cachedQuery(
-  (ids: number[]): Promise<AgenticAggregateMap> => getAgenticAggregates(getDb(), ids),
+  (ids: number[]): Promise<AgenticAggregateMap> =>
+    readRecordFromPayloadDbs(ids, getAgenticAggregates),
   CACHE_KEY_PREFIX,
   { blobOnly: true },
 );
