@@ -354,7 +354,9 @@ describe('Chart Selectors', () => {
           </TooltipProvider>
         </PathnameContext.Provider>,
       );
-      cy.get('[data-testid="model-selector"]').should('contain.text', 'Muse Spark Open').click();
+      cy.get('[data-testid="model-selector"]')
+        .should('contain.text', 'Muse Spark 1.3/Open')
+        .click();
       cy.get('[role="option"]').then(($options) => {
         expect([...$options].slice(0, 8).map((option) => option.textContent?.trim())).to.deep.equal(
           [
@@ -363,7 +365,7 @@ describe('Chart Selectors', () => {
             'GLM5.2/GLM5.3 744B',
             'GLM 5.3 Flash',
             'MiniMax M3.1 Flash 428B',
-            'Muse Spark Open 816B',
+            'Muse Spark 1.3/Open 816B',
             'Qwen3.5 397B',
             'Qwen3.8 Flash Next 176B',
           ],

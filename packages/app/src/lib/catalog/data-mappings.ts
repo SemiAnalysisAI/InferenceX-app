@@ -77,7 +77,7 @@ const GUARDED_ENGINE_FAMILIES = ['vllm', 'sglang'] as const;
 
 const MODEL_CONFIG: Record<Model, ModelConfig> = {
   [Model.Muse_Spark_Open]: {
-    label: 'Muse Spark Open 816B',
+    label: 'Muse Spark 1.3/Open 816B',
     prefix: 'musespark',
     category: 'default',
     logo: 'muse-mascot.webp',

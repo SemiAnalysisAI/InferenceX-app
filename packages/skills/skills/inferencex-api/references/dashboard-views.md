@@ -88,7 +88,7 @@ API 参数。
 
 Use `tcoBasis=internal` (the default) or `tcoBasis=external` in cost-aware
 read-only views. Qwen3.5 and Kimi K3 expose the corresponding dashboard toggle
-on 8K/1K and Agentic Traces; Muse Spark Open, GLM-5.2 and GLM-5.3 Flash expose
+on 8K/1K and Agentic Traces; Muse Spark 1.3/Open, GLM-5.2 and GLM-5.3 Flash expose
 it on Agentic Traces. Inference charts show it for cost metrics when TPUv7 data
 is visible. The API accepts the pricing basis independently of control
 visibility. It changes configured ownership costs, not measured throughput;
@@ -183,7 +183,7 @@ Qwen3.5 workload-retirement coverage:
    latest-image APIs keep historical rows; no data is deleted.
    Preserve `options.models` order within each category when rendering model
    selectors. The default group is DeepSeek V4.1 Flash, GLM5.2/GLM5.3,
-   MiniMax M3.1 Flash, Muse Spark Open, Qwen3.5, then
+   MiniMax M3.1 Flash, Muse Spark 1.3/Open, Qwen3.5, then
    Qwen3.8 Flash Next. This presentation order does not change `defaults.model`
    or the overview's model order.
    GLM-5.3-Flash supports `8k/1k` and `agentic-traces` with raw key `glm5.3flash`,
@@ -260,6 +260,21 @@ https://inferencex.semianalysis.com/api/v1/views/profit-estimator?model=DeepSeek
 
 ## Profit estimator defaults
 
+Both profit views also support `model=Muse-Spark-Open` (dashboard slug
+`muse-spark-open`, label Muse Spark 1.3/Open). They default to `target=100`,
+`priceSource=list`, and `labCut=30`. The list price uses Meta's Muse Spark 1.3
+endpoint rates published by [Vercel AI Gateway](https://vercel.com/ai-gateway/models/muse-spark-1.3):
+$1.25 uncached input, $0.15 cached input reads, and $4.25 output per million tokens.
+These estimates price Open checkpoint measurements, not Meta's production costs
+or profits. The target and license fee are editable scenario assumptions, not
+Meta endpoint P90 measurements or actual license terms. Explicit custom pricing,
+targets and unofficial-run overlays retain the same behavior as other models.
+
+中文：两个利润视图均支持 `model=Muse-Spark-Open`，默认采用 100 tok/s/user
+工作点、Muse Spark 1.3 API 价格和 30% 模型许可费假设。实测数据来自 Open
+checkpoint，并非 Meta 生产环境成本或利润。工作点和许可费均可修改，
+不代表 Meta 服务的 P90 实测值或实际许可条款。
+
 Both views default `cacheHitMode` to `theoretical`, displayed as
 “Theroticial Roofline” in English and Chinese dashboards. This uses the
 trace-derived infinite-cache hit rate, falling back to the measured rate when
@@ -267,7 +282,7 @@ unavailable. Pass `cacheHitMode=actual` for measured cache behavior; dashboard
 links preserve that choice as `/cache-hit-mode/actual`. Report the resolved
 `params.cacheHitMode` alongside the pricing assumptions.
 
-Both views use model-specific defaults: the lowest multiples of 5 tok/s/user
+The earlier models below use the lowest multiples of 5 tok/s/user
 that reached each model's maximum priced official SKU count in a 5–300 sweep
 of the public view API on 2026-10-25:
 

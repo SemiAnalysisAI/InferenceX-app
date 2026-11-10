@@ -333,6 +333,19 @@ describe('parseTokenPriceInput', () => {
 });
 
 describe('profitModelDefaults', () => {
+  it('prices Open measurements at the hosted Muse 1.3 rates with explicit scenario assumptions', () => {
+    expect(profitModelDefaults(Model.Muse_Spark_Open)).toEqual({
+      interactivity: 100,
+      labCutPct: DEFAULT_LAB_CUT_PCT,
+      listPricing: {
+        vendor: 'Meta (Vercel AI Gateway)',
+        inputPerMillion: 1.25,
+        cachedInputPerMillion: 0.15,
+        outputPerMillion: 4.25,
+        sourceUrl: 'https://vercel.com/ai-gateway/models/muse-spark-1.3',
+      },
+    });
+  });
   it.each([
     [Model.Kimi_K3, 60],
     [Model.GLM_5_2, 135],

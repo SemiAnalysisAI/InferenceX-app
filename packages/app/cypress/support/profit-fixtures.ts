@@ -12,6 +12,7 @@ const PROFIT_DB_KEY_BY_DISPLAY_MODEL: Record<string, string> = {
   'MiniMax-M3': PROFIT_MINIMAX_DB_KEY,
   'DeepSeek-V4-Pro': PROFIT_DEEPSEEK_DB_KEY,
   'DeepSeek-V4.1-Flash': PROFIT_DEEPSEEK_FLASH_DB_KEY,
+  'Muse-Spark-Open': 'musespark',
 };
 const PROFIT_DB_KEYS = Object.values(PROFIT_DB_KEY_BY_DISPLAY_MODEL);
 export const PROFIT_DATE = '2026-08-31';
