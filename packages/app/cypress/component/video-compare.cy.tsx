@@ -673,6 +673,8 @@ describe('Video results clip stage', () => {
     cy.get('[data-side="b"]').should('contain', 'no lossless config');
     for (const metric of ['speed', 'psnrLossless', 'ssimLossless', 'lpipsLossless'])
       readoutLines(metric).should('have.length', 1).and('have.text', '—');
+    for (const metric of ['wall', 'psnr', 'energy', 'participating', 'allocated'])
+      readoutLines(metric).last().should('have.text', 'B200 lossless —');
   });
 
   it('leads a lossy pair with its speed and never shows a score it has not measured', () => {

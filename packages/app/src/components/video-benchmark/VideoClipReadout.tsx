@@ -254,6 +254,8 @@ const SIDE_METRICS: Record<SideMetric, SideRead> = {
 
 /** One side's value of a per-side metric, with its context line. */
 function readSide(metric: SideMetric, side: ReadoutSide, diagnostic: boolean, s: Strings): Reading {
+  // A missing twin has no cell, so none of its values will ever arrive.
+  if (side.point === null) return { value: '—' };
   const { rerunHasIt, read, context } = SIDE_METRICS[metric];
   if (diagnostic && !rerunHasIt)
     return { value: '—', help: s.diagnosticMetric, sub: s.diagnosticMetric };
