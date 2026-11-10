@@ -190,6 +190,8 @@ type Strings = (typeof STRINGS)['en'] | (typeof STRINGS)['zh'];
 export interface ClipLink {
   playing: string | null;
   baseline: string | null;
+  /** First frames of the stage's prompt by point key, for the hover card. */
+  posters: Readonly<Record<string, string>>;
   onSelect: (pointKey: string) => void;
   /** Brings the stage into view. */
   onReveal: () => void;
@@ -672,6 +674,7 @@ export default function VideoResultsChart({
                 ? s.tipClick
                 : s.tipHollow);
         return chartHoverCard({
+          image: pair?.posters[plot.key],
           title: d.title,
           subtitle: [d.subtitle, history ? d.date : null].filter(Boolean).join(' · ') || undefined,
           color: plot.color,

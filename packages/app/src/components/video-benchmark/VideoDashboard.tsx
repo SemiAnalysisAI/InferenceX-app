@@ -67,6 +67,7 @@ import {
   resultsPlotSeries,
   resultsPointKey,
   resultsSelection,
+  stageOpenings,
 } from './results-chart';
 import { optimizationsOf, runtimeLabel } from './optimizations';
 import { EngineComparisonConfirmation } from '@/components/inference/ui/engine-comparison-confirmation';
@@ -292,7 +293,11 @@ export default function VideoDashboard({
   const [labels, setLabels] = useState(true);
   const [legendExpanded, setLegendExpanded] = useState(true);
   /** The chart points the clip stage plays, which the chart badges. */
-  const [stagePair, setStagePair] = useState<StagePair>({ playing: null, baseline: null });
+  const [stagePair, setStagePair] = useState<StagePair>({
+    playing: null,
+    baseline: null,
+    posters: {},
+  });
   /** What the stage compares its subject with, by `StageOption.value`. */
   const [against, setAgainst] = useState('reference');
   /** Counts requests to bring the stage into view; the stage answers once its reads land. */
@@ -310,7 +315,11 @@ export default function VideoDashboard({
   const onStagePair = useCallback(
     (pair: StagePair) =>
       setStagePair((previous) =>
-        previous.playing === pair.playing && previous.baseline === pair.baseline ? previous : pair,
+        previous.playing === pair.playing &&
+        previous.baseline === pair.baseline &&
+        JSON.stringify(previous.posters) === JSON.stringify(pair.posters)
+          ? previous
+          : pair,
       ),
     [],
   );
@@ -537,6 +546,7 @@ export default function VideoDashboard({
     charted.filter((c) => !c.overlay),
     { tier: state.costTier },
   );
+  const stageClipPoints = stageOpenings(projection, state, clipPoints);
   const profitBars: ResultBar[] = roster
     .filter((key) => !hidden.has(key))
     .flatMap((key) => {
@@ -970,11 +980,11 @@ export default function VideoDashboard({
                 }
               />
             </div>
-          </ChartSection>
-          <Card>
+            <hr className="my-6 border-border-alt" />
             <VideoResultsClips
               initialSides={initialData?.sides}
               points={clipPoints}
+              openings={stageClipPoints}
               drawn={drawnPoints}
               deployments={deploymentPoints}
               officialLeads={officialClipPoints}
@@ -987,7 +997,7 @@ export default function VideoDashboard({
               costs={clipCosts}
               unofficialRun={state.unofficialRun ?? undefined}
             />
-          </Card>
+          </ChartSection>
           <Card>
             <section
               className="flex min-w-0 flex-col gap-3"

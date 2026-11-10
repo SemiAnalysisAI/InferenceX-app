@@ -5,8 +5,9 @@ export function servingArtifact(
   id = 123,
   artifactId = 40,
   hardware = 'NVIDIA H200',
+  takes = 4,
 ): StoredArtifact {
-  const fixture = servingFixture(String(id), hardware);
+  const fixture = servingFixture(String(id), hardware, takes);
   fixture.documents.set('manifest.json', fixture.manifest);
   fixture.documents.set('ci.json', fixture.ci);
   fixture.checksums.set('manifest.json', String(id).padEnd(64, '0'));

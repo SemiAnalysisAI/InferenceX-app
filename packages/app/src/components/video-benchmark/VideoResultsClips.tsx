@@ -1,9 +1,8 @@
 'use client';
 
 import { ChevronRight } from 'lucide-react';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import { Heading } from '@/components/ui/heading';
 import { InfoHelp } from '@/components/ui/option-info';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { useClientSearch } from '@/hooks/useClientSearch';
@@ -25,6 +24,7 @@ import {
   type StageOption,
   type StagePair,
 } from './clip-stage';
+import { engineLabel } from './engines';
 import { hardwareLabel } from './hardware';
 import type { VideoPoint } from './metrics';
 import { isLossy, lossyLabel, optimizationsOf } from './optimizations';
@@ -65,6 +65,8 @@ const STRINGS = {
     take: (n: number) => `take ${n}`,
     more: 'More',
     less: 'Less',
+    morePrompts: (n: number) => `Show ${n} more prompts`,
+    fewerPrompts: 'Show fewer prompts',
     noPair: 'No retained clips share a verified prompt, seed, take and generation configuration.',
     loading: 'Loading retained clips…',
     missing: 'No matched clip',
@@ -87,7 +89,8 @@ const STRINGS = {
       'Encoded reference MP4. PSNR compares every decoded RGB pixel and frame; it does not measure semantic quality.',
     metricsHelp:
       'PSNR uses a sealed Diffusers reference pair and every decoded RGB frame. Speed is the ratio of the two cells’ p50; wall time is this prompt’s request alone. $ per clip is modelled TCO on the participating GPUs from the selected tier and recorded GPU count, and $/video-s spreads it over valid decoded output duration; hover it for the allocated basis. Energy per clip is the selected cell’s mean. Paired scores against the lossless twin are planned; no scorer computes them yet.',
-    gpu: (n: number) => `${n} GPU`,
+    gpu: (n: number) => (n === 1 ? '1 GPU' : `${n} GPUs`),
+    official: 'official',
     compareWith: 'Compare with',
     lossless: 'lossless',
     twin: (hardware: string) => `${hardware} lossless`,
@@ -114,6 +117,8 @@ const STRINGS = {
     take: (n: number) => `第 ${n} 次`,
     more: '展开',
     less: '收起',
+    morePrompts: (n: number) => `显示其余 ${n} 条 prompt`,
+    fewerPrompts: '收起 prompt 列表',
     noPair: '没有 prompt、seed、重复次数和生成配置均已核实一致的保留视频。',
     loading: '正在加载保留视频…',
     missing: '没有匹配的视频',
@@ -136,6 +141,7 @@ const STRINGS = {
     metricsHelp:
       'PSNR 使用已封存的 Diffusers 参考配对，比较全部解码 RGB 帧。速度是两个测量单元 p50 之比，出片时间只是当前 prompt 这一次请求的时长。每条视频成本按所选成本档位和记录的 GPU 数量估算参与 GPU 的 TCO，每视频秒成本按有效输出的实际解码时长分摊；悬停该格可查看按分配 GPU 估算的口径。每条视频能耗是所选测量单元的平均值。以无损对照为基准的配对评分仍在计划中，目前还没有评分器计算。',
     gpu: (n: number) => `${n} 张 GPU`,
+    official: '官方',
     compareWith: '对比',
     lossless: '无损',
     twin: (hardware: string) => `${hardware} 无损对照`,
@@ -145,8 +151,10 @@ const STRINGS = {
 
 type Strings = (typeof STRINGS)['en'] | (typeof STRINGS)['zh'];
 export interface VideoResultsClipsProps {
-  /** One lead point per hardware: the default subject, and what the other side can show. */
+  /** One lead point per hardware: what the other side can show. */
   points: VideoPoint[];
+  /** The deployment the stage opens on per hardware (`stageOpenings`); defaults to `points`. */
+  openings?: readonly VideoPoint[];
   /** Points the chart draws; `r_clip` plays one of them. */
   drawn?: readonly VideoPoint[];
   /** Every deployment of the workload, where a lossy subject finds its lossless twin. */
@@ -174,12 +182,20 @@ export interface VideoResultsClipsProps {
 }
 
 const NO_POINTS: readonly VideoPoint[] = [];
+const onRoster = (p: VideoPoint) => RESULTS_HARDWARE.some((key) => p.hardwareKey === key);
+/** Strip geometry in px: a 92 px tile, the 40 px "+N" tile and the 8 px gap between them. */
+const TILE = 92;
+const MORE = 40;
+const GAP = 8;
+/** The most tiles the collapsed strip shows, so the prompt beside it stays the row's subject. */
+const MAX_TILES = 3;
 
 /** "FirstBlockCache + Sol-Attn" for a lossy side, so it never reads as its lossless twin. */
 const lossyVariant = (p: VideoPoint) => (isLossy(p) ? (lossyLabel(optimizationsOf(p)) ?? '') : '');
 
 export default function VideoResultsClips({
   points,
+  openings,
   drawn = NO_POINTS,
   deployments = NO_POINTS,
   officialLeads = NO_POINTS,
@@ -196,10 +212,8 @@ export default function VideoResultsClips({
   const s = STRINGS[useLocale()];
   const stage = parseStage(useClientSearch());
   // Callers pick one clip per hardware, which may be a lossy named run's.
-  const selected = useMemo(
-    () => points.filter((p) => RESULTS_HARDWARE.some((key) => p.hardwareKey === key)),
-    [points],
-  );
+  const selected = useMemo(() => points.filter(onRoster), [points]);
+  const opening = useMemo(() => (openings ?? points).filter(onRoster), [openings, points]);
   const picked = stage.clip ? drawn.find((p) => stagePointKey(p) === stage.clip) : undefined;
   const cache = useRef(new Map<string, ResultsClipSide | null>(Object.entries(initialSides)));
   const [revision, setRevision] = useState(0);
@@ -216,14 +230,14 @@ export default function VideoResultsClips({
   const subject = useMemo(
     () =>
       stageSubject(
-        [...selected, ...(picked && !selected.includes(picked) ? [picked] : [])].map((point) => ({
+        [...opening, ...(picked && !opening.includes(picked) ? [picked] : [])].map((point) => ({
           point,
           side: sideOf(point),
         })),
         unofficialRun,
         stage.clip,
       ),
-    [selected, picked, revision, failedKeys, unofficialRun, stage.clip],
+    [opening, picked, revision, failedKeys, unofficialRun, stage.clip],
   );
   const options = useMemo(() => {
     if (!subject) return [];
@@ -237,7 +251,7 @@ export default function VideoResultsClips({
   const option = options.find((item) => item.value === against) ?? options[0];
   const other = option?.point ?? null;
   const wantedPoints = [
-    ...new Set([...selected, ...(picked ? [picked] : []), ...(other ? [other] : [])]),
+    ...new Set([...selected, ...opening, ...(picked ? [picked] : []), ...(other ? [other] : [])]),
   ];
   // Callers rebuild `points` on every render; reads restart only when the set of sides changes.
   const wantedKey = wantedPoints.map(sourceKey).join('\n');
@@ -293,14 +307,32 @@ export default function VideoResultsClips({
     // Space and T act on the focused stage.
     stageRef.current?.focus({ preventScroll: true });
   }, [reveal, loading]);
-  const playing = subject ? stagePointKey(subject.point) : null;
-  const baseline = other ? stagePointKey(other) : null;
-  useEffect(() => onPairChange?.({ playing, baseline }), [playing, baseline, onPairChange]);
   /** Web renditions that failed to load; their sides play the sealed original instead. */
   const [failedPreviews, setFailedPreviews] = useState<ReadonlySet<string>>(new Set());
   const groups = subject?.groups ?? [];
   const group = stagePrompt(groups, stage.prompt);
   const diagnostic = group?.scope === 'matched-noise-diagnostic';
+  const playing = subject ? stagePointKey(subject.point) : null;
+  const baseline = other ? stagePointKey(other) : null;
+  // Only sides already read lend a poster, so hovering a chart point never starts a read.
+  const postersJson = useMemo(
+    () =>
+      JSON.stringify(
+        wanted.flatMap((p) => {
+          const side = sideOf(p);
+          const match = side && pairedGroup(resultsClipGroups([side]), group);
+          const url = match ? match.clips.get(side.hardwareKey)?.posterUrl : undefined;
+          return url ? [[stagePointKey(p), url]] : [];
+        }),
+      ),
+    [wanted, revision, failedKeys, group],
+  );
+  // Before paint, so the chart's badges and hover card never lag the stage they describe.
+  useLayoutEffect(
+    () =>
+      onPairChange?.({ playing, baseline, posters: Object.fromEntries(JSON.parse(postersJson)) }),
+    [playing, baseline, postersJson, onPairChange],
+  );
   const clip = group && subject?.side ? (group.clips.get(subject.side.hardwareKey) ?? null) : null;
   const reference = resultsClipReference(group, new Set());
   const point = subject?.point;
@@ -326,14 +358,17 @@ export default function VideoResultsClips({
   ): StageClip => {
     const rerun = found?.quality && 'scope' in found.quality ? found.quality.candidate : null;
     const gpus = rerun?.gpu_count ?? p.participating;
+    const engine = rerun?.runtime_name ?? resultMetadata(p).engine;
     return {
       source: stagePointKey(p),
       id: p.hardwareKey ?? '',
       label: hardwareLabel(p.hardwareKey ?? ''),
+      engine: engine ? engineLabel(engine) : undefined,
       meta: [typeof gpus === 'number' ? s.gpu(gpus) : '', variant].filter(Boolean).join(' · '),
       color: colorOf(p),
       url: found?.url ?? '',
       previewUrl: preview(found?.previewUrl),
+      posterUrl: found?.posterUrl,
       empty: found ? s.unpublishedMedia : pending ? s.loading : s.missing,
       unofficial: !diagnostic && unofficialRun !== undefined && p.runId === unofficialRun,
     };
@@ -347,10 +382,11 @@ export default function VideoResultsClips({
           source: 'reference',
           id: 'reference',
           label: s.referenceShort,
-          meta: '',
+          meta: s.official,
           color: null,
           url: reference?.url ?? '',
           previewUrl: preview(reference?.previewUrl),
+          posterUrl: reference?.posterUrl,
           empty: subject?.pending ? s.loading : s.noReference,
         }
       : other
@@ -378,19 +414,10 @@ export default function VideoResultsClips({
   return (
     <section
       id="comparison-clips"
-      aria-labelledby="comparison-clips-title"
+      aria-label={s.label}
       data-testid="video-results-clips"
       className="min-w-0 scroll-mt-24 space-y-3"
     >
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <Heading as="h2" level="card" id="comparison-clips-title">
-          {s.label}
-        </Heading>
-        {diagnostic && <span className="text-sm text-muted-foreground">{s.diagnostic}</span>}
-        <InfoHelp label={s.label} value="clip-metrics" triggerTestId="video-results-metrics-help">
-          {diagnostic ? s.diagnosticNote : s.metricsHelp}
-        </InfoHelp>
-      </div>
       {loading && (
         <p role="status" className="text-sm text-muted-foreground">
           {s.loading}
@@ -413,62 +440,41 @@ export default function VideoResultsClips({
       )}
       {a && point ? (
         <>
-          {groups.length > 1 && (
-            <div
-              role="group"
-              aria-label={s.prompts}
-              data-testid="video-results-prompts"
-              className="flex gap-2 overflow-x-auto pb-1"
-            >
-              {groups.map((item, index) => {
-                const key = promptKey(item);
-                const caseId = [...item.clips.values()][0]?.record.caseId ?? key;
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    data-prompt={key}
-                    aria-pressed={item === group}
-                    className={cn(
-                      'flex w-32 shrink-0 flex-col gap-0.5 rounded-md border px-2.5 py-1.5 text-left text-xs',
-                      item === group
-                        ? 'border-foreground bg-muted'
-                        : 'border-border hover:border-muted-foreground',
-                    )}
-                    onClick={() => {
-                      track('video_results_prompt_selected', { index, case: caseId });
-                      writeStage({ ...stage, prompt: key });
-                    }}
-                  >
-                    <span className="truncate font-mono font-medium">{caseId}</span>
-                    <span className="truncate text-muted-foreground">
-                      {item.scope ? s.diagnostic : `${s.seed} ${item.seed}`}
-                      {!item.scope && item.take > 1 && ` · ${s.take(item.take)}`}
-                    </span>
-                  </button>
-                );
-              })}
+          <PromptRow
+            groups={groups}
+            group={group}
+            s={s}
+            onPick={(item, index, poster) => {
+              track('video_results_prompt_selected', { index, case: caseOf(item), poster });
+              writeStage({ ...stage, prompt: promptKey(item) });
+            }}
+          >
+            <div className="flex shrink-0 items-center gap-1.5">
+              <SegmentedToggle
+                role="group"
+                ariaLabel={s.view}
+                value={stage.view}
+                size="sm"
+                options={STAGE_VIEWS.map((mode) => ({
+                  value: mode,
+                  label: s.views[mode],
+                  title: s.viewHelp[mode],
+                  testId: `video-results-view-${mode}`,
+                }))}
+                onValueChange={(view) => {
+                  track('video_results_clips_view', { view });
+                  writeStage({ ...stage, view });
+                }}
+              />
+              <InfoHelp
+                label={s.label}
+                value="clip-metrics"
+                triggerTestId="video-results-metrics-help"
+              >
+                {diagnostic ? s.diagnosticNote : s.metricsHelp}
+              </InfoHelp>
             </div>
-          )}
-          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-            {group ? <PromptLine group={group} s={s} /> : <span />}
-            <SegmentedToggle
-              role="group"
-              ariaLabel={s.view}
-              value={stage.view}
-              size="sm"
-              options={STAGE_VIEWS.map((mode) => ({
-                value: mode,
-                label: s.views[mode],
-                title: s.viewHelp[mode],
-                testId: `video-results-view-${mode}`,
-              }))}
-              onValueChange={(view) => {
-                track('video_results_clips_view', { view });
-                writeStage({ ...stage, view });
-              }}
-            />
-          </div>
+          </PromptRow>
           {options.length > 1 && option && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <span className="text-xs font-medium">{s.compareWith}</span>
@@ -685,36 +691,251 @@ function MediaLink({ url, label, onOpen }: { url?: string; label: string; onOpen
   );
 }
 
+const caseOf = (group: ResultsClipGroup) =>
+  [...group.clips.values()][0]?.record.caseId ?? promptKey(group);
+
+/** "take N" tells a group apart only when another loaded take shares its prompt and seed. */
+const namesTake = (groups: readonly ResultsClipGroup[], group: ResultsClipGroup) =>
+  !group.scope &&
+  groups.some(
+    (other) =>
+      other !== group && !other.scope && other.prompt === group.prompt && other.seed === group.seed,
+  );
+
+const NO_HIDDEN: ReadonlySet<string> = new Set();
+
+/**
+ * The prompt strip, the shown prompt and `children` (the view modes) on one row; below 820 px the
+ * strip and the prompt each take a full line. The collapsed strip shows the tiles that fit, up to
+ * three plus the shown prompt's, and a "+N" tile that expands it.
+ */
+function PromptRow({
+  groups,
+  group,
+  s,
+  onPick,
+  children,
+}: {
+  groups: readonly ResultsClipGroup[];
+  group: ResultsClipGroup | null;
+  s: Strings;
+  onPick: (group: ResultsClipGroup, index: number, poster: boolean) => void;
+  children: ReactNode;
+}) {
+  const row = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(Infinity);
+  const [expanded, setExpanded] = useState(false);
+  /** Posters that failed to load; their tiles fall back to the next poster, then to text. */
+  const [failedPosters, setFailedPosters] = useState<ReadonlySet<string>>(new Set());
+  useLayoutEffect(() => {
+    const element = row.current;
+    if (!element || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(() => setWidth(element.clientWidth));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  const fits = (room: number) => Math.min(MAX_TILES, Math.floor(room / (TILE + GAP)));
+  const count = expanded
+    ? groups.length
+    : groups.length <= fits(width + GAP)
+      ? groups.length
+      : Math.max(1, fits(width - MORE));
+  const head = groups.slice(0, count);
+  const shown = !group || head.includes(group) ? head : [...head.slice(0, count - 1), group];
+  const rest = groups.length - shown.length;
+  const posterOf = (item: ResultsClipGroup) =>
+    [resultsClipReference(item, NO_HIDDEN)?.posterUrl, [...item.clips.values()][0]?.posterUrl].find(
+      (url) => url && !failedPosters.has(url),
+    );
+  return (
+    <div
+      ref={row}
+      data-testid="video-results-prompt-row"
+      className="flex flex-wrap items-center gap-x-4 gap-y-3"
+    >
+      {groups.length > 1 && (
+        <div
+          role="group"
+          aria-label={s.prompts}
+          data-testid="video-results-prompts"
+          className={cn(
+            // The padding keeps the selected tile's ring inside the clip.
+            '-m-0.5 flex min-w-0 items-start gap-2 p-0.5',
+            expanded ? 'basis-full flex-wrap' : 'overflow-hidden max-[820px]:basis-full',
+          )}
+        >
+          {shown.map((item) => {
+            const poster = posterOf(item);
+            const take = namesTake(groups, item) ? s.take(item.take) : null;
+            return (
+              <PromptTile
+                key={item.key}
+                prompt={promptKey(item)}
+                caseId={caseOf(item)}
+                label={
+                  item.scope
+                    ? s.diagnostic
+                    : poster
+                      ? take
+                      : [`${s.seed} ${item.seed}`, take].filter(Boolean).join(' · ')
+                }
+                poster={poster}
+                pressed={item === group}
+                onPick={() => onPick(item, groups.indexOf(item), Boolean(poster))}
+                onPosterError={(url) => setFailedPosters((previous) => new Set([...previous, url]))}
+              />
+            );
+          })}
+          {(rest > 0 || expanded) && (
+            <button
+              type="button"
+              data-testid="video-results-prompts-more"
+              aria-expanded={expanded}
+              aria-label={expanded ? s.fewerPrompts : s.morePrompts(rest)}
+              title={expanded ? s.fewerPrompts : s.morePrompts(rest)}
+              className="h-13 w-10 shrink-0 rounded-md border border-dashed border-border bg-muted/20 text-2xs font-medium text-muted-foreground hover:border-foreground hover:text-foreground"
+              onClick={() => {
+                track('video_results_prompts_expanded', { enabled: !expanded });
+                setExpanded(!expanded);
+              }}
+            >
+              {expanded ? s.less : `+${rest}`}
+            </button>
+          )}
+        </div>
+      )}
+      {group ? (
+        <PromptLine group={group} take={namesTake(groups, group)} s={s} />
+      ) : (
+        <span className="flex-1" />
+      )}
+      {children}
+    </div>
+  );
+}
+
+/** A prompt's first frame over its case id, or a text tile while it has no poster. */
+function PromptTile({
+  prompt,
+  caseId,
+  label,
+  poster,
+  pressed,
+  onPick,
+  onPosterError,
+}: {
+  prompt: string;
+  caseId: string;
+  /** Seed, take or the diagnostic label; a poster tile shows only what tells it apart. */
+  label: string | null;
+  poster: string | undefined;
+  pressed: boolean;
+  onPick: () => void;
+  onPosterError: (url: string) => void;
+}) {
+  const focus = 'group-focus-visible/tile:ring-2 group-focus-visible/tile:ring-ring';
+  return (
+    <button
+      type="button"
+      data-prompt={prompt}
+      aria-pressed={pressed}
+      title={caseId}
+      className="group/tile flex w-23 shrink-0 flex-col gap-1 text-left outline-none"
+      onClick={onPick}
+    >
+      {poster ? (
+        <>
+          <span
+            className={cn(
+              'relative block aspect-[1344/768] overflow-hidden rounded-md bg-muted',
+              pressed
+                ? 'ring-2 ring-foreground'
+                : 'ring-1 ring-border-alt group-hover/tile:ring-2 group-hover/tile:ring-muted-foreground',
+              focus,
+            )}
+          >
+            <img
+              src={poster}
+              alt={caseId}
+              width={TILE}
+              height={Math.round((TILE * 768) / 1344)}
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 size-full object-cover"
+              onError={() => onPosterError(poster)}
+            />
+          </span>
+          <span
+            aria-hidden="true"
+            className={cn(
+              'truncate font-mono text-2xs',
+              pressed ? 'font-medium text-foreground' : 'text-muted-foreground',
+            )}
+          >
+            {caseId}
+          </span>
+          {label && <span className="truncate text-3xs text-muted-foreground">{label}</span>}
+        </>
+      ) : (
+        <span
+          className={cn(
+            'flex aspect-[1344/768] flex-col justify-center gap-0.5 rounded-md border px-2',
+            pressed
+              ? 'border-foreground bg-muted'
+              : 'border-border-alt group-hover/tile:border-muted-foreground',
+            focus,
+          )}
+        >
+          <span className="truncate font-mono text-2xs">{caseId}</span>
+          <span className="truncate text-2xs text-muted-foreground">{label}</span>
+        </span>
+      )}
+    </button>
+  );
+}
+
 /** Seed, take and the prompt text, clamped to two lines with a More toggle when it overflows. */
-function PromptLine({ group, s }: { group: ResultsClipGroup; s: Strings }) {
+function PromptLine({ group, take, s }: { group: ResultsClipGroup; take: boolean; s: Strings }) {
   const text = useRef<HTMLParagraphElement>(null);
   const [open, setOpen] = useState(false);
   const [clamped, setClamped] = useState(false);
   useLayoutEffect(() => {
+    const element = text.current;
+    if (!element) return undefined;
     const measure = () => {
-      const element = text.current;
-      if (element && !open) setClamped(element.scrollHeight > element.clientHeight + 1);
+      if (!open) setClamped(element.scrollHeight > element.clientHeight + 1);
     };
     measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
+    // The row reflows as the strip expands or the window resizes, which moves the clamp.
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
   }, [group.prompt, open]);
   return (
     <div
       data-testid="video-results-prompt"
-      className="flex min-w-0 flex-1 basis-72 items-baseline gap-2 text-xs"
+      className="flex min-w-0 flex-1 basis-56 items-baseline gap-2 max-[820px]:basis-full"
     >
-      <span className="shrink-0 font-mono text-muted-foreground">
-        {s.seed} {group.seed} · {group.scope ? s.diagnostic : s.take(group.take)}
+      <span className="shrink-0 font-mono text-xs font-semibold text-foreground">
+        {[`${s.seed} ${group.seed}`, group.scope ? s.diagnostic : take ? s.take(group.take) : null]
+          .filter(Boolean)
+          .join(' · ')}
       </span>
-      <p ref={text} className={cn('min-w-0 flex-1 break-words', !open && 'line-clamp-2')}>
+      <p
+        ref={text}
+        className={cn(
+          'min-w-0 flex-1 text-sm leading-5 break-words text-foreground',
+          !open && 'line-clamp-2',
+        )}
+      >
         {group.prompt}
       </p>
       {(clamped || open) && (
         <button
           type="button"
           aria-expanded={open}
-          className="shrink-0 text-primary hover:underline"
+          className="shrink-0 text-sm text-brand-fill hover:underline"
           onClick={() => {
             track('video_results_prompt_toggled', { enabled: !open });
             setOpen(!open);

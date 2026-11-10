@@ -855,6 +855,68 @@ describe('VideoGenX results', () => {
     cy.focused().should('have.attr', 'data-testid', 'video-results-stage');
   });
 
+  it('opens the stage on the middle of the B200 frontier, not its most efficient end', () => {
+    mount({
+      edit: (observation) => {
+        observation.results = evidence(observation);
+      },
+      editPage: (page) => {
+        const source = page.entries.find((entry) => entry.runId === '34341996789')!.sources[0];
+        const lead = source.observations.find((observation) => observation.concurrency === 1)!;
+        // 1 and 2 GPUs are slower but more efficient; 8 GPUs is the fastest, costliest end.
+        for (const [gpus, p50] of [
+          [1, 300],
+          [2, 150],
+          [8, 40],
+        ])
+          source.observations.push({
+            ...lead,
+            id: `${lead.id}-g${gpus}`,
+            participating: gpus,
+            p50,
+          });
+      },
+    });
+    hardwarePoints('b200').should('have.length', 4);
+    stagePill('a').should('contain', '4 GPUs').find('b').should('have.text', 'B200 · SGLang');
+  });
+
+  it('shows a read clip’s first frame in the hover card, and none for a point without one', () => {
+    const run = '34341996789';
+    const frame = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="9"/>')}`;
+    mount({
+      editPage: (page) => {
+        for (const entry of page.entries) entry.publishedAt = '2026-11-01T00:00:00.000Z';
+        const lead = videoPoints([page]).find(
+          (item) => item.runId === run && item.concurrency === 1,
+        )!;
+        const saved = servingArtifact(Number(run), lead.artifactId, 'NVIDIA B200');
+        saved.sources[0].checksums = saved.sources[0].checksums.map(([path, sha]) => [
+          path,
+          path === 'manifest.json' ? lead.id.split(':')[0] : sha,
+        ]);
+        saved.sources[0].assets = saved.sources[0].assets.map(([path, asset]) => [
+          path,
+          { ...asset, posterUrl: frame },
+        ]);
+        cy.intercept(
+          'GET',
+          `/api/video-runs?run=${run}&artifact=${lead.artifactId}&format=published`,
+          saved,
+        ).as('b200');
+      },
+    });
+    cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('exist');
+    const tooltip = '[data-chart-tooltip="video-results-chart"]';
+    hardwarePoints('b200').trigger('mouseenter', { force: true });
+    cy.get(`${tooltip} [data-hover-image]`).should('have.attr', 'src', frame);
+    hardwarePoints('b200').trigger('mouseleave', { force: true });
+    // H100's read answered without media, so its card keeps text only.
+    hardwarePoints('h100').trigger('mouseenter', { force: true });
+    cy.get(tooltip).should('contain', 'H100').find('[data-hover-image]').should('not.exist');
+    cy.get('@b200.all').should('have.length', 1);
+  });
+
   it('falls back to the overview for an unknown or hidden deployment and drops its key', () => {
     mount({ search: '?r_y=videosPerGpuHour&r_point=0:missing' });
     cy.get('[data-testid="video-results-detail"]').should('not.exist');
