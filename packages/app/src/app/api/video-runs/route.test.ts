@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fakeNextCache, resetFakeNextCache } from '@/lib/testing/fake-next-cache';
+import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import { GET, POST } from './route';
 import { publishedVideoHistory, recordVideoHistory } from '@/lib/video/video-history-store';
 import { publishVideoQuality } from '@/lib/video/video-quality';
@@ -99,6 +100,18 @@ describe('H3 CI artifact access', () => {
     expect(failed.status).toBe(502);
     expect(retried.status).toBe(200);
     expect(publishedVideoHistory).toHaveBeenCalledTimes(2);
+  });
+
+  it('marks a History page whose index or approval reads failed as incomplete', async () => {
+    const page: VideoHistoryPage = { schemaVersion: 1, entries: [], nextPage: null };
+    vi.mocked(publishedVideoHistory)
+      .mockResolvedValueOnce({ page, complete: false })
+      .mockResolvedValueOnce({ page, complete: true });
+    const degraded = await GET(request('?format=history&page=1&pages=5'));
+    const complete = await GET(request('?format=history&page=1&pages=5'));
+    expect(degraded.status).toBe(200);
+    expect(degraded.headers.get('x-videogenx-incomplete')).toBe('1');
+    expect(complete.headers.get('x-videogenx-incomplete')).toBeNull();
   });
 
   it('never serves synthetic History approval in production when fixture mode is set', async () => {

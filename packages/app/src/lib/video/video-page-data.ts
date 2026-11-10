@@ -51,6 +51,10 @@ export async function loadVideoPageData(params: VideoPageSearchParams): Promise<
       pages: String(VIDEO_HISTORY_MAX_PAGES),
     });
     if (!historyResponse.ok) throw new Error('Published history unavailable');
+    // The shared cache serves a degraded read without retaining it; a seed would retain it
+    // for this document and stop the browser's own read.
+    if (historyResponse.headers.get('x-videogenx-incomplete') === '1')
+      throw new Error('Published history incomplete');
     const data: VideoHistoryPage = await historyResponse.json();
     if (data.schemaVersion !== 1 || !Array.isArray(data.entries))
       throw new Error('Unsupported published history projection');

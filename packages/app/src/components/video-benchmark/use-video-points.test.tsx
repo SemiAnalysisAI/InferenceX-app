@@ -51,3 +51,44 @@ describe('useVideoPoints live overlay', () => {
     expect(container.textContent).toBe('live');
   });
 });
+
+function ReadProbe() {
+  const { points, error, loading } = useVideoPoints(null);
+  return createElement(
+    'output',
+    null,
+    JSON.stringify({ points: points.length, failed: error !== null, loading }),
+  );
+}
+
+describe('useVideoPoints History read', () => {
+  it('keeps an incomplete page but reports the read as failed, so retry stays available', async () => {
+    const page: VideoHistoryPage = {
+      schemaVersion: 1,
+      entries: [{ ...live.entries[0], approved: true }],
+      nextPage: null,
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(Response.json(page, { headers: { 'X-VideoGenX-Incomplete': '1' } })),
+    );
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const container = document.createElement('div');
+    root = createRoot(container);
+    await act(async () => {
+      root.render(createElement(ReadProbe));
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+    const read = JSON.parse(container.textContent ?? '{}') as {
+      points: number;
+      failed: boolean;
+      loading: boolean;
+    };
+    expect(read.points).toBeGreaterThan(0);
+    expect(read).toMatchObject({ failed: true, loading: false });
+  });
+});

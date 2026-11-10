@@ -55,7 +55,8 @@ describe('shared VideoGenX read cache', () => {
     const second = await cachedVideoHistory(2, 1);
     const bounded = await cachedVideoHistory(1, 5);
     expect(again).toEqual(first);
-    expect(second.entries[0]?.runId).toBe('2');
+    expect(first.complete).toBe(true);
+    expect(second.page.entries[0]?.runId).toBe('2');
     expect(bounded).toEqual(first);
     expect(publishedVideoHistory).toHaveBeenCalledTimes(3);
     expect(publishedVideoHistory).toHaveBeenNthCalledWith(1, 1, 1);
@@ -98,8 +99,9 @@ describe('shared VideoGenX read cache', () => {
     });
     const first = await cachedVideoHistory(1, 1);
     const second = await cachedVideoHistory(1, 1);
-    expect(first.entries).toHaveLength(1);
-    expect(second.entries).toHaveLength(1);
+    expect(first).toMatchObject({ complete: false });
+    expect(first.page.entries).toHaveLength(1);
+    expect(second.page.entries).toHaveLength(1);
     expect(publishedVideoHistory).toHaveBeenCalledTimes(2);
   });
 
