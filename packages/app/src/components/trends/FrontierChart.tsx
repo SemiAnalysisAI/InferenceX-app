@@ -10,7 +10,7 @@ import {
 } from '@/components/inference/ui/line-label-layer';
 import { getChartWatermark } from '@/lib/catalog/data-mappings';
 import { getLineLabelVendorIcon, VENDOR_LOGO_ICONS } from '@/lib/catalog/vendor-logos';
-import { formatLargeNumber, logTickFormat } from '@/lib/charts/chart-rendering';
+import { formatLargeNumber, HIT_AREA_RADIUS, logTickFormat } from '@/lib/charts/chart-rendering';
 import { D3Chart, type RenderContext } from '@/lib/d3-chart/D3Chart';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
@@ -77,12 +77,8 @@ const CHART_MARGIN = { top: 24, right: 30, bottom: 50, left: 64 };
 const GROWTH_TOLERANCE = 0.01;
 /** How close, in pixels, a click must land to a frontier point to pin its card. */
 const PIN_REACH_PX = 48;
-/**
- * Within this many pixels of a measured point the crosshair shows that point; elsewhere it
- * follows the pointer along the curve. Earlier points crowd the plot on later dates, so they
- * use the same short reach and a click on empty plot dismisses a pin.
- */
-const POINT_REACH_PX = 10;
+/** Off so hover answers only near a measured point, like the inference chart. */
+const TRACE_CURVES = false;
 /** Width a line label claims when labels are checked for overlap. */
 const LABEL_WIDTH_PX = 150;
 /** Shade under the current frontier: the theme's blue, the same in light and dark. */
@@ -95,8 +91,8 @@ const STRINGS = {
     aria: 'Pareto frontier over time, colored by the chip or vendor that holds each stretch',
     instructions: 'Scroll to zoom · Drag to pan · Double-click to reset',
     startingCurve: (date: string) => `Starting curve · ${date}`,
-    onCurve: 'Frontier curve, interpolated',
     earlierPoint: 'Earlier frontier point',
+    onCurve: 'Frontier curve, interpolated',
     openRun: 'Open run',
     dismiss: 'Click elsewhere to dismiss',
     conc: 'Concurrency',
@@ -107,8 +103,8 @@ const STRINGS = {
     aria: '帕累托前沿随时间的变化，按占据各区段的芯片或厂商着色',
     instructions: '滚轮缩放 · 拖动平移 · 双击重置',
     startingCurve: (date: string) => `起点曲线 · ${date}`,
-    onCurve: '前沿曲线插值',
     earlierPoint: '此前的前沿点',
+    onCurve: '前沿曲线插值',
     openRun: '查看运行记录',
     dismiss: '点击其他位置关闭',
     conc: '并发',
@@ -696,7 +692,7 @@ const FrontierChart = React.memo(
           Math.hypot(x(v.x) - pointerX, y(v.y) - pointerY);
         return d3.least(
           hoverable.filter(
-            (point) => distance(point) <= (point.current ? currentReach : POINT_REACH_PX),
+            (point) => distance(point) <= (point.current ? currentReach : HIT_AREA_RADIUS),
           ),
           distance,
         );
@@ -760,12 +756,12 @@ const FrontierChart = React.memo(
             rulers.style('display', 'none');
             return;
           }
-          const near = pointNear(event, POINT_REACH_PX);
+          const near = pointNear(event, HIT_AREA_RADIUS);
           if (near) {
             showCrosshair(near, false);
             return;
           }
-          const hit = curveAt(event);
+          const hit = TRACE_CURVES ? curveAt(event) : undefined;
           if (hit) showCurveCrosshair(hit);
           else hideCrosshair();
         })

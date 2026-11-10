@@ -159,7 +159,7 @@ export interface TooltipConfig<T = any> {
   attachToLayer?: number;
   proximityHover?: boolean;
   getDataX?: (d: T) => number;
-  /** With proximityHover, snap to the nearest point in two dimensions instead of by x alone. */
+  /** With proximityHover, lock onto a point only within the scatter hit radius instead of by x alone. */
   getDataY?: (d: T) => number;
   details?: (d: T, isOverlay: boolean, close: () => void) => React.ReactNode;
 }

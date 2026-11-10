@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import type { RulerScale } from '@/hooks/useChartTooltipHandlers';
 import { getDomainAwareChartWatermark } from '@/lib/runtime/unofficial-domain';
+import { HIT_AREA_RADIUS } from '@/lib/charts/chart-rendering';
 import { registerChartExportRenderer } from '../export-registry';
 
 import { invalidateTooltipGeometry } from '../layers/scatter-points';
@@ -586,8 +587,8 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
             return { currentXScale, currentYScale };
           };
 
-          // With getDataY the pointer snaps to the closest point in pixels, so one ruler can
-          // follow many series; without it the closest x wins, which suits one-row-per-x data.
+          // With getDataY the pointer locks onto a point only within the scatter hit radius;
+          // without it the closest x wins, which suits one-row-per-x data.
           const nearestDatum = (
             mx: number,
             my: number,
@@ -596,13 +597,13 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           ): T | undefined => {
             if (getDataY && !isBandScale(currentXScale) && !isBandScale(currentYScale)) {
               let best: T | undefined;
-              let bestDistance = Infinity;
+              let bestDistance = HIT_AREA_RADIUS ** 2;
               for (const d of sortedData) {
                 const px = Number(currentXScale(getDataX(d)));
                 const py = Number(currentYScale(getDataY(d)));
                 if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
                 const distance = (px - mx) ** 2 + (py - my) ** 2;
-                if (distance < bestDistance) {
+                if (distance <= bestDistance) {
                   bestDistance = distance;
                   best = d;
                 }
@@ -658,7 +659,13 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
               const [mx, my] = d3.pointer(event);
               const { currentXScale, currentYScale } = currentScales();
               const d = nearestDatum(mx, my, currentXScale, currentYScale);
-              if (!d) return;
+              d3.select(event.currentTarget as SVGRectElement).style('cursor', d ? 'pointer' : '');
+              if (!d) {
+                if (isPinned()) return;
+                tooltip.style('opacity', 0).style('display', 'none');
+                rulerGroup.style('display', 'none');
+                return;
+              }
 
               tooltip
                 .style('opacity', 1)
