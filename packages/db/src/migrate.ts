@@ -8,7 +8,6 @@ import { reserveDownstreamIds } from './lib/reserve-downstream-ids';
 
 const MIGRATIONS_DIR = path.join(import.meta.dirname, '..', 'migrations');
 
-/** A downstream deployment's database, whose own ids must stay clear of public ids. */
 const downstream = process.argv.includes('--downstream');
 
 const sql = createAdminSql({

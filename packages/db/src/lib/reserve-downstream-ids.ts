@@ -1,12 +1,6 @@
 import type { Sql } from '../etl/db-utils.js';
 import { DOWNSTREAM_ID_START, RESERVED_ID_TABLES } from './downstream-ids.js';
 
-/**
- * Make a downstream database assign its own run, benchmark, and eval ids from
- * `DOWNSTREAM_ID_START` up. Sequences already in the range are left alone. A
- * table holding ids below the range is refused, because those rows would
- * collide with public ids. Returns the sequences it restarted.
- */
 export function reserveDownstreamIds(sql: Sql): Promise<string[]> {
   return sql.begin(async (tx) => {
     const pending: string[] = [];
@@ -30,7 +24,6 @@ export function reserveDownstreamIds(sql: Sql): Promise<string[]> {
       pending.push(state.sequence);
     }
     for (const sequence of pending) {
-      // START as well as RESTART: the app checks the start value, which any role can read.
       await tx.unsafe(`alter sequence ${sequence} start with ${DOWNSTREAM_ID_START} restart`);
     }
     return pending;

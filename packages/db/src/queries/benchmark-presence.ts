@@ -22,7 +22,6 @@ export async function getBenchmarkPresence(sql: DbClient): Promise<BenchmarkPres
   return presence;
 }
 
-/** Combine presence read from databases that hold disjoint id ranges. */
 export function mergeBenchmarkPresence(parts: readonly BenchmarkPresence[]): BenchmarkPresence {
   if (parts.length === 1) return parts[0]!;
   return {

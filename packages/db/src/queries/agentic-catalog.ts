@@ -12,17 +12,14 @@ export interface AgenticCatalogEntry {
   latestDate: string;
 }
 
-/** One catalog entry per database, plus the throughput that ranks its representative point. */
 export interface AgenticCatalogGroup extends AgenticCatalogEntry {
   tputPerGpu: number | null;
 }
 
-/** Every traced point across `dbs`, one entry per model, hardware, framework, and precision. */
 export async function getAgenticCatalog(dbs: readonly DbClient[]): Promise<AgenticCatalogEntry[]> {
   return mergeAgenticCatalogGroups(await Promise.all(dbs.map(readAgenticCatalogGroups)));
 }
 
-/** Ranks representatives as the query does: latest date, then throughput, then lowest id. */
 function outranks(a: AgenticCatalogGroup, b: AgenticCatalogGroup): boolean {
   if (a.latestDate !== b.latestDate) return a.latestDate > b.latestDate;
   if (a.tputPerGpu !== b.tputPerGpu) {
@@ -32,7 +29,6 @@ function outranks(a: AgenticCatalogGroup, b: AgenticCatalogGroup): boolean {
   return a.id < b.id;
 }
 
-/** Combine catalogs of databases that hold disjoint sets of traced points. */
 export function mergeAgenticCatalogGroups(
   parts: readonly (readonly AgenticCatalogGroup[])[],
 ): AgenticCatalogEntry[] {

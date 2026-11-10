@@ -27,7 +27,6 @@ const publicDb = clients.public as DbClient;
 const BELOW = DOWNSTREAM_ID_START - 1;
 const echo = (sql: DbClient, ids: number[]) => Promise.resolve([sql, ids]);
 
-// The reserved-ids check is remembered per process, so each test loads a fresh module.
 const load = () => import('./payload-db');
 
 function setPublicDb(set: boolean) {

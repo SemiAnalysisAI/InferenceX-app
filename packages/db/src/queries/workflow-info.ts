@@ -166,10 +166,6 @@ export interface DateChangelogBundle {
   runConfigs: RunConfigRow[];
 }
 
-/**
- * Changelog dates in a range with their runs and run configs. Given several
- * databases, a date with a changelog in any of them lists the runs of all of them.
- */
 export async function getChangelogDatesInRange(
   sql: DbClient | readonly DbClient[],
   from: string,

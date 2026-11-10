@@ -1,12 +1,3 @@
-/**
- * Combine reads of the public database and a downstream deployment's own
- * database into the answer one database holding every run would give. The two
- * hold disjoint runs: a downstream database holds only the runs it ingested,
- * with ids from `DOWNSTREAM_ID_START` up. Each merge takes one part per
- * database in `getReadDbs` order (public first) and returns a single part
- * unchanged.
- */
-
 import { benchmarkCurveScope } from '@semianalysisai/inferencex-constants';
 
 import type { DbClient } from '../connection.js';
@@ -20,11 +11,6 @@ import type { ReliabilityRow } from './reliability.js';
 import type { SubmissionSummaryRow, SubmissionVolumeRow } from './submissions.js';
 import type { AvailabilityRow, WorkflowRunRow } from './workflow-info.js';
 
-/**
- * `getLatestBenchmarks` across databases: each curve comes from the database
- * whose newest snapshot of it is newest. An as-of run is resolved in whichever
- * database holds it, so it bounds both.
- */
 export async function getLatestBenchmarksAcross(
   dbs: readonly DbClient[],
   modelKey: string | string[],
@@ -55,7 +41,6 @@ async function findRunStartedAt(dbs: readonly DbClient[], githubRunId: number) {
   return row?.started_at ?? null;
 }
 
-/** Orders snapshots as `ranked_runs` does: date, then start time (nulls last), then run id. */
 function snapshotIsNewer(a: BenchmarkRow, b: BenchmarkRow): boolean {
   const dateA = a.curve_date ?? a.date;
   const dateB = b.curve_date ?? b.date;
@@ -69,7 +54,6 @@ function snapshotIsNewer(a: BenchmarkRow, b: BenchmarkRow): boolean {
   );
 }
 
-/** Keep each curve from the database with its newest snapshot. */
 export function mergeLatestBenchmarks(parts: readonly BenchmarkRow[][]): BenchmarkRow[] {
   if (parts.length === 1) return parts[0]!;
   const newest = new Map<string, { part: number; row: BenchmarkRow }>();
@@ -85,7 +69,6 @@ export function mergeLatestBenchmarks(parts: readonly BenchmarkRow[][]): Benchma
   );
 }
 
-/** Every snapshot of every database, in snapshot date order. */
 export function mergeBenchmarkHistory(parts: readonly BenchmarkRow[][]): BenchmarkRow[] {
   if (parts.length === 1) return parts[0]!;
   return parts
@@ -93,17 +76,12 @@ export function mergeBenchmarkHistory(parts: readonly BenchmarkRow[][]): Benchma
     .toSorted((a, b) => (a.curve_date ?? a.date).localeCompare(b.curve_date ?? b.date));
 }
 
-/** Past any serial `configs.id`, so a config only the downstream database holds keeps its own id. */
 const OWN_CONFIG_ID_OFFSET = 2 ** 31;
 
 function configKeyOf(row: EvalRow): string {
   return naturalKey(CONFIG_NATURAL_KEY.map((column) => row[column]));
 }
 
-/**
- * Clients group eval rows by `config_id`, so a downstream row takes the public
- * id of the same config, or a disjoint id when public lacks the config.
- */
 export function mergeEvalResults(parts: readonly EvalRow[][]): EvalRow[] {
   if (parts.length === 1) return parts[0]!;
   const [publicRows = [], ...ownParts] = parts;
@@ -139,10 +117,6 @@ const SUMMARY_GROUP = [
   'date',
 ] as const satisfies readonly (keyof SubmissionSummaryRow)[];
 
-/**
- * A config both databases submitted on one date becomes one row; its distinct
- * counts are then the larger of the two, a lower bound.
- */
 export function mergeSubmissionSummaries(
   parts: readonly SubmissionSummaryRow[][],
 ): SubmissionSummaryRow[] {
@@ -186,7 +160,6 @@ export function mergeSubmissionVolumes(
   return [...merged.values()].toSorted((a, b) => a.date.localeCompare(b.date));
 }
 
-/** The latest image of each line. */
 export function mergeLatestImages(parts: readonly LatestImageRow[][]): LatestImageRow[] {
   if (parts.length === 1) return parts[0]!;
   const latest = new Map<string, LatestImageRow>();
@@ -199,7 +172,6 @@ export function mergeLatestImages(parts: readonly LatestImageRow[][]): LatestIma
   return [...latest.values()];
 }
 
-/** Each GitHub run attempt once, in date and creation order. */
 export function mergeWorkflowRuns(parts: readonly WorkflowRunRow[][]): WorkflowRunRow[] {
   if (parts.length === 1) return parts[0]!;
   return distinctBy(parts.flat(), (run) => `${run.github_run_id}#${run.run_attempt}`).toSorted(
@@ -215,7 +187,6 @@ export function mergeAvailabilityRows(parts: readonly AvailabilityRow[][]): Avai
   return mergeDistinctRows(parts).toSorted((a, b) => a.date.localeCompare(b.date));
 }
 
-/** Each slug once (the public database's), newest first. */
 export function mergeDatasetLists(parts: readonly DatasetRecord[][]): DatasetRecord[] {
   if (parts.length === 1) return parts[0]!;
   return distinctBy(parts.flat(), (dataset) => dataset.slug).toSorted(

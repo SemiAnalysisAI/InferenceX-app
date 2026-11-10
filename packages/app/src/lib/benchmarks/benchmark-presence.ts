@@ -13,7 +13,6 @@ export function presentIds(runs: IdRuns, sortedIds: number[]): Record<number, tr
   return present;
 }
 
-/** Ids per bitset chunk. Downstream ids start at 10^12, past 32-bit math and a flat bitset. */
 const CHUNK_IDS = 65_536;
 
 export class IdBitset {

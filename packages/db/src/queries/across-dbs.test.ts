@@ -31,7 +31,6 @@ interface Run {
   points: [id: number, config: keyof typeof CONFIGS, conc: number][];
 }
 
-// Same day: public 111 at 12:00, downstream 222 at 14:00, public 333 at 16:00.
 const PUBLIC_RUNS: Run[] = [
   {
     id: 11,

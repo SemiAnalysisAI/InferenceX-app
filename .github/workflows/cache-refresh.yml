@@ -2,8 +2,6 @@ name: Cache Refresh
 
 on:
   workflow_dispatch:
-  # A deployment that reads the public database caches its results; refresh it hourly so
-  # new public results show up. Scheduled runs skip repositories without that secret.
   schedule:
     - cron: '17 * * * *'
 
@@ -74,7 +72,6 @@ jobs:
           EVENT: ${{ github.event_name }}
         run: |
           : "${APP_URL:?APP_URL repository variable is not set}"
-          # Scheduled refreshes serve stale pages while they rebuild instead of dropping them.
           if [ "$EVENT" = schedule ]; then
             bun run admin:cache:invalidate "$APP_URL"
           else

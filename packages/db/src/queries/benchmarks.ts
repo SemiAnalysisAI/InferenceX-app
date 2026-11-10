@@ -108,7 +108,6 @@ function executeSqlPiece(sql: DbClient, piece: SqlPiece) {
   return sql(strings, ...piece.values);
 }
 
-/** Run that bounds an as-of view, by GitHub run id or by its resolved start time. */
 type AsOf = { runId: number } | { startedAt: string | null };
 
 type RecursiveBenchmarkVariant =
@@ -382,7 +381,6 @@ export async function getLatestBenchmarks(
    * the state of the data at that point in time (later runs don't render yet).
    * No-op when this is the latest run (the filter then includes everything).
    * Only applied on the date-filtered (non-`exact`) path used by the main chart.
-   * Pass the run's start time instead when another database holds the run.
    */
   asOfRunId?: string | { startedAt: string | null },
 ): Promise<BenchmarkRow[]> {

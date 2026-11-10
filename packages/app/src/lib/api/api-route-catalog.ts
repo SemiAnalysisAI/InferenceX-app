@@ -1993,7 +1993,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-presence.ts',
-    sourceSha256: '2a0b0f99ef09f550e8df4563123f1e4505d567b2a7123330f6de8b7be13feb50',
+    sourceSha256: '7e9ac9210cdbe5e910dd9f3aa66b18c7de424adfa70bd74d83cc472092a6d33a',
     reviewArea: {
       en: 'Trace and log availability ID-keyed boolean response built from presence runs.',
       zh: '由可用性 ID 区间构建的跟踪与日志可用性按 ID 索引的布尔响应。',
@@ -2107,7 +2107,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmark-presence.ts',
-    sourceSha256: 'ffd6c32e85b428ed82865fde2c711f88cc069867763f3df6b0810ceb506969b5',
+    sourceSha256: '64d4eb7e7f14bf0c52167d18c581c6790458cf4b396f7445abe4c1506bb8e6bc',
     reviewArea: {
       en: 'Which benchmark IDs count as having a stored trace or a linked server log.',
       zh: '哪些基准 ID 被视为拥有已存储的跟踪或已关联的服务器日志。',
@@ -2123,7 +2123,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmarks.ts',
-    sourceSha256: '741ffd9608dfb69a707ccd2c913899f4d271bf237e5529dad98107ea7bc0dcaa',
+    sourceSha256: '9b881c41bbe6866b939558d91bc2cf0e6b981f87bb6fe6932bff995fee03a4c5',
     reviewArea: {
       en: 'Benchmark row fields and latest, exact-run, history, and TCO query semantics.',
       zh: '基准行字段以及最新、精确运行、历史和 TCO 查询语义。',
@@ -2220,7 +2220,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/workflow-info.ts',
-    sourceSha256: '4bdb8d7744a5103f25f439ac7a2c470c4dcbd18e14f4322caea6e6f7411af92f',
+    sourceSha256: '87a525b3030d4333245671db394a06a0d93e230b8d9f38357539eda7f299780b',
     reviewArea: {
       en: 'Availability rows plus workflow runs, changelogs, configurations, and run coverage responses.',
       zh: '可用配置行以及工作流运行、变更记录、配置和运行覆盖响应。',

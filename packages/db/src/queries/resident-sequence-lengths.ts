@@ -27,7 +27,6 @@ export interface ResidentSequenceLengthSketches {
   requestedPoints: number;
 }
 
-/** Combine the sketches of disjoint id sets read from different databases. */
 export function mergeResidentSequenceLengthSketches(
   parts: readonly ResidentSequenceLengthSketches[],
 ): ResidentSequenceLengthSketches {

@@ -3,11 +3,6 @@ import { DOWNSTREAM_ID_START, isPublicRowId, RESERVED_ID_TABLES } from './downst
 
 let ownIdsReserved: Promise<void> | undefined;
 
-/**
- * The public database, when this deployment shows public results next to its
- * own (`PUBLIC_DATABASE_READONLY_URL`). Fails until the deployment's own
- * database reserves its ids, since unreserved ids would route to public rows.
- */
 export async function getPublicDb(): Promise<DbClient | null> {
   const url = process.env.PUBLIC_DATABASE_READONLY_URL;
   if (!url) return null;
@@ -36,19 +31,16 @@ async function assertOwnIdsReserved(): Promise<void> {
   }
 }
 
-/** Databases this deployment serves, the public one first. */
 export async function getReadDbs(): Promise<DbClient[]> {
   const publicDb = await getPublicDb();
   return publicDb ? [publicDb, getDb()] : [getDb()];
 }
 
-/** Run one read against every served database, in `getReadDbs` order. */
 export async function readEachDb<T>(read: (sql: DbClient) => Promise<T>): Promise<T[]> {
   const dbs = await getReadDbs();
   return Promise.all(dbs.map((sql) => read(sql)));
 }
 
-/** The first database's non-null result, public first. */
 export async function readFirstFound<T>(read: (sql: DbClient) => Promise<T | null>) {
   for (const sql of await getReadDbs()) {
     const found = await read(sql);
@@ -57,12 +49,10 @@ export async function readFirstFound<T>(read: (sql: DbClient) => Promise<T | nul
   return null;
 }
 
-/** Database holding a benchmark or eval result, by its id. */
 export async function getPayloadDb(id: number): Promise<DbClient> {
   return (isPublicRowId(id) && (await getPublicDb())) || getDb();
 }
 
-/** Run an id-list read once per database that holds some of `ids`. */
 export async function readFromPayloadDbs<T>(
   ids: readonly number[],
   read: (sql: DbClient, ids: number[]) => Promise<T>,
@@ -76,7 +66,6 @@ export async function readFromPayloadDbs<T>(
   return Promise.all(reads);
 }
 
-/** `readFromPayloadDbs` for reads that return a record keyed by id. */
 export async function readRecordFromPayloadDbs<T extends Record<number, unknown>>(
   ids: readonly number[],
   read: (sql: DbClient, ids: number[]) => Promise<T>,
@@ -85,7 +74,6 @@ export async function readRecordFromPayloadDbs<T extends Record<number, unknown>
   return Object.assign({}, ...parts) as T;
 }
 
-/** Database holding a GitHub run: this deployment's when it ingested the run, else the public one. */
 export async function getRunDb(githubRunId: number): Promise<DbClient> {
   const publicDb = await getPublicDb();
   if (!publicDb) return getDb();
