@@ -179,6 +179,8 @@ export interface VideoResultsClipsProps {
   onShow: (point: VideoPoint, against: string) => void;
   /** Counts reveal requests; each scrolls the stage into view and focuses it once its reads land. */
   reveal: number;
+  /** The drawn point the reader rests on in the chart; its clips are read ahead for its hover card. */
+  peek?: string | null;
 }
 
 const NO_POINTS: readonly VideoPoint[] = [];
@@ -192,6 +194,25 @@ const MAX_TILES = 3;
 
 /** "FirstBlockCache + Sol-Attn" for a lossy side, so it never reads as its lossless twin. */
 const lossyVariant = (p: VideoPoint) => (isLossy(p) ? (lossyLabel(optimizationsOf(p)) ?? '') : '');
+
+/** A point's published clips; null when its run stored none. Throws when the read fails. */
+async function readSide(
+  point: VideoPoint,
+  unofficialRun: string | undefined,
+  signal: AbortSignal,
+): Promise<ResultsClipSide | null> {
+  const read = (format: 'published' | 'live') =>
+    fetch(
+      `/api/video-runs?run=${encodeURIComponent(point.runId)}&artifact=${encodeURIComponent(String(point.artifactId))}&format=${format}`,
+      { signal },
+    );
+  let response = await read('published');
+  // An unstored named run carries PSNR without media.
+  if (response.status === 204 && point.runId === unofficialRun) response = await read('live');
+  if (response.status === 204) return null;
+  if (!response.ok) throw new Error('Published media read failed');
+  return publishedResultsSide((await response.json()) as StoredArtifact, point);
+}
 
 export default function VideoResultsClips({
   points,
@@ -208,6 +229,7 @@ export default function VideoResultsClips({
   onAgainstChange,
   onShow,
   reveal,
+  peek = null,
 }: VideoResultsClipsProps) {
   const s = STRINGS[useLocale()];
   const stage = parseStage(useClientSearch());
@@ -264,22 +286,7 @@ export default function VideoResultsClips({
     setFailedKeys((previous) => (previous.size > 0 ? new Set() : previous));
     void Promise.allSettled(
       missing.map(async (point) => {
-        const read = (format: 'published' | 'live') =>
-          fetch(
-            `/api/video-runs?run=${encodeURIComponent(point.runId)}&artifact=${encodeURIComponent(String(point.artifactId))}&format=${format}`,
-            { signal: controller.signal },
-          );
-        let response = await read('published');
-        // An unstored named run carries PSNR without media.
-        if (response.status === 204 && point.runId === unofficialRun) response = await read('live');
-        if (response.status === 204) {
-          if (controller.signal.aborted) return null;
-          cache.current.set(sourceKey(point), null);
-          setRevision((n) => n + 1);
-          return null;
-        }
-        if (!response.ok) throw new Error('Published media read failed');
-        const side = publishedResultsSide((await response.json()) as StoredArtifact, point);
+        const side = await readSide(point, unofficialRun, controller.signal);
         if (controller.signal.aborted) return null;
         cache.current.set(sourceKey(point), side);
         setRevision((n) => n + 1);
@@ -297,6 +304,25 @@ export default function VideoResultsClips({
     });
     return () => controller.abort();
   }, [wanted, retry, unofficialRun]);
+  // A rested-on chart point's read never counts as loading; moving on to another point drops it.
+  const peeked = useMemo(
+    () => (peek ? drawn.find((p) => stagePointKey(p) === peek) : undefined),
+    [peek, drawn],
+  );
+  useEffect(() => {
+    if (!peeked) return undefined;
+    const key = sourceKey(peeked);
+    if (cache.current.has(key) || wanted.some((p) => sourceKey(p) === key)) return undefined;
+    const controller = new AbortController();
+    readSide(peeked, unofficialRun, controller.signal)
+      .then((side) => {
+        if (controller.signal.aborted) return;
+        cache.current.set(key, side);
+        setRevision((n) => n + 1);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [peeked, wanted, unofficialRun]);
   const stageRef = useRef<HTMLDivElement>(null);
   const revealed = useRef(reveal);
   // A read that lands restores the prompt row above the stage, so a reveal waits for every read.
@@ -314,18 +340,20 @@ export default function VideoResultsClips({
   const diagnostic = group?.scope === 'matched-noise-diagnostic';
   const playing = subject ? stagePointKey(subject.point) : null;
   const baseline = other ? stagePointKey(other) : null;
-  // Only sides already read lend a poster, so hovering a chart point never starts a read.
+  // Each read point lends its first frame of the shown prompt, or null when it has none.
   const postersJson = useMemo(
     () =>
       JSON.stringify(
-        wanted.flatMap((p) => {
+        [...new Set([...wanted, ...drawn])].flatMap((p) => {
           const side = sideOf(p);
-          const match = side && pairedGroup(resultsClipGroups([side]), group);
-          const url = match ? match.clips.get(side.hardwareKey)?.posterUrl : undefined;
-          return url ? [[stagePointKey(p), url]] : [];
+          if (side === undefined) return [];
+          const url = side
+            ? pairedGroup(resultsClipGroups([side]), group)?.clips.get(side.hardwareKey)?.posterUrl
+            : undefined;
+          return [[stagePointKey(p), url ?? null]];
         }),
       ),
-    [wanted, revision, failedKeys, group],
+    [wanted, drawn, revision, failedKeys, group],
   );
   // Before paint, so the chart's badges and hover card never lag the stage they describe.
   useLayoutEffect(
@@ -743,9 +771,10 @@ function PromptRow({
   const head = groups.slice(0, count);
   const shown = !group || head.includes(group) ? head : [...head.slice(0, count - 1), group];
   const rest = groups.length - shown.length;
-  const posterOf = (item: ResultsClipGroup) =>
-    [resultsClipReference(item, NO_HIDDEN)?.posterUrl, [...item.clips.values()][0]?.posterUrl].find(
-      (url) => url && !failedPosters.has(url),
+  /** The clip whose first frame a tile shows: the reference's, else the first clip's. */
+  const faceOf = (item: ResultsClipGroup) =>
+    [resultsClipReference(item, NO_HIDDEN), [...item.clips.values()][0]].find(
+      (clip) => clip?.posterUrl && !failedPosters.has(clip.posterUrl),
     );
   return (
     <div
@@ -765,7 +794,8 @@ function PromptRow({
           )}
         >
           {shown.map((item) => {
-            const poster = posterOf(item);
+            const face = faceOf(item);
+            const poster = face?.posterUrl;
             const take = namesTake(groups, item) ? s.take(item.take) : null;
             return (
               <PromptTile
@@ -780,6 +810,7 @@ function PromptRow({
                       : [`${s.seed} ${item.seed}`, take].filter(Boolean).join(' · ')
                 }
                 poster={poster}
+                preview={face?.previewUrl}
                 pressed={item === group}
                 onPick={() => onPick(item, groups.indexOf(item), Boolean(poster))}
                 onPosterError={(url) => setFailedPosters((previous) => new Set([...previous, url]))}
@@ -814,12 +845,16 @@ function PromptRow({
   );
 }
 
-/** A prompt's first frame over its case id, or a text tile while it has no poster. */
+/**
+ * A prompt's first frame over its case id, or a text tile while it has no poster. Resting the
+ * mouse on it, or focusing it from the keyboard, loops its muted preview over the frame.
+ */
 function PromptTile({
   prompt,
   caseId,
   label,
   poster,
+  preview,
   pressed,
   onPick,
   onPosterError,
@@ -829,11 +864,22 @@ function PromptTile({
   /** Seed, take or the diagnostic label; a poster tile shows only what tells it apart. */
   label: string | null;
   poster: string | undefined;
+  /** The poster clip's web rendition; fetched only once the tile is hovered. */
+  preview: string | undefined;
   pressed: boolean;
   onPick: () => void;
   onPosterError: (url: string) => void;
 }) {
   const focus = 'group-focus-visible/tile:ring-2 group-focus-visible/tile:ring-ring';
+  const [previewing, setPreviewing] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const start = () => {
+    if (preview && !matchMedia('(prefers-reduced-motion: reduce)').matches) setPreviewing(true);
+  };
+  const stop = () => {
+    setPreviewing(false);
+    setMoving(false);
+  };
   return (
     <button
       type="button"
@@ -842,6 +888,11 @@ function PromptTile({
       title={caseId}
       className="group/tile flex w-23 shrink-0 flex-col gap-1 text-left outline-none"
       onClick={onPick}
+      // A touch would start a download only to pick the prompt.
+      onPointerEnter={(event) => event.pointerType === 'mouse' && start()}
+      onPointerLeave={stop}
+      onFocus={(event) => event.currentTarget.matches(':focus-visible') && start()}
+      onBlur={stop}
     >
       {poster ? (
         <>
@@ -864,6 +915,23 @@ function PromptTile({
               className="absolute inset-0 size-full object-cover"
               onError={() => onPosterError(poster)}
             />
+            {previewing && (
+              <video
+                src={preview}
+                muted
+                loop
+                autoPlay
+                playsInline
+                aria-hidden="true"
+                data-testid="video-results-prompt-preview"
+                className={cn(
+                  'absolute inset-0 size-full object-cover transition-opacity duration-150',
+                  moving ? 'opacity-100' : 'opacity-0',
+                )}
+                onPlaying={() => setMoving(true)}
+                onError={stop}
+              />
+            )}
           </span>
           <span
             aria-hidden="true"

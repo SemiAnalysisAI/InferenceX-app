@@ -71,9 +71,19 @@ export interface ChartHoverCardMetric {
   color?: string;
 }
 
+const HOVER_IMAGE_STYLE =
+  'display: block; width: 100%; aspect-ratio: 1344 / 768; object-fit: cover; border-radius: 6px; background: var(--muted);';
+
+/** A hover card's image; `chartHoverCard` reserves its box when the image is still loading. */
+export function chartHoverCardImage(url: string): string {
+  return `<img data-hover-image src="${escapeHtml(url)}" alt="" style="${HOVER_IMAGE_STYLE}">`;
+}
+
 export interface ChartHoverCardContent {
   /** Image URL shown above the title, such as a clip's first frame. */
   image?: string;
+  /** Reserves the image's box until its URL is known; the caller swaps in `chartHoverCardImage`. */
+  imagePending?: boolean;
   title: string;
   subtitle?: string;
   color?: string;
@@ -85,7 +95,17 @@ export interface ChartHoverCardContent {
 
 /** Compact hover card. Title, subtitle, labels, summary, warning and the image URL are escaped here. Metric values and body are inserted raw. */
 export function chartHoverCard(
-  { image, title, subtitle, color, metrics, summary, warning, body }: ChartHoverCardContent,
+  {
+    image,
+    imagePending,
+    title,
+    subtitle,
+    color,
+    metrics,
+    summary,
+    warning,
+    body,
+  }: ChartHoverCardContent,
   options: ChartTooltipShellOptions = {},
 ): string {
   const values = metrics
@@ -98,12 +118,13 @@ export function chartHoverCard(
     ? `<span style="min-width: 0;">${escapeHtml(title)} <span style="font-weight: 400; color: var(--muted-foreground);">${escapeHtml(subtitle)}</span></span>`
     : escapeHtml(title);
   // Inline-size containment keeps the image from widening the card; it fills the card's width.
-  const media = image
-    ? `<div style="contain: inline-size; margin-bottom: 8px;"><img data-hover-image src="${escapeHtml(image)}" alt="" style="display: block; width: 100%; aspect-ratio: 1344 / 768; object-fit: cover; border-radius: 6px; background: var(--muted);"></div>`
+  const framed = image || imagePending;
+  const media = framed
+    ? `<div data-hover-media style="contain: inline-size; margin-bottom: 8px;">${image ? chartHoverCardImage(image) : `<div data-hover-image-pending style="${HOVER_IMAGE_STYLE}"></div>`}</div>`
     : '';
   return chartTooltipShell(
     `${warning ? `<div data-hover-notice style="color: #dc2626; font-size: 11px; font-weight: 600; margin-bottom: 4px;">${escapeHtml(warning)}</div>` : ''}${media}${chartTooltipTitle(heading, color)}${values ? `<div style="display: flex; flex-wrap: wrap; gap: 4px 20px;">${values}</div>` : ''}${body ? `<div style="margin-top: 6px;">${body}</div>` : ''}${summary ? `<div style="margin-top: 6px; font-size: 11px; line-height: 14px; color: var(--muted-foreground); font-variant-numeric: tabular-nums;">${escapeHtml(summary)}</div>` : ''}`,
-    { maxWidth: 280, ...(image ? { minWidth: 212 } : {}), ...options },
+    { maxWidth: 280, ...(framed ? { minWidth: 212 } : {}), ...options },
   );
 }
 

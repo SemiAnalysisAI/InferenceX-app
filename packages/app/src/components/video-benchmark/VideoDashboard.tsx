@@ -300,12 +300,21 @@ export default function VideoDashboard({
   });
   /** What the stage compares its subject with, by `StageOption.value`. */
   const [against, setAgainst] = useState('reference');
+  /** Whether the reader has picked a clip yet; until then playable chart points pulse. */
+  const [picked, setPicked] = useState(false);
+  /** The chart point the reader rests on, whose clips are read ahead for its hover card. */
+  const [peek, setPeek] = useState<string | null>(null);
+  const pickAgainst = useCallback((value: string) => {
+    setPicked(true);
+    setAgainst(value);
+  }, []);
   /** Counts requests to bring the stage into view; the stage answers once its reads land. */
   const [reveal, setReveal] = useState(0);
   const requestReveal = useCallback(() => setReveal((count) => count + 1), []);
   /** Plays `point` against the `compare` option in Wipe, then brings the stage into view. */
   const showOnStage = useCallback(
     (point: VideoPoint, compare: string) => {
+      setPicked(true);
       setAgainst(compare);
       writeStage({ ...parseStage(location.search), clip: stagePointKey(point), view: 'wipe' });
       requestReveal();
@@ -326,10 +335,15 @@ export default function VideoDashboard({
   const clipLink = useMemo<ClipLink>(
     () => ({
       ...stagePair,
-      onSelect: (key) => writeStage({ ...parseStage(location.search), clip: key }),
+      pulse: !picked,
+      onSelect: (key) => {
+        setPicked(true);
+        writeStage({ ...parseStage(location.search), clip: key });
+      },
+      onPeek: setPeek,
       onReveal: requestReveal,
     }),
-    [stagePair, requestReveal],
+    [stagePair, picked, requestReveal],
   );
   const overviewScroll = useRef(0);
   const pendingAnchor = useRef<string | null>(null);
@@ -990,8 +1004,9 @@ export default function VideoDashboard({
               officialLeads={officialClipPoints}
               onPairChange={onStagePair}
               against={against}
-              onAgainstChange={setAgainst}
+              onAgainstChange={pickAgainst}
               onShow={showOnStage}
+              peek={peek}
               reveal={reveal}
               colorFor={colorFor}
               costs={clipCosts}

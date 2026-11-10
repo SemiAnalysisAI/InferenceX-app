@@ -917,6 +917,74 @@ describe('VideoGenX results', () => {
     cy.get('@b200.all').should('have.length', 1);
   });
 
+  it('reads a point the pointer rests on, so its hover card shows its first frame', () => {
+    const run = '34341996789';
+    const frame = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="9"/>')}`;
+    mount({
+      edit: (observation) => {
+        observation.results = evidence(observation);
+      },
+      editPage: (page) => {
+        for (const entry of page.entries) entry.publishedAt = '2026-11-01T00:00:00.000Z';
+        const source = page.entries.find((entry) => entry.runId === run)!.sources[0];
+        const lead = source.observations.find((observation) => observation.concurrency === 1)!;
+        // Drawn and playable, but neither the lead nor where the stage opens.
+        for (const [gpus, p50] of [
+          [1, 300],
+          [2, 150],
+          [8, 40],
+        ])
+          source.observations.push({
+            ...lead,
+            id: `${lead.id}-g${gpus}`,
+            participating: gpus,
+            p50,
+          });
+        const point = videoPoints([page]).find((item) => item.id === lead.id)!;
+        const saved = servingArtifact(Number(run), point.artifactId, 'NVIDIA B200');
+        saved.sources[0].checksums = saved.sources[0].checksums.map(([path, sha]) => [
+          path,
+          path === 'manifest.json' ? lead.id.split(':')[0] : sha,
+        ]);
+        saved.sources[0].assets = saved.sources[0].assets.map(([path, asset]) => [
+          path,
+          { ...asset, posterUrl: frame },
+        ]);
+        cy.intercept(
+          'GET',
+          `/api/video-runs?run=${run}&artifact=${point.artifactId}&format=published`,
+          saved,
+        ).as('b200');
+      },
+    });
+    cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('exist');
+    const tooltip = '[data-chart-tooltip="video-results-chart"]';
+    cy.get('@b200.all').then((before) => {
+      hardwarePoints('b200').not('[data-clip-role]').first().trigger('mouseenter', { force: true });
+      // The card keeps the frame's box while the point's clips are read.
+      cy.get(`${tooltip} [data-hover-image-pending]`).should('exist');
+      cy.get(`${tooltip} [data-hover-image]`).should('have.attr', 'src', frame);
+      cy.get('@b200.all').should('have.length', before.length + 1);
+    });
+  });
+
+  it('pulses playable points until the first clip is picked', () => {
+    mount({
+      editPage: (page) => {
+        for (const entry of page.entries) entry.publishedAt = '2026-11-01T00:00:00.000Z';
+      },
+    });
+    cy.get('[data-clip-role="playing"]').should('exist');
+    points('[data-clips="true"]:not([data-clip-role]) .video-clip-pulse').should(
+      'have.length.at.least',
+      1,
+    );
+    points('[data-clip-role] .video-clip-pulse').should('not.exist');
+    points('[data-clips="false"] .video-clip-pulse').should('not.exist');
+    points('[data-hardware="h200"] .visible-shape').click({ force: true });
+    cy.get('[data-testid="video-results-chart"] .video-clip-pulse').should('not.exist');
+  });
+
   it('falls back to the overview for an unknown or hidden deployment and drops its key', () => {
     mount({ search: '?r_y=videosPerGpuHour&r_point=0:missing' });
     cy.get('[data-testid="video-results-detail"]').should('not.exist');

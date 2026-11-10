@@ -188,6 +188,6 @@ export function speedVs(subject: number | null, pair: number | null): Speed | nu
 export interface StagePair {
   playing: string | null;
   baseline: string | null;
-  /** First frames of the shown prompt by chart point key, for points whose clips are already read. */
-  posters: Readonly<Record<string, string>>;
+  /** First frames of the shown prompt by chart point key for read points; null when one has none. */
+  posters: Readonly<Record<string, string | null>>;
 }

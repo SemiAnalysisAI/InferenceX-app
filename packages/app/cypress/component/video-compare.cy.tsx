@@ -75,6 +75,7 @@ const splitOf = ($media: JQuery<HTMLElement>) => {
 const poster = (fill: string) =>
   `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="9"><rect width="16" height="9" fill="${fill}"/></svg>`)}`;
 const WIPE_MEDIA = '[data-side="b"] > div';
+const TILE_PREVIEW = '[data-testid="video-results-prompt-preview"]';
 /** Pills, wipe and clip-path agree on which side the baseline (side b) sits. */
 const expectBaselineLeft = (left: boolean) => {
   cy.get('[data-testid="video-results-pill"]').should(($pills) => {
@@ -568,6 +569,28 @@ describe('Video results clip stage', () => {
     // Difference hides both frames behind its empty canvas, so Play comes back.
     cy.get('[data-testid="video-results-view-diff"]').click();
     cy.get('[data-testid="video-results-start"]').should('be.visible');
+  });
+
+  it('loops a tile’s preview while the mouse rests on it, and fetches nothing before', () => {
+    mountResultsClips(['b200', 'h200'], '/vgx', false, undefined, ['reference'], false, [], {
+      posters: { reference: poster('red') },
+    });
+    const tile = '[data-prompt="drum-taps"]';
+    cy.get(tile).find('img').should('exist');
+    cy.get(tile).find(TILE_PREVIEW).should('not.exist');
+    // A touch picks the prompt; it never starts a download.
+    cy.get(tile).trigger('pointerover', { pointerType: 'touch' });
+    cy.get(tile).find(TILE_PREVIEW).should('not.exist');
+    cy.get(tile).trigger('pointerover', { pointerType: 'mouse' });
+    cy.get<string>('@preview-url').then((url) =>
+      cy
+        .get(tile)
+        .find(TILE_PREVIEW)
+        .should('have.attr', 'src', url)
+        .and('have.css', 'opacity', '1'),
+    );
+    cy.get(tile).trigger('pointerout', { pointerType: 'mouse' });
+    cy.get(tile).find(TILE_PREVIEW).should('not.exist');
   });
 
   it('keeps Play on the stage while a first frame fails to load', () => {
