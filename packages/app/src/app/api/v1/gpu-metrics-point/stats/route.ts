@@ -1,4 +1,4 @@
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { getPayloadDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 import { getGpuMetricsPointRevision } from '@semianalysisai/inferencex-db/queries/gpu-metrics-revision';
 import type { NextRequest } from 'next/server';
 import {
@@ -63,8 +63,8 @@ export interface LoadSwingResponse {
 }
 
 const getCachedGpuMetricsForPoint = cachedQuery(
-  (id: number, _revision: string): Promise<GpuMetricsPointPayload | null> =>
-    getGpuMetricsForPoint(getDb(), id),
+  async (id: number, _revision: string): Promise<GpuMetricsPointPayload | null> =>
+    getGpuMetricsForPoint(await getPayloadDb(id), id),
   CACHE_KEY_PREFIX,
   { blobOnly: true },
 );
@@ -178,7 +178,7 @@ async function handle(request: NextRequest): Promise<Response> {
     return publicApiError('scale must be gpu or nvl72', 400);
   }
   try {
-    const revision = await getGpuMetricsPointRevision(getDb(), id);
+    const revision = await getGpuMetricsPointRevision(await getPayloadDb(id), id);
     const payload = revision === null ? null : await getCachedGpuMetricsForPoint(id, revision);
     if (!payload) return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
     if (format === 'csv') {

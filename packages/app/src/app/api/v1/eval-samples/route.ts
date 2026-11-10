@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { getPayloadDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 import {
   getEvalSampleOffset,
   getEvalSamples,
@@ -19,7 +19,13 @@ const getCachedEvalSamples = cachedQuery(
     offset: number,
     limit: number,
   ) => {
-    const result = await getEvalSamples(getDb(), evalResultId, filter, offset, limit);
+    const result = await getEvalSamples(
+      await getPayloadDb(evalResultId),
+      evalResultId,
+      filter,
+      offset,
+      limit,
+    );
     return {
       samples: result.samples.map((s) => ({
         docId: s.doc_id,
@@ -40,7 +46,8 @@ const getCachedEvalSamples = cachedQuery(
   'eval-samples-page',
 );
 const getCachedEvalSampleOffset = cachedQuery(
-  (evalResultId: number, docId: number) => getEvalSampleOffset(getDb(), evalResultId, docId),
+  async (evalResultId: number, docId: number) =>
+    getEvalSampleOffset(await getPayloadDb(evalResultId), evalResultId, docId),
   'eval-sample-offset',
 );
 

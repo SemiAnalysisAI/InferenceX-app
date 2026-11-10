@@ -1,4 +1,6 @@
 import type { DbClient } from '../connection.js';
+import { mergeDistinctRows } from '../lib/distinct-by.js';
+import { mergeWorkflowRuns } from './across-dbs.js';
 
 export interface WorkflowRunRow {
   github_run_id: number;
@@ -164,27 +166,40 @@ export interface DateChangelogBundle {
   runConfigs: RunConfigRow[];
 }
 
+/**
+ * Changelog dates in a range with their runs and run configs. Given several
+ * databases, a date with a changelog in any of them lists the runs of all of them.
+ */
 export async function getChangelogDatesInRange(
-  sql: DbClient,
+  sql: DbClient | readonly DbClient[],
   from: string,
   to: string,
   benchmarkType?: 'agentic_traces',
 ): Promise<DateChangelogBundle[]> {
-  const changelogs = (await sql`
-    SELECT
-      wr.github_run_id as workflow_run_id,
-      cl.date::text,
-      cl.base_ref,
-      cl.head_ref,
-      cl.config_keys,
-      cl.description,
-      cl.pr_link,
-      cl.append_only
-    FROM changelog_entries cl
-    JOIN latest_workflow_runs wr ON wr.id = cl.workflow_run_id
-    WHERE cl.date BETWEEN ${from}::date AND ${to}::date
-    ORDER BY cl.date ASC
-  `) as unknown as ChangelogRow[];
+  const dbs = typeof sql === 'function' ? [sql] : sql;
+  const changelogParts = (await Promise.all(
+    dbs.map(
+      (db) => db`
+        SELECT
+          wr.github_run_id as workflow_run_id,
+          cl.date::text,
+          cl.base_ref,
+          cl.head_ref,
+          cl.config_keys,
+          cl.description,
+          cl.pr_link,
+          cl.append_only
+        FROM changelog_entries cl
+        JOIN latest_workflow_runs wr ON wr.id = cl.workflow_run_id
+        WHERE cl.date BETWEEN ${from}::date AND ${to}::date
+        ORDER BY cl.date ASC
+      `,
+    ),
+  )) as unknown as ChangelogRow[][];
+  const changelogs =
+    changelogParts.length === 1
+      ? changelogParts[0]!
+      : changelogParts.flat().toSorted((a, b) => a.date.localeCompare(b.date));
   if (changelogs.length === 0) return [];
 
   const byDate = new Map<string, DateChangelogBundle>();
@@ -198,39 +213,47 @@ export async function getChangelogDatesInRange(
   }
   const dates = [...byDate.keys()];
 
-  const benchmarkTypeFilter = benchmarkType ? sql`AND br.benchmark_type = ${benchmarkType}` : sql``;
-  const [runs, runConfigs] = await Promise.all([
-    sql`
-      SELECT github_run_id, name, conclusion, run_attempt, html_url, to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at, date::text
-      FROM latest_workflow_runs
-      WHERE date = ANY(${dates}::date[])
-        AND conclusion IS NOT NULL
-      ORDER BY date ASC, created_at ASC, github_run_id ASC
-    `,
-    sql`
-      SELECT DISTINCT
-        br.date::text as date,
-        wr.github_run_id,
-        to_char(COALESCE(wr.run_started_at, wr.created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as run_started_at,
-        wr.html_url,
-        wr.head_sha,
-        c.model,
-        c.precision,
-        c.hardware,
-        c.framework,
-        c.spec_method,
-        c.disagg
-      FROM benchmark_results br
-      JOIN configs c ON c.id = br.config_id
-      JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
-      WHERE br.date = ANY(${dates}::date[])
-        AND br.error IS NULL
-        ${benchmarkTypeFilter}
-    `,
-  ]);
-  for (const row of runs as unknown as WorkflowRunRow[]) byDate.get(row.date)?.runs.push(row);
-  for (const { date, ...row } of runConfigs as unknown as (RunConfigRow & { date: string })[]) {
-    byDate.get(date)?.runConfigs.push(row);
-  }
+  const perDb = await Promise.all(
+    dbs.map((db) => {
+      const benchmarkTypeFilter = benchmarkType
+        ? db`AND br.benchmark_type = ${benchmarkType}`
+        : db``;
+      return Promise.all([
+        db`
+          SELECT github_run_id, name, conclusion, run_attempt, html_url, to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at, date::text
+          FROM latest_workflow_runs
+          WHERE date = ANY(${dates}::date[])
+            AND conclusion IS NOT NULL
+          ORDER BY date ASC, created_at ASC, github_run_id ASC
+        `,
+        db`
+          SELECT DISTINCT
+            br.date::text as date,
+            wr.github_run_id,
+            to_char(COALESCE(wr.run_started_at, wr.created_at), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as run_started_at,
+            wr.html_url,
+            wr.head_sha,
+            c.model,
+            c.precision,
+            c.hardware,
+            c.framework,
+            c.spec_method,
+            c.disagg
+          FROM benchmark_results br
+          JOIN configs c ON c.id = br.config_id
+          JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
+          WHERE br.date = ANY(${dates}::date[])
+            AND br.error IS NULL
+            ${benchmarkTypeFilter}
+        `,
+      ]);
+    }),
+  );
+  const runs = mergeWorkflowRuns(perDb.map(([rows]) => rows as unknown as WorkflowRunRow[]));
+  const runConfigs = mergeDistinctRows(
+    perDb.map(([, rows]) => rows as unknown as (RunConfigRow & { date: string })[]),
+  );
+  for (const row of runs) byDate.get(row.date)?.runs.push(row);
+  for (const { date, ...row } of runConfigs) byDate.get(date)?.runConfigs.push(row);
   return dates.map((date) => byDate.get(date)!);
 }

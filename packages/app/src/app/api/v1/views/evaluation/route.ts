@@ -11,8 +11,10 @@ import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import { unofficialRunPayload } from '@/lib/views-api/source';
 import type { NextRequest } from 'next/server';
 
-import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
+import { readEachDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 
+import { mergeEvalResults } from '@semianalysisai/inferencex-db/queries/across-dbs';
 import { getAllEvalResults, type EvalRow } from '@semianalysisai/inferencex-db/queries/evaluations';
 
 import {
@@ -51,7 +53,10 @@ export const dynamic = 'force-dynamic';
 
 // Same cache key as /api/v1/evaluations: both routes read the identical raw
 // eval_results rows, so they intentionally share one cached payload.
-const getCachedEvalRows = cachedQuery(() => getAllEvalResults(getDb()), 'evaluations');
+const getCachedEvalRows = cachedQuery(
+  async () => mergeEvalResults(await readEachDb(getAllEvalResults)),
+  'evaluations',
+);
 
 interface EvaluationBar {
   source: string;

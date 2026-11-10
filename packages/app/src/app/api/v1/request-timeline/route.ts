@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 
 import { REQUEST_TIMELINE_VERSION } from '@semianalysisai/inferencex-db/etl/compute-request-timeline';
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { getPayloadDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 
 import {
   getRequestTimeline,
@@ -31,7 +31,8 @@ export const CACHE_KEY_PREFIX = `request-timeline-v${REQUEST_TIMELINE_VERSION}`;
 const STORED_GZIP_NAMESPACE = 'request-timeline-gz';
 
 const getCachedRequestTimeline = cachedQuery(
-  (id: number): Promise<RequestTimeline | null> => getRequestTimeline(getDb(), id),
+  async (id: number): Promise<RequestTimeline | null> =>
+    getRequestTimeline(await getPayloadDb(id), id),
   CACHE_KEY_PREFIX,
   { blobOnly: true },
 );
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest): Promise<Response> {
     return publicApiError(PUBLIC_API_ERRORS.idRequired, 400);
   }
   try {
-    const stored = await getStoredRequestTimelineGz(getDb(), id);
+    const stored = await getStoredRequestTimelineGz(await getPayloadDb(id), id);
     if (!stored) return legacyGET(request);
     if (!stored.sha256) return cachedGzipJson(request, stored.chunks);
     const key = contentBlobKey(STORED_GZIP_NAMESPACE, stored.sha256);

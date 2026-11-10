@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { readFirstFound } from '@semianalysisai/inferencex-db/lib/payload-db';
 
 import {
   getConversation,
@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 
 const getCachedConversation = cachedQuery(
   (slug: string, convId: string): Promise<ConversationDetail | null> =>
-    getConversation(getDb(), slug, convId),
+    readFirstFound((sql) => getConversation(sql, slug, convId)),
   'dataset-conversation',
 );
 

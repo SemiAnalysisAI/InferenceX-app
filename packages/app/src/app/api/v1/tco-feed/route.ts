@@ -1,9 +1,10 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { DB_MODEL_TO_DISPLAY, DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
-import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
+import { getReadDbs } from '@semianalysisai/inferencex-db/lib/payload-db';
 
-import { getLatestBenchmarks } from '@semianalysisai/inferencex-db/queries/benchmarks';
+import { getLatestBenchmarksAcross } from '@semianalysisai/inferencex-db/queries/across-dbs';
 
 import { cachedJson, cachedQuery, cachedText } from '@/lib/cache/api-cache';
 import { loadFixture } from '@/lib/testing/test-fixtures';
@@ -79,7 +80,7 @@ const getCachedTcoFeed = cachedQuery(
     workloads: TcoFeedWorkload[],
     tiers: number[],
   ): Promise<TcoFeedRow[]> => {
-    const rows = await getLatestBenchmarks(getDb(), dbModelKeys, date);
+    const rows = await getLatestBenchmarksAcross(await getReadDbs(), dbModelKeys, date);
     return computeTcoFeed(rows, workloads, tiers);
   },
   'tco-feed-v2',

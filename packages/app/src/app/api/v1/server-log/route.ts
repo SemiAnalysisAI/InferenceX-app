@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { getPayloadDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 
 import {
   getBoundedServerLog,
@@ -41,14 +41,14 @@ const MAX_SERVER_LOG_OFFSET = 2_000_000_000;
 const MAX_SERVER_LOG_FILE_NAME_LENGTH = 1024;
 
 const getCachedBoundedServerLog = cachedQuery(
-  (id: number, maxBytes: number, fileName: string | null) =>
-    getBoundedServerLog(getDb(), id, maxBytes, fileName ?? undefined),
+  async (id: number, maxBytes: number, fileName: string | null) =>
+    getBoundedServerLog(await getPayloadDb(id), id, maxBytes, fileName ?? undefined),
   'server-log-bounded',
   { blobOnly: true },
 );
 const getCachedServerLogChunk = cachedQuery(
-  (id: number, offset: number, limit: number, fileName: string | null) =>
-    getServerLogChunk(getDb(), id, offset, limit, fileName ?? undefined),
+  async (id: number, offset: number, limit: number, fileName: string | null) =>
+    getServerLogChunk(await getPayloadDb(id), id, offset, limit, fileName ?? undefined),
   'server-log-chunk',
 );
 
@@ -84,7 +84,7 @@ function downloadStream(
         if (nextOffset === null) return;
         try {
           const chunk = await getServerLogChunk(
-            getDb(),
+            await getPayloadDb(id),
             id,
             nextOffset,
             DOWNLOAD_CHUNK_CHARACTERS,
@@ -166,7 +166,7 @@ export async function GET(request: NextRequest) {
     if (download === '1') {
       // One query sizes the file and, for most files, returns it whole.
       const whole = await getBoundedServerLog(
-        getDb(),
+        await getPayloadDb(id),
         id,
         DOWNLOAD_CHUNK_CHARACTERS,
         fileName ?? undefined,
@@ -190,7 +190,7 @@ export async function GET(request: NextRequest) {
       const first: ServerLogChunk | null =
         whole.serverLog === null
           ? await getServerLogChunk(
-              getDb(),
+              await getPayloadDb(id),
               id,
               0,
               DOWNLOAD_CHUNK_CHARACTERS,

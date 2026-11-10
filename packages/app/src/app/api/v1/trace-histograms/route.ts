@@ -1,7 +1,10 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { REQUEST_TIMELINE_VERSION } from '@semianalysisai/inferencex-db/etl/compute-request-timeline';
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import {
+  readFromPayloadDbs,
+  readRecordFromPayloadDbs,
+} from '@semianalysisai/inferencex-db/lib/payload-db';
 
 import { getCurrentRequestTimelineSha256s } from '@semianalysisai/inferencex-db/queries/request-timeline';
 import { getTraceHistograms } from '@semianalysisai/inferencex-db/queries/trace-histograms';
@@ -32,14 +35,15 @@ export async function GET(request: NextRequest): Promise<Response> {
   const ids = parseIdsParam(request, MAX_IDS);
   if (ids instanceof NextResponse) return ids;
   try {
-    const sha256s = await getCurrentRequestTimelineSha256s(getDb(), ids);
+    const parts = await readFromPayloadDbs(ids, getCurrentRequestTimelineSha256s);
+    const sha256s = new Map(parts.flatMap((part) => [...part]));
     const inputs = [...sha256s].toSorted(([a], [b]) => a - b).map(([id, sha]) => `${id}:${sha}`);
     const key = [...sha256s.values()].every(Boolean)
       ? contentBlobKeyOf(CACHE_KEY_PREFIX, inputs)
       : null;
     const redirect = key ? await contentBlobRedirect(request, key) : null;
     if (redirect) return redirect;
-    const histograms = await getTraceHistograms(getDb(), ids);
+    const histograms = await readRecordFromPayloadDbs(ids, getTraceHistograms);
     const complete = Object.keys(histograms).length === sha256s.size;
     return cachedJsonStoringContentBlob(request, histograms, complete ? key : null);
   } catch (error) {

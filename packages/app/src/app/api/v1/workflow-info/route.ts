@@ -1,7 +1,10 @@
 import type { NextRequest } from 'next/server';
 
-import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
+import { mergeDistinctRows } from '@semianalysisai/inferencex-db/lib/distinct-by';
+import { readEachDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 
+import { mergeWorkflowRuns } from '@semianalysisai/inferencex-db/queries/across-dbs';
 import {
   getChangelogByDate,
   getDateConfigs,
@@ -16,14 +19,22 @@ import { loadFixture } from '@/lib/testing/test-fixtures';
 export const dynamic = 'force-dynamic';
 
 async function loadWorkflowInfo(date: string, benchmarkType?: 'agentic_traces') {
-  const sql = getDb();
-  const [runs, changelogs, configs, runConfigs] = await Promise.all([
-    getWorkflowRunsByDate(sql, date),
-    getChangelogByDate(sql, date),
-    getDateConfigs(sql, date),
-    benchmarkType ? getRunConfigsByDate(sql, date, benchmarkType) : getRunConfigsByDate(sql, date),
-  ]);
-  return { runs, changelogs, configs, runConfigs };
+  const parts = await readEachDb((sql) =>
+    Promise.all([
+      getWorkflowRunsByDate(sql, date),
+      getChangelogByDate(sql, date),
+      getDateConfigs(sql, date),
+      benchmarkType
+        ? getRunConfigsByDate(sql, date, benchmarkType)
+        : getRunConfigsByDate(sql, date),
+    ]),
+  );
+  return {
+    runs: mergeWorkflowRuns(parts.map((part) => part[0])),
+    changelogs: parts.flatMap((part) => part[1]),
+    configs: mergeDistinctRows(parts.map((part) => part[2])),
+    runConfigs: mergeDistinctRows(parts.map((part) => part[3])),
+  };
 }
 
 // Scenario is an explicit cache dimension: fixed-sequence and Agentic Traces
