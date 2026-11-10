@@ -1592,7 +1592,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/video/video-read-cache.ts',
-    sourceSha256: 'd293ea16b75e2d1d7666ae9b743386bca259ea33deb5f3bb89069dd62a0aab2e',
+    sourceSha256: '0605181b45f27cceab2438404f60ef0dd6af16a733339a51f77588b1e44ebfc4',
     reviewArea: {
       en: 'VideoGenX published History, media with its stored quality, and rendition-listing cache shared across instances under the video tag.',
       zh: 'VideoGenX 已发布 History、含已存质量结果的媒体及转码回执列表以 video 标签跨实例共享的缓存。',

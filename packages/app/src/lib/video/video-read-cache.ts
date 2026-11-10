@@ -51,12 +51,19 @@ function retained<T, Args extends unknown[]>(
   };
 }
 
-/** The page with its completeness, so consumers can tell a degraded read from a retained one. */
-export const cachedVideoHistory = retained('video:history', async (page: number, pages: number) => {
-  const value = await publishedVideoHistory(page, pages);
-  // A page past the end is empty for any number; keeping it would let requests grow the cache.
-  return { value, retain: value.complete && (page === 1 || value.page.entries.length > 0) };
-});
+/**
+ * The page with its completeness, so consumers can tell a degraded read from a complete one. The
+ * key is versioned because the runtime cache outlives deploys and keys only on this prefix: bump
+ * it whenever the cached value's shape changes.
+ */
+export const cachedVideoHistory = retained(
+  'video:history:v2',
+  async (page: number, pages: number) => {
+    const value = await publishedVideoHistory(page, pages);
+    // A page past the end is empty for any number; keeping it would let requests grow the cache.
+    return { value, retain: value.complete && (page === 1 || value.page.entries.length > 0) };
+  },
+);
 
 const cachedStoredArtifact = retained(
   'video:artifact',
