@@ -262,6 +262,8 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
     let shown = !badged && focus.has(point.series) && at !== null;
     label.removeAttribute('transform');
     if (shown && at) {
+      // Show before measuring: a hidden label has no layout, so it would measure 0.
+      label.style.display = '';
       const width = textWidth(label, CHART_TYPE.dataLabel);
       const shift = labelShift(at.x, width, size.width);
       const box = {

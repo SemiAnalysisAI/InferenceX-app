@@ -1015,8 +1015,21 @@ describe('VideoGenX results', () => {
           ).to.equal(true);
         }
     });
+    // A label hidden until hover is measured shown, so its box uses the rendered width.
+    const hiddenMeasures: string[] = [];
+    cy.window().then((win) => {
+      const measure = win.SVGTextElement.prototype.getComputedTextLength;
+      cy.stub(win.SVGTextElement.prototype, 'getComputedTextLength').callsFake(function (
+        this: SVGTextElement,
+      ) {
+        if (this.classList.contains('point-label') && win.getComputedStyle(this).display === 'none')
+          hiddenMeasures.push(this.textContent ?? '');
+        return measure.call(this);
+      });
+    });
     points('[data-hardware="h200"]').first().trigger('mouseenter', { force: true });
     labelled().should('have.members', ['b200:true', 'h200:false', 'h200:false']);
+    cy.wrap(hiddenMeasures).should('have.length', 0);
     points('[data-hardware="h200"]').first().trigger('mouseleave', { force: true });
     labelled().should('deep.equal', ['b200:true']);
   });
