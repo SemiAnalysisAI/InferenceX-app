@@ -96,6 +96,25 @@ describe('spreadPills', () => {
         expect(boxesOverlap(box(a), box(b))).toBe(false);
       }
   });
+
+  it('never spreads a pill back over a shown label near the plot bottom', () => {
+    const label = { x0: 50, x1: 160, y0: 250, y1: 270 };
+    const dropped = clearOfLabels({ key: 'a', x: 60, y: 255, width: 80 }, { x: 152 }, [label], 400);
+    expect(dropped.y).toBe(272);
+    const spread = spreadPills([dropped, { key: 'b', x: 70, y: 278, width: 80 }], 300, [label]);
+    const box = (p: (typeof spread)[number]) => ({
+      x0: p.x,
+      x1: p.x + p.width,
+      y0: p.y,
+      y1: p.y + PILL_HEIGHT,
+    });
+    for (const pill of spread) {
+      expect(boxesOverlap(box(pill), label), pill.key).toBe(false);
+      expect(pill.y).toBeGreaterThanOrEqual(2);
+      expect(pill.y).toBeLessThanOrEqual(300 - PILL_HEIGHT - 2);
+    }
+    expect(boxesOverlap(box(spread[0]), box(spread[1]))).toBe(false);
+  });
 });
 
 describe('labelShift', () => {

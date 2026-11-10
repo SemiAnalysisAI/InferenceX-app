@@ -44,10 +44,15 @@ export function pillBox(
 /**
  * Pushes colliding pills apart and keeps them inside the plot: a top-down pass from the
  * top edge, then a bottom-up pass from the bottom edge, so clamping a stack at either edge
- * moves the whole stack rather than piling pills into one band. Only a stack taller than
- * the plot can still overlap. Returns new boxes in the input order.
+ * moves the whole stack rather than piling pills into one band. A pill the bottom-up pass
+ * would lift onto a shown label in `labels` hops above that label instead. Only a stack
+ * taller than the plot can still overlap. Returns new boxes in the input order.
  */
-export function spreadPills(pills: readonly PillBox[], plotHeight: number): PillBox[] {
+export function spreadPills(
+  pills: readonly PillBox[],
+  plotHeight: number,
+  labels: readonly Box[] = [],
+): PillBox[] {
   const placed = pills.map((pill) => ({ ...pill }));
   const sorted = placed.toSorted((a, b) => a.y - b.y);
   const sideBySide = (a: PillBox, b: PillBox) =>
@@ -63,6 +68,9 @@ export function spreadPills(pills: readonly PillBox[], plotHeight: number): Pill
     a.y = Math.min(a.y, bottom);
     for (const b of sorted.slice(i + 1))
       if (sideBySide(a, b) && a.y > b.y - PILL_PITCH) a.y = b.y - PILL_PITCH;
+    for (const label of labels.toSorted((p, q) => q.y0 - p.y0))
+      if (boxesOverlap(label, { x0: a.x, x1: a.x + a.width, y0: a.y, y1: a.y + PILL_HEIGHT }))
+        a.y = label.y0 - EDGE - PILL_HEIGHT;
   }
   for (const pill of placed) pill.y = Math.max(EDGE, Math.min(pill.y, bottom));
   return placed;

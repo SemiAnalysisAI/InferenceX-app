@@ -285,6 +285,8 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
     .append('g')
     .attr('class', PILLS)
     .attr('pointer-events', 'none');
+  // Each shown label covers its point too, so a pill keeps clear of both.
+  const covered = placed.map((label) => ({ ...label, y1: label.y1 + 11 }));
   const boxes = inputs.pills.flatMap((pill) => {
     // A narrow plot has no room to name every overlay line; it names the focus ones.
     if (pill.overlay && size.width < NARROW_PLOT && !focus.has(pill.key)) return [];
@@ -315,18 +317,13 @@ function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings
     const width = textWidth(text.node()!, CHART_TYPE.annotation) + 12;
     rect.attr('width', width);
     const box = pillBox(pill.key, at, width, size.width);
-    // Each shown label covers its point too, so a pill keeps clear of both.
-    clearOfLabels(
-      box,
-      at,
-      placed.map((label) => ({ ...label, y1: label.y1 + 11 })),
-      size.width,
-    );
+    clearOfLabels(box, at, covered, size.width);
     return [{ box, group }];
   });
   const spread = spreadPills(
     boxes.map(({ box }) => box),
     size.height,
+    covered,
   );
   boxes.forEach(({ group }, index) =>
     group.attr('transform', `translate(${spread[index].x},${spread[index].y})`),
