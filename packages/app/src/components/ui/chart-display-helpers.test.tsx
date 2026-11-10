@@ -316,9 +316,10 @@ function control(value: 'pool' | 'total', onChange = vi.fn()) {
   return { value, onChange, source: 'inference' };
 }
 
+const toggle = () => container.querySelector('[data-testid="chip-basis-toggle"]');
+
 describe('MetricAssumptionNotes — chip basis toggle', () => {
   const visibleNote = getVisibleCaveatText;
-  const toggle = () => container.querySelector('[data-testid="chip-basis-toggle"]');
 
   it.each([
     'y_outputTputPerGpu',

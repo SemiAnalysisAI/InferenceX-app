@@ -203,34 +203,34 @@ describe('buildAgentOptions', () => {
   });
 });
 
-describe('buildTokenPoints with agentKey', () => {
-  const session = (): SessionRequest[] => [
-    makeReq({
-      id: 'm1',
-      timestamp: '2026-05-08T00:00:00.000Z',
-      subagentLabel: null,
-      cacheReadInputTokens: 100,
-    }),
-    makeReq({
-      id: 's1a',
-      timestamp: '2026-05-08T00:00:01.000Z',
-      subagentLabel: 'Agent SDK',
-      cacheReadInputTokens: 1000,
-    }),
-    makeReq({
-      id: 's1b',
-      timestamp: '2026-05-08T00:00:02.000Z',
-      subagentLabel: 'Agent SDK',
-      cacheReadInputTokens: 2000,
-    }),
-    makeReq({
-      id: 'm2',
-      timestamp: '2026-05-08T00:00:03.000Z',
-      subagentLabel: null,
-      cacheReadInputTokens: 200,
-    }),
-  ];
+const session = (): SessionRequest[] => [
+  makeReq({
+    id: 'm1',
+    timestamp: '2026-05-08T00:00:00.000Z',
+    subagentLabel: null,
+    cacheReadInputTokens: 100,
+  }),
+  makeReq({
+    id: 's1a',
+    timestamp: '2026-05-08T00:00:01.000Z',
+    subagentLabel: 'Agent SDK',
+    cacheReadInputTokens: 1000,
+  }),
+  makeReq({
+    id: 's1b',
+    timestamp: '2026-05-08T00:00:02.000Z',
+    subagentLabel: 'Agent SDK',
+    cacheReadInputTokens: 2000,
+  }),
+  makeReq({
+    id: 'm2',
+    timestamp: '2026-05-08T00:00:03.000Z',
+    subagentLabel: null,
+    cacheReadInputTokens: 200,
+  }),
+];
 
+describe('buildTokenPoints with agentKey', () => {
   it('defaults to the main agent', () => {
     const points = buildTokenPoints(session());
     expect(points.map((p) => p.requestId)).toEqual(['m1', 'm2']);

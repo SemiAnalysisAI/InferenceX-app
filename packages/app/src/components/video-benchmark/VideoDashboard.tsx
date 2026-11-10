@@ -359,15 +359,16 @@ export default function VideoDashboard({
   );
   const { options, roster } = projection;
   const consent = useEngineComparisonConsent('video-results');
+  const plotted = (next: ResultsState) => {
+    const p = resultProjection(points, { ...next, hidden: [] }, namedPoints);
+    return resultsChartSeries(
+      [...p.deploymentCells, ...p.overlayDeploymentCells],
+      resultsSelection(next),
+    );
+  };
+
   /** Asks before a change first puts two engines on one GPU, as the InferenceX charts do. */
   const updateSeries = (patch: Partial<ResultsState>) => {
-    const plotted = (next: ResultsState) => {
-      const p = resultProjection(points, { ...next, hidden: [] }, namedPoints);
-      return resultsChartSeries(
-        [...p.deploymentCells, ...p.overlayDeploymentCells],
-        resultsSelection(next),
-      );
-    };
     const current = latest.current;
     if (
       consent.accepted ||

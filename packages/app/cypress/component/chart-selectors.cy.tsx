@@ -494,28 +494,29 @@ describe('Chart Selectors', () => {
         });
       }
 
+      const Harness = () => {
+        const [multiple, setMultiple] = useState(false);
+        const [value, setValue] = useState(Sequence.AgenticTraces);
+        return (
+          <TooltipProvider delayDuration={0}>
+            <button onClick={() => setMultiple(!multiple)}>Toggle scenarios</button>
+            <output data-testid="selected-scenario">{value}</output>
+            <div data-testid="selector-host">
+              <ScenarioSelector
+                variant={variant}
+                value={value}
+                onChange={setValue}
+                availableSequences={
+                  multiple ? [Sequence.AgenticTraces, Sequence.EightK_OneK] : [value]
+                }
+                data-testid="scenario-selector"
+              />
+            </div>
+          </TooltipProvider>
+        );
+      };
+
       it(`restores the ${variant} selector when another scenario becomes available`, () => {
-        function Harness() {
-          const [multiple, setMultiple] = useState(false);
-          const [value, setValue] = useState(Sequence.AgenticTraces);
-          return (
-            <TooltipProvider delayDuration={0}>
-              <button onClick={() => setMultiple(!multiple)}>Toggle scenarios</button>
-              <output data-testid="selected-scenario">{value}</output>
-              <div data-testid="selector-host">
-                <ScenarioSelector
-                  variant={variant}
-                  value={value}
-                  onChange={setValue}
-                  availableSequences={
-                    multiple ? [Sequence.AgenticTraces, Sequence.EightK_OneK] : [value]
-                  }
-                  data-testid="scenario-selector"
-                />
-              </div>
-            </TooltipProvider>
-          );
-        }
         cy.mount(<Harness />);
         cy.get('[data-testid="selector-host"]').should('be.empty');
         cy.contains('button', 'Toggle scenarios').click();

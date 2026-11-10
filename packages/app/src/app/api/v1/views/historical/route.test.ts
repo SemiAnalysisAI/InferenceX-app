@@ -154,6 +154,31 @@ beforeEach(() => {
 
 afterEach(() => vi.useRealTimers());
 
+// Median and P90 disagree on purpose: at target 35, the P90 axis reads
+// 300 → 360 (+60) while the median axis would read ~397 → 476.
+const agenticCurve = (date: string, scale: number) =>
+  [
+    [10, 25, 500],
+    [35, 45, 300],
+    [60, 70, 100],
+  ].map(([p90, median, tput]) =>
+    makeRow({
+      benchmark_type: 'agentic_traces',
+      isl: null,
+      osl: null,
+      date,
+      conc: Math.round(640 / p90),
+      metrics: {
+        ...makeRow().metrics,
+        median_intvty: median,
+        p90_intvty: p90,
+        p90_itl: 1 / p90,
+        tput_per_gpu: tput * scale,
+        output_tput_per_gpu: tput * scale,
+      },
+    }),
+  );
+
 describe('GET /api/v1/views/historical', () => {
   it('matches dashboard history at P90 and rejects the median-only reachable range', async () => {
     const rows = curve('2026-03-01', 'h200', 'trt').map((row) => ({
@@ -369,30 +394,6 @@ describe('GET /api/v1/views/historical', () => {
   });
 
   it('interpolates AgentX trends and waterfall steps at P90 interactivity', async () => {
-    // Median and P90 disagree on purpose: at target 35, the P90 axis reads
-    // 300 → 360 (+60) while the median axis would read ~397 → 476.
-    const agenticCurve = (date: string, scale: number) =>
-      [
-        [10, 25, 500],
-        [35, 45, 300],
-        [60, 70, 100],
-      ].map(([p90, median, tput]) =>
-        makeRow({
-          benchmark_type: 'agentic_traces',
-          isl: null,
-          osl: null,
-          date,
-          conc: Math.round(640 / p90),
-          metrics: {
-            ...makeRow().metrics,
-            median_intvty: median,
-            p90_intvty: p90,
-            p90_itl: 1 / p90,
-            tput_per_gpu: tput * scale,
-            output_tput_per_gpu: tput * scale,
-          },
-        }),
-      );
     mockGetAllBenchmarksForHistory.mockResolvedValue([
       ...agenticCurve('2026-02-01', 1),
       ...agenticCurve('2026-03-01', 1.2),

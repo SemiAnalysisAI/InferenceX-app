@@ -630,79 +630,77 @@ describe('GPUGraph', () => {
   });
 });
 
-describe('GPU comparison power envelopes', () => {
-  function PowerComparison({
-    latency = false,
-    normalized = false,
-  }: {
-    latency?: boolean;
-    normalized?: boolean;
-  }) {
-    const [optimal, setOptimal] = useState(true);
-    const [metric, setMetric] = useState('y_measuredAvgPower');
-    const [activeDates, setActiveDates] = useState(new Set(['2026-09-09_h100', '2026-09-10_h100']));
-    const rows = ['2026-09-09', '2026-09-10'].flatMap((date) =>
-      [4, 8].flatMap((tp) =>
-        [1, 8, 32].map((conc, index) => {
-          const interactivity =
-            metric === 'y_measuredJPerOutputToken' || tp === 8
-              ? 200 - index * 70
-              : [200, 120, 130][index];
-          return createMockInferenceData({
-            hwKey: 'h100',
-            precision: Precision.FP8,
-            date,
-            tp,
-            conc,
-            x: latency ? 1000 / interactivity : interactivity,
-            y:
-              metric === 'y_measuredJPerOutputToken'
-                ? 4 - index
-                : (350 + index * 200 + tp) * (metric === 'y_measuredPowerPercentTdp' ? 0.1 : 1),
-            run_url: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${date}`,
-            power_tier: tp === 4 ? 'legacy' : 'certified',
-          });
-        }),
-      ),
-    );
-    const value = createMockInferenceContextValues({
-      selectedYAxisMetric: metric,
-      hideNonOptimal: optimal,
-      setHideNonOptimal: setOptimal,
-      selectedGPUs: ['h100'],
-      selectedDates: ['2026-09-09', '2026-09-10'],
-      selectedDateRange: { startDate: '', endDate: '' },
-      activeDates,
-      selectedPrecisions: [Precision.FP8],
-      hardwareConfig: hwConfig,
-      showLineLabels: true,
-    });
-    return (
-      <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
-        <button onClick={() => setMetric('y_measuredPowerPercentTdp')}>Percent TDP</button>
-        <button onClick={() => setMetric('y_measuredP75Power')}>P75</button>
-        <button onClick={() => setMetric('y_measuredP90Power')}>P90</button>
-        <button onClick={() => setMetric('y_measuredJPerOutputToken')}>Energy</button>
-        <button onClick={() => setActiveDates(new Set(['2026-09-10_h100']))}>
-          Hide older date
-        </button>
-        <div style={{ width: 1000, height: 600 }}>
-          <GPUGraph
-            chartId="gpu-power-curves"
-            modelLabel="Qwen3.5 397B"
-            data={rows}
-            xLabel={latency ? 'Latency' : 'Interactivity'}
-            yLabel="Power"
-            chartDefinition={createMockChartDefinition({
-              chartType: latency || normalized ? 'e2e' : 'interactivity',
-              [`${metric}_roofline`]: latency ? 'lower_left' : 'lower_right',
-            })}
-          />
-        </div>
-      </InferenceContextsProvider>
-    );
-  }
+function PowerComparison({
+  latency = false,
+  normalized = false,
+}: {
+  latency?: boolean;
+  normalized?: boolean;
+}) {
+  const [optimal, setOptimal] = useState(true);
+  const [metric, setMetric] = useState('y_measuredAvgPower');
+  const [activeDates, setActiveDates] = useState(new Set(['2026-09-09_h100', '2026-09-10_h100']));
+  const rows = ['2026-09-09', '2026-09-10'].flatMap((date) =>
+    [4, 8].flatMap((tp) =>
+      [1, 8, 32].map((conc, index) => {
+        const interactivity =
+          metric === 'y_measuredJPerOutputToken' || tp === 8
+            ? 200 - index * 70
+            : [200, 120, 130][index];
+        return createMockInferenceData({
+          hwKey: 'h100',
+          precision: Precision.FP8,
+          date,
+          tp,
+          conc,
+          x: latency ? 1000 / interactivity : interactivity,
+          y:
+            metric === 'y_measuredJPerOutputToken'
+              ? 4 - index
+              : (350 + index * 200 + tp) * (metric === 'y_measuredPowerPercentTdp' ? 0.1 : 1),
+          run_url: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${date}`,
+          power_tier: tp === 4 ? 'legacy' : 'certified',
+        });
+      }),
+    ),
+  );
+  const value = createMockInferenceContextValues({
+    selectedYAxisMetric: metric,
+    hideNonOptimal: optimal,
+    setHideNonOptimal: setOptimal,
+    selectedGPUs: ['h100'],
+    selectedDates: ['2026-09-09', '2026-09-10'],
+    selectedDateRange: { startDate: '', endDate: '' },
+    activeDates,
+    selectedPrecisions: [Precision.FP8],
+    hardwareConfig: hwConfig,
+    showLineLabels: true,
+  });
+  return (
+    <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+      <button onClick={() => setMetric('y_measuredPowerPercentTdp')}>Percent TDP</button>
+      <button onClick={() => setMetric('y_measuredP75Power')}>P75</button>
+      <button onClick={() => setMetric('y_measuredP90Power')}>P90</button>
+      <button onClick={() => setMetric('y_measuredJPerOutputToken')}>Energy</button>
+      <button onClick={() => setActiveDates(new Set(['2026-09-10_h100']))}>Hide older date</button>
+      <div style={{ width: 1000, height: 600 }}>
+        <GPUGraph
+          chartId="gpu-power-curves"
+          modelLabel="Qwen3.5 397B"
+          data={rows}
+          xLabel={latency ? 'Latency' : 'Interactivity'}
+          yLabel="Power"
+          chartDefinition={createMockChartDefinition({
+            chartType: latency || normalized ? 'e2e' : 'interactivity',
+            [`${metric}_roofline`]: latency ? 'lower_left' : 'lower_right',
+          })}
+        />
+      </div>
+    </InferenceContextsProvider>
+  );
+}
 
+describe('GPU comparison power envelopes', () => {
   it('reveals off-boundary measurements without changing power envelopes or axes', () => {
     mountGpuGraph(<PowerComparison />);
     cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
@@ -1079,14 +1077,15 @@ describe('GPU comparison with unofficial runs', () => {
     cy.get('#gpu-overlay .perf-ruler').should('not.exist');
   });
 
+  const audited = (date: string, conc: number, y: number): InferenceData => ({
+    ...official(date, conc, y),
+    power_audit: {
+      source: `power_validation_h100_conc${conc}.json`,
+    } as InferenceData['power_audit'],
+  });
+
   it('opens the power trace from an official point on the date comparison', () => {
     const setSelectedYAxisMetric = cy.stub().as('setMetric');
-    const audited = (date: string, conc: number, y: number): InferenceData => ({
-      ...official(date, conc, y),
-      power_audit: {
-        source: `power_validation_h100_conc${conc}.json`,
-      } as InferenceData['power_audit'],
-    });
     mountComparison(
       createMockChartDefinition({ chartType: 'interactivity' }),
       DATES.flatMap((date, d) => [audited(date, 8, 300 + d), audited(date, 16, 320 + d)]),

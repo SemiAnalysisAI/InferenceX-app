@@ -46,23 +46,24 @@ function evalRow(overrides: Partial<EvalRow> = {}): EvalRow {
   };
 }
 
+const chips = (overrides: Partial<EvalRow>) =>
+  buildEvaluationChartRows(
+    [
+      evalRow({
+        disagg: true,
+        framework: 'dynamo-sglang',
+        metrics: { em_strict: 0.8 },
+        ...overrides,
+      }),
+    ],
+    'gsm8k',
+    Model.DeepSeek_R1,
+    [Precision.FP8],
+    '2026-12-31',
+  )[0]?.physicalChips;
+
 describe('buildEvaluationChartRows', () => {
   it('counts legacy unsplit disaggregated deployments once and real splits as both pools', () => {
-    const chips = (overrides: Partial<EvalRow>) =>
-      buildEvaluationChartRows(
-        [
-          evalRow({
-            disagg: true,
-            framework: 'dynamo-sglang',
-            metrics: { em_strict: 0.8 },
-            ...overrides,
-          }),
-        ],
-        'gsm8k',
-        Model.DeepSeek_R1,
-        [Precision.FP8],
-        '2026-12-31',
-      )[0]?.physicalChips;
     expect(chips({ num_prefill_gpu: 36, num_decode_gpu: 36 })).toBe(36);
     expect(
       chips({

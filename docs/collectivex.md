@@ -66,7 +66,7 @@ machine (`host`, `hosts`, `hostname`, `nodelist`, `slurm_nodelist`, `master_addr
 case-insensitive). Each document is then assembled alone, so every failure names its file.
 
 - **CLI**: `bun run admin:db:ingest:collectivex (--dir <results-dir> --pr <n>... |
---link-run <run_id> --pr <n>... | --delete-run <run_id>) [--yes] [--no-ssl]`. `--dir` reads and
+  --link-run <run_id> --pr <n>... | --delete-run <run_id>) [--yes] [--no-ssl]`. `--dir` reads and
   validates the directory, merges it over the latest stored run, links the run to the changelog
   entries of the named PRs (see [Changelog](#changelog)), prints the plan (run_id, source sha,
   how many uploaded, replaced, kept and dropped, each dropped case, and each entry with the cases

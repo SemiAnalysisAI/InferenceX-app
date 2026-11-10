@@ -379,21 +379,21 @@ describe('groupTrendRowsByDate row preparation', () => {
   });
 });
 
-describe('cache-aware token revenue interpolation', () => {
-  const revenuePoint = (interactivity: number, throughput: number, cacheHitRate?: number) =>
-    rowToLightweightPoint(
-      makeBenchmarkRow({
-        metrics: {
-          tput_per_gpu: throughput,
-          input_tput_per_gpu: throughput * 0.8,
-          output_tput_per_gpu: throughput * 0.2,
-          median_intvty: interactivity,
-          ...(cacheHitRate === undefined ? {} : { server_gpu_cache_hit_rate: cacheHitRate }),
-        },
-      }),
-      ['tokenRevenuePerGpuHour', 'tpPerGpu'],
-    )!;
+const revenuePoint = (interactivity: number, throughput: number, cacheHitRate?: number) =>
+  rowToLightweightPoint(
+    makeBenchmarkRow({
+      metrics: {
+        tput_per_gpu: throughput,
+        input_tput_per_gpu: throughput * 0.8,
+        output_tput_per_gpu: throughput * 0.2,
+        median_intvty: interactivity,
+        ...(cacheHitRate === undefined ? {} : { server_gpu_cache_hit_rate: cacheHitRate }),
+      },
+    }),
+    ['tokenRevenuePerGpuHour', 'tpPerGpu'],
+  )!;
 
+describe('cache-aware token revenue interpolation', () => {
   it('interpolates throughput, token share, and cache hit before pricing dollars', () => {
     const cacheAware = [revenuePoint(20, 800, 0.8), revenuePoint(40, 600, 0.9)];
     const uncached = [revenuePoint(20, 800), revenuePoint(40, 600)];

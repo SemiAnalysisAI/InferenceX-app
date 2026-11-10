@@ -95,6 +95,18 @@ export interface SkipTracker {
 
 const MAX_DB_ERRORS = 10;
 
+const cappedPrinter = (tag: string, suppressedNote: string) => {
+  let printed = 0;
+  return (line: string): void => {
+    if (printed >= MAX_DB_ERRORS) return;
+    console.error(`  [${tag}] ${line}`);
+    printed++;
+    if (printed === MAX_DB_ERRORS) {
+      console.error(`  [${tag}] ${suppressedNote}`);
+    }
+  };
+};
+
 export function createSkipTracker(): SkipTracker {
   const skips: Skips = {
     badZip: 0,
@@ -111,17 +123,6 @@ export function createSkipTracker(): SkipTracker {
   const unmappedPrecisions = new Set<string>();
   const dbWriteErrors: DbWriteFailure[] = [];
   const dbWriteWarnings: DbWriteFailure[] = [];
-  const cappedPrinter = (tag: string, suppressedNote: string) => {
-    let printed = 0;
-    return (line: string): void => {
-      if (printed >= MAX_DB_ERRORS) return;
-      console.error(`  [${tag}] ${line}`);
-      printed++;
-      if (printed === MAX_DB_ERRORS) {
-        console.error(`  [${tag}] ${suppressedNote}`);
-      }
-    };
-  };
   const printDbError = cappedPrinter(
     'DB ERROR',
     'further DB errors suppressed; all are listed in the database write receipt',

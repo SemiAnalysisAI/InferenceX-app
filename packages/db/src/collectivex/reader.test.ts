@@ -24,6 +24,19 @@ function requestedOf(shard: Record<string, unknown>) {
   };
 }
 
+const seriesWithMaturity = (maturity?: string) =>
+  buildDatasetFromNeutral(
+    makeRawMatrix([requestedOf(makeRawShard({}))]),
+    [
+      (() => {
+        const shard = makeRawShard({});
+        if (maturity) (shard.implementation as Record<string, unknown>).maturity = maturity;
+        return shard;
+      })(),
+    ],
+    makeRunMeta(),
+  ).series[0];
+
 describe('CollectiveX artifact assembly', () => {
   it('builds the current view from matrix cases and result shards', () => {
     const dataset = makeCollectiveXDataset();
@@ -262,20 +275,8 @@ describe('CollectiveX artifact assembly', () => {
   });
 
   it('carries a result maturity onto its series, null when the result names none', () => {
-    const series = (maturity?: string) =>
-      buildDatasetFromNeutral(
-        makeRawMatrix([requestedOf(makeRawShard({}))]),
-        [
-          (() => {
-            const shard = makeRawShard({});
-            if (maturity) (shard.implementation as Record<string, unknown>).maturity = maturity;
-            return shard;
-          })(),
-        ],
-        makeRunMeta(),
-      ).series[0];
-    expect(series('candidate').maturity).toBe('candidate');
-    expect(series().maturity).toBeNull();
+    expect(seriesWithMaturity('candidate').maturity).toBe('candidate');
+    expect(seriesWithMaturity().maturity).toBeNull();
   });
 
   it('keeps a withheld tail null through the derived rates', () => {

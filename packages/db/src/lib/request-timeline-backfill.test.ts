@@ -165,15 +165,15 @@ describe('writeRequestTimelineGz', () => {
   });
 });
 
-describe('dropVerifiedLegacyRequestTimeline', () => {
-  async function convertedRow(id: number, legacy: RequestTimeline): Promise<void> {
-    await sql`
-      insert into agentic_trace_replay (id, request_timeline)
-      values (${id}, ${JSON.stringify(legacy)}::jsonb)
-    `;
-    await writeRequestTimelineGz(sql, id, await convertLegacyRequestTimeline(sql, id));
-  }
+async function convertedRow(id: number, legacy: RequestTimeline): Promise<void> {
+  await sql`
+    insert into agentic_trace_replay (id, request_timeline)
+    values (${id}, ${JSON.stringify(legacy)}::jsonb)
+  `;
+  await writeRequestTimelineGz(sql, id, await convertLegacyRequestTimeline(sql, id));
+}
 
+describe('dropVerifiedLegacyRequestTimeline', () => {
   it('clears the legacy JSONB once the stored gzip copy decodes and matches', async () => {
     const legacy = timelineWith(5);
     await convertedRow(31, legacy);

@@ -109,6 +109,51 @@ beforeEach(() => {
   mocks.unofficial.mockImplementation(() => Response.json({ benchmarks: [], evaluations: [] }));
   mocks.submissions.mockImplementation(() => Response.json({ summary: [], volume: [] }));
 });
+const correlation = async (query: string) => {
+  const response = await gpu(req('gpu-metrics', `runId=123&chartView=correlation${query}`));
+  return response.json();
+};
+
+const curve = (scale: number, date: string) =>
+  [
+    [20, 9000, 1],
+    [40, 8000, 0],
+    [60, 3000, 1],
+  ].map(([interactivity, throughput, powerValid], index) =>
+    agenticRow({
+      id: scale * 100 + index,
+      conc: 3 - index,
+      date: scale === 2 && index === 0 ? '2026-09-08' : date,
+      run_url:
+        scale === 2 && index === 0
+          ? 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/122'
+          : agenticRow().run_url,
+      curve_workflow_run_id: scale * 1000,
+      curve_date: date,
+      metrics: {
+        ...agenticRow().metrics,
+        p90_itl: 1 / interactivity,
+        tput_per_gpu: throughput * scale,
+        input_tput_per_gpu: throughput * scale * 0.9,
+        output_tput_per_gpu: throughput * scale * 0.1,
+        power_valid: powerValid,
+      },
+    }),
+  );
+
+const nvl72Tray = (metrics: Record<string, number>, sensor: 'grace_socket' | 'module') =>
+  agenticRow({
+    hardware: 'gb300',
+    prefill_tp: 4,
+    decode_tp: 4,
+    num_prefill_gpu: 4,
+    num_decode_gpu: 4,
+    power_audit: {
+      cpu: { sensor_kind: sensor, expected_sockets: 2, observed_sockets: 2 },
+    },
+    metrics: { ...agenticRow().metrics, avg_total_gpu_power_w: 2400, ...metrics },
+  });
+
 describe('new dashboard projections', () => {
   it('GPU visibility, axes, statistics and no-store match shared helpers', async () => {
     const result = await gpu(
@@ -207,6 +252,7 @@ describe('new dashboard projections', () => {
     const body = await response.json();
     expect(body.stats).toEqual([]);
   });
+
   it('reports the correlation y-axis it draws when the series has no temperature', async () => {
     const data = [
       { timestamp: '2026-09-08T00:00:00Z', index: 0, power: 100, smClock: 1500 },
@@ -215,10 +261,6 @@ describe('new dashboard projections', () => {
     mocks.metrics.mockImplementation(() =>
       Response.json({ runInfo: { id: 123 }, artifacts: [{ name: 'h200', data }] }),
     );
-    const correlation = async (query: string) => {
-      const response = await gpu(req('gpu-metrics', `runId=123&chartView=correlation${query}`));
-      return response.json();
-    };
     const defaulted = await correlation('');
     expect(defaulted.params.corrYMetric).toBe('smClock');
     expect(defaulted.chart).toEqual([
@@ -655,35 +697,10 @@ describe('new dashboard projections', () => {
       expect(body.comparisons[0].data.rows[0].revenuePerGpuHour).toBeCloseTo(5.8536, 4);
     },
   );
+
   it.each(['modeled', 'compare'])(
     'uses valid power curves at the same target in official, historical and overlay %s estimates',
     async (powerBasis) => {
-      const curve = (scale: number, date: string) =>
-        [
-          [20, 9000, 1],
-          [40, 8000, 0],
-          [60, 3000, 1],
-        ].map(([interactivity, throughput, powerValid], index) =>
-          agenticRow({
-            id: scale * 100 + index,
-            conc: 3 - index,
-            date: scale === 2 && index === 0 ? '2026-09-08' : date,
-            run_url:
-              scale === 2 && index === 0
-                ? 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/122'
-                : agenticRow().run_url,
-            curve_workflow_run_id: scale * 1000,
-            curve_date: date,
-            metrics: {
-              ...agenticRow().metrics,
-              p90_itl: 1 / interactivity,
-              tput_per_gpu: throughput * scale,
-              input_tput_per_gpu: throughput * scale * 0.9,
-              output_tput_per_gpu: throughput * scale * 0.1,
-              power_valid: powerValid,
-            },
-          }),
-        );
       mocks.benchmarks.mockImplementation((query: BenchmarkRequestParams) =>
         Response.json(query.exact ? curve(2, '2026-09-09') : curve(1, '2026-09-10')),
       );
@@ -720,18 +737,6 @@ describe('new dashboard projections', () => {
     avg_cpu_socket_power_w: 98.066,
     avg_total_cpu_power_w: 196.132,
   };
-  const nvl72Tray = (metrics: Record<string, number>, sensor: 'grace_socket' | 'module') =>
-    agenticRow({
-      hardware: 'gb300',
-      prefill_tp: 4,
-      decode_tp: 4,
-      num_prefill_gpu: 4,
-      num_decode_gpu: 4,
-      power_audit: {
-        cpu: { sensor_kind: sensor, expected_sockets: 2, observed_sockets: 2 },
-      },
-      metrics: { ...agenticRow().metrics, avg_total_gpu_power_w: 2400, ...metrics },
-    });
   it('retains provisioned NVL72 estimates with invalid GPU telemetry and explains missing measured power', async () => {
     mocks.benchmarks.mockImplementation(() =>
       Response.json([nvl72Tray({ power_valid: 0 }, 'grace_socket')]),

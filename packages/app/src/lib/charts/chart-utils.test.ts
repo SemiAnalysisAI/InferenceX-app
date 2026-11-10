@@ -224,6 +224,15 @@ function isNotGreenish(rgb: [number, number, number]): boolean {
   return !(g > r * 1.2 && g > b * 1.2);
 }
 
+function assertMinDist(colors: Record<string, string>, min: number) {
+  const rgbs = Object.values(colors).map(parseRgb);
+  for (let i = 0; i < rgbs.length; i++) {
+    for (let j = i + 1; j < rgbs.length; j++) {
+      expect(rgbDist(rgbs[i], rgbs[j])).toBeGreaterThanOrEqual(min);
+    }
+  }
+}
+
 describe('generateHighContrastColors', () => {
   it.each(['light', 'dark'])(
     'gives TPUv7 the Google blue high-contrast color alongside Blackwell (%s)',
@@ -233,15 +242,6 @@ describe('generateHighContrastColors', () => {
       expect(new Set(Object.values(colors)).size).toBe(3);
     },
   );
-
-  function assertMinDist(colors: Record<string, string>, min: number) {
-    const rgbs = Object.values(colors).map(parseRgb);
-    for (let i = 0; i < rgbs.length; i++) {
-      for (let j = i + 1; j < rgbs.length; j++) {
-        expect(rgbDist(rgbs[i], rgbs[j])).toBeGreaterThanOrEqual(min);
-      }
-    }
-  }
 
   it('returns an empty object for an empty keys array', () => {
     expect(generateHighContrastColors([], 'dark')).toEqual({});

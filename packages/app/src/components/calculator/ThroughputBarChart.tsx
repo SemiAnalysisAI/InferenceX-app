@@ -731,9 +731,7 @@ export default function ThroughputBarChart({
             const costLbl = getCostTypeLabel(costType);
             return `$${getCostForType(d, costType).toFixed(3)}${costLbl}`;
           });
-
-        const barColor = (d: InterpolatedResult) => resolveBarColor(d);
-        positionLabelPairs(zoomGroup, xScale, ctx.width, barMetric, costType, barColor);
+        positionLabelPairs(zoomGroup, xScale, ctx.width, barMetric, costType, resolveBarColor);
         renderTopAxis(
           ctx.layout,
           (ctx.renderedXScale ?? xScale) as d3.ScaleLinear<number, number>,
@@ -757,8 +755,7 @@ export default function ThroughputBarChart({
       },
       onZoom: (zoomGroup, ctx) => {
         const newXScale = ctx.newXScale as d3.ScaleLinear<number, number>;
-        const barColor = (d: InterpolatedResult) => resolveBarColor(d);
-        positionLabelPairs(zoomGroup, newXScale, ctx.width, barMetric, costType, barColor);
+        positionLabelPairs(zoomGroup, newXScale, ctx.width, barMetric, costType, resolveBarColor);
         renderTopAxis(ctx.layout, newXScale, xTickCount);
       },
     };

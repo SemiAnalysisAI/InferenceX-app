@@ -765,11 +765,12 @@ describe('splitTokenStreams', () => {
     }
   });
 
+  const revenue = (total: number) => {
+    const s = splitTokenStreams(total, SHARE, undefined, 1);
+    return s.billableInputTokPerSec * 0.27 + s.outputTokPerSec * 1.1;
+  };
+
   it('keeps revenue monotone in the total when the mix holds — the dip regression', () => {
-    const revenue = (total: number) => {
-      const s = splitTokenStreams(total, SHARE, undefined, 1);
-      return s.billableInputTokPerSec * 0.27 + s.outputTokPerSec * 1.1;
-    };
     expect(revenue(2336)).toBeLessThan(revenue(2618));
   });
 });

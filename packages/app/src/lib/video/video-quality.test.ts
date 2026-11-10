@@ -74,35 +74,36 @@ describe('trusted quality artifacts', () => {
   });
 });
 
+async function stage(
+  referenceBytes: string,
+  change: (f: ReturnType<typeof referenceQualityFixture>) => void = () => {},
+) {
+  const f = referenceQualityFixture();
+  f.descriptor.cases[0].sha256 = await sha256(new Blob(['reference-video']));
+  f.descriptor.cases[0].bytes = 'reference-video'.length;
+  f.attachment.pairs[0].reference.media_sha256 = f.descriptor.cases[0].sha256;
+  change(f);
+  const descriptor = JSON.stringify(f.descriptor);
+  f.attachment.references.descriptor_sha256 = await sha256(new Blob([descriptor]));
+  const quality = JSON.stringify(f.attachment);
+  const sums = `${await sha256(new Blob([descriptor]))}  h3-v2.json\n${await sha256(new Blob([quality]))}  quality.json\n`;
+  vi.mocked(artifactFiles).mockResolvedValue(
+    new Map([
+      ['SHA256SUMS', encode(sums)],
+      ['quality.json', encode(quality)],
+      ['h3-v2.json', encode(descriptor)],
+    ]),
+  );
+  vi.mocked(readStoredQuality).mockResolvedValue(null);
+  vi.mocked(storeReferenceMedia).mockImplementation(async (_sha, name, download) => {
+    await download();
+    return `https://blob.test/${name}`;
+  });
+  fetchMock.mockResolvedValue(new Response(referenceBytes));
+  return f.stored;
+}
+
 describe('quality publication', () => {
-  async function stage(
-    referenceBytes: string,
-    change: (f: ReturnType<typeof referenceQualityFixture>) => void = () => {},
-  ) {
-    const f = referenceQualityFixture();
-    f.descriptor.cases[0].sha256 = await sha256(new Blob(['reference-video']));
-    f.descriptor.cases[0].bytes = 'reference-video'.length;
-    f.attachment.pairs[0].reference.media_sha256 = f.descriptor.cases[0].sha256;
-    change(f);
-    const descriptor = JSON.stringify(f.descriptor);
-    f.attachment.references.descriptor_sha256 = await sha256(new Blob([descriptor]));
-    const quality = JSON.stringify(f.attachment);
-    const sums = `${await sha256(new Blob([descriptor]))}  h3-v2.json\n${await sha256(new Blob([quality]))}  quality.json\n`;
-    vi.mocked(artifactFiles).mockResolvedValue(
-      new Map([
-        ['SHA256SUMS', encode(sums)],
-        ['quality.json', encode(quality)],
-        ['h3-v2.json', encode(descriptor)],
-      ]),
-    );
-    vi.mocked(readStoredQuality).mockResolvedValue(null);
-    vi.mocked(storeReferenceMedia).mockImplementation(async (_sha, name, download) => {
-      await download();
-      return `https://blob.test/${name}`;
-    });
-    fetchMock.mockResolvedValue(new Response(referenceBytes));
-    return f.stored;
-  }
   it('stores the verified reference MP4 before the attachment, then reuses it on republish', async () => {
     const saved = await stage('reference-video');
     const stored = await publishVideoQuality(

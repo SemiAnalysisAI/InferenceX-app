@@ -53,12 +53,16 @@ describe('contrastColors', () => {
     const alphas: number[] = [];
     Object.defineProperty(mockCtx, 'fillStyle', {
       configurable: true,
-      set: (value: string) => fills.push(value),
+      set: (value: string) => {
+        fills.push(value);
+      },
       get: () => '',
     });
     Object.defineProperty(mockCtx, 'globalAlpha', {
       configurable: true,
-      set: (value: number) => alphas.push(value),
+      set: (value: number) => {
+        alphas.push(value);
+      },
       get: () => 1,
     });
     setProbeColor(240, 128, 140);

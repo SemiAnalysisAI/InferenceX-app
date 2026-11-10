@@ -628,6 +628,16 @@ interface QuoteFrame {
 }
 type ScanFrame = SubstFrame | QuoteFrame;
 
+const toBinaryName = (token: string): string => {
+  const cut = Math.max(token.lastIndexOf('/'), token.lastIndexOf('\\'));
+  let base = cut === -1 ? token : token.slice(cut + 1);
+  const hasWindowsLauncherExtension = LAUNCHER_EXT_RE.test(base);
+  base = base.replace(LAUNCHER_EXT_RE, '');
+  if (hasWindowsLauncherExtension) base = base.toLowerCase();
+  if (base.length >= MAX_BINARY_LENGTH) return '';
+  return base;
+};
+
 export function extractCommandBinaries(command: string | null | undefined): string[] {
   if (!command) return [];
   const src = command.length > MAX_SCAN_LENGTH ? command.slice(0, MAX_SCAN_LENGTH) : command;
@@ -651,16 +661,6 @@ export function extractCommandBinaries(command: string | null | undefined): stri
   let pendingHeredocs: { delim: string; stripTabs: boolean }[] = [];
 
   const inOperandContext = (): boolean => inTest || (caseLevel > 0 && inCasePattern);
-
-  const toBinaryName = (token: string): string => {
-    const cut = Math.max(token.lastIndexOf('/'), token.lastIndexOf('\\'));
-    let base = cut === -1 ? token : token.slice(cut + 1);
-    const hasWindowsLauncherExtension = LAUNCHER_EXT_RE.test(base);
-    base = base.replace(LAUNCHER_EXT_RE, '');
-    if (hasWindowsLauncherExtension) base = base.toLowerCase();
-    if (base.length >= MAX_BINARY_LENGTH) return '';
-    return base;
-  };
 
   const dropCmd = (): void => {
     atCmd = false;

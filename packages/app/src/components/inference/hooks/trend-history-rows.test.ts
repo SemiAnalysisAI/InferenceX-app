@@ -80,6 +80,17 @@ const base: BenchmarkRow = {
   run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/11',
 };
 
+const curve = (date: string, run: number, itl: (conc: number) => Record<string, number>) =>
+  [1, 2, 4, 8].map((conc) => ({
+    ...base,
+    id: run * 100 + conc,
+    conc,
+    date,
+    workflow_run_id: run,
+    run_url: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${run}`,
+    metrics: { tput_per_gpu: 300 * conc, output_tput_per_gpu: 100 * conc, ...itl(conc) },
+  }));
+
 describe('compactTrendHistory', () => {
   it('restores every row column and the run provenance exactly as present', async () => {
     const audit = {
@@ -162,16 +173,6 @@ describe('compactTrendHistory', () => {
   });
 
   it('keeps the inputs that decide agentic interactivity', async () => {
-    const curve = (date: string, run: number, itl: (conc: number) => Record<string, number>) =>
-      [1, 2, 4, 8].map((conc) => ({
-        ...base,
-        id: run * 100 + conc,
-        conc,
-        date,
-        workflow_run_id: run,
-        run_url: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${run}`,
-        metrics: { tput_per_gpu: 300 * conc, output_tput_per_gpu: 100 * conc, ...itl(conc) },
-      }));
     const rows = [
       ...curve('2026-03-01', 1, (conc) => ({ p90_full_response_itl: 0.01 * conc, p90_itl: 1 })),
       ...curve('2026-03-02', 2, (conc) => ({ p90_itl: 0.012 * conc })),

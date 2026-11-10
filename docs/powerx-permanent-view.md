@@ -225,7 +225,7 @@ link still opens that view for locked visitors.
   window, window mean, P5/P95, max Δ1s / Δ5s in W and % TDP, ramp up/down W/s, volatility =
   std ÷ mean; telemetry gaps are counted, never bridged), a × 72 per NVL72 rack switch, and
   per-point CSV / JSON links to `GET /api/v1/gpu-metrics-point/stats?id=N[&format=csv|json]
-[&scale=gpu|nvl72]`, which runs the same function over the same stored buckets
+  [&scale=gpu|nvl72]`, which runs the same function over the same stored buckets
   (`storedPowerSeries`). The fixed caveat line under the chart reads "1 s DCGM samples ·
   single node · inference only · sub-second swings not captured".
 - **Labels**: `PowerBasisPill` (GPU / IT / Facility) on readouts, table headers, the breakdown

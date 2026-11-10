@@ -193,30 +193,30 @@ describe('CanvasPointLayer labels', () => {
   });
 });
 
-describe('CanvasPointLayer pointer', () => {
-  function pointerLayer() {
-    const mounted = placedLayer([point('a', 10, 10), point('b', 60, 10)]);
-    stubScreenOrigin(mounted.layer.element, 100, 50);
-    const events: string[] = [];
-    const handlers: PointPointerHandlers<Datum> = {
-      enter: (_event, datum) => {
-        events.push(`enter:${datum.id}`);
-        return true;
-      },
-      move: () => events.push('move'),
-      leave: (_event, datum) => {
-        events.push(`leave:${datum.id}`);
-        return true;
-      },
-      click: (_event, datum, position) => events.push(`click:${datum.id}@${position.x}`),
-    };
-    mounted.layer.listen(handlers);
-    const hitArea = mounted.svg.querySelector('.dot-hit-area')!;
-    const fire = (type: string, x: number, y: number) =>
-      hitArea.dispatchEvent(new MouseEvent(type, { clientX: 100 + x, clientY: 50 + y }));
-    return { ...mounted, events, fire };
-  }
+function pointerLayer() {
+  const mounted = placedLayer([point('a', 10, 10), point('b', 60, 10)]);
+  stubScreenOrigin(mounted.layer.element, 100, 50);
+  const events: string[] = [];
+  const handlers: PointPointerHandlers<Datum> = {
+    enter: (_event, datum) => {
+      events.push(`enter:${datum.id}`);
+      return true;
+    },
+    move: () => events.push('move'),
+    leave: (_event, datum) => {
+      events.push(`leave:${datum.id}`);
+      return true;
+    },
+    click: (_event, datum, position) => events.push(`click:${datum.id}@${position.x}`),
+  };
+  mounted.layer.listen(handlers);
+  const hitArea = mounted.svg.querySelector('.dot-hit-area')!;
+  const fire = (type: string, x: number, y: number) =>
+    hitArea.dispatchEvent(new MouseEvent(type, { clientX: 100 + x, clientY: 50 + y }));
+  return { ...mounted, events, fire };
+}
 
+describe('CanvasPointLayer pointer', () => {
   it('enters on mouseenter, clears hover on mouseleave and re-enters the same point', () => {
     const { layer, frames, events, fire } = pointerLayer();
     fire('mouseenter', 10, 10);
