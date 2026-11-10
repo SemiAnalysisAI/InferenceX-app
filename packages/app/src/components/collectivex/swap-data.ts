@@ -103,3 +103,45 @@ export function swapRooflines(
   }
   return [...roofs.values()].sort((a, b) => a.gbps - b.gbps);
 }
+
+/**
+ * Linear y-axis for the bandwidth chart. A roofline far above the measured data (NVLink-C2C at
+ * 225 GB/s next to ~80 GB/s of data) would squash every series into the bottom third, so the
+ * axis breaks just above the data and stacks those rooflines in a short band above the break.
+ * Plot coordinates equal GB/s below the break; `toPlot`/`fromPlot` convert the compressed band.
+ */
+export interface SwapYAxis {
+  domainMax: number;
+  /** Plot-space y where the axis breaks, or null when every roofline fits on a true scale. */
+  breakAt: number | null;
+  toPlot: (gbps: number) => number;
+  /** GB/s for a plot-space tick, or null for a position inside the break band. */
+  fromPlot: (plot: number) => number | null;
+}
+
+export function swapYAxis(dataMax: number, rooflineGbps: number[]): SwapYAxis {
+  const top = dataMax > 0 ? dataMax : 1;
+  // Rooflines up to 1.7x the data stay on the true scale; the break sits above all of them.
+  const far = [...new Set(rooflineGbps.filter((gbps) => gbps > top * 1.7))].sort((a, b) => a - b);
+  const breakAt = Math.max(top, ...rooflineGbps.filter((gbps) => gbps <= top * 1.7)) * 1.15;
+  if (far.length === 0) {
+    return {
+      domainMax: Math.max(top, ...rooflineGbps) * 1.1,
+      breakAt: null,
+      toPlot: (gbps) => gbps,
+      fromPlot: (plot) => plot,
+    };
+  }
+  const step = breakAt * 0.14;
+  const plotOf = new Map(far.map((gbps, i) => [gbps, breakAt + step * (i + 1)]));
+  return {
+    domainMax: breakAt + step * (far.length + 0.6),
+    breakAt,
+    toPlot: (gbps) => plotOf.get(gbps) ?? gbps,
+    fromPlot: (plot) => {
+      if (plot <= breakAt) return plot;
+      for (const [gbps, at] of plotOf) if (Math.abs(at - plot) < 1e-9 * breakAt) return gbps;
+      return null;
+    },
+  };
+}

@@ -13,10 +13,73 @@ import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import ChartLegend from '@/components/ui/chart-legend';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { collectiveXRunDasharray } from './data';
-import { formatSwapBytes, swapChartPoints, swapRooflines, type SwapChartPoint } from './swap-data';
+import {
+  formatSwapBytes,
+  swapChartPoints,
+  swapRooflines,
+  swapYAxis,
+  type SwapChartPoint,
+  type SwapRoofline,
+  type SwapYAxis,
+} from './swap-data';
+
+type LinearScale = d3.ScaleLinear<number, number>;
+
+/** Roofline names on the empty left side of the plot plus the axis-break marker. */
+function drawRooflineAnnotations(
+  group: d3.Selection<SVGGElement, unknown, null, undefined>,
+  yScale: LinearScale,
+  width: number,
+  rooflines: SwapRoofline[],
+  axis: SwapYAxis,
+) {
+  const firstFar = rooflines
+    .map((r) => axis.toPlot(r.gbps))
+    .find((y) => y > (axis.breakAt ?? Infinity));
+  const breaks =
+    axis.breakAt !== null && firstFar !== undefined
+      ? [
+          {
+            low: yScale(axis.breakAt),
+            high: yScale(axis.breakAt + (firstFar - axis.breakAt) * 0.45),
+          },
+        ]
+      : [];
+  group
+    .selectAll<SVGRectElement, (typeof breaks)[number]>('rect.swap-axis-break')
+    .data(breaks)
+    .join('rect')
+    .attr('class', 'swap-axis-break')
+    .attr('x', 0)
+    .attr('width', width)
+    .attr('y', (b) => b.high)
+    .attr('height', (b) => Math.max(0, b.low - b.high))
+    .attr('fill', 'var(--card)');
+  group
+    .selectAll<SVGPathElement, (typeof breaks)[number]>('path.swap-axis-break-mark')
+    .data(breaks.flatMap((b) => [b.low, b.high]))
+    .join('path')
+    .attr('class', 'swap-axis-break-mark')
+    .attr('d', (y) => `M0,${y + 3}L10,${y - 3}`)
+    .attr('stroke', 'var(--muted-foreground)')
+    .attr('stroke-width', 1.5)
+    .attr('fill', 'none');
+  group
+    .selectAll<SVGTextElement, SwapRoofline>('text.swap-roofline-label')
+    .data(rooflines, (r) => r.id)
+    .join('text')
+    .attr('class', 'swap-roofline-label')
+    .attr('data-testid', 'swap-roofline-label')
+    .attr('x', 16)
+    .attr('y', (r) => yScale(axis.toPlot(r.gbps)) - 6)
+    .attr('fill', 'var(--muted-foreground)')
+    .style('font-size', px(CHART_TYPE.annotation))
+    .text((r) => `${r.path} · ${r.gbps.toLocaleString()} GB/s`);
+}
 
 /**
  * vLLM's function name, set as inline code: monospace on a gray chip. Light themes use the
@@ -136,7 +199,12 @@ export function CollectiveXSwapSection({
   const xMin = xValues[0] ?? 1;
   const xMax = xValues.at(-1) ?? 10;
   const rooflines = metric === 'bandwidth' ? swapRooflines(points, direction) : [];
-  const yMax = Math.max(d3.max(points, (p) => p.y) ?? 1, ...rooflines.map((r) => r.gbps));
+  const dataMax = d3.max(points, (p) => p.y) ?? 1;
+  const yAxis = swapYAxis(
+    dataMax,
+    rooflines.map((r) => r.gbps),
+  );
+  const yMax = Math.max(dataMax, ...rooflines.map((r) => r.gbps));
   const yMin = d3.min(points, (p) => p.y) ?? 1;
   const results = datasets.flatMap((d) => d.swap_blocks ?? []);
   if (results.length === 0) return null;
@@ -239,7 +307,7 @@ export function CollectiveXSwapSection({
         xScale={{ type: 'log', domain: [xMin / 1.2, xMax * 1.2], nice: false }}
         yScale={{
           type: metric === 'bandwidth' ? 'linear' : 'log',
-          domain: metric === 'bandwidth' ? [0, yMax * 1.1] : [yMin / 1.2, yMax * 1.2],
+          domain: metric === 'bandwidth' ? [0, yAxis.domainMax] : [yMin / 1.2, yMax * 1.2],
           nice: false,
         }}
         xAxis={{
@@ -269,8 +337,22 @@ export function CollectiveXSwapSection({
                     .flatMap((exponent) => [1, 2, 5].map((n) => n * 10 ** exponent))
                     .filter((value) => value >= low && value <= high);
                 }
-              : undefined,
-          tickFormat: (v) => d3.format('.3~s')(Number(v)),
+              : (scale) => {
+                  const [low, high] = (scale as LinearScale).domain();
+                  const cut = yAxis.breakAt;
+                  if (cut === null) return (scale as LinearScale).ticks(6);
+                  const below = d3
+                    .ticks(Math.max(0, low), Math.min(high, cut), 6)
+                    .filter((v) => v < cut * 0.92);
+                  const above = rooflines
+                    .map((r) => yAxis.toPlot(r.gbps))
+                    .filter((v) => v > cut && v >= low && v <= high);
+                  return [...below, ...above];
+                },
+          tickFormat: (v) => {
+            const value = metric === 'bandwidth' ? yAxis.fromPlot(Number(v)) : Number(v);
+            return value === null ? '' : d3.format('.3~s')(value);
+          },
         }}
         layers={[
           {
@@ -309,8 +391,8 @@ export function CollectiveXSwapSection({
               rooflines.map((roof) => [
                 roof.id,
                 [
-                  { x: xMin / 1.2, y: roof.gbps },
-                  { x: xMax * 1.2, y: roof.gbps },
+                  { x: xMin / 1.2, y: yAxis.toPlot(roof.gbps) },
+                  { x: xMax * 1.2, y: yAxis.toPlot(roof.gbps) },
                 ],
               ]),
             ),
@@ -320,6 +402,26 @@ export function CollectiveXSwapSection({
               strokeWidth: 1.5,
               curve: d3.curveLinear,
             },
+          },
+          {
+            type: 'custom',
+            key: 'swap-roofline-labels',
+            render: (group, ctx) =>
+              drawRooflineAnnotations(
+                group,
+                ctx.yScale as LinearScale,
+                ctx.width,
+                rooflines,
+                yAxis,
+              ),
+            onZoom: (group, ctx) =>
+              drawRooflineAnnotations(
+                group,
+                ctx.newYScale as LinearScale,
+                ctx.width,
+                rooflines,
+                yAxis,
+              ),
           },
         ]}
         tooltip={{

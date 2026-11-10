@@ -1,11 +1,11 @@
-import { expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { buildDatasetFromNeutral } from '@semianalysisai/inferencex-db/collectivex/reader';
 import {
   makeSwapDoc,
   swapMatrix,
   swapMeta,
 } from '@semianalysisai/inferencex-db/collectivex/swap-test-fixture';
-import { formatSwapBytes, swapChartPoints, swapRooflines } from './swap-data';
+import { formatSwapBytes, swapChartPoints, swapRooflines, swapYAxis } from './swap-data';
 
 it('formats byte units without losing the 1 GiB endpoint', () => {
   expect([257, 1024, 262144, 1048576, 1073741824].map(formatSwapBytes)).toEqual([
@@ -104,4 +104,34 @@ it('labels a GPU whose runtime reports an empty device name using its recorded S
   expect(swapChartPoints([dataset], selection).map((p) => p.device)).toEqual(['MI355X', 'MI355X']);
   result.sku = 'future-gpu';
   expect(swapChartPoints([dataset], selection)[0].device).toBe('future-gpu');
+});
+
+describe('swapYAxis', () => {
+  it('breaks above the data and stacks a distant NVLink-C2C roofline just above the break', () => {
+    const axis = swapYAxis(80, [64, 225]);
+    expect(axis.breakAt).toBeCloseTo(92);
+    expect(axis.toPlot(64)).toBe(64);
+    const c2c = axis.toPlot(225);
+    expect(c2c).toBeGreaterThan(92);
+    expect(c2c).toBeLessThan(axis.domainMax);
+    expect(axis.domainMax).toBeLessThan(130);
+    expect(axis.fromPlot(c2c)).toBe(225);
+    expect(axis.fromPlot(50)).toBe(50);
+    expect(axis.fromPlot((92 + c2c) / 2)).toBeNull();
+  });
+
+  it('keeps a true linear scale when every roofline is near the data', () => {
+    const axis = swapYAxis(50, [64]);
+    expect(axis.breakAt).toBeNull();
+    expect(axis.toPlot(64)).toBe(64);
+    expect(axis.domainMax).toBeCloseTo(70.4);
+  });
+
+  it('keeps a roofline just above the data below the break so its tick stays labelled', () => {
+    const axis = swapYAxis(80, [120, 900]);
+    expect(axis.breakAt).toBeCloseTo(138);
+    expect(axis.toPlot(120)).toBe(120);
+    expect(axis.fromPlot(120)).toBe(120);
+    expect(axis.fromPlot(axis.toPlot(900))).toBe(900);
+  });
 });
