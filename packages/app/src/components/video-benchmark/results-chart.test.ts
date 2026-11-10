@@ -83,6 +83,14 @@ const run = (name: string, engine: string, p50: number, optimizations: string[])
     results: { engine, optimizations } as ResultsEvidence,
   });
 
+/** A twin needs a recorded layout to match on. */
+const laidOutRun = (name: string, engine: string, p50: number, optimizations: string[]) =>
+  deployment(name, 4, p50, 400 - p50, 200, {
+    hardwareKey: 'b200',
+    server: { tp: 2, ulysses: 2, attention: null },
+    results: { engine, optimizations } as ResultsEvidence,
+  });
+
 const b200Point = (name: string, engine: string, p50: number, change: Partial<VideoPoint> = {}) =>
   deployment(name, 4, p50, 400 - p50, 200, {
     hardwareKey: 'b200',
@@ -260,16 +268,10 @@ describe('resultsChartSeries', () => {
   });
 
   it('draws a lossy line’s lossless twin under Best engines, which never stands for its GPU', () => {
-    const run = (name: string, engine: string, p50: number, optimizations: string[]) =>
-      deployment(name, 4, p50, 400 - p50, 200, {
-        hardwareKey: 'b200',
-        server: { tp: 2, ulysses: 2, attention: null },
-        results: { engine, optimizations } as ResultsEvidence,
-      });
     const points = [
-      run('stock', 'sglang', 20, []),
-      run('fused', 'sol-engine', 30, ['cuda-graph']),
-      run('cached', 'sol-engine', 10, ['cuda-graph', 'first-block-cache']),
+      laidOutRun('stock', 'sglang', 20, []),
+      laidOutRun('fused', 'sol-engine', 30, ['cuda-graph']),
+      laidOutRun('cached', 'sol-engine', 10, ['cuda-graph', 'first-block-cache']),
     ];
     const state = { ...DEFAULT_RESULTS_STATE, lossy: true };
     const drawn = resultsChartSeries(cells(points, state), selection({ lossy: true }));
