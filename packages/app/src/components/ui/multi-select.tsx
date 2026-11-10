@@ -86,6 +86,8 @@ interface MultiSelectProps {
   clearSearchLabel?: string;
   selectedSuffix?: string;
   minimumPrefix?: string;
+  /** Display a retained selection without adding it to the available options. */
+  missingSelectedOption?: (value: string) => MultiSelectOption;
 }
 
 function MultiSelect({
@@ -116,6 +118,7 @@ function MultiSelect({
   clearSearchLabel,
   selectedSuffix,
   minimumPrefix,
+  missingSelectedOption,
 }: MultiSelectProps) {
   const t = STRINGS[useLocale()];
   const resolvedPlaceholder = placeholder ?? t.placeholder;
@@ -303,7 +306,9 @@ function MultiSelect({
   };
 
   const selectedOptions = value.map(
-    (val) => flatOptions.find((opt) => opt.value === val) ?? { value: val, label: val },
+    (val) =>
+      flatOptions.find((opt) => opt.value === val) ??
+      missingSelectedOption?.(val) ?? { value: val, label: val },
   );
   const selectedLabels = selectedOptions.map((opt) => opt.label);
 
