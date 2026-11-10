@@ -310,7 +310,7 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'CollectiveX dataset schema version; default 1.',
     'CollectiveX 数据集 schema 版本，默认 1。',
   ],
-  suite: ['Run-list filter: all, ep, kv or swap.', '运行列表筛选：all、ep、kv 或 swap。'],
+  suite: ['Run-list filter: all, ep or swap.', '运行列表筛选：all、ep 或 swap。'],
   epSize: [
     'EP size, default 8 when available, otherwise the first available size.',
     'EP 大小，有 8 时默认选 8，否则选首个可用值。',
@@ -339,27 +339,9 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'Comma-separated run-namespaced EP series IDs. Omit for all.',
     '以逗号分隔、带运行命名空间的 EP 曲线 ID。省略时选择全部。',
   ],
-  kvSeries: [
-    'Comma-separated run:case IDs for KV series. Omit for all.',
-    '以逗号分隔的 KV run:case ID。省略时选择全部。',
-  ],
   swapSeries: [
     'Comma-separated swap series IDs. Omit for all.',
     '以逗号分隔的 swap 曲线 ID。省略时选择全部。',
-  ],
-  kvX: [
-    'KV projection: isl (default), batch, frontier or overlap.',
-    'KV 展示方式：isl（默认）、batch、frontier 或 overlap。',
-  ],
-  kvY: ['KV metric: latency (default) or bandwidth.', 'KV 指标：latency（默认）或 bandwidth。'],
-  kvOp: ['KV operation: push (default) or pull.', 'KV 操作：push（默认）或 pull。'],
-  pageTokens: [
-    'Deprecated and ignored: KV rows move whole cache rows, with no page size.',
-    '已弃用，将被忽略：KV 数据按整行缓存搬运，不再区分页大小。',
-  ],
-  overlapIsl: [
-    'Overlap input length: auto (default; the ISL with the widest batch sweep) or a positive integer.',
-    '重叠测试输入长度：auto（默认，取批大小扫描最宽的 ISL）或正整数。',
   ],
   swapDirection: ['h2d (default), d2h or d2d.', 'h2d（默认）、d2h 或 d2d。'],
   swapLayout: ['contiguous (default) or random.', 'contiguous（默认）或 random。'],
@@ -724,12 +706,11 @@ const NEW_VIEWS = {
     { pricing: object, data: object, overlays: object, comparisons: objects },
   ],
   collectivex: [
-    'CollectiveX EP, KV and swap views',
-    'CollectiveX EP、KV 与 swap 视图',
+    'CollectiveX EP and swap views',
+    'CollectiveX EP 与 swap 视图',
     {
       runs: objects,
       ep: object,
-      kv: object,
       swap: object,
       options: object,
       knownSupport: object,
