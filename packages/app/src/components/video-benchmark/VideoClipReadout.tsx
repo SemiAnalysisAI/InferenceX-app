@@ -33,7 +33,8 @@ const STRINGS = {
     lpipsLossless: 'LPIPS vs lossless',
     higherCloser: 'Higher is closer',
     lowerCloser: 'Lower is closer',
-    pairedPending: 'Scores against the same engine’s lossless output are not published yet.',
+    pairedPending:
+      'Scoring against the same engine’s lossless output is planned; no scorer computes it yet.',
     energy: 'Energy per clip',
     energySub: 'Cell mean',
     participating: 'TCO per clip (participating)',
@@ -90,7 +91,7 @@ const STRINGS = {
     lpipsLossless: '相对无损对照的 LPIPS',
     higherCloser: '越高越接近',
     lowerCloser: '越低越接近',
-    pairedPending: '与同一引擎无损输出对比的质量分尚未发布。',
+    pairedPending: '以同一引擎无损输出为基准的质量评分仍在计划中，目前还没有评分器计算。',
     energy: '每条视频能耗',
     energySub: '测量单元均值',
     participating: '每条视频 TCO（参与 GPU）',
