@@ -196,6 +196,22 @@ export default function VideoClipStage({
   const [inspect, setInspect] = useState(false);
   /** One zoom and pan, in percent of a side, applied to both sides and the Difference canvas. */
   const [lens, setLens] = useState({ zoom: 1, x: 0, y: 0 });
+  /** First frames that have loaded; a poster that fails never counts as a picture to split. */
+  const [loadedPosters, setLoadedPosters] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    const images = [a.posterUrl, b.posterUrl].flatMap((url) => {
+      if (!url) return [];
+      const image = new Image();
+      image.addEventListener('load', () =>
+        setLoadedPosters((previous) =>
+          previous.has(url) ? previous : new Set([...previous, url]),
+        ),
+      );
+      image.src = url;
+      return [image];
+    });
+    return () => images.forEach((image) => image.removeAttribute('src'));
+  }, [a.posterUrl, b.posterUrl]);
   /**
    * One pan gesture. `from` is the lens it started on while the pointer is held; `moved` outlives
    * the release, so the click that ends a pan is not a lock or flip.
@@ -232,10 +248,14 @@ export default function VideoClipStage({
   const overlay = view !== 'side';
   /**
    * Before the first Play, the idle frame replaces the split until there is a picture to split:
-   * both sides' posters, or else the clips themselves.
+   * both sides' loaded posters in a view that shows them (Difference hides them behind its
+   * canvas), or else the clips themselves.
    */
-  const idle =
-    !armed && playable.length > 0 && !(both && playable.every((role) => clips[role].posterUrl));
+  const postersShown =
+    both &&
+    view !== 'diff' &&
+    playable.every((role) => loadedPosters.has(clips[role].posterUrl ?? ''));
+  const idle = !armed && playable.length > 0 && !postersShown;
   /** While idle the split stays hidden, so it neither follows the pointer nor locks. */
   const wiping = view === 'wipe' && !idle;
   const original = view === 'diff';

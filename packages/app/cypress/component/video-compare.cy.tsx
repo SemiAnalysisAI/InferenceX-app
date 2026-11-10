@@ -565,6 +565,17 @@ describe('Video results clip stage', () => {
     cy.get('[data-testid="video-results-start"]').should('not.exist');
     pointAt(0.25);
     cy.get(WIPE_MEDIA).should(($media) => expect(splitOf($media)).to.be.closeTo(25, 0.5));
+    // Difference hides both frames behind its empty canvas, so Play comes back.
+    cy.get('[data-testid="video-results-view-diff"]').click();
+    cy.get('[data-testid="video-results-start"]').should('be.visible');
+  });
+
+  it('keeps Play on the stage while a first frame fails to load', () => {
+    mountResultsClips(['b200', 'h200'], '/vgx', false, undefined, [], false, [], {
+      posters: { reference: poster('red'), 'measurement-r001': 'data:image/png;base64,AAAA' },
+    });
+    sideVideo('a').should('have.attr', 'poster', 'data:image/png;base64,AAAA');
+    cy.get('[data-testid="video-results-start"]').should('be.visible');
   });
 
   it('cannot draw a difference after the reference decoder fails', () => {
