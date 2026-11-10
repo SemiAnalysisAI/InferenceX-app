@@ -203,12 +203,15 @@ export default function VideoResultsClips({
   const picked = stage.clip ? drawn.find((p) => stagePointKey(p) === stage.clip) : undefined;
   const cache = useRef(new Map<string, ResultsClipSide | null>(Object.entries(initialSides)));
   const [revision, setRevision] = useState(0);
-  const [failed, setFailed] = useState(false);
+  /** Sources whose last read failed; a source added since is still pending, not missing. */
+  const [failedKeys, setFailedKeys] = useState<ReadonlySet<string>>(new Set());
+  const failed = failedKeys.size > 0;
   const [retry, setRetry] = useState(0);
   /** Undefined while its read is in flight; null when there is none. */
   const sideOf = (point: VideoPoint) => {
     const key = sourceKey(point);
-    return cache.current.has(key) ? (cache.current.get(key) ?? null) : failed ? null : undefined;
+    if (cache.current.has(key)) return cache.current.get(key) ?? null;
+    return failedKeys.has(key) ? null : undefined;
   };
   const subject = useMemo(
     () =>
@@ -220,7 +223,7 @@ export default function VideoResultsClips({
         unofficialRun,
         stage.clip,
       ),
-    [selected, picked, revision, failed, unofficialRun, stage.clip],
+    [selected, picked, revision, failedKeys, unofficialRun, stage.clip],
   );
   const options = useMemo(() => {
     if (!subject) return [];
@@ -244,7 +247,7 @@ export default function VideoResultsClips({
   useEffect(() => {
     const controller = new AbortController();
     const missing = wanted.filter((point) => !cache.current.has(sourceKey(point)));
-    setFailed(false);
+    setFailedKeys((previous) => (previous.size > 0 ? new Set() : previous));
     void Promise.allSettled(
       missing.map(async (point) => {
         const read = (format: 'published' | 'live') =>
@@ -270,7 +273,13 @@ export default function VideoResultsClips({
       }),
     ).then((results) => {
       if (controller.signal.aborted) return;
-      setFailed(results.some((result) => result.status === 'rejected'));
+      setFailedKeys(
+        new Set(
+          missing
+            .filter((_, index) => results[index].status === 'rejected')
+            .map((point) => sourceKey(point)),
+        ),
+      );
     });
     return () => controller.abort();
   }, [wanted, retry, unofficialRun]);
