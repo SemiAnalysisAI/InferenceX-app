@@ -614,12 +614,20 @@ describe('CollectiveX swap_blocks', () => {
     cy.get('@swapChart')
       .find('.y-axis .tick text')
       .then((labels) => {
-        const values = [...labels].map((label) => Number(label.textContent));
+        // Linear below the axis break; the distant roofline sits alone above it at its true value.
+        const all = [...labels].map((label) => Number(label.textContent));
+        const values = all.slice(0, -1);
+        expect(all.at(-1)).to.eq(64);
         expect(values[0]).to.eq(0);
         expect(values.length).to.be.greaterThan(3);
         const step = values[1] - values[0];
         values.slice(1).forEach((value, i) => expect(value - values[i]).to.eq(step));
+        expect(values.at(-1)).to.be.lessThan(64);
       });
+    cy.get('@swapChart')
+      .find('[data-testid="swap-roofline-label"]')
+      .should('have.length', 1)
+      .and('have.text', 'PCIe 5.0 x16 · 64 GB/s');
     cy.get('@swapChart').find('.point').should('have.length', 2).last().click({ force: true });
     cy.get('body')
       .should('contain.text', '32.768p50 (GB/s)')
