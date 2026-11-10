@@ -21,7 +21,13 @@ function visitModelPage(slug: string) {
     },
   });
   cy.get('[data-testid="model-architecture-inline"]').should('be.visible');
-  cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+  // Force-clicks on server-rendered markup are lost until React attaches its handlers.
+  cy.get('[data-testid="model-architecture-svg"]')
+    .should('be.visible')
+    .and(([svg]) => {
+      const hydrated = Object.keys(svg).some((key) => key.startsWith('__reactProps'));
+      expect(hydrated, 'architecture diagram is hydrated').to.equal(true);
+    });
 }
 
 describe('Model Architecture Diagram', () => {
