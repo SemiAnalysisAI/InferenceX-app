@@ -75,7 +75,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-collectivex-view',
-    sourceSha256: 'ca9c3013e755de88a9241f8e8142e1c4a3936aa0772e317e110375836f97930d',
+    sourceSha256: '58f0c2659a85de8c3838fe3597a34a6add4de52d1f8022feec4cdd3714117e44',
   },
   {
     source: 'src/app/api/v1/views/compare/route.ts',
@@ -1879,7 +1879,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: 'd4120ea9f15798bcac37f5f811fa3b71e9c9905adf3a90defd4b11ea701c451f',
+    sourceSha256: 'fc182b89629b0b0dce6df319ab8ddcfad3325dd0d0ee98c1f68913712910133a',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

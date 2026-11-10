@@ -199,6 +199,14 @@ uses the middle value for odd counts and the mean of the two middle values for e
 counts after sorting. Name that population and count; this is a median of point
 statistics, not the p50 of pooled timing samples.
 
+The swap chart defaults to **Range by SKU**. `GET /api/v1/views/collectivex`
+with `swapView=range` (the default) returns `swap.ranges`: one band per run and
+SKU, holding at each block size the lowest (`lo`), median (`mid`) and highest
+(`hi`) value across that SKU's block counts, plus each block count's value in
+`members`. The median uses the same odd/even rule. `swapView=series` returns an
+empty `swap.ranges`, and `swap.points` always keeps every block-count series. The
+range is a spread across block counts, not a confidence interval.
+
 `roundtrip_token_rate_at_latency_percentile` belongs to each point, beside
 `components`. The latency, activation/payload data rates, and `payload_bytes`
 belong inside each component. Check availability at the field's documented object

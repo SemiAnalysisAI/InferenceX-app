@@ -20,65 +20,110 @@ import { collectiveXRunDasharray } from './data';
 import {
   formatSwapBytes,
   swapChartPoints,
+  swapRangeBands,
   swapRooflines,
   swapYAxis,
   type SwapChartPoint,
+  type SwapRangePoint,
   type SwapRoofline,
   type SwapYAxis,
 } from './swap-data';
 
 type LinearScale = d3.ScaleLinear<number, number>;
 
-/** Roofline names on the empty left side of the plot plus the axis-break marker. */
+type PlotGroup = d3.Selection<SVGGElement, unknown, null, undefined>;
+
+/** Pixel span of the axis break (top < bottom), or null when the axis has no break. */
+function breakSpan(yScale: LinearScale, rooflines: SwapRoofline[], axis: SwapYAxis) {
+  const cut = axis.breakAt;
+  if (cut === null) return null;
+  const firstFar = rooflines.map((r) => axis.toPlot(r.gbps)).find((y) => y > cut);
+  if (firstFar === undefined) return null;
+  return {
+    top: yScale(cut + (firstFar - cut) * 0.5),
+    bottom: yScale(cut + (firstFar - cut) * 0.15),
+  };
+}
+
+/**
+ * Roofline names on the empty left of the plot, plus the axis break: a card-coloured gap across
+ * the plot (hiding gridlines) and, on the y-axis itself, a gap in the axis line capped by two
+ * parallel slashes. The axis marks live in the axis group because the plot group is clipped.
+ */
 function drawRooflineAnnotations(
-  group: d3.Selection<SVGGElement, unknown, null, undefined>,
+  group: PlotGroup,
   yScale: LinearScale,
   width: number,
+  height: number,
   rooflines: SwapRoofline[],
   axis: SwapYAxis,
 ) {
-  const firstFar = rooflines
-    .map((r) => axis.toPlot(r.gbps))
-    .find((y) => y > (axis.breakAt ?? Infinity));
-  const breaks =
-    axis.breakAt !== null && firstFar !== undefined
-      ? [
-          {
-            low: yScale(axis.breakAt),
-            high: yScale(axis.breakAt + (firstFar - axis.breakAt) * 0.45),
-          },
-        ]
-      : [];
+  const span = breakSpan(yScale, rooflines, axis);
+  const spans = span && span.bottom > 0 && span.top < height ? [span] : [];
   group
-    .selectAll<SVGRectElement, (typeof breaks)[number]>('rect.swap-axis-break')
-    .data(breaks)
+    .selectAll<SVGRectElement, (typeof spans)[number]>('rect.swap-axis-break')
+    .data(spans)
     .join('rect')
     .attr('class', 'swap-axis-break')
+    .attr('data-testid', 'swap-axis-break')
     .attr('x', 0)
     .attr('width', width)
-    .attr('y', (b) => b.high)
-    .attr('height', (b) => Math.max(0, b.low - b.high))
+    .attr('y', (b) => b.top)
+    .attr('height', (b) => b.bottom - b.top)
     .attr('fill', 'var(--card)');
-  group
-    .selectAll<SVGPathElement, (typeof breaks)[number]>('path.swap-axis-break-mark')
-    .data(breaks.flatMap((b) => [b.low, b.high]))
-    .join('path')
-    .attr('class', 'swap-axis-break-mark')
-    .attr('d', (y) => `M0,${y + 3}L10,${y - 3}`)
-    .attr('stroke', 'var(--muted-foreground)')
-    .attr('stroke-width', 1.5)
-    .attr('fill', 'none');
+  const svg = group.node()?.ownerSVGElement;
+  const yAxisGroup = svg ? d3.select(svg).select<SVGGElement>('g.y-axis') : null;
+  if (yAxisGroup && !yAxisGroup.empty()) {
+    const stroke = yAxisGroup.select('path.domain').attr('stroke') ?? 'currentColor';
+    const marks = yAxisGroup
+      .selectAll<SVGGElement, (typeof spans)[number]>('g.swap-axis-break-mark')
+      .data(spans)
+      .join((enter) => {
+        const g = enter.append('g').attr('class', 'swap-axis-break-mark');
+        g.append('rect').attr('fill', 'var(--card)');
+        g.append('path').attr('fill', 'none').attr('stroke-width', 1.25);
+        return g;
+      });
+    marks
+      .select('rect')
+      .attr('x', -4)
+      .attr('width', 8)
+      .attr('y', (b) => b.top)
+      .attr('height', (b) => b.bottom - b.top);
+    marks
+      .select('path')
+      .attr('stroke', stroke)
+      .attr(
+        'd',
+        (b) => `M-5,${b.top + 2.5}L5,${b.top - 2.5}M-5,${b.bottom + 2.5}L5,${b.bottom - 2.5}`,
+      );
+  }
   group
     .selectAll<SVGTextElement, SwapRoofline>('text.swap-roofline-label')
     .data(rooflines, (r) => r.id)
     .join('text')
     .attr('class', 'swap-roofline-label')
     .attr('data-testid', 'swap-roofline-label')
-    .attr('x', 16)
+    .attr('x', 8)
     .attr('y', (r) => yScale(axis.toPlot(r.gbps)) - 6)
     .attr('fill', 'var(--muted-foreground)')
     .style('font-size', px(CHART_TYPE.annotation))
     .text((r) => `${r.path} · ${r.gbps.toLocaleString()} GB/s`);
+}
+
+const bandOf = (p: SwapChartPoint) => `${p.runId}__${p.sku}`;
+
+/** A plotted point: one block count's measurement, or a SKU range's median at one block size. */
+interface SwapDisplayPoint {
+  id: string;
+  x: number;
+  y: number;
+  legendId: string;
+  runId: string;
+  label: string;
+  colorKey: string;
+  series?: SwapChartPoint;
+  range?: SwapRangePoint;
 }
 
 /**
@@ -112,7 +157,15 @@ const STRINGS = {
     log: 'log',
     payload: 'Copied payload',
     description:
-      'Host-observed copy latency includes submission and CUDA synchronization. Bandwidth counts copied payload once (GB/s, linear). Each line holds the number of blocks fixed.',
+      'Host-observed copy latency includes submission and CUDA synchronization. Bandwidth counts copied payload once (GB/s, linear).',
+    view: 'Swap-block view',
+    viewSeries: 'Series',
+    viewRange: 'Range by SKU',
+    seriesNote: 'Each line holds the number of blocks fixed.',
+    rangeNote:
+      'Each band spans the lowest to the highest value across block counts at that block size; the line is their median.',
+    rangeMedian: 'Median',
+    rangeHeading: 'Range across block counts',
     roofline: 'Nominal hardware roofline',
     rooflineNote:
       'Host transfers use one-way link bandwidth per GPU. Same-GPU copies use HBM bandwidth ÷ 2 (read + write); warm-cache points can exceed that HBM reference. Actual throughput also depends on host memory and placement.',
@@ -143,7 +196,14 @@ const STRINGS = {
     log: '对数',
     payload: '复制的有效载荷',
     description:
-      '主机侧观测的复制延迟包含提交和 CUDA 同步时间。带宽按复制的有效载荷计算一次（GB/s，线性坐标）。每条线对应固定的块数量。',
+      '主机侧观测的复制延迟包含提交和 CUDA 同步时间。带宽按复制的有效载荷计算一次（GB/s，线性坐标）。',
+    view: '块交换视图',
+    viewSeries: '序列',
+    viewRange: '按 SKU 显示范围',
+    seriesNote: '每条线对应固定的块数量。',
+    rangeNote: '每个色带覆盖该块大小下各块数量的最低值到最高值，线为其中位数。',
+    rangeMedian: '中位数',
+    rangeHeading: '各块数量的范围',
     roofline: '标称硬件带宽上限',
     rooflineNote:
       '主机与 GPU 之间的传输按每个 GPU 的单向链路带宽计算。同一 GPU 内的复制按 HBM 带宽 ÷ 2（读 + 写）计算；缓存命中的数据点可能高于这一 HBM 参考线。实际吞吐量还受主机内存和内存放置位置影响。',
@@ -169,6 +229,7 @@ export function CollectiveXSwapSection({
   const [direction, setDirection] = useState<CollectiveXSwapPoint['direction']>('h2d');
   const [layout, setLayout] = useState<CollectiveXSwapPoint['layout']>('contiguous');
   const [percentile, setPercentile] = useState<CollectiveXPercentile>('p50');
+  const [view, setView] = useState<'series' | 'range'>('range');
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState(true);
   const allPoints = useMemo(
@@ -179,22 +240,101 @@ export function CollectiveXSwapSection({
     () => allPoints.filter((p) => !hidden.has(p.seriesId)),
     [allPoints, hidden],
   );
-  const series = useMemo(
-    () => [...new Map(allPoints.map((p) => [p.seriesId, p])).values()],
-    [allPoints],
-  );
+  const seriesByBand = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const p of allPoints) {
+      const ids = map.get(bandOf(p)) ?? [];
+      if (!ids.includes(p.seriesId)) ids.push(p.seriesId);
+      map.set(bandOf(p), ids);
+    }
+    return map;
+  }, [allPoints]);
+  // SKU colours in range view (one per SKU); SKU x block-count colours in series view.
   const colorKeys = useMemo(
-    () => [...new Set(allPoints.map((p) => p.colorKey))].sort(),
-    [allPoints],
+    () => [...new Set(allPoints.map((p) => (view === 'range' ? p.sku : p.colorKey)))].toSorted(),
+    [allPoints, view],
   );
-  const color = (p: SwapChartPoint) => d3.schemeTableau10[colorKeys.indexOf(p.colorKey) % 10];
+  const colorOf = (key: string) => d3.schemeTableau10[colorKeys.indexOf(key) % 10];
+  const bands = useMemo(() => swapRangeBands(points, metric), [points, metric]);
+  const display: SwapDisplayPoint[] = useMemo(
+    () =>
+      view === 'range'
+        ? bands.flatMap((band) =>
+            band.points.map((range) => ({
+              id: `${band.id}:${range.x}`,
+              x: range.x,
+              y: range.mid,
+              legendId: band.id,
+              runId: band.runId,
+              label: band.device,
+              colorKey: band.sku,
+              range,
+            })),
+          )
+        : points.map((p) => ({
+            id: `${p.seriesId}:${p.x}`,
+            x: p.x,
+            y: p.y,
+            legendId: p.seriesId,
+            runId: p.runId,
+            label: p.device,
+            colorKey: p.colorKey,
+            series: p,
+          })),
+    [view, bands, points],
+  );
   const lines = useMemo(() => {
     const grouped: Record<string, { x: number; y: number }[]> = {};
-    for (const p of points) (grouped[p.seriesId] ??= []).push({ x: p.x, y: p.y });
+    for (const p of display) (grouped[p.legendId] ??= []).push({ x: p.x, y: p.y });
     for (const line of Object.values(grouped)) line.sort((a, b) => a.x - b.x);
     return grouped;
-  }, [points]);
-  const byId = new Map(series.map((p) => [p.seriesId, p]));
+  }, [display]);
+  const legendEntries = useMemo(
+    () =>
+      view === 'range'
+        ? [...seriesByBand].map(([id, ids]) => {
+            const p = allPoints.find((item) => bandOf(item) === id)!;
+            return {
+              id,
+              label: p.device,
+              colorKey: p.sku,
+              runId: p.runId,
+              active: ids.some((sid) => !hidden.has(sid)),
+            };
+          })
+        : [...new Map(allPoints.map((p) => [p.seriesId, p])).values()].map((p) => ({
+            id: p.seriesId,
+            label: `${p.device} · ${t.blocks(p.row.num_blocks)}`,
+            colorKey: p.colorKey,
+            runId: p.runId,
+            active: !hidden.has(p.seriesId),
+          })),
+    [view, seriesByBand, allPoints, hidden, t],
+  );
+  const lineMeta = new Map(display.map((p) => [p.legendId, p]));
+  // Always mounted, so leaving the range view redraws it empty.
+  const drawRangeBands = (group: PlotGroup, xScale: unknown, yScale: unknown) => {
+    const x = xScale as d3.ScaleLogarithmic<number, number>;
+    const y = yScale as d3.ScaleContinuousNumeric<number, number>;
+    const area = d3
+      .area<SwapRangePoint>()
+      .x((d) => x(d.x))
+      .y0((d) => y(d.lo))
+      .y1((d) => y(d.hi))
+      .curve(d3.curveLinear);
+    group
+      .selectAll<SVGPathElement, (typeof bands)[number]>('path.swap-range-band')
+      .data(view === 'range' ? bands : [], (band) => band.id)
+      .join('path')
+      .attr('class', 'swap-range-band')
+      .attr('data-testid', 'swap-range-band')
+      .attr('fill', (band) => colorOf(band.sku))
+      .attr('fill-opacity', 0.18)
+      .attr('stroke', (band) => colorOf(band.sku))
+      .attr('stroke-opacity', 0.35)
+      .attr('stroke-width', 0.75)
+      .attr('d', (band) => area(band.points));
+  };
   const xValues = [...new Set(points.map((p) => p.x))].sort((a, b) => a - b);
   const xMin = xValues[0] ?? 1;
   const xMax = xValues.at(-1) ?? 10;
@@ -211,9 +351,13 @@ export function CollectiveXSwapSection({
   const skipped = results.reduce((n, r) => n + r.skipped_points, 0);
   const toggle = (id: string) => {
     setHidden((prev) => {
+      const ids = seriesByBand.get(id) ?? [id];
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      const show = ids.every((sid) => next.has(sid));
+      for (const sid of ids) {
+        if (show) next.delete(sid);
+        else next.add(sid);
+      }
       return next;
     });
     track('collectivex_swap_series_toggled', { series: id });
@@ -221,13 +365,28 @@ export function CollectiveXSwapSection({
   return (
     <Card data-testid="collectivex-swap-section" className="min-w-0 overflow-hidden">
       <Heading level="card">{t.heading}</Heading>
-      <p className="mt-1 text-sm text-muted-foreground">{t.description}</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {t.description} {view === 'range' ? t.rangeNote : t.seriesNote}
+      </p>
       {skipped > 0 && (
         <p className="mt-1 text-xs text-muted-foreground">
           {skipped} {t.skipped}
         </p>
       )}
       <div className="my-3 flex flex-wrap gap-3">
+        <SegmentedToggle
+          value={view}
+          options={[
+            { value: 'range', label: t.viewRange },
+            { value: 'series', label: t.viewSeries },
+          ]}
+          onValueChange={(v) => {
+            setView(v);
+            track('collectivex_swap_view_changed', { view: v });
+          }}
+          ariaLabel={t.view}
+          testId="swap-view"
+        />
         <SegmentedToggle
           value={metric}
           options={[
@@ -297,10 +456,10 @@ export function CollectiveXSwapSection({
           <p className="mt-1">{t.rooflineNote}</p>
         </div>
       )}
-      <D3Chart<SwapChartPoint>
+      <D3Chart<SwapDisplayPoint>
         chartId="collectivex-swap"
         testId="collectivex-swap-chart"
-        data={points}
+        data={display}
         height={440}
         margin={{ top: 24, right: 24, bottom: 65, left: 82 }}
         watermark="logo"
@@ -360,27 +519,33 @@ export function CollectiveXSwapSection({
             key: 'swap-lines',
             lines,
             config: {
-              getColor: (key) => color(byId.get(key)!),
+              getColor: (key) => colorOf(lineMeta.get(key)!.colorKey),
               getStrokeDasharray: (key) =>
-                collectiveXRunDasharray(runIndexById.get(byId.get(key)!.runId) ?? 0),
-              strokeWidth: 1.75,
+                collectiveXRunDasharray(runIndexById.get(lineMeta.get(key)!.runId) ?? 0),
+              strokeWidth: view === 'range' ? 2 : 1.75,
               curve: d3.curveLinear,
             },
           },
           {
+            type: 'custom',
+            key: 'swap-range-bands',
+            render: (group, ctx) => drawRangeBands(group, ctx.xScale, ctx.yScale),
+            onZoom: (group, ctx) => drawRangeBands(group, ctx.newXScale, ctx.newYScale),
+          },
+          {
             type: 'point',
             key: 'swap-points',
-            data: points,
+            data: display,
             config: {
               getCx: () => 0,
               getCy: () => 0,
               getX: (p) => p.x,
               getY: (p) => p.y,
-              getColor: color,
+              getColor: (p) => colorOf(p.colorKey),
               getRadius: () => 3.5,
               stroke: 'var(--background)',
               strokeWidth: 1,
-              keyFn: (p) => `${p.seriesId}:${p.x}`,
+              keyFn: (p) => p.id,
               maxPoints: Infinity,
             },
           },
@@ -411,6 +576,7 @@ export function CollectiveXSwapSection({
                 group,
                 ctx.yScale as LinearScale,
                 ctx.width,
+                ctx.height,
                 rooflines,
                 yAxis,
               ),
@@ -419,27 +585,47 @@ export function CollectiveXSwapSection({
                 group,
                 ctx.newYScale as LinearScale,
                 ctx.width,
+                ctx.height,
                 rooflines,
                 yAxis,
               ),
           },
         ]}
         tooltip={{
-          attachToLayer: 1,
+          attachToLayer: 2,
           rulerType: 'crosshair',
-          content: (p) =>
-            chartHoverCard({
-              title: p.device,
-              subtitle: `${t.blocks(p.row.num_blocks)} · ${formatSwapBytes(p.x)}`,
-              color: color(p),
-              metrics: [
-                {
-                  value: p.y.toFixed(3),
-                  label: `${percentile} (${metric === 'bandwidth' ? 'GB/s' : 'µs'})`,
-                },
-              ],
-              summary: `${t.payload}: ${formatSwapBytes(p.row.payload_bytes)} · ${p.row.sample_count} ${t.samples} · ${t.verified}`,
-            }),
+          content: (p) => {
+            const unit = `${percentile} (${metric === 'bandwidth' ? 'GB/s' : 'µs'})`;
+            if (p.range) {
+              const range = p.range;
+              return chartHoverCard({
+                title: p.label,
+                subtitle: formatSwapBytes(p.x),
+                color: colorOf(p.colorKey),
+                metrics: [
+                  { value: range.mid.toFixed(3), label: `${t.rangeMedian} · ${unit}` },
+                  {
+                    value: `${range.lo.toFixed(2)} – ${range.hi.toFixed(2)}`,
+                    label: t.rangeHeading,
+                  },
+                ],
+                body: range.members
+                  .map(
+                    (m) =>
+                      `<div style="display: flex; justify-content: space-between; gap: 12px; font-size: 11px; line-height: 15px; font-variant-numeric: tabular-nums;"><span style="color: var(--muted-foreground);">${t.blocks(m.numBlocks)}</span><span>${m.y.toFixed(3)}</span></div>`,
+                  )
+                  .join(''),
+              });
+            }
+            const row = p.series!.row;
+            return chartHoverCard({
+              title: p.label,
+              subtitle: `${t.blocks(row.num_blocks)} · ${formatSwapBytes(p.x)}`,
+              color: colorOf(p.colorKey),
+              metrics: [{ value: p.y.toFixed(3), label: unit }],
+              summary: `${t.payload}: ${formatSwapBytes(row.payload_bytes)} · ${row.sample_count} ${t.samples} · ${t.verified}`,
+            });
+          },
           getRulerX: (p, scale) => (scale as d3.ScaleLogarithmic<number, number>)(p.x),
           getRulerY: (p, scale) => scale(p.y),
         }}
@@ -451,7 +637,7 @@ export function CollectiveXSwapSection({
         }}
         instructions={t.instructions}
         noDataOverlay={
-          points.length === 0 ? (
+          display.length === 0 ? (
             <p className="absolute inset-0 flex items-center justify-center pointer-events-none text-sm text-muted-foreground">
               {t.noData}
             </p>
@@ -465,19 +651,19 @@ export function CollectiveXSwapSection({
             onItemRemove={toggle}
             reset={{
               id: 'collectivex-swap-reset-filter',
-              disabled: series.every((p) => !hidden.has(p.seriesId)),
+              disabled: hidden.size === 0,
               onClick: () => {
                 setHidden(new Set());
                 track('collectivex_swap_filter_reset');
               },
             }}
-            legendItems={series.map((p) => ({
-              name: p.seriesId,
-              label: `${p.device} · ${t.blocks(p.row.num_blocks)}`,
-              color: color(p),
-              lineDasharray: collectiveXRunDasharray(runIndexById.get(p.runId) ?? 0),
-              isActive: !hidden.has(p.seriesId),
-              onClick: () => toggle(p.seriesId),
+            legendItems={legendEntries.map((entry) => ({
+              name: entry.id,
+              label: entry.label,
+              color: colorOf(entry.colorKey),
+              lineDasharray: collectiveXRunDasharray(runIndexById.get(entry.runId) ?? 0),
+              isActive: entry.active,
+              onClick: () => toggle(entry.id),
             }))}
           />
         }

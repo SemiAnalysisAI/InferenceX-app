@@ -145,3 +145,73 @@ export function swapYAxis(dataMax: number, rooflineGbps: number[]): SwapYAxis {
     },
   };
 }
+
+/** One block count's value inside a SKU range at one block size. */
+export interface SwapRangeMember {
+  seriesId: string;
+  numBlocks: number;
+  y: number;
+}
+
+/** A SKU's lowest, median and highest value across block counts at one block size. */
+export interface SwapRangePoint {
+  x: number;
+  lo: number;
+  mid: number;
+  hi: number;
+  /** Best first: highest bandwidth or lowest latency. */
+  members: SwapRangeMember[];
+}
+
+/** Every block count of one SKU in one run, combined into one band. */
+export interface SwapRangeBand {
+  id: string;
+  runId: string;
+  sku: string;
+  device: string;
+  points: SwapRangePoint[];
+}
+
+/**
+ * Combine swap series into one band per (run, SKU): at each block size, the band spans the lowest
+ * to the highest value across block counts and its line is their median (mean of the two middle
+ * values for an even count), matching the EP "Range by SKU" view.
+ */
+export function swapRangeBands(
+  points: readonly SwapChartPoint[],
+  metric: 'latency' | 'bandwidth',
+): SwapRangeBand[] {
+  const bands = new Map<
+    string,
+    { band: Omit<SwapRangeBand, 'points'>; byX: Map<number, SwapRangeMember[]> }
+  >();
+  for (const p of points) {
+    const id = `${p.runId}__${p.sku}`;
+    let entry = bands.get(id);
+    if (!entry) {
+      entry = { band: { id, runId: p.runId, sku: p.sku, device: p.device }, byX: new Map() };
+      bands.set(id, entry);
+    }
+    const members = entry.byX.get(p.x) ?? [];
+    members.push({ seriesId: p.seriesId, numBlocks: p.row.num_blocks, y: p.y });
+    entry.byX.set(p.x, members);
+  }
+  return [...bands.values()]
+    .map(({ band, byX }) => ({
+      ...band,
+      points: [...byX]
+        .map(([x, members]) => {
+          const ys = members.map((m) => m.y).toSorted((a, b) => a - b);
+          const middle = Math.floor(ys.length / 2);
+          return {
+            x,
+            lo: ys[0],
+            mid: ys.length % 2 === 1 ? ys[middle] : (ys[middle - 1] + ys[middle]) / 2,
+            hi: ys.at(-1)!,
+            members: members.toSorted((a, b) => (metric === 'bandwidth' ? b.y - a.y : a.y - b.y)),
+          };
+        })
+        .toSorted((a, b) => a.x - b.x),
+    }))
+    .toSorted((a, b) => a.device.localeCompare(b.device) || a.runId.localeCompare(b.runId));
+}

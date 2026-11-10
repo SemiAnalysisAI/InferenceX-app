@@ -628,6 +628,13 @@ describe('CollectiveX swap_blocks', () => {
       .find('[data-testid="swap-roofline-label"]')
       .should('have.length', 1)
       .and('have.text', 'PCIe 5.0 x16 · 64 GB/s');
+    cy.get('@swapChart').find('[data-testid="swap-axis-break"]').should('have.length', 1);
+    // Range by SKU is the default: one band per SKU, its median point carries the range tooltip.
+    cy.get('@swapChart').find('[data-testid="swap-range-band"]').should('have.length', 1);
+    cy.get('@swapChart').find('.point').should('have.length', 2).last().click({ force: true });
+    cy.get('body').should('contain.text', 'Median · p50 (GB/s)').and('contain.text', '1 block');
+    cy.get('[data-testid="swap-view"]').contains('Series').click();
+    cy.get('@swapChart').find('[data-testid="swap-range-band"]').should('not.exist');
     cy.get('@swapChart').find('.point').should('have.length', 2).last().click({ force: true });
     cy.get('body')
       .should('contain.text', '32.768p50 (GB/s)')
@@ -656,6 +663,10 @@ describe('CollectiveX swap_blocks', () => {
     );
     cy.get('[data-testid="swap-metric"]').contains('延迟').click();
     cy.get('[data-testid="collectivex-swap-chart"]').should('contain.text', '块大小（字节，对数）');
+    cy.get('[data-testid="swap-view"]').should('contain.text', '按 SKU 显示范围');
+    cy.get('[data-testid="collectivex-swap-chart"] .point').last().click({ force: true });
+    cy.get('body').should('contain.text', '中位数').and('contain.text', '各块数量的范围');
+    cy.get('[data-testid="swap-view"]').contains('序列').click();
     cy.get('[data-testid="collectivex-swap-chart"] .point').last().click({ force: true });
     cy.get('body')
       .should('contain.text', '复制的有效载荷: 1 GiB')

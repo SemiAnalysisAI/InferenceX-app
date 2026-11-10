@@ -55,6 +55,7 @@ export const VIEW_QUERY_PARAMS = {
     'swapLayout',
     'swapMetric',
     'swapPercentile',
+    'swapView',
     'version',
     'yAxis',
   ],

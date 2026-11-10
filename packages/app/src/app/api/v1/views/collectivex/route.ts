@@ -11,7 +11,7 @@ import {
   normalizeCollectiveXSku,
   seriesMatchesSelection,
 } from '@/components/collectivex/data';
-import { swapChartPoints, swapRooflines } from '@/components/collectivex/swap-data';
+import { swapChartPoints, swapRangeBands, swapRooflines } from '@/components/collectivex/swap-data';
 import { cachedJson } from '@/lib/cache/api-cache';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 import {
@@ -164,9 +164,10 @@ export function GET(request: NextRequest) {
     const swapPercentile = parseEnumParam(
       s.get('swapPercentile'),
       'swapPercentile',
-      ['p50', 'p95', 'p99'],
+      ['p50', 'p90', 'p95', 'p99'],
       'p50',
     );
+    const swapView = parseEnumParam(s.get('swapView'), 'swapView', ['range', 'series'], 'range');
     const swapPoints = swapChartPoints(datasets, {
       direction: swapDirection,
       layout: swapLayout,
@@ -196,6 +197,7 @@ export function GET(request: NextRequest) {
         swapLayout,
         swapMetric,
         swapPercentile,
+        swapView,
         swapSeries: [...new Set(swapPoints.map((p) => p.seriesId))],
       },
       runs: list.runs.filter(
@@ -216,7 +218,11 @@ export function GET(request: NextRequest) {
           fit: fitAlphaBeta(item, operation, percentile),
         })),
       },
-      swap: { points: swapPoints, rooflines: swapRooflines(swapPoints, swapDirection) },
+      swap: {
+        points: swapPoints,
+        ranges: swapView === 'range' ? swapRangeBands(swapPoints, swapMetric) : [],
+        rooflines: swapRooflines(swapPoints, swapDirection),
+      },
       options: {
         epSizes,
         phases,

@@ -346,7 +346,11 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
   swapDirection: ['h2d (default), d2h or d2d.', 'h2d（默认）、d2h 或 d2d。'],
   swapLayout: ['contiguous (default) or random.', 'contiguous（默认）或 random。'],
   swapMetric: ['bandwidth (default) or latency.', 'bandwidth（默认）或 latency。'],
-  swapPercentile: ['p50 (default), p95 or p99.', 'p50（默认）、p95 或 p99。'],
+  swapPercentile: ['p50 (default), p90, p95 or p99.', 'p50（默认）、p90、p95 或 p99。'],
+  swapView: [
+    'range (default; swap.ranges holds one band per run and SKU: lowest, median and highest value across block counts at each block size) or series (swap.ranges is empty).',
+    'range（默认；swap.ranges 按运行和 SKU 各返回一个色带，包含每个块大小下各块数量的最低值、中位数和最高值）或 series（swap.ranges 为空）。',
+  ],
   backend: ['Backend filter; omit for all.', '后端筛选；省略时选择全部。'],
   sku: ['CollectiveX chip SKU filter; default all.', 'CollectiveX 芯片 SKU 筛选，默认 all。'],
   page: [
