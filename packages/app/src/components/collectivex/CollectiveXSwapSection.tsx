@@ -197,6 +197,10 @@ const STRINGS = {
     view: 'Swap-block view',
     viewSeries: 'Series',
     viewRange: 'Range by SKU',
+    viewBest: 'Best by SKU',
+    bestNote:
+      'Each line is the best value (highest bandwidth, lowest latency) across block counts at that block size; the tooltip names the block count.',
+    best: 'Best',
     seriesNote: 'Each line holds the number of blocks fixed.',
     rangeNote:
       'Each band spans the lowest to the highest value across block counts at that block size; the line is their median.',
@@ -236,6 +240,10 @@ const STRINGS = {
     view: '块交换视图',
     viewSeries: '序列',
     viewRange: '按 SKU 显示范围',
+    viewBest: '按 SKU 显示最佳',
+    bestNote:
+      '每条线为该块大小下各块数量中的最佳值（带宽最高、延迟最低），提示框会标明对应的块数量。',
+    best: '最佳',
     seriesNote: '每条线对应固定的块数量。',
     rangeNote: '每个色带覆盖该块大小下各块数量的最低值到最高值，线为其中位数。',
     rangeMedian: '中位数',
@@ -265,10 +273,13 @@ export function CollectiveXSwapSection({
   const [direction, setDirection] = useState<CollectiveXSwapPoint['direction']>('h2d');
   const [layout, setLayout] = useState<CollectiveXSwapPoint['layout']>('contiguous');
   const [percentile, setPercentile] = useState<CollectiveXPercentile>('p50');
-  const [view, setView] = useState<'series' | 'range'>('range');
+  const [view, setView] = useState<'best' | 'range' | 'series'>('best');
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState(true);
   const cardRef = useRef<HTMLDivElement>(null);
+  // Legend entry of the pinned point, so its spotlight survives hover-end until the pin is dismissed.
+  const pinnedRef = useRef<string | null>(null);
+  const bySku = view !== 'series';
   const allPoints = useMemo(
     () => swapChartPoints(datasets, { metric, direction, layout, percentile }),
     [datasets, metric, direction, layout, percentile],
@@ -286,21 +297,22 @@ export function CollectiveXSwapSection({
     }
     return map;
   }, [allPoints]);
-  // SKU colours in range view (one per SKU); SKU x block-count colours in series view.
+  // One colour per SKU in the SKU views; SKU x block-count colours in the series view.
   const colorKeys = useMemo(
-    () => [...new Set(allPoints.map((p) => (view === 'range' ? p.sku : p.colorKey)))].toSorted(),
-    [allPoints, view],
+    () => [...new Set(allPoints.map((p) => (bySku ? p.sku : p.colorKey)))].toSorted(),
+    [allPoints, bySku],
   );
   const colorOf = (key: string) => d3.schemeTableau10[colorKeys.indexOf(key) % 10];
   const bands = useMemo(() => swapRangeBands(points, metric), [points, metric]);
   const display: SwapDisplayPoint[] = useMemo(
     () =>
-      view === 'range'
+      bySku
         ? bands.flatMap((band) =>
             band.points.map((range) => ({
               id: `${band.id}:${range.x}`,
               x: range.x,
-              y: range.mid,
+              // Members are sorted best first: highest bandwidth or lowest latency.
+              y: view === 'best' ? range.members[0].y : range.mid,
               legendId: band.id,
               runId: band.runId,
               label: collectiveXSkuLabel(band.sku),
@@ -318,7 +330,7 @@ export function CollectiveXSwapSection({
             colorKey: p.colorKey,
             series: p,
           })),
-    [view, bands, points],
+    [bySku, view, bands, points],
   );
   const lines = useMemo(() => {
     const grouped: Record<string, { x: number; y: number }[]> = {};
@@ -328,7 +340,7 @@ export function CollectiveXSwapSection({
   }, [display]);
   const legendEntries = useMemo(
     () =>
-      view === 'range'
+      bySku
         ? [...seriesByBand].map(([id, ids]) => {
             const p = allPoints.find((item) => bandOf(item) === id)!;
             return {
@@ -346,7 +358,7 @@ export function CollectiveXSwapSection({
             runId: p.runId,
             active: !hidden.has(p.seriesId),
           })),
-    [view, seriesByBand, allPoints, hidden, t],
+    [bySku, seriesByBand, allPoints, hidden, t],
   );
   const lineMeta = new Map(display.map((p) => [p.legendId, p]));
   // Always mounted, so leaving the range view redraws it empty.
@@ -406,7 +418,7 @@ export function CollectiveXSwapSection({
       {/* Both view notes share one grid cell so the taller one reserves the height and switching
           views does not move the controls and chart below. */}
       <div className="mt-1 grid text-sm text-muted-foreground">
-        {(['range', 'series'] as const).map((note) => (
+        {(['best', 'range', 'series'] as const).map((note) => (
           <p
             key={note}
             aria-hidden={note !== view}
@@ -414,7 +426,8 @@ export function CollectiveXSwapSection({
               note === view ? 'col-start-1 row-start-1' : 'invisible col-start-1 row-start-1'
             }
           >
-            {t.description} {note === 'range' ? t.rangeNote : t.seriesNote}
+            {t.description}{' '}
+            {note === 'best' ? t.bestNote : note === 'range' ? t.rangeNote : t.seriesNote}
           </p>
         ))}
       </div>
@@ -427,6 +440,7 @@ export function CollectiveXSwapSection({
         <SegmentedToggle
           value={view}
           options={[
+            { value: 'best', label: t.viewBest },
             { value: 'range', label: t.viewRange },
             { value: 'series', label: t.viewSeries },
           ]}
@@ -562,84 +576,104 @@ export function CollectiveXSwapSection({
             return value === null ? '' : d3.format('.3~s')(value);
           },
         }}
-        layers={[
-          {
-            type: 'line',
-            key: 'swap-lines',
-            lines,
-            config: {
-              getColor: (key) => colorOf(lineMeta.get(key)!.colorKey),
-              getStrokeDasharray: (key) =>
-                collectiveXRunDasharray(runIndexById.get(lineMeta.get(key)!.runId) ?? 0),
-              strokeWidth: view === 'range' ? 2 : 1.75,
-              curve: d3.curveLinear,
-            },
-          },
-          {
-            type: 'custom',
-            key: 'swap-range-bands',
-            render: (group, ctx) => drawRangeBands(group, ctx.xScale, ctx.yScale),
-            onZoom: (group, ctx) => drawRangeBands(group, ctx.newXScale, ctx.newYScale),
-          },
-          {
-            type: 'point',
-            key: 'swap-points',
-            data: display,
-            config: {
-              getCx: () => 0,
-              getCy: () => 0,
-              getX: (p) => p.x,
-              getY: (p) => p.y,
-              getColor: (p) => colorOf(p.colorKey),
-              getRadius: () => 3.5,
-              stroke: 'var(--background)',
-              strokeWidth: 1,
-              keyFn: (p) => p.id,
-              maxPoints: Infinity,
-            },
-          },
-          {
-            type: 'roofline',
-            key: 'swap-rooflines',
-            rooflines: Object.fromEntries(
-              rooflines.map((roof) => [
-                roof.id,
-                [
-                  { x: xMin / 1.2, y: yAxis.toPlot(roof.gbps) },
-                  { x: xMax * 1.2, y: yAxis.toPlot(roof.gbps) },
-                ],
-              ]),
-            ),
-            config: {
-              getColor: () => 'var(--muted-foreground)',
-              strokeDasharray: '6 4',
-              strokeWidth: 1.5,
-              curve: d3.curveLinear,
-            },
-          },
-          {
-            type: 'custom',
-            key: 'swap-roofline-labels',
-            render: (group, ctx) =>
-              drawRooflineAnnotations(
-                group,
-                ctx.yScale as LinearScale,
-                ctx.width,
-                ctx.height,
-                rooflines,
-                yAxis,
-              ),
-            onZoom: (group, ctx) =>
-              drawRooflineAnnotations(
-                group,
-                ctx.newYScale as LinearScale,
-                ctx.width,
-                ctx.height,
-                rooflines,
-                yAxis,
-              ),
-          },
-        ]}
+        // With nothing to plot, pass no layers so D3Chart clears the SVG and shows only the
+        // no-data message instead of axes on a fallback domain.
+        layers={
+          display.length === 0
+            ? []
+            : [
+                // Bands first so the median lines and points paint on top of their fill.
+                {
+                  type: 'custom',
+                  key: 'swap-range-bands',
+                  render: (group, ctx) => drawRangeBands(group, ctx.xScale, ctx.yScale),
+                  onZoom: (group, ctx) => drawRangeBands(group, ctx.newXScale, ctx.newYScale),
+                },
+                {
+                  type: 'line',
+                  key: 'swap-lines',
+                  lines,
+                  config: {
+                    getColor: (key) => colorOf(lineMeta.get(key)!.colorKey),
+                    getStrokeDasharray: (key) =>
+                      collectiveXRunDasharray(runIndexById.get(lineMeta.get(key)!.runId) ?? 0),
+                    strokeWidth: bySku ? 2 : 1.75,
+                    curve: d3.curveLinear,
+                  },
+                },
+                {
+                  type: 'point',
+                  key: 'swap-points',
+                  data: display,
+                  config: {
+                    getCx: () => 0,
+                    getCy: () => 0,
+                    getX: (p) => p.x,
+                    getY: (p) => p.y,
+                    getColor: (p) => colorOf(p.colorKey),
+                    getRadius: () => 3.5,
+                    stroke: 'var(--background)',
+                    strokeWidth: 1,
+                    keyFn: (p) => p.id,
+                    maxPoints: Infinity,
+                  },
+                },
+                {
+                  type: 'roofline',
+                  key: 'swap-rooflines',
+                  rooflines: Object.fromEntries(
+                    rooflines.map((roof) => [
+                      roof.id,
+                      [
+                        { x: xMin / 1.2, y: yAxis.toPlot(roof.gbps) },
+                        { x: xMax * 1.2, y: yAxis.toPlot(roof.gbps) },
+                      ],
+                    ]),
+                  ),
+                  config: {
+                    getColor: () => 'var(--muted-foreground)',
+                    strokeDasharray: '6 4',
+                    strokeWidth: 1.5,
+                    curve: d3.curveLinear,
+                  },
+                },
+                {
+                  type: 'custom',
+                  key: 'swap-roofline-labels',
+                  render: (group, ctx) => {
+                    // A click that leaves no tooltip open dismissed the pin: clear its spotlight.
+                    const svg = group.node()?.ownerSVGElement;
+                    if (svg)
+                      d3.select(svg).on('click.swap-spotlight', () => {
+                        setTimeout(() => {
+                          const tip = ctx.tooltipElement.style;
+                          if (tip.display === 'none' || tip.opacity === '0') {
+                            pinnedRef.current = null;
+                            spotlightSwap(cardRef.current, null, rooflineIds);
+                          }
+                        }, 0);
+                      });
+                    drawRooflineAnnotations(
+                      group,
+                      ctx.yScale as LinearScale,
+                      ctx.width,
+                      ctx.height,
+                      rooflines,
+                      yAxis,
+                    );
+                  },
+                  onZoom: (group, ctx) =>
+                    drawRooflineAnnotations(
+                      group,
+                      ctx.newYScale as LinearScale,
+                      ctx.width,
+                      ctx.height,
+                      rooflines,
+                      yAxis,
+                    ),
+                },
+              ]
+        }
         tooltip={{
           attachToLayer: 2,
           rulerType: 'crosshair',
@@ -647,12 +681,18 @@ export function CollectiveXSwapSection({
             const unit = `${percentile} (${metric === 'bandwidth' ? 'GB/s' : 'µs'})`;
             if (p.range) {
               const range = p.range;
+              const top = range.members[0];
               return chartHoverCard({
                 title: p.label,
                 subtitle: formatSwapBytes(p.x),
                 color: colorOf(p.colorKey),
                 metrics: [
-                  { value: range.mid.toFixed(3), label: `${t.rangeMedian} · ${unit}` },
+                  view === 'best'
+                    ? {
+                        value: top.y.toFixed(3),
+                        label: `${t.best} · ${t.blocks(top.numBlocks)} · ${unit}`,
+                      }
+                    : { value: range.mid.toFixed(3), label: `${t.rangeMedian} · ${unit}` },
                   {
                     value: `${range.lo.toFixed(2)} – ${range.hi.toFixed(2)}`,
                     label: t.rangeHeading,
@@ -683,7 +723,12 @@ export function CollectiveXSwapSection({
           },
           onHoverEnd: (selection) => {
             selection.attr('r', 3.5);
-            spotlightSwap(cardRef.current, null, rooflineIds);
+            spotlightSwap(cardRef.current, pinnedRef.current, rooflineIds);
+          },
+          // Hover callbacks stop while a point is pinned, so pinning keeps that point's spotlight.
+          onPointClick: (p) => {
+            pinnedRef.current = p.legendId;
+            spotlightSwap(cardRef.current, p.legendId, rooflineIds);
           },
         }}
         zoom={{
@@ -707,7 +752,7 @@ export function CollectiveXSwapSection({
             <ChartLegend
               variant="sidebar"
               onItemHover={(id) => spotlightSwap(cardRef.current, id, rooflineIds)}
-              onItemHoverEnd={() => spotlightSwap(cardRef.current, null, rooflineIds)}
+              onItemHoverEnd={() => spotlightSwap(cardRef.current, pinnedRef.current, rooflineIds)}
               isLegendExpanded={expanded}
               onExpandedChange={setExpanded}
               onItemRemove={toggle}

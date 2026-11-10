@@ -167,7 +167,12 @@ export function GET(request: NextRequest) {
       ['p50', 'p90', 'p95', 'p99'],
       'p50',
     );
-    const swapView = parseEnumParam(s.get('swapView'), 'swapView', ['range', 'series'], 'range');
+    const swapView = parseEnumParam(
+      s.get('swapView'),
+      'swapView',
+      ['best', 'range', 'series'],
+      'best',
+    );
     const swapPoints = swapChartPoints(datasets, {
       direction: swapDirection,
       layout: swapLayout,
@@ -220,7 +225,8 @@ export function GET(request: NextRequest) {
       },
       swap: {
         points: swapPoints,
-        ranges: swapView === 'range' ? swapRangeBands(swapPoints, swapMetric) : [],
+        // Best and Range by SKU share the bands: best is members[0], range is lo/mid/hi.
+        ranges: swapView === 'series' ? [] : swapRangeBands(swapPoints, swapMetric),
         rooflines: swapRooflines(swapPoints, swapDirection),
       },
       options: {

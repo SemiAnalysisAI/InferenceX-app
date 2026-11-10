@@ -32,10 +32,10 @@ const get = async (query: string) => {
 };
 
 describe('GET /api/v1/views/collectivex swap view', () => {
-  it('defaults to the Range by SKU view and returns the dashboard bands', async () => {
+  it('defaults to the Best by SKU view and returns the dashboard bands', async () => {
     const res = await get('?swapPercentile=p90');
     const body = await res.json();
-    expect(body.params).toMatchObject({ swapView: 'range', swapPercentile: 'p90' });
+    expect(body.params).toMatchObject({ swapView: 'best', swapPercentile: 'p90' });
     const points = swapChartPoints([dataset], {
       direction: 'h2d',
       layout: 'contiguous',
@@ -45,6 +45,11 @@ describe('GET /api/v1/views/collectivex swap view', () => {
     expect(body.swap.points).toHaveLength(points.length);
     expect(body.swap.ranges).toEqual(swapRangeBands(points, 'bandwidth'));
     expect(body.swap.ranges.length).toBeGreaterThan(0);
+    // Best and Range by SKU share the same bands; only the plotted value differs.
+    const rangeRes = await get('?swapPercentile=p90&swapView=range');
+    const range = await rangeRes.json();
+    expect(range.params.swapView).toBe('range');
+    expect(range.swap.ranges).toEqual(body.swap.ranges);
   });
 
   it('returns no bands for the series view and rejects an unknown view', async () => {
@@ -53,7 +58,7 @@ describe('GET /api/v1/views/collectivex swap view', () => {
     expect(body.params.swapView).toBe('series');
     expect(body.swap.ranges).toEqual([]);
     expect(body.swap.points.length).toBeGreaterThan(0);
-    const bad = await get('?swapView=best');
+    const bad = await get('?swapView=max');
     expect(bad.status).toBe(400);
   });
 });
