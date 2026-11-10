@@ -48,6 +48,9 @@ export function writeStage(state: StageState) {
   replaceClientSearch(stageSearch(state, window.location.search));
 }
 
+/** Element id of the stage and its transport, which a reveal scrolls into view. */
+export const STAGE_ID = 'comparison-stage';
+
 /** A prompt's URL id: its case id, `~take` after the first take, `diag:` for the matched-noise rerun. */
 export function promptKey(group: ResultsClipGroup): string {
   const caseId = [...group.clips.values()][0]?.record.caseId ?? '';
@@ -87,7 +90,8 @@ export interface StageSubject {
   pending: boolean;
 }
 
-const SUBJECT_ORDER = ['b200', ...RESULTS_HARDWARE.filter((key) => key !== 'b200')];
+/** Hardware the stage prefers, in order: B200 first, then the roster. */
+export const SUBJECT_ORDER = ['b200', ...RESULTS_HARDWARE.filter((key) => key !== 'b200')];
 
 export const stagePointKey = (point: VideoPoint) => resultsPointKey({ point });
 

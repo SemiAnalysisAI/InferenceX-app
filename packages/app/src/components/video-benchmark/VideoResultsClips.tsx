@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronRight } from 'lucide-react';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { InfoHelp } from '@/components/ui/option-info';
@@ -15,6 +15,7 @@ import {
   pairedGroup,
   parseStage,
   promptKey,
+  STAGE_ID,
   STAGE_VIEWS,
   stageOptions,
   stagePointKey,
@@ -38,6 +39,7 @@ import {
 import { RESULTS_HARDWARE, resultMetadata, type ResultCell } from './results';
 import type { StoredArtifact } from './stored';
 import { videoClipSourceKey as sourceKey, type VideoInitialData } from './initial-data';
+import QualityMethod from './QualityMethod';
 import VideoClipReadout from './VideoClipReadout';
 import VideoClipStage, { SideDot, type StageClip } from './VideoClipStage';
 
@@ -159,8 +161,16 @@ export interface VideoResultsClipsProps {
   initialSides?: VideoInitialData['sides'];
   /** The chart points the two sides play, for the chart's Playing and Baseline badges. */
   onPairChange?: (pair: StagePair) => void;
-  /** Under the readout rows; the quality explainer fills it. */
-  readoutFooter?: ReactNode;
+  /**
+   * `StageOption.value` the reader picked; one the subject lacks shows the reference. Page state,
+   * so "See what changes" in the chart legend can pick the lossless twin.
+   */
+  against: string;
+  onAgainstChange: (value: string) => void;
+  /** Plays a point against a `StageOption.value` in Wipe and asks for a reveal. */
+  onShow: (point: VideoPoint, against: string) => void;
+  /** Counts reveal requests; each scrolls the stage into view and focuses it once its reads land. */
+  reveal: number;
 }
 
 const NO_POINTS: readonly VideoPoint[] = [];
@@ -178,7 +188,10 @@ export default function VideoResultsClips({
   unofficialRun,
   initialSides = {},
   onPairChange,
-  readoutFooter,
+  against,
+  onAgainstChange,
+  onShow,
+  reveal,
 }: VideoResultsClipsProps) {
   const s = STRINGS[useLocale()];
   const stage = parseStage(useClientSearch());
@@ -188,17 +201,17 @@ export default function VideoResultsClips({
     [points],
   );
   const picked = stage.clip ? drawn.find((p) => stagePointKey(p) === stage.clip) : undefined;
-  /** `StageOption.value` the reader picked; one the subject lacks shows the reference. */
-  const [against, setAgainst] = useState('reference');
   const cache = useRef(new Map<string, ResultsClipSide | null>(Object.entries(initialSides)));
   const [revision, setRevision] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState(false);
+  /** Sources whose last read failed; a source added since is still pending, not missing. */
+  const [failedKeys, setFailedKeys] = useState<ReadonlySet<string>>(new Set());
+  const failed = failedKeys.size > 0;
   const [retry, setRetry] = useState(0);
   /** Undefined while its read is in flight; null when there is none. */
   const sideOf = (point: VideoPoint) => {
     const key = sourceKey(point);
-    return cache.current.has(key) ? (cache.current.get(key) ?? null) : failed ? null : undefined;
+    if (cache.current.has(key)) return cache.current.get(key) ?? null;
+    return failedKeys.has(key) ? null : undefined;
   };
   const subject = useMemo(
     () =>
@@ -210,7 +223,7 @@ export default function VideoResultsClips({
         unofficialRun,
         stage.clip,
       ),
-    [selected, picked, revision, failed, unofficialRun, stage.clip],
+    [selected, picked, revision, failedKeys, unofficialRun, stage.clip],
   );
   const options = useMemo(() => {
     if (!subject) return [];
@@ -229,11 +242,12 @@ export default function VideoResultsClips({
   // Callers rebuild `points` on every render; reads restart only when the set of sides changes.
   const wantedKey = wantedPoints.map(sourceKey).join('\n');
   const wanted = useMemo(() => wantedPoints, [wantedKey]);
+  // Derived in render, so it is true from the render that asks for a new side, not one effect later.
+  const loading = wanted.some((point) => sideOf(point) === undefined);
   useEffect(() => {
     const controller = new AbortController();
     const missing = wanted.filter((point) => !cache.current.has(sourceKey(point)));
-    setLoading(missing.length > 0);
-    setFailed(false);
+    setFailedKeys((previous) => (previous.size > 0 ? new Set() : previous));
     void Promise.allSettled(
       missing.map(async (point) => {
         const read = (format: 'published' | 'live') =>
@@ -247,6 +261,7 @@ export default function VideoResultsClips({
         if (response.status === 204) {
           if (controller.signal.aborted) return null;
           cache.current.set(sourceKey(point), null);
+          setRevision((n) => n + 1);
           return null;
         }
         if (!response.ok) throw new Error('Published media read failed');
@@ -258,11 +273,26 @@ export default function VideoResultsClips({
       }),
     ).then((results) => {
       if (controller.signal.aborted) return;
-      setFailed(results.some((result) => result.status === 'rejected'));
-      setLoading(false);
+      setFailedKeys(
+        new Set(
+          missing
+            .filter((_, index) => results[index].status === 'rejected')
+            .map((point) => sourceKey(point)),
+        ),
+      );
     });
     return () => controller.abort();
   }, [wanted, retry, unofficialRun]);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const revealed = useRef(reveal);
+  // A read that lands restores the prompt row above the stage, so a reveal waits for every read.
+  useEffect(() => {
+    if (reveal === revealed.current || loading) return;
+    revealed.current = reveal;
+    document.querySelector(`#${STAGE_ID}`)?.scrollIntoView({ block: 'nearest' });
+    // Space and T act on the focused stage.
+    stageRef.current?.focus({ preventScroll: true });
+  }, [reveal, loading]);
   const playing = subject ? stagePointKey(subject.point) : null;
   const baseline = other ? stagePointKey(other) : null;
   useEffect(() => onPairChange?.({ playing, baseline }), [playing, baseline, onPairChange]);
@@ -470,12 +500,13 @@ export default function VideoResultsClips({
                     against: next?.kind,
                     gpu: next?.point?.hardwareKey ?? null,
                   });
-                  setAgainst(value);
+                  onAgainstChange(value);
                 }}
               />
             </div>
           )}
           <VideoClipStage
+            ref={stageRef}
             a={a}
             b={b}
             view={stage.view}
@@ -502,7 +533,11 @@ export default function VideoResultsClips({
               cost: other ? costs?.[other.id] : undefined,
             }}
             diagnostic={diagnostic}
-            footer={readoutFooter}
+          />
+          <QualityMethod
+            leads={selected.map((lead) => ({ point: lead, side: sideOf(lead) }))}
+            namedRun={unofficialRun}
+            onShowMe={(target) => onShow(target, 'reference')}
           />
           <details
             data-testid="video-results-sources"

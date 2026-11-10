@@ -49,6 +49,10 @@ it('keeps one clip audible, including after the overview is hidden and revealed'
         points={[point]}
         initialSides={{ [videoClipSourceKey(point)]: publishedResultsSide(fixture.stored, point) }}
         colorFor={() => 'black'}
+        against="reference"
+        onAgainstChange={() => {}}
+        onShow={() => {}}
+        reveal={0}
       />
     </Activity>
   );

@@ -38,6 +38,7 @@ import { hardwareLabel } from './hardware';
 import { compareDeployments, layoutLabel, leadCell, runtimeKey } from './deployment';
 import { engineLabel, engineSort } from './engines';
 import { useVideoPoints } from './use-video-points';
+import type { VideoPoint } from './metrics';
 import type { VideoInitialData } from './initial-data';
 import {
   DEFAULT_RESULTS_STATE,
@@ -71,7 +72,9 @@ import VideoDeploymentDetail from './VideoDeploymentDetail';
 import VideoResultsChart, { VIDEO_RESULTS_CHART_ID, type ClipLink } from './VideoResultsChart';
 import VideoCostContext from './VideoCostContext';
 import VideoResultsClips from './VideoResultsClips';
-import { isStageParam, parseStage, writeStage, type StagePair } from './clip-stage';
+import { isStageParam, parseStage, stagePointKey, writeStage, type StagePair } from './clip-stage';
+import { seeChangesPair } from './quality-method';
+import { LossyQualityHint } from './QualityMethod';
 import { resultsClipPoints } from './results-clips';
 import { ResultsBars, resultsNumber as n, type ResultBar } from './VideoResultsCharts';
 import VideoHistory from './VideoHistory';
@@ -287,6 +290,20 @@ export default function VideoDashboard({
   const [legendExpanded, setLegendExpanded] = useState(true);
   /** The chart points the clip stage plays, which the chart badges. */
   const [stagePair, setStagePair] = useState<StagePair>({ playing: null, baseline: null });
+  /** What the stage compares its subject with, by `StageOption.value`. */
+  const [against, setAgainst] = useState('reference');
+  /** Counts requests to bring the stage into view; the stage answers once its reads land. */
+  const [reveal, setReveal] = useState(0);
+  const requestReveal = useCallback(() => setReveal((count) => count + 1), []);
+  /** Plays `point` against the `compare` option in Wipe, then brings the stage into view. */
+  const showOnStage = useCallback(
+    (point: VideoPoint, compare: string) => {
+      setAgainst(compare);
+      writeStage({ ...parseStage(location.search), clip: stagePointKey(point), view: 'wipe' });
+      requestReveal();
+    },
+    [requestReveal],
+  );
   const onStagePair = useCallback(
     (pair: StagePair) =>
       setStagePair((previous) =>
@@ -298,10 +315,9 @@ export default function VideoDashboard({
     () => ({
       ...stagePair,
       onSelect: (key) => writeStage({ ...parseStage(location.search), clip: key }),
-      onReveal: () =>
-        document.querySelector('#comparison-clips')?.scrollIntoView({ block: 'nearest' }),
+      onReveal: requestReveal,
     }),
-    [stagePair],
+    [stagePair, requestReveal],
   );
   const overviewScroll = useRef(0);
   const pendingAnchor = useRef<string | null>(null);
@@ -539,6 +555,11 @@ export default function VideoDashboard({
   const deploymentPoints = useMemo(
     () => [...deploymentCells, ...projection.history].map((cell) => cell.point),
     [deploymentCells, projection.history],
+  );
+  const lossyPair = useMemo(
+    () =>
+      seeChangesPair(drawnPoints, deploymentPoints, { tier: state.costTier }, state.unofficialRun),
+    [drawnPoints, deploymentPoints, state.costTier, state.unofficialRun],
   );
   // A chart pick or a lossless twin may sit outside the cohort, so every cell lends its cost.
   const clipCosts = useMemo(
@@ -920,6 +941,12 @@ export default function VideoDashboard({
                 onOpen={openPoint}
                 clipLink={clipLink}
                 heading={heading}
+                lossyNote={
+                  <LossyQualityHint
+                    pair={lossyPair}
+                    onSeeChanges={({ lossy }) => showOnStage(lossy, 'twin')}
+                  />
+                }
                 footer={
                   <VideoCostContext
                     state={state}
@@ -943,6 +970,10 @@ export default function VideoDashboard({
               deployments={deploymentPoints}
               officialLeads={officialClipPoints}
               onPairChange={onStagePair}
+              against={against}
+              onAgainstChange={setAgainst}
+              onShow={showOnStage}
+              reveal={reveal}
               colorFor={colorFor}
               costs={clipCosts}
               unofficialRun={state.unofficialRun ?? undefined}

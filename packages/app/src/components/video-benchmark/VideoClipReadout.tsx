@@ -1,6 +1,5 @@
 'use client';
 
-import type { ReactNode } from 'react';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 import { speedVs, type StageOption } from './clip-stage';
@@ -10,6 +9,12 @@ import { lossyLabel, optimizationsOf } from './optimizations';
 import type { ResultCell } from './results';
 import type { ResultsClip } from './results-clips';
 import { SideDot, type StageClip } from './VideoClipStage';
+
+/** Why reference PSNR alone cannot judge a clip; the quality explainer says it too. */
+export const PIXELS_DIFFER = {
+  en: 'Different engines and parallel layouts produce different pixels from the same prompt and seed',
+  zh: '不同引擎或并行配置即使使用相同的 prompt 和 seed，生成的像素也会不同',
+} as const;
 
 const STRINGS = {
   en: {
@@ -46,7 +51,7 @@ const STRINGS = {
     incompatibleShort: 'Incompatible pair',
     incompatible: 'Paired media are incompatible; PSNR is unavailable.',
     psnrMeasured: (frames: number) =>
-      `Decoded RGB24 · all ${frames} frames · full-stream MSE. Descriptive cross-engine comparison; no quality pass/fail threshold. Different engines and parallel layouts produce different pixels from the same prompt and seed, so a low value alone does not indicate a defect.`,
+      `Decoded RGB24 · all ${frames} frames · full-stream MSE. Descriptive cross-engine comparison; no quality pass/fail threshold. ${PIXELS_DIFFER.en}, so a low value alone does not indicate a defect.`,
     energyNote:
       'Mean GPU-board joules per valid clip in the selected measurement cell; not a per-clip energy trace.',
     psnrNote: 'No sealed paired PSNR result is available for this clip.',
@@ -103,7 +108,7 @@ const STRINGS = {
     incompatibleShort: '配对不兼容',
     incompatible: '配对媒体不兼容，无法提供 PSNR。',
     psnrMeasured: (frames: number) =>
-      `解码后 RGB24 · 全部 ${frames} 帧 · 全流 MSE。仅作跨引擎数值对比，不设质量合格阈值。不同引擎或并行配置即使使用相同的 prompt 和 seed，生成的像素也会不同，因此仅凭 PSNR 偏低不能说明输出有问题。`,
+      `解码后 RGB24 · 全部 ${frames} 帧 · 全流 MSE。仅作跨引擎数值对比，不设质量合格阈值。${PIXELS_DIFFER.zh}，因此仅凭 PSNR 偏低不能说明输出有问题。`,
     energyNote: '所选测量单元每条有效视频的平均 GPU 板卡能耗，不是单条视频的能耗轨迹。',
     psnrNote: '此视频尚无已封存的配对 PSNR 结果。',
     unscored: {
@@ -348,16 +353,9 @@ export interface VideoClipReadoutProps {
   b: ReadoutSide;
   /** The matched-noise rerun carries PSNR only; the cell's time, energy and cost are not its own. */
   diagnostic: boolean;
-  footer?: ReactNode;
 }
 
-export default function VideoClipReadout({
-  kind,
-  a,
-  b: pair,
-  diagnostic,
-  footer,
-}: VideoClipReadoutProps) {
+export default function VideoClipReadout({ kind, a, b: pair, diagnostic }: VideoClipReadoutProps) {
   const locale = useLocale();
   const s = STRINGS[locale];
   // An unofficial run against its own GPU's official lead would otherwise read "B200 against B200".
@@ -371,54 +369,51 @@ export default function VideoClipReadout({
       data-testid="video-results-readout"
       data-pair={kind}
       aria-label={s.pair(a.name, b.name)}
-      className="space-y-3 text-xs"
+      aria-live="polite"
+      className="space-y-2 text-xs"
     >
-      {/* The footer stays outside the live region, so opening it does not re-announce the values. */}
-      <div aria-live="polite" className="space-y-2">
-        <p
-          data-testid="video-results-readout-pair"
-          className="flex flex-wrap items-center gap-x-2 gap-y-1"
-        >
-          <PairSide side={a} diagnostic={diagnostic} locale={locale} />
-          <span className="text-muted-foreground">{s.against}</span>
-          <PairSide side={b} diagnostic={diagnostic} locale={locale} />
-        </p>
-        {/* Auto columns keep every pair, four or five cells, on one row from lg. */}
-        <dl className="m-0 grid grid-cols-2 overflow-hidden rounded-lg border border-border/30 bg-muted/10 tabular-nums lg:auto-cols-fr lg:grid-flow-col lg:grid-cols-none lg:divide-x lg:divide-border/30">
-          {cells.map((item) => (
-            <div
-              key={item.metric}
-              data-metric={item.metric}
-              data-lead={item.lead ? '' : undefined}
-              title={item.help}
+      <p
+        data-testid="video-results-readout-pair"
+        className="flex flex-wrap items-center gap-x-2 gap-y-1"
+      >
+        <PairSide side={a} diagnostic={diagnostic} locale={locale} />
+        <span className="text-muted-foreground">{s.against}</span>
+        <PairSide side={b} diagnostic={diagnostic} locale={locale} />
+      </p>
+      {/* Auto columns keep every pair, four or five cells, on one row from lg. */}
+      <dl className="m-0 grid grid-cols-2 overflow-hidden rounded-lg border border-border/30 bg-muted/10 tabular-nums lg:auto-cols-fr lg:grid-flow-col lg:grid-cols-none lg:divide-x lg:divide-border/30">
+        {cells.map((item) => (
+          <div
+            key={item.metric}
+            data-metric={item.metric}
+            data-lead={item.lead ? '' : undefined}
+            title={item.help}
+            className={cn(
+              'flex min-w-0 flex-col gap-0.5 px-3.5 py-2.5',
+              item.lead && 'bg-success/10',
+            )}
+          >
+            <dt className="text-2xs text-muted-foreground">{item.label}</dt>
+            <dd
               className={cn(
-                'flex min-w-0 flex-col gap-0.5 px-3.5 py-2.5',
-                item.lead && 'bg-success/10',
+                'm-0 font-mono text-base font-medium break-words',
+                item.lead?.faster && 'font-semibold text-success',
               )}
             >
-              <dt className="text-2xs text-muted-foreground">{item.label}</dt>
-              <dd
-                className={cn(
-                  'm-0 font-mono text-base font-medium break-words',
-                  item.lead?.faster && 'font-semibold text-success',
-                )}
-              >
-                {item.value}
+              {item.value}
+            </dd>
+            {item.sub && (
+              <dd className="m-0 text-2xs break-words text-muted-foreground">{item.sub}</dd>
+            )}
+            {item.pairValue && (
+              <dd className="m-0 flex min-w-0 items-center gap-1.5 text-2xs text-muted-foreground">
+                <SideDot color={b.pill.color} />
+                <span className="min-w-0 break-words">{item.pairValue}</span>
               </dd>
-              {item.sub && (
-                <dd className="m-0 text-2xs break-words text-muted-foreground">{item.sub}</dd>
-              )}
-              {item.pairValue && (
-                <dd className="m-0 flex min-w-0 items-center gap-1.5 text-2xs text-muted-foreground">
-                  <SideDot color={b.pill.color} />
-                  <span className="min-w-0 break-words">{item.pairValue}</span>
-                </dd>
-              )}
-            </div>
-          ))}
-        </dl>
-      </div>
-      {footer}
+            )}
+          </div>
+        ))}
+      </dl>
     </section>
   );
 }

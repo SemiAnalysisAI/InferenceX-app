@@ -61,6 +61,10 @@ it.each([true, false])(
             points={[point]}
             initialSides={{ [videoClipSourceKey(point)]: available ? side : null }}
             colorFor={() => 'black'}
+            against="reference"
+            onAgainstChange={() => {}}
+            onShow={() => {}}
+            reveal={0}
           />
         </>
       );
@@ -127,7 +131,16 @@ it('shows a newly read clip while another selected source is still pending', asy
   document.body.append(container);
   await act(async () => {
     root = createRoot(container!);
-    root.render(<VideoResultsClips points={points} colorFor={() => 'black'} />);
+    root.render(
+      <VideoResultsClips
+        points={points}
+        colorFor={() => 'black'}
+        against="reference"
+        onAgainstChange={() => {}}
+        onShow={() => {}}
+        reveal={0}
+      />,
+    );
     await Promise.resolve();
   });
   expect(container.querySelectorAll('video')).toHaveLength(1);
@@ -158,10 +171,80 @@ it('shows the loading state on both sides while the subject is read', () => {
   document.body.append(container);
   act(() => {
     root = createRoot(container!);
-    root.render(<VideoResultsClips points={[point]} colorFor={() => 'black'} />);
+    root.render(
+      <VideoResultsClips
+        points={[point]}
+        colorFor={() => 'black'}
+        against="reference"
+        onAgainstChange={() => {}}
+        onShow={() => {}}
+        reveal={0}
+      />,
+    );
   });
   for (const side of ['a', 'b'])
     expect(container.querySelector(`[data-side="${side}"]`)?.textContent).toContain(
       'Loading retained clips',
     );
+});
+
+it('waits for a newly wanted side before a reveal scrolls, even after an earlier read failed', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  const scroll = vi.fn();
+  Element.prototype.scrollIntoView = scroll;
+  const broken = referenceQualityFixture(20, '123', 7);
+  const later = referenceQualityFixture(20, '456', 8, 'b'.repeat(64), 'NVIDIA H100');
+  const points = [broken, later].map((fixture) => {
+    const path = fixture.attachment.pairs[0].candidate.media_path;
+    fixture.stored.sources[0].assets = [
+      [path, { url: `/${fixture.stored.runId}.mp4`, downloadUrl: '/clip.mp4' }],
+    ];
+    return namedRunPoints(
+      [{ schemaVersion: 1, entries: [videoHistoryEntry(fixture.stored, null)], nextPage: null }],
+      fixture.stored.runId,
+    ).find((candidate) => candidate.cell === 'c1')!;
+  });
+  const pending = Promise.withResolvers<Response>();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) =>
+      url.includes('run=123')
+        ? Promise.resolve(new Response(null, { status: 500 }))
+        : pending.promise,
+    ),
+  );
+  const render = (shown: typeof points, reveal: number) => (
+    <VideoResultsClips
+      points={shown}
+      colorFor={() => 'black'}
+      against="reference"
+      onAgainstChange={() => {}}
+      onShow={() => {}}
+      reveal={reveal}
+    />
+  );
+  container = document.createElement('div');
+  document.body.append(container);
+  try {
+    await act(async () => {
+      root = createRoot(container!);
+      root.render(render([points[0]], 0));
+      await Promise.resolve();
+    });
+    expect(container.textContent, 'the first read failed').toContain('Retry clips');
+    await act(async () => {
+      root!.render(render(points, 1));
+      await Promise.resolve();
+    });
+    expect(scroll, 'no scroll while the new side is still being read').not.toHaveBeenCalled();
+    await act(async () => {
+      pending.resolve(Response.json(later.stored));
+      await pending.promise;
+    });
+    expect(scroll).toHaveBeenCalledTimes(1);
+  } finally {
+    delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+  }
 });

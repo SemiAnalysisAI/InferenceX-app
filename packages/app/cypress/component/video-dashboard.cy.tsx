@@ -8,6 +8,8 @@ import { videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState } from '@/components/video-benchmark/results';
 import type { ResultsEvidence } from '@/components/video-benchmark/results-evidence';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
+import { verifiedQuality } from '@/components/video-benchmark/reference-quality';
+import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
 import { servingArtifact } from '../support/video-artifacts';
 import { readOnlyVideoRequests, resultHistory } from '../support/video-results';
 
@@ -67,6 +69,15 @@ const openPoint = (hardware: string, overlay = false) => {
 const playing = () => points('[data-clip-role="playing"]');
 const stagePill = (side: 'a' | 'b') =>
   cy.get(`[data-side="${side}"] [data-testid="video-results-pill"]`);
+/** The stage and its transport sit fully inside the viewport. */
+const stageInView = () =>
+  cy.get('#comparison-stage').should(($stage) => {
+    const rect = $stage[0].getBoundingClientRect();
+    expect(rect.top, 'stage top').to.be.at.least(0);
+    expect(rect.bottom, 'stage bottom').to.be.at.most(
+      $stage[0].ownerDocument.defaultView!.innerHeight + 1,
+    );
+  });
 const toggleHardware = (hardware: string) => cy.get(`label[for="checkbox-${hardware}"]`).click();
 const chooseEngine = (label: string) =>
   cy.get('[data-testid="results-engine"]').contains('button', label).click();
@@ -711,6 +722,91 @@ describe('VideoGenX results', () => {
     points('[data-clip-role="baseline"]')
       .should('have.attr', 'data-hardware', 'b200')
       .and('have.attr', 'data-overlay', 'false');
+  });
+
+  it('plays the B200 lead against its reference and a lossy cell against its twin, in view', () => {
+    // On a phone the stage is shorter than the viewport, so scroll anchoring cannot hide a shift.
+    cy.viewport(375, 812);
+    const run = '34341996789';
+    mount({
+      search: '?r_y=videosPerGpuHour&r_lossy=1&r_view=side',
+      editPage: (page) => {
+        for (const entry of page.entries) {
+          entry.publishedAt = '2026-11-01T00:00:00.000Z';
+          for (const source of entry.sources)
+            source.observations = source.observations.flatMap((observation) => [
+              { ...observation, results: evidence(observation) },
+              {
+                ...observation,
+                id: `${observation.id}-fbc`,
+                results: { ...evidence(observation), optimizations: ['first-block-cache'] },
+              },
+            ]);
+        }
+        const lead = videoPoints([page]).find(
+          (item) => item.runId === run && item.concurrency === 1,
+        )!;
+        const saved = servingArtifact(Number(run), lead.artifactId, 'NVIDIA B200');
+        saved.sources[0].checksums = saved.sources[0].checksums.map(([path, sha]) => [
+          path,
+          path === 'manifest.json' ? lead.id.split(':')[0] : sha,
+        ]);
+        const fixture = referenceQualityFixture();
+        const [quality] = verifiedQuality(
+          fixture.attachment,
+          fixture.descriptor,
+          fixture.stored,
+          '9'.repeat(64),
+        ).pairs;
+        quality.candidate = {
+          ...quality.candidate,
+          run_id: run,
+          artifact_id: lead.artifactId,
+          source_id: saved.sources[0].id,
+          manifest_sha256: lead.id.split(':')[0],
+        };
+        quality.reference.url = 'https://media.test/reference.mp4';
+        saved.quality = [quality];
+        // As in production, a read lands after the click's next frame.
+        cy.intercept(
+          'GET',
+          `/api/video-runs?run=${run}&artifact=${lead.artifactId}&format=published`,
+          { body: saved, delay: 400 },
+        );
+      },
+    });
+    cy.get('[data-testid="video-results-compare-h200"]').click();
+    cy.get('[data-testid="video-results-quality-method"] summary').click();
+    // The button sits below the stage; once it tops the viewport the stage is out of view above.
+    cy.get('[data-testid="video-results-quality-show-me"]')
+      .scrollIntoView()
+      .click({ scrollBehavior: false });
+    cy.get('[data-testid="video-results-compare-reference"]').should(
+      'have.attr',
+      'aria-pressed',
+      'true',
+    );
+    cy.get('[data-testid="video-results-stage"]').should('have.attr', 'data-view', 'wipe');
+    searchParam('r_clip').should('match', new RegExp(`^${run}:[^-]+$`, 'u'));
+    stageInView();
+
+    cy.get('[data-testid="video-results-view-side"]').click();
+    // From the legend above, the stage is out of view below.
+    cy.get('[data-testid="video-results-lossy-see-changes"]')
+      .scrollIntoView()
+      .click({ scrollBehavior: false });
+    searchParam('r_clip').should('match', new RegExp(`^${run}:.+-fbc$`, 'u'));
+    cy.get('[data-testid="video-results-compare-twin"]').should(
+      'have.attr',
+      'aria-pressed',
+      'true',
+    );
+    stagePill('a').should('contain', 'FirstBlockCache');
+    cy.get('[data-testid="video-results-stage"]').should('have.attr', 'data-view', 'wipe');
+    // The lossy cell's own read restores the prompt row above the stage; the stage stays in view.
+    cy.get('[data-testid="video-results-prompt"]').should('exist');
+    stageInView();
+    cy.focused().should('have.attr', 'data-testid', 'video-results-stage');
   });
 
   it('falls back to the overview for an unknown or hidden deployment and drops its key', () => {

@@ -288,6 +288,7 @@ export default function VideoResultsChart({
   clipLink,
   heading,
   footer,
+  lossyNote,
 }: {
   /** Official and named-run deployment cells across every GPU count, hidden hardware included. */
   cells: ResultCell[];
@@ -307,6 +308,8 @@ export default function VideoResultsChart({
   heading?: ReactNode;
   /** Result context under the chart. */
   footer?: ReactNode;
+  /** Under the legend's lossy line key, shown while a lossy line is charted. */
+  lossyNote?: ReactNode;
 }) {
   const locale = useLocale();
   const s = STRINGS[locale];
@@ -815,6 +818,15 @@ export default function VideoResultsChart({
                 track('video_results_optimal_toggled', { enabled: optimal });
               },
             },
+            {
+              id: 'video-results-labels',
+              label: s.labels,
+              checked: labels,
+              onCheckedChange: (enabled) => {
+                onLabelsChange(enabled);
+                track('video_results_labels_toggled', { enabled });
+              },
+            },
             ...(state.lossy || (!history && cells.some((cell) => isLossy(cell.point)))
               ? [
                   {
@@ -829,15 +841,6 @@ export default function VideoResultsChart({
                   },
                 ]
               : []),
-            {
-              id: 'video-results-labels',
-              label: s.labels,
-              checked: labels,
-              onCheckedChange: (enabled) => {
-                onLabelsChange(enabled);
-                track('video_results_labels_toggled', { enabled });
-              },
-            },
           ]}
           keyIndicators={
             engines.length > 1 || lossySeries.length > 0 || state.unofficialRun ? (
@@ -886,6 +889,7 @@ export default function VideoResultsChart({
                     ))}
                   </ul>
                 )}
+                {lossySeries.length > 0 && lossyNote}
                 {state.unofficialRun && (
                   <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                     <span
