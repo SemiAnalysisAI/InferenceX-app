@@ -1,7 +1,7 @@
 'use client';
 
 import * as d3 from 'd3';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type {
   CollectiveXDataset,
   CollectiveXPercentile,
@@ -16,7 +16,7 @@ import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { collectiveXRunDasharray } from './data';
+import { collectiveXRunDasharray, collectiveXSkuLabel } from './data';
 import {
   formatSwapBytes,
   swapChartPoints,
@@ -111,7 +111,43 @@ function drawRooflineAnnotations(
     .text((r) => `${r.path} · ${r.gbps.toLocaleString()} GB/s`);
 }
 
+/** Roofline device names without form-factor suffixes ("B200 SXM" -> "B200"), as in the legend. */
+const shortDevices = (roof: SwapRoofline) =>
+  [...new Set(roof.devices.map((name) => name.replace(/ (?:SXM|NVL72)$/u, '')))].join(', ');
+
 const bandOf = (p: SwapChartPoint) => `${p.runId}__${p.sku}`;
+
+const BAND_FILL = 0.18;
+const BAND_FOCUS_FILL = 0.3;
+const BAND_FADED_FILL = 0.03;
+const FADED_OPACITY = '0.15';
+
+/**
+ * Spotlight one legend entry (a series line or a SKU band) as the EP chart does: fade every other
+ * line, point and band. Rooflines keep full strength. Null restores everything.
+ */
+export function spotlightSwap(
+  root: Element | null,
+  focusId: string | null,
+  rooflineIds: Set<string>,
+) {
+  if (!root) return;
+  const chart = d3.select(root);
+  const fade = (id: string) => (focusId === null || id === focusId ? null : FADED_OPACITY);
+  chart.selectAll<SVGPathElement, unknown>('.line-path').style('opacity', function () {
+    const key = this.dataset.lineKey ?? '';
+    return rooflineIds.has(key) ? null : fade(key);
+  });
+  chart
+    .selectAll<SVGCircleElement, SwapDisplayPoint>('.point')
+    .style('opacity', (p) => (p ? fade(p.legendId) : null));
+  chart
+    .selectAll<SVGPathElement, { id: string }>('path.swap-range-band')
+    .attr('fill-opacity', (band) =>
+      focusId === null ? BAND_FILL : band.id === focusId ? BAND_FOCUS_FILL : BAND_FADED_FILL,
+    )
+    .style('opacity', (band) => fade(band.id));
+}
 
 /** A plotted point: one block count's measurement, or a SKU range's median at one block size. */
 interface SwapDisplayPoint {
@@ -232,6 +268,7 @@ export function CollectiveXSwapSection({
   const [view, setView] = useState<'series' | 'range'>('range');
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState(true);
+  const cardRef = useRef<HTMLDivElement>(null);
   const allPoints = useMemo(
     () => swapChartPoints(datasets, { metric, direction, layout, percentile }),
     [datasets, metric, direction, layout, percentile],
@@ -266,7 +303,7 @@ export function CollectiveXSwapSection({
               y: range.mid,
               legendId: band.id,
               runId: band.runId,
-              label: band.device,
+              label: collectiveXSkuLabel(band.sku),
               colorKey: band.sku,
               range,
             })),
@@ -277,7 +314,7 @@ export function CollectiveXSwapSection({
             y: p.y,
             legendId: p.seriesId,
             runId: p.runId,
-            label: p.device,
+            label: collectiveXSkuLabel(p.sku),
             colorKey: p.colorKey,
             series: p,
           })),
@@ -296,7 +333,7 @@ export function CollectiveXSwapSection({
             const p = allPoints.find((item) => bandOf(item) === id)!;
             return {
               id,
-              label: p.device,
+              label: collectiveXSkuLabel(p.sku),
               colorKey: p.sku,
               runId: p.runId,
               active: ids.some((sid) => !hidden.has(sid)),
@@ -304,7 +341,7 @@ export function CollectiveXSwapSection({
           })
         : [...new Map(allPoints.map((p) => [p.seriesId, p])).values()].map((p) => ({
             id: p.seriesId,
-            label: `${p.device} · ${t.blocks(p.row.num_blocks)}`,
+            label: `${collectiveXSkuLabel(p.sku)} · ${t.blocks(p.row.num_blocks)}`,
             colorKey: p.colorKey,
             runId: p.runId,
             active: !hidden.has(p.seriesId),
@@ -329,7 +366,7 @@ export function CollectiveXSwapSection({
       .attr('class', 'swap-range-band')
       .attr('data-testid', 'swap-range-band')
       .attr('fill', (band) => colorOf(band.sku))
-      .attr('fill-opacity', 0.18)
+      .attr('fill-opacity', BAND_FILL)
       .attr('stroke', (band) => colorOf(band.sku))
       .attr('stroke-opacity', 0.35)
       .attr('stroke-width', 0.75)
@@ -339,6 +376,7 @@ export function CollectiveXSwapSection({
   const xMin = xValues[0] ?? 1;
   const xMax = xValues.at(-1) ?? 10;
   const rooflines = metric === 'bandwidth' ? swapRooflines(points, direction) : [];
+  const rooflineIds = new Set(rooflines.map((r) => r.id));
   const dataMax = d3.max(points, (p) => p.y) ?? 1;
   const yAxis = swapYAxis(
     dataMax,
@@ -363,11 +401,23 @@ export function CollectiveXSwapSection({
     track('collectivex_swap_series_toggled', { series: id });
   };
   return (
-    <Card data-testid="collectivex-swap-section" className="min-w-0 overflow-hidden">
+    <Card ref={cardRef} data-testid="collectivex-swap-section" className="min-w-0 overflow-hidden">
       <Heading level="card">{t.heading}</Heading>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {t.description} {view === 'range' ? t.rangeNote : t.seriesNote}
-      </p>
+      {/* Both view notes share one grid cell so the taller one reserves the height and switching
+          views does not move the controls and chart below. */}
+      <div className="mt-1 grid text-sm text-muted-foreground">
+        {(['range', 'series'] as const).map((note) => (
+          <p
+            key={note}
+            aria-hidden={note !== view}
+            className={
+              note === view ? 'col-start-1 row-start-1' : 'invisible col-start-1 row-start-1'
+            }
+          >
+            {t.description} {note === 'range' ? t.rangeNote : t.seriesNote}
+          </p>
+        ))}
+      </div>
       {skipped > 0 && (
         <p className="mt-1 text-xs text-muted-foreground">
           {skipped} {t.skipped}
@@ -444,13 +494,12 @@ export function CollectiveXSwapSection({
       {rooflines.length > 0 && (
         <div data-testid="swap-roofline-legend" className="mb-3 text-xs text-muted-foreground">
           {rooflines.map((roof) => (
-            <p key={roof.id} title={roof.devices.join(', ')}>
+            <p key={roof.id} title={shortDevices(roof)}>
               <span
                 aria-hidden="true"
                 className="mr-2 inline-block w-5 border-t-2 border-dashed border-current align-middle"
               />
-              {t.roofline}: {roof.gbps.toLocaleString()} GB/s · {roof.path} ·{' '}
-              {roof.devices.join(', ')}
+              {t.roofline}: {roof.gbps.toLocaleString()} GB/s · {roof.path} · {shortDevices(roof)}
             </p>
           ))}
           <p className="mt-1">{t.rooflineNote}</p>
@@ -628,6 +677,14 @@ export function CollectiveXSwapSection({
           },
           getRulerX: (p, scale) => (scale as d3.ScaleLogarithmic<number, number>)(p.x),
           getRulerY: (p, scale) => scale(p.y),
+          onHoverStart: (selection, p) => {
+            selection.attr('r', 6);
+            spotlightSwap(cardRef.current, p.legendId, rooflineIds);
+          },
+          onHoverEnd: (selection) => {
+            selection.attr('r', 3.5);
+            spotlightSwap(cardRef.current, null, rooflineIds);
+          },
         }}
         zoom={{
           enabled: true,
@@ -644,28 +701,34 @@ export function CollectiveXSwapSection({
           ) : undefined
         }
         legendElement={
-          <ChartLegend
-            variant="sidebar"
-            isLegendExpanded={expanded}
-            onExpandedChange={setExpanded}
-            onItemRemove={toggle}
-            reset={{
-              id: 'collectivex-swap-reset-filter',
-              disabled: hidden.size === 0,
-              onClick: () => {
-                setHidden(new Set());
-                track('collectivex_swap_filter_reset');
-              },
-            }}
-            legendItems={legendEntries.map((entry) => ({
-              name: entry.id,
-              label: entry.label,
-              color: colorOf(entry.colorKey),
-              lineDasharray: collectiveXRunDasharray(runIndexById.get(entry.runId) ?? 0),
-              isActive: entry.active,
-              onClick: () => toggle(entry.id),
-            }))}
-          />
+          // Fixed width so switching views (short SKU rows vs. longer block-count rows) does not
+          // resize the plot and shift the page.
+          <div className="flex min-h-0 flex-col lg:w-56">
+            <ChartLegend
+              variant="sidebar"
+              onItemHover={(id) => spotlightSwap(cardRef.current, id, rooflineIds)}
+              onItemHoverEnd={() => spotlightSwap(cardRef.current, null, rooflineIds)}
+              isLegendExpanded={expanded}
+              onExpandedChange={setExpanded}
+              onItemRemove={toggle}
+              reset={{
+                id: 'collectivex-swap-reset-filter',
+                disabled: hidden.size === 0,
+                onClick: () => {
+                  setHidden(new Set());
+                  track('collectivex_swap_filter_reset');
+                },
+              }}
+              legendItems={legendEntries.map((entry) => ({
+                name: entry.id,
+                label: entry.label,
+                color: colorOf(entry.colorKey),
+                lineDasharray: collectiveXRunDasharray(runIndexById.get(entry.runId) ?? 0),
+                isActive: entry.active,
+                onClick: () => toggle(entry.id),
+              }))}
+            />
+          </div>
         }
       />
     </Card>
