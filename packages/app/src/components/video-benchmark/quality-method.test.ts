@@ -43,16 +43,16 @@ const side = (
   diagnostics,
 });
 const lossyResults = { engine: 'sglang', optimizations: ['first-block-cache'] };
-const point = (hardwareKey: string, lossy = false) =>
+const point = (hardwareKey: string, lossy = false, runId = 'official') =>
   ({
     id: hardwareKey,
     hardwareKey,
-    runId: 'official',
+    runId,
     results: lossy ? lossyResults : undefined,
   }) as unknown as VideoPoint;
 
-const lead = (hardwareKey: string, referenceUrl: string, lossy = false) => ({
-  point: point(hardwareKey, lossy),
+const lead = (hardwareKey: string, referenceUrl: string, lossy = false, runId = 'official') => ({
+  point: point(hardwareKey, lossy, runId),
   side: side(hardwareKey, [[record('crane'), pair('measured', 20, referenceUrl)]]),
 });
 const cell = (id: string, runId: string, lossy: boolean, publishedAt: string | null = 'x') =>
@@ -106,11 +106,14 @@ describe('quality method', () => {
   it('shows B200 against its reference, else the first lossless lead that has one', () => {
     const h100 = lead('h100', '/reference.mp4');
     const h200 = lead('h200', '/reference.mp4');
-    expect(showMeTarget([h100, h200, lead('b200', '/reference.mp4')])?.hardwareKey).toBe('b200');
+    const b200 = lead('b200', '/reference.mp4');
+    expect(showMeTarget([h100, h200, b200])?.hardwareKey).toBe('b200');
     // An unpublished reference cannot play; a lossy lead is no lossless example.
     expect(showMeTarget([h100, h200, lead('b200', '')])).toBe(h200.point);
     expect(showMeTarget([h100, lead('b200', '/reference.mp4', true)])).toBe(h100.point);
-    expect(showMeTarget([lead('b200', '')])).toBeNull();
+    // As on the stage, the named run's lead goes first, whatever its hardware.
+    const named = lead('h100', '/reference.mp4', false, 'named');
+    expect(showMeTarget([named, h200, b200], 'named')).toBe(named.point);
   });
 
   it('pairs a lossy cell with its own run’s twin, preferring the named run, only when both have clips', () => {

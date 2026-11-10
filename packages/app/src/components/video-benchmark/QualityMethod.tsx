@@ -91,17 +91,20 @@ const STRINGS = {
  */
 export default function QualityMethod({
   leads,
+  namedRun,
   onShowMe,
 }: {
   /** The visible hardware leads and their loaded sides. */
   leads: readonly StageCandidate[];
+  /** `?unofficialrun=`, whose leads Show me tries first. */
+  namedRun?: string;
   /** Plays `point` against its Diffusers reference in Wipe. */
   onShowMe: (point: VideoPoint) => void;
 }) {
   const locale = useLocale();
   const s = STRINGS[locale];
   const range = referencePsnrRange(leads);
-  const target = showMeTarget(leads);
+  const target = showMeTarget(leads, namedRun);
   const targetLabel = target ? hardwareLabel(target.hardwareKey ?? '') : '';
   return (
     <details

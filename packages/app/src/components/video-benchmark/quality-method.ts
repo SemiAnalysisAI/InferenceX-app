@@ -36,13 +36,20 @@ export function referencePsnrRange(leads: readonly StageCandidate[]): ReferenceP
 }
 
 /**
- * The lead "Show me" plays against its Diffusers reference: B200's, else the first lead in stage
- * order whose loaded clips have a playable reference pair. A lossy lead is no lossless example.
+ * The lead "Show me" plays against its Diffusers reference: the first, in stage order, whose
+ * loaded clips have a playable reference pair, trying the named run's leads before the official
+ * ones as the stage does. A lossy lead is no lossless example.
  */
-export function showMeTarget(leads: readonly StageCandidate[]): VideoPoint | null {
-  for (const key of SUBJECT_ORDER) {
-    const lead = leads.find(({ point }) => point.hardwareKey === key);
-    if (!lead?.side || isLossy(lead.point)) continue;
+export function showMeTarget(
+  leads: readonly StageCandidate[],
+  namedRun?: string,
+): VideoPoint | null {
+  const ordered = SUBJECT_ORDER.flatMap((key) =>
+    leads.filter(({ point }) => point.hardwareKey === key),
+  );
+  const named = ordered.filter(({ point }) => point.runId === namedRun);
+  for (const lead of [...named, ...ordered.filter((item) => !named.includes(item))]) {
+    if (!lead.side || isLossy(lead.point)) continue;
     const groups = resultsClipGroups([lead.side]).filter((group) => !group.scope);
     if (groups.some((group) => resultsClipReference(group, new Set()) !== null)) return lead.point;
   }

@@ -527,6 +527,7 @@ export default function VideoResultsClips({
             footer={
               <QualityMethod
                 leads={selected.map((lead) => ({ point: lead, side: sideOf(lead) }))}
+                namedRun={unofficialRun}
                 onShowMe={(target) => onShow(target, 'reference')}
               />
             }

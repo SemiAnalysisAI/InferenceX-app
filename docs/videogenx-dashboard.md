@@ -397,13 +397,13 @@ twice, and the gap between those runs would be the noise floor. Show me (`showMe
 plays the B200 lead against its reference in Wipe and reveals the stage as Compare below
 does (`showOnStage` in `VideoDashboard.tsx`). When B200 is hidden, lossy or has
 no playable reference, it plays the first visible lead that has one; without one the button
-is absent. With `?unofficialrun=`, the named run's lead stands for its hardware, as on the
-stage. Full methodology opens the Reference PSNR section of the InferenceX
+is absent. With `?unofficialrun=`, Show me tries the named run's leads first, whatever their
+hardware, as the stage does. Full methodology opens the Reference PSNR section of the InferenceX
 `video-generation` README (`README_zh.md` from `/zh`) in a new tab. Events:
 `video_results_quality_method_opened`, `video_results_quality_show_me`,
 `video_results_quality_methodology_clicked` and `video_results_lossy_see_changes`.
 
-中文：读数区底部有一个默认收起的“质量评分方法”说明（`QualityMethod.tsx`）。它先说明目前的方法：每条视频与官方 Diffusers 参考视频比较 PSNR，使用相同的 prompt 和 seed，逐帧比较全部解码画面。可见代表部署的视频加载后，再补充实时的 PSNR 范围：`referencePsnrRange`（`quality-method.ts`）只取无损 CI 视频的有限 PSNR，跳过有损代表部署、相同初始噪声重跑，以及完全一致、不兼容和未评分的配对；还没有可计入的视频时，这句话不带数字，范围也从不写死。说明沿用读数区的审慎表述：不同引擎或并行配置即使使用相同的 prompt 和 seed，生成的像素也会不同。HTML/CSS 示意图展示标为“计划中”的无损配对方法，因为目前还没有评分器计算配对的 SSIM 或 LPIPS：GPU、引擎、服务器布局、prompt 和 seed 保持不变；分别进行无损运行和有损运行；对全部解码帧计算 PSNR、SSIM 和 LPIPS；报告已评分的 prompt（最多 20 条）中的中位数和最差一条。按计划，无损配置还会再运行一次，两次运行之间的差距即为本底噪声。“播放示例”（`showMeTarget`）以卷帘视图播放 B200 代表部署与其参考视频，并像“在下方对比”一样把对比区滚入视野（`VideoDashboard.tsx` 中的 `showOnStage`）；B200 被隐藏、为有损配置或没有可播放的参考视频时，改为播放第一个有参考视频的可见代表部署，都没有时不显示该按钮。使用 `?unofficialrun=` 时，与对比区一致，由指定运行的代表部署代表其硬件。“完整方法说明”在新标签页中打开 InferenceX `video-generation` README 的 Reference PSNR 一节（`/zh` 页面打开 `README_zh.md`）。事件为 `video_results_quality_method_opened`、`video_results_quality_show_me`、`video_results_quality_methodology_clicked` 和 `video_results_lossy_see_changes`。
+中文：读数区底部有一个默认收起的“质量评分方法”说明（`QualityMethod.tsx`）。它先说明目前的方法：每条视频与官方 Diffusers 参考视频比较 PSNR，使用相同的 prompt 和 seed，逐帧比较全部解码画面。可见代表部署的视频加载后，再补充实时的 PSNR 范围：`referencePsnrRange`（`quality-method.ts`）只取无损 CI 视频的有限 PSNR，跳过有损代表部署、相同初始噪声重跑，以及完全一致、不兼容和未评分的配对；还没有可计入的视频时，这句话不带数字，范围也从不写死。说明沿用读数区的审慎表述：不同引擎或并行配置即使使用相同的 prompt 和 seed，生成的像素也会不同。HTML/CSS 示意图展示标为“计划中”的无损配对方法，因为目前还没有评分器计算配对的 SSIM 或 LPIPS：GPU、引擎、服务器布局、prompt 和 seed 保持不变；分别进行无损运行和有损运行；对全部解码帧计算 PSNR、SSIM 和 LPIPS；报告已评分的 prompt（最多 20 条）中的中位数和最差一条。按计划，无损配置还会再运行一次，两次运行之间的差距即为本底噪声。“播放示例”（`showMeTarget`）以卷帘视图播放 B200 代表部署与其参考视频，并像“在下方对比”一样把对比区滚入视野（`VideoDashboard.tsx` 中的 `showOnStage`）；B200 被隐藏、为有损配置或没有可播放的参考视频时，改为播放第一个有参考视频的可见代表部署，都没有时不显示该按钮。使用 `?unofficialrun=` 时，与对比区一致，先尝试指定运行的代表部署，无论其硬件是什么。“完整方法说明”在新标签页中打开 InferenceX `video-generation` README 的 Reference PSNR 一节（`/zh` 页面打开 `README_zh.md`）。事件为 `video_results_quality_method_opened`、`video_results_quality_show_me`、`video_results_quality_methodology_clicked` 和 `video_results_lossy_see_changes`。
 
 ## Cost and profit
 
