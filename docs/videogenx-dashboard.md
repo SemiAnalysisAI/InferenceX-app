@@ -384,8 +384,10 @@ with the controls for the URL-selected state and a loading status. The shell is
 would drop edits made there. The
 dashboard with the complete bounded History cohort and exact selected clip
 metadata replaces it once the server reads finish; the browser does not read
-History on its own while that is pending. Without video storage the server
-seeds nothing and the browser reads History as before. Hydration reuses successful and
+History on its own while that is pending. Without video storage, or when the History
+read came back incomplete (`X-VideoGenX-Incomplete: 1`, see
+[Video History](./video-history.md#publication-and-discovery)), the server seeds
+nothing and the browser reads History as before. Hydration reuses successful and
 known-missing reads; failures retain the existing retry path. Later media sources
 appear independently without clearing matching clips. Videos request no media
 before the first Play (`preload="none"`, see Synchronized clips); no poster, generated
@@ -397,7 +399,7 @@ official/unofficial source membership remain unchanged.
 
 中文：中英文页面分两段流式输出：文档先带出页面骨架，即 URL 所选状态的控件和加载提示。骨架设为 `inert`（可见但不可操作），因为仪表板会在原处重新挂载，在骨架中所做的修改会丢失；
 服务端读取完成后，再以带有完整有界 History 数据和所选视频元数据的仪表板替换它，
-等待期间浏览器不会自行读取 History；未配置视频存储时服务端不预填数据，仍由浏览器读取 History。hydration 复用成功读取和已确认缺失的结果；失败仍可重试。
+等待期间浏览器不会自行读取 History；未配置视频存储，或 History 读取结果不完整（带 `X-VideoGenX-Incomplete: 1`，见 [Video History](./video-history.md#publication-and-discovery)）时，服务端不预填数据，仍由浏览器读取 History。hydration 复用成功读取和已确认缺失的结果；失败仍可重试。
 后续媒体源独立显示，不会先清空仍匹配的视频。首次播放前视频不请求任何媒体（`preload="none"`，详见 Synchronized clips 一节），
 不新增封面、生成帧或媒体产物。服务端读取来自 [Video History](./video-history.md#publication-and-discovery)
 中描述的共享标签缓存，只有发布后的首次读取需要等待存储。这只是加载方式的调整，
