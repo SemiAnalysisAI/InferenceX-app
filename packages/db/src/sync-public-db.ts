@@ -57,6 +57,7 @@ import {
   type RunSummary,
   type RunSyncPlan,
 } from './lib/public-db-sync.js';
+import { materializePowerSeriesForRun } from './queries/gpu-power-series';
 
 type Row = Record<string, postgres.ParameterOrJSON<never>>;
 type Db = Sql | postgres.TransactionSql;
@@ -81,7 +82,6 @@ const SYNCED_TABLES = [
   'gpu_metric_samples',
   'gpu_metric_sample_blobs',
   'benchmark_result_gpu_metrics',
-  'gpu_power_series',
 ] as const;
 type Table = (typeof SYNCED_TABLES)[number];
 
@@ -612,7 +612,7 @@ async function copyGpuTelemetry(
   db: Db,
   run: RunSummary,
   configIds: Map<string, string>,
-): Promise<void> {
+): Promise<number> {
   const findRun = (sql: Db) => sql<{ id: string }[]>`
     select id::text from workflow_runs
     where github_run_id = ${run.github_run_id} and run_attempt = ${run.run_attempt}
@@ -670,16 +670,7 @@ async function copyGpuTelemetry(
       return pointId && seriesId ? [{ benchmark_result_id: pointId, series_id: seriesId }] : [];
     }),
   );
-
-  const power = await source<Row[]>`
-    select ${source(columns.gpu_power_series)} from gpu_power_series
-    where workflow_run_id = ${sourceRun.id}
-  `;
-  await insertRows(
-    db,
-    'gpu_power_series',
-    power.map((row) => ({ ...row, workflow_run_id: targetRun.id })),
-  );
+  return Number(targetRun.id);
 }
 
 function readTelemetryCounts(sql: Sql, runs: readonly RunSummary[]) {
@@ -691,8 +682,7 @@ function readTelemetryCounts(sql: Sql, runs: readonly RunSummary[]) {
       (select count(*) from gpu_metric_sample_blobs bl
         join gpu_metric_series s on s.id = bl.series_id where s.workflow_run_id = wr.id),
       (select count(*) from benchmark_result_gpu_metrics l
-        join benchmark_results b on b.id = l.benchmark_result_id where b.workflow_run_id = wr.id),
-      (select count(*) from gpu_power_series p where p.workflow_run_id = wr.id)
+        join benchmark_results b on b.id = l.benchmark_result_id where b.workflow_run_id = wr.id)
     ) as counts
     from workflow_runs wr
     join unnest(
@@ -1000,7 +990,7 @@ async function moveVerifiedRuns(runs: readonly RunSummary[]): Promise<number> {
   const telemetryGaps = sourceTelemetry.filter((row) => targetCounts.get(row.key) !== row.counts);
   for (const row of telemetryGaps) {
     console.error(
-      `  ✗ ${row.key} GPU telemetry differs in public: series, samples, blobs, links, power ` +
+      `  ✗ ${row.key} GPU telemetry differs in public: series, samples, blobs, links ` +
         `${row.counts} here, ${targetCounts.get(row.key) ?? 'none'} there`,
     );
   }
@@ -1121,14 +1111,33 @@ async function main(): Promise<void> {
     }
   }
   if (toPublic) {
-    for (const run of selectedRuns!.filter((selected) => !failedRuns.has(runKey(selected)))) {
-      try {
-        await target.begin((tx) => copyGpuTelemetry(tx, run, configIds));
-      } catch (error) {
-        failed++;
-        const message = error instanceof Error ? error.message : String(error);
-        console.error(`  ✗ ${runKey(run)} GPU telemetry: ${message}`);
+    const publicSql = createAdminSql({
+      envVar: 'PUBLIC_DATABASE_WRITE_URL',
+      max: 1,
+      onnotice: () => {},
+    });
+    try {
+      for (const run of selectedRuns!.filter((selected) => !failedRuns.has(runKey(selected)))) {
+        let targetRunId: number;
+        try {
+          targetRunId = await target.begin((tx) => copyGpuTelemetry(tx, run, configIds));
+        } catch (error) {
+          failed++;
+          const message = error instanceof Error ? error.message : String(error);
+          console.error(`  ✗ ${runKey(run)} GPU telemetry: ${message}`);
+          continue;
+        }
+        try {
+          await materializePowerSeriesForRun(publicSql, targetRunId);
+        } catch (error) {
+          console.warn(
+            `  ${runKey(run)} PowerX series: precompute failed; readers fall back to samples:`,
+            error,
+          );
+        }
       }
+    } finally {
+      await publicSql.end();
     }
   }
 
