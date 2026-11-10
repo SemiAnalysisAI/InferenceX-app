@@ -51,6 +51,24 @@ const point = (hardwareKey: string, lossy = false) =>
     results: lossy ? lossyResults : undefined,
   }) as unknown as VideoPoint;
 
+const lead = (hardwareKey: string, referenceUrl: string, lossy = false) => ({
+  point: point(hardwareKey, lossy),
+  side: side(hardwareKey, [[record('crane'), pair('measured', 20, referenceUrl)]]),
+});
+const cell = (id: string, runId: string, lossy: boolean, publishedAt: string | null = 'x') =>
+  ({
+    id,
+    runId,
+    hardwareKey: 'b200',
+    workloadKey: 'w',
+    concurrency: 1,
+    participating: 4,
+    replicas: 1,
+    server: { tp: 2, ulysses: 2, attention: null },
+    results: (lossy ? lossyResults : { engine: 'sglang' }) as unknown as ResultsEvidence,
+    publishedAt,
+  }) as unknown as VideoPoint;
+
 describe('quality method', () => {
   it('ranges reference PSNR over lossless CI clips with a finite score only', () => {
     const rerun = {
@@ -86,10 +104,6 @@ describe('quality method', () => {
   });
 
   it('shows B200 against its reference, else the first lossless lead that has one', () => {
-    const lead = (hardwareKey: string, referenceUrl: string, lossy = false) => ({
-      point: point(hardwareKey, lossy),
-      side: side(hardwareKey, [[record('crane'), pair('measured', 20, referenceUrl)]]),
-    });
     const h100 = lead('h100', '/reference.mp4');
     const h200 = lead('h200', '/reference.mp4');
     expect(showMeTarget([h100, h200, lead('b200', '/reference.mp4')])?.hardwareKey).toBe('b200');
@@ -100,19 +114,6 @@ describe('quality method', () => {
   });
 
   it('pairs a lossy cell with its own run’s twin, preferring the named run, only when both have clips', () => {
-    const cell = (id: string, runId: string, lossy: boolean, publishedAt: string | null = 'x') =>
-      ({
-        id,
-        runId,
-        hardwareKey: 'b200',
-        workloadKey: 'w',
-        concurrency: 1,
-        participating: 4,
-        replicas: 1,
-        server: { tp: 2, ulysses: 2, attention: null },
-        results: (lossy ? lossyResults : { engine: 'sglang' }) as unknown as ResultsEvidence,
-        publishedAt,
-      }) as unknown as VideoPoint;
     const options = { tier: 'h' } as const;
     const officialLossy = cell('official-lossy', 'official', true);
     const officialTwin = cell('official-twin', 'official', false);
