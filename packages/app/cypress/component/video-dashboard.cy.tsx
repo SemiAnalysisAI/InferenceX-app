@@ -634,6 +634,14 @@ describe('VideoGenX results', () => {
       'contain',
       'B200 (NVIDIA Sol Engine · FirstBlockCache + Sol-Attn)',
     );
+    // A lossy line's pill is a dashed outline, named by its optimisations.
+    cy.get('[data-series-pill][data-lossy="true"]')
+      .should('have.length.at.least', 1)
+      .first()
+      .should('contain', 'B200 · ')
+      .find('rect')
+      .should('have.attr', 'stroke-dasharray', '3 2')
+      .and('have.attr', 'fill', 'var(--card)');
   });
 
   it('opens deployment telemetry from chart points, switches tabs and returns', () => {
