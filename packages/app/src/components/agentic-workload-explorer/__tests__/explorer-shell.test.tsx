@@ -14,6 +14,7 @@ vi.mock('@/components/agentic-workload-explorer/snapshot-stamp', () => ({
 vi.mock('@/components/agentic-workload-explorer/trace-version-selector', () => ({
   TraceVersionSelector: () => null,
 }));
+vi.mock('@/components/ui/chart-display-helpers', () => ({ ChartShareActions: () => null }));
 
 import { ExplorerShell } from '../explorer-shell';
 

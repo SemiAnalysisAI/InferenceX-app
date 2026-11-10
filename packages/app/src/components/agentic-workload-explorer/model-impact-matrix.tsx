@@ -162,7 +162,7 @@ export function ModelImpactMatrix({ data }: { data: ErrorData['byModel'] }) {
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-3xs font-mono text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
         <span>{t.modelsRanked(rows.length)}</span>
         <span className="inline-flex items-center gap-1.5">
           {t.peakSeverity}
@@ -175,7 +175,7 @@ export function ModelImpactMatrix({ data }: { data: ErrorData['byModel'] }) {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] text-2xs font-mono">
+        <table className="w-full min-w-[640px] text-xs tabular-nums">
           <caption className="sr-only">{t.caption}</caption>
           <thead>
             <tr className="border-b border-border/20">
@@ -248,7 +248,7 @@ export function ModelImpactMatrix({ data }: { data: ErrorData['byModel'] }) {
           </tbody>
         </table>
       </div>
-      <p className="text-3xs font-mono text-muted-foreground">{t.severityBands}</p>
+      <p className="text-xs text-muted-foreground">{t.severityBands}</p>
     </div>
   );
 }

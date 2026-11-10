@@ -8,13 +8,13 @@ import {
 import type { CompareModelSlug } from '@/lib/compare/compare-slug';
 import {
   bandFor,
-  fmtCost,
-  fmtPctDelta,
-  fmtTput,
+  fmtPctLower,
   type PairSummary,
   pickRotated,
   type SsrInterpolatedRow,
 } from '@/lib/compare/compare-ssr';
+import { fmtCost, fmtTput } from '@/lib/compare/compare-table-view';
+import { higherByZh } from '@/lib/compare/compare-ssr-zh';
 import { datasetJsonLd } from '@/lib/seo/dataset-jsonld';
 import { type VariantBoth, type VariantCompareKind } from '@/lib/compare/compare-variant-ssr';
 
@@ -27,16 +27,25 @@ function bandPositionZh(target: number, range: string, band: 'low' | 'middle' | 
 function variantFullSummaryZh(i: VariantBoth): string {
   const cheaper = i.cheaper === '关闭' || i.cheaper === 'Off' ? '关闭投机解码' : i.cheaper;
   const faster = i.faster === '关闭' || i.faster === 'Off' ? '关闭投机解码' : i.faster;
+  if (
+    i.cheaper === i.faster &&
+    !i.costTied &&
+    !i.tputTied &&
+    i.costRatio !== null &&
+    i.tputRatio !== null
+  ) {
+    return `在同一芯片上，${faster} 的单芯片吞吐量${higherByZh(i.tputRatio)}，因此每 token 成本低 ${fmtPctLower(i.costRatio)}`;
+  }
   const costPart = i.costTied
     ? '每 token 成本基本持平'
     : i.costRatio === null
       ? null
-      : `${cheaper} 的成本效率高出 ${fmtPctDelta(i.costRatio)}`;
+      : `${cheaper} 的每 token 成本低 ${fmtPctLower(i.costRatio)}`;
   const tputPart = i.tputTied
     ? '单芯片吞吐量基本持平'
     : i.tputRatio === null
       ? null
-      : `${faster} 的单芯片吞吐量高出 ${fmtPctDelta(i.tputRatio)}`;
+      : `${faster} 的单芯片吞吐量${higherByZh(i.tputRatio)}`;
   const both = [costPart, tputPart].filter(Boolean).join('；');
   return both.length > 0 ? both : '缺少可比较的有效数据';
 }

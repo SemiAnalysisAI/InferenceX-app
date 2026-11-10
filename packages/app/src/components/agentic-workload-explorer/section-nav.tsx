@@ -10,6 +10,13 @@ import {
   explorerRelativePath,
   versionQuery,
 } from '@/lib/agentic-workload-explorer/paths';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { track } from '@/lib/analytics/analytics';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -85,7 +92,7 @@ const tabClass = (active: boolean) =>
   cn(
     '-mb-px inline-flex items-center gap-1 border-b-2 pt-1 pb-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-200 focus-visible:outline-none',
     active
-      ? 'border-secondary text-secondary dark:border-primary dark:text-primary'
+      ? 'border-brand text-foreground'
       : 'border-transparent text-muted-foreground hover:text-foreground',
   );
 
@@ -185,24 +192,27 @@ function SectionNavInner({ query }: { query: string }) {
 
   return (
     <>
-      <label className="flex items-center gap-2 text-sm lg:hidden">
+      <div className="flex items-center gap-2 text-sm lg:hidden">
         <span className="text-muted-foreground">{strings.select}</span>
-        <select
+        <Select
           value={activePath}
-          onChange={(e) => {
-            track('agentic_workload_section_selected', { section: e.target.value });
-            router.push(explorerHref(e.target.value, locale) + query);
+          onValueChange={(next) => {
+            track('agentic_workload_section_selected', { section: next });
+            router.push(explorerHref(next, locale) + query);
           }}
-          className="h-9 min-w-0 flex-1 rounded-md border border-border/30 bg-background px-2 text-sm"
         >
-          {activePath === '' && <option value="" disabled />}
-          {ALL_SECTIONS.map((link) => (
-            <option key={link.path} value={link.path}>
-              {link.label[locale]}
-            </option>
-          ))}
-        </select>
-      </label>
+          <SelectTrigger aria-label={strings.select} className="min-h-11 min-w-0 flex-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {ALL_SECTIONS.map((link) => (
+              <SelectItem key={link.path} value={link.path}>
+                {link.label[locale]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       <nav
         aria-label={strings.navLabel}
         className="relative z-40 hidden border-b border-border/30 lg:block"

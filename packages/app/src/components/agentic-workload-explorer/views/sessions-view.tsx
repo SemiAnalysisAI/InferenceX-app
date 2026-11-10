@@ -6,15 +6,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
-import {
-  formatNumber,
-  truncateHash,
-  truncateSessionId,
-} from '@/lib/agentic-workload-explorer/format';
+import { formatNumber } from '@/lib/agentic-workload-explorer/format';
 import { formatCost } from '@/components/agentic-workload-explorer/session-dag';
 import { parseUserAgent } from '@/lib/agentic-workload-explorer/user-agent';
 import { useInfiniteList } from '@/hooks/agentic-workload-explorer/use-infinite-scroll';
 import { ArrowDown, ArrowUp, Loader2, Search, X } from 'lucide-react';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import {
   HARNESSES,
   harnessFromUserAgent,
@@ -29,7 +26,7 @@ import type {
   SessionStats,
 } from '@/lib/agentic-workload-explorer/api-types';
 import { createTaskLimiter } from '@/lib/agentic-workload-explorer/task-limiter';
-import { formatSnapshotTime } from '@/lib/agentic-workload-explorer/snapshot';
+import { formatSnapshotClock, formatSnapshotDate } from '@/lib/agentic-workload-explorer/snapshot';
 import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-href';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
@@ -50,14 +47,14 @@ const STRINGS = {
     colCost: 'Cost',
     colApiHit: 'API hit',
     colHashUpper: 'Hash upper bound',
-    colStarted: 'Started',
-    colActive: 'Active',
+    colStarted: 'Started (UTC)',
+    colActive: 'Active (UTC)',
     apiHitTitle:
       'API cache hit rate — cache_read / (cache_read + cache_write + input) across every request in the session.',
     hashUpperTitle:
       'Theoretical upper-bound cache hit rate — assuming infinite cache TTL and an infinitely large cache. Walks a chain-hash trie over every request to find the longest prefix match against any prior chain in the session.',
     computeHashTitle: 'Compute the exact theoretical hash-cache upper bound for this session.',
-    hashLoad: 'Load',
+    hashLoad: 'Compute',
     hashRetry: 'Retry',
     hashNoData: 'No hash data — session has no recorded prompt blocks.',
     colVersion: 'Version',
@@ -81,14 +78,14 @@ const STRINGS = {
     colCost: '成本',
     colApiHit: 'API 命中',
     colHashUpper: 'Hash 上界',
-    colStarted: '开始',
-    colActive: '活跃',
+    colStarted: '开始 (UTC)',
+    colActive: '活跃 (UTC)',
     apiHitTitle:
       'API 缓存命中率 — 会话内所有请求的 cache_read / (cache_read + cache_write + input)',
     hashUpperTitle:
       '理论缓存命中上界 — 假设无限 Cache TTL 与无限大缓存。对每个请求遍历 chain-hash trie，查找与此前任意链的最长前缀匹配。',
     computeHashTitle: '计算此会话的精确理论 hash-cache 命中上界',
-    hashLoad: '加载',
+    hashLoad: '计算',
     hashRetry: '重试',
     hashNoData: '无 hash 数据 — 此会话没有记录 prompt 块',
     colVersion: '版本',
@@ -211,6 +208,7 @@ export default function SessionsPage() {
 function SessionsPageContent() {
   const locale = useLocale();
   const t = STRINGS[locale];
+  const isMobile = useIsMobileViewport();
   const explorerHref = useExplorerHref();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -337,7 +335,7 @@ function SessionsPageContent() {
         {loading || !stats ? (
           <Skeleton className="h-3 w-10" />
         ) : (
-          <span className="text-3xs font-mono text-muted-foreground tabular-nums">
+          <span className="text-3xs text-muted-foreground tabular-nums">
             {formatNumber(stats.total)} {t.total}
           </span>
         )}
@@ -365,7 +363,7 @@ function SessionsPageContent() {
               }
             }}
             placeholder={t.searchPlaceholder}
-            className="h-11 md:h-8 pl-8 pr-7 w-56 rounded-md border border-input bg-background text-2xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-border"
+            className="h-11 md:h-8 pl-8 pr-7 w-56 rounded-md border border-input bg-background text-2xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-border"
           />
           {searchQuery && (
             <button
@@ -383,6 +381,8 @@ function SessionsPageContent() {
         </div>
         <SegmentedToggle
           role="group"
+          variant={isMobile ? 'select' : 'segments'}
+          className={isMobile ? 'min-w-28 flex-1' : undefined}
           ariaLabel={t.minReqsFilterLabel}
           value={minReqsFilter}
           onValueChange={(value) => setFilter('minReqs', value)}
@@ -393,6 +393,8 @@ function SessionsPageContent() {
         />
         <SegmentedToggle
           role="group"
+          variant={isMobile ? 'select' : 'segments'}
+          className={isMobile ? 'min-w-28 flex-1' : undefined}
           ariaLabel={t.versionFilterLabel}
           value={versionFilter}
           onValueChange={(value) => setFilter('version', value)}
@@ -403,6 +405,8 @@ function SessionsPageContent() {
         />
         <SegmentedToggle
           role="group"
+          variant={isMobile ? 'select' : 'segments'}
+          className={isMobile ? 'min-w-28 flex-1' : undefined}
           ariaLabel={t.harnessFilterLabel}
           value={harnessFilter}
           onValueChange={(value) => setFilter('harness', value)}
@@ -427,8 +431,8 @@ function SessionsPageContent() {
       ) : sessions.length === 0 ? (
         <EmptyState className="py-16">{t.noMatch}</EmptyState>
       ) : (
-        <div className="rounded-lg border border-border/30 overflow-x-auto">
-          <div className="grid min-w-[1160px] gap-4 px-4 py-2.5 bg-card text-xs text-muted-foreground border-b border-border/20 grid-cols-[1fr_80px_140px_72px_80px_88px_112px_80px_80px] font-medium">
+        <div className="rounded-lg border border-border/30 sm:overflow-x-auto">
+          <div className="grid min-w-[1160px] gap-4 px-4 py-2.5 bg-card text-xs text-muted-foreground border-b border-border/20 grid-cols-[1fr_80px_140px_72px_80px_88px_112px_104px_104px] font-medium max-sm:hidden">
             <SortButton col="session" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}>
               {t.colSession}
             </SortButton>
@@ -486,7 +490,7 @@ function SessionsPageContent() {
             </SortButton>
           </div>
 
-          <div className="min-w-[1160px] divide-y divide-border/20">
+          <div className="divide-y divide-border/20 sm:min-w-[1160px]">
             {sessions.map((session) => (
               <SessionRow key={session.id} session={session} />
             ))}
@@ -528,7 +532,7 @@ function SessionRow({ session }: { session: Session }) {
   const { cliVersion, os } = sessionUaInfo(session);
 
   return (
-    <div className="relative grid gap-4 px-4 py-3 cursor-pointer hover:bg-surface-hover transition-colors items-center grid-cols-[1fr_80px_140px_72px_80px_88px_112px_80px_80px]">
+    <div className="relative grid gap-4 px-4 py-3 cursor-pointer hover:bg-surface-hover transition-colors items-center max-sm:grid-cols-1 max-sm:gap-1 sm:grid-cols-[1fr_80px_140px_72px_80px_88px_112px_104px_104px]">
       <Link
         href={explorerHref(`/sessions/${session.id}`)}
         aria-label={t.openSession(session.id)}
@@ -536,8 +540,8 @@ function SessionRow({ session }: { session: Session }) {
       />
       <div className="min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
-          <span className="font-mono text-sm font-medium truncate block">
-            {truncateSessionId(session.id)}
+          <span className="min-w-0 truncate font-mono text-xs font-medium" title={session.id}>
+            {session.id}
           </span>
           {(() => {
             const harness = harnessFromUserAgent(session.metadata?.userAgent);
@@ -548,16 +552,24 @@ function SessionRow({ session }: { session: Session }) {
             );
           })()}
         </div>
-        <div className="flex items-center gap-2 text-3xs font-mono text-muted-foreground">
+        <div className="flex items-center gap-2 text-xs tabular-nums text-muted-foreground">
+          <span className="sm:hidden">
+            {formatNumber(session.requestCount)} {t.colReqs}
+          </span>
+          {Number(session.totalCost) > 0 && (
+            <span className="text-foreground sm:hidden">
+              {formatCost(Number(session.totalCost))}
+            </span>
+          )}
           {os && (
             <>
-              <span className="text-border">·</span>
+              <span className="text-border sm:hidden">·</span>
               <span>{os}</span>
             </>
           )}
           {session.totalOutput > 0 && (
             <>
-              <span className="text-border">·</span>
+              <span className={os ? 'text-border' : 'text-border sm:hidden'}>·</span>
               <span className="text-muted-foreground">
                 {(session.totalCacheRead / session.totalOutput).toFixed(1)}:
                 {(session.totalCacheWrite / session.totalOutput).toFixed(1)}:1
@@ -567,7 +579,7 @@ function SessionRow({ session }: { session: Session }) {
         </div>
       </div>
 
-      <span className="font-mono text-2xs truncate" title={cliVersion ?? undefined}>
+      <span className="truncate text-xs tabular-nums max-sm:hidden" title={cliVersion ?? undefined}>
         {cliVersion ? (
           <span className="text-muted-foreground">v{cliVersion}</span>
         ) : (
@@ -575,13 +587,18 @@ function SessionRow({ session }: { session: Session }) {
         )}
       </span>
 
-      <span className="font-mono text-2xs truncate">
-        <span className="text-muted-foreground">{truncateHash(session.clientApiKeyHash)}</span>
+      <span
+        className="truncate font-mono text-xs text-muted-foreground max-sm:hidden"
+        title={session.clientApiKeyHash}
+      >
+        {session.clientApiKeyHash}
       </span>
 
-      <span className="text-right font-mono text-sm tabular-nums">{session.requestCount}</span>
+      <span className="text-right text-xs tabular-nums max-sm:hidden">
+        {session.requestCount.toLocaleString(locale)}
+      </span>
 
-      <span className="text-right font-mono text-2xs tabular-nums">
+      <span className="text-right text-xs tabular-nums max-sm:hidden">
         {Number(session.totalCost) > 0 ? (
           <span className="text-foreground">{formatCost(Number(session.totalCost))}</span>
         ) : (
@@ -589,7 +606,7 @@ function SessionRow({ session }: { session: Session }) {
         )}
       </span>
 
-      <span className="text-right font-mono text-2xs tabular-nums">
+      <span className="text-right text-xs tabular-nums max-sm:hidden">
         {apiHit === null ? (
           <span className="text-muted-foreground">—</span>
         ) : (
@@ -597,34 +614,39 @@ function SessionRow({ session }: { session: Session }) {
         )}
       </span>
 
-      <button
-        type="button"
-        className="relative z-20 text-right font-mono text-2xs tabular-nums hover:text-foreground"
-        title={t.computeHashTitle}
-        onClick={loadHashStats}
-      >
-        <HashHitRateCell state={hashState} />
-      </button>
-
-      <span className="text-right text-3xs font-mono text-muted-foreground">
-        {formatSnapshotTime(session.startedAt, locale)}
+      <span className="relative z-20 justify-self-end text-right text-xs tabular-nums max-sm:hidden">
+        <HashHitRateCell state={hashState} onCompute={loadHashStats} />
       </span>
 
-      <span className="text-right text-3xs font-mono text-muted-foreground">
-        {formatSnapshotTime(session.lastActiveAt, locale)}
+      <span className="whitespace-nowrap text-right text-xs tabular-nums text-muted-foreground max-sm:hidden">
+        {formatSnapshotDate(session.startedAt, locale)} {formatSnapshotClock(session.startedAt)}
+      </span>
+
+      <span className="whitespace-nowrap text-right text-xs tabular-nums text-muted-foreground max-sm:hidden">
+        {formatSnapshotDate(session.lastActiveAt, locale)}{' '}
+        {formatSnapshotClock(session.lastActiveAt)}
       </span>
     </div>
   );
 }
 
-function HashHitRateCell({ state }: { state: HashStatsState }) {
+function HashHitRateCell({ state, onCompute }: { state: HashStatsState; onCompute: () => void }) {
   const t = STRINGS[useLocale()];
-  if (state.status === 'pending')
-    return <span className="text-muted-foreground">{t.hashLoad}</span>;
-  if (state.status === 'loading') return <span className="text-muted-foreground">···</span>;
-  if (state.status === 'error') {
-    return <span className="text-muted-foreground">{t.hashRetry}</span>;
+  if (state.status === 'pending' || state.status === 'error') {
+    return (
+      <Button
+        type="button"
+        variant="link"
+        size="2xs"
+        className="px-0"
+        title={t.computeHashTitle}
+        onClick={onCompute}
+      >
+        {state.status === 'pending' ? t.hashLoad : t.hashRetry}
+      </Button>
+    );
   }
+  if (state.status === 'loading') return <span className="text-muted-foreground">···</span>;
   if (state.data.hashTotal === 0) {
     return (
       <span className="text-muted-foreground" title={t.hashNoData}>

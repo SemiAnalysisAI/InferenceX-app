@@ -64,7 +64,7 @@ const WORKFLOW_STRINGS = {
 } as const;
 
 export const RUN_CONTEXT_GRID =
-  'grid min-w-0 items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,24rem)_minmax(0,24rem)_minmax(0,1fr)]';
+  'grid min-w-0 items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,24rem)_minmax(0,24rem)_minmax(max-content,1fr)]';
 
 export function workflowRunCountLabel(index: number, total: number, locale: Locale): string {
   return locale === 'zh' ? `第 ${index} 次运行（共 ${total} 次）` : `Run ${index}/${total}`;

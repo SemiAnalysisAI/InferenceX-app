@@ -21,7 +21,12 @@ interface FloatingTooltipProps extends Omit<HTMLAttributes<HTMLDivElement>, 'sty
   /** Pointer or anchor position in viewport coordinates (`clientX` / `clientY`). */
   x: number;
   y: number;
+  /** Space between the anchor and the card, never less than 12px. */
   offset?: number;
+  /**
+   * Side used when no chart SVG is under the anchor. Over a chart the card takes the
+   * quadrant away from the anchor's position in the plot.
+   */
   placement?: 'below' | 'above';
   style?: CSSProperties;
   /** Skips the shared tooltip card when the content draws its own surface. */

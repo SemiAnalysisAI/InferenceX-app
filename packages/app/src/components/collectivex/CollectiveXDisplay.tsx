@@ -8,6 +8,7 @@ import { GITHUB_REPO_FULL } from '@semianalysisai/inferencex-constants';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Card } from '@/components/ui/card';
+import { ControlPanel } from '@/components/ui/control-panel';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Heading } from '@/components/ui/heading';
 import ChartLegend from '@/components/ui/chart-legend';
@@ -759,10 +760,10 @@ export default function CollectiveXDisplay() {
                 <EmptyState data-testid="collectivex-empty-state">{t.noSeries}</EmptyState>
               )}
               <Card className="relative z-10 py-4 md:py-5" data-testid="collectivex-chart-filters">
-                <Heading level="card" className="mb-4">
-                  {t.chartControlsHeading}
-                </Heading>
-                <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+                <ControlPanel
+                  legend={t.chartControlsHeading}
+                  className="gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6"
+                >
                   <SelectControl
                     label={t.epControl}
                     testId="collectivex-ep-select"
@@ -899,7 +900,7 @@ export default function CollectiveXDisplay() {
                       { value: 'payload-rate', label: t.payloadRateOption },
                     ]}
                   />
-                </div>
+                </ControlPanel>
               </Card>
               <Card ref={mainChartRef} data-testid="collectivex-main-chart" className="relative">
                 <CollectiveXChart

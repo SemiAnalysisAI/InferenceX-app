@@ -1,18 +1,21 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams, usePathname } from 'next/navigation';
+import { useParams, usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { SEGMENT_RADIUS_STYLE, SEGMENTED_CONTAINER_STYLE } from '@/components/ui/control-styles';
 import { cn } from '@/lib/shared/utils';
-import {
-  formatNumber,
-  formatTimestamp,
-  truncateHash,
-} from '@/lib/agentic-workload-explorer/format';
+import { formatDollars, formatNumber } from '@/lib/agentic-workload-explorer/format';
 import { SessionProvider, type SessionData } from '@/lib/agentic-workload-explorer/session-context';
 import { useInfiniteScroll } from '@/hooks/agentic-workload-explorer/use-infinite-scroll';
 import { formatSnapshotTime } from '@/lib/agentic-workload-explorer/snapshot';
@@ -46,10 +49,12 @@ const STRINGS = {
     estCost: 'Est. cost',
     readWriteOut: 'Read : write : out',
     requestsHeading: 'Requests',
-    loading: (remaining: number) => `Loading... (${remaining} remaining)`,
+    loading: (remaining: string) => `Loading... (${remaining} remaining)`,
     sessionNotFound: 'Session not found',
     oldest: 'Oldest',
     newest: 'Newest',
+    sessionView: 'Session view',
+    sessions: 'Sessions',
   },
   zh: {
     sessionInfo: '会话信息',
@@ -71,10 +76,12 @@ const STRINGS = {
     estCost: '预估成本',
     readWriteOut: '读取 : 写入 : 输出',
     requestsHeading: '请求',
-    loading: (remaining: number) => `加载中…（剩余 ${remaining}）`,
+    loading: (remaining: string) => `加载中…（剩余 ${remaining}）`,
     sessionNotFound: '未找到会话',
     oldest: '最早',
     newest: '最新',
+    sessionView: '会话视图',
+    sessions: '会话',
   },
 };
 
@@ -97,6 +104,7 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
   const explorerHref = useExplorerHref();
   const params = useParams();
   const pathname = usePathname();
+  const router = useRouter();
   const id = params.id as string;
   const [data, setData] = useState<SessionDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -252,33 +260,29 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
       relativePath === `${sessionPath}/${key}` ||
       (key === 'conversation' && relativePath === sessionPath),
   }));
+  const activeKey = tabKeys.find((_, i) => navLinks[i].active) ?? 'conversation';
 
   return (
     <div className="space-y-5">
       <div className="space-y-1">
-        <div className="flex items-center gap-1.5 text-xs font-mono">
+        <div className="flex items-center gap-1.5 text-xs">
           <Link
             href={explorerHref('/sessions')}
             className="text-muted-foreground hover:text-foreground transition-colors"
           >
-            sessions
+            {t.sessions}
           </Link>
           <span className="text-muted-foreground">/</span>
-          <span className="font-medium">{session.id}</span>
+          <span className="min-w-0 truncate font-mono font-medium">{session.id}</span>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         <Card>
           <div className="text-xs font-medium text-muted-foreground mb-2">{t.sessionInfo}</div>
-          <div className="text-xs space-y-1.5">
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">{t.client}</span>
-              <span className="font-mono text-foreground">
-                {truncateHash(session.clientApiKeyHash)}
-              </span>
-            </div>
-            <InfoRow label={t.started} value={formatTimestamp(session.startedAt, locale)} />
+          <dl className={INFO_GRID}>
+            <InfoRow label={t.client} value={session.clientApiKeyHash} mono />
+            <InfoRow label={t.started} value={formatSnapshotTime(session.startedAt, locale)} />
             <InfoRow
               label={t.lastActive}
               value={formatSnapshotTime(session.lastActiveAt, locale)}
@@ -303,26 +307,19 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
                     ? `v${session.maxTraceVersion}`
                     : `v${session.minTraceVersion}–v${session.maxTraceVersion}`
                 }
-                mono
               />
             )}
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">{t.traceMode}</span>
-              <span
-                className={`font-mono ${
-                  session.privacyMode === 'anon' ? 'text-foreground' : 'text-muted-foreground'
-                }`}
-              >
-                {session.privacyMode === 'anon' ? t.anonymized : t.full}
-              </span>
-            </div>
-          </div>
+            <InfoRow
+              label={t.traceMode}
+              value={session.privacyMode === 'anon' ? t.anonymized : t.full}
+            />
+          </dl>
         </Card>
 
         <Card>
           <div className="text-xs font-medium text-muted-foreground mb-2">{t.usage}</div>
-          <div className="text-xs space-y-1.5">
-            <InfoRow label={t.requests} value={String(usage.requestCount)} />
+          <dl className={INFO_GRID}>
+            <InfoRow label={t.requests} value={formatNumber(Number(usage.requestCount))} />
             <InfoRow label={t.inputTokens} value={formatNumber(Number(usage.totalInputTokens))} />
             <InfoRow label={t.outputTokens} value={formatNumber(Number(usage.totalOutputTokens))} />
             {Number(usage.totalCacheCreation) > 0 && (
@@ -335,7 +332,7 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
               <InfoRow label={t.cacheRead} value={formatNumber(Number(usage.totalCacheRead))} />
             )}
             {Number(usage.totalCost) > 0 && (
-              <InfoRow label={t.estCost} value={`$${Number(usage.totalCost).toFixed(2)}`} />
+              <InfoRow label={t.estCost} value={formatDollars(Number(usage.totalCost))} />
             )}
             {Number(usage.totalOutputTokens) > 0 && (
               <InfoRow
@@ -343,18 +340,18 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
                 value={`${(Number(usage.totalCacheRead) / Number(usage.totalOutputTokens)).toFixed(1)} : ${(Number(usage.totalCacheCreation) / Number(usage.totalOutputTokens)).toFixed(1)} : 1`}
               />
             )}
-          </div>
+          </dl>
         </Card>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
           <span className="text-xs font-medium text-muted-foreground">{t.requestsHeading}</span>
-          <span className="text-3xs font-mono text-muted-foreground">
-            {requests.length} / {data.total}
+          <span className="text-3xs tabular-nums text-muted-foreground">
+            {requests.length.toLocaleString(locale)} / {data.total.toLocaleString(locale)}
           </span>
         </div>
-        <div className="flex min-w-0 max-w-full items-center gap-2">
+        <div className="flex w-full min-w-0 max-w-full flex-wrap items-center gap-2 sm:w-auto">
           <SegmentedToggle
             role="group"
             ariaLabel={t.requestsHeading}
@@ -370,7 +367,28 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
               { value: 'newest', label: t.newest },
             ]}
           />
-          <nav className={cn(SEGMENTED_CONTAINER_STYLE, 'flex-nowrap overflow-x-auto')}>
+          <Select
+            value={activeKey}
+            onValueChange={(next: ExplorerSessionTab) => {
+              track('agentic_workload_session_view_changed', { view: next });
+              router.push(explorerHref(`${sessionPath}/${next}`));
+            }}
+          >
+            <SelectTrigger aria-label={t.sessionView} className="min-h-11 min-w-0 flex-1 sm:hidden">
+              <SelectValue>{EXPLORER_SESSION_TAB_META[activeKey][locale]}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {tabKeys.map((key) => (
+                <SelectItem key={key} value={key}>
+                  {EXPLORER_SESSION_TAB_META[key][locale]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <nav
+            aria-label={t.sessionView}
+            className={cn(SEGMENTED_CONTAINER_STYLE, 'flex-nowrap overflow-x-auto max-sm:hidden')}
+          >
             {navLinks.map((link) => {
               const isActive = link.active;
               return (
@@ -394,8 +412,8 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
       {requests.length < data.total && (
         <div ref={sentinelRef} className="flex items-center justify-center py-4 gap-2">
           <span className="h-4 w-4 border-2 border-foreground/20 border-t-foreground/60 rounded-full animate-spin" />
-          <span className="text-2xs font-mono text-muted-foreground">
-            {t.loading(data.total - requests.length)}
+          <span className="text-2xs tabular-nums text-muted-foreground">
+            {t.loading((data.total - requests.length).toLocaleString(locale))}
           </span>
         </div>
       )}
@@ -416,27 +434,18 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
   );
 }
 
-function InfoRow({
-  label,
-  value,
-  mono,
-  href,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-  href?: string;
-}) {
+const INFO_GRID = 'grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-3 lg:grid-cols-4';
+
+function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex justify-between">
-      <span className="text-muted-foreground">{label}</span>
-      {href ? (
-        <Link href={href} className={`${mono ? 'font-mono' : ''} hover:underline text-foreground`}>
-          {value}
-        </Link>
-      ) : (
-        <span className={mono ? 'font-mono' : ''}>{value}</span>
-      )}
+    <div className="min-w-0">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd
+        className={cn('truncate text-foreground', mono ? 'font-mono' : 'tabular-nums')}
+        title={value}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

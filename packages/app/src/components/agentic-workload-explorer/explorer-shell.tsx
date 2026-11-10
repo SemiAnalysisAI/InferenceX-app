@@ -6,7 +6,10 @@ import { Suspense, type ReactNode } from 'react';
 import { SectionNav } from '@/components/agentic-workload-explorer/section-nav';
 import { SnapshotStamp } from '@/components/agentic-workload-explorer/snapshot-stamp';
 import { TraceVersionSelector } from '@/components/agentic-workload-explorer/trace-version-selector';
-import { Heading } from '@/components/ui/heading';
+import { Card } from '@/components/ui/card';
+import { ChartShareActions } from '@/components/ui/chart-display-helpers';
+import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { explorerRelativePath } from '@/lib/agentic-workload-explorer/paths';
 import { useLocale } from '@/lib/i18n/use-locale';
 
@@ -27,23 +30,30 @@ export function ExplorerShell({ children }: { children: ReactNode }) {
   const strings = STRINGS[useLocale()];
   // The overview page's TabIntro carries its h1; every section page uses this title as its h1.
   const isOverview = explorerRelativePath(usePathname() ?? '') === '/';
+  const isMobile = useIsMobileViewport();
+  const actions = (
+    <>
+      <Suspense fallback={null}>
+        <TraceVersionSelector />
+      </Suspense>
+      <ChartShareActions />
+    </>
+  );
   return (
     <section className="flex min-w-0 flex-col gap-4" data-testid="agentic-workload-explorer">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <Heading as={isOverview ? 'h2' : 'h1'} level="title" className="mb-1">
-            {strings.title}
-          </Heading>
-          <p className="text-sm text-muted-foreground">{strings.description}</p>
-          <div className="mt-2">
-            <SnapshotStamp />
-          </div>
+      <Card className="gap-4">
+        <div className="flex flex-col gap-2">
+          <DashboardSectionHeader
+            title={strings.title}
+            headingAs={isOverview ? 'h2' : 'h1'}
+            description={strings.description}
+            actions={isMobile ? undefined : actions}
+          />
+          <SnapshotStamp />
+          {isMobile && <div className="flex min-w-0 flex-wrap gap-2">{actions}</div>}
         </div>
-        <Suspense fallback={null}>
-          <TraceVersionSelector />
-        </Suspense>
-      </div>
-      <SectionNav />
+        <SectionNav />
+      </Card>
       <div className="min-w-0">{children}</div>
     </section>
   );

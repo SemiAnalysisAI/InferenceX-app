@@ -25,3 +25,6 @@ export const CHART_COLORS = [
   '#ec4899',
   '#84cc16',
 ];
+
+/** Baseline or remainder series ("regular", "other", "unknown") next to a colored one. */
+export const NEUTRAL_SERIES_COLOR = '#9aa3ad';

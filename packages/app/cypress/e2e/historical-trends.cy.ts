@@ -3,6 +3,16 @@ import type { AvailabilityRow, BenchmarkRow } from '@/lib/api/api';
 
 import { availabilityBody } from '../support/e2e';
 
+/** Opens the waterfall series picker, reads every option's series id, and closes it again. */
+const waterfallSeriesIds = () => {
+  cy.get('[data-testid="waterfall-series"]').click();
+  return cy.get('[data-testid="waterfall-series-option"]').then(($options) => {
+    const ids = [...$options].map((option) => option.dataset.seriesId ?? '');
+    cy.focused().type('{esc}');
+    return cy.wrap(ids);
+  });
+};
+
 describe('Historical improvement waterfall', () => {
   beforeEach(() => {
     cy.fixture<BenchmarkRow[]>('api/benchmarks-history.json').then((rows) => {
@@ -22,10 +32,10 @@ describe('Historical improvement waterfall', () => {
     cy.get('#historical-trend-export').should('exist');
     cy.get('[data-testid="waterfall-step"][data-kind="baseline"]').should('have.length', 1);
     cy.get('[data-testid="waterfall-step"][data-kind="best"]').should('have.length', 1);
-    cy.get('[data-testid="waterfall-series"] option').then(($options) => {
-      if ($options.length > 1) {
-        cy.get('[data-testid="waterfall-series"]').select($options.eq(1).val() as string);
-      }
+    cy.get('[data-testid="waterfall-series"]').click();
+    cy.get('[data-testid="waterfall-series-option"]').then(($options) => {
+      if ($options.length > 1) cy.wrap($options.eq(1)).click();
+      else cy.focused().type('{esc}');
     });
     cy.get('[data-testid="historical-view-line"]').click();
     cy.get('[data-testid="trend-chart-svg"]').should('be.visible');
@@ -34,7 +44,7 @@ describe('Historical improvement waterfall', () => {
 
   it('uses internal horizontal scrolling without widening a 375px page', () => {
     cy.viewport(375, 844);
-    cy.get('[data-testid="historical-view-waterfall"]').click();
+    cy.get('select[data-testid="historical-view"]').select('waterfall');
     cy.get('[data-testid="waterfall-chart-svg"]').should('exist');
     cy.document().then((doc) => {
       expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
@@ -44,30 +54,25 @@ describe('Historical improvement waterfall', () => {
 
   it('preserves hardware filtering, high contrast and reset in waterfall mode', () => {
     cy.get('[data-testid="historical-view-waterfall"]').click();
-    cy.get('[data-testid="waterfall-controls"] summary').click();
-    cy.get('[data-testid="waterfall-controls"]').should('have.attr', 'open');
+    cy.get('[data-testid="waterfall-controls"] button[aria-expanded]').should('not.be.visible');
     cy.get('#historical-log-scale').should('not.exist');
     cy.get('#historical-high-contrast').should('be.visible').click();
     cy.get('#historical-high-contrast').should('have.attr', 'data-state', 'checked');
 
-    cy.get('[data-testid="waterfall-series"] option').then(($options) => {
-      const initialCount = $options.length;
+    waterfallSeriesIds().then((ids) => {
+      const initialCount = ids.length;
       expect(initialCount).to.be.greaterThan(1);
-      const hardware = String($options.eq(0).val()).split('__')[0];
+      const hardware = ids[0].split('__')[0];
       cy.get(`[data-testid="waterfall-controls"] label[for="checkbox-${hardware}"]`).click();
-      cy.get('[data-testid="waterfall-series"] option').should(
-        'have.length.lessThan',
-        initialCount,
-      );
+      waterfallSeriesIds().should('have.length.lessThan', initialCount);
       cy.get('[data-testid="historical-reset-filter"]').should('be.visible').click();
-      cy.get('[data-testid="waterfall-series"] option').should('have.length', initialCount);
+      waterfallSeriesIds().should('have.length', initialCount);
     });
 
     cy.get('[data-testid="historical-view-line"]').click();
     cy.get('#historical-high-contrast').should('have.attr', 'data-state', 'checked');
     cy.get('#historical-log-scale').should('be.visible');
     cy.get('[data-testid="historical-view-waterfall"]').click();
-    cy.get('[data-testid="waterfall-controls"] summary').click();
     cy.get('#historical-high-contrast').should('have.attr', 'data-state', 'checked').click();
     cy.get('#historical-high-contrast').should('have.attr', 'data-state', 'unchecked');
   });
@@ -76,7 +81,6 @@ describe('Historical improvement waterfall', () => {
     cy.get('[data-testid="historical-trend-figure"] [data-testid="legend-close-button"]').click();
     cy.get('#historical-high-contrast').should('not.exist');
     cy.get('[data-testid="historical-view-waterfall"]').click();
-    cy.get('[data-testid="waterfall-controls"] summary').click();
     cy.get('#historical-high-contrast').should('be.visible').click();
     cy.get('[data-testid="waterfall-controls"] [data-testid="legend-open-button"]').should(
       'not.exist',
@@ -86,7 +90,6 @@ describe('Historical improvement waterfall', () => {
     );
     cy.get('[data-testid="waterfall-controls"] label[for^="checkbox-"]').first().click();
     cy.get('[data-testid="historical-reset-filter"]').should('be.visible').click();
-    cy.get('[data-testid="waterfall-controls"] summary').click().click();
     cy.get('#historical-high-contrast')
       .should('be.visible')
       .and('have.attr', 'data-state', 'checked');
@@ -97,7 +100,6 @@ describe('Historical improvement waterfall', () => {
     );
     cy.get('#historical-high-contrast').should('not.exist');
     cy.get('[data-testid="historical-view-waterfall"]').click();
-    cy.get('[data-testid="waterfall-controls"] summary').click();
     cy.get('#historical-high-contrast')
       .should('be.visible')
       .and('have.attr', 'data-state', 'checked');
@@ -413,7 +415,8 @@ describe('Historical frontier views', () => {
     });
     cy.get('[data-testid="historical-view-frontier"]').click();
     cy.get('[data-testid="frontier-view"]').should('be.visible');
-    cy.get('[data-testid="historical-target-slider"]').should('not.exist');
+    // The trend target keeps its place but is inert: frontier views span every interactivity.
+    cy.get('[data-testid="historical-target-slider"]').closest('[inert]').should('exist');
     cy.get('[data-testid="frontier-grouping"]').should('not.exist');
     cy.get('[data-testid="frontier-vendor-all"]').should('have.attr', 'aria-pressed', 'true');
     cy.get('[data-testid="frontier-svg"] path.fr-area').should('have.length', 1);
@@ -427,7 +430,7 @@ describe('Historical frontier views', () => {
 
     cy.get('[data-testid="historical-view-line"]').click();
     cy.get('[data-testid="trend-chart-svg"]').should('be.visible');
-    cy.get('[data-testid="historical-target-slider"]').should('exist');
+    cy.get('[data-testid="historical-target-slider"]').closest('[inert]').should('not.exist');
   });
 
   it('compares vendors and chips with lead bars and per-series selection', () => {

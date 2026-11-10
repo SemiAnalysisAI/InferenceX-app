@@ -72,6 +72,15 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
     [rawRows],
   );
 
+  const latestDataDate = useMemo(
+    () =>
+      rawRows?.reduce<string | null>(
+        (max, row) => (max && max > row.date ? max : row.date),
+        null,
+      ) ?? null,
+    [rawRows],
+  );
+
   const availableModels = useMemo(() => {
     const rangeData = dateRangeSuccessRateData[dateRange] ?? dateRangeSuccessRateData['all-time'];
     return rangeData ? Object.keys(rangeData) : [];
@@ -175,6 +184,7 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
       error,
       refetch,
       dateRangeSuccessRateData,
+      latestDataDate,
       filteredReliabilityData,
       chartData,
       availableModels,
@@ -197,6 +207,7 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
       error,
       refetch,
       dateRangeSuccessRateData,
+      latestDataDate,
       filteredReliabilityData,
       chartData,
       availableModels,

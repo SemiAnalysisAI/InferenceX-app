@@ -29,6 +29,8 @@ export interface ReliabilityChartContextType {
   error: string | null;
   refetch: () => Promise<unknown>;
   dateRangeSuccessRateData: DateRangeSuccessRateData;
+  /** Newest run date in the feed (YYYY-MM-DD), so an empty window can say where data stops. */
+  latestDataDate: string | null;
   filteredReliabilityData: ModelSuccessRateData[];
   chartData: (ModelSuccessRateData & { modelLabel: string })[];
   availableModels: string[];

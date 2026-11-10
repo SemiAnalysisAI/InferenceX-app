@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useMemo, useState } from 'react';
+import { Suspense, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   HARNESSES,
@@ -9,6 +9,7 @@ import {
 } from '@semianalysisai/inferencex-db/proxytrace/shared/harness';
 import { Button } from '@/components/ui/button';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -17,15 +18,23 @@ import {
 } from '@/components/agentic-workload-explorer/tool-os-error-rates';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
 import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-href';
-import { getToolColor } from '@/lib/agentic-workload-explorer/tool-colors';
 import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
-import { ChartActions, Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import {
+  ChartActions,
+  ExpandableChart,
+} from '@/components/agentic-workload-explorer/expandable-chart';
+import { DistributionHistogram } from '@/components/agentic-workload-explorer/distribution-histogram';
+import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
+import { CHART_FONT_SANS, CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
 import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
+import { CURSOR_LINE_PROPS } from '@/lib/d3-chart/cursor';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Stat } from '@/components/ui/stat';
+import { CHART_COLORS } from '@/components/agentic-workload-explorer/series-colors';
+import { formatAxisNumber } from '@/components/agentic-workload-explorer/trends-charts';
 
 interface ToolAnalyticsData {
   toolCounts: { toolName: string; count: number }[];
@@ -185,48 +194,6 @@ function buildHistogram(values: number[], bucketCount: number): Bucket[] {
   return buckets;
 }
 
-function niceNum(range: number, round: boolean): number {
-  const exponent = Math.floor(Math.log10(range));
-  const fraction = range / 10 ** exponent;
-  let niceFraction: number;
-  if (round) {
-    if (fraction < 1.5) niceFraction = 1;
-    else if (fraction < 3) niceFraction = 2;
-    else if (fraction < 7) niceFraction = 5;
-    else niceFraction = 10;
-  } else if (fraction <= 1) {
-    niceFraction = 1;
-  } else if (fraction <= 2) {
-    niceFraction = 2;
-  } else if (fraction <= 5) {
-    niceFraction = 5;
-  } else {
-    niceFraction = 10;
-  }
-  return niceFraction * 10 ** exponent;
-}
-
-function generateTicks(min: number, max: number, targetCount: number): number[] {
-  if (max <= min) return [min];
-  const range = niceNum(max - min, false);
-  const spacing = niceNum(range / (targetCount - 1), true);
-  const niceMin = Math.floor(min / spacing) * spacing;
-  const ticks: number[] = [];
-  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
-    ticks.push(Math.round(t * 1e10) / 1e10);
-  }
-  return ticks;
-}
-
-function formatAxisValue(v: number): string {
-  if (v >= 1e9) return `${(v / 1e9).toFixed(v % 1e9 === 0 ? 0 : 1)}B`;
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(v % 1_000 === 0 ? 0 : 1)}K`;
-  if (Number.isInteger(v)) return String(v);
-  if (v < 1) return v.toFixed(2);
-  return v.toFixed(1);
-}
-
 function formatPct(v: number | null): string {
   if (v === null || Number.isNaN(v)) return '—';
   return `${(v * 100).toFixed(1)}%`;
@@ -281,8 +248,17 @@ type HarnessFilter = 'all' | Harness;
 
 const STRINGS = {
   en: {
-    sessions: 'Sessions',
-    hideSmall: 'Hide n<5',
+    sessionOne: 'session',
+    sessionOther: 'sessions',
+    hideSmall: 'Hide cells under 5',
+    hiddenUnderFive: 'Under 5 transitions, hidden',
+    matrixScaleCount: 'Transitions',
+    matrixScaleProbability: 'Share of row',
+    logScale: '(log scale)',
+    transitionsUnit: 'transitions',
+    ofRowTransitions: 'of transitions from this tool',
+    shareOfSamples: 'Share of samples in this bin',
+    invocationsCount: (n: string) => `N = ${n} invocations`,
     noTransitionData: 'No transition data',
     workflowPatterns: 'Workflow patterns',
     workflowCacheMissing:
@@ -294,15 +270,14 @@ const STRINGS = {
     reload: 'Reload',
     reloadWorkflowAriaLabel: 'Reload workflow patterns',
     repeatShare: 'Repeat share',
-    repeatShareDetail: 'tool calls that repeat the previous tool back-to-back',
+    repeatShareDetail: 'Tool calls that repeat the previous tool back-to-back',
     longestStreak: 'Longest streak',
-    longestStreakDetail: 'most consecutive calls of a single tool in one session',
+    longestStreakDetail: 'Most consecutive calls of a single tool in one session',
     sessionsMined: 'Sessions mined',
     sessionsMinedDetail: (calls: string, steps: string) =>
       `${calls} tool calls → ${steps} collapsed steps`,
     recurringMotifs: 'Recurring motifs',
-    motifsSubtitle: (count: number, sessions: string) =>
-      `(top ${count} · from ${sessions} sessions)`,
+    motifsSubtitle: (count: number, sessions: string) => `Top ${count} · from ${sessions} sessions`,
     motifsDescription:
       'Consecutive repeats are collapsed (Bash, Bash, Bash → one step) and only contiguous steps count, so each row is a real local workflow instead of a Bash permutation. ×N marks steps that average N repeated calls.',
     toolStreaks: 'Tool streaks',
@@ -317,8 +292,9 @@ const STRINGS = {
       'Alternating A→B→A→B segments of 2+ full cycles — the edit/verify and read/tweak feedback loops. Cycles = A→B round trips per segment.',
     noRecurringLoops: 'No recurring loops found',
     toolWallTime: 'Tool wall-time',
+    toolCountDetail: (n: number) => `${n} ${n === 1 ? 'tool' : 'tools'}`,
     turnaroundByTool: 'Turnaround by tool',
-    clientSideWallTime: '(client-side wall time)',
+    clientSideWallTime: 'Client-side wall time',
     turnaroundByToolDescription: (single: string, total: string, pct: string, batchLabel: string) =>
       `Time between a response ending in one tool_use and the next request in the same session lane carrying its tool_result — tool execution plus harness overhead. Single-tool turns only (${single} of ${total} tool turns, ${pct}%); turns with parallel tool calls are lumped under ${batchLabel}; gaps over 30 minutes are dropped as idle.`,
     turnaroundDistribution: 'Turnaround distribution',
@@ -349,11 +325,9 @@ const STRINGS = {
     bashTopBinariesAriaLabel: 'Bash top binaries',
     colBinary: 'Binary',
     colInvocations: 'Invocations',
-    usageBreakdown: 'Usage breakdown',
     batchLabel: '(parallel batch)',
     callsUnit: 'calls',
     allTools: 'All',
-    otherTools: 'Other',
     sessionCount: (n: string) => ` · ${n} sess`,
     loadingToolAnalytics: 'Loading tool analytics…',
     cacheTableMissing: 'Tool analytics are not yet built for this snapshot',
@@ -392,7 +366,7 @@ const STRINGS = {
       `Cell (i, j) = after tool i, tool j was called next. Top ${count} tools by usage.`,
     explicitToolErrorRates: 'Explicit tool error rates',
     anthropicToolResults: 'Anthropic tool results',
-    matchedResults: (n: string) => `(${n} matched results)`,
+    matchedResults: (n: string) => `${n} matched results`,
     anthropicToolResultsDescription:
       'Explicit error rate is errors divided by matched Anthropic tool results. OpenAI and Codex are excluded because their protocol does not carry the same error flag; unmatched Anthropic calls remain unknown.',
     noToolResultData: 'No tool result data',
@@ -455,8 +429,17 @@ const STRINGS = {
       `Session sample: ${sessions} of ${totalSessions} sessions, ${requests} of ${totalRequests} requests`,
   },
   zh: {
-    sessions: '会话数',
-    hideSmall: '隐藏 n<5',
+    sessionOne: '会话',
+    sessionOther: '会话',
+    hideSmall: '隐藏少于 5 的单元格',
+    hiddenUnderFive: '少于 5 次转换，已隐藏',
+    matrixScaleCount: '转换次数',
+    matrixScaleProbability: '行内占比',
+    logScale: '（对数刻度）',
+    transitionsUnit: '次转换',
+    ofRowTransitions: '占该工具后续转换',
+    shareOfSamples: '该区间的样本占比',
+    invocationsCount: (n: string) => `N = ${n} 次调用`,
     noTransitionData: '暂无转换数据',
     workflowPatterns: '工作流模式',
     workflowCacheMissing:
@@ -474,8 +457,7 @@ const STRINGS = {
     sessionsMinedDetail: (calls: string, steps: string) =>
       `${calls} 次工具调用 → ${steps} 步（合并后）`,
     recurringMotifs: '常见模式',
-    motifsSubtitle: (count: number, sessions: string) =>
-      `(前 ${count} 个 · 来自 ${sessions} 个会话)`,
+    motifsSubtitle: (count: number, sessions: string) => `前 ${count} 个 · 来自 ${sessions} 个会话`,
     motifsDescription:
       '连续重复调用被合并（Bash, Bash, Bash → 一步），且仅统计相邻步骤，因此每行是一个真实的局部工作流而非 Bash 排列组合。×N 表示该步骤平均重复调用 N 次。',
     toolStreaks: '工具连续调用',
@@ -490,8 +472,9 @@ const STRINGS = {
       '交替 A→B→A→B 的 2+ 完整周期片段——编辑/验证和读取/调整反馈循环。Cycles = 每段 A→B 往返次数。',
     noRecurringLoops: '未发现循环模式',
     toolWallTime: '工具耗时',
+    toolCountDetail: (n: number) => `${n} 个工具`,
     turnaroundByTool: '按工具分组的周转时间',
-    clientSideWallTime: '（客户端耗时）',
+    clientSideWallTime: '客户端耗时',
     turnaroundByToolDescription: (single: string, total: string, pct: string, batchLabel: string) =>
       `从 tool_use 响应结束到同一会话 lane 的下一条 tool_result 请求之间的时间——包含工具执行和 harness 开销。仅统计单工具 turn（${single} / ${total} 个 tool turns，${pct}%）；并行 tool call 的 turn 归入${batchLabel}；超过 30 分钟的间隔视为空闲已排除。`,
     turnaroundDistribution: '周转时间分布',
@@ -522,11 +505,9 @@ const STRINGS = {
     bashTopBinariesAriaLabel: 'Bash 常用二进制程序',
     colBinary: '二进制程序',
     colInvocations: '调用次数',
-    usageBreakdown: '使用量分布',
     batchLabel: '（并行批次）',
     callsUnit: '次调用',
     allTools: '全部',
-    otherTools: '其他',
     sessionCount: (n: string) => ` · ${n} 个会话`,
     loadingToolAnalytics: '正在加载工具分析数据…',
     cacheTableMissing: '当前快照尚未构建工具分析数据',
@@ -565,7 +546,7 @@ const STRINGS = {
       `Cell (i, j) = 工具 i 之后调用了工具 j。按用量排前 ${count} 的工具。`,
     explicitToolErrorRates: '显式工具错误率',
     anthropicToolResults: 'Anthropic 工具结果',
-    matchedResults: (n: string) => `(${n} 个匹配结果)`,
+    matchedResults: (n: string) => `${n} 个匹配结果`,
     anthropicToolResultsDescription:
       '显式错误率 = 错误数 / Anthropic 匹配工具结果数。OpenAI 和 Codex 被排除，因为其协议不携带相同的错误标志；未匹配的 Anthropic 调用保持 unknown 状态。',
     noToolResultData: '暂无工具结果数据',
@@ -628,286 +609,72 @@ const STRINGS = {
   },
 };
 
-const CHART_WIDTH = 520;
-const CHART_HEIGHT = 200;
-const MARGIN = { top: 8, right: 12, bottom: 36, left: 48 };
-const PLOT_W = CHART_WIDTH - MARGIN.left - MARGIN.right;
-const PLOT_H = CHART_HEIGHT - MARGIN.top - MARGIN.bottom;
+const MATRIX_ROW_LABEL_W = 120;
+const MATRIX_COL_LABEL_H = 96;
+const MATRIX_COLOR = CHART_COLORS[0];
+const MATRIX_LEGEND_GAP = 4;
 
-function Histogram({
-  buckets,
-  color,
-  values,
-  axisLabel,
-  format,
-  title,
-  exportFilename,
-  yAxisLabel,
-}: {
-  buckets: Bucket[];
-  color: string;
-  values: number[];
-  axisLabel: string;
-  format?: (v: number) => string;
-  title?: string;
-  exportFilename?: string;
-  yAxisLabel?: string;
-}) {
-  const locale = useLocale();
-  const t = STRINGS[locale];
-  const sorted = useMemo(() => [...values].toSorted((a, b) => a - b), [values]);
-
-  const maxCount = Math.max(...buckets.map((b) => b.count), 1);
-  const xMin = buckets[0].min;
-  const xMax = buckets.at(-1)!.max;
-
-  const yTicks = generateTicks(0, maxCount, 5);
-  const yMax = yTicks.at(-1) || maxCount;
-  const xTicks = generateTicks(xMin, xMax, 10);
-  const fmt = format || formatAxisValue;
-
-  const sx = (v: number) => MARGIN.left + ((v - xMin) / (xMax - xMin || 1)) * PLOT_W;
-  const sy = (v: number) => MARGIN.top + PLOT_H - (v / yMax) * PLOT_H;
-
-  const pct = (p: number) =>
-    sorted[Math.min(Math.floor((p / 100) * sorted.length), sorted.length - 1)];
-  const percentileColors: Record<string, string> = {
-    p25: '#94a3b8',
-    p50: '#ef4444',
-    p75: '#94a3b8',
-    p90: '#f59e0b',
-    p95: '#f59e0b',
-    p99: '#f43f5e',
-  };
-  const percentiles = [
-    { label: 'p25', value: pct(25) },
-    { label: 'p50', value: pct(50) },
-    { label: 'p75', value: pct(75) },
-    { label: 'p90', value: pct(90) },
-    { label: 'p95', value: pct(95) },
-    { label: 'p99', value: pct(99) },
-  ];
-
-  return (
-    <Expandable title={title}>
-      <div>
-        {title && (
-          <div className="flex items-center justify-end mb-2">
-            <ChartActions
-              fileName={(exportFilename || 'histogram.png').replace(/\.png$/u, '')}
-              onExportPng={() =>
-                track('agentic_workload_export_png', {
-                  chart: exportFilename?.replace(/\.png$/u, '') || 'tool-histogram',
-                })
-              }
-            />
-          </div>
-        )}
-        <svg
-          viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-          className="w-full"
-          style={{ maxHeight: 220 }}
-        >
-          {yTicks.map((tick) => (
-            <g key={`y-${tick}`}>
-              {tick > 0 && (
-                <line
-                  x1={MARGIN.left}
-                  y1={sy(tick)}
-                  x2={MARGIN.left + PLOT_W}
-                  y2={sy(tick)}
-                  stroke="currentColor"
-                  className="text-border"
-                  strokeWidth={0.5}
-                  strokeDasharray="3 3"
-                />
-              )}
-              <text
-                x={MARGIN.left - 6}
-                y={sy(tick) + 3}
-                textAnchor="end"
-                className="fill-muted-foreground"
-                style={{ fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}
-              >
-                {formatAxisValue(tick)}
-              </text>
-            </g>
-          ))}
-          <text
-            x={12}
-            y={MARGIN.top + PLOT_H / 2}
-            textAnchor="middle"
-            transform={`rotate(-90, 12, ${MARGIN.top + PLOT_H / 2})`}
-            className="fill-muted-foreground"
-            style={{ fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}
-          >
-            {yAxisLabel ?? t.sessions}
-          </text>
-          <line
-            x1={MARGIN.left}
-            y1={MARGIN.top}
-            x2={MARGIN.left}
-            y2={MARGIN.top + PLOT_H}
-            stroke="currentColor"
-            className="text-muted-foreground"
-            strokeWidth={1}
-          />
-          <line
-            x1={MARGIN.left}
-            y1={MARGIN.top + PLOT_H}
-            x2={MARGIN.left + PLOT_W}
-            y2={MARGIN.top + PLOT_H}
-            stroke="currentColor"
-            className="text-muted-foreground"
-            strokeWidth={1}
-          />
-          {buckets.map((bucket, i) => {
-            const x = sx(bucket.min);
-            const w = sx(bucket.max) - sx(bucket.min);
-            const h = (bucket.count / yMax) * PLOT_H;
-            if (bucket.count === 0) return null;
-            return (
-              <rect
-                key={i}
-                x={x}
-                y={sy(bucket.count)}
-                width={Math.max(w - 0.5, 1)}
-                height={h}
-                fill={color}
-                opacity={0.75}
-                stroke={color}
-                strokeWidth={0.5}
-              />
-            );
-          })}
-          {sorted.length > 0 &&
-            percentiles.map(({ label, value: val }) => {
-              const px = sx(val);
-              if (px < MARGIN.left || px > MARGIN.left + PLOT_W) return null;
-              const lineColor = percentileColors[label] || '#94a3b8';
-              return (
-                <g key={label}>
-                  <line
-                    x1={px}
-                    y1={MARGIN.top}
-                    x2={px}
-                    y2={MARGIN.top + PLOT_H}
-                    stroke={lineColor}
-                    strokeWidth={1}
-                    strokeDasharray="4 3"
-                  />
-                  <text
-                    x={px}
-                    y={MARGIN.top - 2}
-                    textAnchor="middle"
-                    fill={lineColor}
-                    style={{
-                      fontSize: '7px',
-                      fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                    }}
-                  >
-                    {label}
-                  </text>
-                </g>
-              );
-            })}
-          {xTicks.map((tick) => {
-            const x = sx(tick);
-            if (x < MARGIN.left - 1 || x > MARGIN.left + PLOT_W + 1) return null;
-            return (
-              <g key={`x-${tick}`}>
-                <line
-                  x1={x}
-                  y1={MARGIN.top + PLOT_H}
-                  x2={x}
-                  y2={MARGIN.top + PLOT_H + 4}
-                  stroke="currentColor"
-                  className="text-muted-foreground"
-                  strokeWidth={1}
-                />
-                <text
-                  x={x}
-                  y={MARGIN.top + PLOT_H + 14}
-                  textAnchor="middle"
-                  className="fill-muted-foreground"
-                  style={{
-                    fontSize: '9px',
-                    fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                  }}
-                >
-                  {fmt(tick)}
-                </text>
-              </g>
-            );
-          })}
-          <text
-            x={MARGIN.left + PLOT_W / 2}
-            y={CHART_HEIGHT - 2}
-            textAnchor="middle"
-            className="fill-muted-foreground"
-            style={{ fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}
-          >
-            {axisLabel}
-          </text>
-        </svg>
-        <div className="grid grid-cols-6 gap-1.5 mt-3 pt-3 border-t border-border/20">
-          {percentiles.map((p) => (
-            <div key={p.label} className="rounded-md bg-muted/40 px-2 py-1.5 text-center">
-              <div className="text-xs font-medium text-muted-foreground">{p.label}</div>
-              <div className="text-sm font-mono font-medium mt-0.5">{fmt(p.value)}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </Expandable>
-  );
+function matrixCellSize(width: number, count: number): number {
+  if (count === 0) return 0;
+  return Math.max(22, Math.min(44, Math.floor((width - MATRIX_ROW_LABEL_W) / count)));
 }
 
-const CELL = 36;
-const ROW_LABEL_W = 110;
-const COL_LABEL_H = 100;
+function matrixOpacity(intensity: number): number {
+  return 0.08 + intensity * 0.87;
+}
 
-function cellColorFn(intensity: number): string {
-  if (intensity === 0) return 'transparent';
-  const a = 0.08 + intensity * 0.87;
-  return `rgba(16, 185, 129, ${a.toFixed(2)})`;
+function truncateLabel(label: string): string {
+  return label.length > 16 ? `${label.slice(0, 15)}…` : label;
+}
+
+function formatProbability(p: number): string {
+  const pct = p * 100;
+  return pct >= 10 ? `${pct.toFixed(0)}%` : `${pct.toFixed(1)}%`;
+}
+
+interface MatrixHover {
+  row: number;
+  col: number;
+  x: number;
+  y: number;
 }
 
 function TransitionHeatmap({
-  title,
   transitions,
-  showProbability,
-  hideSmallLabel,
-  noDataLabel,
+  toolCount,
 }: {
-  title: string;
   transitions: { fromTool: string; toTool: string; count: number }[];
-  showProbability: boolean;
-  hideSmallLabel: string;
-  noDataLabel: string;
+  toolCount: number;
 }) {
+  const t = STRINGS[useLocale()];
   const [hideSmall, setHideSmall] = useState(true);
+  const [showProbability, setShowProbability] = useState(false);
+  const [hover, setHover] = useState<MatrixHover | null>(null);
   const tools = useMemo(() => {
     const totals = new Map<string, number>();
-    for (const t of transitions) {
-      totals.set(t.fromTool, (totals.get(t.fromTool) || 0) + t.count);
-      totals.set(t.toTool, (totals.get(t.toTool) || 0) + t.count);
+    for (const tr of transitions) {
+      totals.set(tr.fromTool, (totals.get(tr.fromTool) || 0) + tr.count);
+      totals.set(tr.toTool, (totals.get(tr.toTool) || 0) + tr.count);
     }
     return [...totals.entries()]
       .toSorted((a, b) => b[1] - a[1])
       .slice(0, 15)
       .map(([name]) => name);
   }, [transitions]);
+  const n = tools.length;
+  const { dimensions, setContainerRef } = useResponsiveChartDimensions({
+    height: (width) => MATRIX_COL_LABEL_H + n * matrixCellSize(width, n) + MATRIX_LEGEND_GAP,
+  });
 
   const { matrix, rowSums, maxVal } = useMemo(() => {
     const m: number[][] = Array.from({ length: tools.length }, () =>
       Array.from<number>({ length: tools.length }).fill(0),
     );
-    const idx = new Map(tools.map((t, i) => [t, i]));
-    for (const t of transitions) {
-      const fi = idx.get(t.fromTool);
-      const ti = idx.get(t.toTool);
-      if (fi !== undefined && ti !== undefined) m[fi][ti] = t.count;
+    const idx = new Map(tools.map((tool, i) => [tool, i]));
+    for (const tr of transitions) {
+      const fi = idx.get(tr.fromTool);
+      const ti = idx.get(tr.toTool);
+      if (fi !== undefined && ti !== undefined) m[fi][ti] = tr.count;
     }
     const rs = m.map((row) => row.reduce((a, b) => a + b, 0));
     let mx = 0;
@@ -915,43 +682,45 @@ function TransitionHeatmap({
     return { matrix: m, rowSums: rs, maxVal: mx };
   }, [transitions, tools, hideSmall]);
 
-  const n = tools.length;
-  if (n === 0)
-    return (
-      <EmptyState bare className="py-8">
-        {noDataLabel}
-      </EmptyState>
-    );
+  const probability = (row: number, col: number) =>
+    rowSums[row] > 0 ? matrix[row][col] / rowSums[row] : 0;
 
-  const W = ROW_LABEL_W + n * CELL;
-  const H = COL_LABEL_H + n * CELL;
-
-  function cellIntensity(row: number, col: number): number {
+  const cellIntensity = (row: number, col: number): number => {
     const raw = matrix[row][col];
     if (raw === 0) return 0;
-    if (showProbability) {
-      const prob = rowSums[row] > 0 ? raw / rowSums[row] : 0;
-      return prob;
-    }
-    return Math.log1p(raw) / Math.log1p(maxVal);
-  }
+    if (showProbability) return probability(row, col);
+    return maxVal > 0 ? Math.min(1, Math.log1p(raw) / Math.log1p(maxVal)) : 0;
+  };
 
-  const cellColor = cellColorFn;
-
-  function cellLabel(row: number, col: number): string {
+  const cellLabel = (row: number, col: number): string => {
     const raw = matrix[row][col];
     if (raw === 0) return '';
-    if (showProbability) {
-      const pct = rowSums[row] > 0 ? (raw / rowSums[row]) * 100 : 0;
-      return pct >= 10 ? `${pct.toFixed(0)}%` : `${pct.toFixed(1)}%`;
-    }
-    return raw >= 1000 ? `${(raw / 1000).toFixed(1)}k` : String(raw);
-  }
+    if (showProbability) return formatProbability(probability(row, col));
+    return formatAxisNumber(raw);
+  };
+
+  const cell = matrixCellSize(dimensions.width, n);
+  const gridBottom = MATRIX_COL_LABEL_H + n * cell;
 
   return (
-    <Expandable title={title}>
-      <div>
-        <div className="flex items-center gap-2 mb-2">
+    <ExpandableChart
+      title={t.transitionMatrix}
+      subtitle={`${showProbability ? t.rowNormalizedProbability : t.rawCounts} · ${t.transitionMatrixDescription(Math.min(15, toolCount))}`}
+      actions={
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            onClick={() => {
+              track('agentic_workload_transition_mode_toggled', {
+                show_probability: !showProbability,
+              });
+              setShowProbability((v) => !v);
+            }}
+          >
+            {showProbability ? t.showCounts : t.showProbability}
+          </Button>
           <Button
             type="button"
             variant="outline"
@@ -962,7 +731,7 @@ function TransitionHeatmap({
               setHideSmall((h) => !h);
             }}
           >
-            {hideSmallLabel}
+            {t.hideSmall}
           </Button>
           <ChartActions
             fileName="tool-transition-matrix"
@@ -971,88 +740,140 @@ function TransitionHeatmap({
             }
           />
         </div>
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: H }}>
-          {tools.map((tool, j) => {
-            const label = tool.length > 14 ? `${tool.slice(0, 13)}…` : tool;
-            const cx = ROW_LABEL_W + j * CELL + CELL / 2;
-            return (
-              <text
-                key={`col-${tool}`}
-                x={cx}
-                y={COL_LABEL_H - 4}
-                textAnchor="start"
-                transform={`rotate(-90, ${cx}, ${COL_LABEL_H - 4})`}
-                style={{
-                  fontSize: '9px',
-                  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                  fill: getToolColor(tool),
-                }}
+      }
+    >
+      {n === 0 ? (
+        <EmptyState bare className="py-8">
+          {t.noTransitionData}
+        </EmptyState>
+      ) : (
+        <>
+          <div ref={setContainerRef} className="w-full min-w-0 overflow-x-auto">
+            {dimensions.width > 0 && (
+              <svg
+                width={MATRIX_ROW_LABEL_W + n * cell}
+                height={gridBottom + MATRIX_LEGEND_GAP}
+                role="img"
+                aria-label={t.transitionMatrix}
+                fontFamily={CHART_FONT_SANS}
+                className="block"
+                onMouseLeave={() => setHover(null)}
               >
-                {label}
-              </text>
-            );
-          })}
-
-          {tools.map((tool, i) => {
-            const label = tool.length > 14 ? `${tool.slice(0, 13)}…` : tool;
-            return (
-              <text
-                key={`row-${tool}`}
-                x={ROW_LABEL_W - 6}
-                y={COL_LABEL_H + i * CELL + CELL / 2 + 3}
-                textAnchor="end"
-                style={{
-                  fontSize: '9px',
-                  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                  fill: getToolColor(tool),
-                }}
-              >
-                {label}
-              </text>
-            );
-          })}
-
-          {tools.map((_fromTool, i) =>
-            tools.map((_toTool, j) => {
-              const raw = matrix[i][j];
-              const hidden = hideSmall && raw < 5;
-              const intensity = hidden ? 0 : cellIntensity(i, j);
-              const x = ROW_LABEL_W + j * CELL;
-              const y = COL_LABEL_H + i * CELL;
-              return (
-                <g key={`${i}-${j}`}>
-                  <rect
-                    x={x}
-                    y={y}
-                    width={CELL}
-                    height={CELL}
-                    fill={cellColor(intensity)}
-                    stroke="currentColor"
-                    className="text-border"
-                    strokeWidth={0.5}
-                  />
-                  {raw > 0 && !hidden && (
+                {tools.map((tool, j) => {
+                  const cx = MATRIX_ROW_LABEL_W + j * cell + cell / 2;
+                  return (
                     <text
-                      x={x + CELL / 2}
-                      y={y + CELL / 2 + 3}
-                      textAnchor="middle"
-                      fill={intensity > 0.5 ? '#ffffff' : 'currentColor'}
-                      className={intensity > 0.5 ? undefined : 'fill-muted-foreground'}
-                      style={{
-                        fontSize: '7.5px',
-                        fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                      }}
+                      key={`col-${tool}`}
+                      x={cx}
+                      y={MATRIX_COL_LABEL_H - 6}
+                      dominantBaseline="central"
+                      transform={`rotate(-90, ${cx}, ${MATRIX_COL_LABEL_H - 6})`}
+                      fontSize={px(CHART_TYPE.annotation)}
+                      className="fill-muted-foreground"
                     >
-                      {cellLabel(i, j)}
+                      {truncateLabel(tool)}
                     </text>
-                  )}
-                </g>
-              );
-            }),
+                  );
+                })}
+                {tools.map((tool, i) => (
+                  <text
+                    key={`row-${tool}`}
+                    x={MATRIX_ROW_LABEL_W - 8}
+                    y={MATRIX_COL_LABEL_H + i * cell + cell / 2}
+                    dominantBaseline="central"
+                    textAnchor="end"
+                    fontSize={px(CHART_TYPE.annotation)}
+                    className="fill-muted-foreground"
+                  >
+                    {truncateLabel(tool)}
+                  </text>
+                ))}
+                {tools.map((_fromTool, i) =>
+                  tools.map((_toTool, j) => {
+                    const raw = matrix[i][j];
+                    const hidden = hideSmall && raw < 5;
+                    const intensity = hidden ? 0 : cellIntensity(i, j);
+                    const x = MATRIX_ROW_LABEL_W + j * cell;
+                    const y = MATRIX_COL_LABEL_H + i * cell;
+                    const isHovered = hover?.row === i && hover.col === j;
+                    return (
+                      <g
+                        key={`${i}-${j}`}
+                        onMouseMove={(e) =>
+                          setHover({ row: i, col: j, x: e.clientX, y: e.clientY })
+                        }
+                      >
+                        <rect
+                          x={x + 0.5}
+                          y={y + 0.5}
+                          width={cell - 1}
+                          height={cell - 1}
+                          fill={raw === 0 || hidden ? 'var(--muted)' : MATRIX_COLOR}
+                          fillOpacity={raw === 0 || hidden ? 0.4 : matrixOpacity(intensity)}
+                          stroke={isHovered ? 'var(--foreground)' : 'none'}
+                          strokeWidth={1.5}
+                        />
+                        {raw > 0 && !hidden && cell >= 28 && (
+                          <text
+                            x={x + cell / 2}
+                            y={y + cell / 2}
+                            dominantBaseline="central"
+                            textAnchor="middle"
+                            fontSize={px(CHART_TYPE.micro)}
+                            className="tabular-nums"
+                            fill={intensity > 0.55 ? 'var(--background)' : 'var(--foreground)'}
+                            pointerEvents="none"
+                          >
+                            {cellLabel(i, j)}
+                          </text>
+                        )}
+                      </g>
+                    );
+                  }),
+                )}
+              </svg>
+            )}
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span className="font-medium">
+              {showProbability ? t.matrixScaleProbability : t.matrixScaleCount}
+            </span>
+            <span className="tabular-nums">{showProbability ? '0%' : '1'}</span>
+            <span
+              aria-hidden="true"
+              className="h-2.5 w-32 rounded-sm"
+              style={{
+                backgroundImage: `linear-gradient(to right, color-mix(in oklab, ${MATRIX_COLOR} 8%, transparent), ${MATRIX_COLOR})`,
+              }}
+            />
+            <span className="tabular-nums">
+              {showProbability ? '100%' : maxVal.toLocaleString()}
+            </span>
+            {!showProbability && <span>{t.logScale}</span>}
+          </div>
+          {hover && (
+            <FloatingTooltip x={hover.x} y={hover.y}>
+              <ChartHoverCardBody
+                title={`${tools[hover.row]} → ${tools[hover.col]}`}
+                metrics={[
+                  {
+                    value: matrix[hover.row][hover.col].toLocaleString(),
+                    label: t.transitionsUnit,
+                  },
+                  {
+                    value: formatProbability(probability(hover.row, hover.col)),
+                    label: t.ofRowTransitions,
+                  },
+                ]}
+                summary={
+                  hideSmall && matrix[hover.row][hover.col] < 5 ? t.hiddenUnderFive : undefined
+                }
+              />
+            </FloatingTooltip>
           )}
-        </svg>
-      </div>
-    </Expandable>
+        </>
+      )}
+    </ExpandableChart>
   );
 }
 
@@ -1096,19 +917,11 @@ interface SequenceInsightsPayload {
 }
 
 function ToolChip({ tool, avgRun }: { tool: string; avgRun?: number }) {
-  const color = getToolColor(tool);
   const showRun = avgRun !== undefined && avgRun >= 1.15;
   return (
-    <span
-      className="inline-flex items-center gap-1 rounded-md border px-1.5 py-px text-3xs font-mono font-medium"
-      style={{
-        borderColor: `${color}40`,
-        backgroundColor: `${color}14`,
-        color,
-      }}
-    >
+    <span className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/40 px-1.5 py-px text-xs font-medium text-foreground">
       {tool}
-      {showRun && <span className="opacity-70">×{avgRun.toFixed(1)}</span>}
+      {showRun && <span className="tabular-nums text-muted-foreground">×{avgRun.toFixed(1)}</span>}
     </span>
   );
 }
@@ -1229,13 +1042,11 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle>
-            {t.recurringMotifs}{' '}
-            <span className="text-muted-foreground font-normal">
-              {t.motifsSubtitle(motifs.length, data.totalSessions.toLocaleString())}
-            </span>
-          </CardTitle>
-          <p className="text-3xs font-mono text-muted-foreground mt-0.5">{t.motifsDescription}</p>
+          <CardTitle>{t.recurringMotifs}</CardTitle>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {t.motifsSubtitle(motifs.length, data.totalSessions.toLocaleString())} ·{' '}
+            {t.motifsDescription}
+          </p>
         </CardHeader>
         <CardContent>
           <div className="space-y-1.5">
@@ -1244,14 +1055,14 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
               const barPct = (m.support / maxSupport) * 100;
               return (
                 <div key={i} className="flex items-center gap-3">
-                  <div className="w-6 text-right text-3xs font-mono text-muted-foreground shrink-0">
+                  <div className="w-6 text-right text-xs tabular-nums text-muted-foreground shrink-0">
                     #{i + 1}
                   </div>
                   <div className="flex items-center gap-1 flex-1 min-w-0 flex-wrap">
                     {m.pattern.map((tool, ti) => (
                       <span key={ti} className="flex items-center gap-0.5">
                         {ti > 0 && (
-                          <span className="text-3xs text-muted-foreground mx-0.5">&rarr;</span>
+                          <span className="text-xs text-muted-foreground mx-0.5">&rarr;</span>
                         )}
                         <ToolChip tool={tool} avgRun={m.avgRuns[ti]} />
                       </span>
@@ -1265,7 +1076,7 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
                       />
                     </div>
                   </div>
-                  <div className="min-w-20 shrink-0 whitespace-nowrap text-right text-3xs font-mono tabular-nums text-muted-foreground">
+                  <div className="min-w-20 shrink-0 whitespace-nowrap text-right text-xs tabular-nums text-muted-foreground">
                     {m.support.toLocaleString()} ({pct}%)
                   </div>
                 </div>
@@ -1279,13 +1090,11 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle>{t.toolStreaks}</CardTitle>
-            <p className="text-3xs font-mono text-muted-foreground mt-0.5">
-              {t.toolStreaksDescription}
-            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">{t.toolStreaksDescription}</p>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <table className="w-full text-2xs font-mono">
+              <table className="w-full text-xs tabular-nums">
                 <thead className="text-muted-foreground border-b border-border/20">
                   <tr>
                     <th className="text-left py-1.5 font-medium">{t.colTool}</th>
@@ -1300,9 +1109,7 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
                 <tbody className="divide-y divide-border/20">
                   {streaks.map((row) => (
                     <tr key={row.tool}>
-                      <td className="py-1.5 font-medium" style={{ color: getToolColor(row.tool) }}>
-                        {row.tool}
-                      </td>
+                      <td className="py-1.5 font-medium text-foreground">{row.tool}</td>
                       <td className="py-1.5 text-right">{row.totalCalls.toLocaleString()}</td>
                       <td className="py-1.5 text-right">{row.runs.toLocaleString()}</td>
                       <td className="py-1.5 text-right">{row.p50Run}</td>
@@ -1322,9 +1129,7 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle>{t.pingPongLoops}</CardTitle>
-            <p className="text-3xs font-mono text-muted-foreground mt-0.5">
-              {t.pingPongDescription}
-            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">{t.pingPongDescription}</p>
           </CardHeader>
           <CardContent>
             {loops.length === 0 ? (
@@ -1338,14 +1143,14 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
                   return (
                     <div
                       key={loop.pair.join('→')}
-                      className="flex flex-wrap items-center gap-x-2 gap-y-1 text-2xs font-mono sm:flex-nowrap"
+                      className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:flex-nowrap"
                     >
                       <div className="flex items-center gap-1 w-[190px] shrink-0">
                         <ToolChip tool={loop.pair[0]} />
-                        <span className="text-3xs text-muted-foreground">&harr;</span>
+                        <span className="text-xs text-muted-foreground">&harr;</span>
                         <ToolChip tool={loop.pair[1]} />
                       </div>
-                      <span className="hidden flex-1 border-b border-dotted border-border/20 sm:block" />
+                      <span className="hidden flex-1 sm:block" />
                       <span className="shrink-0 whitespace-nowrap tabular-nums text-muted-foreground">
                         {t.loopSessions(loop.sessions.toLocaleString(), pct)}
                       </span>
@@ -1604,269 +1409,343 @@ function OsTurnaroundCards({ byOs }: { byOs: ToolTimings['byOs'] }) {
   hi = Math.min(Math.max(hi, lo + 1), FINE_BIN_MAX);
   if (lo >= hi) lo = Math.max(hi - 1, 0);
 
+  return (
+    <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <ExpandableChart
+        title={t.toolTurnaroundTitle(activeTool === ALL_TOOL ? t.allTools : activeTool, splitArch)}
+        subtitle={t.turnaroundShapeDescription}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              aria-pressed={splitArch}
+              onClick={() => {
+                track('agentic_workload_turnaround_split_arch_toggled', {
+                  enabled: !splitArch,
+                });
+                setSplitArch((v) => !v);
+              }}
+            >
+              {t.splitByArch}
+            </Button>
+            <ChartActions
+              fileName={`turnaround-by-os-${activeTool.toLowerCase()}`}
+              onExportPng={() =>
+                track('agentic_workload_export_png', { chart: 'tool-turnaround-by-os' })
+              }
+            />
+          </div>
+        }
+      >
+        <div className="mb-3 space-y-1">
+          <div className="flex items-start gap-2">
+            <span className="flex h-7 w-12 shrink-0 items-center text-xs font-medium text-muted-foreground">
+              {t.agent}
+            </span>
+            <div className="flex flex-wrap items-center gap-1">
+              {availableAgents.map((agent) => (
+                <Button
+                  key={agent}
+                  type="button"
+                  variant="outline"
+                  size="2xs"
+                  aria-pressed={agent === agentFilter}
+                  onClick={() => {
+                    track('agentic_workload_turnaround_agent_filter_changed', { agent });
+                    setAgentFilter(agent);
+                  }}
+                >
+                  {t.agentLabels[agent]}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="flex h-7 w-12 shrink-0 items-center text-xs font-medium text-muted-foreground">
+              {t.tool}
+            </span>
+            <div className="flex flex-wrap items-center gap-1">
+              {selectableTools.map((tool) => (
+                <Button
+                  key={tool}
+                  type="button"
+                  variant="outline"
+                  size="2xs"
+                  aria-pressed={tool === activeTool}
+                  onClick={() => {
+                    track('agentic_workload_turnaround_tool_selected', { tool });
+                    setSelected(tool);
+                  }}
+                >
+                  {tool === ALL_TOOL ? t.allTools : tool}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <TurnaroundShapeChart series={series} lo={lo} hi={hi} />
+        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
+          {series.map(({ key, total, p50Ms, sessions }) => (
+            <span key={key} className="flex items-center gap-1.5 text-xs">
+              <span
+                aria-hidden="true"
+                className="size-2 shrink-0 rounded-sm"
+                style={{ backgroundColor: platformColor(key) }}
+              />
+              <span className="text-foreground">{key}</span>
+              <span className="tabular-nums text-muted-foreground">
+                n={total.toLocaleString()}
+                {sessions !== null && t.sessionCount(sessions.toLocaleString())}
+                {p50Ms !== null && ` · p50 ${formatMs(p50Ms)}`}
+              </span>
+            </span>
+          ))}
+        </div>
+      </ExpandableChart>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle>{t.medianTurnaroundByOs(splitArch)}</CardTitle>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {t.medianTurnaroundDescription(splitArch)}
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs tabular-nums">
+              <thead className="text-muted-foreground border-b border-border/20">
+                <tr>
+                  <th className="text-left py-1.5 font-medium">{t.colTool}</th>
+                  {tableColumns.map((col) => (
+                    <th key={col.key} className="text-right py-1.5 font-medium">
+                      <span
+                        aria-hidden="true"
+                        className="mr-1.5 inline-block size-2 rounded-sm"
+                        style={{ backgroundColor: platformColor(col.key) }}
+                      />
+                      {col.arch ? `${col.os} ${col.arch}` : col.os}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/20">
+                {filteredTools.map((tool) => (
+                  <tr key={tool}>
+                    <td className="py-1.5 font-medium text-foreground">{tool}</td>
+                    {tableColumns.map((col) => {
+                      const stat = statFor(col, tool);
+                      return (
+                        <td key={col.key} className="py-1.5 text-right align-top">
+                          {stat ? (
+                            <>
+                              <div>{formatMs(stat.p50Ms)}</div>
+                              <div className="text-2xs text-muted-foreground">
+                                p90 {formatMs(stat.p90Ms)}
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+interface ShapeSeries {
+  key: string;
+  bins: Map<number, number>;
+  total: number;
+  p50Ms: number | null;
+}
+
+const SHAPE_MARGIN = { top: 12, right: 12, bottom: 40, left: 44 };
+const SHAPE_HEIGHT = 240;
+const SHAPE_Y_TICKS = [0, 0.25, 0.5, 0.75, 1];
+
+function TurnaroundShapeChart({
+  series,
+  lo,
+  hi,
+}: {
+  series: ShapeSeries[];
+  lo: number;
+  hi: number;
+}) {
+  const t = STRINGS[useLocale()];
+  const { dimensions, setContainerRef } = useResponsiveChartDimensions({ height: SHAPE_HEIGHT });
+  const [hover, setHover] = useState<{ bin: number; x: number; y: number } | null>(null);
+
+  const visible = series.filter((s) => s.total > 0);
   let yMax = 0;
-  for (const s of series) {
-    if (s.total === 0) continue;
+  for (const s of visible) {
     for (const [bin, count] of s.bins) {
-      if (bin < lo || bin > hi) continue;
-      yMax = Math.max(yMax, count / s.total);
+      if (bin >= lo && bin <= hi) yMax = Math.max(yMax, count / s.total);
     }
   }
   if (yMax === 0) yMax = 1;
 
-  const sx = (bin: number) => MARGIN.left + ((bin - lo) / (hi - lo)) * PLOT_W;
-  const sy = (share: number) => MARGIN.top + PLOT_H - (share / yMax) * PLOT_H;
+  const plotW = Math.max(0, dimensions.width - SHAPE_MARGIN.left - SHAPE_MARGIN.right);
+  const plotH = SHAPE_HEIGHT - SHAPE_MARGIN.top - SHAPE_MARGIN.bottom;
+  const baseline = SHAPE_MARGIN.top + plotH;
+  const sx = (bin: number) => SHAPE_MARGIN.left + ((bin - lo) / (hi - lo + 1)) * plotW;
+  const sy = (share: number) => baseline - (share / yMax) * plotH;
 
-  const decadeTicks = [];
-  for (let bin = Math.ceil(lo / 8) * 8; bin <= hi; bin += 8) decadeTicks.push(bin);
+  const decadeTicks: number[] = [];
+  for (
+    let bin = Math.ceil(lo / FINE_BINS_PER_DECADE) * FINE_BINS_PER_DECADE;
+    bin <= hi;
+    bin += FINE_BINS_PER_DECADE
+  ) {
+    decadeTicks.push(bin);
+  }
+
+  const onMove = (e: ReactMouseEvent<SVGRectElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const rel = (e.clientX - rect.left) / Math.max(rect.width, 1);
+    const bin = Math.min(hi, Math.max(lo, Math.floor(lo + rel * (hi - lo + 1))));
+    setHover({ bin, x: e.clientX, y: e.clientY });
+  };
 
   return (
-    <Expandable
-      title={t.toolTurnaroundTitle(activeTool === ALL_TOOL ? t.allTools : activeTool, splitArch)}
-    >
-      <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle>{t.turnaroundShapeByOs}</CardTitle>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="xs"
-                  aria-pressed={splitArch}
-                  onClick={() => {
-                    track('agentic_workload_turnaround_split_arch_toggled', {
-                      enabled: !splitArch,
-                    });
-                    setSplitArch((v) => !v);
-                  }}
-                >
-                  {t.splitByArch}
-                </Button>
-                <ChartActions
-                  fileName={`turnaround-by-os-${activeTool.toLowerCase()}`}
-                  onExportPng={() =>
-                    track('agentic_workload_export_png', { chart: 'tool-turnaround-by-os' })
-                  }
-                />
-              </div>
-            </div>
-            <p className="text-3xs font-mono text-muted-foreground mt-0.5">
-              {t.turnaroundShapeDescription}
-            </p>
-            <div className="mt-1.5 space-y-1">
-              <div className="flex items-start gap-2">
-                <span className="flex h-7 w-12 shrink-0 items-center text-xs font-medium text-muted-foreground">
-                  {t.agent}
-                </span>
-                <div className="flex flex-wrap items-center gap-1">
-                  {availableAgents.map((agent) => (
-                    <Button
-                      key={agent}
-                      type="button"
-                      variant="outline"
-                      size="2xs"
-                      aria-pressed={agent === agentFilter}
-                      onClick={() => {
-                        track('agentic_workload_turnaround_agent_filter_changed', { agent });
-                        setAgentFilter(agent);
-                      }}
-                    >
-                      {t.agentLabels[agent]}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="flex h-7 w-12 shrink-0 items-center text-xs font-medium text-muted-foreground">
-                  {t.tool}
-                </span>
-                <div className="flex flex-wrap items-center gap-1">
-                  {selectableTools.map((tool) => (
-                    <Button
-                      key={tool}
-                      type="button"
-                      variant="outline"
-                      size="2xs"
-                      aria-pressed={tool === activeTool}
-                      onClick={() => {
-                        track('agentic_workload_turnaround_tool_selected', { tool });
-                        setSelected(tool);
-                      }}
-                    >
-                      {tool === ALL_TOOL ? t.allTools : tool}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <svg
-              viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-              className="w-full"
-              style={{ maxHeight: 220 }}
-            >
+    <div ref={setContainerRef} className="w-full min-w-0">
+      {dimensions.width > 0 && (
+        <svg
+          width={dimensions.width}
+          height={SHAPE_HEIGHT}
+          role="img"
+          aria-label={`${t.turnaroundShapeByOs}, ${t.turnaroundAxisLabel}`}
+          fontFamily={CHART_FONT_SANS}
+          className="block"
+        >
+          {SHAPE_Y_TICKS.map((f) => (
+            <g key={f}>
               <line
-                x1={MARGIN.left}
-                y1={MARGIN.top + PLOT_H}
-                x2={MARGIN.left + PLOT_W}
-                y2={MARGIN.top + PLOT_H}
-                stroke="currentColor"
-                className="text-muted-foreground"
+                x1={SHAPE_MARGIN.left}
+                x2={SHAPE_MARGIN.left + plotW}
+                y1={sy(f * yMax)}
+                y2={sy(f * yMax)}
+                stroke="var(--border)"
                 strokeWidth={1}
               />
-              {decadeTicks.map((bin) => (
-                <g key={bin}>
-                  <line
-                    x1={sx(bin)}
-                    y1={MARGIN.top}
-                    x2={sx(bin)}
-                    y2={MARGIN.top + PLOT_H}
-                    stroke="currentColor"
-                    className="text-border"
-                    strokeWidth={0.5}
-                    strokeDasharray="3 3"
-                  />
-                  <text
-                    x={sx(bin)}
-                    y={MARGIN.top + PLOT_H + 14}
-                    textAnchor="middle"
-                    className="fill-muted-foreground"
-                    style={{
-                      fontSize: '9px',
-                      fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                    }}
-                  >
-                    {formatMs(fineBinMs(bin))}
-                  </text>
-                </g>
-              ))}
-              {series.map(({ key, bins, total, p50Ms }) => {
-                if (total === 0) return null;
-                const color = platformColor(key);
-                const points = [];
-                for (let bin = lo; bin <= hi; bin++) {
-                  points.push(
-                    `${sx(bin + 0.5).toFixed(1)},${sy((bins.get(bin) ?? 0) / total).toFixed(1)}`,
-                  );
-                }
-                const baseline = (MARGIN.top + PLOT_H).toFixed(1);
-                const area = `M ${sx(lo + 0.5).toFixed(1)} ${baseline} L ${points.join(' L ')} L ${sx(hi + 0.5).toFixed(1)} ${baseline} Z`;
-                const p50Bin =
-                  p50Ms === null
-                    ? null
-                    : Math.log10(Math.max(Number(p50Ms), 1)) * FINE_BINS_PER_DECADE;
-                return (
-                  <g key={key}>
-                    <path d={area} fill={color} fillOpacity={0.1} />
-                    <polyline
-                      points={points.join(' ')}
-                      fill="none"
-                      stroke={color}
-                      strokeWidth={1.5}
-                    />
-                    {p50Bin !== null && p50Bin >= lo && p50Bin <= hi && (
-                      <line
-                        x1={sx(p50Bin)}
-                        y1={MARGIN.top}
-                        x2={sx(p50Bin)}
-                        y2={MARGIN.top + PLOT_H}
-                        stroke={color}
-                        strokeWidth={1}
-                        strokeDasharray="4 3"
-                        opacity={0.6}
-                      />
-                    )}
-                  </g>
-                );
-              })}
               <text
-                x={MARGIN.left + PLOT_W / 2}
-                y={CHART_HEIGHT - 2}
-                textAnchor="middle"
-                className="fill-muted-foreground"
-                style={{ fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}
+                x={SHAPE_MARGIN.left - 6}
+                y={sy(f * yMax)}
+                dominantBaseline="central"
+                textAnchor="end"
+                fontSize={px(CHART_TYPE.annotation)}
+                className="fill-muted-foreground tabular-nums"
               >
-                {t.turnaroundAxisLabel}
+                {`${(f * yMax * 100).toFixed(yMax < 0.1 ? 1 : 0)}%`}
               </text>
-            </svg>
-            <div className="flex flex-wrap gap-x-5 gap-y-1 mt-2">
-              {series.map(({ key, total, p50Ms, sessions }) => (
-                <span key={key} className="flex items-center gap-1.5 text-3xs font-mono">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{ backgroundColor: platformColor(key) }}
+            </g>
+          ))}
+          {decadeTicks.map((bin) => (
+            <text
+              key={bin}
+              x={sx(bin)}
+              y={baseline + 16}
+              textAnchor="middle"
+              fontSize={px(CHART_TYPE.annotation)}
+              className="fill-muted-foreground tabular-nums"
+            >
+              {formatMs(fineBinMs(bin))}
+            </text>
+          ))}
+          <text
+            x={SHAPE_MARGIN.left + plotW / 2}
+            y={SHAPE_HEIGHT - 4}
+            textAnchor="middle"
+            fontSize={px(CHART_TYPE.axisLabel)}
+            className="fill-muted-foreground"
+          >
+            {t.turnaroundAxisLabel}
+          </text>
+          {visible.map(({ key, bins, total, p50Ms }) => {
+            const color = platformColor(key);
+            const points: string[] = [];
+            for (let bin = lo; bin <= hi; bin++) {
+              points.push(
+                `${sx(bin + 0.5).toFixed(1)},${sy((bins.get(bin) ?? 0) / total).toFixed(1)}`,
+              );
+            }
+            const area = `M ${sx(lo + 0.5).toFixed(1)} ${baseline} L ${points.join(' L ')} L ${sx(hi + 0.5).toFixed(1)} ${baseline} Z`;
+            const p50Bin =
+              p50Ms === null ? null : Math.log10(Math.max(Number(p50Ms), 1)) * FINE_BINS_PER_DECADE;
+            return (
+              <g key={key} pointerEvents="none">
+                <path d={area} fill={color} fillOpacity={0.1} />
+                <polyline points={points.join(' ')} fill="none" stroke={color} strokeWidth={1.5} />
+                {p50Bin !== null && p50Bin >= lo && p50Bin <= hi && (
+                  <line
+                    x1={sx(p50Bin)}
+                    y1={SHAPE_MARGIN.top}
+                    x2={sx(p50Bin)}
+                    y2={baseline}
+                    stroke={color}
+                    strokeWidth={1}
+                    strokeDasharray="4 3"
+                    opacity={0.6}
                   />
-                  <span style={{ color: platformColor(key) }}>{key}</span>
-                  <span className="text-muted-foreground">
-                    n={total.toLocaleString()}
-                    {sessions !== null && t.sessionCount(sessions.toLocaleString())}
-                    {p50Ms !== null && ` · p50 ${formatMs(p50Ms)}`}
-                  </span>
-                </span>
+                )}
+              </g>
+            );
+          })}
+          {hover && (
+            <g pointerEvents="none">
+              <line
+                x1={sx(hover.bin + 0.5)}
+                x2={sx(hover.bin + 0.5)}
+                y1={SHAPE_MARGIN.top}
+                y2={baseline}
+                {...CURSOR_LINE_PROPS}
+              />
+              {visible.map(({ key, bins, total }) => (
+                <circle
+                  key={key}
+                  cx={sx(hover.bin + 0.5)}
+                  cy={sy((bins.get(hover.bin) ?? 0) / total)}
+                  r={3}
+                  fill={platformColor(key)}
+                />
               ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle>{t.medianTurnaroundByOs(splitArch)}</CardTitle>
-            <p className="text-3xs font-mono text-muted-foreground mt-0.5">
-              {t.medianTurnaroundDescription(splitArch)}
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-2xs font-mono">
-                <thead className="text-muted-foreground border-b border-border/20">
-                  <tr>
-                    <th className="text-left py-1.5 font-medium">{t.colTool}</th>
-                    {tableColumns.map((col) => (
-                      <th key={col.key} className="text-right py-1.5 font-medium">
-                        <span
-                          className="inline-block w-2 h-2 rounded-full mr-1.5"
-                          style={{ backgroundColor: platformColor(col.key) }}
-                        />
-                        {col.arch ? `${col.os} ${col.arch}` : col.os}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/20">
-                  {filteredTools.map((tool) => (
-                    <tr key={tool}>
-                      <td className="py-1.5 font-medium" style={{ color: getToolColor(tool) }}>
-                        {tool}
-                      </td>
-                      {tableColumns.map((col) => {
-                        const stat = statFor(col, tool);
-                        return (
-                          <td key={col.key} className="py-1.5 text-right align-top">
-                            {stat ? (
-                              <>
-                                <div>{formatMs(stat.p50Ms)}</div>
-                                <div className="text-3xs text-muted-foreground">
-                                  p90 {formatMs(stat.p90Ms)}
-                                </div>
-                              </>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </Expandable>
+            </g>
+          )}
+          <rect
+            x={SHAPE_MARGIN.left}
+            y={SHAPE_MARGIN.top}
+            width={plotW}
+            height={plotH}
+            fill="transparent"
+            onMouseMove={onMove}
+            onMouseLeave={() => setHover(null)}
+          />
+        </svg>
+      )}
+      {hover && (
+        <FloatingTooltip x={hover.x} y={hover.y}>
+          <ChartHoverCardBody
+            title={`${formatMs(fineBinMs(hover.bin))} – ${formatMs(fineBinMs(hover.bin + 1))}`}
+            metrics={visible.map(({ key, bins, total }) => ({
+              value: `${(((bins.get(hover.bin) ?? 0) / total) * 100).toFixed(1)}%`,
+              label: key,
+              color: platformColor(key),
+            }))}
+            summary={t.shareOfSamples}
+          />
+        </FloatingTooltip>
+      )}
+    </div>
   );
 }
 
@@ -1929,15 +1808,13 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
 
   return (
     <section>
-      <SectionHeader label={t.toolWallTime} detail={perTool.length} />
+      <SectionHeader label={t.toolWallTime} detail={t.toolCountDetail(perTool.length)} />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle>
-              {t.turnaroundByTool}{' '}
-              <span className="text-muted-foreground font-normal">{t.clientSideWallTime}</span>
-            </CardTitle>
-            <p className="text-3xs font-mono text-muted-foreground mt-0.5">
+            <CardTitle>{t.turnaroundByTool}</CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {t.clientSideWallTime} ·{' '}
               {t.turnaroundByToolDescription(
                 coverage.singleToolTurns.toLocaleString(),
                 coverage.toolTurns.toLocaleString(),
@@ -1948,7 +1825,7 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <table className="w-full text-2xs font-mono">
+              <table className="w-full text-xs tabular-nums">
                 <thead className="text-muted-foreground border-b border-border/20">
                   <tr>
                     <th className="text-left py-1.5 font-medium">{t.colTool}</th>
@@ -1963,11 +1840,7 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
                   {perTool.slice(0, 14).map((row) => (
                     <tr key={row.toolName}>
                       <td
-                        className="py-1.5 font-medium"
-                        style={{
-                          color:
-                            row.toolName === BATCH_LABEL ? '#6b7280' : getToolColor(row.toolName),
-                        }}
+                        className={`py-1.5 font-medium ${row.toolName === BATCH_LABEL ? 'text-muted-foreground' : 'text-foreground'}`}
                       >
                         {row.toolName === BATCH_LABEL ? t.batchLabel : row.toolName}
                       </td>
@@ -1989,13 +1862,9 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-2">
-              <CardTitle>
-                {t.turnaroundDistribution}{' '}
-                <span className="text-muted-foreground font-normal">
-                  (N={binTotal.toLocaleString()})
-                </span>
-              </CardTitle>
+              <CardTitle>{t.turnaroundDistribution}</CardTitle>
             </div>
+            <p className="text-xs text-muted-foreground mt-0.5">N = {binTotal.toLocaleString()}</p>
             <div className="flex flex-wrap gap-1 mt-1.5">
               {selectable.map((tool) => (
                 <Button
@@ -2020,21 +1889,24 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
                 const count = bins[i];
                 const pct = binTotal > 0 ? (count / binTotal) * 100 : 0;
                 return (
-                  <div key={label} className="flex items-center gap-2">
-                    <span className="min-w-14 shrink-0 whitespace-nowrap text-right text-2xs font-mono text-muted-foreground">
+                  <div
+                    key={label}
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 sm:flex"
+                  >
+                    <span className="min-w-0 sm:w-14 shrink-0 whitespace-nowrap text-right text-xs tabular-nums text-muted-foreground">
                       {label}
                     </span>
-                    <div className="flex-1 h-4 rounded-sm overflow-hidden bg-surface-hover">
+                    <div className="h-3 flex-1 max-sm:col-span-full max-sm:row-start-2 overflow-hidden rounded-sm bg-muted/40">
                       <div
                         className="h-full rounded-sm"
                         style={{
                           width: `${(count / maxBin) * 100}%`,
-                          backgroundColor: activeTool ? getToolColor(activeTool) : '#6b7280',
-                          opacity: 0.7,
+                          minWidth: count > 0 ? 2 : 0,
+                          backgroundColor: CHART_COLORS[0],
                         }}
                       />
                     </div>
-                    <span className="min-w-24 shrink-0 whitespace-nowrap text-right text-2xs font-mono tabular-nums text-muted-foreground">
+                    <span className="sm:w-28 shrink-0 whitespace-nowrap text-right text-xs tabular-nums text-muted-foreground">
                       {count.toLocaleString()} ({pct.toFixed(1)}%)
                     </span>
                   </div>
@@ -2050,14 +1922,9 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
       <div className="mt-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle>
-              {t.bashBreakdown}{' '}
-              <span className="text-muted-foreground font-normal">
-                (N={bashTotal.toLocaleString()} {t.callsUnit})
-              </span>
-            </CardTitle>
-            <p className="text-3xs font-mono text-muted-foreground mt-0.5">
-              {t.bashBreakdownDescription}
+            <CardTitle>{t.bashBreakdown}</CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              N = {bashTotal.toLocaleString()} {t.callsUnit} · {t.bashBreakdownDescription}
             </p>
           </CardHeader>
           <CardContent>
@@ -2067,7 +1934,7 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
               </EmptyState>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-2xs font-mono">
+                <table className="w-full text-xs tabular-nums">
                   <thead className="text-muted-foreground border-b border-border/20">
                     <tr>
                       <th className="text-left py-1.5 font-medium">{t.colKind}</th>
@@ -2088,13 +1955,13 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
                           <td className="py-1.5 text-right">{row.count.toLocaleString()}</td>
                           <td className="py-1.5 pl-4">
                             <div className="flex items-center gap-2">
-                              <div className="flex-1 h-3 rounded-sm overflow-hidden bg-surface-hover">
+                              <div className="h-3 flex-1 overflow-hidden rounded-sm bg-muted/40">
                                 <div
                                   className="h-full rounded-sm"
                                   style={{
                                     width: `${share}%`,
-                                    backgroundColor: getToolColor('Bash'),
-                                    opacity: 0.7,
+                                    minWidth: row.count > 0 ? 2 : 0,
+                                    backgroundColor: CHART_COLORS[0],
                                   }}
                                 />
                               </div>
@@ -2124,13 +1991,9 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
         <div className="mt-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle>
-                {t.bashBinaries}{' '}
-                <span className="text-muted-foreground font-normal">
-                  (N={binaryTotal.toLocaleString()} invocations)
-                </span>
-              </CardTitle>
-              <p className="text-3xs font-mono text-muted-foreground mt-0.5">
+              <CardTitle>{t.bashBinaries}</CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {t.invocationsCount(binaryTotal.toLocaleString())} ·{' '}
                 {t.bashBinariesDescription(binaryRows.length.toLocaleString())}
               </p>
             </CardHeader>
@@ -2141,7 +2004,7 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
                 tabIndex={0}
                 className="max-h-80 overflow-auto overscroll-contain focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/40"
               >
-                <table className="w-full text-2xs font-mono">
+                <table className="w-full text-xs tabular-nums">
                   <thead className="sticky top-0 z-10 bg-background text-muted-foreground border-b border-border/20">
                     <tr>
                       <th className="text-left py-1.5 font-medium">{t.colBinary}</th>
@@ -2158,17 +2021,17 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
                       const share = binaryTotal > 0 ? (row.count / binaryTotal) * 100 : 0;
                       return (
                         <tr key={row.binary}>
-                          <td className="py-1.5 font-medium">{row.binary}</td>
+                          <td className="py-1.5 font-mono font-medium">{row.binary}</td>
                           <td className="py-1.5 text-right">{row.count.toLocaleString()}</td>
                           <td className="py-1.5 pl-4">
                             <div className="flex items-center gap-2">
-                              <div className="flex-1 h-3 rounded-sm overflow-hidden bg-surface-hover">
+                              <div className="h-3 flex-1 overflow-hidden rounded-sm bg-muted/40">
                                 <div
                                   className="h-full rounded-sm"
                                   style={{
                                     width: `${share}%`,
-                                    backgroundColor: getToolColor('Bash'),
-                                    opacity: 0.7,
+                                    minWidth: row.count > 0 ? 2 : 0,
+                                    backgroundColor: CHART_COLORS[0],
                                   }}
                                 />
                               </div>
@@ -2197,162 +2060,77 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
   );
 }
 
-interface PieSlice {
-  label: string;
-  count: number;
-  fraction: number;
-  color: string;
-  items?: { toolName: string; count: number }[];
+const HISTOGRAM_PERCENTILES = [25, 50, 75, 90, 95, 99];
+
+function formatRatio(v: number): string {
+  return v.toFixed(2);
 }
 
-function PieChartSection({
-  toolCounts,
-  totalToolCalls,
+function SessionHistogram({
+  id,
+  title,
+  values,
+  axisLabel,
+  format,
 }: {
-  toolCounts: { toolName: string; count: number }[];
-  totalToolCalls: number;
+  id: string;
+  title: string;
+  values: number[];
+  axisLabel: string;
+  format: (v: number) => string;
 }) {
   const t = STRINGS[useLocale()];
-  const [hoveredSlice, setHoveredSlice] = useState<PieSlice | null>(null);
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const { buckets, percentiles, clipped } = useMemo(() => {
+    const sorted = values.toSorted((a, b) => a - b);
+    const bins = buildHistogram(values, 50);
+    const at = (p: number) =>
+      sorted[Math.min(Math.floor((p / 100) * sorted.length), sorted.length - 1)];
+    return {
+      buckets: bins,
+      percentiles: HISTOGRAM_PERCENTILES.map((p) => ({ label: `p${p}`, value: at(p) })),
+      clipped: bins.length > 0 ? values.filter((v) => v > bins.at(-1)!.max).length : 0,
+    };
+  }, [values]);
+  const fileName = `${id}-distribution`;
 
-  const slices = useMemo(() => {
-    const major: PieSlice[] = [];
-    const minorItems: { toolName: string; count: number }[] = [];
-    let minorTotal = 0;
-
-    for (const tc of toolCounts) {
-      const fraction = Number(tc.count) / totalToolCalls;
-      if (fraction >= 0.01) {
-        major.push({
-          label: tc.toolName,
-          count: Number(tc.count),
-          fraction,
-          color: getToolColor(tc.toolName),
-        });
-      } else {
-        minorItems.push({ toolName: tc.toolName, count: Number(tc.count) });
-        minorTotal += Number(tc.count);
-      }
-    }
-
-    if (minorItems.length > 0) {
-      major.push({
-        label: t.otherTools,
-        count: minorTotal,
-        fraction: minorTotal / totalToolCalls,
-        color: '#6b7280',
-        items: minorItems,
-      });
-    }
-
-    return major;
-  }, [toolCounts, totalToolCalls, t.otherTools]);
+  if (values.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle>{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EmptyState bare className="h-40">
+            {t.noData}
+          </EmptyState>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <section>
-      <SectionHeader label={t.usageBreakdown} detail={toolCounts.length} />
-      <Expandable title={t.usageBreakdown} corner>
-        <div className="rounded-xl border border-border/30 bg-card p-4 relative">
-          <div className="flex flex-col lg:flex-row items-center gap-6">
-            <div className="shrink-0">
-              <svg viewBox="-1.1 -1.1 2.2 2.2" width={220} height={220}>
-                {(() => {
-                  const paths: { slice: PieSlice; d: string }[] = [];
-                  let cumAngle = -Math.PI / 2;
-                  for (const slice of slices) {
-                    const angle = slice.fraction * Math.PI * 2;
-                    const x1 = Math.cos(cumAngle);
-                    const y1 = Math.sin(cumAngle);
-                    cumAngle += angle;
-                    const x2 = Math.cos(cumAngle);
-                    const y2 = Math.sin(cumAngle);
-                    const largeArc = angle > Math.PI ? 1 : 0;
-                    paths.push({
-                      slice,
-                      d: `M 0 0 L ${x1} ${y1} A 1 1 0 ${largeArc} 1 ${x2} ${y2} Z`,
-                    });
-                  }
-                  const sorted = hoveredSlice
-                    ? [
-                        ...paths.filter((p) => p.slice.label !== hoveredSlice.label),
-                        ...paths.filter((p) => p.slice.label === hoveredSlice.label),
-                      ]
-                    : paths;
-                  return sorted.map(({ slice, d }) => {
-                    const isHovered = hoveredSlice?.label === slice.label;
-                    return (
-                      <path
-                        key={slice.label}
-                        d={d}
-                        fill={slice.color}
-                        fillOpacity={hoveredSlice ? (isHovered ? 1 : 0.4) : 0.85}
-                        stroke="var(--bg)"
-                        strokeWidth={0.02}
-                        style={{
-                          cursor: 'pointer',
-                          transform: isHovered ? 'scale(1.04)' : 'scale(1)',
-                          transformOrigin: 'center',
-                          transition: 'fill-opacity 150ms, transform 150ms',
-                        }}
-                        onMouseEnter={(e) => {
-                          setHoveredSlice(slice);
-                          setTooltipPos({ x: e.clientX, y: e.clientY });
-                        }}
-                        onMouseMove={(e) => setTooltipPos({ x: e.clientX, y: e.clientY })}
-                        onMouseLeave={() => setHoveredSlice(null)}
-                      />
-                    );
-                  });
-                })()}
-              </svg>
-            </div>
-
-            <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1.5">
-              {slices.map((slice) => (
-                <div
-                  key={slice.label}
-                  className="flex items-center gap-2"
-                  onMouseEnter={(e) => {
-                    setHoveredSlice(slice);
-                    setTooltipPos({ x: e.clientX, y: e.clientY });
-                  }}
-                  onMouseLeave={() => setHoveredSlice(null)}
-                >
-                  <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0"
-                    style={{ backgroundColor: slice.color }}
-                  />
-                  <span className="text-2xs font-mono truncate">{slice.label}</span>
-                  <span className="text-3xs font-mono text-muted-foreground ml-auto tabular-nums">
-                    {(slice.fraction * 100).toFixed(1)}%
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {hoveredSlice && (
-            <FloatingTooltip x={tooltipPos.x} y={tooltipPos.y} offset={16}>
-              <ChartHoverCardBody
-                title={hoveredSlice.label}
-                color={hoveredSlice.color}
-                metrics={[
-                  { value: hoveredSlice.count.toLocaleString(), label: t.callsUnit },
-                  { value: `${(hoveredSlice.fraction * 100).toFixed(1)}%`, label: t.colShare },
-                ]}
-                summary={hoveredSlice.items
-                  ?.map(
-                    (item) =>
-                      `${item.toolName} ${Number(item.count).toLocaleString()} (${((Number(item.count) / totalToolCalls) * 100).toFixed(2)}%)`,
-                  )
-                  .join(' · ')}
-              />
-            </FloatingTooltip>
-          )}
-        </div>
-      </Expandable>
-    </section>
+    <ExpandableChart
+      title={title}
+      subtitle={`N = ${values.length.toLocaleString()} · ${t.binsClip(buckets.length, clipped > 0 ? clipped.toLocaleString() : '')}`}
+      actions={
+        <ChartActions
+          fileName={fileName}
+          onExportPng={() => track('agentic_workload_export_png', { chart: fileName })}
+        />
+      }
+    >
+      {(expanded) => (
+        <DistributionHistogram
+          buckets={buckets}
+          percentiles={percentiles}
+          format={format}
+          axisLabel={axisLabel}
+          expanded={expanded}
+          color={CHART_COLORS[0]}
+          countLabel={{ one: t.sessionOne, other: t.sessionOther }}
+        />
+      )}
+    </ExpandableChart>
   );
 }
 
@@ -2381,6 +2159,7 @@ function ToolAnalyticsPageContent() {
   const searchParams = useSearchParams();
   const raw = searchParams.get('harness');
   const harness: HarnessFilter = isHarness(raw) ? raw : 'all';
+  const isMobile = useIsMobileViewport();
 
   function setHarness(value: HarnessFilter) {
     const params = new URLSearchParams(searchParams.toString());
@@ -2394,6 +2173,7 @@ function ToolAnalyticsPageContent() {
     <div className="space-y-5">
       <SegmentedToggle
         role="group"
+        variant={isMobile ? 'select' : 'segments'}
         ariaLabel={t.harnessFilterGroupLabel}
         value={harness}
         onValueChange={(value) => {
@@ -2412,7 +2192,6 @@ function ToolAnalyticsPageContent() {
 
 function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
   const t = STRINGS[useLocale()];
-  const [showProbability, setShowProbability] = useState(false);
 
   const {
     data: response,
@@ -2456,7 +2235,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
   if (loading) {
     return (
       <div className="space-y-4">
-        <div className="text-2xs font-mono text-muted-foreground">{t.loadingToolAnalytics}</div>
+        <div className="text-xs text-muted-foreground">{t.loadingToolAnalytics}</div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="rounded-xl border border-border/30 bg-card p-3">
@@ -2471,9 +2250,9 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
 
   if (response && isSetupRequiredResponse(response)) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-2 text-muted-foreground text-sm font-mono">
+      <div className="flex flex-col items-center justify-center h-64 gap-2 text-muted-foreground text-sm">
         <div>{t.cacheTableMissing}</div>
-        <div className="text-3xs text-muted-foreground">{t.cacheTableMissingDetail}</div>
+        <div className="text-xs text-muted-foreground">{t.cacheTableMissingDetail}</div>
       </div>
     );
   }
@@ -2481,12 +2260,12 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
   if (response && isWarmingResponse(response)) {
     return (
       <div
-        className="flex h-64 flex-col items-center justify-center gap-3 text-sm font-mono text-muted-foreground"
+        className="flex h-64 flex-col items-center justify-center gap-3 text-sm text-muted-foreground"
         role="status"
         aria-live="polite"
       >
         <div>{t.notAvailableInSnapshot}</div>
-        <div className="text-3xs text-muted-foreground">{t.notAvailableDetail}</div>
+        <div className="text-xs text-muted-foreground">{t.notAvailableDetail}</div>
         <Button
           type="button"
           variant="outline"
@@ -2496,7 +2275,6 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
             reload();
           }}
           aria-label={t.reloadToolAnalyticsAriaLabel}
-          className="font-sans"
         >
           {t.reload}
         </Button>
@@ -2506,7 +2284,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
 
   if (!data) {
     return (
-      <div className="flex h-64 flex-col items-center justify-center gap-3 text-sm font-mono text-muted-foreground">
+      <div className="flex h-64 flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
         <div>
           {t.failedToLoad}
           {loadError ? `: ${loadError.message}` : ''}
@@ -2519,7 +2297,6 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
             track('agentic_workload_tool_analytics_retry');
             reload();
           }}
-          className="font-sans"
         >
           {t.retry}
         </Button>
@@ -2573,7 +2350,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
   return (
     <div className="space-y-5">
       {data.sample && (
-        <div className="text-3xs font-mono text-muted-foreground">
+        <div className="text-xs tabular-nums text-muted-foreground">
           {t.sessionSample(
             data.sample.sessions.toLocaleString(),
             data.sample.totalSessions.toLocaleString(),
@@ -2584,8 +2361,8 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
       )}
 
       <section>
-        <SectionHeader label={t.stats} detail={8} />
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <SectionHeader label={t.stats} />
+        <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
             { label: t.totalToolCalls, value: totalToolCalls.toLocaleString() },
             {
@@ -2624,55 +2401,51 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
               ),
             },
           ].map((stat) => (
-            <div key={stat.label} className="rounded-xl border border-border/30 bg-card p-3">
-              <div className="text-xs font-medium text-muted-foreground mb-1.5">{stat.label}</div>
-              <div className="text-lg font-medium tabular-nums">{stat.value}</div>
-              {'detail' in stat && stat.detail && (
-                <p className="text-3xs text-muted-foreground mt-1 leading-relaxed font-mono">
-                  {stat.detail}
-                </p>
-              )}
-            </div>
+            <Stat
+              key={stat.label}
+              boxed
+              label={stat.label}
+              value={stat.value}
+              detail={'detail' in stat ? stat.detail : undefined}
+            />
           ))}
-        </div>
+        </dl>
       </section>
 
-      <PieChartSection toolCounts={toolCounts} totalToolCalls={totalToolCalls} />
-
       <section>
-        <SectionHeader label={t.distribution} detail={Math.min(toolCounts.length, 15)} />
+        <SectionHeader label={t.distribution} />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle>
-                {t.toolUsageDistribution}{' '}
-                <span className="text-muted-foreground font-normal">
-                  (N={totalToolCalls.toLocaleString()})
-                </span>
-              </CardTitle>
+              <CardTitle>{t.toolUsageDistribution}</CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                N = {totalToolCalls.toLocaleString()}
+              </p>
             </CardHeader>
             <CardContent>
               <div className="space-y-1.5">
                 {toolCounts.slice(0, 15).map((tc) => (
-                  <div key={tc.toolName} className="flex items-center gap-2">
+                  <div
+                    key={tc.toolName}
+                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:flex"
+                  >
                     <span
-                      className="w-[180px] text-right text-2xs font-mono font-medium shrink-0 truncate"
-                      style={{ color: getToolColor(tc.toolName) }}
+                      className="min-w-0 sm:w-36 shrink-0 truncate text-xs text-foreground"
                       title={tc.toolName}
                     >
                       {tc.toolName}
                     </span>
-                    <div className="flex-1 h-4 rounded-sm overflow-hidden bg-surface-hover">
+                    <div className="h-3 flex-1 max-sm:col-span-full max-sm:row-start-2 overflow-hidden rounded-sm bg-muted/40">
                       <div
                         className="h-full rounded-sm"
                         style={{
                           width: `${(Number(tc.count) / maxToolCount) * 100}%`,
-                          backgroundColor: getToolColor(tc.toolName),
-                          opacity: 0.7,
+                          minWidth: 2,
+                          backgroundColor: CHART_COLORS[0],
                         }}
                       />
                     </div>
-                    <span className="min-w-14 shrink-0 whitespace-nowrap text-right text-2xs font-mono tabular-nums text-muted-foreground">
+                    <span className="sm:w-16 shrink-0 text-right text-xs tabular-nums text-foreground">
                       {Number(tc.count).toLocaleString()}
                     </span>
                   </div>
@@ -2683,12 +2456,10 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle>
-                {t.topTransitions}{' '}
-                <span className="text-muted-foreground font-normal">
-                  (N={totalTransitions.toLocaleString()})
-                </span>
-              </CardTitle>
+              <CardTitle>{t.topTransitions}</CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                N = {totalTransitions.toLocaleString()}
+              </p>
             </CardHeader>
             <CardContent>
               <div className="space-y-1">
@@ -2696,16 +2467,13 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                   const pct =
                     totalTransitions > 0 ? (Number(tr.count) / totalTransitions) * 100 : 0;
                   return (
-                    <div key={i} className="flex items-center gap-2 text-2xs font-mono">
-                      <span className="shrink-0" style={{ color: getToolColor(tr.fromTool) }}>
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      <span className="min-w-0 flex-1 truncate text-foreground">
                         {tr.fromTool}
-                      </span>
-                      <span className="text-muted-foreground shrink-0">&rarr;</span>
-                      <span className="shrink-0" style={{ color: getToolColor(tr.toTool) }}>
+                        <span className="mx-1.5 text-muted-foreground">&rarr;</span>
                         {tr.toTool}
                       </span>
-                      <span className="flex-1 border-b border-dotted border-border/20" />
-                      <span className="text-muted-foreground shrink-0">
+                      <span className="w-16 shrink-0 text-right tabular-nums text-foreground">
                         {Number(tr.count).toLocaleString()}
                       </span>
                       <span className="min-w-12 shrink-0 whitespace-nowrap text-right tabular-nums text-muted-foreground">
@@ -2722,48 +2490,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
 
       <ToolTimingSection timings={data.toolTimings} />
 
-      <section>
-        <SectionHeader label={t.transitionMatrix} detail={transitions.length} />
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle>
-                {t.transitionMatrix}{' '}
-                <span className="text-muted-foreground font-normal">
-                  ({showProbability ? t.rowNormalizedProbability : t.rawCounts})
-                </span>
-              </CardTitle>
-              <Button
-                type="button"
-                variant="outline"
-                size="xs"
-                onClick={() => {
-                  track('agentic_workload_transition_mode_toggled', {
-                    show_probability: !showProbability,
-                  });
-                  setShowProbability((v) => !v);
-                }}
-              >
-                {showProbability ? t.showCounts : t.showProbability}
-              </Button>
-            </div>
-            <p className="text-3xs font-mono text-muted-foreground mt-0.5">
-              {t.transitionMatrixDescription(Math.min(15, toolCounts.length))}
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <TransitionHeatmap
-                title={t.transitionMatrix}
-                transitions={transitions}
-                showProbability={showProbability}
-                hideSmallLabel={t.hideSmall}
-                noDataLabel={t.noTransitionData}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+      <TransitionHeatmap transitions={transitions} toolCount={toolCounts.length} />
 
       <WorkflowPatterns harness={harness} />
 
@@ -2773,13 +2500,9 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
           <ToolOsErrorRates rows={toolErrorRatesByOs} />
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle>
-                {t.anthropicToolResults}{' '}
-                <span className="text-muted-foreground font-normal">
-                  {t.matchedResults(matchedToolResults.toLocaleString())}
-                </span>
-              </CardTitle>
-              <p className="text-3xs font-mono text-muted-foreground mt-0.5">
+              <CardTitle>{t.anthropicToolResults}</CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {t.matchedResults(matchedToolResults.toLocaleString())} ·{' '}
                 {t.anthropicToolResultsDescription}
               </p>
             </CardHeader>
@@ -2795,7 +2518,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                   tabIndex={0}
                   className="max-h-64 overflow-auto overscroll-contain focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/40"
                 >
-                  <table className="w-full text-2xs font-mono">
+                  <table className="w-full text-xs tabular-nums">
                     <thead className="sticky top-0 z-10 bg-background text-muted-foreground border-b border-border/20">
                       <tr>
                         <th className="text-left py-1.5 font-medium">{t.colTool}</th>
@@ -2810,20 +2533,15 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                     <tbody className="divide-y divide-border/20">
                       {toolErrorRates.map((row) => (
                         <tr key={row.toolName}>
-                          <td
-                            className="py-1.5 font-medium"
-                            style={{ color: getToolColor(row.toolName) }}
-                          >
-                            {row.toolName}
-                          </td>
+                          <td className="py-1.5 font-medium text-foreground">{row.toolName}</td>
                           <td className="py-1.5 text-right">{row.totalCalls.toLocaleString()}</td>
                           <td className="py-1.5 text-right">
                             {row.matchedResults.toLocaleString()}
                           </td>
-                          <td className="py-1.5 text-right text-success">
+                          <td className="py-1.5 text-right text-emerald-700 dark:text-emerald-400">
                             {row.successes.toLocaleString()}
                           </td>
-                          <td className="py-1.5 text-right text-destructive">
+                          <td className="py-1.5 text-right text-red-700 dark:text-red-400">
                             {row.errors.toLocaleString()}
                           </td>
                           <td className="py-1.5 text-right text-muted-foreground">
@@ -2849,12 +2567,10 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle>
-                {t.sessionOutcomeProxies}{' '}
-                <span className="text-muted-foreground font-normal">
-                  (N={verificationSummary.sessionsAnalyzed.toLocaleString()})
-                </span>
-              </CardTitle>
+              <CardTitle>{t.sessionOutcomeProxies}</CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                N = {verificationSummary.sessionsAnalyzed.toLocaleString()}
+              </p>
             </CardHeader>
             <CardContent>
               <div className="space-y-1.5">
@@ -2862,34 +2578,37 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                   const total = Math.max(Number(verificationSummary.sessionsAnalyzed), 1);
                   const pct = Number(outcome.count) / total;
                   return (
-                    <div key={outcome.outcome} className="flex items-center gap-2">
+                    <div
+                      key={outcome.outcome}
+                      className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1 sm:flex"
+                    >
                       <span
-                        className="w-[150px] shrink-0 truncate text-right text-2xs font-mono font-medium"
+                        className="min-w-0 sm:w-36 shrink-0 truncate text-xs text-foreground"
                         title={t.outcomeLabels[outcome.outcome]}
                       >
                         {t.outcomeLabels[outcome.outcome]}
                       </span>
-                      <div className="flex-1 h-4 rounded-sm overflow-hidden bg-surface-hover">
+                      <div className="h-3 flex-1 max-sm:col-span-full max-sm:row-start-2 overflow-hidden rounded-sm bg-muted/40">
                         <div
                           className="h-full rounded-sm"
                           style={{
                             width: `${pct * 100}%`,
+                            minWidth: pct > 0 ? 2 : 0,
                             backgroundColor: OUTCOME_COLORS[outcome.outcome],
-                            opacity: 0.75,
                           }}
                         />
                       </div>
-                      <span className="min-w-14 shrink-0 whitespace-nowrap text-right text-2xs font-mono tabular-nums text-muted-foreground">
+                      <span className="sm:w-16 shrink-0 text-right text-xs tabular-nums text-foreground">
                         {Number(outcome.count).toLocaleString()}
                       </span>
-                      <span className="min-w-12 shrink-0 whitespace-nowrap text-right text-2xs font-mono tabular-nums text-muted-foreground">
+                      <span className="sm:w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
                         {formatPct(pct)}
                       </span>
                     </div>
                   );
                 })}
               </div>
-              <p className="text-3xs font-mono text-muted-foreground mt-3 leading-relaxed">
+              <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
                 {t.sessionOutcomeDescription}
               </p>
             </CardContent>
@@ -2897,12 +2616,10 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle>
-                {t.verificationCommandClasses}{' '}
-                <span className="text-muted-foreground font-normal">
-                  (N={verificationSummary.verificationAttempts.toLocaleString()})
-                </span>
-              </CardTitle>
+              <CardTitle>{t.verificationCommandClasses}</CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                N = {verificationSummary.verificationAttempts.toLocaleString()}
+              </p>
             </CardHeader>
             <CardContent>
               {verificationByKind.length === 0 ? (
@@ -2911,7 +2628,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                 </EmptyState>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-2xs font-mono">
+                  <table className="w-full text-xs tabular-nums">
                     <thead className="text-muted-foreground border-b border-border/20">
                       <tr>
                         <th className="text-left py-1.5 font-medium">{t.colKind}</th>
@@ -2931,10 +2648,10 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                           <td className="py-1.5 text-right">
                             {row.afterEditAttempts.toLocaleString()}
                           </td>
-                          <td className="py-1.5 text-right text-success">
+                          <td className="py-1.5 text-right text-emerald-700 dark:text-emerald-400">
                             {row.passes.toLocaleString()}
                           </td>
-                          <td className="py-1.5 text-right text-destructive">
+                          <td className="py-1.5 text-right text-red-700 dark:text-red-400">
                             {row.failures.toLocaleString()}
                           </td>
                           <td className="py-1.5 text-right text-muted-foreground">
@@ -2955,76 +2672,27 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
       <section>
         <SectionHeader label={t.agenticLoopDepth} detail={sessionToolStats.length} />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {[
-            {
-              key: 'totalTools',
-              title: t.toolCallsPerSession,
-              color: '#8b5cf6',
-              values: totalToolValues,
-              axisLabel: t.axisToolCalls,
-              format: (v: number) => String(Math.round(v)),
-            },
-            {
-              key: 'uniqueTools',
-              title: t.uniqueToolsPerSession,
-              color: '#0ea5e9',
-              values: uniqueToolValues,
-              axisLabel: t.axisUniqueTools,
-              format: (v: number) => String(Math.round(v)),
-            },
-            {
-              key: 'diversity',
-              title: t.toolDiversityRatio,
-              color: '#10b981',
-              values: diversityValues,
-              axisLabel: t.axisRatio,
-              format: (v: number) => v.toFixed(2),
-            },
-          ].map(({ key, title, color, values, axisLabel, format }) => {
-            if (values.length === 0) {
-              return (
-                <Card key={key}>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">{title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <EmptyState bare className="h-40">
-                      {t.noData}
-                    </EmptyState>
-                  </CardContent>
-                </Card>
-              );
-            }
-            const buckets = buildHistogram(values, 50);
-            const clipped = values.filter((v) => v > buckets.at(-1)!.max).length;
-            return (
-              <Card key={key}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">
-                    {title}{' '}
-                    <span className="text-muted-foreground font-normal">
-                      (N={values.length.toLocaleString()})
-                    </span>
-                  </CardTitle>
-                  <p className="text-3xs font-mono text-muted-foreground mt-0.5">
-                    {t.binsClip(buckets.length, clipped > 0 ? clipped.toLocaleString() : '')}
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <Histogram
-                    buckets={buckets}
-                    color={color}
-                    values={values}
-                    axisLabel={axisLabel}
-                    format={format}
-                    title={title}
-                    exportFilename={`${key}-distribution.png`}
-                    yAxisLabel={t.sessions}
-                  />
-                </CardContent>
-              </Card>
-            );
-          })}
+          <SessionHistogram
+            id="totalTools"
+            title={t.toolCallsPerSession}
+            values={totalToolValues}
+            axisLabel={t.axisToolCalls}
+            format={formatAxisNumber}
+          />
+          <SessionHistogram
+            id="uniqueTools"
+            title={t.uniqueToolsPerSession}
+            values={uniqueToolValues}
+            axisLabel={t.axisUniqueTools}
+            format={formatAxisNumber}
+          />
+          <SessionHistogram
+            id="diversity"
+            title={t.toolDiversityRatio}
+            values={diversityValues}
+            axisLabel={t.axisRatio}
+            format={formatRatio}
+          />
         </div>
       </section>
     </div>

@@ -264,29 +264,6 @@ export default function ComparePerDollarPageClient({
               </p>
             )}
           </header>
-          <figure
-            className="mt-2 flex flex-col gap-2"
-            data-testid="compare-per-dollar-indexed-image"
-          >
-            <img
-              src={heroImageSrc}
-              alt={
-                isZh
-                  ? `${modelLabel}：${aLabel} 与 ${bLabel} 在相同交互性水平下的每百万 token 成本`
-                  : `${modelLabel}: ${aLabel} versus ${bLabel} cost per million tokens at matched interactivity levels`
-              }
-              width={1200}
-              height={675}
-              loading="eager"
-              fetchPriority="high"
-              className="w-full rounded-lg"
-            />
-            <figcaption className="text-xs text-muted-foreground">
-              {isZh
-                ? `${aLabel} 与 ${bLabel} 在此对比默认工作负载下的每百万 token 成本。成本越低表示每美元性能越高。`
-                : `${aLabel} versus ${bLabel} cost per million tokens for this comparison's canonical default workload. Lower cost indicates better performance per dollar.`}
-            </figcaption>
-          </figure>
           <CompareTableSection
             a={a}
             b={b}
@@ -301,6 +278,38 @@ export default function ComparePerDollarPageClient({
             emptyStateText={t.emptyState}
             isZh={isZh}
           />
+          <figure
+            className="mt-2 flex max-w-sm flex-col gap-2"
+            data-testid="compare-per-dollar-indexed-image"
+          >
+            <a href={heroImageSrc} target="_blank" rel="noopener noreferrer">
+              <img
+                src={heroImageSrc}
+                alt={
+                  isZh
+                    ? `${modelLabel}：${aLabel} 与 ${bLabel} 在相同交互性水平下的每百万 token 成本`
+                    : `${modelLabel}: ${aLabel} versus ${bLabel} cost per million tokens at matched interactivity levels`
+                }
+                width={1200}
+                height={675}
+                loading="lazy"
+                className="w-full rounded-lg"
+              />
+            </a>
+            <figcaption className="text-xs text-muted-foreground">
+              {isZh
+                ? `${aLabel} 与 ${bLabel} 在此对比默认工作负载下的每百万 token 成本。成本越低表示每美元性能越高。`
+                : `${aLabel} versus ${bLabel} cost per million tokens for this comparison's canonical default workload. Lower cost indicates better performance per dollar.`}
+            </figcaption>
+            <a
+              href={heroImageSrc}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-foreground underline underline-offset-2"
+            >
+              {isZh ? '查看大图 ↗' : 'Open full-size image ↗'}
+            </a>
+          </figure>
         </Card>
         <LazyCompareInferenceChart
           activeTab="compare"

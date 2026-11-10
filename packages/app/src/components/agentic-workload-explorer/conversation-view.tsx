@@ -1,12 +1,13 @@
 'use client';
 
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Search, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
+  formatDollars,
   formatDuration,
   formatInteractivity,
   formatNumber,
@@ -414,6 +415,61 @@ const typeStyles: Record<string, { label: string; color: string; border: string;
   },
 };
 
+export const ROW_PAGE_SIZE = 50;
+
+const ROW_STRINGS = {
+  en: {
+    showMore: (n: string) => `Show ${n} more`,
+    hidden: (n: string) => `(${n} hidden)`,
+  },
+  zh: {
+    showMore: (n: string) => `再显示 ${n} 条`,
+    hidden: (n: string) => `（还有 ${n} 条隐藏）`,
+  },
+};
+
+export function useRowLimit(resetKey?: unknown): [number, (n: number) => void, () => void] {
+  const [limit, setLimit] = useState(ROW_PAGE_SIZE);
+  useEffect(() => setLimit(ROW_PAGE_SIZE), [resetKey]);
+  const showMore = useCallback(() => setLimit((l) => l + ROW_PAGE_SIZE), []);
+  return [limit, setLimit, showMore];
+}
+
+export function ShowMoreRows({
+  shown,
+  total,
+  view,
+  onShowMore,
+}: {
+  shown: number;
+  total: number;
+  view: string;
+  onShowMore: () => void;
+}) {
+  const locale = useLocale();
+  const t = ROW_STRINGS[locale];
+  const hidden = total - shown;
+  if (hidden <= 0) return null;
+  return (
+    <div className="flex justify-center py-3">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => {
+          track('agentic_workload_session_rows_expanded', { view, shown, total });
+          onShowMore();
+        }}
+      >
+        {t.showMore(Math.min(ROW_PAGE_SIZE, hidden).toLocaleString(locale))}
+        <span className="tabular-nums text-muted-foreground">
+          {t.hidden(hidden.toLocaleString(locale))}
+        </span>
+      </Button>
+    </div>
+  );
+}
+
 const STRINGS = {
   en: {
     typeLabels: {
@@ -449,8 +505,8 @@ const STRINGS = {
     tokenIn: 'in:',
     tokenOut: 'out:',
     tok: 'tok',
-    cacheReadLabel: 'cache_read',
-    cacheCreateLabel: 'cache_create',
+    cacheReadLabel: 'Cache read',
+    cacheCreateLabel: 'Cache create',
   },
   zh: {
     typeLabels: {
@@ -486,8 +542,8 @@ const STRINGS = {
     tokenIn: '输入:',
     tokenOut: '输出:',
     tok: 'tok',
-    cacheReadLabel: 'cache_read',
-    cacheCreateLabel: 'cache_create',
+    cacheReadLabel: '缓存读取',
+    cacheCreateLabel: '缓存创建',
   },
 };
 
@@ -507,10 +563,12 @@ export function ConversationView({
   requests,
   visibleNodeCount,
   reversed,
+  targetRequestId,
 }: {
   requests: RequestData[];
   visibleNodeCount?: number;
   reversed?: boolean;
+  targetRequestId?: string | null;
 }) {
   const t = STRINGS[useLocale()];
   const tree = buildConversationTree(requests);
@@ -541,7 +599,17 @@ export function ConversationView({
     [tree, q],
   );
   const sliced = visibleNodeCount === undefined ? filtered : filtered.slice(0, visibleNodeCount);
-  const displayNodes = reversed ? [...sliced].toReversed() : sliced;
+  const allNodes = reversed ? [...sliced].toReversed() : sliced;
+  const [rowLimit, , showMoreRows] = useRowLimit(q);
+  const targetIndex = targetRequestId
+    ? allNodes.findIndex(
+        (node) =>
+          node.kind === 'message' && node.isRequestAnchor && node.requestId === targetRequestId,
+      )
+    : -1;
+  const paged = visibleNodeCount === undefined;
+  const shownCount = paged ? Math.max(rowLimit, targetIndex + 1) : allNodes.length;
+  const displayNodes = shownCount < allNodes.length ? allNodes.slice(0, shownCount) : allNodes;
 
   if (tree.length === 0) {
     return (
@@ -567,7 +635,7 @@ export function ConversationView({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t.searchPlaceholder}
-                className="h-11 w-full rounded-md border border-input bg-background pl-8 pr-8 text-xs font-mono text-foreground placeholder:text-muted-foreground transition-colors focus:border-foreground/30 focus:outline-none md:h-8"
+                className="h-11 w-full rounded-md border border-input bg-background pl-8 pr-8 text-xs text-foreground placeholder:text-muted-foreground transition-colors focus:border-foreground/30 focus:outline-none md:h-8"
               />
               {query && (
                 <button
@@ -600,7 +668,7 @@ export function ConversationView({
             </Button>
           )}
           {showSearch && q && (
-            <span className="text-3xs font-mono text-muted-foreground shrink-0">
+            <span className="text-3xs tabular-nums text-muted-foreground shrink-0">
               {filtered.length} / {tree.length}
             </span>
           )}
@@ -621,10 +689,14 @@ export function ConversationView({
           </Fragment>
         );
       })}
+      <ShowMoreRows
+        shown={displayNodes.length}
+        total={allNodes.length}
+        view="conversation"
+        onShowMore={showMoreRows}
+      />
       {q && filtered.length === 0 && (
-        <p className="text-xs text-muted-foreground py-6 text-center font-mono">
-          {t.noMatches(query)}
-        </p>
+        <p className="text-xs text-muted-foreground py-6 text-center">{t.noMatches(query)}</p>
       )}
     </div>
   );
@@ -660,7 +732,7 @@ function SubagentGroup({ group, highlight }: { group: SubagentGroupNode; highlig
             {formatNumber(group.totalInputTokens)}/{formatNumber(group.totalOutputTokens)} tok
           </span>
           {(group.totalCacheRead > 0 || group.totalCacheCreation > 0) && (
-            <span className="text-xs text-muted-foreground font-mono">
+            <span className="text-xs text-muted-foreground tabular-nums">
               {group.totalCacheRead > 0 && `${formatNumber(group.totalCacheRead)} ${t.cached}`}
               {group.totalCacheRead > 0 && group.totalCacheCreation > 0 && ' · '}
               {group.totalCacheCreation > 0 &&
@@ -669,8 +741,10 @@ function SubagentGroup({ group, highlight }: { group: SubagentGroupNode; highlig
           )}
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          {group.totalCost > 0 && <span className="font-mono">{formatCost(group.totalCost)}</span>}
-          <span className="font-mono">{formatDuration(group.totalDurationMs)}</span>
+          {group.totalCost > 0 && (
+            <span className="tabular-nums">{formatDollars(group.totalCost)}</span>
+          )}
+          <span className="tabular-nums">{formatDuration(group.totalDurationMs)}</span>
           <span>{timeRange}</span>
           <ChevronDown
             className={`size-4 transition-transform ${expanded ? 'rotate-180' : ''}`}
@@ -778,7 +852,7 @@ function MessageRow({
             </Badge>
           )}
           {msg.model && !compact && (
-            <span className="text-xs text-muted-foreground font-mono">{msg.model}</span>
+            <span className="text-xs text-muted-foreground">{msg.model}</span>
           )}
           {msg.fastMode && (
             <Badge variant="outline" className="text-xs py-0 h-5">
@@ -786,7 +860,7 @@ function MessageRow({
             </Badge>
           )}
           {msg.is1mContext && (
-            <Badge variant="outline" className="text-xs py-0 h-5 font-mono">
+            <Badge variant="outline" className="text-xs py-0 h-5 tabular-nums">
               1M
             </Badge>
           )}
@@ -801,10 +875,10 @@ function MessageRow({
             </Badge>
           )}
         </div>
-        <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        <div className="flex min-w-0 flex-wrap items-center justify-start gap-x-3 gap-y-1 text-xs text-muted-foreground sm:justify-end">
           <TokenInfo msg={msg} />
           {msg.ttftMs !== null && (
-            <span className="font-mono">TTFT {formatDuration(msg.ttftMs)}</span>
+            <span className="tabular-nums">TTFT {formatDuration(msg.ttftMs)}</span>
           )}
           {(() => {
             const ps = computePrefillSpeed(
@@ -812,13 +886,15 @@ function MessageRow({
               msg.cacheWriteTokens,
               msg.ttftMs,
             );
-            return ps === null ? null : <span className="font-mono">{formatPrefillSpeed(ps)}</span>;
+            return ps === null ? null : (
+              <span className="tabular-nums">{formatPrefillSpeed(ps)}</span>
+            );
           })()}
           {msg.tpotMs !== null && (
-            <span className="font-mono">{formatInteractivity(msg.tpotMs)}</span>
+            <span className="tabular-nums">{formatInteractivity(msg.tpotMs)}</span>
           )}
           {msg.durationMs !== null && (
-            <span className="font-mono">E2E {formatDuration(msg.durationMs)}</span>
+            <span className="tabular-nums">E2E {formatDuration(msg.durationMs)}</span>
           )}
           <span>{formatTime(msg.timestamp, locale)}</span>
         </div>
@@ -864,7 +940,7 @@ function RequestContextBlock({ context }: { context: NonNullable<MessageNode['re
 
   return (
     <details className="mb-2">
-      <summary className="text-3xs font-mono text-muted-foreground cursor-pointer hover:text-foreground">
+      <summary className="text-3xs text-muted-foreground cursor-pointer hover:text-foreground">
         {t.requestContext}
         {context.messageCount > 1 && t.messagesInHistory(context.messageCount)}
         {hasTools && t.nTools(context.tools!.length)}
@@ -887,7 +963,7 @@ function RequestContextBlock({ context }: { context: NonNullable<MessageNode['re
               {t.toolsHeading(context.tools!.length)}
             </div>
             <details>
-              <summary className="text-3xs font-mono text-muted-foreground cursor-pointer">
+              <summary className="text-3xs text-muted-foreground cursor-pointer">
                 {t.showToolDefs}
               </summary>
               <pre className="text-xs font-mono bg-muted/40 rounded-md p-2 overflow-x-auto max-h-64 overflow-y-auto mt-1">
@@ -934,7 +1010,7 @@ function TextContent({
   const [expanded, setExpanded] = useState(false);
 
   if (text === null) {
-    return <div className="text-xs font-mono text-muted-foreground">{t.contentStripped}</div>;
+    return <div className="text-xs text-muted-foreground">{t.contentStripped}</div>;
   }
   if (!text) return null;
   if (typeof text !== 'string') {
@@ -1125,7 +1201,7 @@ function ToolCallContent({ name, input }: { name?: string; input?: Record<string
 function ToolResultContent({ content, isError }: { content: string | unknown; isError?: boolean }) {
   const t = STRINGS[useLocale()];
   if (content === null) {
-    return <div className="text-xs font-mono text-muted-foreground">{t.contentStripped}</div>;
+    return <div className="text-xs text-muted-foreground">{t.contentStripped}</div>;
   }
   if (!content) return null;
   if (typeof content !== 'string') {
@@ -1164,11 +1240,6 @@ function is1MContext(headers: Record<string, string> | null): boolean {
   return beta.includes('context-1m-');
 }
 
-function formatCost(cost: number): string {
-  if (cost < 0.01) return `<$0.01`;
-  return `$${cost.toFixed(3)}`;
-}
-
 function TokenInfo({ msg }: { msg: MessageNode }) {
   const t = STRINGS[useLocale()];
   if (msg.inputTokens === null && msg.outputTokens === null) return null;
@@ -1179,7 +1250,7 @@ function TokenInfo({ msg }: { msg: MessageNode }) {
   const cost = msg.costUsd;
 
   return (
-    <span className="font-mono flex items-center gap-1.5">
+    <span className="flex items-center gap-1.5 tabular-nums">
       {hasCache ? (
         <>
           <span className="text-muted-foreground">
@@ -1204,7 +1275,7 @@ function TokenInfo({ msg }: { msg: MessageNode }) {
           {formatNumber(msg.inputTokens || 0)}/{formatNumber(msg.outputTokens || 0)} {t.tok}
         </span>
       )}
-      {cost !== null && <span>{formatCost(cost)}</span>}
+      {cost !== null && <span>{formatDollars(cost)}</span>}
     </span>
   );
 }

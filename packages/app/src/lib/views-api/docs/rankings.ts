@@ -123,7 +123,7 @@ const responseExample = {
     {
       model: 'DeepSeek-V4-Pro',
       modelSlug: 'deepseek-v4',
-      modelLabel: 'DeepSeekv4 Pro 0813 1.6T',
+      modelLabel: 'DeepSeek V4 Pro 0813 1.6T',
       scenario: 'agentx',
       tier: 50,
       rows: [

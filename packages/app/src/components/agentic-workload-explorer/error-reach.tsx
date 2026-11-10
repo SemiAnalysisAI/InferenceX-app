@@ -1,4 +1,4 @@
-import { Card } from '@/components/ui/card';
+import { Card, CardTitle } from '@/components/ui/card';
 import { Stat } from '@/components/ui/stat';
 import { EmptyState } from '@/components/ui/empty-state';
 import { formatNumber } from '@/lib/agentic-workload-explorer/format';
@@ -77,7 +77,7 @@ function ProviderRow({ row }: { row: ErrorReachCohort }) {
         {PROVIDER_LABELS[row.client] ?? row.client}
       </th>
       <td className="py-1.5 text-right tabular-nums">{formatNumber(row.requestCount)}</td>
-      <td className="py-1.5 text-right tabular-nums text-destructive">
+      <td className="py-1.5 text-right tabular-nums text-red-700 dark:text-red-400">
         {formatNumber(row.errorCount)}
       </td>
       <td className="py-1.5 text-right tabular-nums">{formatPct(row.requestErrorRate, 2)}</td>
@@ -113,7 +113,7 @@ export function ErrorReachPanel({ data, locale = 'en' }: { data: ErrorReach; loc
   return (
     <Card className="gap-4">
       <div>
-        <div className="text-sm font-medium text-foreground">{t.reachTitle}</div>
+        <CardTitle>{t.reachTitle}</CardTitle>
         <p className="mt-0.5 text-xs text-muted-foreground">
           {t.reachDescription(data.windowDays)}
         </p>
@@ -152,7 +152,7 @@ export function ErrorReachPanel({ data, locale = 'en' }: { data: ErrorReach; loc
       </dl>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[860px] text-2xs font-mono">
+        <table className="w-full min-w-[860px] text-xs tabular-nums">
           <caption className="sr-only">{t.caption}</caption>
           <thead className="border-b border-border/20 text-muted-foreground">
             <tr>

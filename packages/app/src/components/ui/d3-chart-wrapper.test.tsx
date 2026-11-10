@@ -187,16 +187,56 @@ const drag = (svg: SVGSVGElement, from: EventTarget) => {
   fire(window, new MouseEvent('mousemove', { bubbles: true, buttons: 1, clientX: 40 }));
 };
 
+const axisDomain = (svg: SVGSVGElement, axis: 'x' | 'y', rect: Partial<DOMRect>) => {
+  const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  group.setAttribute('class', `${axis}-axis`);
+  const domain = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  domain.setAttribute('class', 'domain');
+  domain.getBoundingClientRect = () => ({ top: 0, right: 0, ...rect }) as DOMRect;
+  group.append(domain);
+  svg.append(group);
+};
+
 describe('D3ChartWrapper zoom hint placement', () => {
   const hint = () => container.querySelector<HTMLElement>('[data-testid="chart-instructions"]');
-  it('overlays the zoom hint on the plot instead of taking a line under it', () => {
-    const svgRef = renderWrapper();
-    expect(hint()?.parentElement).toBe(svgRef.current?.parentElement);
+
+  it('puts the zoom hint in the top margin above the plot when the margin fits a line', async () => {
+    const svg = renderWrapper().current!;
+    svg.getBoundingClientRect = () => ({ top: 0, right: 640, height: 400 }) as DOMRect;
+    await act(() => {
+      axisDomain(svg, 'x', { right: 620, width: 560 });
+      axisDomain(svg, 'y', { top: 24 });
+      return Promise.resolve();
+    });
+    expect(hint()?.parentElement).toBe(svg.parentElement);
     expect(hint()?.classList.contains('absolute')).toBe(true);
     expect(hint()?.classList.contains('pointer-events-none')).toBe(true);
     expect(hint()?.classList.contains('no-export')).toBe(true);
-    expect(hint()?.style.top).not.toBe('');
-    expect(hint()?.style.right).not.toBe('');
+    expect(hint()?.style.bottom).toBe(`${400 - 24 + 2}px`);
+    expect(hint()?.style.right).toBe('20px');
+  });
+
+  it('puts the zoom hint under the plot when the top margin is too short for it', async () => {
+    const svg = renderWrapper().current!;
+    svg.getBoundingClientRect = () => ({ top: 0, right: 640, height: 400 }) as DOMRect;
+    await act(() => {
+      axisDomain(svg, 'y', { top: 8 });
+      return Promise.resolve();
+    });
+    expect(hint()?.classList.contains('absolute')).toBe(false);
+    expect(hint()?.style.bottom).toBe('');
+  });
+
+  it('puts the zoom hint under the plot when the plot is narrower than the hint', async () => {
+    const svg = renderWrapper().current!;
+    svg.getBoundingClientRect = () => ({ top: 0, right: 320, height: 400 }) as DOMRect;
+    await act(() => {
+      axisDomain(svg, 'x', { right: 300, width: 120 });
+      axisDomain(svg, 'y', { top: 24 });
+      return Promise.resolve();
+    });
+    expect(hint()?.classList.contains('absolute')).toBe(false);
+    expect(hint()?.style.bottom).toBe('');
   });
 
   it('keeps the hint while input does not move the zoom transform', async () => {

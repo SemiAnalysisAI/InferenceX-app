@@ -727,18 +727,27 @@ export function averageSoftwareGain(
   return Math.exp(ratios.reduce((sum, ratio) => sum + Math.log(ratio), 0) / ratios.length);
 }
 
-/** Largest software-gain bar magnitude across playback, in log2 units. */
-export function softwareGainBarMaxLog(
+/**
+ * Software-gain bar axis across playback, in log2 units: the top from the largest gain (at
+ * least 2x), the bottom from the deepest loss rounded down (1x when nothing fell), so big
+ * losses never stretch the gain side or the reverse.
+ */
+export function softwareGainBarExtent(
   history: FrontierHistory,
   keys: readonly string[],
   buckets: readonly number[],
-): number {
+): { min: number; max: number } {
+  let min = 0;
   let max = 1;
   for (const key of keys)
     for (let index = 0; index < history.dates.length; index++)
-      for (const { ratio } of softwareGainByInteractivity(history, key, index, buckets))
-        if (ratio !== null) max = Math.max(max, Math.abs(Math.log2(ratio)));
-  return Math.min(max, 6);
+      for (const { ratio } of softwareGainByInteractivity(history, key, index, buckets)) {
+        if (ratio === null || ratio <= 0) continue;
+        const log = Math.log2(ratio);
+        min = Math.min(min, log);
+        max = Math.max(max, log);
+      }
+  return { min: Math.max(-6, Math.floor(min)), max: Math.min(max, 6) };
 }
 
 export interface LeadMargin {

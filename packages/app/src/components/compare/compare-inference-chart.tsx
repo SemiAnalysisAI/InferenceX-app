@@ -10,7 +10,7 @@ export type CompareInferenceChartProps = Omit<ComponentProps<typeof InferencePro
 export default function CompareInferenceChart(props: CompareInferenceChartProps) {
   return (
     <InferenceProvider {...props}>
-      <InferenceChartDisplay />
+      <InferenceChartDisplay headerLevel="card" />
     </InferenceProvider>
   );
 }

@@ -189,29 +189,6 @@ export default function ComparePrecisionPageClient({
               </Link>
             </div>
           </header>
-          <figure
-            className="mt-2 flex flex-col gap-2"
-            data-testid="compare-precision-indexed-image"
-          >
-            <img
-              src={heroImageSrc}
-              alt={
-                isZh
-                  ? `${modelLabel}：${gpuLabel} 上 ${aLabel} 与 ${bLabel} 在相同交互性水平下的吞吐量与成本`
-                  : `${modelLabel}: ${aLabel} versus ${bLabel} throughput and cost at matched interactivity levels on ${gpuLabel}`
-              }
-              width={1200}
-              height={675}
-              loading="eager"
-              fetchPriority="high"
-              className="w-full rounded-lg"
-            />
-            <figcaption className="text-xs text-muted-foreground">
-              {isZh
-                ? `${gpuLabel} 上 ${aLabel} 与 ${bLabel} 在此对比默认工作负载下的吞吐量与每百万 token 成本`
-                : `${aLabel} versus ${bLabel} throughput and cost per million tokens on ${gpuLabel} for this comparison's canonical default workload`}
-            </figcaption>
-          </figure>
           <CompareTableSection
             gpu={gpu}
             precA={precA}
@@ -224,6 +201,38 @@ export default function ComparePrecisionPageClient({
             ssrPrecisions={initialPrecisions}
             emptyStateText={t.emptyState}
           />
+          <figure
+            className="mt-2 flex max-w-sm flex-col gap-2"
+            data-testid="compare-precision-indexed-image"
+          >
+            <a href={heroImageSrc} target="_blank" rel="noopener noreferrer">
+              <img
+                src={heroImageSrc}
+                alt={
+                  isZh
+                    ? `${modelLabel}：${gpuLabel} 上 ${aLabel} 与 ${bLabel} 在相同交互性水平下的吞吐量与成本`
+                    : `${modelLabel}: ${aLabel} versus ${bLabel} throughput and cost at matched interactivity levels on ${gpuLabel}`
+                }
+                width={1200}
+                height={675}
+                loading="lazy"
+                className="w-full rounded-lg"
+              />
+            </a>
+            <figcaption className="text-xs text-muted-foreground">
+              {isZh
+                ? `${gpuLabel} 上 ${aLabel} 与 ${bLabel} 在此对比默认工作负载下的吞吐量与每百万 token 成本`
+                : `${aLabel} versus ${bLabel} throughput and cost per million tokens on ${gpuLabel} for this comparison's canonical default workload`}
+            </figcaption>
+            <a
+              href={heroImageSrc}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-foreground underline underline-offset-2"
+            >
+              {isZh ? '查看大图 ↗' : 'Open full-size image ↗'}
+            </a>
+          </figure>
         </Card>
         <LazyCompareInferenceChart activeTab="compare" initialActiveHwTypes={[gpu]} />
       </div>

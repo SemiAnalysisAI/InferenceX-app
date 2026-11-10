@@ -4,11 +4,18 @@ import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { formatNumber, formatDuration } from '@/lib/agentic-workload-explorer/format';
-import type {
-  ConversationNode,
-  MessageNode,
-  SubagentGroupNode,
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  formatDollars,
+  formatNumber,
+  formatDuration,
+} from '@/lib/agentic-workload-explorer/format';
+import {
+  ShowMoreRows,
+  useRowLimit,
+  type ConversationNode,
+  type MessageNode,
+  type SubagentGroupNode,
 } from '@/components/agentic-workload-explorer/conversation-view';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
@@ -26,7 +33,6 @@ const CONNECTOR_WIDTH = 32;
 const STRINGS = {
   en: {
     flowGraph: 'Flow graph',
-    legend: 'Legend',
     noData: 'No conversation data to display',
     nodes: (n: number) => `${n} nodes`,
     subAgents: (n: number) => `${n} sub-agent${n === 1 ? '' : 's'}`,
@@ -46,10 +52,10 @@ const STRINGS = {
     thinkingLabel: (chars: number) => `Thinking · ${formatNumber(chars)} chars`,
     resultLabel: 'Result',
     resultError: 'Result (error)',
+    errorBadge: 'error',
   },
   zh: {
     flowGraph: '流程图',
-    legend: '图例',
     noData: '暂无会话数据',
     nodes: (n: number) => `${n} 个节点`,
     subAgents: (n: number) => `${n} 个子智能体`,
@@ -69,6 +75,7 @@ const STRINGS = {
     thinkingLabel: (chars: number) => `思考 · ${formatNumber(chars)} 字符`,
     resultLabel: '结果',
     resultError: '结果（错误）',
+    errorBadge: '错误',
   },
 } as const;
 
@@ -144,8 +151,7 @@ export function tokenSummary(
 }
 
 export function formatCost(cost: number): string {
-  if (cost < 0.01) return '<$0.01';
-  return `$${cost.toFixed(3)}`;
+  return formatDollars(cost);
 }
 
 export function messageNodeSummary(node: MessageNode, t?: Strings): string {
@@ -201,6 +207,8 @@ export function SessionDAG({ nodes }: { nodes: ConversationNode[] }) {
 
   const [expandAllCounter, setExpandAllCounter] = useState(0);
   const [collapseAllCounter, setCollapseAllCounter] = useState(0);
+  const [rowLimit, , showMoreRows] = useRowLimit(nodes.length === 0);
+  const shownNodes = nodes.length > rowLimit ? nodes.slice(0, rowLimit) : nodes;
 
   if (nodes.length === 0) {
     return (
@@ -211,48 +219,63 @@ export function SessionDAG({ nodes }: { nodes: ConversationNode[] }) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-4">
-        <span className="text-xs font-medium text-muted-foreground">{t.flowGraph}</span>
-        <div className="h-px flex-1 bg-border/30" />
-        <div className="flex items-center gap-3 text-2xs font-mono text-muted-foreground">
-          <span>{t.nodes(nodes.length)}</span>
-          {subagentGroupCount > 0 && <span>{t.subAgents(subagentGroupCount)}</span>}
-        </div>
-        {subagentGroupCount > 0 && (
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="xs"
-              onClick={() => {
-                setExpandAllCounter((c) => c + 1);
-                track('agentic_workload_dag_expand_all');
-              }}
-            >
-              {t.expandAll}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="xs"
-              onClick={() => {
-                setCollapseAllCounter((c) => c + 1);
-                track('agentic_workload_dag_collapse_all');
-              }}
-            >
-              {t.collapseAll}
-            </Button>
+    <Card>
+      <CardHeader className="gap-2 pb-3">
+        <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
+          <div className="min-w-0 grow basis-48">
+            <CardTitle>{t.flowGraph}</CardTitle>
+            <div className="mt-1 text-xs tabular-nums text-muted-foreground">
+              {[
+                t.nodes(nodes.length),
+                subagentGroupCount > 0 ? t.subAgents(subagentGroupCount) : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </div>
           </div>
-        )}
-      </div>
+          {subagentGroupCount > 0 && (
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                onClick={() => {
+                  setExpandAllCounter((c) => c + 1);
+                  track('agentic_workload_dag_expand_all');
+                }}
+              >
+                {t.expandAll}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                onClick={() => {
+                  setCollapseAllCounter((c) => c + 1);
+                  track('agentic_workload_dag_collapse_all');
+                }}
+              >
+                {t.collapseAll}
+              </Button>
+            </div>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {Object.entries(nodeStyleDefs).map(([key, style]) => (
+            <div key={key} className="flex items-center gap-1.5">
+              <div className={`w-3 h-3 rounded-sm border ${style.bg} ${style.border}`} />
+              <span className="text-xs text-muted-foreground">{getNodeStyle(key, t).label}</span>
+            </div>
+          ))}
+        </div>
+      </CardHeader>
 
-      <div className="relative rounded-xl border border-border/30 bg-card p-4 overflow-x-auto">
+      <CardContent className="overflow-x-auto">
         <div
           className="relative"
           style={{ minWidth: TRUNK_X + TRUNK_WIDTH + CONNECTOR_WIDTH + BRANCH_WIDTH + 40 }}
         >
-          {nodes.map((node, idx) => {
+          {shownNodes.map((node, idx) => {
             if (node.kind === 'subagent_group') {
               return (
                 <SubagentGroupRow
@@ -260,7 +283,7 @@ export function SessionDAG({ nodes }: { nodes: ConversationNode[] }) {
                   node={node}
                   index={idx}
                   isFirst={idx === 0}
-                  isLast={idx === nodes.length - 1}
+                  isLast={idx === shownNodes.length - 1}
                   expandAllCounter={expandAllCounter}
                   collapseAllCounter={collapseAllCounter}
                   t={t}
@@ -274,26 +297,20 @@ export function SessionDAG({ nodes }: { nodes: ConversationNode[] }) {
                 node={node}
                 index={idx}
                 isFirst={idx === 0}
-                isLast={idx === nodes.length - 1}
+                isLast={idx === shownNodes.length - 1}
                 t={t}
               />
             );
           })}
         </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-xs font-medium text-muted-foreground">{t.legend}</span>
-        {Object.entries(nodeStyleDefs).map(([key, style]) => (
-          <div key={key} className="flex items-center gap-1.5">
-            <div className={`w-3 h-3 rounded-sm border ${style.bg} ${style.border}`} />
-            <span className="text-3xs font-mono text-muted-foreground">
-              {getNodeStyle(key, t).label}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
+        <ShowMoreRows
+          shown={shownNodes.length}
+          total={nodes.length}
+          view="flow"
+          onShowMore={showMoreRows}
+        />
+      </CardContent>
+    </Card>
   );
 }
 
@@ -324,7 +341,7 @@ function MessageNodeRow({
       </div>
 
       <div
-        className={`flex items-center gap-2 rounded-md border ${style.bg} ${style.border} px-3 font-mono`}
+        className={`flex items-center gap-2 rounded-md border ${style.bg} ${style.border} px-3 tabular-nums`}
         style={{
           marginLeft: TRUNK_X + 16,
           height: NODE_HEIGHT,
@@ -333,15 +350,15 @@ function MessageNodeRow({
           marginBottom: NODE_GAP / 2,
         }}
       >
-        <span className={`text-3xs font-medium shrink-0 ${style.text}`}>{style.label}</span>
-        <span className="text-2xs text-muted-foreground truncate">
+        <span className={`text-xs font-medium shrink-0 ${style.text}`}>{style.label}</span>
+        <span className="text-xs text-muted-foreground truncate">
           {messageNodeSummary(node, t)}
         </span>
         {(node.inputTokens ||
           node.cacheReadInputTokens ||
           node.cacheWriteTokens ||
           node.outputTokens) && (
-          <span className="text-3xs text-muted-foreground shrink-0">
+          <span className="text-xs text-muted-foreground shrink-0">
             {tokenSummary(
               node.inputTokens,
               node.cacheReadInputTokens,
@@ -351,21 +368,19 @@ function MessageNodeRow({
           </span>
         )}
         {node.durationMs !== null && (
-          <span className="text-3xs text-muted-foreground shrink-0">
+          <span className="text-xs text-muted-foreground shrink-0">
             {formatDuration(node.durationMs)}
           </span>
         )}
         {node.costUsd !== null && node.costUsd > 0 && (
-          <span className="text-3xs text-muted-foreground shrink-0">
-            {formatCost(node.costUsd)}
-          </span>
+          <span className="text-xs text-muted-foreground shrink-0">{formatCost(node.costUsd)}</span>
         )}
         {node.isError && (
           <Badge
             variant="outline"
-            className="text-3xs py-0 h-4 border-destructive/30 text-destructive shrink-0"
+            className="text-xs py-0 h-4 border-destructive/30 text-destructive shrink-0"
           >
-            error
+            {t.errorBadge}
           </Badge>
         )}
       </div>
@@ -438,7 +453,7 @@ function SubagentGroupRow({
         </svg>
 
         <div
-          className={`flex items-center gap-2 rounded-md border ${style.bg} ${style.border} px-3 font-mono cursor-pointer hover:bg-muted/60 transition-colors`}
+          className={`flex items-center gap-2 rounded-md border ${style.bg} ${style.border} px-3 tabular-nums cursor-pointer hover:bg-muted/60 transition-colors`}
           style={{
             marginLeft: TRUNK_X + 16 + CONNECTOR_WIDTH,
             height: NODE_HEIGHT,
@@ -456,13 +471,13 @@ function SubagentGroupRow({
           ) : (
             <ChevronRight className="size-3 text-muted-foreground shrink-0" aria-hidden="true" />
           )}
-          <span className={`text-3xs font-medium shrink-0 ${style.text}`}>{style.label}</span>
-          <span className="text-2xs text-muted-foreground truncate">{subagentSummary(node)}</span>
+          <span className={`text-xs font-medium shrink-0 ${style.text}`}>{style.label}</span>
+          <span className="text-xs text-muted-foreground truncate">{subagentSummary(node)}</span>
           {(node.totalInputTokens ||
             node.totalCacheRead ||
             node.totalCacheCreation ||
             node.totalOutputTokens) && (
-            <span className="text-3xs text-muted-foreground shrink-0">
+            <span className="text-xs text-muted-foreground shrink-0">
               {tokenSummary(
                 node.totalInputTokens,
                 node.totalCacheRead,
@@ -472,7 +487,7 @@ function SubagentGroupRow({
             </span>
           )}
           {node.totalDurationMs > 0 && (
-            <span className="text-3xs text-muted-foreground shrink-0">
+            <span className="text-xs text-muted-foreground shrink-0">
               {formatDuration(node.totalDurationMs)}
             </span>
           )}
@@ -518,7 +533,7 @@ function SubagentGroupRow({
                 </div>
 
                 <div
-                  className={`flex items-center gap-2 rounded-md border ${childStyle.bg} ${childStyle.border} px-3 font-mono`}
+                  className={`flex items-center gap-2 rounded-md border ${childStyle.bg} ${childStyle.border} px-3 tabular-nums`}
                   style={{
                     marginLeft: TRUNK_X + 16 + CONNECTOR_WIDTH + CHILD_INDENT,
                     height: NODE_HEIGHT,
@@ -527,17 +542,17 @@ function SubagentGroupRow({
                     marginBottom: NODE_GAP / 2,
                   }}
                 >
-                  <span className={`text-3xs font-medium shrink-0 ${childStyle.text}`}>
+                  <span className={`text-xs font-medium shrink-0 ${childStyle.text}`}>
                     {childStyle.label}
                   </span>
-                  <span className="text-2xs text-muted-foreground truncate">
+                  <span className="text-xs text-muted-foreground truncate">
                     {messageNodeSummary(child, t)}
                   </span>
                   {(child.inputTokens ||
                     child.cacheReadInputTokens ||
                     child.cacheWriteTokens ||
                     child.outputTokens) && (
-                    <span className="text-3xs text-muted-foreground shrink-0">
+                    <span className="text-xs text-muted-foreground shrink-0">
                       {tokenSummary(
                         child.inputTokens,
                         child.cacheReadInputTokens,
@@ -549,7 +564,7 @@ function SubagentGroupRow({
                   {child.isError && (
                     <Badge
                       variant="outline"
-                      className="text-3xs py-0 h-4 border-destructive/30 text-destructive shrink-0"
+                      className="text-xs py-0 h-4 border-destructive/30 text-destructive shrink-0"
                     >
                       error
                     </Badge>

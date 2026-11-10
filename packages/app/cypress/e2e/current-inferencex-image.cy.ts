@@ -62,7 +62,7 @@ describe('Current image P90 age history', () => {
     cy.get('[data-testid="image-age-panel"] svg[role="img"]')
       .focus()
       .trigger('keydown', { key: 'ArrowLeft' });
-    cy.get('[data-testid="image-age-readout"]').should('contain', '2026-10-12');
+    cy.get('[data-testid="image-age-readout"]').should('contain', 'Oct 12, 2026');
     cy.intercept('GET', '**/api/v1/views/current-inferencex-image?*', (request) => {
       if (request.query.model === 'unknown-new-model') request.alias = 'filteredHistory';
       request.reply({ body: { ageHistory } });
@@ -387,7 +387,9 @@ describe('Current InferenceX Image localized routes', () => {
             expect(el.clientHeight).to.be.greaterThan(40);
           });
         cy.contains('Review image').should('have.attr', 'title');
-        cy.get('time').should('have.attr', 'datetime', '2026-08-20').and('have.text', '2026-08-20');
+        cy.get('time')
+          .should('have.attr', 'datetime', '2026-08-20')
+          .and('have.text', 'Aug 20, 2026');
         cy.get('td[title^="Last submission:"]').should('contain.text', '3d');
       });
     cy.get('#image-model-select').click();
@@ -422,7 +424,19 @@ describe('Current InferenceX Image localized routes', () => {
       .should('be.focused')
       .scrollTo('right');
     cy.get('table').should('contain.text', '暂无信息');
-    cy.get('time').first().should('be.visible').and('have.text', today);
+    cy.get('time')
+      .first()
+      .should('be.visible')
+      .and('have.attr', 'datetime', today)
+      .and(
+        'have.text',
+        new Intl.DateTimeFormat('zh-CN', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          timeZone: 'UTC',
+        }).format(new Date(`${today}T00:00:00Z`)),
+      );
     cy.get('#image-sequence-select').click();
     cy.get('[data-slot="select-item"]').contains('智能体').click();
     cy.get('table').should('contain.text', 'AgentX 提交已超过 14 天').and('contain.text', '22 天');

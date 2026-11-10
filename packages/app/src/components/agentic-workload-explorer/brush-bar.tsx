@@ -1,12 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CHART_FONT_SANS, CHART_TYPE, px } from '@/lib/d3-chart/typography';
 
 const BAR_HEIGHT = 28;
 const TRACK_Y = 14;
 const HANDLE_R = 6;
 const HANDLE_HIT_R = 10;
 const ACCENT = 'currentColor';
+const LABEL_STYLE = {
+  fontSize: px(CHART_TYPE.axisLabelSub),
+  fontFamily: CHART_FONT_SANS,
+  fontVariantNumeric: 'tabular-nums',
+} as const;
 
 export function clampBrushRange(
   s: number,
@@ -110,7 +116,7 @@ export function BrushBar({
   );
 
   const pxToData = useCallback(
-    (px: number) => fullStart + ((px - trackLeft) / trackWidth) * fullSpan,
+    (x: number) => fullStart + ((x - trackLeft) / trackWidth) * fullSpan,
     [fullStart, trackLeft, trackWidth, fullSpan],
   );
 
@@ -190,7 +196,8 @@ export function BrushBar({
         y={TRACK_Y}
         textAnchor="end"
         dominantBaseline="middle"
-        className="fill-muted-foreground font-mono text-3xs tabular-nums"
+        className="fill-muted-foreground"
+        style={LABEL_STYLE}
       >
         {startLabel}
       </text>
@@ -200,7 +207,8 @@ export function BrushBar({
         y={TRACK_Y}
         textAnchor="start"
         dominantBaseline="middle"
-        className="fill-muted-foreground font-mono text-3xs tabular-nums"
+        className="fill-muted-foreground"
+        style={LABEL_STYLE}
       >
         {endLabel}
       </text>

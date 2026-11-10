@@ -10,7 +10,19 @@ import { track } from '@/lib/analytics/analytics';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-import { PANEL_HEADER_CLASS, PANEL_MARGIN, panelLabelCount } from './frontier-panel-layout';
+import {
+  nearestDateIndex,
+  PanelHoverCard,
+  usePanelHover,
+  useSnapshotDateFormat,
+} from './FrontierIndexedTimeline';
+import {
+  formatRatio,
+  PANEL_HEADER_CLASS,
+  PANEL_MARGIN,
+  panelLabelCount,
+  SHORT_TABLE_ROWS,
+} from './frontier-panel-layout';
 import type { FrontierSeriesStyle } from './FrontierChart';
 import {
   commonSoftwareGainRate,
@@ -36,6 +48,11 @@ const STRINGS = {
     byAge: 'Days since first run',
     ageLabel: 'Days since first run',
     common: 'All-chip median',
+    selectedDate: 'Selected date',
+    yAxis: 'Gain rate per month',
+    day: (day: number) => `Day ${day}`,
+    seekHint: 'Hover to read rates, click or drag to jump to a date',
+    hoverHint: 'Hover to read rates',
     pick: 'Pick at least one chip.',
     noRate: 'Not enough history yet: a rate needs at least half the window.',
     tableTitle: 'Gain rate by chip',
@@ -59,6 +76,11 @@ const STRINGS = {
     byAge: '距首次测试天数',
     ageLabel: '距首次测试天数',
     common: '全部芯片中位数',
+    selectedDate: '所选日期',
+    yAxis: '每月提升速度',
+    day: (day: number) => `第 ${day} 天`,
+    seekHint: '悬停查看速度，点击或拖动跳转到日期',
+    hoverHint: '悬停查看速度',
     pick: '请至少选择一款芯片。',
     noRate: '历史数据不足：计算速度至少需要半个窗口的数据。',
     tableTitle: '各芯片的提升速度',
@@ -81,12 +103,6 @@ const formatRate = (rate: number | null, perMonth: string) =>
   rate === null ? '—' : `${rate >= 0 ? '+' : ''}${d3.format('.0%')(rate)}${perMonth}`;
 const formatPoints = (delta: number | null) =>
   delta === null ? '—' : `${delta >= 0 ? '+' : ''}${(delta * 100).toFixed(0)} pp`;
-const formatRatio = (ratio: number | null) =>
-  ratio === null
-    ? '—'
-    : ratio >= 10
-      ? `${ratio.toFixed(0)}x`
-      : `${ratio.toFixed(ratio >= 2 ? 1 : 2)}x`;
 
 /** Rates plot on log(1 + rate), so a +400% spike and a +5% month both stay readable. */
 const toLog = (rate: number) => Math.log2(1 + Math.max(rate, -0.95));
@@ -230,8 +246,6 @@ export function FrontierGainRate({
           rates={rates}
           common={axis === 'date' ? common : null}
           ages={axis === 'age' ? ages : null}
-          title={t.title}
-          ageLabel={t.ageLabel}
           locale={locale}
           onSeek={onSeek}
         />
@@ -244,6 +258,9 @@ export function FrontierGainRate({
   );
 }
 
+/** Days on either side of a hovered chip age within which a chip's rate still counts. */
+const AGE_HOVER_REACH_DAYS = 7;
+
 function RateChart({
   history,
   dateIndex,
@@ -252,8 +269,6 @@ function RateChart({
   rates,
   common,
   ages,
-  title,
-  ageLabel,
   locale,
   onSeek,
 }: {
@@ -266,13 +281,13 @@ function RateChart({
   common: readonly (number | null)[] | null;
   /** Days since first run per series on the age axis; null on the calendar axis. */
   ages: ReadonlyMap<string, readonly (number | null)[]> | null;
-  title: string;
-  ageLabel: string;
   locale: 'en' | 'zh';
   onSeek: (index: number) => void;
 }) {
+  const t = STRINGS[locale];
+  const formatDate = useSnapshotDateFormat();
   const { dimensions, setContainerRef } = useResponsiveChartDimensions({ height: CHART_HEIGHT });
-  const margin = { ...PANEL_MARGIN, left: 64, bottom: ages ? 44 : PANEL_MARGIN.bottom };
+  const margin = { ...PANEL_MARGIN, left: 76, bottom: ages ? 44 : PANEL_MARGIN.bottom };
   const width = Math.max(0, dimensions.width - margin.left - margin.right);
   const height = dimensions.height - margin.top - margin.bottom;
   const times = history.dates.map((date) => new Date(`${date}T00:00:00Z`));
@@ -294,7 +309,8 @@ function RateChart({
         rate === null ? [] : [{ index, rate, at: times[index].getTime() }],
       )
     : [];
-  const all = [...lines.flatMap((line) => line.points), ...commonPoints].map((p) => toLog(p.rate));
+  const plotted = [...lines.flatMap((line) => line.points), ...commonPoints];
+  const all = plotted.map((p) => toLog(p.rate));
   const lo = Math.min(0, d3.min(all) ?? 0);
   const hi = Math.max(0.5, d3.max(all) ?? 0.5);
   const y = d3.scaleLinear().domain([lo, hi]).range([height, 0]).nice();
@@ -304,9 +320,12 @@ function RateChart({
     return value >= y.domain()[0] && value <= y.domain()[1];
   });
   const maxAge = d3.max(lines.flatMap((line) => line.points.map((p) => p.at ?? 0))) ?? 1;
+  // A rate needs half its window of history, so the calendar axis starts at the first rate
+  // rather than leaving the opening weeks empty.
+  const firstIndex = d3.min(plotted, (p) => p.index) ?? 0;
   const xDate = d3
     .scaleTime()
-    .domain([times[0], times.at(-1)!])
+    .domain([times[firstIndex], times.at(-1)!])
     .range([0, width]);
   const xAge = d3
     .scaleLinear()
@@ -314,6 +333,21 @@ function RateChart({
     .range([0, width])
     .nice();
   const xOf = (at: number | null) => (ages ? xAge(at ?? 0) : xDate(new Date(at ?? 0)));
+  const shownTimes = times.slice(firstIndex);
+  const agePoints = lines.flatMap((line) => line.points.map((p) => p.at ?? 0));
+  const { hover, svgProps } = usePanelHover({
+    marginLeft: margin.left,
+    pick: (plotX) => {
+      if (!ages) return firstIndex + nearestDateIndex(shownTimes, xDate.invert(plotX).getTime());
+      const age = xAge.invert(plotX);
+      return d3.least(agePoints, (at) => Math.abs(at - age)) ?? null;
+    },
+    onSeek: ages
+      ? undefined
+      : (index) => {
+          if (index !== dateIndex) onSeek(index);
+        },
+  });
   const dateTicks = xDate.ticks(panelLabelCount(width));
   const tickDays =
     dateTicks.length > 1 ? (dateTicks[1].getTime() - dateTicks[0].getTime()) / 86_400_000 : 365;
@@ -330,45 +364,90 @@ function RateChart({
     .line<{ at: number | null; rate: number }>()
     .x((p) => xOf(p.at))
     .y((p) => y(toLog(p.rate)));
-  const seekTo = (event: React.PointerEvent<SVGSVGElement>) => {
-    if (ages) return;
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const time = xDate.invert(event.clientX - bounds.left - margin.left).getTime();
-    const after = Math.min(times.length - 1, d3.bisectLeft(times, new Date(time)));
-    const before = Math.max(0, after - 1);
-    const nearest =
-      Math.abs(times[after].getTime() - time) < Math.abs(times[before].getTime() - time)
-        ? after
-        : before;
-    if (nearest !== dateIndex) onSeek(nearest);
-  };
+  const colorOf = (key: string) => styles.get(key)?.color ?? 'var(--muted-foreground)';
   const markers = lines.flatMap((entry) => {
     const point = entry.points.find((p) => p.index === dateIndex);
     return point ? [{ key: entry.key, point }] : [];
   });
+  const hovered = hover
+    ? lines.flatMap((entry) => {
+        const point = ages
+          ? d3.least(
+              entry.points.filter((p) => Math.abs((p.at ?? 0) - hover.at) <= AGE_HOVER_REACH_DAYS),
+              (p) => Math.abs((p.at ?? 0) - hover.at),
+            )
+          : entry.points.find((p) => p.index === hover.at);
+        return point ? [{ key: entry.key, point }] : [];
+      })
+    : [];
+  const hoveredCommon = hover && !ages ? commonPoints.find((p) => p.index === hover.at) : undefined;
+  const cursorX = hover ? (ages ? xAge(hover.at) : xDate(times[hover.at])) : null;
+  const showsDateCursor = !ages && dateIndex >= firstIndex;
 
   return (
     <div ref={setContainerRef} className="w-full" data-testid="frontier-gain-rate">
+      <ul
+        className="flex flex-wrap items-center gap-x-4 gap-y-1 pb-2 text-xs font-medium text-muted-foreground"
+        data-testid="frontier-gain-rate-legend"
+      >
+        {keys.map((key) => (
+          <li key={key} className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className="size-2.5 shrink-0 rounded-full"
+              style={{ background: colorOf(key) }}
+            />
+            {styles.get(key)?.label ?? key}
+          </li>
+        ))}
+        {commonPoints.length > 1 && (
+          <li className="flex items-center gap-1.5">
+            <svg aria-hidden width={18} height={4}>
+              <line
+                x2={18}
+                y1={2}
+                y2={2}
+                stroke="var(--muted-foreground)"
+                strokeWidth={2}
+                strokeDasharray="5 4"
+              />
+            </svg>
+            {t.common}
+          </li>
+        )}
+        {showsDateCursor && (
+          <li className="flex items-center gap-1.5">
+            <svg aria-hidden width={4} height={12}>
+              <line
+                x1={2}
+                x2={2}
+                y2={12}
+                stroke="var(--foreground)"
+                strokeDasharray="3 3"
+                opacity={0.6}
+              />
+            </svg>
+            {t.selectedDate}
+          </li>
+        )}
+      </ul>
       {width > 0 && (
         <svg
+          {...svgProps}
           width={dimensions.width}
           height={dimensions.height}
           role="img"
-          className={ages ? undefined : 'cursor-pointer touch-none'}
-          onPointerDown={(event) => {
-            if (ages) return;
-            event.currentTarget.setPointerCapture(event.pointerId);
-            seekTo(event);
-          }}
-          onPointerMove={(event) => {
-            if (event.buttons > 0) seekTo(event);
-          }}
+          aria-label={`${t.title}. ${ages ? t.hoverHint : t.seekHint}`}
+          className={ages ? 'touch-none' : 'cursor-pointer touch-none'}
         >
-          <title>{title}</title>
           <g transform={`translate(${margin.left},${margin.top})`}>
             {rateTicks.map((rate) => (
               <g key={rate} transform={`translate(0,${y(toLog(rate))})`}>
-                <line x2={width} stroke="var(--border)" strokeWidth={rate === 0 ? 1.5 : 1} />
+                <line
+                  x2={width}
+                  stroke={rate === 0 ? 'var(--border)' : 'var(--chart-grid)'}
+                  strokeWidth={rate === 0 ? 1.5 : 1}
+                />
                 <text
                   x={-8}
                   dy="0.32em"
@@ -380,6 +459,14 @@ function RateChart({
                 </text>
               </g>
             ))}
+            <text
+              transform={`translate(${-margin.left + 14},${height / 2}) rotate(-90)`}
+              textAnchor="middle"
+              fontSize={px(CHART_TYPE.axisLabel)}
+              fill="var(--muted-foreground)"
+            >
+              {t.yAxis}
+            </text>
             {ages
               ? xAge.ticks(panelLabelCount(width)).map((tick) => (
                   <text
@@ -413,7 +500,7 @@ function RateChart({
                 fontSize={px(CHART_TYPE.axisLabelSub)}
                 fill="var(--muted-foreground)"
               >
-                {ageLabel}
+                {t.ageLabel}
               </text>
             )}
             {commonPoints.length > 1 && (
@@ -431,11 +518,11 @@ function RateChart({
                 key={entry.key}
                 d={line(entry.points) ?? ''}
                 fill="none"
-                stroke={styles.get(entry.key)?.color ?? 'var(--muted-foreground)'}
+                stroke={colorOf(entry.key)}
                 strokeWidth={2}
               />
             ))}
-            {!ages && (
+            {showsDateCursor && (
               <line
                 x1={xDate(times[dateIndex])}
                 x2={xDate(times[dateIndex])}
@@ -445,19 +532,64 @@ function RateChart({
                 opacity={0.6}
               />
             )}
-            {markers.map(({ key, point }) => (
+            {cursorX !== null && (
+              <line
+                x1={cursorX}
+                x2={cursorX}
+                y2={height}
+                stroke="var(--muted-foreground)"
+                opacity={0.5}
+                pointerEvents="none"
+                data-testid="frontier-gain-rate-cursor"
+              />
+            )}
+            {[
+              ...markers.map((marker) => ({ ...marker, id: `now:${marker.key}` })),
+              ...hovered.map((marker) => ({ ...marker, id: `hover:${marker.key}` })),
+            ].map(({ id, key, point }) => (
               <circle
-                key={key}
+                key={id}
                 cx={xOf(point.at)}
                 cy={y(toLog(point.rate))}
                 r={4}
-                fill={styles.get(key)?.color ?? 'var(--muted-foreground)'}
+                fill={colorOf(key)}
                 stroke="var(--background)"
                 strokeWidth={1.5}
+                pointerEvents="none"
               />
             ))}
+            {hoveredCommon && (
+              <circle
+                cx={xOf(hoveredCommon.at)}
+                cy={y(toLog(hoveredCommon.rate))}
+                r={3.5}
+                fill="var(--muted-foreground)"
+                stroke="var(--background)"
+                strokeWidth={1.5}
+                pointerEvents="none"
+              />
+            )}
           </g>
         </svg>
+      )}
+      {hover && (
+        <PanelHoverCard
+          hover={hover}
+          title={ages ? t.day(hover.at) : formatDate(history.dates[hover.at])}
+          metrics={[
+            ...hovered
+              .toSorted((a, b) => b.point.rate - a.point.rate)
+              .map(({ key, point }) => ({
+                value: formatRate(point.rate, t.perMonth),
+                label: styles.get(key)?.label ?? key,
+                color: colorOf(key),
+              })),
+            ...(hoveredCommon
+              ? [{ value: formatRate(hoveredCommon.rate, t.perMonth), label: t.common }]
+              : []),
+          ]}
+          testId="frontier-gain-rate-hover-card"
+        />
       )}
     </div>
   );
@@ -506,7 +638,7 @@ function GainRateTable({
         align: 'right',
         importance: 'key',
         sortValue: (row) => num(row.gain),
-        cell: (row) => formatRatio(row.gain),
+        cell: (row) => (row.gain === null ? '—' : formatRatio(row.gain)),
       },
       {
         header: t.lifetime,
@@ -564,6 +696,8 @@ function GainRateTable({
         columns={columns}
         testId="frontier-gain-rate-table"
         analyticsPrefix="historical_frontier_gain_rate_table"
+        searchable={rows.length > SHORT_TABLE_ROWS}
+        columnPresets={rows.length > SHORT_TABLE_ROWS}
       />
     </section>
   );

@@ -24,11 +24,19 @@ import { SectionHeader } from '@/components/agentic-workload-explorer/section-he
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 
+const TEXT_WARNING = 'text-amber-700 dark:text-amber-400';
+const TEXT_DESTRUCTIVE = 'text-red-700 dark:text-red-400';
+
+function shareLabel(count: number, total: number): string {
+  if (total <= 0 || count <= 0) return '0.0%';
+  const fixed = ((count / total) * 100).toFixed(1);
+  return fixed === '0.0' ? '<0.1%' : `${fixed}%`;
+}
+
 const STRINGS = {
   en: {
     errorSummary: 'Error summary',
     errorReach: 'Error reach vs retry concentration',
-    hourlyIncident: 'Hourly incident signals',
     statusBreakdown: 'Status code breakdown',
     modelImpact: 'All-time model impact matrix',
     recentErrors: 'Recent errors',
@@ -64,7 +72,6 @@ const STRINGS = {
   zh: {
     errorSummary: '错误概览',
     errorReach: '错误覆盖面 vs 重试集中度',
-    hourlyIncident: '逐小时事件信号',
     statusBreakdown: '状态码分布',
     modelImpact: '全时段模型影响矩阵',
     recentErrors: '最近的错误',
@@ -106,8 +113,8 @@ function StatusBadge({ code }: { code: number | null }) {
     <span
       className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-3xs font-mono font-medium ${
         is5xx
-          ? 'border-destructive/30 bg-destructive/10 text-destructive'
-          : 'border-warning/30 bg-warning/10 text-warning'
+          ? `border-destructive/30 bg-destructive/10 ${TEXT_DESTRUCTIVE}`
+          : `border-warning/30 bg-warning/10 ${TEXT_WARNING}`
       }`}
     >
       {code}
@@ -119,7 +126,7 @@ function StatusCodeBreakdown({ data }: { data: ErrorData['statusCodes'] }) {
   const t = STRINGS[useLocale()];
   if (data.length === 0) {
     return (
-      <div role="status" className="text-2xs font-mono text-muted-foreground">
+      <div role="status" className="text-xs text-muted-foreground">
         {t.noStatusData}
       </div>
     );
@@ -131,28 +138,28 @@ function StatusCodeBreakdown({ data }: { data: ErrorData['statusCodes'] }) {
     .filter((d) => d.statusCode >= 400 && d.statusCode < 500)
     .reduce((sum, d) => sum + d.count, 0);
   const count5xx = data.filter((d) => d.statusCode >= 500).reduce((sum, d) => sum + d.count, 0);
-  const pct4xx = total > 0 ? ((count4xx / total) * 100).toFixed(1) : '0.0';
-  const pct5xx = total > 0 ? ((count5xx / total) * 100).toFixed(1) : '0.0';
+  const pct4xx = shareLabel(count4xx, total);
+  const pct5xx = shareLabel(count5xx, total);
 
   return (
     <div className="grid lg:grid-cols-2 gap-4">
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {data.map((d) => {
           const is5xx = d.statusCode >= 500;
           const barColor = is5xx ? 'bg-destructive' : 'bg-warning';
           const widthPct = (d.count / maxCount) * 100;
           return (
             <div key={d.statusCode} className="flex items-center gap-3">
-              <span className="text-2xs font-mono font-medium w-8 text-right shrink-0">
+              <span className="text-xs font-mono font-medium w-8 text-right shrink-0">
                 {d.statusCode}
               </span>
-              <div className="flex-1 h-5 bg-surface-hover rounded-sm overflow-hidden">
+              <div className="h-3 flex-1 overflow-hidden rounded-sm bg-muted/40">
                 <div
                   className={`h-full ${barColor} rounded-sm`}
                   style={{ width: `${widthPct}%` }}
                 />
               </div>
-              <span className="text-3xs font-mono text-muted-foreground w-10 text-right shrink-0">
+              <span className="text-xs tabular-nums text-muted-foreground w-12 text-right shrink-0">
                 {formatNumber(d.count)}
               </span>
             </div>
@@ -164,8 +171,8 @@ function StatusCodeBreakdown({ data }: { data: ErrorData['statusCodes'] }) {
         <div>
           <div className="text-xs font-medium text-muted-foreground mb-1">{t.clientErrors}</div>
           <div className="flex items-baseline gap-2">
-            <span className="text-lg font-medium text-warning tabular-nums">{pct4xx}%</span>
-            <span className="text-3xs font-mono text-muted-foreground">
+            <span className={`text-lg font-medium ${TEXT_WARNING} tabular-nums`}>{pct4xx}</span>
+            <span className="text-xs tabular-nums text-muted-foreground">
               {formatNumber(count4xx)} / {formatNumber(total)}
             </span>
           </div>
@@ -173,8 +180,8 @@ function StatusCodeBreakdown({ data }: { data: ErrorData['statusCodes'] }) {
         <div>
           <div className="text-xs font-medium text-muted-foreground mb-1">{t.serverErrors}</div>
           <div className="flex items-baseline gap-2">
-            <span className="text-lg font-medium text-destructive tabular-nums">{pct5xx}%</span>
-            <span className="text-3xs font-mono text-muted-foreground">
+            <span className={`text-lg font-medium ${TEXT_DESTRUCTIVE} tabular-nums`}>{pct5xx}</span>
+            <span className="text-xs tabular-nums text-muted-foreground">
               {formatNumber(count5xx)} / {formatNumber(total)}
             </span>
           </div>
@@ -357,7 +364,6 @@ function ErrorsPageContent() {
       </section>
 
       <section>
-        <SectionHeader label={t.hourlyIncident} />
         {initialLoading ? (
           <Skeleton className="h-[360px] rounded-xl" />
         ) : (
@@ -406,7 +412,7 @@ function ErrorsPageContent() {
         ) : (
           data && (
             <Card className="overflow-x-auto p-0 md:p-0">
-              <table className="w-full text-2xs font-mono">
+              <table className="w-full text-xs tabular-nums">
                 <thead>
                   <tr className="border-b border-border/20">
                     <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">
@@ -464,7 +470,7 @@ function ErrorsPageContent() {
                         <td className="px-3 py-2">
                           <Link
                             href={explorerHref(`/sessions/${err.sessionId}/conversation`)}
-                            className="text-brand hover:underline"
+                            className="font-mono text-brand hover:underline"
                           >
                             {err.sessionId.split('-')[0]}...
                           </Link>

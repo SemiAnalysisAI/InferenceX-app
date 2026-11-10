@@ -19,7 +19,7 @@ import {
   monthlyRate,
   softwareGainRates,
   softwareGainByInteractivity,
-  softwareGainBarMaxLog,
+  softwareGainBarExtent,
   softwareGains,
   vendorsAtOtherPrecisions,
   leadMargins,
@@ -513,6 +513,22 @@ describe('software gains', () => {
       { ...OPTIONS, groupBy: 'gpu' },
     );
     expect(softwareGainByInteractivity(history, 'h200', 2, [20])[0].ratio).toBeCloseTo(2);
-    expect(softwareGainBarMaxLog(history, ['h200'], [20])).toBeCloseTo(2);
+    const extent = softwareGainBarExtent(history, ['h200'], [20]);
+    expect(extent.min).toBe(0);
+    expect(extent.max).toBeCloseTo(2);
+  });
+
+  it('takes the bar axis floor from losses alone', () => {
+    const history = buildFrontierHistory(
+      [
+        ...sweep('h200', '2026-03-01', 1, 'trt:1.0'),
+        ...sweep('h200', '2026-03-20', 0.4, 'trt:1.1'),
+      ],
+      { ...OPTIONS, groupBy: 'gpu' },
+    );
+    expect(softwareGainByInteractivity(history, 'h200', 1, [20])[0].ratio).toBeCloseTo(0.4);
+    const extent = softwareGainBarExtent(history, ['h200'], [20]);
+    expect(extent.min).toBe(-2);
+    expect(extent.max).toBe(1);
   });
 });

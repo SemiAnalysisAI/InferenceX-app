@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import * as d3 from 'd3';
+import { CHART_FONT_SANS, CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { useSession, type SessionRequest } from '@/lib/agentic-workload-explorer/session-context';
+import { formatDollars } from '@/lib/agentic-workload-explorer/format';
+import { formatAxisNumber } from '@/components/agentic-workload-explorer/trends-charts';
 import {
   useSessionReplay,
   ReplayControls,
@@ -11,6 +14,7 @@ import {
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
 import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
@@ -175,9 +179,7 @@ function truncHash(h: string) {
 
 function formatTokens(n: number | null) {
   if (n === null || n === undefined) return '—';
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
+  return formatAxisNumber(n);
 }
 
 const DEPTH_SVG_COLORS = [
@@ -372,11 +374,11 @@ function D3Tree({
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'central')
       .attr('fill', '#fff')
-      .attr('font-family', 'monospace')
+      .attr('font-family', CHART_FONT_SANS)
       .attr('font-weight', 'bold')
       .attr('font-size', (d) => {
         const r = rScale(d.data.reqs);
-        return r < 10 ? '6px' : r < 16 ? '8px' : '10px';
+        return px(r < 16 ? CHART_TYPE.micro : CHART_TYPE.dataLabel);
       })
       .text((d) => (d.data.blocks > 0 ? String(d.data.blocks) : 'R'))
       .style('pointer-events', 'none');
@@ -474,15 +476,11 @@ function D3Tree({
   }, [visibleCount, isReplay]);
 
   return (
-    <div
-      ref={containerRef}
-      className="rounded-xl border border-border/30 bg-card overflow-hidden relative"
-      style={{ height: 500 }}
-    >
+    <div ref={containerRef} className="overflow-hidden relative" style={{ height: 500 }}>
       {!rendered && (
         <div className="flex items-center justify-center py-16 gap-2">
           <span className="h-4 w-4 border-2 border-foreground/20 border-t-foreground/60 rounded-full animate-spin" />
-          <span className="text-2xs font-mono text-muted-foreground">{t.renderingTree}</span>
+          <span className="text-2xs text-muted-foreground">{t.renderingTree}</span>
         </div>
       )}
       <svg ref={svgRef} className={`min-w-full ${rendered ? '' : 'h-0 overflow-hidden'}`} />
@@ -617,7 +615,7 @@ function TreeNode({
           </span>
         )}
 
-        <span className="text-3xs font-mono text-muted-foreground mt-0.5">
+        <span className="text-3xs tabular-nums text-muted-foreground mt-0.5">
           {t.req(node.totalLeaves)}
           {node.children.size > 0 && (
             <span className="text-muted-foreground ml-1.5">{t.branch(node.children.size)}</span>
@@ -632,7 +630,7 @@ function TreeNode({
               {node.leaves.map((req) => (
                 <div
                   key={req.id}
-                  className="flex items-center gap-2 text-3xs font-mono text-muted-foreground"
+                  className="flex items-center gap-2 text-3xs tabular-nums text-muted-foreground"
                 >
                   <span aria-hidden="true" className="size-1 rounded-full bg-muted-foreground" />
                   <span>{req.model?.replace('claude-', '') || '—'}</span>
@@ -644,7 +642,7 @@ function TreeNode({
                     {req.hashIds?.length || 0} {t.blocksLabel}
                   </span>
                   {req.costUsd !== null && req.costUsd !== undefined && (
-                    <span>${req.costUsd.toFixed(4)}</span>
+                    <span>{formatDollars(req.costUsd)}</span>
                   )}
                 </div>
               ))}
@@ -677,7 +675,8 @@ export default function RadixTreePage() {
   const [listForceOpen, setListForceOpen] = useState<boolean | undefined>(undefined);
   const [listKey, setListKey] = useState(0);
   const [replayMode, setReplayMode] = useState(false);
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
 
   const hashRequests = useMemo(
     () => requests.filter((r) => r.hashIds && r.hashIds.length > 0),
@@ -736,12 +735,12 @@ export default function RadixTreePage() {
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         {[
-          { label: t.requestsStat, value: stats.requests },
-          { label: t.uniqueHashes, value: stats.uniqueHashes },
-          { label: t.totalBlocks, value: stats.totalBlocks },
+          { label: t.requestsStat, value: stats.requests.toLocaleString(locale) },
+          { label: t.uniqueHashes, value: stats.uniqueHashes.toLocaleString(locale) },
+          { label: t.totalBlocks, value: stats.totalBlocks.toLocaleString(locale) },
           { label: t.blockReuse, value: `${stats.compressionRatio}×` },
-          { label: t.treeNodes, value: stats.treeNodes },
-          { label: t.maxDepth, value: stats.maxDepth },
+          { label: t.treeNodes, value: stats.treeNodes.toLocaleString(locale) },
+          { label: t.maxDepth, value: stats.maxDepth.toLocaleString(locale) },
         ].map((item) => (
           <div key={item.label} className="rounded-xl border border-border/30 bg-card p-3">
             <div className="text-xs font-medium text-muted-foreground mb-1.5">{item.label}</div>
@@ -750,136 +749,138 @@ export default function RadixTreePage() {
         ))}
       </div>
 
-      <div>
-        <div className="flex flex-wrap items-center gap-2 mb-2">
-          <span className="text-xs font-medium text-muted-foreground">{t.radixTree}</span>
-          <span className="flex-1 h-px bg-border/30" />
-          <span className="text-3xs font-mono text-muted-foreground">
-            {t.summary(tree.totalLeaves, tree.children.size)}
-          </span>
-          <div className="flex flex-wrap items-center gap-2">
-            <SegmentedToggle
-              role="group"
-              ariaLabel={t.radixTree}
-              value={viewMode}
-              onValueChange={(view) => {
-                setViewMode(view);
-                track('agentic_workload_radix_view_changed', { view });
-              }}
-              options={[
-                { value: 'list', label: t.list },
-                { value: 'graph', label: t.graph },
-              ]}
+      <Card>
+        <CardHeader className="gap-2 pb-3">
+          <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
+            <div className="min-w-0 grow basis-48">
+              <CardTitle>{t.radixTree}</CardTitle>
+              <div className="mt-1 text-xs tabular-nums text-muted-foreground">
+                {t.summary(tree.totalLeaves, tree.children.size)}
+              </div>
+            </div>
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <SegmentedToggle
+                role="group"
+                ariaLabel={t.radixTree}
+                value={viewMode}
+                onValueChange={(view) => {
+                  setViewMode(view);
+                  track('agentic_workload_radix_view_changed', { view });
+                }}
+                options={[
+                  { value: 'list', label: t.list },
+                  { value: 'graph', label: t.graph },
+                ]}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                aria-pressed={compact}
+                onClick={() => {
+                  setCompact(!compact);
+                  track('agentic_workload_radix_compact_toggled', { compact: !compact });
+                }}
+              >
+                {t.compact}
+              </Button>
+              {viewMode === 'list' && (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={() => {
+                      setListForceOpen(true);
+                      setListKey((k) => k + 1);
+                      track('agentic_workload_radix_expand_all');
+                    }}
+                  >
+                    {t.expandAll}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={() => {
+                      setListForceOpen(false);
+                      setListKey((k) => k + 1);
+                      track('agentic_workload_radix_collapse_all');
+                    }}
+                  >
+                    {t.collapseAll}
+                  </Button>
+                </>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                aria-pressed={replayMode}
+                onClick={() => {
+                  if (replayMode) {
+                    replay.reset();
+                    setReplayMode(false);
+                  } else {
+                    setReplayMode(true);
+                  }
+                  track('agentic_workload_radix_replay_toggled', { active: !replayMode });
+                }}
+              >
+                {replayMode ? t.exitReplay : t.replay}
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {replayMode && totalNodes > 0 && (
+            <div className="mb-3">
+              <ReplayControls
+                isPlaying={replay.isPlaying}
+                currentIndex={replay.currentIndex}
+                total={totalNodes}
+                speed={replay.speed}
+                onToggle={replay.toggle}
+                onSpeedChange={replay.setSpeed}
+                onSeek={replay.seekTo}
+                onReset={replay.reset}
+              />
+            </div>
+          )}
+
+          {viewMode === 'graph' ? (
+            <D3Tree
+              tree={tree}
+              compact={compact}
+              visibleCount={replayMode ? replay.currentIndex : undefined}
+              chronoMap={chronoMap}
+              t={t}
             />
-            <Button
-              type="button"
-              variant="outline"
-              size="xs"
-              aria-pressed={compact}
-              onClick={() => {
-                setCompact(!compact);
-                track('agentic_workload_radix_compact_toggled', { compact: !compact });
-              }}
+          ) : (
+            <div
+              key={replayMode ? `replay-${listKey}` : `list-${listKey}`}
+              className="overflow-x-auto"
             >
-              {t.compact}
-            </Button>
-            {viewMode === 'list' && (
-              <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="xs"
-                  onClick={() => {
-                    setListForceOpen(true);
-                    setListKey((k) => k + 1);
-                    track('agentic_workload_radix_expand_all');
-                  }}
-                >
-                  {t.expandAll}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="xs"
-                  onClick={() => {
-                    setListForceOpen(false);
-                    setListKey((k) => k + 1);
-                    track('agentic_workload_radix_collapse_all');
-                  }}
-                >
-                  {t.collapseAll}
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 mb-3">
-          <Button
-            type="button"
-            variant="outline"
-            size="xs"
-            aria-pressed={replayMode}
-            onClick={() => {
-              if (replayMode) {
-                replay.reset();
-                setReplayMode(false);
-              } else {
-                setReplayMode(true);
-              }
-              track('agentic_workload_radix_replay_toggled', { active: !replayMode });
-            }}
-          >
-            {replayMode ? t.exitReplay : t.replay}
-          </Button>
-        </div>
-        {replayMode && totalNodes > 0 && (
-          <div className="mb-3">
-            <ReplayControls
-              isPlaying={replay.isPlaying}
-              currentIndex={replay.currentIndex}
-              total={totalNodes}
-              speed={replay.speed}
-              onToggle={replay.toggle}
-              onSpeedChange={replay.setSpeed}
-              onSeek={replay.seekTo}
-              onReset={replay.reset}
-            />
-          </div>
-        )}
-
-        {viewMode === 'graph' ? (
-          <D3Tree
-            tree={tree}
-            compact={compact}
-            visibleCount={replayMode ? replay.currentIndex : undefined}
-            chronoMap={chronoMap}
-            t={t}
-          />
-        ) : (
-          <div
-            key={replayMode ? `replay-${listKey}` : `list-${listKey}`}
-            className="rounded-xl border border-border/30 bg-card p-4 overflow-x-auto"
-          >
-            {[...tree.children.values()]
-              .toSorted((a, b) => b.totalLeaves - a.totalLeaves)
-              .map((child) => (
-                <TreeNode
-                  key={child.segment[0]}
-                  node={child}
-                  depth={0}
-                  defaultOpen={child.totalLeaves > 1}
-                  compact={compact}
-                  forceOpen={replayMode ? true : listForceOpen}
-                  chronoMap={replayMode ? chronoMap : undefined}
-                  visibleCount={replayMode ? replay.currentIndex : undefined}
-                  t={t}
-                />
-              ))}
-            <div ref={lastNodeRef} />
-          </div>
-        )}
-      </div>
+              {[...tree.children.values()]
+                .toSorted((a, b) => b.totalLeaves - a.totalLeaves)
+                .map((child) => (
+                  <TreeNode
+                    key={child.segment[0]}
+                    node={child}
+                    depth={0}
+                    defaultOpen={child.totalLeaves > 1}
+                    compact={compact}
+                    forceOpen={replayMode ? true : listForceOpen}
+                    chronoMap={replayMode ? chronoMap : undefined}
+                    visibleCount={replayMode ? replay.currentIndex : undefined}
+                    t={t}
+                  />
+                ))}
+              <div ref={lastNodeRef} />
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

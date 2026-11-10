@@ -1,6 +1,6 @@
 'use client';
 
-import { Card } from '@/components/ui/card';
+import { Card, CardTitle } from '@/components/ui/card';
 import { Stat } from '@/components/ui/stat';
 import { formatNumber } from '@/lib/agentic-workload-explorer/format';
 import type { PricingCoverage } from '@/lib/agentic-workload-explorer/api-types';
@@ -84,7 +84,7 @@ export function PricingCoverageCard({ coverage }: { coverage: PricingCoverage })
   return (
     <Card className="gap-4">
       <div>
-        <div className="text-sm font-medium text-foreground">{t.heading}</div>
+        <CardTitle>{t.heading}</CardTitle>
         <p className="mt-0.5 text-xs text-muted-foreground">{t.description(coverage.windowDays)}</p>
       </div>
 
@@ -117,7 +117,7 @@ export function PricingCoverageCard({ coverage }: { coverage: PricingCoverage })
           tabIndex={0}
           className="max-h-64 overflow-auto overscroll-contain focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/40"
         >
-          <table className="w-full min-w-[680px] text-2xs font-mono">
+          <table className="w-full min-w-[680px] text-xs tabular-nums">
             <caption className="sr-only">{t.caption}</caption>
             <thead className="sticky top-0 z-10 border-b border-border/20 bg-card text-muted-foreground">
               <tr>
@@ -144,7 +144,7 @@ export function PricingCoverageCard({ coverage }: { coverage: PricingCoverage })
             <tbody className="divide-y divide-border/20">
               {coverage.byModel.map((row) => (
                 <tr key={row.model} className="transition-colors hover:bg-surface-hover/70">
-                  <th scope="row" className="py-1.5 text-left font-medium text-warning">
+                  <th scope="row" className="py-1.5 text-left font-mono font-medium text-warning">
                     {row.model}
                   </th>
                   <td className="py-1.5 text-right tabular-nums">

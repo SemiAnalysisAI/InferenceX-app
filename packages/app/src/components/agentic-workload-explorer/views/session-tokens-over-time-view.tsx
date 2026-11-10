@@ -17,6 +17,13 @@ import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const STRINGS = {
   en: {
@@ -129,23 +136,27 @@ function TokensOverTimePageContent() {
             />
 
             {agentOptions.length > 1 && (
-              <label className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
-                {t.agentLabel}
-                <select
+              <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+                <span id="tokens-agent-label">{t.agentLabel}</span>
+                <Select
                   value={agentKey}
-                  onChange={(e) => {
-                    setParam('agent', e.target.value, MAIN_AGENT_KEY);
-                    track('agentic_workload_tokens_agent_changed', { agent: e.target.value });
+                  onValueChange={(value) => {
+                    setParam('agent', value, MAIN_AGENT_KEY);
+                    track('agentic_workload_tokens_agent_changed', { agent: value });
                   }}
-                  className="h-11 rounded-md border border-input bg-background px-2.5 text-xs text-foreground focus:outline-none md:h-8"
                 >
-                  {agentOptions.map((opt) => (
-                    <option key={opt.key} value={opt.key}>
-                      {opt.label} ({opt.requestCount})
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  <SelectTrigger aria-labelledby="tokens-agent-label">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {agentOptions.map((opt) => (
+                      <SelectItem key={opt.key} value={opt.key}>
+                        {opt.label} ({opt.requestCount})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
           </>
         )}
@@ -154,7 +165,7 @@ function TokensOverTimePageContent() {
       <Expandable
         title={view === 'cached' ? t.tokensOverTimeTitle : t.contextTrajectories}
         subtitle={view === 'cached' ? (activeAgent?.label ?? t.mainAgent) : undefined}
-        corner
+        corner={view !== 'cached'}
       >
         {view === 'cached' ? (
           <TokensOverTimeChart

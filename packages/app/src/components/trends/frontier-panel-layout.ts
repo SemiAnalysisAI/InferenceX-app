@@ -34,3 +34,17 @@ export function labeledBuckets(buckets: readonly number[], width: number): numbe
   const step = Math.ceil(buckets.length / Math.max(2, Math.floor(width / BUCKET_LABEL_PX)));
   return buckets.filter((_, index) => index % step === 0);
 }
+
+/** Tables with this many rows or fewer show without search or column toggle. */
+export const SHORT_TABLE_ROWS = 10;
+
+/** A ratio as the panels print it: 26x, 8.8x, 1.21x. */
+export const formatRatio = (ratio: number) =>
+  ratio >= 10 ? `${ratio.toFixed(0)}x` : `${ratio.toFixed(ratio >= 2 ? 1 : 2)}x`;
+
+/** Band index under a plot x on a band scale, with the padding split between neighbours. */
+export function bandIndexAt(step: number, paddingInner: number, count: number, plotX: number) {
+  if (count === 0 || step <= 0) return null;
+  const index = Math.floor((plotX + (step * paddingInner) / 2) / step);
+  return Math.max(0, Math.min(count - 1, index));
+}

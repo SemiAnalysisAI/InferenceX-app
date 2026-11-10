@@ -8,6 +8,8 @@ import { track } from '@/lib/analytics/analytics';
 import { cn } from '@/lib/shared/utils';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { Input } from '@/components/ui/input';
+import { useScrollFade } from '@/hooks/useScrollFade';
+import { fmtCost, fmtTput } from '@/lib/compare/compare-table-view';
 
 const STRINGS = {
   en: {
@@ -16,6 +18,7 @@ const STRINGS = {
     interactivity: 'Interactivity (tok/s/user)',
     table: 'Interpolated benchmark comparison',
     target: (n: number) => `Target interactivity ${n} (tok/s/user)`,
+    scrollHint: (n: number) => `Swipe sideways to see all ${n} interactivity targets →`,
   },
   zh: {
     hint: '数据由真实基准测试结果插值得出。调整下方的目标交互性数值，即可比较不同运行点。',
@@ -23,6 +26,7 @@ const STRINGS = {
     interactivity: '交互性（tok/s/user）',
     table: '基准测试结果插值对比',
     target: (n: number) => `目标交互性 ${n}（tok/s/user）`,
+    scrollHint: (n: number) => `左右滑动查看全部 ${n} 个交互性目标 →`,
   },
 } as const;
 
@@ -82,14 +86,13 @@ const METRICS: MetricRow[] = [
   {
     label: 'Throughput (tok/s/chip)',
     extract: (r) => r.value,
-    format: (v) =>
-      v.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+    format: fmtTput,
     direction: 'higher',
   },
   {
     label: 'Cost ($/M tok)',
     extract: (r) => r.cost,
-    format: (v) => `$${v.toFixed(3)}`,
+    format: fmtCost,
     direction: 'lower',
   },
   {
@@ -101,7 +104,7 @@ const METRICS: MetricRow[] = [
   {
     label: 'Concurrency',
     extract: (r) => r.concurrency,
-    format: (v) => `~${Math.round(v)}`,
+    format: (v) => `~${Math.round(v).toLocaleString('en-US')}`,
     direction: 'higher',
   },
 ];
@@ -241,72 +244,89 @@ export function CompareInterpolatedTable({
 
   const winnerClass = 'font-semibold text-foreground';
 
+  const scroll = useScrollFade<HTMLDivElement>();
+
   if (columns.length === 0) return null;
 
   return (
     <div className="mt-3 flex flex-col gap-2">
       <p className="text-xs text-muted-foreground">{t.hint}</p>
-      <div
-        tabIndex={0}
-        role="region"
-        aria-label={t.table}
-        className="overflow-x-auto rounded-lg border border-border/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <table className="w-full text-sm" data-testid="compare-interpolated-table">
-          <thead>
-            <tr className="border-b border-border/30">
-              <th className="sticky left-0 z-10 min-w-36 max-w-44 border-r border-border/30 bg-card px-3 py-2 text-left align-bottom text-xs font-medium text-muted-foreground">
-                {t.metric}
-              </th>
-              {columns.map((col, ci) => (
-                <th
-                  key={ci}
-                  className="min-w-45 border-r border-border/30 px-3 py-2 text-right font-medium last:border-r-0"
-                >
-                  <div className="flex flex-col items-end gap-1.5">
-                    <span className="text-xs text-muted-foreground">{t.interactivity}</span>
-                    <Input
-                      type="text"
-                      aria-label={t.target(ci + 1)}
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      value={col.inputValue}
-                      onChange={(e) => handleInputChange(ci, e.target.value)}
-                      onBlur={() => handleInputBlur(ci)}
-                      onKeyDown={(e) => handleKeyDown(ci, e)}
-                      className={cn(
-                        'w-20 text-right tabular-nums',
-                        isInteractivityInputOutOfRange(
+      {scroll.fade && (
+        <p className="text-xs font-medium text-foreground" data-testid="compare-table-scroll-hint">
+          {t.scrollHint(columns.length)}
+        </p>
+      )}
+      <div className="relative">
+        <div
+          ref={scroll.ref}
+          onScroll={scroll.onScroll}
+          tabIndex={0}
+          role="region"
+          aria-label={t.table}
+          className="overflow-x-auto rounded-lg border border-border/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <table className="w-full text-sm" data-testid="compare-interpolated-table">
+            <thead>
+              <tr className="border-b border-border/30">
+                <th className="sticky left-0 z-10 min-w-28 max-w-44 border-r border-border/30 bg-card px-3 py-2 text-left align-bottom text-xs font-medium text-muted-foreground sm:min-w-36">
+                  {t.metric}
+                </th>
+                {columns.map((col, ci) => (
+                  <th
+                    key={ci}
+                    className="min-w-36 border-r border-border/30 px-3 py-2 text-right font-medium last:border-r-0 sm:min-w-45"
+                  >
+                    <div className="flex flex-col items-end gap-1.5">
+                      <span className="text-xs text-muted-foreground">{t.interactivity}</span>
+                      <Input
+                        type="text"
+                        aria-label={t.target(ci + 1)}
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={col.inputValue}
+                        onChange={(e) => handleInputChange(ci, e.target.value)}
+                        onBlur={() => handleInputBlur(ci)}
+                        onKeyDown={(e) => handleKeyDown(ci, e)}
+                        className={cn(
+                          'w-20 text-right tabular-nums',
+                          isInteractivityInputOutOfRange(
+                            col.inputValue,
+                            interactivityRange.min,
+                            interactivityRange.max,
+                          ) && 'border-destructive ring-2 ring-destructive/30',
+                        )}
+                        data-testid={`compare-table-target-${ci}`}
+                        {...(isInteractivityInputOutOfRange(
                           col.inputValue,
                           interactivityRange.min,
                           interactivityRange.max,
-                        ) && 'border-destructive ring-2 ring-destructive/30',
-                      )}
-                      data-testid={`compare-table-target-${ci}`}
-                      {...(isInteractivityInputOutOfRange(
-                        col.inputValue,
-                        interactivityRange.min,
-                        interactivityRange.max,
-                      ) && { 'data-compare-target-oob': 'true' })}
-                    />
-                  </div>
-                </th>
+                        ) && { 'data-compare-target-oob': 'true' })}
+                      />
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {localizedMetrics.map((metric) => (
+                <MetricTableRow
+                  key={metric.label}
+                  metric={metric}
+                  columns={columns}
+                  aLabel={aLabel}
+                  bLabel={bLabel}
+                  winnerClass={winnerClass}
+                />
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {localizedMetrics.map((metric) => (
-              <MetricTableRow
-                key={metric.label}
-                metric={metric}
-                columns={columns}
-                aLabel={aLabel}
-                bLabel={bLabel}
-                winnerClass={winnerClass}
-              />
-            ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
+        {scroll.fade && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 right-0 w-8 rounded-r-lg bg-linear-to-l from-card to-transparent"
+          />
+        )}
       </div>
     </div>
   );

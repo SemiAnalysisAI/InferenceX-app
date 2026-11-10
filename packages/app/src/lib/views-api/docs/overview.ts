@@ -229,7 +229,7 @@ const responseExample = {
   rows: [
     {
       model: 'DeepSeek-V4-Pro',
-      modelLabel: 'DeepSeekv4 Pro 0813 1.6T',
+      modelLabel: 'DeepSeek V4 Pro 0813 1.6T',
       category: 'frontier',
       scenario: 'agentx',
       cells: [

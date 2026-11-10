@@ -3,7 +3,11 @@
 import * as d3 from 'd3';
 import React, { useEffect, useMemo, useRef } from 'react';
 
-import { placeLineLabels, renderLineLabels } from '@/components/inference/ui/line-label-layer';
+import {
+  placeLineLabels,
+  renderLineLabels,
+  type LineLabelPlacement,
+} from '@/components/inference/ui/line-label-layer';
 import { getChartWatermark } from '@/lib/catalog/data-mappings';
 import { getLineLabelVendorIcon, VENDOR_LOGO_ICONS } from '@/lib/catalog/vendor-logos';
 import { formatLargeNumber, logTickFormat } from '@/lib/charts/chart-rendering';
@@ -71,13 +75,16 @@ export interface FrontierChartProps {
 const CHART_MARGIN = { top: 24, right: 30, bottom: 50, left: 64 };
 /** A point counts as growth only if it beats the previous frontier by more than this. */
 const GROWTH_TOLERANCE = 0.01;
-/** How close, in pixels, the pointer must be to a frontier point for the crosshair to show. */
-const CROSSHAIR_REACH_PX = 48;
+/** How close, in pixels, a click must land to a frontier point to pin its card. */
+const PIN_REACH_PX = 48;
 /**
- * Earlier points crowd the plot on later dates, so they only answer a pointer right on the dot;
- * elsewhere the crosshair stays on today's frontier and a click on empty plot dismisses a pin.
+ * Within this many pixels of a measured point the crosshair shows that point; elsewhere it
+ * follows the pointer along the curve. Earlier points crowd the plot on later dates, so they
+ * use the same short reach and a click on empty plot dismisses a pin.
  */
-const EARLIER_POINT_REACH_PX = 8;
+const POINT_REACH_PX = 10;
+/** Width a line label claims when labels are checked for overlap. */
+const LABEL_WIDTH_PX = 150;
 /** Shade under the current frontier: the theme's blue, the same in light and dark. */
 const FILL_COLOR = 'color-mix(in oklab, var(--secondary) 30%, var(--background))';
 /** Pseudo-series that carries the running record into the next date's pooled frontier. */
@@ -88,6 +95,7 @@ const STRINGS = {
     aria: 'Pareto frontier over time, colored by the chip or vendor that holds each stretch',
     instructions: 'Scroll to zoom · Drag to pan · Double-click to reset',
     startingCurve: (date: string) => `Starting curve · ${date}`,
+    onCurve: 'Frontier curve, interpolated',
     earlierPoint: 'Earlier frontier point',
     openRun: 'Open run',
     dismiss: 'Click elsewhere to dismiss',
@@ -99,6 +107,7 @@ const STRINGS = {
     aria: '帕累托前沿随时间的变化，按占据各区段的芯片或厂商着色',
     instructions: '滚轮缩放 · 拖动平移 · 双击重置',
     startingCurve: (date: string) => `起点曲线 · ${date}`,
+    onCurve: '前沿曲线插值',
     earlierPoint: '此前的前沿点',
     openRun: '查看运行记录',
     dismiss: '点击其他位置关闭',
@@ -295,19 +304,25 @@ const FrontierChart = React.memo(
       zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
       ctx: RenderContext,
     ) => {
-      const showTooltip = (event: PointerEvent, html: string) => {
+      // The card hangs off the point it describes (plot coordinates), never on top of it.
+      const showTooltip = (plotX: number, plotY: number, html: string) => {
         const card = cardRef.current;
-        if (!card) return;
+        const ctm = zoomGroup.node()?.getScreenCTM();
+        if (!card || !ctm) return;
         card.innerHTML = html;
         card.style.display = 'block';
+        const anchor = new DOMPoint(plotX, plotY).matrixTransform(ctm);
+        const origin = new DOMPoint(0, 0).matrixTransform(ctm);
+        const corner = new DOMPoint(ctx.width, ctx.height).matrixTransform(ctm);
         const root = document.documentElement;
         const { left, top } = placeFloatingTooltip({
-          x: event.clientX,
-          y: event.clientY,
+          x: anchor.x,
+          y: anchor.y,
           width: card.offsetWidth,
           height: card.offsetHeight,
           offset: 14,
           placement: 'below',
+          bounds: { left: origin.x, top: origin.y, right: corner.x, bottom: corner.y },
           viewportWidth: root.clientWidth || window.innerWidth,
           viewportHeight: root.clientHeight || window.innerHeight,
           headerBottom: stickyHeaderBottom(),
@@ -350,7 +365,8 @@ const FrontierChart = React.memo(
       pinnedRef.current = null;
       const svg = ctx.layout.svg.node();
       const transform = svg ? d3.zoomTransform(svg) : d3.zoomIdentity;
-      const x = transform.rescaleX(ctx.xScale as ContinuousScale) as unknown as Scale;
+      const zoomedX = transform.rescaleX(ctx.xScale as ContinuousScale);
+      const x = zoomedX as unknown as Scale;
       const y = transform.rescaleY(ctx.yScale as ContinuousScale) as unknown as Scale;
       const visibleFrontiers = (index: number) => {
         const frontiers = seriesFrontiersAt(history, index);
@@ -418,7 +434,7 @@ const FrontierChart = React.memo(
         .data([history.dates[dateIndex]])
         .join('text')
         .attr('x', ctx.width - 12)
-        .attr('y', 64)
+        .attr('y', CHART_TYPE.dateStamp + 40)
         .attr('text-anchor', 'end')
         .attr('font-size', px(CHART_TYPE.dateStamp))
         .attr('font-weight', 700)
@@ -554,7 +570,8 @@ const FrontierChart = React.memo(
           const [pointerX] = d3.pointer(event, root.node());
           const nearest = d3.least(d.vertices, (v) => Math.abs(x(v.x) - pointerX))!;
           showTooltip(
-            event,
+            x(nearest.x),
+            y(nearest.y),
             pointCard(
               nearest,
               `${t.startingCurve(formatDate(d.date))} · ${configLabel(nearest.config)}`,
@@ -638,9 +655,9 @@ const FrontierChart = React.memo(
         .attr('fill', (d) => styles.get(d.key)!.color)
         .attr('stroke', 'var(--background)')
         .attr('stroke-width', 1.5);
-      // Like the dashboard's other charts: near any point, today's frontier or an earlier one,
-      // dashed rulers cross at the closest point and its hover card follows the pointer. A click
-      // pins the card (with a link to the run) until the next click.
+      // Like the dashboard's other charts: dashed rulers cross where the pointer meets the
+      // curve (or at a measured point right under it) and the hover card follows the pointer.
+      // A click pins a point's card (with a link to the run) until the next click.
       const rulers = root
         .selectAll<SVGGElement, null>('g.fr-rulers')
         .data([null])
@@ -663,43 +680,77 @@ const FrontierChart = React.memo(
         hideTooltip();
       };
       const hoverable = [
-        ...frontier.map((v) => ({ v, subtitle: configLabel(v.config), reach: CROSSHAIR_REACH_PX })),
+        ...frontier.map((v) => ({ v, subtitle: configLabel(v.config), current: true })),
         ...[...pastById.values()].map((v) => ({
           v,
           subtitle: `${t.earlierPoint} · ${configLabel(v.config)}`,
-          reach: EARLIER_POINT_REACH_PX,
+          current: false,
         })),
       ];
-      const pointNear = (event: PointerEvent) => {
+      const pointNear = (event: PointerEvent, currentReach: number) => {
         const [pointerX, pointerY] = d3.pointer(event, root.node());
         if (pointerX < 0 || pointerX > ctx.width || pointerY < 0 || pointerY > ctx.height)
           return undefined;
         const distance = ({ v }: (typeof hoverable)[number]) =>
           Math.hypot(x(v.x) - pointerX, y(v.y) - pointerY);
         return d3.least(
-          hoverable.filter((point) => distance(point) <= point.reach),
+          hoverable.filter(
+            (point) => distance(point) <= (point.current ? currentReach : POINT_REACH_PX),
+          ),
           distance,
         );
       };
-      const showCrosshair = (
-        event: PointerEvent,
-        { v, subtitle }: (typeof hoverable)[number],
-        pinned: boolean,
-      ) => {
+      // The drawn curves, vertices carrying their owner, for snapping the crosshair by x.
+      const curves = pooled ? [frontier] : stretches.map((stretch) => stretch.owned);
+      const curveAt = (event: PointerEvent) => {
+        const [pointerX, pointerY] = d3.pointer(event, root.node());
+        if (pointerX < 0 || pointerX > ctx.width || pointerY < 0 || pointerY > ctx.height)
+          return undefined;
+        const at = zoomedX.invert(pointerX);
+        const hits = curves.flatMap((owned) => {
+          const value = frontierValueAt(owned, at);
+          if (value === null) return [];
+          const owner = owned.findLast((v) => v.x <= at) ?? owned[0];
+          return [{ key: owner.key, value }];
+        });
+        const hit = d3.least(hits, (h) => Math.abs(y(h.value) - pointerY));
+        return hit && { ...hit, at };
+      };
+      const placeRulers = (rulerX: number, rulerY: number) => {
         rulers.style('display', null);
         rulers
           .select('.fr-ruler-x')
-          .attr('x1', x(v.x))
-          .attr('x2', x(v.x))
+          .attr('x1', rulerX)
+          .attr('x2', rulerX)
           .attr('y1', 0)
           .attr('y2', ctx.height);
         rulers
           .select('.fr-ruler-y')
           .attr('x1', 0)
           .attr('x2', ctx.width)
-          .attr('y1', y(v.y))
-          .attr('y2', y(v.y));
-        showTooltip(event, pointCard(v, subtitle, pinned));
+          .attr('y1', rulerY)
+          .attr('y2', rulerY);
+      };
+      const showCrosshair = ({ v, subtitle }: (typeof hoverable)[number], pinned: boolean) => {
+        placeRulers(x(v.x), y(v.y));
+        showTooltip(x(v.x), y(v.y), pointCard(v, subtitle, pinned));
+      };
+      const showCurveCrosshair = (hit: { key: string; value: number; at: number }) => {
+        placeRulers(x(hit.at), y(hit.value));
+        const style = styles.get(hit.key);
+        showTooltip(
+          x(hit.at),
+          y(hit.value),
+          chartHoverCard({
+            title: style?.label ?? hit.key,
+            subtitle: t.onCurve,
+            color: style?.color,
+            metrics: [
+              { value: formatLargeNumber(hit.value), label: axisLabelUnit(yLabel) },
+              { value: hit.at.toFixed(1), label: axisLabelUnit(xLabel) },
+            ],
+          }),
+        );
       };
       ctx.layout.svg
         .on('pointermove.frontier', (event: PointerEvent) => {
@@ -708,15 +759,20 @@ const FrontierChart = React.memo(
             rulers.style('display', 'none');
             return;
           }
-          const near = pointNear(event);
-          if (near) showCrosshair(event, near, false);
+          const near = pointNear(event, POINT_REACH_PX);
+          if (near) {
+            showCrosshair(near, false);
+            return;
+          }
+          const hit = curveAt(event);
+          if (hit) showCurveCrosshair(hit);
           else hideCrosshair();
         })
         .on('click.frontier', (event: PointerEvent) => {
-          const near = pointNear(event);
+          const near = pointNear(event, PIN_REACH_PX);
           if (near && pinnedRef.current !== vertexId(near.v)) {
             pinnedRef.current = vertexId(near.v);
-            showCrosshair(event, near, true);
+            showCrosshair(near, true);
             track('historical_frontier_point_pinned', { gpu: near.v.key });
           } else if (pinnedRef.current) {
             pinnedRef.current = null;
@@ -753,16 +809,38 @@ const FrontierChart = React.memo(
         color: styles.get(stretch.key)!.color,
         points: stretch.path,
       }));
-      renderLineLabels(
-        zoomGroup.select<SVGGElement>('g.frontier-chart'),
-        placeLineLabels(labelSeries, x, y, { collisionWidth: 150 }),
-        {
-          seriesAttribute: 'data-series-id',
-          opacity: 0.95,
-          iconFor: (label) =>
-            getLineLabelVendorIcon(label.seriesId) ?? VENDOR_LOGO_ICONS[label.seriesId],
-        },
+      // Labels that still overlap after placement step up or down a row; the series holding
+      // more of the drawn curve keeps its spot, and a label with no free row is hidden.
+      const rank = new Map(
+        [...longest].map(([key, stretch]) => [key, onScreenLength(stretch.path)] as const),
       );
+      const labelHeight = CHART_TYPE.lineLabel + 8;
+      const kept: LineLabelPlacement[] = [];
+      const placements = placeLineLabels(labelSeries, x, y, { collisionWidth: LABEL_WIDTH_PX })
+        .toSorted((a, b) => (rank.get(b.key) ?? 0) - (rank.get(a.key) ?? 0))
+        .map((label) => {
+          const spot = [0, -1, 1, -2, 2]
+            .map((row) => ({ ...label, y: label.y + row * labelHeight }))
+            .find(
+              (candidate) =>
+                candidate.y >= 0 &&
+                candidate.y <= ctx.height &&
+                !kept.some(
+                  (other) =>
+                    Math.abs(other.x - candidate.x) < LABEL_WIDTH_PX &&
+                    Math.abs(other.y - candidate.y) < labelHeight,
+                ),
+            );
+          if (!spot) return { ...label, visible: false };
+          kept.push(spot);
+          return spot;
+        });
+      renderLineLabels(zoomGroup.select<SVGGElement>('g.frontier-chart'), placements, {
+        seriesAttribute: 'data-series-id',
+        opacity: 0.95,
+        iconFor: (label) =>
+          getLineLabelVendorIcon(label.seriesId) ?? VENDOR_LOGO_ICONS[label.seriesId],
+      });
       root.selectAll('.line-label').raise();
     };
 

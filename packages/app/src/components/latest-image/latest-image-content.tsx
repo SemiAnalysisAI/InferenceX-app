@@ -199,6 +199,12 @@ export function CurrentImageContent() {
   } = useFrameworkReleases();
   const locale = useLocale();
   const t = STRINGS[locale];
+  const submissionDate = new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
 
   const [requestedModel, setSelectedModel] = useState<string>('all');
   const selectedModel = isModelVisible(requestedModel, featureGateUnlocked)
@@ -652,7 +658,7 @@ export function CurrentImageContent() {
                           dateTime={row.date}
                           className="mt-1 block text-xs font-normal text-muted-foreground"
                         >
-                          {row.date}
+                          {submissionDate.format(new Date(`${row.date}T00:00:00Z`))}
                         </time>
                         {staleAgentx && (
                           <p className="mt-2 text-xs font-normal text-muted-foreground">

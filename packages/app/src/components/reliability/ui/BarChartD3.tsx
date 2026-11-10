@@ -110,6 +110,8 @@ const RELIABILITY_STRINGS = {
     loadError: 'Failed to load reliability data',
     retry: 'Retry',
     noData: 'No reliability data available for this date range',
+    dataEnds: (date: string) => `The newest reliability data is from ${date}.`,
+    showAllTime: 'Show all available data',
     instructions: 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
     runCount: (success: number, total: number) => `${success}/${total} runs`,
   },
@@ -120,6 +122,8 @@ const RELIABILITY_STRINGS = {
     loadError: '可靠性数据加载失败',
     retry: '重试',
     noData: '所选时间范围内暂无可靠性数据',
+    dataEnds: (date: string) => `最新的可靠性数据来自 ${date}。`,
+    showAllTime: '显示全部可用数据',
     instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置',
     runCount: (success: number, total: number) => `${success}/${total} 次运行`,
   },
@@ -147,6 +151,10 @@ export default function ReliabilityBarChartD3({
     selectAllModels,
     isLegendExpanded,
     setIsLegendExpanded,
+    dateRange,
+    setDateRange,
+    dateRangeSuccessRateData,
+    latestDataDate,
   } = useReliabilityContext();
   const locale = useLocale();
   const legendT = RELIABILITY_STRINGS[locale];
@@ -393,9 +401,11 @@ export default function ReliabilityBarChartD3({
   );
 
   const isEmpty = loading || error || chartData.length === 0;
+  const canShowAllTime =
+    dateRange !== 'all-time' && Object.keys(dateRangeSuccessRateData['all-time'] ?? {}).length > 0;
 
   const emptyOverlay = isEmpty ? (
-    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-card/60 backdrop-blur-[2px]">
+    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-card">
       {error ? (
         <EmptyState
           data-testid="reliability-error"
@@ -417,7 +427,38 @@ export default function ReliabilityBarChartD3({
           {legendT.loadError}
         </EmptyState>
       ) : (
-        <EmptyState role="status">{loading ? legendT.loading : legendT.noData}</EmptyState>
+        <EmptyState
+          role="status"
+          action={
+            !loading && canShowAllTime ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  track('reliability_date_range_changed', { date_range: 'all-time' });
+                  setDateRange('all-time');
+                }}
+              >
+                {legendT.showAllTime}
+              </Button>
+            ) : undefined
+          }
+        >
+          {loading ? legendT.loading : legendT.noData}
+          {!loading && latestDataDate && (
+            <span className="mt-1 block">
+              {legendT.dataEnds(
+                new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                  timeZone: 'UTC',
+                }).format(new Date(`${latestDataDate}T00:00:00Z`)),
+              )}
+            </span>
+          )}
+        </EmptyState>
       )}
     </div>
   ) : null;
