@@ -7,7 +7,7 @@ import { type Sql, createAdminSql } from './etl/db-utils.js';
 import { jsonbParam } from './lib/backfill-runner.js';
 import { planBenchmarkPointBackfill } from './lib/benchmark-point-backfill.js';
 import { selectRunOverrides } from './lib/run-override-selection.js';
-import { deleteStaleAvailability, purgeBenchmarkResults, purgeRuns } from './lib/run-purge.js';
+import { deleteStaleAvailability, purgeBenchmarkResults, purgeRuns } from './lib/run-purge';
 import {
   type BenchmarkPointBackfill,
   type ChangelogBackfill,

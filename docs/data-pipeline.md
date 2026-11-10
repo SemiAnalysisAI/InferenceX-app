@@ -379,14 +379,14 @@ Setup is in [Deployment configuration](./deployment-configuration.md#showing-pub
 
 `Promote Runs To Public Database` (`promote-to-public.yml`) publishes downstream runs. It runs
 `bun run admin:db:promote-to-public --run-id <ids>` in the `public-promotion` environment,
-which copies the selected runs into the public database with only the configs and datasets they
-reference, re-counts each run in public, and only then deletes them from the downstream
-database. A run short in public is not deleted and the job fails; rerunning finishes it. The
-command refuses when the public schema lacks a column the downstream one has. Promoted points
-take new public ids, so links to their downstream ids stop resolving. The command only inserts
-into the public database, but its publication triggers rewrite derived tables, so the role
-needs the public ingest role's privileges. The job then invalidates and warms both sites. It
-does not run in `SemiAnalysisAI/InferenceX-app`.
+which copies the selected runs, including their GPU telemetry, into the public database with
+only the configs and datasets they reference, re-counts each run in public, and only then
+deletes them from the downstream database. A run short in public is not deleted and the job
+fails; rerunning finishes it. The command refuses when the public schema lacks a column the
+downstream one has. Promoted points take new public ids, so links to their downstream ids stop
+resolving. The command only inserts into the public database, but its publication triggers
+rewrite derived tables, so the role needs the public ingest role's privileges. The job then
+invalidates and warms both sites. It does not run in `SemiAnalysisAI/InferenceX-app`.
 
 ### Connection drivers and policy
 

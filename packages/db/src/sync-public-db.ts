@@ -43,7 +43,7 @@ import type postgres from 'postgres';
 import { hasNoSslFlag } from './cli-utils.js';
 import { createAdminSql, type Sql } from './etl/db-utils.js';
 import { confirmProceed, parseLimitForceFlags, runBackfillMain } from './lib/backfill-runner.js';
-import { purgeRuns } from './lib/run-purge.js';
+import { purgeRuns } from './lib/run-purge';
 import {
   configKey,
   findDriftedRuns,
@@ -77,6 +77,11 @@ const SYNCED_TABLES = [
   'availability',
   'datasets',
   'dataset_conversations',
+  'gpu_metric_series',
+  'gpu_metric_samples',
+  'gpu_metric_sample_blobs',
+  'benchmark_result_gpu_metrics',
+  'gpu_power_series',
 ] as const;
 type Table = (typeof SYNCED_TABLES)[number];
 
@@ -580,6 +585,124 @@ async function copyEvalSamples(db: Db, sourceEvalId: string, targetEvalId: strin
   }
 }
 
+async function copyGpuSamples(db: Db, sourceSeriesId: string, targetSeriesId: string) {
+  const cursor = source<Row[]>`
+    select ${source(columns.gpu_metric_samples)} from gpu_metric_samples
+    where series_id = ${sourceSeriesId}
+  `.cursor(MAX_BATCH_ROWS);
+  for await (const rows of cursor) {
+    await insertRows(
+      db,
+      'gpu_metric_samples',
+      rows.map((row) => ({ ...row, series_id: targetSeriesId })),
+    );
+  }
+  const blobs = await source<Row[]>`
+    select ${source(columns.gpu_metric_sample_blobs)} from gpu_metric_sample_blobs
+    where series_id = ${sourceSeriesId}
+  `;
+  await insertRows(
+    db,
+    'gpu_metric_sample_blobs',
+    blobs.map((row) => ({ ...row, series_id: targetSeriesId })),
+  );
+}
+
+async function copyGpuTelemetry(
+  db: Db,
+  run: RunSummary,
+  configIds: Map<string, string>,
+): Promise<void> {
+  const findRun = (sql: Db) => sql<{ id: string }[]>`
+    select id::text from workflow_runs
+    where github_run_id = ${run.github_run_id} and run_attempt = ${run.run_attempt}
+  `;
+  const [[sourceRun], [targetRun]] = await Promise.all([findRun(source), findRun(db)]);
+  if (!sourceRun || !targetRun) throw new Error('run is missing from one database');
+
+  const seriesKey = (row: Row) => naturalKey([row.artifact_name, row.file_name]);
+  const [sourceSeries, targetSeries] = await Promise.all([
+    source<Row[]>`
+      select id::text, ${source(columns.gpu_metric_series)} from gpu_metric_series
+      where workflow_run_id = ${sourceRun.id}
+    `,
+    db<Row[]>`
+      select id::text, artifact_name, file_name from gpu_metric_series
+      where workflow_run_id = ${targetRun.id}
+    `,
+  ]);
+  const targetSeriesIds = new Map(targetSeries.map((row) => [seriesKey(row), String(row.id)]));
+  const seriesIds = new Map<string, string>();
+  for (const row of sourceSeries) {
+    let targetId = targetSeriesIds.get(seriesKey(row));
+    if (!targetId) {
+      targetId = await insertReturningId(db, 'gpu_metric_series', {
+        ...row,
+        workflow_run_id: targetRun.id,
+      });
+      await copyGpuSamples(db, String(row.id), targetId);
+    }
+    seriesIds.set(String(row.id), targetId);
+  }
+
+  const [links, targetPoints] = await Promise.all([
+    source<Row[]>`
+      select l.series_id::text, ${source(BENCHMARK_NATURAL_KEY.map((column) => `b.${column}`))}
+      from benchmark_result_gpu_metrics l
+      join benchmark_results b on b.id = l.benchmark_result_id
+      where b.workflow_run_id = ${sourceRun.id}
+    `,
+    db<Row[]>`
+      select id::text, ${db(BENCHMARK_NATURAL_KEY)} from benchmark_results
+      where workflow_run_id = ${targetRun.id}
+    `,
+  ]);
+  const pointKey = (row: Row, configId: unknown) =>
+    naturalKey(BENCHMARK_NATURAL_KEY.map((c) => (c === 'config_id' ? String(configId) : row[c])));
+  const pointIds = new Map(targetPoints.map((row) => [pointKey(row, row.config_id), row.id]));
+  await insertRows(
+    db,
+    'benchmark_result_gpu_metrics',
+    links.flatMap((row) => {
+      const configId = configIds.get(String(row.config_id));
+      const pointId = configId === undefined ? undefined : pointIds.get(pointKey(row, configId));
+      const seriesId = seriesIds.get(String(row.series_id));
+      return pointId && seriesId ? [{ benchmark_result_id: pointId, series_id: seriesId }] : [];
+    }),
+  );
+
+  const power = await source<Row[]>`
+    select ${source(columns.gpu_power_series)} from gpu_power_series
+    where workflow_run_id = ${sourceRun.id}
+  `;
+  await insertRows(
+    db,
+    'gpu_power_series',
+    power.map((row) => ({ ...row, workflow_run_id: targetRun.id })),
+  );
+}
+
+function readTelemetryCounts(sql: Sql, runs: readonly RunSummary[]) {
+  return sql<{ key: string; counts: string }[]>`
+    select wr.github_run_id::text || '#' || wr.run_attempt::text as key, concat_ws(' ',
+      (select count(*) from gpu_metric_series s where s.workflow_run_id = wr.id),
+      (select count(*) from gpu_metric_samples m
+        join gpu_metric_series s on s.id = m.series_id where s.workflow_run_id = wr.id),
+      (select count(*) from gpu_metric_sample_blobs bl
+        join gpu_metric_series s on s.id = bl.series_id where s.workflow_run_id = wr.id),
+      (select count(*) from benchmark_result_gpu_metrics l
+        join benchmark_results b on b.id = l.benchmark_result_id where b.workflow_run_id = wr.id),
+      (select count(*) from gpu_power_series p where p.workflow_run_id = wr.id)
+    ) as counts
+    from workflow_runs wr
+    join unnest(
+      ${`{${runs.map((run) => run.github_run_id).join(',')}}`}::bigint[],
+      ${`{${runs.map((run) => run.run_attempt).join(',')}}`}::smallint[]
+    ) as selected(github_run_id, run_attempt)
+      on selected.github_run_id = wr.github_run_id and selected.run_attempt = wr.run_attempt
+  `;
+}
+
 interface TargetBenchmark {
   id: string;
   server_log_id: string | null;
@@ -869,9 +992,21 @@ async function moveVerifiedRuns(runs: readonly RunSummary[]): Promise<number> {
   for (const gap of gaps) {
     console.error(`  ✗ ${runKey(gap.summary)} incomplete in public: ${gap.shortTables.join(', ')}`);
   }
-  if (gaps.length > 0) {
+  const [sourceTelemetry, targetTelemetry] = await Promise.all([
+    readTelemetryCounts(source, runs),
+    readTelemetryCounts(target, runs),
+  ]);
+  const targetCounts = new Map(targetTelemetry.map((row) => [row.key, row.counts]));
+  const telemetryGaps = sourceTelemetry.filter((row) => targetCounts.get(row.key) !== row.counts);
+  for (const row of telemetryGaps) {
+    console.error(
+      `  ✗ ${row.key} GPU telemetry differs in public: series, samples, blobs, links, power ` +
+        `${row.counts} here, ${targetCounts.get(row.key) ?? 'none'} there`,
+    );
+  }
+  if (gaps.length + telemetryGaps.length > 0) {
     console.error('  nothing deleted from this database; rerun to finish the promotion');
-    return gaps.length;
+    return gaps.length + telemetryGaps.length;
   }
   const owner = createAdminSql({ noSsl: hasNoSslFlag(), max: 1, onnotice: () => {} });
   try {
@@ -965,6 +1100,7 @@ async function main(): Promise<void> {
   let ok = 0;
   let failed = 0;
   const t0 = Date.now();
+  const failedRuns = new Set<string>();
   for (const plan of plans) {
     const start = Date.now();
     try {
@@ -974,6 +1110,7 @@ async function main(): Promise<void> {
       console.log(`  ✓ ${describePlan(plan)} (${elapsed}s, ${ok + failed}/${plans.length})`);
     } catch (error) {
       failed++;
+      failedRuns.add(runKey(plan.summary));
       const message = error instanceof Error ? error.message : String(error);
       // postgres.js attaches the failing statement; its head names the table.
       const query =
@@ -981,6 +1118,17 @@ async function main(): Promise<void> {
           ? error.query.replaceAll(/\s+/g, ' ').slice(0, 80)
           : null;
       console.error(`  ✗ ${describePlan(plan)}: ${message}${query ? ` [${query}]` : ''}`);
+    }
+  }
+  if (toPublic) {
+    for (const run of selectedRuns!.filter((selected) => !failedRuns.has(runKey(selected)))) {
+      try {
+        await target.begin((tx) => copyGpuTelemetry(tx, run, configIds));
+      } catch (error) {
+        failed++;
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`  ✗ ${runKey(run)} GPU telemetry: ${message}`);
+      }
     }
   }
 
