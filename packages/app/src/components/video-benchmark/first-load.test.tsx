@@ -61,7 +61,6 @@ it.each([true, false])(
             points={[point]}
             initialSides={{ [videoClipSourceKey(point)]: available ? side : null }}
             colorFor={() => 'black'}
-            hidden={new Set()}
           />
         </>
       );
@@ -77,7 +76,11 @@ it.each([true, false])(
     expect(container.querySelector('video')?.getAttribute('src')).toBe(
       available ? '/retained.mp4' : undefined,
     );
-    if (available) expect(container.querySelector('video')?.getAttribute('preload')).toBe('auto');
+    if (available)
+      expect(
+        container.querySelector('video')?.getAttribute('preload'),
+        'no media before Play',
+      ).toBe('none');
     expect(container.querySelector('output')?.textContent).toBe(
       JSON.stringify({ official: 0, named: 3, loading: false, replay: true }),
     );
@@ -124,7 +127,7 @@ it('shows a newly read clip while another selected source is still pending', asy
   document.body.append(container);
   await act(async () => {
     root = createRoot(container!);
-    root.render(<VideoResultsClips points={points} colorFor={() => 'black'} hidden={new Set()} />);
+    root.render(<VideoResultsClips points={points} colorFor={() => 'black'} />);
     await Promise.resolve();
   });
   expect(container.querySelectorAll('video')).toHaveLength(1);
@@ -134,6 +137,31 @@ it('shows a newly read clip while another selected source is still pending', asy
     pending.resolve(Response.json(slow.stored));
     await pending.promise;
   });
-  expect(container.querySelectorAll('video')).toHaveLength(2);
+  expect(container.querySelectorAll('video')).toHaveLength(1);
+  expect(container.querySelector('video')?.getAttribute('src')).toBe('/123.mp4');
   expect(container.textContent).not.toContain('Loading retained clips');
+});
+
+it('shows the loading state on both sides while the subject is read', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => new Promise<Response>(() => {})),
+  );
+  const fixture = referenceQualityFixture(20);
+  const point = namedRunPoints(
+    [{ schemaVersion: 1, entries: [videoHistoryEntry(fixture.stored, null)], nextPage: null }],
+    fixture.stored.runId,
+  ).find((candidate) => candidate.cell === 'c1')!;
+  container = document.createElement('div');
+  document.body.append(container);
+  act(() => {
+    root = createRoot(container!);
+    root.render(<VideoResultsClips points={[point]} colorFor={() => 'black'} />);
+  });
+  for (const side of ['a', 'b'])
+    expect(container.querySelector(`[data-side="${side}"]`)?.textContent).toContain(
+      'Loading retained clips',
+    );
 });

@@ -70,6 +70,7 @@ import VideoDeploymentDetail from './VideoDeploymentDetail';
 import VideoResultsChart, { VIDEO_RESULTS_CHART_ID } from './VideoResultsChart';
 import VideoCostContext from './VideoCostContext';
 import VideoResultsClips from './VideoResultsClips';
+import { isStageParam } from './clip-stage';
 import { resultsClipPoints } from './results-clips';
 import { ResultsBars, resultsNumber as n, type ResultBar } from './VideoResultsCharts';
 import VideoHistory from './VideoHistory';
@@ -304,7 +305,10 @@ export default function VideoDashboard({
     latest.current = next;
     const params = new URLSearchParams(
       [...new URLSearchParams(location.search)].filter(
-        ([key]) => !key.startsWith('r_') && key !== 'unofficialrun' && key !== 'unofficialruns',
+        ([key]) =>
+          (!key.startsWith('r_') || isStageParam(key)) &&
+          key !== 'unofficialrun' &&
+          key !== 'unofficialruns',
       ),
     );
     for (const [key, value] of new URLSearchParams(resultsSearch(next))) params.set(key, value);
@@ -897,8 +901,6 @@ export default function VideoDashboard({
               initialSides={initialData?.sides}
               points={clipPoints}
               colorFor={(key) => (overlayClips.has(key) ? overlayRunColor(0) : colorFor(key))}
-              hidden={hidden}
-              options={{ tier: state.costTier }}
               costs={Object.fromEntries(
                 cells.map((c) => [
                   c.point.id,

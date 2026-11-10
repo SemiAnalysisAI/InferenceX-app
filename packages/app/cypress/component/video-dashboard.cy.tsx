@@ -236,7 +236,7 @@ describe('VideoGenX results', () => {
 
   it('shows a named unapproved run without an approved cohort and clears it without promotion', () => {
     mount({
-      search: '?unofficialrun=34341996789&r_y=videosPerGpuHour',
+      search: '?unofficialrun=34341996789&r_y=videosPerGpuHour&r_view=side',
       editPage: (page) => {
         for (const entry of page.entries) entry.approved = false;
       },
@@ -257,9 +257,9 @@ describe('VideoGenX results', () => {
       });
     cy.get('[data-testid="results-overlay"]').should('not.exist');
     points().should('not.exist');
-    cy.get('[data-testid="video-results-clip"] video').should('not.exist');
-    cy.get('[data-testid="video-results-play"]').should('be.disabled');
-    cy.get('[data-testid="video-results-scrub"]').should('be.disabled');
+    cy.get('[data-testid="video-results-stage"]').should('not.exist');
+    // Rewriting the results keys keeps the clip stage's own keys.
+    searchParam('r_view').should('equal', 'side');
     cy.contains('summary', 'Performance history').click();
     cy.get('[data-testid="video-history-entry"]').should('have.length', 7);
     cy.get('[data-testid="video-history-publication"]').each(($entry) => {
@@ -284,7 +284,7 @@ describe('VideoGenX results', () => {
     });
     cy.get('[data-testid="video-results-clip"][data-hardware="b200"]')
       .should('contain', 'Unofficial run')
-      .find('.rounded-full')
+      .find('[data-testid="video-results-pill"] .rounded-full')
       .should('have.attr', 'style')
       .and('contain', overlayRunColor(0));
   });
@@ -699,20 +699,13 @@ describe('VideoGenX results', () => {
       cy.get('[data-testid="results-price-t2v"]').should('be.visible');
       cy.get('[data-testid="results-advanced"] > summary').click();
       cy.get('[data-testid="results-advanced"]').should('not.have.attr', 'open');
-      cy.get('[data-testid="video-results-clip"]').should(($tiles) => {
-        expect($tiles, 'one tile per measured hardware').to.have.length(3);
-        const first = $tiles[0].getBoundingClientRect();
-        const second = $tiles[1].getBoundingClientRect();
-        if (width === 1440) {
-          const columns = new Set(
-            [...$tiles].map((tile) => Math.round(tile.getBoundingClientRect().left)),
-          );
-          expect(columns.size).to.equal(3);
-        }
-        if (width === 320) expect(second.top).to.be.greaterThan(first.top);
-        else if (width === 390) expect(second.top).to.be.closeTo(first.top, 2);
+      cy.get('[data-testid="video-results-stage"]').should(($stage) => {
+        const rect = $stage[0].getBoundingClientRect();
+        expect(rect.left, 'stage inside the page').to.be.at.least(0);
+        expect(rect.right).to.be.at.most(width);
+        expect(rect.width, 'stage spans the card').to.be.greaterThan(width * 0.6);
       });
-      cy.get('[data-testid="video-results-clip"][data-hardware="b200"]')
+      cy.get('[data-testid="video-results-facts"]')
         .should('contain', 'TCO')
         .and('contain', pathname.startsWith('/zh') ? '分配 GPU' : 'Allocated');
       cy.get('[data-testid="video-results-sources"] summary').click();
