@@ -21,6 +21,7 @@ import {
 } from '@/components/agentic-workload-explorer/ui/table';
 import { Badge } from '@/components/ui/badge';
 import {
+  formatDollars,
   formatNumber,
   formatDuration,
   formatInteractivityCompact,
@@ -36,6 +37,10 @@ import {
 import { computeSessionCacheHitRates } from '@/lib/agentic-workload-explorer/tokens-over-time';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import {
+  ShowMoreRows,
+  useRowLimit,
+} from '@/components/agentic-workload-explorer/conversation-view';
 
 const STRINGS = {
   en: {
@@ -58,6 +63,7 @@ const STRINGS = {
     nReq: (n: number) => `${n} req`,
     childRequest: (n: number) => `└ request ${n}`,
     tokens: 'tokens',
+    sampleCount: (n: string) => `N = ${n}`,
     colTurn: 'Turn',
     colTimestamp: 'Timestamp (UTC)',
     colType: 'Type',
@@ -101,6 +107,7 @@ const STRINGS = {
     nReq: (n: number) => `${n} 个请求`,
     childRequest: (n: number) => `└ 请求 ${n}`,
     tokens: 'token',
+    sampleCount: (n: string) => `N = ${n}`,
     colTurn: '轮次',
     colTimestamp: '时间戳 (UTC)',
     colType: '类型',
@@ -145,7 +152,8 @@ function scrollToRow(turn: number) {
 }
 
 export default function StatisticsPage() {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const { requests, loadUntil } = useSession();
   const params = useParams();
   const id = params.id as string;
@@ -159,6 +167,7 @@ export default function StatisticsPage() {
   } | null>(null);
   const [loadingRequest, setLoadingRequest] = useState<number | null>(null);
   const pendingScrollRef = useRef<HistogramEntry | null>(null);
+  const [rowLimit, setRowLimit, showMoreRows] = useRowLimit();
 
   useEffect(() => {
     fetch(`/api/v1/agentic-workload-explorer/sessions/${id}/stats`)
@@ -181,6 +190,8 @@ export default function StatisticsPage() {
   }, [requests.length, rows]);
 
   function revealTurn(info: TurnInfo) {
+    const rowIndex = rows.findIndex((r) => r.turn === info.turn);
+    if (rowIndex >= rowLimit) setRowLimit(rowIndex + 1);
     if (info.kind === 'subagent_group') {
       setExpandedGroups((prev) => new Set(prev).add(info.turn));
     }
@@ -325,12 +336,8 @@ export default function StatisticsPage() {
             <ExpandableChart
               key={key}
               sharedZoom
-              title={
-                <>
-                  {title} {t.distribution}{' '}
-                  <span className="text-muted-foreground font-normal">(N={indexed.length})</span>
-                </>
-              }
+              title={`${title} ${t.distribution}`}
+              subtitle={t.sampleCount(indexed.length.toLocaleString(locale))}
             >
               {(expanded, close) => (
                 <>
@@ -381,7 +388,7 @@ export default function StatisticsPage() {
                                 void navigateToRequest(e);
                               }}
                             >
-                              <span className="font-mono flex items-center gap-1.5">
+                              <span className="flex items-center gap-1.5 tabular-nums">
                                 {isLoading && (
                                   <span className="inline-block w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
                                 )}
@@ -400,7 +407,7 @@ export default function StatisticsPage() {
                                   <span>{t.reqNum(e.request)}</span>
                                 )}
                               </span>
-                              <span className="font-mono">{formatNumber(e.value)}</span>
+                              <span className="tabular-nums">{formatNumber(e.value)}</span>
                             </button>
                           );
                         })}
@@ -432,12 +439,8 @@ export default function StatisticsPage() {
             <ExpandableChart
               key={title}
               sharedZoom
-              title={
-                <>
-                  {title} {t.distribution}{' '}
-                  <span className="text-muted-foreground font-normal">(N={values.length})</span>
-                </>
-              }
+              title={`${title} ${t.distribution}`}
+              subtitle={t.sampleCount(values.length.toLocaleString(locale))}
             >
               {(expanded) => (
                 <DistributionHistogram
@@ -456,7 +459,7 @@ export default function StatisticsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">{t.tokenStatistics}</CardTitle>
+          <CardTitle>{t.tokenStatistics}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -480,54 +483,54 @@ export default function StatisticsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row, rowIdx) => {
+              {rows.slice(0, rowLimit).map((row, rowIdx) => {
                 const gap = gaps[rowIdx];
                 const gapStr = gap === null ? '—' : `${gap.toFixed(1)}s`;
                 if (row.kind === 'main') {
                   return (
                     <TableRow key={row.turn} id={`turn-${row.turn}`}>
-                      <TableCell className="font-mono text-xs">{row.turn}</TableCell>
-                      <TableCell className="font-mono text-xs">
+                      <TableCell className="tabular-nums text-xs">{row.turn}</TableCell>
+                      <TableCell className="tabular-nums text-xs">
                         {formatUTC(row.timestamp)}
                       </TableCell>
                       <TableCell>
                         <span className="text-xs text-muted-foreground">{t.main}</span>
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{row.model || '—'}</TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="text-xs">{row.model || '—'}</TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">
                         {formatNumber(row.input)}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="text-right tabular-nums text-xs">
                         {row.cacheRead > 0 ? formatNumber(row.cacheRead) : '—'}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="text-right tabular-nums text-xs">
                         {row.cacheWrite > 0 ? formatNumber(row.cacheWrite) : '—'}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="text-right tabular-nums text-xs">
                         {formatNumber(row.output)}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        {row.cost > 0 ? `$${row.cost.toFixed(4)}` : '—'}
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {row.cost > 0 ? formatDollars(row.cost) : '—'}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="text-right tabular-nums text-xs">
                         {row.ttftMs === null ? '—' : formatDuration(row.ttftMs)}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                      <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
                         {(() => {
                           const ps = computePrefillSpeed(row.cacheRead, row.cacheWrite, row.ttftMs);
                           return ps === null ? '—' : formatPrefillSpeedCompact(ps);
                         })()}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="text-right tabular-nums text-xs">
                         {row.tpotMs === null ? '—' : formatDuration(row.tpotMs)}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="text-right tabular-nums text-xs">
                         {row.tpotMs === null ? '—' : formatInteractivityCompact(row.tpotMs)}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="text-right tabular-nums text-xs">
                         {row.durationMs > 0 ? formatDuration(row.durationMs) : '—'}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">{gapStr}</TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">{gapStr}</TableCell>
                     </TableRow>
                   );
                 }
@@ -543,8 +546,8 @@ export default function StatisticsPage() {
                         toggleGroup(row.turn);
                       }}
                     >
-                      <TableCell className="font-mono text-xs">{row.turn}</TableCell>
-                      <TableCell className="font-mono text-xs">
+                      <TableCell className="tabular-nums text-xs">{row.turn}</TableCell>
+                      <TableCell className="tabular-nums text-xs">
                         {formatUTC(row.timestamp)}
                       </TableCell>
                       <TableCell>
@@ -561,41 +564,41 @@ export default function StatisticsPage() {
                           />
                         </div>
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{row.model || '—'}</TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="text-xs">{row.model || '—'}</TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">
                         {formatNumber(row.input)}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="text-right tabular-nums text-xs">
                         {row.cacheRead > 0 ? formatNumber(row.cacheRead) : '—'}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="text-right tabular-nums text-xs">
                         {row.cacheWrite > 0 ? formatNumber(row.cacheWrite) : '—'}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="text-right tabular-nums text-xs">
                         {formatNumber(row.output)}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        {row.cost > 0 ? `$${row.cost.toFixed(4)}` : '—'}
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {row.cost > 0 ? formatDollars(row.cost) : '—'}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="text-right tabular-nums text-xs">
                         {row.ttftMs === null ? '—' : formatDuration(row.ttftMs)}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                      <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
                         {(() => {
                           const ps = computePrefillSpeed(row.cacheRead, row.cacheWrite, row.ttftMs);
                           return ps === null ? '—' : formatPrefillSpeedCompact(ps);
                         })()}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="text-right tabular-nums text-xs">
                         {row.tpotMs === null ? '—' : formatDuration(row.tpotMs)}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="text-right tabular-nums text-xs">
                         {row.tpotMs === null ? '—' : formatInteractivityCompact(row.tpotMs)}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
+                      <TableCell className="text-right tabular-nums text-xs">
                         {row.durationMs > 0 ? formatDuration(row.durationMs) : '—'}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs">{gapStr}</TableCell>
+                      <TableCell className="text-right tabular-nums text-xs">{gapStr}</TableCell>
                     </TableRow>
                     {isExpanded &&
                       row.children.map((child, ci) => {
@@ -605,7 +608,7 @@ export default function StatisticsPage() {
                         return (
                           <TableRow key={`${row.turn}-sub-${ci}`} className="bg-muted/30">
                             <TableCell />
-                            <TableCell className="font-mono text-xs">
+                            <TableCell className="tabular-nums text-xs">
                               {formatUTC(child.timestamp)}
                             </TableCell>
                             <TableCell>
@@ -613,28 +616,26 @@ export default function StatisticsPage() {
                                 {t.childRequest(ci + 1)}
                               </span>
                             </TableCell>
-                            <TableCell className="font-mono text-xs">
-                              {child.model || '—'}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-xs">
+                            <TableCell className="text-xs">{child.model || '—'}</TableCell>
+                            <TableCell className="text-right tabular-nums text-xs">
                               {formatNumber(child.input)}
                             </TableCell>
-                            <TableCell className="text-right font-mono text-xs">
+                            <TableCell className="text-right tabular-nums text-xs">
                               {child.cacheRead > 0 ? formatNumber(child.cacheRead) : '—'}
                             </TableCell>
-                            <TableCell className="text-right font-mono text-xs">
+                            <TableCell className="text-right tabular-nums text-xs">
                               {child.cacheWrite > 0 ? formatNumber(child.cacheWrite) : '—'}
                             </TableCell>
-                            <TableCell className="text-right font-mono text-xs">
+                            <TableCell className="text-right tabular-nums text-xs">
                               {formatNumber(child.output)}
                             </TableCell>
-                            <TableCell className="text-right font-mono text-xs">
-                              {child.cost > 0 ? `$${child.cost.toFixed(4)}` : '—'}
+                            <TableCell className="text-right tabular-nums text-xs">
+                              {child.cost > 0 ? formatDollars(child.cost) : '—'}
                             </TableCell>
-                            <TableCell className="text-right font-mono text-xs">
+                            <TableCell className="text-right tabular-nums text-xs">
                               {child.ttftMs === null ? '—' : formatDuration(child.ttftMs)}
                             </TableCell>
-                            <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                            <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
                               {(() => {
                                 const ps = computePrefillSpeed(
                                   child.cacheRead,
@@ -644,18 +645,18 @@ export default function StatisticsPage() {
                                 return ps === null ? '—' : formatPrefillSpeedCompact(ps);
                               })()}
                             </TableCell>
-                            <TableCell className="text-right font-mono text-xs">
+                            <TableCell className="text-right tabular-nums text-xs">
                               {child.tpotMs === null ? '—' : formatDuration(child.tpotMs)}
                             </TableCell>
-                            <TableCell className="text-right font-mono text-xs">
+                            <TableCell className="text-right tabular-nums text-xs">
                               {child.tpotMs === null
                                 ? '—'
                                 : formatInteractivityCompact(child.tpotMs)}
                             </TableCell>
-                            <TableCell className="text-right font-mono text-xs">
+                            <TableCell className="text-right tabular-nums text-xs">
                               {child.durationMs > 0 ? formatDuration(child.durationMs) : '—'}
                             </TableCell>
-                            <TableCell className="text-right font-mono text-xs">
+                            <TableCell className="text-right tabular-nums text-xs">
                               {childGap.toFixed(1)}s
                             </TableCell>
                           </TableRow>
@@ -671,48 +672,54 @@ export default function StatisticsPage() {
                 <TableCell />
                 <TableCell className="text-xs">{t.total}</TableCell>
                 <TableCell />
-                <TableCell className="text-right font-mono text-xs">
+                <TableCell className="text-right tabular-nums text-xs">
                   {formatNumber(totals.input)}
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs">
+                <TableCell className="text-right tabular-nums text-xs">
                   {totals.cacheRead > 0 ? formatNumber(totals.cacheRead) : '—'}
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs">
+                <TableCell className="text-right tabular-nums text-xs">
                   {totals.cacheWrite > 0 ? formatNumber(totals.cacheWrite) : '—'}
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs">
+                <TableCell className="text-right tabular-nums text-xs">
                   {formatNumber(totals.output)}
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs">
-                  ${totals.cost.toFixed(4)}
+                <TableCell className="text-right tabular-nums text-xs">
+                  ${totals.cost.toFixed(2)}
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs">
+                <TableCell className="text-right tabular-nums text-xs">
                   {totals.ttftCount > 0 ? formatDuration(totals.ttftMs / totals.ttftCount) : '—'}
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
                   {(() => {
                     const avgTtft = totals.ttftCount > 0 ? totals.ttftMs / totals.ttftCount : null;
                     const ps = computePrefillSpeed(totals.cacheRead, totals.cacheWrite, avgTtft);
                     return ps === null ? '—' : formatPrefillSpeedCompact(ps);
                   })()}
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs">
+                <TableCell className="text-right tabular-nums text-xs">
                   {totals.tpotTokenCount > 0
                     ? formatDuration(totals.tpotWeightedMs / totals.tpotTokenCount)
                     : '—'}
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs">
+                <TableCell className="text-right tabular-nums text-xs">
                   {totals.tpotTokenCount > 0
                     ? formatInteractivityCompact(totals.tpotWeightedMs / totals.tpotTokenCount)
                     : '—'}
                 </TableCell>
-                <TableCell className="text-right font-mono text-xs">
+                <TableCell className="text-right tabular-nums text-xs">
                   {formatDuration(totals.durationMs)}
                 </TableCell>
                 <TableCell />
               </TableRow>
             </TableFooter>
           </Table>
+          <ShowMoreRows
+            shown={Math.min(rowLimit, rows.length)}
+            total={rows.length}
+            view="statistics"
+            onShowMore={showMoreRows}
+          />
         </CardContent>
       </Card>
     </div>
@@ -731,11 +738,11 @@ function CacheHitRateCard({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-xs font-medium text-muted-foreground">{label}</CardTitle>
+        <CardTitle>{label}</CardTitle>
+        <div className="text-xs text-muted-foreground">{subLabel}</div>
       </CardHeader>
       <CardContent>
         <div className="text-3xl font-medium tabular-nums text-foreground">{value.toFixed(1)}%</div>
-        <div className="mt-1 text-3xs font-mono text-muted-foreground">{subLabel}</div>
       </CardContent>
     </Card>
   );
@@ -757,7 +764,7 @@ function EmptyDistribution({ title, t }: { title: string; t: (typeof STRINGS)['e
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm">
+        <CardTitle>
           {title} {t.distribution}
         </CardTitle>
       </CardHeader>

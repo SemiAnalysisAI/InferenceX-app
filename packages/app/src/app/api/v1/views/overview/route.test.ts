@@ -32,7 +32,7 @@ function pageData(): OverviewPageData {
     models: [
       {
         model: 'DeepSeek-V4-Pro',
-        modelLabel: 'DeepSeekv4 Pro 0813 1.6T',
+        modelLabel: 'DeepSeek V4 Pro 0813 1.6T',
         category: 'default',
         scenario: 'single_turn_8k1k',
         platforms: [

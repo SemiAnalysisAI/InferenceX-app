@@ -12,6 +12,17 @@ export function emptyCompareTableData(): CompareTableData {
   return { defaultTargets: [], ssrRows: [], interactivityRange: { min: 0, max: 100 } };
 }
 
+/** Cost per million tokens at three significant figures, shared by the prose and the table. */
+export function fmtCost(v: number): string {
+  if (v >= 10) return `$${v.toFixed(1)}`;
+  if (v >= 0.1) return `$${v.toFixed(2)}`;
+  return `$${v.toFixed(3)}`;
+}
+
+export function fmtTput(v: number): string {
+  return Math.round(v).toLocaleString('en-US');
+}
+
 function interactivityRangeOf(pts: GPUDataPoint[]): { min: number; max: number } | null {
   if (pts.length === 0) return null;
   let min = Infinity;

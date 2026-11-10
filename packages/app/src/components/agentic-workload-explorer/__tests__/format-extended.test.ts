@@ -1,37 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import {
-  formatExplorerDateTime,
-  formatTime,
-  formatTimestamp,
-} from '@/lib/agentic-workload-explorer/format';
-
-describe('formatTimestamp', () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('formats a date string', () => {
-    const result = formatTimestamp('2026-03-15T14:30:00Z');
-    expect(result).toContain('Mar');
-    expect(result).toContain('15');
-  });
-
-  it('formats a Date object', () => {
-    const result = formatTimestamp(new Date('2026-12-25T08:00:00Z'));
-    expect(result).toContain('Dec');
-    expect(result).toContain('25');
-  });
-
-  it('includes time components', () => {
-    const result = formatTimestamp('2026-06-01T00:00:00Z');
-    expect(result).toMatch(/\d{1,2}:\d{2}/u);
-  });
-
-  it('includes timezone name', () => {
-    const result = formatTimestamp('2026-01-01T00:00:00Z');
-    expect(result.length).toBeGreaterThan(10);
-  });
-});
+import { formatExplorerDateTime, formatTime } from '@/lib/agentic-workload-explorer/format';
 
 describe('formatTime', () => {
   afterEach(() => {
@@ -53,9 +21,10 @@ describe('formatTime', () => {
     expect(result).toMatch(/:\d{2}\s/u);
   });
 
-  it('includes timezone name', () => {
-    const result = formatTime('2026-01-01T00:00:00Z');
-    expect(result.length).toBeGreaterThan(8);
+  it('shows UTC on a 24-hour clock in every locale', () => {
+    expect(formatTime('2026-09-26T02:38:16Z')).toBe('02:38:16 UTC');
+    expect(formatTime('2026-09-26T14:00:05Z')).toBe('14:00:05 UTC');
+    expect(formatTime('2026-09-26T00:00:00Z', 'zh')).toBe('00:00:00 UTC');
   });
 });
 

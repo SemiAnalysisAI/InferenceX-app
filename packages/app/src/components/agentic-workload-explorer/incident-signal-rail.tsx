@@ -1,13 +1,21 @@
 'use client';
 
 import { type KeyboardEvent, useMemo, useRef, useState } from 'react';
-import { formatExplorerDateTime, formatNumber } from '@/lib/agentic-workload-explorer/format';
+import { scaleLinear } from 'd3';
+import { formatNumber } from '@/lib/agentic-workload-explorer/format';
+import { formatHourLabel } from '@/components/agentic-workload-explorer/trends-charts';
 import type { ErrorData } from '@/lib/agentic-workload-explorer/api-types';
 import { ChartActions, Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { EmptyState } from '@/components/ui/empty-state';
+import { CardTitle } from '@/components/ui/card';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
+import { CHART_TYPE } from '@/lib/d3-chart/typography';
+import { CURSOR_LINE_PROPS } from '@/lib/d3-chart/cursor';
+import { chartFont, measureTextWidth, useFontsVersion } from '@/lib/d3-chart/dynamic-margins';
 
 type Severity = 'nominal' | 'watch' | 'elevated' | 'critical';
 
@@ -173,13 +181,7 @@ function buildRailPoints(data: ErrorData['timeline']): RailPoint[] {
 }
 
 function formatHourUtc(hour: string, locale: Locale) {
-  return formatExplorerDateTime(hour, locale, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    timeZone: 'UTC',
-    timeZoneName: 'short',
-  });
+  return `${formatHourLabel(hour, locale)} UTC`;
 }
 
 function formatRate(rate: number) {
@@ -192,6 +194,8 @@ export function IncidentSignalRail({ data }: { data: ErrorData['timeline'] }) {
   const pointRefs = useRef<(SVGGElement | null)[]>([]);
   const points = useMemo(() => buildRailPoints(data), [data]);
   const [selectedHour, setSelectedHour] = useState<string | null>(() => data.at(-1)?.hour ?? null);
+  const [hover, setHover] = useState<{ index: number; x: number; y: number } | null>(null);
+  useFontsVersion();
 
   if (points.length === 0) {
     return (
@@ -204,14 +208,30 @@ export function IncidentSignalRail({ data }: { data: ErrorData['timeline'] }) {
   const matchingIndex = points.findIndex((point) => point.hour === selectedHour);
   const activeIndex = matchingIndex === -1 ? points.length - 1 : matchingIndex;
   const selected = points[activeIndex] ?? points.at(-1)!;
+  const hovered = hover ? points[hover.index] : undefined;
+  const shown = hovered ?? selected;
   const chartWidth = Math.max(760, LEFT + RIGHT + points.length * 24);
   const plotWidth = chartWidth - LEFT - RIGHT;
   const slotWidth = plotWidth / points.length;
   const barWidth = Math.min(12, Math.max(4, slotWidth - 3));
-  const maxRate = points.reduce(
-    (maximum, point) => Math.max(maximum, point.rate, point.baselineRate),
-    1,
-  );
+  const rateScale = scaleLinear()
+    .domain([
+      0,
+      points.reduce((maximum, point) => Math.max(maximum, point.rate, point.baselineRate), 1),
+    ])
+    .nice(4)
+    .range([RATE_TOP + RATE_HEIGHT, RATE_TOP]);
+  const rateTickFormat = rateScale.tickFormat(4);
+  const tickFont = chartFont(CHART_TYPE.axisLabelSub);
+  const hourTicks = points.flatMap((point, index) => {
+    const date = new Date(point.hour);
+    if (!Number.isFinite(date.getTime())) return [];
+    const label = formatHourLabel(point.hour, locale);
+    return [{ index, hour: date.getUTCHours(), label, width: measureTextWidth(label, tickFont) }];
+  });
+  const tickLabelWidth = Math.max(0, ...hourTicks.map((tick) => tick.width));
+  const tickStepHours = [6, 12, 24].find((step) => step * slotWidth >= tickLabelWidth + 16) ?? 24;
+  const xTicks = hourTicks.filter((tick) => tick.hour % tickStepHours === 0);
   const maxVolume = points.reduce((maximum, point) => Math.max(maximum, point.totalCount), 1);
   const anomalyCount = points.reduce(
     (count, point) => count + (point.severity === 'nominal' ? 0 : 1),
@@ -246,24 +266,10 @@ export function IncidentSignalRail({ data }: { data: ErrorData['timeline'] }) {
   return (
     <Expandable title={t.title}>
       <div className="space-y-3">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium">
-              {(Object.keys(SEVERITY_META) as Severity[]).map((severity) => (
-                <span
-                  key={severity}
-                  className="inline-flex items-center gap-1.5 text-muted-foreground"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="size-2 border border-black/10"
-                    style={{ backgroundColor: SEVERITY_META[severity].fill }}
-                  />
-                  {t.severity[severity].label}
-                </span>
-              ))}
-            </div>
-            <p className="mt-1 text-3xs font-mono text-muted-foreground">
+        <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
+          <div className="min-w-0 grow basis-48">
+            <CardTitle>{t.title}</CardTitle>
+            <p className="mt-1 text-xs text-muted-foreground">
               {t.baselineNote(TRAILING_HOURS, anomalyCount)}
             </p>
           </div>
@@ -272,69 +278,68 @@ export function IncidentSignalRail({ data }: { data: ErrorData['timeline'] }) {
             onExportPng={() => track('agentic_workload_incident_rail_export_png')}
           />
         </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium">
+          {(Object.keys(SEVERITY_META) as Severity[]).map((severity) => (
+            <span key={severity} className="inline-flex items-center gap-1.5 text-muted-foreground">
+              <span
+                aria-hidden="true"
+                className="size-2 border border-black/10"
+                style={{ backgroundColor: SEVERITY_META[severity].fill }}
+              />
+              {t.severity[severity].label}
+            </span>
+          ))}
+        </div>
 
         <div className="overflow-x-auto border-y border-border/20" data-chart-scroll>
           <svg
-            viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
-            className="h-[244px] min-w-[760px]"
-            style={{ width: chartWidth }}
+            width={chartWidth}
+            height={CHART_HEIGHT}
+            className="block"
             role="group"
             aria-label={t.ariaLabel}
+            onPointerLeave={() => setHover(null)}
           >
-            <text
-              x={LEFT - 10}
-              y={RATE_TOP + 8}
-              textAnchor="end"
-              fill="currentColor"
-              opacity={0.55}
-              className="text-3xs font-mono"
-            >
-              {formatRate(maxRate)}
-            </text>
-            <text
-              x={LEFT - 10}
-              y={RATE_TOP + RATE_HEIGHT}
-              textAnchor="end"
-              dominantBaseline="middle"
-              fill="currentColor"
-              opacity={0.55}
-              className="text-3xs font-mono"
-            >
-              0%
-            </text>
+            {rateScale.ticks(4).map((value) => (
+              <g key={value}>
+                <line
+                  x1={LEFT}
+                  x2={chartWidth - RIGHT}
+                  y1={rateScale(value)}
+                  y2={rateScale(value)}
+                  stroke="var(--chart-grid)"
+                  strokeWidth={1}
+                  shapeRendering="crispEdges"
+                />
+                <text
+                  x={LEFT - 10}
+                  y={rateScale(value)}
+                  textAnchor="end"
+                  dominantBaseline="middle"
+                  fill="var(--muted-foreground)"
+                  fontSize={CHART_TYPE.axisLabelSub}
+                  className="tabular-nums"
+                >
+                  {`${rateTickFormat(value)}%`}
+                </text>
+              </g>
+            ))}
             <text
               x={LEFT - 10}
               y={VOLUME_TOP + VOLUME_HEIGHT / 2}
               textAnchor="end"
               dominantBaseline="middle"
-              fill="currentColor"
-              opacity={0.55}
-              className="text-3xs font-mono"
+              fill="var(--muted-foreground)"
+              fontSize={CHART_TYPE.axisLabelSub}
             >
               {t.requests}
             </text>
-
-            {[0, 0.5, 1].map((fraction) => {
-              const y = RATE_TOP + RATE_HEIGHT * fraction;
-              return (
-                <line
-                  key={fraction}
-                  x1={LEFT}
-                  x2={chartWidth - RIGHT}
-                  y1={y}
-                  y2={y}
-                  stroke="currentColor"
-                  strokeOpacity={fraction === 1 ? 0.18 : 0.08}
-                  strokeDasharray={fraction === 1 ? undefined : '2 3'}
-                />
-              );
-            })}
 
             <polyline
               points={points
                 .map((point, index) => {
                   const x = LEFT + index * slotWidth + slotWidth / 2;
-                  return `${x},${RATE_TOP + RATE_HEIGHT - (point.baselineRate / maxRate) * RATE_HEIGHT}`;
+                  return `${x},${rateScale(point.baselineRate)}`;
                 })
                 .join(' ')}
               fill="none"
@@ -345,9 +350,20 @@ export function IncidentSignalRail({ data }: { data: ErrorData['timeline'] }) {
               aria-hidden="true"
             />
 
+            {hover && hovered && (
+              <line
+                x1={LEFT + hover.index * slotWidth + slotWidth / 2}
+                x2={LEFT + hover.index * slotWidth + slotWidth / 2}
+                y1={RATE_TOP - 5}
+                y2={VOLUME_TOP + VOLUME_HEIGHT + 5}
+                {...CURSOR_LINE_PROPS}
+                className="pointer-events-none"
+              />
+            )}
+
             {points.map((point, index) => {
               const x = LEFT + index * slotWidth + (slotWidth - barWidth) / 2;
-              const y = RATE_TOP + RATE_HEIGHT - (point.rate / maxRate) * RATE_HEIGHT;
+              const y = rateScale(point.rate);
               const height = Math.max(1, RATE_TOP + RATE_HEIGHT - y);
               const volumeHeight = Math.max(1, (point.totalCount / maxVolume) * VOLUME_HEIGHT);
               const isSelected = index === activeIndex;
@@ -384,6 +400,7 @@ export function IncidentSignalRail({ data }: { data: ErrorData['timeline'] }) {
                   }}
                   onFocus={() => setSelectedHour(point.hour)}
                   onKeyDown={(event) => selectAdjacent(event, index)}
+                  onPointerMove={(event) => setHover({ index, x: event.clientX, y: event.clientY })}
                 >
                   <rect
                     x={LEFT + index * slotWidth}
@@ -399,10 +416,10 @@ export function IncidentSignalRail({ data }: { data: ErrorData['timeline'] }) {
                       width={Math.max(1, slotWidth - 1)}
                       height={VOLUME_TOP + VOLUME_HEIGHT - RATE_TOP + 9}
                       fill="none"
-                      stroke="currentColor"
+                      stroke="var(--foreground)"
                       strokeWidth={1}
-                      strokeOpacity={0.8}
-                      strokeDasharray="2 2"
+                      strokeOpacity={0.6}
+                      rx={2}
                     />
                   )}
                   <rect
@@ -421,36 +438,57 @@ export function IncidentSignalRail({ data }: { data: ErrorData['timeline'] }) {
                     fill="#38bdf8"
                     opacity={isSelected ? 0.9 : 0.45}
                   />
-                  <title>{accessibleLabel}</title>
                 </g>
               );
             })}
 
-            <text
-              x={LEFT}
-              y={CHART_HEIGHT - 12}
-              fill="currentColor"
-              opacity={0.55}
-              className="text-3xs font-mono"
-            >
-              {formatExplorerDateTime(points[0].hour, locale, {
-                month: 'short',
-                day: 'numeric',
-                timeZone: 'UTC',
-              })}
-            </text>
-            <text
-              x={chartWidth - RIGHT}
-              y={CHART_HEIGHT - 12}
-              textAnchor="end"
-              fill="currentColor"
-              opacity={0.55}
-              className="text-3xs font-mono"
-            >
-              {formatHourUtc(points.at(-1)!.hour, locale)}
-            </text>
+            {xTicks.map((tick) => {
+              const x = LEFT + tick.index * slotWidth + slotWidth / 2;
+              return (
+                <g key={tick.index}>
+                  <line
+                    x1={x}
+                    x2={x}
+                    y1={VOLUME_TOP + VOLUME_HEIGHT + 5}
+                    y2={VOLUME_TOP + VOLUME_HEIGHT + 9}
+                    stroke="var(--muted-foreground)"
+                    strokeWidth={1}
+                    shapeRendering="crispEdges"
+                  />
+                  <text
+                    x={Math.min(chartWidth - tick.width / 2, Math.max(tick.width / 2, x))}
+                    y={CHART_HEIGHT - 12}
+                    textAnchor="middle"
+                    fill="var(--muted-foreground)"
+                    fontSize={CHART_TYPE.axisLabelSub}
+                    className="tabular-nums"
+                  >
+                    {tick.label}
+                  </text>
+                </g>
+              );
+            })}
           </svg>
         </div>
+        {hovered && hover && (
+          <FloatingTooltip x={hover.x} y={hover.y} placement="above">
+            <ChartHoverCardBody
+              title={formatHourUtc(hovered.hour, locale)}
+              subtitle={t.severity[hovered.severity].label}
+              color={SEVERITY_META[hovered.severity].fill}
+              metrics={[
+                { value: formatRate(hovered.rate), label: t.errorRate },
+                { value: formatNumber(hovered.errorCount), label: t.errors },
+                { value: formatNumber(hovered.totalCount), label: t.requests },
+              ]}
+              summary={
+                hovered.hasBaseline
+                  ? t.trailingBaselineLabel(formatRate(hovered.baselineRate))
+                  : t.baselineLearning
+              }
+            />
+          </FloatingTooltip>
+        )}
 
         <div
           className="grid gap-3 pt-1 sm:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))]"
@@ -460,40 +498,38 @@ export function IncidentSignalRail({ data }: { data: ErrorData['timeline'] }) {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span
-                className={`inline-flex rounded-md border px-1.5 py-0.5 text-xs font-medium ${SEVERITY_META[selected.severity].badge}`}
+                className={`inline-flex rounded-md border px-1.5 py-0.5 text-xs font-medium ${SEVERITY_META[shown.severity].badge}`}
               >
-                {t.severity[selected.severity].label}
+                {t.severity[shown.severity].label}
               </span>
-              <span className="truncate text-2xs font-mono font-medium">
-                {formatHourUtc(selected.hour, locale)}
+              <span className="truncate text-xs font-medium tabular-nums">
+                {formatHourUtc(shown.hour, locale)}
               </span>
             </div>
-            <p className="mt-1 text-3xs font-mono text-muted-foreground">
-              {t.severity[selected.severity].description}
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t.severity[shown.severity].description}
             </p>
           </div>
           <div>
             <div className="text-xs font-medium text-muted-foreground">{t.errorRate}</div>
-            <div className="text-sm font-medium tabular-nums">{formatRate(selected.rate)}</div>
-            <div className="text-3xs font-mono text-muted-foreground">
-              {formatNumber(selected.errorCount)} {t.errors}
+            <div className="text-sm font-medium tabular-nums">{formatRate(shown.rate)}</div>
+            <div className="text-xs tabular-nums text-muted-foreground">
+              {formatNumber(shown.errorCount)} {t.errors}
             </div>
           </div>
           <div>
             <div className="text-xs font-medium text-muted-foreground">{t.volume}</div>
-            <div className="text-sm font-medium tabular-nums">
-              {formatNumber(selected.totalCount)}
-            </div>
-            <div className="text-3xs font-mono text-muted-foreground">{t.requests}</div>
+            <div className="text-sm font-medium tabular-nums">{formatNumber(shown.totalCount)}</div>
+            <div className="text-xs text-muted-foreground">{t.requests}</div>
           </div>
           <div>
             <div className="text-xs font-medium text-muted-foreground">{t.trailingBaseline}</div>
             <div className="text-sm font-medium tabular-nums">
-              {selected.hasBaseline ? formatRate(selected.baselineRate) : t.learning}
+              {shown.hasBaseline ? formatRate(shown.baselineRate) : t.learning}
             </div>
-            <div className="text-3xs font-mono text-muted-foreground">
-              {selected.hasBaseline
-                ? `+${Math.max(0, selected.rate - selected.baselineRate).toFixed(2)} pp`
+            <div className="text-xs tabular-nums text-muted-foreground">
+              {shown.hasBaseline
+                ? `+${Math.max(0, shown.rate - shown.baselineRate).toFixed(2)} pp`
                 : t.needs3Hours}
             </div>
           </div>

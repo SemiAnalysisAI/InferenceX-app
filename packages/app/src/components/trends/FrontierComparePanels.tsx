@@ -7,8 +7,15 @@ import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensio
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-import { IndexedTimeline } from './FrontierIndexedTimeline';
 import {
+  IndexedTimeline,
+  PanelHoverCard,
+  usePanelHover,
+  useSnapshotDateFormat,
+} from './FrontierIndexedTimeline';
+import {
+  bandIndexAt,
+  formatRatio,
   labeledBuckets,
   PANEL_HEADER_CLASS,
   PANEL_HEIGHT,
@@ -22,6 +29,7 @@ import {
   frontierAreas,
   leadMargins,
   type FrontierHistory,
+  type LeadMargin,
 } from './frontier-history-core';
 
 const STRINGS = {
@@ -32,6 +40,9 @@ const STRINGS = {
     na: 'NA',
     noData: (name: string) => `no data for ${name}`,
     ahead: (name: string) => `${name} ahead`,
+    over: (leader: string, runnerUp: string) => `${leader} ahead of ${runnerUp}`,
+    onlyOne: (name: string) => `only ${name} reaches this interactivity`,
+    noneReach: 'None of the compared series reach this interactivity',
     even: 'even',
     needTwo: 'Pick at least two to compare.',
     areaTitle: 'Ground covered over time',
@@ -46,6 +57,9 @@ const STRINGS = {
     na: '无数据',
     noData: (name: string) => `${name} 无数据`,
     ahead: (name: string) => `${name} 领先`,
+    over: (leader: string, runnerUp: string) => `${leader} 领先 ${runnerUp}`,
+    onlyOne: (name: string) => `仅 ${name} 达到该交互性`,
+    noneReach: '所比较的系列均未达到该交互性',
     even: '持平',
     needTwo: '请至少选择两项进行比较。',
     areaTitle: '前沿覆盖面积随时间的变化',
@@ -54,9 +68,6 @@ const STRINGS = {
     was: (ratio: string, date: string) => `（${date} 时为 ${ratio}）`,
   },
 } as const;
-
-const formatRatio = (ratio: number) =>
-  ratio >= 10 ? `${ratio.toFixed(0)}x` : `${ratio.toFixed(ratio >= 2 ? 1 : 2)}x`;
 
 interface PanelProps {
   history: FrontierHistory;
@@ -83,18 +94,43 @@ export function FrontierLeadBars({ history, dateIndex, keys, styles, xLabel }: P
     return Math.min(max, 6);
   }, [history, keys, buckets]);
 
+  const width = Math.max(0, dimensions.width - PANEL_MARGIN.left - PANEL_MARGIN.right);
+  const height = dimensions.height - PANEL_MARGIN.top - PANEL_MARGIN.bottom;
+  const x = d3.scaleBand<number>().domain(buckets).range([0, width]).paddingInner(0.25);
+  const { hover, svgProps } = usePanelHover({
+    marginLeft: PANEL_MARGIN.left,
+    pick: (plotX) => bandIndexAt(x.step(), x.paddingInner(), buckets.length, plotX),
+  });
+
   if (keys.length < 2)
     return <p className="py-6 text-center text-sm text-muted-foreground">{t.needTwo}</p>;
 
   const margins = leadMargins(history, dateIndex, keys, buckets);
-  const width = Math.max(0, dimensions.width - PANEL_MARGIN.left - PANEL_MARGIN.right);
-  const height = dimensions.height - PANEL_MARGIN.top - PANEL_MARGIN.bottom;
-  const x = d3.scaleBand<number>().domain(buckets).range([0, width]).paddingInner(0.25);
   const y = d3
     .scaleLinear()
     .domain(diverging ? [-maxLog, maxLog] : [0, maxLog])
     .range([height, 0]);
   const ticks = d3.range(diverging ? -Math.floor(maxLog) : 0, Math.floor(maxLog) + 1);
+  const colorOf = (key: string) => styles.get(key)?.color ?? 'var(--muted-foreground)';
+  const missingOf = (m: LeadMargin) =>
+    diverging ? (keys.find((key) => key !== m.leader) ?? null) : null;
+  const hovered = hover ? margins[hover.at] : undefined;
+  const hoverMetric = (m: LeadMargin) => {
+    if (!m.leader) return { value: t.na, label: t.noneReach };
+    if (m.ratio === null) {
+      const missing = missingOf(m);
+      return {
+        value: t.na,
+        label: missing ? t.noData(label(missing)) : t.onlyOne(label(m.leader)),
+        color: colorOf(missing ?? m.leader),
+      };
+    }
+    return {
+      value: formatRatio(m.ratio),
+      label: t.over(label(m.leader), label(m.runnerUp!)),
+      color: colorOf(m.leader),
+    };
+  };
 
   return (
     <section className={PANEL_SECTION_CLASS}>
@@ -106,12 +142,33 @@ export function FrontierLeadBars({ history, dateIndex, keys, styles, xLabel }: P
       </div>
       <div ref={setContainerRef} className="w-full" data-testid="frontier-lead-bars">
         {width > 0 && (
-          <svg width={dimensions.width} height={dimensions.height} role="img">
-            <title>{t.barsTitle}</title>
+          <svg
+            {...svgProps}
+            width={dimensions.width}
+            height={dimensions.height}
+            role="img"
+            aria-label={t.barsTitle}
+            className="touch-none"
+          >
             <g transform={`translate(${PANEL_MARGIN.left},${PANEL_MARGIN.top})`}>
+              {hovered && (
+                <rect
+                  x={(x(hovered.x) ?? 0) - (x.step() * x.paddingInner()) / 2}
+                  width={x.step()}
+                  height={height}
+                  fill="var(--muted-foreground)"
+                  opacity={0.1}
+                  pointerEvents="none"
+                  data-testid="frontier-lead-bars-band"
+                />
+              )}
               {ticks.map((tick) => (
                 <g key={tick} transform={`translate(0,${y(tick)})`}>
-                  <line x2={width} stroke="var(--border)" strokeWidth={tick === 0 ? 1.5 : 1} />
+                  <line
+                    x2={width}
+                    stroke={tick === 0 ? 'var(--border)' : 'var(--chart-grid)'}
+                    strokeWidth={tick === 0 ? 1.5 : 1}
+                  />
                   <text
                     x={-8}
                     dy="0.32em"
@@ -136,7 +193,7 @@ export function FrontierLeadBars({ history, dateIndex, keys, styles, xLabel }: P
                     y={side.y}
                     fontSize={px(CHART_TYPE.annotation)}
                     fontWeight={600}
-                    fill={styles.get(side.key)?.color ?? 'var(--muted-foreground)'}
+                    fill={colorOf(side.key)}
                   >
                     {`${side.arrow} ${t.ahead(label(side.key))}`}
                   </text>
@@ -147,7 +204,7 @@ export function FrontierLeadBars({ history, dateIndex, keys, styles, xLabel }: P
                 const center = bandX + x.bandwidth() / 2;
                 // Only one series reaches this interactivity: no bar, just NA for the other.
                 if (m.ratio === null) {
-                  const missing = diverging ? keys.find((key) => key !== m.leader)! : null;
+                  const missing = missingOf(m);
                   const below = diverging && missing === keys[1];
                   return (
                     <text
@@ -157,15 +214,8 @@ export function FrontierLeadBars({ history, dateIndex, keys, styles, xLabel }: P
                       textAnchor="middle"
                       fontSize={px(CHART_TYPE.micro)}
                       fontWeight={600}
-                      fill={
-                        missing
-                          ? (styles.get(missing)?.color ?? 'var(--muted-foreground)')
-                          : 'var(--muted-foreground)'
-                      }
+                      fill={missing ? colorOf(missing) : 'var(--muted-foreground)'}
                     >
-                      <title>
-                        {`${Math.round(m.x)} ${xLabel} · ${missing ? t.noData(label(missing)) : t.na}`}
-                      </title>
                       {t.na}
                     </text>
                   );
@@ -182,13 +232,9 @@ export function FrontierLeadBars({ history, dateIndex, keys, styles, xLabel }: P
                     width={x.bandwidth()}
                     height={Math.max(1, bottom - top)}
                     rx={3}
-                    fill={styles.get(m.leader)?.color ?? 'var(--muted-foreground)'}
+                    fill={colorOf(m.leader)}
                     opacity={0.9}
-                  >
-                    <title>
-                      {`${label(m.leader)} · ${Math.round(m.x)} ${xLabel} · ${formatRatio(m.ratio)} ${label(m.runnerUp!)}`}
-                    </title>
-                  </rect>
+                  />
                 );
               })}
               {labeledBuckets(buckets, width).map((bucket) => (
@@ -215,6 +261,14 @@ export function FrontierLeadBars({ history, dateIndex, keys, styles, xLabel }: P
             </g>
           </svg>
         )}
+        {hover && hovered && (
+          <PanelHoverCard
+            hover={hover}
+            title={`${Math.round(hovered.x)} ${xLabel}`}
+            metrics={[hoverMetric(hovered)]}
+            testId="frontier-lead-bars-hover-card"
+          />
+        )}
       </div>
     </section>
   );
@@ -228,18 +282,9 @@ export function FrontierAreaTimeline({
   styles,
   onSeek,
 }: Omit<PanelProps, 'xLabel'> & { onSeek: (index: number) => void }) {
-  const locale = useLocale();
-  const t = STRINGS[locale];
+  const t = STRINGS[useLocale()];
   const areas = useMemo(() => frontierAreas(history), [history]);
-  const formatDate = useMemo(() => {
-    const formatter = new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'UTC',
-    });
-    return (date: string) => formatter.format(new Date(`${date}T00:00:00Z`));
-  }, [locale]);
+  const formatDate = useSnapshotDateFormat();
 
   const label = (key: string) => styles.get(key)?.label ?? key;
   const ranked = (index: number) =>

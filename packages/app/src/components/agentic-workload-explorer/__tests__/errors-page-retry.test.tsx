@@ -40,6 +40,12 @@ vi.mock('@/hooks/agentic-workload-explorer/use-dashboard-data', () => ({
   useDashboardData: mocks.useDashboardData,
 }));
 
+vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  measureTextWidth: (text: string, font: string) =>
+    text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
+}));
+
 import ErrorsPage from '@/components/agentic-workload-explorer/views/errors-view';
 
 const staleSnapshot: ErrorData = {

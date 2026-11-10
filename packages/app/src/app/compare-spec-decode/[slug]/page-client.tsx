@@ -219,29 +219,6 @@ export default function CompareSpecDecodePageClient({
               </Link>
             </div>
           </header>
-          <figure
-            className="mt-2 flex flex-col gap-2"
-            data-testid="compare-spec-decode-indexed-image"
-          >
-            <img
-              src={heroImageSrc}
-              alt={
-                isZh
-                  ? `${modelLabel}：${gpuLabel} ${precisionLabel} 上两种配置（启用 ${aLabel}、关闭投机解码）在相同交互性水平下的对比`
-                  : `${modelLabel}: ${gpuLabel} ${precisionLabel} ${aLabel} versus ${bLabel} speculative decoding comparison at matched interactivity levels`
-              }
-              width={1200}
-              height={675}
-              loading="eager"
-              fetchPriority="high"
-              className="w-full rounded-lg"
-            />
-            <figcaption className="text-xs text-muted-foreground">
-              {isZh
-                ? `${gpuLabel} ${precisionLabel} 上两种配置（启用 ${aLabel}、关闭投机解码）的对比（默认工作负载）`
-                : `${gpuLabel} ${precisionLabel} ${aLabel} versus ${bLabel} speculative decoding comparison for this page's canonical default workload`}
-            </figcaption>
-          </figure>
           <CompareTableSection
             gpu={gpu}
             method={method}
@@ -254,6 +231,38 @@ export default function CompareSpecDecodePageClient({
             ssrPrecisions={defaultPrecision ? [defaultPrecision] : (initialPrecisions ?? [])}
             emptyStateText={t.emptyState}
           />
+          <figure
+            className="mt-2 flex max-w-sm flex-col gap-2"
+            data-testid="compare-spec-decode-indexed-image"
+          >
+            <a href={heroImageSrc} target="_blank" rel="noopener noreferrer">
+              <img
+                src={heroImageSrc}
+                alt={
+                  isZh
+                    ? `${modelLabel}：${gpuLabel} ${precisionLabel} 上两种配置（启用 ${aLabel}、关闭投机解码）在相同交互性水平下的对比`
+                    : `${modelLabel}: ${gpuLabel} ${precisionLabel} ${aLabel} versus ${bLabel} speculative decoding comparison at matched interactivity levels`
+                }
+                width={1200}
+                height={675}
+                loading="lazy"
+                className="w-full rounded-lg"
+              />
+            </a>
+            <figcaption className="text-xs text-muted-foreground">
+              {isZh
+                ? `${gpuLabel} ${precisionLabel} 上两种配置（启用 ${aLabel}、关闭投机解码）的对比（默认工作负载）`
+                : `${gpuLabel} ${precisionLabel} ${aLabel} versus ${bLabel} speculative decoding comparison for this page's canonical default workload`}
+            </figcaption>
+            <a
+              href={heroImageSrc}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-foreground underline underline-offset-2"
+            >
+              {isZh ? '查看大图 ↗' : 'Open full-size image ↗'}
+            </a>
+          </figure>
         </Card>
         <LazyCompareInferenceChart
           activeTab="compare"

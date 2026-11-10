@@ -8,6 +8,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComparisonOp } from '@semianalysisai/inferencex-db/operatorx/compare';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
+import { ControlPanel } from '@/components/ui/control-panel';
 import { CONTROL_HEIGHT } from '@/components/ui/control-styles';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Heading } from '@/components/ui/heading';
@@ -40,6 +41,7 @@ const NO_BASELINE = 'none';
 const STRINGS = {
   en: {
     loading: 'Loading results…',
+    controlsGroup: 'Comparison config',
     empty: 'No results yet',
     workload: 'Workload',
     devices: 'Devices',
@@ -52,6 +54,7 @@ const STRINGS = {
   },
   zh: {
     loading: '正在加载结果…',
+    controlsGroup: '对比配置',
     empty: '暂无结果',
     workload: '工作负载',
     devices: '设备',
@@ -207,14 +210,17 @@ function ComparisonSkeleton({ op }: { op: ComparisonOp }) {
       aria-label={strings.loading}
     >
       <Card className="relative z-10 py-4 md:py-5">
-        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+        <ControlPanel
+          legend={strings.controlsGroup}
+          className="gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4"
+        >
           {CONTROL_LABELS.map((key) => (
             <div key={key} className="min-w-0 space-y-1.5">
               <Label>{strings[key]}</Label>
               <Skeleton aria-hidden="true" className={CONTROL_HEIGHT.default} />
             </div>
           ))}
-        </div>
+        </ControlPanel>
         <div className="mt-4 border-t border-border/30 pt-3">
           <Skeleton aria-hidden="true" className="h-[106px] lg:h-[62px]" />
         </div>
@@ -313,7 +319,10 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   return (
     <div className="flex flex-col gap-4">
       <Card className="relative z-10 py-4 md:py-5" data-testid="operatorx-controls">
-        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+        <ControlPanel
+          legend={strings.controlsGroup}
+          className="gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4"
+        >
           <ControlGroup label={strings.workload} htmlFor="operatorx-workload">
             <SearchableSelect
               triggerId="operatorx-workload"
@@ -395,7 +404,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
               ]}
             />
           </ControlGroup>
-        </div>
+        </ControlPanel>
         <div className="mt-4 border-t border-border/30 pt-3">
           <CoverageStrip model={model} />
         </div>

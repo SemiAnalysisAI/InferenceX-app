@@ -8,20 +8,23 @@ import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensio
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-import { IndexedTimeline } from './FrontierIndexedTimeline';
+import { IndexedTimeline, PanelHoverCard, usePanelHover } from './FrontierIndexedTimeline';
 import {
+  bandIndexAt,
+  formatRatio,
   labeledBuckets,
   PANEL_HEADER_CLASS,
   PANEL_HEIGHT,
   PANEL_MARGIN,
   PANEL_SECTION_CLASS,
+  SHORT_TABLE_ROWS,
 } from './frontier-panel-layout';
 import type { FrontierSeriesStyle } from './FrontierChart';
 import {
   averageSoftwareGain,
   comparisonBuckets,
   FRONTIER_COMPARISON_BUCKETS,
-  softwareGainBarMaxLog,
+  softwareGainBarExtent,
   softwareGainByInteractivity,
   softwareGains,
   type FrontierHistory,
@@ -33,6 +36,7 @@ const STRINGS = {
     gain: (name: string, ratio: string, date: string) =>
       `${name}: ${ratio} the ground of its first run (${date})`,
     barsTitle: 'Gain at each interactivity vs first run',
+    vsFirst: 'vs first run',
     na: 'NA',
     noData: (name: string) => `${name} does not reach this interactivity on both dates`,
     pick: 'Pick at least one chip.',
@@ -46,6 +50,7 @@ const STRINGS = {
     gain: (name: string, ratio: string, date: string) =>
       `${name}：覆盖面积为首次测试（${date}）的 ${ratio}`,
     barsTitle: '各交互性水平上相对首次测试的提升',
+    vsFirst: '相对首次测试',
     na: '无数据',
     noData: (name: string) => `${name} 在两个日期中未同时覆盖该交互性`,
     pick: '请至少选择一款芯片。',
@@ -55,9 +60,6 @@ const STRINGS = {
     average: '平均',
   },
 } as const;
-
-const formatRatio = (ratio: number) =>
-  ratio >= 10 ? `${ratio.toFixed(0)}x` : `${ratio.toFixed(ratio >= 2 ? 1 : 2)}x`;
 
 interface SoftwareProps {
   history: FrontierHistory;
@@ -145,23 +147,29 @@ export function FrontierSoftwareGainBars({
   const { dimensions, setContainerRef } = useResponsiveChartDimensions({ height: PANEL_HEIGHT });
   const buckets = useMemo(() => comparisonBuckets(history, FRONTIER_COMPARISON_BUCKETS), [history]);
   // Fixed scale across every date so playback never clips an earlier peak.
-  const maxLog = useMemo(
-    () => softwareGainBarMaxLog(history, keys, buckets),
+  const { min: minLog, max: maxLog } = useMemo(
+    () => softwareGainBarExtent(history, keys, buckets),
     [history, keys, buckets],
   );
+  const width = Math.max(0, dimensions.width - PANEL_MARGIN.left - PANEL_MARGIN.right);
+  const height = dimensions.height - PANEL_MARGIN.top - PANEL_MARGIN.bottom;
+  const x = d3.scaleBand<number>().domain(buckets).range([0, width]).paddingInner(0.25);
+  const { hover, svgProps } = usePanelHover({
+    marginLeft: PANEL_MARGIN.left,
+    pick: (plotX) => bandIndexAt(x.step(), x.paddingInner(), buckets.length, plotX),
+  });
 
   if (keys.length === 0) return null;
   const rows = keys.map((key) => ({
     key,
     gains: softwareGainByInteractivity(history, key, dateIndex, buckets),
   }));
-  const width = Math.max(0, dimensions.width - PANEL_MARGIN.left - PANEL_MARGIN.right);
-  const height = dimensions.height - PANEL_MARGIN.top - PANEL_MARGIN.bottom;
-  const x = d3.scaleBand<number>().domain(buckets).range([0, width]).paddingInner(0.25);
   const inner = d3.scaleBand<string>().domain(keys).range([0, x.bandwidth()]).paddingInner(0.1);
-  const y = d3.scaleLinear().domain([-maxLog, maxLog]).range([height, 0]);
-  const ticks = d3.range(Math.ceil(y.domain()[0]), Math.floor(maxLog) + 1);
+  const y = d3.scaleLinear().domain([minLog, maxLog]).range([height, 0]);
+  const ticks = d3.range(minLog, Math.floor(maxLog) + 1);
   const label = (key: string) => styles.get(key)?.label ?? key;
+  const colorOf = (key: string) => styles.get(key)?.color ?? 'var(--muted-foreground)';
+  const hoveredBucket = hover ? buckets[hover.at] : undefined;
 
   return (
     <section className={PANEL_SECTION_CLASS}>
@@ -170,12 +178,33 @@ export function FrontierSoftwareGainBars({
       </div>
       <div ref={setContainerRef} className="w-full" data-testid="frontier-software-bars">
         {width > 0 && (
-          <svg width={dimensions.width} height={dimensions.height} role="img">
-            <title>{t.barsTitle}</title>
+          <svg
+            {...svgProps}
+            width={dimensions.width}
+            height={dimensions.height}
+            role="img"
+            aria-label={t.barsTitle}
+            className="touch-none"
+          >
             <g transform={`translate(${PANEL_MARGIN.left},${PANEL_MARGIN.top})`}>
+              {hoveredBucket !== undefined && (
+                <rect
+                  x={(x(hoveredBucket) ?? 0) - (x.step() * x.paddingInner()) / 2}
+                  width={x.step()}
+                  height={height}
+                  fill="var(--muted-foreground)"
+                  opacity={0.1}
+                  pointerEvents="none"
+                  data-testid="frontier-software-bars-band"
+                />
+              )}
               {ticks.map((tick) => (
                 <g key={tick} transform={`translate(0,${y(tick)})`}>
-                  <line x2={width} stroke="var(--border)" strokeWidth={tick === 0 ? 1.5 : 1} />
+                  <line
+                    x2={width}
+                    stroke={tick === 0 ? 'var(--border)' : 'var(--chart-grid)'}
+                    strokeWidth={tick === 0 ? 1.5 : 1}
+                  />
                   <text
                     x={-8}
                     dy="0.32em"
@@ -190,7 +219,7 @@ export function FrontierSoftwareGainBars({
               {rows.flatMap((row) =>
                 row.gains.map((gain) => {
                   const left = (x(gain.x) ?? 0) + (inner(row.key) ?? 0);
-                  const color = styles.get(row.key)?.color ?? 'var(--muted-foreground)';
+                  const color = colorOf(row.key);
                   if (gain.ratio === null)
                     return (
                       <text
@@ -202,11 +231,10 @@ export function FrontierSoftwareGainBars({
                         fill={color}
                         opacity={0.7}
                       >
-                        <title>{t.noData(label(row.key))}</title>
                         {keys.length === 1 ? t.na : '·'}
                       </text>
                     );
-                  const value = Math.max(-maxLog, Math.min(maxLog, Math.log2(gain.ratio)));
+                  const value = Math.max(minLog, Math.min(maxLog, Math.log2(gain.ratio)));
                   const top = y(Math.max(0, value));
                   return (
                     <rect
@@ -218,11 +246,7 @@ export function FrontierSoftwareGainBars({
                       rx={2}
                       fill={color}
                       opacity={0.9}
-                    >
-                      <title>
-                        {`${label(row.key)} · ${Math.round(gain.x)} ${xLabel} · ${formatRatio(gain.ratio)}`}
-                      </title>
-                    </rect>
+                    />
                   );
                 }),
               )}
@@ -249,6 +273,22 @@ export function FrontierSoftwareGainBars({
               </text>
             </g>
           </svg>
+        )}
+        {hover && hoveredBucket !== undefined && (
+          <PanelHoverCard
+            hover={hover}
+            title={`${Math.round(hoveredBucket)} ${xLabel}`}
+            subtitle={t.vsFirst}
+            metrics={rows.map((row) => {
+              const ratio = row.gains[hover.at]?.ratio ?? null;
+              return {
+                value: ratio === null ? t.na : formatRatio(ratio),
+                label: ratio === null ? t.noData(label(row.key)) : label(row.key),
+                color: colorOf(row.key),
+              };
+            })}
+            testId="frontier-software-bars-hover-card"
+          />
         )}
       </div>
     </section>
@@ -326,7 +366,7 @@ export function FrontierSoftwareGainTable({
 
   if (keys.length === 0) return null;
   return (
-    <section className={`${PANEL_SECTION_CLASS} min-w-0 lg:col-span-2`}>
+    <section className={`${PANEL_SECTION_CLASS} min-w-0 pt-4 lg:col-span-2`}>
       <div className={PANEL_HEADER_CLASS}>
         <h3 className="text-sm font-semibold">{t.tableTitle}</h3>
       </div>
@@ -335,6 +375,8 @@ export function FrontierSoftwareGainTable({
         columns={columns}
         testId="frontier-software-table"
         analyticsPrefix="historical_frontier_software_table"
+        searchable={rows.length > SHORT_TABLE_ROWS}
+        columnPresets={rows.length > SHORT_TABLE_ROWS}
       />
     </section>
   );

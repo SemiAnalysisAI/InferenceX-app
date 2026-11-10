@@ -19,6 +19,7 @@ import FrontierChart, {
 import { FrontierAreaTimeline, FrontierLeadBars } from './FrontierComparePanels';
 import FrontierDataTable from './FrontierDataTable';
 import { FrontierGainRate } from './FrontierGainRatePanels';
+import { useSnapshotDateFormat } from './FrontierIndexedTimeline';
 import {
   FrontierSoftwareGain,
   FrontierSoftwareGainBars,
@@ -180,18 +181,6 @@ function headlineOvertake(
   );
 }
 
-function useDateFormatter(locale: 'en' | 'zh') {
-  return useMemo(() => {
-    const day = new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'UTC',
-    });
-    return (date: string) => day.format(new Date(`${date}T00:00:00Z`));
-  }, [locale]);
-}
-
 /**
  * The Frontier, Compare and Software gains views: the frontier chart with playback, chapters
  * and a data table, plus each view's own controls and panels.
@@ -212,9 +201,8 @@ export default function FrontierView({
   ...chartProps
 }: FrontierViewProps) {
   const { history: fullHistory, styles: allStyles } = chartProps;
-  const locale = useLocale();
-  const t = STRINGS[locale];
-  const formatDate = useDateFormatter(locale);
+  const t = STRINGS[useLocale()];
+  const formatDate = useSnapshotDateFormat();
   // Compare and Software gains draw each selected series on its own; Frontier pools them all.
   const perSeries = section !== 'frontier';
   // Comparing vendors shows every vendor; otherwise a chosen vendor narrows the view to its chips.
@@ -457,7 +445,9 @@ export default function FrontierView({
                 data-testid={`frontier-series-${key}`}
                 onClick={() => toggleSelected(key)}
                 className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                  on ? 'border-foreground/30 bg-secondary font-medium' : 'text-muted-foreground'
+                  on
+                    ? 'border-border bg-muted font-medium text-foreground dark:bg-input'
+                    : 'border-border text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <span

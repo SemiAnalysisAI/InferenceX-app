@@ -234,7 +234,11 @@ const responseExample = {
     tiers: 'default',
     format: 'json',
   },
-  model: { slug: 'deepseek-v4', displayName: 'DeepSeek-V4-Pro', label: 'DeepSeekv4 Pro 0813 1.6T' },
+  model: {
+    slug: 'deepseek-v4',
+    displayName: 'DeepSeek-V4-Pro',
+    label: 'DeepSeek V4 Pro 0813 1.6T',
+  },
   gpus: ['b200', 'mi355x'],
   scenario: 'agentic-traces',
   precision: 'fp8',

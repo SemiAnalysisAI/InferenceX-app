@@ -22,8 +22,17 @@ const data = buildSessionReusePayload(
   'anon',
 );
 let container: HTMLDivElement, root: Root;
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('ResizeObserver', ResizeObserverStub);
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(0, 0, 720, 0),
+  );
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);

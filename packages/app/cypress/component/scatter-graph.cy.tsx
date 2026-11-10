@@ -146,7 +146,7 @@ describe('ScatterGraph', () => {
     });
   }
 
-  it('shows the zoom hint in the plot corner until the first zoom', () => {
+  it('shows the zoom hint above the plot corner until the first zoom', () => {
     mountWithProviders(
       <div style={{ width: 1000 }}>
         <ScatterGraph
@@ -192,11 +192,10 @@ describe('ScatterGraph', () => {
         const svg = doc.querySelector('#zoom-hint [data-testid="d3-chart-svg"]')!;
         const xDomain = svg.querySelector('.x-axis > .domain')!.getBoundingClientRect();
         const yDomain = svg.querySelector('.y-axis > .domain')!.getBoundingClientRect();
-        expect(hint.top).to.be.at.least(yDomain.top);
-        expect(hint.top - yDomain.top).to.be.lessThan(16);
+        expect(hint.bottom).to.be.at.most(yDomain.top);
+        expect(yDomain.top - hint.bottom).to.be.lessThan(8);
         expect(hint.right).to.be.at.most(xDomain.right);
         expect(xDomain.right - hint.right).to.be.lessThan(20);
-        expect(hint.bottom).to.be.lessThan(xDomain.top);
         expect(doc.elementFromPoint(hint.left + 4, hint.top + 4)).not.to.equal($hint[0]);
       });
     cy.get('#zoom-hint [data-testid="d3-chart-svg"]').then(($svg) => {

@@ -59,13 +59,13 @@ function Content() {
   });
   if (loading)
     return (
-      <p className="text-xs font-mono text-muted-foreground" role="status">
+      <p className="text-xs text-muted-foreground" role="status">
         {t.loading}
       </p>
     );
   if (error || !data)
     return (
-      <div role="alert" className="text-xs font-mono">
+      <div role="alert" className="text-xs">
         {t.error}{' '}
         <button
           onClick={() => {
@@ -82,7 +82,7 @@ function Content() {
     return <p className="text-xs text-muted-foreground">{t.setupRequired}</p>;
   if ('warming' in data)
     return (
-      <div className="text-xs font-mono text-muted-foreground" role="status">
+      <div className="text-xs text-muted-foreground" role="status">
         {t.warming}{' '}
         <button
           onClick={() => {

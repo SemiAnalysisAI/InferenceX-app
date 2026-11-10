@@ -178,7 +178,7 @@ export default function ConversationPage() {
           {replayMode ? t.exitReplay : t.replay}
         </Button>
         {loadingAll && (
-          <span className="flex items-center gap-1.5 text-2xs font-mono text-muted-foreground">
+          <span className="flex items-center gap-1.5 text-2xs tabular-nums text-muted-foreground">
             <span className="h-3 w-3 border-2 border-foreground/20 border-t-foreground/60 rounded-full animate-spin" />
             {t.loadingRequests(requests.length, total)}
           </span>
@@ -205,6 +205,7 @@ export default function ConversationPage() {
           requests={requests}
           visibleNodeCount={replayReady ? replay.currentIndex : undefined}
           reversed={replayMode ? false : Boolean(reversed)}
+          targetRequestId={getHashTargetId(targetHash)?.slice('req-'.length) ?? null}
         />
         <div ref={lastNodeRef} />
       </div>

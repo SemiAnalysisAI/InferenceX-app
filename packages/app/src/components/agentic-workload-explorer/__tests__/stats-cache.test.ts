@@ -77,7 +77,6 @@ describe('statsCacheKey', () => {
       'traffic',
       'web-search',
       'platform',
-      'session-insights',
       'performance',
       'fast-mode',
     ] satisfies StatsCacheKind[];
@@ -90,6 +89,8 @@ describe('statsCacheKey', () => {
     expect(statsCacheKey('errors', [], 7)).toBe('sc:2:errors:anon:7');
     expect(statsCacheKey('graphs', null, null)).toBe('sc:4:graphs:all:all');
     expect(statsCacheKey('graphs', [], 7)).toBe('sc:4:graphs:anon:7');
+    expect(statsCacheKey('session-insights', null, null)).toBe('sc:2:session-insights:all:all');
+    expect(statsCacheKey('session-insights', [], 7)).toBe('sc:2:session-insights:anon:7');
     for (const kind of wave2AKinds) {
       expect(statsCacheKey(kind, null, null)).toBe(`sc:1:${kind}:all:all`);
       expect(statsCacheKey(kind, [], 7)).toBe(`sc:1:${kind}:anon:7`);
@@ -99,14 +100,16 @@ describe('statsCacheKey', () => {
 
 describe('sessionInsightsHistogram / sessionInsightsPercentiles (route port)', () => {
   it('empty input yields no bins and zeroed percentiles', () => {
-    const { bins, percentiles } = sessionInsightsHistogram([], 30);
+    const { bins, percentiles, total } = sessionInsightsHistogram([], 30);
     expect(bins).toEqual([]);
     expect(percentiles).toEqual({ p25: 0, p50: 0, p75: 0, p90: 0, p95: 0, p99: 0 });
+    expect(total).toBe(0);
   });
 
   it('single distinct value collapses to one [v, v+1) bin', () => {
-    const { bins } = sessionInsightsHistogram([5, 5, 5], 30);
+    const { bins, total } = sessionInsightsHistogram([5, 5, 5], 30);
     expect(bins).toEqual([{ min: 5, max: 6, count: 3 }]);
+    expect(total).toBe(3);
   });
 
   it('builds exactly bucketCount equal-width bins and clips beyond p95+10%', () => {
@@ -118,7 +121,7 @@ describe('sessionInsightsHistogram / sessionInsightsPercentiles (route port)', (
     expect(bins[0].min).toBe(1);
   });
 
-  it('clips extreme outliers above the p95+10% ceiling', () => {
+  it('clips extreme outliers above the p95+10% ceiling but counts them in total', () => {
     const values = [
       ...Array.from({ length: 100 }, (_, i) => i + 1),
       10000,
@@ -127,10 +130,11 @@ describe('sessionInsightsHistogram / sessionInsightsPercentiles (route port)', (
       10000,
       10000,
     ];
-    const { bins } = sessionInsightsHistogram(values, 10);
+    const { bins, total } = sessionInsightsHistogram(values, 10);
     expect(bins).toHaveLength(10);
-    const total = bins.reduce((s, b) => s + b.count, 0);
-    expect(total).toBe(100);
+    const binned = bins.reduce((s, b) => s + b.count, 0);
+    expect(binned).toBe(100);
+    expect(total).toBe(105);
   });
 
   it('percentiles use nearest-rank (matches the old route pct())', () => {

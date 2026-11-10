@@ -11,6 +11,15 @@ import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 import { axisLabelUnit } from '@/lib/d3-chart/tooltip-shell';
 import { formatLargeNumber } from '@/lib/charts/chart-rendering';
 import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
+import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
+import { MobileControlSection } from '@/components/ui/mobile-control-section';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { TrendChartProps } from './TrendChart';
 import {
   buildImprovementWaterfall,
@@ -39,6 +48,7 @@ const STRINGS = {
       'Record improvements at fixed interactivity. Regressions and recoveries are omitted. Links identify source-curve runs and matching changelogs, not isolated PR effects. Linear scale.',
     vsPrevious: 'vs previous best',
     vsBaseline: 'vs baseline',
+    changed: 'changed',
   },
   zh: {
     series: '瀑布图配置',
@@ -59,6 +69,7 @@ const STRINGS = {
       '展示固定交互速率下刷新最佳纪录的变化，不含性能回退及恢复。链接指向源曲线的运行记录及匹配的变更日志，不代表单个 PR 的独立效果。使用线性坐标。',
     vsPrevious: '较此前最佳',
     vsBaseline: '相对基线',
+    changed: '项已更改',
   },
 } as const;
 
@@ -76,7 +87,12 @@ export default function ImprovementWaterfallChart({
   const t = STRINGS[locale];
   const plotRef = useRef<HTMLDivElement>(null);
   const [plotWidth, setPlotWidth] = useState(1000);
-  const [hover, setHover] = useState<{ index: number; x: number; y: number } | null>(null);
+  const [hover, setHover] = useState<{
+    index: number;
+    x: number;
+    y: number;
+    offset: number;
+  } | null>(null);
   useEffect(() => {
     const element = plotRef.current;
     if (!element) return;
@@ -128,34 +144,42 @@ export default function ImprovementWaterfallChart({
   const hovered = hover ? steps[hover.index] : undefined;
 
   return (
-    <div id={chartId} className="min-w-0 p-4" data-testid="improvement-waterfall">
+    <div id={chartId} className="min-w-0" data-testid="improvement-waterfall">
       <div className="max-h-0 overflow-hidden" aria-hidden="true">
         <div id={`${chartId}-export`} className="p-4" />
       </div>
       <figcaption className="mb-4">{caption}</figcaption>
       <div className="min-w-0">
         <div ref={plotRef} className="min-w-0">
-          <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
-            <label htmlFor={`${chartId}-series`}>{t.series}</label>
-            <select
-              id={`${chartId}-series`}
-              data-testid="waterfall-series"
-              className="max-w-full rounded-md border bg-background px-3 py-2 text-sm"
+          <div className="mb-3 flex max-w-sm flex-col gap-1.5">
+            <LabelWithTooltip htmlFor={`${chartId}-series`} label={t.series} tooltip={t.method} />
+            <Select
               value={config?.id ?? ''}
-              onChange={(event) => {
-                track('historical_waterfall_series_selected', { series: event.target.value });
-                setSelectedId(event.target.value);
+              onValueChange={(value) => {
+                track('historical_waterfall_series_selected', { series: value });
+                setSelectedId(value);
               }}
             >
-              {lineConfigs.map((line) => (
-                <option key={line.id} value={line.id}>
-                  {line.label}
-                </option>
-              ))}
-            </select>
-            <span className="text-muted-foreground" title={t.method} tabIndex={0}>
-              {t.baseline} → {t.best}
-            </span>
+              <SelectTrigger
+                id={`${chartId}-series`}
+                data-testid="waterfall-series"
+                className="w-full"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {lineConfigs.map((line) => (
+                  <SelectItem
+                    key={line.id}
+                    value={line.id}
+                    data-testid="waterfall-series-option"
+                    data-series-id={line.id}
+                  >
+                    {line.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           {steps.length === 0 ? (
             <p className="py-20 text-center text-sm text-muted-foreground">{t.noData}</p>
@@ -170,7 +194,6 @@ export default function ImprovementWaterfallChart({
                   data-testid="waterfall-chart-svg"
                   style={{ display: 'block' }}
                 >
-                  <title>{`${config?.label}: ${t.aria}`}</title>
                   <desc>{t.method}</desc>
                   {y.ticks(6).map((tick) => (
                     <g key={tick}>
@@ -179,7 +202,7 @@ export default function ImprovementWaterfallChart({
                         x2={width - right}
                         y1={y(tick)}
                         y2={y(tick)}
-                        stroke="var(--border)"
+                        stroke="var(--chart-grid)"
                       />
                       <text
                         x={left - 10}
@@ -205,12 +228,8 @@ export default function ImprovementWaterfallChart({
                     const x = left + slot * index + slot * 0.15;
                     const barWidth = slot * 0.7;
                     const top = y(Math.max(step.from, step.to));
-                    const color =
-                      step.kind === 'baseline'
-                        ? 'var(--muted-foreground)'
-                        : step.kind === 'best'
-                          ? 'var(--foreground)'
-                          : (config?.color ?? 'var(--primary)');
+                    const color = config?.color ?? 'var(--primary)';
+                    const labelColor = step.kind === 'gain' ? color : 'var(--foreground)';
                     return (
                       <g
                         key={`${step.kind}-${step.date}`}
@@ -218,11 +237,32 @@ export default function ImprovementWaterfallChart({
                         data-kind={step.kind}
                         data-from={step.from}
                         data-to={step.to}
-                        onPointerMove={(event) =>
-                          setHover({ index, x: event.clientX, y: event.clientY })
-                        }
+                        onPointerMove={(event) => {
+                          const svgRect =
+                            event.currentTarget.ownerSVGElement?.getBoundingClientRect();
+                          const scale = svgRect && svgRect.width > 0 ? svgRect.width / width : 0;
+                          setHover(
+                            svgRect && scale > 0
+                              ? {
+                                  index,
+                                  x: svgRect.left + (left + slot * (index + 0.5)) * scale,
+                                  y: event.clientY,
+                                  offset: (slot * scale) / 2 + 12,
+                                }
+                              : { index, x: event.clientX, y: event.clientY, offset: 12 },
+                          );
+                        }}
                         onPointerLeave={() => setHover(null)}
                       >
+                        <rect
+                          x={left + slot * index}
+                          y={0}
+                          width={slot}
+                          height={bottom + 48}
+                          fill={hover?.index === index ? 'var(--muted-foreground)' : 'transparent'}
+                          fillOpacity={hover?.index === index ? 0.1 : 1}
+                          data-testid={hover?.index === index ? 'waterfall-hover-band' : undefined}
+                        />
                         {index < steps.length - 1 && (
                           <line
                             x1={x + barWidth}
@@ -239,12 +279,13 @@ export default function ImprovementWaterfallChart({
                           width={barWidth}
                           height={Math.max(1, Math.abs(y(step.from) - y(step.to)))}
                           fill={color}
+                          fillOpacity={step.kind === 'gain' ? 1 : 0.35}
                         />
                         <text
                           x={x + barWidth / 2}
-                          y={top - 10}
+                          y={top - 14}
                           textAnchor="middle"
-                          fill={color}
+                          fill={labelColor}
                           fontSize={CHART_TYPE.lineLabel}
                           fontWeight={600}
                         >
@@ -255,10 +296,11 @@ export default function ImprovementWaterfallChart({
                         {step.kind === 'best' && (
                           <text
                             x={x + barWidth / 2}
-                            y={top - 28}
+                            y={top - 34}
                             textAnchor="middle"
-                            fill={color}
-                            fontSize={CHART_TYPE.annotation}
+                            fill={labelColor}
+                            fontSize={CHART_TYPE.lineLabel}
+                            fontWeight={600}
                           >
                             {ratio.toFixed(2)}×
                           </text>
@@ -317,7 +359,7 @@ export default function ImprovementWaterfallChart({
                         data-testid="waterfall-sources"
                       >
                         <span
-                          className="line-clamp-2 min-h-8 w-full overflow-hidden break-words font-medium"
+                          className="line-clamp-3 min-h-8 w-full break-words text-pretty font-medium"
                           title={description || t[step.kind]}
                         >
                           {step.kind === 'gain' && description ? description : t[step.kind]}
@@ -367,10 +409,22 @@ export default function ImprovementWaterfallChart({
             </div>
           )}
           {hover && hovered && (
-            <FloatingTooltip x={hover.x} y={hover.y} data-testid="waterfall-hover-card">
+            <FloatingTooltip
+              x={hover.x}
+              y={hover.y}
+              offset={hover.offset}
+              data-testid="waterfall-hover-card"
+            >
               <ChartHoverCardBody
                 title={config?.label ?? ''}
-                subtitle={hovered.date}
+                subtitle={`${t[hovered.kind]} · ${new Date(
+                  `${hovered.date}T00:00:00Z`,
+                ).toLocaleDateString(locale === 'zh' ? 'zh-CN' : 'en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                  timeZone: 'UTC',
+                })}`}
                 color={config?.color}
                 metrics={[
                   { value: number(hovered.to), label: axisLabelUnit(yLabel) },
@@ -385,7 +439,6 @@ export default function ImprovementWaterfallChart({
                       ? [{ value: `${ratio.toFixed(2)}×`, label: t.vsBaseline }]
                       : []),
                 ]}
-                summary={t[hovered.kind]}
               />
             </FloatingTooltip>
           )}
@@ -397,12 +450,14 @@ export default function ImprovementWaterfallChart({
           )}
           {footer}
           {legendElement && (
-            <details className="no-export mt-4" data-testid="waterfall-controls">
-              <summary className="w-fit cursor-pointer rounded-sm text-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-4">
-                {t.controls}
-              </summary>
-              <div className="mt-2 max-w-sm">{legendElement}</div>
-            </details>
+            <MobileControlSection
+              label={t.controls}
+              count={0}
+              countLabel={t.changed}
+              testId="waterfall-controls"
+            >
+              <div className="no-export mt-4 max-w-sm">{legendElement}</div>
+            </MobileControlSection>
           )}
         </div>
       </div>

@@ -301,7 +301,8 @@ export function formatTokenLength(value: number): string {
 export default function ChartDisplay({
   embedded = false,
   centerOnEnter = false,
-}: { embedded?: boolean; centerOnEnter?: boolean } = {}) {
+  headerLevel = 'title',
+}: { embedded?: boolean; centerOnEnter?: boolean; headerLevel?: 'title' | 'card' } = {}) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const chartRootRef = useRef<HTMLDivElement>(null);
@@ -1672,6 +1673,7 @@ export default function ChartDisplay({
                 <>
                   <DashboardSectionHeader
                     title={powerXSurface ? powerXT.title : t.inferencePerformance}
+                    level={headerLevel}
                     description={powerXSurface ? powerXT.description : t.inferencePerformanceDesc}
                     actions={
                       powerXSurface ? (

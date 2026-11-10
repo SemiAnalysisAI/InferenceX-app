@@ -282,7 +282,7 @@ export function ChartButtons({
   );
 }
 
-/** Ghost icon button that opens a chart in a larger dialog. */
+/** Outlined icon button, matching download and reset, that opens a chart in a larger dialog. */
 export function ExpandChartButton({
   onClick,
   label,
@@ -297,7 +297,7 @@ export function ExpandChartButton({
   return (
     <Button
       type="button"
-      variant="ghost"
+      variant="outline"
       size="icon-xs"
       aria-label={label ?? (chartTitle ? `${base}: ${chartTitle}` : base)}
       onClick={onClick}

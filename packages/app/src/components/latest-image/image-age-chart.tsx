@@ -51,6 +51,12 @@ export function ImageAgeChart({
   const hasData = points.some((p) => p.p90AgeDays !== null);
   const dayLabel = (days: number | null) =>
     days === null ? (zh ? '暂无数据' : 'No data') : `${days}${zh ? ' 天' : 'd'}`;
+  const fullDate = new Intl.DateTimeFormat(zh ? 'zh-CN' : 'en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
 
   return (
     <section className="mb-6" aria-labelledby="image-age-title" data-testid="image-age-panel">
@@ -170,9 +176,20 @@ export function ImageAgeChart({
                     className="fill-muted-foreground"
                     fontSize={CHART_TYPE.axisLabel}
                   >
-                    {utcFormat('%m/%d')(date)}
+                    {utcFormat(zh ? '%-m月%-d日' : '%b %-d')(date)}
                   </text>
                 ))}
+                {hovered !== null && active && (
+                  <line
+                    x1={x(new Date(`${active.date}T00:00:00Z`))}
+                    x2={x(new Date(`${active.date}T00:00:00Z`))}
+                    y1={26}
+                    y2={212}
+                    className="stroke-foreground"
+                    strokeOpacity={0.35}
+                    pointerEvents="none"
+                  />
+                )}
                 <path d={path ?? ''} fill="none" className="stroke-primary" strokeWidth="2" />
                 {points
                   .filter((p) => p.p90AgeDays !== null)
@@ -202,7 +219,7 @@ export function ImageAgeChart({
                 >
                   {active && (
                     <>
-                      {active.date} ·{' '}
+                      {fullDate.format(new Date(`${active.date}T00:00:00Z`))} ·{' '}
                       <span className="text-base font-semibold text-foreground">
                         P90 {dayLabel(active.p90AgeDays)}
                       </span>{' '}

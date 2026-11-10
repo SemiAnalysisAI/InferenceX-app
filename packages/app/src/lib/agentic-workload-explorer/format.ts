@@ -10,10 +10,11 @@ export function formatNumber(n: number): string {
 }
 
 export function formatDollars(v: number): string {
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1000) return `$${(v / 1000).toFixed(1)}K`;
+  if (v === 0) return '$0';
+  if (v > 0 && v < 0.01) return '<$0.01';
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (v >= 1000) return `$${(v / 1000).toFixed(1).replace(/\.0$/, '')}K`;
   if (v >= 100) return `$${v.toFixed(0)}`;
-  if (v >= 10) return `$${v.toFixed(1)}`;
   return `$${v.toFixed(2)}`;
 }
 
@@ -120,21 +121,13 @@ export function formatExplorerDateTime(
   return parts.join(' ');
 }
 
-export function formatTimestamp(date: string | Date, locale: Locale = 'en'): string {
-  return formatExplorerDateTime(date, locale, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZoneName: 'short',
-  });
-}
-
 export function formatTime(date: string | Date, locale: Locale = 'en'): string {
   return formatExplorerDateTime(date, locale, {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
+    hourCycle: 'h23',
+    timeZone: 'UTC',
     timeZoneName: 'short',
   });
 }

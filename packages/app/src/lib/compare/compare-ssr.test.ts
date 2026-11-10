@@ -247,6 +247,33 @@ describe('compare table narrative fallbacks', () => {
     const zh = compareTableNarrativeZh('full', 'Model 3', 'A', 'B', rows, range)[0];
     expect(zh).toContain('缺少可比较的有效数据。');
   });
+
+  it('states the cheaper side as a share of the pricier cost, never above 100%', () => {
+    const rows = makeSsrRows([[40, ir(100, 0.033), ir(60, 0.057)]]);
+    const range = { min: 20, max: 60 };
+    const en = compareTableNarrative('full', 'Model 3', 'A', 'B', rows, range).join(' ');
+    expect(en).toContain('A is 42% cheaper per token');
+    const zh = compareTableNarrativeZh('full', 'Model 3', 'A', 'B', rows, range).join(' ');
+    expect(zh).toContain('A 的每 token 成本低 42%');
+  });
+
+  it('never rounds a nonzero cost up to 100% cheaper', () => {
+    const rows = makeSsrRows([[40, ir(100, 0.097), ir(60, 20)]]);
+    const range = { min: 20, max: 60 };
+    const en = compareTableNarrative('full', 'Model 3', 'A', 'B', rows, range).join(' ');
+    expect(en).toContain('A is 99.5% cheaper per token');
+    expect(en).not.toContain('100% cheaper');
+  });
+
+  it('states very large gaps as a multiple instead of a five-digit percentage', () => {
+    const rows = makeSsrRows([[40, ir(2100, 0.1), ir(10, 21)]]);
+    const range = { min: 20, max: 60 };
+    const en = compareTableNarrative('full', 'Model 3', 'A', 'B', rows, range).join(' ');
+    expect(en).toContain('A delivers 210× the tok/s/chip');
+    expect(en).not.toMatch(/\d{4,}%/);
+    const zh = compareTableNarrativeZh('full', 'Model 3', 'A', 'B', rows, range).join(' ');
+    expect(zh).toContain('A 的单芯片吞吐量为对方的 210 倍');
+  });
 });
 
 describe('compareMetaDescription', () => {

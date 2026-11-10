@@ -67,6 +67,8 @@ export function chartTooltipDismiss(text: string): string {
 export interface ChartHoverCardMetric {
   value: string;
   label: string;
+  /** Series swatch drawn before the label. */
+  color?: string;
 }
 
 export interface ChartHoverCardContent {
@@ -87,7 +89,7 @@ export function chartHoverCard(
   const values = metrics
     .map(
       (m) =>
-        `<div style="min-width: 0;"><div style="font-size: 16px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--foreground);">${m.value}</div><div style="font-size: 11px; line-height: 14px; color: var(--muted-foreground);">${escapeHtml(m.label)}</div></div>`,
+        `<div style="min-width: 0;"><div style="font-size: 16px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--foreground);">${m.value}</div><div style="${m.color ? 'display: flex; align-items: center; gap: 4px; ' : ''}font-size: 11px; line-height: 14px; color: var(--muted-foreground);">${m.color ? `<span style="width: 8px; height: 8px; border-radius: 9999px; background: ${m.color}; flex-shrink: 0;"></span>` : ''}${escapeHtml(m.label)}</div></div>`,
     )
     .join('');
   const heading = subtitle

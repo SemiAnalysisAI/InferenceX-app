@@ -55,7 +55,7 @@ import {
   getPrecisionLabel,
   getSequenceLabel,
 } from '@/lib/catalog/data-mappings';
-import { getDisplayLabel } from '@/lib/shared/utils';
+import { cn, getDisplayLabel } from '@/lib/shared/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import {
   includesJalapenoResult,
@@ -75,6 +75,7 @@ import {
 } from '@/components/inference/metric-registry';
 import { Button } from '@/components/ui/button';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 
 import FrontierView, {
   FRONTIER_SECTIONS,
@@ -144,6 +145,7 @@ const STRINGS = {
     trendRetry: 'Retry loading trend data',
     targetHint: 'Adjust the operating point used by the trend interpolation.',
     targetGroup: 'Trend target',
+    targetNotUsed: 'Frontier views cover every interactivity, so this target does not apply.',
   },
   zh: {
     chartView: '图表视图',
@@ -178,13 +180,15 @@ const STRINGS = {
     trendRetry: '重试加载趋势数据',
     targetHint: '调整趋势插值所使用的交互性水平。',
     targetGroup: '趋势目标',
+    targetNotUsed: '前沿视图覆盖全部交互性水平，因此该目标不适用。',
   },
 };
 
 export default function HistoricalTrendsDisplay() {
   const [chartView, setChartView] = useState<'line' | 'waterfall' | FrontierSection>('line');
+  const isPhone = useIsMobileViewport();
   const frontierSection = isFrontierSection(chartView) ? chartView : null;
-  const [memesEnabled, setMemesEnabled] = useState(true);
+  const [memesEnabled, setMemesEnabled] = useState(false);
   // Compare can put vendors or chips side by side; the other views always show chips.
   const [compareGrouping, setCompareGrouping] = useState<FrontierGrouping>('vendor');
   const frontierGrouping: FrontierGrouping =
@@ -468,7 +472,9 @@ export default function HistoricalTrendsDisplay() {
             label: t[view],
             testId: `historical-view-${view}`,
           }))}
-          className="shrink-0"
+          variant={isPhone ? 'select' : 'segments'}
+          testId="historical-view"
+          className={isPhone ? 'w-full' : 'shrink-0'}
         />
       }
       analyticsPrefix="historical"
@@ -582,19 +588,29 @@ export default function HistoricalTrendsDisplay() {
         legendItems={Object.entries(hardwareConfig)
           .filter(([key]) => hwTypesWithData.has(key))
           .toSorted(([a], [b]) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
-          .map(([key, hwConfig]) => ({
-            name: hwConfig.name,
-            label: getDisplayLabel(hwConfig),
-            color: resolveColor(key),
-            lineDasharray: chartView === 'line' ? (frameworkDasharray(key) ?? 'none') : undefined,
-            title: hwConfig.gpu,
-            hw: key,
-            isActive: activeHwTypes.has(key),
-            onClick: () => {
-              toggleHwType(key);
-              track('historical_hw_type_toggled', { gpu: key });
-            },
-          }))}
+          .map(([key, hwConfig]) => {
+            // Frontier views may recolour chips for contrast; the legend follows the chart.
+            const frontierSeries = frontierSection
+              ? frontierHistory?.series.find(
+                  (series) => series.hwKey !== series.vendor && series.hwKey === key.split('_')[0],
+                )
+              : undefined;
+            return {
+              name: hwConfig.name,
+              label: getDisplayLabel(hwConfig),
+              color:
+                (frontierSeries && frontierStyles.get(frontierSeries.key)?.color) ??
+                resolveColor(key),
+              lineDasharray: chartView === 'line' ? (frameworkDasharray(key) ?? 'none') : undefined,
+              title: hwConfig.gpu,
+              hw: key,
+              isActive: activeHwTypes.has(key),
+              onClick: () => {
+                toggleHwType(key);
+                track('historical_hw_type_toggled', { gpu: key });
+              },
+            };
+          })}
         isLegendExpanded={isLegendExpanded}
         onExpandedChange={(expanded) => {
           setIsLegendExpanded(expanded);
@@ -744,32 +760,39 @@ export default function HistoricalTrendsDisplay() {
             hideGpuComparison
             modelDetails={modelDetails}
             trailingPanel={
-              hasInteractivityChart &&
-              !frontierSection && (
+              hasInteractivityChart && (
                 <ControlPanel legend={t.targetGroup} className="gap-1.5">
-                  <LabelWithTooltip
-                    htmlFor="historical-target"
-                    label={targetLabel}
-                    tooltip={`${t.targetHint}${locale === 'zh' ? '' : ' '}${isAgentic ? t.agenticTargetTooltip : t.targetTooltip}`}
-                  />
-                  <RangeField
-                    label={targetLabel}
-                    min={interactivityRange.min}
-                    max={interactivityRange.max}
-                    value={targetInteractivity}
-                    onSliderChange={handleSliderChange}
-                    onSliderCommit={() =>
-                      track('historical_trend_target_set', { value: targetInteractivity })
-                    }
-                    sliderTestId="historical-target-slider"
-                    input={{
-                      id: 'historical-target',
-                      value: interactivityInput,
-                      onChange: handleInputChange,
-                      onBlur: handleInputBlur,
-                      'data-testid': 'historical-target-input',
-                    }}
-                  />
+                  <div
+                    inert={frontierSection ? true : undefined}
+                    className={cn('grid gap-1.5', frontierSection && 'opacity-50')}
+                  >
+                    <LabelWithTooltip
+                      htmlFor="historical-target"
+                      label={targetLabel}
+                      tooltip={`${t.targetHint}${locale === 'zh' ? '' : ' '}${isAgentic ? t.agenticTargetTooltip : t.targetTooltip}`}
+                    />
+                    <RangeField
+                      label={targetLabel}
+                      min={interactivityRange.min}
+                      max={interactivityRange.max}
+                      value={targetInteractivity}
+                      onSliderChange={handleSliderChange}
+                      onSliderCommit={() =>
+                        track('historical_trend_target_set', { value: targetInteractivity })
+                      }
+                      sliderTestId="historical-target-slider"
+                      input={{
+                        id: 'historical-target',
+                        value: interactivityInput,
+                        onChange: handleInputChange,
+                        onBlur: handleInputBlur,
+                        'data-testid': 'historical-target-input',
+                      }}
+                    />
+                  </div>
+                  {frontierSection && (
+                    <p className="text-xs text-muted-foreground">{t.targetNotUsed}</p>
+                  )}
                 </ControlPanel>
               )
             }

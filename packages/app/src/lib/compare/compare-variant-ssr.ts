@@ -15,9 +15,8 @@ import {
   BAND_PHRASE,
   bandFor,
   buildGpuDataPoints,
-  fmtCost,
-  fmtPctDelta,
-  fmtTput,
+  fmtMore,
+  fmtPctLower,
   type PairSummary,
   pickRotated,
   type SsrInterpolatedRow,
@@ -26,6 +25,8 @@ import {
   type CompareTableData,
   compareTableDataFromPoints,
   emptyCompareTableData,
+  fmtCost,
+  fmtTput,
 } from '@/lib/compare/compare-table-view';
 import { datasetJsonLd } from '@/lib/seo/dataset-jsonld';
 
@@ -262,16 +263,25 @@ export interface VariantBoth {
 }
 
 function variantFullSummary(i: VariantBoth): string {
+  if (
+    i.cheaper === i.faster &&
+    !i.costTied &&
+    !i.tputTied &&
+    i.costRatio !== null &&
+    i.tputRatio !== null
+  ) {
+    return `${i.faster} delivers ${fmtMore(i.tputRatio, 'tok/s/chip')} on the same chip, which makes it ${fmtPctLower(i.costRatio)} cheaper per token`;
+  }
   const costPart = i.costTied
     ? 'cost per token is essentially tied'
     : i.costRatio === null
       ? null
-      : `${i.cheaper} is ${fmtPctDelta(i.costRatio)} cheaper per token`;
+      : `${i.cheaper} is ${fmtPctLower(i.costRatio)} cheaper per token`;
   const tputPart = i.tputTied
     ? 'throughput per chip is essentially tied'
     : i.tputRatio === null
       ? null
-      : `${i.faster} delivers ${fmtPctDelta(i.tputRatio)} more tok/s/chip`;
+      : `${i.faster} delivers ${fmtMore(i.tputRatio, 'tok/s/chip')}`;
   const both = [costPart, tputPart].filter(Boolean).join('; ');
   return both.length > 0
     ? `${both.charAt(0).toUpperCase()}${both.slice(1)}`
@@ -284,9 +294,9 @@ const PRECISION_BOTH_TEMPLATES: ((i: VariantBoth) => string)[] = [
   (i) =>
     `${i.aLabel} posts ${fmtTput(i.aValue)} tok/s/chip for ${fmtCost(i.aCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}); ${i.bLabel} posts ${fmtTput(i.bValue)} tok/s/chip for ${fmtCost(i.bCost)}. ${variantFullSummary(i)}. Quantization-level accuracy differences are tracked on the evaluation tab.`,
   (i) =>
-    `Throughput at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}): ${i.aLabel} hits ${fmtTput(i.aValue)} tok/s/chip, ${i.bLabel} hits ${fmtTput(i.bValue)}. Per-million costs land at ${fmtCost(i.aCost)} and ${fmtCost(i.bCost)} respectively. ${variantFullSummary(i)}. The cost-throughput tradeoff from lower precision is only part of the picture — see the evaluation page for accuracy data.`,
+    `Throughput at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}): ${i.aLabel} hits ${fmtTput(i.aValue)} tok/s/chip, ${i.bLabel} hits ${fmtTput(i.bValue)}. Costs per million tokens land at ${fmtCost(i.aCost)} and ${fmtCost(i.bCost)} respectively. ${variantFullSummary(i)}. The cost-throughput tradeoff from lower precision is only part of the picture — see the evaluation page for accuracy data.`,
   (i) =>
-    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band, at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}): ${i.aLabel} runs ${fmtTput(i.aValue)} tok/s/chip at ${fmtCost(i.aCost)}/M tokens, ${i.bLabel} runs ${fmtTput(i.bValue)} at ${fmtCost(i.bCost)}/M. ${variantFullSummary(i)}. Precision changes affect both inference speed and model quality — consult the evaluation tab for accuracy benchmarks.`,
+    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band, at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}): ${i.aLabel} runs ${fmtTput(i.aValue)} tok/s/chip at ${fmtCost(i.aCost)} per million tokens, ${i.bLabel} runs ${fmtTput(i.bValue)} at ${fmtCost(i.bCost)}. ${variantFullSummary(i)}. Precision changes affect both inference speed and model quality — consult the evaluation tab for accuracy benchmarks.`,
 ];
 
 const SPEC_DECODE_BOTH_TEMPLATES: ((i: VariantBoth) => string)[] = [
@@ -295,9 +305,9 @@ const SPEC_DECODE_BOTH_TEMPLATES: ((i: VariantBoth) => string)[] = [
   (i) =>
     `${i.aLabel} posts ${fmtTput(i.aValue)} tok/s/chip for ${fmtCost(i.aCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}); ${i.bLabel} posts ${fmtTput(i.bValue)} tok/s/chip for ${fmtCost(i.bCost)}. ${variantFullSummary(i)}. Draft-token acceptance rates determine whether speculative decoding helps or hurts at a given concurrency level.`,
   (i) =>
-    `Throughput at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}): ${i.aLabel} hits ${fmtTput(i.aValue)} tok/s/chip, ${i.bLabel} hits ${fmtTput(i.bValue)}. Per-million costs land at ${fmtCost(i.aCost)} and ${fmtCost(i.bCost)} respectively. ${variantFullSummary(i)}. Speculative decoding trades extra compute on draft tokens for fewer decoding steps — the payoff depends on sequence length and batch size.`,
+    `Throughput at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}): ${i.aLabel} hits ${fmtTput(i.aValue)} tok/s/chip, ${i.bLabel} hits ${fmtTput(i.bValue)}. Costs per million tokens land at ${fmtCost(i.aCost)} and ${fmtCost(i.bCost)} respectively. ${variantFullSummary(i)}. Speculative decoding trades extra compute on draft tokens for fewer decoding steps — the payoff depends on sequence length and batch size.`,
   (i) =>
-    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band, at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}): ${i.aLabel} runs ${fmtTput(i.aValue)} tok/s/chip at ${fmtCost(i.aCost)}/M tokens, ${i.bLabel} runs ${fmtTput(i.bValue)} at ${fmtCost(i.bCost)}/M. ${variantFullSummary(i)}. Gains from speculative decoding vary by workload; short-output prompts tend to benefit less.`,
+    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band, at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}): ${i.aLabel} runs ${fmtTput(i.aValue)} tok/s/chip at ${fmtCost(i.aCost)} per million tokens, ${i.bLabel} runs ${fmtTput(i.bValue)} at ${fmtCost(i.bCost)}. ${variantFullSummary(i)}. Gains from speculative decoding vary by workload; short-output prompts tend to benefit less.`,
 ];
 
 const VARIANT_SINGLE_TEMPLATES: ((args: {

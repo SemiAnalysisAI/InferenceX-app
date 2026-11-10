@@ -1,37 +1,49 @@
 'use client';
 
-import { Suspense, useState, type ReactNode } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Stat } from '@/components/ui/stat';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
 import { formatNumber } from '@/lib/agentic-workload-explorer/format';
-import { Button } from '@/components/ui/button';
 import {
   useTraceVersion,
   appendTraceVersion,
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
-import type {
-  TrafficData,
-  TrafficHeatmapCell,
-  DailyCount,
-  StreamingDay,
-} from '@/lib/agentic-workload-explorer/api-types';
-import { formatSnapshotDate } from '@/lib/agentic-workload-explorer/snapshot';
+import type { TrafficData, TrafficHeatmapCell } from '@/lib/agentic-workload-explorer/api-types';
 import {
   DAY_RANGES,
   DAY_RANGE_DAYS,
   RangeToggle,
   type DayRange,
 } from '@/components/agentic-workload-explorer/range-toggle';
-import { ChartActions, Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import {
+  ChartActions,
+  ExpandableChart,
+} from '@/components/agentic-workload-explorer/expandable-chart';
+import {
+  formatAxisNumber,
+  formatHourLabel,
+  TrendsStackedChart,
+} from '@/components/agentic-workload-explorer/trends-charts';
+import { HideSmallToggle } from '@/components/agentic-workload-explorer/hide-small-toggle';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
+import { CHART_FONT_SANS, CHART_TYPE, px } from '@/lib/d3-chart/typography';
+import { chartFont, measureTextWidth, useFontsVersion } from '@/lib/d3-chart/dynamic-margins';
+import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
 import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import {
+  CHART_COLORS,
+  NEUTRAL_SERIES_COLOR,
+} from '@/components/agentic-workload-explorer/series-colors';
 
 const STRINGS = {
   en: {
+    yRequests: 'Requests',
     trafficOverview: 'Traffic overview',
     failedToLoad: 'Failed to load traffic data',
     totalRequests: 'Total requests',
@@ -40,23 +52,23 @@ const STRINGS = {
     requestsOverTime: 'Requests over time',
     requests: 'requests',
     hourlyHeatmap: 'Hourly heatmap',
-    heatmapDetail: 'requests by day of week and hour',
+    heatmapDetail: 'Requests by day of week and hour',
     streamingVsNonStreaming: 'Streaming vs non-streaming',
-    finalDays: (n: number) => `final ${n} days`,
+    finalDays: (n: number) => `Final ${n} days`,
     noDaily: 'No daily request data available',
     noHeatmap: 'No heatmap data available',
     noStreaming: 'No streaming breakdown data available',
     dayLabels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as readonly string[],
     streaming: 'Streaming',
     nonStreaming: 'Non-streaming',
-    hideSmall: 'Hide n<5',
-    exportDaily: 'Daily requests',
-    exportHeatmap: 'Request heatmap',
-    exportStreaming: 'Streaming vs non-streaming',
-    tooltipStreaming: 'streaming',
-    tooltipNonStreaming: 'non-streaming',
+    hiddenCells: 'Under 5 requests, hidden',
+    hourOfDay: 'Hour of day',
+    scaleTitle: 'Requests per hour',
+    requestsLabel: 'Requests',
+    dailyRequests: 'Daily requests',
   },
   zh: {
+    yRequests: '请求数',
     trafficOverview: '流量概览',
     failedToLoad: '无法加载流量数据',
     totalRequests: '总请求数',
@@ -74,460 +86,216 @@ const STRINGS = {
     dayLabels: ['周日', '周一', '周二', '周三', '周四', '周五', '周六'] as readonly string[],
     streaming: '流式',
     nonStreaming: '非流式',
-    hideSmall: '隐藏 n<5',
-    exportDaily: '每日请求',
-    exportHeatmap: '请求热力图',
-    exportStreaming: '流式与非流式',
-    tooltipStreaming: '流式',
-    tooltipNonStreaming: '非流式',
+    hiddenCells: '少于 5 个请求，已隐藏',
+    hourOfDay: '小时',
+    scaleTitle: '每小时请求数',
+    requestsLabel: '请求数',
+    dailyRequests: '每日请求',
   },
 } as const;
 
-const CHART_W = 600;
-const CHART_H = 200;
-const MARGIN = { top: 8, right: 12, bottom: 36, left: 56 };
-const PLOT_W = CHART_W - MARGIN.left - MARGIN.right;
-const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
+type Strings = (typeof STRINGS)[keyof typeof STRINGS];
 
-const SVG_FONT = 'var(--font-mono, ui-monospace, monospace)';
-const SVG_FONT_SIZE = '9px';
+const DAILY_KEYS = ['requests'];
+const STREAMING_KEYS = ['streaming', 'nonStreaming'];
+const STREAMING_COLORS: Record<string, string> = {
+  streaming: CHART_COLORS[0],
+  nonStreaming: NEUTRAL_SERIES_COLOR,
+};
+const streamingColor = (key: string) => STREAMING_COLORS[key];
+const dailyColor = () => CHART_COLORS[0];
 
-function niceNum(range: number, round: boolean): number {
-  const exponent = Math.floor(Math.log10(range));
-  const fraction = range / 10 ** exponent;
-  let niceFraction: number;
-  if (round) {
-    if (fraction < 1.5) niceFraction = 1;
-    else if (fraction < 3) niceFraction = 2;
-    else if (fraction < 7) niceFraction = 5;
-    else niceFraction = 10;
-  } else if (fraction <= 1) {
-    niceFraction = 1;
-  } else if (fraction <= 2) {
-    niceFraction = 2;
-  } else if (fraction <= 5) {
-    niceFraction = 5;
-  } else {
-    niceFraction = 10;
-  }
-  return niceFraction * 10 ** exponent;
+const HEATMAP_MARGIN = { top: 4, right: 8, bottom: 36, left: 44 };
+const HEATMAP_ROW_H = 24;
+const HEATMAP_HEIGHT = HEATMAP_MARGIN.top + HEATMAP_ROW_H * 7 + HEATMAP_MARGIN.bottom;
+const HEATMAP_HOURS = Array.from({ length: 24 }, (_, h) => h);
+const HEATMAP_TICK_STEPS = [3, 6, 12];
+const HEATMAP_TICK_GAP = 8;
+const HIDE_SMALL_THRESHOLD = 5;
+const HEATMAP_COLOR = CHART_COLORS[0];
+
+function heatmapOpacity(intensity: number): number {
+  return 0.08 + intensity * 0.92;
 }
 
-function generateTicks(min: number, max: number, targetCount: number): number[] {
-  if (max <= min) return [min];
-  const range = niceNum(max - min, false);
-  const spacing = niceNum(range / (targetCount - 1), true);
-  const niceMin = Math.floor(min / spacing) * spacing;
-  const ticks: number[] = [];
-  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
-    ticks.push(Math.round(t * 1e10) / 1e10);
-  }
-  return ticks;
+function formatHour(hour: number): string {
+  return `${String(hour).padStart(2, '0')}:00`;
 }
 
-function formatPeakHour(peakHour: string | null): string {
-  if (!peakHour) return '--';
-  const h = parseInt(peakHour, 10);
-  if (Number.isNaN(h)) return peakHour;
-  const suffix = h >= 12 ? 'PM' : 'AM';
-  const h12 = h % 12 || 12;
-  return `${h12}:00 ${suffix}`;
+interface HeatmapHover {
+  dow: number;
+  hour: number;
+  count: number;
+  x: number;
+  y: number;
 }
 
-function DailyRequestsChart({
-  data,
-  controls,
-  strings,
-}: {
-  data: DailyCount[];
-  controls: ReactNode;
-  strings: { noDaily: string; exportDaily: string; requests: string };
-}) {
-  const locale = useLocale();
-  const labelEvery = Math.ceil(data.length / 7);
-  if (data.length === 0) {
-    return (
-      <EmptyState bare className="py-8">
-        {strings.noDaily}
-      </EmptyState>
-    );
-  }
-
-  const maxCount = Math.max(...data.map((d) => d.requestCount), 1);
-  const yTicks = generateTicks(0, maxCount, 5);
-  const yMax = yTicks.at(-1) || maxCount;
-
-  const barGap = 2;
-  const barWidth = Math.max(1, (PLOT_W - barGap * data.length) / data.length);
-
-  const sy = (v: number) => MARGIN.top + PLOT_H - (v / yMax) * PLOT_H;
-
-  return (
-    <Expandable title={strings.exportDaily}>
-      <Card>
-        <div className="flex items-center justify-between gap-2 mb-2">
-          {controls}
-          <ChartActions
-            fileName="daily-requests"
-            onExportPng={() => track('agentic_workload_export_png', { chart: 'daily-requests' })}
-          />
-        </div>
-        <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ maxHeight: 240 }}>
-          {yTicks.map((t) => (
-            <g key={`y-${t}`}>
-              {t > 0 && (
-                <line
-                  x1={MARGIN.left}
-                  y1={sy(t)}
-                  x2={MARGIN.left + PLOT_W}
-                  y2={sy(t)}
-                  stroke="currentColor"
-                  className="text-border"
-                  strokeWidth={0.5}
-                  strokeDasharray="3 3"
-                />
-              )}
-              <text
-                x={MARGIN.left - 6}
-                y={sy(t) + 3}
-                textAnchor="end"
-                className="fill-muted-foreground"
-                style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-              >
-                {formatNumber(t)}
-              </text>
-            </g>
-          ))}
-
-          <line
-            x1={MARGIN.left}
-            y1={MARGIN.top + PLOT_H}
-            x2={MARGIN.left + PLOT_W}
-            y2={MARGIN.top + PLOT_H}
-            stroke="currentColor"
-            className="text-border"
-            strokeWidth={0.5}
-          />
-
-          {data.map((d, i) => {
-            const x = MARGIN.left + i * (barWidth + barGap);
-            const barH = (d.requestCount / yMax) * PLOT_H;
-            return (
-              <g key={d.day}>
-                <rect
-                  x={x}
-                  y={sy(d.requestCount)}
-                  width={barWidth}
-                  height={Math.max(barH, 0.5)}
-                  fill="#6366f1"
-                  rx={1}
-                >
-                  <title>
-                    {formatSnapshotDate(d.day, locale)}: {formatNumber(d.requestCount)}{' '}
-                    {strings.requests}
-                  </title>
-                </rect>
-                {i % labelEvery === 0 && (
-                  <text
-                    x={x + barWidth / 2}
-                    y={MARGIN.top + PLOT_H + 14}
-                    textAnchor="middle"
-                    className="fill-muted-foreground"
-                    style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-                  >
-                    {formatSnapshotDate(d.day, locale)}
-                  </text>
-                )}
-              </g>
-            );
-          })}
-        </svg>
-      </Card>
-    </Expandable>
-  );
-}
-
-function HourlyHeatmap({
-  heatmap,
-  strings,
-}: {
-  heatmap: TrafficHeatmapCell[];
-  strings: {
-    noHeatmap: string;
-    hideSmall: string;
-    exportHeatmap: string;
-    dayLabels: readonly string[];
-    requests: string;
-  };
-}) {
+function HourlyHeatmap({ heatmap, t }: { heatmap: TrafficHeatmapCell[]; t: Strings }) {
   const [hideSmall, setHideSmall] = useState(true);
+  const [hovered, setHovered] = useState<HeatmapHover | null>(null);
+  const { dimensions, setContainerRef } = useResponsiveChartDimensions({ height: HEATMAP_HEIGHT });
+  useFontsVersion();
+
+  const { lookup, maxCount } = useMemo(() => {
+    const counts = new Map<string, number>();
+    let max = 1;
+    for (const c of heatmap) {
+      counts.set(`${c.dayOfWeek}-${c.hourOfDay}`, c.requestCount);
+      if ((!hideSmall || c.requestCount >= HIDE_SMALL_THRESHOLD) && c.requestCount > max) {
+        max = c.requestCount;
+      }
+    }
+    return { lookup: counts, maxCount: max };
+  }, [heatmap, hideSmall]);
+
   if (heatmap.length === 0) {
     return (
-      <EmptyState bare className="py-8">
-        {strings.noHeatmap}
-      </EmptyState>
+      <Card>
+        <EmptyState bare className="py-8">
+          {t.noHeatmap}
+        </EmptyState>
+      </Card>
     );
   }
 
-  const maxCount = Math.max(
-    ...heatmap.filter((c) => !hideSmall || c.requestCount >= 5).map((c) => c.requestCount),
-    1,
+  const plotW = Math.max(0, dimensions.width - HEATMAP_MARGIN.left - HEATMAP_MARGIN.right);
+  const cellW = plotW / 24;
+  const plotBottom = HEATMAP_MARGIN.top + HEATMAP_ROW_H * 7;
+  const tickFont = chartFont(CHART_TYPE.annotation);
+  const tickWidth = Math.max(
+    ...HEATMAP_HOURS.map((h) => measureTextWidth(formatHour(h), tickFont)),
   );
-
-  const lookup = new Map<string, number>();
-  for (const c of heatmap) {
-    lookup.set(`${c.dayOfWeek}-${c.hourOfDay}`, c.requestCount);
-  }
-
-  const labelW = 32;
-  const bottomH = 16;
-  const gridW = 600 - labelW - 8;
-  const gridH = 200 - bottomH - 4;
-  const cellW = gridW / 24;
-  const cellH = gridH / 7;
+  const tickStep =
+    HEATMAP_TICK_STEPS.find((step) => step * cellW >= tickWidth + HEATMAP_TICK_GAP) ?? 24;
 
   return (
-    <Expandable title={strings.exportHeatmap}>
-      <Card>
-        <div className="flex items-center gap-2 mb-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="xs"
-            aria-pressed={hideSmall}
-            onClick={() => {
-              setHideSmall((h) => !h);
-              track('agentic_workload_traffic_heatmap_toggle', { enabled: !hideSmall });
+    <ExpandableChart
+      title={t.hourlyHeatmap}
+      subtitle={t.heatmapDetail}
+      actions={
+        <div className="flex shrink-0 flex-nowrap items-center gap-2">
+          <HideSmallToggle
+            threshold={HIDE_SMALL_THRESHOLD}
+            pressed={hideSmall}
+            onPressedChange={(enabled) => {
+              setHideSmall(enabled);
+              track('agentic_workload_traffic_heatmap_toggle', { enabled });
             }}
-          >
-            {strings.hideSmall}
-          </Button>
+          />
           <ChartActions
             fileName="request-heatmap"
             onExportPng={() => track('agentic_workload_export_png', { chart: 'request-heatmap' })}
           />
         </div>
-        <svg viewBox="0 0 600 200" className="w-full" style={{ maxHeight: 240 }}>
-          {strings.dayLabels.map((label, dow) => (
+      }
+    >
+      <div ref={setContainerRef} className="w-full min-w-0">
+        {dimensions.width > 0 && (
+          <svg
+            width={dimensions.width}
+            height={dimensions.height}
+            role="img"
+            aria-label={`${t.hourlyHeatmap}, ${t.heatmapDetail}`}
+            fontFamily={CHART_FONT_SANS}
+            onMouseLeave={() => setHovered(null)}
+          >
+            {t.dayLabels.map((label, dow) => (
+              <text
+                key={`row-${dow}`}
+                x={HEATMAP_MARGIN.left - 8}
+                y={HEATMAP_MARGIN.top + dow * HEATMAP_ROW_H + HEATMAP_ROW_H / 2}
+                dominantBaseline="central"
+                textAnchor="end"
+                fontSize={px(CHART_TYPE.annotation)}
+                className="fill-muted-foreground"
+              >
+                {label}
+              </text>
+            ))}
+            {HEATMAP_HOURS.filter((h) => h % tickStep === 0).map((h) => (
+              <text
+                key={`col-${h}`}
+                x={HEATMAP_MARGIN.left + h * cellW + cellW / 2}
+                y={plotBottom + 14}
+                textAnchor="middle"
+                fontSize={px(CHART_TYPE.annotation)}
+                className="fill-muted-foreground"
+              >
+                {formatHour(h)}
+              </text>
+            ))}
             <text
-              key={`row-${dow}`}
-              x={labelW - 4}
-              y={4 + dow * cellH + cellH / 2 + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{ fontSize: '8px', fontFamily: SVG_FONT }}
-            >
-              {label}
-            </text>
-          ))}
-
-          {Array.from({ length: 7 }, (_, i) => i * 4).map((h) => (
-            <text
-              key={`col-${h}`}
-              x={labelW + h * cellW + cellW / 2}
-              y={4 + 7 * cellH + 12}
+              x={HEATMAP_MARGIN.left + plotW / 2}
+              y={plotBottom + 32}
               textAnchor="middle"
+              fontSize={px(CHART_TYPE.axisLabel)}
               className="fill-muted-foreground"
-              style={{ fontSize: '8px', fontFamily: SVG_FONT }}
             >
-              {h}
+              {t.hourOfDay}
             </text>
-          ))}
-
-          {Array.from({ length: 7 }, (_row, dow) =>
-            Array.from({ length: 24 }, (_col, hour) => {
-              const count = lookup.get(`${dow}-${hour}`) || 0;
-              if (hideSmall && count < 5) {
+            {t.dayLabels.map((_, dow) =>
+              HEATMAP_HOURS.map((hour) => {
+                const count = lookup.get(`${dow}-${hour}`) ?? 0;
+                const hidden = hideSmall && count < HIDE_SMALL_THRESHOLD;
+                const isHovered = hovered?.dow === dow && hovered.hour === hour;
                 return (
                   <rect
                     key={`${dow}-${hour}`}
-                    x={labelW + hour * cellW}
-                    y={4 + dow * cellH}
-                    width={cellW - 1}
-                    height={cellH - 1}
+                    x={HEATMAP_MARGIN.left + hour * cellW + 0.5}
+                    y={HEATMAP_MARGIN.top + dow * HEATMAP_ROW_H + 0.5}
+                    width={Math.max(0, cellW - 2)}
+                    height={HEATMAP_ROW_H - 2}
                     rx={2}
-                    fill="transparent"
+                    fill={hidden ? 'var(--muted)' : HEATMAP_COLOR}
+                    fillOpacity={hidden ? 0.5 : heatmapOpacity(Math.min(1, count / maxCount))}
+                    stroke={isHovered ? 'var(--foreground)' : 'none'}
+                    strokeWidth={1.5}
+                    onMouseMove={(e) =>
+                      setHovered({ dow, hour, count, x: e.clientX, y: e.clientY })
+                    }
                   />
                 );
-              }
-              const intensity = maxCount > 0 ? count / maxCount : 0;
-              return (
-                <rect
-                  key={`${dow}-${hour}`}
-                  x={labelW + hour * cellW}
-                  y={4 + dow * cellH}
-                  width={cellW - 1}
-                  height={cellH - 1}
-                  rx={2}
-                  fill="#6366f1"
-                  fillOpacity={intensity}
-                >
-                  <title>
-                    {strings.dayLabels[dow]} {hour}:00 - {formatNumber(count)} {strings.requests}
-                  </title>
-                </rect>
-              );
-            }),
-          )}
-        </svg>
-      </Card>
-    </Expandable>
-  );
-}
-
-function StreamingChart({
-  data,
-  strings,
-}: {
-  data: StreamingDay[];
-  strings: {
-    noStreaming: string;
-    exportStreaming: string;
-    streaming: string;
-    nonStreaming: string;
-    tooltipStreaming: string;
-    tooltipNonStreaming: string;
-  };
-}) {
-  const locale = useLocale();
-  const sliced = data.slice(-30);
-  if (sliced.length === 0) {
-    return (
-      <EmptyState bare className="py-8">
-        {strings.noStreaming}
-      </EmptyState>
-    );
-  }
-
-  const maxTotal = Math.max(...sliced.map((d) => d.streamingCount + d.nonStreamingCount), 1);
-  const yTicks = generateTicks(0, maxTotal, 5);
-  const yMax = yTicks.at(-1) || maxTotal;
-
-  const barGap = 2;
-  const barWidth = Math.max(1, (PLOT_W - barGap * sliced.length) / sliced.length);
-
-  const sy = (v: number) => MARGIN.top + PLOT_H - (v / yMax) * PLOT_H;
-
-  return (
-    <Expandable title={strings.exportStreaming}>
-      <Card>
-        <div className="flex items-center justify-end mb-2">
-          <ChartActions
-            fileName="streaming-vs-non-streaming"
-            onExportPng={() =>
-              track('agentic_workload_export_png', { chart: 'streaming-vs-non-streaming' })
-            }
+              }),
+            )}
+          </svg>
+        )}
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <span className="font-medium">{t.scaleTitle}</span>
+        <span className="tabular-nums">{formatAxisNumber(0)}</span>
+        <span
+          aria-hidden="true"
+          className="h-2.5 w-32 rounded-sm"
+          style={{
+            backgroundImage: `linear-gradient(to right, color-mix(in oklab, ${HEATMAP_COLOR} ${heatmapOpacity(0) * 100}%, transparent), ${HEATMAP_COLOR})`,
+          }}
+        />
+        <span className="tabular-nums">{formatAxisNumber(maxCount)}</span>
+        {hideSmall && (
+          <span className="ml-2 inline-flex items-center gap-1.5">
+            <span aria-hidden="true" className="size-2.5 rounded-sm bg-muted" />
+            {t.hiddenCells}
+          </span>
+        )}
+      </div>
+      {hovered && (
+        <FloatingTooltip x={hovered.x} y={hovered.y}>
+          <ChartHoverCardBody
+            title={`${t.dayLabels[hovered.dow]} ${formatHour(hovered.hour)}`}
+            metrics={[{ value: formatAxisNumber(hovered.count), label: t.requestsLabel }]}
+            summary={hideSmall && hovered.count < HIDE_SMALL_THRESHOLD ? t.hiddenCells : undefined}
           />
-        </div>
-        <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ maxHeight: 240 }}>
-          {yTicks.map((t) => (
-            <g key={`y-${t}`}>
-              {t > 0 && (
-                <line
-                  x1={MARGIN.left}
-                  y1={sy(t)}
-                  x2={MARGIN.left + PLOT_W}
-                  y2={sy(t)}
-                  stroke="currentColor"
-                  className="text-border"
-                  strokeWidth={0.5}
-                  strokeDasharray="3 3"
-                />
-              )}
-              <text
-                x={MARGIN.left - 6}
-                y={sy(t) + 3}
-                textAnchor="end"
-                className="fill-muted-foreground"
-                style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-              >
-                {formatNumber(t)}
-              </text>
-            </g>
-          ))}
-
-          <line
-            x1={MARGIN.left}
-            y1={MARGIN.top + PLOT_H}
-            x2={MARGIN.left + PLOT_W}
-            y2={MARGIN.top + PLOT_H}
-            stroke="currentColor"
-            className="text-border"
-            strokeWidth={0.5}
-          />
-
-          {sliced.map((d, i) => {
-            const x = MARGIN.left + i * (barWidth + barGap);
-            const total = d.streamingCount + d.nonStreamingCount;
-            const streamH = (d.streamingCount / yMax) * PLOT_H;
-            const nonStreamH = (d.nonStreamingCount / yMax) * PLOT_H;
-
-            return (
-              <g key={d.day}>
-                <rect
-                  x={x}
-                  y={sy(total)}
-                  width={barWidth}
-                  height={Math.max(nonStreamH, total > 0 ? 0.5 : 0)}
-                  fill="#6b7280"
-                  rx={0}
-                >
-                  <title>
-                    {d.day}: {formatNumber(d.nonStreamingCount)} {strings.tooltipNonStreaming}
-                  </title>
-                </rect>
-                <rect
-                  x={x}
-                  y={sy(total) + Math.max(nonStreamH, 0)}
-                  width={barWidth}
-                  height={Math.max(streamH, total > 0 ? 0.5 : 0)}
-                  fill="#06b6d4"
-                  rx={0}
-                >
-                  <title>
-                    {d.day}: {formatNumber(d.streamingCount)} {strings.tooltipStreaming}
-                  </title>
-                </rect>
-                {i % 5 === 0 && (
-                  <text
-                    x={x + barWidth / 2}
-                    y={MARGIN.top + PLOT_H + 14}
-                    textAnchor="middle"
-                    className="fill-muted-foreground"
-                    style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-                  >
-                    {formatSnapshotDate(d.day, locale)}
-                  </text>
-                )}
-              </g>
-            );
-          })}
-        </svg>
-
-        <div className="flex gap-4 mt-2">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: '#06b6d4' }} />
-            <span className="text-3xs font-mono text-muted-foreground">{strings.streaming}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: '#6b7280' }} />
-            <span className="text-3xs font-mono text-muted-foreground">{strings.nonStreaming}</span>
-          </div>
-        </div>
-      </Card>
-    </Expandable>
+        </FloatingTooltip>
+      )}
+    </ExpandableChart>
   );
 }
 
 export default function TrafficPage() {
-  const locale = useLocale();
-  const t = STRINGS[locale];
   return (
-    <Expandable title={t.exportStreaming}>
-      <Suspense>
-        <TrafficPageContent />
-      </Suspense>
-    </Expandable>
+    <Suspense>
+      <TrafficPageContent />
+    </Suspense>
   );
 }
 
@@ -548,7 +316,17 @@ function TrafficPageContent() {
     key: String(traceVersionParam),
   });
   const [range, setRange] = useState<DayRange>('30d');
-  const days = data?.daily.slice(-DAY_RANGE_DAYS[range]) ?? [];
+  const { dailyDays, dailyTotal, streamingDays } = useMemo(() => {
+    const days = data?.daily.slice(-DAY_RANGE_DAYS[range]) ?? [];
+    return {
+      dailyDays: days.map((d) => ({ day: d.day, values: { requests: d.requestCount } })),
+      dailyTotal: days.reduce((sum, d) => sum + d.requestCount, 0),
+      streamingDays: (data?.streamingBreakdown ?? []).slice(-30).map((d) => ({
+        day: d.day,
+        values: { streaming: d.streamingCount, nonStreaming: d.nonStreamingCount },
+      })),
+    };
+  }, [data, range]);
 
   return (
     <div className="space-y-6">
@@ -568,7 +346,11 @@ function TrafficPageContent() {
         ) : (
           <dl className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             <Stat boxed label={t.totalRequests} value={formatNumber(data.stats.totalRequests)} />
-            <Stat boxed label={t.peakHour} value={formatPeakHour(data.stats.peakHour)} />
+            <Stat
+              boxed
+              label={t.peakHour}
+              value={data.stats.peakHour ? formatHourLabel(data.stats.peakHour, locale) : '--'}
+            />
             <Stat boxed label={t.avgRequestsPerDay} value={formatNumber(data.stats.avgPerDay)} />
           </dl>
         )}
@@ -576,62 +358,43 @@ function TrafficPageContent() {
 
       {data && (
         <>
-          <div>
-            <SectionHeader
-              label={t.requestsOverTime}
-              detail={`${formatNumber(days.reduce((sum, d) => sum + d.requestCount, 0))} ${t.requests}`}
-            />
-            <DailyRequestsChart
-              data={days}
-              controls={
-                <RangeToggle
-                  value={range}
-                  options={DAY_RANGES}
-                  onChange={(v) => {
-                    setRange(v);
-                    track('agentic_workload_traffic_range_changed', { range: v });
-                  }}
-                />
-              }
-              strings={{
-                noDaily: t.noDaily,
-                exportDaily: t.exportDaily,
-                requests: t.requests,
-              }}
-            />
-          </div>
+          <TrendsStackedChart
+            title={t.requestsOverTime}
+            subtext={`${formatNumber(dailyTotal)} ${t.requests}`}
+            days={dailyDays}
+            seriesKeys={DAILY_KEYS}
+            labelFor={() => t.dailyRequests}
+            colorFor={dailyColor}
+            mode="count"
+            yLabel={t.yRequests}
+            filename="daily-requests"
+            emptyLabel={t.noDaily}
+            controls={
+              <RangeToggle
+                value={range}
+                options={DAY_RANGES}
+                onChange={(v) => {
+                  setRange(v);
+                  track('agentic_workload_traffic_range_changed', { range: v });
+                }}
+              />
+            }
+          />
 
-          <div>
-            <SectionHeader label={t.hourlyHeatmap} detail={t.heatmapDetail} />
-            <HourlyHeatmap
-              heatmap={data.heatmap}
-              strings={{
-                noHeatmap: t.noHeatmap,
-                hideSmall: t.hideSmall,
-                exportHeatmap: t.exportHeatmap,
-                dayLabels: t.dayLabels,
-                requests: t.requests,
-              }}
-            />
-          </div>
+          <HourlyHeatmap heatmap={data.heatmap} t={t} />
 
-          <div>
-            <SectionHeader
-              label={t.streamingVsNonStreaming}
-              detail={t.finalDays(Math.min(data.streamingBreakdown.length, 30))}
-            />
-            <StreamingChart
-              data={data.streamingBreakdown}
-              strings={{
-                noStreaming: t.noStreaming,
-                exportStreaming: t.exportStreaming,
-                streaming: t.streaming,
-                nonStreaming: t.nonStreaming,
-                tooltipStreaming: t.tooltipStreaming,
-                tooltipNonStreaming: t.tooltipNonStreaming,
-              }}
-            />
-          </div>
+          <TrendsStackedChart
+            title={t.streamingVsNonStreaming}
+            subtext={t.finalDays(Math.min(data.streamingBreakdown.length, 30))}
+            days={streamingDays}
+            seriesKeys={STREAMING_KEYS}
+            labelFor={(key) => (key === 'streaming' ? t.streaming : t.nonStreaming)}
+            colorFor={streamingColor}
+            mode="count"
+            yLabel={t.yRequests}
+            filename="streaming-vs-non-streaming"
+            emptyLabel={t.noStreaming}
+          />
         </>
       )}
     </div>

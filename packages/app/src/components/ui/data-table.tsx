@@ -43,6 +43,8 @@ interface DataTableProps<T> {
   analyticsPrefix?: string;
   watermark?: boolean;
   searchable?: boolean;
+  /** Offers the key-metrics / all-data column toggle when columns carry an importance. */
+  columnPresets?: boolean;
 }
 
 type TablePreset = 'key' | 'all';
@@ -110,6 +112,7 @@ export function DataTable<T>({
   analyticsPrefix = 'table',
   watermark = true,
   searchable = true,
+  columnPresets = true,
 }: DataTableProps<T>) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -119,6 +122,7 @@ export function DataTable<T>({
   const [sort, setSort] = useState<SortState>({ columnIndex: -1, dir: null });
   const [search, setSearch] = useState('');
   const hasPresets =
+    columnPresets &&
     columns.some((column) => column.importance === 'secondary') &&
     columns.some((column) => column.importance === 'key');
   const [preset, setPreset] = useState<TablePreset>('key');
@@ -354,88 +358,90 @@ export function DataTable<T>({
         </table>
       </div>
 
-      <div className="mt-3 flex flex-col gap-2 border-t border-border/50 pt-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-          <span data-testid="data-table-pagination-summary">
-            {locale === 'zh' ? (
-              <>
-                {sorted.length === 0
-                  ? `共 0 ${t.rowUnit}`
-                  : `第 ${safePage * pageSize + 1}–${Math.min((safePage + 1) * pageSize, sorted.length)} ${t.rowUnit}，共 ${sorted.length} ${t.rowUnit}`}
-                {search && `（${t.filteredFrom} ${data.length} ${t.rowUnit}）`}
-              </>
-            ) : (
-              <>
-                {sorted.length === 0
-                  ? '0'
-                  : `${safePage * pageSize + 1}–${Math.min((safePage + 1) * pageSize, sorted.length)}`}{' '}
-                {t.of} {sorted.length}
-                {search && ` (${t.filteredFrom} ${data.length})`}
-              </>
-            )}
-          </span>
-          <div
-            data-testid="data-table-page-size"
-            className="flex shrink-0 items-center gap-1 whitespace-nowrap"
-          >
-            {locale === 'zh' && <span>{t.perPage}</span>}
-            <Select
-              value={String(pageSize)}
-              onValueChange={(v) => {
-                const size = Number(v);
-                setPageSize(size);
-                setPage(0);
-                track(`${analyticsPrefix}_page_size_changed`, { size });
-              }}
+      {data.length > PAGE_SIZE_OPTIONS[0] && (
+        <div className="mt-3 flex flex-col gap-2 border-t border-border/50 pt-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+            <span data-testid="data-table-pagination-summary">
+              {locale === 'zh' ? (
+                <>
+                  {sorted.length === 0
+                    ? `共 0 ${t.rowUnit}`
+                    : `第 ${safePage * pageSize + 1}–${Math.min((safePage + 1) * pageSize, sorted.length)} ${t.rowUnit}，共 ${sorted.length} ${t.rowUnit}`}
+                  {search && `（${t.filteredFrom} ${data.length} ${t.rowUnit}）`}
+                </>
+              ) : (
+                <>
+                  {sorted.length === 0
+                    ? '0'
+                    : `${safePage * pageSize + 1}–${Math.min((safePage + 1) * pageSize, sorted.length)}`}{' '}
+                  {t.of} {sorted.length}
+                  {search && ` (${t.filteredFrom} ${data.length})`}
+                </>
+              )}
+            </span>
+            <div
+              data-testid="data-table-page-size"
+              className="flex shrink-0 items-center gap-1 whitespace-nowrap"
             >
-              <SelectTrigger
-                size="sm"
-                className="min-w-14 w-auto gap-1 px-2 text-xs data-[size=sm]:h-11 md:data-[size=sm]:h-8"
-                aria-label={t.rowsPerPage}
+              {locale === 'zh' && <span>{t.perPage}</span>}
+              <Select
+                value={String(pageSize)}
+                onValueChange={(v) => {
+                  const size = Number(v);
+                  setPageSize(size);
+                  setPage(0);
+                  track(`${analyticsPrefix}_page_size_changed`, { size });
+                }}
               >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PAGE_SIZE_OPTIONS.map((size) => (
-                  <SelectItem key={size} value={String(size)}>
-                    {size}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <span>{locale === 'zh' ? t.rowUnit : t.perPage}</span>
+                <SelectTrigger
+                  size="sm"
+                  className="min-w-14 w-auto gap-1 px-2 text-xs data-[size=sm]:h-11 md:data-[size=sm]:h-8"
+                  aria-label={t.rowsPerPage}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAGE_SIZE_OPTIONS.map((size) => (
+                    <SelectItem key={size} value={String(size)}>
+                      {size}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span>{locale === 'zh' ? t.rowUnit : t.perPage}</span>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1 self-end sm:self-auto">
+            <button
+              type="button"
+              onClick={() => {
+                setPage((p) => Math.max(0, p - 1));
+                track(`${analyticsPrefix}_page_changed`, { direction: 'prev' });
+              }}
+              disabled={safePage === 0}
+              className="inline-flex size-11 items-center justify-center rounded-md hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 transition-colors md:size-8"
+              aria-label={t.previousPage}
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+            <span>
+              {safePage + 1} / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setPage((p) => Math.min(totalPages - 1, p + 1));
+                track(`${analyticsPrefix}_page_changed`, { direction: 'next' });
+              }}
+              disabled={safePage >= totalPages - 1}
+              className="inline-flex size-11 items-center justify-center rounded-md hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 transition-colors md:size-8"
+              aria-label={t.nextPage}
+            >
+              <ChevronRight className="size-4" />
+            </button>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1 self-end sm:self-auto">
-          <button
-            type="button"
-            onClick={() => {
-              setPage((p) => Math.max(0, p - 1));
-              track(`${analyticsPrefix}_page_changed`, { direction: 'prev' });
-            }}
-            disabled={safePage === 0}
-            className="inline-flex size-11 items-center justify-center rounded-md hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 transition-colors md:size-8"
-            aria-label={t.previousPage}
-          >
-            <ChevronLeft className="size-4" />
-          </button>
-          <span>
-            {safePage + 1} / {totalPages}
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              setPage((p) => Math.min(totalPages - 1, p + 1));
-              track(`${analyticsPrefix}_page_changed`, { direction: 'next' });
-            }}
-            disabled={safePage >= totalPages - 1}
-            className="inline-flex size-11 items-center justify-center rounded-md hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 transition-colors md:size-8"
-            aria-label={t.nextPage}
-          >
-            <ChevronRight className="size-4" />
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

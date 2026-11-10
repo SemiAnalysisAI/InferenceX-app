@@ -5,7 +5,11 @@ import { useParams, useRouter } from 'next/navigation';
 import { type SessionRequest } from '@/lib/agentic-workload-explorer/session-context';
 import { buildRequestRuns } from '@/lib/agentic-workload-explorer/subagent-runs';
 import { type ContentBlock } from '@/lib/agentic-workload-explorer/subagent';
-import { formatDuration, formatNumber } from '@/lib/agentic-workload-explorer/format';
+import {
+  formatDollars,
+  formatDuration,
+  formatNumber,
+} from '@/lib/agentic-workload-explorer/format';
 import { TOOL_COLORS as BASE_TOOL_COLORS } from '@/lib/agentic-workload-explorer/tool-colors';
 import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-href';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -14,8 +18,16 @@ import { Button } from '@/components/ui/button';
 import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
 import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 import { ChartButtons } from '@/components/ui/chart-buttons';
-import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
+import { CHART_FONT_SANS, CHART_TYPE, px } from '@/lib/d3-chart/typography';
+import { chartFont, measureTextWidth, useFontsVersion } from '@/lib/d3-chart/dynamic-margins';
+import { readableTextColor } from '@/lib/d3-chart/contrast-colors';
+import { formatCost } from '@/components/agentic-workload-explorer/session-dag';
+
+const BAR_OPACITY = 0.85;
+const BAR_LABEL_PAD = 4;
 
 const STRINGS = {
   en: {
@@ -221,6 +233,24 @@ export function formatTickLabel(ms: number): string {
   return `+${(ms / 60000).toFixed(1)}m`;
 }
 
+/** Bars that overlap no other bar in their row; parallel requests would paint over a label. */
+function isolatedBarIds(bars: TimelineBar[]): Set<string> {
+  const sorted = bars.toSorted((a, b) => a.startMs - b.startMs);
+  const ids = new Set<string>();
+  let reachedMs = -Infinity;
+  sorted.forEach((bar, i) => {
+    const nextStart = sorted[i + 1]?.startMs ?? Infinity;
+    if (bar.startMs >= reachedMs && bar.endMs <= nextStart) ids.add(bar.id);
+    reachedMs = Math.max(reachedMs, bar.endMs);
+  });
+  return ids;
+}
+
+function pointerX(e: React.MouseEvent<SVGSVGElement>, viewWidth: number): number {
+  const rect = e.currentTarget.getBoundingClientRect();
+  return rect.width > 0 ? ((e.clientX - rect.left) / rect.width) * viewWidth : 0;
+}
+
 type Strings = (typeof STRINGS)[keyof typeof STRINGS];
 
 function TimelineTooltip({ data, t }: { data: TooltipData; t: Strings }) {
@@ -251,7 +281,9 @@ function TimelineTooltip({ data, t }: { data: TooltipData; t: Strings }) {
           bar.cacheWrite !== null && bar.cacheWrite > 0
             ? `${t.cacheWrite} ${formatNumber(bar.cacheWrite)}`
             : null,
-          bar.costUsd !== null && bar.costUsd > 0 ? `${t.cost} $${bar.costUsd.toFixed(4)}` : null,
+          bar.costUsd !== null && bar.costUsd > 0
+            ? `${t.cost} ${formatDollars(bar.costUsd)}`
+            : null,
         ]
           .filter(Boolean)
           .join(' · ')}
@@ -270,19 +302,21 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
   const { rows, totalDurationMs } = useMemo(() => buildTimelineRows(requests), [requests]);
 
   const [viewStart, setViewStart] = useState(0);
+  const [hoverX, setHoverX] = useState<number | null>(null);
+  const { dimensions, setContainerRef } = useResponsiveChartDimensions({ height: 0 });
   const [viewEnd, setViewEnd] = useState<number | null>(null);
   const dragRef = useRef<{ startX: number; startViewStart: number; startViewEnd: number } | null>(
     null,
   );
 
-  const LABEL_WIDTH = 180;
+  const LABEL_WIDTH = dimensions.width > 0 && dimensions.width < 640 ? 96 : 180;
   const ROW_HEIGHT = 32;
   const ROW_GAP = 4;
   const HEADER_HEIGHT = 28;
   const PADDING_RIGHT = 20;
   const MIN_BAR_WIDTH = 4;
 
-  const chartWidth = Math.max(600, 800);
+  const chartWidth = Math.max(200, dimensions.width - LABEL_WIDTH - 2);
   const svgHeight = HEADER_HEIGHT + rows.length * (ROW_HEIGHT + ROW_GAP) + 8;
 
   const vStart = viewStart;
@@ -306,9 +340,7 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
   const handleWheel = useCallback(
     (e: React.WheelEvent<SVGSVGElement>) => {
       e.preventDefault();
-      const rect = e.currentTarget.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseRatio = mouseX / (chartWidth - PADDING_RIGHT);
+      const mouseRatio = pointerX(e, chartWidth) / (chartWidth - PADDING_RIGHT);
       const curStart = viewStart;
       const curEnd = viewEnd ?? totalDurationMs;
       const curDuration = curEnd - curStart;
@@ -345,18 +377,22 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
     (e: React.MouseEvent<SVGSVGElement>) => {
       if (e.button !== 0) return;
       dragRef.current = {
-        startX: e.clientX,
+        startX: pointerX(e, chartWidth),
         startViewStart: viewStart,
         startViewEnd: viewEnd ?? totalDurationMs,
       };
     },
-    [viewStart, viewEnd, totalDurationMs],
+    [viewStart, viewEnd, totalDurationMs, chartWidth],
   );
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
-      if (!dragRef.current) return;
-      const dx = e.clientX - dragRef.current.startX;
+      if (!dragRef.current) {
+        setHoverX(pointerX(e, chartWidth));
+        return;
+      }
+      setHoverX(null);
+      const dx = pointerX(e, chartWidth) - dragRef.current.startX;
       const msPx = visibleDuration / (chartWidth - PADDING_RIGHT);
       const deltaMs = -dx * msPx;
 
@@ -385,27 +421,45 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
     dragRef.current = null;
   }, []);
 
+  const handleMouseLeave = useCallback(() => {
+    dragRef.current = null;
+    setHoverX(null);
+  }, []);
+
   const resetZoom = useCallback(() => {
     setViewStart(0);
     setViewEnd(null);
   }, []);
 
   const uniqueTypes = [...new Set(rows.map((r) => r.agentType))];
+  const barTextColors = useMemo(
+    () =>
+      new Map(
+        rows.map((r) => [r.agentType, readableTextColor(getAgentColor(r.agentType), BAR_OPACITY)]),
+      ),
+    [rows],
+  );
+  const isolatedBars = useMemo(() => rows.map((r) => isolatedBarIds(r.bars)), [rows]);
 
   const totalCost = rows.reduce((s, r) => s + r.totalCost, 0);
 
   const chartId = `agent-timeline-${useId().replaceAll(/[^a-zA-Z0-9_-]/gu, '')}`;
+  useFontsVersion();
 
   if (rows.length === 0) {
     return <EmptyState className="h-32">{t.noData}</EmptyState>;
   }
 
+  const barFont = chartFont(CHART_TYPE.axisLabelSub);
+
   return (
-    <div id={chartId} className="space-y-3">
-      <SectionHeader
-        label={t.sectionTitle}
-        detail={t.rows(rows.length)}
-        actions={
+    <Card id={chartId}>
+      <CardHeader className="pb-2">
+        <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
+          <div className="min-w-0 grow basis-48">
+            <CardTitle>{t.sectionTitle}</CardTitle>
+            <div className="mt-1 text-xs text-muted-foreground">{t.rows(rows.length)}</div>
+          </div>
           <ChartButtons
             chartId={chartId}
             exportFileName={`agent-timeline-${params.id || 'session'}`}
@@ -426,260 +480,302 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
                 </Button>
               ) : undefined
             }
-            className="mb-0"
+            className="mb-0 ml-auto shrink-0 flex-nowrap"
           />
-        }
-      />
-      <div className="max-h-0 overflow-hidden" aria-hidden="true">
-        <div id={`${chartId}-export`} className="p-4" />
-      </div>
+        </div>
+      </CardHeader>
+      <CardContent ref={setContainerRef} className="space-y-3">
+        <div className="max-h-0 overflow-hidden" aria-hidden="true">
+          <div id={`${chartId}-export`} className="p-4" />
+        </div>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1">
-        {uniqueTypes.map((agentType) => (
-          <div key={agentType} className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-2.5 h-2.5 rounded-sm"
-              style={{ backgroundColor: getAgentColor(agentType) }}
-            />
-            <span className="text-3xs font-mono text-muted-foreground">{agentType}</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="rounded-xl border border-border/30 bg-card overflow-hidden">
-        <div className="flex">
-          <div
-            className="flex-shrink-0 border-r border-border/20 bg-card"
-            style={{ width: LABEL_WIDTH }}
-          >
-            <div
-              className="border-b border-border/20 flex items-end px-2 pb-1"
-              style={{ height: HEADER_HEIGHT }}
-            >
-              <span className="text-xs font-medium text-muted-foreground">{t.agentHeader}</span>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1">
+          {uniqueTypes.map((agentType) => (
+            <div key={agentType} className="flex items-center gap-1.5">
+              <span
+                className="inline-block w-2.5 h-2.5 rounded-sm"
+                style={{ backgroundColor: getAgentColor(agentType) }}
+              />
+              <span className="text-xs text-muted-foreground">{agentType}</span>
             </div>
-            {rows.map((row) => {
-              const color = getAgentColor(row.agentType);
-              return (
-                <div
-                  key={row.id}
-                  className="flex items-center px-2 gap-1.5 overflow-hidden"
-                  style={{ height: ROW_HEIGHT + ROW_GAP }}
-                >
-                  <span
-                    className="inline-block w-1.5 h-3.5 rounded-sm flex-shrink-0"
-                    style={{ backgroundColor: color }}
-                  />
-                  <span className="text-3xs font-mono truncate font-medium" style={{ color }}>
-                    {row.label}
-                  </span>
-                  <span className="text-3xs font-mono text-muted-foreground ml-auto shrink-0">
-                    {row.bars.length}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+          ))}
+        </div>
 
-          <div className="flex-1 overflow-x-auto" data-chart-scroll>
-            <svg
-              width={chartWidth}
-              height={svgHeight}
-              className="block"
-              style={{ cursor: isZoomed ? 'grab' : undefined }}
-              onWheel={handleWheel}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
+        <div className="overflow-hidden rounded-lg border border-border/30">
+          <div className="flex">
+            <div
+              className="flex-shrink-0 border-r border-border/20 bg-card"
+              style={{ width: LABEL_WIDTH }}
             >
-              <rect
-                x={0}
-                y={0}
-                width={chartWidth}
-                height={HEADER_HEIGHT}
-                className="fill-surface"
-              />
-              <line
-                x1={0}
-                y1={HEADER_HEIGHT}
-                x2={chartWidth}
-                y2={HEADER_HEIGHT}
-                className="stroke-border"
-                strokeWidth={1}
-              />
-
-              {ticks.map((tick) => {
-                const x = (tick - vStart) * scale;
+              <div
+                className="border-b border-border/20 flex items-end px-2 pb-1"
+                style={{ height: HEADER_HEIGHT }}
+              >
+                <span className="text-xs font-medium text-muted-foreground">{t.agentHeader}</span>
+              </div>
+              {rows.map((row) => {
+                const color = getAgentColor(row.agentType);
                 return (
-                  <g key={tick}>
-                    <line
-                      x1={x}
-                      y1={HEADER_HEIGHT}
-                      x2={x}
-                      y2={svgHeight}
-                      stroke="currentColor"
-                      className="text-border"
-                      strokeWidth={1}
-                      strokeDasharray="2 4"
+                  <div
+                    key={row.id}
+                    className="flex items-center px-2 gap-1.5 overflow-hidden"
+                    style={{ height: ROW_HEIGHT + ROW_GAP }}
+                  >
+                    <span
+                      className="inline-block w-1.5 h-3.5 rounded-sm flex-shrink-0"
+                      style={{ backgroundColor: color }}
                     />
-                    <text
-                      x={x + 3}
-                      y={HEADER_HEIGHT - 6}
-                      className="fill-muted-foreground"
-                      style={{
-                        fontSize: '9px',
-                        fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                      }}
+                    <span
+                      className="text-xs truncate font-medium text-foreground"
+                      title={row.label}
                     >
-                      {formatTickLabel(tick)}
-                    </text>
-                  </g>
+                      {LABEL_WIDTH < 180 ? row.label.replace(/^.*? · /u, '') : row.label}
+                    </span>
+                    <span className="text-xs tabular-nums text-muted-foreground ml-auto shrink-0">
+                      {row.bars.length}
+                    </span>
+                  </div>
                 );
               })}
+            </div>
 
-              {rows.map((_, rowIdx) => (
+            <div className="min-w-0 flex-1 overflow-hidden" data-chart-scroll>
+              <svg
+                role="img"
+                aria-label={t.sectionTitle}
+                width="100%"
+                height={svgHeight}
+                viewBox={`0 0 ${chartWidth} ${svgHeight}`}
+                preserveAspectRatio="none"
+                className="block"
+                style={{ cursor: isZoomed ? 'grab' : undefined }}
+                onWheel={handleWheel}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseLeave}
+              >
                 <rect
-                  key={`row-bg-${rowIdx}`}
                   x={0}
-                  y={HEADER_HEIGHT + rowIdx * (ROW_HEIGHT + ROW_GAP)}
+                  y={0}
                   width={chartWidth}
-                  height={ROW_HEIGHT}
-                  fill={rowIdx % 2 === 1 ? 'currentColor' : 'transparent'}
-                  className="text-border"
-                  opacity={rowIdx % 2 === 1 ? 0.05 : 0}
+                  height={HEADER_HEIGHT}
+                  className="fill-surface"
                 />
-              ))}
+                <line
+                  x1={0}
+                  y1={HEADER_HEIGHT}
+                  x2={chartWidth}
+                  y2={HEADER_HEIGHT}
+                  className="stroke-border"
+                  strokeWidth={1}
+                />
 
-              {rows.map((_, rowIdx) => {
-                if (rowIdx === 0) return null;
-                const y = HEADER_HEIGHT + rowIdx * (ROW_HEIGHT + ROW_GAP) - ROW_GAP / 2;
-                return (
-                  <line
-                    key={`row-sep-${rowIdx}`}
-                    x1={0}
-                    y1={y}
-                    x2={chartWidth}
-                    y2={y}
-                    stroke="currentColor"
-                    className="text-border"
-                    strokeWidth={0.5}
-                    opacity={0.3}
-                  />
-                );
-              })}
-
-              {rows.map((row, rowIdx) =>
-                row.bars.map((bar) => {
-                  const x = (bar.startMs - vStart) * scale;
-                  const barWidth = Math.max(bar.durationMs * scale, MIN_BAR_WIDTH);
-                  const y = HEADER_HEIGHT + rowIdx * (ROW_HEIGHT + ROW_GAP) + 4;
-                  const barHeight = ROW_HEIGHT - 8;
-                  const color = getAgentColor(row.agentType);
-                  const toolColor = getToolColor(bar.tool);
-
+                {ticks.map((tick) => {
+                  const x = (tick - vStart) * scale;
                   return (
-                    <g
-                      key={bar.id}
-                      onMouseMove={(e) =>
-                        setTooltip({
-                          x: e.clientX,
-                          y: e.clientY,
-                          row,
-                          bar,
-                        })
-                      }
-                      onMouseLeave={() => setTooltip(null)}
-                      onClick={() =>
-                        router.push(
-                          explorerHref(`/sessions/${params.id}/conversation#req-${bar.requestId}`),
-                        )
-                      }
-                      className="cursor-pointer"
-                    >
-                      <rect
-                        x={x - 1}
-                        y={HEADER_HEIGHT + rowIdx * (ROW_HEIGHT + ROW_GAP)}
-                        width={barWidth + 2}
-                        height={ROW_HEIGHT}
-                        fill="transparent"
-                        className="hover:fill-surface-hover/50"
-                        rx={2}
+                    <g key={tick}>
+                      <line
+                        x1={x}
+                        y1={HEADER_HEIGHT}
+                        x2={x}
+                        y2={svgHeight}
+                        stroke="var(--chart-grid)"
+                        strokeWidth={1}
                       />
-                      <rect
-                        x={x}
-                        y={y}
-                        width={barWidth}
-                        height={barHeight}
-                        rx={2}
-                        fill={color}
-                        opacity={0.85}
-                      />
-                      <rect
-                        x={x}
-                        y={y + barHeight - 3}
-                        width={barWidth}
-                        height={3}
-                        rx={1}
-                        fill={toolColor}
-                        opacity={0.7}
-                      />
-                      {barWidth > 50 && (
-                        <text
-                          x={x + barWidth / 2}
-                          y={y + (barHeight - 3) / 2 + 1}
-                          textAnchor="middle"
-                          dominantBaseline="middle"
-                          fill="white"
-                          style={{
-                            fontSize: '9px',
-                            fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                          }}
-                        >
-                          {formatDuration(bar.durationMs)}
-                        </text>
-                      )}
-                      {barWidth > 90 && (
-                        <text
-                          x={x + 5}
-                          y={y + (barHeight - 3) / 2 + 1}
-                          dominantBaseline="middle"
-                          fill="white"
-                          opacity={0.7}
-                          style={{
-                            fontSize: '8px',
-                            fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                          }}
-                        >
-                          {bar.tool}
-                        </text>
-                      )}
+                      <text
+                        x={x + 3}
+                        y={HEADER_HEIGHT - 6}
+                        className="fill-muted-foreground"
+                        style={{
+                          fontSize: px(CHART_TYPE.axisLabel),
+                          fontFamily: CHART_FONT_SANS,
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        {tick === 0 ? '0' : formatTickLabel(tick)}
+                      </text>
                     </g>
                   );
-                }),
-              )}
-            </svg>
+                })}
+
+                {rows.map((_, rowIdx) => (
+                  <rect
+                    key={`row-bg-${rowIdx}`}
+                    x={0}
+                    y={HEADER_HEIGHT + rowIdx * (ROW_HEIGHT + ROW_GAP)}
+                    width={chartWidth}
+                    height={ROW_HEIGHT}
+                    fill={rowIdx % 2 === 1 ? 'currentColor' : 'transparent'}
+                    className="text-border"
+                    opacity={rowIdx % 2 === 1 ? 0.05 : 0}
+                  />
+                ))}
+
+                {rows.map((_, rowIdx) => {
+                  if (rowIdx === 0) return null;
+                  const y = HEADER_HEIGHT + rowIdx * (ROW_HEIGHT + ROW_GAP) - ROW_GAP / 2;
+                  return (
+                    <line
+                      key={`row-sep-${rowIdx}`}
+                      x1={0}
+                      y1={y}
+                      x2={chartWidth}
+                      y2={y}
+                      stroke="currentColor"
+                      className="text-border"
+                      strokeWidth={0.5}
+                      opacity={0.3}
+                    />
+                  );
+                })}
+
+                {rows.map((row, rowIdx) =>
+                  row.bars.map((bar) => {
+                    const x = (bar.startMs - vStart) * scale;
+                    const barWidth = Math.max(bar.durationMs * scale, MIN_BAR_WIDTH);
+                    const y = HEADER_HEIGHT + rowIdx * (ROW_HEIGHT + ROW_GAP) + 4;
+                    const barHeight = ROW_HEIGHT - 8;
+                    const color = getAgentColor(row.agentType);
+                    const toolColor = getToolColor(bar.tool);
+                    const textColor = barTextColors.get(row.agentType);
+                    const durationLabel = formatDuration(bar.durationMs);
+                    const durationWidth = measureTextWidth(durationLabel, barFont);
+                    const showDuration =
+                      isolatedBars[rowIdx].has(bar.id) && durationWidth + BAR_LABEL_PAD <= barWidth;
+                    const showTool =
+                      showDuration &&
+                      measureTextWidth(bar.tool, barFont) + durationWidth + BAR_LABEL_PAD * 3 <=
+                        barWidth;
+                    const labelY = y + (barHeight - 3) / 2 + 1;
+
+                    return (
+                      <g
+                        key={bar.id}
+                        onMouseMove={(e) =>
+                          setTooltip({
+                            x: e.clientX,
+                            y: e.clientY,
+                            row,
+                            bar,
+                          })
+                        }
+                        onMouseLeave={() => setTooltip(null)}
+                        onClick={() =>
+                          router.push(
+                            explorerHref(
+                              `/sessions/${params.id}/conversation#req-${bar.requestId}`,
+                            ),
+                          )
+                        }
+                        className="cursor-pointer"
+                      >
+                        <rect
+                          x={x - 1}
+                          y={HEADER_HEIGHT + rowIdx * (ROW_HEIGHT + ROW_GAP)}
+                          width={barWidth + 2}
+                          height={ROW_HEIGHT}
+                          fill="transparent"
+                          className="hover:fill-surface-hover/50"
+                          rx={2}
+                        />
+                        <rect
+                          x={x}
+                          y={y}
+                          width={barWidth}
+                          height={barHeight}
+                          rx={2}
+                          fill={color}
+                          opacity={BAR_OPACITY}
+                        />
+                        <rect
+                          x={x}
+                          y={y + barHeight - 3}
+                          width={barWidth}
+                          height={3}
+                          rx={1}
+                          fill={toolColor}
+                          opacity={0.7}
+                        />
+                        {showDuration && (
+                          <text
+                            x={showTool ? x + barWidth - BAR_LABEL_PAD : x + barWidth / 2}
+                            y={labelY}
+                            textAnchor={showTool ? 'end' : 'middle'}
+                            dominantBaseline="middle"
+                            fill={textColor}
+                            pointerEvents="none"
+                            style={{
+                              fontSize: px(CHART_TYPE.axisLabelSub),
+                              fontFamily: CHART_FONT_SANS,
+                              fontVariantNumeric: 'tabular-nums',
+                            }}
+                          >
+                            {durationLabel}
+                          </text>
+                        )}
+                        {showTool && (
+                          <text
+                            x={x + BAR_LABEL_PAD}
+                            y={labelY}
+                            dominantBaseline="middle"
+                            fill={textColor}
+                            pointerEvents="none"
+                            style={{
+                              fontSize: px(CHART_TYPE.axisLabelSub),
+                              fontFamily: CHART_FONT_SANS,
+                            }}
+                          >
+                            {bar.tool}
+                          </text>
+                        )}
+                      </g>
+                    );
+                  }),
+                )}
+                {hoverX !== null && (
+                  <g pointerEvents="none">
+                    <line
+                      x1={hoverX}
+                      y1={HEADER_HEIGHT}
+                      x2={hoverX}
+                      y2={svgHeight}
+                      className="stroke-foreground"
+                      strokeOpacity={0.4}
+                      strokeWidth={1}
+                    />
+                    <text
+                      x={Math.min(hoverX + 3, chartWidth - 40)}
+                      y={HEADER_HEIGHT - 6}
+                      className="fill-foreground"
+                      style={{
+                        fontSize: px(CHART_TYPE.axisLabel),
+                        fontFamily: CHART_FONT_SANS,
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    >
+                      {formatTickLabel(vStart + hoverX / scale)}
+                    </text>
+                  </g>
+                )}
+              </svg>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="flex items-center gap-4 text-2xs font-mono text-muted-foreground px-1">
-        <span>{t.requests(rows.reduce((s, r) => s + r.bars.length, 0))}</span>
-        <span className="h-px w-3 bg-border/30" />
-        <span>{t.subAgentInstances(rows.length - (rows[0]?.agentType === 'Main' ? 1 : 0))}</span>
-        <span className="h-px w-3 bg-border/30" />
-        <span>
-          {t.span} {formatDuration(totalDurationMs)}
-        </span>
-        {totalCost > 0 && (
-          <>
-            <span className="h-px w-3 bg-border/30" />
-            <span>${totalCost < 0.01 ? '<0.01' : totalCost.toFixed(3)}</span>
-          </>
-        )}
-      </div>
+        <div className="px-1 text-xs tabular-nums text-muted-foreground">
+          {[
+            t.requests(rows.reduce((s, r) => s + r.bars.length, 0)),
+            t.subAgentInstances(rows.length - (rows[0]?.agentType === 'Main' ? 1 : 0)),
+            `${t.span} ${formatDuration(totalDurationMs)}`,
+            totalCost > 0 ? formatCost(totalCost) : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </div>
 
-      {tooltip && <TimelineTooltip data={tooltip} t={t} />}
-    </div>
+        {tooltip && <TimelineTooltip data={tooltip} t={t} />}
+      </CardContent>
+    </Card>
   );
 }

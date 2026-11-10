@@ -10,17 +10,12 @@ import {
   type ZoomContext,
   type ScaleConfig,
 } from '@/lib/d3-chart/D3Chart';
+import type { AnyScale } from '@/lib/d3-chart/chart-update';
 import { chartFont, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import { axisLabelUnit, chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import { ChartPointDetails } from '@/components/ui/chart-point-details';
-import {
-  applyHoverState,
-  applyNormalState,
-  formatLargeNumber,
-  getShapeKeyForPrecision,
-  logTickFormat,
-} from '@/lib/charts/chart-rendering';
+import { formatLargeNumber, logTickFormat } from '@/lib/charts/chart-rendering';
 import { SERIES_LINE_PATTERNS, frameworkDasharray } from '@/lib/charts/framework-dash';
 import { type Precision, getChartWatermark, getPrecisionLabel } from '@/lib/catalog/data-mappings';
 import { updateRepoUrl } from '@/lib/shared/utils';
@@ -43,6 +38,38 @@ export interface TrendChartProps {
 }
 
 const CHART_MARGIN = { top: 20, right: 30, bottom: 64, left: 66 };
+
+const DAY_MS = 86_400_000;
+const DAY_TICK_STEPS = [1, 2, 3, 7, 14];
+const MONTH_TICK_STEPS = [1, 2, 3, 6];
+const MIN_DATE_TICKS = 3;
+
+/**
+ * About `count` UTC date ticks with equal gaps: whole days on a grid fixed to Mondays
+ * (1970-01-05 is day 4), so panning keeps the same dates, else months or years. Takes the
+ * coarsest step within `count`, unless it leaves fewer than three ticks and a finer one exists.
+ */
+function evenDateTicks(start: Date, end: Date, count: number): Date[] {
+  const stop = new Date(end.getTime() + 1);
+  const days = (end.getTime() - start.getTime()) / DAY_MS;
+  const candidates = [
+    ...DAY_TICK_STEPS.map(
+      (step) => () =>
+        d3.utcDay
+          .range(start, stop)
+          .filter((day) => (Math.round(day.getTime() / DAY_MS) - 4) % step === 0),
+    ),
+    ...MONTH_TICK_STEPS.map((step) => () => d3.utcMonth.every(step)?.range(start, stop) ?? []),
+    () => d3.utcYear.every(Math.ceil(days / 365.25 / count))?.range(start, stop) ?? [],
+  ];
+  let finer: Date[] | undefined;
+  for (const candidate of candidates) {
+    const ticks = candidate();
+    if (ticks.length <= count) return ticks.length < MIN_DATE_TICKS && finer ? finer : ticks;
+    finer = ticks;
+  }
+  return finer ?? [];
+}
 
 const STRINGS = {
   en: {
@@ -273,12 +300,15 @@ const TrendChart = React.memo(
     const tooltipConfig = useMemo(
       () => ({
         rulerType: 'crosshair' as const,
+        proximityHover: true,
+        getDataX: (d: PreparedPoint) => d.x,
+        getDataY: (d: PreparedPoint) => d.y,
         content: (d: PreparedPoint) => {
           const config = getPointConfig(d);
           return chartHoverCard(
             {
               title: config?.label ?? '',
-              subtitle: locale === 'zh' ? dateFormatter.format(new Date(d.raw.date)) : d.raw.date,
+              subtitle: dateFormatter.format(new Date(d.raw.date)),
               color: config?.color ?? '#888',
               metrics: [{ value: formatLargeNumber(d.value), label: axisLabelUnit(yLabel) }],
               summary: t.interpolatedAt(d.raw.x),
@@ -295,7 +325,7 @@ const TrendChart = React.memo(
             <ChartPointDetails
               title={config?.label ?? ''}
               color={config?.color ?? '#888'}
-              date={locale === 'zh' ? dateFormatter.format(new Date(d.raw.date)) : d.raw.date}
+              date={dateFormatter.format(new Date(d.raw.date))}
               metrics={[
                 { value: formatLargeNumber(d.value), label: yLabel, exact: formatExact(d.value) },
               ]}
@@ -318,24 +348,13 @@ const TrendChart = React.memo(
         },
         getRulerX: (d: PreparedPoint, xScale: any) => xScale(d.x),
         getRulerY: (d: PreparedPoint, yScale: any) => yScale(d.y),
-        onHoverStart: (sel: d3.Selection<any, PreparedPoint, any, any>, d: PreparedPoint) =>
-          applyHoverState(
-            sel.select('.visible-shape') as any,
-            getShapeKeyForPrecision(d.precision, selectedPrecisions ?? []),
-          ),
-        onHoverEnd: (sel: d3.Selection<any, PreparedPoint, any, any>, d: PreparedPoint) =>
-          applyNormalState(
-            sel.select('.visible-shape') as any,
-            getShapeKeyForPrecision(d.precision, selectedPrecisions ?? []),
-          ),
         onPointClick: (d: PreparedPoint) => {
           const config = getPointConfig(d);
           if (config)
             track('inference_trend_point_clicked', { config: config.hwKey, date: d.raw.date });
         },
-        attachToLayer: 1,
       }),
-      [dateFormatter, getPointConfig, locale, selectedPrecisions, t, yLabel],
+      [dateFormatter, getPointConfig, t, yLabel],
     );
 
     const xAxisConfig = useMemo(
@@ -344,8 +363,19 @@ const TrendChart = React.memo(
         tickFormat: ((value: d3.AxisDomain) =>
           locale === 'zh'
             ? axisDateFormatter.format(new Date(Number(value)))
-            : d3.timeFormat('%b %d')(new Date(Number(value)))) as any,
+            : d3.utcFormat('%b %-d')(new Date(Number(value)))) as any,
         tickCount: 10,
+        // Short "Oct 1" labels fit every ~64px; the default 80px step leaves one tick on phones.
+        tickValues: (scale: AnyScale) => {
+          const time = scale as d3.ScaleTime<number, number>;
+          const [left, right] = time.range();
+          const [start, end] = time.domain();
+          return evenDateTicks(
+            start,
+            end,
+            Math.min(10, Math.max(3, Math.floor(Math.abs(right - left) / 64))),
+          );
+        },
         customize: (g: d3.Selection<SVGGElement, unknown, null, undefined>) => {
           const ticks = g.selectAll<SVGGElement, unknown>('.tick');
           const xs = ticks

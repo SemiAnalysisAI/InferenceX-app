@@ -34,7 +34,7 @@ const CLIENT_LABELS: Record<string, string> = {
 const STRINGS = {
   en: {
     title: 'Explicit tool-result error rate by OS',
-    comparableResults: (n: string) => `(${n} comparable results)`,
+    comparableResults: (n: string) => `${n} comparable results`,
     description:
       'Error rate uses matched Anthropic results because that protocol carries an explicit error signal. OpenAI and Codex remain in all-call volume and traffic mix, but are not silently counted as successes. OS describes the request sender, not necessarily the tool execution host. Coverage is matched/comparable calls; Signal Share is comparable/all matched results.',
     caption:
@@ -56,7 +56,7 @@ const STRINGS = {
   },
   zh: {
     title: '按操作系统分组的工具结果错误率',
-    comparableResults: (n: string) => `(${n} 个可比较结果)`,
+    comparableResults: (n: string) => `${n} 个可比较结果`,
     description:
       '错误率使用 Anthropic 匹配结果计算，因为该协议携带显式错误信号。OpenAI 和 Codex 仅参与总调用量和流量占比统计，不被默认计为成功。OS 指请求发送端，不一定是工具执行主机。覆盖率为 matched/comparable 调用比；信号占比为 comparable/全部 matched 结果比。',
     caption:
@@ -124,13 +124,10 @@ export function ToolOsErrorRates({ rows }: { rows: ToolOsErrorRate[] }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle>
-          {t.title}{' '}
-          <span className="font-normal text-muted-foreground">
-            {t.comparableResults(matchedResults.toLocaleString())}
-          </span>
-        </CardTitle>
-        <p className="mt-0.5 text-3xs font-mono text-muted-foreground">{t.description}</p>
+        <CardTitle>{t.title}</CardTitle>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {t.comparableResults(matchedResults.toLocaleString())} · {t.description}
+        </p>
       </CardHeader>
       <CardContent>
         {sortedRows.length === 0 ? (
@@ -139,7 +136,7 @@ export function ToolOsErrorRates({ rows }: { rows: ToolOsErrorRate[] }) {
           </EmptyState>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[850px] text-2xs font-mono">
+            <table className="w-full min-w-[850px] text-xs tabular-nums">
               <caption className="sr-only">{t.caption}</caption>
               <thead className="border-b border-border/20 text-muted-foreground">
                 <tr>

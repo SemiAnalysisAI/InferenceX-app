@@ -5,25 +5,31 @@ import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Stat } from '@/components/ui/stat';
-import { formatNumber } from '@/lib/agentic-workload-explorer/format';
-import { formatSnapshotDate } from '@/lib/agentic-workload-explorer/snapshot';
+import { formatDollars, formatNumber } from '@/lib/agentic-workload-explorer/format';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
 import {
   useTraceVersion,
   appendTraceVersion,
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
 import { getFastModeMultiplier } from '@semianalysisai/inferencex-db/proxytrace/shared/pricing';
-import { ChartActions, Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
-import { track } from '@/lib/analytics/analytics';
+import {
+  formatDayLabel,
+  TrendsStackedChart,
+} from '@/components/agentic-workload-explorer/trends-charts';
+import {
+  CHART_COLORS,
+  NEUTRAL_SERIES_COLOR,
+} from '@/components/agentic-workload-explorer/series-colors';
 import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {
+    yShareOfRequests: 'Share of requests',
     summary: 'Summary',
     dailyFastModePct: 'Daily fast mode %',
     modelBreakdown: 'Model breakdown',
-    finalDays: (n: number) => `final ${n} days`,
+    finalDays: (n: number) => `Final ${n} days`,
     models: (n: number) => `${n} models`,
     fastModePct: 'Fast mode %',
     fastModeCost: 'Fast mode cost',
@@ -36,7 +42,8 @@ const STRINGS = {
     errorLoading: 'Failed to load fast mode data',
     noDailyData: 'No daily data available',
     noModelData: 'No model data available',
-    exportTitle: 'Daily fast mode %',
+    fast: 'Fast mode',
+    regular: 'Regular',
     thModel: 'Model',
     thFastCount: 'Fast count',
     thRegularCount: 'Regular count',
@@ -45,10 +52,9 @@ const STRINGS = {
     thFastE2e: 'Fast E2E',
     thRegularE2e: 'Regular E2E',
     thDiff: 'Diff',
-    tooltipFast: (day: string, pct: string, fast: number, total: number, cost: string) =>
-      `${day}: ${pct}% fast (${fast}/${total} requests, ${cost} fast cost)`,
   },
   zh: {
+    yShareOfRequests: '请求占比',
     summary: '概览',
     dailyFastModePct: '每日 Fast Mode 占比',
     modelBreakdown: '模型明细',
@@ -65,7 +71,8 @@ const STRINGS = {
     errorLoading: '无法加载 Fast Mode 数据',
     noDailyData: '暂无每日数据',
     noModelData: '暂无模型数据',
-    exportTitle: '每日 Fast Mode 占比',
+    fast: 'Fast Mode',
+    regular: '常规',
     thModel: '模型',
     thFastCount: 'Fast 次数',
     thRegularCount: '常规次数',
@@ -74,8 +81,6 @@ const STRINGS = {
     thFastE2e: 'Fast E2E',
     thRegularE2e: '常规 E2E',
     thDiff: '差异',
-    tooltipFast: (day: string, pct: string, fast: number, total: number, cost: string) =>
-      `${day}：${pct}% 为 Fast Mode（${fast}/${total} 个请求，Fast 成本 ${cost}）`,
   },
 } as const;
 
@@ -112,21 +117,12 @@ interface FastModeData {
   byModel: FastModeModelRow[];
 }
 
-const CHART_W = 600;
-const CHART_H = 200;
-const MARGIN = { top: 8, right: 12, bottom: 36, left: 56 };
-const PLOT_W = CHART_W - MARGIN.left - MARGIN.right;
-const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
-
-const SVG_FONT = 'var(--font-mono, ui-monospace, monospace)';
-const SVG_FONT_SIZE = '9px';
-
-function formatDollars(v: number): string {
-  if (v >= 1000) return `$${(v / 1000).toFixed(1)}K`;
-  if (v >= 100) return `$${v.toFixed(0)}`;
-  if (v >= 10) return `$${v.toFixed(1)}`;
-  return `$${v.toFixed(2)}`;
-}
+const DAILY_KEYS = ['fast', 'regular'];
+const DAILY_COLORS: Record<string, string> = {
+  fast: CHART_COLORS[1],
+  regular: NEUTRAL_SERIES_COLOR,
+};
+const dailyColor = (key: string) => DAILY_COLORS[key];
 
 function formatPct(v: number): string {
   if (isNaN(v) || !isFinite(v)) return '0%';
@@ -134,123 +130,8 @@ function formatPct(v: number): string {
 }
 
 function formatMs(v: number): string {
-  if (v >= 1000) return `${(v / 1000).toFixed(1)}s`;
+  if (Math.abs(v) >= 1000) return `${(v / 1000).toFixed(1)}s`;
   return `${Math.round(v)}ms`;
-}
-
-function truncateModel(model: string, maxLen = 32): string {
-  if (model.length <= maxLen) return model;
-  return `${model.slice(0, maxLen - 1)}...`;
-}
-
-function DailyFastModeChart({ daily, t }: { daily: FastModeDaily[]; t: Strings }) {
-  const locale = useLocale();
-  const data = daily.slice(-30);
-
-  if (data.length === 0) {
-    return (
-      <EmptyState bare className="py-8">
-        {t.noDailyData}
-      </EmptyState>
-    );
-  }
-
-  const yMax = 100;
-  const yTicks = [0, 25, 50, 75, 100];
-
-  const barGap = 2;
-  const barWidth = Math.max(1, (PLOT_W - barGap * data.length) / data.length);
-
-  const sy = (v: number) => MARGIN.top + PLOT_H - (v / yMax) * PLOT_H;
-
-  return (
-    <Expandable title={t.exportTitle}>
-      <Card>
-        <div className="flex items-center justify-end mb-2">
-          <ChartActions
-            fileName="daily-fast-mode"
-            onExportPng={() => track('agentic_workload_export_png', { chart: 'daily-fast-mode' })}
-          />
-        </div>
-        <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ maxHeight: 240 }}>
-          {yTicks.map((tv) => (
-            <g key={`y-${tv}`}>
-              {tv > 0 && (
-                <line
-                  x1={MARGIN.left}
-                  y1={sy(tv)}
-                  x2={MARGIN.left + PLOT_W}
-                  y2={sy(tv)}
-                  stroke="currentColor"
-                  className="text-border"
-                  strokeWidth={0.5}
-                  strokeDasharray="3 3"
-                />
-              )}
-              <text
-                x={MARGIN.left - 6}
-                y={sy(tv) + 3}
-                textAnchor="end"
-                className="fill-muted-foreground"
-                style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-              >
-                {tv}%
-              </text>
-            </g>
-          ))}
-
-          <line
-            x1={MARGIN.left}
-            y1={MARGIN.top + PLOT_H}
-            x2={MARGIN.left + PLOT_W}
-            y2={MARGIN.top + PLOT_H}
-            stroke="currentColor"
-            className="text-border"
-            strokeWidth={0.5}
-          />
-
-          {data.map((d, i) => {
-            const x = MARGIN.left + i * (barWidth + barGap);
-            const pct = d.totalCount > 0 ? (d.fastCount / d.totalCount) * 100 : 0;
-            const barH = (pct / yMax) * PLOT_H;
-            return (
-              <g key={d.day}>
-                <rect
-                  x={x}
-                  y={sy(pct)}
-                  width={barWidth}
-                  height={Math.max(barH, 0.5)}
-                  fill="#f59e0b"
-                  rx={1}
-                >
-                  <title>
-                    {t.tooltipFast(
-                      d.day,
-                      pct.toFixed(1),
-                      d.fastCount,
-                      d.totalCount,
-                      formatDollars(d.fastCost),
-                    )}
-                  </title>
-                </rect>
-                {i % 5 === 0 && (
-                  <text
-                    x={x + barWidth / 2}
-                    y={MARGIN.top + PLOT_H + 14}
-                    textAnchor="middle"
-                    className="fill-muted-foreground"
-                    style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-                  >
-                    {formatSnapshotDate(d.day, locale)}
-                  </text>
-                )}
-              </g>
-            );
-          })}
-        </svg>
-      </Card>
-    </Expandable>
-  );
 }
 
 interface ModelBreakdown {
@@ -305,7 +186,7 @@ function ModelBreakdownTable({ byModel, t }: { byModel: FastModeModelRow[]; t: S
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full font-mono text-2xs">
+      <table className="w-full text-xs tabular-nums">
         <thead>
           <tr className="text-muted-foreground text-left border-b border-border/20">
             <th className="py-1.5 px-2 font-medium text-xs">{t.thModel}</th>
@@ -326,8 +207,8 @@ function ModelBreakdownTable({ byModel, t }: { byModel: FastModeModelRow[]; t: S
                 : null;
             return (
               <tr key={m.model} className="border-b border-border/20 hover:bg-surface-hover">
-                <td className="py-1.5 px-2" title={m.model}>
-                  {truncateModel(m.model)}
+                <td className="max-w-64 truncate py-1.5 px-2 font-mono" title={m.model}>
+                  {m.model}
                 </td>
                 <td className="py-1.5 px-2 text-right text-foreground">
                   {formatNumber(m.fastCount)}
@@ -342,16 +223,16 @@ function ModelBreakdownTable({ byModel, t }: { byModel: FastModeModelRow[]; t: S
                   {formatDollars(m.regularCost)}
                 </td>
                 <td className="py-1.5 px-2 text-right text-foreground">
-                  {m.fastAvgDuration > 0 ? formatMs(m.fastAvgDuration) : '---'}
+                  {m.fastAvgDuration > 0 ? formatMs(m.fastAvgDuration) : '—'}
                 </td>
                 <td className="py-1.5 px-2 text-right text-muted-foreground">
-                  {m.regularAvgDuration > 0 ? formatMs(m.regularAvgDuration) : '---'}
+                  {m.regularAvgDuration > 0 ? formatMs(m.regularAvgDuration) : '—'}
                 </td>
                 <td
                   className={`py-1.5 px-2 text-right ${latencyDiff !== null && latencyDiff < 0 ? 'text-success' : latencyDiff !== null && latencyDiff > 0 ? 'text-destructive' : 'text-muted-foreground'}`}
                 >
                   {latencyDiff === null
-                    ? '---'
+                    ? '—'
                     : `${latencyDiff < 0 ? '' : '+'}${formatMs(latencyDiff)}`}
                 </td>
               </tr>
@@ -432,6 +313,15 @@ function FastModePageContent() {
     };
   }, [data]);
 
+  const dailyDays = useMemo(
+    () =>
+      (data?.daily ?? []).slice(-30).map((d) => ({
+        day: d.day,
+        values: { fast: d.fastCount, regular: Math.max(0, d.totalCount - d.fastCount) },
+      })),
+    [data],
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -475,7 +365,7 @@ function FastModePageContent() {
                   ? formatMs(stats.latencyGain)
                   : stats.latencyGain < 0
                     ? `+${formatMs(Math.abs(stats.latencyGain))}`
-                    : '---'
+                    : '—'
               }
               detail={
                 stats.fastAvgDuration > 0 && stats.regularAvgDuration > 0
@@ -492,13 +382,19 @@ function FastModePageContent() {
 
       {data && stats && (
         <>
-          <div>
-            <SectionHeader
-              label={t.dailyFastModePct}
-              detail={t.finalDays(Math.min(data.daily.length, 30))}
-            />
-            <DailyFastModeChart daily={data.daily} t={t} />
-          </div>
+          <TrendsStackedChart
+            title={t.dailyFastModePct}
+            subtext={t.finalDays(Math.min(data.daily.length, 30))}
+            days={dailyDays}
+            seriesKeys={DAILY_KEYS}
+            labelFor={(key) => (key === 'fast' ? t.fast : t.regular)}
+            colorFor={dailyColor}
+            mode="share"
+            yLabel={t.yShareOfRequests}
+            xFormatter={(day: string) => formatDayLabel(day, locale)}
+            filename="daily-fast-mode"
+            emptyLabel={t.noDailyData}
+          />
 
           <div>
             <SectionHeader

@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
 import {
+  formatDollars,
   formatDuration,
   formatInteractivity,
   formatNumber,
@@ -23,6 +24,16 @@ import { track } from '@/lib/analytics/analytics';
 import { TOKEN_SERIES_COLORS as COLORS } from '@/components/agentic-workload-explorer/series-colors';
 import { Button } from '@/components/ui/button';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CHART_FONT_SANS, CHART_TYPE, px } from '@/lib/d3-chart/typography';
+import { chartFont, useFontsVersion } from '@/lib/d3-chart/dynamic-margins';
+import { fitLabel, rowChartColumns } from '@/components/agentic-workload-explorer/row-chart-layout';
+import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
+import {
+  ShowMoreRows,
+  useRowLimit,
+} from '@/components/agentic-workload-explorer/conversation-view';
 
 const RATIO_COLORS = {
   good: '#10b981',
@@ -44,6 +55,7 @@ const STRINGS = {
     layoutLabel: 'Layout',
     grouped: 'Grouped',
     classifierLike: 'Classifier-like',
+    classifierLikeHint: 'Inferred from the response stop marker',
     expandAll: 'Expand all',
     collapseAll: 'Collapse all',
     classifierLikeSignature: 'Classifier-like response signature',
@@ -91,6 +103,7 @@ const STRINGS = {
     layoutLabel: '布局',
     grouped: '分组',
     classifierLike: '类分类器',
+    classifierLikeHint: '根据响应的停止标记推断',
     expandAll: '全部展开',
     collapseAll: '全部折叠',
     classifierLikeSignature: '类分类器响应特征',
@@ -160,9 +173,6 @@ function ratioColor(ratio: number): string {
 
 const ROW_HEIGHT = 28;
 const ROW_GAP = 2;
-const LABEL_WIDTH = 180;
-const COST_WIDTH = 70;
-const BAR_LEFT = LABEL_WIDTH + 8;
 const CLASSIFIER_COLOR = '#f97316';
 
 type FlamegraphMode = 'api' | 'hash' | 'ratio';
@@ -219,19 +229,10 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
     return all;
   });
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(800);
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width);
-      }
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  const { dimensions, setContainerRef } = useResponsiveChartDimensions({ height: 0 });
+  const containerWidth = dimensions.width;
+  const [rowLimit, , showMoreRows] = useRowLimit(`${mode}-${layout}`);
+  useFontsVersion();
 
   const toggleGroup = useCallback((turn: number) => {
     setExpandedGroups((prev) => {
@@ -416,9 +417,13 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
     return Math.max(2, observed * 1.05);
   }, [visibleRows]);
 
-  const barWidth = containerWidth - BAR_LEFT - COST_WIDTH - 16;
-  const svgHeight = visibleRows.length * (ROW_HEIGHT + ROW_GAP) + ROW_GAP;
-  const ratioReferenceX = BAR_LEFT + (barWidth > 0 ? barWidth / maxRatio : 0);
+  const columns = rowChartColumns(containerWidth);
+  const barLeft = columns.label + 8;
+  const labelFont = chartFont(CHART_TYPE.axisLabel);
+  const barWidth = containerWidth - barLeft - columns.value - 8;
+  const shownRows = visibleRows.length > rowLimit ? visibleRows.slice(0, rowLimit) : visibleRows;
+  const svgHeight = shownRows.length * (ROW_HEIGHT + ROW_GAP) + ROW_GAP;
+  const ratioReferenceX = barLeft + (barWidth > 0 ? barWidth / maxRatio : 0);
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent, row: (typeof visibleRows)[number]) => {
@@ -451,21 +456,13 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
   }, []);
 
   if (rows.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-32 text-muted-foreground font-mono text-xs">
-        {t.noData}
-      </div>
-    );
+    return <EmptyState className="h-32">{t.noData}</EmptyState>;
   }
 
   return (
-    <div className="space-y-4">
-      <div className="sticky -top-5 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 -mx-2 px-2 pt-5 pb-2 space-y-2 border-b border-border/20">
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-medium text-muted-foreground">{t.sectionTitle}</span>
-          <div className="flex-1 h-px bg-border/30" />
-        </div>
-
+    <Card className="relative">
+      <CardHeader className="sticky top-0 z-20 gap-2 bg-card/95 pb-3 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+        <CardTitle>{t.sectionTitle}</CardTitle>
         <div className="flex items-center gap-4 flex-wrap">
           <SegmentedToggle
             role="group"
@@ -499,15 +496,15 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
           {legendItems.map((item) => (
             <div key={item.key} className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.color }} />
-              <span className="text-3xs font-mono text-muted-foreground">{item.label}</span>
+              <span className="text-xs text-muted-foreground">{item.label}</span>
             </div>
           ))}
-          <div className="flex items-center gap-1.5" title="Inferred from the response stop marker">
+          <div className="flex items-center gap-1.5" title={t.classifierLikeHint}>
             <div
               className="w-2.5 h-2.5 rotate-45 rounded-[1px]"
               style={{ backgroundColor: CLASSIFIER_COLOR }}
             />
-            <span className="text-3xs font-mono text-muted-foreground">{t.classifierLike}</span>
+            <span className="text-xs text-muted-foreground">{t.classifierLike}</span>
           </div>
           {subagentGroupTurns.length > 0 && layout === 'grouped' && (
             <div className="ml-auto flex items-center gap-2">
@@ -536,212 +533,211 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
             </div>
           )}
         </div>
-      </div>
+      </CardHeader>
 
-      <div
-        ref={containerRef}
-        className="bg-card border border-border/30 rounded-xl p-4 overflow-x-auto relative"
-      >
-        <svg width={containerWidth - 32} height={svgHeight} className="block">
-          {mode === 'ratio' && barWidth > 0 && (
-            <>
-              <line
-                x1={ratioReferenceX}
-                y1={0}
-                x2={ratioReferenceX}
-                y2={svgHeight}
-                stroke="currentColor"
-                strokeWidth={1}
-                strokeDasharray="3 3"
-                className="text-muted-foreground"
-                opacity={0.6}
-              />
-              <text
-                x={ratioReferenceX + 4}
-                y={10}
-                className="fill-current text-muted-foreground"
-                style={{
-                  fontSize: '9px',
-                  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                }}
-              >
-                1.0
-              </text>
-            </>
-          )}
-          {visibleRows.map((row, idx) => {
-            const y = idx * (ROW_HEIGHT + ROW_GAP) + ROW_GAP;
-            const total = getTotal(row);
-            const scale = barWidth > 0 ? barWidth / maxTokens : 0;
+      <CardContent className="overflow-x-auto">
+        <div ref={setContainerRef} className="min-w-0">
+          <svg
+            role="img"
+            aria-label={t.sectionTitle}
+            width={Math.max(0, containerWidth)}
+            height={svgHeight}
+            className="block"
+          >
+            {mode === 'ratio' && barWidth > 0 && (
+              <>
+                <line
+                  x1={ratioReferenceX}
+                  y1={0}
+                  x2={ratioReferenceX}
+                  y2={svgHeight}
+                  stroke="currentColor"
+                  strokeWidth={1}
+                  strokeDasharray="3 3"
+                  className="text-muted-foreground"
+                  opacity={0.6}
+                />
+                <text
+                  x={ratioReferenceX + 4}
+                  y={10}
+                  className="fill-current text-muted-foreground"
+                  style={{
+                    fontSize: px(CHART_TYPE.axisLabel),
+                    fontFamily: CHART_FONT_SANS,
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  1.0
+                </text>
+              </>
+            )}
+            {shownRows.map((row, idx) => {
+              const y = idx * (ROW_HEIGHT + ROW_GAP) + ROW_GAP;
+              const total = getTotal(row);
+              const scale = barWidth > 0 ? barWidth / maxTokens : 0;
 
-            const inputW = row.input * scale;
-            const cacheReadW = row.cacheRead * scale;
-            const cacheWriteW = row.cacheWrite * scale;
-            const outputW = row.output * scale;
+              const inputW = row.input * scale;
+              const cacheReadW = row.cacheRead * scale;
+              const cacheWriteW = row.cacheWrite * scale;
+              const outputW = row.output * scale;
 
-            const barX = BAR_LEFT;
-            const segments = [
-              { x: barX, w: inputW, color: COLORS.input },
-              { x: barX + inputW, w: cacheReadW, color: COLORS.cacheRead },
-              { x: barX + inputW + cacheReadW, w: cacheWriteW, color: COLORS.cacheWrite },
-              { x: barX + inputW + cacheReadW + cacheWriteW, w: outputW, color: COLORS.output },
-            ];
+              const barX = barLeft;
+              const segments = [
+                { x: barX, w: inputW, color: COLORS.input },
+                { x: barX + inputW, w: cacheReadW, color: COLORS.cacheRead },
+                { x: barX + inputW + cacheReadW, w: cacheWriteW, color: COLORS.cacheWrite },
+                { x: barX + inputW + cacheReadW + cacheWriteW, w: outputW, color: COLORS.output },
+              ];
 
-            const ratioScale = barWidth > 0 ? barWidth / maxRatio : 0;
-            const ratioW = row.ratio === null ? 0 : row.ratio * ratioScale;
-            const ratioFill = row.ratio === null ? RATIO_COLORS.bad : ratioColor(row.ratio);
+              const ratioScale = barWidth > 0 ? barWidth / maxRatio : 0;
+              const ratioW = row.ratio === null ? 0 : row.ratio * ratioScale;
+              const ratioFill = row.ratio === null ? RATIO_COLORS.bad : ratioColor(row.ratio);
 
-            const labelX = row.indent === 1 ? 20 : 0;
+              const labelX = row.indent === 1 ? 20 : 0;
+              const labelOffset = labelX + (row.isGroup ? 16 : 4);
 
-            function navigateToConversation() {
-              router.push(explorerHref(`/sessions/${sessionId}/conversation#req-${row.requestId}`));
-            }
+              function navigateToConversation() {
+                router.push(
+                  explorerHref(`/sessions/${sessionId}/conversation#req-${row.requestId}`),
+                );
+              }
 
-            return (
-              <g
-                key={row.key}
-                className="cursor-pointer"
-                onClick={row.isGroup ? undefined : navigateToConversation}
-                onMouseMove={(e) => handleMouseMove(e, row)}
-                onMouseLeave={handleMouseLeave}
-              >
-                {row.indent === 1 && (
-                  <line
-                    x1={8}
-                    y1={y}
-                    x2={8}
-                    y2={y + ROW_HEIGHT}
-                    stroke="#8b5cf6"
-                    strokeWidth={2}
-                    strokeOpacity={0.5}
-                  />
-                )}
+              return (
+                <g
+                  key={row.key}
+                  className="cursor-pointer"
+                  onClick={row.isGroup ? undefined : navigateToConversation}
+                  onMouseMove={(e) => handleMouseMove(e, row)}
+                  onMouseLeave={handleMouseLeave}
+                >
+                  {row.indent === 1 && (
+                    <line
+                      x1={8}
+                      y1={y}
+                      x2={8}
+                      y2={y + ROW_HEIGHT}
+                      stroke={COLORS.output}
+                      strokeWidth={2}
+                      strokeOpacity={0.5}
+                    />
+                  )}
 
-                {row.isGroup && (
+                  {row.isGroup && (
+                    <text
+                      x={labelX + 4}
+                      y={y + ROW_HEIGHT / 2}
+                      dominantBaseline="central"
+                      className="fill-current text-muted-foreground cursor-pointer"
+                      style={{
+                        fontSize: px(CHART_TYPE.axisLabel),
+                        fontFamily: CHART_FONT_SANS,
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleGroup(row.turn);
+                      }}
+                    >
+                      {row.isExpanded ? '\u25BC' : '\u25B6'}
+                    </text>
+                  )}
                   <text
-                    x={labelX + 4}
+                    x={labelOffset}
                     y={y + ROW_HEIGHT / 2}
                     dominantBaseline="central"
-                    className="fill-current text-muted-foreground cursor-pointer"
+                    className={`fill-current hover:underline ${
+                      row.isClassifierLike ? 'text-warning' : 'text-muted-foreground'
+                    }`}
                     style={{
-                      fontSize: '11px',
-                      fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+                      fontSize: px(CHART_TYPE.axisLabel),
+                      fontFamily: CHART_FONT_SANS,
+                      fontVariantNumeric: 'tabular-nums',
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      toggleGroup(row.turn);
+                      navigateToConversation();
                     }}
                   >
-                    {row.isExpanded ? '\u25BC' : '\u25B6'}
+                    {fitLabel(row.label, labelFont, columns.label - labelOffset)}
                   </text>
-                )}
-                <text
-                  x={labelX + (row.isGroup ? 16 : 4)}
-                  y={y + ROW_HEIGHT / 2}
-                  dominantBaseline="central"
-                  className={`fill-current hover:underline ${
-                    row.isClassifierLike ? 'text-warning' : 'text-muted-foreground'
-                  }`}
-                  style={{
-                    fontSize: '11px',
-                    fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigateToConversation();
-                  }}
-                >
-                  {row.label}
-                </text>
 
-                <rect
-                  x={barX}
-                  y={y + 2}
-                  width={Math.max(0, barWidth)}
-                  height={ROW_HEIGHT - 4}
-                  rx={3}
-                  className="fill-current"
-                  style={{ color: 'var(--color-border)', opacity: 0.3 }}
-                />
-
-                {!row.isGroup &&
-                  mode !== 'ratio' &&
-                  segments.map((seg, si) =>
-                    seg.w > 0 ? (
-                      <rect
-                        key={si}
-                        x={seg.x}
-                        y={y + 2}
-                        width={seg.w}
-                        height={ROW_HEIGHT - 4}
-                        rx={
-                          si === 0 && total > 0
-                            ? 3
-                            : si === segments.length - 1 ||
-                                segments.slice(si + 1).every((s) => s.w === 0)
-                              ? 3
-                              : 0
-                        }
-                        fill={seg.color}
-                        opacity={0.85}
-                      >
-                        <title>
-                          {(legendItems as readonly { label: string }[])[si]?.label}:{' '}
-                          {formatNumber(
-                            si === 0
-                              ? row.input
-                              : si === 1
-                                ? row.cacheRead
-                                : si === 2
-                                  ? row.cacheWrite
-                                  : row.output,
-                          )}
-                        </title>
-                      </rect>
-                    ) : null,
-                  )}
-
-                {!row.isGroup && mode === 'ratio' && row.ratio !== null && ratioW > 0 && (
                   <rect
                     x={barX}
                     y={y + 2}
-                    width={ratioW}
+                    width={Math.max(0, barWidth)}
                     height={ROW_HEIGHT - 4}
                     rx={3}
-                    fill={ratioFill}
-                    opacity={0.85}
-                  >
-                    <title>
-                      ratio {row.ratio.toFixed(2)} = hash {formatNumber(row.hashTokenCount ?? 0)} /
-                      provider {formatNumber(row.providerInputTotal ?? 0)}
-                    </title>
-                  </rect>
-                )}
+                    className="fill-current"
+                    style={{ color: 'var(--color-border)', opacity: 0.3 }}
+                  />
 
-                <text
-                  x={barX + barWidth + 8}
-                  y={y + ROW_HEIGHT / 2}
-                  dominantBaseline="central"
-                  className="fill-current text-muted-foreground"
-                  style={{
-                    fontSize: '10px',
-                    fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                  }}
-                >
-                  {row.isGroup
-                    ? ''
-                    : mode === 'ratio'
-                      ? row.ratio === null
-                        ? '\u2014'
-                        : row.ratio.toFixed(2)
-                      : row.cost > 0
-                        ? `$${row.cost.toFixed(2)}`
-                        : '\u2014'}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
+                  {!row.isGroup &&
+                    mode !== 'ratio' &&
+                    segments.map((seg, si) =>
+                      seg.w > 0 ? (
+                        <rect
+                          key={si}
+                          x={seg.x}
+                          y={y + 2}
+                          width={seg.w}
+                          height={ROW_HEIGHT - 4}
+                          rx={
+                            si === 0 && total > 0
+                              ? 3
+                              : si === segments.length - 1 ||
+                                  segments.slice(si + 1).every((s) => s.w === 0)
+                                ? 3
+                                : 0
+                          }
+                          fill={seg.color}
+                          opacity={0.85}
+                        />
+                      ) : null,
+                    )}
+
+                  {!row.isGroup && mode === 'ratio' && row.ratio !== null && ratioW > 0 && (
+                    <rect
+                      x={barX}
+                      y={y + 2}
+                      width={ratioW}
+                      height={ROW_HEIGHT - 4}
+                      rx={3}
+                      fill={ratioFill}
+                      opacity={0.85}
+                    />
+                  )}
+
+                  <text
+                    x={barX + barWidth + 8}
+                    y={y + ROW_HEIGHT / 2}
+                    dominantBaseline="central"
+                    className="fill-current text-muted-foreground"
+                    style={{
+                      fontSize: px(CHART_TYPE.axisLabel),
+                      fontFamily: CHART_FONT_SANS,
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    {row.isGroup
+                      ? ''
+                      : mode === 'ratio'
+                        ? row.ratio === null
+                          ? '\u2014'
+                          : row.ratio.toFixed(2)
+                        : row.cost > 0
+                          ? formatDollars(row.cost)
+                          : '\u2014'}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+        <ShowMoreRows
+          shown={shownRows.length}
+          total={visibleRows.length}
+          view="flamegraph"
+          onShowMore={showMoreRows}
+        />
 
         {tooltip && (
           <FloatingTooltip x={tooltip.x} y={tooltip.y} placement="above">
@@ -816,12 +812,12 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
                     );
                   parts.push(
                     `${t.output} ${formatNumber(tooltip.output)}`,
-                    `$${tooltip.cost.toFixed(4)}`,
+                    formatDollars(tooltip.cost),
                   );
                 } else {
                   parts.push(
                     `${t.total} ${formatNumber(tooltip.total)}`,
-                    `$${tooltip.cost.toFixed(4)}`,
+                    formatDollars(tooltip.cost),
                   );
                   if (tooltip.mode === 'hash' && tooltip.hashBlocks !== null) {
                     parts.push(
@@ -851,7 +847,7 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
             />
           </FloatingTooltip>
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

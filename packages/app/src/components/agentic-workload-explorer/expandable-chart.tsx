@@ -13,21 +13,18 @@ import {
   type ReactNode,
 } from 'react';
 import { ChartButtons, ExpandChartButton } from '@/components/ui/chart-buttons';
+import { resolveChartInstructions, TOUCH_PRIMARY_QUERY } from '@/components/ui/d3-chart-wrapper';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { zoomEventFilter } from '@/hooks/useChartZoom';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 
 const STRINGS = {
-  en: {
-    expandChart: 'Expand chart',
-    zoomInstructions: 'scroll to zoom · drag to pan · double-click to reset',
-  },
-  zh: {
-    expandChart: '展开图表',
-    zoomInstructions: '滚轮缩放 · 拖动平移 · 双击重置',
-  },
+  en: { expandChart: 'Expand chart' },
+  zh: { expandChart: '展开图表' },
 } as const;
 
 function useChartId() {
@@ -87,12 +84,18 @@ function setScale(svg: SVGSVGElement) {
 
 function ChartZoom({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const touchPrimary = useMediaQuery(TOUCH_PRIMARY_QUERY);
+  const [zoomable, setZoomable] = useState(false);
 
   useEffect(() => {
     const root = ref.current;
     if (!root) return;
-    const rescale = () => root.querySelectorAll<SVGSVGElement>(CHART_SVG).forEach(setScale);
+    const rescale = () => {
+      const svgs = root.querySelectorAll<SVGSVGElement>(CHART_SVG);
+      svgs.forEach(setScale);
+      setZoomable(svgs.length > 0);
+    };
     const resize = new ResizeObserver(rescale);
     resize.observe(root);
     const mutations = new MutationObserver(rescale);
@@ -118,9 +121,10 @@ function ChartZoom({ children }: { children: ReactNode }) {
       const o = svg && original(svg);
       const b = svg && readBox(svg);
       const ctm = svg?.getScreenCTM();
-      if (!svg || !o || !b || !ctm) return;
+      if (!svg || !o || !b || !ctm || !zoomEventFilter(e)) return;
       e.preventDefault();
-      const w = Math.min(o.w, Math.max(o.w / MAX_ZOOM, b.w * Math.exp(e.deltaY * 0.0015)));
+      const delta = e.deltaY || e.deltaX;
+      const w = Math.min(o.w, Math.max(o.w / MAX_ZOOM, b.w * Math.exp(delta * 0.0015)));
       const f = w / b.w;
       const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
       apply(svg, { x: p.x - (p.x - b.x) * f, y: p.y - (p.y - b.y) * f, w, h: b.h * f }, o);
@@ -181,9 +185,11 @@ function ChartZoom({ children }: { children: ReactNode }) {
   return (
     <div ref={ref} className="chart-zoom w-full min-w-0">
       {children}
-      <p className="mt-2 text-right text-3xs font-mono text-muted-foreground">
-        {t.zoomInstructions}
-      </p>
+      {zoomable && !touchPrimary && (
+        <p className="no-export mt-2 text-center text-xs text-balance text-muted-foreground">
+          {resolveChartInstructions(undefined, locale, true, false)}
+        </p>
+      )}
     </div>
   );
 }
@@ -274,21 +280,19 @@ export function ExpandableChart({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <CardTitle className="text-sm">{title}</CardTitle>
+        <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
+          <div className="min-w-0 grow basis-48">
+            <CardTitle>{title}</CardTitle>
             {subtitle && <div className="mt-1 text-xs text-muted-foreground">{subtitle}</div>}
           </div>
-          {actions !== undefined && (
-            <ExpandContext.Provider value={expandContext}>
-              <ChartIdContext.Provider value={chartId}>{actions}</ChartIdContext.Provider>
-            </ExpandContext.Provider>
-          )}
-          {inlineTriggers === 0 && (
-            <div className="-my-1 -mr-1">
-              <ExpandChartButton onClick={expand} chartTitle={titleText} />
-            </div>
-          )}
+          <div className="ml-auto flex shrink-0 flex-nowrap items-center gap-2">
+            {actions !== undefined && (
+              <ExpandContext.Provider value={expandContext}>
+                <ChartIdContext.Provider value={chartId}>{actions}</ChartIdContext.Provider>
+              </ExpandContext.Provider>
+            )}
+            {inlineTriggers === 0 && <ExpandChartButton onClick={expand} chartTitle={titleText} />}
+          </div>
         </div>
       </CardHeader>
       <CardContent ref={bodyRef} style={open && !isRender ? { minHeight: bodyHeight } : undefined}>
@@ -335,7 +339,8 @@ interface ExpandContextValue {
   title?: string;
 }
 
-const ExpandContext = createContext<ExpandContextValue | null>(null);
+/** Non-null while a chart renders inline; the expanded dialog renders it without this context. */
+export const ExpandContext = createContext<ExpandContextValue | null>(null);
 
 export function Expandable({
   title,
@@ -426,7 +431,7 @@ export function ChartActions({
       hideZoomReset
       onExportPng={onExportPng}
       leadingControls={expand ? <ExpandTrigger /> : undefined}
-      className="mb-0 ml-auto"
+      className="mb-0 ml-auto shrink-0 flex-nowrap"
     />
   );
 }

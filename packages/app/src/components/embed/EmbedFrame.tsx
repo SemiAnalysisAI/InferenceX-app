@@ -12,6 +12,7 @@ import {
 } from '@/lib/embed/embed';
 
 const SKIN_FONT_VARS = ['--font-embed-sans', '--font-embed-mono'] as const;
+const SITE_THEME_STORAGE_KEY = 'theme';
 
 export default function EmbedFrame({
   theme,
@@ -25,7 +26,11 @@ export default function EmbedFrame({
   const { setTheme } = useTheme();
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    const saved = localStorage.getItem(SITE_THEME_STORAGE_KEY);
     setTheme(theme);
+    // next-themes persists every setTheme; an embed must not change the visitor's saved site theme.
+    if (saved === null) localStorage.removeItem(SITE_THEME_STORAGE_KEY);
+    else localStorage.setItem(SITE_THEME_STORAGE_KEY, saved);
   }, [setTheme, theme]);
 
   useEffect(() => {

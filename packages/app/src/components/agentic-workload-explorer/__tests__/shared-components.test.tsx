@@ -150,9 +150,15 @@ describe('shared D3 explorer charts', () => {
     expect(container.innerHTML).not.toContain('NaN');
     expect(container.textContent).toContain('100%');
     act(() => bars[0].dispatchEvent(new MouseEvent('mouseenter', { bubbles: true })));
+    expect(bars[1].getAttribute('opacity')).not.toBe('0.2');
+    act(() => bars[0].dispatchEvent(new MouseEvent('mouseleave', { bubbles: true })));
+    const legendItem = [...container.querySelectorAll('span')].find(
+      (span) => span.textContent === 'a' && span.querySelector('span') !== null,
+    )!;
+    act(() => legendItem.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
     expect(bars[0].getAttribute('opacity')).toBe('1');
     expect(bars[1].getAttribute('opacity')).toBe('0.2');
-    act(() => bars[0].dispatchEvent(new MouseEvent('mouseleave', { bubbles: true })));
+    act(() => legendItem.dispatchEvent(new MouseEvent('mouseout', { bubbles: true })));
     expect(bars[1].getAttribute('opacity')).toBe('1');
   });
 
@@ -301,7 +307,7 @@ describe('shared controls', () => {
       'Time range',
     );
     expect(buttons[0].getAttribute('aria-pressed')).toBe('true');
-    expect(buttons[1].title).toBe("Snapshot's final 14 days");
+    expect(buttons[1].title).toBe('Final 14 days');
     act(() => buttons[1].click());
     expect(onChange).toHaveBeenCalledWith('14d');
   });

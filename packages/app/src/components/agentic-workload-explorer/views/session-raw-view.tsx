@@ -12,6 +12,10 @@ import {
   formatJsonCompact,
 } from '@/lib/agentic-workload-explorer/format';
 import { useSession } from '@/lib/agentic-workload-explorer/session-context';
+import {
+  ShowMoreRows,
+  useRowLimit,
+} from '@/components/agentic-workload-explorer/conversation-view';
 import { formatSnapshotTime } from '@/lib/agentic-workload-explorer/snapshot';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
@@ -24,6 +28,13 @@ const STRINGS = {
     requestBody: 'Request body',
     responseBody: 'Response body',
     error: 'Error',
+    tokensIn: 'in',
+    tokensOut: 'out',
+    cacheRead: 'cache read',
+    cacheWrite: 'cache write',
+    stream: 'stream',
+    errorBadge: 'error',
+    unknownModel: 'unknown',
   },
   zh: {
     title: '原始请求 Trace',
@@ -32,6 +43,13 @@ const STRINGS = {
     requestBody: '请求体',
     responseBody: '响应体',
     error: '错误',
+    tokensIn: '输入',
+    tokensOut: '输出',
+    cacheRead: '缓存读取',
+    cacheWrite: '缓存写入',
+    stream: '流式',
+    errorBadge: '错误',
+    unknownModel: '未知',
   },
 };
 
@@ -40,15 +58,16 @@ export default function RawTracePage() {
   const t = STRINGS[locale];
   const { requests } = useSession();
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
+  const [rowLimit, , showMoreRows] = useRowLimit();
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">{t.title}</CardTitle>
-        <CardDescription>{t.description}</CardDescription>
+        <CardTitle>{t.title}</CardTitle>
+        <CardDescription className="text-xs">{t.description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
-        {requests.map((req) => {
+        {requests.slice(0, rowLimit).map((req) => {
           const isExpanded = expandedRequest === req.id;
           return (
             <div
@@ -68,36 +87,36 @@ export default function RawTracePage() {
                 <div className="flex items-center gap-3">
                   <Badge
                     variant={req.responseStatusCode === 200 ? 'default' : 'destructive'}
-                    className="font-mono text-xs"
+                    className="tabular-nums text-xs"
                   >
                     {req.responseStatusCode || 'ERR'}
                   </Badge>
-                  <span className="font-mono text-xs">{req.model || 'unknown'}</span>
+                  <span className="text-xs">{req.model || t.unknownModel}</span>
                   {has1MContext(req.requestHeaders) && (
-                    <Badge variant="outline" className="text-xs py-0 h-5 font-mono">
+                    <Badge variant="outline" className="text-xs py-0 h-5 tabular-nums">
                       1M
                     </Badge>
                   )}
                   {req.isStreaming && (
                     <Badge variant="outline" className="text-xs">
-                      stream
+                      {t.stream}
                     </Badge>
                   )}
                   {req.error && (
                     <Badge variant="destructive" className="text-xs">
-                      error
+                      {t.errorBadge}
                     </Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <div className="flex items-center gap-4 text-xs tabular-nums text-muted-foreground">
                   {req.inputTokens !== null && (
                     <span>
-                      {formatNumber(req.inputTokens)} in
+                      {formatNumber(req.inputTokens)} {t.tokensIn}
                       {(req.cacheReadInputTokens ?? 0) > 0 &&
-                        ` · ${formatNumber(req.cacheReadInputTokens!)} cache_read`}
+                        ` · ${formatNumber(req.cacheReadInputTokens!)} ${t.cacheRead}`}
                       {(req.cacheWriteTokens ?? 0) > 0 &&
-                        ` · ${formatNumber(req.cacheWriteTokens!)} cache_write`}
-                      {` · ${formatNumber(req.outputTokens || 0)} out`}
+                        ` · ${formatNumber(req.cacheWriteTokens!)} ${t.cacheWrite}`}
+                      {` · ${formatNumber(req.outputTokens || 0)} ${t.tokensOut}`}
                     </span>
                   )}
                   {req.ttftMs !== null && <span>TTFT {formatDuration(req.ttftMs)}</span>}
@@ -173,6 +192,12 @@ export default function RawTracePage() {
             </div>
           );
         })}
+        <ShowMoreRows
+          shown={Math.min(rowLimit, requests.length)}
+          total={requests.length}
+          view="raw"
+          onShowMore={showMoreRows}
+        />
       </CardContent>
     </Card>
   );

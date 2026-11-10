@@ -8,9 +8,12 @@ import { useIsCoarsePointer, useIsMobileViewport, useMediaQuery } from '@/hooks/
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { CHART_TOOLTIP_Z_INDEX } from '@/lib/d3-chart/tooltip-placement';
+import { chartFont, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import { cn } from '@/lib/shared/utils';
 
 const ZOOM_HINT_SETTLE_MS = 400;
+const HINT_MIN_TOP_MARGIN_PX = 18;
+const HINT_FONT_PX = 11;
 
 const DEFAULT_CHART_INSTRUCTIONS = {
   en: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
@@ -234,40 +237,44 @@ export function D3ChartWrapper({
     }
   });
 
-  // A zoom hint sits in the plot's top-right corner and goes away once the reader zooms or
-  // pans; a chart that cannot zoom keeps its hint under the plot.
-  const hintInPlot = Boolean(resolvedInstructions) && zoomEnabled;
-  const [hintCorner, setHintCorner] = useState({ top: 8, right: 12 });
+  // A zoom hint sits right-aligned in the top margin, just above the plot, so it never covers
+  // data, notices or labels, and fades once the reader zooms or pans. When the top margin is
+  // too short for a line of text it sits under the plot instead.
+  const zoomHint = Boolean(resolvedInstructions) && zoomEnabled;
+  const [hintCorner, setHintCorner] = useState<{ bottom: number; right: number } | null>(null);
   const [hintDismissed, setHintDismissed] = useState(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const svg = svgRef.current;
-    if (!svg || !hintInPlot) return;
-    let frame = 0;
+    if (!svg || !zoomHint) return;
+    // Measured synchronously on every axis redraw so the hint never paints in the wrong place.
     const measure = () => {
-      frame = 0;
       const bounds = svg.getBoundingClientRect();
       const xDomain = svg.querySelector('.x-axis > .domain')?.getBoundingClientRect();
       const yDomain = svg.querySelector('.y-axis > .domain')?.getBoundingClientRect();
-      const top = Math.max(0, Math.round((yDomain?.top ?? bounds.top) - bounds.top)) + 8;
-      const right = Math.max(0, Math.round(bounds.right - (xDomain?.right ?? bounds.right))) + 12;
+      const topMargin = Math.round((yDomain?.top ?? bounds.top) - bounds.top);
+      const plotWidth = xDomain?.width ?? bounds.width;
+      const next =
+        topMargin < HINT_MIN_TOP_MARGIN_PX ||
+        measureTextWidth(resolvedInstructions, chartFont(HINT_FONT_PX)) > plotWidth
+          ? null
+          : {
+              bottom: Math.round(bounds.height) - topMargin + 2,
+              right: Math.max(0, Math.round(bounds.right - (xDomain?.right ?? bounds.right))),
+            };
       setHintCorner((current) =>
-        current.top === top && current.right === right ? current : { top, right },
+        current && next && current.bottom === next.bottom && current.right === next.right
+          ? current
+          : next,
       );
     };
-    const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(measure);
-    };
-    schedule();
-    const mutations = new MutationObserver(schedule);
+    measure();
+    const mutations = new MutationObserver(measure);
     mutations.observe(svg, { childList: true, subtree: true });
-    return () => {
-      cancelAnimationFrame(frame);
-      mutations.disconnect();
-    };
-  }, [svgRef, hintInPlot]);
+    return () => mutations.disconnect();
+  }, [svgRef, zoomHint, resolvedInstructions]);
   useEffect(() => {
     const svg = svgRef.current;
-    if (!svg || !hintInPlot || hintDismissed) return;
+    if (!svg || !zoomHint || hintDismissed) return;
     // The hint goes once a zoom gesture on this chart actually moves its zoom transform, so
     // page scrolling, clicks, gestures the zoom ignores and the chart's own setup leave it
     // in place. Window capture listeners still see a drag that d3-zoom stops from propagating.
@@ -311,7 +318,7 @@ export function D3ChartWrapper({
       window.clearTimeout(timer);
       for (const type of events) window.removeEventListener(type, onInput, { capture: true });
     };
-  }, [svgRef, hintInPlot, hintDismissed]);
+  }, [svgRef, zoomHint, hintDismissed]);
 
   const plot = (
     <div
@@ -357,22 +364,25 @@ export function D3ChartWrapper({
             }}
           />
           {noDataOverlay}
-          {hintInPlot && (
+          {zoomHint && (
             <p
               data-testid="chart-instructions"
               data-dismissed={hintDismissed ? '' : undefined}
               aria-hidden={hintDismissed || undefined}
               className={cn(
-                'no-export pointer-events-none absolute max-w-[60%] text-right text-2xs leading-4 text-balance text-muted-foreground/80 transition-opacity duration-300',
+                'no-export pointer-events-none text-muted-foreground/80 transition-opacity duration-300',
+                hintCorner
+                  ? 'absolute max-w-full truncate text-right text-2xs leading-4'
+                  : 'mt-2 text-center text-xs text-balance',
                 hintDismissed && 'opacity-0',
               )}
-              style={hintCorner}
+              style={hintCorner ?? undefined}
             >
               {resolvedInstructions}
             </p>
           )}
         </div>
-        {resolvedInstructions && !hintInPlot && (
+        {resolvedInstructions && !zoomHint && (
           <p
             data-testid="chart-instructions"
             className="no-export mt-2 text-center text-xs text-balance text-muted-foreground"

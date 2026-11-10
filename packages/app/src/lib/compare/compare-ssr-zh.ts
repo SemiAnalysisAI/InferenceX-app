@@ -12,15 +12,17 @@ import {
   bandFor,
   type CompareJsonLdVariant,
   computeCompareStat,
-  fmtCost,
   fmtPctDelta,
-  fmtTput,
+  fmtPctLower,
+  fmtRatioTimes,
+  LARGE_RATIO,
   type FullBoth,
   type PairSummary,
   type PerDollarBoth,
   pickRotated,
   type SsrInterpolatedRow,
 } from '@/lib/compare/compare-ssr';
+import { fmtCost, fmtTput } from '@/lib/compare/compare-table-view';
 import { datasetJsonLd } from '@/lib/seo/dataset-jsonld';
 import { clampMetaDescription, fitMetaTitle, META_DESCRIPTION_MAX } from '@/lib/seo/meta-text';
 import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
@@ -28,6 +30,12 @@ import { AGENTX_ROUTE } from '@/lib/routing/dashboard-routes';
 export function formatModelListZh(models: CompareModelSlug[]): string {
   const labels = models.map((model) => model.label);
   return labels.length === 0 ? '暂无模型' : labels.join('、');
+}
+
+export function higherByZh(ratio: number): string {
+  return ratio >= LARGE_RATIO
+    ? `为对方的 ${fmtRatioTimes(ratio).replace('×', ' 倍')}`
+    : `高出 ${fmtPctDelta(ratio)}`;
 }
 
 function bandPositionZh(target: number, range: string, band: 'low' | 'middle' | 'high'): string {
@@ -38,17 +46,17 @@ function bandPositionZh(target: number, range: string, band: 'low' | 'middle' | 
 
 const PER_DOLLAR_BOTH_TEMPLATES_ZH: ((i: PerDollarBoth) => string)[] = [
   (i) =>
-    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 的每百万 token 成本为 ${fmtCost(i.aCost)}，${i.bLabel} 为 ${fmtCost(i.bCost)}；在这一运行点，${i.cheaper} 的成本效率高出 ${fmtPctDelta(i.ratio)}。`,
+    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 的每百万 token 成本为 ${fmtCost(i.aCost)}，${i.bLabel} 为 ${fmtCost(i.bCost)}；在这一运行点，${i.cheaper} 的成本效率${higherByZh(i.ratio)}。`,
   (i) =>
-    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.cheaper} 与 ${i.pricier} 的每百万 token 成本分别为 ${fmtCost(i.cheaperCost)} 和 ${fmtCost(i.pricierCost)}；${i.cheaper} 的成本效率高出 ${fmtPctDelta(i.ratio)}。`,
+    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.cheaper} 与 ${i.pricier} 的每百万 token 成本分别为 ${fmtCost(i.cheaperCost)} 和 ${fmtCost(i.pricierCost)}；${i.cheaper} 的每 token 成本低 ${fmtPctLower(i.ratio)}。`,
   (i) =>
-    `将 ${i.modelLabel} 的目标交互性设为 ${i.target} tok/s/user 时，${i.aLabel} 的每百万 token 成本为 ${fmtCost(i.aCost)}，${i.bLabel} 为 ${fmtCost(i.bCost)}；${i.cheaper} 的成本效率高出 ${fmtPctDelta(i.ratio)}。`,
+    `将 ${i.modelLabel} 的目标交互性设为 ${i.target} tok/s/user 时，${i.aLabel} 的每百万 token 成本为 ${fmtCost(i.aCost)}，${i.bLabel} 为 ${fmtCost(i.bCost)}；${i.cheaper} 的成本低 ${fmtPctLower(i.ratio)}。`,
   (i) =>
-    `在 ${i.modelLabel} 的 ${i.target} tok/s/user 运行点，${i.aLabel} 的每百万 token 成本为 ${fmtCost(i.aCost)}，${i.bLabel} 为 ${fmtCost(i.bCost)}；${i.cheaper} 的成本效率高出 ${fmtPctDelta(i.ratio)}。`,
+    `在 ${i.modelLabel} 的 ${i.target} tok/s/user 运行点，${i.aLabel} 的每百万 token 成本为 ${fmtCost(i.aCost)}，${i.bLabel} 为 ${fmtCost(i.bCost)}；${i.cheaper} 便宜 ${fmtPctLower(i.ratio)}。`,
   (i) =>
-    `${bandPositionZh(i.target, i.range, i.band)}。在这一运行点，${i.aLabel} 运行 ${i.modelLabel} 的每百万 token 成本为 ${fmtCost(i.aCost)}，${i.bLabel} 为 ${fmtCost(i.bCost)}；${i.cheaper} 的成本效率高出 ${fmtPctDelta(i.ratio)}。`,
+    `${bandPositionZh(i.target, i.range, i.band)}。在这一运行点，${i.aLabel} 运行 ${i.modelLabel} 的每百万 token 成本为 ${fmtCost(i.aCost)}，${i.bLabel} 为 ${fmtCost(i.bCost)}；${i.cheaper} 的成本低 ${fmtPctLower(i.ratio)}。`,
   (i) =>
-    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 与 ${i.bLabel} 的每百万 token 成本分别为 ${fmtCost(i.aCost)} 和 ${fmtCost(i.bCost)}；${i.cheaper} 每美元可处理的总 token 数多出 ${fmtPctDelta(i.ratio)}。`,
+    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 与 ${i.bLabel} 的每百万 token 成本分别为 ${fmtCost(i.aCost)} 和 ${fmtCost(i.bCost)}；${i.cheaper} 每美元可处理的总 token 数${higherByZh(i.ratio)}。`,
 ];
 
 const PER_DOLLAR_TIED_TEMPLATES_ZH: ((i: PerDollarBoth) => string)[] = [
@@ -94,12 +102,12 @@ function fullSummaryZh(i: FullBoth): string {
     ? '每 token 成本基本持平'
     : i.costRatio === null
       ? null
-      : `${i.cheaper} 的成本效率高出 ${fmtPctDelta(i.costRatio)}`;
+      : `${i.cheaper} 的每 token 成本低 ${fmtPctLower(i.costRatio)}`;
   const tputPart = i.tputTied
     ? '单芯片吞吐量基本持平'
     : i.tputRatio === null
       ? null
-      : `${i.faster} 的单芯片吞吐量高出 ${fmtPctDelta(i.tputRatio)}`;
+      : `${i.faster} 的单芯片吞吐量${higherByZh(i.tputRatio)}`;
   const both = [costPart, tputPart].filter(Boolean).join('；');
   return both.length > 0 ? both : '缺少可比较的有效数据';
 }
