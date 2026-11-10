@@ -28,7 +28,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
-import { SearchableSelect } from '@/components/ui/searchable-select';
+import { SearchableSelect, type SearchableSelectGroup } from '@/components/ui/searchable-select';
 import { DatePicker } from '@/components/ui/date-picker';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
@@ -53,11 +53,14 @@ import {
 import {
   chartedCells,
   comparesEngines,
+  plottedXMetric,
+  RESULTS_X_METRIC_KEYS,
   RESULTS_X_METRICS,
   RESULTS_Y_METRIC_KEYS,
   RESULTS_Y_METRICS,
   resultsChartSeries,
   resultsMetricLabel,
+  resultsPlotSeries,
   resultsPointKey,
   resultsSelection,
 } from './results-chart';
@@ -65,9 +68,10 @@ import { optimizationsOf, runtimeLabel } from './optimizations';
 import { EngineComparisonConfirmation } from '@/components/inference/ui/engine-comparison-confirmation';
 import { useEngineComparisonConsent } from '@/components/inference/hooks/use-engine-comparison-consent';
 import VideoDeploymentDetail from './VideoDeploymentDetail';
-import VideoResultsChart, { VIDEO_RESULTS_CHART_ID } from './VideoResultsChart';
+import VideoResultsChart, { VIDEO_RESULTS_CHART_ID, type ClipLink } from './VideoResultsChart';
 import VideoCostContext from './VideoCostContext';
 import VideoResultsClips from './VideoResultsClips';
+import { isStageParam, parseStage, writeStage, type StagePair } from './clip-stage';
 import { resultsClipPoints } from './results-clips';
 import { ResultsBars, resultsNumber as n, type ResultBar } from './VideoResultsCharts';
 import VideoHistory from './VideoHistory';
@@ -78,7 +82,7 @@ const STRINGS = {
     advanced: 'Advanced',
     title: 'VideoGenX',
     description:
-      'Serving latency, cost and energy for one matched 20-clip video workload across hardware. Click a point to pin its measurements; View telemetry opens that deployment.',
+      'Serving latency, cost and energy for one matched 20-clip video workload across hardware. Click a point to pin its measurements and play its clips below; hollow points have no clips. View telemetry opens that deployment.',
     chartConfig: 'Chart config',
     runContext: 'Run context',
     compareHistory: 'Compare history',
@@ -105,6 +109,9 @@ const STRINGS = {
       confirm: 'I agree, show both',
     },
     date: 'Run date',
+    xAxis: 'X-axis metric',
+    xUnmeasured: 'Not measured yet',
+    xUnmeasuredMetrics: ['Quality loss vs lossless (LPIPS)', 'Peak GPU memory'],
     yAxis: 'Y-axis metric',
     stepsUnit: 'steps',
     loading: 'Loading video results…',
@@ -151,7 +158,7 @@ const STRINGS = {
     advanced: '高级选项',
     title: 'VideoGenX',
     description:
-      '在同一组匹配的 20 条视频工作负载上，比较各硬件的服务延迟、成本与能耗。点击数据点可固定显示其测量值，再点击“查看遥测”打开对应部署。',
+      '在同一组匹配的 20 条视频工作负载上，比较各硬件的服务延迟、成本与能耗。点击数据点可固定显示其测量值，并在下方播放其视频；空心点没有视频。点击“查看遥测”可打开对应部署。',
     chartConfig: '图表配置',
     runContext: '运行信息',
     compareHistory: '对比历史趋势',
@@ -177,6 +184,9 @@ const STRINGS = {
       confirm: '我同意，同时显示',
     },
     date: '运行日期',
+    xAxis: 'X 轴指标',
+    xUnmeasured: '尚未测量',
+    xUnmeasuredMetrics: ['相对无损输出的质量损失（LPIPS）', 'GPU 峰值显存'],
     yAxis: 'Y 轴指标',
     stepsUnit: '步',
     loading: '正在加载视频结果…',
@@ -220,6 +230,36 @@ const STRINGS = {
   },
 };
 const subscribe = () => () => {};
+
+function MetricSelect({
+  id,
+  label,
+  value,
+  groups,
+  onValueChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  groups: SearchableSelectGroup[];
+  onValueChange: (value: string) => void;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <SearchableSelect
+        triggerId={id}
+        triggerTestId={id}
+        value={value}
+        onValueChange={onValueChange}
+        groups={groups}
+        placeholder={label}
+        searchable={false}
+      />
+    </div>
+  );
+}
+
 /** Marks a history entry this page pushed for a detail, so in-page Back pops it even after reload or Forward. */
 const DETAIL_ENTRY = 'videoResultsDetail';
 const onDetailEntry = () =>
@@ -245,6 +285,24 @@ export default function VideoDashboard({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [labels, setLabels] = useState(true);
   const [legendExpanded, setLegendExpanded] = useState(true);
+  /** The chart points the clip stage plays, which the chart badges. */
+  const [stagePair, setStagePair] = useState<StagePair>({ playing: null, baseline: null });
+  const onStagePair = useCallback(
+    (pair: StagePair) =>
+      setStagePair((previous) =>
+        previous.playing === pair.playing && previous.baseline === pair.baseline ? previous : pair,
+      ),
+    [],
+  );
+  const clipLink = useMemo<ClipLink>(
+    () => ({
+      ...stagePair,
+      onSelect: (key) => writeStage({ ...parseStage(location.search), clip: key }),
+      onReveal: () =>
+        document.querySelector('#comparison-clips')?.scrollIntoView({ block: 'nearest' }),
+    }),
+    [stagePair],
+  );
   const overviewScroll = useRef(0);
   const pendingAnchor = useRef<string | null>(null);
   useEffect(() => {
@@ -266,7 +324,10 @@ export default function VideoDashboard({
     latest.current = next;
     const params = new URLSearchParams(
       [...new URLSearchParams(location.search)].filter(
-        ([key]) => !key.startsWith('r_') && key !== 'unofficialrun' && key !== 'unofficialruns',
+        ([key]) =>
+          (!key.startsWith('r_') || isStageParam(key)) &&
+          key !== 'unofficialrun' &&
+          key !== 'unofficialruns',
       ),
     );
     for (const [key, value] of new URLSearchParams(resultsSearch(next))) params.set(key, value);
@@ -317,15 +378,16 @@ export default function VideoDashboard({
   );
   const { options, roster } = projection;
   const consent = useEngineComparisonConsent('video-results');
+  const plotted = (next: ResultsState) => {
+    const p = resultProjection(points, { ...next, hidden: [] }, namedPoints);
+    return resultsChartSeries(
+      [...p.deploymentCells, ...p.overlayDeploymentCells],
+      resultsSelection(next),
+    );
+  };
+
   /** Asks before a change first puts two engines on one GPU, as the InferenceX charts do. */
   const updateSeries = (patch: Partial<ResultsState>) => {
-    const plotted = (next: ResultsState) => {
-      const p = resultProjection(points, { ...next, hidden: [] }, namedPoints);
-      return resultsChartSeries(
-        [...p.deploymentCells, ...p.overlayDeploymentCells],
-        resultsSelection(next),
-      );
-    };
     const current = latest.current;
     if (
       consent.accepted ||
@@ -357,7 +419,6 @@ export default function VideoDashboard({
       .join(' · ');
   }, [projection.state.workload, points, namedPoints, s]);
   const allCells = [...projection.cells, ...projection.overlayCells];
-  const cells = allCells.filter(shown);
   const deploymentCells = useMemo(
     () => [...projection.deploymentCells, ...projection.overlayDeploymentCells],
     [projection],
@@ -445,12 +506,11 @@ export default function VideoDashboard({
       return first ? [first] : [];
     }),
   );
+  // A lossy named run owns its clip without leading a card.
   const clipPoints = resultsClipPoints(charted, { tier: state.costTier });
-  // A clip takes its run's color; a lossy named run owns its clip without leading a card.
-  const overlayClips = new Set(
-    charted
-      .filter((c) => c.overlay && clipPoints.includes(c.point))
-      .map((c) => c.point.hardwareKey),
+  const officialClipPoints = resultsClipPoints(
+    charted.filter((c) => !c.overlay),
+    { tier: state.costTier },
   );
   const profitBars: ResultBar[] = roster
     .filter((key) => !hidden.has(key))
@@ -466,34 +526,41 @@ export default function VideoDashboard({
           }))
         : [{ key, label: hardwareLabel(key), color: colorFor(key), value: null, secondary: null }];
     });
-  const metricSelector = () => {
-    const label = s.yAxis;
-    const id = 'results-y-metric';
-    const choices = RESULTS_Y_METRIC_KEYS.map((metric) => ({
-      value: metric,
-      label: resultsMetricLabel(RESULTS_Y_METRICS[metric], locale),
-    }));
-    return (
-      <div className="flex min-w-0 flex-col gap-1.5">
-        <Label htmlFor={id}>{label}</Label>
-        <SearchableSelect
-          triggerId={id}
-          triggerTestId={id}
-          value={state.yMetric}
-          onValueChange={(value) => update({ yMetric: value as ResultsState['yMetric'] })}
-          groups={[{ label: '', options: choices }]}
-          placeholder={label}
-          searchable={false}
-        />
-      </div>
-    );
-  };
+  const chipHistory = compareConfigs.length > 0;
+  const xMetric = plottedXMetric(state.xMetric, chipHistory);
+  // The stage plays only a point the chart draws; a lossy one finds its twin among every deployment.
+  const drawnPoints = useMemo(
+    () =>
+      resultsPlotSeries(deploymentCells, chipHistory ? projection.history : null, state)
+        .filter((item) => !hidden.has(item.hardwareKey))
+        .flatMap((item) => item.points.map(({ cell }) => cell.point)),
+    [deploymentCells, chipHistory, projection.history, state, hidden],
+  );
+  const deploymentPoints = useMemo(
+    () => [...deploymentCells, ...projection.history].map((cell) => cell.point),
+    [deploymentCells, projection.history],
+  );
+  // A chart pick or a lossless twin may sit outside the cohort, so every cell lends its cost.
+  const clipCosts = useMemo(
+    () =>
+      Object.fromEntries(
+        [...projection.history, ...deploymentCells].map((cell) => [
+          cell.point.id,
+          {
+            participating: cell.cost.participating?.perVideoSecond ?? null,
+            allocated: cell.cost.allocated?.perVideoSecond ?? null,
+          },
+        ]),
+      ),
+    [projection.history, deploymentCells],
+  );
   const apiUrl = `/api/v1/views/video?view=overview&${resultsSearch(state)}`;
   const secondaryChanged = [
+    state.xMetric !== DEFAULT_RESULTS_STATE.xMetric,
     state.yMetric !== DEFAULT_RESULTS_STATE.yMetric,
     state.engine !== null || state.compareEngines,
     state.date !== null || state.run !== null,
-    compareConfigs.length > 0,
+    chipHistory,
   ].filter(Boolean).length;
   const model = deploymentCells[0]?.metadata.model ?? state.model ?? s.title;
   const csvUrl = `${apiUrl}&format=csv`;
@@ -502,7 +569,7 @@ export default function VideoDashboard({
       <Heading as="h2" level="card" id="video-results-chart-title">
         {model} · {RESULTS_Y_METRICS[state.yMetric].label[locale]}
         <HeadingQualifier>
-          {s.vs} {RESULTS_X_METRICS[state.xMetric].label[locale]}
+          {s.vs} {RESULTS_X_METRICS[xMetric].label[locale]}
         </HeadingQualifier>
       </Heading>
     </div>
@@ -578,7 +645,56 @@ export default function VideoDashboard({
                     className={styles.chartConfig}
                     data-testid="results-chart-config"
                   >
-                    {metricSelector()}
+                    <MetricSelect
+                      id="results-x-metric"
+                      label={s.xAxis}
+                      value={xMetric}
+                      groups={[
+                        {
+                          label: '',
+                          options: RESULTS_X_METRIC_KEYS.filter(
+                            (metric) => plottedXMetric(metric, chipHistory) === metric,
+                          ).map((metric) => ({
+                            value: metric,
+                            label: resultsMetricLabel(RESULTS_X_METRICS[metric], locale),
+                          })),
+                        },
+                        {
+                          label: s.xUnmeasured,
+                          heading: (
+                            <span data-testid="results-x-unmeasured">
+                              {s.xUnmeasured}
+                              {s.xUnmeasuredMetrics.map((metric) => (
+                                <span key={metric} className="mt-1 block font-normal opacity-70">
+                                  {metric}
+                                </span>
+                              ))}
+                            </span>
+                          ),
+                          options: [],
+                        },
+                      ]}
+                      onValueChange={(value) =>
+                        update({ xMetric: value as ResultsState['xMetric'] })
+                      }
+                    />
+                    <MetricSelect
+                      id="results-y-metric"
+                      label={s.yAxis}
+                      value={state.yMetric}
+                      groups={[
+                        {
+                          label: '',
+                          options: RESULTS_Y_METRIC_KEYS.map((metric) => ({
+                            value: metric,
+                            label: resultsMetricLabel(RESULTS_Y_METRICS[metric], locale),
+                          })),
+                        },
+                      ]}
+                      onValueChange={(value) =>
+                        update({ yMetric: value as ResultsState['yMetric'] })
+                      }
+                    />
                     {(options.engines.length > 1 || state.engine !== null) && (
                       <div className="flex min-w-0 flex-col gap-1.5">
                         <LabelWithTooltip label={s.engine} tooltip={s.engineHelp} />
@@ -646,7 +762,7 @@ export default function VideoDashboard({
                           selectedSuffix={locale === 'zh' ? ' 已选' : undefined}
                         />
                       </div>
-                      {compareConfigs.length > 0 && (
+                      {chipHistory && (
                         <div className="flex min-w-0 flex-col space-y-1.5">
                           <LabelWithTooltip
                             htmlFor="date-picker"
@@ -798,7 +914,7 @@ export default function VideoDashboard({
             <div className="flex min-w-0 flex-col gap-6" data-testid="video-results-chart-card">
               <VideoResultsChart
                 cells={deploymentCells}
-                history={compareConfigs.length > 0 ? projection.history : null}
+                history={chipHistory ? projection.history : null}
                 roster={roster}
                 state={state}
                 colorFor={colorFor}
@@ -808,6 +924,7 @@ export default function VideoDashboard({
                 onLegendExpandedChange={setLegendExpanded}
                 onUpdate={updateSeries}
                 onOpen={openPoint}
+                clipLink={clipLink}
                 heading={heading}
                 footer={
                   <VideoCostContext
@@ -828,18 +945,12 @@ export default function VideoDashboard({
             <VideoResultsClips
               initialSides={initialData?.sides}
               points={clipPoints}
-              colorFor={(key) => (overlayClips.has(key) ? overlayRunColor(0) : colorFor(key))}
-              hidden={hidden}
-              options={{ tier: state.costTier }}
-              costs={Object.fromEntries(
-                cells.map((c) => [
-                  c.point.id,
-                  {
-                    participating: c.cost.participating?.perVideoSecond ?? null,
-                    allocated: c.cost.allocated?.perVideoSecond ?? null,
-                  },
-                ]),
-              )}
+              drawn={drawnPoints}
+              deployments={deploymentPoints}
+              officialLeads={officialClipPoints}
+              onPairChange={onStagePair}
+              colorFor={colorFor}
+              costs={clipCosts}
               unofficialRun={state.unofficialRun ?? undefined}
             />
           </Card>

@@ -31,10 +31,10 @@ describe('chipsWithoutSystemModel', () => {
   });
 });
 
-describe('hasRoleTelemetry', () => {
-  const disagg = (overrides: Partial<InferenceData> = {}) =>
-    point('b200_dynamo-sglang', { disagg: true, median_intvty: 40, ...overrides });
+const disagg = (overrides: Partial<InferenceData> = {}) =>
+  point('b200_dynamo-sglang', { disagg: true, median_intvty: 40, ...overrides });
 
+describe('hasRoleTelemetry', () => {
   it('is false when disaggregated results carry no prefill/decode power, true with one role reading', () => {
     expect(hasRoleTelemetry([disagg(), point('h200_sglang')], 'median_intvty')).toBe(false);
     // One validated decode reading is enough.

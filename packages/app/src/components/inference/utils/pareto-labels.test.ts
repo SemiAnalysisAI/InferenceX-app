@@ -208,13 +208,13 @@ describe('computeParetoPointLabels', () => {
 
 const linearScale = (x: number) => x;
 
-describe('computeGradientStops', () => {
-  const makeParetoLabel = (x: number, label: string, color: string): ParetoPointLabel => ({
-    point: makePoint({ x, y: 100 }),
-    label,
-    color,
-  });
+const makeParetoLabel = (x: number, label: string, color: string): ParetoPointLabel => ({
+  point: makePoint({ x, y: 100 }),
+  label,
+  color,
+});
 
+describe('computeGradientStops', () => {
   it('returns null for fewer than 2 points', () => {
     const result = computeGradientStops([makeParetoLabel(10, 'TP4', '#aaa')], linearScale);
     expect(result).toBeNull();

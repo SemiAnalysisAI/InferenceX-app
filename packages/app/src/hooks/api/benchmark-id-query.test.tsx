@@ -42,22 +42,22 @@ function jsonResponse(body: unknown, etag: string): Response {
   return Response.json(body, { headers: { ETag: etag } });
 }
 
+function CaptionHarness({ caption: _caption }: { caption: string }) {
+  useByIdQuery('request-chart-data', 439331, true, decode);
+  return null;
+}
+
 describe('useByIdQuery', () => {
   beforeEach(() => useQueryMock.mockClear());
 
   it('keeps the nullable select wrapper stable across parent renders', () => {
-    function Harness({ caption: _caption }: { caption: string }) {
-      useByIdQuery('request-chart-data', 439331, true, decode);
-      return null;
-    }
-
     const container = document.createElement('div');
     const root = createRoot(container);
 
-    act(() => root.render(createElement(Harness, { caption: 'first' })));
+    act(() => root.render(createElement(CaptionHarness, { caption: 'first' })));
     const firstSelect = useQueryMock.mock.calls.at(-1)?.[0].select;
 
-    act(() => root.render(createElement(Harness, { caption: 'second' })));
+    act(() => root.render(createElement(CaptionHarness, { caption: 'second' })));
     const secondSelect = useQueryMock.mock.calls.at(-1)?.[0].select;
 
     expect(secondSelect).toBe(firstSelect);

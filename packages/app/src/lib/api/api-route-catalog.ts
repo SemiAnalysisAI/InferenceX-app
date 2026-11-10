@@ -147,7 +147,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: '67e21ed1cf1c3bf7a022c32292593cd4a40a9050a23bd02e981ce00ab479d74e',
+    sourceSha256: '1e6d87de9fb74785a458a904c5df378e5ff21d94e8ea71ed09b7e1757b4d9a56',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -1488,7 +1488,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/power-breakdown.ts',
-    sourceSha256: 'dc11d8c04a614a9313e390b5eb0911beb1dc94473984eaa6f9a62b9542af1d09',
+    sourceSha256: 'a360d5044e821e0a8e630fda7d0e0721920727a2c89224e6dc5bdef38ebbbac6',
     reviewArea: {
       en: 'Per-point system power breakdown: measured GPU and Grace parts, then the modeled CPU, memory, NIC, NVSwitch, storage, PCIe/misc, fan, PSU-loss, scale-out network and PUE overhead parts, summing to All in Measured W/GPU; the IT (no PUE) boundary is the same stack without the facility part.',
       zh: '逐点系统功耗构成：实测 GPU 与 Grace 部分，以及建模的 CPU、内存、网卡、NVSwitch、存储、PCIe 及其他、风扇、电源损耗、横向扩展网络与 PUE 开销部分，合计等于 All in Measured W/GPU；IT（不含 PUE）边界即去掉数据中心开销后的同一堆叠。',
@@ -1504,7 +1504,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-transform.ts',
-    sourceSha256: '3b23eece1e21f423fd3e60f3e6d6a1b8214c120407b2b8fb935320b1b8570440',
+    sourceSha256: '22322bba9d59237a3f97af0e30ab30bdb23dd2b1793362e32103db698fae6cbe',
     reviewArea: {
       en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
       zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',
@@ -1544,7 +1544,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/calculator/profit-estimator.ts',
-    sourceSha256: 'c55de32de8d96e3d086975f06b717c5799a7faacecc27c7396a49038451322b5',
+    sourceSha256: '6ebd9cf0172a205df642e7b683012afbe657998a8280b652940e128333514519',
     reviewArea: {
       en: 'Shared profit-estimator defaults and calculation parity, including model-specific target assumptions.',
       zh: '利润估算器的共享默认值与计算一致性，包括各模型的目标假设。',
@@ -1560,7 +1560,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results.ts',
-    sourceSha256: '40d257c6cb14ebc7b252e12eb40bd3cb856428370228efdd39b425e6a317720b',
+    sourceSha256: '8d6559a4955c51ba1d98c9672b13ef0d0e236ce3a7e2cae2b939160d013ff7e1',
     reviewArea: {
       en: 'Shared VideoGenX results selectors, sample admission, dual GPU cost bases and modelled profit.',
       zh: 'VideoGenX 结果页共用的筛选、样本准入、两种 GPU 成本口径及估算利润。',
@@ -1568,7 +1568,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-chart.ts',
-    sourceSha256: 'a077d5692f4f409e093aeaf4c0f48b11c02c4aa43b46f95cba6a70c5369bb563',
+    sourceSha256: '3643a1e3c3557a10c4c01545ebac189063ae9a9eb9d574efef60d8f30de276c3',
     reviewArea: {
       en: 'VideoGenX results chart axes, accepted r_x/r_y metric keys, GPU basis and deployment detail key.',
       zh: 'VideoGenX 结果图表的坐标轴、r_x/r_y 可接受的指标键、GPU 口径及部署详情键。',
@@ -1616,7 +1616,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/video/video-replay.ts',
-    sourceSha256: '5c1407c2627e2f427b37ec98801bc14beba8afc25945b84a73e0f9edfb5843c1',
+    sourceSha256: '8c52be64bd2abae1058ae53965a2a9cd7a9cdb001d5c16e2b9fec32ac4e99f8c',
     reviewArea: {
       en: 'Development-only original artifact replay, exact source media membership and private byte-range delivery.',
       zh: '仅开发环境使用的原始产物回放、精确来源媒体匹配及私有字节区间读取。',
@@ -1712,7 +1712,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/deployment.ts',
-    sourceSha256: 'cd3e9ce61fe83a07a7429b790905597dab229a498e190ad65b5d57633f8f6bfc',
+    sourceSha256: '6cf184d20bc1eec7d261e364aec63cb6d1db74a725b0fad21fd0590b76cc60a5',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1736,7 +1736,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/compare-url-state.ts',
-    sourceSha256: 'ed290bb46eae01c07ac75f4f1ef3d4d117bb3f315c7fc82bbe43d1786c28e9ae',
+    sourceSha256: 'be0f4c64d85afe8d62fc651b328045ce0336054d9deae51d846aa6b2c40836cd',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',

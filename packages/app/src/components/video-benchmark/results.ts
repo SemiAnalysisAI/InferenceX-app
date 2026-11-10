@@ -7,6 +7,7 @@ import { optimizationsOf } from './optimizations';
 import { DASHBOARD_SAMPLE_FLOOR, latestVideoCells } from './points';
 import type { ResultsEvidence } from './results-evidence';
 import {
+  isResultsXMetric,
   isResultsYMetric,
   type CostBasis,
   type ResultsXMetric,
@@ -129,7 +130,8 @@ export const RESULTS_QUERY_PARAMS = [
 export function parseResultsState(search: string | URLSearchParams): ResultsState {
   const s = typeof search === 'string' ? new URLSearchParams(search) : search;
   const overlay = s.get('unofficialruns') ?? s.get('unofficialrun');
-  const y = s.get('r_y');
+  const x = s.get('r_x'),
+    y = s.get('r_y');
   const numeric = (key: string, fallback: number | null, allowZero = false) => {
     if (!s.has(key) || s.get(key)?.trim() === '') return fallback;
     const n = Number(s.get(key));
@@ -167,7 +169,7 @@ export function parseResultsState(search: string | URLSearchParams): ResultsStat
     },
     utilization: Math.min(numeric('r_utilization', 1, true)!, 1),
     unofficialRun: /^[1-9]\d*$/u.test(overlay ?? '') ? overlay : null,
-    xMetric: 'p50',
+    xMetric: isResultsXMetric(x) ? x : DEFAULT_RESULTS_STATE.xMetric,
     yMetric: isResultsYMetric(y) ? y : DEFAULT_RESULTS_STATE.yMetric,
     costBasis: 'participating',
     optimal: s.get('r_optimal') !== '0',
@@ -200,6 +202,7 @@ export function resultsSearch(state: ResultsState): string {
     r_price_i2v: state.apiPrices.i2v,
     r_price_r2v: state.apiPrices.r2v,
     r_utilization: state.utilization,
+    r_x: state.xMetric,
     r_y: state.yMetric,
     r_optimal: state.optimal ? 1 : 0,
     r_point: state.point,

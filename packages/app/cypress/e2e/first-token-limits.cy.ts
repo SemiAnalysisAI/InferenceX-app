@@ -66,30 +66,28 @@ describe('First-Token Limits', () => {
       let downloads = 0;
       let failure: unknown;
       cy.window().then((win) => {
-        cy.stub(win.HTMLAnchorElement.prototype, 'click').callsFake(
-          function (this: HTMLAnchorElement) {
-            if (!this.download.endsWith('.png')) return;
-            try {
-              const root = win.document.querySelector('#first-token-limits-export')!;
-              const svg = root.querySelector('svg[data-testid="d3-chart-svg"]')!;
-              const plot = svg.querySelector('.grid .border-right')!;
-              const width = Number(plot.getAttribute('x1'));
-              const height = Number(plot.getAttribute('y2'));
-              expect(Number(svg.querySelector('.ft-x-title')!.getAttribute('x'))).to.eq(width / 2);
-              expect(Number(svg.querySelector('.ft-x-title')!.getAttribute('y'))).to.eq(
-                height + 82,
-              );
-              for (const summary of svg.querySelectorAll('.ft-summary-who')) {
-                expect(Number(summary.getAttribute('y'))).to.eq(height + 40);
-              }
-              const bounds = svg.getBoundingClientRect();
-              expect(bounds.bottom).to.be.at.most(root.getBoundingClientRect().bottom);
-              downloads++;
-            } catch (error) {
-              failure = error;
+        cy.stub(win.HTMLAnchorElement.prototype, 'click').callsFake(function (
+          this: HTMLAnchorElement,
+        ) {
+          if (!this.download.endsWith('.png')) return;
+          try {
+            const root = win.document.querySelector('#first-token-limits-export')!;
+            const svg = root.querySelector('svg[data-testid="d3-chart-svg"]')!;
+            const plot = svg.querySelector('.grid .border-right')!;
+            const width = Number(plot.getAttribute('x1'));
+            const height = Number(plot.getAttribute('y2'));
+            expect(Number(svg.querySelector('.ft-x-title')!.getAttribute('x'))).to.eq(width / 2);
+            expect(Number(svg.querySelector('.ft-x-title')!.getAttribute('y'))).to.eq(height + 82);
+            for (const summary of svg.querySelectorAll('.ft-summary-who')) {
+              expect(Number(summary.getAttribute('y'))).to.eq(height + 40);
             }
-          },
-        );
+            const bounds = svg.getBoundingClientRect();
+            expect(bounds.bottom).to.be.at.most(root.getBoundingClientRect().bottom);
+            downloads++;
+          } catch (error) {
+            failure = error;
+          }
+        });
       });
       (['16:9', '1:1'] as const).forEach((ratio, index) => {
         cy.get('[data-testid="first-token-figure"] [data-testid="export-button"]').click();

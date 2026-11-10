@@ -64,12 +64,46 @@ export function layoutLabel(p: Layout, locale: 'en' | 'zh'): string {
   return parts.length > 0 ? parts.join(' · ') : '—';
 }
 
-/** Known workload, runtime and layout required for a measured evidence comparison. */
-export function evidenceComparisonKey(p: VideoPoint): string | null {
+/** Workload and server layout; null while the workload or any layout part is unrecorded. */
+function workloadLayout(p: VideoPoint): unknown[] | null {
   const layout = [p.participating, p.server?.tp, p.server?.ulysses, p.replicas ?? 1];
   if (!p.workloadKey || layout.some((n) => typeof n !== 'number' || !Number.isFinite(n) || n <= 0))
     return null;
-  return JSON.stringify([p.workloadKey, runtimeKey(p), ...layout]);
+  return [p.workloadKey, ...layout];
+}
+
+/** Known workload, runtime and layout required for a measured evidence comparison. */
+export function evidenceComparisonKey(p: VideoPoint): string | null {
+  const known = workloadLayout(p);
+  return known && JSON.stringify([runtimeKey(p), ...known]);
+}
+
+/** Run, hardware, engine, workload and layout: everything but the optimizations. */
+function twinKey(p: VideoPoint): string | null {
+  const known = workloadLayout(p);
+  return known && JSON.stringify([p.runId, p.hardwareKey, p.results?.engine ?? null, ...known]);
+}
+
+/**
+ * The lossless cell a lossy cell is compared with: same run, hardware, engine, workload, GPU
+ * count and server layout, with no lossy optimization. A cell from another run, workload or
+ * layout differs in more than the optimization, so it never pairs. The same concurrency comes first, then
+ * a cell whose optimizations the lossy cell also declares.
+ */
+export function losslessTwin<T extends VideoPoint>(
+  lossy: VideoPoint,
+  pool: readonly T[],
+): T | null {
+  const key = twinKey(lossy);
+  if (key === null || !isLossy(lossy)) return null;
+  const declared = optimizationsOf(lossy);
+  const rank = (p: T) =>
+    Number(p.concurrency !== lossy.concurrency) * 2 +
+    Number(!optimizationsOf(p).every((name) => declared.includes(name)));
+  let best: T | null = null;
+  for (const p of pool)
+    if (!isLossy(p) && twinKey(p) === key && (best === null || rank(p) < rank(best))) best = p;
+  return best;
 }
 
 /**

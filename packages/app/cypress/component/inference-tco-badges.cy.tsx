@@ -5,8 +5,11 @@ import { InferenceContextsProvider } from '@/components/inference/InferenceConte
 import { CostTierSelector } from '@/components/inference/ui/CostTierSelector';
 import { InferenceTcoBadges } from '@/components/inference/ui/InferenceTcoBadges';
 import { PricesSourceLink } from '@/components/ui/chart-display-helpers';
+import { ChartButtons } from '@/components/ui/chart-buttons';
+import { TcoPriceTable } from '@/components/ui/editable-tco-badges';
 import { ResultContext } from '@/components/ui/result-context';
 import { getGpuSpecs } from '@/lib/catalog/constants';
+import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import { createMockInferenceContextValues } from '../support/mock-data';
 import { mountWithProviders } from '../support/test-utils';
 
@@ -18,7 +21,124 @@ const PUBLISHED = Object.fromEntries(
 );
 const GB300_INPUT = '[data-testid="cost-input-gb300"]';
 
+const a = () => cy.get(`[data-testid="figure-a"] ${GB300_INPUT}`);
+
+const b = () => cy.get(`[data-testid="figure-b"] ${GB300_INPUT}`);
+
 describe('InferenceTcoBadges', () => {
+  for (const count of [2, 12]) {
+    it(`exports all ${count} prices without scrollbars in every PNG layout`, () => {
+      cy.viewport(375, 900);
+      const items = [
+        { base: 'gb200', label: 'GB200', value: '1.86' },
+        { base: 'tpu7x', label: 'TPU7x', value: '1.21' },
+        ...REGISTRY_BASES.filter((base) => !['gb200', 'tpu7x'].includes(base))
+          .slice(0, count - 2)
+          .map((base) => ({ base, label: base.toUpperCase(), value: '2.31' })),
+      ];
+      mountWithProviders(
+        <div className="p-4">
+          <ChartButtons chartId="price-export" />
+          <D3Chart
+            chartId="price-export"
+            data={[]}
+            layers={[]}
+            height={400}
+            xScale={{ type: 'linear', domain: [0, 1] }}
+            yScale={{ type: 'linear', domain: [0, 1] }}
+            footer={
+              <ResultContext
+                locale="en"
+                layout="footer"
+                costTier="Owning at large hyperscaler volume"
+                costTierControl={<button type="button">Cost tier</button>}
+                priceTable={
+                  <TcoPriceTable
+                    items={items}
+                    editable
+                    testId="export-prices"
+                    cellTestId="export-price"
+                    inputIdPrefix="export-price-input"
+                  />
+                }
+                metaEnd={<PricesSourceLink />}
+              />
+            }
+          />
+        </div>,
+      );
+      const liveTable = '#price-export [data-testid="export-prices"]';
+      let liveScroll = 0;
+      cy.get(liveTable).should('have.css', 'overflow-x', 'auto');
+      if (count > 2) {
+        cy.get(liveTable)
+          .scrollTo('right')
+          .then(($table) => {
+            liveScroll = $table[0].scrollLeft;
+            expect(liveScroll).to.be.greaterThan(0);
+          });
+      }
+      let png = '';
+      let captureCount = 0;
+      cy.window().then((win) => {
+        cy.stub(win.HTMLAnchorElement.prototype, 'click').callsFake(function (
+          this: HTMLAnchorElement,
+        ) {
+          if (!this.download.endsWith('.png')) return;
+          png = this.href;
+          captureCount++;
+          const root = win.document.querySelector('#price-export-export')!;
+          const wrapper = root.querySelector<HTMLElement>('[data-testid="export-prices"]')!;
+          expect(win.getComputedStyle(wrapper).overflowX, 'no exported scroll viewport').to.eq(
+            'visible',
+          );
+          expect(wrapper.scrollWidth, 'all columns fit').to.be.at.most(wrapper.clientWidth + 1);
+          expect(wrapper.querySelectorAll('td')).to.have.length(count);
+          expect(wrapper.querySelector('tbody th')!.textContent).to.contain(
+            'Owning at large hyperscaler volume',
+          );
+          const frame = root.getBoundingClientRect();
+          for (const cell of wrapper.querySelectorAll('th, td')) {
+            const bounds = cell.getBoundingClientRect();
+            expect(bounds.left).to.be.at.least(frame.left);
+            expect(bounds.right).to.be.at.most(frame.right);
+            expect(bounds.bottom).to.be.at.most(frame.bottom);
+          }
+          expect(root.querySelector('[data-testid="tco-prices-source"]')!.textContent).to.contain(
+            'SemiAnalysis Market',
+          );
+        });
+      });
+      ['auto', '16:9', '1:1'].forEach((ratio, index) => {
+        cy.get('[data-testid="export-button"]').click();
+        cy.get('[data-testid="png-aspect-ratio"]').select(ratio);
+        cy.get('[data-testid="export-png-button"]').click();
+        cy.window().should(() => {
+          expect(captureCount).to.eq(index + 1);
+          expect(png).to.match(/^data:image\/png;base64,/u);
+        });
+        cy.window().then(async (win) => {
+          const image = new win.Image();
+          image.src = png;
+          await image.decode();
+          expect(image.naturalWidth).to.be.greaterThan(0);
+          if (ratio !== 'auto') {
+            expect(image.naturalWidth / image.naturalHeight).to.be.closeTo(
+              ratio === '16:9' ? 16 / 9 : 1,
+              0.001,
+            );
+          }
+        });
+        cy.get(liveTable)
+          .should('have.css', 'overflow-x', 'auto')
+          .and(($table) => {
+            expect($table[0].scrollLeft).to.eq(liveScroll);
+            expect($table.find('input')).to.have.length(count);
+          });
+      });
+    });
+  }
+
   it('quotes the published prices on a tiered metric', () => {
     mountWithProviders(<InferenceTcoBadges bases={BASES} values={VALUES} />, {
       inference: { selectedYAxisMetric: 'y_costh' },
@@ -119,8 +239,6 @@ describe('InferenceTcoBadges', () => {
       );
     }
     mountWithProviders(<Harness />, { globalFilters: {} });
-    const a = () => cy.get(`[data-testid="figure-a"] ${GB300_INPUT}`);
-    const b = () => cy.get(`[data-testid="figure-b"] ${GB300_INPUT}`);
     a().clear().type('2.50');
     a().should('have.value', '2.50');
     b().should('have.value', '2.50');

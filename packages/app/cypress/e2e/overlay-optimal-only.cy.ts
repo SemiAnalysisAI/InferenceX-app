@@ -70,36 +70,34 @@ describe('Overlay points follow Optimal Only on the selected axes', () => {
         originalSvg = chartSnapshot($svg[0]);
       });
     cy.window().then((win) => {
-      cy.stub(win.HTMLAnchorElement.prototype, 'click').callsFake(
-        function (this: HTMLAnchorElement) {
-          if (this.download.endsWith('.png')) {
-            png = this.href;
-            const exported = win.document.querySelector('#chart-0-export')!;
-            expect(exported.querySelectorAll('.dot-group').length).to.be.greaterThan(0);
-            expect(exported.querySelectorAll('.unofficial-overlay-pt').length).to.be.greaterThan(0);
-            const svg = exported.querySelector<SVGSVGElement>('[data-testid="d3-chart-svg"]')!;
-            const bounds = svg.getBoundingClientRect();
-            const frame = exported.getBoundingClientRect();
-            for (const span of exported.querySelectorAll('span.export-only')) {
-              expect(win.getComputedStyle(span).display, 'caption values stay inline').to.eq(
-                'inline',
-              );
-            }
-            expect(bounds.bottom, 'entire plot fits above the footer').to.be.at.most(frame.bottom);
-            expect(bounds.width / frame.width, 'plot uses the image width').to.be.greaterThan(0.85);
-            expect(bounds.height / frame.height, 'plot uses the image height').to.be.greaterThan(
-              0.5,
+      cy.stub(win.HTMLAnchorElement.prototype, 'click').callsFake(function (
+        this: HTMLAnchorElement,
+      ) {
+        if (this.download.endsWith('.png')) {
+          png = this.href;
+          const exported = win.document.querySelector('#chart-0-export')!;
+          expect(exported.querySelectorAll('.dot-group').length).to.be.greaterThan(0);
+          expect(exported.querySelectorAll('.unofficial-overlay-pt').length).to.be.greaterThan(0);
+          const svg = exported.querySelector<SVGSVGElement>('[data-testid="d3-chart-svg"]')!;
+          const bounds = svg.getBoundingClientRect();
+          const frame = exported.getBoundingClientRect();
+          for (const span of exported.querySelectorAll('span.export-only')) {
+            expect(win.getComputedStyle(span).display, 'caption values stay inline').to.eq(
+              'inline',
             );
-            expect(svg.getAttribute('height'), 'SVG was re-rendered, not padded').not.to.eq('600');
-            layouts.push({
-              width: bounds.width,
-              height: bounds.height,
-              axis: svg.querySelector('.x-axis')!.getAttribute('transform'),
-              font: win.getComputedStyle(svg.querySelector('.x-axis text')!).fontSize,
-            });
           }
-        },
-      );
+          expect(bounds.bottom, 'entire plot fits above the footer').to.be.at.most(frame.bottom);
+          expect(bounds.width / frame.width, 'plot uses the image width').to.be.greaterThan(0.85);
+          expect(bounds.height / frame.height, 'plot uses the image height').to.be.greaterThan(0.5);
+          expect(svg.getAttribute('height'), 'SVG was re-rendered, not padded').not.to.eq('600');
+          layouts.push({
+            width: bounds.width,
+            height: bounds.height,
+            axis: svg.querySelector('.x-axis')!.getAttribute('transform'),
+            font: win.getComputedStyle(svg.querySelector('.x-axis text')!).fontSize,
+          });
+        }
+      });
     });
     (
       [

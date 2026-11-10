@@ -250,12 +250,12 @@ describe('buildCacheReuse', () => {
   });
 });
 
-describe('defaultCacheReuseGroup', () => {
-  const tiered = (n: number, hardware: string, framework: string) =>
-    Array.from({ length: n }, (_, i) =>
-      makePoint({ server_gpu_cache_hit_rate: 0.5 }, { hardware, framework, conc: i + 1 }),
-    );
+const tiered = (n: number, hardware: string, framework: string) =>
+  Array.from({ length: n }, (_, i) =>
+    makePoint({ server_gpu_cache_hit_rate: 0.5 }, { hardware, framework, conc: i + 1 }),
+  );
 
+describe('defaultCacheReuseGroup', () => {
   it('opens on the configuration with the most tiered rows', () => {
     const groups = {
       b300_sglang: tiered(3, 'b300', 'sglang'),

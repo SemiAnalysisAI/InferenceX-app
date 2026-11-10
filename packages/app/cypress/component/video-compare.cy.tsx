@@ -23,11 +23,10 @@ const colorFor = (key: string) => COLORS[key] ?? 'rgb(0, 0, 0)';
 
 const mediaUrl = (point: VideoPoint) =>
   `/api/video-runs?run=${point.runId}&artifact=${point.artifactId}&format=published`;
-const pick = (label: string, option: string) => {
-  cy.get(`[role="combobox"][aria-label="${label}"]`).click();
-  cy.contains('[role="option"]', option).click();
-};
-const tileVideo = (key: string) => cy.get(`[data-hardware="${key}"] video`);
+const sideVideo = (side: 'a' | 'b') =>
+  cy.get(`[data-testid="video-results-clip"][data-side="${side}"] video`);
+const speaker = (side: 'a' | 'b') =>
+  cy.get(`[data-side="${side}"] [data-testid="video-results-speaker"]`);
 const scrub = (time: number) => {
   cy.window().then((win) => {
     cy.get('[data-testid="video-results-scrub"]').then(($input) => {
@@ -41,10 +40,11 @@ const scrub = (time: number) => {
   });
   cy.get('[data-testid="video-results-scrub"]').should('have.value', String(time));
 };
-/** Every tile and the reference, so a reloaded tile cannot fall behind the group unnoticed. */
+/** Both sides, so a reloaded side cannot fall behind the group unnoticed. */
 const expectClipsAt = (time: number) =>
   cy
-    .get('[data-testid="video-results-clips"] video')
+    .get('[data-testid="video-results-stage"] video')
+    .should('have.length', 2)
     .each(($video) =>
       cy
         .wrap($video)
@@ -52,12 +52,47 @@ const expectClipsAt = (time: number) =>
           expect(($element[0] as HTMLVideoElement).currentTime).to.be.closeTo(time, 0.08),
         ),
     );
-const expectAudio = (source: string | null) =>
-  cy.get<HTMLVideoElement>('video').should(($videos) => {
+const expectAudio = (side: 'a' | 'b' | null) =>
+  cy.get<HTMLVideoElement>('[data-testid="video-results-stage"] video').should(($videos) => {
     for (const video of $videos) {
-      const hardware = video.closest<HTMLElement>('[data-hardware]')?.dataset.hardware;
-      expect(video.muted, hardware ?? 'reference').to.equal(!source || hardware !== source);
+      const role = video.closest<HTMLElement>('[data-side]')?.dataset.side;
+      expect(video.muted, role).to.equal(role !== side);
     }
+  });
+/** The Wipe split, read from the right side's clip-path. */
+const splitOf = ($media: JQuery<HTMLElement>) =>
+  Number(/(?<split>[\d.]+)%/u.exec($media[0].style.clipPath)?.groups?.split);
+const WIPE_MEDIA = '[data-side="b"] > div';
+/** Two animation frames, so a throttled split update would have landed. */
+const nextFrames = () =>
+  cy.window().then(
+    (win) =>
+      new Cypress.Promise<void>((resolve) => {
+        win.requestAnimationFrame(() => win.requestAnimationFrame(() => resolve()));
+      }),
+  );
+/** Moves the pointer to a share of the stage width. */
+const pointAt = (share: number) =>
+  cy.get('[data-testid="video-results-stage"]').then(($stage) => {
+    const rect = $stage[0].getBoundingClientRect();
+    cy.wrap($stage).trigger('pointermove', {
+      clientX: rect.left + rect.width * share,
+      clientY: rect.top + rect.height / 2,
+    });
+  });
+/** Play, then pause at once: the media is requested and the scrubber learns the duration. */
+const load = (start = '[data-testid="video-results-play"]') => {
+  cy.get(start).click();
+  cy.get('[data-testid="video-results-play"]').click();
+  cy.get('[data-testid="video-results-play"]').should('have.attr', 'aria-pressed', 'false');
+  cy.get('[data-testid="video-results-scrub"]').should('not.be.disabled');
+};
+/** Retries until the Difference canvas has a drawn top-left pixel that passes `check`. */
+const expectDifference = (check: (rgba: number[]) => void) =>
+  cy.get<HTMLCanvasElement>('[data-testid="video-results-difference"]').should(($canvas) => {
+    const rgba = [...$canvas[0].getContext('2d')!.getImageData(0, 0, 1, 1).data];
+    expect(rgba[3], 'drawn').to.equal(255);
+    check(rgba);
   });
 
 // These decoder fixtures are test inputs, never benchmark evidence.
@@ -197,10 +232,10 @@ function mountResultsClips(
         <button onClick={() => setHidden(hidden.size > 0 ? new Set() : new Set(['b200']))}>
           Toggle B200
         </button>
+        <input aria-label="Notes" />
         <VideoResultsClips
-          points={selectedPoints}
+          points={selectedPoints.filter((point) => !hidden.has(point.hardwareKey ?? ''))}
           colorFor={colorFor}
-          hidden={hidden}
           costs={{ [c1('b200').id]: { participating: 0.02, allocated: null } }}
           unofficialRun={unofficialRun}
         />
@@ -211,79 +246,86 @@ function mountResultsClips(
   cy.wait(keys.map((key) => `@results-${key}` as const));
 }
 
-describe('Video results synchronized clips', () => {
-  it('selects one audio source during playback and resets audio when the case changes', () => {
-    mountResultsClips(['b200', 'h100'], '/vgx', true);
-    expectAudio(null);
-    cy.get('[data-testid="video-results-audio"]').should('contain', 'Muted').click();
-    cy.get('[role="option"]').should(($options) => {
-      expect([...$options].map((option) => option.textContent)).to.deep.equal([
-        'Muted',
-        'Listen to B200',
-        'Listen to H100',
-      ]);
-    });
-    cy.contains('[role="option"]', 'Listen to B200').click();
-    expectAudio('b200');
-    cy.get<HTMLVideoElement>('video').then(($videos) => {
-      for (const video of $videos) video.playbackRate = 0.1;
-    });
-    cy.get('[data-testid="video-results-play"]').click();
-    pick('Audio', 'Listen to H100');
-    expectAudio('h100');
-    cy.get<HTMLVideoElement>('[data-hardware="h100"] video').should(($video) => {
-      expect($video[0].paused).to.equal(false);
-    });
-    cy.screenshot('audio-desktop-en');
-    pick('Audio', 'Muted');
-    expectAudio(null);
-    pick('Audio', 'Listen to B200');
-    pick('Case', 'drum-taps · take 1');
-    expectAudio(null);
-    cy.get('[data-testid="video-results-audio"]').should('contain', 'Muted');
+describe('Video results clip stage', () => {
+  beforeEach(() => {
+    // The stage keeps its view and prompt in the URL, which outlives one test's mount.
+    cy.window().then((win) => win.history.replaceState(null, '', win.location.pathname));
   });
 
-  it('resets hidden or failed audio sources and supports the Chinese unofficial-run view', () => {
-    cy.viewport(390, 900);
-    mountResultsClips(['b200', 'h100'], '/zh/vgx', false, c1('h100').runId);
-    cy.get('[data-hardware="h100"]').should('contain', '非官方运行');
-    pick('音频', '收听 B200');
-    expectAudio('b200');
-    cy.contains('button', 'Toggle B200').click();
+  it('keeps one audible side, also across a prompt switch', () => {
+    mountResultsClips(['b200', 'h100'], '/vgx', true);
     expectAudio(null);
-    cy.get('[data-testid="video-results-audio"]').should('contain', '静音').click();
-    cy.get('[role="option"]').should('have.length', 2).and('not.contain', 'B200');
-    cy.contains('[role="option"]', '静音').click();
-    cy.contains('button', 'Toggle B200').click();
+    speaker('a').click();
+    expectAudio('a');
+    pointAt(0);
+    cy.get('[data-testid="video-results-play"]').click();
+    cy.get(WIPE_MEDIA).should(($media) =>
+      expect(splitOf($media), 'split ignores the pointer before the first Play').to.equal(50),
+    );
+    speaker('b').click();
+    expectAudio('b');
+    sideVideo('b').should(($video) =>
+      expect(($video[0] as HTMLVideoElement).paused).to.equal(false),
+    );
+    cy.screenshot('audio-desktop-en');
+    cy.get('[data-prompt="drum-taps"]').click();
+    cy.get('[data-testid="video-results-play"]').should('have.attr', 'aria-pressed', 'false');
+    expectAudio('b');
+    speaker('b').should('have.attr', 'aria-pressed', 'true').click();
     expectAudio(null);
-    pick('音频', '收听 H100');
-    expectAudio('h100');
+  });
+
+  it('restores mute when the audible hardware is hidden or fails, and stacks Side by side on a phone', () => {
+    cy.viewport(375, 900);
+    mountResultsClips(['b200', 'h100'], '/zh/vgx', false, c1('b200').runId);
+    cy.get('[data-side="a"]').should('contain', 'B200').and('contain', '非官方运行');
+    cy.get('[data-side="a"] [data-testid="video-results-pill"] b').should(($name) => {
+      expect($name.text()).to.contain('B200');
+      expect($name[0].scrollWidth, 'hardware name not truncated').to.be.at.most(
+        $name[0].clientWidth,
+      );
+    });
+    cy.get('[aria-label="收听 B200"]').click();
+    expectAudio('a');
+    cy.contains('button', 'Toggle B200').click();
+    cy.get('[data-side="a"]').should('contain', 'H100');
+    expectAudio(null);
+    cy.get('[aria-label="收听 H100"]').click();
+    expectAudio('a');
+    cy.get('[data-testid="video-results-view-side"]').click();
+    cy.get('[data-testid="video-results-clip"]').should(($sides) => {
+      const [a, b] = [...$sides].map((side) => side.getBoundingClientRect());
+      expect(b.top, 'stacked below 640 px').to.be.at.least(a.bottom);
+    });
     cy.document().should((doc) => {
       expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
     });
     cy.screenshot('audio-mobile-zh');
-    cy.get<HTMLVideoElement>('[data-hardware="h100"] video').then(($video) => {
-      $video[0].src = 'data:video/mp4;base64,YmFk';
-      $video[0].load();
+    load();
+    sideVideo('a').then(($video) => {
+      const video = $video[0] as HTMLVideoElement;
+      video.src = 'data:video/mp4;base64,YmFk';
+      video.load();
     });
+    cy.get('[data-side="a"]').should('contain', '此视频无法播放');
     expectAudio(null);
-    cy.get('[data-testid="video-results-audio"]').should('contain', '静音').click();
-    cy.get('[role="option"]').should('have.length', 2).and('not.contain', 'H100');
+    speaker('a').should('not.exist');
   });
 
   it('keeps native rerun media and PSNR separate from the original CI performance', () => {
     cy.viewport(390, 900);
     mountResultsClips(['b200', 'h100'], '/vgx', true);
-    cy.get('[data-testid="video-results-case"]').should('contain', 'Matched-noise rerun');
-    const tile = '[data-testid="video-results-clip"][data-hardware="b200"]';
-    cy.get(tile).should('contain', '30 dB').and('contain', '4 GPU');
+    cy.get('[data-prompt="diag:drum-taps"]')
+      .should('have.attr', 'aria-pressed', 'true')
+      .and('contain', 'Matched-noise rerun');
+    cy.get('[data-side="a"]').should('contain', '4 GPU');
+    const facts = '[data-testid="video-results-facts"]';
+    cy.get(facts).should('contain', '30 dB');
     for (const label of ['Wall time', 'J / clip', 'Participating', 'Allocated'])
-      cy.get(tile).contains('dt', label).next('dd').should('have.text', '—');
-    cy.get('@diagnostic-b200-url').then((url) =>
-      cy.get(tile).find('video').should('have.attr', 'src', url),
-    );
+      cy.get(facts).contains('dt', label).next('dd').should('have.text', '—');
+    cy.get('@diagnostic-b200-url').then((url) => sideVideo('a').should('have.attr', 'src', url));
     cy.get('@diagnostic-reference-url').then((url) =>
-      cy.get('[data-testid="video-results-reference"] video').should('have.attr', 'src', url),
+      sideVideo('b').should('have.attr', 'src', url),
     );
     cy.get('[data-testid="video-results-sources"] summary').click();
     cy.get('[data-testid="video-results-sources"]')
@@ -295,43 +337,48 @@ describe('Video results synchronized clips', () => {
     cy.document().should((doc) => {
       expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
     });
-    pick('Case', 'drum-taps · take 1');
-    cy.get(tile).should('contain', '25 dB');
-    cy.get(tile).contains('dt', 'Wall time').next('dd').should('have.text', '120 s');
-    cy.get(tile).contains('dt', 'Participating').next('dd').should('have.text', '0.02');
+    cy.get('[data-prompt="drum-taps"]').click();
+    cy.get(facts).should('contain', '25 dB');
+    cy.get(facts).contains('dt', 'Wall time').next('dd').should('have.text', '120 s');
+    cy.get(facts).contains('dt', 'Participating').next('dd').should('have.text', '0.02');
     cy.get('[data-testid="video-results-sources"]').should('contain', c1('b200').runId);
   });
 
-  it('decodes retained media, seeks and plays all three clips, then displays real pixel differences', () => {
+  it('requests media only on Play, then plays, seeks, wipes and draws real pixel differences', () => {
     mountResultsClips(['b200', 'h200', 'h100']);
-    cy.get('[data-testid="video-results-clip"] video')
-      .should('have.length', 3)
-      .each(($video) => {
-        cy.wrap($video).should(($element) => {
-          const video = $element[0] as HTMLVideoElement;
-          expect(video.readyState).to.be.greaterThan(0.8);
-          expect(video.videoWidth).to.equal(32);
-          expect(video.duration).to.equal(2);
-        });
-      });
+    cy.get<HTMLVideoElement>('[data-testid="video-results-stage"] video')
+      .should('have.length', 2)
+      .each(($video) => expect(($video[0] as HTMLVideoElement).preload).to.equal('none'));
     cy.get('[data-testid="video-results-sources"]').should('not.have.attr', 'open');
     cy.get('[data-testid="video-results-sources"] summary').focus();
     cy.focused().should('contain', 'Prompt & sources').click();
     cy.get('[data-testid="video-results-sources"]')
       .should('contain', c1('b200').runId)
       .and('contain', c1('b200').runtime)
-      .and('contain', c1('h200').runId)
-      .and('contain', c1('h100').runId)
+      .and('contain', 'Official Diffusers reference')
       .and('not.contain', 'web encode');
-
     cy.get('[data-testid="video-results-prompt"]')
       .should('contain', 'A drummer taps a snare drum.')
       .and('contain', 'seed 11')
       .and('contain', 'take 1');
+    cy.get('[data-testid="video-results-facts"]').should('contain', '0.02');
+
+    cy.get('[data-testid="video-results-stage"]').click('right');
+    load('[data-testid="video-results-start"]');
+    cy.get('[data-side="b"] [data-testid="video-results-pill"] b').click();
+    cy.get('[data-testid="video-results-split"]').should('have.attr', 'aria-pressed', 'false');
+    cy.get('[data-testid="video-results-stage"] video').each(($video) =>
+      cy.wrap($video).should(($element) => {
+        const video = $element[0] as HTMLVideoElement;
+        expect(video.readyState).to.be.greaterThan(0);
+        expect(video.videoWidth).to.equal(32);
+        expect(video.duration).to.equal(2);
+      }),
+    );
     scrub(0.8);
     expectClipsAt(0.8);
     cy.get('[data-testid="video-results-play"]').click();
-    cy.get('[data-testid="video-results-clip"] video').each(($video) =>
+    cy.get('[data-testid="video-results-stage"] video').each(($video) =>
       cy.wrap($video).should(($element) => {
         const video = $element[0] as HTMLVideoElement;
         expect(video.paused).to.equal(false);
@@ -339,121 +386,225 @@ describe('Video results synchronized clips', () => {
       }),
     );
     cy.get('[data-testid="video-results-play"]').click();
-    cy.get('[data-testid="video-results-clip"] video').each(($video) =>
+    cy.get('[data-testid="video-results-stage"] video').each(($video) =>
       cy
         .wrap($video)
         .should(($element) => expect(($element[0] as HTMLVideoElement).paused).to.equal(true)),
     );
-    cy.get('[data-testid="video-results-view-difference"]').click();
-    cy.get('[data-testid="video-results-clip"][data-hardware="h200"] canvas').should(($canvas) => {
-      const rgba = ($canvas[0] as HTMLCanvasElement)
-        .getContext('2d')!
-        .getImageData(0, 0, 1, 1).data;
-      expect([...rgba]).to.deep.equal([0, 0, 0, 255]);
+
+    pointAt(0.25);
+    cy.get(WIPE_MEDIA).should(($media) => expect(splitOf($media)).to.be.closeTo(25, 0.5));
+    cy.get('[data-testid="video-results-stage"]').click('right');
+    cy.get('[data-testid="video-results-split"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get(WIPE_MEDIA).then(($media) => {
+      const locked = splitOf($media);
+      pointAt(0.8);
+      nextFrames();
+      cy.get(WIPE_MEDIA).should(($after) => expect(splitOf($after)).to.equal(locked));
     });
-    cy.get('[data-testid="video-results-clip"][data-hardware="b200"] canvas').should(($canvas) => {
-      const rgba = ($canvas[0] as HTMLCanvasElement)
-        .getContext('2d')!
-        .getImageData(0, 0, 1, 1).data;
+
+    cy.get('[data-testid="video-results-view-diff"]').click();
+    expectDifference((rgba) => {
       expect(rgba[0]).to.be.greaterThan(200);
       expect(rgba[2]).to.be.greaterThan(200);
-      expect(rgba[3]).to.equal(255);
     });
-    cy.get('[data-testid="video-results-clip"][data-hardware="b200"]')
-      .should('contain', '0.02')
-      .find('dl')
-      .should('contain', '—');
+    // H200's clip equals the reference, so the next subject draws a black difference.
+    cy.contains('button', 'Toggle B200').click();
+    cy.get('[data-side="a"]').should('contain', 'H200');
+    expectDifference((rgba) => expect(rgba).to.deep.equal([0, 0, 0, 255]));
+    // Compared with H100 instead, the other side plays H100's clip of the same prompt.
+    cy.get('[data-testid="video-results-compare-h100"]').click();
+    cy.get('@original-h100').then((url) => sideVideo('b').should('have.attr', 'src', url));
+    expectDifference((rgba) => expect(rgba[0]).to.be.greaterThan(200));
   });
-  it('shows tiles only for measured hardware and cannot draw a difference after the reference decoder fails', () => {
+
+  it('cannot draw a difference after the reference decoder fails', () => {
     mountResultsClips();
-    cy.get('[data-testid="video-results-clip"]')
-      .should('have.length', 2)
-      .then(($tiles) =>
-        expect([...$tiles].map((tile) => tile.dataset.hardware)).to.deep.equal(['b200', 'h200']),
-      );
-    cy.get('[data-testid="video-results-reference"] video').then(($video) => {
+    load();
+    sideVideo('b').then(($video) => {
       const video = $video[0] as HTMLVideoElement;
       video.src = 'data:video/mp4;base64,YmFk';
       video.load();
     });
-    cy.get('[data-testid="video-results-view-difference"]').click();
-    cy.get(
-      '[data-testid="video-results-clip"][data-hardware="b200"] [data-testid="video-results-media-empty"]',
-    ).should('contain', 'reference');
-    cy.get('[data-testid="video-results-clips"]').should(
-      'contain',
-      'No sealed reference pair for this clip.',
-    );
+    cy.get('[data-side="b"]').should('contain', 'This clip could not be played.');
+    cy.get('[data-side="b"]').contains('button', 'Retry').should('be.visible');
+    cy.get('[data-testid="video-results-view-diff"]').click();
+    cy.get('[data-testid="video-results-stage"]').should('contain', 'Both sides need a clip.');
+    cy.get('[data-testid="video-results-difference"]').should('not.exist');
   });
-  it('plays a web rendition in Clip view and the sealed original for Difference, also for an overlay', () => {
-    mountResultsClips(['b200', 'h200'], '/vgx', false, c1('h200').runId, [
+
+  it('plays web renditions outside Difference and sealed originals in it, also for an overlay', () => {
+    mountResultsClips(['b200', 'h200'], '/vgx', false, c1('b200').runId, [
       'b200',
       'h200',
       'reference',
     ]);
-    cy.get('[data-hardware="h200"]').should('contain', 'Unofficial run');
-    cy.get('@preview-url').then((url) => tileVideo('h200').should('have.attr', 'src', url));
-    cy.get('@preview-url').then((url) => tileVideo('b200').should('have.attr', 'src', url));
-    cy.get('@preview-url').then((url) =>
-      cy.get('[data-testid="video-results-reference"] video').should('have.attr', 'src', url),
-    );
+    cy.get('[data-side="a"]').should('contain', 'Unofficial run');
+    cy.get('@preview-url').then((url) => {
+      sideVideo('a').should('have.attr', 'src', url);
+      sideVideo('b').should('have.attr', 'src', url);
+    });
     cy.get('[data-testid="video-results-sources"] summary').click();
-    cy.get('[data-testid="video-results-prompt"]').should(
+    cy.get('[data-testid="video-results-sources"]').should(
       'contain',
       'Playback uses a web encode; Difference, PSNR and the media link use the original.',
     );
-    cy.get('@original-h200').then((url) =>
+    cy.get('@original-b200').then((url) =>
       cy
         .get('[data-testid="video-results-sources"] tbody tr')
-        .eq(1)
+        .eq(0)
         .find('a')
         .should('have.attr', 'href', url),
     );
+    load();
     scrub(0.8);
     expectClipsAt(0.8);
 
-    cy.get('[data-testid="video-results-view-difference"]').click();
-    cy.get('@original-h200').then((url) => tileVideo('h200').should('have.attr', 'src', url));
-    cy.get('[data-testid="video-results-reference"] video')
+    cy.get('[data-testid="video-results-view-diff"]').click();
+    cy.get('@original-b200').then((url) => sideVideo('a').should('have.attr', 'src', url));
+    sideVideo('b')
       .invoke('attr', 'src')
       .then((src) => cy.get('@preview-url').should('not.equal', src));
-    // Swapping to the original reloads the tile; it must resume at the group's time, not 0.
+    // Swapping to the original reloads each side; it must resume at the group's time, not 0.
     expectClipsAt(0.8);
-    // The h200 original equals the reference, so only the original yields a black difference.
-    cy.get('[data-testid="video-results-clip"][data-hardware="h200"] canvas').should(($canvas) => {
-      const rgba = ($canvas[0] as HTMLCanvasElement)
-        .getContext('2d')!
-        .getImageData(0, 0, 1, 1).data;
-      expect([...rgba]).to.deep.equal([0, 0, 0, 255]);
-    });
+    // Both renditions are the same stand-in, so only the originals differ.
+    expectDifference((rgba) => expect(rgba[0]).to.be.greaterThan(200));
 
-    cy.get('[data-testid="video-results-view-clip"]').click();
-    cy.get('@preview-url').then((url) => tileVideo('h200').should('have.attr', 'src', url));
+    cy.get('[data-testid="video-results-view-toggle"]').click();
+    cy.get('@preview-url').then((url) => sideVideo('a').should('have.attr', 'src', url));
     expectClipsAt(0.8);
+    cy.get('[data-testid="video-results-toggle-a"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get('[aria-label="Notes"]').type('t');
+    cy.get('[data-testid="video-results-toggle-a"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get('[data-testid="video-results-stage"]').focus().type('t');
+    cy.get('[data-testid="video-results-toggle-b"]').should('have.attr', 'aria-pressed', 'true');
+    cy.location('search').should('contain', 'r_view=toggle');
+    cy.get('[data-testid="video-results-view-wipe"]').click();
+    cy.location('search').should('not.contain', 'r_view');
   });
+
+  it('steps, slows, zooms, pans, swaps and loops both sides together, also for an overlay', () => {
+    mountResultsClips(['b200', 'h200'], '/vgx', false, c1('b200').runId);
+    cy.get('[data-side="a"]').should('contain', 'Unofficial run');
+    const videos = '[data-testid="video-results-stage"] video';
+    /** Both sides paused on one frame; the workload's 24 fps sets the frame, not the fixture's. */
+    const expectFrame = (frame: number) =>
+      cy
+        .get(videos)
+        .should('have.length', 2)
+        .each(($video) =>
+          cy.wrap($video).should(($element) => {
+            const video = $element[0] as HTMLVideoElement;
+            expect(video.paused).to.equal(true);
+            expect(video.currentTime).to.be.closeTo((frame + 0.5) / 24, 0.002);
+          }),
+        );
+    const expectTransforms = (expected: string[]) =>
+      cy
+        .get<HTMLVideoElement>(videos)
+        .should(($videos) =>
+          expect([...$videos].map((video) => video.style.transform)).to.deep.equal(expected),
+        );
+    load();
+    cy.get('[data-testid="video-results-inspect-toggle"]').click();
+    cy.get('[data-testid="video-results-loop"]').should('have.attr', 'aria-pressed', 'true');
+
+    scrub(0.8);
+    cy.get('[data-testid="video-results-frame-next"]').click();
+    expectFrame(20);
+    cy.get('[data-testid="video-results-frame"]').should('have.text', 'frame 21 / 48');
+    cy.get('[data-testid="video-results-stage"]').focus().type('{leftArrow}');
+    expectFrame(19);
+
+    cy.get('[data-testid="video-results-speed-0.5"]').click();
+    cy.get('[data-testid="video-results-play"]').click();
+    cy.get(videos).each(($video) =>
+      cy.wrap($video).should(($element) => {
+        const video = $element[0] as HTMLVideoElement;
+        expect(video.paused).to.equal(false);
+        // A drift nudge is ±10% around the chosen speed, never a return to 1×.
+        expect(video.playbackRate).to.be.closeTo(0.5, 0.051);
+      }),
+    );
+    cy.get('[data-testid="video-results-play"]').click();
+
+    cy.get('[data-testid="video-results-zoom-2"]').click();
+    expectTransforms(['scale(2) translate(0%, 0%)', 'scale(2) translate(0%, 0%)']);
+    cy.get('[data-testid="video-results-stage"]').then(($stage) => {
+      const { width, height, left, top } = $stage[0].getBoundingClientRect();
+      // Below the centre, so the drag starts on the clips rather than the split handle.
+      const at = (x: number) =>
+        [x, height * 0.75, { clientX: left + x, clientY: top + height * 0.75 }] as const;
+      cy.wrap($stage)
+        .trigger('pointerdown', ...at(width * 0.3))
+        .trigger('pointermove', ...at(width * 0.4));
+      // Dragging a tenth of the width at 2× pans by 5% of the scaled side.
+      expectTransforms(['scale(2) translate(5%, 0%)', 'scale(2) translate(5%, 0%)']);
+      // Esc while the pointer is still down resets the zoom; the held drag must not restore it.
+      cy.wrap($stage)
+        .focus()
+        .type('{esc}')
+        .trigger('pointermove', ...at(width * 0.5));
+      nextFrames();
+      cy.get<HTMLVideoElement>(videos).then(($videos) =>
+        expect([...$videos].map((video) => video.style.transform)).to.deep.equal(['', '']),
+      );
+      cy.wrap($stage)
+        .trigger('pointerup', ...at(width * 0.5))
+        .trigger('click', ...at(width * 0.5));
+    });
+    cy.get('[data-testid="video-results-split"]').should('have.attr', 'aria-pressed', 'false');
+
+    cy.get('[data-testid="video-results-swap"]').click();
+    cy.get('[data-testid="video-results-pill"]').then(($pills) => {
+      const [a, b] = [...$pills].map((pill) => pill.getBoundingClientRect().left);
+      expect(b, 'reference pill moved left').to.be.lessThan(a);
+    });
+    cy.get(WIPE_MEDIA).should(($media) =>
+      expect($media[0].style.clipPath).to.match(/^inset\(0(?:px)? [\d.]+% 0(?:px)? 0(?:px)?\)$/u),
+    );
+    cy.get('[data-testid="video-results-stage"]').should(
+      'have.attr',
+      'aria-label',
+      'B200 against Diffusers reference',
+    );
+
+    scrub(2);
+    cy.get('[data-testid="video-results-frame"]').should('have.text', 'frame 48 / 48');
+    scrub(1.9);
+    cy.get('[data-testid="video-results-play"]').click();
+    cy.get(videos).each(($video) =>
+      cy.wrap($video).should(($element) => {
+        const video = $element[0] as HTMLVideoElement;
+        expect(video.paused).to.equal(false);
+        expect(video.currentTime).to.be.lessThan(1);
+      }),
+    );
+  });
+
   it('shows PSNR without media for an unpublished named run', () => {
-    mountResultsClips(['b200', 'h200'], '/vgx', false, c1('h200').runId, [], false, ['h200']);
-    cy.get('[data-hardware="h200"]')
+    // H200 has media, but the run the user loaded stays the subject.
+    mountResultsClips(['b200', 'h200'], '/vgx', false, c1('b200').runId, [], false, ['b200']);
+    cy.get('[data-side="a"]')
       .should('contain', 'Media is not shown for an unpublished run.')
-      .and('contain', '25 dB')
+      .and('contain', 'Unofficial run')
       .find('video')
       .should('not.exist');
-    cy.get('[data-hardware="b200"] video').should('exist');
+    cy.get('[data-testid="video-results-facts"]').should('contain', '25 dB');
+    cy.get('[data-side="b"]').should('contain', 'No sealed reference pair for this clip.');
+    cy.get('[data-testid="video-results-play"]').should('be.disabled');
   });
+
   it('falls back to the sealed original when a web rendition cannot be played', () => {
-    mountResultsClips(['b200', 'h200'], '/vgx', false, undefined, ['h200'], true);
-    cy.get('@original-h200').then((url) => tileVideo('h200').should('have.attr', 'src', url));
-    tileVideo('h200').should(($video) =>
+    mountResultsClips(['b200', 'h200'], '/vgx', false, undefined, ['b200'], true);
+    load();
+    cy.get('@original-b200').then((url) => sideVideo('a').should('have.attr', 'src', url));
+    sideVideo('a').should(($video) =>
       expect(($video[0] as HTMLVideoElement).readyState).to.be.at.least(1),
     );
-    cy.get('[data-testid="video-results-clip"][data-hardware="h200"]').should(
-      'not.contain',
-      'This clip could not be played',
-    );
-    // Every tile now plays an original, so the note must not claim a web encode.
+    cy.get('[data-side="a"]').should('not.contain', 'This clip could not be played');
+    // Both sides now play an original, so the note must not claim a web encode.
     cy.get('[data-testid="video-results-sources"] summary').click();
-    cy.get('[data-testid="video-results-prompt"]')
-      .should('contain', 'A drummer taps a snare drum.')
-      .and('not.contain', 'web encode');
+    cy.get('[data-testid="video-results-sources"]').should('not.contain', 'web encode');
   });
 });

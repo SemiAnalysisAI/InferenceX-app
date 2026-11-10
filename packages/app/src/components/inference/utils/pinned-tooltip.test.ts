@@ -343,32 +343,33 @@ describe('reader-facing fields', () => {
     },
   );
 
-  it('shows every aggregate width and marks unrecorded ones unknown', () => {
-    const aggregate = (overrides: Partial<InferenceData>) =>
-      text(
-        buildPointDetails(
-          config({
-            data: point({
-              disagg: false,
-              is_multinode: false,
-              tp: 8,
-              physicalChips: 8,
-              decode_tp: 8,
-              ep: 8,
-              dp: 2,
-              pp: 1,
-              dp_attention: true,
-              prefill_dcp_size: 1,
-              decode_dcp_size: 4,
-              prefill_pcp_size: 2,
-              decode_pcp_size: 1,
-              prefill_dwdp_size: 4,
-              prefill_num_workers: 2,
-              ...overrides,
-            }),
+  const aggregate = (overrides: Partial<InferenceData>) =>
+    text(
+      buildPointDetails(
+        config({
+          data: point({
+            disagg: false,
+            is_multinode: false,
+            tp: 8,
+            physicalChips: 8,
+            decode_tp: 8,
+            ep: 8,
+            dp: 2,
+            pp: 1,
+            dp_attention: true,
+            prefill_dcp_size: 1,
+            decode_dcp_size: 4,
+            prefill_pcp_size: 2,
+            decode_pcp_size: 1,
+            prefill_dwdp_size: 4,
+            prefill_num_workers: 2,
+            ...overrides,
           }),
-        ).html,
-      );
+        }),
+      ).html,
+    );
+
+  it('shows every aggregate width and marks unrecorded ones unknown', () => {
     expect(aggregate({})).toContain(
       'TP 8 · EP 8 · DP 2 · DPA on · PP 1 · DCP 4 · PCP 2 · DWDP 4 · Workers 2',
     );

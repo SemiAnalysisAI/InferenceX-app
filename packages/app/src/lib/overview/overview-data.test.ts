@@ -1219,6 +1219,21 @@ describe('overview platform selection', () => {
   });
 });
 
+const overviewPage = (tier?: 30 | 50 | 75 | 100) =>
+  assembleOverviewPageData(
+    {
+      [Model.Qwen3_5]: [
+        ...frontier([10800, 9000, 7200, 3600], {
+          hardware: 'mi355x',
+          precision: Precision.FP4,
+        }),
+        ...frontier([9900, 8100, 7650, 6300], { hardware: 'mi355x', precision: Precision.FP8 }),
+        ...frontier([10800, 9000, 7200, 5400], { hardware: 'b200', precision: Precision.FP8 }),
+      ],
+    },
+    tier,
+  ).models.find((m) => m.model === Model.Qwen3_5 && m.scenario === 'single_turn_8k1k')!;
+
 describe('tier-parameterized overview', () => {
   it('resolves the tier query value and falls back to 100', () => {
     expect(resolveOverviewTier('100')).toBe(100);
@@ -1288,28 +1303,13 @@ describe('tier-parameterized overview', () => {
   });
 
   it('re-selects each platform independently at the displayed tier', () => {
-    const page = (tier?: 30 | 50 | 75 | 100) =>
-      assembleOverviewPageData(
-        {
-          [Model.Qwen3_5]: [
-            ...frontier([10800, 9000, 7200, 3600], {
-              hardware: 'mi355x',
-              precision: Precision.FP4,
-            }),
-            ...frontier([9900, 8100, 7650, 6300], { hardware: 'mi355x', precision: Precision.FP8 }),
-            ...frontier([10800, 9000, 7200, 5400], { hardware: 'b200', precision: Precision.FP8 }),
-          ],
-        },
-        tier,
-      ).models.find((m) => m.model === Model.Qwen3_5 && m.scenario === 'single_turn_8k1k')!;
-
-    const at50 = headlinePairOf(page(50), 'mi355x-vs-b200');
+    const at50 = headlinePairOf(overviewPage(50), 'mi355x-vs-b200');
     expect(at50?.candidate.precision).toBe(Precision.FP4);
     expect(at50?.candidate.read.value).toBe(9000);
     expect(at50?.baseline.precision).toBe(Precision.FP8);
     expect(at50?.baseline.read.value).toBe(9000);
 
-    const at100 = headlinePairOf(page(100), 'mi355x-vs-b200');
+    const at100 = headlinePairOf(overviewPage(100), 'mi355x-vs-b200');
     expect(at100?.candidate.precision).toBe(Precision.FP4);
     expect(at100?.candidate.read.value).toBe(3600);
     expect(at100?.baseline.precision).toBe(Precision.FP8);

@@ -146,32 +146,31 @@ function snapshot(): Promise<Snapshot[]> {
             throw new Error('Diagnostic attachment failed verification');
           });
           for (const replay of snapshots) {
+            const mediaUrl = (receipt: string, path: string) =>
+              replayAssetUrl(
+                replay,
+                `diagnostic:${receipt}`,
+                path,
+                diagnostics.media.get(receipt)!.get(path)!,
+              );
+
             replay.stored.diagnostics = diagnostics.pairs
               .filter(
                 (pair) =>
                   pair.origin.run_id === replay.stored.runId &&
                   pair.origin.artifact_id === replay.stored.artifact.id,
               )
-              .map((pair) => {
-                const mediaUrl = (receipt: string, path: string) =>
-                  replayAssetUrl(
-                    replay,
-                    `diagnostic:${receipt}`,
-                    path,
-                    diagnostics.media.get(receipt)!.get(path)!,
-                  );
-                return {
-                  ...pair,
-                  candidate: {
-                    ...pair.candidate,
-                    url: mediaUrl(pair.candidate.receipt_sha256, pair.candidate.media_path),
-                  },
-                  reference: {
-                    ...pair.reference,
-                    url: mediaUrl(pair.reference.receipt_sha256, pair.reference.media_path),
-                  },
-                };
-              });
+              .map((pair) => ({
+                ...pair,
+                candidate: {
+                  ...pair.candidate,
+                  url: mediaUrl(pair.candidate.receipt_sha256, pair.candidate.media_path),
+                },
+                reference: {
+                  ...pair.reference,
+                  url: mediaUrl(pair.reference.receipt_sha256, pair.reference.media_path),
+                },
+              }));
           }
         }
         return snapshots;

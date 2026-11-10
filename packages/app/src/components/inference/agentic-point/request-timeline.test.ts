@@ -309,13 +309,14 @@ describe('timelineWheelZoomDirection', () => {
   });
 });
 
+const rec = (
+  cid: string,
+  phase: RequestRecord['phase'],
+  start: number,
+  end: number,
+): RequestRecord => ({ ...request(start, end), cid, phase });
+
 describe('stable row order + color across phase filters', () => {
-  const rec = (
-    cid: string,
-    phase: RequestRecord['phase'],
-    start: number,
-    end: number,
-  ): RequestRecord => ({ ...request(start, end), cid, phase });
   const full: RequestRecord[] = [
     rec('A', 'warmup', 0, 5),
     rec('A', 'profiling', 100, 110),

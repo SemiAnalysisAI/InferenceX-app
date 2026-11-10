@@ -58,9 +58,8 @@ describe('Muse Spark Open results', () => {
       cy.get('[data-testid="compare-agentx-model-muse-spark-open"]').click();
       cy.location('pathname').should('eq', `${prefix}/infx/inference/muse-spark-open`);
       cy.location('search').should('eq', '');
-      cy.get('[data-testid="model-selector"]').should(($selector) => {
-        expect(['Muse Spark Open 816B', 'Muse-Spark-Open']).to.include($selector.text().trim());
-      });
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'Muse Spark 1.3/Open 816B');
+      cy.title().should('contain', 'Muse Spark 1.3/Open');
       cy.get('[data-testid="scenario-selector"]').should('not.exist');
       cy.get('[data-slot="unofficial-banner"]').should('not.exist');
       cy.get('@museRun.all').should('have.length', 0);
@@ -71,7 +70,7 @@ describe('Muse Spark Open results', () => {
       cy.wait('@museRun');
       cy.location('search').should('match', /unofficialruns?=38825822770/iu);
       cy.get('[data-testid="model-selector"]')
-        .should('contain.text', 'Muse Spark Open 816B')
+        .should('contain.text', 'Muse Spark 1.3/Open 816B')
         .find('img')
         .should('have.attr', 'src', '/logos/muse-mascot.webp');
       cy.get('[data-testid="scatter-graph"] .unofficial-overlay-pt').should(

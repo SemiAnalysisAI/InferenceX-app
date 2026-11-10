@@ -309,8 +309,8 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
           },
         },
         {
-          label: 'Muse Spark',
-          labelZh: 'Muse Spark',
+          label: 'Muse Spark 1.3/Open',
+          labelZh: 'Muse Spark 1.3/Open',
           icon: <ModelLogo model={Model.Muse_Spark_Open} />,
           onClick: () => {
             window.location.href = localizedNudgeHref(

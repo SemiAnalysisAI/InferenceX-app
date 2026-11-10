@@ -518,23 +518,23 @@ describe('getPostBySlug', () => {
   });
 });
 
+function mockThreePosts() {
+  vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+
+  vi.spyOn(fs, 'readdirSync').mockReturnValue([
+    'test-post.mdx',
+    'middle-post.mdx',
+    'older-post.mdx',
+  ] as any);
+  vi.spyOn(fs, 'readFileSync').mockImplementation((filePath) => {
+    const p = String(filePath);
+    if (p.includes('test-post')) return FAKE_MDX;
+    if (p.includes('middle-post')) return FAKE_MDX_MIDDLE;
+    return FAKE_MDX_OLDER;
+  });
+}
+
 describe('getAdjacentPosts', () => {
-  function mockThreePosts() {
-    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-
-    vi.spyOn(fs, 'readdirSync').mockReturnValue([
-      'test-post.mdx',
-      'middle-post.mdx',
-      'older-post.mdx',
-    ] as any);
-    vi.spyOn(fs, 'readFileSync').mockImplementation((filePath) => {
-      const p = String(filePath);
-      if (p.includes('test-post')) return FAKE_MDX;
-      if (p.includes('middle-post')) return FAKE_MDX_MIDDLE;
-      return FAKE_MDX_OLDER;
-    });
-  }
-
   it('returns prev (older) and next (newer) for a middle post', () => {
     mockThreePosts();
     const { prev, next } = getAdjacentPosts('middle-post');

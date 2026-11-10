@@ -249,6 +249,17 @@ interface SummaryRow {
   value: (h: Harness) => string;
 }
 
+const tokens = (v: number | undefined) => (v === undefined ? '—' : formatTokens(v));
+
+const quantileOf = (rows: HarnessBucket[] | undefined, p: number) => {
+  const v = rows ? bucketQuantile(rows, PER_DECADE, p) : null;
+  return v === null ? '—' : formatTokens(v);
+};
+
+const shareText = (num = 0, den = 0, digits = 1) => (den > 0 ? pct(num / den, digits) : '—');
+
+const ratio = (num = 0, den = 0) => (den > 0 ? formatTokens(num / den) : '—');
+
 function SummaryTable({
   data,
   strings,
@@ -261,15 +272,8 @@ function SummaryTable({
   const output = byHarness(data.outputBuckets);
   const sess = (h: Harness) => data.sessions.find((s) => s.harness === h);
   const total = (h: Harness) => data.totals.find((tt) => tt.harness === h);
-  const tokens = (v: number | undefined) => (v === undefined ? '—' : formatTokens(v));
   const sessionTokens = (key: keyof Omit<HarnessSessions, 'harness'>) => (h: Harness) =>
     tokens(sess(h)?.[key]);
-  const q = (rows: HarnessBucket[] | undefined, p: number) => {
-    const v = rows ? bucketQuantile(rows, PER_DECADE, p) : null;
-    return v === null ? '—' : formatTokens(v);
-  };
-  const share = (num = 0, den = 0, digits = 1) => (den > 0 ? pct(num / den, digits) : '—');
-  const ratio = (num = 0, den = 0) => (den > 0 ? formatTokens(num / den) : '—');
   const prompt = (h: Harness) => {
     const s = sess(h);
     return s ? s.inputTokens + s.cacheReadTokens + s.cacheWriteTokens : 0;
@@ -290,15 +294,15 @@ function SummaryTable({
         { label: strings.outputTokensPerRequestP50, value: sessionTokens('outputPerRequestP50') },
         {
           label: strings.promptTokensFromCacheRead,
-          value: (h) => share(sess(h)?.cacheReadTokens, prompt(h)),
+          value: (h) => shareText(sess(h)?.cacheReadTokens, prompt(h)),
         },
         {
           label: strings.promptTokensFromCacheWrite,
-          value: (h) => share(sess(h)?.cacheWriteTokens, prompt(h)),
+          value: (h) => shareText(sess(h)?.cacheWriteTokens, prompt(h)),
         },
         {
           label: strings.promptTokensUncached,
-          value: (h) => share(sess(h)?.inputTokens, prompt(h)),
+          value: (h) => shareText(sess(h)?.inputTokens, prompt(h)),
         },
       ],
     },
@@ -308,7 +312,7 @@ function SummaryTable({
         { label: strings.sampledRequests, value: (h) => formatNumber(total(h)?.requests ?? 0) },
         {
           label: strings.mainAgentRequests,
-          value: (h) => share(total(h)?.mainRequests, total(h)?.requests),
+          value: (h) => shareText(total(h)?.mainRequests, total(h)?.requests),
         },
         {
           label: strings.toolCallsPerRequest,
@@ -325,17 +329,17 @@ function SummaryTable({
           label: strings.outputTokensPerToolCall,
           value: (h) => ratio(total(h)?.outputTokens, total(h)?.toolCalls),
         },
-        { label: strings.promptTokensP50MainAgent, value: (h) => q(context.get(h), 0.5) },
-        { label: strings.promptTokensP95MainAgent, value: (h) => q(context.get(h), 0.95) },
-        { label: strings.outputTokensP50, value: (h) => q(output.get(h), 0.5) },
-        { label: strings.outputTokensP95, value: (h) => q(output.get(h), 0.95) },
+        { label: strings.promptTokensP50MainAgent, value: (h) => quantileOf(context.get(h), 0.5) },
+        { label: strings.promptTokensP95MainAgent, value: (h) => quantileOf(context.get(h), 0.95) },
+        { label: strings.outputTokensP50, value: (h) => quantileOf(output.get(h), 0.5) },
+        { label: strings.outputTokensP95, value: (h) => quantileOf(output.get(h), 0.95) },
         {
           label: strings.responsesLt20OutputTokens,
           value: (h) => {
             const out = output.get(h) ?? [];
             const all = out.reduce((sum, r) => sum + r.count, 0);
             const small = out.filter((r) => r.bucket < 13).reduce((sum, r) => sum + r.count, 0);
-            return share(small, all);
+            return shareText(small, all);
           },
         },
       ],

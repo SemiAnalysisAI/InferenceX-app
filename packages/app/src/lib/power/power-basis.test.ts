@@ -342,27 +342,27 @@ describe('J per total token at every power boundary', () => {
   });
 });
 
-describe('powerBasisNormalization — legacy unsplit disaggregated rows', () => {
-  // Both pool fields hold the whole deployment (8) with no workers. The hidden
-  // split is 1 prefill + 7 decode chips; 7200 tok/s total at ISL:OSL 8192:1024.
-  const legacy = () =>
-    row({
-      disagg: true,
-      is_multinode: false,
-      prefill_num_workers: 0,
-      decode_num_workers: 0,
-      num_prefill_gpu: 8,
-      num_decode_gpu: 8,
-      isl: 8192,
-      osl: 1024,
-      metrics: {
-        ...row().metrics,
-        tput_per_gpu: 900,
-        input_tput_per_gpu: 6400,
-        output_tput_per_gpu: 800 / 7,
-      },
-    });
+// Both pool fields hold the whole deployment (8) with no workers. The hidden
+// split is 1 prefill + 7 decode chips; 7200 tok/s total at ISL:OSL 8192:1024.
+const legacy = () =>
+  row({
+    disagg: true,
+    is_multinode: false,
+    prefill_num_workers: 0,
+    decode_num_workers: 0,
+    num_prefill_gpu: 8,
+    num_decode_gpu: 8,
+    isl: 8192,
+    osl: 1024,
+    metrics: {
+      ...row().metrics,
+      tput_per_gpu: 900,
+      input_tput_per_gpu: 6400,
+      output_tput_per_gpu: 800 / 7,
+    },
+  });
 
+describe('powerBasisNormalization — legacy unsplit disaggregated rows', () => {
   it.each(['pool', 'total'] as const)(
     'allocates the deployment once and recovers its output on the %s basis',
     (basis) => {
@@ -391,13 +391,14 @@ describe('powerBasisNormalization — legacy unsplit disaggregated rows', () => 
   });
 });
 
+const supported = () => {
+  const entry = rowToAggDataEntry(row());
+  const model = entry.modeledSystemPower;
+  if (model?.status !== 'supported') throw new Error('expected a supported power model');
+  return { entry, model };
+};
+
 describe('writePowerBasisChartFields', () => {
-  const supported = () => {
-    const entry = rowToAggDataEntry(row());
-    const model = entry.modeledSystemPower;
-    if (model?.status !== 'supported') throw new Error('expected a supported power model');
-    return { entry, model };
-  };
   const specs = { tdp: 1000, power: 1.5 };
 
   it('writes the IT and facility modeled boundaries independently', () => {

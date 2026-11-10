@@ -222,18 +222,18 @@ describe('D3Chart proximity overlay', () => {
   });
 });
 
-describe('D3Chart PNG export', () => {
-  function exportedPointPosition() {
-    const svg = container.querySelector('svg')!;
-    const clone = svg.cloneNode(true) as SVGSVGElement;
-    document.body.append(clone);
-    renderChartForExport(svg, clone, 1000, 500);
-    const point = clone.querySelector('.point')!;
-    const position = [point.getAttribute('cx'), point.getAttribute('cy')];
-    clone.remove();
-    return position;
-  }
+function exportedPointPosition() {
+  const svg = container.querySelector('svg')!;
+  const clone = svg.cloneNode(true) as SVGSVGElement;
+  document.body.append(clone);
+  renderChartForExport(svg, clone, 1000, 500);
+  const point = clone.querySelector('.point')!;
+  const position = [point.getAttribute('cx'), point.getAttribute('cy')];
+  clone.remove();
+  return position;
+}
 
+describe('D3Chart PNG export', () => {
   it('draws the clone at the live zoom', () => {
     draw(lineChart(undefined));
     const [cx, cy] = exportedPointPosition();

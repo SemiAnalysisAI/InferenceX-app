@@ -11,6 +11,11 @@ const artifact = (id: number, name: string, created_at: string, expired = false)
   archive_download_url: `https://api.github.com/artifacts/${id}/zip`,
 });
 
+const sized = (id: number, name: string, size_in_bytes?: number) => ({
+  ...artifact(id, name, '2026-01-01T00:00:00Z'),
+  size_in_bytes,
+});
+
 describe('buildArtifactPlan', () => {
   it('keeps the source required manifest and successful artifacts on reuse', () => {
     const rows = [
@@ -67,10 +72,6 @@ describe('buildArtifactPlan', () => {
   });
 
   it('downloads the largest artifacts first', () => {
-    const sized = (id: number, name: string, size_in_bytes?: number) => ({
-      ...artifact(id, name, '2026-01-01T00:00:00Z'),
-      size_in_bytes,
-    });
     const plan = buildArtifactPlan('100', '100', [
       sized(1, 'run-stats', 10),
       sized(2, 'bmk_b', 5_000_000_000),

@@ -181,15 +181,15 @@ describe('fetchEvaluations', () => {
   });
 });
 
+function mockJson(payload: unknown) {
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve(payload),
+  });
+}
+
 describe('CollectiveX API', () => {
   const dataset = makeCollectiveXDataset();
-
-  function mockJson(payload: unknown) {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(payload),
-    });
-  }
 
   it('fetches a specific run by id', async () => {
     mockJson(dataset);

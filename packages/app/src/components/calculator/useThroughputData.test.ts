@@ -314,6 +314,16 @@ describe('hermiteInterpolate', () => {
   });
 });
 
+const withCache = (rates: (number | undefined)[]) =>
+  rates.map((cacheHitRate, i) =>
+    makePoint({
+      interactivity: 20 + i * 20,
+      throughput: 500 - i * 100,
+      inputThroughput: 400 - i * 80,
+      ...(cacheHitRate === undefined ? {} : { cacheHitRate }),
+    }),
+  );
+
 describe('interpolateForGPU', () => {
   it('returns null for empty points array', () => {
     expect(interpolateForGPU([], 30, 'interactivity_to_throughput', 'costh')).toBeNull();
@@ -360,16 +370,6 @@ describe('interpolateForGPU', () => {
   });
 
   describe('cached-input fraction', () => {
-    const withCache = (rates: (number | undefined)[]) =>
-      rates.map((cacheHitRate, i) =>
-        makePoint({
-          interactivity: 20 + i * 20,
-          throughput: 500 - i * 100,
-          inputThroughput: 400 - i * 80,
-          ...(cacheHitRate === undefined ? {} : { cacheHitRate }),
-        }),
-      );
-
     it('interpolates the rate between measured points', () => {
       const result = interpolateForGPU(
         withCache([0.4, 0.8]),
@@ -975,6 +975,71 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
 
 const singlePrecisionClassify = (hwKey: string) => ({ key: hwKey, meta: { hwKey } });
 
+const withMetrics = (extra: Record<string, number>) =>
+  makeRow({
+    metrics: {
+      median_intvty: 50,
+      tput_per_gpu: 900,
+      output_tput_per_gpu: 300,
+      input_tput_per_gpu: 600,
+      ...extra,
+    },
+  });
+
+const agenticRow = (
+  conc: number,
+  interactivity: number,
+  e2eLatency: number,
+  throughput: number,
+  date = '2026-07-19',
+) =>
+  makeRow({
+    id: conc,
+    benchmark_type: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc,
+    date,
+    metrics: {
+      p90_itl: 1 / interactivity,
+      p90_ttlt: e2eLatency,
+      tput_per_gpu: throughput,
+      output_tput_per_gpu: throughput * 0.3,
+      input_tput_per_gpu: throughput * 0.7,
+    },
+  });
+
+const onlyRowFor = (row: BenchmarkRow, sequence = Sequence.OneK_OneK, percentile?: Percentile) => {
+  const { grouped } = buildGpuGroups([row], {
+    sequence,
+    precisions: ['fp4'],
+    percentile,
+    classify: singlePrecisionClassify,
+  });
+  return Object.values(grouped)[0][0];
+};
+
+const agentic = (percentile: Percentile) =>
+  onlyRowFor(
+    makeRow({
+      benchmark_type: 'agentic_traces',
+      isl: null,
+      osl: null,
+      metrics: {
+        p75_itl: 1 / 200,
+        p90_itl: 1 / 160,
+        p75_e2el: 20,
+        p90_e2el: 30,
+        tput_per_gpu: 900,
+        median_ttft: 0.5,
+        p75_ttft: 1.2,
+        p90_ttft: 3.1,
+      },
+    }),
+    Sequence.AgenticTraces,
+    percentile,
+  );
+
 describe('buildGpuGroups', () => {
   const shared = { sequence: Sequence.OneK_OneK, precisions: ['fp4'] };
 
@@ -1072,27 +1137,18 @@ describe('buildGpuGroups', () => {
       expect(p.sourceRow).toBe(disagg);
     });
 
+    const aggregated = (chipBasis: 'pool' | 'total') =>
+      buildGpuGroups([makeRow()], { ...shared, chipBasis, classify: singlePrecisionClassify })
+        .grouped;
+
     it('leaves aggregated rows identical under both bases', () => {
-      const aggregated = (chipBasis: 'pool' | 'total') =>
-        buildGpuGroups([makeRow()], { ...shared, chipBasis, classify: singlePrecisionClassify })
-          .grouped;
       expect(aggregated('total')).toEqual(aggregated('pool'));
     });
   });
 
   describe('time to first token', () => {
-    const only = (row: BenchmarkRow, sequence = Sequence.OneK_OneK, percentile?: Percentile) => {
-      const { grouped } = buildGpuGroups([row], {
-        sequence,
-        precisions: ['fp4'],
-        percentile,
-        classify: singlePrecisionClassify,
-      });
-      return Object.values(grouped)[0][0];
-    };
-
     it('reads the median for fixed-sequence rows, matching the inference TTFT axis', () => {
-      const point = only(
+      const point = onlyRowFor(
         makeRow({
           metrics: { median_intvty: 50, tput_per_gpu: 900, median_ttft: 0.8, p90_ttft: 2.4 },
         }),
@@ -1101,69 +1157,40 @@ describe('buildGpuGroups', () => {
     });
 
     it('reads the selected percentile for agentic rows', () => {
-      const agentic = (percentile: Percentile) =>
-        only(
-          makeRow({
-            benchmark_type: 'agentic_traces',
-            isl: null,
-            osl: null,
-            metrics: {
-              p75_itl: 1 / 200,
-              p90_itl: 1 / 160,
-              p75_e2el: 20,
-              p90_e2el: 30,
-              tput_per_gpu: 900,
-              median_ttft: 0.5,
-              p75_ttft: 1.2,
-              p90_ttft: 3.1,
-            },
-          }),
-          Sequence.AgenticTraces,
-          percentile,
-        );
       expect(agentic(Percentile.P90).ttft).toBe(3.1);
       expect(agentic(Percentile.P75).ttft).toBe(1.2);
     });
 
     it('is absent, not zero, when the row reported no first-token time', () => {
-      expect(only(makeRow()).ttft).toBeUndefined();
-      expect('ttft' in only(makeRow())).toBe(false);
+      expect(onlyRowFor(makeRow()).ttft).toBeUndefined();
+      expect('ttft' in onlyRowFor(makeRow())).toBe(false);
     });
   });
 
-  describe('cached-input fraction', () => {
-    const withMetrics = (extra: Record<string, number>) =>
-      makeRow({
-        metrics: {
-          median_intvty: 50,
-          tput_per_gpu: 900,
-          output_tput_per_gpu: 300,
-          input_tput_per_gpu: 600,
-          ...extra,
-        },
-      });
-    const only = (row: BenchmarkRow) => {
-      const { grouped } = buildGpuGroups([row], {
-        ...shared,
-        classify: singlePrecisionClassify,
-      });
-      return Object.values(grouped)[0][0];
-    };
+  const onlyRow = (row: BenchmarkRow) => {
+    const { grouped } = buildGpuGroups([row], {
+      ...shared,
+      classify: singlePrecisionClassify,
+    });
+    return Object.values(grouped)[0][0];
+  };
 
+  describe('cached-input fraction', () => {
     it('is absent when the row records no cache metric — every fixed-sequence row', () => {
-      expect(only(makeRow()).cacheHitRate).toBeUndefined();
+      expect(onlyRow(makeRow()).cacheHitRate).toBeUndefined();
     });
 
     it('sums the GPU and external hit rates', () => {
       expect(
-        only(withMetrics({ server_gpu_cache_hit_rate: 0.66, server_external_cache_hit_rate: 0.25 }))
-          .cacheHitRate,
+        onlyRow(
+          withMetrics({ server_gpu_cache_hit_rate: 0.66, server_external_cache_hit_rate: 0.25 }),
+        ).cacheHitRate,
       ).toBeCloseTo(0.91, 10);
     });
 
     it('ignores the CPU tier when an external rate is reported — external already counts it', () => {
       expect(
-        only(
+        onlyRow(
           withMetrics({
             server_gpu_cache_hit_rate: 0.819,
             server_external_cache_hit_rate: 0.06,
@@ -1175,51 +1202,50 @@ describe('buildGpuGroups', () => {
 
     it('adds the CPU tier when no external rate is reported', () => {
       expect(
-        only(withMetrics({ server_gpu_cache_hit_rate: 0.771, server_cpu_cache_hit_rate: 0.055 }))
+        onlyRow(withMetrics({ server_gpu_cache_hit_rate: 0.771, server_cpu_cache_hit_rate: 0.055 }))
           .cacheHitRate,
       ).toBeCloseTo(0.826, 10);
     });
 
     it('reads the CPU tier alone, and an external rate of zero still suppresses it', () => {
-      expect(only(withMetrics({ server_cpu_cache_hit_rate: 0.5 })).cacheHitRate).toBeCloseTo(
+      expect(onlyRow(withMetrics({ server_cpu_cache_hit_rate: 0.5 })).cacheHitRate).toBeCloseTo(
         0.5,
         10,
       );
       expect(
-        only(withMetrics({ server_external_cache_hit_rate: 0, server_cpu_cache_hit_rate: 0.5 }))
+        onlyRow(withMetrics({ server_external_cache_hit_rate: 0, server_cpu_cache_hit_rate: 0.5 }))
           .cacheHitRate,
       ).toBe(0);
     });
 
     it('reads either metric alone', () => {
-      expect(only(withMetrics({ server_gpu_cache_hit_rate: 0.4 })).cacheHitRate).toBeCloseTo(
+      expect(onlyRow(withMetrics({ server_gpu_cache_hit_rate: 0.4 })).cacheHitRate).toBeCloseTo(
         0.4,
         10,
       );
-      expect(only(withMetrics({ server_external_cache_hit_rate: 0.3 })).cacheHitRate).toBeCloseTo(
-        0.3,
-        10,
-      );
+      expect(
+        onlyRow(withMetrics({ server_external_cache_hit_rate: 0.3 })).cacheHitRate,
+      ).toBeCloseTo(0.3, 10);
     });
 
     it('clamps into [0,1] — real rows report a GPU rate as high as 1.185', () => {
-      expect(only(withMetrics({ server_gpu_cache_hit_rate: 1.185 })).cacheHitRate).toBe(1);
-      expect(only(withMetrics({ server_gpu_cache_hit_rate: -0.2 })).cacheHitRate).toBe(0);
+      expect(onlyRow(withMetrics({ server_gpu_cache_hit_rate: 1.185 })).cacheHitRate).toBe(1);
+      expect(onlyRow(withMetrics({ server_gpu_cache_hit_rate: -0.2 })).cacheHitRate).toBe(0);
     });
 
     it('falls back to the theoretical rate only on fallback hardware', () => {
       const theoretical = { theoretical_cache_hit_rate: 0.4 };
-      expect(only({ ...withMetrics(theoretical), hardware: 'gb300' }).cacheHitRate).toBe(0.4);
-      expect(only(withMetrics(theoretical)).cacheHitRate).toBeUndefined();
+      expect(onlyRow({ ...withMetrics(theoretical), hardware: 'gb300' }).cacheHitRate).toBe(0.4);
+      expect(onlyRow(withMetrics(theoretical)).cacheHitRate).toBeUndefined();
     });
   });
 
-  describe('input token share', () => {
-    const only = (row: BenchmarkRow) => {
-      const { grouped } = buildGpuGroups([row], { ...shared, classify: singlePrecisionClassify });
-      return Object.values(grouped)[0][0];
-    };
+  const only = (row: BenchmarkRow) => {
+    const { grouped } = buildGpuGroups([row], { ...shared, classify: singlePrecisionClassify });
+    return Object.values(grouped)[0][0];
+  };
 
+  describe('input token share', () => {
     it('takes the share from the rates when they agree with the total', () => {
       const point = only(
         makeRow({
@@ -1467,29 +1493,6 @@ describe('buildGpuGroups', () => {
   });
 
   it('keeps an e2e-dominated agentic point, because grouping no longer gates on the e2e frontier', () => {
-    const agenticRow = (
-      conc: number,
-      interactivity: number,
-      e2eLatency: number,
-      throughput: number,
-      date = '2026-07-19',
-    ) =>
-      makeRow({
-        id: conc,
-        benchmark_type: 'agentic_traces',
-        isl: null,
-        osl: null,
-        conc,
-        date,
-        metrics: {
-          p90_itl: 1 / interactivity,
-          p90_ttlt: e2eLatency,
-          tput_per_gpu: throughput,
-          output_tput_per_gpu: throughput * 0.3,
-          input_tput_per_gpu: throughput * 0.7,
-        },
-      });
-
     const { grouped } = buildGpuGroups(
       [
         agenticRow(1, 100, 20, 900),

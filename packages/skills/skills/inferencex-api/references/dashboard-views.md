@@ -88,7 +88,7 @@ API 参数。
 
 Use `tcoBasis=internal` (the default) or `tcoBasis=external` in cost-aware
 read-only views. Qwen3.5 and Kimi K3 expose the corresponding dashboard toggle
-on 8K/1K and Agentic Traces; Muse Spark Open, GLM-5.2 and GLM-5.3 Flash expose
+on 8K/1K and Agentic Traces; Muse Spark 1.3/Open, GLM-5.2 and GLM-5.3 Flash expose
 it on Agentic Traces. Inference charts show it for cost metrics when TPUv7 data
 is visible. The API accepts the pricing basis independently of control
 visibility. It changes configured ownership costs, not measured throughput;
@@ -183,7 +183,7 @@ Qwen3.5 workload-retirement coverage:
    latest-image APIs keep historical rows; no data is deleted.
    Preserve `options.models` order within each category when rendering model
    selectors. The default group is DeepSeek V4.1 Flash, GLM5.2/GLM5.3,
-   MiniMax M3.1 Flash, Muse Spark Open, Qwen3.5, then
+   MiniMax M3.1 Flash, Muse Spark 1.3/Open, Qwen3.5, then
    Qwen3.8 Flash Next. This presentation order does not change `defaults.model`
    or the overview's model order.
    GLM-5.3-Flash supports `8k/1k` and `agentic-traces` with raw key `glm5.3flash`,
@@ -260,6 +260,21 @@ https://inferencex.semianalysis.com/api/v1/views/profit-estimator?model=DeepSeek
 
 ## Profit estimator defaults
 
+Both profit views also support `model=Muse-Spark-Open` (dashboard slug
+`muse-spark-open`, label Muse Spark 1.3/Open). They default to `target=100`,
+`priceSource=list`, and `labCut=30`. The list price uses Meta's Muse Spark 1.3
+endpoint rates published by [Vercel AI Gateway](https://vercel.com/ai-gateway/models/muse-spark-1.3):
+$1.25 uncached input, $0.15 cached input reads, and $4.25 output per million tokens.
+These estimates price Open checkpoint measurements, not Meta's production costs
+or profits. The target and license fee are editable scenario assumptions, not
+Meta endpoint P90 measurements or actual license terms. Explicit custom pricing,
+targets and unofficial-run overlays retain the same behavior as other models.
+
+中文：两个利润视图均支持 `model=Muse-Spark-Open`，默认采用 100 tok/s/user
+工作点、Muse Spark 1.3 API 价格和 30% 模型许可费假设。实测数据来自 Open
+checkpoint，并非 Meta 生产环境成本或利润。工作点和许可费均可修改，
+不代表 Meta 服务的 P90 实测值或实际许可条款。
+
 Both views default `cacheHitMode` to `theoretical`, displayed as
 “Theroticial Roofline” in English and Chinese dashboards. This uses the
 trace-derived infinite-cache hit rate, falling back to the measured rate when
@@ -267,7 +282,7 @@ unavailable. Pass `cacheHitMode=actual` for measured cache behavior; dashboard
 links preserve that choice as `/cache-hit-mode/actual`. Report the resolved
 `params.cacheHitMode` alongside the pricing assumptions.
 
-Both views use model-specific defaults: the lowest multiples of 5 tok/s/user
+The earlier models below use the lowest multiples of 5 tok/s/user
 that reached each model's maximum priced official SKU count in a 5–300 sweep
 of the public view API on 2026-10-25:
 
@@ -969,7 +984,8 @@ evidence remains. An older H100 workload does not qualify a newer workload.
 | Model and frozen workload         | `r_model`, `r_workload`                              | Compact key from options.workloads resolves to full canonical identity; one 20-scheduled-clip C1 spec, at least 10 valid samples on every hardware; shorter historical runs remain History-only.                                                                                                                                                            |
 | Resolution, duration, mode, steps | `r_resolution`, `r_duration`, `r_mode`, `r_steps`    | Exact recorded plan metadata; duration is the requested value, not decoded output duration. No mode inferred from model names.                                                                                                                                                                                                                              |
 | Engine, execution date            | `r_engine`, `r_date`                                 | Recorded engine and as-of execution date. All GPU counts are included.                                                                                                                                                                                                                                                                                      |
-| Fixed overview settings           | `r_gpus`, `r_x`, `r_basis` (deprecated)              | Accepted but ignored: `params.gpuCount=null`, `params.xMetric=p50`, `params.costBasis=participating`. New share/export URLs omit these keys.                                                                                                                                                                                                                |
+| X metric                          | `r_x`                                                | `p50` (default) or `p90` per-clip latency, or `gpus` (participating GPUs per deployment, log axis). Presentation only; the GPU axis keeps the median-latency frontier and Best engine, and Chip config history plots median latency for `gpus`.                                                                                                             |
+| Fixed overview settings           | `r_gpus`, `r_basis` (deprecated)                     | Accepted but ignored: `params.gpuCount=null`, `params.costBasis=participating`. New share/export URLs omit these keys.                                                                                                                                                                                                                                      |
 | Advanced disclosure               | None                                                 | Profit estimator is collapsed by default. Opening/closing preserves inputs and does not change data or calculations.                                                                                                                                                                                                                                        |
 | Representative deployments table  | None                                                 | Removed from the UI; representative cells, deadline metrics and both GPU cost bases remain in the read-only evidence.                                                                                                                                                                                                                                       |
 | Hardware legend                   | `r_hidden`                                           | Applies to all groups and media selection.                                                                                                                                                                                                                                                                                                                  |
@@ -979,7 +995,7 @@ evidence remains. An older H100 workload does not qualify a newer workload.
 | Utilization                       | `r_utilization`                                      | Fraction 0-1, default 1. Modelled revenue scales; reserved GPU hourly cost does not.                                                                                                                                                                                                                                                                        |
 | Named run overlay                 | `unofficialrun` / `unofficialruns`                   | Exact run only, in separate `overlayCells` and `overlayDeploymentCells`, excluded from official cells, deployments and workload mix. A stored run keeps its actual approval. A run absent from History is read live from the JSON documents of its public `h3-results` artifacts: unapproved, `publishedAt` null, no media. Nothing is stored or published. |
 
-中文：概览固定包含全部 GPU 数量，图表使用中位延迟和参与计算的 GPU 口径。旧 `r_gpus`、`r_x`、`r_basis` 参数仍接受但会被忽略；新分享和导出链接不再携带这些参数。代表性部署表已移除，利润估算器位于默认收起的“高级选项”中；展开或收起都不会改变数据和计算结果，已填写的输入会保留。只读证据仍保留代表性数据点、deadline 指标及两种 GPU 成本口径。
+中文：概览固定包含全部 GPU 数量，图表使用参与计算的 GPU 口径。`r_x` 可选单条视频 `p50`（默认）或 `p90` 延迟，或 `gpus`（每个部署参与计算的 GPU 数，对数坐标）；GPU 坐标轴沿用中位延迟的前沿和最优引擎，芯片配置历史对 `gpus` 改为绘制中位延迟。旧 `r_gpus`、`r_basis` 参数仍接受但会被忽略；新分享和导出链接不再携带这些参数。代表性部署表已移除，利润估算器位于默认收起的“高级选项”中；展开或收起都不会改变数据和计算结果，已填写的输入会保留。只读证据仍保留代表性数据点、deadline 指标及两种 GPU 成本口径。
 
 `cells` carries the source point, per-clip/frame energy, P95 only with 20 complete
 request samples, deadline metrics, both cost bases and modelled profit per GPU-hour.

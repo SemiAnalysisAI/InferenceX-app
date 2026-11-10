@@ -143,7 +143,7 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
           [...modal.querySelectorAll('button[data-testid]')].map((button) =>
             button.textContent?.trim(),
           ),
-        ).to.deep.eq(['Qwen3.5', 'Kimi K3', 'GLM5.3', 'Muse Spark']);
+        ).to.deep.eq(['Qwen3.5', 'Kimi K3', 'GLM5.3', 'Muse Spark 1.3/Open']);
         expect(rows.size).to.eq(2);
         expect(modal.querySelector('[data-testid="launch-modal-dismiss"]')).to.eq(null);
         const close = modal.querySelector('button[aria-label]')!;
@@ -274,7 +274,7 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
   for (const prefix of ['', '/zh']) {
     for (const [index, label, slug, model] of [
       [0, 'GLM5.3', 'glm-5-3', 'GLM-5.2'],
-      [1, 'Muse Spark', 'muse-spark-open', 'Muse-Spark-Open'],
+      [1, 'Muse Spark 1.3/Open', 'muse-spark-open', 'Muse-Spark-Open'],
     ] as const) {
       it(`opens ${label} with its intended filters from ${prefix || '/'}`, () => {
         interceptTpuLaunchData(model);

@@ -5,8 +5,8 @@ const ANSI_CSI_PATTERN = /\u001B\[[0-?]*[ -/]*[@-~]/gu;
 
 export function readableLogText(value: string): string {
   return value
-    .replace(ANSI_OSC_PATTERN, '')
-    .replace(ANSI_CSI_PATTERN, '')
+    .replaceAll(ANSI_OSC_PATTERN, '')
+    .replaceAll(ANSI_CSI_PATTERN, '')
     .replaceAll('\r\n', '\n')
     .replaceAll('\r', '\n');
 }

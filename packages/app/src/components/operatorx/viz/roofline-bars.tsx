@@ -74,6 +74,8 @@ export function RooflineBars({
     summary.normalized
       ? `${(value * 100).toFixed(1)}%`
       : value.toLocaleString('en-US', { maximumFractionDigits: value < 10 ? 1 : 0 });
+  const labelWidth = (value: number) => format(value).length * 7;
+
   const layer: CustomLayerConfig = {
     type: 'custom',
     key: 'median-best',
@@ -124,7 +126,6 @@ export function RooflineBars({
         .attr('width', (d) => Math.max(0, x(d.median) - x(0)))
         .attr('height', y.bandwidth())
         .attr('fill', (d) => model.colors[d.hardware]);
-      const labelWidth = (value: number) => format(value).length * 7;
       const fits = (d: RooflineSummaryBar) => x(d.median) - x(0) > labelWidth(d.median) + 12;
       // A median label that does not fit inside its bar sits just after it on the same row,
       // so tight rows never stack it onto the next bar; the best label moves past it.

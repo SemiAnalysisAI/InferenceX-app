@@ -265,7 +265,7 @@ describe('compareModelDisplayLabel', () => {
 describe('compareModelSeoName', () => {
   const EXPECTED: Record<string, string> = {
     'glm-5-3-flash': 'GLM-5.3-Flash',
-    'muse-spark-open': 'Muse Spark Open',
+    'muse-spark-open': 'Muse Spark 1.3/Open',
     'deepseek-v4': 'DeepSeek V4 Pro',
     'deepseek-v41-flash': 'DeepSeek V4.1 Flash',
     'deepseek-r1': 'DeepSeek R1',
@@ -285,7 +285,7 @@ describe('compareModelSeoName', () => {
     'llama-3-3-70b': 'Llama 3.3 70B',
   };
 
-  it('returns the expected single-version name for every model', () => {
+  it('returns the expected SEO name for every model', () => {
     for (const model of COMPARE_MODEL_SLUGS) {
       expect(compareModelSeoName(model), `seoName for ${model.slug}`).toBe(EXPECTED[model.slug]);
     }
@@ -297,12 +297,12 @@ describe('compareModelSeoName', () => {
     );
   });
 
-  it('never returns a version-grouped label (no slashes) and is non-empty', () => {
-    for (const model of COMPARE_MODEL_SLUGS) {
-      const name = compareModelSeoName(model);
-      expect(name.length, `non-empty for ${model.slug}`).toBeGreaterThan(0);
-      expect(name.includes('/'), `no slash in ${model.slug}`).toBe(false);
-    }
+  it('keeps the shared Muse family name in comparison titles without changing its URL', () => {
+    const model = getCompareModelBySlug('muse-spark-open')!;
+    expect(compareSeoTitle('B200 vs H200', compareModelSeoName(model))).toContain(
+      'Muse Spark 1.3/Open',
+    );
+    expect(canonicalCompareSlug(model.slug, 'b200', 'h200')).toBe('muse-spark-open-b200-vs-h200');
   });
 });
 

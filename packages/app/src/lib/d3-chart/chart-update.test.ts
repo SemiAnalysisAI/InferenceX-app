@@ -854,6 +854,17 @@ describe('writeAttrs and writeText', () => {
 
 const prefixedLabel = (d: d3.AxisDomain) => `#${String(d)}`;
 
+const split = (group: d3.Selection<SVGGElement, unknown, null, undefined>) => {
+  group.selectAll('.tick').attr('data-mark', (_, index) => String(index));
+  group.selectAll<SVGTextElement, unknown>('.tick text').each(function () {
+    const label = this.textContent ?? '';
+    this.textContent = '';
+    const tspan = document.createElementNS(SVG_NS, 'tspan');
+    tspan.textContent = label;
+    this.append(tspan);
+  });
+};
+
 describe('renderAxes parity with d3-axis', () => {
   it('renders the same DOM as d3 axis generators across domain, format and tick changes', () => {
     const ours = makeLayout();
@@ -898,16 +909,6 @@ describe('renderAxes parity with d3-axis', () => {
   it('matches d3 for band and time scales and after labels are customized', () => {
     const ours = makeLayout();
     const theirs = makeLayout();
-    const split = (group: d3.Selection<SVGGElement, unknown, null, undefined>) => {
-      group.selectAll('.tick').attr('data-mark', (_, index) => String(index));
-      group.selectAll<SVGTextElement, unknown>('.tick text').each(function () {
-        const label = this.textContent ?? '';
-        this.textContent = '';
-        const tspan = document.createElementNS(SVG_NS, 'tspan');
-        tspan.textContent = label;
-        this.append(tspan);
-      });
-    };
     const domains = [
       ['b200 fp4', 'h100 fp8', 'mi355x fp4'],
       ['h100 fp8', 'gb200 fp4', 'b200 fp4', 'mi300x fp8'],

@@ -96,21 +96,21 @@ describe('EditableTcoBadges', () => {
   });
 });
 
-describe('TcoPriceTable', () => {
-  function renderTable(items: typeof ITEMS) {
-    act(() =>
-      root.render(
-        <TcoPriceTable
-          items={items}
-          editable
-          testId="table"
-          cellTestId="cell"
-          inputIdPrefix="cost-input"
-        />,
-      ),
-    );
-  }
+function renderTable(items: typeof ITEMS) {
+  act(() =>
+    root.render(
+      <TcoPriceTable
+        items={items}
+        editable
+        testId="table"
+        cellTestId="cell"
+        inputIdPrefix="cost-input"
+      />,
+    ),
+  );
+}
 
+describe('TcoPriceTable', () => {
   it('keeps the focused cell mounted while its chip drops out of the items', () => {
     renderTable(ITEMS);
     const input = container.querySelector<HTMLInputElement>('[data-testid="cost-input-gb300"]');

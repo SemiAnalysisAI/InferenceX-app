@@ -191,9 +191,10 @@ describe('OperatorX case labels', () => {
   });
 });
 
+const withGate = (dtype: string) => ({ ...v41Flash(8), router: { gate: { dtype } } });
+
 describe('OperatorX router gate bytes', () => {
   it('reads the router gate at its stored width', () => {
-    const withGate = (dtype: string) => ({ ...v41Flash(8), router: { gate: { dtype } } });
     const extra = usefulBytes('moe', withGate('fp32'))! - usefulBytes('moe', withGate('bf16'))!;
     // hidden x experts gate weights, 2 extra bytes each.
     expect(extra).toBeCloseTo(5120 * 384 * 2, 3);

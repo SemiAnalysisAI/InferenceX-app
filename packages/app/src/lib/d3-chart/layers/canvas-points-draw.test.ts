@@ -395,20 +395,20 @@ describe('CanvasPointLayer position animation', () => {
   });
 });
 
-describe('CanvasPointLayer opacity transitions', () => {
-  function fadingLayer(durationMs: number) {
-    const frames = installFrames();
-    const calls = installRecordingContext();
-    const { layer } = mountLayer();
-    layer.join([point('a', 10, 10)], key, 100, 100);
-    layer.restyle(config);
-    layer.place(identity, identity);
-    frames.run(5);
-    layer.setOpacityTransition(durationMs);
-    calls.length = 0;
-    return { frames, calls, layer };
-  }
+function fadingLayer(durationMs: number) {
+  const frames = installFrames();
+  const calls = installRecordingContext();
+  const { layer } = mountLayer();
+  layer.join([point('a', 10, 10)], key, 100, 100);
+  layer.restyle(config);
+  layer.place(identity, identity);
+  frames.run(5);
+  layer.setOpacityTransition(durationMs);
+  calls.length = 0;
+  return { frames, calls, layer };
+}
 
+describe('CanvasPointLayer opacity transitions', () => {
   it('eases from the shown opacity, starting at the first frame even at time zero', () => {
     const { frames, calls, layer } = fadingLayer(100);
     layer.setOpacity(() => 0.5);
