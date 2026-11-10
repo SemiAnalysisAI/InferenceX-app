@@ -527,18 +527,6 @@ describe('buildShareUrl tab filtering', () => {
     expect(url).not.toContain('i_seq');
   });
 
-  it('includes only reliability-tab params when on /infx/reliability', async () => {
-    setupWindow('', '/infx/reliability');
-    const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
-
-    writeUrlParams({ r_range: 'last-7-days', g_model: 'x' });
-    await vi.advanceTimersByTimeAsync(200);
-
-    const url = buildShareUrl();
-    expect(url).toContain('r_range=last-7-days');
-    expect(url).not.toContain('g_model');
-  });
-
   it('includes global, inference and c_ params when on /infx/calculator', async () => {
     setupWindow('', '/infx/calculator');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
@@ -730,19 +718,6 @@ describe('buildShareUrl tab filtering', () => {
     expect(url).toMatch(/e_active=h100(?:,|%2C)b200/u);
     expect(url).not.toContain('i_active');
     expect(url).not.toContain('r_active');
-  });
-
-  it('includes r_active on /infx/reliability but not i_active or e_active', async () => {
-    setupWindow('', '/infx/reliability');
-    const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
-
-    writeUrlParams({ i_active: 'x', e_active: 'y', r_active: 'dsr1,llama70b' });
-    await vi.advanceTimersByTimeAsync(200);
-
-    const url = buildShareUrl();
-    expect(url).toMatch(/r_active=dsr1(?:,|%2C)llama70b/u);
-    expect(url).not.toContain('i_active');
-    expect(url).not.toContain('e_active');
   });
 });
 

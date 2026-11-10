@@ -2752,28 +2752,6 @@
       ]
     },
     {
-      "spec": "cypress/component/reliability-bar-chart.cy.tsx",
-      "duration": 224,
-      "tests": [
-        {
-          "title": ["ReliabilityBarChartD3", "tracks retry and requests reliability data again"],
-          "duration": 218,
-          "attempts": 1
-        }
-      ]
-    },
-    {
-      "spec": "cypress/component/reliability-chart-controls.cy.tsx",
-      "duration": 271,
-      "tests": [
-        {
-          "title": ["Reliability ChartControls", "calls setDateRange when an option is selected"],
-          "duration": 268,
-          "attempts": 1
-        }
-      ]
-    },
-    {
       "spec": "cypress/component/scale-up-topology.cy.tsx",
       "duration": 1580,
       "tests": [

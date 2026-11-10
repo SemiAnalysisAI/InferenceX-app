@@ -14,11 +14,6 @@ const routes: readonly ExportRoute[] = [
     headers: ['Hardware Key', 'Throughput/Chip (tok/s)', 'Mean TTFT (s)'],
   },
   {
-    route: '/infx/reliability?r_range=all-time',
-    ready: '#reliability-chart svg rect.bar',
-    headers: ['Chip Key', 'Success Rate (%)', 'Successful Runs', 'Total Runs'],
-  },
-  {
     route: '/infx/evaluation',
     ready: '[data-testid="evaluation-chart-display"]',
     headers: ['Benchmark', 'Mean Score', 'Hardware Key'],

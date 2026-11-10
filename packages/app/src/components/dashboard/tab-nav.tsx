@@ -45,7 +45,6 @@ const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
   'cache-reuse': 'Prefix cache reuse',
   'profit-estimator': 'Profit estimator',
   'profit-estimator-per-gigawatt': 'Profit estimator per GW',
-  reliability: 'Reliability',
   'gpu-specs': 'Chip specs',
   submissions: 'Submissions',
   operatorx: 'OperatorX',
