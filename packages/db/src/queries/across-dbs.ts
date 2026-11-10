@@ -1,9 +1,9 @@
 import { benchmarkCurveScope } from '@semianalysisai/inferencex-constants';
 
 import type { DbClient } from '../connection.js';
-import { distinctBy, mergeDistinctRows } from '../lib/distinct-by.js';
-import { CONFIG_NATURAL_KEY, naturalKey } from '../lib/public-db-sync.js';
-import { getLatestBenchmarks, type BenchmarkRow } from './benchmarks.js';
+import { distinctBy, mergeDistinctRows } from '../lib/distinct-by';
+import { CONFIG_NATURAL_KEY, naturalKey } from '../lib/public-db-sync';
+import { getLatestBenchmarks, type BenchmarkRow } from './benchmarks';
 import type { DatasetRecord } from './datasets.js';
 import type { EvalRow } from './evaluations.js';
 import type { LatestImageRow } from './latest-images.js';

@@ -199,8 +199,8 @@ describe('mergeEvalResults', () => {
   });
 });
 
-describe('mergeSubmissionSummaries', () => {
-  const summary = (overrides: Partial<SubmissionSummaryRow>): SubmissionSummaryRow => ({
+function summary(overrides: Partial<SubmissionSummaryRow>): SubmissionSummaryRow {
+  return {
     model: MODEL,
     hardware: 'b200',
     framework: 'vllm',
@@ -221,8 +221,10 @@ describe('mergeSubmissionSummaries', () => {
     max_concurrency: 64,
     image: null,
     ...overrides,
-  });
+  };
+}
 
+describe('mergeSubmissionSummaries', () => {
   it('adds up a config both databases submitted on one date and keeps others apart', () => {
     const merged = mergeSubmissionSummaries([
       [summary({ total_datapoints: 10, max_concurrency: 64 })],

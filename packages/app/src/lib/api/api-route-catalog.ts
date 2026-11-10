@@ -2220,7 +2220,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/workflow-info.ts',
-    sourceSha256: '87a525b3030d4333245671db394a06a0d93e230b8d9f38357539eda7f299780b',
+    sourceSha256: '2935f30ed447cf579bae25cae9e81eb32671fe76b6b1a1d26c96807e2ce8a95e',
     reviewArea: {
       en: 'Availability rows plus workflow runs, changelogs, configurations, and run coverage responses.',
       zh: '可用配置行以及工作流运行、变更记录、配置和运行覆盖响应。',

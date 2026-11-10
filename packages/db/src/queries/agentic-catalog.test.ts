@@ -24,6 +24,10 @@ function group(overrides: Partial<AgenticCatalogGroup>): AgenticCatalogGroup {
   };
 }
 
+function representative(a: Partial<AgenticCatalogGroup>, b: Partial<AgenticCatalogGroup>) {
+  return mergeAgenticCatalogGroups([[group({ id: 1, ...a })], [group({ id: 2, ...b })]])[0]!.id;
+}
+
 describe('mergeAgenticCatalogGroups', () => {
   it('returns one database unchanged apart from the ranking throughput', () => {
     const { tputPerGpu: _tput, ...entry } = group({});
@@ -39,9 +43,6 @@ describe('mergeAgenticCatalogGroups', () => {
   });
 
   it('picks the representative as one query would: newest, then fastest, then lowest id', () => {
-    const representative = (a: Partial<AgenticCatalogGroup>, b: Partial<AgenticCatalogGroup>) =>
-      mergeAgenticCatalogGroups([[group({ id: 1, ...a })], [group({ id: 2, ...b })]])[0]!.id;
-
     expect(representative({ latestDate: '2026-10-01' }, { latestDate: '2026-10-02' })).toBe(2);
     expect(representative({ tputPerGpu: 90 }, { tputPerGpu: 110 })).toBe(2);
     expect(representative({ tputPerGpu: null }, { tputPerGpu: 1 })).toBe(2);

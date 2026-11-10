@@ -1,5 +1,5 @@
-import { getDb, type DbClient } from '../connection.js';
-import { DOWNSTREAM_ID_START, isPublicRowId, RESERVED_ID_TABLES } from './downstream-ids.js';
+import { getDb, type DbClient } from '../connection';
+import { DOWNSTREAM_ID_START, isPublicRowId, RESERVED_ID_TABLES } from './downstream-ids';
 
 let ownIdsReserved: Promise<void> | undefined;
 

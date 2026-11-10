@@ -1,5 +1,5 @@
 import type { Sql } from '../etl/db-utils.js';
-import { DOWNSTREAM_ID_START, RESERVED_ID_TABLES } from './downstream-ids.js';
+import { DOWNSTREAM_ID_START, RESERVED_ID_TABLES } from './downstream-ids';
 
 export function reserveDownstreamIds(sql: Sql): Promise<string[]> {
   return sql.begin(async (tx) => {

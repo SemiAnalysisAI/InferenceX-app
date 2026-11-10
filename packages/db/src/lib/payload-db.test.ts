@@ -18,7 +18,7 @@ const { clients, own } = vi.hoisted(() => {
   return { clients: { own: client(true), public: client(false) }, own: state };
 });
 
-vi.mock('../connection.js', () => ({
+vi.mock('../connection', () => ({
   getDb: (overrides?: { url?: string }) => (overrides?.url ? clients.public : clients.own),
 }));
 

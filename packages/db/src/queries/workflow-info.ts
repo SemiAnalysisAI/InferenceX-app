@@ -1,6 +1,6 @@
 import type { DbClient } from '../connection.js';
-import { mergeDistinctRows } from '../lib/distinct-by.js';
-import { mergeWorkflowRuns } from './across-dbs.js';
+import { mergeDistinctRows } from '../lib/distinct-by';
+import { mergeWorkflowRuns } from './across-dbs';
 
 export interface WorkflowRunRow {
   github_run_id: number;
