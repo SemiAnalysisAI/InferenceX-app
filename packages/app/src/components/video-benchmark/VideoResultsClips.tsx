@@ -9,20 +9,29 @@ import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { useClientSearch } from '@/hooks/useClientSearch';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { cn } from '@/lib/shared/utils';
 import {
+  pairedGroup,
   parseStage,
   promptKey,
   STAGE_VIEWS,
+  stageOptions,
+  stagePointKey,
   stagePrompt,
   stageSubject,
   writeStage,
+  type StageOption,
+  type StagePair,
 } from './clip-stage';
 import { hardwareLabel } from './hardware';
 import type { VideoPoint } from './metrics';
+import { isLossy, lossyLabel, optimizationsOf } from './optimizations';
 import {
   publishedResultsSide,
+  resultsClipGroups,
   resultsClipReference,
+  type ResultsClip,
   type ResultsClipGroup,
   type ResultsClipSide,
 } from './results-clips';
@@ -111,6 +120,10 @@ const STRINGS = {
       'PSNR uses a sealed Diffusers reference pair and every decoded RGB frame. J/clip is the selected cell mean. Both TCO bases use the selected tier, recorded GPU count and valid decoded output duration.',
     gpu: (n: number) => `${n} GPU`,
     seconds: 's',
+    compareWith: 'Compare with',
+    lossless: 'lossless',
+    twin: (hardware: string) => `${hardware} lossless`,
+    noTwin: 'This run has no lossless config with the same engine and server layout.',
   },
   zh: {
     label: '视频对比',
@@ -185,18 +198,31 @@ const STRINGS = {
       'PSNR 使用已封存的 Diffusers 参考配对，比较全部解码 RGB 帧。J/clip 是所选测量单元的平均值。两种 TCO 口径均使用所选成本档位、记录的 GPU 数量和有效输出的实际时长。',
     gpu: (n: number) => `${n} 张 GPU`,
     seconds: 's',
+    compareWith: '对比',
+    lossless: '无损',
+    twin: (hardware: string) => `${hardware} 无损对照`,
+    noTwin: '该运行中没有引擎和服务器布局都相同的无损配置。',
   },
 };
 
 type Strings = (typeof STRINGS)['en'] | (typeof STRINGS)['zh'];
 type Costs = Record<string, { participating: number | null; allocated: number | null }>;
 export interface VideoResultsClipsProps {
-  /** One lead point per hardware; the stage shows one of them against its reference. */
+  /** One lead point per hardware: the default subject, and what the other side can show. */
   points: VideoPoint[];
+  /** Points the chart draws; `r_clip` plays one of them. */
+  drawn?: readonly VideoPoint[];
+  /** Every deployment of the workload, where a lossy subject finds its lossless twin. */
+  deployments?: readonly VideoPoint[];
+  /** One official lead per hardware, which a subject from `unofficialRun` is compared with. */
+  officialLeads?: readonly VideoPoint[];
+  /** Hardware color; a side from `unofficialRun` takes the overlay color. */
   colorFor: (key: string) => string;
   costs?: Costs;
   unofficialRun?: string;
   initialSides?: VideoInitialData['sides'];
+  /** The chart points the two sides play, for the chart's Playing and Baseline badges. */
+  onPairChange?: (pair: StagePair) => void;
 }
 
 const display = (value: number | null | undefined, digits = 1) =>
@@ -204,12 +230,21 @@ const display = (value: number | null | undefined, digits = 1) =>
     ? value.toLocaleString('en-US', { maximumFractionDigits: digits })
     : '—';
 
+const NO_POINTS: readonly VideoPoint[] = [];
+
+/** "FirstBlockCache + Sol-Attn" for a lossy side, so it never reads as its lossless twin. */
+const lossyVariant = (p: VideoPoint) => (isLossy(p) ? (lossyLabel(optimizationsOf(p)) ?? '') : '');
+
 export default function VideoResultsClips({
   points,
+  drawn = NO_POINTS,
+  deployments = NO_POINTS,
+  officialLeads = NO_POINTS,
   colorFor,
   costs,
   unofficialRun,
   initialSides = {},
+  onPairChange,
 }: VideoResultsClipsProps) {
   const s = STRINGS[useLocale()];
   const stage = parseStage(useClientSearch());
@@ -218,14 +253,51 @@ export default function VideoResultsClips({
     () => points.filter((p) => RESULTS_HARDWARE.some((key) => p.hardwareKey === key)),
     [points],
   );
+  const picked = stage.clip ? drawn.find((p) => stagePointKey(p) === stage.clip) : undefined;
+  /** `StageOption.value` the reader picked; one the subject lacks shows the reference. */
+  const [against, setAgainst] = useState('reference');
   const cache = useRef(new Map<string, ResultsClipSide | null>(Object.entries(initialSides)));
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const [retry, setRetry] = useState(0);
+  /** Undefined while its read is in flight; null when there is none. */
+  const sideOf = (point: VideoPoint) => {
+    const key = sourceKey(point);
+    return cache.current.has(key) ? (cache.current.get(key) ?? null) : failed ? null : undefined;
+  };
+  const subject = useMemo(
+    () =>
+      stageSubject(
+        [...selected, ...(picked && !selected.includes(picked) ? [picked] : [])].map((point) => ({
+          point,
+          side: sideOf(point),
+        })),
+        unofficialRun,
+        stage.clip,
+      ),
+    [selected, picked, revision, failed, unofficialRun, stage.clip],
+  );
+  const options = useMemo(() => {
+    if (!subject) return [];
+    // A candidate run is read against production: the official lead on its own GPU.
+    const own =
+      subject.point.runId === unofficialRun
+        ? (officialLeads.find((p) => p.hardwareKey === subject.point.hardwareKey) ?? null)
+        : null;
+    return stageOptions(subject.point, selected, deployments, own);
+  }, [subject, selected, deployments, officialLeads, unofficialRun]);
+  const option = options.find((item) => item.value === against) ?? options[0];
+  const other = option?.point ?? null;
+  const wantedPoints = [
+    ...new Set([...selected, ...(picked ? [picked] : []), ...(other ? [other] : [])]),
+  ];
+  // Callers rebuild `points` on every render; reads restart only when the set of sides changes.
+  const wantedKey = wantedPoints.map(sourceKey).join('\n');
+  const wanted = useMemo(() => wantedPoints, [wantedKey]);
   useEffect(() => {
     const controller = new AbortController();
-    const missing = selected.filter((point) => !cache.current.has(sourceKey(point)));
+    const missing = wanted.filter((point) => !cache.current.has(sourceKey(point)));
     setLoading(missing.length > 0);
     setFailed(false);
     void Promise.allSettled(
@@ -256,25 +328,10 @@ export default function VideoResultsClips({
       setLoading(false);
     });
     return () => controller.abort();
-  }, [selected, retry, unofficialRun]);
-  const subject = useMemo(
-    () =>
-      stageSubject(
-        selected.map((point) => {
-          const key = sourceKey(point);
-          return {
-            point,
-            side: cache.current.has(key)
-              ? (cache.current.get(key) ?? null)
-              : failed
-                ? null
-                : undefined,
-          };
-        }),
-        unofficialRun,
-      ),
-    [selected, revision, failed, unofficialRun],
-  );
+  }, [wanted, retry, unofficialRun]);
+  const playing = subject ? stagePointKey(subject.point) : null;
+  const baseline = other ? stagePointKey(other) : null;
+  useEffect(() => onPairChange?.({ playing, baseline }), [playing, baseline, onPairChange]);
   /** Web renditions that failed to load; their sides play the sealed original instead. */
   const [failedPreviews, setFailedPreviews] = useState<ReadonlySet<string>>(new Set());
   const groups = subject?.groups ?? [];
@@ -285,34 +342,75 @@ export default function VideoResultsClips({
   const point = subject?.point;
   const hardware = point?.hardwareKey ?? '';
   const native = clip?.quality && 'scope' in clip.quality ? clip.quality.candidate : null;
+  const otherSide = other ? sideOf(other) : null;
+  // The other side plays its clip of the subject's prompt, seed and take.
+  const otherClip = useMemo(() => {
+    const match = otherSide && pairedGroup(resultsClipGroups([otherSide]), group);
+    return match ? (match.clips.get(otherSide.hardwareKey) ?? null) : null;
+  }, [otherSide, group]);
+  const otherNative =
+    otherClip?.quality && 'scope' in otherClip.quality ? otherClip.quality.candidate : null;
   const preview = (url: string | undefined) => (url && !failedPreviews.has(url) ? url : undefined);
-  const a: StageClip | null = point
-    ? {
-        source: point.id,
-        id: hardware,
-        label: hardwareLabel(hardware),
-        meta: native
-          ? s.gpu(native.gpu_count)
-          : typeof point.participating === 'number'
-            ? s.gpu(point.participating)
-            : '',
-        color: colorFor(hardware),
-        url: clip?.url ?? '',
-        previewUrl: preview(clip?.previewUrl),
-        empty: clip ? s.unpublishedMedia : subject.pending ? s.loading : s.missing,
-        unofficial: !diagnostic && unofficialRun !== undefined && point.runId === unofficialRun,
-      }
-    : null;
-  const b: StageClip = {
-    source: 'reference',
-    id: 'reference',
-    label: s.referenceShort,
-    meta: '',
-    color: null,
-    url: reference?.url ?? '',
-    previewUrl: preview(reference?.previewUrl),
-    empty: subject?.pending ? s.loading : s.noReference,
+  const colorOf = (p: VideoPoint) =>
+    p.runId === unofficialRun ? overlayRunColor(0) : colorFor(p.hardwareKey ?? '');
+  /** A chart point's side: its clip of the shown prompt, or why it has none. */
+  const pointSide = (
+    p: VideoPoint,
+    found: ResultsClip | null,
+    pending: boolean,
+    variant: string,
+  ): StageClip => {
+    const rerun = found?.quality && 'scope' in found.quality ? found.quality.candidate : null;
+    const gpus = rerun?.gpu_count ?? p.participating;
+    return {
+      source: stagePointKey(p),
+      id: p.hardwareKey ?? '',
+      label: hardwareLabel(p.hardwareKey ?? ''),
+      meta: [typeof gpus === 'number' ? s.gpu(gpus) : '', variant].filter(Boolean).join(' · '),
+      color: colorOf(p),
+      url: found?.url ?? '',
+      previewUrl: preview(found?.previewUrl),
+      empty: found ? s.unpublishedMedia : pending ? s.loading : s.missing,
+      unofficial: !diagnostic && unofficialRun !== undefined && p.runId === unofficialRun,
+    };
   };
+  const a: StageClip | null = point
+    ? pointSide(point, clip, subject.pending, lossyVariant(point))
+    : null;
+  const b: StageClip =
+    !option || option.kind === 'reference'
+      ? {
+          source: 'reference',
+          id: 'reference',
+          label: s.referenceShort,
+          meta: '',
+          color: null,
+          url: reference?.url ?? '',
+          previewUrl: preview(reference?.previewUrl),
+          empty: subject?.pending ? s.loading : s.noReference,
+        }
+      : other
+        ? pointSide(
+            other,
+            otherClip,
+            otherSide === undefined,
+            option.kind === 'twin' ? s.lossless : lossyVariant(other),
+          )
+        : {
+            source: 'twin',
+            id: hardware,
+            label: s.twin(hardwareLabel(hardware)),
+            meta: '',
+            color: a?.color ?? null,
+            url: '',
+            empty: s.noTwin,
+          };
+  const optionLabel = (item: StageOption) =>
+    item.kind === 'reference'
+      ? s.referenceShort
+      : item.kind === 'twin'
+        ? s.twin(hardwareLabel(hardware))
+        : hardwareLabel(item.value);
   return (
     <section
       id="comparison-clips"
@@ -407,11 +505,47 @@ export default function VideoResultsClips({
               }}
             />
           </div>
+          {options.length > 1 && option && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <span className="text-xs font-medium">{s.compareWith}</span>
+              <SegmentedToggle
+                role="group"
+                ariaLabel={s.compareWith}
+                testId="video-results-compare"
+                value={option.value}
+                size="sm"
+                options={options.map((item) => ({
+                  value: item.value,
+                  label: optionLabel(item),
+                  icon: (
+                    <span
+                      aria-hidden="true"
+                      className="size-2 shrink-0 rounded-full"
+                      style={
+                        item.kind === 'reference'
+                          ? { border: '1.5px solid currentColor' }
+                          : { background: item.point ? colorOf(item.point) : (a.color ?? '') }
+                      }
+                    />
+                  ),
+                  testId: `video-results-compare-${item.value}`,
+                }))}
+                onValueChange={(value) => {
+                  const next = options.find((item) => item.value === value);
+                  track('video_results_compare_selected', {
+                    against: next?.kind,
+                    gpu: next?.point?.hardwareKey ?? null,
+                  });
+                  setAgainst(value);
+                }}
+              />
+            </div>
+          )}
           <VideoClipStage
             a={a}
             b={b}
             view={stage.view}
-            selection={JSON.stringify([point.id, group?.key ?? null])}
+            selection={JSON.stringify([a.source, b.source, group?.key ?? null])}
             prompt={group?.prompt}
             onPreviewError={(url) => setFailedPreviews((previous) => new Set([...previous, url]))}
           />
@@ -516,35 +650,25 @@ export default function VideoResultsClips({
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="border-t align-top">
-                    <td className="pr-3 whitespace-nowrap">{a.label}</td>
-                    <td className="pr-3 break-all">
-                      {native?.run_id ?? (diagnostic ? '—' : point.runId)}
-                    </td>
-                    <td className="pr-3 break-all" title={native?.receipt_sha256}>
-                      {native
-                        ? native.receipt_sha256.slice(0, 12)
-                        : diagnostic
-                          ? '—'
-                          : point.artifactId}
-                    </td>
-                    <td className="pr-3 break-all">
-                      {native
-                        ? `${native.runtime_name} ${native.runtime_revision.slice(0, 12)}`
-                        : (!diagnostic && point.runtime) || '—'}
-                    </td>
-                    <td className="pr-3 whitespace-nowrap">
-                      {diagnostic ? '—' : point.approved === true ? s.approved : s.unapproved}
-                    </td>
-                    <td className="whitespace-nowrap">
-                      <MediaLink
-                        url={clip?.url}
-                        label={s.media}
-                        onOpen={() => track('video_results_media_source_opened', { gpu: hardware })}
-                      />
-                    </td>
-                  </tr>
-                  {reference && (
+                  <SourceRow
+                    label={a.label}
+                    point={point}
+                    native={native}
+                    diagnostic={diagnostic}
+                    url={clip?.url}
+                    s={s}
+                  />
+                  {other && (
+                    <SourceRow
+                      label={b.label}
+                      point={other}
+                      native={otherNative}
+                      diagnostic={diagnostic}
+                      url={otherClip?.url}
+                      s={s}
+                    />
+                  )}
+                  {reference && b.source === 'reference' && (
                     <tr className="border-t align-top">
                       <td className="pr-3 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1">
@@ -581,6 +705,51 @@ export default function VideoResultsClips({
         !loading && <p className="text-sm text-muted-foreground">{s.noPair}</p>
       )}
     </section>
+  );
+}
+
+type RerunCandidate = Extract<ResultsClip['quality'], { scope: unknown }>['candidate'];
+
+/** Run, artifact, runtime, approval and media link of one side's chart point. */
+function SourceRow({
+  label,
+  point,
+  native,
+  diagnostic,
+  url,
+  s,
+}: {
+  label: string;
+  point: VideoPoint;
+  /** The matched-noise rerun's own run, receipt and runtime, which replace the point's. */
+  native: RerunCandidate | null;
+  diagnostic: boolean;
+  url?: string;
+  s: Strings;
+}) {
+  return (
+    <tr className="border-t align-top">
+      <td className="pr-3 whitespace-nowrap">{label}</td>
+      <td className="pr-3 break-all">{native?.run_id ?? (diagnostic ? '—' : point.runId)}</td>
+      <td className="pr-3 break-all" title={native?.receipt_sha256}>
+        {native ? native.receipt_sha256.slice(0, 12) : diagnostic ? '—' : point.artifactId}
+      </td>
+      <td className="pr-3 break-all">
+        {native
+          ? `${native.runtime_name} ${native.runtime_revision.slice(0, 12)}`
+          : (!diagnostic && point.runtime) || '—'}
+      </td>
+      <td className="pr-3 whitespace-nowrap">
+        {diagnostic ? '—' : point.approved === true ? s.approved : s.unapproved}
+      </td>
+      <td className="whitespace-nowrap">
+        <MediaLink
+          url={url}
+          label={s.media}
+          onOpen={() => track('video_results_media_source_opened', { gpu: point.hardwareKey })}
+        />
+      </td>
+    </tr>
   );
 }
 

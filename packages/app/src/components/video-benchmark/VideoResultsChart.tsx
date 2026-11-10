@@ -1,19 +1,27 @@
 'use client';
 
-import { curveLinear, type ScaleContinuousNumeric } from 'd3';
-import { useMemo, type ReactNode } from 'react';
+import { curveLinear, select, type ScaleContinuousNumeric } from 'd3';
+import { useCallback, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import ChartLegend, { type CommonLegendItemProps } from '@/components/ui/chart-legend';
 import { ChartPointDetails } from '@/components/ui/chart-point-details';
 import { EmptyState } from '@/components/ui/empty-state';
-import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import type { LayerConfig, TooltipConfig } from '@/lib/d3-chart/D3Chart/types';
+import { D3Chart, type D3ChartHandle } from '@/lib/d3-chart/D3Chart';
+import type {
+  LayerConfig,
+  RenderContext,
+  ScaleConfig,
+  TooltipConfig,
+} from '@/lib/d3-chart/D3Chart/types';
+import { readableTextColor } from '@/lib/d3-chart/contrast-colors';
 import { axisLabelUnit, chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { ShapeKey } from '@/lib/charts/chart-rendering';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { logDomain, zeroAnchoredDomain } from './chart-domain';
+import { mayHaveClips } from './clip-stage';
 import { serverSplit } from './deployment';
 import { engineLabel, engineShape, engineSort } from './engines';
 import { isLossy, runtimeLabel } from './optimizations';
@@ -26,11 +34,9 @@ import {
   RESULTS_Y_METRICS,
   comparesEngines,
   plottedXMetric,
-  resultsChartSeries,
   resultsClip,
-  resultsHistorySeries,
   resultsMetricLabel,
-  resultsSelection,
+  resultsPlotSeries,
   type ResultsChartPoint,
 } from './results-chart';
 import { resultsNumber as n } from './VideoResultsCharts';
@@ -74,8 +80,15 @@ const STRINGS = {
     engineNotRecorded: 'Engine not recorded',
     lossy: 'Lossy optimizations',
     lossyHelp:
-      'Adds dashed lines for runs that skip or approximate computation, such as cross-step caching or sparse attention. They never compete for a GPU’s default line. Quality scores against the same engine’s lossless output are not published yet.',
+      'Adds dashed lines for runs that skip or approximate computation, such as cross-step caching or sparse attention. They never compete for a GPU’s default line, and each brings the lossless line of the same run, engine and layout to compare with. Quality scores against the same engine’s lossless output are not published yet.',
     lossySeries: 'Lossy optimization lines',
+    playing: 'Playing',
+    baseline: 'Baseline',
+    tipPlaying: 'Playing below',
+    tipBaseline: 'Baseline below',
+    tipClick: 'Click to compare below',
+    tipHollow: 'Only filled points have clips',
+    compareBelow: 'Compare below ↓',
   },
   zh: {
     gpus: (count: number | null) => (count === null ? '未记录 GPU 数量' : `${count} 张 GPU`),
@@ -111,8 +124,15 @@ const STRINGS = {
     engineNotRecorded: '未记录引擎',
     lossy: '有损优化',
     lossyHelp:
-      '以虚线加入跳过或近似部分计算的运行，例如跨步 cache 或稀疏注意力。它们不参与每张 GPU 默认线的评选。与同一引擎无损输出对比的质量分尚未发布。',
+      '以虚线加入跳过或近似部分计算的运行，例如跨步 cache 或稀疏注意力。它们不参与每张 GPU 默认线的评选，并会带上同一运行、引擎和布局下的无损对照线。与同一引擎无损输出对比的质量分尚未发布。',
     lossySeries: '有损优化线',
+    playing: '播放中',
+    baseline: '基线',
+    tipPlaying: '正在下方播放',
+    tipBaseline: '在下方作为基线播放',
+    tipClick: '点击即可在下方对比',
+    tipHollow: '只有实心点有视频',
+    compareBelow: '在下方对比 ↓',
   },
 };
 
@@ -123,9 +143,105 @@ interface PlotPoint extends ResultsChartPoint {
   engine: string | null;
   overlay: boolean;
   color: string;
+  /** A click loads it on the clip stage; without clips it draws hollow. */
+  clips: boolean;
+}
+
+type Strings = (typeof STRINGS)['en'] | (typeof STRINGS)['zh'];
+
+/** The chart side of the clip stage: the points its two sides play, and a click that loads one. */
+export interface ClipLink {
+  playing: string | null;
+  baseline: string | null;
+  onSelect: (pointKey: string) => void;
+  /** Brings the stage into view. */
+  onReveal: () => void;
 }
 
 const LOSSY_DASH = '6 4';
+const BADGES = 'clip-badges';
+
+/** Points without clips draw hollow; that depends on the data only, so it follows each plot render. */
+function drawHollow(root: Element) {
+  select(root)
+    .selectAll<SVGGElement, PlotPoint>('.dot-group')
+    .each(function (point) {
+      const shape = this.querySelector<SVGElement>('.visible-shape');
+      if (!shape) return;
+      shape.style.fill = point.clips ? '' : 'var(--card)';
+      shape.style.stroke = point.clips ? '' : point.color;
+      shape.style.strokeWidth = point.clips ? '' : '1.5px';
+    });
+}
+
+/**
+ * Rings and labels the two points the stage plays, in one group after every point so no point or
+ * label covers them. Each badge copies its point's transform, so it runs after every plot render,
+ * zoom frame and pick, never reordering the points themselves.
+ */
+function drawBadges(root: Element, link: ClipLink, s: Strings) {
+  root.querySelector(`.${BADGES}`)?.remove();
+  const points = [...root.querySelectorAll<SVGGElement>('.dot-group')];
+  const host = points[0]?.parentNode;
+  if (!host) return;
+  const layer = select(host as SVGGElement)
+    .append('g')
+    .attr('class', BADGES)
+    .attr('pointer-events', 'none');
+  for (const node of points) {
+    const point = select<SVGGElement, PlotPoint>(node).datum();
+    const role =
+      point.key === link.playing ? 'playing' : point.key === link.baseline ? 'baseline' : null;
+    node.toggleAttribute('data-clip-role', role !== null);
+    if (role) node.dataset.clipRole = role;
+    // The pill covers the point's own label.
+    const ownLabel = node.querySelector<SVGElement>('.point-label');
+    if (ownLabel) ownLabel.style.display = role ? 'none' : '';
+    if (!role) continue;
+    const playing = role === 'playing';
+    const badge = layer
+      .append('g')
+      .attr('data-clip-badge', role)
+      .attr('data-point', point.key)
+      .attr('transform', node.getAttribute('transform'));
+    badge
+      .append('circle')
+      .attr('r', 8)
+      .attr('fill', 'none')
+      .attr('stroke', point.color)
+      .attr('stroke-width', 1.5)
+      .attr('stroke-dasharray', playing ? null : '3 2');
+    const text = badge
+      .append('text')
+      .attr('y', -20)
+      .attr('dominant-baseline', 'central')
+      .attr('font-size', px(CHART_TYPE.annotationSub))
+      .attr('font-weight', 600)
+      .attr('fill', playing ? readableTextColor(point.color) : 'var(--foreground)')
+      .text(playing ? s.playing : s.baseline);
+    const label = text.node()!;
+    const textWidth =
+      label.getComputedTextLength() || [...label.textContent!].length * CHART_TYPE.annotationSub;
+    const icon = playing ? 8 : 0;
+    const width = textWidth + icon + 12;
+    text.attr('x', -width / 2 + 6 + icon);
+    badge
+      .insert('rect', 'text')
+      .attr('x', -width / 2)
+      .attr('y', -28)
+      .attr('width', width)
+      .attr('height', 16)
+      .attr('rx', 8)
+      .attr('fill', playing ? point.color : 'var(--card)')
+      .attr('stroke', playing ? 'none' : point.color)
+      .attr('stroke-width', 1);
+    if (playing)
+      badge
+        .append('path')
+        .attr('d', `M${-width / 2 + 6} -23 l5 3 l-5 3 z`)
+        .attr('fill', readableTextColor(point.color));
+  }
+}
 
 const SWATCH_SHAPES: Record<ShapeKey, ReactNode> = {
   circle: <circle cx="12" cy="6" r="3.5" />,
@@ -169,6 +285,7 @@ export default function VideoResultsChart({
   onLegendExpandedChange,
   onUpdate,
   onOpen,
+  clipLink,
   heading,
   footer,
 }: {
@@ -185,6 +302,7 @@ export default function VideoResultsChart({
   onLegendExpandedChange: (expanded: boolean) => void;
   onUpdate: (patch: Partial<ResultsState>) => void;
   onOpen: (pointKey: string, source: 'popover') => void;
+  clipLink?: ClipLink;
   /** Chart title; it sits in the chart caption so image exports carry it. */
   heading?: ReactNode;
   /** Result context under the chart. */
@@ -199,16 +317,12 @@ export default function VideoResultsChart({
   const clip = useMemo(() => resultsClip(history ?? cells), [history, cells]);
   const xLabel = resultsMetricLabel(x, locale, clip),
     yLabel = resultsMetricLabel(y, locale);
+  const chart = useRef<D3ChartHandle>(null);
+  // Kept out of `layers` and `tooltip`: a new one rebuilds the plot, which closes a pinned panel.
+  const link = useRef(clipLink);
+  link.current = clipLink;
   // Hidden hardware is dropped after ranking, so its legend entry still names its engine.
-  const ranked = useMemo(
-    () =>
-      (history ? resultsHistorySeries : resultsChartSeries)(history ?? cells, {
-        ...resultsSelection(state),
-        x: xKey,
-        hidden: [],
-      }),
-    [history, cells, state, xKey],
-  );
+  const ranked = useMemo(() => resultsPlotSeries(cells, history, state), [cells, history, state]);
   const series = useMemo(
     () => ranked.filter((item) => !state.hidden.includes(item.hardwareKey)),
     [ranked, state.hidden],
@@ -225,6 +339,7 @@ export default function VideoResultsChart({
           engine: item.engine,
           overlay: item.overlay,
           color: item.overlay ? overlayRunColor(0) : colorFor(item.hardwareKey),
+          clips: mayHaveClips(point.cell.point),
         })),
       ),
     [series, colorFor],
@@ -234,7 +349,7 @@ export default function VideoResultsChart({
       Object.fromEntries(
         series
           .filter((item) => item.frontier.length > 1)
-          .map((item) => [item.key, item.frontier.map(({ x: px, y: py }) => ({ x: px, y: py }))]),
+          .map((item) => [item.key, item.frontier.map((point) => ({ x: point.x, y: point.y }))]),
       ),
     [series],
   );
@@ -284,11 +399,38 @@ export default function VideoResultsChart({
             overlay: (point) => String(point.overlay),
             point: (point) => point.key,
             optimal: (point) => String(point.optimal),
+            clips: (point) => String(point.clips),
           },
+        },
+      },
+      {
+        type: 'custom',
+        key: 'video-results-clip-marks',
+        render: (group) => {
+          const root = group.node();
+          if (root && link.current) drawHollow(root);
+        },
+        onZoom: (group) => {
+          const root = group.node();
+          if (root && link.current) drawBadges(root, link.current, s);
         },
       },
     ],
     [lines, lineColors, lineDashes, plotted, labels, s, history, byEngine, labelsRepeatX],
+  );
+  const playing = clipLink?.playing ?? null,
+    baseline = clipLink?.baseline ?? null;
+  useLayoutEffect(() => {
+    const svg = chart.current?.getSvgElement();
+    if (svg && link.current) drawBadges(svg, link.current, s);
+  }, [playing, baseline, s]);
+  // Runs after the plot raises its points, so the badges stay in front; also on image export.
+  const onRender = useCallback(
+    ({ layout }: RenderContext) => {
+      const root = layout.zoomGroup.node();
+      if (root && link.current) drawBadges(root, link.current, s);
+    },
+    [s],
   );
   const tooltip = useMemo<TooltipConfig<PlotPoint>>(() => {
     const latencies = RESULTS_X_METRIC_KEYS.filter(
@@ -315,6 +457,16 @@ export default function VideoResultsChart({
       content: (plot) => {
         const { point } = plot.cell;
         const d = describe(plot);
+        const pair = link.current;
+        const hint =
+          pair &&
+          (plot.key === pair.playing
+            ? s.tipPlaying
+            : plot.key === pair.baseline
+              ? s.tipBaseline
+              : plot.clips
+                ? s.tipClick
+                : s.tipHollow);
         return chartHoverCard({
           title: d.title,
           subtitle: [d.subtitle, history ? d.date : null].filter(Boolean).join(' · ') || undefined,
@@ -337,6 +489,9 @@ export default function VideoResultsChart({
           ]
             .filter(Boolean)
             .join(' · '),
+          body: hint
+            ? `<div data-clip-hint style="font-size: ${px(CHART_TYPE.annotationSub)}; color: var(--muted-foreground);">${hint}</div>`
+            : undefined,
         });
       },
       details: (plot, _isOverlay, close) => {
@@ -425,29 +580,58 @@ export default function VideoResultsChart({
             onClose={close}
             onAction={(_action, event) => event.stopPropagation()}
           >
-            <Button
-              type="button"
-              variant="outline"
-              size="xs"
-              data-action="view-telemetry"
-              className="mt-3 w-full"
-              onClick={(event) => {
-                event.stopPropagation();
-                close();
-                onOpen(plot.key, 'popover');
-              }}
-            >
-              {s.viewTelemetry} →
-            </Button>
+            <div className="mt-3 flex flex-col gap-2">
+              {link.current && plot.clips && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  data-action="compare-below"
+                  className="w-full"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    track('video_results_compare_revealed', { gpu: point.hardwareKey });
+                    link.current?.onReveal();
+                  }}
+                >
+                  {s.compareBelow}
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                data-action="view-telemetry"
+                className="w-full"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  close();
+                  onOpen(plot.key, 'popover');
+                }}
+              >
+                {s.viewTelemetry} →
+              </Button>
+            </div>
           </ChartPointDetails>
         );
       },
       onPointClick: (point) => {
+        const pair = link.current;
         track('video_results_point_pinned', {
           gpu: point.hardwareKey,
           overlay: point.overlay,
           optimal: point.optimal,
+          playable: point.clips,
         });
+        if (!pair || !point.clips) return;
+        track('video_results_clip_selected', {
+          source: 'chart',
+          gpu: point.hardwareKey,
+          overlay: point.overlay,
+          lossy: isLossy(point.cell.point),
+          engine: point.engine,
+        });
+        pair.onSelect(point.key);
       },
     };
   }, [locale, s, state, x, xKey, y, xLabel, yLabel, clip, history, onOpen]);
@@ -499,6 +683,39 @@ export default function VideoResultsChart({
             onClick: () => {},
           },
     );
+  // New scale objects rebuild the plot, which closes a pinned panel, so they change only with the data.
+  const xScale = useMemo<ScaleConfig>(
+    () =>
+      x.scale === 'log'
+        ? {
+            type: 'log',
+            domain: logDomain(
+              plotted.map((point) => point.x),
+              1.25,
+            ),
+            nice: false,
+          }
+        : {
+            type: 'linear',
+            domain: zeroAnchoredDomain(
+              plotted.map((point) => point.x),
+              1.12,
+            ),
+            nice: true,
+          },
+    [x.scale, plotted],
+  );
+  const yScale = useMemo<ScaleConfig>(
+    () => ({
+      type: 'linear',
+      domain: zeroAnchoredDomain(
+        plotted.map((point) => point.y),
+        1.15,
+      ),
+      nice: true,
+    }),
+    [plotted],
+  );
   const single = !history && series.length > 0 && series.every((item) => item.measured <= 1);
   const engines = byEngine
     ? [...new Set(series.map((item) => item.engine))].toSorted(
@@ -508,6 +725,7 @@ export default function VideoResultsChart({
 
   return (
     <D3Chart<PlotPoint>
+      ref={chart}
       chartId={VIDEO_RESULTS_CHART_ID}
       testId="video-results-chart"
       data={plotted}
@@ -517,33 +735,8 @@ export default function VideoResultsChart({
       margin={{ top: 24, right: 28, bottom: 64, left: 72 }}
       watermark="logo"
       transitionDuration={0}
-      xScale={
-        x.scale === 'log'
-          ? {
-              type: 'log',
-              domain: logDomain(
-                plotted.map((point) => point.x),
-                1.25,
-              ),
-              nice: false,
-            }
-          : {
-              type: 'linear',
-              domain: zeroAnchoredDomain(
-                plotted.map((point) => point.x),
-                1.12,
-              ),
-              nice: true,
-            }
-      }
-      yScale={{
-        type: 'linear',
-        domain: zeroAnchoredDomain(
-          plotted.map((point) => point.y),
-          1.15,
-        ),
-        nice: true,
-      }}
+      xScale={xScale}
+      yScale={yScale}
       xAxis={
         x.scale === 'log'
           ? {
@@ -561,6 +754,8 @@ export default function VideoResultsChart({
       yAxis={{ label: yLabel, tickCount: 6 }}
       layers={layers}
       tooltip={tooltip}
+      onRender={onRender}
+      onExportRender={onRender}
       zoom={{
         enabled: true,
         axes: 'both',

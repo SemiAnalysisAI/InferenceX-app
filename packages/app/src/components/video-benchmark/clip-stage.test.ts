@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { parseStage, promptKey, stagePrompt, stageSearch, stageSubject } from './clip-stage';
+import {
+  pairedGroup,
+  parseStage,
+  promptKey,
+  stagePrompt,
+  stageSearch,
+  stageSubject,
+} from './clip-stage';
 import type { CaseRecord } from './compare';
+import type { DiagnosticPair } from './diagnostic-quality';
 import type { VideoPoint } from './metrics';
 import { resultsClipGroups, type ResultsClipSide } from './results-clips';
 
@@ -34,11 +42,21 @@ const point = (hardwareKey: string, runId = 'official') =>
 describe('clip stage', () => {
   it('rewrites only its own URL keys and reads an unknown view as Wipe', () => {
     const search = stageSearch(
-      { prompt: 'crane', view: 'wipe' },
-      '?r_y=videosPerGpuHour&r_view=side',
+      { prompt: 'crane', view: 'wipe', clip: null },
+      '?r_y=videosPerGpuHour&r_view=side&r_clip=1:old',
     );
     expect(Object.fromEntries(search)).toEqual({ r_y: 'videosPerGpuHour', r_prompt: 'crane' });
-    expect(parseStage('?r_view=zoom&r_prompt=')).toEqual({ prompt: null, view: 'wipe' });
+    expect(parseStage('?r_view=zoom&r_prompt=')).toEqual({
+      prompt: null,
+      view: 'wipe',
+      clip: null,
+    });
+    const clip = stageSearch({ prompt: null, view: 'side', clip: '34341996789:abc:c1' }, '');
+    expect(parseStage(`?${clip}`)).toEqual({
+      prompt: null,
+      view: 'side',
+      clip: '34341996789:abc:c1',
+    });
   });
 
   it('leads with the named run, skips clipless hardware, and waits for a preferred side', () => {
@@ -51,6 +69,10 @@ describe('clip stage', () => {
     expect(stageSubject([unpublished, h200], 'named')?.point).toBe(unpublished.point);
     const namedH200 = { ...h200, point: point('h200', 'named') };
     expect(stageSubject([official, namedH200], 'named')?.point).toBe(namedH200.point);
+    // A clicked chart point outranks the named run.
+    expect(stageSubject([official, namedH200], 'named', 'official:b200')?.point).toBe(
+      official.point,
+    );
     expect(stageSubject([{ point: point('b200'), side: undefined }, h200])).toMatchObject({
       point: { hardwareKey: 'b200' },
       pending: true,
@@ -63,5 +85,27 @@ describe('clip stage', () => {
     expect(groups.map(promptKey)).toEqual(['crane', 'crane~2']);
     expect(stagePrompt(groups, 'crane~2')?.take).toBe(2);
     expect(stagePrompt(groups, 'gone')).toBe(groups[0]);
+  });
+
+  it('finds the other GPU’s clip of a matched-noise rerun, whose attachment differs per GPU', () => {
+    const rerun = (hardwareKey: string, attachmentSha256: string): ResultsClipSide => ({
+      ...side(hardwareKey, [record('crane')]),
+      diagnostics: [
+        {
+          attachmentSha256,
+          candidate: {
+            url: `/${hardwareKey}-rerun.mp4`,
+            case_id: 'crane',
+            prompt: 'crane prompt',
+            seed: 11,
+          },
+        } as unknown as DiagnosticPair,
+      ],
+    });
+    const [subject] = resultsClipGroups([rerun('b200', 'a'.repeat(64))]);
+    const other = resultsClipGroups([rerun('h200', 'b'.repeat(64))]);
+    expect(pairedGroup(other, subject)?.clips.get('h200')?.url).toBe('/h200-rerun.mp4');
+    const [ci] = resultsClipGroups([side('b200', [record('crane')])]);
+    expect(pairedGroup(other, ci)?.scope).toBeUndefined();
   });
 });

@@ -39,8 +39,8 @@ cohort separately rather than averaging across resolutions, durations or modes.
 `r_*` URL parameters record filters, hidden hardware, the X and Y metrics (`r_x`, `r_y`),
 Optimal only (`r_optimal`), the open deployment
 (`r_point`), deadline, cost tier, entered mode prices and utilization. The clip stage's
-`r_view` and `r_prompt` stay in the page URL and are not API parameters; the overview API
-rejects them as unknown.
+`r_view`, `r_prompt` and `r_clip` stay in the page URL and are not API parameters; the
+overview API rejects them as unknown.
 The retired `r_gpus` and `r_basis` parameters are accepted but ignored by the
 UI and overview API: all GPU counts and participating GPUs
 are fixed. New share/export URLs omit these keys. Both GPU cost bases
@@ -127,6 +127,10 @@ The page follows the inference and AgentX two-level layout. The overview has fiv
    an unknown key counts as lossy, and a lossy series never ranks. The legend's Lossy
    optimizations switch, shown when such series exist, adds them as dashed lines listed
    below the legend, such as "H100 (NVIDIA Sol Engine · Sol-Attn + FirstBlockCache)".
+   Each lossy line brings its lossless twin's line, even where another engine is Best:
+   `losslessTwin` (`deployment.ts`) pairs a lossy cell only with a lossless cell of the
+   same run, hardware, engine, GPU count and server layout, preferring the same
+   concurrency. A twin line is drawn as the comparison, so it never leads cards or clips.
    A change that first puts two engines on one GPU asks for the shared
    engine-comparison confirmation, and engine point shapes appear only then. Legend
    entries name each GPU's lossless engines, such as "H100 (SGLang)". Lossy deployments
@@ -141,7 +145,16 @@ The page follows the inference and AgentX two-level layout. The overview has fiv
    (`ChartPointDetails`): date, both axis values, concurrency, participating and
    allocated GPUs, valid clips, deployment, each latency not on the X axis, cost, energy, power,
    runtime and the GitHub Actions run link. Unofficial points carry the run marker in
-   both. Its View telemetry action opens the deployment detail. The representative
+   both. Its View telemetry action opens the deployment detail. The same click plays that
+   deployment's clips on the stage below (`r_clip`), and the panel's Compare below action
+   scrolls the stage into view with `scrollIntoView({ block: 'nearest' })`; the click alone
+   never scrolls the page. Only stored cells (`publishedAt` set) may have clips. Points of a
+   live named run draw hollow, and a click on one only pins its details; a stored cell
+   without clips still shows the stage's empty state. The points the stage's two sides play
+   carry Playing and Baseline badges. The badges and hollow points are a custom layer
+   that reads the selection from a ref and redraws through the `D3ChartHandle`; the
+   selection never reaches the plot's data, layers, tooltip or scale configs, because a new
+   one rebuilds the plot and closes the panel the click just pinned. The representative
    deployments table and its deadline input have been removed; the overview API
    retains representative cells and deadline calculations for data consumers.
 3. The clip comparison card described in Synchronized clips.
@@ -186,13 +199,20 @@ null when it fails. GPU-board energy excludes host, chassis and facility energy.
 source identity and matches prompt, seed, repetition and recorded generation
 configuration before showing clips together. Missing media does not erase numeric
 evidence. The clips play on a two-sided stage (`VideoClipStage`) under the chart: the
-subject on the left and its pair on the right. A visible point of the run named by
+subject on the left and its pair on the right. The chart point named by `r_clip` is the
+subject when the chart draws it. Otherwise a visible point of the run named by
 `?unofficialrun=` is the subject, with or without media. Otherwise the subject is the B200
 lead; when B200 is hidden or has no published clip, it is the first visible roster hardware
 with one. A preferred side that is still loading holds its place, so the stage does not
-jump when it arrives. The pair is the subject's sealed Diffusers reference. Pills name each side
-(hardware and GPU count, or the reference) and carry its speaker. Overlay subjects
-from `?unofficialrun=` use `overlayRunColor` and an Unofficial run tag.
+jump when it arrives. The Compare with row picks the pair: the subject's sealed Diffusers
+reference (default), each other visible hardware's lead, the official lead on the subject's
+own hardware when the subject is from `?unofficialrun=`, and, for a lossy subject, its
+lossless twin. The pair plays its own clip of the subject's prompt, seed and take; a
+missing twin says so in place of the clip. The choice is local state; a choice the next
+subject lacks shows the reference. Pills name each side (hardware and GPU count plus a
+lossy side's optimizations or "lossless", or the reference) and carry its speaker. Sides
+from `?unofficialrun=` use `overlayRunColor` and an Unofficial run tag. Prompt & sources
+lists the two sides shown.
 
 The stage has four views: Wipe (default), Side by side, Toggle and Difference. Wipe stacks
 the sides and clips the right one at a split that follows the pointer; a click, or the
@@ -203,12 +223,14 @@ Toggle, Space on the focused stage plays or pauses. Keys act only on the focused
 never on the document, and Space or Enter on a button inside it still activates that button. A
 text-tile prompt filmstrip (case id and seed; no posters exist) picks the prompt; the
 prompt text sits beside the view switcher. `clip-stage.ts` owns the stage's URL keys:
-`r_prompt` (case id, `~take` after the first take, `diag:` for the matched-noise rerun)
-and `r_view` (omitted for Wipe). Its writer replaces only those keys, and the dashboard's
-`commit` keeps them while it rewrites the results keys. They are page state only: the
-overview API request is built from the results keys and never carries them. An unknown
-prompt shows the first prompt and stays in the URL. Changing the prompt or the subject
-pauses and rewinds both sides; the view, the split lock and the audio source stay.
+`r_prompt` (case id, `~take` after the first take, `diag:` for the matched-noise rerun),
+`r_view` (omitted for Wipe) and `r_clip` (the subject's `resultsPointKey`). Its writer
+replaces only those keys, and the dashboard's `commit` keeps them while it rewrites the
+results keys. They are page state only: the overview API request is built from the results
+keys and never carries them. An unknown prompt shows the first prompt, and an unknown,
+hidden or undrawn `r_clip` plays the default subject; both stay in the URL. Changing the
+prompt, the subject or the pair pauses and rewinds both sides; the view, the split lock and
+the audio source stay.
 
 The shared transport drives real video elements through the pure state
 machine in `clip-sync.ts` (`paused`, `loading`, `buffering`, `playing`, `ended`).
@@ -376,6 +398,7 @@ official/unofficial source membership remain unchanged.
 | Advanced disclosure                                                                     | Presentation only; closed by default, preserves scenario inputs                        |
 | Deployment labels, detail tab, pinned point                                             | Presentation only                                                                      |
 | Clip transport, audio source, Difference, case navigation, History expand, theme, Share | Presentation only; published media metadata uses the existing read-only media contract |
+| Clip subject and its pair                                                               | Presentation only; `r_clip` is page state                                              |
 | Cohort help, prompt/source and hash disclosures, media link                             | Presentation only; existing history and published media reads provide their data       |
 
 Admin/publication handlers, private artifacts and credentials are excluded.
@@ -396,13 +419,13 @@ browser playback and difference failure, bilingual layout and 390px overflow.
 页面沿用推理与 AgentX 的两级布局。概览页首将筛选分为基准测试配置（模型、工作负载、引擎）、图表配置（X 与 Y 指标）、对比历史趋势和运行信息。对比历史趋势中的芯片配置最多可选 4 个部署，并可限定日期范围；图表随即按时间顺序绘制各部署的每次运行并标注运行日期，指定的叠加运行中匹配的部署单独成一组，表格、视频和成本说明仍按所选运行显示。运行信息沿用推理页的运行日期和运行选择器：每个正式部署显示其在所选运行或之前的最新运行，运行链接打开对应的 GitHub Actions 运行。图表绘制所选工作负载的全部实测部署：X 轴可选单条视频延迟或每个部署的 GPU 数（见 X-axis metric 一节），所有部署生成的视频时长和帧率相同时，延迟坐标轴的标题会注明这两项；
 Y 轴可选每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时生成视频数或每条有效视频的 GPU 能耗；每种硬件及每个叠加运行
 各自绘制 Pareto 前沿。右侧图例可隐藏硬件，没有匹配运行的硬件显示为灰色，并提供部署标签开关和“重置筛选”。图表卡片使用 `ChartSection`，带有共享的图表按钮（PNG 导出、overview API `format=csv` 的 CSV、图例开关和缩放重置），图表标题放在图表说明中，导出的 PNG 也会带上标题。图表下方的 `ResultContext` 页脚与推理页一致，可切换成本层级，并标明固定使用的参与计算 GPU 口径，同时列出更新时间、来源、各硬件 TCO $/chip/hr 价格表（`TcoPriceTable`）及价格来源链接。
-每种硬件、runtime 和运行通道各为一组，各自计算 Pareto 前沿。默认每种硬件只绘制一条无损曲线，即前沿面积最大的一条（`frontierArea`，与推理页每个 SKU 选最优曲线的 hypervolume 规则相同），指定运行单独评选。数据中有两个引擎时，图表配置里的引擎选择器可选「最优」（默认）、「全部」或单个引擎。`optimizations.ts` 判定声明的优化项是否有损，未登记的优化项按有损处理；有损曲线不参与评选，存在时图例中的「有损优化」开关可以把它们以虚线加入，并在图例下方列出，例如 “H100 (NVIDIA Sol Engine · Sol-Attn + FirstBlockCache)”。任何操作第一次让同一 GPU 出现两个引擎时，先弹出共享的引擎对比确认框，此后才按引擎区分点形。图例写明每张 GPU 的无损引擎，例如 “H100 (SGLang)”。有损部署不会作为硬件的代表出现在卡片、视频或证据对比中。悬停数据点时显示共享的精简悬停卡片（`chartHoverCard`）：硬件与引擎、两个坐标轴的数值、GPU、部署和并发数。点击后打开共享的数据点详情面板（`ChartPointDetails`）：日期、两个坐标轴的数值、并发数、参与和分配的 GPU、有效视频数、部署、不在 X 轴上的各项延迟、成本、能耗、功率、Runtime 和 GitHub Actions 运行链接；非官方运行的数据点在两处都会标出运行编号。再点击“查看遥测”进入部署详情（`r_point`）。详情页页首使用 `DashboardSectionHeader` 并带分享按钮。详情入口在 `history.state` 中做标记，
+每种硬件、runtime 和运行通道各为一组，各自计算 Pareto 前沿。默认每种硬件只绘制一条无损曲线，即前沿面积最大的一条（`frontierArea`，与推理页每个 SKU 选最优曲线的 hypervolume 规则相同），指定运行单独评选。数据中有两个引擎时，图表配置里的引擎选择器可选「最优」（默认）、「全部」或单个引擎。`optimizations.ts` 判定声明的优化项是否有损，未登记的优化项按有损处理；有损曲线不参与评选，存在时图例中的「有损优化」开关可以把它们以虚线加入，并在图例下方列出，例如 “H100 (NVIDIA Sol Engine · Sol-Attn + FirstBlockCache)”。每条有损曲线都会带上它的无损对照曲线，即使该引擎不是「最优」：`losslessTwin`（`deployment.ts`）只把有损数据点与同一运行、硬件、引擎、GPU 数量和服务器布局的无损数据点配对，并优先选择相同并发数。无损对照曲线只用于对比，不会作为硬件的代表出现在卡片或视频中。任何操作第一次让同一 GPU 出现两个引擎时，先弹出共享的引擎对比确认框，此后才按引擎区分点形。图例写明每张 GPU 的无损引擎，例如 “H100 (SGLang)”。有损部署不会作为硬件的代表出现在卡片、视频或证据对比中。悬停数据点时显示共享的精简悬停卡片（`chartHoverCard`）：硬件与引擎、两个坐标轴的数值、GPU、部署和并发数。点击后打开共享的数据点详情面板（`ChartPointDetails`）：日期、两个坐标轴的数值、并发数、参与和分配的 GPU、有效视频数、部署、不在 X 轴上的各项延迟、成本、能耗、功率、Runtime 和 GitHub Actions 运行链接；非官方运行的数据点在两处都会标出运行编号。再点击“查看遥测”进入部署详情（`r_point`）。同一次点击还会在下方对比区播放该部署的视频（`r_clip`），面板中的“在下方对比”用 `scrollIntoView({ block: 'nearest' })` 把对比区滚入视野；仅点击数据点不会滚动页面。只有已存储的数据点（有 `publishedAt`）可能有视频：实时读取的指定运行的数据点画成空心，点击只固定其详情；已存储但没有视频的数据点仍由对比区显示空状态。对比区两侧播放的数据点分别标有“播放中”和“基线”。这些标记和空心点由自定义图层绘制，它从 ref 读取选择并通过 `D3ChartHandle` 重绘；选择不会进入图表的数据、图层、悬停配置或坐标轴配置，因为其中任何一项变化都会重建图表，并关闭刚刚固定的详情面板。详情页页首使用 `DashboardSectionHeader` 并带分享按钮。详情入口在 `history.state` 中做标记，
 刷新或前进后页内返回仍会弹出该条目，浏览器后退也会回到原滚动位置；概览在后台保持挂载，视频、已加载的性能历史和图表状态不会丢失。
 详情页分为遥测、有效性、来源三个标签页。未知、已筛除或已隐藏的 `r_point` 回到概览，结果加载后会从 URL 中移除，重新显示该硬件或分享时不会再打开它。“如何解读这些结果”始终展开；利润估算器位于默认收起的“高级选项”中，其各模式价格和利用率放在“场景”控制面板中；性能历史需要读取已存储的 History 页面，因此默认折叠在带箭头的标题下，深链接时自动展开。尚未采集的指标在“如何解读”中列出，
 不使用占位图表或示意数值。功率无效时不展示功率或能耗结论。
 
-视频对比只读取已存储产物，核对 prompt、seed、重复次数和生成配置后同步播放。视频在图表下方的双侧对比区（`VideoClipStage`）中播放：左侧为对比对象，右侧为与之配对的视频。通过 `?unofficialrun=` 指定的运行若有可见数据点，无论是否有视频，都以它为对比对象；否则默认对比对象为 B200 的代表部署，B200 被隐藏或没有已发布视频时，改用名单中第一个有视频且未隐藏的硬件。优先的硬件仍在加载时会先占住位置，加载完成后画面不会跳到别的硬件。配对视频是该对象已封存的 Diffusers 参考。每侧左上或右上的标签注明硬件与 GPU 数量（或参考），并带有扬声器按钮；`?unofficialrun=` 叠加运行使用 `overlayRunColor`，并标注“非官方运行”。
-对比区有四种视图：卷帘（默认）、并排、切换和差异。卷帘视图把两侧叠放，右侧画面从跟随指针移动的分界线处裁切；点击画面或分界线按钮可锁定，焦点在按钮上时可用 `←`/`→` 移动分界线。并排把两段视频左右排列，宽度小于 640px 时改为上下排列。切换一次只显示一侧：点击画面或按 `T` 切换，按住空格键可临时查看另一侧，松开后复原；在其他视图中，焦点位于对比区时按空格键播放或暂停。快捷键只作用于获得焦点的对比区，不监听整个页面；对比区内按钮上的空格键和回车键仍触发按钮本身。Prompt 用文字卡片排成一行（显示用例 ID 和 seed，目前没有封面图），prompt 原文显示在视图切换器旁边。`clip-stage.ts` 负责对比区自己的 URL 参数：`r_prompt`（用例 ID，第二次及之后的重复加 `~take`，相同初始噪声重跑加 `diag:` 前缀）和 `r_view`（卷帘视图时省略）。它只改写这两个参数，仪表板的 `commit` 改写结果参数时也会保留它们。这两个参数只是页面状态：overview API 请求由结果参数构成，不会携带它们。未知的 prompt 显示第一条，但参数仍留在 URL 中。切换 prompt 或对比对象会暂停并把两侧都回到开头，视图、分界线锁定和音源保持不变。
+视频对比只读取已存储产物，核对 prompt、seed、重复次数和生成配置后同步播放。视频在图表下方的双侧对比区（`VideoClipStage`）中播放：左侧为对比对象，右侧为与之配对的视频。`r_clip` 指向的数据点若在图表中绘制，就以它为对比对象；否则通过 `?unofficialrun=` 指定的运行若有可见数据点，无论是否有视频，都以它为对比对象；否则默认对比对象为 B200 的代表部署，B200 被隐藏或没有已发布视频时，改用名单中第一个有视频且未隐藏的硬件。优先的硬件仍在加载时会先占住位置，加载完成后画面不会跳到别的硬件。“对比”一行选择配对视频：该对象已封存的 Diffusers 参考（默认）、其他每种可见硬件的代表部署、对象来自 `?unofficialrun=` 时其同一硬件的官方代表部署，以及有损对象的无损对照。配对一侧播放与对象相同 prompt、seed 和重复次数的视频；找不到无损对照时，画面位置会说明原因。这一选择只是本地状态，下一个对象没有该选项时显示参考。每侧左上或右上的标签注明硬件与 GPU 数量（有损一侧另注优化项，无损对照注明“无损”），或注明参考，并带有扬声器按钮；`?unofficialrun=` 叠加运行使用 `overlayRunColor`，并标注“非官方运行”。“Prompt 与来源”列出画面中的两侧。
+对比区有四种视图：卷帘（默认）、并排、切换和差异。卷帘视图把两侧叠放，右侧画面从跟随指针移动的分界线处裁切；点击画面或分界线按钮可锁定，焦点在按钮上时可用 `←`/`→` 移动分界线。并排把两段视频左右排列，宽度小于 640px 时改为上下排列。切换一次只显示一侧：点击画面或按 `T` 切换，按住空格键可临时查看另一侧，松开后复原；在其他视图中，焦点位于对比区时按空格键播放或暂停。快捷键只作用于获得焦点的对比区，不监听整个页面；对比区内按钮上的空格键和回车键仍触发按钮本身。Prompt 用文字卡片排成一行（显示用例 ID 和 seed，目前没有封面图），prompt 原文显示在视图切换器旁边。`clip-stage.ts` 负责对比区自己的 URL 参数：`r_prompt`（用例 ID，第二次及之后的重复加 `~take`，相同初始噪声重跑加 `diag:` 前缀）、`r_view`（卷帘视图时省略）和 `r_clip`（对比对象的 `resultsPointKey`）。它只改写这几个参数，仪表板的 `commit` 改写结果参数时也会保留它们。这些参数只是页面状态：overview API 请求由结果参数构成，不会携带它们。未知的 prompt 显示第一条；未知、已隐藏或未绘制的 `r_clip` 播放默认对象；两者都仍留在 URL 中。切换 prompt、对比对象或配对视频会暂停并把两侧都回到开头，视图、分界线锁定和音源保持不变。
 卷帘、并排和切换视图优先播放 `previewUrl` 指向的网页转码版本，没有转码版本或转码版本加载失败时播放封存的原始视频；“差异”视图两侧都加载原始视频，PSNR 和视频文件链接始终使用原始视频。播放转码版本时，“Prompt 与来源”中会注明。首次点击播放前不请求任何视频媒体：视频以 `preload="none"` 渲染在待播放画面（prompt、两侧标签和播放按钮）之后，首次播放时在点击手势内改为 `preload="auto"` 再预热。浏览器只把 `preload` 视为提示，因此这只是尽力而为。
 同步播放由 `clip-sync.ts` 中的纯函数状态机驱动（暂停、加载、缓冲、播放、结束五个状态），`useClipGroup` 只负责采集每个视频的快照并执行返回的动作，`?unofficialrun=` 叠加视频走同一套逻辑。首次播放后每段视频完整下载；视频只有几秒长，因此先下载完整再播放，播放过程中不会卡顿。只要还有视频没有从当前时间缓冲到共享结尾（允许 50 毫秒误差）或 `readyState` 低于 3，控制条就显示“加载中 N%”（以最慢视频已缓冲的共享时长百分比计）。此时点击播放会进入加载状态，等全部视频加载完成后一起开始；拖动进度条和结束后重播同样经过加载状态。播放过程中若有视频停顿（未在 seek 且 `readyState` 低于 3，例如浏览器回收了缓冲），全部视频一起暂停并显示“缓冲中 N%”，等每个视频都至少缓冲了 1 秒后续数据或缓冲到结尾后，再从主视频的时间点一起恢复。开启音频时以有声视频为主，否则以第一个未停顿的视频为主；有声视频不会被 seek 去追赶其他视频。40 到 250 毫秒的偏差通过微调 playbackRate 纠正，超过 250 毫秒才 seek 一次，且该视频 seek 过程中不会重复触发。时间显示和进度条每秒最多刷新十次。
 默认静音。点击任一可播放一侧的扬声器按钮即只播放这一侧的声音，参考视频也可以；再次点击恢复静音。切换 prompt 时保留当前音源，隐藏音源或音源播放失败后恢复静音。从部署详情返回总览时，负责 `muted` 的 layout effect 会重新应用音源选择，因为 React 不会重新设置没有变化的 prop。音源选择只影响本地播放，不改变媒体、指标、URL 参数或只读 API 返回内容。
@@ -414,7 +437,7 @@ Y 轴可选每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时�
 成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补；图表固定使用参与计算的 GPU 口径，对比区和部署详情仍同时展示两种口径。代表性部署表，以及 GPU 数量和 GPU 口径选择器，均已移除。界面与 overview API 始终包含全部 GPU 数量；旧链接中的 `r_gpus`、`r_basis` 参数会被忽略。利润估算器位于默认收起的“高级选项”中；展开或收起都不会改变数据和计算结果，已填写的场景输入会保留。视频秒吞吐量、每视频秒成本及收入使用有效测量请求的实际解码视频时长，不包含 warmup；请求时长仅用于工作负载身份与筛选。
 任何有效测量请求缺少视频时长，或旧 History 投影没有 `videoSecondsPerHour` 时，上述指标及利润保持为空，不以请求时长代替。每条视频成本仍可在证据充分时计算。利润输入默认空白，属于用户
 场景假设；利用率只降低收入，不减少付费时长。模式未知时不套用 T2V/I2V/R2V 价格。
-页面与只读 API 以一次请求最多读取五页 History，共用选择和计算逻辑，`r_*` 参数可以分享，其中对比区的 `r_view` 和 `r_prompt` 只保留在页面 URL 中，不是 API 参数，overview API 会将其视为未知参数而拒绝；`?unofficialrun=` 只读取指定运行。
+页面与只读 API 以一次请求最多读取五页 History，共用选择和计算逻辑，`r_*` 参数可以分享，其中对比区的 `r_view`、`r_prompt` 和 `r_clip` 只保留在页面 URL 中，不是 API 参数，overview API 会将其视为未知参数而拒绝；`?unofficialrun=` 只读取指定运行。
 已存储的运行保留其发布批准状态；不在 History 中的运行，通过 `/api/video-runs?run=<id>&format=live` 从其 GitHub 产物实时读取：
 只取每个原生 `h3-results` 配置的最新一次尝试，按显式字节区间读取 JSON 文档，并用 `SHA256SUMS` 和 manifest 身份校验。
 这类条目未经批准，没有 `publishedAt`，也不附带媒体，因此视频面板不显示它们，横幅会注明该运行尚未发布。

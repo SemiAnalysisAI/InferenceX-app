@@ -1568,7 +1568,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-chart.ts',
-    sourceSha256: '1aee8d9487d7aaf5661810374d95544ec6b2eabe21ec4444c30da7f8dbb3840e',
+    sourceSha256: '3643a1e3c3557a10c4c01545ebac189063ae9a9eb9d574efef60d8f30de276c3',
     reviewArea: {
       en: 'VideoGenX results chart axes, accepted r_x/r_y metric keys, GPU basis and deployment detail key.',
       zh: 'VideoGenX 结果图表的坐标轴、r_x/r_y 可接受的指标键、GPU 口径及部署详情键。',
@@ -1712,7 +1712,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/deployment.ts',
-    sourceSha256: 'cd3e9ce61fe83a07a7429b790905597dab229a498e190ad65b5d57633f8f6bfc',
+    sourceSha256: '6cf184d20bc1eec7d261e364aec63cb6d1db74a725b0fad21fd0590b76cc60a5',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',

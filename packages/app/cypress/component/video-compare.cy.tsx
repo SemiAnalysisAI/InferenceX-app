@@ -412,6 +412,10 @@ describe('Video results clip stage', () => {
     cy.contains('button', 'Toggle B200').click();
     cy.get('[data-side="a"]').should('contain', 'H200');
     expectDifference((rgba) => expect(rgba).to.deep.equal([0, 0, 0, 255]));
+    // Compared with H100 instead, the other side plays H100's clip of the same prompt.
+    cy.get('[data-testid="video-results-compare-h100"]').click();
+    cy.get('@original-h100').then((url) => sideVideo('b').should('have.attr', 'src', url));
+    expectDifference((rgba) => expect(rgba[0]).to.be.greaterThan(200));
   });
 
   it('cannot draw a difference after the reference decoder fails', () => {

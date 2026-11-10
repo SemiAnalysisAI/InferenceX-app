@@ -1,5 +1,5 @@
 import { frontierArea } from '@/components/inference/utils/best-series-per-sku';
-import { chipConfigKey, runtimeKey } from './deployment';
+import { chipConfigKey, losslessTwin, runtimeKey } from './deployment';
 import { engineSort } from './engines';
 import { paretoFrontier } from './frontier';
 import { hardwareSort, type CostTier } from './hardware';
@@ -171,6 +171,8 @@ export interface ResultsChartSeries {
   frontier: ResultsChartPoint[];
   /** Deployments with both axis values, before Optimal Only. */
   measured: number;
+  /** Drawn only as a drawn lossy line's lossless twin, so it never stands for its hardware. */
+  twin?: boolean;
 }
 
 export interface ResultsChartSelection extends ResultsMetricContext {
@@ -317,11 +319,38 @@ export function resultsChartSeries(
     };
   });
   const lossless = series.filter((item) => !item.lossy);
-  return [
-    ...(selection.compareEngines ? lossless : bestPerHardware(lossless, selection)),
-    ...(selection.lossy ? series.filter((item) => item.lossy) : []),
-  ].toSorted(seriesOrder);
+  const lossy = selection.lossy ? series.filter((item) => item.lossy) : [];
+  const shown = selection.compareEngines ? lossless : bestPerHardware(lossless, selection);
+  // A lossy line keeps the lossless line it is compared with, even where another engine leads.
+  const pool = cells.map((cell) => cell.point);
+  const twinKeys = new Set(
+    lossy.flatMap((item) =>
+      item.points.flatMap(({ cell }) => {
+        const twin = losslessTwin(cell.point, pool);
+        return twin ? [seriesKey({ point: twin, overlay: cell.overlay })] : [];
+      }),
+    ),
+  );
+  const twins = lossless
+    .filter((item) => twinKeys.has(item.key) && !shown.includes(item))
+    .map((item) => ({ ...item, twin: true }));
+  return [...shown, ...twins, ...lossy].toSorted(seriesOrder);
 }
+
+/**
+ * The series the results chart plots: Chip config runs when `history` is set, else the
+ * deployments. Hidden hardware stays in, so the legend can still name its engines.
+ */
+export const resultsPlotSeries = (
+  cells: readonly ResultCell[],
+  history: readonly ResultCell[] | null,
+  state: ResultsState,
+): ResultsChartSeries[] =>
+  (history ? resultsHistorySeries : resultsChartSeries)(history ?? cells, {
+    ...resultsSelection(state),
+    x: plottedXMetric(state.xMetric, history !== null),
+    hidden: [],
+  });
 
 /**
  * Ranks the cells the axis can place on `rankOn`, then moves each point to its
@@ -372,9 +401,10 @@ export function comparesEngines(series: readonly ResultsChartSeries[]): boolean 
 
 /**
  * Cells that may stand for their hardware in cards, profit bars and clips: those of
- * a runtime the chart draws for that hardware and run channel, so they name the
- * chart's engine. A channel the chart draws nothing for keeps every cell. The page,
- * its server seed and the overview API all pick clips from these cells.
+ * a runtime the chart draws for that hardware and run channel, other than a lossy
+ * line's twin, so they name the chart's engine. A channel the chart draws nothing for
+ * keeps every cell. The page, its server seed and the overview API all pick clips
+ * from these cells.
  */
 export function chartedCells(
   projection: Record<
@@ -386,7 +416,7 @@ export function chartedCells(
   const series = resultsChartSeries(
     [...projection.deploymentCells, ...projection.overlayDeploymentCells],
     { ...resultsSelection(state), hidden: [] },
-  );
+  ).filter((item) => !item.twin);
   const drawn = new Set(series.map((item) => item.key));
   const channels = new Set(series.map((item) => channelKey(item.hardwareKey, item.overlay)));
   return [...projection.cells, ...projection.overlayCells].filter(
