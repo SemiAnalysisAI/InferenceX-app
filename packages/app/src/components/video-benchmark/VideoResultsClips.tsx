@@ -305,6 +305,8 @@ export default function VideoResultsClips({
     return () => controller.abort();
   }, [wanted, retry, unofficialRun]);
   // A rested-on chart point's read never counts as loading; moving on to another point drops it.
+  /** Rested-on points whose read failed, so their hover card stops waiting; a click reads again. */
+  const [failedPeeks, setFailedPeeks] = useState<ReadonlySet<string>>(new Set());
   const peeked = useMemo(
     () => (peek ? drawn.find((p) => stagePointKey(p) === peek) : undefined),
     [peek, drawn],
@@ -320,7 +322,9 @@ export default function VideoResultsClips({
         cache.current.set(key, side);
         setRevision((n) => n + 1);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!controller.signal.aborted) setFailedPeeks((previous) => new Set([...previous, key]));
+      });
     return () => controller.abort();
   }, [peeked, wanted, unofficialRun]);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -346,14 +350,15 @@ export default function VideoResultsClips({
       JSON.stringify(
         [...new Set([...wanted, ...drawn])].flatMap((p) => {
           const side = sideOf(p);
-          if (side === undefined) return [];
+          if (side === undefined)
+            return failedPeeks.has(sourceKey(p)) ? [[stagePointKey(p), null]] : [];
           const url = side
             ? pairedGroup(resultsClipGroups([side]), group)?.clips.get(side.hardwareKey)?.posterUrl
             : undefined;
           return [[stagePointKey(p), url ?? null]];
         }),
       ),
-    [wanted, drawn, revision, failedKeys, group],
+    [wanted, drawn, revision, failedKeys, failedPeeks, group],
   );
   // Before paint, so the chart's badges and hover card never lag the stage they describe.
   useLayoutEffect(

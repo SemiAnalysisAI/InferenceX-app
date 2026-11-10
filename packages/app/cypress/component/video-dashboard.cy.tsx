@@ -78,6 +78,8 @@ function mount({
 const points = (selector = '') =>
   cy.get(`[data-testid="video-results-chart"] .dot-group${selector}`);
 const hardwarePoints = (hardware: string) => points(`[data-hardware="${hardware}"]`);
+/** Points of `hardware` that neither side of the stage plays. */
+const offStage = (hardware: string) => hardwarePoints(hardware).not('[data-clip-role]');
 const openPoint = (hardware: string, overlay = false) => {
   hardwarePoints(hardware)
     .filter(`[data-overlay="${overlay}"]`)
@@ -919,6 +921,7 @@ describe('VideoGenX results', () => {
 
   it('reads a point the pointer rests on, so its hover card shows its first frame', () => {
     const run = '34341996789';
+    let read = '';
     const frame = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="16" height="9"/>')}`;
     mount({
       edit: (observation) => {
@@ -950,22 +953,26 @@ describe('VideoGenX results', () => {
           path,
           { ...asset, posterUrl: frame },
         ]);
-        cy.intercept(
-          'GET',
-          `/api/video-runs?run=${run}&artifact=${point.artifactId}&format=published`,
-          saved,
-        ).as('b200');
+        read = `/api/video-runs?run=${run}&artifact=${point.artifactId}&format=published`;
+        cy.intercept('GET', read, saved).as('b200');
       },
     });
     cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('exist');
     const tooltip = '[data-chart-tooltip="video-results-chart"]';
     cy.get('@b200.all').then((before) => {
-      hardwarePoints('b200').not('[data-clip-role]').first().trigger('mouseenter', { force: true });
+      offStage('b200').first().trigger('mouseenter', { force: true });
       // The card keeps the frame's box while the point's clips are read.
       cy.get(`${tooltip} [data-hover-image-pending]`).should('exist');
       cy.get(`${tooltip} [data-hover-image]`).should('have.attr', 'src', frame);
       cy.get('@b200.all').should('have.length', before.length + 1);
     });
+    // A read that fails closes the box instead of leaving the card waiting.
+    offStage('b200').first().trigger('mouseleave', { force: true });
+    cy.then(() => cy.intercept('GET', read, { statusCode: 500 }).as('failed'));
+    offStage('b200').eq(1).trigger('mouseenter', { force: true });
+    cy.get(`${tooltip} [data-hover-image-pending]`).should('exist');
+    cy.wait('@failed');
+    cy.get(tooltip).should('contain', 'B200').find('[data-hover-media]').should('not.exist');
   });
 
   it('pulses playable points until the first clip is picked', () => {
