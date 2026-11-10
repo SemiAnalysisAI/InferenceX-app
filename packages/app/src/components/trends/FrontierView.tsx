@@ -424,7 +424,7 @@ export default function FrontierView({
                       src={VENDOR_MARK_HREFS[name]}
                       alt=""
                       aria-hidden
-                      className="size-3 object-contain"
+                      className="size-3 object-contain dark:invert"
                     />
                   ) : undefined,
                 })),
