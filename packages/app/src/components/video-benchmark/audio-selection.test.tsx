@@ -51,6 +51,8 @@ it('keeps one clip audible, including after the overview is hidden and revealed'
         colorFor={() => 'black'}
         against="reference"
         onAgainstChange={() => {}}
+        onShow={() => {}}
+        reveal={0}
       />
     </Activity>
   );

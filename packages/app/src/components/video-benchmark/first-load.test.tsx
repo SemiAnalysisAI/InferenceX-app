@@ -63,6 +63,8 @@ it.each([true, false])(
             colorFor={() => 'black'}
             against="reference"
             onAgainstChange={() => {}}
+            onShow={() => {}}
+            reveal={0}
           />
         </>
       );
@@ -135,6 +137,8 @@ it('shows a newly read clip while another selected source is still pending', asy
         colorFor={() => 'black'}
         against="reference"
         onAgainstChange={() => {}}
+        onShow={() => {}}
+        reveal={0}
       />,
     );
     await Promise.resolve();
@@ -173,6 +177,8 @@ it('shows the loading state on both sides while the subject is read', () => {
         colorFor={() => 'black'}
         against="reference"
         onAgainstChange={() => {}}
+        onShow={() => {}}
+        reveal={0}
       />,
     );
   });

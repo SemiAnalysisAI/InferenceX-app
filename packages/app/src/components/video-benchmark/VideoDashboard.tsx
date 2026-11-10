@@ -38,6 +38,7 @@ import { hardwareLabel } from './hardware';
 import { compareDeployments, layoutLabel, leadCell, runtimeKey } from './deployment';
 import { engineLabel, engineSort } from './engines';
 import { useVideoPoints } from './use-video-points';
+import type { VideoPoint } from './metrics';
 import type { VideoInitialData } from './initial-data';
 import {
   DEFAULT_RESULTS_STATE,
@@ -71,7 +72,7 @@ import VideoDeploymentDetail from './VideoDeploymentDetail';
 import VideoResultsChart, { VIDEO_RESULTS_CHART_ID, type ClipLink } from './VideoResultsChart';
 import VideoCostContext from './VideoCostContext';
 import VideoResultsClips from './VideoResultsClips';
-import { isStageParam, parseStage, showOnStage, writeStage, type StagePair } from './clip-stage';
+import { isStageParam, parseStage, stagePointKey, writeStage, type StagePair } from './clip-stage';
 import { seeChangesPair } from './quality-method';
 import { LossyQualityHint } from './QualityMethod';
 import { resultsClipPoints } from './results-clips';
@@ -291,6 +292,18 @@ export default function VideoDashboard({
   const [stagePair, setStagePair] = useState<StagePair>({ playing: null, baseline: null });
   /** What the stage compares its subject with, by `StageOption.value`. */
   const [against, setAgainst] = useState('reference');
+  /** Counts requests to bring the stage into view; the stage answers once its reads land. */
+  const [reveal, setReveal] = useState(0);
+  const requestReveal = useCallback(() => setReveal((count) => count + 1), []);
+  /** Plays `point` against the `compare` option in Wipe, then brings the stage into view. */
+  const showOnStage = useCallback(
+    (point: VideoPoint, compare: string) => {
+      setAgainst(compare);
+      writeStage({ ...parseStage(location.search), clip: stagePointKey(point), view: 'wipe' });
+      requestReveal();
+    },
+    [requestReveal],
+  );
   const onStagePair = useCallback(
     (pair: StagePair) =>
       setStagePair((previous) =>
@@ -302,10 +315,9 @@ export default function VideoDashboard({
     () => ({
       ...stagePair,
       onSelect: (key) => writeStage({ ...parseStage(location.search), clip: key }),
-      onReveal: () =>
-        document.querySelector('#comparison-clips')?.scrollIntoView({ block: 'nearest' }),
+      onReveal: requestReveal,
     }),
-    [stagePair],
+    [stagePair, requestReveal],
   );
   const overviewScroll = useRef(0);
   const pendingAnchor = useRef<string | null>(null);
@@ -932,10 +944,7 @@ export default function VideoDashboard({
                 lossyNote={
                   <LossyQualityHint
                     pair={lossyPair}
-                    onSeeChanges={({ lossy }) => {
-                      setAgainst('twin');
-                      showOnStage(lossy);
-                    }}
+                    onSeeChanges={({ lossy }) => showOnStage(lossy, 'twin')}
                   />
                 }
                 footer={
@@ -963,6 +972,8 @@ export default function VideoDashboard({
               onPairChange={onStagePair}
               against={against}
               onAgainstChange={setAgainst}
+              onShow={showOnStage}
+              reveal={reveal}
               colorFor={colorFor}
               costs={clipCosts}
               unofficialRun={state.unofficialRun ?? undefined}

@@ -15,7 +15,7 @@ import {
   pairedGroup,
   parseStage,
   promptKey,
-  showOnStage,
+  STAGE_ID,
   STAGE_VIEWS,
   stageOptions,
   stagePointKey,
@@ -167,6 +167,10 @@ export interface VideoResultsClipsProps {
    */
   against: string;
   onAgainstChange: (value: string) => void;
+  /** Plays a point against a `StageOption.value` in Wipe and asks for a reveal. */
+  onShow: (point: VideoPoint, against: string) => void;
+  /** Counts reveal requests; each scrolls the stage into view and focuses it once its reads land. */
+  reveal: number;
 }
 
 const NO_POINTS: readonly VideoPoint[] = [];
@@ -186,6 +190,8 @@ export default function VideoResultsClips({
   onPairChange,
   against,
   onAgainstChange,
+  onShow,
+  reveal,
 }: VideoResultsClipsProps) {
   const s = STRINGS[useLocale()];
   const stage = parseStage(useClientSearch());
@@ -197,7 +203,6 @@ export default function VideoResultsClips({
   const picked = stage.clip ? drawn.find((p) => stagePointKey(p) === stage.clip) : undefined;
   const cache = useRef(new Map<string, ResultsClipSide | null>(Object.entries(initialSides)));
   const [revision, setRevision] = useState(0);
-  const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const [retry, setRetry] = useState(0);
   /** Undefined while its read is in flight; null when there is none. */
@@ -234,10 +239,11 @@ export default function VideoResultsClips({
   // Callers rebuild `points` on every render; reads restart only when the set of sides changes.
   const wantedKey = wantedPoints.map(sourceKey).join('\n');
   const wanted = useMemo(() => wantedPoints, [wantedKey]);
+  // Derived in render, so it is true from the render that asks for a new side, not one effect later.
+  const loading = wanted.some((point) => sideOf(point) === undefined);
   useEffect(() => {
     const controller = new AbortController();
     const missing = wanted.filter((point) => !cache.current.has(sourceKey(point)));
-    setLoading(missing.length > 0);
     setFailed(false);
     void Promise.allSettled(
       missing.map(async (point) => {
@@ -252,6 +258,7 @@ export default function VideoResultsClips({
         if (response.status === 204) {
           if (controller.signal.aborted) return null;
           cache.current.set(sourceKey(point), null);
+          setRevision((n) => n + 1);
           return null;
         }
         if (!response.ok) throw new Error('Published media read failed');
@@ -264,10 +271,19 @@ export default function VideoResultsClips({
     ).then((results) => {
       if (controller.signal.aborted) return;
       setFailed(results.some((result) => result.status === 'rejected'));
-      setLoading(false);
     });
     return () => controller.abort();
   }, [wanted, retry, unofficialRun]);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const revealed = useRef(reveal);
+  // A read that lands restores the prompt row above the stage, so a reveal waits for every read.
+  useEffect(() => {
+    if (reveal === revealed.current || loading) return;
+    revealed.current = reveal;
+    document.querySelector(`#${STAGE_ID}`)?.scrollIntoView({ block: 'nearest' });
+    // Space and T act on the focused stage.
+    stageRef.current?.focus({ preventScroll: true });
+  }, [reveal, loading]);
   const playing = subject ? stagePointKey(subject.point) : null;
   const baseline = other ? stagePointKey(other) : null;
   useEffect(() => onPairChange?.({ playing, baseline }), [playing, baseline, onPairChange]);
@@ -481,6 +497,7 @@ export default function VideoResultsClips({
             </div>
           )}
           <VideoClipStage
+            ref={stageRef}
             a={a}
             b={b}
             view={stage.view}
@@ -510,10 +527,7 @@ export default function VideoResultsClips({
             footer={
               <QualityMethod
                 leads={selected.map((lead) => ({ point: lead, side: sideOf(lead) }))}
-                onShowMe={(target) => {
-                  onAgainstChange('reference');
-                  showOnStage(target);
-                }}
+                onShowMe={(target) => onShow(target, 'reference')}
               />
             }
           />

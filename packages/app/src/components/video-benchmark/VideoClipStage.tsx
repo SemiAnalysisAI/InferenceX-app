@@ -19,6 +19,7 @@ import {
   useState,
   type KeyboardEvent,
   type PointerEvent,
+  type Ref,
 } from 'react';
 import { Button } from '@/components/ui/button';
 import { InfoHelp } from '@/components/ui/option-info';
@@ -132,6 +133,8 @@ export function SideDot({ color }: { color: string | null }) {
 }
 
 export interface VideoClipStageProps {
+  /** The focusable stage, which takes the Space and T shortcuts. */
+  ref?: Ref<HTMLDivElement>;
   /** Subject, on the left (or top). */
   a: StageClip;
   /** Its pair, on the right (or bottom). */
@@ -159,6 +162,7 @@ const SPEEDS = [0.25, 0.5, 1] as const;
 const ZOOMS = [1, 2, 4] as const;
 
 export default function VideoClipStage({
+  ref,
   a,
   b,
   view,
@@ -457,6 +461,7 @@ export default function VideoClipStage({
   return (
     <div id={STAGE_ID} className="min-w-0 scroll-mt-24 space-y-3">
       <div
+        ref={ref}
         data-testid="video-results-stage"
         data-view={view}
         tabIndex={0}

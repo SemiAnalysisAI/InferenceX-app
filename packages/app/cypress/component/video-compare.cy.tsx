@@ -276,6 +276,8 @@ function mountResultsClips(
           unofficialRun={unofficialRun}
           against={against}
           onAgainstChange={setAgainst}
+          onShow={() => {}}
+          reveal={0}
         />
       </PathnameContext.Provider>
     );

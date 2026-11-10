@@ -74,7 +74,9 @@ const stageInView = () =>
   cy.get('#comparison-stage').should(($stage) => {
     const rect = $stage[0].getBoundingClientRect();
     expect(rect.top, 'stage top').to.be.at.least(0);
-    expect(rect.bottom, 'stage bottom').to.be.at.most(Cypress.config('viewportHeight') + 1);
+    expect(rect.bottom, 'stage bottom').to.be.at.most(
+      $stage[0].ownerDocument.defaultView!.innerHeight + 1,
+    );
   });
 const toggleHardware = (hardware: string) => cy.get(`label[for="checkbox-${hardware}"]`).click();
 const chooseEngine = (label: string) =>
@@ -723,6 +725,8 @@ describe('VideoGenX results', () => {
   });
 
   it('plays the B200 lead against its reference and a lossy cell against its twin, in view', () => {
+    // On a phone the stage is shorter than the viewport, so scroll anchoring cannot hide a shift.
+    cy.viewport(375, 812);
     const run = '34341996789';
     mount({
       search: '?r_y=videosPerGpuHour&r_lossy=1&r_view=side',
@@ -763,10 +767,11 @@ describe('VideoGenX results', () => {
         };
         quality.reference.url = 'https://media.test/reference.mp4';
         saved.quality = [quality];
+        // As in production, a read lands after the click's next frame.
         cy.intercept(
           'GET',
           `/api/video-runs?run=${run}&artifact=${lead.artifactId}&format=published`,
-          saved,
+          { body: saved, delay: 400 },
         );
       },
     });
@@ -803,7 +808,10 @@ describe('VideoGenX results', () => {
     stagePill('a').should('contain', 'FirstBlockCache');
     stagePill('b').should('contain', 'lossless');
     cy.get('[data-testid="video-results-stage"]').should('have.attr', 'data-view', 'wipe');
+    // The lossy cell's own read restores the prompt row above the stage; the stage stays in view.
+    cy.get('[data-testid="video-results-prompt"]').should('exist');
     stageInView();
+    cy.focused().should('have.attr', 'data-testid', 'video-results-stage');
   });
 
   it('falls back to the overview for an unknown or hidden deployment and drops its key', () => {
