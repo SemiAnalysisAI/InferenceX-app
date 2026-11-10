@@ -274,6 +274,23 @@ function mountResultsClips(
   cy.wait(keys.map((key) => `@results-${key}` as const));
 }
 
+/** A lossy B200 lead at p50 40 s against its lossless twin, if any; both clips take 120 s. */
+function mountLossyPair(twinP50: number | null) {
+  const lossy: VideoPoint = {
+    ...c1('b200'),
+    id: `${c1('b200').id}-fbc`,
+    p50: 40,
+    results: { optimizations: ['first-block-cache'] } as unknown as ResultsEvidence,
+  };
+  const twins = twinP50 === null ? [] : [{ ...c1('b200'), p50: twinP50 }];
+  mountResultsClips(['b200'], '/vgx', false, undefined, [], false, [], {
+    leads: [lossy],
+    deployments: [lossy, ...twins],
+    costs: { [lossy.id]: { participating: cost(0.04, 0.01), allocated: null } },
+  });
+  cy.get('[data-testid="video-results-compare-twin"]').click();
+}
+
 describe('Video results clip stage', () => {
   beforeEach(() => {
     // The stage keeps its view and prompt in the URL, which outlives one test's mount.
@@ -648,23 +665,6 @@ describe('Video results clip stage', () => {
     readoutValue('participating', 1).should('have.text', '$0.02 / video-s');
     readoutValue('participating', 2).should('have.text', 'H100 $0.3');
   });
-
-  /** A lossy B200 lead at p50 40 s against its lossless twin, if any; both clips take 120 s. */
-  function mountLossyPair(twinP50: number | null) {
-    const lossy: VideoPoint = {
-      ...c1('b200'),
-      id: `${c1('b200').id}-fbc`,
-      p50: 40,
-      results: { optimizations: ['first-block-cache'] } as unknown as ResultsEvidence,
-    };
-    const twins = twinP50 === null ? [] : [{ ...c1('b200'), p50: twinP50 }];
-    mountResultsClips(['b200'], '/vgx', false, undefined, [], false, [], {
-      leads: [lossy],
-      deployments: [lossy, ...twins],
-      costs: { [lossy.id]: { participating: cost(0.04, 0.01), allocated: null } },
-    });
-    cy.get('[data-testid="video-results-compare-twin"]').click();
-  }
 
   it('shows a dash, not a pending score or stray times, where a lossy pair has nothing to compare', () => {
     mountLossyPair(0);
