@@ -3,6 +3,21 @@ import type { AvailabilityRow, BenchmarkRow } from '@/lib/api/api';
 
 import { availabilityBody } from '../support/e2e';
 
+/** Clicks the trend chart where its first point is drawn; the hover overlay above the dots takes the click. */
+const clickFirstTrendPoint = () =>
+  cy
+    .get('[data-testid="trend-chart-svg"] .dot-group circle')
+    .first()
+    .then(($dot) => {
+      const dot = $dot[0].getBoundingClientRect();
+      cy.get('[data-testid="trend-chart-svg"] .proximity-overlay').then(($overlay) => {
+        const plot = $overlay[0].getBoundingClientRect();
+        cy.wrap($overlay).click(dot.x + dot.width / 2 - plot.x, dot.y + dot.height / 2 - plot.y, {
+          force: true,
+        });
+      });
+    });
+
 /** Opens the waterfall series picker, reads every option's series id, and closes it again. */
 const waterfallSeriesIds = () => {
   cy.get('[data-testid="waterfall-series"]').click();
@@ -171,7 +186,7 @@ describe('Historical Trends AgentX P90 operating point', () => {
         .should('have.attr', 'aria-label')
         .and('contain', 'P90');
       cy.get('[data-testid="historical-trend-figure"] h2').should('contain.text', 'P90');
-      cy.get('[data-testid="trend-chart-svg"] .dot-group circle').first().click({ force: true });
+      clickFirstTrendPoint();
       cy.get('[data-testid="point-details-panel"]').should('contain.text', '300');
     }
   });
@@ -282,7 +297,7 @@ describe('Historical Trends — Chinese route', () => {
     cy.contains('目标交互性（tok/s/user）').should('be.visible');
     cy.get('[data-testid="historical-trend-figure"] h2').should('contain.text', '随时间变化');
     cy.get('[data-testid="historical-trend-figure"]').should('contain.text', 'Shift+滚轮横向缩放');
-    cy.get('[data-testid="trend-chart-svg"] .dot-group circle').first().click({ force: true });
+    clickFirstTrendPoint();
     cy.get('[data-testid="point-details-panel"]')
       .should('contain.text', '目标交互性')
       .invoke('text')
