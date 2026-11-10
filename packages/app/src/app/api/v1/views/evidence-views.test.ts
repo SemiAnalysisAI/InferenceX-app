@@ -81,6 +81,11 @@ describe('public evidence projections', () => {
     const hiddenBody = await hidden.json();
     expect(hiddenBody.ep.points).toEqual([]);
     expect(hiddenBody.swap.points).toEqual([]);
+    expect(hiddenBody).not.toHaveProperty('kv');
+    for (const query of ['runs=160&suite=kv', 'runs=160&kvX=frontier']) {
+      const rejected = await collective(request('collectivex', query));
+      expect(rejected.status).toBe(400);
+    }
   });
 
   it('filters image deployment, hardware, framework and date assumptions', async () => {
