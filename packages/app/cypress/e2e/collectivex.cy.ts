@@ -614,16 +614,41 @@ describe('CollectiveX swap_blocks', () => {
     cy.get('@swapChart')
       .find('.y-axis .tick text')
       .then((labels) => {
-        const values = [...labels].map((label) => Number(label.textContent));
+        // Linear below the axis break; the distant roofline sits alone above it at its true value.
+        const all = [...labels].map((label) => Number(label.textContent));
+        const values = all.slice(0, -1);
+        expect(all.at(-1)).to.eq(64);
         expect(values[0]).to.eq(0);
         expect(values.length).to.be.greaterThan(3);
         const step = values[1] - values[0];
         values.slice(1).forEach((value, i) => expect(value - values[i]).to.eq(step));
+        expect(values.at(-1)).to.be.lessThan(64);
       });
+    cy.get('@swapChart')
+      .find('[data-testid="swap-roofline-label"]')
+      .should('have.length', 1)
+      .and('have.text', 'PCIe 5.0 x16 · 64 GB/s');
+    cy.get('@swapChart').find('[data-testid="swap-axis-break"]').should('have.length', 1);
+    // Best by SKU is the default: one line per SKU at its best block count, no band.
+    cy.get('@swapChart').find('[data-testid="swap-range-band"]').should('not.exist');
+    cy.get('@swapChart').find('.point').should('have.length', 2).last().click({ force: true });
+    cy.get('body').should('contain.text', 'Best · 1 block · p50 (GB/s)');
+    // Range by SKU: one band per SKU, its median point carries the range tooltip.
+    cy.get('[data-testid="swap-view"]').contains('Range by SKU').click();
+    cy.get('@swapChart').find('[data-testid="swap-range-band"]').should('have.length', 1);
+    cy.get('@swapChart').find('.point').should('have.length', 2).last().click({ force: true });
+    cy.get('body').should('contain.text', 'Median · p50 (GB/s)').and('contain.text', '1 block');
+    cy.get('[data-testid="swap-view"]').contains('Series').click();
+    cy.get('@swapChart').find('[data-testid="swap-range-band"]').should('not.exist');
     cy.get('@swapChart').find('.point').should('have.length', 2).last().click({ force: true });
     cy.get('body')
       .should('contain.text', '32.768p50 (GB/s)')
       .and('contain.text', 'Copied payload: 1 GiB');
+    // Hiding the only series clears the plot instead of drawing axes on a fallback domain.
+    cy.get('[data-testid="collectivex-swap-section"]').contains('H200 · 1 block').click();
+    cy.get('@swapChart').find('.y-axis').should('not.exist');
+    cy.get('[data-testid="collectivex-swap-reset-filter"]').click();
+    cy.get('@swapChart').find('.y-axis').should('exist');
     cy.get('[data-testid="swap-metric"]').contains('Latency').click();
     cy.get('@swapChart').should('contain.text', 'µs, log');
     cy.get('[data-testid="swap-direction"]').contains('GPU → GPU').click();
@@ -648,6 +673,13 @@ describe('CollectiveX swap_blocks', () => {
     );
     cy.get('[data-testid="swap-metric"]').contains('延迟').click();
     cy.get('[data-testid="collectivex-swap-chart"]').should('contain.text', '块大小（字节，对数）');
+    cy.get('[data-testid="swap-view"]').should('contain.text', '按 SKU 显示最佳');
+    cy.get('[data-testid="collectivex-swap-chart"] .point').last().click({ force: true });
+    cy.get('body').should('contain.text', '最佳 · 1 个块');
+    cy.get('[data-testid="swap-view"]').contains('按 SKU 显示范围').click();
+    cy.get('[data-testid="collectivex-swap-chart"] .point').last().click({ force: true });
+    cy.get('body').should('contain.text', '中位数').and('contain.text', '各块数量的范围');
+    cy.get('[data-testid="swap-view"]').contains('序列').click();
     cy.get('[data-testid="collectivex-swap-chart"] .point').last().click({ force: true });
     cy.get('body')
       .should('contain.text', '复制的有效载荷: 1 GiB')

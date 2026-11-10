@@ -1,11 +1,18 @@
-import { expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { buildDatasetFromNeutral } from '@semianalysisai/inferencex-db/collectivex/reader';
 import {
   makeSwapDoc,
   swapMatrix,
   swapMeta,
 } from '@semianalysisai/inferencex-db/collectivex/swap-test-fixture';
-import { formatSwapBytes, swapChartPoints, swapRooflines } from './swap-data';
+import {
+  formatSwapBytes,
+  swapChartPoints,
+  swapRangeBands,
+  swapRooflines,
+  swapYAxis,
+  type SwapChartPoint,
+} from './swap-data';
 
 it('formats byte units without losing the 1 GiB endpoint', () => {
   expect([257, 1024, 262144, 1048576, 1073741824].map(formatSwapBytes)).toEqual([
@@ -104,4 +111,83 @@ it('labels a GPU whose runtime reports an empty device name using its recorded S
   expect(swapChartPoints([dataset], selection).map((p) => p.device)).toEqual(['MI355X', 'MI355X']);
   result.sku = 'future-gpu';
   expect(swapChartPoints([dataset], selection)[0].device).toBe('future-gpu');
+});
+
+describe('swapYAxis', () => {
+  it('breaks above the data and stacks a distant NVLink-C2C roofline just above the break', () => {
+    const axis = swapYAxis(80, [64, 225]);
+    expect(axis.breakAt).toBeCloseTo(92);
+    expect(axis.toPlot(64)).toBe(64);
+    const c2c = axis.toPlot(225);
+    expect(c2c).toBeGreaterThan(92);
+    expect(c2c).toBeLessThan(axis.domainMax);
+    expect(axis.domainMax).toBeLessThan(130);
+    expect(axis.fromPlot(c2c)).toBe(225);
+    expect(axis.fromPlot(50)).toBe(50);
+    expect(axis.fromPlot((92 + c2c) / 2)).toBeNull();
+  });
+
+  it('keeps a true linear scale when every roofline is near the data', () => {
+    const axis = swapYAxis(50, [64]);
+    expect(axis.breakAt).toBeNull();
+    expect(axis.toPlot(64)).toBe(64);
+    expect(axis.domainMax).toBeCloseTo(70.4);
+  });
+
+  it('keeps a roofline just above the data below the break so its tick stays labelled', () => {
+    const axis = swapYAxis(80, [120, 900]);
+    expect(axis.breakAt).toBeCloseTo(138);
+    expect(axis.toPlot(120)).toBe(120);
+    expect(axis.fromPlot(120)).toBe(120);
+    expect(axis.fromPlot(axis.toPlot(900))).toBe(900);
+  });
+});
+
+const rangePoint = (runId: string, sku: string, numBlocks: number, x: number, y: number) =>
+  ({
+    x,
+    y,
+    runId,
+    sku,
+    device: sku.toUpperCase(),
+    seriesId: `${runId}__${sku}__${numBlocks}`,
+    colorKey: `${sku}:${numBlocks}`,
+    row: { num_blocks: numBlocks },
+  }) as SwapChartPoint;
+
+describe('swapRangeBands', () => {
+  it('spans block counts per run and SKU with a median line, best member first', () => {
+    const bands = swapRangeBands(
+      [
+        rangePoint('1', 'gb200', 1, 4096, 2),
+        rangePoint('1', 'gb200', 4, 4096, 8),
+        rangePoint('1', 'gb200', 16, 4096, 4),
+        rangePoint('1', 'gb200', 64, 4096, 10),
+        rangePoint('1', 'gb200', 1, 1024, 1),
+        rangePoint('1', 'b200', 1, 4096, 3),
+        rangePoint('2', 'gb200', 1, 4096, 5),
+      ],
+      'bandwidth',
+    );
+    expect(bands.map((b) => b.id)).toEqual(['1__b200', '1__gb200', '2__gb200']);
+    const gb200 = bands[1];
+    expect(gb200.points.map((p) => p.x)).toEqual([1024, 4096]);
+    expect(gb200.points[0]).toMatchObject({ lo: 1, mid: 1, hi: 1 });
+    // Even count: mean of the two middle values (4 and 8).
+    expect(gb200.points[1]).toMatchObject({ lo: 2, mid: 6, hi: 10 });
+    expect(gb200.points[1].members.map((m) => m.numBlocks)).toEqual([64, 4, 16, 1]);
+  });
+
+  it('puts the lowest latency first', () => {
+    const [band] = swapRangeBands(
+      [
+        rangePoint('1', 'h200', 1, 4096, 9),
+        rangePoint('1', 'h200', 4, 4096, 3),
+        rangePoint('1', 'h200', 16, 4096, 5),
+      ],
+      'latency',
+    );
+    expect(band.points[0]).toMatchObject({ lo: 3, mid: 5, hi: 9 });
+    expect(band.points[0].members.map((m) => m.y)).toEqual([3, 5, 9]);
+  });
 });

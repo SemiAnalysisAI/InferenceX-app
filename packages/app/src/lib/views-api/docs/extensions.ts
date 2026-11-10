@@ -346,7 +346,11 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
   swapDirection: ['h2d (default), d2h or d2d.', 'h2d（默认）、d2h 或 d2d。'],
   swapLayout: ['contiguous (default) or random.', 'contiguous（默认）或 random。'],
   swapMetric: ['bandwidth (default) or latency.', 'bandwidth（默认）或 latency。'],
-  swapPercentile: ['p50 (default), p95 or p99.', 'p50（默认）、p95 或 p99。'],
+  swapPercentile: ['p50 (default), p90, p95 or p99.', 'p50（默认）、p90、p95 或 p99。'],
+  swapView: [
+    'best (default), range or series. best and range return swap.ranges: one entry per run and SKU with, at each block size, the lowest, median and highest value across block counts and every block count in members, best first (highest bandwidth, lowest latency). The best view plots members[0]; the range view plots the band and median. series returns an empty swap.ranges.',
+    'best（默认）、range 或 series。best 和 range 返回 swap.ranges：按运行和 SKU 各一项，包含每个块大小下各块数量的最低值、中位数和最高值，并在 members 中按最佳优先（带宽最高、延迟最低）列出各块数量。best 视图绘制 members[0]，range 视图绘制色带与中位数；series 返回空的 swap.ranges。',
+  ],
   backend: ['Backend filter; omit for all.', '后端筛选；省略时选择全部。'],
   sku: ['CollectiveX chip SKU filter; default all.', 'CollectiveX 芯片 SKU 筛选，默认 all。'],
   page: [
