@@ -1,7 +1,7 @@
 'use client';
 
 import * as d3 from 'd3';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   CollectiveXDataset,
   CollectiveXPercentile,
@@ -279,6 +279,12 @@ export function CollectiveXSwapSection({
   const cardRef = useRef<HTMLDivElement>(null);
   // Legend entry of the pinned point, so its spotlight survives hover-end until the pin is dismissed.
   const pinnedRef = useRef<string | null>(null);
+  // Any view or filter change redraws the chart, so drop the pin and its spotlight: Best and Range
+  // reuse line keys (a stale fade would stick), and a band id matches nothing in Series.
+  useEffect(() => {
+    pinnedRef.current = null;
+    spotlightSwap(cardRef.current, null, new Set());
+  }, [view, metric, direction, layout, percentile, hidden]);
   const bySku = view !== 'series';
   const allPoints = useMemo(
     () => swapChartPoints(datasets, { metric, direction, layout, percentile }),
