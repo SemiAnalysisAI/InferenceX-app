@@ -3,6 +3,7 @@ import {
   pairedGroup,
   parseStage,
   promptKey,
+  speedVs,
   stagePrompt,
   stageSearch,
   stageSubject,
@@ -78,6 +79,15 @@ describe('clip stage', () => {
       pending: true,
     });
     expect(stageSubject([clipless])?.groups).toHaveLength(1);
+  });
+
+  it('reads speed from seconds per clip in the right direction and leaves a missing p50 unmeasured', () => {
+    expect(speedVs(10, 28)).toEqual({ direction: 'faster', times: '2.80' });
+    expect(speedVs(28, 10)).toEqual({ direction: 'slower', times: '2.80' });
+    expect(speedVs(7, 20)).toEqual({ direction: 'faster', times: '2.86' });
+    expect(speedVs(10, 10.04)).toEqual({ direction: 'same', times: '1.00' });
+    expect(speedVs(null, 28)).toBeNull();
+    expect(speedVs(10, 0)).toBeNull();
   });
 
   it('keeps each take of a prompt addressable and falls back to the first prompt', () => {

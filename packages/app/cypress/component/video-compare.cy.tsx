@@ -3,11 +3,14 @@ import { useState } from 'react';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import type { VideoPoint } from '@/components/video-benchmark/metrics';
 import { dashboardCells, videoPoints } from '@/components/video-benchmark/points';
+import type { ResultCell } from '@/components/video-benchmark/results';
+import type { ResultsEvidence } from '@/components/video-benchmark/results-evidence';
 import VideoResultsClips from '@/components/video-benchmark/VideoResultsClips';
 import history from '../fixtures/api/video-history.json';
 import { servingArtifact } from '../support/video-artifacts';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
 import { verifiedQuality } from '@/components/video-benchmark/reference-quality';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 
 // Retained H100/H200/B200 C1/C2/C4 observations; clips come from synthetic stored artifacts.
 const points = videoPoints([history as unknown as VideoHistoryPage]);
@@ -95,6 +98,23 @@ const expectDifference = (check: (rgba: number[]) => void) =>
     check(rgba);
   });
 
+const cost = (perVideo: number, perVideoSecond: number) => ({
+  perVideo,
+  perVideoSecond,
+  perHour: 1,
+});
+const readout = '[data-testid="video-results-readout"]';
+/** A readout cell's lines: its own value, its context, then the pair's value when it has one. */
+const readoutLines = (metric: string) => cy.get(`${readout} [data-metric="${metric}"] dd`);
+const readoutValue = (metric: string, index = 0) => readoutLines(metric).eq(index);
+/** The readout's cells in reading order. */
+const readoutOrder = (metrics: readonly string[]) =>
+  cy
+    .get(`${readout} [data-metric]`)
+    .should(($cells) =>
+      expect($cells.toArray().map((cell) => cell.dataset.metric)).to.deep.equal(metrics),
+    );
+
 // These decoder fixtures are test inputs, never benchmark evidence.
 function mountResultsClips(
   keys = ['b200', 'h200'],
@@ -104,6 +124,16 @@ function mountResultsClips(
   previews: string[] = [],
   brokenPreview = false,
   unpublished: string[] = [],
+  {
+    leads,
+    deployments,
+    costs = {},
+  }: {
+    /** Replace the C1 leads of `keys`, which still serve the media. */
+    leads?: VideoPoint[];
+    deployments?: VideoPoint[];
+    costs?: Record<string, ResultCell['cost']>;
+  } = {},
 ) {
   const referenceMedia = { url: '', diagnosticUrl: '', previewUrl: '' };
   cy.fixture('video-results/reference.mp4', 'base64').then((encoded: string) => {
@@ -224,7 +254,7 @@ function mountResultsClips(
       },
     );
   }
-  const selectedPoints = keys.map(c1);
+  const selectedPoints = leads ?? keys.map(c1);
   function Clips() {
     const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
     return (
@@ -236,7 +266,12 @@ function mountResultsClips(
         <VideoResultsClips
           points={selectedPoints.filter((point) => !hidden.has(point.hardwareKey ?? ''))}
           colorFor={colorFor}
-          costs={{ [c1('b200').id]: { participating: 0.02, allocated: null } }}
+          deployments={deployments}
+          costs={{
+            [c1('b200').id]: { participating: cost(0.1, 0.02), allocated: null },
+            [c1('h100').id]: { participating: cost(0.3, 0.06), allocated: cost(0.6, 0.12) },
+            ...costs,
+          }}
           unofficialRun={unofficialRun}
         />
       </PathnameContext.Provider>
@@ -244,6 +279,23 @@ function mountResultsClips(
   }
   cy.mount(<Clips />);
   cy.wait(keys.map((key) => `@results-${key}` as const));
+}
+
+/** A lossy B200 lead at p50 40 s against its lossless twin, if any; both clips take 120 s. */
+function mountLossyPair(twinP50: number | null) {
+  const lossy: VideoPoint = {
+    ...c1('b200'),
+    id: `${c1('b200').id}-fbc`,
+    p50: 40,
+    results: { optimizations: ['first-block-cache'] } as unknown as ResultsEvidence,
+  };
+  const twins = twinP50 === null ? [] : [{ ...c1('b200'), p50: twinP50 }];
+  mountResultsClips(['b200'], '/vgx', false, undefined, [], false, [], {
+    leads: [lossy],
+    deployments: [lossy, ...twins],
+    costs: { [lossy.id]: { participating: cost(0.04, 0.01), allocated: null } },
+  });
+  cy.get('[data-testid="video-results-compare-twin"]').click();
 }
 
 describe('Video results clip stage', () => {
@@ -319,10 +371,8 @@ describe('Video results clip stage', () => {
       .should('have.attr', 'aria-pressed', 'true')
       .and('contain', 'Matched-noise rerun');
     cy.get('[data-side="a"]').should('contain', '4 GPU');
-    const facts = '[data-testid="video-results-facts"]';
-    cy.get(facts).should('contain', '30 dB');
-    for (const label of ['Wall time', 'J / clip', 'Participating', 'Allocated'])
-      cy.get(facts).contains('dt', label).next('dd').should('have.text', '—');
+    cy.get(readout).should('have.attr', 'data-pair', 'reference').and('contain', '30 dB');
+    for (const metric of ['wall', 'energy', 'cost']) readoutValue(metric).should('have.text', '—');
     cy.get('@diagnostic-b200-url').then((url) => sideVideo('a').should('have.attr', 'src', url));
     cy.get('@diagnostic-reference-url').then((url) =>
       sideVideo('b').should('have.attr', 'src', url),
@@ -338,9 +388,20 @@ describe('Video results clip stage', () => {
       expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
     });
     cy.get('[data-prompt="drum-taps"]').click();
-    cy.get(facts).should('contain', '25 dB');
-    cy.get(facts).contains('dt', 'Wall time').next('dd').should('have.text', '120 s');
-    cy.get(facts).contains('dt', 'Participating').next('dd').should('have.text', '0.02');
+    // The board's reference order: quality first, then latency and one cost, then energy.
+    readoutOrder(['psnr', 'wall', 'cost', 'energy']);
+    readoutValue('psnr').should('have.text', '25 dB');
+    readoutValue('wall').should('have.text', '120 s');
+    readoutValue('energy').should('have.text', '301,088 J');
+    readoutValue('cost').should('have.text', '$0.1');
+    readoutValue('cost', 1).should('have.text', '$0.02 / video-s');
+    cy.get(`${readout} [data-metric="cost"]`)
+      .should('have.attr', 'title')
+      .and('contain', 'On the allocated GPUs: not measured yet.');
+    cy.get(`${readout} [data-testid="video-results-readout-pair"]`).should(
+      'contain',
+      '4 GPU · TP2 × Ulysses 2',
+    );
     cy.get('[data-testid="video-results-sources"]').should('contain', c1('b200').runId);
   });
 
@@ -361,7 +422,7 @@ describe('Video results clip stage', () => {
       .should('contain', 'A drummer taps a snare drum.')
       .and('contain', 'seed 11')
       .and('contain', 'take 1');
-    cy.get('[data-testid="video-results-facts"]').should('contain', '0.02');
+    readoutValue('cost').should('have.text', '$0.1');
 
     cy.get('[data-testid="video-results-stage"]').click('right');
     load('[data-testid="video-results-start"]');
@@ -590,9 +651,66 @@ describe('Video results clip stage', () => {
       .and('contain', 'Unofficial run')
       .find('video')
       .should('not.exist');
-    cy.get('[data-testid="video-results-facts"]').should('contain', '25 dB');
+    readoutValue('psnr').should('have.text', '25 dB');
     cy.get('[data-side="b"]').should('contain', 'No sealed reference pair for this clip.');
     cy.get('[data-testid="video-results-play"]').should('be.disabled');
+  });
+
+  it('reads out both sides against another GPU and names the unofficial one', () => {
+    mountResultsClips(['b200', 'h100'], '/vgx', false, c1('b200').runId);
+    cy.get('[data-testid="video-results-compare-h100"]').click();
+    cy.get(readout).should('have.attr', 'data-pair', 'lead');
+    // Speed leads, so no sixth cell strands on a second row.
+    readoutOrder(['speed', 'psnr', 'wall', 'cost', 'energy']);
+    cy.get(`${readout} [data-readout-side="b200"]`)
+      .should('contain', 'Unofficial run')
+      .find('span')
+      .first()
+      .should('have.attr', 'style')
+      .and('contain', overlayRunColor(0));
+    cy.get(`${readout} [data-readout-side="h100"]`).should('not.contain', 'Unofficial run');
+    readoutLines('wall').should('have.length', 2).last().should('have.text', 'H100 120 s');
+    readoutValue('speed').should('have.text', '2.15× faster');
+    readoutValue('speed', 1).should('have.text', 'p50 77.9 s vs 167.3 s');
+    readoutValue('psnr', 2).should('have.text', 'H100 25 dB');
+    readoutValue('cost', 1).should('have.text', '$0.02 / video-s');
+    readoutValue('cost', 2).should('have.text', 'H100 $0.3');
+  });
+
+  it('shows a dash, not a pending score or stray times, where a lossy pair has nothing to compare', () => {
+    mountLossyPair(0);
+    readoutLines('speed').should('have.length', 1).and('have.text', '—');
+    mountLossyPair(null);
+    cy.get('[data-side="b"]').should('contain', 'no lossless config');
+    for (const metric of ['speed', 'paired'])
+      readoutLines(metric).should('have.length', 1).and('have.text', '—');
+    for (const metric of ['psnr', 'cost', 'energy'])
+      readoutLines(metric).last().should('have.text', 'B200 lossless —');
+  });
+
+  it('leads a lossy pair with its speed and never shows a score it has not measured', () => {
+    mountLossyPair(112);
+    cy.get(readout).should('have.attr', 'data-pair', 'twin');
+    readoutOrder(['speed', 'paired', 'psnr', 'cost', 'energy']);
+    cy.get(`${readout} [data-metric="speed"] dt`).should('have.text', 'Speed vs lossless');
+    readoutValue('speed').should('have.text', '2.80× faster');
+    readoutValue('speed', 1).should('have.text', 'p50 40 s vs 112 s');
+    // Only the trade is tinted.
+    cy.get(`${readout} [data-metric]`).should(($cells) => {
+      const tinted = $cells
+        .toArray()
+        .filter((cell) => getComputedStyle(cell).backgroundColor !== 'rgba(0, 0, 0, 0)')
+        .map((cell) => cell.dataset.metric);
+      expect(tinted).to.deep.equal(['speed']);
+    });
+    // One planned cell stands for PSNR, SSIM and LPIPS against lossless; it holds no number.
+    cy.get(`${readout} [data-metric="paired"] dt`).should('have.text', 'Paired scores');
+    readoutValue('paired').should('have.text', 'Planned');
+    cy.get(`${readout} [data-metric="paired"]`).invoke('text').should('not.match', /\d/u);
+    readoutValue('cost').should('have.text', '$0.04');
+    readoutValue('cost', 1).should('have.text', '$0.01 / video-s');
+    readoutValue('cost', 2).should('have.text', 'B200 lossless $0.1');
+    readoutValue('psnr', 2).should('have.text', 'B200 lossless 25 dB');
   });
 
   it('falls back to the sealed original when a web rendition cannot be played', () => {

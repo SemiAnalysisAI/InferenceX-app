@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronRight } from 'lucide-react';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { InfoHelp } from '@/components/ui/option-info';
@@ -35,10 +35,11 @@ import {
   type ResultsClipGroup,
   type ResultsClipSide,
 } from './results-clips';
-import { RESULTS_HARDWARE, resultMetadata } from './results';
+import { RESULTS_HARDWARE, resultMetadata, type ResultCell } from './results';
 import type { StoredArtifact } from './stored';
 import { videoClipSourceKey as sourceKey, type VideoInitialData } from './initial-data';
-import VideoClipStage, { type StageClip } from './VideoClipStage';
+import VideoClipReadout from './VideoClipReadout';
+import VideoClipStage, { SideDot, type StageClip } from './VideoClipStage';
 
 const STRINGS = {
   en: {
@@ -56,7 +57,6 @@ const STRINGS = {
     diagnostic: 'Matched-noise rerun',
     diagnosticNote:
       'Single-clip rerun with fixed noise and parallelism. Charts below use the original 20-clip run.',
-    diagnosticMetric: 'Not provided for this diagnostic.',
     media: 'Media',
     webEncode: 'Playback uses a web encode; Difference, PSNR and the media link use the original.',
     seed: 'seed',
@@ -81,45 +81,11 @@ const STRINGS = {
     reference: 'Official Diffusers reference',
     referenceShort: 'Diffusers reference',
     schedule: (updates: number, sigmas: number) => `${updates} updates · ${sigmas} sigma points`,
-    exactMatch: 'Exact match',
-    incompatible: 'Paired media are incompatible; PSNR is unavailable.',
-    psnrMeasured: (frames: number) =>
-      `Decoded RGB24 · all ${frames} frames · full-stream MSE. Descriptive cross-engine comparison; no quality pass/fail threshold. Different engines and parallel layouts produce different pixels from the same prompt and seed, so a low value alone does not indicate a defect.`,
     referenceNote:
       'Encoded reference MP4. PSNR compares every decoded RGB pixel and frame; it does not measure semantic quality.',
-    facts: (name: string) => `${name} clip metrics`,
-    wall: 'Wall time',
-    psnr: 'PSNR',
-    energy: 'J / clip',
-    costBasis: 'Modelled TCO · $/video-s',
-    participatingCost: 'Participating',
-    allocatedCost: 'Allocated',
-    energyNote:
-      'Mean GPU-board joules per valid clip in the selected measurement cell; not a per-clip energy trace.',
-    psnrNote: 'No sealed paired PSNR result is available for this clip.',
-    unscored: {
-      invalid_candidate: 'Invalid clip',
-      checksum_mismatch: 'Checksum mismatch',
-      no_reference: 'No reference',
-      settings_mismatch: 'Settings differ',
-      unreadable: 'Unreadable artifact',
-    },
-    unscoredNote: {
-      invalid_candidate: () =>
-        'The quality scorer did not compare this clip because it is not a valid measured output.',
-      checksum_mismatch: () =>
-        'The quality scorer did not compare this clip because its bytes do not match the recorded SHA256.',
-      no_reference: () =>
-        'The quality scorer did not compare this clip because the reference set has no clip for this case.',
-      settings_mismatch: (fields: string[]) =>
-        `The quality scorer did not compare this clip because its settings differ from the reference${fields.length > 0 ? `: ${fields.join(', ')}` : ''}.`,
-      unreadable: () =>
-        'The quality scorer could not read this artifact, so none of its clips were compared.',
-    },
     metricsHelp:
-      'PSNR uses a sealed Diffusers reference pair and every decoded RGB frame. J/clip is the selected cell mean. Both TCO bases use the selected tier, recorded GPU count and valid decoded output duration.',
+      'PSNR uses a sealed Diffusers reference pair and every decoded RGB frame. Speed is the ratio of the two cells’ p50; wall time is this prompt’s request alone. $ per clip is modelled TCO on the participating GPUs from the selected tier and recorded GPU count, and $/video-s spreads it over valid decoded output duration; hover it for the allocated basis. Energy per clip is the selected cell’s mean. Paired scores against the lossless twin are planned; no scorer computes them yet.',
     gpu: (n: number) => `${n} GPU`,
-    seconds: 's',
     compareWith: 'Compare with',
     lossless: 'lossless',
     twin: (hardware: string) => `${hardware} lossless`,
@@ -140,7 +106,6 @@ const STRINGS = {
     diagnostic: '相同初始噪声重跑',
     diagnosticNote:
       '单条视频重跑，使用固定的初始噪声和并行配置。下方图表仍展示原始 20 条视频的测试结果。',
-    diagnosticMetric: '此次重跑未提供该指标。',
     media: '视频文件',
     webEncode: '播放使用网页转码版本；“差异”视图、PSNR 和视频文件链接仍使用原始视频。',
     seed: 'seed',
@@ -165,39 +130,10 @@ const STRINGS = {
     reference: '官方 Diffusers 参考',
     referenceShort: 'Diffusers 参考',
     schedule: (updates: number, sigmas: number) => `${updates} 次更新 · ${sigmas} 个 sigma 点`,
-    exactMatch: '完全一致',
-    incompatible: '配对媒体不兼容，无法提供 PSNR。',
-    psnrMeasured: (frames: number) =>
-      `解码后 RGB24 · 全部 ${frames} 帧 · 全流 MSE。仅作跨引擎数值对比，不设质量合格阈值。不同引擎或并行配置即使使用相同的 prompt 和 seed，生成的像素也会不同，因此仅凭 PSNR 偏低不能说明输出有问题。`,
     referenceNote: '已编码的参考 MP4。PSNR 对比全部解码 RGB 像素和帧，不衡量语义质量。',
-    facts: (name: string) => `${name} 视频指标`,
-    wall: '出片时间',
-    psnr: 'PSNR',
-    energy: 'J / clip',
-    costBasis: 'TCO 估算 · $/视频秒',
-    participatingCost: '参与 GPU',
-    allocatedCost: '分配 GPU',
-    energyNote: '所选测量单元每条有效视频的平均 GPU 板卡能耗，不是单条视频的能耗轨迹。',
-    psnrNote: '此视频尚无已封存的配对 PSNR 结果。',
-    unscored: {
-      invalid_candidate: '无效视频',
-      checksum_mismatch: '校验和不符',
-      no_reference: '无参考视频',
-      settings_mismatch: '配置不一致',
-      unreadable: '产物无法读取',
-    },
-    unscoredNote: {
-      invalid_candidate: () => '该视频不是有效的测量输出，质量评分器未作比较。',
-      checksum_mismatch: () => '该视频文件的 SHA256 与记录值不符，质量评分器未作比较。',
-      no_reference: () => '参考集中没有该用例的视频，质量评分器未作比较。',
-      settings_mismatch: (fields: string[]) =>
-        `该视频的配置与参考不一致${fields.length > 0 ? `（${fields.join('、')}）` : ''}，质量评分器未作比较。`,
-      unreadable: () => '质量评分器无法读取该产物，因此其中的视频均未比较。',
-    },
     metricsHelp:
-      'PSNR 使用已封存的 Diffusers 参考配对，比较全部解码 RGB 帧。J/clip 是所选测量单元的平均值。两种 TCO 口径均使用所选成本档位、记录的 GPU 数量和有效输出的实际时长。',
+      'PSNR 使用已封存的 Diffusers 参考配对，比较全部解码 RGB 帧。速度是两个测量单元 p50 之比，出片时间只是当前 prompt 这一次请求的时长。每条视频成本按所选成本档位和记录的 GPU 数量估算参与 GPU 的 TCO，每视频秒成本按有效输出的实际解码时长分摊；悬停该格可查看按分配 GPU 估算的口径。每条视频能耗是所选测量单元的平均值。以无损对照为基准的配对评分仍在计划中，目前还没有评分器计算。',
     gpu: (n: number) => `${n} 张 GPU`,
-    seconds: 's',
     compareWith: '对比',
     lossless: '无损',
     twin: (hardware: string) => `${hardware} 无损对照`,
@@ -206,7 +142,6 @@ const STRINGS = {
 };
 
 type Strings = (typeof STRINGS)['en'] | (typeof STRINGS)['zh'];
-type Costs = Record<string, { participating: number | null; allocated: number | null }>;
 export interface VideoResultsClipsProps {
   /** One lead point per hardware: the default subject, and what the other side can show. */
   points: VideoPoint[];
@@ -218,17 +153,15 @@ export interface VideoResultsClipsProps {
   officialLeads?: readonly VideoPoint[];
   /** Hardware color; a side from `unofficialRun` takes the overlay color. */
   colorFor: (key: string) => string;
-  costs?: Costs;
+  /** Modelled TCO of every point by `VideoPoint.id`, for the readout's per-clip cost. */
+  costs?: Readonly<Record<string, ResultCell['cost']>>;
   unofficialRun?: string;
   initialSides?: VideoInitialData['sides'];
   /** The chart points the two sides play, for the chart's Playing and Baseline badges. */
   onPairChange?: (pair: StagePair) => void;
+  /** Under the readout rows; the quality explainer fills it. */
+  readoutFooter?: ReactNode;
 }
-
-const display = (value: number | null | undefined, digits = 1) =>
-  typeof value === 'number' && Number.isFinite(value)
-    ? value.toLocaleString('en-US', { maximumFractionDigits: digits })
-    : '—';
 
 const NO_POINTS: readonly VideoPoint[] = [];
 
@@ -245,6 +178,7 @@ export default function VideoResultsClips({
   unofficialRun,
   initialSides = {},
   onPairChange,
+  readoutFooter,
 }: VideoResultsClipsProps) {
   const s = STRINGS[useLocale()];
   const stage = parseStage(useClientSearch());
@@ -518,13 +452,13 @@ export default function VideoResultsClips({
                   value: item.value,
                   label: optionLabel(item),
                   icon: (
-                    <span
-                      aria-hidden="true"
-                      className="size-2 shrink-0 rounded-full"
-                      style={
+                    <SideDot
+                      color={
                         item.kind === 'reference'
-                          ? { border: '1.5px solid currentColor' }
-                          : { background: item.point ? colorOf(item.point) : (a.color ?? '') }
+                          ? null
+                          : item.point
+                            ? colorOf(item.point)
+                            : a.color
                       }
                     />
                   ),
@@ -551,74 +485,25 @@ export default function VideoResultsClips({
             frames={point.frameCount}
             onPreviewError={(url) => setFailedPreviews((previous) => new Set([...previous, url]))}
           />
-          <div
-            data-testid="video-results-facts"
-            aria-label={s.facts(a.label)}
-            className="grid gap-x-6 gap-y-2 text-xs tabular-nums sm:grid-cols-2"
-          >
-            <dl className="space-y-1">
-              {[
-                [
-                  s.wall,
-                  diagnostic || !clip || clip.record.seconds === null
-                    ? '—'
-                    : `${display(clip.record.seconds)} ${s.seconds}`,
-                  diagnostic ? s.diagnosticMetric : '',
-                ],
-                [
-                  s.psnr,
-                  clip?.quality?.status === 'identical'
-                    ? s.exactMatch
-                    : clip?.quality?.status === 'measured'
-                      ? `${display(clip.quality.psnrDb, 2)} dB`
-                      : clip?.unscored
-                        ? s.unscored[clip.unscored.reason]
-                        : '—',
-                  clip?.quality
-                    ? clip.quality.status === 'incompatible'
-                      ? s.incompatible
-                      : s.psnrMeasured(clip.quality.totalFrames)
-                    : clip?.unscored
-                      ? s.unscoredNote[clip.unscored.reason](clip.unscored.fields)
-                      : s.psnrNote,
-                ],
-                [
-                  s.energy,
-                  display(diagnostic || point.energyKj === null ? null : point.energyKj * 1000, 0),
-                  diagnostic ? s.diagnosticMetric : s.energyNote,
-                ],
-              ].map(([label, value, title]) => (
-                <div
-                  key={label}
-                  title={title || undefined}
-                  className="flex min-w-0 flex-wrap justify-between gap-x-2 border-b border-border/40 py-0.5"
-                >
-                  <dt className="min-w-0 text-muted-foreground">{label}</dt>
-                  <dd className="m-0 font-medium">{value}</dd>
-                </div>
-              ))}
-            </dl>
-            <div>
-              <p className="text-2xs text-muted-foreground">{s.costBasis}</p>
-              <dl className="space-y-1">
-                {[
-                  [
-                    s.participatingCost,
-                    display(diagnostic ? null : costs?.[point.id]?.participating, 4),
-                  ],
-                  [s.allocatedCost, display(diagnostic ? null : costs?.[point.id]?.allocated, 4)],
-                ].map(([label, value]) => (
-                  <div
-                    key={label}
-                    className="flex min-w-0 flex-wrap justify-between gap-x-2 border-b border-border/40 py-0.5"
-                  >
-                    <dt className="min-w-0 text-muted-foreground">{label}</dt>
-                    <dd className="m-0 font-medium">{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          </div>
+          <VideoClipReadout
+            kind={option?.kind ?? 'reference'}
+            a={{
+              name: a.label,
+              pill: a,
+              point,
+              clip: subject?.pending ? undefined : clip,
+              cost: costs?.[point.id],
+            }}
+            b={{
+              name: option?.kind === 'twin' ? s.twin(hardwareLabel(hardware)) : b.label,
+              pill: b,
+              point: other,
+              clip: other && otherSide === undefined ? undefined : otherClip,
+              cost: other ? costs?.[other.id] : undefined,
+            }}
+            diagnostic={diagnostic}
+            footer={readoutFooter}
+          />
           <details
             data-testid="video-results-sources"
             className="group/sources text-xs"

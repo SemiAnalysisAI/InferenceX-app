@@ -476,9 +476,9 @@ describe('VideoGenX results', () => {
     points('[data-hardware="b200"] .visible-shape').click({ force: true });
     // The stage plays that history point, and its TCO comes from the history cell too.
     searchParam('r_clip').should('match', /^34341996789:/u);
-    cy.contains('[data-testid="video-results-facts"] dt', /^Participating$/u)
-      .next()
-      .should(($value) => expect($value.text(), 'history point TCO').to.match(/^\d/u));
+    cy.get('[data-testid="video-results-readout"] [data-metric="cost"] dd')
+      .first()
+      .should(($value) => expect($value.text(), 'history point TCO').to.match(/^\$\d/u));
     cy.get('[data-testid="point-details-panel"] [data-action="view-telemetry"]').click();
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
     searchParam('r_point').should('match', /^34341996789:/u);
@@ -703,6 +703,11 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="video-results-compare-reference"]').click();
     cy.get('[data-testid="video-results-compare-b200"]').click();
     stagePill('b').should('contain', 'B200').and('not.contain', 'Unofficial run');
+    // Both sides are B200, so the readout names the baseline as the official run.
+    cy.get('[data-testid="video-results-readout"] [data-readout-side="b200"]')
+      .last()
+      .should('contain', 'B200 official')
+      .and('not.contain', 'Unofficial run');
     points('[data-clip-role="baseline"]')
       .should('have.attr', 'data-hardware', 'b200')
       .and('have.attr', 'data-overlay', 'false');
@@ -789,9 +794,14 @@ describe('VideoGenX results', () => {
         expect(rect.right).to.be.at.most(width);
         expect(rect.width, 'stage spans the card').to.be.greaterThan(width * 0.6);
       });
-      cy.get('[data-testid="video-results-facts"]')
-        .should('contain', 'TCO')
-        .and('contain', pathname.startsWith('/zh') ? '分配 GPU' : 'Allocated');
+      cy.get('[data-testid="video-results-readout"] dl').should(($grid) => {
+        const cells = [...$grid[0].children];
+        const rows = new Set(cells.map((cell) => cell.getBoundingClientRect().top)).size;
+        expect(rows, 'readout rows').to.equal(width >= 1024 ? 1 : Math.ceil(cells.length / 2));
+        expect($grid.find('[data-metric="cost"]').attr('title')).to.contain(
+          pathname.startsWith('/zh') ? '分配 GPU' : 'allocated',
+        );
+      });
       cy.get('[data-testid="video-results-sources"] summary').click();
       cy.get('[data-testid="video-results-sources"] table').should(($table) => {
         const container = $table[0].parentElement!;
