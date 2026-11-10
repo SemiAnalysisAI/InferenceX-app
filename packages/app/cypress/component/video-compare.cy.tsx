@@ -571,16 +571,16 @@ describe('Video results clip stage', () => {
     cy.get('[data-testid="video-results-start"]').should('be.visible');
   });
 
-  it('fits the stage in a short window, and gives Side by side the full width', () => {
+  it('fits the stage in a short window, also with two frames Side by side', () => {
     cy.viewport(1280, 600);
     mountResultsClips(['b200', 'h200'], '/vgx', false);
-    // 600px less the 12rem kept for the header and transport.
+    // 600px less the 18rem kept for the header, Compare row, transport and readout.
     cy.get('[data-testid="video-results-stage"]').should(($stage) =>
-      expect($stage[0].getBoundingClientRect().height).to.be.closeTo(408, 1),
+      expect($stage[0].getBoundingClientRect().height).to.be.closeTo(312, 1),
     );
     cy.get('[data-testid="video-results-view-side"]').click();
     cy.get('[data-testid="video-results-clip"]').should(($clips) =>
-      expect($clips[0].getBoundingClientRect().width).to.be.greaterThan(600),
+      expect($clips[0].getBoundingClientRect().height).to.be.closeTo(312, 1),
     );
   });
 
