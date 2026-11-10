@@ -162,6 +162,12 @@ const OTHER = { a: 'b', b: 'a' } as const;
 /** Playback-time gap beyond which a Difference frame would compare different moments. */
 const DIFFERENCE_SYNC_SECONDS = 0.12;
 const SPLIT_STEP = 5;
+// The stage and its transport fit under the sticky header: a picture is at most the window's height
+// less 12rem, and the block narrows to match, one 16:9 frame wide or two side by side.
+const FIT_WIDTH = {
+  overlay: 'max(20rem, calc((100dvh - 12rem) * 16 / 9))',
+  side: 'max(20rem, calc((100dvh - 12rem) * 32 / 9 + 0.75rem))',
+};
 const SPEEDS = [0.25, 0.5, 1] as const;
 const ZOOMS = [1, 2, 4] as const;
 
@@ -488,7 +494,11 @@ export default function VideoClipStage({
   );
 
   return (
-    <div id={STAGE_ID} className="min-w-0 scroll-mt-24 space-y-3">
+    <div
+      id={STAGE_ID}
+      className="mx-auto w-full min-w-0 scroll-mt-24 space-y-3"
+      style={{ maxWidth: overlay ? FIT_WIDTH.overlay : FIT_WIDTH.side }}
+    >
       <div
         ref={ref}
         data-testid="video-results-stage"
