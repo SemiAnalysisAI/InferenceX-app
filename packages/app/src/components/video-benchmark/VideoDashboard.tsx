@@ -419,7 +419,6 @@ export default function VideoDashboard({
       .join(' · ');
   }, [projection.state.workload, points, namedPoints, s]);
   const allCells = [...projection.cells, ...projection.overlayCells];
-  const cells = allCells.filter(shown);
   const deploymentCells = useMemo(
     () => [...projection.deploymentCells, ...projection.overlayDeploymentCells],
     [projection],
@@ -540,6 +539,20 @@ export default function VideoDashboard({
   const deploymentPoints = useMemo(
     () => [...deploymentCells, ...projection.history].map((cell) => cell.point),
     [deploymentCells, projection.history],
+  );
+  // A chart pick or a lossless twin may sit outside the cohort, so every cell lends its cost.
+  const clipCosts = useMemo(
+    () =>
+      Object.fromEntries(
+        [...projection.history, ...deploymentCells].map((cell) => [
+          cell.point.id,
+          {
+            participating: cell.cost.participating?.perVideoSecond ?? null,
+            allocated: cell.cost.allocated?.perVideoSecond ?? null,
+          },
+        ]),
+      ),
+    [projection.history, deploymentCells],
   );
   const apiUrl = `/api/v1/views/video?view=overview&${resultsSearch(state)}`;
   const secondaryChanged = [
@@ -937,15 +950,7 @@ export default function VideoDashboard({
               officialLeads={officialClipPoints}
               onPairChange={onStagePair}
               colorFor={colorFor}
-              costs={Object.fromEntries(
-                cells.map((c) => [
-                  c.point.id,
-                  {
-                    participating: c.cost.participating?.perVideoSecond ?? null,
-                    allocated: c.cost.allocated?.perVideoSecond ?? null,
-                  },
-                ]),
-              )}
+              costs={clipCosts}
               unofficialRun={state.unofficialRun ?? undefined}
             />
           </Card>

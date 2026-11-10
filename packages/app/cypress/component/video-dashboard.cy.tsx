@@ -442,7 +442,17 @@ describe('VideoGenX results', () => {
   });
 
   it('views results as of an earlier run and compares a chip config over time', () => {
-    mount({ search: '?r_y=videosPerGpuHour' });
+    mount({
+      search: '?r_y=videosPerGpuHour',
+      // Retained projections predate the output-seconds rate that prices a video-second.
+      edit: (observation) => {
+        observation.videoSecondsPerHour = 400;
+      },
+      editPage: (page) => {
+        for (const entry of page.entries)
+          if (entry.runId === '34341996789') entry.publishedAt = '2026-11-01T00:00:00.000Z';
+      },
+    });
     cy.get('#run-select').should('contain', 'Run 3/3');
     points().should('have.length', 3);
     cy.get('[data-testid="results-run-context"] button[aria-label="Previous run"]').click();
@@ -464,6 +474,11 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="results-run-context"] button[aria-label="Previous run"]').click();
     cy.get('#run-select').should('contain', 'Run 1/3');
     points('[data-hardware="b200"] .visible-shape').click({ force: true });
+    // The stage plays that history point, and its TCO comes from the history cell too.
+    searchParam('r_clip').should('match', /^34341996789:/u);
+    cy.contains('[data-testid="video-results-facts"] dt', /^Participating$/u)
+      .next()
+      .should(($value) => expect($value.text(), 'history point TCO').to.match(/^\d/u));
     cy.get('[data-testid="point-details-panel"] [data-action="view-telemetry"]').click();
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
     searchParam('r_point').should('match', /^34341996789:/u);
