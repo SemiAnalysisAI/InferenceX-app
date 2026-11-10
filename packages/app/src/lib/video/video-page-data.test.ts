@@ -74,6 +74,31 @@ describe('VideoGenX first document', () => {
     expect(GET).toHaveBeenCalledTimes(2);
   });
 
+  it('leaves an incomplete History read to the browser instead of seeding it', async () => {
+    const { stored } = referenceQualityFixture(20);
+    vi.mocked(GET).mockResolvedValueOnce(
+      Response.json(
+        {
+          schemaVersion: 1,
+          entries: [
+            {
+              ...videoHistoryEntry(stored, null),
+              approved: false,
+              sources: [],
+              error: 'Stored result unavailable',
+            },
+          ],
+          nextPage: null,
+        },
+        { headers: { 'X-VideoGenX-Incomplete': '1' } },
+      ),
+    );
+    const initial = await loadVideoPageData({});
+    expect(initial.history).toBeNull();
+    expect(initial.sides).toEqual({});
+    expect(GET).toHaveBeenCalledTimes(1);
+  });
+
   it('parses the URL selection for the streamed shell without reading data', () => {
     expect(videoPageState({ unofficialrun: '456' }).unofficialRun).toBe('456');
     expect(videoPageState({ unofficialrun: ['789', '456'] }).unofficialRun).toBe('789');

@@ -441,9 +441,8 @@ function D3Tree({
 
     const vc = visibleCount!;
 
-    g.selectAll<SVGGElement, d3.HierarchyPointNode<D3TreeNode>>('.tree-node').attr(
-      'opacity',
-      (d) => (d.data.chronoIndex < vc ? 1 : 0.08),
+    g.selectAll<SVGGElement, d3.HierarchyPointNode<D3TreeNode>>('.tree-node').attr('opacity', (d) =>
+      d.data.chronoIndex < vc ? 1 : 0.08,
     );
 
     g.selectAll<SVGPathElement, d3.HierarchyLink<D3TreeNode>>('.tree-link').attr('opacity', (d) =>

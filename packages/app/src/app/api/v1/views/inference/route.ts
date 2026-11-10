@@ -267,17 +267,18 @@ function observedPointIdentity(point: InferenceData) {
   };
 }
 
+const estimate = (value: EqualServiceEstimate | null) =>
+  value === null
+    ? null
+    : {
+        ...value,
+        endpoints: value.endpoints.map(({ point, ...endpoint }) => ({
+          ...endpoint,
+          point: observedPointIdentity(point),
+        })),
+      };
+
 function publicServiceComparison(comparison: EqualServiceComparison) {
-  const estimate = (value: EqualServiceEstimate | null) =>
-    value === null
-      ? null
-      : {
-          ...value,
-          endpoints: value.endpoints.map(({ point, ...endpoint }) => ({
-            ...endpoint,
-            point: observedPointIdentity(point),
-          })),
-        };
   return {
     ...comparison,
     metrics: Object.fromEntries(

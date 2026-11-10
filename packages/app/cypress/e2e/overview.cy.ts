@@ -1,7 +1,7 @@
 import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
 
 const MODEL_LABELS = [
-  'Muse Spark Open 816B',
+  'Muse Spark 1.3/Open 816B',
   'DeepSeek V4.1 Flash 552B',
   'Kimi K3.1 Pro 2.8T',
   'MiniMax M3.1 Flash 428B',
@@ -1100,9 +1100,7 @@ describe('Overview page', () => {
     cy.get('[data-testid="overview-pair-missing"]').each(($cell) => {
       expect($cell.text()).not.to.contain('∞');
     });
-    cy.get('body')
-      .invoke('text')
-      .should('not.match', /∞\s*%/);
+    cy.get('body').invoke('text').should('not.match', /∞\s*%/);
   });
 
   it('re-renders the whole matrix from the six-stop SLO slider', () => {
@@ -1188,9 +1186,7 @@ describe('Overview page', () => {
           .and('have.attr', 'data-cost-polarity', 'no-baseline');
       });
     });
-    cy.get('body')
-      .invoke('text')
-      .should('not.match', /∞\s*%/);
+    cy.get('body').invoke('text').should('not.match', /∞\s*%/);
 
     cy.visit('/overview?compare=hardware');
     expectScope(SCOPE_LINE, SOURCE_NOTE);

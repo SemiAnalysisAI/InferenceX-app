@@ -39,6 +39,14 @@ const evidence = (overrides: Partial<ResultsEvidence> = {}): ResultsEvidence => 
 
 const ids = (cells: ResultCell[]) => cells.map((c) => c.point.id).sort();
 
+const run = (id: string, runId: string, observedAt: string, hardwareKey = 'h200') => ({
+  ...eligible,
+  id,
+  runId,
+  observedAt,
+  hardwareKey,
+});
+
 describe('VideoGenX results contract', () => {
   it('uses one complete 20-clip C1 workload, the same ten-sample floor and the requested hardware roster', () => {
     const result = resultProjection(points, state());
@@ -266,13 +274,6 @@ describe('VideoGenX results contract', () => {
   });
 
   it('shows each deployment as of the selected run date and run', () => {
-    const run = (id: string, runId: string, observedAt: string, hardwareKey = 'h200') => ({
-      ...eligible,
-      id,
-      runId,
-      observedAt,
-      hardwareKey,
-    });
     // Newest publication first, as the history pages deliver them.
     const rerun = run('h200:new', '300', '2026-11-03T05:00:00Z');
     const republished = run('h200:stale', '300', '2026-11-03T05:00:00Z');
@@ -408,14 +409,15 @@ describe('VideoGenX results contract', () => {
       'vllm-omni',
     ]);
   });
+  const b200Entry = (id: string, engine: string) => ({
+    ...eligible,
+    id,
+    hardwareKey: 'b200',
+    results: evidence({ engine }),
+  });
+
   it('offers each engine as its own chip config and ignores a key from before engines', () => {
-    const b200 = (id: string, engine: string) => ({
-      ...eligible,
-      id,
-      hardwareKey: 'b200',
-      results: evidence({ engine }),
-    });
-    const input = [b200('vllm:c1', 'vllm-omni'), b200('sglang:c1', 'sglang')];
+    const input = [b200Entry('vllm:c1', 'vllm-omni'), b200Entry('sglang:c1', 'sglang')];
     const offered = resultProjection(input, state()).chipConfigs;
     expect(offered.map(({ point }) => point.id)).toEqual(['sglang:c1', 'vllm:c1']);
     // A share link from before engines named the same B200 4-GPU TP2 × Ulysses 2 deployment.

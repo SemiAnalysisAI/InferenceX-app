@@ -31,12 +31,12 @@ const positiveValue = (value: number): number => {
 
 export const HGX_FAN_BASELINE = new Provenance({
   profile_id: 'normalized-hgx-fans',
-  version: '1',
+  version: '2',
   source: 'User-specified GPU TDPs and shared cooling-policy assumptions',
   kind: 'assumed',
   input_boundary: 'Chassis fan DC watts from pre-fan component DC load; excludes PSU loss and PUE',
   assumptions: [
-    'Default GPU TDP per device: Hopper 700 W, B200 1000 W, B300 1200 W, ' +
+    'Default GPU TDP per device: Hopper 700 W, B200 1000 W, B300 1100 W, ' +
       'MI300 750 W, MI325 1000 W, MI355 1400 W.',
     'Design heat is GPU count times GPU TDP plus the highest modeled non-GPU power: ' +
       'CPU offloading and active scale-out networking, including board NICs and optional extras.',

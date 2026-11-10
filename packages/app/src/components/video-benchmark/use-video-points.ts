@@ -40,6 +40,10 @@ export function useVideoPoints(
       if (controller.signal.aborted) return;
       setPages([data]);
       setReplay(response.headers.get('x-videogenx-replay') === '1');
+      // Entries whose index or approval read failed are missing or unapproved; keep what
+      // arrived and leave the retry offered.
+      if (response.headers.get('x-videogenx-incomplete') === '1')
+        throw new Error('Published history incomplete');
     })()
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;

@@ -444,6 +444,11 @@ describe('bestSoFarProgression', () => {
   });
 });
 
+const mergeAt = (rows: BenchmarkRow[], targetValue = 45) => {
+  const opts = { ...options(rows), targetValue };
+  return mergeProgressionsByChip(bestSoFarProgression(groupHistoryByHwKeyAndDate(opts), opts));
+};
+
 describe('mergeProgressionsByChip', () => {
   const twoFrameworks = [
     ...[30, 60].map((iv) => sweep('2026-04-25', iv, iv === 30 ? 900 : 500)),
@@ -455,11 +460,6 @@ describe('mergeProgressionsByChip', () => {
       sweep('2026-07-04', iv, iv === 30 ? 1600 : 800, { framework: 'trtllm' }),
     ),
   ];
-
-  const mergeAt = (rows: BenchmarkRow[], targetValue = 45) => {
-    const opts = { ...options(rows), targetValue };
-    return mergeProgressionsByChip(bestSoFarProgression(groupHistoryByHwKeyAndDate(opts), opts));
-  };
 
   it('draws one line per chip, not one per software config', () => {
     const chips = mergeAt(twoFrameworks);
@@ -543,31 +543,31 @@ describe('mergeProgressionsByChip', () => {
   });
 });
 
-describe('agentic traces', () => {
-  function agenticSweep(
-    date: string,
-    interactivity: number,
-    tputPerGpu: number,
-    cacheHitRate?: number,
-  ): BenchmarkRow {
-    return makeRow({
-      id: Math.round(interactivity * 1000 + tputPerGpu),
-      date,
-      benchmark_type: 'agentic_traces',
-      isl: null,
-      osl: null,
-      conc: Math.round(tputPerGpu / interactivity),
-      metrics: {
-        p90_itl: 1 / interactivity,
-        p90_e2el: 10,
-        tput_per_gpu: tputPerGpu,
-        output_tput_per_gpu: tputPerGpu * 0.008,
-        input_tput_per_gpu: tputPerGpu * 0.992,
-        ...(cacheHitRate === undefined ? {} : { server_gpu_cache_hit_rate: cacheHitRate }),
-      },
-    });
-  }
+function agenticSweep(
+  date: string,
+  interactivity: number,
+  tputPerGpu: number,
+  cacheHitRate?: number,
+): BenchmarkRow {
+  return makeRow({
+    id: Math.round(interactivity * 1000 + tputPerGpu),
+    date,
+    benchmark_type: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc: Math.round(tputPerGpu / interactivity),
+    metrics: {
+      p90_itl: 1 / interactivity,
+      p90_e2el: 10,
+      tput_per_gpu: tputPerGpu,
+      output_tput_per_gpu: tputPerGpu * 0.008,
+      input_tput_per_gpu: tputPerGpu * 0.992,
+      ...(cacheHitRate === undefined ? {} : { server_gpu_cache_hit_rate: cacheHitRate }),
+    },
+  });
+}
 
+describe('agentic traces', () => {
   const agenticRows = [
     agenticSweep('2026-08-07', 40, 800, 0.9),
     agenticSweep('2026-08-07', 80, 500, 0.95),

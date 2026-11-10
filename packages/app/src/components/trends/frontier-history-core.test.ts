@@ -224,14 +224,17 @@ describe('comparisonBuckets', () => {
   });
 });
 
-describe('sweep cleaning', () => {
-  const fullSweep = (date: string, scale = 1) =>
-    [10, 20, 30, 40, 50].map((x) => row('h200', date, x, (1000 - x * 10) * scale, { conc: x }));
-  const frontierOn = (rows: BenchmarkRow[], date: string) => {
-    const history = buildFrontierHistory(rows, OPTIONS);
-    return seriesFrontiersAt(history, history.dates.indexOf(date)).get('h200_trt')!;
-  };
+const fullSweep = (date: string, scale = 1) =>
+  [10, 20, 30, 40, 50].map((x) => row('h200', date, x, (1000 - x * 10) * scale, { conc: x }));
 
+const frontierOn = (rows: BenchmarkRow[], date: string) => {
+  const history = buildFrontierHistory(rows, OPTIONS);
+  return seriesFrontiersAt(history, history.dates.indexOf(date)).get('h200_trt')!;
+};
+
+const narrow = (date: string) => [row('h200', date, 10, 500), row('h200', date, 20, 400)];
+
+describe('sweep cleaning', () => {
   it('keeps the last full sweep when a nightly stops early', () => {
     const rows = [...fullSweep('2026-03-01'), row('h200', '2026-03-12', 10, 100)];
     expect(frontierOn(rows, '2026-03-12').map((v) => v.measured)).toEqual(
@@ -240,7 +243,6 @@ describe('sweep cleaning', () => {
   });
 
   it('accepts a deliberately narrower sweep once it repeats', () => {
-    const narrow = (date: string) => [row('h200', date, 10, 500), row('h200', date, 20, 400)];
     const rows = [
       ...fullSweep('2026-03-01'),
       ...narrow('2026-03-10'),

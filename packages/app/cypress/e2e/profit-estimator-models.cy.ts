@@ -1,6 +1,33 @@
 import { chart, revenueLabels, stubOpenRouter, suppressNudges } from '../support/profit-estimator';
 import { profitBenchmarkRows } from '../support/profit-fixtures';
 
+describe('Muse Spark profit estimates', () => {
+  for (const prefix of ['', '/zh']) {
+    for (const basis of ['profit-estimator', 'profit-estimator-per-gigawatt']) {
+      it(`prices Open benchmarks with Muse 1.3 rates on ${prefix}/${basis}`, () => {
+        stubOpenRouter();
+        cy.visit(`${prefix}/infx/${basis}/muse-spark-open`, { onBeforeLoad: suppressNudges });
+        cy.get('[data-testid="profit-model-selector"]').should(
+          'contain.text',
+          'Muse Spark 1.3/Open',
+        );
+        cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
+        cy.get('[data-testid="profit-selling-prices"]')
+          .should('contain.text', '$1.25')
+          .and('contain.text', '$0.15')
+          .and('contain.text', '$4.25');
+        cy.get('[data-testid="profit-list-price-source"]').should(
+          'have.attr',
+          'href',
+          'https://vercel.com/ai-gateway/models/muse-spark-1.3',
+        );
+        cy.get('[data-testid="profit-muse-provenance"]').should('contain.text', 'Open checkpoint');
+        revenueLabels().should('have.length.greaterThan', 0);
+      });
+    }
+  }
+});
+
 function coverageRows(dbKey: string, target: number) {
   return profitBenchmarkRows(dbKey).map((row) => {
     if (row.hardware === 'gb300' || row.hardware === 'h200') return row;

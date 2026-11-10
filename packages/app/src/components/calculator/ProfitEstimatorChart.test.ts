@@ -412,6 +412,9 @@ describe('barLabelSlotPx', () => {
 
 const boldWidth = (text: string, fontPx: number) => estimateTextWidth(text, fontPx) * 1.1;
 
+const digitsWidth = (digits: number, fontPx: number) =>
+  boldWidth(formatProfitUsd(110.3e9, 'gw-year', digits), fontPx);
+
 describe('revenueLabelStyle', () => {
   const phoneRows = [137.1e9, 110.3e9, 108.7e9, 38.5e9, 33.7e9, 32.7e9, 21.7e9].map((revenue) =>
     row({ revenue }),
@@ -440,17 +443,15 @@ describe('revenueLabelStyle', () => {
 
   it('shrinks before it rounds, and rounds before it shrinks again', () => {
     const rows = [row({ revenue: 110.3e9 })];
-    const width = (digits: number, fontPx: number) =>
-      boldWidth(formatProfitUsd(110.3e9, 'gw-year', digits), fontPx);
-    expect(revenueLabelStyle(rows, 'gw-year', width(1, CHART_TYPE.annotation))).toEqual({
+    expect(revenueLabelStyle(rows, 'gw-year', digitsWidth(1, CHART_TYPE.annotation))).toEqual({
       digits: 1,
       fontPx: CHART_TYPE.annotation,
     });
-    expect(revenueLabelStyle(rows, 'gw-year', width(0, CHART_TYPE.axisLabel))).toEqual({
+    expect(revenueLabelStyle(rows, 'gw-year', digitsWidth(0, CHART_TYPE.axisLabel))).toEqual({
       digits: 0,
       fontPx: CHART_TYPE.axisLabel,
     });
-    expect(revenueLabelStyle(rows, 'gw-year', width(0, CHART_TYPE.annotation))).toEqual({
+    expect(revenueLabelStyle(rows, 'gw-year', digitsWidth(0, CHART_TYPE.annotation))).toEqual({
       digits: 0,
       fontPx: CHART_TYPE.annotation,
     });
@@ -474,6 +475,11 @@ describe('revenueLabelStyle', () => {
     expect(formatProfitUsd(3.96, 'chip-hour', style.digits)).toBe('$3.96');
   });
 });
+
+const styleWidth = (style: { word: boolean; digits: number }) => {
+  const amount = formatProfitUsd(-561.2e6, 'gw-year', style.digits);
+  return boldWidth(style.word ? `Loss ${amount}` : amount, CHART_TYPE.annotation);
+};
 
 describe('lossLabelStyle', () => {
   const flashRows = [
@@ -514,22 +520,22 @@ describe('lossLabelStyle', () => {
 
   it('drops the decimal before the word, and the word before the last decimal', () => {
     const rows = [row({ profit: -561.2e6 })];
-    const width = (style: { word: boolean; digits: number }) => {
-      const amount = formatProfitUsd(-561.2e6, 'gw-year', style.digits);
-      return boldWidth(style.word ? `Loss ${amount}` : amount, CHART_TYPE.annotation);
-    };
-    expect(lossLabelStyle(rows, 'Loss', 'gw-year', width({ word: true, digits: 0 }))).toEqual({
+    expect(lossLabelStyle(rows, 'Loss', 'gw-year', styleWidth({ word: true, digits: 0 }))).toEqual({
       word: true,
       digits: 0,
     });
-    expect(lossLabelStyle(rows, 'Loss', 'gw-year', width({ word: false, digits: 1 }))).toEqual({
-      word: false,
-      digits: 1,
-    });
-    expect(lossLabelStyle(rows, 'Loss', 'gw-year', width({ word: false, digits: 0 }))).toEqual({
-      word: false,
-      digits: 0,
-    });
+    expect(lossLabelStyle(rows, 'Loss', 'gw-year', styleWidth({ word: false, digits: 1 }))).toEqual(
+      {
+        word: false,
+        digits: 1,
+      },
+    );
+    expect(lossLabelStyle(rows, 'Loss', 'gw-year', styleWidth({ word: false, digits: 0 }))).toEqual(
+      {
+        word: false,
+        digits: 0,
+      },
+    );
     expect(lossLabelText(-561.2e6, 'Loss', 'gw-year', { word: false, digits: 0 })).toBe('−$561M');
   });
 

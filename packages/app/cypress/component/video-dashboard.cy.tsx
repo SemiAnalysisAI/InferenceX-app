@@ -7,7 +7,11 @@ import type {
 import { videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState } from '@/components/video-benchmark/results';
 import type { ResultsEvidence } from '@/components/video-benchmark/results-evidence';
+import { ThemeProvider } from '@/components/ui/theme-provider';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
+import { verifiedQuality } from '@/components/video-benchmark/reference-quality';
+import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
+import { APP_THEMES } from '@/lib/themes/themes';
 import { servingArtifact } from '../support/video-artifacts';
 import { readOnlyVideoRequests, resultHistory } from '../support/video-results';
 
@@ -31,12 +35,15 @@ function mount({
   search = '?r_y=videosPerGpuHour',
   edit,
   editPage,
+  theme,
 }: {
   pathname?: string;
   search?: string;
   edit?: (observation: VideoHistoryObservation) => void;
   editPage?: (page: VideoHistoryPage) => void;
+  theme?: 'light' | 'dark';
 } = {}) {
+  if (theme) cy.window().then((win) => win.localStorage.setItem('theme', theme));
   readOnlyVideoRequests();
   resultHistory(edit).then((page) => {
     editPage?.(page);
@@ -45,10 +52,24 @@ function mount({
   cy.window().then((win) =>
     win.history.replaceState(null, '', `${win.location.pathname}${search}`),
   );
-  cy.mount(
+  const dashboard = (
     <PathnameContext.Provider value={pathname}>
       <VideoDashboard />
-    </PathnameContext.Provider>,
+    </PathnameContext.Provider>
+  );
+  cy.mount(
+    theme ? (
+      <ThemeProvider
+        attribute="class"
+        defaultTheme={theme}
+        enableSystem={false}
+        themes={APP_THEMES}
+      >
+        {dashboard}
+      </ThemeProvider>
+    ) : (
+      dashboard
+    ),
   );
   cy.wait('@history');
   cy.get('[data-testid="video-results"]').should('be.visible');
@@ -64,6 +85,24 @@ const openPoint = (hardware: string, overlay = false) => {
     .click({ force: true });
   cy.get('[data-testid="point-details-panel"] [data-action="view-telemetry"]').click();
 };
+const seriesPills = () => cy.get('[data-testid="video-results-chart"] [data-series-pill]');
+const lineColor = (hardware: string) =>
+  hardwarePoints(hardware)
+    .filter('[data-overlay="false"]')
+    .find('.visible-shape')
+    .then(($shape) => getComputedStyle($shape[0]).stroke);
+const playing = () => points('[data-clip-role="playing"]');
+const stagePill = (side: 'a' | 'b') =>
+  cy.get(`[data-side="${side}"] [data-testid="video-results-pill"]`);
+/** The stage and its transport sit fully inside the viewport. */
+const stageInView = () =>
+  cy.get('#comparison-stage').should(($stage) => {
+    const rect = $stage[0].getBoundingClientRect();
+    expect(rect.top, 'stage top').to.be.at.least(0);
+    expect(rect.bottom, 'stage bottom').to.be.at.most(
+      $stage[0].ownerDocument.defaultView!.innerHeight + 1,
+    );
+  });
 const toggleHardware = (hardware: string) => cy.get(`label[for="checkbox-${hardware}"]`).click();
 const chooseEngine = (label: string) =>
   cy.get('[data-testid="results-engine"]').contains('button', label).click();
@@ -73,6 +112,19 @@ const plottedY = (hardware: string) =>
   points(`[data-hardware="${hardware}"][data-overlay="false"]`).then(
     ($group) => ($group[0] as unknown as { __data__: { y: number } }).__data__.y,
   );
+
+/** Adds an unapproved re-export of the B200 run, so the official B200 line stays drawn. */
+const NAMED_RUN = '90000000003';
+const addNamedRun = (page: VideoHistoryPage) => {
+  const named = structuredClone(page.entries.find((entry) => entry.runId === '34341996789')!);
+  named.runId = NAMED_RUN;
+  named.artifact.id = 99993;
+  named.approved = false;
+  // Distinct observation IDs, so neither copy displaces the other's points.
+  for (const source of named.sources)
+    for (const observation of source.observations) observation.id = `named-${observation.id}`;
+  page.entries.unshift(named);
+};
 
 const evidence = (observation: VideoHistoryObservation): ResultsEvidence => ({
   workloadHash: 'a'.repeat(64),
@@ -104,6 +156,11 @@ const focusFirstControl = (focusable: boolean) =>
       $button[0].focus();
       expect($button[0].ownerDocument.activeElement === $button[0]).to.equal(focusable);
     });
+
+const engines = () =>
+  hardwarePoints('b200').then(($groups) => [
+    ...new Set([...$groups].map((group) => group.dataset.engine)),
+  ]);
 
 describe('VideoGenX results', () => {
   it('shows the loading state without reading History while the server streams the cohort', () => {
@@ -236,7 +293,7 @@ describe('VideoGenX results', () => {
 
   it('shows a named unapproved run without an approved cohort and clears it without promotion', () => {
     mount({
-      search: '?unofficialrun=34341996789&r_y=videosPerGpuHour',
+      search: '?unofficialrun=34341996789&r_y=videosPerGpuHour&r_view=side',
       editPage: (page) => {
         for (const entry of page.entries) entry.approved = false;
       },
@@ -257,9 +314,9 @@ describe('VideoGenX results', () => {
       });
     cy.get('[data-testid="results-overlay"]').should('not.exist');
     points().should('not.exist');
-    cy.get('[data-testid="video-results-clip"] video').should('not.exist');
-    cy.get('[data-testid="video-results-play"]').should('be.disabled');
-    cy.get('[data-testid="video-results-scrub"]').should('be.disabled');
+    cy.get('[data-testid="video-results-stage"]').should('not.exist');
+    // Rewriting the results keys keeps the clip stage's own keys.
+    searchParam('r_view').should('equal', 'side');
     cy.contains('summary', 'Performance history').click();
     cy.get('[data-testid="video-history-entry"]').should('have.length', 7);
     cy.get('[data-testid="video-history-publication"]').each(($entry) => {
@@ -284,7 +341,7 @@ describe('VideoGenX results', () => {
     });
     cy.get('[data-testid="video-results-clip"][data-hardware="b200"]')
       .should('contain', 'Unofficial run')
-      .find('.rounded-full')
+      .find('[data-testid="video-results-pill"] .rounded-full')
       .should('have.attr', 'style')
       .and('contain', overlayRunColor(0));
   });
@@ -434,7 +491,17 @@ describe('VideoGenX results', () => {
   });
 
   it('views results as of an earlier run and compares a chip config over time', () => {
-    mount({ search: '?r_y=videosPerGpuHour' });
+    mount({
+      search: '?r_y=videosPerGpuHour',
+      // Retained projections predate the output-seconds rate that prices a video-second.
+      edit: (observation) => {
+        observation.videoSecondsPerHour = 400;
+      },
+      editPage: (page) => {
+        for (const entry of page.entries)
+          if (entry.runId === '34341996789') entry.publishedAt = '2026-11-01T00:00:00.000Z';
+      },
+    });
     cy.get('#run-select').should('contain', 'Run 3/3');
     points().should('have.length', 3);
     cy.get('[data-testid="results-run-context"] button[aria-label="Previous run"]').click();
@@ -456,6 +523,11 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="results-run-context"] button[aria-label="Previous run"]').click();
     cy.get('#run-select').should('contain', 'Run 1/3');
     points('[data-hardware="b200"] .visible-shape').click({ force: true });
+    // The stage plays that history point, and its TCO comes from the history cell too.
+    searchParam('r_clip').should('match', /^34341996789:/u);
+    cy.get('[data-testid="video-results-readout"] [data-metric="cost"] dd')
+      .first()
+      .should(($value) => expect($value.text(), 'history point TCO').to.match(/^\$\d/u));
     cy.get('[data-testid="point-details-panel"] [data-action="view-telemetry"]').click();
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
     searchParam('r_point').should('match', /^34341996789:/u);
@@ -540,10 +612,6 @@ describe('VideoGenX results', () => {
             ]);
       },
     });
-    const engines = () =>
-      hardwarePoints('b200').then(($groups) => [
-        ...new Set([...$groups].map((group) => group.dataset.engine)),
-      ]);
     // A tie keeps the engine listed first; the cached Sol run never competes.
     engines().should('deep.equal', ['sglang']);
     cy.get('label[for="checkbox-b200"]').should('contain', 'B200 (SGLang)');
@@ -566,6 +634,14 @@ describe('VideoGenX results', () => {
       'contain',
       'B200 (NVIDIA Sol Engine · FirstBlockCache + Sol-Attn)',
     );
+    // A lossy line's pill is a dashed outline, named by its optimisations.
+    cy.get('[data-series-pill][data-lossy="true"]')
+      .should('have.length.at.least', 1)
+      .first()
+      .should('contain', 'B200 · ')
+      .find('rect')
+      .should('have.attr', 'stroke-dasharray', '3 2')
+      .and('have.attr', 'fill', 'var(--card)');
   });
 
   it('opens deployment telemetry from chart points, switches tabs and returns', () => {
@@ -624,6 +700,161 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
   });
 
+  it('plays a clicked point on the clip stage, keeping its details pinned', () => {
+    const namedRun = '90000000002';
+    mount({
+      search: `?unofficialrun=${namedRun}&r_y=videosPerGpuHour`,
+      editPage: (page) => {
+        const named = structuredClone(page.entries.find((entry) => entry.runId === '34341996789')!);
+        named.runId = namedRun;
+        named.artifact.id = 99992;
+        named.approved = false;
+        page.entries.unshift(named);
+        // Stored runs may have clips; H100's runs stand in for a live run without media.
+        for (const entry of page.entries)
+          if (!['34336635063', '34344378350'].includes(entry.runId))
+            entry.publishedAt = '2026-11-01T00:00:00.000Z';
+      },
+    });
+    playing().should('have.length', 1).and('have.attr', 'data-overlay', 'true');
+    hardwarePoints('h200').find('.visible-shape').click({ force: true });
+    playing().should('have.attr', 'data-hardware', 'h200');
+    stagePill('a').should('contain', 'H200');
+    searchParam('r_clip').should('match', /^34342452354:/u);
+    // The stage switch redraws the chart without closing the panel the click pinned.
+    cy.get('[data-testid="point-details-panel"]').should('contain', 'H200');
+    // Hidden hardware stops playing; the stage falls back to the named run until it returns.
+    cy.get('[data-testid="point-details-close"]').click();
+    toggleHardware('h200');
+    stagePill('a').should('contain', 'B200').and('contain', 'Unofficial run');
+    playing().should('have.attr', 'data-hardware', 'b200').and('have.attr', 'data-overlay', 'true');
+    toggleHardware('h200');
+    playing().should('have.attr', 'data-hardware', 'h200');
+
+    hardwarePoints('h100').should('have.attr', 'data-clips', 'false');
+    hardwarePoints('h100').find('.visible-shape').should('have.css', 'stroke-width', '1.5px');
+    hardwarePoints('h100').find('.visible-shape').click({ force: true });
+    cy.get('[data-testid="point-details-panel"]')
+      .should('contain', 'H100')
+      .find('[data-action="compare-below"]')
+      .should('not.exist');
+    playing().should('have.attr', 'data-hardware', 'h200');
+    searchParam('r_clip').should('match', /^34342452354:/u);
+
+    // An official subject is never offered its own GPU.
+    cy.get('[data-testid="video-results-compare-h200"]').should('not.exist');
+    cy.get('[data-testid="video-results-compare-b200"]').click();
+    stagePill('b').should('contain', 'B200').and('contain', 'Unofficial run');
+    points('[data-clip-role="baseline"]').should('have.attr', 'data-overlay', 'true');
+
+    points('[data-hardware="b200"][data-overlay="true"] .visible-shape').click({ force: true });
+    playing().should('have.attr', 'data-overlay', 'true');
+    cy.get('[data-testid="video-results-chart"] [data-clip-badge="playing"] rect').should(
+      'have.attr',
+      'fill',
+      overlayRunColor(0),
+    );
+    stagePill('a').should('contain', 'Unofficial run');
+    searchParam('r_clip').should('match', new RegExp(`^${namedRun}:`, 'u'));
+    // The unofficial subject is offered the official lead on its own GPU.
+    cy.get('[data-testid="video-results-compare-reference"]').click();
+    cy.get('[data-testid="video-results-compare-b200"]').click();
+    stagePill('b').should('contain', 'B200').and('not.contain', 'Unofficial run');
+    // Both sides are B200, so the readout names the baseline as the official run.
+    cy.get('[data-testid="video-results-readout"] [data-readout-side="b200"]')
+      .last()
+      .should('contain', 'B200 official')
+      .and('not.contain', 'Unofficial run');
+    points('[data-clip-role="baseline"]')
+      .should('have.attr', 'data-hardware', 'b200')
+      .and('have.attr', 'data-overlay', 'false');
+  });
+
+  it('plays the B200 lead against its reference and a lossy cell against its twin, in view', () => {
+    // On a phone the stage is shorter than the viewport, so scroll anchoring cannot hide a shift.
+    cy.viewport(375, 812);
+    const run = '34341996789';
+    mount({
+      search: '?r_y=videosPerGpuHour&r_lossy=1&r_view=side',
+      editPage: (page) => {
+        for (const entry of page.entries) {
+          entry.publishedAt = '2026-11-01T00:00:00.000Z';
+          for (const source of entry.sources)
+            source.observations = source.observations.flatMap((observation) => [
+              { ...observation, results: evidence(observation) },
+              {
+                ...observation,
+                id: `${observation.id}-fbc`,
+                results: { ...evidence(observation), optimizations: ['first-block-cache'] },
+              },
+            ]);
+        }
+        const lead = videoPoints([page]).find(
+          (item) => item.runId === run && item.concurrency === 1,
+        )!;
+        const saved = servingArtifact(Number(run), lead.artifactId, 'NVIDIA B200');
+        saved.sources[0].checksums = saved.sources[0].checksums.map(([path, sha]) => [
+          path,
+          path === 'manifest.json' ? lead.id.split(':')[0] : sha,
+        ]);
+        const fixture = referenceQualityFixture();
+        const [quality] = verifiedQuality(
+          fixture.attachment,
+          fixture.descriptor,
+          fixture.stored,
+          '9'.repeat(64),
+        ).pairs;
+        quality.candidate = {
+          ...quality.candidate,
+          run_id: run,
+          artifact_id: lead.artifactId,
+          source_id: saved.sources[0].id,
+          manifest_sha256: lead.id.split(':')[0],
+        };
+        quality.reference.url = 'https://media.test/reference.mp4';
+        saved.quality = [quality];
+        // As in production, a read lands after the click's next frame.
+        cy.intercept(
+          'GET',
+          `/api/video-runs?run=${run}&artifact=${lead.artifactId}&format=published`,
+          { body: saved, delay: 400 },
+        );
+      },
+    });
+    cy.get('[data-testid="video-results-compare-h200"]').click();
+    cy.get('[data-testid="video-results-quality-method"] summary').click();
+    // The button sits below the stage; once it tops the viewport the stage is out of view above.
+    cy.get('[data-testid="video-results-quality-show-me"]')
+      .scrollIntoView()
+      .click({ scrollBehavior: false });
+    cy.get('[data-testid="video-results-compare-reference"]').should(
+      'have.attr',
+      'aria-pressed',
+      'true',
+    );
+    cy.get('[data-testid="video-results-stage"]').should('have.attr', 'data-view', 'wipe');
+    searchParam('r_clip').should('match', new RegExp(`^${run}:[^-]+$`, 'u'));
+    stageInView();
+
+    cy.get('[data-testid="video-results-view-side"]').click();
+    // From the legend above, the stage is out of view below.
+    cy.get('[data-testid="video-results-lossy-see-changes"]')
+      .scrollIntoView()
+      .click({ scrollBehavior: false });
+    searchParam('r_clip').should('match', new RegExp(`^${run}:.+-fbc$`, 'u'));
+    cy.get('[data-testid="video-results-compare-twin"]').should(
+      'have.attr',
+      'aria-pressed',
+      'true',
+    );
+    stagePill('a').should('contain', 'FirstBlockCache');
+    cy.get('[data-testid="video-results-stage"]').should('have.attr', 'data-view', 'wipe');
+    // The lossy cell's own read restores the prompt row above the stage; the stage stays in view.
+    cy.get('[data-testid="video-results-prompt"]').should('exist');
+    stageInView();
+    cy.focused().should('have.attr', 'data-testid', 'video-results-stage');
+  });
+
   it('falls back to the overview for an unknown or hidden deployment and drops its key', () => {
     mount({ search: '?r_y=videosPerGpuHour&r_point=0:missing' });
     cy.get('[data-testid="video-results-detail"]').should('not.exist');
@@ -656,6 +887,175 @@ describe('VideoGenX results', () => {
         hardwarePoints('b200').should('exist');
         cy.get('[data-testid="video-results-detail"]').should('not.exist');
       });
+  });
+
+  it('names each drawn line with one pill at its end, apart and in the line colour', () => {
+    cy.viewport(1440, 900);
+    mount({
+      search: `?unofficialrun=${NAMED_RUN}&r_y=videosPerGpuHour`,
+      edit: (observation) => {
+        observation.results = evidence(observation);
+      },
+      editPage: addNamedRun,
+    });
+    // Three official GPUs and the unofficial run, one pill each.
+    seriesPills().should('have.length', 4);
+    seriesPills().should(($pills) => {
+      const texts = [...$pills].map((pill) => pill.textContent);
+      expect(texts).to.include.members([
+        'B200 (SGLang)',
+        'H200 (SGLang)',
+        'H100 (SGLang)',
+        'B200 (SGLang) · unofficial',
+      ]);
+      const boxes = [...$pills].map((pill) => pill.getBoundingClientRect());
+      const zoom = $pills[0].closest<SVGGElement>('.zoom-group')!;
+      const ctm = zoom.getScreenCTM()!;
+      const width = Number(
+        zoom
+          .ownerSVGElement!.querySelector('#clip-video-results-chart rect')!
+          .getAttribute('width'),
+      );
+      const plot = { left: ctm.e, right: ctm.e + width };
+      for (const [i, a] of boxes.entries()) {
+        expect(a.left, 'pill inside the plot').to.be.at.least(plot.left - 0.5);
+        expect(a.right, 'pill inside the plot').to.be.at.most(plot.right + 0.5);
+        for (const b of boxes.slice(i + 1))
+          expect(
+            a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top,
+            `${texts[i]} clear of the next pill`,
+          ).to.equal(true);
+      }
+    });
+    cy.contains('[data-series-pill]', 'unofficial')
+      .find('rect')
+      .should('have.attr', 'fill', overlayRunColor(0));
+    cy.contains('[data-series-pill]', 'H200 (SGLang)')
+      .find('rect')
+      .then(($h200) =>
+        cy
+          .contains('[data-series-pill]', 'H100 (SGLang)')
+          .find('rect')
+          .should('not.have.attr', 'fill', $h200.attr('fill')),
+      );
+  });
+
+  it('names only the focus overlay lines on a narrow plot', () => {
+    cy.viewport(375, 844);
+    mount({
+      search: `?unofficialrun=${NAMED_RUN}&r_y=videosPerGpuHour`,
+      edit: (observation) => {
+        observation.results = evidence(observation);
+      },
+      editPage: (page) => {
+        addNamedRun(page);
+        // Stored runs may have clips, so a click on H200 plays it.
+        for (const entry of page.entries) entry.publishedAt = '2026-11-01T00:00:00.000Z';
+      },
+    });
+    // The unofficial run plays, so its line keeps a pill beside the three official ones.
+    seriesPills().should('have.length', 4);
+    cy.contains('[data-series-pill]', 'unofficial').should('exist');
+    hardwarePoints('h200').find('.visible-shape').click({ force: true });
+    playing().should('have.attr', 'data-hardware', 'h200');
+    seriesPills().should('have.length', 3);
+    cy.contains('[data-series-pill]', 'unofficial').should('not.exist');
+    assertResultsFit();
+  });
+
+  it('gives H100 and H200 distinct VideoGenX colours in light and dark themes', () => {
+    mount({ theme: 'light' });
+    lineColor('b200').should('equal', 'rgb(95, 158, 69)');
+    lineColor('h200').should('equal', 'rgb(29, 111, 184)');
+    lineColor('h100').should('equal', 'rgb(11, 92, 60)');
+    mount({ theme: 'dark' });
+    lineColor('h200').should('equal', 'rgb(90, 169, 236)');
+    lineColor('h100').should('equal', 'rgb(47, 181, 138)');
+    cy.document().then((document) => document.documentElement.classList.remove('dark'));
+  });
+
+  it('labels deployments only on the playing, baseline and hovered lines', () => {
+    mount({
+      search: `?unofficialrun=${NAMED_RUN}&r_y=videosPerGpuHour&r_optimal=0`,
+      editPage: (page) => {
+        // Every line gets a second deployment, so each has a label to show or hide.
+        for (const entry of page.entries)
+          for (const source of entry.sources) {
+            const first = source.observations[0];
+            if (!first) continue;
+            source.observations.push({
+              ...structuredClone(first),
+              id: `two-gpu-${entry.runId}:${first.cell}`,
+              participating: 2,
+              allocated: 2,
+            });
+          }
+        addNamedRun(page);
+      },
+    });
+    const labelled = () =>
+      points('[data-labelled]').then(($points) =>
+        [...$points].map((point) => `${point.dataset.hardware}:${point.dataset.overlay}`),
+      );
+    // The unofficial run plays; only its other deployment is labelled, once.
+    playing().should('have.attr', 'data-overlay', 'true');
+    labelled().should('deep.equal', ['b200:true']);
+    cy.get('[data-testid="video-results-chart"]').should(($chart) => {
+      const labels = [
+        ...$chart[0].querySelectorAll<SVGTextElement>('.dot-group[data-labelled] .point-label'),
+      ];
+      const pills = [...$chart[0].querySelectorAll('[data-series-pill] rect')];
+      for (const label of labels)
+        for (const pill of pills) {
+          const a = label.getBoundingClientRect();
+          const b = pill.getBoundingClientRect();
+          expect(
+            a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top,
+            `"${label.textContent}" clear of every pill`,
+          ).to.equal(true);
+        }
+    });
+    // A label hidden until hover is measured shown, so its box uses the rendered width.
+    const hiddenMeasures: string[] = [];
+    cy.window().then((win) => {
+      const measure = win.SVGTextElement.prototype.getComputedTextLength;
+      cy.stub(win.SVGTextElement.prototype, 'getComputedTextLength').callsFake(function (
+        this: SVGTextElement,
+      ) {
+        if (this.classList.contains('point-label') && win.getComputedStyle(this).display === 'none')
+          hiddenMeasures.push(this.textContent ?? '');
+        return measure.call(this);
+      });
+    });
+    points('[data-hardware="h200"]').first().trigger('mouseenter', { force: true });
+    labelled().should('have.members', ['b200:true', 'h200:false', 'h200:false']);
+    cy.wrap(hiddenMeasures).should('have.length', 0);
+    points('[data-hardware="h200"]').first().trigger('mouseleave', { force: true });
+    labelled().should('deep.equal', ['b200:true']);
+  });
+
+  it('shows power and the telemetry action without scrolling the details panel', () => {
+    cy.viewport(1440, 900);
+    mount();
+    hardwarePoints('b200').find('.visible-shape').click({ force: true });
+    cy.get('[data-testid="point-details-panel"]').then(($panel) => {
+      const body = $panel[0].querySelector('[data-slot="point-details-body"]')!;
+      const bounds = body.getBoundingClientRect();
+      const power = [...$panel[0].querySelectorAll('dt')].find(
+        (term) => term.textContent === 'Avg board power',
+      )!;
+      expect(power, 'power row').not.to.equal(undefined);
+      expect(power.getBoundingClientRect().bottom, 'power row in view').to.be.at.most(
+        bounds.bottom,
+      );
+      const telemetry = $panel[0].querySelector('[data-action="view-telemetry"]')!;
+      expect(
+        telemetry.closest('[data-slot="point-details-actions"]'),
+        'fixed action row',
+      ).not.to.equal(null);
+      const rect = telemetry.getBoundingClientRect();
+      expect(rect.bottom, 'telemetry inside the window').to.be.at.most(900);
+    });
   });
 
   for (const [pathname, width] of [
@@ -699,22 +1099,20 @@ describe('VideoGenX results', () => {
       cy.get('[data-testid="results-price-t2v"]').should('be.visible');
       cy.get('[data-testid="results-advanced"] > summary').click();
       cy.get('[data-testid="results-advanced"]').should('not.have.attr', 'open');
-      cy.get('[data-testid="video-results-clip"]').should(($tiles) => {
-        expect($tiles, 'one tile per measured hardware').to.have.length(3);
-        const first = $tiles[0].getBoundingClientRect();
-        const second = $tiles[1].getBoundingClientRect();
-        if (width === 1440) {
-          const columns = new Set(
-            [...$tiles].map((tile) => Math.round(tile.getBoundingClientRect().left)),
-          );
-          expect(columns.size).to.equal(3);
-        }
-        if (width === 320) expect(second.top).to.be.greaterThan(first.top);
-        else if (width === 390) expect(second.top).to.be.closeTo(first.top, 2);
+      cy.get('[data-testid="video-results-stage"]').should(($stage) => {
+        const rect = $stage[0].getBoundingClientRect();
+        expect(rect.left, 'stage inside the page').to.be.at.least(0);
+        expect(rect.right).to.be.at.most(width);
+        expect(rect.width, 'stage spans the card').to.be.greaterThan(width * 0.6);
       });
-      cy.get('[data-testid="video-results-clip"][data-hardware="b200"]')
-        .should('contain', 'TCO')
-        .and('contain', pathname.startsWith('/zh') ? '分配 GPU' : 'Allocated');
+      cy.get('[data-testid="video-results-readout"] dl').should(($grid) => {
+        const cells = [...$grid[0].children];
+        const rows = new Set(cells.map((cell) => cell.getBoundingClientRect().top)).size;
+        expect(rows, 'readout rows').to.equal(width >= 1024 ? 1 : Math.ceil(cells.length / 2));
+        expect($grid.find('[data-metric="cost"]').attr('title')).to.contain(
+          pathname.startsWith('/zh') ? '分配 GPU' : 'allocated',
+        );
+      });
       cy.get('[data-testid="video-results-sources"] summary').click();
       cy.get('[data-testid="video-results-sources"] table').should(($table) => {
         const container = $table[0].parentElement!;

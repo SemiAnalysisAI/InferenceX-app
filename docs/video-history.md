@@ -42,7 +42,11 @@ differ, so a page read does not warm the view API and vice versa; each entry is
 still shared across requests and instances, and the tag purge expires both.
 These reads do not call GitHub. A page whose index or approval receipt could not be read, a
 page read while storage is off, and absent media are returned but not retained,
-so the next read tries storage again. A page past the end is empty for any page number,
+so the next read tries storage again. Such a History page carries
+`X-VideoGenX-Incomplete: 1`: the page shell seeds nothing from it and leaves History to
+the browser, and the browser keeps the entries it received but shows the failed-read
+notice with its retry, because the missing entries would otherwise read as an empty chart
+without a retry. A page past the end is empty for any page number,
 so only page 1 is retained when empty. Unapproved entries are retained, because
 an approval only appears through publication. A publication or backfill expires
 the tag at once, also when it fails after a write, and
@@ -54,7 +58,7 @@ verified, read-only snapshot and bypasses this cache.
 超过 5 分钟的条目会再返回一次，同时由 Next 在后台刷新；这只用于兜底与发布失效同时进行的读取。页面渲染与 HTTP 路由对同一页各自持有一份缓存条目：Next 以编译后的回调文本作为
 `unstable_cache` 的键，而两个 bundle 并不相同，因此页面读取不会预热视图 API，反之亦然；
 每份条目仍跨请求、跨实例共享，标签失效会同时清除两者。这些读取不调用 GitHub。
-索引或批准回执读取失败的页、存储关闭时读到的页以及缺失的媒体会照常返回但不保留，下次仍会读取存储；
+索引或批准回执读取失败的页、存储关闭时读到的页以及缺失的媒体会照常返回但不保留，下次仍会读取存储；这样的 History 页带有 `X-VideoGenX-Incomplete: 1`：页面骨架不用它预填数据，改由浏览器读取 History；浏览器保留已收到的条目，但显示读取失败提示和重试按钮，否则缺失的条目只会表现为一张没有重试入口的空图表；
 超出末页的页对任何页码都为空，因此只有第 1 页在为空时也会保留；未批准条目会保留，因为批准只会通过发布产生。发布或历史补建会立即让该标签失效，即使在写入后失败也是如此；
 `POST /api/v1/invalidate?scope=video` 可手动触发同样的失效。History 按起始页与页数分别缓存，
 仪表板、视图 API 和浏览器重试均在一次请求中读取全部有界分页。HTTP 响应仍为 `private, no-store`。
@@ -131,14 +135,30 @@ unfinished clips. The output hash in the receipt path lets readers resolve every
 rendition from one listing. `--dry-run` lists the work and `--out-dir <dir>` encodes
 locally; neither writes to Blob. `--limit <n>` bounds a run.
 
-Published media reads add `previewUrl` to each asset whose sealed SHA256 has a receipt,
-from one listing shared across instances. Renditions are encoded after the publication
-purge, so the listing refreshes in the background after 60 seconds instead of waiting for
-the next publication. `url` stays the sealed
-original. A failed listing serves the originals only. Indexes, approvals and History
-are unchanged.
+The same job also writes a poster for each sealed MP4: the `poster-f0-w672-q4` profile
+decodes the first frame, with no seek, so the still matches the frame playback starts on.
+It scales the frame to at most 672 px wide at the source aspect (672x384 for the
+1344x768 clips) and writes one JPEG at `-q:v 4` with metadata stripped. The script rejects
+a poster unless the original matched its recorded SHA256 and ffprobe reports one `mjpeg`
+frame no wider than 672 px whose aspect is within 1% of the original. It uploads the JPEG
+to `objects/<output sha256>/poster-f0-w672-q4.jpg`, then writes the receipt
+`renditions/<source sha256>/poster-f0-w672-q4/<output sha256>.json` with its bytes, size,
+the ffmpeg version and the arguments. The plan is per original and profile: each original
+is downloaded and verified once, the poster encodes first, then the rendition, and a
+profile with a receipt is skipped. A backfill after renditions exist therefore encodes
+posters only. Changed poster arguments need a new profile id. Diagnostic media are not
+planned and get no poster.
 
-中文：封存的 CI MP4 码率约 10 Mbit/s，且 `moov` 位于文件末尾，浏览器须先下载大部分文件才能播放。发布成功后，`h3-media` 中独立的 `renditions` job 安装 ffmpeg 并运行 `scripts/video-renditions.ts --run <source run>`；该 job 失败不影响发布结果和原始视频。手动触发并勾选 `backfill_renditions` 时跳过发布，处理全部已存储索引。只有 `publish` 占用 `h3-media-publication` 并发组：同一并发组只保留一个排队运行并取消更早的排队运行，长时间转码若在组内会导致发布被丢弃。每个转码 job 按来源运行使用独立并发组（补转共用一个），不同运行的转码可以并行，上传从不覆盖已有文件。无法读取的索引会记录日志，并在其余视频转码完成后让 job 失败。脚本对每个尚无回执的封存 MP4 下载原始文件、核对记录的 SHA256，并按固定的 `web-h264-crf23` 配置转码（libx264 High、CRF 23、preset slow、yuv420p、音频直接复制、faststart）。无法解码、不是 faststart 或时长与原始视频相差超过 0.05 秒的输出会被拒绝。脚本先上传 MP4，再写入记录 ffmpeg 版本和参数的回执；回执存在即表示完成，中断后重跑只处理未完成的视频；回执路径包含输出文件的 SHA256，因此读取端只需列出一次回执，就能得到全部转码版本的地址。`--dry-run` 只列出待处理项，`--out-dir` 在本地转码，均不写入 Blob；`--limit` 限制单次处理数量。读取已发布媒体时，某个媒体的封存 SHA256 有对应回执时，返回结果会附加 `previewUrl`；回执列表跨实例共享缓存。转码在发布清除缓存之后才完成，因此该列表 60 秒后在后台刷新，而不是等到下一次发布；`url` 仍是封存的原始视频，列表读取失败时只返回原始视频。索引、发布批准和 History 不变。
+Published media reads add `previewUrl` and `posterUrl` to each asset and stored reference
+whose sealed SHA256 has the matching receipt, from one listing shared across instances. A
+missing receipt leaves the field absent. Renditions and posters are encoded after the
+publication purge, so the listing refreshes in the background after 60 seconds instead of
+waiting for the next publication. Its cache key is versioned with the value shape. `url`
+stays the sealed original, and metrics, PSNR, Difference and the media link never read a
+poster. A failed listing serves the originals only. Indexes, approvals and History are
+unchanged.
+
+中文：封存的 CI MP4 码率约 10 Mbit/s，且 `moov` 位于文件末尾，浏览器须先下载大部分文件才能播放。发布成功后，`h3-media` 中独立的 `renditions` job 安装 ffmpeg 并运行 `scripts/video-renditions.ts --run <source run>`；该 job 失败不影响发布结果和原始视频。手动触发并勾选 `backfill_renditions` 时跳过发布，处理全部已存储索引。只有 `publish` 占用 `h3-media-publication` 并发组：同一并发组只保留一个排队运行并取消更早的排队运行，长时间转码若在组内会导致发布被丢弃。每个转码 job 按来源运行使用独立并发组（补转共用一个），不同运行的转码可以并行，上传从不覆盖已有文件。无法读取的索引会记录日志，并在其余视频转码完成后让 job 失败。脚本对每个尚无回执的封存 MP4 下载原始文件、核对记录的 SHA256，并按固定的 `web-h264-crf23` 配置转码（libx264 High、CRF 23、preset slow、yuv420p、音频直接复制、faststart）。无法解码、不是 faststart 或时长与原始视频相差超过 0.05 秒的输出会被拒绝。脚本先上传 MP4，再写入记录 ffmpeg 版本和参数的回执；回执存在即表示完成，中断后重跑只处理未完成的视频；回执路径包含输出文件的 SHA256，因此读取端只需列出一次回执，就能得到全部转码版本的地址。`--dry-run` 只列出待处理项，`--out-dir` 在本地转码，均不写入 Blob；`--limit` 限制单次处理数量。同一 job 还为每个封存 MP4 生成封面：`poster-f0-w672-q4` 配置不做 seek，直接解码第一帧，使封面与开始播放时的画面一致；按原始宽高比缩放到最宽 672 px（1344x768 的视频为 672x384），以 `-q:v 4` 输出单张 JPEG 并去除元数据。只有原始视频与记录的 SHA256 一致，且 ffprobe 显示输出为单帧 `mjpeg`、宽度不超过 672 px、宽高比与原始视频相差不超过 1% 时，封面才会被接受。脚本先把 JPEG 上传到 `objects/<output sha256>/poster-f0-w672-q4.jpg`，再写入回执 `renditions/<source sha256>/poster-f0-w672-q4/<output sha256>.json`，记录字节数、尺寸、ffmpeg 版本和参数。处理计划按原始视频和配置分别计算：每个原始视频只下载并校验一次，先生成封面再转码，已有回执的配置直接跳过，因此转码版本已存在时补转只生成封面。封面参数变化时须使用新的配置 ID。诊断视频不在计划内，没有封面。读取已发布媒体和已存参考视频时，封存 SHA256 有对应回执的媒体会附加 `previewUrl` 和 `posterUrl`；没有回执时对应字段不出现。回执列表跨实例共享缓存。转码和封面都在发布清除缓存之后才生成，因此该列表 60 秒后在后台刷新，而不是等到下一次发布；其缓存键随值结构升级版本。`url` 仍是封存的原始视频，指标、PSNR、“差异”视图和视频文件链接都不读取封面；列表读取失败时只返回原始视频。索引、发布批准和 History 不变。
 
 ## Evidence boundaries
 

@@ -99,6 +99,15 @@ const count = ({ queries }: Observed, pattern: string): number =>
   queries.filter((text) => text.includes(pattern)).length;
 const rowsRead = (observed: Observed): number => count(observed, 'from gpu_metric_samples');
 
+const timingOut: DbClient = (strings, ...values) =>
+  strings.join('?').includes(BLOB_QUERY)
+    ? Promise.reject(
+        Object.assign(new Error('canceling statement due to statement timeout'), {
+          code: '57014',
+        }),
+      )
+    : sql(strings, ...values);
+
 describe('stored sample blobs', () => {
   it('decode to the SQL rows and serve the identical point payload from one blob query', async () => {
     const sqlRows = await readSqlSampleRows(sql, SERIES);
@@ -192,14 +201,6 @@ describe('stored sample blobs', () => {
 
   it('propagates a blob query failure other than a missing table', async () => {
     await storeBlobs(SERIES);
-    const timingOut: DbClient = (strings, ...values) =>
-      strings.join('?').includes(BLOB_QUERY)
-        ? Promise.reject(
-            Object.assign(new Error('canceling statement due to statement timeout'), {
-              code: '57014',
-            }),
-          )
-        : sql(strings, ...values);
 
     await expect(getGpuMetricsForPoint(timingOut, 10)).rejects.toThrow('statement timeout');
   });

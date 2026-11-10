@@ -41,7 +41,7 @@ export const config: ProxyConfig = {
     { source: '/:locale(zh)?/infx/inference/:slug?', has: [{ type: 'query', key: 'i_power' }] },
     {
       source: '/:locale(zh)?/infx/inference/:slug?',
-      has: [{ type: 'query', key: 'g_model', value: 'GLM-5\\.3-Flash' }],
+      has: [{ type: 'query', key: 'g_model', value: 'GLM-5[.]3-Flash' }],
     },
     { source: '/:locale(zh)?/opx/:category?', has: [{ type: 'query', key: 'op' }] },
     '/:locale(zh)?/:tab(inference|profit-estimator|profit-estimator-per-gigawatt|evaluation|historical|calculator|fleet|first-token|cache-reuse|reliability|gpu-specs|submissions|ai-chart|current-inferencex-image|agentic-workload-explorer|agentx|operatorx|ubenchx|powerx|collectivex|video)/:path*',

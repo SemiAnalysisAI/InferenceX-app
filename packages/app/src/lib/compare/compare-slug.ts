@@ -25,8 +25,8 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     slug: 'muse-spark-open',
     displayName: 'Muse-Spark-Open',
     dbKeys: ['musespark'],
-    label: 'Muse Spark Open 816B',
-    seoName: 'Muse Spark Open',
+    label: 'Muse Spark 1.3/Open 816B',
+    seoName: 'Muse Spark 1.3/Open',
   },
   {
     slug: 'deepseek-v4',

@@ -1,4 +1,5 @@
-import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
+import { getReadDbs } from '@semianalysisai/inferencex-db/lib/payload-db';
 
 import {
   type AgenticCatalogEntry,
@@ -11,10 +12,10 @@ import { cachedQuery } from '@/lib/cache/api-cache';
 import { PUBLIC_COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
 import { loadFixture } from '@/lib/testing/test-fixtures';
 
-export const getCachedAgenticCatalog = cachedQuery(() => {
-  if (FIXTURES_MODE) return Promise.resolve(loadFixture<AgenticCatalogEntry[]>('agentic-catalog'));
+export const getCachedAgenticCatalog = cachedQuery(async () => {
+  if (FIXTURES_MODE) return loadFixture<AgenticCatalogEntry[]>('agentic-catalog');
 
-  return getAgenticCatalog(getDb());
+  return getAgenticCatalog(await getReadDbs());
 }, 'agentic-catalog');
 
 export interface AgenticCatalogCard {

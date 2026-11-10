@@ -191,6 +191,9 @@ test('stalled reads time out and retain failure metadata without a complete-body
   assert.match(record(capture).error, /timed out|timeout/iu);
 });
 
+const rejectBudget = (options) =>
+  assert.throws(() => createResponseCapture(options), { code: 'INVALID_ARGUMENT' });
+
 test('unsafe origins and invalid budgets fail before fetching', async (t) => {
   const capture = await setup(t, () => new Response('{}'));
   for (const path of [
@@ -202,8 +205,6 @@ test('unsafe origins and invalid budgets fail before fetching', async (t) => {
   ]) {
     await assert.rejects(capture.read(path), { code: 'INVALID_ARGUMENT' });
   }
-  const rejectBudget = (options) =>
-    assert.throws(() => createResponseCapture(options), { code: 'INVALID_ARGUMENT' });
   rejectBudget({ timeoutMs: 0 });
   rejectBudget({ timeoutMs: 30_001 });
   rejectBudget({ responseBytes: NaN });

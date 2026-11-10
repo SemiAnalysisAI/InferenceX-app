@@ -85,7 +85,7 @@ import {
   getSequenceLabel,
   Percentile,
   Sequence,
-  type Model,
+  Model,
 } from '@/lib/catalog/data-mappings';
 import { modelRoutesForTab } from '@/lib/routing/model-routes';
 import { profitRouteForTab, type ProfitRouteTab } from '@/lib/routing/profit-estimator-routes';
@@ -1444,6 +1444,13 @@ function ProfitEstimatorInner({
           </>
         )}
       </p>
+      {selectedModel === Model.Muse_Spark_Open && (
+        <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-muse-provenance">
+          {locale === 'zh'
+            ? '实测数据来自 Open checkpoint；默认售价采用 Muse Spark 1.3 API 定价。这不是 Meta 生产环境成本或利润的实测结果。100 tok/s/user 目标和 30% 模型许可费均为可修改的假设，并非 Meta 服务的 P90 实测值或实际许可条款。'
+            : "Measurements use Open checkpoints; default selling prices use the Muse Spark 1.3 API. These are not measurements of Meta's production costs or profits. The 100 tok/s/user target and 30% model license fee are editable assumptions, not Meta endpoint P90 measurements or actual license terms."}
+        </p>
+      )}
     </div>
   ) : null;
 

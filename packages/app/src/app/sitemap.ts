@@ -1,6 +1,8 @@
 import type { MetadataRoute } from 'next';
 import { isFeatureGatedModelPath } from '@/lib/routing/model-feature-visibility';
-import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
+import { readEachDb } from '@semianalysisai/inferencex-db/lib/payload-db';
+import { mergeDatasetLists } from '@semianalysisai/inferencex-db/queries/across-dbs';
 import { listDatasets } from '@semianalysisai/inferencex-db/queries/datasets';
 
 import { AGENTX_OPTIMIZATION_SLUGS } from '@/lib/agentx/agentx-optimizations';
@@ -46,7 +48,10 @@ import { SITE_URL as BASE_URL } from '@semianalysisai/inferencex-constants';
 
 export const revalidate = 3600;
 
-const getCachedDatasets = cachedQuery(() => listDatasets(getDb()), 'sitemap-datasets');
+const getCachedDatasets = cachedQuery(
+  async () => mergeDatasetLists(await readEachDb(listDatasets)),
+  'sitemap-datasets',
+);
 
 type SitemapEntry = MetadataRoute.Sitemap[number];
 

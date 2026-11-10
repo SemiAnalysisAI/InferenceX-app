@@ -218,6 +218,7 @@ export function ModelSelector({
         <div className="min-w-0 flex-1">
           <MultiSelect
             sections={sections}
+            missingSelectedOption={toOption}
             value={[value]}
             onChange={(values) => {
               const next = values[0];

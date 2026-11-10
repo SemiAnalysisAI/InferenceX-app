@@ -184,8 +184,12 @@ export async function GET(request: NextRequest) {
       }
       return NextResponse.json(data, { status: response.status, headers });
     }
-    if (history)
-      return NextResponse.json(await cachedVideoHistory(Number(page), Number(pages)), { headers });
+    if (history) {
+      const read = await cachedVideoHistory(Number(page), Number(pages));
+      return NextResponse.json(read.page, {
+        headers: read.complete ? headers : { ...headers, 'X-VideoGenX-Incomplete': '1' },
+      });
+    }
     if (live && runId) {
       const artifacts = await runArtifacts(runId, await firstArtifactPage(runId));
       if (!artifacts)

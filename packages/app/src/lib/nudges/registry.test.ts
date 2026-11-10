@@ -165,7 +165,7 @@ describe('NUDGE_REGISTRY integrity', () => {
     expect(location.href).toBe(`${prefix}/infx/inference/kimi-k3`);
     expect(modal?.content.additionalActions?.map((action) => action.label)).toEqual([
       'GLM5.3',
-      'Muse Spark',
+      'Muse Spark 1.3/Open',
     ]);
     modal?.content.additionalActions?.[0].onClick();
     expect(location.href).toBe(

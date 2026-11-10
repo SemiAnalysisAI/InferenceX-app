@@ -108,12 +108,14 @@ function executeSqlPiece(sql: DbClient, piece: SqlPiece) {
   return sql(strings, ...piece.values);
 }
 
+type AsOf = { runId: number } | { startedAt: string | null };
+
 type RecursiveBenchmarkVariant =
   | {
       kind: 'latest';
       date: string;
       exact: boolean;
-      asOfRunId?: number;
+      asOf?: AsOf;
     }
   | {
       kind: 'run';
@@ -262,14 +264,17 @@ function queryRecursiveBenchmarks(
       const datePredicate = variant.exact
         ? sqlPiece`r.date = ${variant.date}::date`
         : sqlPiece`r.date <= ${variant.date}::date`;
+      const asOfBound =
+        variant.asOf === undefined
+          ? null
+          : 'startedAt' in variant.asOf
+            ? sqlPiece`${variant.asOf.startedAt}::timestamptz`
+            : sqlPiece`(SELECT lwr.run_started_at FROM latest_workflow_runs lwr WHERE lwr.github_run_id = ${variant.asOf.runId})`;
       const asOfPredicate =
-        !variant.exact && variant.asOfRunId !== undefined
+        !variant.exact && asOfBound
           ? sqlPiece`AND (
               r.run_started_at IS NULL
-              OR r.run_started_at <= COALESCE(
-                (SELECT lwr.run_started_at FROM latest_workflow_runs lwr WHERE lwr.github_run_id = ${variant.asOfRunId}),
-                'infinity'::timestamptz
-              )
+              OR r.run_started_at <= COALESCE(${asOfBound}, 'infinity'::timestamptz)
             )`
           : sqlPiece``;
       const seed = sqlPiece`
@@ -377,8 +382,15 @@ export async function getLatestBenchmarks(
    * No-op when this is the latest run (the filter then includes everything).
    * Only applied on the date-filtered (non-`exact`) path used by the main chart.
    */
-  asOfRunId?: string,
+  asOfRunId?: string | { startedAt: string | null },
 ): Promise<BenchmarkRow[]> {
+  const asOf: AsOf | undefined =
+    exact || !asOfRunId
+      ? undefined
+      : typeof asOfRunId === 'string'
+        ? { runId: Number(asOfRunId) }
+        : asOfRunId;
+
   const modelKeys = Array.isArray(modelKey) ? modelKey : [modelKey];
   if (date) {
     // The latest variant chooses one seed per line under the requested cutoff.
@@ -388,7 +400,7 @@ export async function getLatestBenchmarks(
       kind: 'latest',
       date,
       exact: exact ?? false,
-      asOfRunId: !exact && asOfRunId ? Number(asOfRunId) : undefined,
+      asOf,
     });
     return withStoredPerPoolBasis(rows as unknown as BenchmarkRow[]);
   }

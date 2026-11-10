@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { readFirstFound } from '@semianalysisai/inferencex-db/lib/payload-db';
 
 import {
   listConversations,
@@ -29,7 +29,7 @@ const getCachedConversations = cachedQuery(
       sort: sort as ListConversationsOpts['sort'],
     };
 
-    return listConversations(getDb(), slug, opts);
+    return readFirstFound((sql) => listConversations(sql, slug, opts));
   },
   'dataset-conversations',
 );

@@ -190,6 +190,11 @@ function hitArea(type: string, point: { clientX: number; clientY: number }) {
   flushFrames();
 }
 
+const pinnedDot = () =>
+  [...container.querySelectorAll<SVGGElement>('.dot-group')].find(
+    (group) => group.querySelector('.visible-shape') && group.getAttribute('transform'),
+  )!;
+
 describe('D3Chart pinned point', () => {
   it('keeps the rulers and the hover-size canvas dot on the pinned point through zoom and pan', async () => {
     const calls = installRecordingContext();
@@ -233,21 +238,17 @@ describe('D3Chart pinned point', () => {
 
   it('keeps SVG dots enlarged under the rulers through zoom', () => {
     draw(chart(false));
-    const dot = () =>
-      [...container.querySelectorAll<SVGGElement>('.dot-group')].find(
-        (group) => group.querySelector('.visible-shape') && group.getAttribute('transform'),
-      )!;
-    const radius = () => dot().querySelector('.visible-shape')!.getAttribute('r');
-    const before = overlayMarkerPosition(dot())!;
+    const radius = () => pinnedDot().querySelector('.visible-shape')!.getAttribute('r');
+    const before = overlayMarkerPosition(pinnedDot())!;
     act(() => {
-      dot().dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      pinnedDot().dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(pinMarks()).toMatchObject({ shown: true, x: before.x, y: before.y });
     expect(radius()).toBe(String(HOVER_POINT_SIZE));
 
     zoomIn(before.x, before.y + 30);
-    const after = overlayMarkerPosition(dot())!;
+    const after = overlayMarkerPosition(pinnedDot())!;
     expect(after).not.toEqual(before);
     expect(pinMarks()).toEqual({
       shown: true,

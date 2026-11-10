@@ -354,7 +354,9 @@ describe('Chart Selectors', () => {
           </TooltipProvider>
         </PathnameContext.Provider>,
       );
-      cy.get('[data-testid="model-selector"]').should('contain.text', 'Muse Spark Open').click();
+      cy.get('[data-testid="model-selector"]')
+        .should('contain.text', 'Muse Spark 1.3/Open')
+        .click();
       cy.get('[role="option"]').then(($options) => {
         expect([...$options].slice(0, 8).map((option) => option.textContent?.trim())).to.deep.equal(
           [
@@ -363,7 +365,7 @@ describe('Chart Selectors', () => {
             'GLM5.2/GLM5.3 744B',
             'GLM 5.3 Flash',
             'MiniMax M3.1 Flash 428B',
-            'Muse Spark Open 816B',
+            'Muse Spark 1.3/Open 816B',
             'Qwen3.5 397B',
             'Qwen3.8 Flash Next 176B',
           ],
@@ -494,28 +496,29 @@ describe('Chart Selectors', () => {
         });
       }
 
+      const Harness = () => {
+        const [multiple, setMultiple] = useState(false);
+        const [value, setValue] = useState(Sequence.AgenticTraces);
+        return (
+          <TooltipProvider delayDuration={0}>
+            <button onClick={() => setMultiple(!multiple)}>Toggle scenarios</button>
+            <output data-testid="selected-scenario">{value}</output>
+            <div data-testid="selector-host">
+              <ScenarioSelector
+                variant={variant}
+                value={value}
+                onChange={setValue}
+                availableSequences={
+                  multiple ? [Sequence.AgenticTraces, Sequence.EightK_OneK] : [value]
+                }
+                data-testid="scenario-selector"
+              />
+            </div>
+          </TooltipProvider>
+        );
+      };
+
       it(`restores the ${variant} selector when another scenario becomes available`, () => {
-        function Harness() {
-          const [multiple, setMultiple] = useState(false);
-          const [value, setValue] = useState(Sequence.AgenticTraces);
-          return (
-            <TooltipProvider delayDuration={0}>
-              <button onClick={() => setMultiple(!multiple)}>Toggle scenarios</button>
-              <output data-testid="selected-scenario">{value}</output>
-              <div data-testid="selector-host">
-                <ScenarioSelector
-                  variant={variant}
-                  value={value}
-                  onChange={setValue}
-                  availableSequences={
-                    multiple ? [Sequence.AgenticTraces, Sequence.EightK_OneK] : [value]
-                  }
-                  data-testid="scenario-selector"
-                />
-              </div>
-            </TooltipProvider>
-          );
-        }
         cy.mount(<Harness />);
         cy.get('[data-testid="selector-host"]').should('be.empty');
         cy.contains('button', 'Toggle scenarios').click();

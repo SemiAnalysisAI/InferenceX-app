@@ -72,6 +72,38 @@ const runtime = (series: ResultsChartSeries[]) =>
 const value = (series: ResultsChartSeries, id: string) =>
   series.points.find((p) => p.cell.point.id === id)?.y;
 
+const layout = (name: string, gpus: number, p50: number, kj: number, tp: number) =>
+  deployment(name, gpus, p50, 400, kj, {
+    server: { ...eligible.server!, tp, ulysses: gpus / tp },
+  });
+
+const run = (name: string, engine: string, p50: number, optimizations: string[]) =>
+  deployment(name, 4, p50, 400 - p50, 200, {
+    hardwareKey: 'b200',
+    results: { engine, optimizations } as ResultsEvidence,
+  });
+
+/** A twin needs a recorded layout to match on. */
+const laidOutRun = (name: string, engine: string, p50: number, optimizations: string[]) =>
+  deployment(name, 4, p50, 400 - p50, 200, {
+    hardwareKey: 'b200',
+    server: { tp: 2, ulysses: 2, attention: null },
+    results: { engine, optimizations } as ResultsEvidence,
+  });
+
+const b200Point = (name: string, engine: string, p50: number, change: Partial<VideoPoint> = {}) =>
+  deployment(name, 4, p50, 400 - p50, 200, {
+    hardwareKey: 'b200',
+    results: { engine } as ResultsEvidence,
+    ...change,
+  });
+
+const b200Deployment = (name: string, engine: string, gpus: number, p50: number, perHour: number) =>
+  deployment(name, gpus, p50, perHour, 200, {
+    hardwareKey: 'b200',
+    results: { engine } as ResultsEvidence,
+  });
+
 describe('resultsChartSeries', () => {
   it('selects each frontier with the declared direction of both axes', () => {
     const deployments = cells([fast, mid, slow]);
@@ -137,16 +169,10 @@ describe('resultsChartSeries', () => {
   });
 
   it('plots each GPU’s best engine unless engines are compared, ranking a named run on its own', () => {
-    const b200 = (name: string, engine: string, p50: number, change: Partial<VideoPoint> = {}) =>
-      deployment(name, 4, p50, 400 - p50, 200, {
-        hardwareKey: 'b200',
-        results: { engine } as ResultsEvidence,
-        ...change,
-      });
     const deployments = cells(
-      [b200('sglang', 'sglang', 30), b200('vllm', 'vllm-omni', 40)],
+      [b200Point('sglang', 'sglang', 30), b200Point('vllm', 'vllm-omni', 40)],
       { unofficialRun: '200' },
-      [b200('named', 'vllm-omni', 50, { runId: '200', approved: false })],
+      [b200Point('named', 'vllm-omni', 50, { runId: '200', approved: false })],
     );
     const plotted = (change: Partial<ResultsChartSelection>) =>
       resultsChartSeries(deployments, selection({ optimal: true, ...change }));
@@ -165,7 +191,10 @@ describe('resultsChartSeries', () => {
     expect(comparesEngines(compared)).toBe(true);
     // Cards and clips stand for a GPU with the engine the chart draws, even when
     // another engine rates more videos per GPU-hour.
-    const rated = [b200('sglang', 'sglang', 30), b200('vllm', 'vllm-omni', 40, { wallSeconds: 1 })];
+    const rated = [
+      b200Point('sglang', 'sglang', 30),
+      b200Point('vllm', 'vllm-omni', 40, { wallSeconds: 1 }),
+    ];
     const charted = chartedCells(
       resultProjection(rated, DEFAULT_RESULTS_STATE),
       DEFAULT_RESULTS_STATE,
@@ -181,16 +210,11 @@ describe('resultsChartSeries', () => {
   });
 
   it('keeps the latency frontier and Best engine on the GPU axis', () => {
-    const b200 = (name: string, engine: string, gpus: number, p50: number, perHour: number) =>
-      deployment(name, gpus, p50, perHour, 200, {
-        hardwareKey: 'b200',
-        results: { engine } as ResultsEvidence,
-      });
     // Ranked on GPU count, the 1-GPU vLLM-Omni deployment would win B200 and hide SGLang's 4-GPU one.
     const deployments = cells([
-      b200('wide', 'sglang', 4, 30, 400),
-      b200('narrow', 'sglang', 1, 100, 120),
-      b200('vllm', 'vllm-omni', 1, 60, 200),
+      b200Deployment('wide', 'sglang', 4, 30, 400),
+      b200Deployment('narrow', 'sglang', 1, 100, 120),
+      b200Deployment('vllm', 'vllm-omni', 1, 60, 200),
     ]);
     const plotted = (x: ResultsChartSelection['x']) =>
       resultsChartSeries(deployments, selection({ x, optimal: true })).map((s) => [
@@ -203,10 +227,6 @@ describe('resultsChartSeries', () => {
   });
 
   it('joins deployments that share a GPU count in latency order, whatever the row order', () => {
-    const layout = (name: string, gpus: number, p50: number, kj: number, tp: number) =>
-      deployment(name, gpus, p50, 400, kj, {
-        server: { ...eligible.server!, tp, ulysses: gpus / tp },
-      });
     const rows = [
       layout('two', 2, 100, 50, 2),
       layout('tp4', 4, 40, 120, 4),
@@ -230,11 +250,6 @@ describe('resultsChartSeries', () => {
   });
 
   it('never lets a faster lossy series become a GPU’s default line', () => {
-    const run = (name: string, engine: string, p50: number, optimizations: string[]) =>
-      deployment(name, 4, p50, 400 - p50, 200, {
-        hardwareKey: 'b200',
-        results: { engine, optimizations } as ResultsEvidence,
-      });
     // Same engine and layout with and without caching: two deployments, neither replaces the other.
     const deployments = cells([
       run('stock', 'sglang', 40, []),
@@ -250,6 +265,23 @@ describe('resultsChartSeries', () => {
       ['sol-engine', 'first-block-cache+sol-attn', true],
       ['sol-engine', 'mystery-cache', true],
     ]);
+  });
+
+  it('draws a lossy line’s lossless twin under Best engines, which never stands for its GPU', () => {
+    const points = [
+      laidOutRun('stock', 'sglang', 20, []),
+      laidOutRun('fused', 'sol-engine', 30, ['cuda-graph']),
+      laidOutRun('cached', 'sol-engine', 10, ['cuda-graph', 'first-block-cache']),
+    ];
+    const state = { ...DEFAULT_RESULTS_STATE, lossy: true };
+    const drawn = resultsChartSeries(cells(points, state), selection({ lossy: true }));
+    expect(drawn.map((s) => [s.engine, s.lossy, Boolean(s.twin)])).toEqual([
+      ['sglang', false, false],
+      ['sol-engine', false, true],
+      ['sol-engine', true, false],
+    ]);
+    const charted = chartedCells(resultProjection(points, state), state);
+    expect(charted.map((c) => c.point.id).toSorted()).toEqual(['cached:c1', 'stock:c1']);
   });
 });
 

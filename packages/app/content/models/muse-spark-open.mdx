@@ -1,5 +1,5 @@
 ---
-title: 'Muse Spark Open'
+title: 'Muse Spark 1.3/Open'
 developer: 'Meta'
 releaseDate: 'October 15, 2026'
 description: "Meta's 816B-total / 42B-active multimodal MoE with pooled experts, gated residuals, and a 1M-token context window."
@@ -7,7 +7,9 @@ description: "Meta's 816B-total / 42B-active multimodal MoE with pooled experts,
 
 ## Overview
 
-Muse Spark Open is Meta's open-weight model for coding and agentic work. It accepts text, image, video and audio inputs and generates text. Meta reports 816B total parameters, 42B active per token, and a 1,048,576-token context window. These figures refer to Muse Spark Open, rather than an inferred architecture for the closed Muse Spark service ([Meta documentation](https://dev.meta.ai/docs/muse-spark-open), [release announcement](https://research.meta.ai/blog/muse-spark-open)).
+Muse Spark Open is Meta's open-weight model for coding and agentic work. It accepts text, image, video and audio inputs and generates text. Meta reports 816B total parameters, 42B active per token, and a 1,048,576-token context window ([Meta documentation](https://dev.meta.ai/docs/muse-spark-open), [release announcement](https://research.meta.ai/blog/muse-spark-open)).
+
+InferenceX labels this family **Muse Spark 1.3/Open** because Open shares the same base model as Muse Spark 1.3, with additional safety post-training for standalone deployment ([PyTorch announcement](https://pytorch.org/blog/muse-spark-open/)). The benchmark results use Open checkpoints; they do not measure Meta's hosted Muse Spark 1.3 service or its production inference costs. The release date above refers to Open.
 
 ## Architecture
 

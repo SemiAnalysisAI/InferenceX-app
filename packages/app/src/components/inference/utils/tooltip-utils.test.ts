@@ -158,16 +158,16 @@ describe('run-specific framework tooltip labels', () => {
   });
 });
 
-describe('modeled system-power tooltip', () => {
-  const config = (overrides: Partial<TooltipConfig> = {}) =>
-    tooltipConfig({
-      data: pt({ modeledSystemPower: systemPower }),
-      selectedYAxisMetric: 'y_measuredAvgPower',
-      ...overrides,
-    });
+const makeTooltipConfig = (overrides: Partial<TooltipConfig> = {}) =>
+  tooltipConfig({
+    data: pt({ modeledSystemPower: systemPower }),
+    selectedYAxisMetric: 'y_measuredAvgPower',
+    ...overrides,
+  });
 
+describe('modeled system-power tooltip', () => {
   it('separates measured input, normalized IT power, and whole-deployment facility power', () => {
-    const html = detailsText(config());
+    const html = detailsText(makeTooltipConfig());
     expect(html).toContain('500 W/GPU');
     expect(html).toContain('750 W/GPU');
     expect(html).toContain('12,000 W');
@@ -181,7 +181,7 @@ describe('modeled system-power tooltip', () => {
     expect(html).toContain(
       'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
     );
-    expect(detailsHtml(config())).toContain(SYSTEM_POWER_MODEL_SOURCE_URL);
+    expect(detailsHtml(makeTooltipConfig())).toContain(SYSTEM_POWER_MODEL_SOURCE_URL);
     expect(html).not.toContain('12,000 W/GPU');
     expect(html).not.toContain('Unmeasured chassis GPUs');
   });
@@ -202,7 +202,7 @@ describe('modeled system-power tooltip', () => {
         chassisBasis: 'extrapolated',
       },
     });
-    const html = detailsText(config({ data }));
+    const html = detailsText(makeTooltipConfig({ data }));
     expect(html).toContain(
       '1 eight-GPU chassis · 4 of 8 GPUs measured, extrapolated to full chassis',
     );
@@ -213,7 +213,7 @@ describe('modeled system-power tooltip', () => {
     expect(html).not.toContain('7200 W');
     expect(html).toContain('4 chips');
 
-    const zh = detailsText(config({ data, locale: 'zh' }));
+    const zh = detailsText(makeTooltipConfig({ data, locale: 'zh' }));
     expect(zh).toContain('1 个八卡机箱 · 实测 4/8 张 GPU，按满机箱外推');
     expect(zh).toContain('假设机箱内未实测的 GPU 运行相同负载');
     expect(zh).toContain('3,000 W');
@@ -222,7 +222,7 @@ describe('modeled system-power tooltip', () => {
 
   it('names NVL72 trays, the measured Grace socket, and the rack-share basis (en/zh)', () => {
     const data = pt({ hwKey: 'gb300', modeledSystemPower: modelSystemPower(gb300DisaggRow()) });
-    const html = detailsText(config({ data }));
+    const html = detailsText(makeTooltipConfig({ data }));
     expect(html).toContain('2 full NVL72 compute trays · 8 GPUs');
     expect(html).toContain('Measured Grace socket power: 98 W/socket');
     expect(html).toContain('Measured: GPU boards and whole Grace sockets');
@@ -231,7 +231,7 @@ describe('modeled system-power tooltip', () => {
     expect(html).not.toContain('eight-GPU chassis');
     expect(html).not.toContain('regulator');
 
-    const zh = detailsText(config({ data, locale: 'zh' }));
+    const zh = detailsText(makeTooltipConfig({ data, locale: 'zh' }));
     expect(zh).toContain('2 个完整 NVL72 计算 tray · 8 张 GPU');
     expect(zh).toContain('Grace socket 实测功耗');
     expect(zh).toContain('每个 tray 分摊机架的 1/18');
@@ -246,7 +246,7 @@ describe('modeled system-power tooltip', () => {
       ],
     ];
     for (const [data, expected] of cases) {
-      const official = config({ data });
+      const official = makeTooltipConfig({ data });
       const overlay = detailsHtml({
         ...official,
         overlayData: {
@@ -263,7 +263,7 @@ describe('modeled system-power tooltip', () => {
 
   it('explains unsupported hardware on the measured baseline without substituting zero', () => {
     const html = detailsHtml(
-      config({
+      makeTooltipConfig({
         selectedYAxisMetric: 'y_measuredAvgPower',
         data: pt({
           modeledSystemPower: {
@@ -281,7 +281,7 @@ describe('modeled system-power tooltip', () => {
 
   it('leaves every system-power line to the pinned panel text size', () => {
     const host = document.createElement('div');
-    host.innerHTML = detailsHtml(config());
+    host.innerHTML = detailsHtml(makeTooltipConfig());
     const section = host.querySelector('[data-testid="tooltip-modeled-system-power"]')!;
     const sizes = new Set<string>();
     const walker = document.createTreeWalker(section, NodeFilter.SHOW_TEXT);
@@ -295,7 +295,7 @@ describe('modeled system-power tooltip', () => {
   });
 
   it('keeps each power reading and its basis pill in the same grid cell', () => {
-    const html = detailsHtml(config());
+    const html = detailsHtml(makeTooltipConfig());
     expect(html.split('<span data-power-reading>')).toHaveLength(4);
     for (const [watts, basis] of [
       [500, 'gpu'],
@@ -309,16 +309,16 @@ describe('modeled system-power tooltip', () => {
   });
 
   it('keeps the hover card compact and leaves unrelated metrics unchanged', () => {
-    const hover = generateHoverTooltipContent({ ...config(), color: 'red' });
+    const hover = generateHoverTooltipContent({ ...makeTooltipConfig(), color: 'red' });
     expect(hover).not.toContain('500 W/GPU');
     expect(hover).not.toContain('PUE 1.2');
-    expect(detailsHtml(config({ selectedYAxisMetric: 'y_tpPerGpu' }))).not.toContain(
+    expect(detailsHtml(makeTooltipConfig({ selectedYAxisMetric: 'y_tpPerGpu' }))).not.toContain(
       'tooltip-modeled-system-power',
     );
   });
 
   it('localizes the measurement boundary and occupancy assumptions', () => {
-    const html = detailsText(config({ locale: 'zh' }));
+    const html = detailsText(makeTooltipConfig({ locale: 'zh' }));
     expect(html).toContain('GPU 实测功耗');
     expect(html).toContain('整个部署的实测 IT 功耗');
     expect(html).toContain('实测数据中心功耗');
@@ -331,7 +331,7 @@ describe('modeled system-power tooltip', () => {
 
   it('breaks normalization and host scope into two compact lines in pinned tooltips', () => {
     for (const locale of ['en', 'zh'] as const) {
-      const html = detailsHtml(config({ locale }));
+      const html = detailsHtml(makeTooltipConfig({ locale }));
       const match = /(?<normalization>[^<>]+)<br\s*\/>(?<boundary>[^<>]+)<\/div>/u.exec(html);
       expect(match?.groups?.normalization).toContain(
         locale === 'en' ? 'all modeled chassis GPUs' : '建模机箱的 GPU 总数',
@@ -909,23 +909,30 @@ describe('buildPointDetails', () => {
   });
 });
 
+function overlayConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
+  return {
+    ...tooltipConfig(),
+    overlayData: {
+      label: 'feature-branch',
+      hardwareConfig: mockHardwareConfig,
+      data: [],
+      runUrl: 'https://example.com',
+    } as any,
+    ...overrides,
+  };
+}
+
+const noBranch = (runUrl?: string) =>
+  buildPointDetails(
+    overlayConfig({
+      overlayData: { label: '', hardwareConfig: mockHardwareConfig, data: [], runUrl },
+    }),
+  ).unofficial;
+
 // ===========================================================================
 // buildPointDetails for unofficial overlays
 // ===========================================================================
 describe('buildPointDetails for unofficial overlays', () => {
-  function overlayConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
-    return {
-      ...tooltipConfig(),
-      overlayData: {
-        label: 'feature-branch',
-        hardwareConfig: mockHardwareConfig,
-        data: [],
-        runUrl: 'https://example.com',
-      } as any,
-      ...overrides,
-    };
-  }
-
   it('builds the overlay hover card and details from the official builders plus the notice', () => {
     const official = generateHoverTooltipContent({ ...tooltipConfig(), color: 'red' });
     const overlay = generateHoverTooltipContent({ ...overlayConfig(), color: 'red' });
@@ -948,12 +955,6 @@ describe('buildPointDetails for unofficial overlays', () => {
   });
 
   it('falls back to the run id, then the unofficial label, without a branch', () => {
-    const noBranch = (runUrl?: string) =>
-      buildPointDetails(
-        overlayConfig({
-          overlayData: { label: '', hardwareConfig: mockHardwareConfig, data: [], runUrl },
-        }),
-      ).unofficial;
     expect(noBranch('https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123')).toBe(
       '✕ #123',
     );

@@ -172,6 +172,23 @@ describe('profitHistoryAvailableDates', () => {
   });
 });
 
+const row = (x: number, throughput: number, valid: boolean, run = 200) => {
+  const point = agenticRow('2026-06-14', 'b200', x, throughput, {
+    workflow_run_id: run,
+    run_started_at: `2026-06-14T${run === 200 ? '12' : '06'}:00:00Z`,
+  });
+  return {
+    ...point,
+    metrics: {
+      ...point.metrics,
+      power_valid: Number(valid),
+      power_metric_schema_version: 2,
+      avg_power_w: 500,
+      avg_total_gpu_power_w: 4000,
+    },
+  };
+};
+
 describe('buildProfitHistoryResults', () => {
   const options = {
     selectedGPUs: ['b200_sglang'],
@@ -183,22 +200,6 @@ describe('buildProfitHistoryResults', () => {
   };
 
   it('selects valid knots within each historical run without borrowing from older runs', () => {
-    const row = (x: number, throughput: number, valid: boolean, run = 200) => {
-      const point = agenticRow('2026-06-14', 'b200', x, throughput, {
-        workflow_run_id: run,
-        run_started_at: `2026-06-14T${run === 200 ? '12' : '06'}:00:00Z`,
-      });
-      return {
-        ...point,
-        metrics: {
-          ...point.metrics,
-          power_valid: Number(valid),
-          power_metric_schema_version: 2,
-          avg_power_w: 500,
-          avg_total_gpu_power_w: 4000,
-        },
-      };
-    };
     const rows = [row(20, 8000, true), row(40, 9000, false), row(80, 3000, true)];
     const selected = buildProfitHistoryResults([{ date: '2026-06-14', rows }], {
       ...options,

@@ -30,14 +30,16 @@ export function defaultComparePair(points: VideoPoint[]): ComparePair {
   return { baseline: slowest.hardwareKey, candidate: fastest.hardwareKey };
 }
 
+const hardwareKeyOrNull = (value: string | null) =>
+  value !== null && HARDWARE_KEY.test(value) ? value : null;
+
 /** `v_base`, `v_cand` and `v_case` live beside the dashboard's other `v_` params; unknown values read as defaults. */
 export function readVideoCompareSelection(search: string): VideoCompareSelection {
   const p = new URLSearchParams(search);
-  const key = (value: string | null) => (value !== null && HARDWARE_KEY.test(value) ? value : null);
   const index = p.get('v_case');
   return {
-    baseline: key(p.get('v_base')),
-    candidate: key(p.get('v_cand')),
+    baseline: hardwareKeyOrNull(p.get('v_base')),
+    candidate: hardwareKeyOrNull(p.get('v_cand')),
     caseIndex: index !== null && CASE_INDEX.test(index) ? Number(index) : 0,
   };
 }

@@ -42,6 +42,7 @@
     "db:backfill-server-log-files": "bun --env-file=../../.env src/backfill-server-log-files.ts",
     "db:backfill-spec-algorithm": "bun --env-file=../../.env src/backfill-spec-algorithm.ts",
     "db:compact-server-logs": "bun --env-file=../../.env src/compact-server-logs.ts",
+    "db:promote-to-public": "bun --env-file=../../.env src/sync-public-db.ts --to-public",
     "db:reset": "bun --env-file=../../.env src/reset-db.ts",
     "db:sync-public": "bun --env-file=../../.env src/sync-public-db.ts",
     "db:verify": "bun --env-file=../../.env src/verify-db.ts",
@@ -54,25 +55,25 @@
     "db:backfill:operatorx-comparisons": "bun --env-file=../../.env src/backfill-operatorx-comparisons.ts"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.1.0",
+    "@neondatabase/serverless": "^1.2.0",
     "@noble/ciphers": "^2.4.0",
     "@semianalysisai/inferencex-constants": "workspace:*",
-    "kysely": "^0.29.3",
+    "kysely": "^0.29.8",
     "kysely-neon": "^3.0.0",
-    "pg": "^8.22.0",
+    "pg": "^8.23.1",
     "postgres": "^3.4.9",
     "stream-chain": "^4.4.1",
     "stream-json": "^3.8.0"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite": "^0.5.14",
     "@types/adm-zip": "^0.5.8",
-    "@types/node": "^26.4.0",
-    "@types/pg": "^8.20.0",
+    "@types/node": "^26.6.6",
+    "@types/pg": "^8.23.1",
     "@types/stream-json": "^1.7.8",
-    "@vitest/coverage-v8": "^4.1.11",
-    "adm-zip": "^0.6.0",
+    "@vitest/coverage-v8": "^5.1.0",
+    "adm-zip": "^0.6.1",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.11"
+    "vitest": "^5.1.0"
   }
 }

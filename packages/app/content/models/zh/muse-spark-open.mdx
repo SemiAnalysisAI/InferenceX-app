@@ -1,5 +1,5 @@
 ---
-title: 'Muse Spark Open'
+title: 'Muse Spark 1.3/Open'
 developer: 'Meta'
 releaseDate: '2026 年 10 月 15 日'
 description: 'Meta 的多模态 MoE 模型，总参数量 816B、每个 token 激活 42B，采用 pooled experts 与门控残差，支持 1M token 上下文。'
@@ -7,7 +7,9 @@ description: 'Meta 的多模态 MoE 模型，总参数量 816B、每个 token �
 
 ## 概述
 
-Muse Spark Open 是 Meta 面向代码与智能体任务发布的开放权重模型，支持文本、图像、视频和音频输入，输出文本。Meta 公布的总参数量为 816B，每个 token 激活 42B，上下文为 1,048,576 token。这些数据专指 Muse Spark Open，不是对闭源 Muse Spark 服务架构的推测（[Meta 文档](https://dev.meta.ai/docs/muse-spark-open)、[发布公告](https://research.meta.ai/blog/muse-spark-open)）。
+Muse Spark Open 是 Meta 面向代码与智能体任务发布的开放权重模型，支持文本、图像、视频和音频输入，输出文本。Meta 公布的总参数量为 816B，每个 token 激活 42B，上下文为 1,048,576 token（[Meta 文档](https://dev.meta.ai/docs/muse-spark-open)、[发布公告](https://research.meta.ai/blog/muse-spark-open)）。
+
+InferenceX 将这一模型系列标为 **Muse Spark 1.3/Open**，因为 Open 与 Muse Spark 1.3 共享基础模型，并针对独立部署增加了安全后训练（[PyTorch 公告](https://pytorch.org/blog/muse-spark-open/)）。基准结果使用 Open checkpoint，不代表 Meta 托管的 Muse Spark 1.3 服务性能或其生产环境推理成本。上方发布日期指 Open 的发布时间。
 
 ## 架构
 

@@ -44,7 +44,7 @@
  */
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { getRunDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 import {
   getGpuMetricsForRun,
   type GpuMetricsRunPayload,
@@ -153,7 +153,7 @@ async function fetchGpuMetricsFromDatabase(
   selection: GpuMetricsRunSelection,
 ): Promise<GpuMetricsRouteResponse | null> {
   if (!process.env.DATABASE_READONLY_URL) return null;
-  const payload = await getGpuMetricsForRun(getDb(), runId, selection);
+  const payload = await getGpuMetricsForRun(await getRunDb(runId), runId, selection);
   return payload ? databasePayloadToResponse(payload) : null;
 }
 
@@ -169,7 +169,7 @@ async function fetchPrecomputedPowerSeries(
 ) {
   if (!process.env.DATABASE_READONLY_URL) return null;
   try {
-    const stored = await getPrecomputedPowerSeries(getDb(), runId, selection);
+    const stored = await getPrecomputedPowerSeries(await getRunDb(runId), runId, selection);
     if (!stored) return null;
     return powerSeriesResponse(
       'database',

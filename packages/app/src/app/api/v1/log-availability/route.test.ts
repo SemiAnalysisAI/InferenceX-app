@@ -6,7 +6,8 @@ const { mockGetBenchmarkPresence, mockGetDb } = vi.hoisted(() => ({
 }));
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({ getDb: mockGetDb }));
-vi.mock('@semianalysisai/inferencex-db/queries/benchmark-presence', () => ({
+vi.mock('@semianalysisai/inferencex-db/queries/benchmark-presence', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getBenchmarkPresence: mockGetBenchmarkPresence,
 }));
 vi.mock('@/lib/cache/api-cache', () => ({

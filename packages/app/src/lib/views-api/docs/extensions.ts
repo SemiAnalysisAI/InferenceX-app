@@ -68,7 +68,7 @@ const clipQuality: ApiSchema & { 'x-description-zh': string } = {
                     reference: {
                       ...object,
                       description:
-                        'Reference case from the public descriptor: receipt/plan/media hashes, official Diffusers/model revisions, denoising_updates, sigma_points, and the stored MP4 url (empty for an unstored named run) with optional previewUrl. Reference execution is not a hardware performance result.',
+                        'Reference case from the public descriptor: receipt/plan/media hashes, official Diffusers/model revisions, denoising_updates, sigma_points, and the stored MP4 url (empty for an unstored named run) with optional previewUrl and posterUrl (first-frame JPEG). Reference execution is not a hardware performance result.',
                     },
                     scorer: {
                       ...object,
@@ -203,8 +203,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '比较范围结束日期 YYYY-MM-DD，不得早于 start。历史视图将其用作含终点的数据范围。',
   ],
   target: [
-    'Positive operating-point target, tok/s/user in interactivity-to-throughput mode. Both profit views use model-specific defaults: Kimi K3 60, GLM-5.2/5.3 135, MiniMax M3 115, DeepSeek V4 Pro 170 and DeepSeek V4.1 Flash 150 tok/s/user. Dashboard links use /<model>/target/<value> route segments; this API continues to accept the target query parameter. These are editable SKU-coverage assumptions, not OpenRouter P90-equivalent measurements.',
-    '正数工作点目标；交互性转吞吐量模式下单位为 tok/s/user。两个利润视图按模型设置默认值：Kimi K3 为 60、GLM-5.2/5.3 为 135、MiniMax M3 为 115、DeepSeek V4 Pro 为 170、DeepSeek V4.1 Flash 为 150 tok/s/user。仪表板链接通过 /<model>/target/<value> 路径片段传递目标值；本 API 仍使用 target 查询参数。这些默认值是用于扩大 SKU 覆盖范围的可修改假设，并非与 OpenRouter P90 等价的实测值。',
+    'Positive operating-point target, tok/s/user in interactivity-to-throughput mode. Both profit views use model-specific defaults: Kimi K3 60, GLM-5.2/5.3 135, MiniMax M3 115, DeepSeek V4 Pro 170, DeepSeek V4.1 Flash 150 and Muse Spark 1.3/Open 100 tok/s/user. Dashboard links use /<model>/target/<value> route segments; this API continues to accept the target query parameter. These are editable operating-point assumptions, not hosted API P90-equivalent measurements.',
+    '正数工作点目标；交互性转吞吐量模式下单位为 tok/s/user。两个利润视图按模型设置默认值：Kimi K3 为 60、GLM-5.2/5.3 为 135、MiniMax M3 为 115、DeepSeek V4 Pro 为 170、DeepSeek V4.1 Flash 为 150、Muse Spark 1.3/Open 为 100 tok/s/user。仪表板链接通过 /<model>/target/<value> 路径片段传递目标值；本 API 仍使用 target 查询参数。这些默认值是可修改的工作点假设，并非与托管 API P90 等价的实测值。',
   ],
   costProvider: [
     'costh = owning, costr = renting. Profit views additionally accept custom with customCosts. No costn provider.',
@@ -251,8 +251,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'JSON 对象，将硬件键映射为有限非负千瓦/芯片功率假设。',
   ],
   priceSource: [
-    'Profit: list, openrouter or custom. Inference/history: normalized or openrouter. Returned pricing records the prices actually used.',
-    '利润视图支持 list、openrouter、custom；推理和历史视图支持 normalized、openrouter。响应 pricing 记录实际使用的价格。',
+    'Profit: list, openrouter or custom. Inference/history: normalized or openrouter. Returned pricing records the prices actually used. Muse-Spark-Open defaults to list: Muse Spark 1.3 rates published at https://vercel.com/ai-gateway/models/muse-spark-1.3 ($1.25 input, $0.15 cached input and $4.25 output per million tokens). It prices Open checkpoint measurements, not Meta production costs or profits; the default 30% labCut is an editable assumption, not actual license terms.',
+    '利润视图支持 list、openrouter、custom；推理和历史视图支持 normalized、openrouter。响应 pricing 记录实际使用的价格。Muse-Spark-Open 默认使用 list，即 https://vercel.com/ai-gateway/models/muse-spark-1.3 公布的 Muse Spark 1.3 价格：每百万 token 输入 $1.25、缓存输入 $0.15、输出 $4.25。估算使用 Open checkpoint 的实测数据，并非 Meta 生产环境成本或利润；默认 30% labCut 为可修改的假设，并非实际许可条款。',
   ],
   inputPrice: [
     'Custom uncached input USD/million tokens, default 1.',
@@ -310,7 +310,7 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'CollectiveX dataset schema version; default 1.',
     'CollectiveX 数据集 schema 版本，默认 1。',
   ],
-  suite: ['Run-list filter: all, ep, kv or swap.', '运行列表筛选：all、ep、kv 或 swap。'],
+  suite: ['Run-list filter: all, ep or swap.', '运行列表筛选：all、ep 或 swap。'],
   epSize: [
     'EP size, default 8 when available, otherwise the first available size.',
     'EP 大小，有 8 时默认选 8，否则选首个可用值。',
@@ -339,27 +339,9 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'Comma-separated run-namespaced EP series IDs. Omit for all.',
     '以逗号分隔、带运行命名空间的 EP 曲线 ID。省略时选择全部。',
   ],
-  kvSeries: [
-    'Comma-separated run:case IDs for KV series. Omit for all.',
-    '以逗号分隔的 KV run:case ID。省略时选择全部。',
-  ],
   swapSeries: [
     'Comma-separated swap series IDs. Omit for all.',
     '以逗号分隔的 swap 曲线 ID。省略时选择全部。',
-  ],
-  kvX: [
-    'KV projection: isl (default), batch, frontier or overlap.',
-    'KV 展示方式：isl（默认）、batch、frontier 或 overlap。',
-  ],
-  kvY: ['KV metric: latency (default) or bandwidth.', 'KV 指标：latency（默认）或 bandwidth。'],
-  kvOp: ['KV operation: push (default) or pull.', 'KV 操作：push（默认）或 pull。'],
-  pageTokens: [
-    'Deprecated and ignored: KV rows move whole cache rows, with no page size.',
-    '已弃用，将被忽略：KV 数据按整行缓存搬运，不再区分页大小。',
-  ],
-  overlapIsl: [
-    'Overlap input length: auto (default; the ISL with the widest batch sweep) or a positive integer.',
-    '重叠测试输入长度：auto（默认，取批大小扫描最宽的 ISL）或正整数。',
   ],
   swapDirection: ['h2d (default), d2h or d2d.', 'h2d（默认）、d2h 或 d2d。'],
   swapLayout: ['contiguous (default) or random.', 'contiguous（默认）或 random。'],
@@ -724,12 +706,11 @@ const NEW_VIEWS = {
     { pricing: object, data: object, overlays: object, comparisons: objects },
   ],
   collectivex: [
-    'CollectiveX EP, KV and swap views',
-    'CollectiveX EP、KV 与 swap 视图',
+    'CollectiveX EP and swap views',
+    'CollectiveX EP 与 swap 视图',
     {
       runs: objects,
       ep: object,
-      kv: object,
       swap: object,
       options: object,
       knownSupport: object,

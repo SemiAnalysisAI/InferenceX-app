@@ -237,6 +237,24 @@ describe('videoPoints', () => {
   });
 });
 
+const pageOf = (
+  runId: string,
+  hardware: string,
+  observations: VideoHistoryObservation[],
+): VideoHistoryPage => ({
+  schemaVersion: 1,
+  nextPage: null,
+  entries: [
+    {
+      ...page.entries[0],
+      id: `${runId}.1`,
+      runId,
+      artifact: { ...artifact, id: Number(runId) },
+      sources: [{ ...source, id: runId, hardware, observations }],
+    },
+  ],
+});
+
 describe('dashboardCells', () => {
   const FORMAL =
     '1344 × 768 · 8 s · 24 fps · 50 steps · MiniMaxAI/MiniMax-H3 @ 42ed227ee7df · seed 11, 29 · A single continuous shot';
@@ -246,23 +264,6 @@ describe('dashboardCells', () => {
     ...observation,
     workload: FORMAL,
     ...over,
-  });
-  const pageOf = (
-    runId: string,
-    hardware: string,
-    observations: VideoHistoryObservation[],
-  ): VideoHistoryPage => ({
-    schemaVersion: 1,
-    nextPage: null,
-    entries: [
-      {
-        ...page.entries[0],
-        id: `${runId}.1`,
-        runId,
-        artifact: { ...artifact, id: Number(runId) },
-        sources: [{ ...source, id: runId, hardware, observations }],
-      },
-    ],
   });
 
   it('drops cells under the sample floor even when they are the most efficient', () => {
@@ -335,14 +336,15 @@ describe('dashboardCells', () => {
     expect(result.otherWorkloads).toBe(1);
   });
 
+  const served = (
+    id: string,
+    hardware: string,
+    engine: string,
+    server: typeof observation.server,
+    optimizations: string[] = [],
+  ) => cell({ id, hardware, server, results: { engine, optimizations } as ResultsEvidence });
+
   it('never lets one engine replace another engine at the same hardware, GPUs and concurrency', () => {
-    const served = (
-      id: string,
-      hardware: string,
-      engine: string,
-      server: typeof observation.server,
-      optimizations: string[] = [],
-    ) => cell({ id, hardware, server, results: { engine, optimizations } as ResultsEvidence });
     const split = { tp: 1, ulysses: 4, attention: null };
     const result = dashboardCells(
       videoPoints([

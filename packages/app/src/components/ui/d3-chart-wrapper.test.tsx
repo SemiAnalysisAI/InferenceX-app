@@ -197,9 +197,9 @@ const axisDomain = (svg: SVGSVGElement, axis: 'x' | 'y', rect: Partial<DOMRect>)
   svg.append(group);
 };
 
-describe('D3ChartWrapper zoom hint placement', () => {
-  const hint = () => container.querySelector<HTMLElement>('[data-testid="chart-instructions"]');
+const hint = () => container.querySelector<HTMLElement>('[data-testid="chart-instructions"]');
 
+describe('D3ChartWrapper zoom hint placement', () => {
   it('puts the zoom hint in the top margin above the plot when the margin fits a line', async () => {
     const svg = renderWrapper().current!;
     svg.getBoundingClientRect = () => ({ top: 0, right: 640, height: 400 }) as DOMRect;

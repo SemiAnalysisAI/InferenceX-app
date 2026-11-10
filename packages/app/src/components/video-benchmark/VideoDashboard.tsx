@@ -13,7 +13,9 @@ import {
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { pushClientSearch, replaceClientSearch } from '@/lib/routing/client-navigation';
+import { useTheme } from 'next-themes';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { isDarkTheme } from '@/lib/themes/themes';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { Button } from '@/components/ui/button';
 import { ShareButton } from '@/components/ui/share-button';
@@ -35,9 +37,11 @@ import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { RUN_CONTEXT_GRID, RunField } from '@/components/inference/ui/WorkflowInfoDisplay';
 import { hardwareLabel } from './hardware';
+import { videoHardwareColor } from './hardware-colors';
 import { compareDeployments, layoutLabel, leadCell, runtimeKey } from './deployment';
 import { engineLabel, engineSort } from './engines';
 import { useVideoPoints } from './use-video-points';
+import type { VideoPoint } from './metrics';
 import type { VideoInitialData } from './initial-data';
 import {
   DEFAULT_RESULTS_STATE,
@@ -60,6 +64,7 @@ import {
   RESULTS_Y_METRICS,
   resultsChartSeries,
   resultsMetricLabel,
+  resultsPlotSeries,
   resultsPointKey,
   resultsSelection,
 } from './results-chart';
@@ -67,9 +72,12 @@ import { optimizationsOf, runtimeLabel } from './optimizations';
 import { EngineComparisonConfirmation } from '@/components/inference/ui/engine-comparison-confirmation';
 import { useEngineComparisonConsent } from '@/components/inference/hooks/use-engine-comparison-consent';
 import VideoDeploymentDetail from './VideoDeploymentDetail';
-import VideoResultsChart, { VIDEO_RESULTS_CHART_ID } from './VideoResultsChart';
+import VideoResultsChart, { VIDEO_RESULTS_CHART_ID, type ClipLink } from './VideoResultsChart';
 import VideoCostContext from './VideoCostContext';
 import VideoResultsClips from './VideoResultsClips';
+import { isStageParam, parseStage, stagePointKey, writeStage, type StagePair } from './clip-stage';
+import { seeChangesPair } from './quality-method';
+import { LossyQualityHint } from './QualityMethod';
 import { resultsClipPoints } from './results-clips';
 import { ResultsBars, resultsNumber as n, type ResultBar } from './VideoResultsCharts';
 import VideoHistory from './VideoHistory';
@@ -80,7 +88,7 @@ const STRINGS = {
     advanced: 'Advanced',
     title: 'VideoGenX',
     description:
-      'Serving latency, cost and energy for one matched 20-clip video workload across hardware. Click a point to pin its measurements; View telemetry opens that deployment.',
+      'Serving latency, cost and energy for one matched 20-clip video workload across hardware. Click a point to pin its measurements and play its clips below; hollow points have no clips. View telemetry opens that deployment.',
     chartConfig: 'Chart config',
     runContext: 'Run context',
     compareHistory: 'Compare history',
@@ -156,7 +164,7 @@ const STRINGS = {
     advanced: '高级选项',
     title: 'VideoGenX',
     description:
-      '在同一组匹配的 20 条视频工作负载上，比较各硬件的服务延迟、成本与能耗。点击数据点可固定显示其测量值，再点击“查看遥测”打开对应部署。',
+      '在同一组匹配的 20 条视频工作负载上，比较各硬件的服务延迟、成本与能耗。点击数据点可固定显示其测量值，并在下方播放其视频；空心点没有视频。点击“查看遥测”可打开对应部署。',
     chartConfig: '图表配置',
     runContext: '运行信息',
     compareHistory: '对比历史趋势',
@@ -283,6 +291,37 @@ export default function VideoDashboard({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [labels, setLabels] = useState(true);
   const [legendExpanded, setLegendExpanded] = useState(true);
+  /** The chart points the clip stage plays, which the chart badges. */
+  const [stagePair, setStagePair] = useState<StagePair>({ playing: null, baseline: null });
+  /** What the stage compares its subject with, by `StageOption.value`. */
+  const [against, setAgainst] = useState('reference');
+  /** Counts requests to bring the stage into view; the stage answers once its reads land. */
+  const [reveal, setReveal] = useState(0);
+  const requestReveal = useCallback(() => setReveal((count) => count + 1), []);
+  /** Plays `point` against the `compare` option in Wipe, then brings the stage into view. */
+  const showOnStage = useCallback(
+    (point: VideoPoint, compare: string) => {
+      setAgainst(compare);
+      writeStage({ ...parseStage(location.search), clip: stagePointKey(point), view: 'wipe' });
+      requestReveal();
+    },
+    [requestReveal],
+  );
+  const onStagePair = useCallback(
+    (pair: StagePair) =>
+      setStagePair((previous) =>
+        previous.playing === pair.playing && previous.baseline === pair.baseline ? previous : pair,
+      ),
+    [],
+  );
+  const clipLink = useMemo<ClipLink>(
+    () => ({
+      ...stagePair,
+      onSelect: (key) => writeStage({ ...parseStage(location.search), clip: key }),
+      onReveal: requestReveal,
+    }),
+    [stagePair, requestReveal],
+  );
   const overviewScroll = useRef(0);
   const pendingAnchor = useRef<string | null>(null);
   useEffect(() => {
@@ -304,7 +343,10 @@ export default function VideoDashboard({
     latest.current = next;
     const params = new URLSearchParams(
       [...new URLSearchParams(location.search)].filter(
-        ([key]) => !key.startsWith('r_') && key !== 'unofficialrun' && key !== 'unofficialruns',
+        ([key]) =>
+          (!key.startsWith('r_') || isStageParam(key)) &&
+          key !== 'unofficialrun' &&
+          key !== 'unofficialruns',
       ),
     );
     for (const [key, value] of new URLSearchParams(resultsSearch(next))) params.set(key, value);
@@ -355,15 +397,16 @@ export default function VideoDashboard({
   );
   const { options, roster } = projection;
   const consent = useEngineComparisonConsent('video-results');
+  const plotted = (next: ResultsState) => {
+    const p = resultProjection(points, { ...next, hidden: [] }, namedPoints);
+    return resultsChartSeries(
+      [...p.deploymentCells, ...p.overlayDeploymentCells],
+      resultsSelection(next),
+    );
+  };
+
   /** Asks before a change first puts two engines on one GPU, as the InferenceX charts do. */
   const updateSeries = (patch: Partial<ResultsState>) => {
-    const plotted = (next: ResultsState) => {
-      const p = resultProjection(points, { ...next, hidden: [] }, namedPoints);
-      return resultsChartSeries(
-        [...p.deploymentCells, ...p.overlayDeploymentCells],
-        resultsSelection(next),
-      );
-    };
     const current = latest.current;
     if (
       consent.accepted ||
@@ -395,7 +438,6 @@ export default function VideoDashboard({
       .join(' · ');
   }, [projection.state.workload, points, namedPoints, s]);
   const allCells = [...projection.cells, ...projection.overlayCells];
-  const cells = allCells.filter(shown);
   const deploymentCells = useMemo(
     () => [...projection.deploymentCells, ...projection.overlayDeploymentCells],
     [projection],
@@ -465,9 +507,15 @@ export default function VideoDashboard({
     () => true,
     () => false,
   );
+  const { resolvedTheme } = useTheme();
+  const paletteTheme = isDarkTheme(resolvedTheme) ? 'dark' : 'light';
+  // VideoGenX's own hues first, so H100 and H200 never share the site's NVIDIA green.
   const colorFor = useCallback(
-    (key: string) => (mounted ? getCssColor(resolveColor(key)) : 'var(--muted-foreground)'),
-    [mounted, getCssColor, resolveColor],
+    (key: string) =>
+      mounted
+        ? (videoHardwareColor(key, paletteTheme) ?? getCssColor(resolveColor(key)))
+        : 'var(--muted-foreground)',
+    [mounted, paletteTheme, getCssColor, resolveColor],
   );
   const color = (cell: ResultCell) =>
     cell.overlay ? overlayRunColor(0) : colorFor(cell.point.hardwareKey ?? '');
@@ -483,12 +531,11 @@ export default function VideoDashboard({
       return first ? [first] : [];
     }),
   );
+  // A lossy named run owns its clip without leading a card.
   const clipPoints = resultsClipPoints(charted, { tier: state.costTier });
-  // A clip takes its run's color; a lossy named run owns its clip without leading a card.
-  const overlayClips = new Set(
-    charted
-      .filter((c) => c.overlay && clipPoints.includes(c.point))
-      .map((c) => c.point.hardwareKey),
+  const officialClipPoints = resultsClipPoints(
+    charted.filter((c) => !c.overlay),
+    { tier: state.costTier },
   );
   const profitBars: ResultBar[] = roster
     .filter((key) => !hidden.has(key))
@@ -506,6 +553,31 @@ export default function VideoDashboard({
     });
   const chipHistory = compareConfigs.length > 0;
   const xMetric = plottedXMetric(state.xMetric, chipHistory);
+  // The stage plays only a point the chart draws; a lossy one finds its twin among every deployment.
+  const drawnPoints = useMemo(
+    () =>
+      resultsPlotSeries(deploymentCells, chipHistory ? projection.history : null, state)
+        .filter((item) => !hidden.has(item.hardwareKey))
+        .flatMap((item) => item.points.map(({ cell }) => cell.point)),
+    [deploymentCells, chipHistory, projection.history, state, hidden],
+  );
+  const deploymentPoints = useMemo(
+    () => [...deploymentCells, ...projection.history].map((cell) => cell.point),
+    [deploymentCells, projection.history],
+  );
+  const lossyPair = useMemo(
+    () =>
+      seeChangesPair(drawnPoints, deploymentPoints, { tier: state.costTier }, state.unofficialRun),
+    [drawnPoints, deploymentPoints, state.costTier, state.unofficialRun],
+  );
+  // A chart pick or a lossless twin may sit outside the cohort, so every cell lends its cost.
+  const clipCosts = useMemo(
+    () =>
+      Object.fromEntries(
+        [...projection.history, ...deploymentCells].map((cell) => [cell.point.id, cell.cost]),
+      ),
+    [projection.history, deploymentCells],
+  );
   const apiUrl = `/api/v1/views/video?view=overview&${resultsSearch(state)}`;
   const secondaryChanged = [
     state.xMetric !== DEFAULT_RESULTS_STATE.xMetric,
@@ -876,7 +948,14 @@ export default function VideoDashboard({
                 onLegendExpandedChange={setLegendExpanded}
                 onUpdate={updateSeries}
                 onOpen={openPoint}
+                clipLink={clipLink}
                 heading={heading}
+                lossyNote={
+                  <LossyQualityHint
+                    pair={lossyPair}
+                    onSeeChanges={({ lossy }) => showOnStage(lossy, 'twin')}
+                  />
+                }
                 footer={
                   <VideoCostContext
                     state={state}
@@ -896,18 +975,16 @@ export default function VideoDashboard({
             <VideoResultsClips
               initialSides={initialData?.sides}
               points={clipPoints}
-              colorFor={(key) => (overlayClips.has(key) ? overlayRunColor(0) : colorFor(key))}
-              hidden={hidden}
-              options={{ tier: state.costTier }}
-              costs={Object.fromEntries(
-                cells.map((c) => [
-                  c.point.id,
-                  {
-                    participating: c.cost.participating?.perVideoSecond ?? null,
-                    allocated: c.cost.allocated?.perVideoSecond ?? null,
-                  },
-                ]),
-              )}
+              drawn={drawnPoints}
+              deployments={deploymentPoints}
+              officialLeads={officialClipPoints}
+              onPairChange={onStagePair}
+              against={against}
+              onAgainstChange={setAgainst}
+              onShow={showOnStage}
+              reveal={reveal}
+              colorFor={colorFor}
+              costs={clipCosts}
               unofficialRun={state.unofficialRun ?? undefined}
             />
           </Card>

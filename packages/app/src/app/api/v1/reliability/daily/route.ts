@@ -1,5 +1,6 @@
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { readEachDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 
+import { mergeReliabilityStats } from '@semianalysisai/inferencex-db/queries/across-dbs';
 import { getReliabilityStats } from '@semianalysisai/inferencex-db/queries/reliability';
 
 import { sumReliabilityByDay } from '@/components/reliability/daily-totals';
@@ -10,7 +11,8 @@ export const dynamic = 'force-dynamic';
 
 export const GET = cachedReadRoute({
   cacheKey: 'reliability-daily',
-  fetch: async () => sumReliabilityByDay(await getReliabilityStats(getDb())),
+  fetch: async () =>
+    sumReliabilityByDay(mergeReliabilityStats(await readEachDb(getReliabilityStats))),
   fixture: () => sumReliabilityByDay(loadFixture('reliability')),
   logLabel: 'daily reliability stats',
 });

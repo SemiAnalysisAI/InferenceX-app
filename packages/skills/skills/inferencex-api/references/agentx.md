@@ -68,7 +68,9 @@ For interactivity comparisons and performance-over-time charts, first read
 [AgentX P90 interactivity](agentic-interactivity.md). The dashboard operating point
 uses reciprocal P90 full-response ITL, not the median or P90 of token rates.
 
-Muse Spark Open uses display model `Muse-Spark-Open`, raw DB key
+Muse Spark 1.3/Open is the UI label (with an `816B` suffix where sizes are shown).
+The measured checkpoints remain Open, not Meta's hosted Muse Spark 1.3 service.
+It uses API display-model identifier `Muse-Spark-Open`, raw DB key
 `musespark`, and dashboard route `/infx/inference/muse-spark-open` (also under `/zh`).
 Use `model=Muse-Spark-Open` for benchmark reads and the inference view API,
 with `sequence=agentic-traces` for the latter. Comparison results links open the

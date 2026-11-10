@@ -251,19 +251,20 @@ export function instantiateCar(t: CarTemplate, paint?: T.Color) {
   const root = t.root.clone(true);
   if (paint) {
     const replaced = new Map<T.Material, T.Material>();
+    const swap = (mat: T.Material) => {
+      if (!t.paint.has(mat)) return mat;
+      let c = replaced.get(mat);
+      if (!c) {
+        c = mat.clone();
+        (c as T.MeshStandardMaterial).color.copy(paint);
+        replaced.set(mat, c);
+      }
+      return c;
+    };
+
     root.traverse((n) => {
       const m = n as T.Mesh;
       if (!m.isMesh) return;
-      const swap = (mat: T.Material) => {
-        if (!t.paint.has(mat)) return mat;
-        let c = replaced.get(mat);
-        if (!c) {
-          c = mat.clone();
-          (c as T.MeshStandardMaterial).color.copy(paint);
-          replaced.set(mat, c);
-        }
-        return c;
-      };
       m.material = Array.isArray(m.material) ? m.material.map(swap) : swap(m.material);
     });
   }

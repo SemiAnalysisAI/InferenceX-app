@@ -24,6 +24,18 @@ function frameworkPoint(
   return { ...point(hw, hwKey, x, y), framework };
 }
 
+const overlayPointAt = (hwKey: string, x: number, y: number) =>
+  ({
+    ...point('B200-8', hwKey, x, y),
+    run_url: 'https://github.com/example/actions/runs/123',
+  }) as InferenceData;
+
+const frameworkOverlayPoint = (hwKey: string, framework: string, x: number, y: number) =>
+  ({
+    ...frameworkPoint('B200-8', hwKey, framework, x, y),
+    run_url: 'https://github.com/example/actions/runs/123',
+  }) as InferenceData;
+
 describe('bestSeriesPerSku', () => {
   it('ranks only selected precisions so an FP4 winner cannot hide the FP8 SKU', () => {
     const rows = [
@@ -249,17 +261,12 @@ describe('bestSeriesPerSku', () => {
   });
 
   it('ranks unofficial-run overlay series with the same SKU policy', () => {
-    const overlayPoint = (hwKey: string, x: number, y: number) =>
-      ({
-        ...point('B200-8', hwKey, x, y),
-        run_url: 'https://github.com/example/actions/runs/123',
-      }) as InferenceData;
     const selected = bestSeriesPerSku(
       skuColumns([
-        overlayPoint('b200_overlay_vllm', 10, 80),
-        overlayPoint('b200_overlay_vllm', 20, 60),
-        overlayPoint('b200_overlay_sglang', 10, 100),
-        overlayPoint('b200_overlay_sglang', 20, 75),
+        overlayPointAt('b200_overlay_vllm', 10, 80),
+        overlayPointAt('b200_overlay_vllm', 20, 60),
+        overlayPointAt('b200_overlay_sglang', 10, 100),
+        overlayPointAt('b200_overlay_sglang', 20, 75),
       ]),
       'upper_left',
     );
@@ -268,16 +275,11 @@ describe('bestSeriesPerSku', () => {
   });
 
   it('keeps TileRT series from an unofficial-run overlay', () => {
-    const overlayPoint = (hwKey: string, framework: string, x: number, y: number) =>
-      ({
-        ...frameworkPoint('B200-8', hwKey, framework, x, y),
-        run_url: 'https://github.com/example/actions/runs/123',
-      }) as InferenceData;
     const selected = bestSeriesPerSku(
       skuColumns([
-        overlayPoint('b200_overlay_sglang', 'sglang', 20, 1_800),
-        overlayPoint('b200_overlay_sglang', 'sglang', 60, 1_000),
-        overlayPoint('b200_overlay_tilert_mtp', 'tilert', 340, 160),
+        frameworkOverlayPoint('b200_overlay_sglang', 'sglang', 20, 1_800),
+        frameworkOverlayPoint('b200_overlay_sglang', 'sglang', 60, 1_000),
+        frameworkOverlayPoint('b200_overlay_tilert_mtp', 'tilert', 340, 160),
       ]),
       'upper_left',
     );

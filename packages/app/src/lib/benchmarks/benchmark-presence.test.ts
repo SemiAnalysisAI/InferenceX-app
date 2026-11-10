@@ -54,4 +54,13 @@ describe('benchmark presence lookups', () => {
     expect(new IdBitset([]).has(1)).toBe(false);
     expect(presentIds([], [1, 2, 3])).toEqual({});
   });
+
+  it('tells apart downstream ids past 2^32 from public ids', () => {
+    const downstream = 1_000_000_000_000;
+    const bitset = new IdBitset([5, 1, downstream - 6, 2]);
+    expect([5, downstream, downstream + 1].map((id) => bitset.has(id))).toEqual([true, true, true]);
+    expect(
+      [6, downstream - 1, downstream + 2, downstream - 2 ** 32].map((id) => bitset.has(id)),
+    ).toEqual([false, false, false, false]);
+  });
 });

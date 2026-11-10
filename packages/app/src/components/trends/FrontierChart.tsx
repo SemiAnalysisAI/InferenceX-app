@@ -300,6 +300,10 @@ const FrontierChart = React.memo(
       [styles, regressions],
     );
 
+    const hideTooltip = () => {
+      if (cardRef.current) cardRef.current.style.display = 'none';
+    };
+
     const draw = (
       zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
       ctx: RenderContext,
@@ -356,9 +360,6 @@ const FrontierChart = React.memo(
           },
           pinned ? { pinned: true, interactive: true } : {},
         );
-      };
-      const hideTooltip = () => {
-        if (cardRef.current) cardRef.current.style.display = 'none';
       };
       // Points are rebuilt on every redraw, so a tooltip could outlive the point it describes.
       hideTooltip();

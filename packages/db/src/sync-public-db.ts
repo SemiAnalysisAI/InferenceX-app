@@ -12,7 +12,8 @@
  * server log, log files, or trace replay when the target lacks them.
  * `datasets` and `dataset_conversations` are synced in full; `availability` is
  * synced in full only when every run synced and neither `--limit` nor
- * `--run-id` was passed. Values already in the target are not refreshed, so
+ * `--run-id` was passed; `--run-id` copies only the configs and datasets of the
+ * selected runs. Values already in the target are not refreshed, so
  * public backfills of existing rows (e.g. recomputed `aggregate_stats`) do not
  * propagate. Source columns the target schema lacks (newer public migrations)
  * are skipped and reported.
@@ -20,9 +21,13 @@
  * Each run commits in its own transaction, so an interrupted sync resumes by
  * rerunning the command.
  *
+ * `--to-public` promotes runs: it copies them into the public database,
+ * verifies them there, then deletes them from this deployment's database.
+ *
  * Env:
  *   PUBLIC_DATABASE_READONLY_URL  public InferenceX database (source, read-only)
- *   DATABASE_WRITE_URL            downstream database (target)
+ *   DATABASE_WRITE_URL            downstream database (target; source with --to-public)
+ *   PUBLIC_DATABASE_WRITE_URL     public InferenceX database (target with --to-public)
  *
  * Usage:
  *   bun run --cwd packages/db db:sync-public --dry-run
@@ -30,6 +35,7 @@
  *   bun run --cwd packages/db db:sync-public --run-id 12345678901,12345678902#2 --yes
  *   bun run --cwd packages/db db:sync-public --limit 5 --yes
  *   bun run --cwd packages/db db:sync-public --max-value-bytes 25000000 --yes
+ *   bun run --cwd packages/db db:promote-to-public --run-id 12345678901 --yes
  */
 
 import type postgres from 'postgres';
@@ -37,6 +43,7 @@ import type postgres from 'postgres';
 import { hasNoSslFlag } from './cli-utils.js';
 import { createAdminSql, type Sql } from './etl/db-utils.js';
 import { confirmProceed, parseLimitForceFlags, runBackfillMain } from './lib/backfill-runner.js';
+import { purgeRuns } from './lib/run-purge';
 import {
   configKey,
   findDriftedRuns,
@@ -50,6 +57,7 @@ import {
   type RunSummary,
   type RunSyncPlan,
 } from './lib/public-db-sync.js';
+import { materializePowerSeriesForRun } from './queries/gpu-power-series';
 
 type Row = Record<string, postgres.ParameterOrJSON<never>>;
 type Db = Sql | postgres.TransactionSql;
@@ -70,6 +78,10 @@ const SYNCED_TABLES = [
   'availability',
   'datasets',
   'dataset_conversations',
+  'gpu_metric_series',
+  'gpu_metric_samples',
+  'gpu_metric_sample_blobs',
+  'benchmark_result_gpu_metrics',
 ] as const;
 type Table = (typeof SYNCED_TABLES)[number];
 
@@ -105,6 +117,7 @@ const PASSTHROUGH_TYPES = {
 
 const { limit } = parseLimitForceFlags();
 const dryRun = process.argv.includes('--dry-run');
+const toPublic = process.argv.includes('--to-public');
 const runIdIndex = process.argv.indexOf('--run-id');
 let runSelectors: RunSelector[] | null = null;
 if (runIdIndex !== -1) {
@@ -114,6 +127,10 @@ if (runIdIndex !== -1) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
+}
+if (toPublic && !runSelectors) {
+  console.error('--to-public requires --run-id');
+  process.exit(1);
 }
 /**
  * Skip server logs, log files, and trace-replay payloads larger than this many
@@ -128,15 +145,21 @@ if (maxValueBytes !== null && !(maxValueBytes > 0)) {
   console.error('--max-value-bytes requires a positive byte count');
   process.exit(1);
 }
+if (toPublic && maxValueBytes !== null) {
+  console.error('--to-public copies runs in full; --max-value-bytes is not allowed');
+  process.exit(1);
+}
 const skippedValues: Record<string, number> = {};
 const source = createAdminSql({
-  envVar: 'PUBLIC_DATABASE_READONLY_URL',
+  envVar: toPublic ? 'DATABASE_WRITE_URL' : 'PUBLIC_DATABASE_READONLY_URL',
+  noSsl: toPublic && hasNoSslFlag(),
   max: 2,
   types: PASSTHROUGH_TYPES,
   onnotice: () => {},
 });
 const target = createAdminSql({
-  noSsl: hasNoSslFlag(),
+  envVar: toPublic ? 'PUBLIC_DATABASE_WRITE_URL' : 'DATABASE_WRITE_URL',
+  noSsl: !toPublic && hasNoSslFlag(),
   max: 1,
   types: PASSTHROUGH_TYPES,
   onnotice: () => {},
@@ -191,6 +214,11 @@ async function resolveColumns(): Promise<void> {
     const targetSet = new Set(targetList);
     const skipped = sourceList.filter((column) => !targetSet.has(column));
     if (skipped.length > 0) {
+      if (toPublic) {
+        throw new Error(
+          `public ${table} lacks ${skipped.join(', ')}; migrate the public database first`,
+        );
+      }
       console.log(`  ! ${table}: target schema lacks ${skipped.join(', ')} (not copied)`);
     }
     // Serial ids differ between databases; natural-key ids (e.g. datasets.id) are copied.
@@ -234,10 +262,49 @@ async function insertReturningId(db: Db, table: Table, row: Row): Promise<string
   return created!.id;
 }
 
-async function syncConfigs(): Promise<{ ids: Map<string, string>; missing: number }> {
+interface RunScope {
+  configIds: Set<string>;
+  datasetSlugs: Set<string>;
+}
+
+async function readRunScope(runs: readonly RunSummary[]): Promise<RunScope> {
+  const runIds = `{${runs.map((run) => run.github_run_id).join(',')}}`;
+  const attempts = `{${runs.map((run) => run.run_attempt).join(',')}}`;
+  const rows = await source<{ config_id: string | null; dataset_slug: string | null }[]>`
+    with selected as (
+      select wr.id from workflow_runs wr
+      join unnest(
+        ${runIds}::bigint[],
+        ${attempts}::smallint[]
+      ) as wanted(github_run_id, run_attempt)
+        on wanted.github_run_id = wr.github_run_id and wanted.run_attempt = wr.run_attempt
+    )
+    select config_id::text, null::text as dataset_slug from benchmark_results
+    where workflow_run_id in (select id from selected)
+    union
+    select config_id::text, null from eval_results
+    where workflow_run_id in (select id from selected)
+    union
+    select null, dataset_slug from run_datasets
+    where workflow_run_id in (select id from selected)
+  `;
+  const scope: RunScope = { configIds: new Set(), datasetSlugs: new Set() };
+  for (const row of rows) {
+    if (row.config_id !== null) scope.configIds.add(row.config_id);
+    if (row.dataset_slug !== null) scope.datasetSlugs.add(row.dataset_slug);
+  }
+  return scope;
+}
+
+async function syncConfigs(
+  scope: RunScope | null,
+): Promise<{ ids: Map<string, string>; missing: number }> {
   const cols = columns.configs;
   const readAll = (db: Sql) => db<Row[]>`select id::text, ${db(cols)} from configs`;
-  const sourceConfigs = await readAll(source);
+  const allSourceConfigs = await readAll(source);
+  const sourceConfigs = allSourceConfigs.filter(
+    (config) => !scope || scope.configIds.has(String(config.id)),
+  );
   let targetConfigs = await readAll(target);
   const known = new Set(targetConfigs.map(configKey));
   const missing = sourceConfigs.filter((config) => !known.has(configKey(config)));
@@ -518,6 +585,114 @@ async function copyEvalSamples(db: Db, sourceEvalId: string, targetEvalId: strin
   }
 }
 
+async function copyGpuSamples(db: Db, sourceSeriesId: string, targetSeriesId: string) {
+  const cursor = source<Row[]>`
+    select ${source(columns.gpu_metric_samples)} from gpu_metric_samples
+    where series_id = ${sourceSeriesId}
+  `.cursor(MAX_BATCH_ROWS);
+  for await (const rows of cursor) {
+    await insertRows(
+      db,
+      'gpu_metric_samples',
+      rows.map((row) => ({ ...row, series_id: targetSeriesId })),
+    );
+  }
+  const blobs = await source<Row[]>`
+    select ${source(columns.gpu_metric_sample_blobs)} from gpu_metric_sample_blobs
+    where series_id = ${sourceSeriesId}
+  `;
+  await insertRows(
+    db,
+    'gpu_metric_sample_blobs',
+    blobs.map((row) => ({ ...row, series_id: targetSeriesId })),
+  );
+}
+
+async function copyGpuTelemetry(
+  db: Db,
+  run: RunSummary,
+  configIds: Map<string, string>,
+): Promise<number> {
+  const findRun = (sql: Db) => sql<{ id: string }[]>`
+    select id::text from workflow_runs
+    where github_run_id = ${run.github_run_id} and run_attempt = ${run.run_attempt}
+  `;
+  const [[sourceRun], [targetRun]] = await Promise.all([findRun(source), findRun(db)]);
+  if (!sourceRun || !targetRun) throw new Error('run is missing from one database');
+
+  const seriesKey = (row: Row) => naturalKey([row.artifact_name, row.file_name]);
+  const [sourceSeries, targetSeries] = await Promise.all([
+    source<Row[]>`
+      select id::text, ${source(columns.gpu_metric_series)} from gpu_metric_series
+      where workflow_run_id = ${sourceRun.id}
+    `,
+    db<Row[]>`
+      select id::text, artifact_name, file_name from gpu_metric_series
+      where workflow_run_id = ${targetRun.id}
+    `,
+  ]);
+  const targetSeriesIds = new Map(targetSeries.map((row) => [seriesKey(row), String(row.id)]));
+  const seriesIds = new Map<string, string>();
+  for (const row of sourceSeries) {
+    let targetId = targetSeriesIds.get(seriesKey(row));
+    if (!targetId) {
+      targetId = await insertReturningId(db, 'gpu_metric_series', {
+        ...row,
+        workflow_run_id: targetRun.id,
+      });
+      await copyGpuSamples(db, String(row.id), targetId);
+    }
+    seriesIds.set(String(row.id), targetId);
+  }
+
+  const [links, targetPoints] = await Promise.all([
+    source<Row[]>`
+      select l.series_id::text, ${source(BENCHMARK_NATURAL_KEY.map((column) => `b.${column}`))}
+      from benchmark_result_gpu_metrics l
+      join benchmark_results b on b.id = l.benchmark_result_id
+      where b.workflow_run_id = ${sourceRun.id}
+    `,
+    db<Row[]>`
+      select id::text, ${db(BENCHMARK_NATURAL_KEY)} from benchmark_results
+      where workflow_run_id = ${targetRun.id}
+    `,
+  ]);
+  const pointKey = (row: Row, configId: unknown) =>
+    naturalKey(BENCHMARK_NATURAL_KEY.map((c) => (c === 'config_id' ? String(configId) : row[c])));
+  const pointIds = new Map(targetPoints.map((row) => [pointKey(row, row.config_id), row.id]));
+  await insertRows(
+    db,
+    'benchmark_result_gpu_metrics',
+    links.flatMap((row) => {
+      const configId = configIds.get(String(row.config_id));
+      const pointId = configId === undefined ? undefined : pointIds.get(pointKey(row, configId));
+      const seriesId = seriesIds.get(String(row.series_id));
+      return pointId && seriesId ? [{ benchmark_result_id: pointId, series_id: seriesId }] : [];
+    }),
+  );
+  return Number(targetRun.id);
+}
+
+function readTelemetryCounts(sql: Sql, runs: readonly RunSummary[]) {
+  return sql<{ key: string; counts: string }[]>`
+    select wr.github_run_id::text || '#' || wr.run_attempt::text as key, concat_ws(' ',
+      (select count(*) from gpu_metric_series s where s.workflow_run_id = wr.id),
+      (select count(*) from gpu_metric_samples m
+        join gpu_metric_series s on s.id = m.series_id where s.workflow_run_id = wr.id),
+      (select count(*) from gpu_metric_sample_blobs bl
+        join gpu_metric_series s on s.id = bl.series_id where s.workflow_run_id = wr.id),
+      (select count(*) from benchmark_result_gpu_metrics l
+        join benchmark_results b on b.id = l.benchmark_result_id where b.workflow_run_id = wr.id)
+    ) as counts
+    from workflow_runs wr
+    join unnest(
+      ${`{${runs.map((run) => run.github_run_id).join(',')}}`}::bigint[],
+      ${`{${runs.map((run) => run.run_attempt).join(',')}}`}::smallint[]
+    ) as selected(github_run_id, run_attempt)
+      on selected.github_run_id = wr.github_run_id and selected.run_attempt = wr.run_attempt
+  `;
+}
+
 interface TargetBenchmark {
   id: string;
   server_log_id: string | null;
@@ -745,8 +920,12 @@ async function insertAvailabilityForRuns(runs: readonly RunSummary[]): Promise<n
   return rows.length;
 }
 
-async function syncDatasets(): Promise<{ datasets: number; conversations: number }> {
-  const missingDatasets = await missingByValue('datasets', ['slug']);
+async function syncDatasets(
+  scope: RunScope | null,
+): Promise<{ datasets: number; conversations: number }> {
+  const inScope = (slug: unknown) => !scope || scope.datasetSlugs.has(String(slug));
+  const allMissingDatasets = await missingByValue('datasets', ['slug']);
+  const missingDatasets = allMissingDatasets.filter((row) => inScope(row.slug));
   if (!dryRun) await insertRows(target, 'datasets', missingDatasets);
 
   const readSlugs = 'select id::text, slug from datasets';
@@ -757,6 +936,7 @@ async function syncDatasets(): Promise<{ datasets: number; conversations: number
   const targetIdBySlug = new Map(targetDatasets.map((d) => [d.slug, d.id]));
   let conversations = 0;
   for (const { id: sourceId, slug } of sourceDatasets) {
+    if (!inScope(slug)) continue;
     const targetId = targetIdBySlug.get(slug);
     const present = targetId
       ? await target<{ conv_id: string }[]>`
@@ -789,6 +969,58 @@ function describePlan(plan: RunSyncPlan): string {
   return `${runKey(summary)} ${plan.missing ? 'missing' : 'partial'} (${detail})`;
 }
 
+async function moveVerifiedRuns(runs: readonly RunSummary[]): Promise<number> {
+  const requested = new Set(runs.map(runKey));
+  const [sourceAfter, targetAfter] = await Promise.all([
+    readRunSummaries(source),
+    readRunSummaries(target),
+  ]);
+  const gaps = planRunSync(
+    sourceAfter.filter((run) => requested.has(runKey(run))),
+    targetAfter,
+  );
+  for (const gap of gaps) {
+    console.error(`  ✗ ${runKey(gap.summary)} incomplete in public: ${gap.shortTables.join(', ')}`);
+  }
+  const [sourceTelemetry, targetTelemetry] = await Promise.all([
+    readTelemetryCounts(source, runs),
+    readTelemetryCounts(target, runs),
+  ]);
+  const targetCounts = new Map(targetTelemetry.map((row) => [row.key, row.counts]));
+  const telemetryGaps = sourceTelemetry.filter((row) => targetCounts.get(row.key) !== row.counts);
+  for (const row of telemetryGaps) {
+    console.error(
+      `  ✗ ${row.key} GPU telemetry differs in public: series, samples, blobs, links ` +
+        `${row.counts} here, ${targetCounts.get(row.key) ?? 'none'} there`,
+    );
+  }
+  if (gaps.length + telemetryGaps.length > 0) {
+    console.error('  nothing deleted from this database; rerun to finish the promotion');
+    return gaps.length + telemetryGaps.length;
+  }
+  const owner = createAdminSql({ noSsl: hasNoSslFlag(), max: 1, onnotice: () => {} });
+  try {
+    await owner.begin(async (tx) => {
+      const ids = await tx<{ id: number }[]>`
+        SELECT wr.id FROM workflow_runs wr
+        JOIN unnest(
+          ${runs.map((run) => Number(run.github_run_id))}::bigint[],
+          ${runs.map((run) => run.run_attempt)}::smallint[]
+        ) AS selected(github_run_id, run_attempt)
+          ON selected.github_run_id = wr.github_run_id AND selected.run_attempt = wr.run_attempt
+      `;
+      await purgeRuns(
+        tx as unknown as Sql,
+        ids.map((row) => Number(row.id)),
+      );
+    });
+  } finally {
+    await owner.end();
+  }
+  console.log(`  verified in public and deleted from this database: ${[...requested].join(', ')}`);
+  return 0;
+}
+
 async function main(): Promise<void> {
   console.log('=== sync-public-db ===');
   console.log(`  dry run = ${dryRun}`);
@@ -813,6 +1045,7 @@ async function main(): Promise<void> {
     selectedRuns = selection.runs;
   }
   plans = plans.slice(0, limit ?? undefined);
+  const scope = selectedRuns && (await readRunScope(selectedRuns));
   const missingRuns = plans.filter((plan) => plan.missing).length;
   console.log(`  source runs = ${sourceRuns.length}, target runs = ${targetRuns.length}`);
   console.log(
@@ -831,26 +1064,33 @@ async function main(): Promise<void> {
   console.log(`  availability rows missing = ${missingAvailability.length}`);
 
   if (dryRun) {
-    const { missing } = await syncConfigs();
-    const datasets = await syncDatasets();
+    const { missing } = await syncConfigs(scope);
+    const datasets = await syncDatasets(scope);
     console.log(`  configs missing = ${missing}`);
     console.log(
       `  datasets missing = ${datasets.datasets}, conversations missing = ${datasets.conversations}`,
     );
     for (const plan of plans) console.log(`    ${describePlan(plan)}`);
+    if (toPublic) {
+      console.log(`  then deleted from this database: ${selectedRuns!.map(runKey).join(', ')}`);
+    }
     return;
   }
 
-  if (!(await confirmProceed(`${plans.length} run(s) will be copied into the target database.`))) {
+  const confirmation = toPublic
+    ? `${plans.length} run(s) will be copied into the public database, then deleted from this one.`
+    : `${plans.length} run(s) will be copied into the target database.`;
+  if (!(await confirmProceed(confirmation))) {
     return;
   }
 
-  const { ids: configIds, missing } = await syncConfigs();
+  const { ids: configIds, missing } = await syncConfigs(scope);
   console.log(`  configs inserted = ${missing}`);
 
   let ok = 0;
   let failed = 0;
   const t0 = Date.now();
+  const failedRuns = new Set<string>();
   for (const plan of plans) {
     const start = Date.now();
     try {
@@ -860,6 +1100,7 @@ async function main(): Promise<void> {
       console.log(`  ✓ ${describePlan(plan)} (${elapsed}s, ${ok + failed}/${plans.length})`);
     } catch (error) {
       failed++;
+      failedRuns.add(runKey(plan.summary));
       const message = error instanceof Error ? error.message : String(error);
       // postgres.js attaches the failing statement; its head names the table.
       const query =
@@ -867,6 +1108,36 @@ async function main(): Promise<void> {
           ? error.query.replaceAll(/\s+/g, ' ').slice(0, 80)
           : null;
       console.error(`  ✗ ${describePlan(plan)}: ${message}${query ? ` [${query}]` : ''}`);
+    }
+  }
+  if (toPublic) {
+    const publicSql = createAdminSql({
+      envVar: 'PUBLIC_DATABASE_WRITE_URL',
+      max: 1,
+      onnotice: () => {},
+    });
+    try {
+      for (const run of selectedRuns!.filter((selected) => !failedRuns.has(runKey(selected)))) {
+        let targetRunId: number;
+        try {
+          targetRunId = await target.begin((tx) => copyGpuTelemetry(tx, run, configIds));
+        } catch (error) {
+          failed++;
+          const message = error instanceof Error ? error.message : String(error);
+          console.error(`  ✗ ${runKey(run)} GPU telemetry: ${message}`);
+          continue;
+        }
+        try {
+          await materializePowerSeriesForRun(publicSql, targetRunId);
+        } catch (error) {
+          console.warn(
+            `  ${runKey(run)} PowerX series: precompute failed; readers fall back to samples:`,
+            error,
+          );
+        }
+      }
+    } finally {
+      await publicSql.end();
     }
   }
 
@@ -879,7 +1150,8 @@ async function main(): Promise<void> {
   } else {
     console.log('  availability skipped: rerun without --limit once every run syncs');
   }
-  await syncDatasets();
+  await syncDatasets(scope);
+  if (toPublic && failed === 0) failed += await moveVerifiedRuns(selectedRuns!);
 
   const totalSec = Math.round((Date.now() - t0) / 1000);
   console.log(`\n=== sync complete: ${ok} ok, ${failed} failed in ${totalSec}s ===`);

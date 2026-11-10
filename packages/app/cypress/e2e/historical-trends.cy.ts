@@ -480,12 +480,7 @@ describe('Historical frontier views', () => {
     cy.get('[data-testid="frontier-software-table"]').within(() => {
       cy.contains('th', 'Average').should('exist');
       cy.get('tbody tr').should('have.length.greaterThan', 0);
-      cy.get('tbody tr')
-        .first()
-        .find('td')
-        .last()
-        .invoke('text')
-        .should('match', /x$|—/);
+      cy.get('tbody tr').first().find('td').last().invoke('text').should('match', /x$|—/);
     });
   });
 

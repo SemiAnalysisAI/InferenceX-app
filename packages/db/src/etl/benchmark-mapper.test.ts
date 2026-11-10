@@ -1005,12 +1005,12 @@ describe('mapBenchmarkRow', () => {
   });
 });
 
-describe('scrubWithheldPowerMetrics (direct)', () => {
-  function supplementalMetrics(overrides: Record<string, any> = {}): Record<string, number> {
-    const { workers: _workers, ...measured } = dirtyPowerPayload();
-    return { tput_per_gpu: 567.8, ...measured, ...overrides };
-  }
+function supplementalMetrics(overrides: Record<string, any> = {}): Record<string, number> {
+  const { workers: _workers, ...measured } = dirtyPowerPayload();
+  return { tput_per_gpu: 567.8, ...measured, ...overrides };
+}
 
+describe('scrubWithheldPowerMetrics (direct)', () => {
   it('strips every measured key on power_valid=0 and reports withheld', () => {
     const metrics = supplementalMetrics({ power_valid: 0, power_metric_schema_version: 2 });
 

@@ -444,11 +444,11 @@ const matrix = (presenting: boolean) => (
   />
 );
 
+const gate = () =>
+  container.querySelector('[data-testid="overview-desktop-matrix"]')?.parentElement?.className;
+
 describe('DesktopOverviewMatrix', () => {
   it('drops the viewport gate while presenting so a narrow projector still gets a matrix', () => {
-    const gate = () =>
-      container.querySelector('[data-testid="overview-desktop-matrix"]')?.parentElement?.className;
-
     act(() => root.render(matrix(false)));
     expect(gate()).toBe('hidden xl:block');
 

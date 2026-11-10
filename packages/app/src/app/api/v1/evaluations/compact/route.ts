@@ -1,5 +1,6 @@
-import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { readEachDb } from '@semianalysisai/inferencex-db/lib/payload-db';
 
+import { mergeEvalResults } from '@semianalysisai/inferencex-db/queries/across-dbs';
 import { getAllEvalResults } from '@semianalysisai/inferencex-db/queries/evaluations';
 
 import { compactEvalRows } from '@/components/evaluation/compact-rows';
@@ -10,7 +11,7 @@ export const dynamic = 'force-dynamic';
 
 export const GET = cachedReadRoute({
   cacheKey: 'evaluations-compact',
-  fetch: async () => compactEvalRows(await getAllEvalResults(getDb())),
+  fetch: async () => compactEvalRows(mergeEvalResults(await readEachDb(getAllEvalResults))),
   fixture: () => compactEvalRows(loadFixture('evaluations')),
   logLabel: 'compact evaluations',
 });
