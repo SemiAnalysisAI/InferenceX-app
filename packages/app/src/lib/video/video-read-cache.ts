@@ -1,8 +1,8 @@
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
 import { cachedQuery, videoCacheTag } from '@/lib/cache/api-cache';
 import { publishedVideoHistory } from './video-history-store';
-import { readPublishedArtifact, renditionPreviews, storedArtifacts } from './video-storage';
-import { withRenditionPreviews } from './video-renditions';
+import { derivedMedia, readPublishedArtifact, storedArtifacts } from './video-storage';
+import { withDerivedMedia, type DerivedMedia } from './video-renditions';
 
 /**
  * Backstop for the publication purge. A read that started before a purge and finishes after it
@@ -10,7 +10,10 @@ import { withRenditionPreviews } from './video-renditions';
  * refreshes, so no request waits on it.
  */
 export const VIDEO_CACHE_REVALIDATE_SECONDS = 300;
-/** Renditions are encoded after the publication purge, so their listing refreshes on its own. */
+/**
+ * Renditions and posters are encoded after the publication purge, so their listing refreshes on
+ * its own.
+ */
 export const RENDITION_LISTING_REVALIDATE_SECONDS = 60;
 
 /** A value the shared cache must not keep: an incomplete History read or absent media. */
@@ -76,21 +79,22 @@ const cachedStoredArtifact = retained(
   },
 );
 
-// Entries, not the Map: the shared cache stores JSON.
-const cachedRenditionListing = cachedQuery(
-  async () => [...(await renditionPreviews())],
-  'video:renditions',
+// Entries, not the Map: the shared cache stores JSON. Each value is the derived media object of
+// one original; v2 replaced the bare rendition URL, so entries cached under v1 are never read.
+const cachedDerivedMediaListing = cachedQuery(
+  async () => [...(await derivedMedia())],
+  'video:renditions:v2',
   { tag: videoCacheTag(), revalidate: RENDITION_LISTING_REVALIDATE_SECONDS },
 );
 
 export async function cachedPublishedArtifact(runId: string, artifactId: string) {
-  const [saved, previews] = await Promise.all([
+  const [saved, media] = await Promise.all([
     cachedStoredArtifact(runId, artifactId),
-    // A missing rendition listing only costs download size; the sealed originals still play.
-    cachedRenditionListing().then(
+    // A missing listing only costs download size and posters; the sealed originals still play.
+    cachedDerivedMediaListing().then(
       (entries) => new Map(entries),
-      () => new Map<string, string>(),
+      () => new Map<string, DerivedMedia>(),
     ),
   ]);
-  return saved && withRenditionPreviews(saved, previews);
+  return saved && withDerivedMedia(saved, media);
 }

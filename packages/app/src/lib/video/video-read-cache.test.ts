@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeNextCache, resetFakeNextCache } from '@/lib/testing/fake-next-cache';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import { publishedVideoHistory } from './video-history-store';
-import { readPublishedArtifact, renditionPreviews, storedArtifacts } from './video-storage';
+import { readPublishedArtifact, derivedMedia, storedArtifacts } from './video-storage';
 import {
   cachedPublishedArtifact,
   cachedVideoHistory,
@@ -17,7 +17,7 @@ vi.mock('./video-history-store', () => ({ publishedVideoHistory: vi.fn() }));
 vi.mock('./video-storage', () => ({
   storedArtifacts: vi.fn(),
   readPublishedArtifact: vi.fn(),
-  renditionPreviews: vi.fn(),
+  derivedMedia: vi.fn(),
 }));
 
 const page = (entries: VideoHistoryPage['entries'] = []): VideoHistoryPage => ({
@@ -38,7 +38,7 @@ const artifact = { id: 20, name: 'h3-results-10-1', expired: false, size_in_byte
 const saved = { storageVersion: 1 as const, runId: '10', artifact, sources: [] };
 
 beforeEach(() => {
-  vi.mocked(renditionPreviews).mockResolvedValue(new Map());
+  vi.mocked(derivedMedia).mockResolvedValue(new Map());
 });
 afterEach(() => {
   resetFakeNextCache();
@@ -132,7 +132,7 @@ describe('shared VideoGenX read cache', () => {
       await cachedPublishedArtifact('10', '20');
       vi.advanceTimersByTime(RENDITION_LISTING_REVALIDATE_SECONDS * 1000);
       await cachedPublishedArtifact('10', '20');
-      expect(renditionPreviews).toHaveBeenCalledTimes(2);
+      expect(derivedMedia).toHaveBeenCalledTimes(2);
       expect(readPublishedArtifact).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();

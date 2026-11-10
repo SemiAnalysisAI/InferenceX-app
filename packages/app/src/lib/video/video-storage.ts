@@ -20,7 +20,12 @@ import {
   type StoredSource,
 } from '@/components/video-benchmark/stored';
 import { servingCells } from '@/components/video-benchmark/serving';
-import { RENDITION_PROFILE } from './video-renditions';
+import {
+  isMediaProfile,
+  MEDIA_PROFILES,
+  type DerivedMedia,
+  type MediaProfile,
+} from './video-renditions';
 
 export const PREFIX = 'h3-video-media/v1';
 export const videoStorageEnabled = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
@@ -30,11 +35,15 @@ export const approvalPath = (runId: string, artifact: CIArtifact) =>
 const qualityPath = (runId: string, artifact: CIArtifact) =>
   `${PREFIX}/quality/${runId}/${artifact.name}_${artifact.id}.json`;
 const renditionsPrefix = `${PREFIX}/renditions/`;
-export const renditionMediaPath = (outputSha256: string) =>
-  `${PREFIX}/objects/${outputSha256}/${RENDITION_PROFILE}.mp4`;
-/** The output hash in the receipt path lets one listing resolve every rendition URL. */
-export const renditionReceiptPath = (sourceSha256: string, outputSha256: string) =>
-  `${renditionsPrefix}${sourceSha256}/${RENDITION_PROFILE}/${outputSha256}.json`;
+/** Content-addressed by the derived output, like every other stored object. */
+export const derivedMediaPath = (profile: MediaProfile, outputSha256: string) =>
+  `${PREFIX}/objects/${outputSha256}/${profile}.${MEDIA_PROFILES[profile].extension}`;
+/** The output hash in the receipt path lets one listing resolve every derived media URL. */
+export const derivedReceiptPath = (
+  profile: MediaProfile,
+  sourceSha256: string,
+  outputSha256: string,
+) => `${renditionsPrefix}${sourceSha256}/${profile}/${outputSha256}.json`;
 const sourceSeal = (path: string) => /^sources\/[1-9]\d*\/original-SHA256SUMS$/u.test(path);
 const legacyTelemetry = (path: string) =>
   /^gpu\/supervisor\/(?:baseline|candidate)\/telemetry\.jsonl$/u.test(path);
@@ -464,12 +473,13 @@ export async function storeVideoArtifact(
 }
 
 /**
- * Map each original MP4 SHA256 to its web playback rendition from one listing. A receipt is
- * written only after its validated MP4 upload, so its path alone identifies a playable rendition.
+ * Map each original MP4 SHA256 to its derived media (web rendition, poster) from one listing.
+ * A receipt is written only after its validated upload, so its path alone identifies the
+ * object. The first listed receipt of a profile wins; unknown profiles are ignored.
  */
-export async function renditionPreviews(): Promise<Map<string, string>> {
-  const previews = new Map<string, string>();
-  if (!videoStorageEnabled()) return previews;
+export async function derivedMedia(): Promise<Map<string, DerivedMedia>> {
+  const media = new Map<string, DerivedMedia>();
+  if (!videoStorageEnabled()) return media;
   let cursor: string | undefined;
   do {
     const batch = await list({ prefix: renditionsPrefix, cursor });
@@ -478,10 +488,14 @@ export async function renditionPreviews(): Promise<Map<string, string>> {
         /^h3-video-media\/v1\/renditions\/(?<source>[a-f0-9]{64})\/(?<profile>[^/]+)\/(?<output>[a-f0-9]{64})\.json$/u.exec(
           blob.pathname,
         )?.groups;
-      if (match?.profile !== RENDITION_PROFILE || previews.has(match.source)) continue;
-      previews.set(match.source, new URL(`/${renditionMediaPath(match.output)}`, blob.url).href);
+      if (!match || !isMediaProfile(match.profile)) continue;
+      const { field } = MEDIA_PROFILES[match.profile];
+      const derived = media.get(match.source) ?? {};
+      if (derived[field]) continue;
+      derived[field] = new URL(`/${derivedMediaPath(match.profile, match.output)}`, blob.url).href;
+      media.set(match.source, derived);
     }
     cursor = batch.hasMore ? batch.cursor : undefined;
   } while (cursor);
-  return previews;
+  return media;
 }

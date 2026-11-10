@@ -8,7 +8,7 @@ import {
   readPublishedArtifact,
   readVideoPublication,
   readStoredArtifact,
-  renditionPreviews,
+  derivedMedia,
   storeVideoArtifact,
 } from './video-storage';
 import { publishedVideoHistory } from './video-history-store';
@@ -445,11 +445,13 @@ describe('rendition receipts', () => {
         hasMore: false,
         cursor: undefined,
       });
-    expect(await renditionPreviews()).toEqual(
+    expect(await derivedMedia()).toEqual(
       new Map([
         [
           source,
-          `https://store.public.blob.vercel-storage.com/h3-video-media/v1/objects/${output}/web-h264-crf23.mp4`,
+          {
+            previewUrl: `https://store.public.blob.vercel-storage.com/h3-video-media/v1/objects/${output}/web-h264-crf23.mp4`,
+          },
         ],
       ]),
     );
@@ -458,5 +460,37 @@ describe('rendition receipts', () => {
       cursor: 'next',
     });
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('resolves a poster receipt to its JPEG as posterUrl beside the rendition', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    const poster = 'e'.repeat(64);
+    const posterOnly = 'c'.repeat(64);
+    vi.mocked(list).mockResolvedValueOnce({
+      blobs: [
+        uploadReceipt(`h3-video-media/v1/renditions/${source}/poster-f0-w672-q4/${poster}.json`),
+        uploadReceipt(`h3-video-media/v1/renditions/${source}/web-h264-crf23/${output}.json`),
+        // A poster needs no rendition, and an unknown profile is ignored.
+        uploadReceipt(
+          `h3-video-media/v1/renditions/${posterOnly}/poster-f0-w672-q4/${poster}.json`,
+        ),
+        uploadReceipt(`h3-video-media/v1/renditions/${posterOnly}/poster-f1-w448/${output}.json`),
+      ],
+      hasMore: false,
+      cursor: undefined,
+    });
+    const objects = 'https://store.public.blob.vercel-storage.com/h3-video-media/v1/objects';
+    expect(await derivedMedia()).toEqual(
+      new Map([
+        [
+          source,
+          {
+            posterUrl: `${objects}/${poster}/poster-f0-w672-q4.jpg`,
+            previewUrl: `${objects}/${output}/web-h264-crf23.mp4`,
+          },
+        ],
+        [posterOnly, { posterUrl: `${objects}/${poster}/poster-f0-w672-q4.jpg` }],
+      ]),
+    );
   });
 });
