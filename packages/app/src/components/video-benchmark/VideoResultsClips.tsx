@@ -524,13 +524,11 @@ export default function VideoResultsClips({
               cost: other ? costs?.[other.id] : undefined,
             }}
             diagnostic={diagnostic}
-            footer={
-              <QualityMethod
-                leads={selected.map((lead) => ({ point: lead, side: sideOf(lead) }))}
-                namedRun={unofficialRun}
-                onShowMe={(target) => onShow(target, 'reference')}
-              />
-            }
+          />
+          <QualityMethod
+            leads={selected.map((lead) => ({ point: lead, side: sideOf(lead) }))}
+            namedRun={unofficialRun}
+            onShowMe={(target) => onShow(target, 'reference')}
           />
           <details
             data-testid="video-results-sources"

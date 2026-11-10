@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowRight, ChevronRight } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { Fragment, useId, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -9,6 +9,7 @@ import type { StageCandidate } from './clip-stage';
 import { hardwareLabel } from './hardware';
 import type { VideoPoint } from './metrics';
 import { referencePsnrRange, showMeTarget, type LossyPair } from './quality-method';
+import { PIXELS_DIFFER } from './VideoClipReadout';
 
 const METHODOLOGY = {
   en: 'https://github.com/SemiAnalysisAI/InferenceX/blob/main/video-generation/README.md#reference-psnr',
@@ -21,8 +22,9 @@ const STRINGS = {
     today:
       'Today each clip is scored by PSNR against the official Diffusers reference, over every decoded frame of the same prompt and seed.',
     range: (clips: number, hardware: string, min: string, max: string) =>
-      `The ${clips} lossless clips loaded here (${hardware}) score ${min}–${max} dB.`,
-    why: 'Different engines and parallel layouts produce different pixels from the same prompt and seed, so a reference score mixes those differences with any change a lossy optimization makes.',
+      `${clips === 1 ? 'The 1 lossless clip loaded here' : `The ${clips} lossless clips loaded here`} (${hardware}) ${clips === 1 ? 'scores' : 'score'} ${min === max ? min : `${min}–${max}`} dB.`,
+    whyTitle: 'Why not score against the official reference?',
+    why: `${PIXELS_DIFFER.en}, so a reference score mixes those differences with any change a lossy optimization makes.`,
     paired: 'Paired lossless scores',
     planned: 'Planned',
     pairedBody:
@@ -56,8 +58,9 @@ const STRINGS = {
     today:
       '目前每条视频都与官方 Diffusers 参考视频比较 PSNR：使用相同的 prompt 和 seed，逐帧比较全部解码画面。',
     range: (clips: number, hardware: string, min: string, max: string) =>
-      `本页已加载的 ${clips} 条无损视频（${hardware}）PSNR 在 ${min}–${max} dB 之间。`,
-    why: '不同引擎或并行配置即使使用相同的 prompt 和 seed，生成的像素也会不同，因此相对参考的分数会把这些差异与有损优化可能带来的变化混在一起。',
+      `本页已加载的 ${clips} 条无损视频（${hardware}）PSNR ${min === max ? `为 ${min} dB` : `在 ${min}–${max} dB 之间`}。`,
+    whyTitle: '为什么不以官方参考视频为基准评分？',
+    why: `${PIXELS_DIFFER.zh}，因此相对参考的分数会把这些差异与有损优化可能带来的变化混在一起。`,
     paired: '与无损运行的配对评分',
     planned: '计划中',
     pairedBody: '目前还没有评分器计算这些分数。计划改为以每个有损配置自己的无损运行为基准评分。',
@@ -106,46 +109,49 @@ export default function QualityMethod({
   const range = referencePsnrRange(leads);
   const target = showMeTarget(leads, namedRun);
   const targetLabel = target ? hardwareLabel(target.hardwareKey ?? '') : '';
+  const helpId = useId();
   return (
     <details
       data-testid="video-results-quality-method"
-      className="group/quality border-t pt-3"
+      className="group/quality text-xs"
       onToggle={(event) => {
         if (event.currentTarget.open) track('video_results_quality_method_opened');
       }}
     >
-      <summary className="flex w-fit cursor-pointer list-none items-center gap-1.5 font-medium text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
+      <summary className="flex w-full cursor-pointer list-none items-center gap-2 rounded-lg border border-border/30 bg-card px-3 py-2.5 text-sm font-semibold group-open/quality:rounded-b-none hover:bg-muted/10 [&::-webkit-details-marker]:hidden">
         <ChevronRight
           aria-hidden="true"
-          className="size-3.5 transition-transform group-open/quality:rotate-90"
+          className="size-3.5 shrink-0 transition-transform group-open/quality:rotate-90"
         />
         {s.title}
       </summary>
-      <div className="mt-3 flex max-w-4xl flex-col gap-3 leading-relaxed">
-        <p className="max-w-measure">
-          {[
-            s.today,
-            range &&
-              s.range(
-                range.clips,
-                range.hardware.map(hardwareLabel).join(locale === 'zh' ? '、' : ', '),
-                range.min.toFixed(1),
-                range.max.toFixed(1),
-              ),
-            s.why,
-          ]
-            .filter(Boolean)
-            .join(locale === 'zh' ? '' : ' ')}
-        </p>
+      <div className="flex flex-col gap-3 rounded-b-lg border border-t-0 border-border/30 p-3.5 leading-relaxed">
+        <p className="max-w-measure">{s.today}</p>
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{s.paired}</span>
-          <span className="rounded-full border px-2 py-0.5 text-2xs text-muted-foreground">
+          <span className="rounded-full border border-border/30 px-2 py-0.5 text-2xs text-muted-foreground">
             {s.planned}
           </span>
         </div>
         <p className="-mt-1.5 max-w-measure text-muted-foreground">{s.pairedBody}</p>
         <MethodDiagram s={s} />
-        <p className="max-w-measure text-muted-foreground">{s.floor}</p>
+        <p className="max-w-measure rounded-lg bg-muted/20 px-3 py-2">{s.floor}</p>
+        <div
+          data-testid="video-results-quality-why"
+          className="flex max-w-measure flex-col gap-1.5 border-l-3 border-border-alt py-0.5 pl-3"
+        >
+          <p className="text-sm font-semibold">{s.whyTitle}</p>
+          <p className="text-muted-foreground">
+            {range &&
+              `${s.range(
+                range.clips,
+                range.hardware.map(hardwareLabel).join(locale === 'zh' ? '、' : ', '),
+                range.min.toFixed(1),
+                range.max.toFixed(1),
+              )}${locale === 'zh' ? '' : ' '}`}
+            {s.why}
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           {target && (
             <span className="flex flex-wrap items-center gap-2">
@@ -154,6 +160,7 @@ export default function QualityMethod({
                 variant="outline"
                 size="sm"
                 data-testid="video-results-quality-show-me"
+                aria-describedby={helpId}
                 onClick={() => {
                   track('video_results_quality_show_me', { gpu: target.hardwareKey });
                   onShowMe(target);
@@ -161,14 +168,16 @@ export default function QualityMethod({
               >
                 {s.showMe}
               </Button>
-              <span className="text-muted-foreground">{s.showMeHelp(targetLabel)}</span>
+              <span id={helpId} className="text-muted-foreground">
+                {s.showMeHelp(targetLabel)}
+              </span>
             </span>
           )}
           <a
             href={METHODOLOGY[locale]}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-medium text-primary underline-offset-2 hover:underline"
+            className="text-brand-fill underline underline-offset-2"
             onClick={() => track('video_results_quality_methodology_clicked')}
           >
             {s.methodology}
@@ -202,12 +211,13 @@ function MethodDiagram({ s }: { s: Strings }) {
       </Node>
       <Arrow />
       <Node title={s.scoreTitle}>
-        <dl className="flex flex-col gap-1">
+        {/* An auto name column keeps every description on the same line start. */}
+        <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1">
           {s.metrics.map(([name, help]) => (
-            <div key={name} className="flex flex-wrap gap-x-2">
-              <dt className="w-12 shrink-0 font-mono font-medium">{name}</dt>
-              <dd className="m-0 min-w-0 text-muted-foreground">{help}</dd>
-            </div>
+            <Fragment key={name}>
+              <dt className="font-mono font-medium">{name}</dt>
+              <dd className="m-0 text-muted-foreground">{help}</dd>
+            </Fragment>
           ))}
         </dl>
       </Node>
@@ -228,7 +238,7 @@ const Arrow = () => (
 
 function Node({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1.5 rounded-md border bg-background p-2.5">
+    <div className="flex min-w-0 flex-col gap-1.5 rounded-lg border border-border/30 bg-muted/10 p-3">
       <span className="font-medium">{title}</span>
       {children}
     </div>
@@ -240,8 +250,8 @@ function Lane({ name, sub, lossy = false }: { name: string; sub: string; lossy?:
     <div
       className={
         lossy
-          ? 'rounded border border-amber-500/50 bg-amber-500/5 px-2 py-1'
-          : 'rounded border px-2 py-1'
+          ? 'rounded-md border border-amber-500/50 bg-amber-500/5 px-2 py-1'
+          : 'rounded-md border border-border/30 bg-card px-2 py-1'
       }
     >
       <span className="block">{name}</span>
@@ -272,7 +282,7 @@ export function LossyQualityHint({
         <button
           type="button"
           data-testid="video-results-lossy-see-changes"
-          className="font-medium whitespace-nowrap text-primary hover:underline"
+          className="font-semibold whitespace-nowrap text-brand-fill hover:underline"
           onClick={() => {
             track('video_results_lossy_see_changes', {
               gpu: pair.lossy.hardwareKey,
