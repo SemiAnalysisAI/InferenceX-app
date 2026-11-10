@@ -7,9 +7,11 @@ import type {
 import { videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState } from '@/components/video-benchmark/results';
 import type { ResultsEvidence } from '@/components/video-benchmark/results-evidence';
+import { ThemeProvider } from '@/components/ui/theme-provider';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { verifiedQuality } from '@/components/video-benchmark/reference-quality';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
+import { APP_THEMES } from '@/lib/themes/themes';
 import { servingArtifact } from '../support/video-artifacts';
 import { readOnlyVideoRequests, resultHistory } from '../support/video-results';
 
@@ -33,12 +35,15 @@ function mount({
   search = '?r_y=videosPerGpuHour',
   edit,
   editPage,
+  theme,
 }: {
   pathname?: string;
   search?: string;
   edit?: (observation: VideoHistoryObservation) => void;
   editPage?: (page: VideoHistoryPage) => void;
+  theme?: 'light' | 'dark';
 } = {}) {
+  if (theme) cy.window().then((win) => win.localStorage.setItem('theme', theme));
   readOnlyVideoRequests();
   resultHistory(edit).then((page) => {
     editPage?.(page);
@@ -47,10 +52,24 @@ function mount({
   cy.window().then((win) =>
     win.history.replaceState(null, '', `${win.location.pathname}${search}`),
   );
-  cy.mount(
+  const dashboard = (
     <PathnameContext.Provider value={pathname}>
       <VideoDashboard />
-    </PathnameContext.Provider>,
+    </PathnameContext.Provider>
+  );
+  cy.mount(
+    theme ? (
+      <ThemeProvider
+        attribute="class"
+        defaultTheme={theme}
+        enableSystem={false}
+        themes={APP_THEMES}
+      >
+        {dashboard}
+      </ThemeProvider>
+    ) : (
+      dashboard
+    ),
   );
   cy.wait('@history');
   cy.get('[data-testid="video-results"]').should('be.visible');
@@ -66,6 +85,12 @@ const openPoint = (hardware: string, overlay = false) => {
     .click({ force: true });
   cy.get('[data-testid="point-details-panel"] [data-action="view-telemetry"]').click();
 };
+const seriesPills = () => cy.get('[data-testid="video-results-chart"] [data-series-pill]');
+const lineColor = (hardware: string) =>
+  hardwarePoints(hardware)
+    .filter('[data-overlay="false"]')
+    .find('.visible-shape')
+    .then(($shape) => getComputedStyle($shape[0]).stroke);
 const playing = () => points('[data-clip-role="playing"]');
 const stagePill = (side: 'a' | 'b') =>
   cy.get(`[data-side="${side}"] [data-testid="video-results-pill"]`);
@@ -87,6 +112,19 @@ const plottedY = (hardware: string) =>
   points(`[data-hardware="${hardware}"][data-overlay="false"]`).then(
     ($group) => ($group[0] as unknown as { __data__: { y: number } }).__data__.y,
   );
+
+/** Adds an unapproved re-export of the B200 run, so the official B200 line stays drawn. */
+const NAMED_RUN = '90000000003';
+const addNamedRun = (page: VideoHistoryPage) => {
+  const named = structuredClone(page.entries.find((entry) => entry.runId === '34341996789')!);
+  named.runId = NAMED_RUN;
+  named.artifact.id = 99993;
+  named.approved = false;
+  // Distinct observation IDs, so neither copy displaces the other's points.
+  for (const source of named.sources)
+    for (const observation of source.observations) observation.id = `named-${observation.id}`;
+  page.entries.unshift(named);
+};
 
 const evidence = (observation: VideoHistoryObservation): ResultsEvidence => ({
   workloadHash: 'a'.repeat(64),
@@ -841,6 +879,162 @@ describe('VideoGenX results', () => {
         hardwarePoints('b200').should('exist');
         cy.get('[data-testid="video-results-detail"]').should('not.exist');
       });
+  });
+
+  it('names each drawn line with one pill at its end, apart and in the line colour', () => {
+    cy.viewport(1440, 900);
+    mount({
+      search: `?unofficialrun=${NAMED_RUN}&r_y=videosPerGpuHour`,
+      edit: (observation) => {
+        observation.results = evidence(observation);
+      },
+      editPage: addNamedRun,
+    });
+    // Three official GPUs and the unofficial run, one pill each.
+    seriesPills().should('have.length', 4);
+    seriesPills().should(($pills) => {
+      const texts = [...$pills].map((pill) => pill.textContent);
+      expect(texts).to.include.members([
+        'B200 (SGLang)',
+        'H200 (SGLang)',
+        'H100 (SGLang)',
+        'B200 (SGLang) · unofficial',
+      ]);
+      const boxes = [...$pills].map((pill) => pill.getBoundingClientRect());
+      const zoom = $pills[0].closest<SVGGElement>('.zoom-group')!;
+      const ctm = zoom.getScreenCTM()!;
+      const width = Number(
+        zoom
+          .ownerSVGElement!.querySelector('#clip-video-results-chart rect')!
+          .getAttribute('width'),
+      );
+      const plot = { left: ctm.e, right: ctm.e + width };
+      for (const [i, a] of boxes.entries()) {
+        expect(a.left, 'pill inside the plot').to.be.at.least(plot.left - 0.5);
+        expect(a.right, 'pill inside the plot').to.be.at.most(plot.right + 0.5);
+        for (const b of boxes.slice(i + 1))
+          expect(
+            a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top,
+            `${texts[i]} clear of the next pill`,
+          ).to.equal(true);
+      }
+    });
+    cy.contains('[data-series-pill]', 'unofficial')
+      .find('rect')
+      .should('have.attr', 'fill', overlayRunColor(0));
+    cy.contains('[data-series-pill]', 'H200 (SGLang)')
+      .find('rect')
+      .then(($h200) =>
+        cy
+          .contains('[data-series-pill]', 'H100 (SGLang)')
+          .find('rect')
+          .should('not.have.attr', 'fill', $h200.attr('fill')),
+      );
+  });
+
+  it('names only the focus overlay lines on a narrow plot', () => {
+    cy.viewport(375, 844);
+    mount({
+      search: `?unofficialrun=${NAMED_RUN}&r_y=videosPerGpuHour`,
+      edit: (observation) => {
+        observation.results = evidence(observation);
+      },
+      editPage: (page) => {
+        addNamedRun(page);
+        // Stored runs may have clips, so a click on H200 plays it.
+        for (const entry of page.entries) entry.publishedAt = '2026-11-01T00:00:00.000Z';
+      },
+    });
+    // The unofficial run plays, so its line keeps a pill beside the three official ones.
+    seriesPills().should('have.length', 4);
+    cy.contains('[data-series-pill]', 'unofficial').should('exist');
+    hardwarePoints('h200').find('.visible-shape').click({ force: true });
+    playing().should('have.attr', 'data-hardware', 'h200');
+    seriesPills().should('have.length', 3);
+    cy.contains('[data-series-pill]', 'unofficial').should('not.exist');
+    assertResultsFit();
+  });
+
+  it('gives H100 and H200 distinct VideoGenX colours in light and dark themes', () => {
+    mount({ theme: 'light' });
+    lineColor('b200').should('equal', 'rgb(95, 158, 69)');
+    lineColor('h200').should('equal', 'rgb(29, 111, 184)');
+    lineColor('h100').should('equal', 'rgb(11, 92, 60)');
+    mount({ theme: 'dark' });
+    lineColor('h200').should('equal', 'rgb(90, 169, 236)');
+    lineColor('h100').should('equal', 'rgb(47, 181, 138)');
+    cy.document().then((document) => document.documentElement.classList.remove('dark'));
+  });
+
+  it('labels deployments only on the playing, baseline and hovered lines', () => {
+    mount({
+      search: `?unofficialrun=${NAMED_RUN}&r_y=videosPerGpuHour&r_optimal=0`,
+      editPage: (page) => {
+        // Every line gets a second deployment, so each has a label to show or hide.
+        for (const entry of page.entries)
+          for (const source of entry.sources) {
+            const first = source.observations[0];
+            if (!first) continue;
+            source.observations.push({
+              ...structuredClone(first),
+              id: `two-gpu-${entry.runId}:${first.cell}`,
+              participating: 2,
+              allocated: 2,
+            });
+          }
+        addNamedRun(page);
+      },
+    });
+    const labelled = () =>
+      points('[data-labelled]').then(($points) =>
+        [...$points].map((point) => `${point.dataset.hardware}:${point.dataset.overlay}`),
+      );
+    // The unofficial run plays; only its other deployment is labelled, once.
+    playing().should('have.attr', 'data-overlay', 'true');
+    labelled().should('deep.equal', ['b200:true']);
+    cy.get('[data-testid="video-results-chart"]').should(($chart) => {
+      const labels = [
+        ...$chart[0].querySelectorAll<SVGTextElement>('.dot-group[data-labelled] .point-label'),
+      ];
+      const pills = [...$chart[0].querySelectorAll('[data-series-pill] rect')];
+      for (const label of labels)
+        for (const pill of pills) {
+          const a = label.getBoundingClientRect();
+          const b = pill.getBoundingClientRect();
+          expect(
+            a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top,
+            `"${label.textContent}" clear of every pill`,
+          ).to.equal(true);
+        }
+    });
+    points('[data-hardware="h200"]').first().trigger('mouseenter', { force: true });
+    labelled().should('have.members', ['b200:true', 'h200:false', 'h200:false']);
+    points('[data-hardware="h200"]').first().trigger('mouseleave', { force: true });
+    labelled().should('deep.equal', ['b200:true']);
+  });
+
+  it('shows power and the telemetry action without scrolling the details panel', () => {
+    cy.viewport(1440, 900);
+    mount();
+    hardwarePoints('b200').find('.visible-shape').click({ force: true });
+    cy.get('[data-testid="point-details-panel"]').then(($panel) => {
+      const body = $panel[0].querySelector('[data-slot="point-details-body"]')!;
+      const bounds = body.getBoundingClientRect();
+      const power = [...$panel[0].querySelectorAll('dt')].find(
+        (term) => term.textContent === 'Avg board power',
+      )!;
+      expect(power, 'power row').not.to.equal(undefined);
+      expect(power.getBoundingClientRect().bottom, 'power row in view').to.be.at.most(
+        bounds.bottom,
+      );
+      const telemetry = $panel[0].querySelector('[data-action="view-telemetry"]')!;
+      expect(
+        telemetry.closest('[data-slot="point-details-actions"]'),
+        'fixed action row',
+      ).not.to.equal(null);
+      const rect = telemetry.getBoundingClientRect();
+      expect(rect.bottom, 'telemetry inside the window').to.be.at.most(900);
+    });
   });
 
   for (const [pathname, width] of [

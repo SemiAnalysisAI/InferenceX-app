@@ -13,7 +13,9 @@ import {
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { pushClientSearch, replaceClientSearch } from '@/lib/routing/client-navigation';
+import { useTheme } from 'next-themes';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { isDarkTheme } from '@/lib/themes/themes';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { Button } from '@/components/ui/button';
 import { ShareButton } from '@/components/ui/share-button';
@@ -35,6 +37,7 @@ import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { RUN_CONTEXT_GRID, RunField } from '@/components/inference/ui/WorkflowInfoDisplay';
 import { hardwareLabel } from './hardware';
+import { videoHardwareColor } from './hardware-colors';
 import { compareDeployments, layoutLabel, leadCell, runtimeKey } from './deployment';
 import { engineLabel, engineSort } from './engines';
 import { useVideoPoints } from './use-video-points';
@@ -504,9 +507,15 @@ export default function VideoDashboard({
     () => true,
     () => false,
   );
+  const { resolvedTheme } = useTheme();
+  const paletteTheme = isDarkTheme(resolvedTheme) ? 'dark' : 'light';
+  // VideoGenX's own hues first, so H100 and H200 never share the site's NVIDIA green.
   const colorFor = useCallback(
-    (key: string) => (mounted ? getCssColor(resolveColor(key)) : 'var(--muted-foreground)'),
-    [mounted, getCssColor, resolveColor],
+    (key: string) =>
+      mounted
+        ? (videoHardwareColor(key, paletteTheme) ?? getCssColor(resolveColor(key)))
+        : 'var(--muted-foreground)',
+    [mounted, paletteTheme, getCssColor, resolveColor],
   );
   const color = (cell: ResultCell) =>
     cell.overlay ? overlayRunColor(0) : colorFor(cell.point.hardwareKey ?? '');

@@ -21,10 +21,18 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import type { ShapeKey } from '@/lib/charts/chart-rendering';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { logDomain, zeroAnchoredDomain } from './chart-domain';
+import {
+  PILL_HEIGHT,
+  boxesOverlap,
+  clearOfLabels,
+  labelShift,
+  pillBox,
+  spreadPills,
+} from './chart-marks';
 import { mayHaveClips } from './clip-stage';
 import { serverSplit } from './deployment';
 import { engineLabel, engineShape, engineSort } from './engines';
-import { isLossy, runtimeLabel } from './optimizations';
+import { isLossy, lossyLabel, runtimeLabel } from './optimizations';
 import { hardwareLabel, hardwareSort } from './hardware';
 import type { ResultCell, ResultsState } from './results';
 import {
@@ -38,6 +46,7 @@ import {
   resultsMetricLabel,
   resultsPlotSeries,
   type ResultsChartPoint,
+  type ResultsChartSeries,
 } from './results-chart';
 import { resultsNumber as n } from './VideoResultsCharts';
 
@@ -58,6 +67,7 @@ const STRINGS = {
       'No visible hardware has both selected metrics for this workload. Choose another axis metric or show more hardware.',
     controls: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
     unofficial: 'Unofficial run',
+    unofficialPill: 'unofficial',
     conc: (count: number) => `Conc ${count}`,
     gpuSplit: 'GPUs (part. / alloc.)',
     deployment: 'Deployment',
@@ -102,6 +112,7 @@ const STRINGS = {
     noData: '当前工作负载下，没有可见硬件同时具备所选的两项指标。请更换坐标轴指标或显示更多硬件。',
     controls: 'Shift+滚轮缩放 · 拖动平移 · 双击重置',
     unofficial: '非官方运行',
+    unofficialPill: '非官方',
     conc: (count: number) => `并发 ${count}`,
     gpuSplit: 'GPU（参与 / 分配）',
     deployment: '部署',
@@ -145,6 +156,32 @@ interface PlotPoint extends ResultsChartPoint {
   color: string;
   /** A click loads it on the clip stage; without clips it draws hollow. */
   clips: boolean;
+  /** Its series, so hovering one point brings its whole line into focus. */
+  series: string;
+}
+
+/** The pill that names a drawn series at its line end. */
+interface SeriesPill {
+  key: string;
+  text: string;
+  color: string;
+  lossy: boolean;
+  overlay: boolean;
+  /** The point it sits beside: the last frontier point, or the best point without a frontier. */
+  end: string;
+}
+
+/** What the marks layer reads on every redraw; kept in a ref so it never rebuilds the plot. */
+interface MarkInputs {
+  link: ClipLink | undefined;
+  /** The hovered point's series. */
+  hover: string | null;
+  pills: readonly SeriesPill[];
+}
+
+interface PlotSize {
+  width: number;
+  height: number;
 }
 
 type Strings = (typeof STRINGS)['en'] | (typeof STRINGS)['zh'];
@@ -174,16 +211,128 @@ function drawHollow(root: Element) {
     });
 }
 
+const PILLS = 'series-pills';
+/** Plot width, in px, below which only focus overlay lines get a pill. */
+const NARROW_PLOT = 480;
+
+/** The plot position a point's group was moved to. */
+function pointPosition(node: Element): { x: number; y: number } | null {
+  const match = /translate\(\s*(?<x>[-\d.e]+)[\s,]+(?<y>[-\d.e]+)\s*\)/u.exec(
+    node.getAttribute('transform') ?? '',
+  );
+  return match?.groups ? { x: Number(match.groups.x), y: Number(match.groups.y) } : null;
+}
+
+/** Rendered text width, with a character estimate where layout is unavailable. */
+function textWidth(node: SVGTextElement, size: number): number {
+  return node.getComputedTextLength() || [...(node.textContent ?? '')].length * size * 0.6;
+}
+
 /**
- * Rings and labels the two points the stage plays, in one group after every point so no point or
- * label covers them. Each badge copies its point's transform, so it runs after every plot render,
- * zoom frame and pick, never reordering the points themselves.
+ * Rings and labels the two points the stage plays, names each series at its line end, and
+ * shows point labels only on the focus series: the playing, baseline and hovered ones. Pills
+ * and badges sit in groups after every point so no point or label covers them, and copy the
+ * points' transforms, so this runs after every plot render, zoom frame, pick and hover,
+ * never reordering the points themselves.
  */
-function drawBadges(root: Element, link: ClipLink, s: Strings) {
+function drawMarks(root: Element, size: PlotSize, inputs: MarkInputs, s: Strings) {
   root.querySelector(`.${BADGES}`)?.remove();
+  root.querySelector(`.${PILLS}`)?.remove();
   const points = [...root.querySelectorAll<SVGGElement>('.dot-group')];
   const host = points[0]?.parentNode;
   if (!host) return;
+  const { link, hover } = inputs;
+  const nodes = new Map<string, SVGGElement>();
+  const focus = new Set<string>(hover === null ? [] : [hover]);
+  for (const node of points) {
+    const point = select<SVGGElement, PlotPoint>(node).datum();
+    nodes.set(point.key, node);
+    if (link && (point.key === link.playing || point.key === link.baseline))
+      focus.add(point.series);
+  }
+
+  // Point labels: focus series only, kept inside the plot and off each other.
+  const placed: { x0: number; x1: number; y0: number; y1: number }[] = [];
+  for (const node of points) {
+    const label = node.querySelector<SVGTextElement>('.point-label');
+    if (!label) continue;
+    const point = select<SVGGElement, PlotPoint>(node).datum();
+    const badged = link && (point.key === link.playing || point.key === link.baseline);
+    const at = pointPosition(node);
+    let shown = !badged && focus.has(point.series) && at !== null;
+    label.removeAttribute('transform');
+    if (shown && at) {
+      const width = textWidth(label, CHART_TYPE.dataLabel);
+      const shift = labelShift(at.x, width, size.width);
+      const box = {
+        x0: at.x + shift - width / 2,
+        x1: at.x + shift + width / 2,
+        y0: at.y - 18,
+        y1: at.y - 6,
+      };
+      shown = !placed.some((other) => boxesOverlap(other, box));
+      if (shown) {
+        placed.push(box);
+        if (shift !== 0) label.setAttribute('transform', `translate(${shift},0)`);
+      }
+    }
+    label.style.display = shown ? '' : 'none';
+    node.toggleAttribute('data-labelled', shown);
+  }
+
+  // Series pills, beside each line's last point inside the plot, spread apart vertically.
+  const pillLayer = select(host as SVGGElement)
+    .append('g')
+    .attr('class', PILLS)
+    .attr('pointer-events', 'none');
+  const boxes = inputs.pills.flatMap((pill) => {
+    // A narrow plot has no room to name every overlay line; it names the focus ones.
+    if (pill.overlay && size.width < NARROW_PLOT && !focus.has(pill.key)) return [];
+    const node = nodes.get(pill.end);
+    const at = node && pointPosition(node);
+    if (!at || at.x < 0 || at.x > size.width || at.y < 0 || at.y > size.height) return [];
+    const group = pillLayer
+      .append('g')
+      .attr('data-series-pill', pill.key)
+      .attr('data-lossy', String(pill.lossy));
+    const rect = group
+      .append('rect')
+      .attr('height', PILL_HEIGHT)
+      .attr('rx', 4)
+      .attr('fill', pill.lossy ? 'var(--card)' : pill.color)
+      .attr('stroke', pill.color)
+      .attr('stroke-width', 1)
+      .attr('stroke-dasharray', pill.lossy ? '3 2' : null);
+    const text = group
+      .append('text')
+      .attr('x', 6)
+      .attr('y', PILL_HEIGHT / 2)
+      .attr('dominant-baseline', 'central')
+      .attr('font-size', px(CHART_TYPE.annotation))
+      .attr('font-weight', 600)
+      .attr('fill', pill.lossy ? 'var(--foreground)' : readableTextColor(pill.color))
+      .text(pill.text);
+    const width = textWidth(text.node()!, CHART_TYPE.annotation) + 12;
+    rect.attr('width', width);
+    const box = pillBox(pill.key, at, width, size.width);
+    // Each shown label covers its point too, so a pill keeps clear of both.
+    clearOfLabels(
+      box,
+      at,
+      placed.map((label) => ({ ...label, y1: label.y1 + 11 })),
+      size.width,
+    );
+    return [{ box, group }];
+  });
+  const spread = spreadPills(
+    boxes.map(({ box }) => box),
+    size.height,
+  );
+  boxes.forEach(({ group }, index) =>
+    group.attr('transform', `translate(${spread[index].x},${spread[index].y})`),
+  );
+
+  if (!link) return;
   const layer = select(host as SVGGElement)
     .append('g')
     .attr('class', BADGES)
@@ -194,9 +343,6 @@ function drawBadges(root: Element, link: ClipLink, s: Strings) {
       point.key === link.playing ? 'playing' : point.key === link.baseline ? 'baseline' : null;
     node.toggleAttribute('data-clip-role', role !== null);
     if (role) node.dataset.clipRole = role;
-    // The pill covers the point's own label.
-    const ownLabel = node.querySelector<SVGElement>('.point-label');
-    if (ownLabel) ownLabel.style.display = role ? 'none' : '';
     if (!role) continue;
     const playing = role === 'playing';
     const badge = layer
@@ -220,10 +366,10 @@ function drawBadges(root: Element, link: ClipLink, s: Strings) {
       .attr('fill', playing ? readableTextColor(point.color) : 'var(--foreground)')
       .text(playing ? s.playing : s.baseline);
     const label = text.node()!;
-    const textWidth =
+    const labelWidth =
       label.getComputedTextLength() || [...label.textContent!].length * CHART_TYPE.annotationSub;
     const icon = playing ? 8 : 0;
-    const width = textWidth + icon + 12;
+    const width = labelWidth + icon + 12;
     text.attr('x', -width / 2 + 6 + icon);
     badge
       .insert('rect', 'text')
@@ -241,6 +387,22 @@ function drawBadges(root: Element, link: ClipLink, s: Strings) {
         .attr('d', `M${-width / 2 + 6} -23 l5 3 l-5 3 z`)
         .attr('fill', readableTextColor(point.color));
   }
+}
+
+/** "B200 (SGLang)" for a lossless line, "B200 · FirstBlockCache" for a lossy one, as the legend names them. */
+function pillText(item: ResultsChartSeries, s: Strings, history: boolean): string {
+  const hardware = hardwareLabel(item.hardwareKey);
+  const lossy = item.lossy ? lossyLabel(item.optimizations) : null;
+  const name = lossy
+    ? `${hardware} · ${lossy}`
+    : item.engine
+      ? `${hardware} (${engineLabel(item.engine)})`
+      : hardware;
+  // A Chip config history line is one deployment, so its GPU count tells same-GPU lines apart.
+  const gpus = history ? item.points[0]?.cell.point.participating : undefined;
+  return [name, gpus === undefined ? null : s.gpus(gpus), item.overlay ? s.unofficialPill : null]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 const SWATCH_SHAPES: Record<ShapeKey, ReactNode> = {
@@ -324,6 +486,8 @@ export default function VideoResultsChart({
   // Kept out of `layers` and `tooltip`: a new one rebuilds the plot, which closes a pinned panel.
   const link = useRef(clipLink);
   link.current = clipLink;
+  const hover = useRef<string | null>(null);
+  const size = useRef<PlotSize>({ width: 0, height: 0 });
   // Hidden hardware is dropped after ranking, so its legend entry still names its engine.
   const ranked = useMemo(() => resultsPlotSeries(cells, history, state), [cells, history, state]);
   const series = useMemo(
@@ -343,10 +507,38 @@ export default function VideoResultsChart({
           overlay: item.overlay,
           color: item.overlay ? overlayRunColor(0) : colorFor(item.hardwareKey),
           clips: mayHaveClips(point.cell.point),
+          series: item.key,
         })),
       ),
     [series, colorFor],
   );
+  const better = y.better === 'higher' ? 1 : -1;
+  const pills = useMemo<SeriesPill[]>(
+    () =>
+      series.flatMap((item) => {
+        const end =
+          item.frontier.at(-1) ??
+          item.points.reduce<ResultsChartPoint | undefined>(
+            (best, point) => (!best || better * (point.y - best.y) > 0 ? point : best),
+            undefined,
+          );
+        return end
+          ? [
+              {
+                key: item.key,
+                text: pillText(item, s, history !== null),
+                color: item.overlay ? overlayRunColor(0) : colorFor(item.hardwareKey),
+                lossy: item.lossy,
+                overlay: item.overlay,
+                end: end.key,
+              },
+            ]
+          : [];
+      }),
+    [series, s, history, colorFor, better],
+  );
+  const marks = useRef<MarkInputs>({ link: clipLink, hover: null, pills });
+  marks.current = { link: clipLink, hover: hover.current, pills };
   const lines = useMemo(
     () =>
       Object.fromEntries(
@@ -413,9 +605,9 @@ export default function VideoResultsChart({
           const root = group.node();
           if (root && link.current) drawHollow(root);
         },
-        onZoom: (group) => {
+        onZoom: (group, { width, height }) => {
           const root = group.node();
-          if (root && link.current) drawBadges(root, link.current, s);
+          if (root) drawMarks(root, { width, height }, marks.current, s);
         },
       },
     ],
@@ -423,15 +615,25 @@ export default function VideoResultsChart({
   );
   const playing = clipLink?.playing ?? null,
     baseline = clipLink?.baseline ?? null;
-  useLayoutEffect(() => {
+  const redraw = useCallback(() => {
     const svg = chart.current?.getSvgElement();
-    if (svg && link.current) drawBadges(svg, link.current, s);
-  }, [playing, baseline, s]);
-  // Runs after the plot raises its points, so the badges stay in front; also on image export.
+    if (svg) drawMarks(svg, size.current, marks.current, s);
+  }, [s]);
+  useLayoutEffect(redraw, [playing, baseline, pills, redraw]);
+  // Runs after the plot raises its points, so the badges stay in front.
   const onRender = useCallback(
-    ({ layout }: RenderContext) => {
+    ({ layout, width, height }: RenderContext) => {
+      size.current = { width, height };
       const root = layout.zoomGroup.node();
-      if (root && link.current) drawBadges(root, link.current, s);
+      if (root) drawMarks(root, size.current, marks.current, s);
+    },
+    [s],
+  );
+  // An image export renders a resized clone, so it must not overwrite the live plot size.
+  const onExportRender = useCallback(
+    ({ layout, width, height }: RenderContext) => {
+      const root = layout.zoomGroup.node();
+      if (root) drawMarks(root, { width, height }, { ...marks.current, hover: null }, s);
     },
     [s],
   );
@@ -513,7 +715,20 @@ export default function VideoResultsChart({
               { value: d.yValue, label: yLabel },
               { value: d.xValue, label: xLabel },
             ]}
+            // Power and energy lead, so they show without scrolling the panel's default height.
             rows={[
+              {
+                label: s.energy,
+                value: cell.joulesPerClip === null ? '—' : `${n(cell.joulesPerClip / 1000, 1)} kJ`,
+              },
+              {
+                label: s.power,
+                value: point.avgPowerW === null ? '—' : `${n(point.avgPowerW, 0)} W`,
+              },
+              {
+                label: s.powerLimit,
+                value: point.enforcedLimitW === null ? '—' : `${n(point.enforcedLimitW, 0)} W`,
+              },
               {
                 label: s.concurrency,
                 value: point.concurrency === null ? '—' : String(point.concurrency),
@@ -558,20 +773,9 @@ export default function VideoResultsChart({
                 ),
               })),
               { label: s.perVideo, value: cost ? `$${n(cost.perVideo, 4)}` : '—' },
-              {
-                label: s.energy,
-                value: cell.joulesPerClip === null ? '—' : `${n(cell.joulesPerClip / 1000, 1)} kJ`,
-              },
-              {
-                label: s.power,
-                value: point.avgPowerW === null ? '—' : `${n(point.avgPowerW, 0)} W`,
-              },
-              {
-                label: s.powerLimit,
-                value: point.enforcedLimitW === null ? '—' : `${n(point.enforcedLimitW, 0)} W`,
-              },
               ...(point.runtime ? [{ label: s.runtime, value: point.runtime, wide: true }] : []),
             ]}
+            // View telemetry sits in the panel's fixed action row, so it never scrolls away.
             links={[
               {
                 action: 'run',
@@ -579,44 +783,47 @@ export default function VideoResultsChart({
                 href: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${encodeURIComponent(point.runId)}`,
                 external: true,
               },
+              { action: 'view-telemetry', label: `${s.viewTelemetry} →` },
             ]}
             onClose={close}
-            onAction={(_action, event) => event.stopPropagation()}
+            onAction={(action, event) => {
+              event.stopPropagation();
+              if (action !== 'view-telemetry') return;
+              close();
+              onOpen(plot.key, 'popover');
+            }}
           >
-            <div className="mt-3 flex flex-col gap-2">
-              {link.current && plot.clips && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="xs"
-                  data-action="compare-below"
-                  className="w-full"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    track('video_results_compare_revealed', { gpu: point.hardwareKey });
-                    link.current?.onReveal();
-                  }}
-                >
-                  {s.compareBelow}
-                </Button>
-              )}
+            {link.current && plot.clips && (
               <Button
                 type="button"
                 variant="outline"
                 size="xs"
-                data-action="view-telemetry"
-                className="w-full"
+                data-action="compare-below"
+                className="mt-3 w-full"
                 onClick={(event) => {
                   event.stopPropagation();
-                  close();
-                  onOpen(plot.key, 'popover');
+                  track('video_results_compare_revealed', { gpu: point.hardwareKey });
+                  link.current?.onReveal();
                 }}
               >
-                {s.viewTelemetry} →
+                {s.compareBelow}
               </Button>
-            </div>
+            )}
           </ChartPointDetails>
         );
+      },
+      // The shared default dims the hovered point; a custom handler replaces it, so it keeps that.
+      onHoverStart: (target, point) => {
+        target.attr('opacity', 0.8);
+        hover.current = point.series;
+        marks.current = { ...marks.current, hover: point.series };
+        redraw();
+      },
+      onHoverEnd: (target) => {
+        target.attr('opacity', 1);
+        hover.current = null;
+        marks.current = { ...marks.current, hover: null };
+        redraw();
       },
       onPointClick: (point) => {
         const pair = link.current;
@@ -637,7 +844,7 @@ export default function VideoResultsChart({
         pair.onSelect(point.key);
       },
     };
-  }, [locale, s, state, x, xKey, y, xLabel, yLabel, clip, history, onOpen]);
+  }, [locale, s, state, x, xKey, y, xLabel, yLabel, clip, history, onOpen, redraw]);
 
   const hidden = new Set(state.hidden);
   const measured = new Set(cells.map((cell) => cell.point.hardwareKey));
@@ -758,7 +965,7 @@ export default function VideoResultsChart({
       layers={layers}
       tooltip={tooltip}
       onRender={onRender}
-      onExportRender={onRender}
+      onExportRender={onExportRender}
       zoom={{
         enabled: true,
         axes: 'both',
