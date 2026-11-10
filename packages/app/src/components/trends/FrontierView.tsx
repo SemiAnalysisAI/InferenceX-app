@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics/analytics';
-import { VENDOR_LOGO_ICONS } from '@/lib/catalog/vendor-logos';
+import { VENDOR_MARK_HREFS } from '@/lib/catalog/vendor-logos';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import { FrontierChapterNow, FrontierTimeline } from './FrontierChapters';
@@ -419,12 +419,12 @@ export default function FrontierView({
                   value: name,
                   label: name,
                   testId: `frontier-vendor-${name}`,
-                  icon: VENDOR_LOGO_ICONS[name] ? (
+                  icon: VENDOR_MARK_HREFS[name] ? (
                     <img
-                      src={VENDOR_LOGO_ICONS[name].href}
+                      src={VENDOR_MARK_HREFS[name]}
                       alt=""
                       aria-hidden
-                      className="size-3 object-contain"
+                      className="size-3 object-contain dark:invert"
                     />
                   ) : undefined,
                 })),

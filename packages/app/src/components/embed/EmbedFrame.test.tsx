@@ -4,6 +4,8 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { APP_THEMES } from '@/lib/themes/themes';
+
 import EmbedFrame from './EmbedFrame';
 
 let container: HTMLDivElement;
@@ -14,7 +16,7 @@ function renderEmbed(theme: 'light' | 'dark'): void {
     root.render(
       createElement(
         ThemeProvider,
-        { attribute: 'class', defaultTheme: 'light' },
+        { attribute: 'class', defaultTheme: 'light', themes: [...APP_THEMES] },
         createElement(EmbedFrame, { theme, skin: undefined, children: 'chart' }),
       ),
     ),
@@ -35,7 +37,7 @@ afterEach(() => {
 });
 
 describe('EmbedFrame theme', () => {
-  it('applies the embed theme without overwriting the saved site theme', () => {
+  it("applies the embed theme without overwriting the visitor's light or dark choice", () => {
     localStorage.setItem('theme', 'light');
     renderEmbed('dark');
     expect(document.documentElement.classList.contains('dark')).toBe(true);
@@ -45,5 +47,11 @@ describe('EmbedFrame theme', () => {
   it('leaves no saved theme behind for a visitor who never chose one', () => {
     renderEmbed('dark');
     expect(localStorage.getItem('theme')).toBeNull();
+  });
+
+  it('replaces a saved optional theme with the embed theme', () => {
+    localStorage.setItem('theme', 'minecraft');
+    renderEmbed('light');
+    expect(localStorage.getItem('theme')).toBe('light');
   });
 });
