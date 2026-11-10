@@ -789,7 +789,7 @@ describe('VideoGenX results', () => {
     stageInView();
 
     cy.get('[data-testid="video-results-view-side"]').click();
-    cy.get('[data-testid="video-results-lossy-hint"]').should('contain', 'not published yet');
+    cy.get('[data-testid="video-results-lossy-hint"]').should('contain', 'is planned');
     // From the legend above, the stage is out of view below.
     cy.get('[data-testid="video-results-lossy-see-changes"]')
       .scrollIntoView()

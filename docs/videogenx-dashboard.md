@@ -132,7 +132,7 @@ The page follows the inference and AgentX two-level layout. The overview has fiv
    same run, hardware, engine, GPU count and server layout, preferring the same
    concurrency. A twin line is drawn as the comparison, so it never leads cards or clips.
    Under the lossy lines, a note says lossy configs trade some quality for speed and that
-   scores against each config's own lossless run are not published yet. Its See what
+   scoring each one against its own lossless run is planned. Its See what
    changes action (`seeChangesPair`, `quality-method.ts`) plays a drawn lossy cell against
    its lossless twin in Wipe and scrolls the stage into view. The named run's lossy cells
    come first and pair only within that run; then B200 and the roster, and each hardware's
@@ -381,27 +381,27 @@ not a calibrated quality verdict or proof of a hardware-only effect.
 
 A disclosure in the readout footer (`QualityMethod.tsx`), collapsed by default, explains
 how quality is measured. It states today's method: each clip's PSNR against the official
-Diffusers reference, over every decoded frame of the same prompt and seed. Once the
-visible leads' clips load, it adds their live range. `referencePsnrRange`
-(`quality-method.ts`) takes the finite PSNR of lossless CI clips and skips lossy leads, the
-matched-noise rerun, and identical, incompatible and unscored pairs. Until one clip counts,
-the sentence has no numbers; no range is hard-coded. It reuses the readout's cautious
-wording: different engines and parallel layouts produce different pixels from the same
-prompt and seed. An HTML/CSS diagram shows the paired lossless method, marked "Not
-published yet": GPU, engine, server layout, prompt and seed held fixed; a lossless and a
-lossy run; PSNR, SSIM and LPIPS over every decoded frame; the median and the worst clip
-over the scored prompts (up to 20). The lossless config runs twice, and the gap between
-those runs is the noise floor. Show me (`showMeTarget`) plays the B200 lead against its
-reference in Wipe and scrolls the stage into view (`showOnStage`,
-`scrollIntoView({ block: 'nearest' })`). When B200 is hidden, lossy or has no playable
-reference, it plays the first visible lead that has one; without one the button is absent.
-With `?unofficialrun=`, the named run's lead stands for its hardware, as on the stage. Full
-methodology opens the Reference PSNR section of the InferenceX `video-generation` README
-(`README_zh.md` from `/zh`) in a new tab. Events: `video_results_quality_method_opened`,
-`video_results_quality_show_me`, `video_results_quality_methodology_clicked` and
-`video_results_lossy_see_changes`.
+Diffusers reference, over every decoded frame of the same prompt and seed. Once the visible
+leads' clips load, it adds their live range. `referencePsnrRange` (`quality-method.ts`)
+takes the finite PSNR of lossless CI clips and skips lossy leads, the matched-noise rerun,
+and identical, incompatible and unscored pairs. Until one clip counts, the sentence has no
+numbers; no range is hard-coded. It reuses the readout's cautious wording: different
+engines and parallel layouts produce different pixels from the same prompt and seed. An
+HTML/CSS diagram shows the paired lossless method, marked "Planned", because no scorer
+computes paired SSIM or LPIPS yet: GPU, engine, server layout, prompt and seed held fixed;
+a lossless and a lossy run; PSNR, SSIM and LPIPS over every decoded frame; the median and
+the worst clip over the scored prompts (up to 20). The plan also runs the lossless config
+twice, and the gap between those runs would be the noise floor. Show me (`showMeTarget`)
+plays the B200 lead against its reference in Wipe and scrolls the stage into view
+(`showOnStage`, `scrollIntoView({ block: 'nearest' })`). When B200 is hidden, lossy or has
+no playable reference, it plays the first visible lead that has one; without one the button
+is absent. With `?unofficialrun=`, the named run's lead stands for its hardware, as on the
+stage. Full methodology opens the Reference PSNR section of the InferenceX
+`video-generation` README (`README_zh.md` from `/zh`) in a new tab. Events:
+`video_results_quality_method_opened`, `video_results_quality_show_me`,
+`video_results_quality_methodology_clicked` and `video_results_lossy_see_changes`.
 
-中文：读数区底部有一个默认收起的“质量评分方法”说明（`QualityMethod.tsx`）。它先说明目前的方法：每条视频与官方 Diffusers 参考视频比较 PSNR，使用相同的 prompt 和 seed，逐帧比较全部解码画面。可见代表部署的视频加载后，再补充实时的 PSNR 范围：`referencePsnrRange`（`quality-method.ts`）只取无损 CI 视频的有限 PSNR，跳过有损代表部署、相同初始噪声重跑，以及完全一致、不兼容和未评分的配对；还没有可计入的视频时，这句话不带数字，范围也从不写死。说明沿用读数区的审慎表述：不同引擎或并行配置即使使用相同的 prompt 和 seed，生成的像素也会不同。HTML/CSS 示意图展示标为“尚未发布”的无损配对方法：GPU、引擎、服务器布局、prompt 和 seed 保持不变；分别进行无损运行和有损运行；对全部解码帧计算 PSNR、SSIM 和 LPIPS；报告已评分的 prompt（最多 20 条）中的中位数和最差一条。无损配置会运行两次，两次之间的差距就是本底噪声。“播放示例”（`showMeTarget`）以卷帘视图播放 B200 代表部署与其参考视频，并用 `scrollIntoView({ block: 'nearest' })`（`showOnStage`）把对比区滚入视野；B200 被隐藏、为有损配置或没有可播放的参考视频时，改为播放第一个有参考视频的可见代表部署，都没有时不显示该按钮。使用 `?unofficialrun=` 时，与对比区一致，由指定运行的代表部署代表其硬件。“完整方法说明”在新标签页中打开 InferenceX `video-generation` README 的 Reference PSNR 一节（`/zh` 页面打开 `README_zh.md`）。事件为 `video_results_quality_method_opened`、`video_results_quality_show_me`、`video_results_quality_methodology_clicked` 和 `video_results_lossy_see_changes`。
+中文：读数区底部有一个默认收起的“质量评分方法”说明（`QualityMethod.tsx`）。它先说明目前的方法：每条视频与官方 Diffusers 参考视频比较 PSNR，使用相同的 prompt 和 seed，逐帧比较全部解码画面。可见代表部署的视频加载后，再补充实时的 PSNR 范围：`referencePsnrRange`（`quality-method.ts`）只取无损 CI 视频的有限 PSNR，跳过有损代表部署、相同初始噪声重跑，以及完全一致、不兼容和未评分的配对；还没有可计入的视频时，这句话不带数字，范围也从不写死。说明沿用读数区的审慎表述：不同引擎或并行配置即使使用相同的 prompt 和 seed，生成的像素也会不同。HTML/CSS 示意图展示标为“计划中”的无损配对方法，因为目前还没有评分器计算配对的 SSIM 或 LPIPS：GPU、引擎、服务器布局、prompt 和 seed 保持不变；分别进行无损运行和有损运行；对全部解码帧计算 PSNR、SSIM 和 LPIPS；报告已评分的 prompt（最多 20 条）中的中位数和最差一条。按计划，无损配置还会再运行一次，两次运行之间的差距即为本底噪声。“播放示例”（`showMeTarget`）以卷帘视图播放 B200 代表部署与其参考视频，并用 `scrollIntoView({ block: 'nearest' })`（`showOnStage`）把对比区滚入视野；B200 被隐藏、为有损配置或没有可播放的参考视频时，改为播放第一个有参考视频的可见代表部署，都没有时不显示该按钮。使用 `?unofficialrun=` 时，与对比区一致，由指定运行的代表部署代表其硬件。“完整方法说明”在新标签页中打开 InferenceX `video-generation` README 的 Reference PSNR 一节（`/zh` 页面打开 `README_zh.md`）。事件为 `video_results_quality_method_opened`、`video_results_quality_show_me`、`video_results_quality_methodology_clicked` 和 `video_results_lossy_see_changes`。
 
 ## Cost and profit
 
@@ -496,7 +496,7 @@ browser playback and difference failure, bilingual layout and 390px overflow.
 页面沿用推理与 AgentX 的两级布局。概览页首将筛选分为基准测试配置（模型、工作负载、引擎）、图表配置（X 与 Y 指标）、对比历史趋势和运行信息。对比历史趋势中的芯片配置最多可选 4 个部署，并可限定日期范围；图表随即按时间顺序绘制各部署的每次运行并标注运行日期，指定的叠加运行中匹配的部署单独成一组，表格、视频和成本说明仍按所选运行显示。运行信息沿用推理页的运行日期和运行选择器：每个正式部署显示其在所选运行或之前的最新运行，运行链接打开对应的 GitHub Actions 运行。图表绘制所选工作负载的全部实测部署：X 轴可选单条视频延迟或每个部署的 GPU 数（见 X-axis metric 一节），所有部署生成的视频时长和帧率相同时，延迟坐标轴的标题会注明这两项；
 Y 轴可选每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时生成视频数或每条有效视频的 GPU 能耗；每种硬件及每个叠加运行
 各自绘制 Pareto 前沿。右侧图例可隐藏硬件，没有匹配运行的硬件显示为灰色，并提供部署标签开关和“重置筛选”。图表卡片使用 `ChartSection`，带有共享的图表按钮（PNG 导出、overview API `format=csv` 的 CSV、图例开关和缩放重置），图表标题放在图表说明中，导出的 PNG 也会带上标题。图表下方的 `ResultContext` 页脚与推理页一致，可切换成本层级，并标明固定使用的参与计算 GPU 口径，同时列出更新时间、来源、各硬件 TCO $/chip/hr 价格表（`TcoPriceTable`）及价格来源链接。
-每种硬件、runtime 和运行通道各为一组，各自计算 Pareto 前沿。默认每种硬件只绘制一条无损曲线，即前沿面积最大的一条（`frontierArea`，与推理页每个 SKU 选最优曲线的 hypervolume 规则相同），指定运行单独评选。数据中有两个引擎时，图表配置里的引擎选择器可选「最优」（默认）、「全部」或单个引擎。`optimizations.ts` 判定声明的优化项是否有损，未登记的优化项按有损处理；有损曲线不参与评选，存在时图例中的「有损优化」开关可以把它们以虚线加入，并在图例下方列出，例如 “H100 (NVIDIA Sol Engine · Sol-Attn + FirstBlockCache)”。每条有损曲线都会带上它的无损对照曲线，即使该引擎不是「最优」：`losslessTwin`（`deployment.ts`）只把有损数据点与同一运行、硬件、引擎、GPU 数量和服务器布局的无损数据点配对，并优先选择相同并发数。无损对照曲线只用于对比，不会作为硬件的代表出现在卡片或视频中。有损曲线下方的说明指出，有损配置以部分画质换取速度，各配置相对自身无损运行的评分尚未发布；其中的“查看画面变化”（`seeChangesPair`，`quality-method.ts`）以卷帘视图播放一个已绘制的有损数据点及其无损对照，并把对比区滚入视野。指定运行的有损数据点优先，且只与同一运行配对；其次按 B200 和名单顺序，取各硬件的有损代表部署。两个数据点都可能有视频时才显示该操作。目前生产数据没有有损测量单元，因此这部分用 fixture 验证。任何操作第一次让同一 GPU 出现两个引擎时，先弹出共享的引擎对比确认框，此后才按引擎区分点形。图例写明每张 GPU 的无损引擎，例如 “H100 (SGLang)”。有损部署不会作为硬件的代表出现在卡片、视频或证据对比中。悬停数据点时显示共享的精简悬停卡片（`chartHoverCard`）：硬件与引擎、两个坐标轴的数值、GPU、部署和并发数。点击后打开共享的数据点详情面板（`ChartPointDetails`）：日期、两个坐标轴的数值、并发数、参与和分配的 GPU、有效视频数、部署、不在 X 轴上的各项延迟、成本、能耗、功率、Runtime 和 GitHub Actions 运行链接；非官方运行的数据点在两处都会标出运行编号。再点击“查看遥测”进入部署详情（`r_point`）。同一次点击还会在下方对比区播放该部署的视频（`r_clip`），面板中的“在下方对比”用 `scrollIntoView({ block: 'nearest' })` 把对比区滚入视野；仅点击数据点不会滚动页面。只有已存储的数据点（有 `publishedAt`）可能有视频：实时读取的指定运行的数据点画成空心，点击只固定其详情；已存储但没有视频的数据点仍由对比区显示空状态。对比区两侧播放的数据点分别标有“播放中”和“基线”。这些标记和空心点由自定义图层绘制，它从 ref 读取选择并通过 `D3ChartHandle` 重绘；选择不会进入图表的数据、图层、悬停配置或坐标轴配置，因为其中任何一项变化都会重建图表，并关闭刚刚固定的详情面板。详情页页首使用 `DashboardSectionHeader` 并带分享按钮。详情入口在 `history.state` 中做标记，
+每种硬件、runtime 和运行通道各为一组，各自计算 Pareto 前沿。默认每种硬件只绘制一条无损曲线，即前沿面积最大的一条（`frontierArea`，与推理页每个 SKU 选最优曲线的 hypervolume 规则相同），指定运行单独评选。数据中有两个引擎时，图表配置里的引擎选择器可选「最优」（默认）、「全部」或单个引擎。`optimizations.ts` 判定声明的优化项是否有损，未登记的优化项按有损处理；有损曲线不参与评选，存在时图例中的「有损优化」开关可以把它们以虚线加入，并在图例下方列出，例如 “H100 (NVIDIA Sol Engine · Sol-Attn + FirstBlockCache)”。每条有损曲线都会带上它的无损对照曲线，即使该引擎不是「最优」：`losslessTwin`（`deployment.ts`）只把有损数据点与同一运行、硬件、引擎、GPU 数量和服务器布局的无损数据点配对，并优先选择相同并发数。无损对照曲线只用于对比，不会作为硬件的代表出现在卡片或视频中。有损曲线下方的说明指出，有损配置以部分画质换取速度，以各配置自身无损运行为基准的评分尚在计划中；其中的“查看画面变化”（`seeChangesPair`，`quality-method.ts`）以卷帘视图播放一个已绘制的有损数据点及其无损对照，并把对比区滚入视野。指定运行的有损数据点优先，且只与同一运行配对；其次按 B200 和名单顺序，取各硬件的有损代表部署。两个数据点都可能有视频时才显示该操作。目前生产数据没有有损测量单元，因此这部分用 fixture 验证。任何操作第一次让同一 GPU 出现两个引擎时，先弹出共享的引擎对比确认框，此后才按引擎区分点形。图例写明每张 GPU 的无损引擎，例如 “H100 (SGLang)”。有损部署不会作为硬件的代表出现在卡片、视频或证据对比中。悬停数据点时显示共享的精简悬停卡片（`chartHoverCard`）：硬件与引擎、两个坐标轴的数值、GPU、部署和并发数。点击后打开共享的数据点详情面板（`ChartPointDetails`）：日期、两个坐标轴的数值、并发数、参与和分配的 GPU、有效视频数、部署、不在 X 轴上的各项延迟、成本、能耗、功率、Runtime 和 GitHub Actions 运行链接；非官方运行的数据点在两处都会标出运行编号。再点击“查看遥测”进入部署详情（`r_point`）。同一次点击还会在下方对比区播放该部署的视频（`r_clip`），面板中的“在下方对比”用 `scrollIntoView({ block: 'nearest' })` 把对比区滚入视野；仅点击数据点不会滚动页面。只有已存储的数据点（有 `publishedAt`）可能有视频：实时读取的指定运行的数据点画成空心，点击只固定其详情；已存储但没有视频的数据点仍由对比区显示空状态。对比区两侧播放的数据点分别标有“播放中”和“基线”。这些标记和空心点由自定义图层绘制，它从 ref 读取选择并通过 `D3ChartHandle` 重绘；选择不会进入图表的数据、图层、悬停配置或坐标轴配置，因为其中任何一项变化都会重建图表，并关闭刚刚固定的详情面板。详情页页首使用 `DashboardSectionHeader` 并带分享按钮。详情入口在 `history.state` 中做标记，
 刷新或前进后页内返回仍会弹出该条目，浏览器后退也会回到原滚动位置；概览在后台保持挂载，视频、已加载的性能历史和图表状态不会丢失。
 详情页分为遥测、有效性、来源三个标签页。未知、已筛除或已隐藏的 `r_point` 回到概览，结果加载后会从 URL 中移除，重新显示该硬件或分享时不会再打开它。“如何解读这些结果”始终展开；利润估算器位于默认收起的“高级选项”中，其各模式价格和利用率放在“场景”控制面板中；性能历史需要读取已存储的 History 页面，因此默认折叠在带箭头的标题下，深链接时自动展开。尚未采集的指标在“如何解读”中列出，
 不使用占位图表或示意数值。功率无效时不展示功率或能耗结论。

@@ -24,8 +24,9 @@ const STRINGS = {
       `The ${clips} lossless clips loaded here (${hardware}) score ${min}–${max} dB.`,
     why: 'Different engines and parallel layouts produce different pixels from the same prompt and seed, so a reference score mixes those differences with any change a lossy optimization makes.',
     paired: 'Paired lossless scores',
-    notPublished: 'Not published yet',
-    pairedBody: 'Each lossy config will instead be scored against its own lossless run.',
+    planned: 'Planned',
+    pairedBody:
+      'No scorer computes these yet. The plan is to score each lossy config against its own lossless run.',
     fixedTitle: 'Held fixed',
     fixed: ['GPU', 'Engine', 'Server layout', 'Prompt', 'Seed'],
     runsTitle: 'Two runs',
@@ -42,12 +43,12 @@ const STRINGS = {
     reportTitle: 'Report per config',
     report: 'The median and the worst clip over the scored prompts (up to 20).',
     floor:
-      'The lossless config also runs twice. The gap between those two runs is the noise floor for the pair.',
+      'The plan also runs the lossless config twice. The gap between those two runs would be the noise floor for the pair.',
     showMe: 'Show me',
     showMeHelp: (hardware: string) => `Plays ${hardware} against the Diffusers reference in Wipe.`,
     methodology: 'Full methodology →',
     lossyHint:
-      'Lossy configs trade some quality for speed. Scores against each config’s own lossless run are not published yet.',
+      'Lossy configs trade some quality for speed. Scoring each one against its own lossless run is planned.',
     seeChanges: 'See what changes ↓',
   },
   zh: {
@@ -58,8 +59,8 @@ const STRINGS = {
       `本页已加载的 ${clips} 条无损视频（${hardware}）PSNR 在 ${min}–${max} dB 之间。`,
     why: '不同引擎或并行配置即使使用相同的 prompt 和 seed，生成的像素也会不同，因此相对参考的分数会把这些差异与有损优化可能带来的变化混在一起。',
     paired: '与无损运行的配对评分',
-    notPublished: '尚未发布',
-    pairedBody: '之后每个有损配置将改为以它自己的无损运行为基准评分。',
+    planned: '计划中',
+    pairedBody: '目前还没有评分器计算这些分数。计划改为以每个有损配置自己的无损运行为基准评分。',
     fixedTitle: '保持不变',
     fixed: ['GPU', '引擎', '服务器布局', 'prompt', 'seed'],
     runsTitle: '两次运行',
@@ -75,18 +76,18 @@ const STRINGS = {
     ],
     reportTitle: '按配置报告',
     report: '已评分的 prompt（最多 20 条）中的中位数和最差的一条视频。',
-    floor: '无损配置还会再运行一次，两次运行之间的差距就是这组配对的本底噪声。',
+    floor: '按计划，无损配置还会再运行一次，两次运行之间的差距即为这组配对的本底噪声。',
     showMe: '播放示例',
     showMeHelp: (hardware: string) => `以卷帘视图对比播放 ${hardware} 与 Diffusers 参考视频。`,
     methodology: '完整方法说明 →',
-    lossyHint: '有损配置以部分画质换取速度。各配置相对自身无损运行的评分尚未发布。',
+    lossyHint: '有损配置以部分画质换取速度。以各配置自身无损运行为基准的评分尚在计划中。',
     seeChanges: '查看画面变化 ↓',
   },
 };
 
 /**
  * "How we score quality", under the stage readout: today's reference PSNR with the live range of
- * the leads' clips, the paired lossless method that is not published yet, and "Show me".
+ * the leads' clips, the planned paired lossless method, and "Show me".
  */
 export default function QualityMethod({
   leads,
@@ -136,7 +137,7 @@ export default function QualityMethod({
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{s.paired}</span>
           <span className="rounded-full border px-2 py-0.5 text-2xs text-muted-foreground">
-            {s.notPublished}
+            {s.planned}
           </span>
         </div>
         <p className="-mt-1.5 max-w-measure text-muted-foreground">{s.pairedBody}</p>
