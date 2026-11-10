@@ -32,7 +32,6 @@ import {
   restoreCollectiveXSeries,
 } from './CollectiveXChart';
 import { CollectiveXSwapSection, SwapBlocksName } from './CollectiveXSwapSection';
-import { CollectiveXKvSection } from './CollectiveXKvSection';
 import { CollectiveXChangelog } from './CollectiveXChangelog';
 import { CollectiveXSupportMatrices } from './CollectiveXSupportMatrices';
 import {
@@ -67,11 +66,10 @@ interface SelectOption<T extends string | number> {
   label: string;
 }
 
-type CollectiveXSuite = 'ep' | 'kv' | 'swap';
+type CollectiveXSuite = 'ep' | 'swap';
 
 const METHODOLOGY_DOC: Record<CollectiveXSuite, string> = {
   ep: 'methodology',
-  kv: 'kv-transfer',
   swap: 'swap-blocks',
 };
 
@@ -114,8 +112,7 @@ const STRINGS = {
     retry: 'Retry',
     description: (
       <>
-        Compare EP communication, KV-cache transfer, and vLLM <SwapBlocksName /> latency and payload
-        bandwidth
+        Compare EP communication and vLLM <SwapBlocksName /> latency and payload bandwidth
       </>
     ),
     source: 'Source',
@@ -200,7 +197,7 @@ const STRINGS = {
     retry: '重试',
     description: (
       <>
-        对比 EP 通信、KV 缓存传输及 vLLM <SwapBlocksName /> 的延迟与有效载荷带宽
+        对比 EP 通信及 vLLM <SwapBlocksName /> 的延迟与有效载荷带宽
       </>
     ),
     source: '源代码',
@@ -634,13 +631,9 @@ export default function CollectiveXDisplay() {
   );
   // Offer only the suites the shown run carries; EP leads and is the default. A run with no
   // other suite still offers EP, so its empty state stays reachable.
-  const hasKv = datasets.some((dataset) => dataset.kv?.length);
   const hasSwap = datasets.some((dataset) => dataset.swap_blocks?.length);
   const suiteOptions: SegmentedToggleOption<CollectiveXSuite>[] = [
-    ...(combinedSeries.length > 0 || (!hasKv && !hasSwap)
-      ? [{ value: 'ep' as const, label: 'EP' }]
-      : []),
-    ...(hasKv ? [{ value: 'kv' as const, label: 'KV' }] : []),
+    ...(combinedSeries.length > 0 || !hasSwap ? [{ value: 'ep' as const, label: 'EP' }] : []),
     // swap_blocks is a vLLM function name, so it reads as code.
     ...(hasSwap ? [{ value: 'swap' as const, label: 'swap_blocks', className: 'font-mono' }] : []),
   ];
@@ -749,9 +742,6 @@ export default function CollectiveXDisplay() {
         <>
           {shownSuite === 'swap' && (
             <CollectiveXSwapSection datasets={datasets} runIndexById={selectedRunIndexById} />
-          )}
-          {shownSuite === 'kv' && (
-            <CollectiveXKvSection datasets={datasets} runIndexById={selectedRunIndexById} />
           )}
           {shownSuite === 'ep' && (
             <>

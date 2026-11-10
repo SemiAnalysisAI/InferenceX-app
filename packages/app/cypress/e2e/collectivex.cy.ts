@@ -41,49 +41,6 @@ const kvDataset = buildDataset({
   ],
   meta: { run_id: '162', generated_at: '2026-08-07T12:20:00Z', source_sha: 'e'.repeat(40) },
 });
-const kvEnvelopeDataset = buildDataset({
-  shards: [makeRawShard()],
-  kv: [{}],
-  meta: { run_id: '164', generated_at: '2026-08-09T12:20:00Z', source_sha: 'a'.repeat(40) },
-});
-const kvWireCeilingDataset = buildDataset({
-  shards: [makeRawShard()],
-  kv: [
-    {
-      rows: [
-        { kind: 'paged', op: 'push', batch: 1, isl: 4096, gbps_p50: 5.1 },
-        { kind: 'paged', op: 'push', batch: 1, isl: 32768, gbps_p50: 7.39 },
-        { kind: 'bulk', op: 'push', page_tokens: null, batch: 1, isl: 4096, gbps_p50: 52.3 },
-        { kind: 'bulk', op: 'push', page_tokens: null, batch: 1, isl: 32768, gbps_p50: 89.41 },
-      ],
-    },
-  ],
-  meta: { run_id: '165', generated_at: '2026-08-10T12:20:00Z', source_sha: 'b'.repeat(40) },
-});
-const kvRangeDataset = buildDataset({
-  shards: [makeRawShard()],
-  kv: [
-    {
-      implementation: { library_version: '1.5.0', maturity: 'production', transport: 'ucx' },
-      network: 'infiniband',
-      rows: [
-        { kind: 'paged', op: 'push', batch: 1, isl: 4096, latency_p50: 0.6 },
-        { kind: 'paged', op: 'push', batch: 1, isl: 32768, latency_p50: 4.5 },
-      ],
-    },
-    {
-      backend: 'mooncake',
-      implementation: { library_version: '0.3.13', maturity: 'candidate', transport: 'verbs' },
-      network: 'infiniband',
-      rows: [
-        { kind: 'paged', op: 'push', batch: 1, isl: 4096, latency_p50: 0.9 },
-        { kind: 'paged', op: 'push', batch: 1, isl: 32768, latency_p50: 5.8 },
-      ],
-    },
-  ],
-  meta: { run_id: '166', generated_at: '2026-08-11T12:20:00Z', source_sha: 'd'.repeat(40) },
-});
-
 function installRuns(bodies: CollectiveXDataset[] = [dataset]) {
   cy.intercept('GET', '/api/v1/collectivex/runs?*', {
     body: { version: 1, runs: bodies.map(buildRunSummary), discovery_complete: true },
@@ -116,7 +73,7 @@ function suiteTabs() {
   return cy.get('[data-testid="collectivex-suite-filter"] [role="tab"]');
 }
 
-function showSuite(label: 'EP' | 'KV' | 'swap_blocks') {
+function showSuite(label: 'EP' | 'swap_blocks') {
   cy.get('[data-testid="collectivex-suite-filter"]').contains('[role="tab"]', label).click();
   cy.get('[data-testid="collectivex-suite-filter"] [role="tab"][aria-selected="true"]').should(
     'have.text',
@@ -157,7 +114,6 @@ describe('CollectiveX neutral run view', () => {
         `https://github.com/SemiAnalysisAI/InferenceX/blob/${SOURCE_SHA}/collectivex/docs/methodology.md`,
       );
     cy.get('[data-testid="collectivex-display"] a[href*="/actions/runs/"]').should('not.exist');
-    cy.get('[data-testid="collectivex-kv-table"]').should('not.exist');
   });
 
   it('selects the EP16 series through the identity controls', () => {
@@ -393,7 +349,7 @@ describe('CollectiveX neutral run view', () => {
     cy.get('@incompleteRun.all').should('have.length', 0);
   });
 
-  it('shows one suite at a time, EP first, and offers only the suites the run carries', () => {
+  it('offers only EP for a run whose stored kv-transfer cases are no longer shown', () => {
     installRuns([kvDataset]);
     installRun(kvDataset);
     cy.reload();
@@ -401,7 +357,7 @@ describe('CollectiveX neutral run view', () => {
     cy.wait('@run');
 
     suiteTabs().then(($tabs) => {
-      expect([...$tabs].map((tab) => tab.textContent?.trim())).to.deep.equal(['EP', 'KV']);
+      expect([...$tabs].map((tab) => tab.textContent?.trim())).to.deep.equal(['EP']);
     });
     cy.get('[data-testid="collectivex-suite-filter"] [role="tab"][aria-selected="true"]').should(
       'have.text',
@@ -409,21 +365,7 @@ describe('CollectiveX neutral run view', () => {
     );
     cy.get('[data-testid="collectivex-chart-filters"]').should('be.visible');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
-    cy.get('[data-testid="collectivex-kv-table"]').should('not.exist');
-    cy.get('[data-testid="collectivex-kv-chart"]').should('not.exist');
     cy.get('[data-testid="collectivex-swap-chart"]').should('not.exist');
-
-    showSuite('KV');
-    cy.get('[data-testid="collectivex-kv-table"]').should('be.visible');
-    cy.get('[data-testid="collectivex-kv-chart"]').should('be.visible');
-    cy.get('[data-testid="collectivex-chart-filters"]').should('not.exist');
-    cy.get('[data-testid="collectivex-main-chart"]').should('not.exist');
-    cy.get('[data-testid="collectivex-support-matrices"]').should('be.visible');
-
-    showSuite('EP');
-    cy.get('[data-testid="collectivex-kv-table"]').should('not.exist');
-    cy.get('[data-testid="collectivex-chart-filters"]').should('be.visible');
-    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
 
     installRuns();
     installRun();
@@ -631,209 +573,6 @@ describe('CollectiveX source repository links', () => {
   });
 });
 
-describe('CollectiveX kv-transfer card', () => {
-  it('renders kv cases with request, peak and contiguous cells and per-case outcomes', () => {
-    installRuns([kvDataset]);
-    installRun(kvDataset);
-    openCollectiveX();
-    showSuite('KV');
-    cy.get('[data-testid="collectivex-kv-table"]')
-      .should('be.visible')
-      .and('contain.text', 'KV-cache transfer')
-      .and('contain.text', '2 cases')
-      .and('contain.text', '1 measured');
-    cy.get('[data-testid="collectivex-methodology-link"]')
-      .should('have.attr', 'href')
-      .and('match', /\/collectivex\/docs\/kv-transfer\.md$/u);
-    cy.get('[data-testid="collectivex-kv-table-table"]').within(() => {
-      cy.contains('td', 'GB200').parent().as('measured');
-      cy.get('@measured').should('contain.text', 'NIXL').and('contain.text', 'rdma');
-      cy.get('@measured').should('contain.text', '22.82 (32k)');
-      cy.get('@measured').should('contain.text', '8.02 (b1 · 32k)');
-      cy.get('@measured').should('contain.text', '92.10');
-      cy.get('@measured').should('contain.text', '9%');
-      cy.contains('td', 'MI355X').parent().as('failed');
-      cy.get('@failed').should('contain.text', 'invalid');
-      cy.get('@failed').should('contain.text', 'transfer-verification-failed');
-    });
-    cy.get('[data-testid="collectivex-kv-op-toggle"]').contains('button', 'pull').click();
-    cy.get('[data-testid="collectivex-kv-table-table"]')
-      .contains('td', 'GB200')
-      .parent()
-      .should('contain.text', '15.12 (b4 · 32k)')
-      .and('contain.text', '89.41');
-    cy.get('[data-testid="collectivex-display"]').should(
-      'contain.text',
-      `${kvDataset.run.measured_cases}/${kvDataset.run.requested_cases}`,
-    );
-  });
-
-  it('opens on request latency against ISL and switches metric, axis and direction', () => {
-    installRuns([kvDataset]);
-    installRun(kvDataset);
-    openCollectiveX();
-    showSuite('KV');
-    cy.get('[data-testid="collectivex-kv-chart"]').should('be.visible');
-    cy.get('[data-testid="collectivex-kv-chart"] circle').should('have.length', 1);
-    cy.get('[data-testid="collectivex-kv-chart"]').should(
-      'contain.text',
-      'Request latency p50, batch 1 (ms, log)',
-    );
-    cy.get('[data-testid="collectivex-kv-view-toggle"]').should('not.exist');
-    cy.get('[data-testid="collectivex-kv-chart"] .line-path').should(
-      'have.attr',
-      'stroke-width',
-      '1.75',
-    );
-    cy.get('[data-testid="collectivex-kv-chart"] [data-testid="legend-advanced-toggle"]').click();
-    cy.get('[data-testid="collectivex-kv-x-log-scale"]')
-      .should('have.attr', 'aria-checked', 'true')
-      .click()
-      .should('have.attr', 'aria-checked', 'false');
-    cy.get('[data-testid="collectivex-kv-chart"] .x-axis-label').should(
-      'have.text',
-      'Input sequence length, tokens',
-    );
-    cy.get('[data-testid="collectivex-kv-y-log-scale"]')
-      .should('have.attr', 'aria-checked', 'true')
-      .click()
-      .should('have.attr', 'aria-checked', 'false');
-    cy.get('[data-testid="collectivex-kv-chart"] .y-axis-label').should(
-      'have.text',
-      'Request latency p50, batch 1 (ms)',
-    );
-    cy.get('[data-testid="collectivex-kv-metric-toggle"]').contains('button', 'GB/s').click();
-    cy.get('[data-testid="collectivex-kv-chart"] .y-axis-label').should(
-      'have.text',
-      'Aggregate push bandwidth at p50 (GB/s)',
-    );
-    cy.get('[data-testid="collectivex-kv-op-toggle"]').contains('button', 'pull').click();
-    cy.get('[data-testid="collectivex-kv-xaxis-toggle"]').contains('button', 'Batch').click();
-    cy.get('[data-testid="collectivex-kv-chart"] circle').should('have.length', 2);
-    cy.get('[data-testid="collectivex-kv-chart"] .x-axis-label').should(
-      'have.text',
-      'Requests per burst',
-    );
-    cy.get('[data-testid="collectivex-kv-table"]').should('be.visible');
-    cy.get('[data-testid="collectivex-main-chart"]').should('not.exist');
-  });
-
-  it('combines libraries into a band per SKU and fabric in the range and best views', () => {
-    installRuns([kvRangeDataset]);
-    installRun(kvRangeDataset);
-    openCollectiveX();
-    showSuite('KV');
-    cy.get('[data-testid="collectivex-kv-op-toggle"]').should('not.exist');
-    cy.get('[data-testid="collectivex-kv-table-table"]')
-      .should('contain.text', 'production')
-      .and('contain.text', 'candidate')
-      .and('contain.text', '0.3.13')
-      .and('contain.text', 'infiniband · verbs');
-    cy.get('[data-testid="collectivex-kv-table"]').should(
-      'contain.text',
-      'cannot serve DeepSeek-V4 in vLLM 0.32.0 yet',
-    );
-    cy.get('[data-testid="collectivex-kv-chart"] .line-path').should('have.length', 2);
-    cy.get('[data-testid="collectivex-kv-range-band"]').should('not.exist');
-
-    cy.get('[data-testid="collectivex-kv-view-toggle"]').contains('button', 'Range by SKU').click();
-    cy.get('[data-testid="collectivex-kv-range-band"]').should('have.length', 1);
-    cy.get('[data-testid="collectivex-kv-chart"] .line-path').should('have.length', 1);
-    cy.get('[data-testid="collectivex-kv-chart"] [data-testid="chart-legend"]').should(
-      'contain.text',
-      'GB200 · rdma',
-    );
-    cy.get('[data-testid="collectivex-kv-range-note"]').should('contain.text', 'median');
-
-    cy.get('[data-testid="collectivex-kv-view-toggle"]').contains('button', 'Best by SKU').click();
-    cy.get('[data-testid="collectivex-kv-range-band"]').should('not.exist');
-    cy.get('[data-testid="collectivex-kv-range-note"]').should('contain.text', 'best library');
-  });
-
-  it('plots the envelope axes as one solid line for the shown run', () => {
-    installRuns([kvEnvelopeDataset]);
-    installRun(kvEnvelopeDataset);
-    openCollectiveX();
-    showSuite('KV');
-    cy.get('[data-testid="collectivex-kv-xaxis-toggle"]').contains('button', 'Envelope').click();
-
-    cy.get('[data-testid="collectivex-kv-metric-toggle"]').should('not.exist');
-    cy.get('[data-testid="collectivex-kv-frontier-chart"]')
-      .should('contain.text', 'Sequence length (ISL tokens, log)')
-      .and('contain.text', 'Aggregate push bandwidth at p50 (GB/s, log)');
-    cy.get(
-      '[data-testid="collectivex-kv-frontier-chart"] [data-testid="legend-advanced-toggle"]',
-    ).click();
-    cy.get('[data-testid="collectivex-kv-x-log-scale"]').click();
-    cy.get('[data-testid="collectivex-kv-y-log-scale"]').click();
-    cy.get('[data-testid="collectivex-kv-frontier-chart"] .x-axis-label').should(
-      'have.text',
-      'Sequence length (ISL tokens)',
-    );
-    cy.get('[data-testid="collectivex-kv-frontier-chart"] .y-axis-label').should(
-      'have.text',
-      'Aggregate push bandwidth at p50 (GB/s)',
-    );
-    cy.get('[data-testid="collectivex-kv-frontier-chart"] .line-path')
-      .should('have.length', 1)
-      .and('have.attr', 'stroke-width', '2')
-      .and('have.attr', 'stroke-dasharray', 'none');
-  });
-
-  it('toggles the Envelope bulk wire-ceiling lines from Advanced controls', () => {
-    installRuns([kvWireCeilingDataset]);
-    installRun(kvWireCeilingDataset);
-    openCollectiveX();
-    showSuite('KV');
-
-    cy.get('[data-testid="collectivex-kv-xaxis-toggle"]').contains('button', 'Envelope').click();
-    cy.get('[data-testid="collectivex-kv-frontier-chart"] .line-path').should('have.length', 2);
-    cy.get(
-      '[data-testid="collectivex-kv-frontier-chart"] .line-path[stroke-dasharray="1 4"]',
-    ).should('have.length', 1);
-
-    cy.get(
-      '[data-testid="collectivex-kv-frontier-chart"] [data-testid="legend-advanced-toggle"]',
-    ).click();
-    cy.get('[data-testid="collectivex-kv-bulk-wire-ceiling"]')
-      .should('have.attr', 'aria-checked', 'true')
-      .click()
-      .should('have.attr', 'aria-checked', 'false');
-    cy.get('[data-testid="collectivex-kv-frontier-chart"] .line-path').should('have.length', 1);
-    cy.get(
-      '[data-testid="collectivex-kv-frontier-chart"] .line-path[stroke-dasharray="1 4"]',
-    ).should('not.exist');
-    cy.get('[data-testid="collectivex-kv-frontier-chart"]')
-      .should('contain.text', 'hover a point for its batch, latency, and status')
-      .and('not.contain.text', 'dotted line above each library');
-
-    cy.get('[data-testid="collectivex-kv-bulk-wire-ceiling"]').click();
-    cy.get(
-      '[data-testid="collectivex-kv-frontier-chart"] .line-path[stroke-dasharray="1 4"]',
-    ).should('have.length', 1);
-  });
-
-  it('plots the overlap-gain view with its dotted ideal line', () => {
-    installRuns([kvDataset]);
-    installRun(kvDataset);
-    openCollectiveX();
-    showSuite('KV');
-
-    cy.get('[data-testid="collectivex-kv-op-toggle"]').contains('button', 'pull').click();
-    cy.get('[data-testid="collectivex-kv-xaxis-toggle"]')
-      .contains('button', 'Overlap gain')
-      .click();
-    cy.get('[data-testid="collectivex-kv-metric-toggle"]').should('not.exist');
-    cy.get('[data-testid="collectivex-kv-overlap-chart"]')
-      .should('contain.text', 'Requests per burst (log)')
-      .and('contain.text', 'Aggregate bandwidth relative to batch 1 (log)');
-    cy.get('[data-testid="collectivex-kv-overlap-chart"] .line-path').then(($lines) => {
-      expect([...$lines].map((line) => line.getAttribute('stroke-dasharray'))).to.include('2 4');
-    });
-  });
-});
-
-/** The page description and the section heading set the vLLM function name as inline code. */
 function shouldShowSwapBlocksAsCode() {
   for (const scope of ['collectivex-description', 'collectivex-swap-section']) {
     cy.get(`[data-testid="${scope}"] code`).as('code').should('have.text', 'swap_blocks');

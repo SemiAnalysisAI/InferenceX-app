@@ -76,11 +76,10 @@ describe('public evidence projections', () => {
     expect(body.ep.points.length).toBeGreaterThan(0);
     expect(body.ep.points).toEqual(chartPoints(series, 'roundtrip', 'p95', 'tokens-per-second'));
     const hidden = await collective(
-      request('collectivex', 'runs=160&activeSeries=none&kvSeries=none&swapSeries=none'),
+      request('collectivex', 'runs=160&activeSeries=none&swapSeries=none'),
     );
     const hiddenBody = await hidden.json();
     expect(hiddenBody.ep.points).toEqual([]);
-    expect(hiddenBody.kv.points).toEqual([]);
     expect(hiddenBody.swap.points).toEqual([]);
   });
 
