@@ -476,7 +476,7 @@ describe('VideoGenX results', () => {
     points('[data-hardware="b200"] .visible-shape').click({ force: true });
     // The stage plays that history point, and its TCO comes from the history cell too.
     searchParam('r_clip').should('match', /^34341996789:/u);
-    cy.get('[data-testid="video-results-readout"] [data-metric="participating"] dd')
+    cy.get('[data-testid="video-results-readout"] [data-metric="cost"] dd')
       .first()
       .should(($value) => expect($value.text(), 'history point TCO').to.match(/^\$\d/u));
     cy.get('[data-testid="point-details-panel"] [data-action="view-telemetry"]').click();
@@ -795,9 +795,12 @@ describe('VideoGenX results', () => {
         expect(rect.width, 'stage spans the card').to.be.greaterThan(width * 0.6);
       });
       cy.get('[data-testid="video-results-readout"] dl').should(($grid) => {
-        const columns = getComputedStyle($grid[0]).gridTemplateColumns.split(' ').length;
-        expect(columns, 'readout columns').to.equal(width >= 1024 ? 5 : 2);
-        expect($grid.text()).to.contain(pathname.startsWith('/zh') ? '分配 GPU' : 'allocated');
+        const cells = [...$grid[0].children];
+        const rows = new Set(cells.map((cell) => cell.getBoundingClientRect().top)).size;
+        expect(rows, 'readout rows').to.equal(width >= 1024 ? 1 : Math.ceil(cells.length / 2));
+        expect($grid.find('[data-metric="cost"]').attr('title')).to.contain(
+          pathname.startsWith('/zh') ? '分配 GPU' : 'allocated',
+        );
       });
       cy.get('[data-testid="video-results-sources"] summary').click();
       cy.get('[data-testid="video-results-sources"] table').should(($table) => {

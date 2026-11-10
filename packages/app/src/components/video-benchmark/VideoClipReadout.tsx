@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 import { speedVs, type StageOption } from './clip-stage';
 import { layoutLabel } from './deployment';
 import type { VideoPoint } from './metrics';
@@ -19,6 +20,7 @@ const STRINGS = {
     notMeasured: 'Not measured yet',
     diagnosticMetric: 'Not provided for this diagnostic.',
     speed: (name: string) => `Speed vs ${name}`,
+    speedLossless: 'Speed vs lossless',
     speedRatio: {
       faster: (x: string) => `${x}× faster`,
       slower: (x: string) => `${x}× slower`,
@@ -28,19 +30,18 @@ const STRINGS = {
     speedHelp: 'Ratio of the two cells’ median latency per clip.',
     wall: 'Wall time (this prompt)',
     psnr: 'PSNR vs reference',
-    psnrLossless: 'PSNR vs lossless',
-    ssimLossless: 'SSIM vs lossless',
-    lpipsLossless: 'LPIPS vs lossless',
     higherCloser: 'Higher is closer',
-    lowerCloser: 'Lower is closer',
+    paired: 'Paired scores',
+    planned: 'Planned',
+    pairedScores: 'PSNR · SSIM · LPIPS vs lossless',
     pairedPending:
       'Scoring against the same engine’s lossless output is planned; no scorer computes it yet.',
     energy: 'Energy per clip',
     energySub: 'Cell mean',
-    participating: 'TCO per clip (participating)',
-    allocated: 'TCO per clip (allocated)',
+    cost: '$ per clip',
     perVideoSecond: (value: string) => `$${value} / video-s`,
-    costHelp: 'Modelled TCO per valid clip from the selected tier and the recorded GPU count.',
+    costHelp: (allocated: string | null, perSecond: string | null) =>
+      `Modelled TCO per valid clip on the participating GPUs, from the selected tier and the recorded GPU count. On the allocated GPUs: ${allocated === null ? 'not measured yet' : `$${allocated} per clip${perSecond === null ? '' : `, $${perSecond} / video-s`}`}.`,
     exactMatch: 'Exact match',
     incompatibleShort: 'Incompatible pair',
     incompatible: 'Paired media are incompatible; PSNR is unavailable.',
@@ -77,6 +78,7 @@ const STRINGS = {
     notMeasured: '尚未测量',
     diagnosticMetric: '此次重跑未提供该指标。',
     speed: (name: string) => `速度（相对 ${name}）`,
+    speedLossless: '速度（相对无损对照）',
     speedRatio: {
       faster: (x: string) => `加速 ${x}×`,
       slower: (x: string) => `耗时为其 ${x} 倍`,
@@ -86,18 +88,17 @@ const STRINGS = {
     speedHelp: '两个测量单元单条视频中位延迟之比。',
     wall: '出片时间（当前 prompt）',
     psnr: '相对参考的 PSNR',
-    psnrLossless: '相对无损对照的 PSNR',
-    ssimLossless: '相对无损对照的 SSIM',
-    lpipsLossless: '相对无损对照的 LPIPS',
     higherCloser: '越高越接近',
-    lowerCloser: '越低越接近',
+    paired: '配对评分',
+    planned: '计划中',
+    pairedScores: '相对无损对照的 PSNR · SSIM · LPIPS',
     pairedPending: '以同一引擎无损输出为基准的质量评分仍在计划中，目前还没有评分器计算。',
     energy: '每条视频能耗',
     energySub: '测量单元均值',
-    participating: '每条视频 TCO（参与 GPU）',
-    allocated: '每条视频 TCO（分配 GPU）',
+    cost: '每条视频成本',
     perVideoSecond: (value: string) => `$${value} / 视频秒`,
-    costHelp: '按所选成本档位和记录的 GPU 数量估算的每条有效视频 TCO。',
+    costHelp: (allocated: string | null, perSecond: string | null) =>
+      `按所选成本档位和记录的 GPU 数量估算的参与 GPU 每条有效视频 TCO。按分配 GPU 估算：${allocated === null ? '尚未测量' : `每条视频 $${allocated}${perSecond === null ? '' : `，$${perSecond} / 视频秒`}`}。`,
     exactMatch: '完全一致',
     incompatibleShort: '配对不兼容',
     incompatible: '配对媒体不兼容，无法提供 PSNR。',
@@ -138,36 +139,18 @@ export interface ReadoutSide {
 }
 
 /** Per-side metrics: each reads one side, so a pair shows the subject's value and its pair's. */
-type SideMetric = 'wall' | 'psnr' | 'energy' | 'participating' | 'allocated';
-/** Scores against the lossless twin, unpublished until paired scoring lands; each with its polarity. */
-const LOSSLESS_SCORES = {
-  psnrLossless: 'higherCloser',
-  ssimLossless: 'higherCloser',
-  lpipsLossless: 'lowerCloser',
-} as const;
-type LosslessScore = keyof typeof LOSSLESS_SCORES;
-type Metric = 'speed' | SideMetric | LosslessScore;
-
-const isLosslessScore = (metric: Metric): metric is LosslessScore => metric in LOSSLESS_SCORES;
+type SideMetric = 'wall' | 'psnr' | 'energy' | 'cost';
+/** `paired` stands for the PSNR, SSIM and LPIPS against the lossless twin that no scorer computes yet. */
+type Metric = 'speed' | 'paired' | SideMetric;
 
 /**
- * What each pair reads out, in order. A lossy pair leads with its trade against lossless. Energy
- * stays in the third of five columns, so switching the pair does not move it.
+ * What each pair reads out, in order, one row of at most five cells. A pair against another
+ * config leads with speed; quality comes next, then latency and cost as in the board, then energy.
  */
 const ROWS: Record<StageOption['kind'], readonly Metric[]> = {
-  reference: ['wall', 'psnr', 'energy', 'participating', 'allocated'],
-  lead: ['wall', 'psnr', 'energy', 'participating', 'allocated', 'speed'],
-  twin: [
-    'speed',
-    'psnrLossless',
-    'ssimLossless',
-    'lpipsLossless',
-    'participating',
-    'wall',
-    'psnr',
-    'energy',
-    'allocated',
-  ],
+  reference: ['psnr', 'wall', 'cost', 'energy'],
+  lead: ['speed', 'psnr', 'wall', 'cost', 'energy'],
+  twin: ['speed', 'paired', 'psnr', 'cost', 'energy'],
 };
 
 const PENDING = '…';
@@ -189,17 +172,6 @@ interface SideRead {
   read: (side: ReadoutSide, s: Strings) => Reading;
   context?: (side: ReadoutSide, s: Strings) => string | undefined;
 }
-
-const costRead = (basis: 'participating' | 'allocated'): SideRead => ({
-  read: ({ cost }, s) => {
-    const perVideo = display(cost?.[basis]?.perVideo, 4);
-    return { value: perVideo === null ? s.notMeasured : `$${perVideo}`, help: s.costHelp };
-  },
-  context: ({ cost }, s) => {
-    const perSecond = display(cost?.[basis]?.perVideoSecond, 4);
-    return perSecond === null ? undefined : s.perVideoSecond(perSecond);
-  },
-});
 
 const SIDE_METRICS: Record<SideMetric, SideRead> = {
   wall: {
@@ -248,8 +220,23 @@ const SIDE_METRICS: Record<SideMetric, SideRead> = {
     },
     context: (_, s) => s.energySub,
   },
-  participating: costRead('participating'),
-  allocated: costRead('allocated'),
+  // The chart's basis is the participating GPUs; the allocated basis stays one hover away.
+  cost: {
+    read: ({ cost }, s) => {
+      const perVideo = display(cost?.participating?.perVideo, 4);
+      return {
+        value: perVideo === null ? s.notMeasured : `$${perVideo}`,
+        help: s.costHelp(
+          display(cost?.allocated?.perVideo, 4),
+          display(cost?.allocated?.perVideoSecond, 4),
+        ),
+      };
+    },
+    context: ({ cost }, s) => {
+      const perSecond = display(cost?.participating?.perVideoSecond, 4);
+      return perSecond === null ? undefined : s.perVideoSecond(perSecond);
+    },
+  },
 };
 
 /** One side's value of a per-side metric, with its context line. */
@@ -267,6 +254,8 @@ interface Cell extends Reading {
   label: string;
   /** The pair's own value, after its color dot. */
   pairValue?: string;
+  /** The lossy pair's headline trade, tinted; its value turns green only when the subject is faster. */
+  lead?: { faster: boolean };
 }
 
 function cell(
@@ -279,7 +268,7 @@ function cell(
 ): Cell {
   if (metric === 'speed') {
     // Both pairs compare cell p50s, the deployment medians the chart plots; wall time is per prompt.
-    const label = s.speed(b.name);
+    const label = kind === 'twin' ? s.speedLossless : s.speed(b.name);
     if (diagnostic) return { metric, label, value: '—', sub: s.diagnosticMetric };
     const speed = speedVs(a.point?.p50 ?? null, b.point?.p50 ?? null);
     // No ratio is coming without both p50s, so this is a dash, not "Not measured yet".
@@ -292,17 +281,18 @@ function cell(
       value: s.speedRatio[speed.direction](speed.times),
       sub: subject !== null && pair !== null ? s.p50Pair(subject, pair) : undefined,
       help: s.speedHelp,
+      lead: kind === 'twin' ? { faster: speed.direction === 'faster' } : undefined,
     };
   }
-  if (isLosslessScore(metric))
+  if (metric === 'paired')
     // Paired scores need the lossless twin; without one they will never be measured.
     return b.point === null
-      ? { metric, label: s[metric], value: '—' }
+      ? { metric, label: s.paired, value: '—' }
       : {
           metric,
-          label: s[metric],
-          value: s.notMeasured,
-          sub: s[LOSSLESS_SCORES[metric]],
+          label: s.paired,
+          value: s.planned,
+          sub: s.pairedScores,
           help: s.pairedPending,
         };
   return {
@@ -381,10 +371,10 @@ export default function VideoClipReadout({
       data-testid="video-results-readout"
       data-pair={kind}
       aria-label={s.pair(a.name, b.name)}
-      className="space-y-3 rounded-lg border bg-muted/30 p-3 text-xs"
+      className="space-y-3 text-xs"
     >
       {/* The footer stays outside the live region, so opening it does not re-announce the values. */}
-      <div aria-live="polite" className="space-y-3">
+      <div aria-live="polite" className="space-y-2">
         <p
           data-testid="video-results-readout-pair"
           className="flex flex-wrap items-center gap-x-2 gap-y-1"
@@ -393,16 +383,28 @@ export default function VideoClipReadout({
           <span className="text-muted-foreground">{s.against}</span>
           <PairSide side={b} diagnostic={diagnostic} locale={locale} />
         </p>
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 tabular-nums lg:grid-cols-5">
+        {/* Auto columns keep every pair, four or five cells, on one row from lg. */}
+        <dl className="m-0 grid grid-cols-2 overflow-hidden rounded-lg border border-border/30 bg-muted/10 tabular-nums lg:auto-cols-fr lg:grid-flow-col lg:grid-cols-none lg:divide-x lg:divide-border/30">
           {cells.map((item) => (
             <div
               key={item.metric}
               data-metric={item.metric}
+              data-lead={item.lead ? '' : undefined}
               title={item.help}
-              className="flex min-w-0 flex-col gap-0.5"
+              className={cn(
+                'flex min-w-0 flex-col gap-0.5 px-3.5 py-2.5',
+                item.lead && 'bg-success/10',
+              )}
             >
               <dt className="text-2xs text-muted-foreground">{item.label}</dt>
-              <dd className="m-0 text-base font-medium break-words">{item.value}</dd>
+              <dd
+                className={cn(
+                  'm-0 font-mono text-base font-medium break-words',
+                  item.lead?.faster && 'font-semibold text-success',
+                )}
+              >
+                {item.value}
+              </dd>
               {item.sub && (
                 <dd className="m-0 text-2xs break-words text-muted-foreground">{item.sub}</dd>
               )}

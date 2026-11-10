@@ -298,22 +298,25 @@ sealed PSNR result. Distilled and full-step workloads are not silently equated.
 Below the stage, a readout (`VideoClipReadout`) describes the pair. Its first line names
 both sides with their GPU count, server layout and lossy optimizations, and tags the side
 from `?unofficialrun=` as the unofficial run, with its `overlayRunColor` dot; against its own
-GPU's official lead, the readout names that lead "B200 official". Every pair shows the
-subject's wall time for this prompt (that request's duration), the clip's PSNR against the
-reference (the sealed pair), the cell's mean energy per valid clip, and modeled TCO per clip
-on the participating and allocated bases, each cost with the subject's $/video-s under it.
-Energy stays in the third of five columns whichever pair is shown. Against another GPU's
-lead each of these cells adds that lead's value, and a speed cell follows; the readout never
-forms a cross-GPU quality score. Speed is the ratio of the two cells' p50, the deployment
-median the chart plots, written "N× faster" or "N× slower". It never divides one prompt's
-wall times, so a cell never mixes the two bases. A lossy subject against its lossless twin
-leads with speed, then PSNR, SSIM and LPIPS against lossless, which read "Not measured yet"
-until paired scores are published. The reference pair stays PSNR-only; SSIM and LPIPS are
-planned only against the lossless twin. Without a lossless twin, speed, the paired scores
-and the twin's line under every other cell read "—", since no value will follow; speed also
-reads "—" when either p50 is missing. Any other value that was not measured reads "Not measured yet", never a
-placeholder number, and the matched-noise rerun shows only its PSNR. The readout has 5
-columns from 1024 px and 2 below; `readoutFooter` places content under its rows. A side
+GPU's official lead, the readout names that lead "B200 official". Under it, a pale panel holds
+one row of cells split by vertical dividers, with values in mono. The reference pair follows
+the board's order: the clip's PSNR against the reference (the sealed pair), the subject's wall
+time for this prompt (that request's duration), one "$ per clip" cell, then the cell's mean
+energy per valid clip. "$ per clip" is modeled TCO on the participating GPUs, the chart's basis,
+with its $/video-s under it; its tooltip gives the allocated basis per clip and per video-s.
+Against another GPU's lead, a speed cell leads the same four, and each cell adds that lead's
+value; the readout never forms a cross-GPU quality score. Speed is the ratio of the two cells'
+p50, the deployment median the chart plots, written "N× faster" or "N× slower". It never
+divides one prompt's wall times, so a cell never mixes the two bases. A lossy subject against
+its lossless twin leads with a green-tinted "Speed vs lossless" (its value turns green only when
+the lossy config is faster), then one "Paired scores: Planned" cell standing for PSNR, SSIM and
+LPIPS against lossless, which no scorer computes yet, then PSNR against the reference, cost and
+energy. The reference pair stays PSNR-only; SSIM and LPIPS are planned only against the lossless
+twin. Without a lossless twin, speed, the paired scores and the twin's line under every other
+cell read "—", since no value will follow; speed also reads "—" when either p50 is missing. Any
+other value that was not measured reads "Not measured yet", never a placeholder number, and the
+matched-noise rerun shows only its PSNR. Every pair fits one row from 1024 px; below that the
+cells take 2 columns. `readoutFooter` places content under the panel. A side
 without published media shows its reason (no matched clip,
 unpublished run, no sealed reference pair) in place of the video, and a clip that
 fails to play offers Retry. The reference's recorded update/sigma-point counts, Diffusers
@@ -467,7 +470,7 @@ Y 轴可选每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时�
 默认静音。点击任一可播放一侧的扬声器按钮即只播放这一侧的声音，参考视频也可以；再次点击恢复静音。切换 prompt 时保留当前音源，隐藏音源或音源播放失败后恢复静音。从部署详情返回总览时，负责 `muted` 的 layout effect 会重新应用音源选择，因为 React 不会重新设置没有变化的 prop。音源选择只影响本地播放，不改变媒体、指标、URL 参数或只读 API 返回内容。
 “差异”视图是两侧视频在相同播放时刻（相差不超过 0.12 秒）的浏览器 RGB 差异预览，配对视频是明确绑定的官方 Diffusers 参考，与封存的全帧 PSNR 测量分别展示。不能根据硬件型号或步数推断参考身份。
 任一侧没有可播放的视频时显示“两侧都需要有视频”；帧尺寸不一致或无法跨域读取像素时显示不可用。Blob 媒体返回 `access-control-allow-origin: *`，所有视频都设置了 `crossOrigin="anonymous"`。蒸馏与完整步数分组保留。
-对比区下方的读数区（`VideoClipReadout`）说明当前这一对视频。第一行列出两侧的名称、GPU 数量、服务器布局和有损优化项，并把来自 `?unofficialrun=` 的一侧标为非官方运行，色点使用 `overlayRunColor`；与同一 GPU 的官方代表部署对比时，读数区把后者称为“B200 官方运行”。无论与谁对比，读数区都显示对比对象在当前 prompt 下的出片时间（该请求的时长）、该视频相对参考的 PSNR（已封存配对）、所选测量单元每条有效视频的平均能耗，以及按参与 GPU 和分配 GPU 两种口径估算的每条视频 TCO，每项成本下方附对比对象的每视频秒成本。切换对比时，能耗始终位于五列中的第三列。与其他 GPU 的代表部署对比时，上述各项再附上该代表部署的数值，并增加一格速度；读数区不构造跨 GPU 的质量分。速度是两个测量单元 p50 之比，即图表所画的部署中位数，写作“加速 N×”或“耗时为其 N 倍”。速度不用单个 prompt 的出片时间计算，因此同一格内不会混用两种口径。有损对象与其无损对照对比时，先显示速度，随后是相对无损对照的 PSNR、SSIM 和 LPIPS，配对评分发布前均显示“尚未测量”。与参考对比时只显示 PSNR；SSIM 和 LPIPS 只计划在与无损对照配对时计算。没有无损对照时，速度、配对质量分以及其余各格下方无损对照的那一行都显示“—”，因为之后也不会有数值；任一侧缺少 p50 时，速度同样显示“—”。其他未测量的值显示“尚未测量”，不用占位数字代替；相同初始噪声重跑只显示其 PSNR。读数区在 1024px 及以上为 5 列，以下为 2 列；`readoutFooter` 用于在读数下方放置内容。没有已发布媒体的一侧在画面位置显示原因（没有匹配的视频、未发布的运行、暂无封存的参考配对），无法播放的视频提供“重试”。参考视频记录的更新次数和 sigma 点数、Diffusers 版本及视频文件链接，与对比对象的 prompt、seed、重复次数、
+对比区下方的读数区（`VideoClipReadout`）说明当前这一对视频。第一行列出两侧的名称、GPU 数量、服务器布局和有损优化项，并把来自 `?unofficialrun=` 的一侧标为非官方运行，色点使用 `overlayRunColor`；与同一 GPU 的官方代表部署对比时，读数区把后者称为“B200 官方运行”。其下是一块浅色面板，各格排成一行、以竖线分隔，数值使用等宽字体。与参考对比时按设计稿的顺序显示：该视频相对参考的 PSNR（已封存配对）、对比对象在当前 prompt 下的出片时间（该请求的时长）、一格“每条视频成本”，以及所选测量单元每条有效视频的平均能耗。“每条视频成本”按参与 GPU 估算 TCO，与图表口径一致，下方附每视频秒成本；按分配 GPU 估算的每条视频成本和每视频秒成本放在该格的悬停提示中。与其他 GPU 的代表部署对比时，速度一格排在最前，其余四格各附上该代表部署的数值；读数区不构造跨 GPU 的质量分。速度是两个测量单元 p50 之比，即图表所画的部署中位数，写作“加速 N×”或“耗时为其 N 倍”。速度不用单个 prompt 的出片时间计算，因此同一格内不会混用两种口径。有损对象与其无损对照对比时，先显示带浅绿底色的“速度（相对无损对照）”（只有有损配置更快时数值才显示为绿色），随后一格“配对评分：计划中”代表相对无损对照的 PSNR、SSIM 和 LPIPS，目前还没有评分器计算；之后是相对参考的 PSNR、成本和能耗。与参考对比时只显示 PSNR；SSIM 和 LPIPS 只计划在与无损对照配对时计算。没有无损对照时，速度、配对评分以及其余各格下方无损对照的那一行都显示“—”，因为之后也不会有数值；任一侧缺少 p50 时，速度同样显示“—”。其他未测量的值显示“尚未测量”，不用占位数字代替；相同初始噪声重跑只显示其 PSNR。在 1024px 及以上，每种对比都排成一行；以下为 2 列。`readoutFooter` 用于在面板下方放置内容。没有已发布媒体的一侧在画面位置显示原因（没有匹配的视频、未发布的运行、暂无封存的参考配对），无法播放的视频提供“重试”。参考视频记录的更新次数和 sigma 点数、Diffusers 版本及视频文件链接，与对比对象的 prompt、seed、重复次数、
 运行、产物、Runtime 和媒体来源一起放在“Prompt 与来源”中。
 
 成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补；图表固定使用参与计算的 GPU 口径，对比区和部署详情仍同时展示两种口径。代表性部署表，以及 GPU 数量和 GPU 口径选择器，均已移除。界面与 overview API 始终包含全部 GPU 数量；旧链接中的 `r_gpus`、`r_basis` 参数会被忽略。利润估算器位于默认收起的“高级选项”中；展开或收起都不会改变数据和计算结果，已填写的场景输入会保留。视频秒吞吐量、每视频秒成本及收入使用有效测量请求的实际解码视频时长，不包含 warmup；请求时长仅用于工作负载身份与筛选。
