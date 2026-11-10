@@ -287,7 +287,6 @@ export const DASHBOARD_API_COVERAGE = {
   fleet: { view: 'fleet' },
   'first-token': { view: 'first-token' },
   'cache-reuse': { view: 'cache-reuse' },
-  reliability: { view: 'reliability' },
   'gpu-specs': { view: 'gpu-specs' },
   submissions: { view: 'submissions' },
   'agentic-workload-explorer': {

@@ -5,6 +5,11 @@ Use `/api/v1/views/*` for dashboard-calculated values. Read the deployed
 these routes become available only after the corresponding app change deploys.
 Do not assume an installed skill proves server availability.
 
+The Chip reliability dashboard page has been retired in English and Chinese.
+Use `/api/v1/views/reliability` for aggregated run success rates or
+`/api/v1/reliability` for raw counts; both API contracts remain unchanged.
+Do not direct users to `/infx/reliability` or `/zh/infx/reliability`.
+
 The bare `/infx/inference` and `/zh/infx/inference` entry routes temporarily redirect to
 their `/kimi-k31-pro` pages unless `g_model` explicitly selects a model. Other query
 parameters are preserved. This is a navigation default, not an API default:

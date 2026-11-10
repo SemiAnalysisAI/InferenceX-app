@@ -17,7 +17,6 @@ const EXPECTED: readonly (readonly [string, string])[] = [
   ['/fleet', '/infx/fleet'],
   ['/first-token', '/infx/first-token'],
   ['/cache-reuse', '/infx/cache-reuse'],
-  ['/reliability', '/infx/reliability'],
   ['/gpu-specs', '/infx/gpu-specs'],
   ['/submissions', '/infx/submissions'],
   ['/ai-chart', '/infx/ai-chart'],
@@ -97,6 +96,8 @@ describe('legacy dashboard redirect table', () => {
   });
 
   it.each([
+    '/reliability',
+    '/zh/reliability',
     '/',
     '/zh',
     '/infx/inference',

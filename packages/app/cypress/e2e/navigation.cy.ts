@@ -73,12 +73,9 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="cache-reuse-controls"]').should('exist');
   });
 
-  it('opens GPU Reliability from the footer link', () => {
+  it('does not offer the retired Chip reliability page', () => {
     cy.get('[data-testid="tab-trigger-reliability"]').should('not.exist');
-
-    cy.get('[data-testid="footer-link-reliability"]').scrollIntoView().click();
-    cy.url().should('include', '/infx/reliability');
-    cy.get('[data-testid="reliability-chart-display"]').should('exist');
+    cy.get('[data-testid="footer-link-reliability"]').should('not.exist');
   });
 
   it('opens Chip Specs from the footer link', () => {

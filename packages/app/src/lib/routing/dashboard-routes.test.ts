@@ -28,9 +28,7 @@ describe('dashboard route registry', () => {
     expect(existsSync(chinesePage)).toBe(route.localeMirrored);
   });
 
-  it('keeps reliability and gpu-specs footer-only and indexable, and feedback out of the sitemap', () => {
-    expect(getDashboardRoute('reliability').navGroup).toBe('footer-only');
-    expect(getDashboardRoute('reliability').indexable).toBe(true);
+  it('keeps gpu-specs footer-only and indexable, and feedback out of the sitemap', () => {
     expect(getDashboardRoute('gpu-specs').navGroup).toBe('footer-only');
     expect(getDashboardRoute('gpu-specs').indexable).toBe(true);
     expect(getDashboardRoute('feedback').indexable).toBe(false);
@@ -155,7 +153,7 @@ describe('dashboard route registry', () => {
     });
   });
 
-  it.each(['/infx/reliability', '/infx/gpu-specs', '/infx/submissions', '/feedback'])(
+  it.each(['/infx/gpu-specs', '/infx/submissions', '/feedback'])(
     'keeps dashboard nudges active on provider-free route %s',
     (pathname) => {
       expect(dashboardShellCapabilitiesForPathname(pathname).dashboardNudge).toBe(true);
@@ -172,5 +170,13 @@ describe('dashboard route registry', () => {
     expect(dashboardNavTabForPathname('/zh/opx/moe')).toBe('operatorx');
     expect(dashboardRouteForPathname('/compare/foo-vs-bar')).toBeUndefined();
     expect(isDashboardRouteKey('not-a-tab')).toBe(false);
+  });
+
+  it('removes reliability from navigation, discovery, and localized route matching', () => {
+    expect(isDashboardRouteKey('reliability')).toBe(false);
+    for (const path of ['/infx/reliability', '/zh/infx/reliability']) {
+      expect(dashboardRouteForPathname(path)).toBeUndefined();
+      expect(dashboardNavTabForPathname(path)).toBeUndefined();
+    }
   });
 });

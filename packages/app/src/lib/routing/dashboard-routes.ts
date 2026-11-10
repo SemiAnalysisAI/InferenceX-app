@@ -198,17 +198,6 @@ export const DASHBOARD_ROUTES = [
     shareParamScopes: ['g_', 'i_', 'c_'],
   },
   {
-    key: 'reliability',
-    path: '/infx/reliability',
-    canonicalPath: '/infx/reliability',
-    legacyPath: '/reliability',
-    navGroup: 'footer-only',
-    indexable: true,
-    localeMirrored: true,
-    providers: STANDALONE_DASHBOARD_PROVIDERS,
-    shareParamScopes: ['r_'],
-  },
-  {
     key: 'gpu-specs',
     path: '/infx/gpu-specs',
     canonicalPath: '/infx/gpu-specs',

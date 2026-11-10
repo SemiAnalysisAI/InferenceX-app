@@ -197,7 +197,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-reliability-view',
-    sourceSha256: 'af8bdf69e07ebc17ea617582e7f2d5d021ccfc9897ad416ca9aec8f88b8811a6',
+    sourceSha256: '49ef61c55d9a90d33cda2bedda7dffe2c1ede9d890bebb3b7c07223cd3c8852e',
   },
   {
     source: 'src/app/api/v1/views/submissions/route.ts',
@@ -928,8 +928,8 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'page-bff',
     exclusionReason: {
-      en: 'Reliability dashboard BFF: the published reliability rows summed per date and GPU, which the chart aggregates into its date ranges.',
-      zh: '可靠性看板专用 BFF：已发布的可靠性行按日期和 GPU 汇总，图表再将其聚合为各日期范围。',
+      en: 'Legacy reliability BFF retained for existing clients after the dashboard page was retired. Sums published rows per date and GPU.',
+      zh: '旧版可靠性 BFF：可靠性页面下线后仍为现有客户端保留，按日期和 GPU 汇总已发布的数据行。',
     },
     sourceSha256: 'c41d0c3079d4a21c00418998c109d9ede9cd92ada886712b089f4dc0a49ea0b7',
   },
@@ -1789,7 +1789,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/reliability/aggregate.ts',
-    sourceSha256: '2a44701069e3deaaca1c1cb31977c26cd3577ae0cd6edad3dc516fe7f4a093e8',
+    sourceSha256: '59575a34ea8c79e128d2c7322f8789538db07002ba93069a14781c21775f74f8',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1879,7 +1879,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: 'd2d27f22d644de37f9adb3697e4fb5e3edd57f1068869dc0c8e72edd05a3e878',
+    sourceSha256: 'd4120ea9f15798bcac37f5f811fa3b71e9c9905adf3a90defd4b11ea701c451f',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

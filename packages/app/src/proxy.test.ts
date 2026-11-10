@@ -337,7 +337,6 @@ describe('proxy matcher', () => {
     '/fleet',
     '/first-token',
     '/cache-reuse',
-    '/reliability',
     '/gpu-specs',
     '/submissions',
     '/ai-chart',

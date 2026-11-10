@@ -73,11 +73,6 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
     description:
       'Estimate what one gigawatt-year of AI inference earns per chip, split into compute expense (TCO), model license fee and operator profit.',
   },
-  reliability: {
-    title: 'Provider Reliability Metrics',
-    description:
-      'AI inference provider reliability and uptime tracking. Compare error rates and availability across chip cloud providers.',
-  },
   'gpu-specs': {
     title: 'Chip Specifications & Comparison',
     description:
@@ -139,7 +134,6 @@ export const TAB_HEADING: Record<DashboardRouteKey, string> = {
   'cache-reuse': 'Prefix cache reuse',
   'profit-estimator': 'Inference profit estimator',
   'profit-estimator-per-gigawatt': 'Inference profit estimator per gigawatt',
-  reliability: 'Provider reliability metrics',
   'gpu-specs': 'Chip specifications & comparison',
   operatorx: 'OperatorX GEMM, attention and MoE benchmarks',
   collectivex: 'CollectiveX communication benchmarks',
@@ -172,8 +166,6 @@ export const TAB_INTRO: Record<DashboardRouteKey, string> = {
     'The inference profit estimator computes revenue per chip-hour for each chip at a chosen interactivity and utilization, stacked into compute expense (TCO $/chip/hr), the model lab license fee and operator profit.',
   'profit-estimator-per-gigawatt':
     'The per-gigawatt profit estimator computes yearly revenue for each chip within a gigawatt all-in power budget at a chosen interactivity and utilization, stacked into compute expense (TCO), the model lab license fee and operator profit.',
-  reliability:
-    'Reliability metrics for the benchmark infrastructure show run success rates, error rates and availability for each chip cluster and provider.',
   'gpu-specs':
     'Chip specifications compare memory capacity, memory bandwidth, FLOPS, interconnect topology and power for NVIDIA, AMD and other AI accelerators.',
   operatorx:
