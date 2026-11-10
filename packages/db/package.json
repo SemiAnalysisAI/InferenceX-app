@@ -42,6 +42,7 @@
     "db:backfill-server-log-files": "bun --env-file=../../.env src/backfill-server-log-files.ts",
     "db:backfill-spec-algorithm": "bun --env-file=../../.env src/backfill-spec-algorithm.ts",
     "db:compact-server-logs": "bun --env-file=../../.env src/compact-server-logs.ts",
+    "db:promote-to-public": "bun --env-file=../../.env src/sync-public-db.ts --to-public",
     "db:reset": "bun --env-file=../../.env src/reset-db.ts",
     "db:sync-public": "bun --env-file=../../.env src/sync-public-db.ts",
     "db:verify": "bun --env-file=../../.env src/verify-db.ts",
