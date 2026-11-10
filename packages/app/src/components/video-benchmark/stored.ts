@@ -10,6 +10,11 @@ export interface StoredMedia {
   downloadUrl: string;
   /** Web playback rendition of `url`, attached at read time and never stored in the index. */
   previewUrl?: string;
+  /**
+   * JPEG of the first decoded frame of `url`, attached at read time like `previewUrl`.
+   * Presentation only; metrics, PSNR and Difference read the sealed original.
+   */
+  posterUrl?: string;
 }
 export interface StoredSource {
   id: string;

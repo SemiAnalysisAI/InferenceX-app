@@ -68,7 +68,7 @@ const clipQuality: ApiSchema & { 'x-description-zh': string } = {
                     reference: {
                       ...object,
                       description:
-                        'Reference case from the public descriptor: receipt/plan/media hashes, official Diffusers/model revisions, denoising_updates, sigma_points, and the stored MP4 url (empty for an unstored named run) with optional previewUrl. Reference execution is not a hardware performance result.',
+                        'Reference case from the public descriptor: receipt/plan/media hashes, official Diffusers/model revisions, denoising_updates, sigma_points, and the stored MP4 url (empty for an unstored named run) with optional previewUrl and posterUrl (first-frame JPEG). Reference execution is not a hardware performance result.',
                     },
                     scorer: {
                       ...object,

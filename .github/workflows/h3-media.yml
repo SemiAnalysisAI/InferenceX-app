@@ -10,7 +10,7 @@ on:
         type: string
         required: false
       backfill_renditions:
-        description: 'Encode web playback renditions for every stored H3 MP4 instead of publishing a run'
+        description: 'Encode missing web playback renditions and first-frame posters for every stored H3 MP4 instead of publishing a run'
         type: boolean
         default: false
 
@@ -51,7 +51,8 @@ jobs:
   renditions:
     name: 'Encode web playback renditions'
     needs: publish
-    # Runs after a successful publication, or alone for a backfill. Originals keep serving if it fails.
+    # Encodes renditions and posters. Runs after a successful publication, or alone for a backfill.
+    # Originals keep serving if it fails.
     if: ${{ !cancelled() && github.repository == 'SemiAnalysisAI/InferenceX-app' && (needs.publish.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.backfill_renditions)) }}
     # One group per source run (or for backfill), so a queued encode never cancels another run's.
     concurrency:

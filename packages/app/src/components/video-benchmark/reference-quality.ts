@@ -37,6 +37,8 @@ export interface ClipQuality {
     url: string;
     /** Web playback rendition of `url`, attached at read time. */
     previewUrl?: string;
+    /** First-frame JPEG of `url`, attached at read time. */
+    posterUrl?: string;
   };
   scorer: {
     name: string;
