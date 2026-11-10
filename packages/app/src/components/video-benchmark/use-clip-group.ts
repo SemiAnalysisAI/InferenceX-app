@@ -3,8 +3,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type SyntheticEvent } from 'react';
 import {
   clipGroupActive,
+  frameTime,
   stepClipGroup,
   type ClipEvent,
+  type ClipGroup,
   type ClipGroupStep,
   type ClipPhase,
   type ClipSnapshot,
@@ -35,14 +37,16 @@ function clipSnapshot(key: string, video: HTMLVideoElement): ClipSnapshot {
 
 /**
  * Drives the playable video elements registered under `keys` through `stepClipGroup`. The group
- * pauses and rewinds whenever `selection` (the shown clips) changes, `audible` is the only unmuted clip, and
- * `onRejected` receives the clips whose play() failed for a reason other than group control.
+ * pauses and rewinds whenever `selection` (the shown clips) changes, `audible` is the only unmuted clip,
+ * `playback` sets the base speed and loop, and `onRejected` receives the clips whose play() failed
+ * for a reason other than group control.
  */
 export function useClipGroup(
   keys: readonly string[],
   audible: string | null,
   selection: string,
   onRejected: (keys: string[]) => void,
+  playback: Pick<ClipGroup, 'speed' | 'loop'>,
 ) {
   const videos = useRef(new Map<string, HTMLVideoElement>());
   const [shown, setShown] = useState<Pick<ClipGroupStep, 'time' | 'buffered' | 'ready'>>({
@@ -77,8 +81,8 @@ export function useClipGroup(
   }, [audible, keyList]);
 
   // The frame loop reads group inputs through this ref so it never re-subscribes mid-playback.
-  const live = useRef({ keyList, audible, duration, onRejected });
-  live.current = { keyList, audible, duration, onRejected };
+  const live = useRef({ keyList, audible, duration, onRejected, playback });
+  live.current = { keyList, audible, duration, onRejected, playback };
 
   const dispatch = (event: ClipEvent): ClipGroupStep => {
     const current = live.current;
@@ -87,7 +91,13 @@ export function useClipGroup(
       return video ? [clipSnapshot(key, video)] : [];
     });
     const step = stepClipGroup(
-      { phase: phaseRef.current, clips, audible: current.audible, duration: current.duration },
+      {
+        phase: phaseRef.current,
+        clips,
+        audible: current.audible,
+        duration: current.duration,
+        ...current.playback,
+      },
       event,
     );
     const setPhaseNow = (next: ClipPhase) => {
@@ -220,5 +230,10 @@ export function useClipGroup(
       return !pausing;
     },
     seek: (time: number) => show(dispatch({ type: 'seek', time })),
+    /** Pauses the group and moves every clip `frames` frames from the shown one. */
+    stepFrames: (frames: number, { fps, total }: { fps: number; total: number }) => {
+      const { time } = dispatch('pause');
+      show(dispatch({ type: 'seek', time: frameTime(time, frames, fps, total) }));
+    },
   };
 }

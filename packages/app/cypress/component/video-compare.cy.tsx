@@ -483,6 +483,105 @@ describe('Video results clip stage', () => {
     cy.location('search').should('not.contain', 'r_view');
   });
 
+  it('steps, slows, zooms, pans, swaps and loops both sides together, also for an overlay', () => {
+    mountResultsClips(['b200', 'h200'], '/vgx', false, c1('b200').runId);
+    cy.get('[data-side="a"]').should('contain', 'Unofficial run');
+    const videos = '[data-testid="video-results-stage"] video';
+    /** Both sides paused on one frame; the workload's 24 fps sets the frame, not the fixture's. */
+    const expectFrame = (frame: number) =>
+      cy
+        .get(videos)
+        .should('have.length', 2)
+        .each(($video) =>
+          cy.wrap($video).should(($element) => {
+            const video = $element[0] as HTMLVideoElement;
+            expect(video.paused).to.equal(true);
+            expect(video.currentTime).to.be.closeTo((frame + 0.5) / 24, 0.002);
+          }),
+        );
+    const expectTransforms = (expected: string[]) =>
+      cy
+        .get<HTMLVideoElement>(videos)
+        .should(($videos) =>
+          expect([...$videos].map((video) => video.style.transform)).to.deep.equal(expected),
+        );
+    load();
+    cy.get('[data-testid="video-results-inspect-toggle"]').click();
+    cy.get('[data-testid="video-results-loop"]').should('have.attr', 'aria-pressed', 'true');
+
+    scrub(0.8);
+    cy.get('[data-testid="video-results-frame-next"]').click();
+    expectFrame(20);
+    cy.get('[data-testid="video-results-frame"]').should('have.text', 'frame 21 / 48');
+    cy.get('[data-testid="video-results-stage"]').focus().type('{leftArrow}');
+    expectFrame(19);
+
+    cy.get('[data-testid="video-results-speed-0.5"]').click();
+    cy.get('[data-testid="video-results-play"]').click();
+    cy.get(videos).each(($video) =>
+      cy.wrap($video).should(($element) => {
+        const video = $element[0] as HTMLVideoElement;
+        expect(video.paused).to.equal(false);
+        // A drift nudge is ±10% around the chosen speed, never a return to 1×.
+        expect(video.playbackRate).to.be.closeTo(0.5, 0.051);
+      }),
+    );
+    cy.get('[data-testid="video-results-play"]').click();
+
+    cy.get('[data-testid="video-results-zoom-2"]').click();
+    expectTransforms(['scale(2) translate(0%, 0%)', 'scale(2) translate(0%, 0%)']);
+    cy.get('[data-testid="video-results-stage"]').then(($stage) => {
+      const { width, height, left, top } = $stage[0].getBoundingClientRect();
+      // Below the centre, so the drag starts on the clips rather than the split handle.
+      const at = (x: number) =>
+        [x, height * 0.75, { clientX: left + x, clientY: top + height * 0.75 }] as const;
+      cy.wrap($stage)
+        .trigger('pointerdown', ...at(width * 0.3))
+        .trigger('pointermove', ...at(width * 0.4));
+      // Dragging a tenth of the width at 2× pans by 5% of the scaled side.
+      expectTransforms(['scale(2) translate(5%, 0%)', 'scale(2) translate(5%, 0%)']);
+      // Esc while the pointer is still down resets the zoom; the held drag must not restore it.
+      cy.wrap($stage)
+        .focus()
+        .type('{esc}')
+        .trigger('pointermove', ...at(width * 0.5));
+      nextFrames();
+      cy.get<HTMLVideoElement>(videos).then(($videos) =>
+        expect([...$videos].map((video) => video.style.transform)).to.deep.equal(['', '']),
+      );
+      cy.wrap($stage)
+        .trigger('pointerup', ...at(width * 0.5))
+        .trigger('click', ...at(width * 0.5));
+    });
+    cy.get('[data-testid="video-results-split"]').should('have.attr', 'aria-pressed', 'false');
+
+    cy.get('[data-testid="video-results-swap"]').click();
+    cy.get('[data-testid="video-results-pill"]').then(($pills) => {
+      const [a, b] = [...$pills].map((pill) => pill.getBoundingClientRect().left);
+      expect(b, 'reference pill moved left').to.be.lessThan(a);
+    });
+    cy.get(WIPE_MEDIA).should(($media) =>
+      expect($media[0].style.clipPath).to.match(/^inset\(0(?:px)? [\d.]+% 0(?:px)? 0(?:px)?\)$/u),
+    );
+    cy.get('[data-testid="video-results-stage"]').should(
+      'have.attr',
+      'aria-label',
+      'B200 against Diffusers reference',
+    );
+
+    scrub(2);
+    cy.get('[data-testid="video-results-frame"]').should('have.text', 'frame 48 / 48');
+    scrub(1.9);
+    cy.get('[data-testid="video-results-play"]').click();
+    cy.get(videos).each(($video) =>
+      cy.wrap($video).should(($element) => {
+        const video = $element[0] as HTMLVideoElement;
+        expect(video.paused).to.equal(false);
+        expect(video.currentTime).to.be.lessThan(1);
+      }),
+    );
+  });
+
   it('shows PSNR without media for an unpublished named run', () => {
     // H200 has media, but the run the user loaded stays the subject.
     mountResultsClips(['b200', 'h200'], '/vgx', false, c1('b200').runId, [], false, ['b200']);
