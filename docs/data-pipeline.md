@@ -340,9 +340,11 @@ attempt of the run is copied. An id the public database lacks fails the command,
 target already holds in full is reported and skipped. In this mode the global `availability`
 table is not copied, because it could advertise dates whose runs were not synced. Instead the
 sync inserts the availability rows implied by the selected runs' benchmark rows, exactly as
-ingest does. `--dry-run` lists the plan, `--limit <n>` caps the number of runs, and
-`--max-value-bytes <n>` skips individual log and blob values above `n` bytes for a target
-compute that cannot hold them; a later uncapped run fills what was skipped.
+ingest does. Configs and datasets are limited the same way: only the ones the selected runs
+reference are copied, so nothing of another run reaches the target. `--dry-run` lists the
+plan, `--limit <n>` caps the number of runs, and `--max-value-bytes <n>` skips individual log
+and blob values above `n` bytes for a target compute that cannot hold them; a later uncapped
+run fills what was skipped.
 
 The `Sync Runs From Public Database` workflow (`sync-run-from-public-db.yml`) runs the sync for
 the dispatched `run-ids`, migrates the target first, then invalidates and warms `APP_URL`. It
@@ -368,12 +370,23 @@ Setup is in [Deployment configuration](./deployment-configuration.md#showing-pub
   availability, and the agentic catalog are combined the same way.
 - Eval rows of a config the public database lacks get a `config_id` above 2^31, so they never
   group with a public config.
-- A run held by both databases, such as one promoted to public, appears once in run lists and
-  latest results but counts twice in reliability, submissions, and history.
+- A promoted run moves: it is deleted from the downstream database once public holds it in full
+  (below), so no run is counted in both databases.
 - Public ingests invalidate only the public site. `Cache Refresh` runs hourly in any
   repository with the `PUBLIC_DATABASE_READONLY_URL` secret, so new public results reach the
   downstream site within the hour.
 - Append-only runs extend curves only within their own database.
+
+`Promote Runs To Public Database` (`promote-to-public.yml`) publishes downstream runs. It runs
+`bun run admin:db:promote-to-public --run-id <ids>` in the `public-promotion` environment,
+which copies the selected runs, including their GPU telemetry, into the public database with
+only the configs and datasets they reference, re-counts each run in public, and only then
+deletes them from the downstream database. A run short in public is not deleted and the job
+fails; rerunning finishes it. The command refuses when the public schema lacks a column the
+downstream one has. Promoted points take new public ids, so links to their downstream ids stop
+resolving. The command only inserts into the public database, but its publication triggers
+rewrite derived tables, so the role needs the public ingest role's privileges. The job then
+invalidates and warms both sites. It does not run in `SemiAnalysisAI/InferenceX-app`.
 
 ### Connection drivers and policy
 

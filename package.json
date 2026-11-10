@@ -52,6 +52,7 @@
     "admin:db:backfill-sequence-length-sketches": "bun run --cwd packages/db db:backfill-sequence-length-sketches",
     "admin:db:backfill-server-log-files": "bun run --cwd packages/db db:backfill-server-log-files",
     "admin:db:compact-server-logs": "bun run --cwd packages/db db:compact-server-logs",
+    "admin:db:promote-to-public": "bun run --cwd packages/db db:promote-to-public",
     "admin:db:reset": "bun run --cwd packages/db db:reset",
     "admin:db:sync-public": "bun run --cwd packages/db db:sync-public",
     "admin:db:verify": "bun run --cwd packages/db db:verify",
