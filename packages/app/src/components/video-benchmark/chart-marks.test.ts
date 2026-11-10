@@ -62,6 +62,24 @@ describe('spreadPills', () => {
     expect(spread[1].y).toBe(300 - PILL_HEIGHT - 2);
   });
 
+  it('keeps a stack apart when the plot edge clamps it', () => {
+    for (const ys of [
+      [295, 296],
+      [-10, -9],
+    ]) {
+      const spread = spreadPills(
+        ys.map((y, index) => ({ key: String(index), x: 100, y, width: 80 })),
+        300,
+      );
+      const [a, b] = spread.toSorted((p, q) => p.y - q.y);
+      expect(b.y - a.y, `stack from ${ys.join(', ')}`).toBeGreaterThanOrEqual(PILL_HEIGHT + 3);
+      for (const pill of spread) {
+        expect(pill.y).toBeGreaterThanOrEqual(2);
+        expect(pill.y).toBeLessThanOrEqual(300 - PILL_HEIGHT - 2);
+      }
+    }
+  });
+
   it('no two of three stacked pills overlap', () => {
     const spread = spreadPills(
       ['a', 'b', 'c'].map((key) => ({ key, x: 100, y: 100, width: 90 })),

@@ -42,23 +42,29 @@ export function pillBox(
 }
 
 /**
- * Pushes colliding pills down, top to bottom, until none overlaps, then keeps each
- * inside the plot. Returns new boxes in the input order.
+ * Pushes colliding pills apart and keeps them inside the plot: a top-down pass from the
+ * top edge, then a bottom-up pass from the bottom edge, so clamping a stack at either edge
+ * moves the whole stack rather than piling pills into one band. Only a stack taller than
+ * the plot can still overlap. Returns new boxes in the input order.
  */
 export function spreadPills(pills: readonly PillBox[], plotHeight: number): PillBox[] {
   const placed = pills.map((pill) => ({ ...pill }));
   const sorted = placed.toSorted((a, b) => a.y - b.y);
-  for (let i = 1; i < sorted.length; i++) {
-    const b = sorted[i];
-    for (let j = 0; j < i; j++) {
-      const a = sorted[j];
-      const sideBySide =
-        a.x < b.x + b.width + PILL_CLEARANCE && b.x < a.x + a.width + PILL_CLEARANCE;
-      if (sideBySide && b.y < a.y + PILL_PITCH) b.y = a.y + PILL_PITCH;
-    }
+  const sideBySide = (a: PillBox, b: PillBox) =>
+    a.x < b.x + b.width + PILL_CLEARANCE && b.x < a.x + a.width + PILL_CLEARANCE;
+  const bottom = plotHeight - PILL_HEIGHT - EDGE;
+  for (const [i, b] of sorted.entries()) {
+    b.y = Math.max(b.y, EDGE);
+    for (const a of sorted.slice(0, i))
+      if (sideBySide(a, b) && b.y < a.y + PILL_PITCH) b.y = a.y + PILL_PITCH;
   }
-  for (const pill of placed)
-    pill.y = Math.max(EDGE, Math.min(pill.y, plotHeight - PILL_HEIGHT - EDGE));
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const a = sorted[i];
+    a.y = Math.min(a.y, bottom);
+    for (const b of sorted.slice(i + 1))
+      if (sideBySide(a, b) && a.y > b.y - PILL_PITCH) a.y = b.y - PILL_PITCH;
+  }
+  for (const pill of placed) pill.y = Math.max(EDGE, Math.min(pill.y, bottom));
   return placed;
 }
 
