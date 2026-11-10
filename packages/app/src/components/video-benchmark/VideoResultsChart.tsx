@@ -818,6 +818,15 @@ export default function VideoResultsChart({
                 track('video_results_optimal_toggled', { enabled: optimal });
               },
             },
+            {
+              id: 'video-results-labels',
+              label: s.labels,
+              checked: labels,
+              onCheckedChange: (enabled) => {
+                onLabelsChange(enabled);
+                track('video_results_labels_toggled', { enabled });
+              },
+            },
             ...(state.lossy || (!history && cells.some((cell) => isLossy(cell.point)))
               ? [
                   {
@@ -832,15 +841,6 @@ export default function VideoResultsChart({
                   },
                 ]
               : []),
-            {
-              id: 'video-results-labels',
-              label: s.labels,
-              checked: labels,
-              onCheckedChange: (enabled) => {
-                onLabelsChange(enabled);
-                track('video_results_labels_toggled', { enabled });
-              },
-            },
           ]}
           keyIndicators={
             engines.length > 1 || lossySeries.length > 0 || state.unofficialRun ? (
