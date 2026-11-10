@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 
 import {
   inferenceChartToCsv,
-  reliabilityChartToCsv,
   evaluationChartToCsv,
   calculatorChartToCsv,
   historicalTrendToCsv,
@@ -344,46 +343,6 @@ describe('inferenceChartToCsv', () => {
 
     expect(rows[0][headers.indexOf('Mean TTFT (s)')]).toBe('');
     expect(rows[0][headers.indexOf('Median TTFT (s)')]).toBe(0);
-  });
-});
-
-describe('reliabilityChartToCsv (mirrors ReliabilityChartDisplay export)', () => {
-  it('exports reliability data with correct headers and values', () => {
-    const data = [
-      { model: 'h100-sxm', modelLabel: 'H100 SXM', successRate: 99.5, n_success: 199, total: 200 },
-      { model: 'b200-sxm', modelLabel: 'B200 SXM', successRate: 98, n_success: 98, total: 100 },
-    ];
-
-    const { headers, rows } = reliabilityChartToCsv(data);
-
-    expect(headers).toEqual([
-      'Chip Model',
-      'Chip Key',
-      'Success Rate (%)',
-      'Successful Runs',
-      'Total Runs',
-    ]);
-    expect(rows).toHaveLength(2);
-    expect(rows[0]).toEqual(['H100 SXM', 'h100-sxm', 99.5, 199, 200]);
-    expect(rows[1]).toEqual(['B200 SXM', 'b200-sxm', 98, 98, 100]);
-  });
-
-  it('handles empty data', () => {
-    const { headers, rows } = reliabilityChartToCsv([]);
-    expect(headers).toHaveLength(5);
-    expect(rows).toHaveLength(0);
-  });
-
-  it('exports all visible GPUs from chartData (no extra filtering needed)', () => {
-    const chartData = [
-      { model: 'h100-sxm', modelLabel: 'H100 SXM', successRate: 99.5, n_success: 199, total: 200 },
-      { model: 'a100-sxm', modelLabel: 'A100 SXM', successRate: 95, n_success: 95, total: 100 },
-    ];
-
-    const { rows } = reliabilityChartToCsv(chartData);
-    expect(rows).toHaveLength(2);
-    expect(rows[0][0]).toBe('H100 SXM');
-    expect(rows[1][0]).toBe('A100 SXM');
   });
 });
 

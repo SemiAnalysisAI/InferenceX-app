@@ -70,10 +70,6 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
     description:
       '估算每款芯片一个吉瓦年的 AI 推理收益：在选定交互性与利用率下的收入，拆分为算力支出（TCO）、模型许可费与运营方利润。',
   },
-  reliability: {
-    title: '服务商可靠性指标',
-    description: 'AI 推理服务商可靠性与可用性跟踪。对比各芯片云服务商的错误率与可用性。',
-  },
   'gpu-specs': {
     title: '芯片规格与对比',
     description:
@@ -139,8 +135,6 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
     '本页面提供推理利润估算器：在选定的交互性与利用率下，按每芯片每小时计算各芯片的收入，并以堆叠柱形拆分为算力支出（TCO $/chip/hr）、模型实验室从收入中抽取的许可费，以及运营方所剩利润。',
   'profit-estimator-per-gigawatt':
     '本页面提供每吉瓦推理利润估算器：在选定的交互性与利用率下，按每吉瓦全电源配置功率预算计算各芯片的年收入，并以堆叠柱形拆分为算力支出（TCO）、模型实验室从收入中抽取的许可费，以及运营方所剩利润。',
-  reliability:
-    '本页面展示基准测试基础设施的可靠性指标：各芯片集群与服务商的运行成功率、错误率与可用性。',
   'gpu-specs':
     '本页面提供芯片规格对比：NVIDIA、AMD 等厂商加速器的显存容量、显存带宽、FLOPS、互连拓扑与功耗规格。',
   operatorx:
@@ -171,7 +165,6 @@ export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   'cache-reuse': '前缀缓存复用',
   'profit-estimator': '利润估算',
   'profit-estimator-per-gigawatt': '每吉瓦利润估算',
-  reliability: '可靠性',
   'gpu-specs': '芯片规格',
   operatorx: 'OperatorX 算子',
   collectivex: 'CollectiveX 通信',

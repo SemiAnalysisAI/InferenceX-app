@@ -2,15 +2,7 @@ import type { ReliabilityRow } from '@/lib/api/api';
 
 import type { DateRangeSuccessRateData } from './types';
 
-/**
- * Pure reliability aggregation shared by the `/infx/reliability` dashboard context
- * and the read-only views API (`/api/v1/views/reliability`).
- *
- * Extracted from `ReliabilityContext.tsx` so server route handlers can reuse
- * the exact dashboard math without importing a client component module.
- */
-
-/** Date-range presets offered by the reliability chart, in display order. */
+/** Date-range presets retained by the read-only reliability API. */
 export const RELIABILITY_RANGES = [
   'last-3-days',
   'last-7-days',

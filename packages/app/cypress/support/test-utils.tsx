@@ -3,7 +3,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
 import { EvaluationContext } from '@/components/evaluation/EvaluationContext';
-import { ReliabilityContext } from '@/components/reliability/ReliabilityContext';
 import {
   GlobalFilterActionsContext,
   GlobalFilterAvailabilityContext,
@@ -17,12 +16,10 @@ import {
 } from '@/providers/unofficial-run-provider';
 
 import type { EvaluationChartContextType } from '@/components/evaluation/types';
-import type { ReliabilityChartContextType } from '@/components/reliability/types';
 
 import {
   createMockInferenceContextValues,
   createMockEvaluationContext,
-  createMockReliabilityContext,
   createMockGlobalFilterContexts,
   createMockUnofficialRunContext,
   type GlobalFilterContextOverrides,
@@ -32,7 +29,6 @@ import {
 export interface ProviderOverrides {
   inference?: Partial<MockInferenceContextValues>;
   evaluation?: Partial<EvaluationChartContextType>;
-  reliability?: Partial<ReliabilityChartContextType>;
   globalFilters?: GlobalFilterContextOverrides;
   unofficial?: Partial<UnofficialRunContextType>;
 }
@@ -61,11 +57,6 @@ export function mountWithProviders(
   if (overrides.evaluation !== undefined) {
     const value = createMockEvaluationContext(overrides.evaluation);
     tree = <EvaluationContext.Provider value={value}>{tree}</EvaluationContext.Provider>;
-  }
-
-  if (overrides.reliability !== undefined) {
-    const value = createMockReliabilityContext(overrides.reliability);
-    tree = <ReliabilityContext.Provider value={value}>{tree}</ReliabilityContext.Provider>;
   }
 
   if (overrides.globalFilters !== undefined) {

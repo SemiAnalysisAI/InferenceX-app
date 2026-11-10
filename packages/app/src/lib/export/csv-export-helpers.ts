@@ -177,22 +177,6 @@ export function inferenceChartToCsv(
   return { headers, rows };
 }
 
-export function reliabilityChartToCsv(
-  data: {
-    model: string;
-    modelLabel: string;
-    successRate: number;
-    n_success: number;
-    total: number;
-  }[],
-): CsvData {
-  const headers = ['Chip Model', 'Chip Key', 'Success Rate (%)', 'Successful Runs', 'Total Runs'];
-
-  const rows = data.map((d) => [d.modelLabel, d.model, d.successRate, d.n_success, d.total]);
-
-  return { headers, rows };
-}
-
 export function evaluationChartToCsv(
   data: {
     configLabel: string;

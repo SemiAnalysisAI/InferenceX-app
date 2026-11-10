@@ -1,78 +1,29 @@
-function visitReliability(path: string) {
-  cy.clock(Date.UTC(2026, 5, 15, 12), ['Date']);
-  cy.visit(path);
-}
+describe('Retired chip reliability page', () => {
+  for (const prefix of ['', '/zh']) {
+    it(`removes the page and discovery links for ${prefix || 'English'}`, () => {
+      for (const path of ['/infx/reliability', '/reliability']) {
+        cy.request({
+          url: `${prefix}${path}?r_range=all-time`,
+          failOnStatusCode: false,
+          followRedirect: false,
+        })
+          .its('status')
+          .should('eq', 404);
+      }
 
-describe('Reliability Chart — Content & Interactions', () => {
-  before(() => {
-    cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      cy.visit(`${prefix}/infx/gpu-specs`);
+      cy.get('footer').should('exist');
+      cy.get('a[href*="/reliability"]').should('not.exist');
+      cy.get('[data-testid="tab-trigger-reliability"]').should('not.exist');
+      cy.get('[data-testid="footer-link-gpu-specs"]').should('exist');
     });
-    visitReliability('/infx/reliability');
-    cy.get('[data-testid="reliability-chart-display"]').should('be.visible');
-  });
+  }
 
-  it('switching date range from default to "Last 7 days" changes the chart display', () => {
-    cy.get('#reliability-chart svg rect.bar').should('have.length.greaterThan', 0);
-
-    cy.get('#reliability-chart svg rect.bar')
-      .its('length')
-      .then((initialCount) => {
-        cy.get('[data-testid="reliability-date-range"]').click();
-        cy.contains('[role="option"]', 'Last 7 days').click();
-
-        cy.get('#reliability-chart svg rect.bar').should('have.length.lessThan', initialCount);
-
-        cy.get('[data-testid="reliability-date-range"]').click();
-        cy.contains('[role="option"]', 'All time').click();
-        cy.get('#reliability-chart svg rect.bar').should('have.length.greaterThan', 0);
-      });
-  });
-});
-
-describe('Reliability Chart — Chinese route and settled states', () => {
-  it('shows a Chinese empty state only after an empty response settles', () => {
-    cy.intercept('GET', '**/api/v1/reliability/daily', []).as('emptyReliability');
-    visitReliability('/zh/infx/reliability');
-    cy.wait('@emptyReliability');
-    cy.contains('所选时间范围内暂无可靠性数据').should('be.visible');
-    cy.contains('正在加载可靠性数据……').should('not.exist');
-  });
-
-  it('shows a safe Chinese error and recovers through the tracked retry control', () => {
-    let failRequests = true;
-    cy.fixture('api/reliability.json').then((fixture) => {
-      cy.intercept('GET', '**/api/v1/reliability/daily', (req) => {
-        req.reply(
-          failRequests
-            ? { statusCode: 500, body: { error: 'database-internal-detail' } }
-            : { statusCode: 200, body: fixture },
-        );
-      }).as('retryReliability');
+  it('keeps the read-only reliability API available without advertising a page', () => {
+    cy.request('/api/v1/views/reliability?range=all-time').then(({ status, body }) => {
+      expect(status).to.eq(200);
+      expect(body.view).to.eq('reliability');
     });
-    visitReliability('/zh/infx/reliability');
-    cy.wait('@retryReliability');
-    cy.wait('@retryReliability');
-    cy.get('[data-testid="reliability-error"]')
-      .should('be.visible')
-      .and('contain.text', '可靠性数据加载失败');
-    cy.contains('database-internal-detail').should('not.exist');
-    cy.contains('[data-testid="reliability-error"] button', '重试')
-      .then(() => {
-        failRequests = false;
-      })
-      .click();
-    cy.wait('@retryReliability');
-    cy.get('#reliability-chart svg rect.bar').should('have.length.greaterThan', 0);
-  });
-
-  it('keeps controls reachable without body overflow at 375px', () => {
-    cy.viewport(375, 844);
-    visitReliability('/zh/infx/reliability');
-    cy.get('[data-testid="reliability-date-range"]').should('be.visible').click();
-    cy.contains('[role="option"]', '全部时间').should('be.visible');
-    cy.document().then((doc) => {
-      expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
-    });
+    cy.request('/sitemap.xml').its('body').should('not.contain', '/infx/reliability');
   });
 });

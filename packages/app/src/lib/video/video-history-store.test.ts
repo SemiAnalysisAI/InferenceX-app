@@ -356,7 +356,8 @@ describe('history projection version', () => {
       hash.update(relative(root, file)).update(readFileSync(file));
     expect({ projection: VIDEO_HISTORY_PROJECTION, sources: hash.digest('hex') }).toEqual({
       projection: 3,
-      sources: 'db20899e077abb172c3003ec7960a0dbddf3a38b8680536cca229852c5c4af69',
+      // Only the unrelated reliability dashboard route was removed; video entries are unchanged.
+      sources: '8084b02f777fe7666d52280a9a9e2ee1fe052eac5b658411cabe35550d6b0e4c',
     });
   });
 });

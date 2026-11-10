@@ -250,14 +250,6 @@ describe('URL Parameter Persistence', () => {
     });
   });
 
-  describe('Reliability date range', () => {
-    it('r_range=last-7-days pre-selects date range', () => {
-      visitWithDismissedModal('/infx/reliability?r_range=last-7-days');
-      cy.url().should('include', '/infx/reliability');
-      cy.get('[data-testid="reliability-date-range"]').should('contain.text', 'Last 7 days');
-    });
-  });
-
   describe('Hydration on shared-link entry', () => {
     it('/compare/[slug] with ?i_seq=1k/1k seeds the sequence without a hydration error', () => {
       visitWithErrorSpy('/compare/deepseek-r1-h100-vs-h200?i_seq=1k/1k');
@@ -294,12 +286,6 @@ describe('URL Parameter Persistence', () => {
   });
 
   describe('High contrast mode', () => {
-    it('r_hc=1 applies to reliability chart', () => {
-      visitWithDismissedModal('/infx/reliability?r_hc=1');
-      cy.get('[data-testid="reliability-chart-display"]').should('exist');
-      cy.get('#reliability-high-contrast').first().should('have.attr', 'data-state', 'checked');
-    });
-
     it('e_hc=1 applies to evaluation chart', () => {
       visitWithDismissedModal('/infx/evaluation?e_hc=1');
       cy.get('[data-testid="evaluation-chart-display"]').should('exist');
