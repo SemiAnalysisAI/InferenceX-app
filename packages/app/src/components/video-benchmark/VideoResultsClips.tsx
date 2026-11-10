@@ -12,6 +12,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { cn } from '@/lib/shared/utils';
 import {
+  pairedGroup,
   parseStage,
   promptKey,
   STAGE_VIEWS,
@@ -344,7 +345,7 @@ export default function VideoResultsClips({
   const otherSide = other ? sideOf(other) : null;
   // The other side plays its clip of the subject's prompt, seed and take.
   const otherClip = useMemo(() => {
-    const match = otherSide && resultsClipGroups([otherSide]).find((g) => g.key === group?.key);
+    const match = otherSide && pairedGroup(resultsClipGroups([otherSide]), group);
     return match ? (match.clips.get(otherSide.hardwareKey) ?? null) : null;
   }, [otherSide, group]);
   const otherNative =

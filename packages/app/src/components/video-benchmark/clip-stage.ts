@@ -58,6 +58,22 @@ export function promptKey(group: ResultsClipGroup): string {
 export const stagePrompt = (groups: readonly ResultsClipGroup[], key: string | null) =>
   groups.find((group) => promptKey(group) === key) ?? groups[0] ?? null;
 
+/**
+ * The other side's group for the subject's prompt: the same generation, prompt, seed and take. A
+ * matched-noise rerun's key carries its own attachment, so reruns pair by case, prompt and seed.
+ */
+export const pairedGroup = (groups: readonly ResultsClipGroup[], group: ResultsClipGroup | null) =>
+  group
+    ? groups.find((g) =>
+        group.scope
+          ? g.scope === group.scope &&
+            promptKey(g) === promptKey(group) &&
+            g.prompt === group.prompt &&
+            g.seed === group.seed
+          : g.key === group.key,
+      )
+    : undefined;
+
 export interface StageCandidate {
   point: VideoPoint;
   /** Undefined while its published read is in flight; null when there is none. */
