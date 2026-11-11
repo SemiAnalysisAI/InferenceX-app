@@ -20,7 +20,6 @@ const STRINGS = {
     missing: 'A compute or bandwidth reference is unavailable for',
     median: 'Median',
     best: 'Best',
-    cases: 'cases',
     absolute: 'Achieved throughput (TFLOPS)',
     normalized: 'Share of peak compute (%)',
   },
@@ -32,7 +31,6 @@ const STRINGS = {
     missing: '以下硬件缺少计算峰值或带宽参考值',
     median: '中位数',
     best: '最佳值',
-    cases: '个用例',
     absolute: '实测吞吐量（TFLOPS）',
     normalized: '计算峰值占比（%）',
   },
@@ -217,7 +215,6 @@ export function RooflineBars({
                   { value: format(d.median), label: strings.median },
                   { value: format(d.best), label: strings.best },
                 ],
-                summary: `${d.n} ${strings.cases}`,
               }),
           }}
         />

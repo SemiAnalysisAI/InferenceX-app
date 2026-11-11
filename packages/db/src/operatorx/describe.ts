@@ -257,8 +257,13 @@ function attentionWork(type: string, a: Args): AttentionWork | null {
       }
       const indexer = str(a.indexer);
       const [topk, ih, id] = [n('topk'), n('index_heads'), n('index_dim')];
+      // own: projects queries and keys and scores them; shared: scores its own queries over
+      // another layer's index keys; reuse: takes another layer's top-k, no indexer work
+      const scores = indexer === 'own' || indexer === 'shared';
+      const indexKeyBytes =
+        { bf16: 2, mxfp4: 0.5, nvfp4: 0.5 }[str(a.index_cache_dtype) ?? ''] ?? 1;
+      if (scores) proj.push(['indexer.wq_b', ql, ih * id], ['indexer.weights_proj', h, ih]);
       if (indexer === 'own') {
-        proj.push(['indexer.wq_b', ql, ih * id], ['indexer.weights_proj', h, ih]);
         if (ratio === 4)
           proj.push(['indexer.compressor.wkv', h, 2 * id], ['indexer.compressor.wgate', h, 2 * id]);
         else proj.push(['indexer.wk', h, id]);
@@ -267,13 +272,18 @@ function attentionWork(type: string, a: Args): AttentionWork | null {
       const compressed = (g: Group) =>
         ratio > 0 ? Math.min(all(g) / ratio, indexer ? g.q * topk : Infinity) : 0;
       const attended = sumGroups(gs, (g) => keys(g.ctx, g.q, window) + compressed(g));
-      const scored = indexer && ratio > 0 ? sumGroups(gs, all) / ratio : 0;
+      const scored = scores && ratio > 0 ? sumGroups(gs, all) / ratio : 0;
+      // An indexer narrows each request to its top-k compressed entries, so only those are
+      // read in full; scoring reads every compressed entry's index key.
+      const compressedRead = (g: Group) =>
+        indexer ? Math.min(g.ctx / ratio, topk) : g.ctx / ratio;
       return {
         proj,
         core: 4 * heads * hd * attended + 2 * ih * id * scored,
         cache:
           cacheOf(hd * kvBytes, (g) => Math.min(g.ctx, window)) +
-          (ratio > 0 ? (hd * kvBytes * sumGroups(gs, (g) => g.ctx)) / ratio : 0),
+          (ratio > 0 ? hd * kvBytes * sumGroups(gs, compressedRead) : 0) +
+          (scored > 0 ? (id * indexKeyBytes * sumGroups(gs, (g) => g.ctx)) / ratio : 0),
         merge: heads * hd,
       };
     }

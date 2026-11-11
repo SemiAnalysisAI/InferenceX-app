@@ -26,6 +26,7 @@ import { RooflineBars } from './roofline-bars';
 
 const ORDER: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
 const ROOF_DASH = '6 4';
+const ROOF_SAMPLES = 64;
 
 const STRINGS = {
   en: {
@@ -156,11 +157,18 @@ export function Roofline({
         ]
       : [0.1, 10];
   const rooflines: Record<string, { x: number; y: number }[]> = {};
-  const roof = (peak: number, knee: number) => [
-    { x: a0, y: Math.min(peak, (peak / knee) * a0) },
-    ...(knee > a0 && knee < a1 ? [{ x: knee, y: peak }] : []),
-    { x: a1, y: Math.min(peak, (peak / knee) * a1) },
-  ];
+  // The y axis is sqrt over a log x axis, so the bandwidth slope bends on screen: sample it.
+  const roof = (peak: number, knee: number) => {
+    const end = Math.min(knee, a1);
+    const slope =
+      end > a0
+        ? Array.from({ length: ROOF_SAMPLES + 1 }, (_, i) => {
+            const x = a0 * (end / a0) ** (i / ROOF_SAMPLES);
+            return { x, y: (peak / knee) * x };
+          })
+        : [{ x: a0, y: peak }];
+    return knee < a1 ? [...slope, { x: a1, y: peak }] : slope;
+  };
   if (normalized) rooflines[SHARED] = roof(1, 1);
   else
     for (const hw of model.hardware) {
@@ -230,11 +238,7 @@ export function Roofline({
             height={400}
             margin={{ top: 16, right: 16, bottom: 56, left: 72 }}
             xScale={{ type: 'log', domain: [a0, a1], nice: false }}
-            yScale={{
-              type: 'log',
-              domain: [Math.max(1e-3, Math.min(...ys) / 1.5), Math.max(...ys) * 1.3],
-              nice: false,
-            }}
+            yScale={{ type: 'sqrt', domain: [0, Math.max(...ys) * 1.1], nice: false }}
             xAxis={
               normalized
                 ? {
