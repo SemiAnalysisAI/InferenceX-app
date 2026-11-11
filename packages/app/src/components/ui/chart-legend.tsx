@@ -440,12 +440,15 @@ export default function ChartLegend({
 
   const hasBottomControls =
     switchElements || (!isSidebar && actionElements) || keyIndicators || hasAtomFootnote;
+  // Sidebar controls cap at the panel cap minus 6rem so the toolbar and one legend row stay visible.
+  // The mobile padding keeps the Advanced toggle's enlarged tap area inside the scroller.
   const bottomControls = hasBottomControls ? (
     <div
       data-testid="legend-display-controls"
       className={cn(
         'shrink-0 grow-0',
-        isSidebar && 'min-w-0 border-t border-border/50 [contain:inline-size]',
+        isSidebar &&
+          'min-w-0 border-t border-border/50 [contain:inline-size] custom-scrollbar overflow-y-auto max-h-72 lg:max-h-[479px] max-md:pb-2.5 max-md:-mb-2.5',
       )}
     >
       {!isSidebar && actionElements}
