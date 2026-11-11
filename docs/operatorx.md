@@ -122,7 +122,8 @@ The backfill requires `DATABASE_OPERATORX_WRITE_URL`; it loads one run at a time
 preserves run revisions and source indices, and locks the captured revision before
 writing. A concurrent re-ingest causes stale work to be skipped. It is idempotent
 and exits nonzero if a run fails. Ingest workflows now warm both default comparisons
-after invalidating their cache. No administrator credentials or mutation endpoint
+after invalidating their cache, best effort: a failed warm-up does not fail an ingest
+that stored its run. OperatorX ingest failures send no Slack alert. No administrator credentials or mutation endpoint
 are added to the public API.
 
 ### Benchmarking

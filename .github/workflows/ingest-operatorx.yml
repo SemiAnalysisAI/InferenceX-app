@@ -31,10 +31,8 @@ jobs:
           VERCEL_INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
           DATABASE_OPERATORX_WRITE_URL: ${{ secrets.DATABASE_OPERATORX_WRITE_URL }}
           GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           RUN_ID: ${{ github.event.client_payload.run-id || inputs.run-id }}
         run: |
-          [ "$GITHUB_REPOSITORY" != SemiAnalysisAI/InferenceX-app ] || : "${SLACK_WEBHOOK_URL:?SLACK_WEBHOOK_URL secret is not set}"
           : "${BENCHMARK_REPO:?BENCHMARK_REPO repository variable is not set}"
           : "${APP_URL:?APP_URL repository variable is not set}"
           : "${VERCEL_INVALIDATE_SECRET:?VERCEL_INVALIDATE_SECRET secret is not set}"
@@ -97,7 +95,9 @@ jobs:
           fi
           curl -sSf -X POST "${APP_URL%/}/api/v1/invalidate?scope=operatorx" "${headers[@]}"
 
+      # Best effort: the run is stored by now, and many ingests landing at once can 503 the warm-up.
       - name: Warm default OperatorX comparisons
+        continue-on-error: true
         env:
           APP_URL: ${{ vars.APP_URL }}
           VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
@@ -111,14 +111,3 @@ jobs:
             curl -sSf --retry 2 --retry-delay 2 --max-time 300 --compressed \
               "${APP_URL%/}/api/v1/operatorx/compare?op=$op" "${headers[@]}" -o /dev/null
           done
-
-      - name: Notify Slack on failure
-        if: failure() && github.repository == 'SemiAnalysisAI/InferenceX-app'
-        uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d # v4.0.0
-        with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            {
-              "text": ":rotating_light: *Ingest OperatorX workflow failed*\nRun ID: ${{ github.event.client_payload.run-id || inputs.run-id }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
-            }
