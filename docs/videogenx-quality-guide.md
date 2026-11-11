@@ -4,7 +4,8 @@
 `packages/app/content/videogenx/quality.mdx` and `zh/quality.mdx` through the shared tutorial shell
 described in [PowerX Tutorial](./powerx-tutorial.md): the article, MDX map, callout, widget frame
 and chips live in `src/components/tutorial/`, and the loader in `src/lib/tutorial/tutorial-content.ts`
-reads the `VIDEO_QUALITY_GUIDE` config (`src/lib/video/quality-guide.ts`). The InferenceX
+reads the `VIDEO_QUALITY_GUIDE` config (`src/lib/video/quality-guide.ts`), which also sets the
+guide's eyebrow, back link and test ids. The InferenceX
 `video-generation/README.md#reference-psnr` links here.
 
 ## Argument

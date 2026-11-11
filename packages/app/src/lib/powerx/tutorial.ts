@@ -8,4 +8,8 @@ export const POWERX_TUTORIAL: TutorialGuide = {
   path: POWERX_TUTORIAL_PATH,
   seoPrefix: { en: 'PowerX tutorial', zh: 'PowerX 教程' },
   about: 'PowerX',
+  eyebrow: { en: 'Tutorial', zh: '教程' },
+  dashboard: 'powerx',
+  returnedEvent: 'powerx_tutorial_returned',
+  testId: 'powerx-tutorial',
 };

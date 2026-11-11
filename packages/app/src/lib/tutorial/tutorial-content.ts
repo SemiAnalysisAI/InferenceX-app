@@ -13,6 +13,7 @@ import {
   ZH_OG_LOCALE,
   zhAlternates,
 } from '@/lib/i18n/i18n';
+import type { DashboardRouteKey } from '@/lib/routing/dashboard-routes';
 
 /**
  * One long-form guide page rendered from `content/<contentDir>/<slug>.mdx` and its
@@ -24,8 +25,16 @@ export interface TutorialGuide {
   path: string;
   /** Names the page in search results, link previews and the JSON-LD headline. */
   seoPrefix: Record<Locale, string>;
-  /** The JSON-LD `about`. */
+  /** The JSON-LD `about`, and the label of the link back to `dashboard`. */
   about: string;
+  /** The line above the article title. */
+  eyebrow: Record<Locale, string>;
+  /** The tab the article links back to; also that link's analytics target. */
+  dashboard: DashboardRouteKey;
+  /** Tracked when a reader follows the link back to `dashboard`. */
+  returnedEvent: string;
+  /** Prefix of the article and body test ids, e.g. `powerx-tutorial`. */
+  testId: string;
 }
 
 export interface TutorialMeta {

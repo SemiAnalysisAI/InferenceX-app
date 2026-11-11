@@ -6,7 +6,9 @@
 are the only rendering target; the files are not written for GitHub. The article shell, MDX map,
 callout, widget frame and chips are shared with other guides under `src/components/tutorial/`,
 and the loader, metadata and JSON-LD under `src/lib/tutorial/tutorial-content.ts`; PowerX
-supplies its `POWERX_TUTORIAL` config (`src/lib/powerx/tutorial.ts`) and widgets.
+supplies its `POWERX_TUTORIAL` config (`src/lib/powerx/tutorial.ts`) and widgets. The config is
+the whole per-guide surface: content path, route, SEO prefix, eyebrow, the tab the back link
+returns to, that link's analytics event, and the test-id prefix.
 
 ## Syntax
 

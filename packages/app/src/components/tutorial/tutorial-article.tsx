@@ -3,9 +3,10 @@ import type { CSSProperties, ReactNode } from 'react';
 import { BLOG_PROSE_CLASS } from '@/components/blog/blog-prose';
 import { HashScroll } from '@/components/blog/hash-scroll';
 import { formatBlogDate } from '@/lib/blog/blog';
-import type { Locale } from '@/lib/i18n/i18n';
+import { type Locale, localePath } from '@/lib/i18n/i18n';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 import { cn } from '@/lib/shared/utils';
-import type { TutorialMeta } from '@/lib/tutorial/tutorial-content';
+import type { TutorialGuide, TutorialMeta } from '@/lib/tutorial/tutorial-content';
 
 import { TutorialLink } from './tutorial-link';
 
@@ -38,40 +39,29 @@ export interface TutorialArticleProps {
   locale: Locale;
   meta: TutorialMeta;
   content: ReactNode;
-  eyebrow: string;
-  /** The link back to the guide's dashboard, tracked as `analyticsEvent`. */
-  back: { href: string; label: string; analyticsEvent: string; analyticsTarget?: string };
-  /** Prefix of the article and body test ids, e.g. `powerx-tutorial`. */
-  testId: string;
+  guide: TutorialGuide;
 }
 
-export function TutorialArticle({
-  locale,
-  meta,
-  content,
-  eyebrow,
-  back,
-  testId,
-}: TutorialArticleProps) {
+export function TutorialArticle({ locale, meta, content, guide }: TutorialArticleProps) {
   const t = STRINGS[locale];
 
   return (
-    <article data-testid={`${testId}-article`}>
+    <article data-testid={`${guide.testId}-article`}>
       <HashScroll />
       <header className="pt-4 sm:pt-8">
         <TutorialLink
-          href={back.href}
-          analyticsEvent={back.analyticsEvent}
-          analyticsTarget={back.analyticsTarget}
+          href={localePath(getDashboardRoute(guide.dashboard).path, locale)}
+          analyticsEvent={guide.returnedEvent}
+          analyticsTarget={guide.dashboard}
           className="text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
-          {back.label}
+          {`← ${guide.about}`}
         </TutorialLink>
         <p
           className="motion-enter mt-10 text-xs font-medium text-muted-foreground"
           style={heroStep(0)}
         >
-          {eyebrow}
+          {guide.eyebrow[locale]}
         </p>
         <h1
           className={cn(
@@ -96,7 +86,7 @@ export function TutorialArticle({
         </p>
       </header>
 
-      <div className={cn(TUTORIAL_PROSE_CLASS, 'mt-12')} data-testid={`${testId}-body`}>
+      <div className={cn(TUTORIAL_PROSE_CLASS, 'mt-12')} data-testid={`${guide.testId}-body`}>
         {content}
       </div>
     </article>

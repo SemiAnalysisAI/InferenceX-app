@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 
 import { JsonLd } from '@/components/seo/json-ld';
+import { TutorialArticle } from '@/components/tutorial/tutorial-article';
 import { createTutorialComponents } from '@/components/tutorial/tutorial-mdx-components';
 import { videoQualityGuideWidgets } from '@/components/video-benchmark/quality-guide';
-import { VideoQualityGuideArticle } from '@/components/video-benchmark/quality-guide/quality-guide-article';
 import { compileBlogMdx } from '@/lib/blog/blog-mdx';
 import {
   buildTutorialJsonLd,
@@ -39,7 +39,12 @@ export default async function VideoQualityGuidePage() {
     <main className="relative">
       <JsonLd data={buildTutorialJsonLd(VIDEO_QUALITY_GUIDE, meta, LOCALE)} />
       <div className="container mx-auto max-w-5xl px-4 pb-24 lg:px-8">
-        <VideoQualityGuideArticle locale={LOCALE} meta={meta} content={content} />
+        <TutorialArticle
+          locale={LOCALE}
+          meta={meta}
+          content={content}
+          guide={VIDEO_QUALITY_GUIDE}
+        />
       </div>
     </main>
   );

@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 
-import { PowerXTutorialArticle } from '@/components/powerx/powerx-tutorial-article';
 import { PowerXFeatureGate } from '@/components/powerx/powerx-feature-gate';
 import { POWERX_TUTORIAL_WIDGETS } from '@/components/powerx/widgets';
 import { JsonLd } from '@/components/seo/json-ld';
+import { TutorialArticle } from '@/components/tutorial/tutorial-article';
 import { createTutorialComponents } from '@/components/tutorial/tutorial-mdx-components';
 import { compileBlogMdx } from '@/lib/blog/blog-mdx';
 import { POWERX_TUTORIAL } from '@/lib/powerx/tutorial';
@@ -32,7 +32,7 @@ export default async function PowerXTutorialPageZh() {
       <main className="relative">
         <JsonLd data={buildTutorialJsonLd(POWERX_TUTORIAL, meta, LOCALE)} />
         <div className="container mx-auto max-w-5xl px-4 pb-24 lg:px-8">
-          <PowerXTutorialArticle locale={LOCALE} meta={meta} content={content} />
+          <TutorialArticle locale={LOCALE} meta={meta} content={content} guide={POWERX_TUTORIAL} />
         </div>
       </main>
     </PowerXFeatureGate>
