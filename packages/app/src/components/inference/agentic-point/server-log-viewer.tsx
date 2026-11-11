@@ -207,9 +207,6 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
 
   const query = useServerLog(id, selectedFile, enabled && selectedFile !== null, initialOffset);
   const searchQuery = useServerLogSearch(id, searchTerm, enabled);
-  const searchMatches = (searchQuery.data?.matches ?? []).filter(
-    (match) => !isLaunchFileName(match.fileName),
-  );
   const [copied, setCopied] = useState(false);
   const rawLog = useMemo(
     () => query.data?.pages.map((page) => page?.serverLog ?? '').join('') ?? '',
@@ -507,8 +504,8 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
           <div className="grid gap-1.5 pt-1" data-testid="server-log-search-results">
             <p className="text-xs font-medium text-muted-foreground" aria-live="polite">
               {searchQuery.data.truncated ? `${t.firstMatches} ` : ''}
-              {formatter.format(searchMatches.length)}{' '}
-              {searchMatches.length === 1 ? t.match : t.matches}
+              {formatter.format(searchQuery.data.matches.length)}{' '}
+              {searchQuery.data.matches.length === 1 ? t.match : t.matches}
             </p>
             {searchQuery.data.incomplete ? (
               <p
@@ -518,7 +515,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
                 {t.searchIncomplete}
               </p>
             ) : null}
-            {searchMatches.length === 0 ? (
+            {searchQuery.data.matches.length === 0 ? (
               <p className="text-xs text-muted-foreground">{t.noMatches}</p>
             ) : (
               <div
@@ -527,7 +524,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
                   LOG_SURFACE,
                 )}
               >
-                {searchMatches.map((result) => (
+                {searchQuery.data.matches.map((result) => (
                   <article key={`${result.fileName}:${result.offset}`} className="grid gap-1.5 p-3">
                     <div className="flex min-w-0 items-center gap-3 font-mono text-2xs">
                       <span className="min-w-0 truncate text-foreground" title={result.fileName}>

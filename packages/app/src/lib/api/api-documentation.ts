@@ -2715,8 +2715,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/server-log-search',
     summary: text('Search complete benchmark logs', '搜索完整基准测试日志'),
     description: text(
-      'Runs a literal, case-insensitive search across every stored file for one benchmark result, launch files included. The bounded response contains contextual snippets without transferring complete log files. One request scans at most 64 million characters across all files; incomplete is true when that budget stopped the scan before the end. A search that exceeds its time budget returns 504.',
-      '在某个基准测试结果对应的所有已存储文件（包括启动文件）中，按字面值执行不区分大小写的搜索。响应仅返回数量受限的上下文片段，无需传输完整日志文件。单次请求在所有文件中最多扫描 6,400 万个字符；若扫描因该上限而未到达末尾，incomplete 为 true。搜索超时则返回 504。',
+      'Runs a literal, case-insensitive search across every stored .log/.out file for one benchmark result. Launch files such as recipe.lock.yaml are not searched. The bounded response contains contextual snippets without transferring complete log files. One request scans at most 64 million characters across all files; incomplete is true when that budget stopped the scan before the end. A search that exceeds its time budget returns 504.',
+      '在某个基准测试结果对应的所有已存储 .log/.out 文件中，按字面值执行不区分大小写的搜索，不搜索 recipe.lock.yaml 等启动文件。响应仅返回数量受限的上下文片段，无需传输完整日志文件。单次请求在所有文件中最多扫描 6,400 万个字符；若扫描因该上限而未到达末尾，incomplete 为 true。搜索超时则返回 504。',
     ),
     audience: 'public',
     stability: 'beta',
