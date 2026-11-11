@@ -2812,7 +2812,7 @@ export const apiOperations: readonly ApiOperation[] = [
     summary: text('List stored benchmark log files', '列出已存储的基准测试日志文件'),
     description: text(
       'Lists every file retained from the matching server-log artifact: each .log and .out file, plus the launch files srtctl and the engines write (recipe.lock.yaml, srtctl config.yaml, fingerprint_<role>_w<N>.json, trtllm_config_*.yaml, SGLang *_config.json and benchmark_command.txt). Paths are returned relative to the artifact root, with the primary log file first. Bundles ingested before launch files were kept list only logs until they are backfilled.',
-      '列出匹配服务器日志产物中保留的所有文件：每个 .log 和 .out 文件，以及 srtctl 和推理引擎写出的启动文件（recipe.lock.yaml、srtctl 的 config.yaml、fingerprint_<role>_w<N>.json、trtllm_config_*.yaml、SGLang 的 *_config.json 和 benchmark_command.txt）。路径相对于产物根目录返回，主日志文件排在首位。在开始保留启动文件之前导入的文件集合，回填之前只列出日志。',
+      '列出匹配服务器日志产物中保留的所有文件：每个 .log 和 .out 文件，以及 srtctl 和推理引擎写出的启动文件（recipe.lock.yaml、srtctl 的 config.yaml、fingerprint_<role>_w<N>.json、trtllm_config_*.yaml、SGLang 的 *_config.json 和 benchmark_command.txt）。路径相对于产物根目录返回，主日志文件排在首位。早于此改动导入的文件集合在完成回填前只包含日志文件。',
     ),
     audience: 'public',
     stability: 'beta',
