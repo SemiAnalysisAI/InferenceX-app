@@ -95,8 +95,20 @@ jobs:
           fi
           curl -sSf -X POST "${APP_URL%/}/api/v1/invalidate?scope=operatorx" "${headers[@]}"
 
-      # Best effort: the run is stored by now, and many ingests landing at once can 503 the warm-up.
+  # Many sweeps can land at once. Warm-ups run one at a time across all ingests, and while one
+  # runs only the newest waiting warm-up is kept: it covers every run stored so far.
+  warm:
+    name: Warm OperatorX comparisons
+    needs: ingest
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    permissions: {}
+    concurrency:
+      group: ingest-operatorx-warm
+      cancel-in-progress: false
+    steps:
       - name: Warm default OperatorX comparisons
+        # best effort: the run is stored either way
         continue-on-error: true
         env:
           APP_URL: ${{ vars.APP_URL }}
