@@ -31,8 +31,10 @@ jobs:
           VERCEL_INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
           DATABASE_OPERATORX_WRITE_URL: ${{ secrets.DATABASE_OPERATORX_WRITE_URL }}
           GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           RUN_ID: ${{ github.event.client_payload.run-id || inputs.run-id }}
         run: |
+          [ "$GITHUB_REPOSITORY" != SemiAnalysisAI/InferenceX-app ] || : "${SLACK_WEBHOOK_URL:?SLACK_WEBHOOK_URL secret is not set}"
           : "${BENCHMARK_REPO:?BENCHMARK_REPO repository variable is not set}"
           : "${APP_URL:?APP_URL repository variable is not set}"
           : "${VERCEL_INVALIDATE_SECRET:?VERCEL_INVALIDATE_SECRET secret is not set}"
@@ -94,6 +96,17 @@ jobs:
             headers+=(-H "x-vercel-protection-bypass: $VERCEL_PROTECTION_BYPASS_SECRET")
           fi
           curl -sSf -X POST "${APP_URL%/}/api/v1/invalidate?scope=operatorx" "${headers[@]}"
+
+      - name: Notify Slack on failure
+        if: failure() && github.repository == 'SemiAnalysisAI/InferenceX-app'
+        uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d # v4.0.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": ":rotating_light: *Ingest OperatorX workflow failed*\nRun ID: ${{ github.event.client_payload.run-id || inputs.run-id }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+            }
 
   # Many sweeps can land at once. Warm-ups run one at a time across all ingests, and while one
   # runs only the newest waiting warm-up is kept: it covers every run stored so far.
