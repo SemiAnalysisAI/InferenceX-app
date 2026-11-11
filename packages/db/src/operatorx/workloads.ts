@@ -7,7 +7,7 @@ export interface WorkloadSource {
   label: string;
 }
 
-/** Shapes from no checkpoint: source operatorx/Synthetic-Shapes/n<N>_k<K>. */
+/** Shapes from no checkpoint: source operatorx/Synthetic-Shapes/m<M>_n<N>_k<K>. */
 const SYNTHETIC = 'Synthetic-Shapes';
 
 export function modelFamily(name: string): string {
@@ -17,23 +17,14 @@ export function modelFamily(name: string): string {
     .replace(/-v\d+$/iu, '');
 }
 
-const FAMILY_KEYS: Record<string, string> = {
-  'gpt-oss-120b-w-a': 'gptoss120b',
-  'DeepSeek-V4-Pro-0813': 'dsv4',
-};
+const familyKeys = new Map<string, string>(
+  Object.entries(MODEL_TO_KEY).map(([id, key]) => [modelFamily(id), key] as [string, string]),
+);
 
-const familyKeys = new Map<string, string>([
-  ...Object.entries(MODEL_TO_KEY).map(([id, key]) => [modelFamily(id), key] as [string, string]),
-  ...Object.entries(FAMILY_KEYS),
-]);
-
-export function topLevelModel(id: string): string {
-  if (modelFamily(id) === SYNTHETIC) return 'Synthetic Shapes';
-  const key = MODEL_TO_KEY[id] ?? familyKeys.get(modelFamily(id));
-  return (key && DB_MODEL_TO_DISPLAY[key]) ?? modelFamily(id);
-}
-
-/** Versions of one architecture share a workload: their cases are largely the same shapes. */
+/**
+ * Versions of one architecture share a name, in the workload list and the model view alike:
+ * their cases are largely the same shapes.
+ */
 const VERSION_GROUPS: { match: RegExp; id: string; label: string }[] = [
   { match: /^DeepSeek-V4-Pro(?:-\d+)?$/u, id: 'DeepSeek-V4-Pro', label: 'DeepSeek-V4-Pro' },
   { match: /^GLM-5(?:\.\d+)?$/u, id: 'GLM-5', label: 'GLM-5.x' },
@@ -41,6 +32,16 @@ const VERSION_GROUPS: { match: RegExp; id: string; label: string }[] = [
   { match: /^gpt-oss-120b(?:-w-a)?$/u, id: 'gpt-oss-120b', label: 'gpt-oss-120b' },
   { match: /^Synthetic-Shapes$/u, id: SYNTHETIC, label: 'Synthetic Shapes' },
 ];
+
+const groupOf = (family: string) => VERSION_GROUPS.find((g) => g.match.test(family));
+
+/** Display name of a source checkpoint's model. */
+export function topLevelModel(id: string): string {
+  const group = groupOf(modelFamily(id));
+  if (group) return group.label;
+  const key = MODEL_TO_KEY[id] ?? familyKeys.get(modelFamily(id));
+  return (key && DB_MODEL_TO_DISPLAY[key]) ?? modelFamily(id);
+}
 
 const TESTLIST_LABELS: Record<string, string> = {
   gemm: 'InferenceX GEMM shapes',
@@ -55,10 +56,11 @@ export function workloadSources(
   if (checkpoints.length === 0)
     return [{ id: `${opType}:testlist:${testlist}`, label: TESTLIST_LABELS[testlist] ?? testlist }];
   const sources = new Map<string, WorkloadSource>();
-  for (const family of new Set(checkpoints.map(modelFamily))) {
-    const group = VERSION_GROUPS.find((g) => g.match.test(family));
-    const id = group?.id ?? family;
-    sources.set(id, { id: `${opType}:${id}`, label: group?.label ?? family });
+  for (const checkpoint of checkpoints) {
+    const family = modelFamily(checkpoint);
+    const id = groupOf(family)?.id ?? family;
+    if (!sources.has(id))
+      sources.set(id, { id: `${opType}:${id}`, label: topLevelModel(checkpoint) });
   }
   return [...sources.values()];
 }
