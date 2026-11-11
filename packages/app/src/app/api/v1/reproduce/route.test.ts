@@ -114,6 +114,39 @@ describe('GET /api/v1/reproduce', () => {
     expect(mockGetReproduceSource).toHaveBeenCalledWith('mock-sql', 447998);
   });
 
+  it('keeps stored TP and disagg: false for an aggregate point the chart rescales', async () => {
+    const aggRow: BenchmarkRow = {
+      ...disaggRow,
+      id: 447975,
+      framework: 'vllm',
+      disagg: false,
+      is_multinode: false,
+      prefill_tp: 4,
+      prefill_ep: 1,
+      prefill_dp_attention: false,
+      prefill_num_workers: 0,
+      decode_tp: 4,
+      decode_ep: 1,
+      decode_dp_attention: false,
+      decode_num_workers: 1,
+      num_prefill_gpu: 0,
+      num_decode_gpu: 8,
+      metrics: { ...disaggRow.metrics, pp: 2, decode_pp: 2 },
+    };
+    mockGetReproduceSource.mockResolvedValueOnce({ ...source, row: aggRow });
+    const response = await GET(req('/api/v1/reproduce?id=447975'));
+    const body = await response.json();
+
+    const chartPoint = transformBenchmarkRows([aggRow]).chartData[0]![0]!;
+    expect(chartPoint.tp).toBe(8);
+    expect(buildReproduceConfig(chartPoint)).toEqual(body.config);
+    expect(body.config).toMatchObject({
+      disagg: false,
+      physical_chips: 8,
+      topology: { tp: 4, ep: 1, pp: 2, dp_attention: false },
+    });
+  });
+
   it('returns 404 for an unknown result', async () => {
     mockGetReproduceSource.mockResolvedValueOnce(null);
     const response = await GET(req('/api/v1/reproduce?id=9'));

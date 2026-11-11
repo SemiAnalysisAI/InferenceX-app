@@ -1,8 +1,7 @@
 import type { AggDataEntry } from '@/components/inference/types';
 
 /** A transformed row, or a chart point built from one. */
-export type ReproduceConfigInput = Partial<AggDataEntry> &
-  Pick<AggDataEntry, 'conc' | 'date' | 'tp'>;
+export type ReproduceConfigInput = Partial<AggDataEntry> & Pick<AggDataEntry, 'conc' | 'date'>;
 
 export interface ReproduceRoleTopology {
   gpus?: number;
@@ -10,18 +9,18 @@ export interface ReproduceRoleTopology {
   tp?: number;
   ep?: number;
   pp?: number;
-  dp_attention?: boolean | string;
+  dp_attention?: boolean;
   dcp_size?: number;
   pcp_size?: number;
   dwdp_size?: number;
 }
 
 export interface ReproduceAggregateTopology {
-  tp: number;
+  tp?: number;
   ep?: number;
   pp?: number;
   dp?: number;
-  dp_attention?: boolean | string;
+  dp_attention?: boolean;
   dcp_size?: number;
   pcp_size?: number;
 }
@@ -58,10 +57,15 @@ export interface ReproduceConfig {
   run_url?: string;
 }
 
+// Chart points coerce stored "true"/"false" strings to booleans; do the same for raw rows.
+function storedFlag(value: boolean | string | null | undefined): boolean | undefined {
+  return value === null || value === undefined ? undefined : value === true || value === 'true';
+}
+
 /**
  * The drawer and `/api/v1/reproduce` both build the config from the same transformed
- * row, so the dashboard and API cannot disagree. A value the artifact never recorded
- * stays absent.
+ * row, so the dashboard and API cannot disagree. Chart points overwrite `tp` with the
+ * physical chip count and drop `disagg: false`, so only fields both keep are read.
  */
 export function buildReproduceConfig(d: ReproduceConfigInput): ReproduceConfig {
   const topology = d.disagg
@@ -72,7 +76,7 @@ export function buildReproduceConfig(d: ReproduceConfigInput): ReproduceConfig {
           tp: d.prefill_tp,
           ep: d.prefill_ep,
           pp: d.prefill_pp,
-          dp_attention: d.prefill_dp_attention,
+          dp_attention: storedFlag(d.prefill_dp_attention),
           dcp_size: d.prefill_dcp_size,
           pcp_size: d.prefill_pcp_size,
           dwdp_size: d.prefill_dwdp_size,
@@ -83,17 +87,17 @@ export function buildReproduceConfig(d: ReproduceConfigInput): ReproduceConfig {
           tp: d.decode_tp,
           ep: d.decode_ep,
           pp: d.decode_pp,
-          dp_attention: d.decode_dp_attention,
+          dp_attention: storedFlag(d.decode_dp_attention),
           dcp_size: d.decode_dcp_size,
           pcp_size: d.decode_pcp_size,
         },
       }
     : {
-        tp: d.tp,
-        ep: d.ep,
-        pp: d.pp,
+        tp: d.decode_tp,
+        ep: d.decode_ep,
+        pp: d.decode_pp,
         dp: d.dp,
-        dp_attention: d.dp_attention,
+        dp_attention: storedFlag(d.decode_dp_attention),
         dcp_size: d.decode_dcp_size,
         pcp_size: d.decode_pcp_size,
       };
@@ -109,8 +113,8 @@ export function buildReproduceConfig(d: ReproduceConfigInput): ReproduceConfig {
     isl: d.isl,
     osl: d.osl,
     conc: d.conc,
-    disagg: d.disagg,
-    is_multinode: d.is_multinode,
+    disagg: Boolean(d.disagg),
+    is_multinode: storedFlag(d.is_multinode),
     physical_chips: d.physicalChips,
     topology,
     offload_mode: d.offload_mode,
